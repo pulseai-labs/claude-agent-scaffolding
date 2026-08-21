@@ -1,0 +1,6 @@
+#!/bin/sh
+# Dispatcher probe: print deterministic stdout, stderr, and exit code.
+# Used by the bin/ PATH and dispatcher preservation probes.
+echo "probe-stdout-v1"
+echo "probe-stderr-v1" >&2
+exit 7

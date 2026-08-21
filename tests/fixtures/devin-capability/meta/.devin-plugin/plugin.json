@@ -1,0 +1,7 @@
+{
+  "name": "devin-capability-meta",
+  "version": "0.0.1",
+  "description": "Meta-plugin for Devin capability spike",
+  "requiredPlugins": ["../required-a", "../required-b"],
+  "optionalPlugins": ["../optional-c"]
+}

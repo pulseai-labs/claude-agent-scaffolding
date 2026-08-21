@@ -1,0 +1,6 @@
+{
+  "name": "required-a",
+  "version": "0.0.1",
+  "description": "Native manifest for required-a (precedence probe marker: native-wins)",
+  "skills": ["skills/", "alternate-skills/"]
+}
