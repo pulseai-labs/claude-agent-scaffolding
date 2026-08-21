@@ -106,8 +106,10 @@ Exit non-zero. Do NOT touch anything (no mkdirs, no manifest, no hook).
 ## 5. Detect canonical metadata
 
 Detect default branch + remote from the existing repo via the `wi`
-dispatcher (`workspace-init/bin/wi`, on `$PATH`; bash shebang forces a bash
-runtime even when the calling Bash tool subprocess is zsh). Per
+dispatcher (`workspace-init/bin/wi`; bash shebang forces a bash
+runtime even when the calling shell is zsh). On Claude Code, `wi` is on
+`$PATH` automatically; on Devin, invoke via `exec` with the full path
+(`<plugin-source>/bin/wi`). Per
 **SPEC §8.4** the fallback chain is robust to oddly-configured repos:
 
 - `detected_branch="$(wi git_detect_default_branch "$canonical_root")"`

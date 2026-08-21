@@ -26,10 +26,11 @@ auto-commits (SPEC §7.4).
 
 This skill delegates bookkeeping to bash modules under
 `workspace-init/lib/`. Those modules expose stable function names; this skill
-calls them via the `wi` dispatcher (`workspace-init/bin/wi`, on `$PATH`
-because Claude Code adds every plugin's `bin/` automatically). The dispatcher
-has a bash shebang so the libs always run under bash even when the calling
-Bash tool subprocess is zsh (Claude Code's default on macOS). Never `source`
+calls them via the `wi` dispatcher (`workspace-init/bin/wi`). On Claude Code,
+`wi` is on `$PATH` automatically (every plugin's `bin/` is added); on Devin,
+locate it at the plugin's source directory + `/bin/wi` and invoke via the
+`exec` tool with the full path. The dispatcher has a bash shebang so the libs
+always run under bash even when the calling shell is zsh. Never `source`
 the lib files directly from skill body — under zsh `${BASH_SOURCE[0]}` is
 unset and the libs crash. Always go through `wi`.
 
