@@ -94,9 +94,12 @@ mkdir -p \
   "$TEST_ROOT/project"
 
 # Minimal config that disables all cross-tool imports and auto-update.
+# skip_workspace_trust is required for non-interactive -p invocations from
+# the isolated project directory.
 cat > "$ISOLATED_CONFIG/devin/config.json" <<'CFG'
 {
   "auto_update": false,
+  "skip_workspace_trust": true,
   "read_config_from": {
     "cursor": false,
     "windsurf": false,
@@ -202,26 +205,38 @@ run_devin_capture() {
 }
 
 # run_devin_timeout <timeout_ms> <stdout_file> <stderr_file> <args...>
+# Runs from the isolated project directory to satisfy workspace trust.
+# Uses the isolated environment (HOME, XDG, PATH) via env -i.
 run_devin_timeout() {
   local timeout_ms="$1"
   local stdout_file="$2"
   local stderr_file="$3"
   shift 3
-  "$NODE_BIN" - \
+  env -i \
+    HOME="$ISOLATED_HOME" \
+    XDG_CONFIG_HOME="$ISOLATED_CONFIG" \
+    XDG_DATA_HOME="$ISOLATED_DATA" \
+    XDG_CACHE_HOME="$ISOLATED_CACHE" \
+    PATH="$SAFE_PATH" \
+    NO_COLOR=1 \
+    TERM=dumb \
+    DEVIN_AUTO_UPDATE=0 \
+    "$NODE_BIN" - \
     "$DEVIN_BIN" \
     "$timeout_ms" \
     "$stdout_file" \
     "$stderr_file" \
+    "$TEST_ROOT/project" \
     "$@" <<'NODE'
 const fs = require("node:fs");
 const { spawnSync } = require("node:child_process");
-const [binary, timeout, stdoutFile, stderrFile, ...args] = process.argv.slice(2);
+const [binary, timeout, stdoutFile, stderrFile, cwd, ...args] = process.argv.slice(2);
 const stdout = fs.openSync(stdoutFile, "w");
 const stderr = fs.openSync(stderrFile, "w");
 let result;
 try {
   result = spawnSync(binary, args, {
-    cwd: process.cwd(),
+    cwd,
     env: process.env,
     timeout: Number(timeout),
     killSignal: "SIGKILL",
