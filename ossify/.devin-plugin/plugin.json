@@ -1,0 +1,5 @@
+{
+  "name": "ossify",
+  "version": "0.5.0",
+  "description": "Experimental skeleton-first lifecycle from Release 0 through MVP and v1. Six entry skills plus implementer worker. Opt-in only; not in the baseline install."
+}
