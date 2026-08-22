@@ -29,10 +29,10 @@ You read up to four sources in this exact order. Each is optional except shipped
 
 **Source 1 — Shipped defaults** (`shipped`)
 
-The plugin ships `templates/principles.md`. It always exists. Locate it using `$CLAUDE_PLUGIN_ROOT`:
+The plugin ships `templates/principles.md`. It always exists. Locate it relative to the plugin root:
 
 ```bash
-SHIPPED_PATH="${CLAUDE_PLUGIN_ROOT}/templates/principles.md"
+SHIPPED_PATH="$PLUGIN_ROOT/templates/principles.md"
 ```
 
 Contains two load-bearing defaults: the **Ghost Notes principle** (what is absent is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy). Both render under `## Shipped defaults`.

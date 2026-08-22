@@ -9,6 +9,8 @@ You have been invoked because the user wants to know whether architect-critic's 
 
 This skill is **advisory and fail-soft**: it reports readiness and how to fix gaps. It NEVER blocks, and it NEVER installs or logs in on the user's behalf — install/login actions stay explicit and user-approved.
 
+**Devin host policy.** On Devin (`HOST_AGENT=devin`), architect-critic runs **host-only audits** with no external adversary. There is no Codex companion, no fresh-frame backend, and no `--async` support. The readiness probe is a no-op: report immediately — *"Devin host-only audit: no external adversary required. Devin runs self-audit only."* — and skip the Codex/claude binary checks, the companion probe, and the async defaults. Do not prescribe Codex installation on Devin; the host-only policy is by design, not a gap to fix.
+
 ---
 
 ## Step 1: Run the readiness probe

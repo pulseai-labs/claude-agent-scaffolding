@@ -77,7 +77,7 @@ USER_PRINCIPLES="$(arc principles_user_path)"
 If this file does not exist, create it by copying the shipped-defaults header from the plugin template:
 
 ```bash
-PLUGIN_TEMPLATE="${CLAUDE_PLUGIN_ROOT}/templates/principles.md"
+PLUGIN_TEMPLATE="$PLUGIN_ROOT/templates/principles.md"
 mkdir -p "$(dirname "$USER_PRINCIPLES")"
 cp "$PLUGIN_TEMPLATE" "$USER_PRINCIPLES"
 ```
@@ -173,7 +173,7 @@ Example formatted entry:
 
 ## Step 6: Record in state.json
 
-Initialize state via the `arc` dispatcher (`architect-critic/bin/arc`, on `$PATH` because Claude Code adds each plugin's `bin/` automatically; the dispatcher's bash shebang forces a bash runtime for the lib regardless of the caller shell, fixing the BASH_SOURCE crash that bare `source` triggers under zsh):
+Initialize state via the `arc` dispatcher (`architect-critic/bin/arc`; on Claude Code `arc` is on `$PATH` automatically, on Devin invoke via `exec` with the full path `<plugin-source>/bin/arc`; the dispatcher's bash shebang forces a bash runtime for the lib regardless of the caller shell, fixing the BASH_SOURCE crash that bare `source` triggers under zsh):
 
 ```bash
 arc state_init

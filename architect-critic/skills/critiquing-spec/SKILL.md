@@ -61,12 +61,12 @@ Once you have a path: `Read` the artifact end-to-end. Hold its contents in your 
 
 Principles are the lens you audit through. Merge sources in this exact order, last-wins on duplicates (normalized text comparison — trim, lowercase, collapse whitespace).
 
-1. **Shipped defaults** — `${CLAUDE_PLUGIN_ROOT}/templates/principles.md`. Always loaded. Contains the **Ghost Notes principle** (what is absent from the spec is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy as the tone for every challenge raised).
+1. **Shipped defaults** — `templates/principles.md` (relative to the plugin root). Always loaded. Contains the **Ghost Notes principle** (what is absent from the spec is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy as the tone for every challenge raised).
 2. **User-global** — the user's promoted principles across all projects, at the path `arc principles_user_path` resolves (`~/.claude/architect-critic/principles.md`, under `$HOME` — unlike `arc state_path`, this one does not consult `CLAUDE_PLUGIN_DATA`).
 3. **Project-scoped** — `<repo>/.claude/architect-critic/principles.md` if it exists. Project-specific principles override user-global on conflict.
 4. **Memory-bank patterns** — included only when `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` points at a readable file; every `- ` bullet in it becomes a principle. `arc principles_merge` handles all four sources; it is authoritative for resolution order.
 
-Run the `arc` dispatcher to do the file merge (the dispatcher is on `$PATH` because Claude Code adds each plugin's `bin/` automatically; its bash shebang forces a bash runtime for the lib regardless of the calling shell — required because Claude Code's Bash tool runs zsh by default on macOS and bare `source` of these libs crashes with `BASH_SOURCE[0]: parameter not set`):
+Run the `arc` dispatcher to do the file merge (on Claude Code, `arc` is on `$PATH` automatically; on Devin, invoke via `exec` with the full path `<plugin-source>/bin/arc`; its bash shebang forces a bash runtime for the lib regardless of the calling shell — required because bare `source` of these libs crashes with `BASH_SOURCE[0]: parameter not set` under zsh):
 ```bash
 arc principles_merge
 ```
@@ -96,7 +96,7 @@ Skip CORE and your challenges get dismissed defensively even when they're correc
 
 You need four values: `HOST_AGENT`, `codex_available`, `claude_available`, and `close_depth`.
 
-**HOST_AGENT detection:** If this skill is being read by Codex (for example, Codex plugin context, `CODEX_HOME` is present, or the active tool/runtime is Codex), set `HOST_AGENT=codex`. Otherwise set `HOST_AGENT=claude`. Do not ask the user; infer it from the running agent context.
+**HOST_AGENT detection:** If this skill is being read by Codex (for example, Codex plugin context, `CODEX_HOME` is present, or the active tool/runtime is Codex), set `HOST_AGENT=codex`. If this skill is being read by Devin (Devin plugin context, `DEVIN_HOME` is present, or the active tool/runtime is Devin CLI), set `HOST_AGENT=devin`. Otherwise set `HOST_AGENT=claude`. Do not ask the user; infer it from the running agent context.
 
 **Codex availability:** Run `command -v codex` in a Bash tool call. Capture the return code. If the binary resolves, also capture `codex --version` for the status message in Step 4.
 
@@ -109,7 +109,7 @@ You need four values: `HOST_AGENT`, `codex_available`, `claude_available`, and `
 
 Otherwise `close_depth = false` (shallow = claude-only audit, the default).
 
-**Async detection (#39).** Set `async_mode = true` if `--async` is present in `$ARCHITECT_CRITIC_ARGS`. Async is only meaningful for a **close-depth** audit with `HOST_AGENT=claude` (the Codex companion is the only proven background backend; Codex-host keeps the synchronous path). If `--async` is set but `close_depth=false` or `HOST_AGENT=codex`, ignore it and run synchronously, telling the user why. When `async_mode=true` and applicable, Step 6 takes the **defer-to-resume** path (dispatch now, resume later) instead of the inline invocation.
+**Async detection (#39).** Set `async_mode = true` if `--async` is present in `$ARCHITECT_CRITIC_ARGS`. Async is only meaningful for a **close-depth** audit with `HOST_AGENT=claude` (the Codex companion is the only proven background backend; Codex-host keeps the synchronous path). If `--async` is set but `close_depth=false` or `HOST_AGENT=codex`, ignore it and run synchronously, telling the user why. When `async_mode=true` and applicable, Step 6 takes the **defer-to-resume** path (dispatch now, resume later) instead of the inline invocation. **`HOST_AGENT=devin` hard-refuses `--async`:** Devin has no external adversary backend and no background job infrastructure for architect-critic. If `--async` is present and `HOST_AGENT=devin`, do NOT enter the foreground critique path either — refuse immediately with a clear message: *"`--async` is not supported on Devin. Devin runs host-only audits with no external adversary. Run `/critique` without `--async`."* Do not append to `external_runs[]`, do not dispatch any job, and do not mutate state.
 
 **Neutral mode (#93).** Set `neutral_mode = true` if `--neutral` is present in `$ARCHITECT_CRITIC_ARGS`, or the user's natural-language invocation matched *"no recommendations"* / *"just list the challenges"* / *"don't recommend"*. When `neutral_mode=true`, Step 8 omits the per-challenge **recommended disposition** and presents challenges neutrally (the pre-#93 behavior). Default is `false` — recommend by default. Opt-out is per-invocation, not sticky.
 
@@ -123,6 +123,10 @@ The close-depth adversary is host-aware:
 | claude     | false       | codex_available | claude-self-audit only |
 | codex      | true        | claude_available | codex-self-audit + claude fresh-frame |
 | codex      | false       | claude_available | codex-self-audit only |
+| devin      | true        | n/a              | devin-self-audit only (host-only, no external adversary) |
+| devin      | false       | n/a              | devin-self-audit only (host-only, no external adversary) |
+
+On `HOST_AGENT=devin`, `close_depth` does not change the audit shape — Devin always runs host-only self-audit with `adversaries_used=["devin"]`. No `external_runs[]` append occurs. The `--close` flag is accepted but does not dispatch an external adversary; it simply runs the same host-only audit at close-depth rigor.
 
 ---
 
@@ -150,6 +154,7 @@ Pick the matching message and emit it as a normal turn message (not a tool call 
 - **HOST_AGENT=codex && claude_available && close_depth →** *"Claude Code detected; will run fresh-frame audit (~60s)"* (substitute the real version string from `claude --version`).
 - **HOST_AGENT=codex && !claude_available →** *"Claude Code not detected; running codex-self-audit only. Install Claude Code CLI for adversarial fresh-frame."*
 - **HOST_AGENT=codex && claude_available && !close_depth →** *"Claude Code available but depth=shallow; running codex-self-audit only. Use --close for fresh-frame."*
+- **HOST_AGENT=devin →** *"Devin host-only audit: no external adversary. Running devin-self-audit."* (regardless of close_depth — Devin has no fresh-frame backend)
 
 Do not phrase this as a tool-progress message ("Running detection..."). Phrase it as a status declaration the user can act on — they may want to abort and re-run with `--close`, or stop to install codex first.
 
@@ -280,7 +285,7 @@ Then invoke Claude Code via the shell with this pattern, using the same `ADVERSA
 ```bash
 claude --print \
   --output-format json \
-  --json-schema "$(cat "${CLAUDE_PLUGIN_ROOT}/templates/output-schema.json")" \
+  --json-schema "$(cat "$PLUGIN_ROOT/templates/output-schema.json")" \
   --permission-mode dontAsk \
   --no-session-persistence \
   "$ADVERSARIAL_PROMPT"
@@ -348,7 +353,7 @@ Final list: 3 challenges, one cross-confirmed at premise level (surface first in
 This step is the heart of the user experience. It is also the bug #4 fix: **never use bash `read` to capture user input here.** Bash `read` blocks on stdin, which doesn't exist in non-TTY Claude Code sessions (subagent, hooks, headless), and the rebuttal cycle silently skips. Use Claude's native turn handling instead — you ask, the user replies in the next turn, you process.
 
 **Recommend-by-default (#93).** Per the recommendation policy
-(`${CLAUDE_PLUGIN_ROOT}/templates/recommendation-policy.md`), each challenge you surface
+(`templates/recommendation-policy.md`, relative to the plugin root), each challenge you surface
 carries **one recommended disposition** — your honest, CORE-toned lean on how the
 user should dispose of it (`accept`, `rebut`, or `defer`) plus a one-line
 rationale, grounded in the artifact (Step 1) and principles (Step 2) and cited
@@ -359,7 +364,7 @@ doesn't ground it, say *"(general best practice)"*. When `neutral_mode=true`
 (Step 3, `--neutral`), omit the recommended-disposition line and present each
 challenge neutrally.
 
-**Step 8.0 — Triage (disposition triage, pulse360#15).** Skip this step when `walk_mode=true` or `neutral_mode=true` — then every challenge is walked below. Otherwise, before walking anything, initialize `AUTO_APPLIED_COUNT=0`, `ESCALATED_COUNT=0`, `DEFERRED_CHALLENGES_JSON=[]`, and `DEFERRED_COUNT=0`, then classify every challenge in the consolidated list against the escalation predicate in the policy's *Disposition triage* section (`${CLAUDE_PLUGIN_ROOT}/templates/recommendation-policy.md`): UNGROUNDED / VISION/SCOPE-TOUCHING / ONE-WAY DOOR / TOP SEVERITY (`premise` is this surface's top class) / CONTESTED (recommended disposition is `rebut`, or the two adversaries disagree on the finding).
+**Step 8.0 — Triage (disposition triage, pulse360#15).** Skip this step when `walk_mode=true` or `neutral_mode=true` — then every challenge is walked below. Otherwise, before walking anything, initialize `AUTO_APPLIED_COUNT=0`, `ESCALATED_COUNT=0`, `DEFERRED_CHALLENGES_JSON=[]`, and `DEFERRED_COUNT=0`, then classify every challenge in the consolidated list against the escalation predicate in the policy's *Disposition triage* section (`templates/recommendation-policy.md`, relative to the plugin root): UNGROUNDED / VISION/SCOPE-TOUCHING / ONE-WAY DOOR / TOP SEVERITY (`premise` is this surface's top class) / CONTESTED (recommended disposition is `rebut`, or the two adversaries disagree on the finding).
 
 - **Clears the predicate** → apply the recommended disposition now, incrementing `AUTO_APPLIED_COUNT`: `accept` → mark as concession; `defer` → append `{index,text,severity,rationale}` to `DEFERRED_CHALLENGES_JSON` and increment `DEFERRED_COUNT`.
 - **Trips the predicate** → add to the escalated list, incrementing `ESCALATED_COUNT`.
