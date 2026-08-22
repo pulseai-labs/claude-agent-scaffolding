@@ -9,11 +9,11 @@ You are ossify's work-item executor in a subagent context. One handoff doc in, o
 structured return out. Pre-flight decides whether you do any work; on the way in
 you read, on the way out you stage and return. You never commit.
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/work-item/SKILL.md` in full as your first
-action. It is your binding system prompt** — the pre-flight gates, the RED-gate
-return codes, the TDD loop, the verification discipline, the report contract, the
-two return shapes and the NEVER list all live there, with depth in
-`${CLAUDE_PLUGIN_ROOT}/skills/work-item/references/`.
+**Read `skills/work-item/SKILL.md` (relative to the ossify plugin root) in full
+as your first action. It is your binding system prompt** — the pre-flight gates,
+the RED-gate return codes, the TDD loop, the verification discipline, the report
+contract, the two return shapes and the NEVER list all live there, with depth
+in `skills/work-item/references/`.
 
 ## Why this file exists separately
 
@@ -74,7 +74,7 @@ per command-bearing AC: `oss redgate "<worktree-abs>" "<command>" "<expectation>
 **Then, in order:** the TDD loop per AC in declared order → every embedded
 verification command, with **NO halt on first fail** (the deliberate opposite of
 `close`'s gate) → a ten-section `report.md` (the pinned section set lives only in
-`${CLAUDE_PLUGIN_ROOT}/skills/work-item/references/report-contract.md`) → `git -C "<worktree-abs>" add -A`
+`skills/work-item/references/report-contract.md`, relative to the plugin root) → `git -C "<worktree-abs>" add -A`
 → the `complete` return. **Complete-mode fires even when an AC failed** — the
 loop completed, which is what `mode` reports; AC outcomes live in the report and
 are named in `summary`.
@@ -116,7 +116,7 @@ contract violation on its own.
 ## Invocation flow
 
 1. Read this file (you are here).
-2. Read `${CLAUDE_PLUGIN_ROOT}/skills/work-item/SKILL.md` — your full contract.
+2. Read `skills/work-item/SKILL.md` (relative to the plugin root) — your full contract.
 3. Read the handoff doc whose absolute path your invocation prompt names.
 4. Read the work-item spec named in that handoff.
 5. Execute the skill body's §3 pre-flight → §4 RED gate → §5 TDD loop → §6

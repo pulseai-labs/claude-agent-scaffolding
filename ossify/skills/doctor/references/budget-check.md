@@ -36,13 +36,15 @@ fail silently:
   to be the scaffolding checkout. Everywhere else it is a "No such file" that
   takes both budgets down with it.
 - **`${CLAUDE_PLUGIN_ROOT}`** is *not exported into Bash-tool subprocesses*
-  (anthropics/claude-code#48230 — `scaffold-onboard/bin/sf` documents the same
-  behaviour and self-locates for exactly this reason). It expands to the empty
-  string, so the path becomes `/tests/...` — which fails identically to the
-  repo-relative form while looking like it was fixed.
+  on Claude Code (anthropics/claude-code#48230 — `scaffold-onboard/bin/sf`
+  documents the same behaviour and self-locates for exactly this reason). It
+  expands to the empty string, so the path becomes `/tests/...` — which fails
+  identically to the repo-relative form while looking like it was fixed.
 
-`oss` is on `$PATH` because Claude Code adds each plugin's `bin/` automatically,
-and `command -v` finds it in the subprocess where the env var does not survive.
+`oss` is on `$PATH` on Claude Code (which adds each plugin's `bin/`
+automatically), and `command -v` finds it in the subprocess where the env var
+does not survive. On Devin, `bin/` is NOT on `$PATH` — resolve the plugin root
+from `devin plugins info ossify` and invoke `oss` via `exec` with the full path.
 Resolving from there also measures the **installed** plugin, which is the thing
 the budget is actually about.
 
