@@ -14,7 +14,7 @@
 # Pinned to devin 3000.4.25.  A different version is a re-baseline, not a pass.
 set -euo pipefail
 
-EXPECTED_DEVIN_VERSION="3000.4.25"
+EXPECTED_DEVIN_VERSION="3000.5.20"
 COMMAND_TIMEOUT_MS=60000
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"

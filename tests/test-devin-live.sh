@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-EXPECTED_DEVIN_VERSION="3000.4.25"
+EXPECTED_DEVIN_VERSION="3000.5.20"
 COMMAND_TIMEOUT_SECS=60
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
