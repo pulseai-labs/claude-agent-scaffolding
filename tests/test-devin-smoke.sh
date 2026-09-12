@@ -24,7 +24,8 @@ if [ -z "$NODE_BIN" ]; then
 fi
 
 DEVIN_VERSION="$("$DEVIN_BIN" version 2>/dev/null | head -1 || true)"
-if printf '%s' "$DEVIN_VERSION" | grep -qv "$EXPECTED_DEVIN_VERSION"; then
+DEVIN_VERSION_NUM="$(printf '%s' "$DEVIN_VERSION" | awk '{print $2}')"
+if [ "$DEVIN_VERSION_NUM" != "$EXPECTED_DEVIN_VERSION" ]; then
   printf 'FAIL: expected devin %s, got "%s"\n' "$EXPECTED_DEVIN_VERSION" "$DEVIN_VERSION" >&2
   exit 1
 fi
@@ -65,7 +66,9 @@ CFG
 cp "$REAL_CREDENTIALS" "$ISOLATED_DATA/devin/credentials.toml"
 chmod 600 "$ISOLATED_DATA/devin/credentials.toml"
 
-SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:/usr/local/bin:/usr/bin:/bin"
+GIT_BIN_DIR="$(dirname "$(command -v git 2>/dev/null || echo /usr/bin/git)")"
+JQ_BIN_DIR="$(dirname "$(command -v jq 2>/dev/null || echo /usr/bin/jq)")"
+SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:${GIT_BIN_DIR}:${JQ_BIN_DIR}:/usr/local/bin:/usr/bin:/bin"
 
 PASS=0
 FAIL=0
@@ -76,9 +79,11 @@ fail() { FAIL=$((FAIL + 1)); printf '  not ok  %s\n' "$1"; EVIDENCE="${EVIDENCE}
 evidence() { EVIDENCE="${EVIDENCE}EVIDENCE: $1\n"; }
 
 cleanup() {
+  local rc=$?
   rm -rf "$TEST_ROOT"
   printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
   if [ "$FAIL" -gt 0 ]; then exit 1; fi
+  exit $rc
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -103,12 +108,39 @@ run_devin plugins install --local -y "$ROOT/architect-critic" >/dev/null 2>&1
 run_devin plugins install --local -y "$ROOT/ossify" >/dev/null 2>&1
 run_devin plugins install --local -y "$ROOT/code-judo" >/dev/null 2>&1
 
-# For locally-installed plugins, the source IS the local worktree path
+# For locally-installed plugins, the source IS the local worktree path.
+# Cross-check each against what the loader actually reports — the probes below
+# read files at these paths, so they must be the paths Devin installed from.
 WI_SOURCE="$ROOT/workspace-init"
 AIM_SOURCE="$ROOT/ai-mentor"
 ARC_SOURCE="$ROOT/architect-critic"
 OSS_SOURCE="$ROOT/ossify"
 JUDO_SOURCE="$ROOT/code-judo"
+
+printf 'Install check: plugins info source + skills registered with loader\n'
+for entry in \
+  "workspace-init:$WI_SOURCE" \
+  "ai-mentor:$AIM_SOURCE" \
+  "architect-critic:$ARC_SOURCE" \
+  "ossify:$OSS_SOURCE" \
+  "code-judo:$JUDO_SOURCE"
+do
+  plugin="${entry%%:*}"
+  expected_src="${entry#*:}"
+  info="$(run_devin plugins info "$plugin" 2>&1)"
+  reported_src="$(printf '%s' "$info" | awk '/source:/ {print $NF; exit}')"
+  if [ "$reported_src" = "$expected_src" ]; then
+    pass "plugins info source for $plugin matches probe path"
+  else
+    fail "plugins info source for $plugin is '$reported_src', expected '$expected_src'"
+  fi
+  # Loader-level: at least one namespaced skill registered (not just files on disk)
+  if printf '%s' "$info" | grep -q "/${plugin}:"; then
+    pass "$plugin skills registered with Devin loader"
+  else
+    fail "$plugin shows no namespaced skills in plugins info"
+  fi
+done
 
 evidence "Devin version: $DEVIN_VERSION"
 evidence "workspace-init source: $WI_SOURCE"
@@ -126,13 +158,15 @@ if [ -n "$WI_SOURCE" ] && [ -x "$WI_SOURCE/bin/wi" ]; then
   pass "wi dispatcher found at installed source: $WI_SOURCE/bin/wi"
   evidence "wi dispatcher path: $WI_SOURCE/bin/wi"
 
-  # Run wi help to prove the dispatcher works
-  wi_help="$("$WI_SOURCE/bin/wi" help 2>&1)" || true
-  if printf '%s' "$wi_help" | grep -qi 'workspace.init\|wi '; then
-    pass "wi help runs from installed path"
-    evidence "wi help output (first line): $(printf '%s' "$wi_help" | head -1)"
+  # Run wi --list to prove the dispatcher works — `wi help` is NOT a function;
+  # the dispatcher prints "Unknown function: wi_help" (bin/wi exits 2) and
+  # that error text itself contains "wi ", so grepping it proves nothing.
+  wi_list="$("$WI_SOURCE/bin/wi" --list 2>&1)" && wi_rc=0 || wi_rc=$?
+  if [ "$wi_rc" = "0" ] && printf '%s' "$wi_list" | grep -q 'git_init'; then
+    pass "wi --list runs from installed path"
+    evidence "wi --list output (first line): $(printf '%s' "$wi_list" | head -1)"
   else
-    fail "wi help failed from installed path"
+    fail "wi --list failed from installed path (rc=$wi_rc)"
   fi
 
   # Verify rules/dispatcher-path.md exists
@@ -242,11 +276,24 @@ if [ -n "$ARC_SOURCE" ] && [ -x "$ARC_SOURCE/bin/arc" ]; then
   AC_STATE_DIR="$ISOLATED_HOME/.claude/architect-critic"
   mkdir -p "$AC_STATE_DIR"
 
+  # Fake external-adversary binaries: if any arc path below shells out to
+  # codex/claude it writes a sentinel we can detect. They sit first on PATH
+  # for the arc invocations only.
+  FAKE_BIN_DIR="$TEST_ROOT/fake-bin"
+  mkdir -p "$FAKE_BIN_DIR"
+  for fake in codex claude; do
+    cat > "$FAKE_BIN_DIR/$fake" <<EOF
+#!/bin/sh
+touch "$TEST_ROOT/fake-${fake}-invoked"
+EOF
+    chmod +x "$FAKE_BIN_DIR/$fake"
+  done
+
   # Initialize state first (state_append_run requires an existing state.json)
-  HOME="$ISOLATED_HOME" "$ARC_SOURCE/bin/arc" state_init 2>/dev/null || true
+  env HOME="$ISOLATED_HOME" PATH="$FAKE_BIN_DIR:$PATH" "$ARC_SOURCE/bin/arc" state_init 2>/dev/null || true
 
   # Run state_append_run through the dispatcher with isolated HOME
-  HOME="$ISOLATED_HOME" "$ARC_SOURCE/bin/arc" state_append_run \
+  env HOME="$ISOLATED_HOME" PATH="$FAKE_BIN_DIR:$PATH" "$ARC_SOURCE/bin/arc" state_append_run \
     --request-id "SMOKE-R1" \
     --depth "shallow" \
     --adversaries '["devin"]' \
@@ -291,8 +338,9 @@ if [ -n "$ARC_SOURCE" ] && [ -x "$ARC_SOURCE/bin/arc" ]; then
     fail "state.json not created"
   fi
 
-  # Verify no fake codex/claude sentinels were invoked
-  # (We check that no codex/claude binary was called by looking at the state)
+  # Verify no fake codex/claude sentinel was touched by the arc calls above —
+  # the fakes were first on PATH for both invocations, so any shell-out to an
+  # external adversary binary would have created its sentinel file.
   if [ ! -f "$TEST_ROOT/fake-codex-invoked" ] && [ ! -f "$TEST_ROOT/fake-claude-invoked" ]; then
     pass "no external adversary binary invoked"
   else
@@ -437,8 +485,10 @@ if [ -n "$JUDO_SOURCE" ]; then
     fi
   done
 
-  # No CLAUDE_PLUGIN_ROOT tokens in skill bodies — Devin never expands it
-  judo_token_hits="$(grep -rl 'CLAUDE_PLUGIN_ROOT' "$JUDO_SOURCE/skills/" 2>/dev/null | wc -l | tr -d ' ')"
+  # No CLAUDE_PLUGIN_ROOT tokens in skill bodies — Devin never expands it.
+  # Guarded: grep -rl exits 1 on the clean (zero-match) state, which would
+  # abort this script under pipefail mid-pipeline.
+  judo_token_hits="$(grep -rl 'CLAUDE_PLUGIN_ROOT' "$JUDO_SOURCE/skills/" 2>/dev/null | wc -l | tr -d ' ' || true)"
   if [ "$judo_token_hits" = "0" ]; then
     pass "no CLAUDE_PLUGIN_ROOT in code-judo skill bodies"
   else

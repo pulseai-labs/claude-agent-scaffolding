@@ -76,7 +76,8 @@ if [[ -f "$ROOT_MANIFEST" ]]; then
   assert_jq_str '.version' "0.1.0" "$ROOT_MANIFEST" \
     "root manifest version is 0.1.0"
 
-  # Required set is exactly the baseline three.
+  # Required set is exactly the five baseline plugins — membership, count,
+  # and the dep URLs are all pinned.
   # Dependency entries can be strings or objects with path/subdir/repo fields.
   for plugin in $BASELINE_PLUGINS; do
     if jq -e --arg p "$plugin" \
@@ -88,7 +89,24 @@ if [[ -f "$ROOT_MANIFEST" ]]; then
     fi
   done
 
-  # Required set must NOT include ossify or excluded plugins
+  baseline_count="$(printf '%s' "$BASELINE_PLUGINS" | wc -w | tr -d ' ')"
+  assert_jq ".requiredPlugins | length == $baseline_count" "$ROOT_MANIFEST" \
+    "root requiredPlugins count equals the baseline set size"
+
+  # Every required dep must point at this repository — a wrong-org or typo'd
+  # URL is invisible to the hermetic live gate (it rewrites urls to file://).
+  # Strict `.url ==`: a git-subdir entry with no url must fail, not default-pass.
+  for plugin in $BASELINE_PLUGINS; do
+    if jq -e --arg p "$plugin" --arg url "$GITHUB_REPO" \
+      '.requiredPlugins[] | select(.path == $p or .subdir == $p or . == $p) | .url == $url' \
+      "$ROOT_MANIFEST" >/dev/null 2>&1; then
+      pass "requiredPlugins[$plugin].url is $GITHUB_REPO"
+    else
+      fail "requiredPlugins[$plugin] is missing or points off $GITHUB_REPO"
+    fi
+  done
+
+  # Required set must NOT include experimental or excluded plugins
   for plugin in $EXPERIMENTAL_PLUGINS $EXCLUDED_PLUGINS; do
     if jq -e --arg p "$plugin" \
       '.requiredPlugins[] | select(. == $p or .path == $p or .subdir == $p or .repo == $p or .source == $p)' \
@@ -154,9 +172,15 @@ for plugin in $ALL_TARGET_PLUGINS; do
   if [[ "$skills_val" == "null" ]]; then
     pass "$plugin native manifest has no skills override (default skills/)"
   else
-    # Check that skills paths don't reference outside the plugin root
-    if jq -e '.skills | if type == "array" then .[] else . end | test("^\\.\\./")' \
-      "$manifest" >/dev/null 2>&1; then
+    # Check that skills paths don't reference outside the plugin root.
+    # any() aggregation is load-bearing: bare `jq -e .skills[] | test` judges
+    # only the LAST element, so an escape in an earlier slot was masked.
+    # An entry fails if it is not a string, contains a `..` segment anywhere,
+    # or is absolute.
+    if jq -e '
+      (.skills | if type == "array" then . else [.] end) as $s
+      | any($s[]; (type != "string") or test("(^|/)\\.\\.(/|$)") or test("^/"))
+    ' "$manifest" >/dev/null 2>&1; then
       fail "$plugin native skills path escapes plugin root"
     else
       pass "$plugin native skills path stays within plugin root"
@@ -290,18 +314,23 @@ done
 
 assert_doc_contains "3000.10.21" "INSTALL.md pins the supported Devin floor"
 assert_doc_contains "Devin Desktop" "INSTALL.md states CLI/Desktop support boundary"
-assert_doc_contains "cloud" "INSTALL.md states cloud-session limitation"
+assert_doc_contains "cloud sessions is not part of this contract" "INSTALL.md states cloud-session limitation"
 assert_doc_contains "/.claude/architect-critic" "INSTALL.md documents shared critic state path"
-assert_doc_contains "host" "INSTALL.md states architect-critic is host-only under Devin"
-assert_doc_contains "async" "INSTALL.md states async critique is unsupported under Devin"
+assert_doc_contains "host-only" "INSTALL.md states architect-critic is host-only under Devin"
+assert_doc_contains "async request is refused" "INSTALL.md states async critique is refused under Devin"
 assert_doc_contains "<plugin>:<skill>" "INSTALL.md documents namespaced skill invocation"
-assert_doc_contains "beta" "INSTALL.md carries the plugins-beta caveat"
+assert_doc_contains "in beta" "INSTALL.md carries the plugins-beta caveat"
 assert_doc_contains "requiredPlugins" "INSTALL.md documents meta-plugin auto-install"
 
 # Ossify is baseline (amended): the doc must NOT relegate it to opt-in.
+# Line-scoped co-occurrence, minus legitimate uses: the manifest field name,
+# the plugins-info column list, and explicit negations.
 if [[ ! -f "$INSTALL_DOC" ]]; then
   fail "INSTALL.md does not describe ossify as optional/opt-in (doc absent — unverifiable)"
-elif grep -qiE 'ossify.{0,40}(optional|opt-in)|(optional|opt-in).{0,40}ossify' "$INSTALL_DOC"; then
+elif grep -Ei 'ossify' "$INSTALL_DOC" \
+      | grep -Ei 'optional|opt-in' \
+      | grep -vEi 'required/optional|optionalPlugins|no optional|not optional' \
+      | grep -q .; then
   fail "INSTALL.md must not describe ossify as optional/opt-in (it is baseline)"
 else
   pass "INSTALL.md does not describe ossify as optional/opt-in"

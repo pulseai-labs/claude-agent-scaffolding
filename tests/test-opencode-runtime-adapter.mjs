@@ -1019,14 +1019,35 @@ test("Ossify selection registers the translated canonical implementer agent", as
     [join(ossifyRoot, "**")]: "allow",
   };
 
-  assert.equal(agent.description, frontmatter.description);
+  // The description goes through translatePrompt like the prompt — assert the
+  // translated form directly: plugin-root-relative refs absolutized, no bare
+  // relative ref left, no canonical token.
+  assert.ok(
+    agent.description.includes(`\`${ossifyRoot}/skills/work-item/SKILL.md\``),
+  );
+  assert.ok(
+    !/`(?:skills|references|templates|lib|agents|bin)\/(?!\*)/.test(
+      agent.description,
+    ),
+  );
+  assert.ok(!agent.description.includes("CLAUDE_PLUGIN_ROOT"));
   assert.equal(agent.mode, "subagent");
   assert.ok(!Object.hasOwn(agent, "model"));
-  assert.equal(
-    agent.prompt,
-    body
-      .replaceAll("${CLAUDE_PLUGIN_ROOT}", ossifyRoot)
-      .replaceAll("`skills/", `\`${ossifyRoot}/skills/`),
+  // Independent pins (not a re-derived expected string): every backticked
+  // plugin-root-relative ref in the installed prompt must be absolutized, none
+  // may remain relative, and the canonical token must be gone.
+  assert.ok(
+    agent.prompt.includes(`\`${ossifyRoot}/skills/work-item/SKILL.md\``),
+  );
+  assert.ok(
+    agent.prompt.includes(
+      `\`${ossifyRoot}/skills/work-item/references/report-contract.md\``,
+    ),
+  );
+  assert.ok(
+    !/`(?:skills|references|templates|lib|agents|bin)\/(?!\*)/.test(
+      agent.prompt,
+    ),
   );
   assert.ok(!agent.prompt.includes("CLAUDE_PLUGIN_ROOT"));
   assert.ok(
@@ -1181,6 +1202,35 @@ test("prompt translation resolves package placeholders in either shell form", as
       "/opt/plugins/ai-mentor/templates/default.md\n" +
       "/var/data/ai-mentor/cache.json",
   );
+});
+
+test("prompt translation absolutizes existing plugin-relative refs", async () => {
+  const { translatePrompt } = await import(translateUrl);
+  const ossifyRoot = fileURLToPath(new URL("ossify", root)).replace(/\/$/, "");
+
+  const translated = translatePrompt(
+    "Read `skills/work-item/SKILL.md` first.\n" +
+      "Then `skills/work-item/references/report-contract.md`.\n" +
+      "A missing ref `skills/no-such-dir/SKILL.md` stays relative.\n" +
+      "So does a descriptive glob `agents/*.md`.\n" +
+      "And a non-plugin path `docs/something.md`.",
+    { root: ossifyRoot },
+  );
+
+  assert.ok(
+    translated.includes(`\`${ossifyRoot}/skills/work-item/SKILL.md\``),
+  );
+  assert.ok(
+    translated.includes(
+      `\`${ossifyRoot}/skills/work-item/references/report-contract.md\``,
+    ),
+  );
+  // Existence gate: refs that do not resolve under the plugin root must not
+  // be rewritten — they are not plugin-root-relative (e.g. skill-dir-relative
+  // `references/x` inside a skill's own references/ file, or consumer paths).
+  assert.ok(translated.includes("`skills/no-such-dir/SKILL.md`"));
+  assert.ok(translated.includes("`agents/*.md`"));
+  assert.ok(translated.includes("`docs/something.md`"));
 });
 
 test("prompt path substitution preserves replacement tokens literally", async () => {

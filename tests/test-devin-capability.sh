@@ -38,7 +38,8 @@ fi
 
 # Version check — exact pin.
 DEVIN_VERSION="$("$DEVIN_BIN" version 2>/dev/null | head -1 || true)"
-if printf '%s' "$DEVIN_VERSION" | grep -qv "$EXPECTED_DEVIN_VERSION"; then
+DEVIN_VERSION_NUM="$(printf '%s' "$DEVIN_VERSION" | awk '{print $2}')"
+if [ "$DEVIN_VERSION_NUM" != "$EXPECTED_DEVIN_VERSION" ]; then
   printf 'FAIL: expected devin %s, got "%s"\n' "$EXPECTED_DEVIN_VERSION" "$DEVIN_VERSION" >&2
   exit 1
 fi
@@ -127,7 +128,9 @@ if [ -f "$REAL_CONFIG" ]; then
 fi
 REAL_CRED_HASH_BEFORE="$(shasum -a 256 "$REAL_CREDENTIALS" | awk '{print $1}')"
 
-SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:/usr/local/bin:/usr/bin:/bin"
+GIT_BIN_DIR="$(dirname "$(command -v git 2>/dev/null || echo /usr/bin/git)")"
+JQ_BIN_DIR="$(dirname "$(command -v jq 2>/dev/null || echo /usr/bin/jq)")"
+SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:${GIT_BIN_DIR}:${JQ_BIN_DIR}:/usr/local/bin:/usr/bin:/bin"
 
 # Result tracking
 RESULTS_FILE="$TEST_ROOT/results.json"
@@ -137,6 +140,7 @@ SKIP_COUNT=0
 RESULTS_JSONL="$TEST_ROOT/results.jsonl"
 
 cleanup() {
+  local rc=$?
   # Real-state sentinel — hash and stat after the run.
   if [ -f "$REAL_CONFIG" ]; then
     REAL_CONFIG_HASH_AFTER="$(shasum -a 256 "$REAL_CONFIG" | awk '{print $1}')"
@@ -166,6 +170,7 @@ cleanup() {
     exit 1
   fi
   rm -rf "$TEST_ROOT"
+  exit $rc
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -263,7 +268,12 @@ record() {
     fail) FAIL_COUNT=$((FAIL_COUNT + 1)); printf 'FAIL: %s — %s\n' "$name" "$detail" >&2 ;;
     skip) SKIP_COUNT=$((SKIP_COUNT + 1)) ;;
   esac
-  printf '{"status":"%s","name":"%s","detail":"%s"}\n' "$status" "$name" "$detail" >> "$RESULTS_JSONL"
+  # detail can carry LLM/command output — escape for JSON so a quote or
+  # backslash cannot corrupt the line.
+  local detail_json="${detail//\\/\\\\}"
+  detail_json="${detail_json//\"/\\\"}"
+  detail_json="${detail_json//$'\n'/\\n}"
+  printf '{"status":"%s","name":"%s","detail":"%s"}\n' "$status" "$name" "$detail_json" >> "$RESULTS_JSONL"
 }
 
 # assert_contains <haystack> <needle> — literal substring test via awk.
@@ -539,7 +549,7 @@ probe_duplicate_name() {
   local list
   list="$(run_devin plugins list 2>&1)"
   local count
-  count="$(plugins_list_names "$list" | grep -cx 'required-a')"
+  count="$(plugins_list_names "$list" | grep -cx 'required-a' || true)"
   if [ "$count" -eq 1 ]; then
     record pass "duplicate-name-single" "only one required-a after double install"
   else

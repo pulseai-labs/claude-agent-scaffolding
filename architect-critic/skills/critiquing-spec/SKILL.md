@@ -96,7 +96,7 @@ Skip CORE and your challenges get dismissed defensively even when they're correc
 
 You need four values: `HOST_AGENT`, `codex_available`, `claude_available`, and `close_depth`.
 
-**HOST_AGENT detection:** If this skill is being read by Codex (for example, Codex plugin context, `CODEX_HOME` is present, or the active tool/runtime is Codex), set `HOST_AGENT=codex`. If this skill is being read by Devin (Devin plugin context, `DEVIN_HOME` is present, or the active tool/runtime is Devin CLI), set `HOST_AGENT=devin`. Otherwise set `HOST_AGENT=claude`. Do not ask the user; infer it from the running agent context.
+**HOST_AGENT detection:** If this skill is being read by Codex (for example, Codex plugin context, `CODEX_HOME` is present, or the active tool/runtime is Codex), set `HOST_AGENT=codex`. If this skill is being read by Devin (Devin plugin context, `command -v devin` resolves in the exec environment, or the active tool/runtime is Devin CLI), set `HOST_AGENT=devin`. Otherwise set `HOST_AGENT=claude`. Do not ask the user; infer it from the running agent context.
 
 **Codex availability:** Run `command -v codex` in a Bash tool call. Capture the return code. If the binary resolves, also capture `codex --version` for the status message in Step 4.
 
@@ -283,9 +283,10 @@ arc codex_run_audit "$ADVERSARIAL_PROMPT" "$TMP" ${MODEL_OVERRIDE:+--model "$MOD
 Then invoke Claude Code via the shell with this pattern, using the same `ADVERSARIAL_PROMPT` and `templates/output-schema.json` schema:
 
 ```bash
+SCHEMA_PATH="$(dirname "$(arc principles_shipped_path)")/output-schema.json"
 claude --print \
   --output-format json \
-  --json-schema "$(cat "$PLUGIN_ROOT/templates/output-schema.json")" \
+  --json-schema "$(cat "$SCHEMA_PATH")" \
   --permission-mode dontAsk \
   --no-session-persistence \
   "$ADVERSARIAL_PROMPT"

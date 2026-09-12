@@ -41,7 +41,8 @@ if [ -z "$NODE_BIN" ]; then
 fi
 
 DEVIN_VERSION="$("$DEVIN_BIN" version 2>/dev/null | head -1 || true)"
-if printf '%s' "$DEVIN_VERSION" | grep -qv "$EXPECTED_DEVIN_VERSION"; then
+DEVIN_VERSION_NUM="$(printf '%s' "$DEVIN_VERSION" | awk '{print $2}')"
+if [ "$DEVIN_VERSION_NUM" != "$EXPECTED_DEVIN_VERSION" ]; then
   printf 'FAIL: expected devin %s, got "%s"\n' "$EXPECTED_DEVIN_VERSION" "$DEVIN_VERSION" >&2
   exit 1
 fi
@@ -98,7 +99,9 @@ CFG
 cp "$REAL_CREDENTIALS" "$ISOLATED_DATA/devin/credentials.toml"
 chmod 600 "$ISOLATED_DATA/devin/credentials.toml"
 
-SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:/usr/local/bin:/usr/bin:/bin"
+GIT_BIN_DIR="$(dirname "$(command -v git 2>/dev/null || echo /usr/bin/git)")"
+JQ_BIN_DIR="$(dirname "$(command -v jq 2>/dev/null || echo /usr/bin/jq)")"
+SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:${GIT_BIN_DIR}:${JQ_BIN_DIR}:/usr/local/bin:/usr/bin:/bin"
 
 PASS=0
 FAIL=0
@@ -168,16 +171,18 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
+DEVIN_ENV=(
+  "HOME=$ISOLATED_HOME"
+  "XDG_CONFIG_HOME=$ISOLATED_CONFIG"
+  "XDG_DATA_HOME=$ISOLATED_DATA"
+  "XDG_CACHE_HOME=$ISOLATED_CACHE"
+  "PATH=$SAFE_PATH"
+  "NO_COLOR=1" "TERM=dumb" "DEVIN_AUTO_UPDATE=0"
+  "GIT_ALLOW_PROTOCOL=file"
+)
+
 run_devin() {
-  env -i \
-    HOME="$ISOLATED_HOME" \
-    XDG_CONFIG_HOME="$ISOLATED_CONFIG" \
-    XDG_DATA_HOME="$ISOLATED_DATA" \
-    XDG_CACHE_HOME="$ISOLATED_CACHE" \
-    PATH="$SAFE_PATH" \
-    NO_COLOR=1 TERM=dumb DEVIN_AUTO_UPDATE=0 \
-    GIT_ALLOW_PROTOCOL="file:git:https:ssh" \
-    "$DEVIN_BIN" "$@"
+  env -i "${DEVIN_ENV[@]}" "$DEVIN_BIN" "$@"
 }
 
 ###############################################################################
@@ -231,7 +236,7 @@ else
 fi
 
 # Exactness: nothing beyond the five baseline plugins plus the meta-plugin
-installed_count="$(printf '%s\n' "$installed_names" | grep -c '^.')"
+installed_count="$(printf '%s\n' "$installed_names" | grep -c '^.' || true)"
 if [ "$installed_count" = "6" ]; then
   pass "exactly six entries installed (five baseline + meta)"
 else
@@ -371,21 +376,23 @@ printf '\nProbe 4: plugins info approved assets\n'
 
 for plugin in workspace-init ai-mentor architect-critic ossify code-judo; do
   info="$(run_devin plugins info "$plugin" 2>&1)"
-  # Should show skills
-  if printf '%s' "$info" | grep -qi 'skill'; then
-    pass "$plugin info shows skills"
+  # Must show at least one namespaced skill — a bare `Skills`/`(none)` fails
+  if printf '%s' "$info" | grep -q "/${plugin}:"; then
+    pass "$plugin info shows namespaced skills"
   else
-    fail "$plugin info does not show skills"
+    fail "$plugin info shows no namespaced skills"
   fi
 done
 
-# Rules sections only where rules ship (dispatcher-path overlays)
+# Rules are not surfaced in `plugins info` output on this build (measured:
+# the section prints "(none)" even when rules ship), and remote installs
+# report source as a file://…#subdir URL, not a path. The verifiable contract
+# is that the rule file ships in the remote tree the plugin was cloned from.
 for plugin in workspace-init architect-critic ossify; do
-  info="$(run_devin plugins info "$plugin" 2>&1)"
-  if printf '%s' "$info" | grep -qi 'rule\|dispatcher'; then
-    pass "$plugin info shows rules"
+  if [ -f "$REMOTE_REPO/$plugin/rules/dispatcher-path.md" ]; then
+    pass "$plugin ships rules/dispatcher-path.md in the remote tree"
   else
-    fail "$plugin info does not show rules"
+    fail "$plugin missing rules/dispatcher-path.md in remote tree"
   fi
 done
 
@@ -411,7 +418,7 @@ env -i \
   XDG_CACHE_HOME="$IND_HOME/.cache" \
   PATH="$SAFE_PATH" \
   NO_COLOR=1 TERM=dumb DEVIN_AUTO_UPDATE=0 \
-  GIT_ALLOW_PROTOCOL="file:git:https:ssh" \
+  GIT_ALLOW_PROTOCOL="file" \
   "$DEVIN_BIN" plugins install --local -y "$ROOT/code-judo" >/dev/null 2>&1
 
 ind_text="$(env -i \
@@ -421,10 +428,10 @@ ind_text="$(env -i \
   XDG_CACHE_HOME="$IND_HOME/.cache" \
   PATH="$SAFE_PATH" \
   NO_COLOR=1 TERM=dumb DEVIN_AUTO_UPDATE=0 \
-  GIT_ALLOW_PROTOCOL="file:git:https:ssh" \
+  GIT_ALLOW_PROTOCOL="file" \
   "$DEVIN_BIN" plugins list 2>&1)"
 ind_names="$(plugins_list_names "$ind_text")"
-ind_count="$(printf '%s\n' "$ind_names" | grep -c '^.')"
+ind_count="$(printf '%s\n' "$ind_names" | grep -c '^.' || true)"
 
 if printf '%s\n' "$ind_names" | grep -qx "code-judo" && [ "$ind_count" = "1" ]; then
   pass "code-judo installs independently (exactly one plugin in fresh HOME)"
@@ -462,9 +469,33 @@ fi
 ###############################################################################
 printf '\nProbe 7: Timeout controls\n'
 
-# Normal command completes within timeout
+# run_devin_t <secs> <args...> — devin under a wall-clock cap (rc 124 on
+# timeout). Two load-bearing details: `exec` makes the subshell BECOME devin
+# so $! is devin's own pid; and output goes to a FILE, not the caller's pipe —
+# a killed process can leave orphaned children, and an orphan holding the
+# command-substitution pipe open would deadlock the gate past the cap anyway.
+run_devin_t() {
+  local secs="$1"; shift
+  local out="$TEST_ROOT/run_devin_t.$$.out"
+  ( exec env -i "${DEVIN_ENV[@]}" "$DEVIN_BIN" "$@" ) >"$out" 2>&1 &
+  local pid=$! waited=0 rc
+  while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt "$secs" ]; do
+    sleep 1; waited=$((waited + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -9 "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    rc=124
+  else
+    wait "$pid" && rc=0 || rc=$?
+  fi
+  cat "$out"; rm -f "$out"
+  return "$rc"
+}
+
+# Normal command completes within timeout — actually bounded, not just timed
 normal_start=$(date +%s)
-normal_output="$(run_devin plugins list 2>/dev/null)" && normal_rc=0 || normal_rc=$?
+normal_output="$(run_devin_t "$COMMAND_TIMEOUT_SECS" plugins list 2>/dev/null)" && normal_rc=0 || normal_rc=$?
 normal_end=$(date +%s)
 normal_elapsed=$((normal_end - normal_start))
 
@@ -474,27 +505,22 @@ else
   fail "normal command exceeded timeout or failed (rc=$normal_rc, ${normal_elapsed}s)"
 fi
 
-# Excessive command — prove the timeout infrastructure is not vacuous by
-# running a background sleep and killing it after 2 seconds. macOS has no
-# `timeout` command, so we use the background+kill pattern.
+# Excessive command — the control must exercise run_devin_t itself, against a
+# devin stub that hangs. (A plain `( sleep 5 ) &` proves only that kill works
+# in general: bash execs that single simple command, while a function call in
+# a subshell forks a child — exactly the shape that orphaned the real devin.)
+stub_bin="$TEST_ROOT/devin-stub"
+printf '#!/bin/sh\nsleep 30\n' > "$stub_bin"
+chmod +x "$stub_bin"
 excessive_start=$(date +%s)
-( sleep 5 ) &
-sleep_pid=$!
-sleep 2
-if kill -0 "$sleep_pid" 2>/dev/null; then
-  kill "$sleep_pid" 2>/dev/null || true
-  wait "$sleep_pid" 2>/dev/null || true
-  excessive_rc=124  # killed
-else
-  excessive_rc=0    # completed before the kill (shouldn't happen with 5s sleep)
-fi
+hang_out="$(DEVIN_BIN="$stub_bin" run_devin_t 2 plugins list 2>/dev/null)" && excessive_rc=0 || excessive_rc=$?
 excessive_end=$(date +%s)
 excessive_elapsed=$((excessive_end - excessive_start))
 
-if [ "$excessive_rc" = "124" ] && [ "$excessive_elapsed" -ge 2 ] && [ "$excessive_elapsed" -lt 5 ]; then
-  pass "timeout infrastructure works (killed after ${excessive_elapsed}s)"
+if [ "$excessive_rc" = "124" ] && [ "$excessive_elapsed" -ge 2 ] && [ "$excessive_elapsed" -lt 10 ]; then
+  pass "run_devin_t bounds a hung devin (rc 124 after ${excessive_elapsed}s)"
 else
-  fail "timeout infrastructure failed (rc=$excessive_rc, ${excessive_elapsed}s)"
+  fail "run_devin_t did not bound the stub (rc=$excessive_rc, ${excessive_elapsed}s)"
 fi
 
 ###############################################################################

@@ -77,7 +77,7 @@ USER_PRINCIPLES="$(arc principles_user_path)"
 If this file does not exist, create it by copying the shipped-defaults header from the plugin template:
 
 ```bash
-PLUGIN_TEMPLATE="$PLUGIN_ROOT/templates/principles.md"
+PLUGIN_TEMPLATE="$(arc principles_shipped_path)"
 mkdir -p "$(dirname "$USER_PRINCIPLES")"
 cp "$PLUGIN_TEMPLATE" "$USER_PRINCIPLES"
 ```

@@ -29,7 +29,8 @@ if [ -z "$NODE_BIN" ]; then
 fi
 
 DEVIN_VERSION="$("$DEVIN_BIN" version 2>/dev/null | head -1 || true)"
-if printf '%s' "$DEVIN_VERSION" | grep -qv "$EXPECTED_DEVIN_VERSION"; then
+DEVIN_VERSION_NUM="$(printf '%s' "$DEVIN_VERSION" | awk '{print $2}')"
+if [ "$DEVIN_VERSION_NUM" != "$EXPECTED_DEVIN_VERSION" ]; then
   printf 'FAIL: expected devin %s, got "%s"\n' "$EXPECTED_DEVIN_VERSION" "$DEVIN_VERSION" >&2
   exit 1
 fi
@@ -88,7 +89,9 @@ CFG
 cp "$REAL_CREDENTIALS" "$ISOLATED_DATA/devin/credentials.toml"
 chmod 600 "$ISOLATED_DATA/devin/credentials.toml"
 
-SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:/usr/local/bin:/usr/bin:/bin"
+GIT_BIN_DIR="$(dirname "$(command -v git 2>/dev/null || echo /usr/bin/git)")"
+JQ_BIN_DIR="$(dirname "$(command -v jq 2>/dev/null || echo /usr/bin/jq)")"
+SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:${GIT_BIN_DIR}:${JQ_BIN_DIR}:/usr/local/bin:/usr/bin:/bin"
 
 PASS=0
 FAIL=0
@@ -97,9 +100,11 @@ pass() { PASS=$((PASS + 1)); printf '  ok  %s\n' "$1"; }
 fail() { FAIL=$((FAIL + 1)); printf '  not ok  %s\n' "$1"; }
 
 cleanup() {
+  local rc=$?
   rm -rf "$TEST_ROOT"
   printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
   if [ "$FAIL" -gt 0 ]; then exit 1; fi
+  exit $rc
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -176,8 +181,10 @@ else
   pass "no state directory"
 fi
 
-# Check no copied policy in .devin/
-if find "$AM_ROOT/.devin" -name 'recommendation-policy*' 2>/dev/null | grep -q .; then
+# Check no copied policy in .devin/ — -print -quit + string test, not
+# `find | grep -q .` (pipefail SIGPIPE on grep -q's early exit reads as
+# "absent": a false pass on exactly the mutation this guards).
+if [ -n "$(find "$AM_ROOT/.devin" -name 'recommendation-policy*' -print -quit 2>/dev/null)" ]; then
   fail "copied policy found in .devin/"
 else
   pass "no copied policy in .devin/"
@@ -259,11 +266,25 @@ rm -f "$COPY_ROOT/references/recommendation-policy.md"
 run_devin plugins remove -y ai-mentor >/dev/null 2>&1
 run_devin plugins install --local -y "$COPY_ROOT" >/dev/null 2>&1
 
-# The reference should be absent from the installed source
-if [ ! -f "$COPY_ROOT/references/recommendation-policy.md" ]; then
-  pass "absent reference is genuinely absent from installed copy"
+# The meaningful assertion is about the INSTALLED source, not the fixture
+# mutation: `plugins info` must report the copy as the plugin source (so any
+# consumer reads the mutated tree), and the policy must be absent under that
+# reported source — not merely under the path this test happened to rm.
+installed_source="$(run_devin plugins info ai-mentor 2>/dev/null \
+  | awk '/source:/ {print $NF; exit}')"
+
+if [ "$installed_source" = "$COPY_ROOT" ]; then
+  pass "plugins info reports the mutated copy as installed source"
 else
-  fail "absent reference somehow present in installed copy"
+  fail "plugins info source is '$installed_source', expected '$COPY_ROOT'"
+fi
+
+if [ -n "$installed_source" ] \
+  && [ ! -f "$installed_source/references/recommendation-policy.md" ] \
+  && [ -f "$installed_source/skills/grill-me/SKILL.md" ]; then
+  pass "policy absent and skill present at the reported installed source"
+else
+  fail "reported source '$installed_source' does not match the mutated copy"
 fi
 
 # Verify the original canonical checkout still has it (we didn't delete it)

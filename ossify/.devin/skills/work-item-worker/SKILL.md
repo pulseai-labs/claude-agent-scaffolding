@@ -4,7 +4,6 @@ description: Devin subagent worker for ossify work-item execution. Delegates to 
 subagent: true
 allowed-tools:
   - read
-  - write
   - edit
   - exec
   - grep
@@ -20,9 +19,17 @@ RED-gate return codes, TDD loop, verification, report contract, return shapes,
 and NEVER list all live there. This file is the Devin registration only; the
 canonical skill body is the single source of truth.
 
+The plugin root: this file lives at `<plugin-root>/.devin/skills/
+work-item-worker/SKILL.md`, so the plugin root is three directories up from
+this file. Independently, `exec devin plugins info ossify` reports a `source:`
+field carrying the same path. Resolve it once, then all `skills/`,
+`references/`, and `bin/` paths below are relative to it.
+
 ## Tool allowlist (binding)
 
-`read`, `write`, `edit`, `exec`, `grep`, `glob`. No nested subagents —
+`read`, `edit`, `exec`, `grep`, `glob` — the documented `allowed-tools` set
+(Devin 3000.10.21 lists no `write` entry; `edit` and `exec` cover file output).
+No nested subagents —
 nesting is forbidden; if the item needs splitting, say so in the report.
 
 ## No-commit guarantee

@@ -305,6 +305,13 @@ decided by the command that started you and never changes mid-spine:
 Task(subagent_type="ossify:implementer-agent", prompt=<invocation block naming the absolute handoff path>)
 ```
 
+On Devin the dispatch target is the **`ossify:work-item-worker`** skill — a
+`subagent: true` registration under `.devin/skills/` with Devin-namespaced
+`allowed-tools`. Invoke it by name with the same invocation block naming the
+absolute handoff path. `ossify:implementer-agent` is the Claude Code
+registration; its `tools` list is Claude-namespaced and is not the Devin
+dispatch.
+
 **Never pass the Task tool's `isolation: "worktree"`.** The worktree already
 exists — you created it in §3, in a different repo, at a path the handoff names.
 Letting the harness make its own would run the item somewhere the merge never

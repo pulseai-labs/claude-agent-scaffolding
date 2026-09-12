@@ -46,8 +46,19 @@ parent is the bundle package, not the plugin — the plugin sits one level
 further up, beside it. Two steps, loud on failure:
 
 ```bash
-oss_bin="$(command -v oss)"
-plugin_root="$(cd "$(dirname "$oss_bin")/.." && pwd)"          # direct install
+oss_bin="$(command -v oss 2>/dev/null || true)"
+# Devin: bin/ is not on PATH — resolve the installed source instead. The
+# source: field is a filesystem path for --local installs; a remote install
+# reports a file:// URL, which is not a path — fail early rather than
+# deriving a phantom /bin/oss.
+[ -n "$oss_bin" ] || {
+  oss_src="$(devin plugins info ossify | awk '/^  source:/{print $2}')"
+  case "$oss_src" in
+    /*) oss_bin="$oss_src/bin/oss" ;;
+    *)  echo "cannot resolve ossify plugin root (source: '${oss_src:-none}')" >&2; exit 1 ;;
+  esac
+}
+plugin_root="$(cd "$(dirname "$oss_bin")/.." && pwd)"          # direct install / Devin
 schema="$plugin_root/skills/challenge/templates/output-schema.json"
 [ -f "$schema" ] || { plugin_root="$(cd "$(dirname "$oss_bin")/../.." && pwd)/ossify"  # OpenCode wrapper
                       schema="$plugin_root/skills/challenge/templates/output-schema.json"; }

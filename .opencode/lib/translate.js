@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -48,6 +49,16 @@ export function translatePrompt(text, context) {
     translated = translated.replace(
       /\$(?:\{CLAUDE_PLUGIN_ROOT\}|CLAUDE_PLUGIN_ROOT\b)/g,
       () => root,
+    );
+    // Plugin-root-relative refs (the token-free convention): a backticked
+    // `skills/`, `references/`, `templates/`, `lib/`, `agents/`, or `bin/` path
+    // resolves against the owning plugin's root, not the consumer's cwd.
+    // Existence-gated so skill-dir-relative refs (e.g. `references/x` inside a
+    // skill's own references/ file) pass through untouched.
+    translated = translated.replace(
+      /`((?:skills|references|templates|lib|agents|bin)\/[^`\s]+)`/g,
+      (match, rel) =>
+        existsSync(join(root, rel)) ? `\`${root}/${rel}\`` : match,
     );
   }
   const dataRoot =

@@ -21,7 +21,19 @@ room, open the check that enforces the budget you mean.**
 | **Agent listing** | `agents/*.md` descriptions | **nothing** | **none** |
 
 ```bash
-oss_root="$(cd "$(dirname "$(command -v oss)")/.." && pwd)"
+oss_bin="$(command -v oss 2>/dev/null || true)"
+# Devin: bin/ is not on PATH — resolve the installed source instead. The
+# source: field is a filesystem path for --local installs; a remote install
+# reports a file:// URL, which is not a path — fail early rather than
+# deriving a phantom /bin/oss.
+[ -n "$oss_bin" ] || {
+  oss_src="$(devin plugins info ossify | awk '/^  source:/{print $2}')"
+  case "$oss_src" in
+    /*) oss_bin="$oss_src/bin/oss" ;;
+    *)  echo "cannot resolve ossify plugin root (source: '${oss_src:-none}')" >&2; exit 1 ;;
+  esac
+}
+oss_root="$(cd "$(dirname "$oss_bin")/.." && pwd)"
 bash "$oss_root/tests/test-skill-bash-blocks.sh"
 ```
 
@@ -104,7 +116,17 @@ largest every-call string in the plugin.
 So measure it rather than quoting a remembered figure:
 
 ```bash
-oss_root="$(cd "$(dirname "$(command -v oss)")/.." && pwd)"
+oss_bin="$(command -v oss 2>/dev/null || true)"
+# Devin: bin/ is not on PATH — resolve the installed source instead (see the
+# guarded recipe above: source: must be an absolute path, not a file:// URL).
+[ -n "$oss_bin" ] || {
+  oss_src="$(devin plugins info ossify | awk '/^  source:/{print $2}')"
+  case "$oss_src" in
+    /*) oss_bin="$oss_src/bin/oss" ;;
+    *)  echo "cannot resolve ossify plugin root (source: '${oss_src:-none}')" >&2; exit 1 ;;
+  esac
+}
+oss_root="$(cd "$(dirname "$oss_bin")/.." && pwd)"
 awk -F'description: ' '/^description: /{print length($2); exit}' "$oss_root/agents/implementer-agent.md"
 ```
 

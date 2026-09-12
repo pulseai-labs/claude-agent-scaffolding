@@ -31,7 +31,8 @@ if [ -z "$NODE_BIN" ]; then
 fi
 
 DEVIN_VERSION="$("$DEVIN_BIN" version 2>/dev/null | head -1 || true)"
-if printf '%s' "$DEVIN_VERSION" | grep -qv "$EXPECTED_DEVIN_VERSION"; then
+DEVIN_VERSION_NUM="$(printf '%s' "$DEVIN_VERSION" | awk '{print $2}')"
+if [ "$DEVIN_VERSION_NUM" != "$EXPECTED_DEVIN_VERSION" ]; then
   printf 'FAIL: expected devin %s, got "%s"\n' "$EXPECTED_DEVIN_VERSION" "$DEVIN_VERSION" >&2
   exit 1
 fi
@@ -80,7 +81,9 @@ CFG
 cp "$REAL_CREDENTIALS" "$ISOLATED_DATA/devin/credentials.toml"
 chmod 600 "$ISOLATED_DATA/devin/credentials.toml"
 
-SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:/usr/local/bin:/usr/bin:/bin"
+GIT_BIN_DIR="$(dirname "$(command -v git 2>/dev/null || echo /usr/bin/git)")"
+JQ_BIN_DIR="$(dirname "$(command -v jq 2>/dev/null || echo /usr/bin/jq)")"
+SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:${GIT_BIN_DIR}:${JQ_BIN_DIR}:/usr/local/bin:/usr/bin:/bin"
 
 PASS=0
 FAIL=0
@@ -89,9 +92,11 @@ pass() { PASS=$((PASS + 1)); printf '  ok  %s\n' "$1"; }
 fail() { FAIL=$((FAIL + 1)); printf '  not ok  %s\n' "$1"; }
 
 cleanup() {
+  local rc=$?
   rm -rf "$TEST_ROOT"
   printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
   if [ "$FAIL" -gt 0 ]; then exit 1; fi
+  exit $rc
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -114,7 +119,7 @@ run_devin plugins install --local -y "$OS_ROOT" >/dev/null 2>&1
 ###############################################################################
 # Probe 1: All six namespaced skills are advertised
 ###############################################################################
-printf 'Probe 1: Six namespaced skills advertised\n'
+printf 'Probe 1: Namespaced skills advertised (6 canonical + Devin worker overlay)\n'
 
 skills_json="$(run_devin skills list --json 2>/dev/null)"
 skill_names="$(printf '%s' "$skills_json" | "$NODE_BIN" -e '
@@ -128,7 +133,8 @@ for expected in \
   "ossify:plan-spine" \
   "ossify:work-item" \
   "ossify:close" \
-  "ossify:doctor"
+  "ossify:doctor" \
+  "ossify:work-item-worker"
 do
   if printf '%s\n' "$skill_names" | grep -qx "$expected"; then
     pass "skill advertised: $expected"
@@ -182,9 +188,10 @@ else
   fail "worker skill does not reference canonical work-item/SKILL.md"
 fi
 
-# Check it does NOT copy the full contract (should be short, < 50 lines)
+# Check it does NOT copy the full contract — the overlay delegates, so it must
+# stay far below the canonical body's ~450 lines. < 100 still catches a paste.
 line_count="$(wc -l < "$worker_skill" 2>/dev/null || echo 0)"
-if [ "$line_count" -lt 50 ]; then
+if [ "$line_count" -lt 100 ]; then
   pass "worker skill is short ($line_count lines, delegates rather than copies)"
 else
   fail "worker skill is too long ($line_count lines — may be copying contract)"
@@ -260,8 +267,10 @@ printf '\nProbe 6: Claude-only utilities absent\n'
 # handoff, handoff-resume, work-pr are Claude Code slash commands.
 # They should not appear as Devin skills or in the .devin/ adapter.
 for utility in handoff handoff-resume work-pr; do
-  # Check they are not in .devin/skills/
-  if find "$OS_ROOT/.devin" -name "*${utility}*" 2>/dev/null | grep -q .; then
+  # Check they are not in .devin/skills/. -print -quit + string test, not
+  # `find | grep -q .` — under pipefail grep -q's early exit SIGPIPEs find,
+  # and the failure reads as "absent" (a false pass on the guarded mutation).
+  if [ -n "$(find "$OS_ROOT/.devin" -name "*${utility}*" -print -quit 2>/dev/null)" ]; then
     fail "$utility found in .devin/ (should be Claude-only)"
   else
     pass "$utility absent from .devin/"

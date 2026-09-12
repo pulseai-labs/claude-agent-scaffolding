@@ -24,7 +24,7 @@ If any fail, exit non-zero with a clear error; do NOT write the manifest or inst
 - **Canonical path absolute + exists + is a git repo.** `git -C "$canonical_root" rev-parse --git-dir`.
 - AI workspace and canonical must be different paths (no self-pairing).
 
-These are validated by `wi skeleton_preflight_existing_dual "$ai_root" "$canonical_root"` (lib/skeleton.sh) — call it through the `wi` dispatcher; never `source` lib files from the skill body (under zsh `${BASH_SOURCE[0]}` is unset and the libs crash).
+These are validated by `wi skeleton_preflight_existing_dual "$ai_root" "$canonical_root"` (lib/skeleton.sh) — call it through the `wi` dispatcher (`workspace-init/bin/wi`; on Claude Code `wi` is on `$PATH` automatically, on Devin invoke via `exec` with the full path `<plugin-source>/bin/wi`); never `source` lib files from the skill body (under zsh `${BASH_SOURCE[0]}` is unset and the libs crash).
 
 ## 3. Input collection
 

@@ -30,7 +30,8 @@ if [ -z "$NODE_BIN" ]; then
 fi
 
 DEVIN_VERSION="$("$DEVIN_BIN" version 2>/dev/null | head -1 || true)"
-if printf '%s' "$DEVIN_VERSION" | grep -qv "$EXPECTED_DEVIN_VERSION"; then
+DEVIN_VERSION_NUM="$(printf '%s' "$DEVIN_VERSION" | awk '{print $2}')"
+if [ "$DEVIN_VERSION_NUM" != "$EXPECTED_DEVIN_VERSION" ]; then
   printf 'FAIL: expected devin %s, got "%s"\n' "$EXPECTED_DEVIN_VERSION" "$DEVIN_VERSION" >&2
   exit 1
 fi
@@ -80,7 +81,9 @@ CFG
 cp "$REAL_CREDENTIALS" "$ISOLATED_DATA/devin/credentials.toml"
 chmod 600 "$ISOLATED_DATA/devin/credentials.toml"
 
-SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:/usr/local/bin:/usr/bin:/bin"
+GIT_BIN_DIR="$(dirname "$(command -v git 2>/dev/null || echo /usr/bin/git)")"
+JQ_BIN_DIR="$(dirname "$(command -v jq 2>/dev/null || echo /usr/bin/jq)")"
+SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:${GIT_BIN_DIR}:${JQ_BIN_DIR}:/usr/local/bin:/usr/bin:/bin"
 
 PASS=0
 FAIL=0
@@ -89,9 +92,11 @@ pass() { PASS=$((PASS + 1)); printf '  ok  %s\n' "$1"; }
 fail() { FAIL=$((FAIL + 1)); printf '  not ok  %s\n' "$1"; }
 
 cleanup() {
+  local rc=$?
   rm -rf "$TEST_ROOT"
   printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
   if [ "$FAIL" -gt 0 ]; then exit 1; fi
+  exit $rc
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -243,23 +248,38 @@ fi
 ###############################################################################
 printf '\nProbe 5: No lib sourcing under caller shell\n'
 
-# Run wi in a subprocess and check that no lib functions leak to the caller.
-# The dispatcher sources libs internally, but they should not persist in the
-# caller's shell. We test by running wi --list in a subshell and then checking
-# that wi_skeleton_preflight is NOT defined in our shell afterward.
-if eval 'declare -f wi_skeleton_preflight >/dev/null 2>&1'; then
-  fail "wi_skeleton_preflight leaked into caller shell"
+# A subprocess cannot define functions in the caller's shell, so a `declare -f`
+# leak check can only ever pass — vacuous by construction. The testable half
+# of the claim: the libs load inside the DISPATCHER's own bash process, and
+# each skill body forbids caller-side sourcing.
+if grep -qE 'source .*\$_LIB_DIR|source .*lib/' "$wi_path" 2>/dev/null; then
+  pass "wi dispatcher sources lib/ inside its own process"
 else
-  pass "no lib functions leaked into caller shell"
+  fail "wi dispatcher does not source lib/ — dispatch model changed"
 fi
 
-# Also verify that the dispatcher itself uses bash (not zsh)
+# Verify that the dispatcher itself uses bash (not zsh)
 shebang="$(head -1 "$wi_path")"
 if [ "$shebang" = "#!/usr/bin/env bash" ]; then
   pass "wi dispatcher has bash shebang"
 else
   fail "wi dispatcher has wrong shebang: $shebang"
 fi
+
+# Each skill body must forbid direct lib sourcing (the caller-side contract:
+# exec the dispatcher, never source the libs).
+for skill_md in \
+  "$WI_ROOT/skills/initializing-dual-repo-workspace/SKILL.md" \
+  "$WI_ROOT/skills/pairing-canonical-repo/SKILL.md" \
+  "$WI_ROOT/skills/pairing-existing-dual/SKILL.md"
+do
+  skill_name="$(basename "$(dirname "$skill_md")")"
+  if grep -qiE 'never.*source|not.*source.*lib|do not source' "$skill_md" 2>/dev/null; then
+    pass "$skill_name forbids direct lib sourcing"
+  else
+    fail "$skill_name does not forbid direct lib sourcing"
+  fi
+done
 
 ###############################################################################
 # Probe 6: Adapter does not reinterpret wi output
@@ -289,10 +309,12 @@ fi
 printf '\nProbe 7: No $PATH claim in canonical skill body\n'
 
 # The harness-neutral edit should remove the claim that wi is on $PATH.
-# Check all three skill files for the false claim.
+# Check all three skill files for the false claim AND for the positive
+# Devin guidance that replaces it (full path via exec).
 for skill_md in \
   "$WI_ROOT/skills/initializing-dual-repo-workspace/SKILL.md" \
-  "$WI_ROOT/skills/pairing-canonical-repo/SKILL.md"
+  "$WI_ROOT/skills/pairing-canonical-repo/SKILL.md" \
+  "$WI_ROOT/skills/pairing-existing-dual/SKILL.md"
 do
   skill_name="$(basename "$(dirname "$skill_md")")"
   # Look for the claim "on $PATH" or "on `$PATH`" in the context of wi
@@ -300,6 +322,16 @@ do
     fail "$skill_name still claims wi is on \$PATH because Claude Code"
   else
     pass "$skill_name does not claim wi is on \$PATH because Claude Code"
+  fi
+
+  # Positive: the skill must give Devin a working invocation path —
+  # it mentions Devin, the dispatcher path, and exec-based invocation.
+  if grep -qi 'devin' "$skill_md" 2>/dev/null \
+    && grep -q 'bin/wi' "$skill_md" 2>/dev/null \
+    && grep -qi 'exec' "$skill_md" 2>/dev/null; then
+    pass "$skill_name carries Devin full-path invocation guidance"
+  else
+    fail "$skill_name lacks Devin invocation guidance (devin+bin/wi+exec)"
   fi
 done
 
@@ -332,13 +364,15 @@ fi
 ###############################################################################
 printf '\nProbe 9: plugins info shows rules\n'
 
+# `plugins info` does not surface rules/ content on this build — the Rules
+# section prints "(none)" even when the file ships. The verifiable contract:
+# the rule file exists under the loader-reported source path.
 info="$(run_devin plugins info workspace-init 2>&1)"
-if printf '%s' "$info" | grep -q 'dispatcher-path'; then
-  pass "plugins info shows dispatcher-path rule"
-elif printf '%s' "$info" | grep -q 'Rules'; then
-  pass "plugins info has Rules section (rule name may differ)"
+installed_src="$(printf '%s' "$info" | awk '/source:/ {print $NF; exit}')"
+if [ -n "$installed_src" ] && [ -f "$installed_src/rules/dispatcher-path.md" ]; then
+  pass "dispatcher-path.md present at loader-reported source: $installed_src"
 else
-  fail "plugins info does not show rules"
+  fail "dispatcher-path.md absent at loader-reported source '$installed_src'"
 fi
 
 # Cleanup

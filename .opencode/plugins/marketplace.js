@@ -39,12 +39,10 @@ export async function ScaffoldingPlugin(input, options = {}) {
       description: translatePrompt(frontmatter.description, ossify),
       mode: "subagent",
       // Canonical bodies reference skills/ paths relative to the plugin root
-      // (CLAUDE_PLUGIN_ROOT-free); the installed OpenCode prompt absolutizes
-      // them so the worker resolves real files, not the consumer's cwd.
-      prompt: translatePrompt(body, ossify).replaceAll(
-        "`skills/",
-        `\`${ossify.root.replace(/\/+$/, "")}/skills/`,
-      ),
+      // (CLAUDE_PLUGIN_ROOT-free); translatePrompt absolutizes them against the
+      // plugin root so the installed prompt resolves real files, not the
+      // consumer's cwd.
+      prompt: translatePrompt(body, ossify),
       permission: {
         "*": "deny",
         read: "allow",

@@ -33,7 +33,8 @@ if [ -z "$NODE_BIN" ]; then
 fi
 
 DEVIN_VERSION="$("$DEVIN_BIN" version 2>/dev/null | head -1 || true)"
-if printf '%s' "$DEVIN_VERSION" | grep -qv "$EXPECTED_DEVIN_VERSION"; then
+DEVIN_VERSION_NUM="$(printf '%s' "$DEVIN_VERSION" | awk '{print $2}')"
+if [ "$DEVIN_VERSION_NUM" != "$EXPECTED_DEVIN_VERSION" ]; then
   printf 'FAIL: expected devin %s, got "%s"\n' "$EXPECTED_DEVIN_VERSION" "$DEVIN_VERSION" >&2
   exit 1
 fi
@@ -93,7 +94,9 @@ FAKE
   chmod +x "$TEST_ROOT/fake-bin/$fake_bin"
 done
 
-SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:${TEST_ROOT}/fake-bin:/usr/local/bin:/usr/bin:/bin"
+GIT_BIN_DIR="$(dirname "$(command -v git 2>/dev/null || echo /usr/bin/git)")"
+JQ_BIN_DIR="$(dirname "$(command -v jq 2>/dev/null || echo /usr/bin/jq)")"
+SAFE_PATH="${DEVIN_BIN%/*}:${NODE_BIN%/*}:${GIT_BIN_DIR}:${JQ_BIN_DIR}:${TEST_ROOT}/fake-bin:/usr/local/bin:/usr/bin:/bin"
 
 PASS=0
 FAIL=0
@@ -102,9 +105,11 @@ pass() { PASS=$((PASS + 1)); printf '  ok  %s\n' "$1"; }
 fail() { FAIL=$((FAIL + 1)); printf '  not ok  %s\n' "$1"; }
 
 cleanup() {
+  local rc=$?
   rm -rf "$TEST_ROOT"
   printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
   if [ "$FAIL" -gt 0 ]; then exit 1; fi
+  exit $rc
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -238,21 +243,19 @@ else
 fi
 
 ###############################################################################
-# Probe 8: Fake codex/claude binaries NOT invoked during Devin critique
+# Probe 8: Fake codex/claude binaries are armed on SAFE_PATH — the sentinel
+# assertions themselves run at the end of this file (post-check), after every
+# arc invocation that could conceivably dispatch to an external adversary.
 ###############################################################################
-printf '\nProbe 8: Fake codex/claude not invoked\n'
+printf '\nProbe 8: Fake-bin harness armed (post-check at end of file)\n'
 
-# Verify the fake sentinel files do NOT exist (no external dispatch happened)
-if [ -f "$TEST_ROOT/fake-bin/codex-sentinel" ]; then
-  fail "fake codex was executed during test setup"
-else
-  pass "fake codex was not executed"
-fi
-if [ -f "$TEST_ROOT/fake-bin/claude-sentinel" ]; then
-  fail "fake claude was executed during test setup"
-else
-  pass "fake claude was not executed"
-fi
+for fake_bin in codex claude; do
+  if [ -x "$TEST_ROOT/fake-bin/$fake_bin" ]; then
+    pass "fake $fake_bin armed at $TEST_ROOT/fake-bin/$fake_bin"
+  else
+    fail "fake $fake_bin missing or not executable"
+  fi
+done
 
 ###############################################################################
 # Probe 9: Shared state path preserved
@@ -300,7 +303,9 @@ else
   fail "arc dispatcher not executable"
 fi
 
-list_output="$("$arc_path" --list 2>&1)" || true
+# Run under SAFE_PATH so the fake codex/claude binaries are on PATH — the
+# post-check sentinels only prove non-invocation if the fakes were findable.
+list_output="$(env -i HOME="$ISOLATED_HOME" PATH="$SAFE_PATH" "$arc_path" --list 2>&1)" || true
 if printf '%s' "$list_output" | grep -q 'state_append_run'; then
   pass "arc --list shows state_append_run"
 else
@@ -397,3 +402,21 @@ fi
 
 # Cleanup
 run_devin plugins remove -y architect-critic >/dev/null 2>&1
+
+###############################################################################
+# Probe 14 (post-check): Fake codex/claude binaries were NOT invoked by any
+# arc/devin path above. This must run last — every invocation in this gate ran
+# with the fakes first on PATH via SAFE_PATH.
+###############################################################################
+printf '\nProbe 14: Fake codex/claude not invoked (post-check)\n'
+
+if [ -f "$TEST_ROOT/fake-bin/codex-sentinel" ]; then
+  fail "fake codex was executed by an arc path"
+else
+  pass "fake codex was not executed"
+fi
+if [ -f "$TEST_ROOT/fake-bin/claude-sentinel" ]; then
+  fail "fake claude was executed by an arc path"
+else
+  pass "fake claude was not executed"
+fi

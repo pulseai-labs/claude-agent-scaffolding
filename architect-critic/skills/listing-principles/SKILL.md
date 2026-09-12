@@ -29,10 +29,10 @@ You read up to four sources in this exact order. Each is optional except shipped
 
 **Source 1 — Shipped defaults** (`shipped`)
 
-The plugin ships `templates/principles.md`. It always exists. Locate it relative to the plugin root:
+The plugin ships `templates/principles.md`. It always exists. Resolve it through the `arc` dispatcher, which self-locates the installed plugin root on every surface (on Claude Code `arc` is on `$PATH`; on Devin invoke `<plugin-source>/bin/arc` via `exec` with the full path — see `rules/dispatcher-path.md`):
 
 ```bash
-SHIPPED_PATH="$PLUGIN_ROOT/templates/principles.md"
+SHIPPED_PATH="$(arc principles_shipped_path)"
 ```
 
 Contains two load-bearing defaults: the **Ghost Notes principle** (what is absent is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy). Both render under `## Shipped defaults`.

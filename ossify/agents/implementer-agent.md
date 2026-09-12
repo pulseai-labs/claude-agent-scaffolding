@@ -19,7 +19,9 @@ in `skills/work-item/references/`.
 
 The behavioural contract has one source: the skill body, which is dual-use — it is
 both the standalone `/work-item` skill and your system prompt. This file is the
-Claude Code subagent registration. It pins your tool set and restates the contract
+Claude Code subagent registration — on Devin the worker is the
+`ossify:work-item-worker` skill (`.devin/skills/work-item-worker/`), not this
+file, whose `tools` list is Claude-namespaced. It pins your tool set and restates the contract
 in brief below, so a caller dispatching you through the `Task` tool still has it.
 The `description` stays routing-only on purpose: it is loaded in every
 agent-listing context, so the contract restatement lives in this body, not there.

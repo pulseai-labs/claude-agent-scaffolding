@@ -31,10 +31,15 @@ and has its own contract):
   `Task(subagent_type="ossify:implementer-agent", prompt=<the
   invocation block naming the handoff path>)`. This body is that subagent's
   binding contract; `agents/implementer-agent.md` is the registration that points
-  at it. The dispatcher is **not** `plan-spine` — that skill plans and says so in
-  its own body; it authors your spec and the spine's demo lines and stops there.
+  at it. On Devin the same lane invokes the **`ossify:work-item-worker`** skill
+  (a `subagent: true` registration under `.devin/skills/`); the
+  `implementer-agent` file is the Claude Code registration and its `tools` list
+  is Claude-namespaced. The dispatcher is **not** `plan-spine` — that skill plans
+  and says so in its own body; it authors your spec and the spine's demo lines
+  and stops there.
 
-**`ossify:implementer-agent` is the only worker ossify itself dispatches**, and
+**On Claude Code, `ossify:implementer-agent` is the only worker ossify itself
+dispatches** — on Devin it is `ossify:work-item-worker` — and
 it is the default. The one exception is opt-in and belongs to the lane, not to
 you: `/run-spine <spine-id> --external-executor` hands execution to a
 caller-supplied procedure instead of dispatching anything

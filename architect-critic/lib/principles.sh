@@ -249,14 +249,17 @@ ac_principles_filter_by_source() {
 
 # Seed principles.md from the FULL plugin template (with example commented
 # principles) if it does not already exist. Used at plugin install time only.
-# Reads CLAUDE_PLUGIN_ROOT to locate templates/principles.md.
+# Locates templates/principles.md via ac_principles_shipped_path (resolved
+# relative to this lib file — no plugin-root env var is exported on any
+# surface).
 ac_principles_seed() {
   local dest
   dest="$(ac_principles_path)"
   if [[ -f "$dest" ]]; then
     return 0
   fi
-  local template="${CLAUDE_PLUGIN_ROOT:-}/templates/principles.md"
+  local template
+  template="$(ac_principles_shipped_path)"
   if [[ ! -f "$template" ]]; then
     ac_log_warn "principles.md template not found at $template — creating empty file"
     mkdir -p "$(dirname "$dest")"
