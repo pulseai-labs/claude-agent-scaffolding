@@ -406,6 +406,8 @@ pin "$PRBRIEFS_MD" 'REVIEW_LEVEL=' \
   "the work-PR brief injects the decided review level"
 pin "$PRBRIEFS_MD" 'merge bound to the named SHA' \
   "the work-PR session merges bound to the SHA the top relayed"
+pin "$PRBRIEFS_MD" 'never a squash or rebase' \
+  "the operator merge path is bound to the merge-commit convention too"
 pin "$LIFECYCLE_MD" 'dispatch a work-PR session' \
   "1b dispatches a work-PR session per returned PR"
 pin "$SKILL_MD" 'the `orca-execution.md` sidecar' \

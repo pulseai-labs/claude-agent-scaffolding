@@ -29,7 +29,7 @@ is not authority — the phase begins because *this* session planned *this* spin
 | **Spine session** | the ossify lane, a nested child Run, launching and supervising both item terminals per item, relaying plans up, item-local corrections | changing any ossify contract; moving item tasks into the parent Run |
 | **Item terminals** | one item each: implement, verify | crossing into another item |
 | **Close session** | one dispatch of `/ossify:close`, returning every PR it opened | creating any terminal; driving a PR it opened |
-| **Work-PR session** | one returned PR: the reviewer seat, the PR-fix seat, dispositions, ledgers, and the merge on the top's relayed word | talking to the operator; merging without that word |
+| **Work-PR session** | one returned PR: the reviewer seat, the PR-fix seat, dispositions, ledgers, and the merge on the top's relayed word under its `MERGE_EXECUTOR` assignment — always a merge commit on the named SHA, whoever executes | talking to the operator; merging without that word |
 
 ossify owns worktrees, handoffs, closes, merges and the round barrier, and knows
 nothing about the above.

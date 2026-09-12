@@ -151,7 +151,8 @@ briefed with the two profiles you decided at the PR transition
 for a PR no earlier work-PR dispatch has covered, otherwise the durable record that
 PR's last `open:` result persisted. It owns both PR seats in a child Run of its own,
 relays one summary per round, and asks you for the merge word; you ask the operator,
-and it merges bound to the SHA the reply names. `lifecycle.md` steps 8-12 are that
+and the merge lands under the reply's executor — a merge commit on the SHA the reply
+names, session or operator alike. `lifecycle.md` steps 8-12 are that
 session's loop, not yours.
 
 **Then, once every returned PR has merged, one record pass** — a second

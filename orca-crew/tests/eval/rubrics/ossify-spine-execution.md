@@ -58,8 +58,9 @@ aligned.
    PR), or `closed`. Each returned PR then gets its own **work-PR
    session**, created by the top in that PR's hosting-repo worktree **from the
    sidecar's ratified Work-PR-session block**, which owns
-   the reviewer and PR-fix seats in a child Run of its own and merges on the word
-   the top relays; **only the top talks to the operator**, and every other seat
+   the reviewer and PR-fix seats in a child Run of its own and lands the merge
+   on the word the top relays — a merge commit on the named SHA under its
+   `MERGE_EXECUTOR` assignment, whoever executes; **only the top talks to the operator**, and every other seat
    asks upward one hop. The top running the close itself is a wrong answer
    (`close` is a dispatched command), so is the top reviewing, fixing or merging a
    spine PR in its own session, and so is treating the spine session's completion
@@ -157,7 +158,9 @@ aligned.
    invalid or unknown assignment asks upward — never inferred from visible rules
    or a launch profile, never tested by attempting a merge, and naming the
    session as executor never overrides actual permissions: a runtime denial is
-   surfaced verbatim, never bypassed. A post-disposition finding — a P0/P1
+   surfaced verbatim, never bypassed. Whichever branch executes, the landing is
+   a merge commit on the approved SHA — the operator's path included, never a
+   squash or rebase — and a deviating landing is surfaced, not adopted. A post-disposition finding — a P0/P1
    included — returns through the blocking ask before any seat acts on it;
    the session fixing it itself or deferring it silently is a wrong answer.
    Separately, the record pass is **conditional and single**: a second close is

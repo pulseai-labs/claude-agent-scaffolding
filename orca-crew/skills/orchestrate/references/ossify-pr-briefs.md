@@ -50,18 +50,18 @@ carrying exactly one of three results: EVERY PR the close opened — one line pe
 #<number> <url>`; the single word `closed` when it recorded the spine with no PR
 open; or `halted: <step> — <evidence>` when it stopped, naming the failing step and
 repo and, on its own line, what it had already opened: `opened: <repo> #<n> <url> …`
-or `opened: none`. A multi-repo close can open in one repo and halt on the next, so
-a halt that hides those PRs strands them. A halt is a result, not a PR list with
-none in it, and the top settles it without advancing the lifecycle. Whenever the
+or `opened: none`. A multi-repo close can open in one repo and halt on the next:
+a halt that hides those PRs strands them, and the top settles it without
+advancing the lifecycle. Whenever the
 close review ran, carry its ledger verbatim too — each finding, its decision and
-the reason — because the record pass runs in a different session and cannot
-reconstruct it; the close-review halt is the one whose evidence is that ledger.
+the reason: the record pass runs in a different session and cannot
+reconstruct it, and the close-review halt's evidence is that ledger.
 Then:
   Changed / Evidence / Open / Files.
 
-NEVER: create a terminal, merge, ask the operator anything (questions go up to the
-top with `ask`), or re-invoke `/ossify:close` yourself — a halt settles this
-dispatch, and once the blocker is remediated
+NEVER: create a terminal, merge, ask the operator anything (questions go up to
+the top with `ask`), or re-invoke `/ossify:close` yourself — a halt settles
+this dispatch, and once the blocker is remediated
 the top dispatches a fresh close session. Report a refusal verbatim.
 ```
 
@@ -72,8 +72,8 @@ the top dispatches a fresh close session. Report a refusal verbatim.
 Created by the top **in that PR's hosting-repo worktree** — the one the close
 landed from — so REPO_ROOT is the path this terminal already sits in, never a
 fixed canonical path. Launched from the sidecar's ratified Work-PR-session
-block, its brief carrying the top's merge-executor assignment and PRIOR_REVIEW.
-It owns both PR seats inside a child Run of its own.
+block with the top's merge-executor assignment and PRIOR_REVIEW, it owns both
+PR seats inside a child Run of its own.
 
 ```text
 ROLE: work-PR session for PR PR_NUMBER in PR_REPO, and coordinator of its two
@@ -123,20 +123,19 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      review and its unresolved findings still baseline the disposition. A
      record inconsistent with the PR's live state — wrong PR, a referenced
      ledger that does not exist — is neither: `ask` the top and create
-     nothing. You did not open this PR; the record and the top's dispatch
-     decide, never your own inference.
+     nothing. You did not open this PR; the record and the dispatch decide.
   3. Initial runs only: create the reviewer FIRST, from REVIEWER_COMMAND at
-     REVIEWER_EFFORT, confirm REVIEWER_EXPECTED_MODEL from its banner and first
-     reply, and brief it to run `/code-review PR_NUMBER REVIEW_LEVEL`. Read the findings from its
-     worker_done; it posts nothing itself, so that body is the only copy. Validate
-     it against the reviewer brief's schema — `Findings: none` with
-     `Reviewed head:` and `Summary:`, or finding lines plus both — before you
-     pass anything on; on a malformed body send ONE bounded correction request to that reviewer and
-     re-validate, and escalate a second malformed body to the top. Compare the
-     reviewed head to the current PR head: a mismatch makes the review
-     historical, not current — re-fetch the GitHub signals on the current head
-     rather than commissioning another, and absent or untriaged signals never
-     satisfy the merge gate.
+     REVIEWER_EFFORT, confirm REVIEWER_EXPECTED_MODEL from its banner and
+     first reply, and brief it to run `/code-review PR_NUMBER REVIEW_LEVEL`.
+     Read the findings from its worker_done; it posts nothing itself, so that
+     body is the only copy. Validate it against the reviewer brief's schema —
+     `Findings: none` with `Reviewed head:` and `Summary:`, or finding lines
+     plus both — before you pass anything on; on a malformed body send
+     ONE bounded correction request to that reviewer and re-validate, and
+     escalate a second malformed body to the top. Compare the reviewed head
+     to the current PR head: a mismatch makes the review historical — re-fetch
+     the GitHub signals on the current head rather than commissioning another,
+     and absent or untriaged signals never satisfy the merge gate.
   4. THEN run `/ossify:work-pr $PR_NUMBER --repo-root $REPO_ROOT` — initial
      runs carrying those findings in as its disposition inputs,
      resumed runs carrying the PRIOR_REVIEW baseline. It owns the whole
@@ -153,31 +152,32 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      works the fix list you give it, pushes, and returns `fixed in <sha>` per
      finding, never running work-pr and never asking for a merge — created from
      PRFIX_COMMAND at PRFIX_EFFORT — confirm PRFIX_EXPECTED_MODEL from its banner
-     and first reply before the first fix task, a mismatch being a failed launch
-     to stop and ask about, never to work around. The delegated review ran once,
+     and first reply before the first fix task; a mismatch is a failed launch
+     to ask about, never to work around. The delegated review ran once,
      on the head it was briefed with, and that seat is
-     released after its worker_done validates. Each time the PR-fix seat pushes,
-     the head moves under that verdict — so before the next disposition round,
-     re-fetch the GitHub review signals and the thread state on the new head.
-     The bots review every push, so the current-head verdict is there to be read
+     released after its worker_done validates. Each push moves the head under
+     that verdict: before the next disposition round,
+     re-fetch the GitHub review signals and the thread state on the new head —
+     the bots review every push, so the current-head verdict is there to be read
      rather than re-commissioned.
      A finding that arrives after the disposition ledger exists — a
      post-disposition P0/P1 included — returns through the blocking `ask`
      before any seat acts on it; you never fix it yourself and never defer it
-     silently. Relay
-     ONE batched summary per round to the top. STOPPING_RULE decides when fixing
-     stops.
+     silently. Relay ONE batched summary per round to the top; STOPPING_RULE
+     decides when fixing stops.
   6. When the gate is clean, `ask` the top for the merge word. MERGE_EXECUTOR
      is the top's explicit assignment, not something you infer — never parse
      permission settings, never probe by attempting a merge. On `session`: on
      the reply, re-fetch the whole gate set once more and
      merge bound to the named SHA, as a merge commit. On `operator`: your ask
-     names the operator as executor; on the reply you re-fetch the gates, the
-     operator's chosen path merges, and you confirm and report the resulting
-     merge SHA. Either way a later permission denial is surfaced verbatim,
-     never bypassed. Then release both seats — you are exempt from any
-     record-pass hold, but the spine branch and spine worktree are the top's
-     to hold, never yours to delete.
+     names the operator as executor, the approved SHA and the merge-commit
+     convention; on the reply you re-fetch the gates, the operator's landing
+     is a merge commit on that same SHA — never a squash or rebase — and you
+     confirm and report the resulting merge SHA, surfacing any deviation
+     rather than adopting it. Either way a later permission denial is
+     surfaced verbatim, never bypassed. Then release both seats — you are
+     exempt from any record-pass hold, but the spine branch and spine worktree
+     are the top's to hold, never yours to delete.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
