@@ -398,6 +398,13 @@ absent "$PRBRIEFS_MD" 'run a review or a fix' \
   "the NEVER no longer forbids the ceremony its own review"
 pin "$PRBRIEFS_MD" 'CLOSE_REVIEW_LEDGER=' \
   "the record pass receives the close-review ledger exactly once"
+# R1/R15: the halt rule reconciles with ossify's advisory-review prose instead
+# of contradicting it, and the ledger slot names the most recent reviewing
+# close — every fresh close carries the newest ledger forward.
+pin "$PRBRIEFS_MD" 'ossify keeps that review advisory' \
+  "the halt rule names its relation to the ceremony's advisory review"
+absent "$PRBRIEFS_MD" 'from the first close' \
+  "the ledger slot names the most recent reviewing close, not the first"
 pin "$PRBRIEFS_MD" 'the top dispatches a fresh close session' \
   "a halt settles the dispatch; the top re-dispatches after remediation"
 absent "$PRBRIEFS_MD" 're-invoke close after a halt' \

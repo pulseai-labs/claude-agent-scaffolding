@@ -26,7 +26,8 @@ INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 PARENT_RUN_ID=<run id>
 SPINE_ID=<spine id>
 CLOSE_EXPECTED_MODEL=<model id the banner must show>
-CLOSE_REVIEW_LEDGER=<verbatim ledger from the first close, or "none">
+CLOSE_REVIEW_LEDGER=<verbatim ledger from the most recent close that ran its
+review, or "none">
 TASK/DISPATCH: your task and dispatch identities come from the Orca preamble
 injected into this terminal; spend those verbatim — never placeholders, never
 ids predicted before it existed.
@@ -36,9 +37,10 @@ off, you do not drive: if it opens PRs and halts, that halt is your result.
 The ceremony's own steps are yours to perform, including
 the close review the ceremony itself runs over the accumulated diff before any PR
 opens — that is `/ossify:close` doing its job, not a `/code-review` you dispatch.
-Its findings are yours to report, never to fix: a `fix now` disposition ends this
-dispatch as `halted: close-review — <ledger>` carrying each finding, its decision
-and the reason; the top dispatches the writer — per `ossify-close-writer.md`,
+Its findings are yours to report, never to fix: ossify keeps that review advisory —
+it halts no ceremony gate — but this dispatch is stricter, and a `fix now` disposition
+ends this dispatch as `halted: close-review — <ledger>` carrying each finding, its
+decision and the reason; the top dispatches the writer — per `ossify-close-writer.md`,
 one per affected hosting repo — and a fresh close. On a record
 pass, write the accepted findings CLOSE_REVIEW_LEDGER carries into the
 retrospective's carried-and-lessons section, by class.
@@ -54,9 +56,8 @@ or `opened: none`. A multi-repo close can open in one repo and halt on the
 next: a halt that hides those PRs strands them, and the top settles it
 without advancing the lifecycle. Whenever the close review ran, carry its
 ledger verbatim too — each finding, its decision and the reason: the record
-pass runs in a different session and cannot reconstruct it.
-Then:
-  Changed / Evidence / Open / Files.
+pass cannot reconstruct it.
+Then: Changed / Evidence / Open / Files.
 
 NEVER: create a terminal, merge, ask the operator anything (questions go up to
 the top with `ask`), or re-invoke `/ossify:close` yourself — a halt settles
@@ -108,23 +109,20 @@ TASK: drive PR_NUMBER to a merge on the top's word.
   1. Capture your own preamble identities and PARENT_RUN_ID, then bind a CHILD
      Run for your two seats — every seat's task-create, worker-start, dispatch
      and check names --run <child run id>, every top question --run PARENT_RUN_ID.
-  2. Decide your startup branches BEFORE any seat exists. MERGE_EXECUTOR must
-     read exactly `session` or `operator` — a missing, invalid or unknown
-     assignment is asked upward and nothing is created. Then branch on
-     PRIOR_REVIEW. `none` means the top dispatched you onto a PR no earlier
-     work-PR dispatch has covered — an initial run, and step 3 creates the
-     reviewer. `covered` means a dispatch worked this PR but persisted no
-     record — a resumed run with no reviewer created, the GitHub signals on
-     the current head as your baseline. A record whose
-     reviewed head equals the current PR head is a
-     resumed run: skip only step 3's reviewer creation — the review already
-     ran — and enter step 4 with the record and its unresolved findings as
-     your disposition baseline. A record whose reviewed head differs is a
-     resumed run on a moved head: re-fetch the GitHub signals; the prior
-     review and its unresolved findings still baseline the disposition. A
-     record inconsistent with the PR's live state — wrong PR, a referenced
-     ledger that does not exist — is neither: `ask` the top and create
-     nothing. You did not open this PR; the record and the dispatch decide.
+  2. Decide your startup branches BEFORE any seat exists. MERGE_EXECUTOR must read
+     exactly `session` or `operator` — a missing, invalid or unknown assignment is asked
+     upward and nothing is created. Then branch on PRIOR_REVIEW. `none` means the top
+     dispatched you onto a PR no earlier work-PR dispatch has covered — an initial run,
+     and step 3 creates the reviewer. `covered` means a dispatch worked this PR but
+     persisted no record — a resumed run with no reviewer created, the current head's
+     GitHub signals as your baseline. A record whose reviewed head equals the current PR
+     head is a resumed run: skip only step 3's reviewer creation — the review already ran
+     — and enter step 4 with the record and its unresolved findings as your disposition
+     baseline. A record on a moved head is a resumed run too: re-fetch the GitHub
+     signals; the prior review and its unresolved findings still baseline the
+     disposition. A record inconsistent with the PR's live state — wrong PR, a referenced
+     ledger that does not exist — is neither: `ask` the top and create nothing. You did
+     not open this PR; the record and the dispatch decide.
   3. Initial runs only: create the reviewer FIRST, from REVIEWER_COMMAND at
      REVIEWER_EFFORT, confirm REVIEWER_EXPECTED_MODEL from its banner and
      first reply, and brief it to run `/code-review PR_NUMBER REVIEW_LEVEL`.
@@ -133,10 +131,10 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      `Findings: none` with `Reviewed head:` and `Summary:`, or finding lines
      plus both — before you pass anything on; on a malformed body send
      ONE bounded correction request to that reviewer and re-validate, and
-     escalate a second malformed body to the top. Compare the reviewed head
-     to the current PR head: a mismatch makes the review historical — re-fetch
-     the GitHub signals on the current head rather than commissioning another,
-     and absent or untriaged signals never satisfy the merge gate.
+     escalate a second malformed body to the top. A mismatched reviewed head
+     makes the review historical — re-fetch
+     the GitHub signals rather than commissioning another; absent or
+     untriaged signals never satisfy the merge gate.
   4. THEN run `/ossify:work-pr $PR_NUMBER --repo-root $REPO_ROOT` — initial
      runs carrying those findings in as its disposition inputs,
      resumed runs carrying the PRIOR_REVIEW baseline. It owns the whole
