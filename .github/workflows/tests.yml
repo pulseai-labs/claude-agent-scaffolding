@@ -84,6 +84,13 @@ jobs:
       - name: dual-publish parity (repo-root)
         run: bash tests/test-codex-dual-publish.sh
 
+      - name: Devin publish contract (repo-root)
+        # Model-free manifest/docs contract only. The devin binary is not
+        # publicly installable on CI, so every test-devin-* gate that execs it
+        # (capability, live loader, per-plugin adapters, smokes) stays a
+        # required local release gate — see .devin/INSTALL.md.
+        run: bash tests/test-devin-publish.sh
+
       - name: recommendation-policy parity (repo-root)
         run: bash tests/test-recommendation-policy-parity.sh
 

@@ -265,5 +265,47 @@ for plugin in $ALL_TARGET_PLUGINS; do
   fi
 done
 
+###############################################################################
+# Installation/support documentation contract
+#
+# .devin/INSTALL.md is the governing doc for the Devin surface.  These pin the
+# claims the doc MUST carry (test-first: written before the prose).  Claim
+# strings below are the stable substrings the doc is held to.
+###############################################################################
+INSTALL_DOC="$ROOT/.devin/INSTALL.md"
+assert_file "$INSTALL_DOC" ".devin/INSTALL.md exists"
+
+assert_doc_contains() {
+  # $1 = literal substring the doc must carry, $2 = label
+  if [[ -f "$INSTALL_DOC" ]] && grep -qF "$1" "$INSTALL_DOC"; then
+    pass "$2"
+  else
+    fail "$2"
+  fi
+}
+
+for plugin in $BASELINE_PLUGINS; do
+  assert_doc_contains "$plugin" "INSTALL.md names baseline plugin $plugin"
+done
+
+assert_doc_contains "3000.10.21" "INSTALL.md pins the supported Devin floor"
+assert_doc_contains "Devin Desktop" "INSTALL.md states CLI/Desktop support boundary"
+assert_doc_contains "cloud" "INSTALL.md states cloud-session limitation"
+assert_doc_contains "/.claude/architect-critic" "INSTALL.md documents shared critic state path"
+assert_doc_contains "host" "INSTALL.md states architect-critic is host-only under Devin"
+assert_doc_contains "async" "INSTALL.md states async critique is unsupported under Devin"
+assert_doc_contains "<plugin>:<skill>" "INSTALL.md documents namespaced skill invocation"
+assert_doc_contains "beta" "INSTALL.md carries the plugins-beta caveat"
+assert_doc_contains "requiredPlugins" "INSTALL.md documents meta-plugin auto-install"
+
+# Ossify is baseline (amended): the doc must NOT relegate it to opt-in.
+if [[ ! -f "$INSTALL_DOC" ]]; then
+  fail "INSTALL.md does not describe ossify as optional/opt-in (doc absent — unverifiable)"
+elif grep -qiE 'ossify.{0,40}(optional|opt-in)|(optional|opt-in).{0,40}ossify' "$INSTALL_DOC"; then
+  fail "INSTALL.md must not describe ossify as optional/opt-in (it is baseline)"
+else
+  pass "INSTALL.md does not describe ossify as optional/opt-in"
+fi
+
 printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
