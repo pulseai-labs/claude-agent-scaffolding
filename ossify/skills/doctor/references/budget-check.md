@@ -24,6 +24,11 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"
+# A PATH hit is ours only where a plugin loader adds bin/ — on Devin a hit is
+# a foreign binary by construction; verify it answers our dispatcher first.
+if [ -n "$oss_bin" ]; then
+  case "$("$oss_bin" help 2>/dev/null)" in *ossify*) : ;; *) oss_bin="" ;; esac
+fi
 # Devin: bin/ is not on PATH — resolve the installed source instead. For a
 # --local install `source:` is the linked filesystem path; a remote install
 # reports a git URL and the tree materializes under the plugin cache —
@@ -125,6 +130,11 @@ So measure it rather than quoting a remembered figure:
 
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"
+# A PATH hit is ours only where a plugin loader adds bin/ — on Devin a hit is
+# a foreign binary by construction; verify it answers our dispatcher first.
+if [ -n "$oss_bin" ]; then
+  case "$("$oss_bin" help 2>/dev/null)" in *ossify*) : ;; *) oss_bin="" ;; esac
+fi
 # Devin: bin/ is not on PATH — resolve the installed source instead (same
 # guarded recipe as above: absolute source: path, else the materialized
 # plugin-cache manifest for remote installs).

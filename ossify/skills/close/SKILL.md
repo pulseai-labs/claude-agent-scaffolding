@@ -59,7 +59,7 @@ recorded, and the recovery is the user's to pick.
 The scope is derived **mechanically from the id's shape**. Never ask which scope
 the user meant, and never infer it from the wording of the request.
 
-Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
 
 ```bash
 id="<the id from $ARGUMENTS>"

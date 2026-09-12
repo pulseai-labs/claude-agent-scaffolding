@@ -28,7 +28,7 @@ restated here.
 - `/adopt` (slash command — §8 for the `$ARGUMENTS` bridge)
 - "adopt this project into ossify", "onboard a project that already has code"
 
-Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
 
 **Do NOT auto-invoke when:**
 

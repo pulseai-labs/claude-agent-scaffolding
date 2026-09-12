@@ -62,7 +62,7 @@ Once you have a path: `Read` the artifact end-to-end. Hold its contents in your 
 
 Principles are the lens you audit through. Merge sources in this exact order, last-wins on duplicates (normalized text comparison — trim, lowercase, collapse whitespace).
 
-Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
 1. **Shipped defaults** — `templates/principles.md` (relative to the plugin root). Always loaded. Contains the **Ghost Notes principle** (what is absent from the spec is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy as the tone for every challenge raised).
 2. **User-global** — the user's promoted principles across all projects, at the path `"$arc_bin" principles_user_path` resolves (`~/.claude/architect-critic/principles.md`, under `$HOME` — unlike `"$arc_bin" state_path`, this one does not consult `CLAUDE_PLUGIN_DATA`).

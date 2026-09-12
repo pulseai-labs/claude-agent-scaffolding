@@ -7,7 +7,10 @@ globs: "**/*"
 The `wi` dispatcher is at `<plugin-source>/bin/wi` where `<plugin-source>` is
 the installed plugin's source directory. On Devin, `bin/` directories are NOT
 added to `$PATH`. Always invoke `wi` via the `exec` tool with its full path,
-never as a bare `wi` command.
+never as a bare `wi` command. And never resolve `wi` via `command -v wi`
+on Devin — since this plugin's `bin/` is never on `$PATH` there, a PATH hit
+can only be a foreign binary (an unrelated `wi` binary); verify a candidate answers our
+dispatcher (e.g. `wi --list`/`help` emitting our verbs) before trusting it.
 
 To discover the plugin source path, run `devin plugins info workspace-init`
 and read the `source:` field, or use the skill's own base directory and

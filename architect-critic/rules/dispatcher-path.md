@@ -7,7 +7,10 @@ globs: "**/*"
 The `arc` dispatcher is at `<plugin-source>/bin/arc` where `<plugin-source>` is
 the installed plugin's source directory. On Devin, `bin/` directories are NOT
 added to `$PATH`. Always invoke `arc` via the `exec` tool with its full path,
-never as a bare `arc` command.
+never as a bare `arc` command. And never resolve `arc` via `command -v arc`
+on Devin — since this plugin's `bin/` is never on `$PATH` there, a PATH hit
+can only be a foreign binary (Phabricator's Arcanist); verify a candidate answers our
+dispatcher (e.g. `arc --list`/`help` emitting our verbs) before trusting it.
 
 To discover the plugin source path, run `devin plugins info architect-critic`
 and read the `source:` field, or use the skill's own base directory and

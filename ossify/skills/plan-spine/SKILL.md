@@ -59,7 +59,7 @@ implementer dispatch, verification, and merge belong to the execution engine
 
 ## 3. Pre-flight
 
-Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
 
 All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`, on `$PATH`
 because Claude Code adds each plugin's `bin/` automatically; the dispatcher's bash

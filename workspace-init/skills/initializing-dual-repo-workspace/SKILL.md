@@ -109,7 +109,7 @@ the repository state matches the manifest default on every machine.
 
 ## 4. Validate via lib/
 
-Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
+Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
 
 Run preflight via the `wi` dispatcher:
 

@@ -49,6 +49,11 @@ further up, beside it. Two steps, loud on failure:
 
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"
+# A PATH hit is ours only where a plugin loader adds bin/ — on Devin a hit is
+# a foreign binary by construction; verify it answers our dispatcher first.
+if [ -n "$oss_bin" ]; then
+  case "$("$oss_bin" help 2>/dev/null)" in *ossify*) : ;; *) oss_bin="" ;; esac
+fi
 # Devin: bin/ is not on PATH — resolve the installed source instead. For a
 # --local install `source:` is the linked filesystem path; a remote install
 # reports a git URL (file://… or https://…#ossify) and the tree materializes
