@@ -118,7 +118,7 @@ active at the proposed barrier is a halt naming the item and the missing close, 
 success; remediation is the top's to decide, and a fresh spine-level completion is
 required before this section runs.
 
-**The first close opens one PR per hosting repo and halts while any is open**,
+**The first close opens one PR per remote hosting repo and halts while any is open**,
 recording nothing (`close/references/spine-close.md`); its `worker_done` names **every**
 PR it opened, repo and number — or the single word `closed`, when every hosting repo
 was remote-less and it recorded the spine outright.
@@ -151,8 +151,8 @@ fixes, and no seat is created for this permanently.
 hosting-repo worktree, launched from the sidecar's ratified Work-PR-session block, and
 briefed with the two profiles you decided at the PR transition
 (`ossify-execution.md` §5), the merge-executor assignment, and `PRIOR_REVIEW` — `none`
-for a PR no earlier work-PR dispatch has covered, `covered` when one has but left
-no record, otherwise the durable record that
+for a PR no earlier work-PR dispatch has covered, `covered` when one has and left
+durable evidence its review ran but no record, otherwise the durable record that
 PR's last `open:` result persisted. It owns both PR seats in a child Run of its own,
 relays one summary per round, and asks you for the merge word; you ask the operator,
 and the merge lands under the reply's executor — a merge commit on the SHA the reply

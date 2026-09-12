@@ -19,13 +19,15 @@ Every command's syntax comes from `orca skills get orchestration`.
    lands you **dispatch** `/ossify:close <spine-id>` to a **fresh** close session —
    launched from the sidecar's ratified Close-session block — never
    the spine driver's terminal, and wait on its `worker_done`, which returns **every** PR
-   it opened, one per product hosting repo — an AI-workspace record arm is not one —
+   it opened, one per remote product hosting repo — a remote-less repo lands
+   locally and is never a PR; an AI-workspace record arm is not one —
    or `closed`; `close` is a dispatched command (§6),
    not one you run here. Then **dispatch a work-PR session** per returned PR, in that
    PR's own hosting-repo worktree, launched from the sidecar's ratified Work-PR-session
    block, carrying the reviewer **and** PR-fix profiles you
    decide now, the merge-executor assignment, and `PRIOR_REVIEW` (`none` for a PR no
-   earlier work-PR dispatch has covered, `covered` when one has but left no record,
+   earlier work-PR dispatch has covered, `covered` when one has and left durable
+   evidence its review ran but no record,
    otherwise the record its last `open:` result
    persisted): steps 8-12 are that session's loop, and you relay the merge word to it
    rather than merging yourself. Once every returned PR has merged, dispatch the record

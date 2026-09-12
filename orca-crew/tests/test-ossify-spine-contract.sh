@@ -241,6 +241,11 @@ pin "$PRBRIEFS_MD" 'PRIOR_REVIEW=' \
   "the work-PR brief injects the prior review record exactly once"
 pin "$PRBRIEFS_MD" '"covered"' \
   "PRIOR_REVIEW has a third value for a covered-but-recordless PR"
+# N1 (Codex, round 2): "covered" is evidence-gated — a dispatch that crashed
+# before its reviewer existed cannot be labelled covered, or the PR merges
+# with zero reviews.
+pin "$PRBRIEFS_MD" 'durable evidence its delegated review ran' \
+  "'covered' is spent only on durable evidence the review ran"
 pin "$PRBRIEFS_MD" 'MERGE_EXECUTOR=' \
   "the work-PR brief injects the top's merge-executor assignment exactly once"
 pin "$PRBRIEFS_MD" 'halted: close-review' \

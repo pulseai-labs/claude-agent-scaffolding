@@ -52,7 +52,9 @@ aligned.
    naming it, never a completion**. **The top dispatches
    `/ossify:close` as a task** — to a fresh terminal it creates, never the spine
    driver's — and waits on its `worker_done` for every PR it opened, one per
-   **product hosting repo** (a declared product `target_repo`; an AI workspace
+   **remote product hosting repo** — a remote-less repo lands locally in the
+   same close and is never a PR (a declared product `target_repo` either way;
+   an AI workspace
    carrying ceremony records is not one — its records stay on that repo's record
    branch under its own policy, never pushed to its `main`, never claimed as a
    PR), or `closed`. Each returned PR then gets its own **work-PR
@@ -141,8 +143,10 @@ aligned.
    fix task waits for the disposition ledger and rides the fix-round brief.
    The work-PR session branches **initial versus resumed before any reviewer
    exists**, on the top-supplied `PRIOR_REVIEW`: `none` is an initial run;
-   `covered` — a dispatch worked the PR but persisted no record — resumes the
-   same way, no reviewer created, the live GitHub signals as the baseline; a
+   `covered` — a dispatch worked the PR, durable evidence its review ran, no
+   record persisted — resumes the same way, no reviewer created, the live
+   GitHub signals as the baseline, and evidence absent the value is not
+   spent but asked upward; a
    record whose reviewed head equals the current PR head resumes disposition
    with **no reviewer created**, and a moved head re-fetches the GitHub signals
    with the prior review and its unresolved findings as the baseline — same head

@@ -125,8 +125,9 @@ additional reviews, fresh dispatch identities. The merge executor is the top's e
 `MERGE_EXECUTOR` assignment, never inferred or probed. Brief lifecycle identities come
 from the injected Orca preamble, never from pre-filled slots; alias-launched item
 terminals are closed explicitly and their absence verified at teardown; the PR seats are
-exempt from the record-pass hold; and the close's PR list covers product hosting repos
-only — an AI-workspace record arm is not one.
+exempt from the record-pass hold; and the close's PR list covers remote product
+hosting repos only — a remote-less repo lands locally and is never a PR; an
+AI-workspace record arm is not one.
 
 ## Requirements
 
