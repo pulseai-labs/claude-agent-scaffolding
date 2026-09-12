@@ -615,7 +615,7 @@ test("Task 8 reconciles registered Ossify availability across shipped surfaces",
   const localCodex = markdownSection(rootReadme, "Local Codex Development", 3);
   const layout = markdownSection(rootReadme, "Layout");
 
-  assert.match(intro, /Claude Code and Codex plugin marketplace.*OpenCode adapter/is);
+  assert.match(intro, /Claude Code, Codex, and Devin plugin marketplace.*OpenCode\s+adapter/is);
   assert.ok(ossifyRow, "root inventory must include Ossify");
   assert.match(ossifyRow.Scope, /Project-level \(continuous\)/);
   assert.match(
@@ -1024,7 +1024,9 @@ test("Ossify selection registers the translated canonical implementer agent", as
   assert.ok(!Object.hasOwn(agent, "model"));
   assert.equal(
     agent.prompt,
-    body.replaceAll("${CLAUDE_PLUGIN_ROOT}", ossifyRoot),
+    body
+      .replaceAll("${CLAUDE_PLUGIN_ROOT}", ossifyRoot)
+      .replaceAll("`skills/", `\`${ossifyRoot}/skills/`),
   );
   assert.ok(!agent.prompt.includes("CLAUDE_PLUGIN_ROOT"));
   assert.ok(
