@@ -20,9 +20,11 @@ this layer most easily goes silently wrong.
 
 **The worktree is the easy one**: state holds it, written by the execution lane.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
 wi="<work-item id>"
-wt="$(oss get ".work_items[] | select(.id==\"$wi\") | .worktree_path")"
+wt="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .worktree_path")"
 [ -n "$wt" ] && [ "$wt" != "null" ] && [ -d "$wt" ] \
   || { echo "close: no recorded worktree for $wi - halt"; exit 1; }
 ```
@@ -73,10 +75,10 @@ is recovered by globbing the spine directory, exactly as the execution lane
 recovers it for the spine branch.
 
 ```bash
-parts="$(oss id_parse "$wi")" || parts=""
+parts="$("$oss_bin" id_parse "$wi")" || parts=""
 rel_id="r$(printf '%s\n' "$parts" | awk '{print $2}')"
 spine_id="$rel_id.s$(printf '%s\n' "$parts" | awk '{print $3}')"
-rel_dir="$(oss release_dir "$rel_id")"   # ABSOLUTE, ai_workspace-rooted
+rel_dir="$("$oss_bin" release_dir "$rel_id")"   # ABSOLUTE, ai_workspace-rooted
 
 matches="$(find "$rel_dir" -maxdepth 1 -type d -name "$spine_id-*" 2>/dev/null)"
 n="$(printf '%s\n' "$matches" | grep -c . || true)"
@@ -300,7 +302,7 @@ commits. The merge is what actually moves the work onto the spine.
 # host items across several declared repos (round-orchestration.md §2 cuts the
 # spine branch in every one of them); this layer closes ONE item, so it targets
 # exactly the repo that item recorded at work_item_add time.
-target_repo="$(oss get ".work_items[] | select(.id==\"$wi\") | .target_repo")"
+target_repo="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .target_repo")"
 # `ai_workspace` BEFORE the resolver, because the resolver SUCCEEDS on it: it is
 # the reserved alias for the process workspace, so treating resolution as proof
 # of a hosting repo would route this close's commit and merge into the AI
@@ -308,16 +310,16 @@ target_repo="$(oss get ".work_items[] | select(.id==\"$wi\") | .target_repo")"
 # written before that guard - or hand-edited state - still reaches here.
 [ "$target_repo" != "ai_workspace" ] \
   || { echo "close: $wi targets 'ai_workspace', which is the process workspace, not a hosting repo - no ceremony governs that repo and nothing may be merged into it - halt"; exit 1; }
-repo_root="$(oss repo_root "$target_repo")" || { echo "close: $wi targets undeclared repo '$target_repo' - halt"; exit 1; }
+repo_root="$("$oss_bin" repo_root "$target_repo")" || { echo "close: $wi targets undeclared repo '$target_repo' - halt"; exit 1; }
 
 # The merge target comes from STATE, written by the execution lane.
-wi_branch="$(oss get ".work_items[] | select(.id==\"$wi\") | .branch")"
+wi_branch="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .branch")"
 [ -n "$wi_branch" ] && [ "$wi_branch" != "null" ] \
   || { echo "close: no recorded branch for $wi - halt"; exit 1; }
 
 # The spine branch: in the round flow it is already in scope; standalone,
 # recompose it from the slug step 1 recovered.
-spine_branch="$(oss branch_name "$spine_id" "$spine_slug")"
+spine_branch="$("$oss_bin" branch_name "$spine_id" "$spine_slug")"
 head_branch="$(git -C "$repo_root" rev-parse --abbrev-ref HEAD)"
 [ "$head_branch" = "$spine_branch" ] \
   || { echo "close: $target_repo is on '$head_branch', not '$spine_branch' - halt"; exit 1; }
@@ -329,7 +331,7 @@ git -C "$repo_root" merge --no-ff "$wi_branch" -m "merge $wi" || { echo "close: 
 git -C "$repo_root" merge-base --is-ancestor "$wi_sha" HEAD \
   || { echo "close: merge reported success but $wi_sha is not reachable from HEAD - halt"; exit 1; }
 
-oss work_item_status "$wi" complete
+"$oss_bin" work_item_status "$wi" complete
 ```
 
 **Read the branch from state; never re-derive it from a slug.** This layer is

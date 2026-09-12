@@ -18,9 +18,11 @@ at each groom rather than in state (§2). Each entry:
 | `class_guess` | `bone` or `flesh` — a **guess**, made before any plan existed |
 | `source` | `journey-map` · `spec` · `release-retro` · `deferral` · `real-use` · `fake-replacement` · `feature-map-return` |
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss feature_list                                   # the whole map, as JSON
-oss feature_add "<name>" "<value>" "<bone|flesh>" "<source>"
+"$oss_bin" feature_list                                   # the whole map, as JSON
+"$oss_bin" feature_add "<name>" "<value>" "<bone|flesh>" "<source>"
 ```
 
 `class_guess` is **not** the class. It ranks and warns; the class ladder

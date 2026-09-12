@@ -35,8 +35,10 @@ number, a branch name, a worktree path, a spine's `name`, a work item's `title`.
 
 ## 2. The call, and what comes back
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-parts="$(oss id_parse "$id")" || parts=""
+parts="$("$oss_bin" id_parse "$id")" || parts=""
 scope="$(printf '%s\n' "$parts" | awk '{print $1}')"
 ```
 
@@ -93,8 +95,8 @@ bare assignment from a command that is *expected* to fail on bad input; under
 `/close` with no id **refuses and lists what is open.** It does not guess.
 
 ```bash
-oss spine_list
-oss get '[.work_items[] | select(.status != "complete") | {id, title, status}]'
+"$oss_bin" spine_list
+"$oss_bin" get '[.work_items[] | select(.status != "complete") | {id, title, status}]'
 ```
 
 Then ask for the id explicitly. The reason to refuse rather than guess: a close

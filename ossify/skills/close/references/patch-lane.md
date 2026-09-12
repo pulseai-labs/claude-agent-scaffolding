@@ -47,11 +47,13 @@ memory exercise.
 
 Feed it the paths the change actually touches, one argument per path:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
 # "$@" = the paths this change touches, ONE ARGUMENT PER PATH. `set -- a b c`
 # builds that without breaking on a path containing a space; an array is the
 # obvious alternative and is worse, for the reason `spine-close.md` §6 gives.
-tc=0; hits="$(oss touch_check "$@")" || tc=$?
+tc=0; hits="$("$oss_bin" touch_check "$@")" || tc=$?
 case "$tc" in
   0) printf '%s\n' "$hits"
      echo "patch lane: this change touches a declared surface - it is a spine, not a patch" ;;
@@ -131,7 +133,7 @@ repo the patch actually targets:**
 # repo ahead of time - a patch is not a work item, so nothing records one for
 # you to read back.
 repo_key="<the repo this patch targets>"
-repo_root="$(oss repo_root "$repo_key")" \
+repo_root="$("$oss_bin" repo_root "$repo_key")" \
   || { echo "halt: '$repo_key' is not a declared repo"; exit 1; }
 # The project's integration branch. There is no state field for it in v0.2, so
 # resolve it from the remote's default and let the user correct it if wrong.
@@ -181,7 +183,7 @@ splits the patch lane across two places and the second one has no record.
 ## 5b. Recording it
 
 ```bash
-oss patch_add "<commit-sha>" "<one line: what changed and why it took no spine>" "$repo_key"
+"$oss_bin" patch_add "<commit-sha>" "<one line: what changed and why it took no spine>" "$repo_key"
 ```
 
 **Three arguments, and the sha comes first.** It is recorded **after** the

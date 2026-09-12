@@ -108,8 +108,10 @@ Steps 1-4 are the thinnest coherent path: a trader gets a real, judged answer to
 Every step NOT marked `skeleton` is recorded as a candidate spine before you
 leave this block — this is what stops the vision conversation from evaporating:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss feature_add "<name>" "<one-line user value>" "<bone|flesh>" journey-map
+"$oss_bin" feature_add "<name>" "<one-line user value>" "<bone|flesh>" journey-map
 ```
 
 - `<name>` — short, the step's action ("save a named strategy").

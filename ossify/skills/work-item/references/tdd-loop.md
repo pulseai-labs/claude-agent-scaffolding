@@ -19,11 +19,13 @@ AC-4  pytest tests/                                        exit 0
 
 ### RED gate first (SKILL.md §4)
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss redgate "<worktree-abs>" "pytest tests/test_slugify.py::test_ascii_slug" "exit 0"
+"$oss_bin" redgate "<worktree-abs>" "pytest tests/test_slugify.py::test_ascii_slug" "exit 0"
 # rc 2 — tests/test_slugify.py does not exist yet. ADVISORY. Recorded, proceed.
 
-oss redgate "<worktree-abs>" "python -m tocgen sample.md" "output contains - [Install](#install)"
+"$oss_bin" redgate "<worktree-abs>" "python -m tocgen sample.md" "output contains - [Install](#install)"
 # rc 0 — RED. The generator runs but emits no anchor links yet. Proceed.
 ```
 

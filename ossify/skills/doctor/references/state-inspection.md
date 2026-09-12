@@ -70,14 +70,16 @@ line exists.
 **Yours to read.** Each is a count or a directory check; report one line each in
 the same grammar. Run them after the verb, so a broken state fails first:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
 # ONE path for the whole read-out, and pass it to doctor too.
-sf="${OSS_STATE_FILE:-$(oss state_path)}"
-oss doctor "$sf"           # the gate, on the SAME state the reads below use
-oss get '[.demo_ledger[] | select(((.pending_amendments // []) | length) > 0)] | length' "$sf"
-oss get '[.demo_ledger[] | select(.status == "quarantined")] | length' "$sf"
-oss get '[.fakes[] | select(.status == "active" or .status == "renewed")] | length' "$sf"
-oss get '.patch_records | length' "$sf"
+sf="${OSS_STATE_FILE:-$("$oss_bin" state_path)}"
+"$oss_bin" doctor "$sf"           # the gate, on the SAME state the reads below use
+"$oss_bin" get '[.demo_ledger[] | select(((.pending_amendments // []) | length) > 0)] | length' "$sf"
+"$oss_bin" get '[.demo_ledger[] | select(.status == "quarantined")] | length' "$sf"
+"$oss_bin" get '[.fakes[] | select(.status == "active" or .status == "renewed")] | length' "$sf"
+"$oss_bin" get '.patch_records | length' "$sf"
 ```
 
 **Resolve `sf` once, with `$OSS_STATE_FILE` first, and pass it to everything —
@@ -136,7 +138,7 @@ an **object's values**, so a structurally corrupt field returns a plausible numb
 at rc 0 rather than an error. Run this first and treat any non-`array` as `skip:`:
 
 ```bash
-oss get '{ledger: (.demo_ledger|type), fakes: (.fakes|type), patches: (.patch_records|type)}' "$sf"
+"$oss_bin" get '{ledger: (.demo_ledger|type), fakes: (.fakes|type), patches: (.patch_records|type)}' "$sf"
 ```
 
 Measured, all three ways a corrupt field lies:
@@ -221,7 +223,7 @@ file.
 # transcribed copy is exactly the drift the deleted (12b) guard used to catch.
 # ALWAYS both arguments: the repo key AND the state this run is inspecting -
 # the same "$sf" the rest of the read-out uses (§2), never a fresh oss state_path.
-oss worktree_orphans <key> "$sf"     # once per declared key
+"$oss_bin" worktree_orphans <key> "$sf"     # once per declared key
 ```
 
 **Pass the key every time — the verb does not make you.** Omitting it resolves

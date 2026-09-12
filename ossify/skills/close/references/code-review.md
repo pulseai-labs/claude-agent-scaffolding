@@ -60,6 +60,8 @@ contaminated by the other.
 
 ### Getting the diff
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
 # $spine_branch and $repo_base_branches (one "<repo>:<base_branch>" pair per
 # line, one line per hosting repo) are ALREADY RESOLVED by the ceremony —
@@ -72,12 +74,12 @@ contaminated by the other.
 # iterates. A cross-repo spine's diff spans every one of them, and reading
 # only one repo's diff reviews PART of the spine dressed up as the whole of
 # it — which is worse than skipping the review, because it reads as done.
-hosting_repos="$(oss get ".work_items[] | select(.spine==\"$spine_id\") | .target_repo" | sort -u)"
+hosting_repos="$("$oss_bin" get ".work_items[] | select(.spine==\"$spine_id\") | .target_repo" | sort -u)"
 [ -n "$hosting_repos" ] \
   || { echo "code-review: no work items found for $spine_id - halt, cannot scope the diff"; exit 1; }
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue
-  repo_root="$(oss repo_root "$repo")" \
+  repo_root="$("$oss_bin" repo_root "$repo")" \
     || { echo "code-review: $spine_id names undeclared repo '$repo' - halt"; exit 1; }
   base_branch="$(printf '%s\n' "$repo_base_branches" | awk -F: -v r="$repo" '$1==r{print $2; exit}')"
   [ -n "$base_branch" ] \

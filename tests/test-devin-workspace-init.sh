@@ -368,7 +368,7 @@ printf '\nProbe 9: plugins info shows rules\n'
 # section prints "(none)" even when the file ships. The verifiable contract:
 # the rule file exists under the loader-reported source path.
 info="$(run_devin plugins info workspace-init 2>&1)"
-installed_src="$(printf '%s' "$info" | awk '/source:/ {print $NF; exit}')"
+installed_src="$(printf '%s' "$info" | sed -n 's/^ *source: *//p' | head -1)"
 if [ -n "$installed_src" ] && [ -f "$installed_src/rules/dispatcher-path.md" ]; then
   pass "dispatcher-path.md present at loader-reported source: $installed_src"
 else

@@ -70,9 +70,11 @@ libs break. Use `oss help` for discovery.
 
 **Two probes, both fail-fast.**
 
+Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+
 ```bash
-if ! sp="$(oss state_path 2>/dev/null)"; then
-  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands."
+if ! sp="$("$oss_bin" state_path 2>/dev/null)"; then
+  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands. On Devin, adopt is not published - run it on Claude Code or Codex against the same checkout; the .ossify state it authors is surface-agnostic."
   exit 0
 fi
 # Later bare verbs resolve state alone and would honor this override —
@@ -81,7 +83,7 @@ if [ -n "${OSS_STATE_FILE:-}" ]; then
   printf '%s\n' "plan-release plans the manifest's project; OSS_STATE_FILE='${OSS_STATE_FILE}' is set - unset it and re-run."
   exit 0
 fi
-bones="$(oss get '.bones | length' "$sp" 2>/dev/null)" || bones=""
+bones="$("$oss_bin" get '.bones | length' "$sp" 2>/dev/null)" || bones=""
 printf 'bones=%s\n' "${bones:-<no state>}"
 ```
 
@@ -137,7 +139,7 @@ a release planned without it is planned from memory of the plan rather than from
 the product. Record them:
 
 ```bash
-oss release_set_meta "<release-id>" '{"real_use_findings":["<finding>","<finding>"]}'
+"$oss_bin" release_set_meta "<release-id>" '{"real_use_findings":["<finding>","<finding>"]}'
 ```
 
 (Chronology note: the release record must exist before you can patch it — collect
@@ -147,7 +149,7 @@ Findings that describe missing or broken value become feature-map entries
 immediately, so they compete for selection like everything else:
 
 ```bash
-oss feature_add "<name>" "<one-line user value>" "<bone|flesh>" real-use
+"$oss_bin" feature_add "<name>" "<one-line user value>" "<bone|flesh>" real-use
 ```
 
 Full input contract in `references/real-use-findings.md`.
@@ -184,9 +186,9 @@ strike it.
 **5c. Create the release and its spines.**
 
 ```bash
-rel="$(oss release_add "<name>" "<goal phrased as what a user can do at close>")"
-sid="$(oss spine_add "$rel" "<spine name>" "<bone|flesh>")"   # one per spine; keep each id
-oss release_set_meta "$rel" '{"exit_criteria":["At close, a trader can …"]}'
+rel="$("$oss_bin" release_add "<name>" "<goal phrased as what a user can do at close>")"
+sid="$("$oss_bin" spine_add "$rel" "<spine name>" "<bone|flesh>")"   # one per spine; keep each id
+"$oss_bin" release_set_meta "$rel" '{"exit_criteria":["At close, a trader can …"]}'
 ```
 
 `oss release_add` prints the minted release id (`r0`, `r1`, …); `oss spine_add`
@@ -211,7 +213,7 @@ precisely so that exceeding it forces a **prune / parallelize / deepen** decisio
 *at planning time*, never silent growth at close time.
 
 ```bash
-oss release_set_meta "$rel" '{"ledger_budget":"600s"}'
+"$oss_bin" release_set_meta "$rel" '{"ledger_budget":"600s"}'
 ```
 
 Ask the user for the number; propose one if they have none (a few minutes is a
@@ -243,7 +245,7 @@ not work-item granularity (that is `plan-spine`'s round DAG). An edge means *thi
 spine cannot start until that one closes*, for a real reason you can name.
 
 ```bash
-oss release_set_meta "$rel" '{"spine_dag":[["r1.s1",[]],["r1.s2",["r1.s1"]],["r1.s3",[]]]}'
+"$oss_bin" release_set_meta "$rel" '{"spine_dag":[["r1.s1",[]],["r1.s2",["r1.s1"]],["r1.s3",[]]]}'
 ```
 
 Shape: `[[<spine-id>,[<dep-id>,…]],…]`. Every spine in the release appears exactly
@@ -292,7 +294,7 @@ Full rules, the enabler/bone contrast, and worked examples in
 For each spine, collect the paths its plan expects to change and check them:
 
 ```bash
-oss touch_check src/domain/order.rs src/ui/export.rs; tc=$?
+"$oss_bin" touch_check src/domain/order.rs src/ui/export.rs; tc=$?
 case "$tc" in
   0) : ;;   # HIT - prints "bone <adr>" / "risk_gate <name>" per match
   1) : ;;   # clean
@@ -310,8 +312,8 @@ On a hit, reclassify and record — regardless of the spine's declared class and
 regardless of what the critic says:
 
 ```bash
-oss class_set "<spine>" bone "bone-touch: <ADR-ref> (<matched surface>)"
-oss veto_add  "<spine>" "bone-touch: <ADR-ref> (<matched surface>)" auto-bone "touch-surface overlap"
+"$oss_bin" class_set "<spine>" bone "bone-touch: <ADR-ref> (<matched surface>)"
+"$oss_bin" veto_add  "<spine>" "bone-touch: <ADR-ref> (<matched surface>)" auto-bone "touch-surface overlap"
 ```
 
 A **risk-gate** hit does the same *and* attaches that gate's control checklist
@@ -377,7 +379,7 @@ with the dispositions folded in. Create the release spec directory and write
 `RELEASE.md` into it:
 
 ```bash
-rel_dir="$(oss release_dir "$rel")"   # ABSOLUTE, manifest-rooted — never paste the <ai-workspace> shape
+rel_dir="$("$oss_bin" release_dir "$rel")"   # ABSOLUTE, manifest-rooted — never paste the <ai-workspace> shape
 mkdir -p "$rel_dir"                   # e.g. docs/specs/r0/RELEASE.md lives here
 ```
 
@@ -406,7 +408,7 @@ beyond.** The sketch is a goal plus candidate spines — no exit criteria, no DA
 no classes, no specs.
 
 ```bash
-oss release_set_meta "$rel" '{"next_sketch":{"goal":"<one line>","candidates":["<spine>","<spine>"]}}'
+"$oss_bin" release_set_meta "$rel" '{"next_sketch":{"goal":"<one line>","candidates":["<spine>","<spine>"]}}'
 ```
 
 The sketch is the only thing entitled to look past this release, and the

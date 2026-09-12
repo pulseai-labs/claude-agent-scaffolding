@@ -29,8 +29,10 @@ Two kinds, and only the first is a command:
 
 **Mechanical** — the path exists, the ADR id exists, the quoted signature matches:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss get '[.bones[].adr]'                                  # the ADR ids that exist
+"$oss_bin" get '[.bones[].adr]'                                  # the ADR ids that exist
 test -f src/app/orders.rs                                 # the path exists
 grep -n 'fn submit_order' src/app/orders.rs || true       # the signature is still there
 ```
@@ -78,7 +80,7 @@ being executed against architecture that no longer exists. Registered touch
 surfaces make the blast radius findable:
 
 ```bash
-oss get '.bones[] | select(.adr == "ADR-0002") | .touch'
+"$oss_bin" get '.bones[] | select(.adr == "ADR-0002") | .touch'
 ```
 
 ---

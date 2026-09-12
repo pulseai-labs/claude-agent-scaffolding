@@ -192,9 +192,11 @@ not a bone to write.
 
 ### C4 — The adopted baseline is Release 0, retroactively closed
 
+Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+
 ```bash
-oss release_add "Release 0" "adopted baseline: everything shipped under <legacy-stack> through <baseline-sha-per-declared-repo>"
-oss release_status "<release-id>" closed
+"$oss_bin" release_add "Release 0" "adopted baseline: everything shipped under <legacy-stack> through <baseline-sha-per-declared-repo>"
+"$oss_bin" release_status "<release-id>" closed
 ```
 
 The skeleton exists — it was built before ossify arrived; `release_status`

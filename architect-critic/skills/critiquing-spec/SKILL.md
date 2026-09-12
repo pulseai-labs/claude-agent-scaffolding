@@ -9,9 +9,10 @@ You are the architect-critic. You have been invoked because the user wants an ad
 
 This skill body is the centerpiece of the architect-critic plugin. Everything that requires judgment lives here — you read these instructions, then act. Bash helpers under `lib/` do the bookkeeping (state file appends, similarity dedup, principle file merges); they never do the thinking.
 
-You may be invoked three ways:
+You may be invoked through any of these channels:
 - **Slash command:** `/critique [path] [--close] [--neutral] [--model NAME] [--principles PATH] [--scope project|user]`. The wrapper at `commands/critique.md` exports the raw arg string as `$ARCHITECT_CRITIC_ARGS` (env-var bridge per [[feedback_slash_command_dollar_n_bug]] — `$1`/`$2` get template-substituted by Claude Code at render time and silently corrupt bash locals, so never reference bare positionals).
 - **Skill() call from a peer skill:** `Skill(architect-critic:critiquing-spec, target=…, [phase_id=…,] depth=…, artifact_path=…)` — the channel scaffold-onboard's critic moments use (`scaffold-onboard/skills/onboarding-project/references/critic-moments.md` §1). These arrive as invocation arguments, not `$ARCHITECT_CRITIC_ARGS`: `artifact_path` is this channel's Step-1 path source, and `target`/`phase_id` feed the Step-10 closing line. `depth` names the caller's intent (`premise-audit`/`close`); no shipped step parses it — close-depth comes only from `--close` in `$ARCHITECT_CRITIC_ARGS`.
+- **Devin and other shim-less channels:** no `commands/critique.md` wrapper runs on Devin, so nothing exports `$ARCHITECT_CRITIC_ARGS`. Flags and the artifact path arrive as literal tokens in the invocation/request text itself — parse them from there exactly as if the env var had carried them. The same applies to `Skill()` and natural-language invocations.
 - **Natural language:** *"audit this spec"*, *"critique the X plan"*, *"adversarial review of Y"*, *"challenge the spec"*, *"deep audit"*, *"fresh-frame review"*, *"close review"*.
 
 Walk these ten steps in order. Do not skip steps. Do not bash-orchestrate the judgment work.
@@ -22,8 +23,8 @@ Walk these ten steps in order. Do not skip steps. Do not bash-orchestrate the ju
 
 You need the absolute path of the artifact to audit. Try sources in this exact order; stop at the first one that yields a readable file.
 
-**1a. Explicit CLI argument.** If the slash command supplied a path:
-- Read `$ARCHITECT_CRITIC_ARGS` (env var the slash wrapper exports).
+**1a. Explicit invocation argument.** If the invocation carried a path:
+- Read `$ARCHITECT_CRITIC_ARGS` when present (env var the slash wrapper exports). On shim-less channels — Devin, `Skill()`, natural language — nothing exports it: read the path as a literal token in the invocation/request text instead.
 - Extract `--spec PATH` if present, else the first positional argument.
 - Strip a leading `@` if present (Claude Code uses `@path` to load file content into context — fs access wants the bare path).
 - If the resolved path exists and is readable, use it.
@@ -67,8 +68,10 @@ Principles are the lens you audit through. Merge sources in this exact order, la
 4. **Memory-bank patterns** — included only when `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` points at a readable file; every `- ` bullet in it becomes a principle. `arc principles_merge` handles all four sources; it is authoritative for resolution order.
 
 Run the `arc` dispatcher to do the file merge (on Claude Code, `arc` is on `$PATH` automatically; on Devin, invoke via `exec` with the full path `<plugin-source>/bin/arc`; its bash shebang forces a bash runtime for the lib regardless of the calling shell — required because bare `source` of these libs crashes with `BASH_SOURCE[0]: parameter not set` under zsh):
+Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+
 ```bash
-arc principles_merge
+"$arc_bin" principles_merge
 ```
 
 That returns the merged principles block to stdout. Hold it in context for Step 5; you will apply each principle when generating challenges.
@@ -103,17 +106,17 @@ You need four values: `HOST_AGENT`, `codex_available`, `claude_available`, and `
 **Claude availability:** Run `command -v claude` in a Bash tool call. Capture the return code. If the binary resolves, also capture `claude --version` for the status message in Step 4.
 
 **Close-depth detection.** Set `close_depth = true` if ANY of:
-- `--close` slash flag present in `$ARCHITECT_CRITIC_ARGS`
-- `--deep` slash flag present
+- `--close` slash flag present in `$ARCHITECT_CRITIC_ARGS` — or as a literal token in the invocation/request text on shim-less channels (Devin, `Skill()`, natural language)
+- `--deep` slash flag present (same dual source)
 - The user's natural-language invocation matched any of: *"deep audit"*, *"close review"*, *"deeper look"*, *"adversarial fresh-frame"*, *"fresh-frame review"*
 
 Otherwise `close_depth = false` (shallow = claude-only audit, the default).
 
-**Async detection (#39).** Set `async_mode = true` if `--async` is present in `$ARCHITECT_CRITIC_ARGS`. Async is only meaningful for a **close-depth** audit with `HOST_AGENT=claude` (the Codex companion is the only proven background backend; Codex-host keeps the synchronous path). If `--async` is set but `close_depth=false` or `HOST_AGENT=codex`, ignore it and run synchronously, telling the user why. When `async_mode=true` and applicable, Step 6 takes the **defer-to-resume** path (dispatch now, resume later) instead of the inline invocation. **`HOST_AGENT=devin` hard-refuses `--async`:** Devin has no external adversary backend and no background job infrastructure for architect-critic. If `--async` is present and `HOST_AGENT=devin`, do NOT enter the foreground critique path either — refuse immediately with a clear message: *"`--async` is not supported on Devin. Devin runs host-only audits with no external adversary. Run `/critique` without `--async`."* Do not append to `external_runs[]`, do not dispatch any job, and do not mutate state.
+**Async detection (#39).** Set `async_mode = true` if `--async` is present in `$ARCHITECT_CRITIC_ARGS` — or as a literal token in the invocation/request text on shim-less channels. This second source is what makes the Devin refusal below reachable: on Devin nothing exports the env var, so the `--async` a Devin user typed lives only in the request text. Async is only meaningful for a **close-depth** audit with `HOST_AGENT=claude` (the Codex companion is the only proven background backend; Codex-host keeps the synchronous path). If `--async` is set but `close_depth=false` or `HOST_AGENT=codex`, ignore it and run synchronously, telling the user why. When `async_mode=true` and applicable, Step 6 takes the **defer-to-resume** path (dispatch now, resume later) instead of the inline invocation. **`HOST_AGENT=devin` hard-refuses `--async`:** Devin has no external adversary backend and no background job infrastructure for architect-critic. If `--async` is present and `HOST_AGENT=devin`, do NOT enter the foreground critique path either — refuse immediately with a clear message: *"`--async` is not supported on Devin. Devin runs host-only audits with no external adversary. Run `/critique` without `--async`."* Do not append to `external_runs[]`, do not dispatch any job, and do not mutate state.
 
-**Neutral mode (#93).** Set `neutral_mode = true` if `--neutral` is present in `$ARCHITECT_CRITIC_ARGS`, or the user's natural-language invocation matched *"no recommendations"* / *"just list the challenges"* / *"don't recommend"*. When `neutral_mode=true`, Step 8 omits the per-challenge **recommended disposition** and presents challenges neutrally (the pre-#93 behavior). Default is `false` — recommend by default. Opt-out is per-invocation, not sticky.
+**Neutral mode (#93).** Set `neutral_mode = true` if `--neutral` is present in `$ARCHITECT_CRITIC_ARGS` or as a literal token in the invocation/request text, or the user's natural-language invocation matched *"no recommendations"* / *"just list the challenges"* / *"don't recommend"*. When `neutral_mode=true`, Step 8 omits the per-challenge **recommended disposition** and presents challenges neutrally (the pre-#93 behavior). Default is `false` — recommend by default. Opt-out is per-invocation, not sticky.
 
-**Walk mode (pulse360#15).** Set `walk_mode = true` if `--walk` is present in `$ARCHITECT_CRITIC_ARGS`, or the user's natural-language invocation matched *"walk them"* / *"walk them one at a time"* / *"no auto-accept"*. When `walk_mode=true`, Step 8.0 triage is skipped entirely — every challenge is walked sequentially (the #93 behavior). Default is `false`; per-invocation, not sticky. `--neutral` also disables triage transitively: with no recommendations there is nothing grounded to auto-apply.
+**Walk mode (pulse360#15).** Set `walk_mode = true` if `--walk` is present in `$ARCHITECT_CRITIC_ARGS` or as a literal token in the invocation/request text, or the user's natural-language invocation matched *"walk them"* / *"walk them one at a time"* / *"no auto-accept"*. When `walk_mode=true`, Step 8.0 triage is skipped entirely — every challenge is walked sequentially (the #93 behavior). Default is `false`; per-invocation, not sticky. `--neutral` also disables triage transitively: with no recommendations there is nothing grounded to auto-apply.
 
 The close-depth adversary is host-aware:
 
@@ -273,7 +276,7 @@ Everything below is the **synchronous** path (the default, unchanged).
 The implementation lives at `lib/codex.sh:ac_codex_run_audit` — call the helper rather than re-constructing the invocation inline. Signature: `ac_codex_run_audit <prompt> <output_dir> [--model NAME] [--timeout SECS]`. The helper computes its own `REQ_ID`, resolves the schema through `_ac_codex_schema_path`, and writes the parsed JSON to stdout; the raw `--output-last-message` file lands in `<output_dir>/codex-audit-<req-id>.json`. The invocation is **synchronous** (no background mode, no async polling); default timeout 5 minutes, configurable via env var `ARCHITECT_CRITIC_CODEX_TIMEOUT_S`.
 
 ```bash
-arc codex_run_audit "$ADVERSARIAL_PROMPT" "$TMP" ${MODEL_OVERRIDE:+--model "$MODEL_OVERRIDE"}
+"$arc_bin" codex_run_audit "$ADVERSARIAL_PROMPT" "$TMP" ${MODEL_OVERRIDE:+--model "$MODEL_OVERRIDE"}
 ```
 
 **If HOST_AGENT=codex, invoke Claude Code.** Display a progress message first:
@@ -283,7 +286,7 @@ arc codex_run_audit "$ADVERSARIAL_PROMPT" "$TMP" ${MODEL_OVERRIDE:+--model "$MOD
 Then invoke Claude Code via the shell with this pattern, using the same `ADVERSARIAL_PROMPT` and `templates/output-schema.json` schema:
 
 ```bash
-SCHEMA_PATH="$(dirname "$(arc principles_shipped_path)")/output-schema.json"
+SCHEMA_PATH="$(dirname "$("$arc_bin" principles_shipped_path)")/output-schema.json"
 claude --print \
   --output-format json \
   --json-schema "$(cat "$SCHEMA_PATH")" \
@@ -312,7 +315,7 @@ Steps 7 (consolidate), 8 (rebuttal cycle), and 9 (append run) form one reusable 
 You now have one or two challenge lists (claude-only, claude + codex, or the single devin self-audit). Merge them via the bash helper — **except on `HOST_AGENT=devin`**: a lone self-audit has nothing to merge, and the helper's `source`/`adversaries_used` vocabulary only knows claude/codex, so it would mislabel a devin run. On Devin the self-audit list plays the merged-list role directly:
 
 ```bash
-arc consolidator_merge "$CLAUDE_AUDIT_JSON" "$CODEX_AUDIT_JSON"
+"$arc_bin" consolidator_merge "$CLAUDE_AUDIT_JSON" "$CODEX_AUDIT_JSON"
 ```
 
 The consolidator's algorithm:
@@ -427,7 +430,7 @@ When you land on a 3 (the borderline case), default to "stands" but soften the f
 State updates happen in bash because they are pure I/O. Append the run record with the **flag form** — it is the only form that carries the deferred-challenge fields (`--deferred-count` / `--deferred-challenges`), so use it whenever any challenge was deferred (they default to `0`/`[]` when omitted):
 
 ```bash
-arc state_append_run \
+"$arc_bin" state_append_run \
   --request-id "$REQUEST_ID" \
   --depth "$DEPTH" \
   --adversaries "$ADVERSARIES_JSON" \
@@ -458,7 +461,7 @@ The schema v3 `recent_runs[]` entry includes:
 Then run the auto-promotion candidate check:
 
 ```bash
-arc promotion_check_candidates
+"$arc_bin" promotion_check_candidates
 ```
 
 The helper inspects `recent_runs[]` for patterns (same challenge fingerprint surfacing across ≥3 runs) and emits any candidates. If candidates exist, surface them to the user as a separate turn message asking whether to promote — but only when the rebuttal cycle in Step 8 is fully complete (don't interrupt mid-cycle).

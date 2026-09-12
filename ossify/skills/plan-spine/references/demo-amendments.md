@@ -8,9 +8,11 @@ spine's close**.
 
 ## 1. The two planning verbs
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss ledger_supersede "<line-id>" "<by-spine>" "<reason>"
-oss ledger_retire    "<line-id>" "<by-spine>" "<reason>"
+"$oss_bin" ledger_supersede "<line-id>" "<by-spine>" "<reason>"
+"$oss_bin" ledger_retire    "<line-id>" "<by-spine>" "<reason>"
 ```
 
 | Verb | Means | Use when |
@@ -25,7 +27,7 @@ id exits **7** and writes nothing.
 Find the id before you amend:
 
 ```bash
-oss get '[.demo_ledger[] | {id, type, status, text, source_spine}]'
+"$oss_bin" get '[.demo_ledger[] | {id, type, status, text, source_spine}]'
 ```
 
 ---
@@ -94,7 +96,7 @@ and forever. Paste the id you resolved at pre-flight (§3), do not retype it.
 ## 4. Quarantine is not a planning verb
 
 ```bash
-oss ledger_quarantine "<line-id>" "<reason>" "<release>"    # NOT a planning action
+"$oss_bin" ledger_quarantine "<line-id>" "<reason>" "<release>"    # NOT a planning action
 ```
 
 Quarantine exists for a line failing for causes **unrelated to any open spine** —

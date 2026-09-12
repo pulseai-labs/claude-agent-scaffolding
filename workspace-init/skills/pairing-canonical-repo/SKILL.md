@@ -145,8 +145,10 @@ Already collected in section 3. Reference `name`, `parent`, `canonical_root`,
 **Difference vs. fresh mode:** the canonical already exists, so skip
 `mkdir <canonical>`. Only create the new AI workspace:
 
+Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
+
 ```
-wi skeleton_create_root_ai_only "$parent" "$name"
+"$wi_bin" skeleton_create_root_ai_only "$parent" "$name"
 ```
 
 Expected init-log entry: `mkdir <ai_root>`. NO entry for canonical mkdir.
@@ -156,7 +158,7 @@ Expected init-log entry: `mkdir <ai_root>`. NO entry for canonical mkdir.
 Same as fresh mode:
 
 ```
-wi skeleton_seed_subdirs "$ai_root"
+"$wi_bin" skeleton_seed_subdirs "$ai_root"
 ```
 
 Expected init-log entries: subdir mkdirs + `.gitkeep` files + `.gitignore`.
@@ -167,7 +169,7 @@ Expected init-log entries: subdir mkdirs + `.gitkeep` files + `.gitignore`.
 through to `wi_manifest_write`:
 
 ```
-wi manifest_write "$ai_root" "$canonical_root" "$project_type" \
+"$wi_bin" manifest_write "$ai_root" "$canonical_root" "$project_type" \
   --git-remote "$detected_remote" \
   --default-branch "$detected_branch"
 ```
@@ -186,7 +188,7 @@ Expected init-log entry: `file <ai_root>/.workspace/pairing.json`.
 ### 6.5 — Task 8.5: Write CLAUDE.md stub
 
 ```
-wi stub_claude_md "$ai_root" "$name"
+"$wi_bin" stub_claude_md "$ai_root" "$name"
 ```
 
 Expected init-log entry: `file <ai_root>/CLAUDE.md`.
@@ -194,7 +196,7 @@ Expected init-log entry: `file <ai_root>/CLAUDE.md`.
 ### 6.6 — Task 8.6: Write AGENTS.md stub
 
 ```
-wi stub_agents_md "$ai_root"
+"$wi_bin" stub_agents_md "$ai_root"
 ```
 
 Expected init-log entry: `file <ai_root>/AGENTS.md`.
@@ -202,7 +204,7 @@ Expected init-log entry: `file <ai_root>/AGENTS.md`.
 ### 6.7 — Task 8.7: Write README.md
 
 ```
-wi stub_readme "$ai_root" "$name"
+"$wi_bin" stub_readme "$ai_root" "$name"
 ```
 
 Expected init-log entry: `file <ai_root>/README.md`.

@@ -45,8 +45,10 @@ is then equally suspect.
 
 Read the spec end to end (Read tool, absolute path), then:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss verify_acs "<abs spec path>"
+"$oss_bin" verify_acs "<abs spec path>"
 ```
 
 One TSV row per `auto:` AC — `label <tab> command <tab> expectation` — in
@@ -68,7 +70,7 @@ Two malformations still produce a row: an ASCII `->` where the grammar wants
 unusable. Check every row:
 
 ```bash
-oss verify_acs "<abs spec path>" | while IFS=$'\t' read -r label cmd exp; do
+"$oss_bin" verify_acs "<abs spec path>" | while IFS=$'\t' read -r label cmd exp; do
   case "$exp" in
     "exit "*)            case "${exp#exit }" in ''|*[!0-9]*) echo "GAP $label: 'exit' takes digits only, got '$exp'";; esac ;;
     "output contains "?*) ;;

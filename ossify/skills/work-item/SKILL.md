@@ -134,10 +134,10 @@ carries each field above — is in `references/handoff-contract.md`. Read it whe
 you need to name a missing field precisely. It is the **author's** contract, not a
 licence to supply the field yourself.
 
-Then read the spec end to end and extract the ordered `auto:` AC list:
+Then read the spec end to end and extract the ordered `auto:` AC list — every `oss` below and in references is `"$oss_bin"` (resolve it once per `rules/dispatcher-path.md`):
 
 ```bash
-oss verify_acs "<abs spec path>"      # TSV: label <tab> command <tab> expectation
+"$oss_bin" verify_acs "<abs spec path>"      # TSV: label <tab> command <tab> expectation
 ```
 
 Each row is `(AC-N, command, expectation)` in **declared order** — that order is
@@ -190,7 +190,7 @@ AC whose command is a non-invocable probe (a `test -f`, a `! grep`) is not a
 special case; the rc table below covers it. Per AC:
 
 ```bash
-oss redgate "<worktree-abs>" "<command>" "<expectation>"
+"$oss_bin" redgate "<worktree-abs>" "<command>" "<expectation>"
 ```
 
 **Read the return code the right way round:**
@@ -273,7 +273,7 @@ worktree. `oss verify_step` applies the same expectation predicate the ACs were
 parsed with, and fails closed on a malformed expectation:
 
 ```bash
-oss verify_step "<worktree-abs>" "<command>" "<expectation>"   # 0 pass | 1 fail | 2 malformed
+"$oss_bin" verify_step "<worktree-abs>" "<command>" "<expectation>"   # 0 pass | 1 fail | 2 malformed
 ```
 
 Capture, per command: exit code, a short output excerpt, and pass/fail.

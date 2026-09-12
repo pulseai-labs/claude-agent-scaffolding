@@ -32,7 +32,8 @@ path writes rules into whichever repo the session happened to start in.
 When the lane cannot run at all, emit its line anyway — never drop it silently:
 `skip: rules - no topology declaration resolves (neither .ossify/topology.json nor a .workspace/pairing.json fallback), so the memory bank cannot be located`
 (remedy `/ossify:start`, `/ossify:adopt`, `/init-workspace` or
-`/pair-workspace`); `skip: rules - memory-bank
+`/pair-workspace`; on Devin `adopt` is not published — run it on Claude Code
+or Codex against the same checkout, `.ossify` state is shared); `skip: rules - memory-bank
 route '<value>' is not absolute` (the STOP case, surfaced not written around);
 `skip: rules - no 03-code-patterns.md at <path>; /start seeds it with an empty
 section`.

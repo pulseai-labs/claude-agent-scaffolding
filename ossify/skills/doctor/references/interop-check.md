@@ -102,7 +102,9 @@ cause and buries the only thing that has to be fixed first. Remedy:
 `/ossify:start` or `/ossify:adopt` (authors `.ossify/topology.json`) for a new
 or adopted project, or `/init-workspace`/`/pair-workspace` (authors
 `.workspace/pairing.json`) for an existing dual-repo workspace — name those
-tokens literally, do not paraphrase them.
+tokens literally, do not paraphrase them. On Devin `adopt` is not published;
+run it on Claude Code or Codex against the same checkout — the `.ossify`
+state it authors is surface-agnostic.
 
 **Present but unreadable → `fail:`, and STOP**, for the same reason. Read
 whichever file you found and satisfy yourself it is **exactly one JSON
@@ -128,9 +130,11 @@ object carrying a `root` other than `ai_workspace` under a legacy pairing
 manifest, translated the same way `_oss_topology_shape` does). Emit one
 `ok:`/`fail:` line per key, tagged with that key.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss repo_root ai_workspace
-oss repo_root "<repo-key>"            # once per declared repo
+"$oss_bin" repo_root ai_workspace
+"$oss_bin" repo_root "<repo-key>"            # once per declared repo
 ```
 
 Use the verb, not the raw JSON value. It substitutes `${...}` tokens and refuses
@@ -154,7 +158,7 @@ renamed or moved.
 Probe each:
 
 ```bash
-root="$(oss repo_root "<repo-key>")"
+root="$("$oss_bin" repo_root "<repo-key>")"
 # `-P` because git resolves symlinks in --show-toplevel; comparing an
 # unresolved manifest root against a resolved toplevel reports drift that
 # is not there.
@@ -210,7 +214,7 @@ The state file's path must resolve, and the session must not be quietly driving
 a different project's state.
 
 ```bash
-oss state_path      # the manifest's answer; ignores the environment
+"$oss_bin" state_path      # the manifest's answer; ignores the environment
 if [ -n "${OSS_STATE_FILE+set}" ]; then printf 'set: [%s]\n' "$OSS_STATE_FILE"; else printf 'unset\n'; fi
 ```
 

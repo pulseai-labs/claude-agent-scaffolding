@@ -14,9 +14,11 @@ shrugged off.
 
 ## 1. Two halves, two different scopes
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss demo_run                        # every ACTIVE auto: line, from every spine
-oss demo_user_lines "$spine_id"     # THIS spine's own user: lines
+"$oss_bin" demo_run                        # every ACTIVE auto: line, from every spine
+"$oss_bin" demo_user_lines "$spine_id"     # THIS spine's own user: lines
 ```
 
 **The `auto:` half is cumulative; the `user:` half is scoped.** That asymmetry is
@@ -100,7 +102,7 @@ visible to a person using the thing.
 A line that fails for causes **unrelated to any open spine** may be quarantined:
 
 ```bash
-oss ledger_quarantine "<line-id>" "<why it is unrelated to this spine>" "<release-id>"
+"$oss_bin" ledger_quarantine "<line-id>" "<why it is unrelated to this spine>" "<release-id>"
 ```
 
 The runner then prints `SKIP <line-id> (quarantined) - <text>` and continues; the
@@ -135,12 +137,12 @@ declared repo's root when exactly one is):
 # without it BOTH runs did `cd ""`, failed identically, and the matching output
 # read as "already broken" - manufacturing the quarantine evidence. Bind it
 # from the same resolution the runner uses before either invocation.
-wd="$(oss demo_workdir)" \
+wd="$("$oss_bin" demo_workdir)" \
   || { echo "halt: cannot resolve the demo working directory - see cumulative-demo.md section 1; the comparison is void without it"; exit 1; }
 [ -d "$wd" ] || { echo "halt: resolved demo workdir '$wd' does not exist"; exit 1; }
 
 # same command, both trees, and diff the OUTPUT before believing the rc
-cmd="$(oss get ".demo_ledger[] | select(.id==\"<line-id>\") | .command")"
+cmd="$("$oss_bin" get ".demo_ledger[] | select(.id==\"<line-id>\") | .command")"
 ( cd "$wd" && bash -c "$cmd" ) > /tmp/oss-head.txt 2>&1; echo "head rc=$?"
 
 # EVERY hosting repo to its own first parent - not just the one $wd sits in.
@@ -175,7 +177,7 @@ _oss_restore_checkouts() {
 trap _oss_restore_checkouts EXIT
 while IFS=: read -r repo sha; do
   [ -n "$repo" ] || continue
-  root="$(oss repo_root "$repo")" \
+  root="$("$oss_bin" repo_root "$repo")" \
     || { echo "halt: \$merge_shas names undeclared repo '$repo'"; exit 1; }
   # Record the branch BEFORE detaching. `git checkout -` cannot restore N repos:
   # it is per-repo and only remembers one step, and a second detach in the same
@@ -233,7 +235,7 @@ its own — but still owed, because the ledger does not care why a line is red.
 The ledger's cost is bounded by a budget set at release planning:
 
 ```bash
-oss get ".releases[] | select(.id==\"<release-id>\") | .ledger_budget"
+"$oss_bin" get ".releases[] | select(.id==\"<release-id>\") | .ledger_budget"
 ```
 
 Exceeding it forces a **prune / parallelize / deepen** decision at release
@@ -247,10 +249,10 @@ this and none is needed; the shell already has one, so "visibly overshoots" does
 not have to mean "felt slow":
 
 ```bash
-budget="$(oss get ".releases[] | select(.id==\"<release-id>\") | .ledger_budget")"
+budget="$("$oss_bin" get ".releases[] | select(.id==\"<release-id>\") | .ledger_budget")"
 start=$(date +%s)
 demo_rc=0
-oss demo_run || demo_rc=$?
+"$oss_bin" demo_run || demo_rc=$?
 elapsed=$(( $(date +%s) - start ))
 secs="${budget%s}"
 case "$secs" in
@@ -287,7 +289,7 @@ The demo's outcome is written at **step 11**, not here, and only if every step
 between reached the end:
 
 ```bash
-oss demo_record spine "$spine_id" "<true|false>" "<line-count>" "<notes>"
+"$oss_bin" demo_record spine "$spine_id" "<true|false>" "<line-count>" "<notes>"
 ```
 
 `passed` is the literal `true` or `false` — anything else is rc 2. Because a

@@ -128,7 +128,7 @@ do
   plugin="${entry%%:*}"
   expected_src="${entry#*:}"
   info="$(run_devin plugins info "$plugin" 2>&1)"
-  reported_src="$(printf '%s' "$info" | awk '/source:/ {print $NF; exit}')"
+  reported_src="$(printf '%s' "$info" | sed -n 's/^ *source: *//p' | head -1)"
   if [ "$reported_src" = "$expected_src" ]; then
     pass "plugins info source for $plugin matches probe path"
   else

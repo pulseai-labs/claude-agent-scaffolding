@@ -61,8 +61,10 @@ holds two genuinely separable decisions). Four required parts:
 
 ### Recording it
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
+"$oss_bin" bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
 ```
 
 Touch CSV entries follow risk-gates.md §3's grammar — a bare `,` separates entries, `\,` is a literal comma inside one; multiple directories are multiple entries (case-globs do not brace-expand).
@@ -70,11 +72,11 @@ Touch CSV entries follow risk-gates.md §3's grammar — a bare `,` separates en
 Worked example:
 
 ```bash
-oss bone_add "ADR-0002" "Hexagonal core with six port traits" \
+"$oss_bin" bone_add "ADR-0002" "Hexagonal core with six port traits" \
   "src/domain/**,src/port.rs,src/adapters/**" \
   "revisit when a second storage backend is needed"
 
-oss bone_add "ADR-0005" "No persistent state at Release 0" \
+"$oss_bin" bone_add "ADR-0005" "No persistent state at Release 0" \
   "not-applicable" \
   "revisit when the first store lands"
 ```
@@ -120,7 +122,7 @@ SEQUENCE is shared. Read it, do not guess:
 scan="$(mktemp)"
 while IFS= read -r name; do
   [ -n "$name" ] || continue
-  root="$(oss repo_root "$name")" || exit 1
+  root="$("$oss_bin" repo_root "$name")" || exit 1
   mkdir -p "$root/docs/adr"
   ls -1 "$root/docs/adr" 2>/dev/null >> "$scan"
 done <<EOF

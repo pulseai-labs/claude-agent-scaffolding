@@ -62,23 +62,21 @@ spec?"*
 
 ## 3. Pre-flight
 
-All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`, on
-`$PATH` because Claude Code adds each plugin's `bin/` automatically; the
-dispatcher's bash shebang forces a bash runtime under it regardless of the
-calling shell — required because Claude Code's Bash tool runs zsh by default on
-macOS). Call form: `oss <subcommand> [args...]` resolves to `oss_cmd_<subcommand>`.
-Never `source` the lib files directly from a skill body — under zsh
-`BASH_SOURCE` is unset and the libs break. Use `oss help` for discovery.
+All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`):
+`oss <subcommand>` → `oss_cmd_<subcommand>` under a forced bash shebang —
+never `source` the libs (zsh leaves `BASH_SOURCE` unset); `oss help` for
+discovery. Resolve `oss` once into `oss_bin` per `rules/dispatcher-path.md`;
+every `oss` below and in references is `"$oss_bin"`.
 
 **Topology probe (resolves, authors, or refuses fail-closed).** ossify's state lives in
 the AI workspace: walk up for `.ossify/topology.json`, then `.workspace/pairing.json`:
 
 ```bash
-if probe="$(oss state_path 2>&1)"; then
+if probe="$("$oss_bin" state_path 2>&1)"; then
   printf '%s\n' "topology: resolved - author nothing, proceed to the journey map"
 else
   printf '%s\n' "$probe"   # the verb's OWN diagnostic, never swallowed
-  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands."
+  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands. On Devin, adopt is not published - run it on Claude Code or Codex against the same checkout; the .ossify state it authors is surface-agnostic."
 fi
 ```
 
@@ -98,9 +96,10 @@ for every declared repo, halting only if one still refuses.
 establish whether any declared repo (`oss repo_root <name>` per name) already
 carries the product's own source or its own history — either alone refuses,
 and a bare pairing scaffold is neither. If so, author nothing and refuse,
-naming what you found and routing to **`/ossify:adopt` — the adopt-forward
-path for a project that already has code (on Codex/OpenCode, the native
-`adopt` skill).** Those tokens are load-bearing too. Past both gates:
+naming what you found and routing to **`/ossify:adopt`** — the adopt-forward
+path for a project that already has code (native `adopt` on Codex/OpenCode;
+on Devin run `adopt` on Claude Code or Codex — `.ossify` state is shared).
+Those tokens are load-bearing too. Past both gates:
 `oss init "<project-name>"`, which refuses if ossify state already exists — the
 "already onboarded" signal; route per §2 rather than forcing past it.
 
@@ -161,7 +160,7 @@ developer with a debugger.
 candidate spine:
 
 ```bash
-oss feature_add "<name>" "<one-line user value>" "<bone|flesh>" journey-map
+"$oss_bin" feature_add "<name>" "<one-line user value>" "<bone|flesh>" journey-map
 ```
 
 Full grammar + worked example in `references/journey-map.md`.
@@ -214,7 +213,7 @@ Each answered category becomes **an ADR from birth** (default status protocol:
 date.
 
 ```bash
-oss bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
+"$oss_bin" bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
 ```
 
 Touch surfaces use bash `case` glob semantics (`*` matches `/`, so
@@ -236,7 +235,7 @@ Record each hazard whose harm a test failure cannot undo — **money**,
 touch surface and **the controls its family attaches**:
 
 ```bash
-oss risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"
+"$oss_bin" risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"
 ```
 
 Control menu: paper/sandbox env · human confirm (naming the concrete effect) ·
@@ -326,14 +325,14 @@ With a clear, non-conflicting intent the posture reads off the value set
 `fully-private` | `source-available` | `open-core` | `fully-open`:
 
 ```bash
-oss posture_set "<posture>"
+"$oss_bin" posture_set "<posture>"
 ```
 
 Revenue intent (`none|license|saas`) is not its own field — it seeds the posture
 bone's revisit trigger. On a `data-overlay` channel, record the seam:
 
 ```bash
-oss overlay_set '<seam>'      # e.g. '$PULSE_PROMPT_DIR'
+"$oss_bin" overlay_set '<seam>'      # e.g. '$PULSE_PROMPT_DIR'
 ```
 
 Then, per posture-block §5-§10: register the posture as a bone (`oss bone_add`;
@@ -421,7 +420,7 @@ Full derivation brief in `references/memory-bank-brief.md`; section schema in
 Before handing off, run the state gate and surface anything it reports:
 
 ```bash
-oss doctor
+"$oss_bin" doctor
 ```
 
 **That is the gate, not a sweep** — `state`, `schema`, `replay`, `shape`, and

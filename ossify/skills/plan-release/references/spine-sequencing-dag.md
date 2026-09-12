@@ -52,8 +52,10 @@ Interrogate every proposed edge with §1's three-way test, out loud, once each.
 
 ## 3. The recorded shape
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss release_set_meta "$rel" '{"spine_dag":[["r1.s1",[]],["r1.s2",["r1.s1"]],["r1.s3",[]],["r1.s4",["r1.s2","r1.s3"]]]}'
+"$oss_bin" release_set_meta "$rel" '{"spine_dag":[["r1.s1",[]],["r1.s2",["r1.s1"]],["r1.s3",[]],["r1.s4",["r1.s2","r1.s3"]]]}'
 ```
 
 `[[<spine-id>,[<dep-id>,…]],…]` — an array of `[node, deps]` pairs.

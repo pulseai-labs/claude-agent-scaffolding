@@ -133,9 +133,11 @@ module, which surface), **current** (the scope it cites is in this spine's plan)
 and **decidable** (you can state in one sentence why the spine's declared class
 understates the change).
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss class_set "<spine>" bone "critic veto: <finding, condensed>"
-oss veto_add  "<spine>" "<finding>" auto-bone "<why it is a bone: the mechanism>"
+"$oss_bin" class_set "<spine>" bone "critic veto: <finding, condensed>"
+"$oss_bin" veto_add  "<spine>" "<finding>" auto-bone "<why it is a bone: the mechanism>"
 ```
 
 Auto-applying the reclassification is the **spec-aligned safety default**
@@ -172,7 +174,7 @@ Escalate; the user decides whether the concern survived the rename.
 ### 4.5 Recording an escalation
 
 ```bash
-oss veto_add "<spine>" "<finding, verbatim enough to re-read>" escalate "ambiguous|contradictory|stale - fail-closed"
+"$oss_bin" veto_add "<spine>" "<finding, verbatim enough to re-read>" escalate "ambiguous|contradictory|stale - fail-closed"
 ```
 
 Name the trigger in the reason (`ambiguous`, `contradictory`, or `stale`), then
@@ -218,8 +220,8 @@ both required:
    file is a generated stub, not the real port."*
 
 ```bash
-oss class_set "<spine>" flesh "<the user's reason>"
-oss veto_add  "<spine>" "<the original finding>" override "<the user's reason>"
+"$oss_bin" class_set "<spine>" flesh "<the user's reason>"
+"$oss_bin" veto_add  "<spine>" "<the original finding>" override "<the user's reason>"
 ```
 
 Both calls, always. `class_set` moves the class (and appends to

@@ -31,8 +31,10 @@ You read up to four sources in this exact order. Each is optional except shipped
 
 The plugin ships `templates/principles.md`. It always exists. Resolve it through the `arc` dispatcher, which self-locates the installed plugin root on every surface (on Claude Code `arc` is on `$PATH`; on Devin invoke `<plugin-source>/bin/arc` via `exec` with the full path — see `rules/dispatcher-path.md`):
 
+Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+
 ```bash
-SHIPPED_PATH="$(arc principles_shipped_path)"
+SHIPPED_PATH="$("$arc_bin" principles_shipped_path)"
 ```
 
 Contains two load-bearing defaults: the **Ghost Notes principle** (what is absent is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy). Both render under `## Shipped defaults`.
@@ -40,7 +42,7 @@ Contains two load-bearing defaults: the **Ghost Notes principle** (what is absen
 **Source 2 — User-global** (`user`)
 
 ```bash
-USER_PATH="$(arc principles_user_path)"
+USER_PATH="$("$arc_bin" principles_user_path)"
 ```
 
 If this file does not exist, skip this source silently (no "file not found" error in output). If it exists but is empty after stripping headers and blank lines, omit the section header.
@@ -61,10 +63,10 @@ Opt-in via environment variable, not install-probed: this source is included onl
 
 ## Step 3: Merge via the `arc` dispatcher
 
-Call the bash helper to load user-global principles. The `arc` dispatcher is on `$PATH` (Claude Code adds each plugin's `bin/` automatically); the dispatcher's bash shebang forces a bash runtime under it regardless of the calling Bash tool's shell (zsh by default on macOS), so the lib's `${BASH_SOURCE[0]}` and `${BASH_REMATCH[…]}` work as written. Never `source` the lib directly from skill body — under zsh it crashes:
+Call the bash helper to load user-global principles via the resolved `"$arc_bin"` (Step 2 resolves it; on Claude Code `arc` is on `$PATH` because Claude Code adds each plugin's `bin/` automatically — on Devin it is not, hence the resolution). The dispatcher's bash shebang forces a bash runtime under it regardless of the calling Bash tool's shell (zsh by default on macOS), so the lib's `${BASH_SOURCE[0]}` and `${BASH_REMATCH[…]}` work as written. Never `source` the lib directly from skill body — under zsh it crashes:
 
 ```bash
-arc principles_load_user_global
+"$arc_bin" principles_load_user_global
 ```
 
 This strips header lines (lines starting with `# `), strips trailing `[promoted ...]` annotations, and emits one active principle per line. Hold the output in your working context.
@@ -93,7 +95,7 @@ Apply the filter after the merge. Do not re-read files; just drop sections not m
 Read `auto_promote_suppressions[]` from `state.json`:
 
 ```bash
-STATE_FILE="$(arc state_path)"
+STATE_FILE="$("$arc_bin" state_path)"
 SUPPRESSIONS="$(jq -c '.auto_promote_suppressions // []' "$STATE_FILE" 2>/dev/null || echo '[]')"
 NOW_ISO="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 ```

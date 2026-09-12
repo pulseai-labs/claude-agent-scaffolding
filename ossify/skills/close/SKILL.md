@@ -59,9 +59,11 @@ recorded, and the recovery is the user's to pick.
 The scope is derived **mechanically from the id's shape**. Never ask which scope
 the user meant, and never infer it from the wording of the request.
 
+Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+
 ```bash
 id="<the id from $ARGUMENTS>"
-parts="$(oss id_parse "$id")" || parts=""
+parts="$("$oss_bin" id_parse "$id")" || parts=""
 scope="$(printf '%s\n' "$parts" | awk '{print $1}')"
 ```
 
@@ -106,9 +108,9 @@ deliberately not ids, and the routing anti-patterns — in
 Runs before any scope's first step, every time.
 
 ```bash
-oss manifest_require || exit 0        # refuse: run /init-workspace or /pair-workspace first
-oss doctor                            # schema + replay must be green
-ai_root="$(oss repo_root ai_workspace)"
+"$oss_bin" manifest_require || exit 0        # refuse: run /init-workspace or /pair-workspace first
+"$oss_bin" doctor                            # schema + replay must be green
+ai_root="$("$oss_bin" repo_root ai_workspace)"
 ```
 
 1. **Manifest.** `oss manifest_require` resolves `.ossify/topology.json` first
@@ -227,7 +229,9 @@ steps, in **binding order**:
    the *output* of the `oss get` — a `select` matching nothing exits 0.
 2. **Land each hosting repo on its own `base_branch` — by PR where a remote
    exists, locally where none does (#339)**. The PR arm pushes the spine branch,
-   opens the PR, and hands it to `/ossify:work-pr`; the record pass proves the
+   opens the PR, and hands it to `/ossify:work-pr` — not published on
+   Devin/OpenCode, where the operator drives the merge loop manually
+   (`spine-close.md` §3); the record pass proves the
    remote merge locally (identity, lineage, base-contained) before anything is
    recorded. A remote `gh` cannot operate on halts — never a silent local
    fall-through. The local arm keeps all four guards: **derive the spine branch

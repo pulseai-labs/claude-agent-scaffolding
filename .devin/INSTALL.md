@@ -97,8 +97,15 @@ spawn nested agents.
 devin plugins list            # installed plugins, versions, blocked status
 devin plugins info ossify     # a plugin's skills, rules, required/optional/forbidden lists
 devin plugins update          # re-fetch and re-install at latest HEAD
-devin plugins remove ossify   # remove one plugin (auto-installed requireds stay)
 devin plugins prune           # drop requirements whose repo no longer exists
+
+# Removal order matters for the baseline set: each of the five is a required
+# dependency of the meta-plugin and cannot be removed while it stays
+# installed. Remove the meta-plugin first, then the plugins:
+devin plugins remove claude-agent-scaffolding-devin   # meta-plugin first
+devin plugins remove ossify                            # then any baseline plugin
+# (plugins installed individually with --local are not requirements and
+# remove directly, in any order)
 ```
 
 ## Trust Boundary

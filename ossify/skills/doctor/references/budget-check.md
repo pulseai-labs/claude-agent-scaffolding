@@ -28,7 +28,7 @@ oss_bin="$(command -v oss 2>/dev/null || true)"
 # measured on 3000.10.21: cache/<source-id>-<hash>/<version>/ under
 # ${XDG_DATA_HOME:-~/.local/share}/devin/cli/plugins/.
 [ -n "$oss_bin" ] || {
-  oss_src="$(devin plugins info ossify | awk '/^  source:/{print $2}')"
+  oss_src="$(devin plugins info ossify | sed -n 's/^ *source: *//p')"
   case "$oss_src" in
     /*) oss_bin="$oss_src/bin/oss" ;;
     *)  for mf in "${XDG_DATA_HOME:-$HOME/.local/share}"/devin/cli/plugins/cache/*/*/.devin-plugin/plugin.json; do
@@ -127,7 +127,7 @@ oss_bin="$(command -v oss 2>/dev/null || true)"
 # guarded recipe as above: absolute source: path, else the materialized
 # plugin-cache manifest for remote installs).
 [ -n "$oss_bin" ] || {
-  oss_src="$(devin plugins info ossify | awk '/^  source:/{print $2}')"
+  oss_src="$(devin plugins info ossify | sed -n 's/^ *source: *//p')"
   case "$oss_src" in
     /*) oss_bin="$oss_src/bin/oss" ;;
     *)  for mf in "${XDG_DATA_HOME:-$HOME/.local/share}"/devin/cli/plugins/cache/*/*/.devin-plugin/plugin.json; do

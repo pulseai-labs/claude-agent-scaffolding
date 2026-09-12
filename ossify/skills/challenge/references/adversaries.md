@@ -53,7 +53,7 @@ oss_bin="$(command -v oss 2>/dev/null || true)"
 # under the plugin cache — measured on 3000.10.21:
 # ${XDG_DATA_HOME:-~/.local/share}/devin/cli/plugins/cache/<id>-<hash>/<ver>/
 [ -n "$oss_bin" ] || {
-  oss_src="$(devin plugins info ossify | awk '/^  source:/{print $2}')"
+  oss_src="$(devin plugins info ossify | sed -n 's/^ *source: *//p')"
   case "$oss_src" in
     /*) oss_bin="$oss_src/bin/oss" ;;
     *)  for mf in "${XDG_DATA_HOME:-$HOME/.local/share}"/devin/cli/plugins/cache/*/*/.devin-plugin/plugin.json; do

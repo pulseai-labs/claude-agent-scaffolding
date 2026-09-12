@@ -191,9 +191,9 @@ check_2_verbs() { # $1=ossify-root $2=workdir; writes $2/check2-{verbs,ctx,token
   awk -f "$WORK/code-context.awk" $(_md_files "$r") > "$w/check2-ctx.txt"
   awk '{ s=$0
          split($0, _p, ":")
-         while (match(s, /(^|[^A-Za-z0-9_])oss[ \t]+[A-Za-z_][A-Za-z0-9_*-]*/)) {
+         while (match(s, /(^|[^A-Za-z0-9_$])(oss|"?\$oss_bin"?)[ \t]+[A-Za-z_][A-Za-z0-9_*-]*/)) {
            tok=substr(s,RSTART,RLENGTH)
-           sub(/^[^A-Za-z0-9_]?oss[ \t]+/,"",tok)
+           sub(/^[^A-Za-z0-9_$]?(oss|"?\$oss_bin"?)[ \t]+/,"",tok)
            print _p[1] ":" _p[2] "\t" tok
            s=substr(s,RSTART+RLENGTH) } }' "$w/check2-ctx.txt" | sort -u > "$w/check2-tokens.txt"
   : > "$w/check2-excluded.txt"

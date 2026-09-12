@@ -150,11 +150,13 @@ rm -f "$REF_LIST"
 # case /start exists to serve, so the halt made the headline feature of
 # #272/#310 unreachable through its own ceremony. Mechanical fact, mechanical
 # check: the probe block carries no exit.
-PROBE="$(awk '/^```bash$/{n++} n==1 && !/^```/{print} /^```$/{if(n==1) exit}' "$OSSSK/skills/start/SKILL.md")"
-if printf '%s' "$PROBE" | grep -q 'oss state_path'; then
+# The probe is no longer the first bash block — the dispatcher-resolution
+# recipe precedes it — so select the block that actually carries `state_path`.
+PROBE="$(awk '/^```bash$/{inb=1; buf=""; next} inb && /^```$/{if (buf ~ /state_path/) {printf "%s", buf; exit} inb=0; next} inb{buf=buf $0 "\n"}' "$OSSSK/skills/start/SKILL.md")"
+if printf '%s' "$PROBE" | grep -q 'state_path'; then
   T_PASS=$((T_PASS+1))
 else
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: start/SKILL.md's first bash block is not the topology probe - the exit check below is vacuous"
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: no bash block in start/SKILL.md carries state_path - the exit check below is vacuous"
 fi
 case "$PROBE" in
   *exit*) T_FAIL=$((T_FAIL+1)); echo "FAIL: start/SKILL.md's topology probe carries an 'exit' - a refused probe must author and proceed, not halt" ;;

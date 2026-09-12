@@ -271,7 +271,7 @@ run_devin plugins install --local -y "$COPY_ROOT" >/dev/null 2>&1
 # consumer reads the mutated tree), and the policy must be absent under that
 # reported source — not merely under the path this test happened to rm.
 installed_source="$(run_devin plugins info ai-mentor 2>/dev/null \
-  | awk '/source:/ {print $NF; exit}')"
+  | sed -n 's/^ *source: *//p' | head -1)"
 
 if [ "$installed_source" = "$COPY_ROOT" ]; then
   pass "plugins info reports the mutated copy as installed source"

@@ -12,9 +12,11 @@ You have been invoked to manage **background close-depth critique jobs** created
 Parse the verb (+ optional `<run-id>`) from `$ARCHITECT_CRITIC_ARGS` (the `/critique-jobs` wrapper exports it; env-var bridge per [[feedback_slash_command_dollar_n_bug]]). If no `<run-id>` is given, default to the most recent applicable run (see each verb). If `--neutral` is present on `resume`, force `neutral_mode=true`; otherwise resume inherits `external_runs[].neutral_mode` from the original `/critique --close --async [--neutral]` dispatch. All state/spine calls go through the `arc` dispatcher. Likewise re-derive `walk_mode` from the run record — `external_runs[].walk_mode`, persisted at dispatch: when `true`, the resumed unified rebuttal walks every consolidated challenge; otherwise it runs `critiquing-spec` Step 8.0 triage first (auto-apply predicate-clean dispositions, walk the escalated subset).
 
 List runs for context with:
+Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+
 ```bash
-arc state_external_run_list            # all
-arc state_external_run_list --status running
+"$arc_bin" state_external_run_list            # all
+"$arc_bin" state_external_run_list --status running
 ```
 Each record carries: `run_id, host_agent, adversary, artifact_path, depth, status, started_at, completed_at, result_path, codex_session_id, neutral_mode, walk_mode, resolved_run_request_id`. The `target_root` for spine calls is `arc codex_target_root "<artifact_path>"`.
 

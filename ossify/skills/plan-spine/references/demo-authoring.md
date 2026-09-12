@@ -45,11 +45,13 @@ So check it here, at every spine on a public-routed posture:
 A ledger line has no `kind` field (`lib/ledger.sh`'s `add_demo_line` payload), so the
 marker is a **required text prefix**: the line's `text` begins with `[community-edition]`.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-posture="$(oss get '.project.posture')"
+posture="$("$oss_bin" get '.project.posture')"
 case "$posture" in
   open-core|fully-open)
-    oss get '[.demo_ledger[] | select(.status=="active" and (.text|startswith("[community-edition]")))] | length' ;;
+    "$oss_bin" get '[.demo_ledger[] | select(.status=="active" and (.text|startswith("[community-edition]")))] | length' ;;
   *) echo "n/a - posture is $posture" ;;
 esac
 ```
@@ -57,7 +59,7 @@ esac
 **If the posture is public-routed and the count is 0, this spine authors it:**
 
 ```bash
-oss ledger_add_auto "<spine-id>" \
+"$oss_bin" ledger_add_auto "<spine-id>" \
   "[community-edition] clone the public repo fresh, build it standalone, and smoke-run it" \
   "<the clone+build+run command>" "exit:0"
 ```
@@ -229,7 +231,7 @@ recording the admission in the `class_set` reason. **Read that, do not recall it
 
 ```bash
 case "$name" in "[internal]"*) echo "internal — auto: lines only" ;; esac
-oss get ".class_overrides[] | select(.spine == \"$spine\") | .reason"   # the admission record
+"$oss_bin" get ".class_overrides[] | select(.spine == \"$spine\") | .reason"   # the admission record
 ```
 
 You may be re-entered in a session that never saw the planning conversation. The
@@ -250,8 +252,8 @@ Check both against state, not against recollection (`$rel` is the spine's releas
 resolved at SKILL.md §3):
 
 ```bash
-oss spine_list | jq -r '.[] | "\(.id)\t\(.release)\t\(.name)"'          # every planned spine
-oss get ".releases[] | select(.id == \"$rel\") | .next_sketch"          # next release's candidates
+"$oss_bin" spine_list | jq -r '.[] | "\(.id)\t\(.release)\t\(.name)"'          # every planned spine
+"$oss_bin" get ".releases[] | select(.id == \"$rel\") | .next_sketch"          # next release's candidates
 ```
 
 A consumer named among the current release's spines, or in the current release's
@@ -269,7 +271,7 @@ one, the answer is *not admitted* — do not assume a consumer exists because on
 plausibly could. Send it back:
 
 ```bash
-oss feature_add "<name>" "<the value it would enable>" bone feature-map-return
+"$oss_bin" feature_add "<name>" "<the value it would enable>" bone feature-map-return
 ```
 
 If the consuming spine is later **dropped**, the internal spine returns to the
@@ -306,7 +308,7 @@ the comparison and exits non-zero when the bound is missed.
 
 ```bash
 # before: recorded in the spine plan — `hyperfine ./target/release/app --json` → cold start 4.2s
-oss ledger_add_auto "$spine" "cold start ≤ 2.0s (was 4.2s)" "bash scripts/bench-coldstart.sh --max 2.0" "exit:0"
+"$oss_bin" ledger_add_auto "$spine" "cold start ≤ 2.0s (was 4.2s)" "bash scripts/bench-coldstart.sh --max 2.0" "exit:0"
 ```
 
 | Proposed contribution | Verdict |
@@ -325,7 +327,7 @@ spine that wants to keep its claim owes one.
 ## 6. F5 — `auto:` line binding
 
 ```bash
-oss ledger_add_auto "$spine" "<text>" "<command>" "exit:0|contains:<str>"
+"$oss_bin" ledger_add_auto "$spine" "<text>" "<command>" "exit:0|contains:<str>"
 ```
 
 `<expected>` is validated as `exit:<n>` or `contains:<str>`; anything else exits
@@ -365,7 +367,7 @@ finding the line already in the ledger, or by naming the spine that will author
 it; it does not author a second one.
 
 ```bash
-oss ledger_active_auto | jq -r '.[] | "\(.id)\t\(.source_spine)\t\(.text)"'
+"$oss_bin" ledger_active_auto | jq -r '.[] | "\(.id)\t\(.source_spine)\t\(.text)"'
 ```
 
 **What counts.** One command, runnable from the composition root against
@@ -374,7 +376,7 @@ through the layers the journey crosses, to the observable outcome — and exits
 non-zero if any leg breaks:
 
 ```bash
-oss ledger_add_auto "$spine" "the golden journey: <actor> <action> → <outcome>" \
+"$oss_bin" ledger_add_auto "$spine" "the golden journey: <actor> <action> → <outcome>" \
   "bash scripts/golden-journey.sh" "exit:0"
 ```
 

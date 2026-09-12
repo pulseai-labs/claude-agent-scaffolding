@@ -70,14 +70,16 @@ Determine the target `principles.md` path based on scope.
 
 **`user` scope:**
 
+Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+
 ```bash
-USER_PRINCIPLES="$(arc principles_user_path)"
+USER_PRINCIPLES="$("$arc_bin" principles_user_path)"
 ```
 
 If this file does not exist, create it by copying the shipped-defaults header from the plugin template:
 
 ```bash
-PLUGIN_TEMPLATE="$(arc principles_shipped_path)"
+PLUGIN_TEMPLATE="$("$arc_bin" principles_shipped_path)"
 mkdir -p "$(dirname "$USER_PRINCIPLES")"
 cp "$PLUGIN_TEMPLATE" "$USER_PRINCIPLES"
 ```
@@ -176,13 +178,13 @@ Example formatted entry:
 Initialize state via the `arc` dispatcher (`architect-critic/bin/arc`; on Claude Code `arc` is on `$PATH` automatically, on Devin invoke via `exec` with the full path `<plugin-source>/bin/arc`; the dispatcher's bash shebang forces a bash runtime for the lib regardless of the caller shell, fixing the BASH_SOURCE crash that bare `source` triggers under zsh):
 
 ```bash
-arc state_init
+"$arc_bin" state_init
 ```
 
 Then append the promotion record with the dispatcher:
 
 ```bash
-arc state_append_promotion manual "$PRINCIPLE_TEXT" "$SCOPE"
+"$arc_bin" state_append_promotion manual "$PRINCIPLE_TEXT" "$SCOPE"
 ```
 
 `ac_state_append_promotion` (`lib/state.sh`) acquires the state lock, stamps the

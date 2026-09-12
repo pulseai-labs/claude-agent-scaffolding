@@ -74,6 +74,8 @@ tracker**, and every path that cannot produce one stops.
 Resolve the workspace root with the shipped resolver, then read its remote
 **from git, never from the manifest**:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
 # `oss repo_root` walks up from $PWD and refuses by name when unpaired: a
 # non-zero rc here IS branch 2, not an error, so it is swallowed for the same
@@ -81,7 +83,7 @@ Resolve the workspace root with the shipped resolver, then read its remote
 # the session on the ordinary standalone repo before .wayfinder.json is read.
 # It resolves the root under either manifest schema, so the topology branch
 # needs no separate read.
-AI_ROOT="$(oss repo_root ai_workspace 2>/dev/null || true)"
+AI_ROOT="$("$oss_bin" repo_root ai_workspace 2>/dev/null || true)"
 
 # Both branch-1 preconditions are now empty-or-set, so one test routes them:
 # no workspace, or a workspace with no origin, is branch 2 either way. Written

@@ -68,8 +68,10 @@ scrollback of an earlier one.
 **Quarantines: name the ones YOU quarantined, from step 4's own decisions.**
 The obvious selector returns every quarantine the ledger holds:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss get '.demo_ledger[] | select(.status=="quarantined")'    # ALL of them, all releases
+"$oss_bin" get '.demo_ledger[] | select(.status=="quarantined")'    # ALL of them, all releases
 ```
 
 Used as-is it attributes earlier spines' still-open tickets to this spine, and

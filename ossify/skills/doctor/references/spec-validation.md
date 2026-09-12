@@ -15,8 +15,10 @@ schema is*; this one is the authority on *how a validation run reports*.
 
 The spec is manifest-routed, not conventionally placed:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss spec_path
+"$oss_bin" spec_path
 ```
 
 **Use that verb; do not compose the path from `oss repo_root ai_workspace`.**
@@ -78,7 +80,7 @@ in `doctor` rather than in `/start`: it is a comparison between two artifacts,
 and only one of them is the spec.
 
 ```bash
-oss get '.bones | length' "$(oss state_path)"
+"$oss_bin" get '.bones | length' "$("$oss_bin" state_path)"
 ```
 
 **Pass the state path explicitly.** A bare `oss get` honours an exported

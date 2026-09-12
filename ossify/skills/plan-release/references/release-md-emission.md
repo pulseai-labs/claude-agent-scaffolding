@@ -26,9 +26,11 @@ a `.workspace/pairing.json` as the translated fallback, so a topology-only
 workspace needs no pairing manifest to emit a release spec. Release specs are
 process artifacts and live in the AI workspace, not in any declared repo.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-rel="$(oss get '.releases[-1].id')"          # e.g. r0
-rel_dir="$(oss release_dir "$rel")"          # ABSOLUTE, ai_workspace-rooted
+rel="$("$oss_bin" get '.releases[-1].id')"          # e.g. r0
+rel_dir="$("$oss_bin" release_dir "$rel")"          # ABSOLUTE, ai_workspace-rooted
 mkdir -p "$rel_dir"
 ```
 

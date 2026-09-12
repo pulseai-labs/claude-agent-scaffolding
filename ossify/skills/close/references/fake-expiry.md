@@ -36,8 +36,10 @@ judgment arm loses the one part of it a machine can be trusted with.
 
 ## 2. The mechanical arm — `oss expired_fakes`
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-ef=0; fakes_due="$(oss expired_fakes "$rel")" || ef=$?
+ef=0; fakes_due="$("$oss_bin" expired_fakes "$rel")" || ef=$?
 case "$ef" in
   0) echo "fake expiry: clean" ;;
   1) printf '%s\n' "$fakes_due"
@@ -123,7 +125,7 @@ For every fake still outstanding **after** the mechanical arm is satisfied —
 `status` is `active` or `renewed`, expiry still in the future:
 
 ```bash
-oss get '[.fakes[] | select(.status=="active" or .status=="renewed")
+"$oss_bin" get '[.fakes[] | select(.status=="active" or .status=="renewed")
           | {boundary, channel, expiry_release, replacement_trigger, reason}]'
 ```
 
@@ -174,8 +176,8 @@ that is strong evidence the fake needs replacing rather than renewing.
 ## 5. The only two unblocks
 
 ```bash
-oss fake_status "<boundary>" replaced "<what landed, and where>"
-oss fake_status "<boundary>" renewed  "<why it is still needed>" "<new-expiry-release>"
+"$oss_bin" fake_status "<boundary>" replaced "<what landed, and where>"
+"$oss_bin" fake_status "<boundary>" renewed  "<why it is still needed>" "<new-expiry-release>"
 ```
 
 **Replace** — the real boundary landed. The fake entry is never deleted, the same

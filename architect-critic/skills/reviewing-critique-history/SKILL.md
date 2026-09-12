@@ -15,8 +15,10 @@ This skill is intentionally narrow: read, format, display. No judgment, no rebut
 
 Resolve the state file through the dispatcher, never a hardcoded path — `ac_state_path` resolves `ac_data_dir` (which honors a `CLAUDE_PLUGIN_DATA` override) and appends `state.json`, so this read path always matches the write path other skills use.
 
+Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+
 ```bash
-STATE_FILE="$(arc state_path)"
+STATE_FILE="$("$arc_bin" state_path)"
 ```
 
 If the file does not exist at that path, stop here and output:
@@ -114,8 +116,8 @@ If `TOTAL <= LIMIT`, no annotation needed.
 After the `recent_runs` table, or immediately after the empty completed-run message when there are no completed runs, surface any background close-depth audits. These are dispatched by `/critique --close --async` and tracked in `external_runs[]`.
 
 ```bash
-arc state_external_run_list                 # all background runs
-arc state_external_run_list --status running   # just the in-flight ones
+"$arc_bin" state_external_run_list                 # all background runs
+"$arc_bin" state_external_run_list --status running   # just the in-flight ones
 ```
 
 If the array is empty, render nothing for this section (no header). Otherwise, emit a short second table — **running jobs first** — with columns: `run_id`, `status`, `artifact_path` (basename), `started_at` (relative), and a `resumed?` mark (`*` when `resolved_run_request_id` is non-null). End with a one-line pointer: *"Manage background audits with `/critique-jobs status|result|cancel|resume`."* This section is read-only — it never polls, cancels, or resumes (that is `managing-async-critique`).

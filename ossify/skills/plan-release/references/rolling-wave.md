@@ -19,8 +19,10 @@ claiming authority it had lost.
 
 A goal line plus candidate spine names. That is the whole artifact.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss release_set_meta "$rel" '{"next_sketch":{"goal":"a trader can run a saved strategy against paper fills","candidates":["save a named strategy","paper-execution loop","positions list"]}}'
+"$oss_bin" release_set_meta "$rel" '{"next_sketch":{"goal":"a trader can run a saved strategy against paper fills","candidates":["save a named strategy","paper-execution loop","positions list"]}}'
 ```
 
 The sketch is recorded on the **current** release (it is the current planning

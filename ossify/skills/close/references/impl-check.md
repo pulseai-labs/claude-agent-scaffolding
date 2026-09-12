@@ -29,15 +29,17 @@ burns time, and buries it.
 
 ## 2. Layer 1 — `auto:` ACs, halt-on-first-fail
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss verify_acs "$spec"    # TSV: label <tab> command <tab> expectation, in declared order
+"$oss_bin" verify_acs "$spec"    # TSV: label <tab> command <tab> expectation, in declared order
 ```
 
 Then, per row, in the order it printed. The fields are tab-separated (commands
 contain spaces), and the rows are consumed by **redirection, never by a pipe**:
 
 ```bash
-rows="$(oss verify_acs "$spec")" \
+rows="$("$oss_bin" verify_acs "$spec")" \
   || { echo "[AC] cannot read the spec '$spec' - the gate would otherwise pass by reading nothing"; exit 2; }
 [ -n "$rows" ] \
   || { echo "[AC] the spec '$spec' yields zero auto: ACs - verify the spec path and the AC grammar"; exit 2; }
@@ -45,7 +47,7 @@ rows="$(oss verify_acs "$spec")" \
 rc=0
 while IFS="$(printf '\t')" read -r label cmd exp; do
   [ -n "$label" ] || continue
-  oss verify_step "$wt" "$cmd" "$exp" || rc=$?
+  "$oss_bin" verify_step "$wt" "$cmd" "$exp" || rc=$?
   [ "$rc" -eq 0 ] || { echo "[AC] $label \`$cmd\` did not satisfy '$exp' (rc $rc)"; break; }
 done <<EOF
 $rows
@@ -113,7 +115,7 @@ spec's `user:` line is documentation for the implementer only.
 ## 3. Layer 2 — report cross-check
 
 ```bash
-oss report_cross_check "$report" "$spec"    # 0 accounted-for | 1 missing | 2 report not found
+"$oss_bin" report_cross_check "$report" "$spec"    # 0 accounted-for | 1 missing | 2 report not found
 ```
 
 Every `auto:` AC in the spec must appear in the report's AC table

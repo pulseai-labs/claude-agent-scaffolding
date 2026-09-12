@@ -109,8 +109,10 @@ the repository state matches the manifest default on every machine.
 
 Run preflight via the `wi` dispatcher:
 
+Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
+
 ```
-wi skeleton_preflight "$parent" "$name"
+"$wi_bin" skeleton_preflight "$parent" "$name"
 ```
 
 The dispatcher (`workspace-init/bin/wi`) sources every `lib/*.sh` module
@@ -150,7 +152,7 @@ mode, `<parent>` is the existing wrapper; the operation creates/logs only the
 two inner roots and `<name>-ai/.workspace`, never the wrapper itself.
 
 ```
-wi skeleton_create_root_pair "$parent" "$name"
+"$wi_bin" skeleton_create_root_pair "$parent" "$name"
 ```
 
 Expected init-log entries: `mkdir <ai_root>` and `mkdir <canonical_root>`.
@@ -162,7 +164,7 @@ Creates `.workspace/`, `.claude/`, `docs/`, `docs/specs/`, `.superpowers/`,
 template to `<ai_root>/.gitignore`.
 
 ```
-wi skeleton_seed_subdirs "$ai_root"
+"$wi_bin" skeleton_seed_subdirs "$ai_root"
 ```
 
 Expected init-log entries: `mkdir <ai_root>/.workspace`, `mkdir <ai_root>/.claude`,
@@ -177,7 +179,7 @@ is passed; `wi_manifest_write` defaults `default_branch` to `"main"` and
 `git_remote` to `null`.
 
 ```
-wi manifest_write "$ai_root" "$canonical_root" "$project_type"
+"$wi_bin" manifest_write "$ai_root" "$canonical_root" "$project_type"
 ```
 
 **Optional — tooling repo (#48 Stage 2).** If the user volunteers a separate
@@ -194,7 +196,7 @@ Renders the CLAUDE.md router stub. scaffold-onboard's `/scaffold-project`
 will overwrite this later.
 
 ```
-wi stub_claude_md "$ai_root" "$name"
+"$wi_bin" stub_claude_md "$ai_root" "$name"
 ```
 
 Expected init-log entry: `file <ai_root>/CLAUDE.md`.
@@ -204,7 +206,7 @@ Expected init-log entry: `file <ai_root>/CLAUDE.md`.
 Renders the cross-tool AGENTS.md stub.
 
 ```
-wi stub_agents_md "$ai_root"
+"$wi_bin" stub_agents_md "$ai_root"
 ```
 
 Expected init-log entry: `file <ai_root>/AGENTS.md`.
@@ -214,7 +216,7 @@ Expected init-log entry: `file <ai_root>/AGENTS.md`.
 Renders the AI workspace README.
 
 ```
-wi stub_readme "$ai_root" "$name"
+"$wi_bin" stub_readme "$ai_root" "$name"
 ```
 
 Expected init-log entry: `file <ai_root>/README.md`.

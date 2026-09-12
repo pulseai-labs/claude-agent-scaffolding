@@ -222,9 +222,11 @@ An **admitted** internal-enabler is therefore recorded under its structural clas
 — run rungs 2-4 on it to find out which — with its enabler status carried in the
 spine's name and its RELEASE.md line:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-sid="$(oss spine_add "$rel" "[internal] event-store schema" bone)"
-oss class_set "$sid" bone "internal-enabler admitted: consumed by r1.s4 (MVP); creates a bone (data ownership)"
+sid="$("$oss_bin" spine_add "$rel" "[internal] event-store schema" bone)"
+"$oss_bin" class_set "$sid" bone "internal-enabler admitted: consumed by r1.s4 (MVP); creates a bone (data ownership)"
 ```
 
 The `[internal]` marker and the reason string are what `plan-spine` reads to

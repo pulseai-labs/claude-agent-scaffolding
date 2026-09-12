@@ -6,7 +6,7 @@
 # workspace-init pairing manifest (<ai-root>/.workspace/pairing.json),
 # translated into the same internal shape on read; never writes either.
 
-OSS_MANIFEST_REFUSAL="ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands."
+OSS_MANIFEST_REFUSAL="ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands. On Devin, adopt is not published - run it on Claude Code or Codex against the same checkout; the .ossify state it authors is surface-agnostic."
 
 # Resolve the effective ${USER} value without ever propagating a failed `id`
 # call into a caller's `set -e` context: this function's own exit status is

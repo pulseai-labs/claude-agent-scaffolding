@@ -54,18 +54,20 @@ the column is ceremony inflation.
 
 ## 3. Recording a gate
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"
+"$oss_bin" risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"
 ```
 
 Worked example:
 
 ```bash
-oss risk_gate_add "live-order-execution" \
+"$oss_bin" risk_gate_add "live-order-execution" \
   "src/exec/**,src/broker/**" \
   "paper env,human confirm,kill switch,audit trail: record symbol\, side\, qty and outcome per order,progressive exposure"
 
-oss risk_gate_add "user-data-deletion" \
+"$oss_bin" risk_gate_add "user-data-deletion" \
   "src/admin/purge.rs" \
   "paper env,human confirm,audit trail,progressive exposure"
 ```
@@ -86,7 +88,7 @@ gate would never fire. A gate minted before you knew the grammar is
 repaired NOT by editing state but by a corrective append:
 
 ```bash
-oss risk_gate_set_controls "<name>" "<controls-csv>"   # refuses unknown names; refuses duplicate names (#305)
+"$oss_bin" risk_gate_set_controls "<name>" "<controls-csv>"   # refuses unknown names; refuses duplicate names (#305)
 ```
 
 ---

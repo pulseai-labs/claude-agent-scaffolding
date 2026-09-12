@@ -69,9 +69,11 @@ libs break. Use `oss help` for discovery.
 
 **Three probes, all fail-fast.**
 
+Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+
 ```bash
-if ! sp="$(oss state_path 2>/dev/null)"; then
-  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands."
+if ! sp="$("$oss_bin" state_path 2>/dev/null)"; then
+  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands. On Devin, adopt is not published - run it on Claude Code or Codex against the same checkout; the .ossify state it authors is surface-agnostic."
   exit 0
 fi
 # Later bare verbs resolve state alone and would honor this override —
@@ -80,8 +82,8 @@ if [ -n "${OSS_STATE_FILE:-}" ]; then
   printf '%s\n' "plan-spine plans the manifest's project; OSS_STATE_FILE='${OSS_STATE_FILE}' is set - unset it and re-run."
   exit 0
 fi
-bones="$(oss get '.bones | length' "$sp" 2>/dev/null)" || bones=""
-rels="$(oss get '.releases | length' "$sp" 2>/dev/null)" || rels=""
+bones="$("$oss_bin" get '.bones | length' "$sp" 2>/dev/null)" || bones=""
+rels="$("$oss_bin" get '.releases | length' "$sp" 2>/dev/null)" || rels=""
 printf 'bones=%s releases=%s\n' "${bones:-<no state>}" "${rels:-<no state>}"
 ```
 
@@ -102,11 +104,11 @@ the user's intent from a name:
 
 ```bash
 spine="<spine-id from $ARGUMENTS>"
-class="$(oss get ".spines[] | select(.id == \"$spine\") | .class" "$sp")"
-rel="$(oss get ".spines[] | select(.id == \"$spine\") | .release" "$sp")"
-name="$(oss get ".spines[] | select(.id == \"$spine\") | .name" "$sp")"
+class="$("$oss_bin" get ".spines[] | select(.id == \"$spine\") | .class" "$sp")"
+rel="$("$oss_bin" get ".spines[] | select(.id == \"$spine\") | .release" "$sp")"
+name="$("$oss_bin" get ".spines[] | select(.id == \"$spine\") | .name" "$sp")"
 if [ -z "$class" ]; then
-  printf '%s\n' "No spine '$spine'. Planned spines:"; oss spine_list; exit 0
+  printf '%s\n' "No spine '$spine'. Planned spines:"; "$oss_bin" spine_list; exit 0
 fi
 ```
 
@@ -151,7 +153,7 @@ item behind one bullet is still one bullet hiding four items.)
 **4a. Record each item.**
 
 ```bash
-oss work_item_add "$spine" "<title>" [target_repo]      # prints r1.s2.w1, …
+"$oss_bin" work_item_add "$spine" "<title>" [target_repo]      # prints r1.s2.w1, …
 ```
 
 `target_repo` defaults to the sole declared repo, refusing outright once more
@@ -171,7 +173,7 @@ one-line reason cited to the spine's plan or the lean MASTER-SPEC, and ask:
 judged a coarse plan; decomposition is the first moment the real file set exists.
 
 ```bash
-if oss touch_check src/domain/order.rs src/ui/ticket.rs; then
+if "$oss_bin" touch_check src/domain/order.rs src/ui/ticket.rs; then
   : # rc 0 = HIT (prints "bone <adr>" / "risk_gate <name>" per match)
 else
   : # rc 1 = clean. rc 2 = could NOT check (stderr says why) - never read as clean
@@ -187,7 +189,7 @@ was made against a plan that did not include this path. Reclassify and record,
 then tell the user what changed:
 
 ```bash
-oss class_set "$spine" bone "bone-touch at decomposition: <ADR-ref> (<matched surface>)"
+"$oss_bin" class_set "$spine" bone "bone-touch at decomposition: <ADR-ref> (<matched surface>)"
 ```
 
 A **risk-gate** hit additionally attaches that gate's control checklist
@@ -345,8 +347,8 @@ action, not outcome (§3.3), worked accept/reject pairs in both directions
 ### 8d. Record the accepted lines
 
 ```bash
-oss ledger_add_user "$spine" "cancel a working order from the order book and see it drop out of the working list" "the order leaves the working list and its margin is released"
-oss ledger_add_auto "$spine" "a cancelled order round-trips the matching engine" "cargo test --test cancel_order" "exit:0"
+"$oss_bin" ledger_add_user "$spine" "cancel a working order from the order book and see it drop out of the working list" "the order leaves the working list and its margin is released"
+"$oss_bin" ledger_add_auto "$spine" "a cancelled order round-trips the matching engine" "cargo test --test cancel_order" "exit:0"
 ```
 
 Each call **prints the minted line id** (`d7`, `d8`, …) — capture it; amendments
@@ -373,8 +375,8 @@ applied at this spine's close**, so a sibling spine closing first still runs the
 line. `oss ledger_unplan <line-id> <spine>` clears this spine's one if replanned:
 
 ```bash
-oss ledger_supersede d3 "$spine" "the order ticket replaced the CLI entry point"
-oss ledger_retire    d5 "$spine" "the CSV export flow was removed by this spine"
+"$oss_bin" ledger_supersede d3 "$spine" "the order ticket replaced the CLI entry point"
+"$oss_bin" ledger_retire    d5 "$spine" "the CSV export flow was removed by this spine"
 ```
 
 Full rules, and why quarantine is not a planning verb, in
@@ -389,7 +391,7 @@ retains a shell or fake records a fake-ledger entry — no exceptions, including
 fakes inherited from the skeleton and left in place:
 
 ```bash
-oss fake_add "<boundary>" "<real|fake|deferred>" "<reason>" "<replacement trigger>" "<expiry release>"
+"$oss_bin" fake_add "<boundary>" "<real|fake|deferred>" "<reason>" "<replacement trigger>" "<expiry release>"
 ```
 
 The channel is validated against `real|fake|deferred` (exit **2** otherwise). Both
@@ -401,7 +403,7 @@ truth never becomes permanent silently.
 Feed the trigger back into planning so the replacement competes for selection:
 
 ```bash
-oss feature_add "<replace the <boundary> fake>" "<the value the real one unlocks>" "<bone|flesh>" fake-replacement
+"$oss_bin" feature_add "<replace the <boundary> fake>" "<the value the real one unlocks>" "<bone|flesh>" fake-replacement
 ```
 
 **Banned fakes** — never admissible, whatever the schedule pressure: faking the

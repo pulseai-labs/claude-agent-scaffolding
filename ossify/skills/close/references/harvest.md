@@ -41,8 +41,10 @@ harvest". Resolve the paths deliberately.
 
 **The work items come from state:**
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-items="$(oss get "[.work_items[] | select(.spine==\"$spine_id\") | .id] | join(\" \")")"
+items="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\") | .id] | join(\" \")")"
 [ -n "$items" ] || { echo "close: no work items recorded for $spine_id - halt"; exit 1; }
 ```
 
@@ -55,9 +57,9 @@ state holds a spine slug, so the spine directory is recovered exactly as
 which is the part that matters:
 
 ```bash
-parts="$(oss id_parse "$spine_id")" || parts=""
+parts="$("$oss_bin" id_parse "$spine_id")" || parts=""
 rel_id="r$(printf '%s\n' "$parts" | awk '{print $2}')"
-rel_dir="$(oss release_dir "$rel_id")"   # ABSOLUTE, ai_workspace-rooted
+rel_dir="$("$oss_bin" release_dir "$rel_id")"   # ABSOLUTE, ai_workspace-rooted
 
 matches="$(find "$rel_dir" -maxdepth 1 -type d -name "$spine_id-*" 2>/dev/null)"
 n="$(printf '%s\n' "$matches" | grep -c . || true)"

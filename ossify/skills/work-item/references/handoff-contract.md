@@ -151,8 +151,10 @@ The commands to run in the worktree after the loop, each with an expectation in
 the same grammar the ACs use, because the worker runs them through the same
 predicate:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss verify_step "<worktree-abs>" "<command>" "<expectation>"
+"$oss_bin" verify_step "<worktree-abs>" "<command>" "<expectation>"
 ```
 
 State that these run **without halting on first fail** — all of them, every time,

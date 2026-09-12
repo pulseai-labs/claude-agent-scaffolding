@@ -67,8 +67,10 @@ is **`fully-private`**, and the public repo is a migration task, not a posture.
 
 Record it:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss posture_set "<fully-private|source-available|open-core|fully-open>"
+"$oss_bin" posture_set "<fully-private|source-available|open-core|fully-open>"
 ```
 
 **Revenue intent → revisit trigger.** Revenue intent is not stored as its own
@@ -128,7 +130,7 @@ configuration, not manual repair).
 Record the seam:
 
 ```bash
-oss overlay_set '<seam>'      # e.g. oss overlay_set '$PULSE_PROMPT_DIR'
+"$oss_bin" overlay_set '<seam>'      # e.g. oss overlay_set '$PULSE_PROMPT_DIR'
 ```
 
 Also record, in the private inventory: the overlay location, the loader file
@@ -158,7 +160,7 @@ the **primary** protected value.
 Register it in the bones registry (category 9, cross-cutting):
 
 ```bash
-oss bone_add "<ADR-ref>" "Privacy posture: <posture> via <channel>" \
+"$oss_bin" bone_add "<ADR-ref>" "Privacy posture: <posture> via <channel>" \
   "<seam files, private modules, composition root globs>" \
   "<revisit trigger seeded from revenue intent>"
 ```
@@ -337,8 +339,8 @@ it is invoked as a bare `oss demo_run`, so a multi-repo project onboarded under
 the old rule could not close at all.
 
 ```bash
-oss composition_set "/abs/path/to/composition/root"   # N>1: required, absolute
-oss composition_set "<repo-relative composition root>" # exactly one repo: optional
+"$oss_bin" composition_set "/abs/path/to/composition/root"   # N>1: required, absolute
+"$oss_bin" composition_set "<repo-relative composition root>" # exactly one repo: optional
 ```
 
 Absolute under N>1 because a relative value composes against the sole declared

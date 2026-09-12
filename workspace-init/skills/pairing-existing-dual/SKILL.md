@@ -44,8 +44,10 @@ There is **no `name` or `parent` input** — unlike Scenario A, both directories
 
 ## 4. Preflight + detect existing scaffolding state (no abort)
 
+Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
+
 ```bash
-wi skeleton_preflight_existing_dual "$ai_root" "$canonical_root" || exit 1
+"$wi_bin" skeleton_preflight_existing_dual "$ai_root" "$canonical_root" || exit 1
 ```
 
 Then **detect and surface** the existing AI-workspace scaffolding so the user can confirm this is the right directory before anything is written. Scan for (and report which are present):
@@ -66,8 +68,8 @@ If `${ai_root}/.workspace/pairing.json` already exists, the workspace is already
 Detect the default branch + remote from the existing canonical via the `wi` dispatcher (per **SPEC §8.4** the fallback chain is robust to oddly-configured repos):
 
 ```bash
-detected_branch="$(wi git_detect_default_branch "$canonical_root")"
-detected_remote="$(wi git_detect_remote "$canonical_root")"
+detected_branch="$("$wi_bin" git_detect_default_branch "$canonical_root")"
+detected_remote="$("$wi_bin" git_detect_remote "$canonical_root")"
 ```
 
 `wi_git_detect_default_branch` tries `git symbolic-ref refs/remotes/origin/HEAD` → `git symbolic-ref HEAD` → `git branch --show-current` → interactive prompt → ultimate fallback `"main"`. `wi_git_detect_remote` returns `origin`'s URL if set, else empty (manifest records `null`).
@@ -83,18 +85,18 @@ Two operations only — both idempotent and non-destructive to existing AI-works
 # (Scenario C is the only path where it may NOT be). Use the same predicate as
 # `wi trace_filter_install`, so nested subdirs, bare repos, and linked worktrees
 # record false while standard repos and separate-git-dir/submodule roots record true.
-if wi trace_filter_is_installable_repo_root "$ai_root"; then
+if "$wi_bin" trace_filter_is_installable_repo_root "$ai_root"; then
   ai_git_tracked=true
 else
   ai_git_tracked=false
 fi
 
 if [[ -n "$detected_remote" ]]; then
-  wi manifest_write "$ai_root" "$canonical_root" "$project_type" \
+  "$wi_bin" manifest_write "$ai_root" "$canonical_root" "$project_type" \
     --canonical-git-remote "$detected_remote" --default-branch "$detected_branch" \
     --ai-git-tracked "$ai_git_tracked"
 else
-  wi manifest_write "$ai_root" "$canonical_root" "$project_type" \
+  "$wi_bin" manifest_write "$ai_root" "$canonical_root" "$project_type" \
     --default-branch "$detected_branch" \
     --ai-git-tracked "$ai_git_tracked"
 fi
@@ -109,9 +111,9 @@ fi
 The canonical hook is the load-bearing one (it guards the production repo's commits going forward). The AI-workspace hook is installed only when the AI workspace is itself a git repo:
 
 ```bash
-wi trace_filter_install "$ai_root" "$canonical_root"          # canonical: always
+"$wi_bin" trace_filter_install "$ai_root" "$canonical_root"          # canonical: always
 if [[ "$ai_git_tracked" == true ]]; then
-  wi trace_filter_install "$ai_root" "$ai_root"               # AI workspace: only if a git repo
+  "$wi_bin" trace_filter_install "$ai_root" "$ai_root"               # AI workspace: only if a git repo
 fi
 ```
 

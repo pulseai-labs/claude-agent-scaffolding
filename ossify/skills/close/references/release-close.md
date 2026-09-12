@@ -67,9 +67,11 @@ how many repos the closing release actually touched.
 
 `$rel` is the id `/close` was invoked with, carried from SKILL.md §2's routing.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-open_spines="$(oss get "[.spines[] | select(.release==\"$rel\" and .status != \"closed\" and .status != \"abandoned\") | \"\(.id) (\(.status))\"] | join(\", \")")"
-abandoned="$(oss get "[.spines[] | select(.release==\"$rel\" and .status == \"abandoned\") | .id] | join(\", \")")"
+open_spines="$("$oss_bin" get "[.spines[] | select(.release==\"$rel\" and .status != \"closed\" and .status != \"abandoned\") | \"\(.id) (\(.status))\"] | join(\", \")")"
+abandoned="$("$oss_bin" get "[.spines[] | select(.release==\"$rel\" and .status == \"abandoned\") | .id] | join(\", \")")"
 
 [ -z "$open_spines" ] \
   || { echo "close: $rel has spines that are not closed: $open_spines - halt"; exit 1; }
@@ -113,7 +115,7 @@ are still live records, and steps 3 and 4 below pick them up on their own terms.
 ## 3. Step 2 — the full cumulative walkthrough
 
 ```bash
-oss demo_user_lines            # NO argument - every active user: line, all spines
+"$oss_bin" demo_user_lines            # NO argument - every active user: line, all spines
 ```
 
 **The no-argument call is the whole difference from spine close.** With a spine
@@ -176,7 +178,7 @@ in **`references/fake-expiry.md`**. The branch this step runs — the shipped
 copy (`fake-expiry.md` §2), executed from here:
 
 ```bash
-ef=0; fakes_due="$(oss expired_fakes "$rel")" || ef=$?
+ef=0; fakes_due="$("$oss_bin" expired_fakes "$rel")" || ef=$?
 case "$ef" in
   0) echo "fake expiry: clean" ;;
   1) printf '%s\n' "$fakes_due"
@@ -198,7 +200,7 @@ or retired by the next release close**. So every line quarantined in a release
 **strictly earlier** than this one is a blocking finding.
 
 ```bash
-eq=0; quarantines_due="$(oss expired_quarantines "$rel")" || eq=$?
+eq=0; quarantines_due="$("$oss_bin" expired_quarantines "$rel")" || eq=$?
 case "$eq" in
   0) echo "quarantines: clean" ;;
   1) printf '%s\n' "$quarantines_due"
@@ -223,7 +225,7 @@ project has the most owed tickets.
 **The two unblocks are fix or retire**, and both are real work:
 
 ```bash
-oss ledger_retire "<line-id>" "<by-spine>" "<why it is no longer owed>"
+"$oss_bin" ledger_retire "<line-id>" "<by-spine>" "<why it is no longer owed>"
 ```
 
 `retire` is a *planning* verb: it records intent and the line stays live until a
@@ -260,8 +262,8 @@ Resolving it needs the slug, which **nothing persists** — recover it from the
 directory name the way the work-item layer does (`work-item-close.md` §1), then:
 
 ```bash
-ai_root="$(oss repo_root ai_workspace)"
-spine_rel="$(oss spine_dir "$rel" "<spine-id>" "<spine-slug>")"   # RELATIVE
+ai_root="$("$oss_bin" repo_root ai_workspace)"
+spine_rel="$("$oss_bin" spine_dir "$rel" "<spine-id>" "<spine-slug>")"   # RELATIVE
 [ -f "$ai_root/$spine_rel/retrospective.md" ] \
   || { echo "close: $rel - spine <spine-id> has no retrospective.md - halt"; exit 1; }
 ```
@@ -275,7 +277,7 @@ The release retro itself lands beside them, in the release directory — the
 **parent** of what `spine_dir` returns:
 
 ```bash
-rel_dir="$(oss release_dir "$rel")"   # ABSOLUTE, ai_workspace-rooted
+rel_dir="$("$oss_bin" release_dir "$rel")"   # ABSOLUTE, ai_workspace-rooted
 # e.g. docs/specs/r0/ — the retro is "$rel_dir/release-retrospective.md"
 ```
 
@@ -296,7 +298,7 @@ not appear above it**, the same rule the spine retro's §9 states.
 **"What the release set out to do" has a source — read it, do not recall it:**
 
 ```bash
-oss get ".releases[] | select(.id==\"$rel\") | {goal, exit_criteria}"
+"$oss_bin" get ".releases[] | select(.id==\"$rel\") | {goal, exit_criteria}"
 ```
 
 The goal is the one recorded at `release_add`; `exit_criteria` is what
@@ -334,9 +336,9 @@ The rolling-wave crank, and the reason this ceremony is a planning input rather
 than only an accounting one.
 
 ```bash
-oss feature_list                                    # the map, as JSON
-oss feature_add "<name>" "<the value it unlocks>" "<bone|flesh>" release-retro
-oss release_set_meta "$rel" '{"next_sketch":{"goal":"<one line>","candidates":["<spine>","<spine>"]}}'
+"$oss_bin" feature_list                                    # the map, as JSON
+"$oss_bin" feature_add "<name>" "<the value it unlocks>" "<bone|flesh>" release-retro
+"$oss_bin" release_set_meta "$rel" '{"next_sketch":{"goal":"<one line>","candidates":["<spine>","<spine>"]}}'
 ```
 
 Re-groom against what the release actually taught: the walkthrough's friction,
@@ -425,12 +427,12 @@ whichever repo that happens to be:
 # failure in a process substitution is invisible, the loop tags NOTHING and
 # the pass still returns 0. jq variables crossing a shell double-quoted
 # string need the backslash (\$root, \$s); $rel is shell-expanded on purpose.
-tag_repos="$(oss get ". as \$root | .work_items[] | select(.spine as \$s | any(\$root.spines[]; .id == \$s and .status == \"closed\" and .release == \"$rel\")) | .target_repo" | sort -u)" \
+tag_repos="$("$oss_bin" get ". as \$root | .work_items[] | select(.spine as \$s | any(\$root.spines[]; .id == \$s and .status == \"closed\" and .release == \"$rel\")) | .target_repo" | sort -u)" \
   || { echo "close: the release-tag repo set could not be read from state - halt"; exit 1; }
 
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue
-  repo_root="$(oss repo_root "$repo")" \
+  repo_root="$("$oss_bin" repo_root "$repo")" \
     || { echo "close: $rel names undeclared repo '$repo' - halt"; exit 1; }
   # The base must be UNAMBIGUOUS per repo: two closed spines recording
   # different bases in the same repo is a halt, not a first-wins pick - the
@@ -558,8 +560,8 @@ and halts like any other blocked landing: never `--force`, never
 delete-and-retag.
 
 ```bash
-oss release_status "$rel" closed
-oss demo_record release "$rel" "<true|false>" "<line-count>" "<notes>"
+"$oss_bin" release_status "$rel" closed
+"$oss_bin" demo_record release "$rel" "<true|false>" "<line-count>" "<notes>"
 ```
 
 **`demo_record` takes five arguments after the scope word**, not two: scope, id,

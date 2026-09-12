@@ -17,7 +17,8 @@ item claims. Whether a rule block is well-formed is yours since the skill-first
 conversion — checked by reading against the reference's field table (§6). The
 judgment — is this drift the record's fault or the repo's, is this rule the
 right rule for this project, is this warning worth acting on today — happens
-here, in your reasoning.
+here, in your reasoning. Resolve `oss` once into `oss_bin` per
+`rules/dispatcher-path.md`; every `oss` below and in references is `"$oss_bin"`.
 
 ---
 
@@ -76,9 +77,9 @@ the verb, let the user run it.
   release's blocking findings. Those are `/close`, and they halt; you do not.
 - The user wants to **author or amend the spec itself**. Fresh authoring is
   `/start`, which refuses on a declared repo that already carries code; a
-  project that already has code adopts via `/ossify:adopt`. Amending an
-  existing spec
-  is not this surface's job — you validate what exists and never edit it.
+  project that already has code adopts via `/ossify:adopt` — not on Devin
+  (run `adopt` there on Claude Code or Codex — `.ossify` state is shared).
+  Amending an existing spec is not this surface's job — you validate it.
 - The user wants to **plan, decompose, or execute** anything. Those are
   `/plan-release`, `/plan-spine`, `/work-item`.
 - The user asks to **fix** a finding you reported. Name the verb and let them
@@ -152,7 +153,7 @@ Close with the read-out in §14.
 **Four checks are the verb's; the other five are yours.**
 
 ```bash
-oss doctor
+"$oss_bin" doctor
 ```
 
 runs `state`, `schema`, `replay`, `shape`, tagged `ok:` / `fail:` / `skip:`, and

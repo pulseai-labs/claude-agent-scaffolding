@@ -57,8 +57,10 @@ observation is what has planning value.
 
 Attach them to the release being planned:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss release_set_meta "$rel" '{"real_use_findings":["backtest takes ~4 min so iteration stopped","had to hand-edit the saved strategy JSON to change a rule","no way to compare two runs side by side"]}'
+"$oss_bin" release_set_meta "$rel" '{"real_use_findings":["backtest takes ~4 min so iteration stopped","had to hand-edit the saved strategy JSON to change a rule","no way to compare two runs side by side"]}'
 ```
 
 The release record must exist first — collect the findings in §4 of the flow, then
@@ -72,7 +74,7 @@ Findings that describe missing or broken **value** also become feature-map entri
 immediately, so they compete for selection on equal terms:
 
 ```bash
-oss feature_add "compare two backtest runs" "iterate on a strategy without losing the previous result" flesh real-use
+"$oss_bin" feature_add "compare two backtest runs" "iterate on a strategy without losing the previous result" flesh real-use
 ```
 
 The `real-use` source tag matters at the next groom: it marks entries that came
@@ -113,7 +115,7 @@ Record the empty case rather than omitting the key, so the next groom can see th
 run:
 
 ```bash
-oss release_set_meta "$rel" '{"real_use_findings":["none reported - product used, no friction surfaced"]}'
+"$oss_bin" release_set_meta "$rel" '{"real_use_findings":["none reported - product used, no friction surfaced"]}'
 ```
 
 ---

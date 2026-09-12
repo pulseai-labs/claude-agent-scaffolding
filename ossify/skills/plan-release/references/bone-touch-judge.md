@@ -33,8 +33,10 @@ consequence. Overrides are for critic findings; a glob is not a finding.
 
 ## 2. Running it
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-if oss touch_check src/domain/order.rs src/ui/export.rs docs/guide.md; then
+if "$oss_bin" touch_check src/domain/order.rs src/ui/export.rs docs/guide.md; then
   # rc 0 — HIT. stdout carries one line per match:
   #   bone ADR-0002
   #   risk_gate live-order-execution
@@ -60,7 +62,7 @@ the state is broken — the one situation where degrading is least acceptable. W
 the class declaration turns on this verdict, test the rc explicitly:
 
 ```bash
-oss touch_check src/domain/order.rs src/ui/export.rs; tc=$?
+"$oss_bin" touch_check src/domain/order.rs src/ui/export.rs; tc=$?
 case "$tc" in
   0) : ;;   # HIT — reclassify to bone
   1) : ;;   # clean
@@ -104,8 +106,8 @@ Same rules as `start`'s `references/bones-registry.md` §4.
 ### 4.1 Bone hit
 
 ```bash
-oss class_set "<spine>" bone "bone-touch: ADR-0002 (src/domain/**)"
-oss veto_add  "<spine>" "bone-touch: ADR-0002 (src/domain/**)" auto-bone "touch-surface overlap"
+"$oss_bin" class_set "<spine>" bone "bone-touch: ADR-0002 (src/domain/**)"
+"$oss_bin" veto_add  "<spine>" "bone-touch: ADR-0002 (src/domain/**)" auto-bone "touch-surface overlap"
 ```
 
 Both calls. `class_set` moves the class and appends to `class_overrides`;
@@ -122,7 +124,7 @@ Everything above, **plus** the gate's control checklist attaches to the spine's
 close path as required work:
 
 ```bash
-oss get '.risk_gates[] | select(.name=="live-order-execution") | .controls'
+"$oss_bin" get '.risk_gates[] | select(.name=="live-order-execution") | .controls'
 ```
 
 The listed controls (paper/sandbox env · human confirm naming the concrete effect
@@ -133,8 +135,8 @@ The listed controls (paper/sandbox env · human confirm naming the concrete effe
 Record it so the checklist is not lost between planning and decomposition:
 
 ```bash
-oss class_set "<spine>" bone "risk-gate: live-order-execution (src/exec/**) - controls: paper env, human confirm, kill switch, audit trail, progressive exposure"
-oss veto_add  "<spine>" "risk-gate: live-order-execution (src/exec/**)" auto-bone "risk-surface overlap; gate controls attached"
+"$oss_bin" class_set "<spine>" bone "risk-gate: live-order-execution (src/exec/**) - controls: paper env, human confirm, kill switch, audit trail, progressive exposure"
+"$oss_bin" veto_add  "<spine>" "risk-gate: live-order-execution (src/exec/**)" auto-bone "risk-surface overlap; gate controls attached"
 ```
 
 **Harm is orthogonal to reversibility.** A flesh-class one-liner inside the
