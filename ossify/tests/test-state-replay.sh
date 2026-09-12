@@ -230,5 +230,32 @@ case "$T_OUT" in
   *) T_PASS=$((T_PASS+1)) ;;
 esac
 
+# --- #340: legacy-format repair through the corrective append ---------------
+# The pre-#340 world journaled add_risk_gate payloads with SPLIT control
+# fragments (the CSV splitter had no escape). A journal like that is healthy —
+# replay reproduces the fragments faithfully — and the repair is a journaled
+# set_risk_gate_controls, never a history edit. This is the migration-path
+# input: a LEGACY-format journal, not a fresh derivation.
+T6="$(mktemp -d)"; S6="$T6/state.json"
+oss_state_init "$S6" legacy-repair >/dev/null
+# The legacy fragment payload, as the old splitter actually wrote it:
+oss_state_mutate "$S6" add_risk_gate \
+  '{"name":"live-order-execution","touch":["src/exec/**"],"controls":["paper env","human confirm","audit trail: record image","mounts","egress allowlist and exit status per bootstrap","kill switch"],"at":"2026-08-25T00:00:00Z"}'
+t_capture oss_state_replay "$S6"
+t_assert_rc 0 "legacy journal with split fragments replays faithfully"
+t_capture oss_state_read "$S6" '.risk_gates[0].controls | length'
+t_assert_eq "6" "$T_OUT" "the corruption reproduces: one phrase became three fragments"
+t_capture oss_reg_set_risk_gate_controls "$S6" live-order-execution "paper env,human confirm,audit trail: record image\, mounts\, egress allowlist and exit status per bootstrap,kill switch"
+t_assert_rc 0 "corrective append lands on the legacy state"
+t_capture oss_state_replay "$S6"
+t_assert_rc 0 "replay derives the CORRECTED state from base+journal"
+t_capture oss_state_read "$S6" '.risk_gates[0].controls | length'
+t_assert_eq "4" "$T_OUT" "repaired controls hold the phrase whole (4, not 6)"
+t_capture oss_state_read "$S6" '.risk_gates[0].controls[2]'
+t_assert_eq "audit trail: record image, mounts, egress allowlist and exit status per bootstrap" "$T_OUT" "the repaired control holds the phrase TEXT, not just a count"
+t_capture oss_state_read "$S6" '.mutations | length'
+t_assert_eq "2" "$T_OUT" "the journal kept BOTH mutations - append, not edit"
+rm -rf "$T6"
+
 rm -rf "$TMP"
 t_summary

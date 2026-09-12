@@ -28,8 +28,8 @@ MASTER-SPEC.md"* for a properly initialised project. `oss spec_path` reads the
 routed key, expands its `${...}` tokens, falls back to the same convention when
 the key is absent, and refuses a value that is not absolute.
 
-If no pairing manifest resolves, that is a **finding, not a refusal** — emit
-`skip: spec - no pairing manifest, so MASTER-SPEC.md cannot be located` and
+If no topology declaration resolves, that is a **finding, not a refusal** — emit
+`skip: spec - no topology declaration, so MASTER-SPEC.md cannot be located` and
 carry on with the rest of the sweep (`SKILL.md` §3). The verb exits nonzero and
 says why; echo its message rather than substituting a guess.
 

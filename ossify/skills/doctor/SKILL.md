@@ -1,6 +1,6 @@
 ---
 name: doctor
-description: Diagnose an ossify project and name the remedy for what it finds — state health and state-vs-repo drift, rotting demo lines, outstanding fakes, patch records, orphan worktrees, lean-spec validation, machine-checkable-rule authoring, the Claude/Codex interop check, and the skill budgets. Use when the user says run doctor, check project health, validate the spec, add a project rule, check Codex interop, find orphan worktrees, or /ossify:doctor. Not the close gates (/close), not onboarding (/start).
+description: Diagnose an ossify project and name the remedy for what it finds — state health and state-vs-repo drift, rotting demo lines, outstanding fakes, patch records, orphan worktrees, lean-spec validation, machine-checkable-rule authoring, the Claude/Codex interop check, the skill budgets, and plugin provenance. Use when the user says run doctor, check project health, validate the spec, add a project rule, check Codex interop, find orphan worktrees, check plugin provenance, or /ossify:doctor. Not the close gates (/close), not onboarding (/start).
 ---
 
 # doctor
@@ -27,7 +27,7 @@ Where it sits: **nowhere in the chain.** `start` → `plan-release` → `plan-sp
 → `work-item` → `close` is a sequence; `doctor` is a peer to all five and runs at
 any point, including before `start` has ever run.
 
-Five surfaces:
+Six surfaces:
 
 | Surface | The question it answers | Go to |
 |---|---|---|
@@ -36,9 +36,12 @@ Five surfaces:
 | Rule authoring | What rules should `03-code-patterns.md` document for the work-item gate to apply? | §6 |
 | Interop check | Can Claude *and* Codex both drive this workspace safely? | §7 |
 | Budget check | Does the front-loaded surface still cost what it claims? | §8 |
+| Plugin provenance | Do the answering binary, the loaded doctor body, and the expected reference agree? | §13 |
 
 **The guarantee, and it is the inverse of every other entry skill's:
-`doctor` runs on a broken project.** `start` refuses without a pairing manifest;
+`doctor` runs on a broken project.** `start` refuses when a declared repo
+already carries code (it authors a topology rather than refusing for a missing
+one);
 `plan-release` requires an onboarded project; `close` refuses without a green
 `oss doctor`. This skill **never refuses for the condition it exists to report**.
 An uninitialised project, a corrupt state file, a missing manifest — each is a
@@ -48,7 +51,7 @@ of the read-out and mark the rest derived, so the sweep does not lead with three
 consequences of one cause. The one thing you may
 refuse is a request to *change* something you were not asked to change.
 
-**`doctor` reports; it does not mutate state.** Four of the five surfaces are
+**`doctor` reports; it does not mutate state.** Five of the six surfaces are
 strictly read-only. **Exactly one thing writes** — **rule authoring** (§6),
 which appends to `03-code-patterns.md`, and only because the user asked for a
 rule. Everything else names a remedy and stops. Running `oss state_restore`
@@ -65,18 +68,24 @@ the verb, let the user run it.
 - "check Codex interop", "can I switch between Claude and Codex here"
 - "find orphan worktrees"
 - "check the skill budget"
+- "check plugin provenance", "which oss version is loaded"
 
 **Do NOT auto-invoke when:**
 
 - The user wants to **run a gate** — the work-item gate, the cumulative demo, a
   release's blocking findings. Those are `/close`, and they halt; you do not.
-- The user wants to **author or amend the spec itself**. Authoring is `/start`;
-  amending an existing spec is not this surface's job — you validate what exists
-  and never edit it.
+- The user wants to **author or amend the spec itself**. Fresh authoring is
+  `/start`, which refuses on a declared repo that already carries code; a
+  project that already has code adopts via `/ossify:adopt`. Amending an
+  existing spec
+  is not this surface's job — you validate what exists and never edit it.
 - The user wants to **plan, decompose, or execute** anything. Those are
   `/plan-release`, `/plan-spine`, `/work-item`.
 - The user asks to **fix** a finding you reported. Name the verb and let them
   run it, unless it is one of the two explicit-write surfaces above.
+- The spec and the state disagree on **what adoption did**. Read
+  `<ai-workspace>/ADOPTION.md` if it exists — it is adoption's record
+  (`adopt` §6); route the discrepancy there before re-deriving one side.
 
 ---
 
@@ -98,9 +107,10 @@ surface="<the surface token from $ARGUMENTS, lowercased; empty if none>"
 | `rules`, `rule` | §6 |
 | `interop`, `codex` | §7 |
 | `budget` | §8 |
+| `provenance` | §13 |
 
 **An unrecognised token runs the full sweep anyway**, prefaced by one line
-naming what was passed and listing the five surfaces. It does **not** refuse:
+naming what was passed and listing the six surfaces. It does **not** refuse:
 a user who mistypes a surface name still wants to know whether their project is
 healthy, and this is the one skill whose whole contract is that it answers.
 
@@ -108,7 +118,7 @@ healthy, and this is the one skill whose whole contract is that it answers.
 
 ## 3. The full sweep
 
-Run all five surfaces in the order of §4 → §8, and **report every one of them.**
+Run all six surfaces in the order of §4 → §8 then §13, and **report every one of them.**
 
 **No check halts another.** This is the sharpest difference between `doctor` and
 `close`, and copying `close`'s halt discipline here is the mistake to avoid: a
@@ -130,10 +140,10 @@ so the sweep's rule verdict is an *inspection*: how many `mcrule` blocks
 a type this build does not recognise. It never prompts for a rule and never
 writes. Authoring (§6's interactive flow) runs **only** on an explicit request
 for a rule — otherwise the sweep would have to either stall soliciting an
-unrelated write, or drop one of its five verdicts, and both break a contract
+unrelated write, or drop one of its six verdicts, and both break a contract
 stated three paragraphs above this one.
 
-Close with the read-out in §13.
+Close with the read-out in §14.
 
 ---
 
@@ -168,11 +178,14 @@ count.
 It reports directories under `<repo>/.worktrees/` that no work item claims — why
 that matters at all (spine close removes worktrees by reading state) is
 `references/state-inspection.md` §4's account. Being repo-reading also makes
-it the only one that can be legitimately *unavailable*: with no pairing manifest
-there is no repo root to look in, so emit `skip:` rather than falling silent.
+it the only one that can be legitimately *unavailable*: with no topology
+declaration resolving — neither `.ossify/topology.json` nor a
+`.workspace/pairing.json` on the walk-up path — there is no repo root to look
+in, so emit `skip:` rather than falling silent.
 
 **Print one line per repository**, tagged `worktrees(<repo-key>)` — the keys are
-`_oss_repo_root`'s enum, so read that rather than a list here. A key the manifest
+every repo the manifest declares, plus `ai_workspace`, resolved from the
+manifest at run time rather than trusted from a list written here. A key the manifest
 does not configure, or whose root is not on this machine, still costs a `skip:`
 line. Do not summarise the lines into one verdict; the whole point is that
 "clean" and "not looked at" stay distinguishable per repo (the #156 history that
@@ -185,9 +198,13 @@ An unkeyed line means the surface did not run at all, and it names why.
 
 `oss worktree_orphans <repo-key> <state>` names the directories individually.
 **Pass both arguments, every time.** doctor used to print this line for you with
-both pinned; it does not any more, so the discipline is yours. Omitting the key
-silently defaults to `canonical` (the exact habit #156 punished), and omitting
-the state lets an exported `$OSS_STATE_FILE` answer about a different project.
+both pinned; it does not any more, so the discipline is yours. Omitting the
+key resolves to the sole declared repo under one, and refuses outright —
+naming the declared set — under more than one (#272/#310 Task 4); relying on
+that default is still the #156 habit, because a project that grows a second
+repo turns every omitted call into a refusal instead of the per-repo
+read-out this section exists to produce. Omitting the state lets an exported
+`$OSS_STATE_FILE` answer about a different project.
 Pin it once with `sf="${OSS_STATE_FILE:-$(oss state_path)}"` — **override first**,
 matching what `oss doctor` itself resolves — and pass `"$sf"` to every read,
 including to `oss doctor`. `references/state-inspection.md` §2 carries the
@@ -279,9 +296,13 @@ every mutating verb routes through it.
 
 Emit the same line grammar as `oss doctor` — `ok:` / `fail:` per check — and,
 since there is no exit code now, **state plainly at the end whether anything
-failed**. Checks, in order: the pairing manifest (and that it is *exactly one*
-JSON object), both repo roots resolving to real directories with `canonical`
-also being a git **work tree** (a bare repository or a `.git` directory is not
+failed**. Checks, in order: the resolved topology declaration —
+`.ossify/topology.json` first, `.workspace/pairing.json` as the translated
+fallback, and that whichever resolves is *exactly one* JSON object — the
+`ai_workspace` root and every declared repo's root
+resolving to real directories, with each declared repo — never
+`ai_workspace`, which is legitimately allowed to be untracked — also being a
+git **work tree** (a bare repository or a `.git` directory is not
 one and fails), the state path resolving and not silently
 overridden, and **`AGENTS.md` existing and naming ossify**. That last one is the
 check that is actually about Codex: `AGENTS.md` is the only file Codex reads for
@@ -316,7 +337,7 @@ this project's own history:
 
 | Budget | What it sums | Enforced by |
 |---|---|---|
-| **Every-call description** | the `description:` frontmatter of `skills/*/SKILL.md` | `check 7`, a red test |
+| **Every-call description** | the `description:` frontmatter of `commands/*.md` — what the listing loads (#263) | `check 7`, a red test |
 | **SKILL.md body** | line count per `SKILL.md`, 500 each | `check 6`, a red test |
 
 Neither is affected by `references/`, by `plugin.json`'s description, or by the
@@ -362,7 +383,7 @@ Named here rather than left to read as executed:
 - **Refusing because the project is broken.** That is the finding, not an
   obstacle to reporting it (§1).
 - **Halting the sweep on the first `fail:`.** Nothing here mutates, so nothing
-  downstream is unsafe. Report all five surfaces (§3).
+  downstream is unsafe. Report all six surfaces (§3).
 - **Letting a surface that could not run print nothing.** Silence reads as a
   pass (§3).
 - **Branching on `oss worktree_orphans`' rc.** rc 0 means it ran. The finding is
@@ -437,7 +458,26 @@ the full sweep.
 
 ---
 
-## 13. The doctor read-out
+## 13. Plugin provenance
+
+Run this surface in every full sweep and directly for `provenance`. Report
+three roles separately — **answering binary**, **loaded doctor body**,
+**expected reference** — each resolved role with its concrete path and
+manifest version, never one substituted for another. All three resolved and
+both active versions equal to expected is `ok`; either differing is `warn`;
+any unresolved role is `partial`, with a resolved binary/body disagreement
+preserved inside the partial. Detection compares versions only; never derive
+a version from a cache-directory name.
+
+Any version disagreement between resolved roles — including binary/body
+disagreement while expected is unresolved — triggers prior-use inspection:
+name prior `oss` verbs and compare only concrete ossify prose loaded before
+this invocation. Impact coverage that could not be completed is `incomplete`
+and never changes the surface verdict. Never scan unused skills, reverse-map
+verbs, or decide reruns. Follow `references/provenance-check.md`; report
+without updating or halting anything.
+
+## 14. The doctor read-out
 
 **The read-out is this skill's final assistant message.** It is a message, not a
 file: `doctor` writes no report artifact.
@@ -445,7 +485,7 @@ file: `doctor` writes no report artifact.
 It carries, in this order:
 
 1. **Each surface with its verdict** — including the ones that were skipped, and
-   why. The five lines are roll-ups: each is followed by that surface's own
+   why. The six lines are roll-ups: each is followed by that surface's own
    tagged lines verbatim. A `skip:` inside a surface never rolls up to `ok:` —
    the roll-up says `partial` and names which check did not run — and the
    `worktrees(<key>)` lines are never merged.

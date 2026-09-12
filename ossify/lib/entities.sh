@@ -22,12 +22,16 @@ oss_entity_add_spine() { # $1=state $2=release-id $3=name $4=class $5=target_rep
 }
 
 oss_entity_add_work_item() { # $1=state $2=spine-id $3=title $4=target_repo
-  local sf="$1" spine="$2" ts
+  local sf="$1" spine="$2" ts tr
   jq -e --arg s "$spine" '.spines[] | select(.id == $s)' "$sf" >/dev/null 2>&1 \
     || { echo "oss: unknown spine '$spine'" >&2; return 7; }
+  # Callers (commands.sh) now always pass an explicit key; this default is kept
+  # so a direct lib call is honest about the same sole-repo rule (#272/#310
+  # Task 4 - was a literal `canonical`).
+  if [ -z "${4:-}" ]; then tr="$(_oss_default_repo_key)" || return $?; else tr="$4"; fi
   ts="$(_oss_now)"
   oss_state_mutate "$sf" add_work_item \
-    "$(jq -n --arg s "$spine" --arg t "$3" --arg r "${4:-canonical}" --arg ts "$ts" \
+    "$(jq -n --arg s "$spine" --arg t "$3" --arg r "$tr" --arg ts "$ts" \
       '{spine:$s,title:$t,target_repo:$r,status:"planned",created_at:$ts}')" \
     "work_item:$spine"
 }

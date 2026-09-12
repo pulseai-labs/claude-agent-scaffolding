@@ -40,10 +40,13 @@ the check.
 
 **Run each check from the root the cited artifact lives in** — the relative
 paths above silently assume the ambient cwd is that root, and §1's targets
-span **both** repos. Each target's own contract names its home, so resolve
+span **more than one** repo. Each target's own contract names its home, so
+resolve
 from there, not from a remembered rule: file paths and signatures in the work
-item's declared `target_repo` when it carries one, the canonical otherwise
-(`oss repo_root <name>`); bone ADRs always in the canonical
+item's declared `target_repo` when it carries one, the sole declared repo
+otherwise
+(`oss repo_root <name>`); bone ADRs in whichever declared repo the bone
+concerns
 (`start/references/bones-registry.md`); the lean spec wherever `oss spec_path` prints; release
 increment records under the AI workspace's `docs/specs/<release-id>/`
 (`plan-release/references/release-md-emission.md` §1). A check run from the wrong root reports a false

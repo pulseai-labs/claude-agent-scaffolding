@@ -13,7 +13,8 @@ spines' handoffs record `base_branch: main`, the manifest's
 `PUBLIC_BOUNDARY.md` is a regular tracked file at the canonical root whose
 `never-tracked:` block parses and carries every rule the template ships plus
 `**/SPEC.md, docs/planning/**`. `git ls-files` matches no rule.
-`git ls-files --others` (ignored files included) returns only `node_modules/`.
+`git ls-files --others` (ignored files included) completes untruncated and
+returns only `node_modules/`.
 Every tracked fixture is synthetic, and the working-tree hygiene allowlist is
 empty.
 
@@ -64,4 +65,12 @@ bytes match the committed blob and that it holds no sensitive content.
 
 Inventory, manifest and allowlist state, stated so nothing above infers it:
 the private boundary inventory carries no **Accepted disclosures** section; no
-manifest object records a `git_remote` beyond the remotes enumerated above.
+manifest object records a `git_remote` beyond the remotes this scenario enumerates.
+
+Remote, clone and scan-scope state, stated so nothing above infers it: `git
+remote -v` in the canonical lists exactly one remote, `origin`, on
+github.com; the AI workspace is a full clone too — `git rev-parse
+--is-shallow-repository` prints `false` in it and every remote branch of its
+is fetched; the `--no-git` read over the working tree spans every path in it
+— tracked, untracked and gitignored, `node_modules/` included — and no file
+under `node_modules/` carries a credential, a key or a token.

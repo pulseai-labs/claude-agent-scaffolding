@@ -177,18 +177,22 @@ filename), its **target file**, and its **text** (verbatim; a §6 edit means the
 user's words, not yours).
 
 **Where the bank is — this paragraph is the only copy; other surfaces route
-here.** Read the pairing manifest (walk up from the cwd to
-`.workspace/pairing.json`) and take `.well_known_paths.memory_bank`. The value
+here.** Read the manifest — walk up from the cwd for `.ossify/topology.json`
+first, then `.workspace/pairing.json` if no topology file is found (the same
+order `oss_topology_discover` resolves through, `lib/manifest.sh`) — and take
+`.well_known_paths.memory_bank`. The value
 workspace-init writes is TOKEN form — `${ai_workspace.root}/.claude/memory-bank`
-— and the route vocabulary is exactly the four tokens `_oss_manifest_resolve`
-(lib/manifest.sh) substitutes: `${ai_workspace.root}` and `${canonical.root}`
-expand from the manifest's own roots, `${HOME}` and `${USER}` from the
-environment. Expand them before using
-the route; when the key is absent, the bank is
-`<ai_workspace.root>/.claude/memory-bank` by convention. A route that is
-relative, or that still carries a `${...}` token outside that vocabulary (a
-`${PLUGIN_DATA:...}`, an abandoned `${private_core.root}`), is a **STOP**:
-surface it and write nowhere. Never compose the route against your
+— and the route vocabulary is whatever `_oss_manifest_resolve` (lib/manifest.sh)
+substitutes, stated as a rule rather than a list because the list grows with the
+declaration: `${ai_workspace.root}`, **`${repos.<name>.root}` for every repo the
+declaration names**, `${canonical.root}` as a legacy alias that resolves only
+when a repo is actually named `canonical`, and `${HOME}` / `${USER}` from the
+environment. Expand them before using the route; when the key is absent, the
+bank is `<ai_workspace.root>/.claude/memory-bank` by convention. A route that is
+relative, or that still carries a `${...}` token none of those rules cover (a
+`${PLUGIN_DATA:...}`; a bare `${private_core.root}`, which has no legacy alias —
+the addressable form is `${repos.private_core.root}`), is a **STOP**: surface it
+and write nowhere. Never compose the route against your
 own cwd — a cwd-composed path lands the writes in whichever repo you happen to
 be standing in, reads as success, and the real memory bank is never touched.
 

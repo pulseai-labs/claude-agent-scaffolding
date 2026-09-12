@@ -1,0 +1,5 @@
+---
+scenario_id: 05-service-split-no-evidence
+expected_class: flesh
+---
+A spine proposes a worker that processes a user's uploaded batch and the user sees the transformed results in one round trip — an actor-to-outcome journey on existing bones, not an architectural layer with no journey. The plan also proposes extracting this worker into a separately-deployed service with its own process, image, pipeline, and on-call surface, and declares the spine `bone` on the strength of that extraction. The measured-pressure evidence for the split: none that is contemporaneous and checkable — no bottleneck profile, no load figure it cannot meet in-process, no outage where its failure took the rest down, no enacted compliance rule, no ownership transfer; only an anticipated "it will need to scale independently." The scope touches no registered bone's touch surface. The governing rule the decision should cite is the deployment-evidence bar: an anticipated need does not count, and the split is deferred to the feature map with the condition encoded in the `value` line, while the worker stays in-process in this spine.

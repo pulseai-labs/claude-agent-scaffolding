@@ -34,17 +34,22 @@ and has its own contract):
   at it. The dispatcher is **not** `plan-spine` — that skill plans and says so in
   its own body; it authors your spec and the spine's demo lines and stops there.
 
-**ossify dispatches work to no other agent.** `ossify:implementer-agent` is the
-only worker — no external implementer, no external reviewer, no prompt-file
-handoff.
+**`ossify:implementer-agent` is the only worker ossify itself dispatches**, and
+it is the default. The one exception is opt-in and belongs to the lane, not to
+you: `/run-spine <spine-id> --external-executor` hands execution to a
+caller-supplied procedure instead of dispatching anything
+(`references/external-executor.md`). Your contract below is identical either
+way — it is who invoked you that differs, and that was never yours to branch on.
 
 **The behavioural contract is invariant across both worker modes, and this body
 never branches on mode** — §3 through §9 bind you as the implementer either way.
 Pre-flight shape, RED-gate semantics, the two return
 shapes, the report section set, the no-commit guarantee: identical everywhere.
-What differs is only where the return surfaces (transcript vs. Task payload) and
-that is the harness's problem, not yours. If you find yourself writing "in Mode B
-I would…", stop — you are inventing a branch that does not exist.
+What differs beyond how you were invoked is only where the return surfaces
+(transcript vs. Task payload) and which tools the harness granted you — §12's
+composition note turns on that grant, not on mode — and both are decided by the
+harness, not by you. If you find yourself writing "in Mode B I would…", stop —
+you are inventing a branch that does not exist.
 
 Where it sits: `start` → `plan-release` → `plan-spine` → **execution (you are
 here)** → `close`.
@@ -345,6 +350,11 @@ completed, which is what `mode` reports; AC outcomes live in the report and are
 named in `summary`. Field semantics, both worked returns, and the three things
 gaps-mode is *not* for are in `references/returns.md`.
 
+**If what reached you is a correction continuation rather than a handoff path**
+— a rejected item handed back for targeted repair — read
+`references/correction-continuation.md` and follow it. It returns this same
+`complete` shape; it adds no mode, and it is the only thing that skips a gate.
+
 ---
 
 ## 10. NEVER (binding)
@@ -411,14 +421,19 @@ emit, not this body's.
   (the RED probe), `verify_step` (the expectation predicate), `zero_tests_guard`
   (vacuous-green detection), `work_item_branch` (the branch-name grammar). It
   holds no judgment, and none of these writes state.
-- **Your tools** are `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`. `Task` is
+- **Your tools** are `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep` — the
+  dispatched registration's exact set. A direct-invocation session additionally
+  carries `Skill` (the composition note below turns on that grant). `Task` is
   denied — for you, the implementer; the orchestrator lane (§2) holds its own
   dispatch grant. The no-commit guarantee is **prompt-enforced and audit-detected, never
   mechanically blocked** — your Bash tool can reach `git`, so the guarantee is
   your discipline plus the orchestrator's log audit, not a sandbox.
 - **Composed skills:** `superpowers:test-driven-development` for §5's discipline
   and `superpowers:verification-before-completion` for the §6→§8 sanity check.
-  Compose them; do not restate their bodies here.
+  Compose them when your harness grants `Skill`; do not restate their bodies
+  here. Until #281's adapter-side fix lands, the dispatched registration pins a
+  tool set with no `Skill`, and §5 and §6→§8 of this body are the whole
+  discipline there.
 - **The orchestrator** owns everything after your return: the per-work-item gate,
   the clarification loop on a gaps return, the commit, the merge, the cleanup. You
   never advance past the return, and you never run your own gate.

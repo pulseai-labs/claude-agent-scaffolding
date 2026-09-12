@@ -1,6 +1,6 @@
 ---
 name: start
-description: Drive ossify spec-core onboarding for a new project — the Patton journey map, the skeleton cut that fixes Release 0, the bones registry, and the privacy posture with its moat channels — producing a lean MASTER-SPEC, memory bank, bones ADRs and a seed feature map. Use when the user wants to start a new project, onboard a project into ossify, kick off a skeleton-first build, or runs /start. Refuses without a workspace-init pairing manifest. Not release planning (/plan-release), spine decomposition (/plan-spine), or amending an existing spec (/amend-spec).
+description: Drive ossify spec-core onboarding for a new project — the Patton journey map, the skeleton cut that fixes Release 0, the bones registry, and the privacy posture with its moat channels — producing a lean MASTER-SPEC, memory bank, bones ADRs and a seed feature map. Use when the user wants to start a new project, onboard a project into ossify, kick off a skeleton-first build, or runs /start. Resolves or authors the topology declaration; halts only if it still fails to resolve. Not release planning (/plan-release), spine decomposition (/plan-spine), or amending an existing spec (/amend-spec).
 ---
 
 # start
@@ -22,9 +22,11 @@ stuff reasoning steps inside `bash -c '...'` wrappers.
 
 ## 1. Overview
 
-The five stations: **pair** (workspace-init) → **spec-core onboarding** (you are
-here) → **feasibility spike** (optional, §9a) → **Release 0, the skeleton** →
-**rolling releases**.
+The five stations: **declare the topology** (this ceremony authors
+`.ossify/topology.json` itself; workspace-init's `/init-workspace` or
+`/pair-workspace` is an alternative, not a prerequisite) → **spec-core
+onboarding** (you are here) → **feasibility spike** (optional, §9a) →
+**Release 0, the skeleton** → **rolling releases**.
 
 When invoked, work §3 through §13 below in order — each numbered block is one
 step of the conversation.
@@ -68,23 +70,43 @@ macOS). Call form: `oss <subcommand> [args...]` resolves to `oss_cmd_<subcommand
 Never `source` the lib files directly from a skill body — under zsh
 `BASH_SOURCE` is unset and the libs break. Use `oss help` for discovery.
 
-**Manifest probe (refuses fail-fast).** ossify's state lives in the AI
-workspace, discovered by walking up for `.workspace/pairing.json`:
+**Topology probe (resolves, authors, or refuses fail-closed).** ossify's state lives in
+the AI workspace: walk up for `.ossify/topology.json`, then `.workspace/pairing.json`:
 
 ```bash
-if ! oss state_path >/dev/null 2>&1; then
-  printf '%s\n' "ossify requires a workspace-init pairing manifest; run /init-workspace or /pair-workspace first."
-  exit 0
+if probe="$(oss state_path 2>&1)"; then
+  printf '%s\n' "topology: resolved - author nothing, proceed to the journey map"
+else
+  printf '%s\n' "$probe"   # the verb's OWN diagnostic, never swallowed
+  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands."
 fi
-oss init "<project-name>"
 ```
 
-The literal tokens `/init-workspace` and `/pair-workspace` are load-bearing —
-do not paraphrase the refusal. On refusal: author nothing, probe nothing else,
-stop.
+**Not a halt — the block carries no `exit`.** The only halt here is a re-probe
+that still refuses AFTER authoring. **Read `$probe` first:** a declaration that
+exists but is INVALID (bad repo name, entry with no root, empty `.repos`) refuses
+with its own message naming the file, and the fix is that file. Authoring is only
+for the nothing-found case; it never overwrites. Print the refusal's tokens verbatim even so — they name the
+alternatives and the Codex surface. To author: `.ossify/topology.json` at the
+AI-workspace root, schema v1 `{schema_version, repos:{<name>:{root}},
+well_known_paths:{}}`, names `[a-z][a-z0-9_-]*`, roots absolute, from the repo
+set the journey-map station asks about next (`canonical` only if that is
+genuinely the name). Then re-probe `oss state_path` and `oss repo_root <name>`
+for every declared repo, halting only if one still refuses.
 
-`oss init` refuses if state already exists. That is the correct behavior — treat
-it as the "already onboarded" signal and route per §2 rather than forcing past it.
+**Canonical-content gate (refuses fail-fast).** `/start` is pre-code ceremony:
+establish whether any declared repo (`oss repo_root <name>` per name) already
+carries the product's own source or its own history — either alone refuses,
+and a bare pairing scaffold is neither. If so, author nothing and refuse,
+naming what you found and routing to **`/ossify:adopt` — the adopt-forward
+path for a project that already has code (on Codex/OpenCode, the native
+`adopt` skill).** Those tokens are load-bearing too. Past both gates:
+`oss init "<project-name>"`, which refuses if ossify state already exists — the
+"already onboarded" signal; route per §2 rather than forcing past it.
+
+**Wayfinder pre-flight.** If a map exists for this repo, its resolved decisions
+pre-fill stations below rather than being re-elicited. Branch logic:
+`${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/references/preflight.md` — do not restate it here.
 
 ---
 
@@ -211,16 +233,17 @@ defines are vocabulary with an owner — challenging and defining them is
 
 Record each hazard whose harm a test failure cannot undo — **money**,
 **destructive**, **identity/trust**, **ordering/correctness-critical** — with a
-touch surface and a control checklist **scaled to the harm**:
+touch surface and **the controls its family attaches**:
 
 ```bash
 oss risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"
 ```
 
 Control menu: paper/sandbox env · human confirm (naming the concrete effect) ·
-kill switch · audit trail · progressive exposure. Money or destructive → at
-least paper env + human confirm + audit trail. Do **not** apply all five to
-everything; that is ceremony inflation and it trains people to skip checklists.
+kill switch · audit trail · progressive exposure. **Every control the menu
+attaches to the gate's family is required; one it does not attach is ceremony
+inflation.** The attachment table is `references/risk-gates.md` §2 — read it
+there, and do not restate it here.
 
 A spine touching a gate's surface reclassifies to `bone` **and** inherits the
 gate's controls as required work.
@@ -321,7 +344,7 @@ fully-private project authors it; route the **private boundary inventory** (item
 → channel → location → seam → leak-risk) to the AI workspace. Provisioning is
 deferred to Plan D: never call `add-private-core`, never edit the pairing
 manifest (ossify writes `project-state.json`; workspace-init owns the manifest).
-Leave `project.composition_root` unset unless Release 0 is trivially single-repo
+Set `project.composition_root` — **required and absolute** when more than one repo is declared, optional when exactly one is (posture-block §10)
 and the root is unambiguous (then `oss composition_set "<root>"`).
 
 ---
@@ -329,47 +352,33 @@ and the root is unambiguous (then `oss composition_set "<root>"`).
 ## 11. Spec-core critic moment
 
 Fires **once**, at spec-core close — after the lean MASTER-SPEC is authored and
-**before the bones harden** into Release-0 planning.
+**before the bones harden** into Release-0 planning. The audit is ossify's own
+`challenge` skill in audit mode; it always runs — there is no plugin whose
+absence skips it.
 
-1. **Announce**, then end the turn: *"Spec-core close — invoking architect-critic
-   for a `close` audit on the lean MASTER-SPEC + bones registry + skeleton-cut
-   before the bones harden. Type `skip` to bypass."*
+1. **Announce**, then end the turn: *"Spec-core close — running a close-depth
+   audit on the lean MASTER-SPEC + bones registry + skeleton-cut before the
+   bones harden. Type `skip` to bypass."*
 2. **Wait.** If the user types `skip` (case-insensitive), log it and continue
-   to §12.
-3. **Probe:** `oss critic_detect`. If `absent`, warn once — *"architect-critic
-   not installed — skipping spec-core audit. Install via `/plugin install
-   architect-critic` (v0.2+)."* — and continue. Do not stall.
-4. If `v0.2` **or later**, **export the args string, then invoke the skill bare and
-   plugin-qualified** — that env-var bridge is architect-critic's only
-   invocation contract; there are no `target` / `depth` / `artifact_path`
-   parameters:
-
-   ```bash
-   export ARCHITECT_CRITIC_ARGS="--spec \"<absolute path to the lean MASTER-SPEC>\" --close"
-   ```
-
-   ```text
-   Skill(architect-critic:critiquing-spec)
-   ```
-
-   All three details are load-bearing and fail **silently**: `export` it (a bare
-   assignment is invisible to the skill); `--spec` takes **one** quoted absolute
-   path, never a list; `--close` must be **in the args string** — it is the only
-   thing that selects close depth, announcement wording does not, and without it
-   the audit degrades to a shallow claude-only pass. architect-critic infers host
-   agent and adversary availability itself; you supply only the artifact and the
-   depth.
-5. **On control return, disposition-triage** the standing challenges:
-   auto-accept spec-aligned ones (fold into the spec + bones ADRs and say what
-   you folded); escalate load-bearing / vision-touching ones to the user;
-   reject out-of-scope ones (the retired artifacts) with a stated reason;
-   escalate anything ambiguous. Surface a short digest of the triage.
+   to §12. In a non-interactive run the default is to proceed — `skip` is the
+   only bypass.
+3. **Run the audit.** Read
+   `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end and
+   follow it: the lean MASTER-SPEC is the artifact, the depth is `close`.
+   Whether an external fresh-frame adversary joins is the adversary ladder's
+   decision (`challenge/references/adversaries.md`), and the audit's summary
+   names what ran.
+4. **On return, disposition-triage** the standing challenges: auto-accept
+   spec-aligned ones (fold into the spec + bones ADRs and say what you
+   folded); escalate load-bearing / vision-touching ones to the user; reject
+   out-of-scope ones (the retired artifacts) with a stated reason; escalate
+   anything ambiguous. Surface a short digest of the triage.
 
 **Advisory, never a gate.** A standing challenge the user declines is recorded
 and the flow continues.
 
-Full mechanism — including the §3.1 invocation contract and its silent failure
-modes — in `references/critic-moment.md`.
+Full mechanism — the audit contract and the disposition asymmetry with the
+release veto — in `references/critic-moment.md`.
 
 ---
 
@@ -476,8 +485,9 @@ state and is awkward to change later.
 - **`oss`** (the dispatcher over `lib/*.sh`) handles mechanical state only —
   the verbs `oss help` lists: state CRUD, registry adds, and probes. It holds
   no judgment and never should.
-- **`architect-critic:critiquing-spec`** is invoked as a peer skill; it runs its
-  own rebuttal loop and returns a summary. You do not mediate its internals.
+- **`challenge` (audit mode)** is ossify's own critic. As a ceremony caller
+  it hands back every consolidated finding unwalked — no internal rebuttal —
+  and the disposition pass below is where those findings are ruled on.
 - **Peer entry skills:** `plan-release` owns Release 0, spine classes, and the
   critic veto; `plan-spine` owns decomposition and demo lines. `doctor` **ships
   as of v0.3** and owns state inspection, lean-spec validation, machine-checkable

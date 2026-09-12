@@ -1,8 +1,8 @@
 # The critic veto (fail-closed)
 
 Depth for SKILL.md §7c. The veto is **plugin-side interpretation of standard
-architect-critic findings** — the critic gains no new interface, no new output
-format, and no obligation to know ossify exists (spec §12). Everything below is
+audit findings** — the audit is ossify's own `challenge` skill in audit mode,
+and the veto is entirely our reading of what it returned. Everything below is
 about how *you* read what it returned.
 
 **One sentence to hold onto:** a veto-grade finding you understand reclassifies
@@ -27,44 +27,27 @@ hexagonal core, and its findings degrade to generic advice.
 
 ---
 
-## 2. The invocation contract (the only supported shape)
+## 2. Running the audit (the only supported shape)
 
-`architect-critic:critiquing-spec` takes **no parameters**. It reads one env var
-— `$ARCHITECT_CRITIC_ARGS` — holding a CLI-style flag string, exactly as its own
-`/critique` wrapper sets it:
+Read `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end
+and follow it: `RELEASE.md` is the artifact (one absolute path), the depth is
+`close`, the target label is the release id. The bones registry and the spine
+plans go into the conversation alongside it, not into a flag — the audit reads
+one artifact file, and the rest of its context is conversational.
 
-```bash
-export ARCHITECT_CRITIC_ARGS="--spec \"<absolute path to RELEASE.md>\" --close"
-```
+**The audit always runs.** It is internal to ossify: there is no install probe,
+no env bridge, and no absent-critic path. Whether an external fresh-frame
+adversary joins the close-depth pass is the adversary ladder's decision
+(`challenge/references/adversaries.md`), and the audit's summary names what
+ran. A host-only pass on an unconfigured install is the declared default, not
+a skipped veto: the findings are real findings, and Gate A applies to them
+unchanged.
 
-```text
-Skill(architect-critic:critiquing-spec)
-```
-
-| Rule | Why |
-|---|---|
-| **`export` the var** — a bare `VAR=…` assignment is not enough | The skill reads the *environment*; an unexported shell variable is invisible to it |
-| **`--spec` takes ONE quoted absolute path** | Extraction takes `--spec PATH` (else the first positional). A path with spaces unquoted, or a list of paths, breaks it |
-| **`--close` must be in the args string** | Close depth is selected *only* by a literal `--close` (or `--deep`) in the args string. Announcement wording does not count |
-| **Keep it plugin-qualified** — `Skill(architect-critic:critiquing-spec)` | The unqualified name is ambiguous and may not route to this plugin |
-
-There is **no** `target=` / `depth=` / `artifact_path=` / `adversaries=`
-parameter. If you find that shape anywhere, it is wrong (it is a known
-pre-existing pattern in `scaffold-onboard:onboarding-project` §5; do not copy it).
-Each rule fails **silently**: no `--spec` and it audits some other file it
-globbed; no `--close` and you get a shallow host-only pass with no external
-fresh-frame adversary.
-
-`RELEASE.md` is the single `--spec` artifact; the registry and the spine plans go
-into the conversation alongside it, not into the flag.
-
-**Absent critic:** `oss critic_detect` echoes the highest installed version it
-finds — `v0.2`, `v0.3`, or later (rc 0) — or `absent` (rc 1). Branch on
-`absent`; never on the literal string `v0.2` (`start/references/critic-moment.md`
-§3 step 3). On `absent`, warn once and continue with the class ladder and the
-bone-touch judge — those two are not optional and do not depend on the critic.
-Do not stall, do not retry, do not treat the missing critic as a pass *or* as a
-veto.
+Control returns via the audit's closing line — `Audit complete for <target>.
+<K> challenges stood:` plus one `- [<severity>] <text>` bullet per standing
+challenge, the severity prefix being what Gate A's `alternative`-severity
+exclusion sorts on — which is
+the input everything below reads.
 
 ---
 
@@ -183,9 +166,8 @@ exists (`src/legacy/adapter.rs`), a contract already retired, an earlier draft o
 the spine. Stale findings are the tempting ones to discard, because the reasoning
 "that file is gone, so the concern is void" is *usually* right. It is not always
 right: the concern may have moved with the code, and a stale citation frequently
-means the critic saw an older artifact than the one you meant to hand it (see §2's
-silent `--spec` failure). Escalate; the user decides whether the concern survived
-the rename.
+means the audit read an older artifact than the one you meant to hand it.
+Escalate; the user decides whether the concern survived the rename.
 
 ### 4.5 Recording an escalation
 
@@ -308,4 +290,5 @@ Both are true at once, and the asymmetry is deliberate.
   `bone`/`flesh` back.
 - **Re-running the critic until it says something you like.** One pass per
   planning round; a re-run belongs to a re-plan after an escalation resolves.
-- **Dropping `--close`, or forgetting to `export`.** Both fail silently (§2).
+- **Skipping the audit because no adversary is configured.** Host-only is the
+  declared default depth, not an absence; the veto runs either way (§2).

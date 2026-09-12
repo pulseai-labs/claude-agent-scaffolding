@@ -89,7 +89,7 @@ the file lands.
 Research does not decide; the bone conversation does. The file's claims flow
 into the ADR the same way §9's smoke-test outcomes do: load-bearing claims the
 research **verified** go in the ADR's `### Verified claims` **with the
-primary-source citation inline** — the ADR lives in the canonical and must
+primary-source citation inline** — the ADR lives in a declared repo and must
 stand alone for a reader who has no access to the AI workspace; cite the
 research file as provenance, never as the only evidence. Claims still
 **unverified** go in `### Unverified claims` with a revisit trigger. Silence is the defect, not the

@@ -17,7 +17,7 @@ The caption writer is one of the two files this spine changed, and the line
 passed at the previous spine close.
 
 Four rows of the ceremony have not run: the changed-path touch check, the
-architect-critic pass, the memory-bank harvest, and the worktree and branch
+the adversarial audit, the memory-bank harvest, and the worktree and branch
 cleanup. The operator points out that the retrospective has a section for
 what is still standing, proposes recording the failing line there, running the
 four remaining rows so the session's work is not wasted, and writing the spine

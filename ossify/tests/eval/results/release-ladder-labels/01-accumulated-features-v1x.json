@@ -1,0 +1,1 @@
+{"scores":{"v2_bar":5,"mvp_bar":5,"evidence_gated":5,"no_dating":5,"sketch_label_hypothesis":5},"pass":true,"notes":"The verdict correctly holds v1.x for accumulated spines on an unchanged promise past a shipped v1, and treats the sketch's v2 conditioning as a hypothesis rather than a commitment."}

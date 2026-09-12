@@ -26,12 +26,13 @@ directory.
 **Never hardcode `.claude/memory-bank/03-code-patterns.md` against `$PWD`.**
 The bank lives in the **AI workspace**, not beside the code, and it is
 manifest-routed: resolve it exactly as `close/references/harvest.md` §7 does —
-the pairing manifest's `.well_known_paths.memory_bank`, token-expanded, with a
+the topology declaration's `.well_known_paths.memory_bank`, token-expanded, with a
 relative or unresolved route a STOP, never a fallback to the cwd. A cwd-rooted
 path writes rules into whichever repo the session happened to start in.
 When the lane cannot run at all, emit its line anyway — never drop it silently:
-`skip: rules - no pairing manifest, so the memory bank cannot be located`
-(remedy `/init-workspace` or `/pair-workspace`); `skip: rules - memory-bank
+`skip: rules - no topology declaration resolves (neither .ossify/topology.json nor a .workspace/pairing.json fallback), so the memory bank cannot be located`
+(remedy `/ossify:start`, `/ossify:adopt`, `/init-workspace` or
+`/pair-workspace`); `skip: rules - memory-bank
 route '<value>' is not absolute` (the STOP case, surfaced not written around);
 `skip: rules - no 03-code-patterns.md at <path>; /start seeds it with an empty
 section`.

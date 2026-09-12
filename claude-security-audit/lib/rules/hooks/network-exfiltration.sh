@@ -24,15 +24,16 @@ source "$_RULE_DIR/helpers.sh" 2>/dev/null || true
 detect() {
   local target_file="$1"
   [[ -r "$target_file" ]] || return 0
-  # Only scan known hook and wrapper script surfaces.
+  # Only scan known hook handler and wrapper script surfaces.
   if [[ "$target_file" != */.claude/hooks* && "$target_file" != *.sh \
         && "$target_file" != */.opencode/bin/* ]]; then
     return 0
   fi
   # Fire only when BOTH a network command AND a sensitive path reference are present
   local content; content="$(cat "$target_file" 2>/dev/null)"
-  if echo "$content" | grep -qE 'curl|wget|nc[[:space:]]|ssh[[:space:]]|scp[[:space:]]|rsync' && \
-     echo "$content" | grep -qE '~/.ssh|~/.gnupg|~/.aws|/etc/passwd'; then
+  local network_re='curl|wget|nc[[:space:]]|ssh[[:space:]]|scp[[:space:]]|rsync'
+  local sensitive_re='~/.ssh|~/.gnupg|~/.aws|/etc/passwd'
+  if [[ "$content" =~ $network_re ]] && [[ "$content" =~ $sensitive_re ]]; then
     # Emit a finding at line 1 (file-level rule)
     local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$content")"
     jq -nc \

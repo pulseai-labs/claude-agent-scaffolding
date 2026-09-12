@@ -45,9 +45,9 @@ user config at `~/.config/opencode/opencode.json` or a project's
 Restart OpenCode after saving the config. The default enables only
 `workspace-init`, `ai-mentor`, and `architect-critic`.
 
-## Experimental Ossify Opt-In
+## Ossify Opt-In
 
-Ossify v0.x is experimental. To opt in, use OpenCode's native
+Ossify is not among the default three. To opt in, use OpenCode's native
 `[specifier, options]` tuple and the exact four-name allowlist:
 
 ```json
@@ -69,9 +69,24 @@ Ossify v0.x is experimental. To opt in, use OpenCode's native
 }
 ```
 
-Restart OpenCode after changing the options. Ossify remains absent from the
-stable Claude and Codex marketplaces and is not ready for v1 until Plan D's
-consolidated eval and two-pilot gate passes.
+Restart OpenCode after changing the options. Ossify is in the Claude and Codex
+marketplaces as of v1.0.0; in this bundle it stays an explicit opt-in.
+
+## Plugins This Bundle Does Not Carry
+
+**The allowlist accepts only the names in the inventory below, and neither
+`code-judo` nor `orca-crew` is one of them.** They ship to the Claude and Codex
+marketplaces but are deliberately not in the OpenCode bundle yet.
+
+Adding a name the bundle does not carry does not produce a helpful error. The adapter
+throws `Unknown OpenCode plugin: <name>` from its config hook, OpenCode catches
+config-hook errors (see the diagnostics below), and `opencode debug config` can still
+exit 0 — with every skill, command, and alias from **every** selected plugin missing
+from resolved config. One unknown name silently disables the whole bundle, not just
+that plugin.
+
+If skills vanish after a config change, check the allowlist against the inventory
+first and read the ERROR log for the unknown-name line.
 
 ## Native Skills And Commands
 
@@ -83,7 +98,7 @@ selected skill as a same-name native slash command. The complete inventory is:
 | `workspace-init` | Default | `/initializing-dual-repo-workspace`, `/pairing-canonical-repo`, `/pairing-existing-dual` |
 | `ai-mentor` | Default | `/grill-me`, `/council`, `/eli10`, `/fool` |
 | `architect-critic` | Default | `/critiquing-spec`, `/reviewing-critique-history`, `/listing-principles`, `/promoting-principle`, `/checking-adversary-readiness`, `/managing-async-critique` |
-| `ossify` | Experimental opt-in | `/start`, `/plan-spine`, `/work-item`, `/close`, `/plan-release`, `/doctor` |
+| `ossify` | Opt-in | `/start`, `/adopt`, `/plan-spine`, `/work-item`, `/close`, `/plan-release`, `/doctor`, `/challenge`, `/wayfinder` |
 
 ## Differing Aliases
 

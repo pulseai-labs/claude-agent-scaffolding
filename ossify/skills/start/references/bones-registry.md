@@ -65,6 +65,8 @@ holds two genuinely separable decisions). Four required parts:
 oss bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
 ```
 
+Touch CSV entries follow risk-gates.md §3's grammar — a bare `,` separates entries, `\,` is a literal comma inside one; multiple directories are multiple entries (case-globs do not brace-expand).
+
 Worked example:
 
 ```bash
@@ -87,10 +89,12 @@ mechanical checks read.
 ossify ships no `/adr` utility — that is a settled decision, not a pending
 gap — so **this section is the convention, permanently**:
 
-**Where:** `<canonical>/docs/adr/` — resolve it with
-`canonical="$(oss repo_root canonical)"`. Bones are decisions about the
-*product's* architecture, so they live with the product, not in the AI
-workspace beside the planning docs.
+**Where:** each declared repo's `docs/adr/` — resolve the repo the decision
+concerns with `oss repo_root <name>` (the sole declared repo when there is
+only one; under more than one, the repo the bone's touch-glob actually
+covers — ask if that is not obvious from the surface named). Bones are
+decisions about the *product's* architecture, so they live with the product,
+not in the AI workspace beside the planning docs.
 
 **Filename:** `adr-NNNN-kebab-title.md`, four-digit zero-padded, matching the
 index reference — `ADR-0002` is `adr-0002-hexagonal-core-with-six-port-traits.md`.
@@ -99,22 +103,49 @@ The `adr-` prefix is **not** cosmetic: it is the form `scaffold-dev`'s ADR skill
 writes (`adr-NNNN-kebab.md`); `scaffold-onboard`'s seed is the unprefixed
 `0001-record-architecture-decisions.md` — which is exactly why the numbering
 scan below reads both forms.
-A project migrating to ossify already has that series, and the whole reason bone
-ADRs live in the canonical repo is to join it rather than start a rival one.
+A project migrating to ossify already has that series, and the reason bone ADRs
+live in the repo they concern is that the decision belongs with the code it
+governs — the file joins that repo's directory rather than starting a rival one
+elsewhere. The NUMBER, though, comes from the project-wide sequence below.
 
-**Numbering:** the next number is the highest existing plus one, **counting both
-forms**. Read it, do not guess:
+**Numbering is project-wide, across every declared repo:** the next number is
+the highest existing plus one **anywhere in the project**, **counting both
+forms**. The *file* still lands in the repo the decision concerns — only the
+SEQUENCE is shared. Read it, do not guess:
 
 ```bash
-canonical="$(oss repo_root canonical)"; mkdir -p "$canonical/docs/adr"
-next="$(ls -1 "$canonical/docs/adr" 2>/dev/null \
-        | sed -n -e 's/^adr-\([0-9][0-9]*\)-.*\.md$/\1/p' \
-                 -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' | sort -n | tail -1)"
+# $repos is NOT ambient: one declared repo name per line, the set the topology
+# declares (A1 for /adopt, the journey-map station for /start) - the same
+# convention spine-close.md's $repo_base_branches uses.
+scan="$(mktemp)"
+while IFS= read -r name; do
+  [ -n "$name" ] || continue
+  root="$(oss repo_root "$name")" || exit 1
+  mkdir -p "$root/docs/adr"
+  ls -1 "$root/docs/adr" 2>/dev/null >> "$scan"
+done <<EOF
+$repos
+EOF
+next="$(sed -n -e 's/^adr-\([0-9][0-9]*\)-.*\.md$/\1/p' \
+               -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' "$scan" | sort -n | tail -1)"
 printf 'ADR-%04d\n' "$(( 10#${next:-0} + 1 ))"
 ```
 
-Two things this has to get right, and each has already produced a duplicate id:
+**Why project-wide and not per repo.** A bone record stores `adr`, `title` and
+repo-relative touch globs — no repo key — and `touch_check` reports a bare
+`bone <adr>`. With numbering reset in every repo, two repos whose `docs/adr/`
+both start empty each mint `ADR-0001`, and from then on nothing can tell the two
+records apart: not a citation, not a reclassification reason, not a mechanical
+touch hit. A shared sequence keeps the identifier unique by construction, which
+is cheaper than qualifying it everywhere it is read. The cost is that a repo's
+own series gains gaps — a repo may hold ADR-0003 and ADR-0007 and nothing
+between — and that is the intended trade: gaps are legible, collisions are not.
 
+Things this has to get right, each of which has already produced a duplicate id:
+
+- **Every declared repo is scanned, not just the one the ADR lands in.** That is
+  the whole point of the shared sequence; scanning one repo reintroduces the
+  collision this block exists to prevent.
 - **Both filename forms are scanned.** A directory holding `adr-0002-…` matched
   only against `NNNN-…` yields no number at all, so the scan restarts at 1 and
   mints an `ADR-0002` that already exists — duplicating an identifier that bone
@@ -174,7 +205,7 @@ module that embodies the decision.
 
 At release planning, a spine whose plan touches **any** registered bone or
 risk-gate surface is auto-reclassified to `bone` — independently of, and in
-addition to, the architect-critic veto. That is the mechanical, non-skippable
+addition to, the critic veto. That is the mechanical, non-skippable
 half of class declaration. `plan-release` owns that step; `start` owns making
 the surfaces exist and be accurate.
 

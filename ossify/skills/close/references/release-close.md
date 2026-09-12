@@ -16,9 +16,9 @@ step 11 and never escalates.
 ## 1. What this release ships, and what it deliberately does not
 
 Spec §6.2 lists seven steps; the companion boundary spec appends an eighth.
-**This ceremony runs steps 1-4, the two blocking §6.1 findings, and the
-companion's boundary audit. Three of the spec's steps are not here**, and each
-is named rather than left to read as executed:
+**This ceremony runs steps 1-4, the two blocking §6.1 findings, the release
+tag (§9), and the companion's boundary audit. Two of the spec's steps are not
+here**, and each is named rather than left to read as executed:
 
 | Spec §6.2 step | Status here |
 |---|---|
@@ -28,24 +28,38 @@ is named rather than left to read as executed:
 | 4. Feature-map re-groom + next-release sketch | **built** — §7 |
 | **5. Docs increment (spec §8)** | **not shipped.** The trigger table lives in spec §8 and has no executable surface yet |
 | **6. Handoff cleanup for the closed release** | **not shipped.** `/ossify:handoff` authors session handoffs as a standalone utility, but it has no retention policy by design — handoffs accumulate and the user prunes — so there is nothing for a close to clean up; the same non-wiring `spine-close.md` §9 records for the spine boundary |
-| **7. Release tag / PR gate** | **not shipped.** The spine→release / release→main tier question is unsettled, and a PR gate written before it is settled would harden the wrong tier |
+| **7. Release tag / PR gate** | **shipped as the tag half (#339).** The tier question is settled: the PR gate lives at the **spine** boundary — spine close lands each hosting repo by PR through `/ossify:work-pr` (`spine-close.md` §3), work-item merges stay local — so a release needs no merge of its own; this ceremony tags the merged `main` (§9). A release branch would add a third merge with no reviewer, and does not exist |
 | **8. Boundary audit (companion §6)** | **built — core scope over the full repo set** — §8, full depth in `references/boundary-audit.md`. Re-derived under the skill-first freeze: prose driving `git`/`gh`/`gitleaks` plus agent judgment, **every manifest repo object audited with per-role arms, observed-visibility gated**, fail-closed — the tracked-file audit, the secrets scan, the scan-first untracked sweep, the semantic pass over tracked prose, the recorded history pass and the working-tree pass over uncommitted tracked modifications, each tracked submodule's pinned tree audited by that same arm. Confirmed findings block the close; the one other unblock is a recorded accepted-disclosure override. The dimensions this scope still omits — divergence on public refs other than the audited one after a recorded history pass, and every submodule pin but the audited ref's together with a non-manifest pinned submodule repository's own history — are named in that file's own not-shipped table |
 
 A missing step and a step that silently does nothing are indistinguishable to
 every later reader, which is why they are a table rather than an omission.
 
-**The repo dimension is single-repo for every step but the audit.** The
-companion design
-gives a release close a pin/publish step before the walkthrough for open-core
-postures, and one PR per touched repo at the gate. Neither is built; both attach
-to steps this file does not ship. Nothing below assumes one repo *forever* — the
-walkthrough and both blocking gates read state, not a checkout — and the one
-step that does read checkouts, the boundary audit, reads **every repository
-object the pairing manifest carries**, each with per-role arms (git repos via
-`git -C`, never a worktree; a plain non-repo root via its filesystem-only
-policy, determined per the audit's own §2 whatever the manifest field says);
-the audit's own §9 names what remains outside its shipped
-scope.
+**Every step here is per-repo except the boundary audit and the release
+ladder.** Spines and work items carry a `target_repo`, and Tasks 8/9 (#272/#310)
+made the spine and work-item close layers merge each item's work into that
+item's own repo (`work-item-close.md` §4, `spine-close.md` §3) — so the
+walkthrough (§3) and both blocking gates (§4/§5) below are already repo-general
+the moment those merges are: they read state `oss demo_user_lines`,
+`oss expired_fakes`, `oss expired_quarantines` write and select from, never a
+checkout, so a spine that landed across three repos contributes to them exactly
+as one confined to canonical would — nothing in this file has to loop over
+repos for that to be true, because the state it reads already spans however
+many are declared. The companion design gives a release close a pin/publish
+step before the walkthrough for open-core postures, and one PR per touched repo
+at the gate; neither is built, and both attach to steps this file does not
+ship. The one step that does read checkouts, the boundary audit, reads **every
+repo the resolved topology declares** — `.ossify/topology.json` first, a
+translated `.workspace/pairing.json` as the fallback, which is the same order
+`references/boundary-audit.md` §2 walks — each with per-role arms (git
+repos via `git -C`, never a worktree; a plain non-repo root via its
+filesystem-only policy, determined per the audit's own §2 whatever the
+manifest field says) — that step alone iterates the repo set explicitly,
+because it audits the manifest's roles rather than a spine's items; the
+audit's own §9 names what remains outside its shipped scope. **The release
+ladder has no repo dimension at all**: Skeleton (Release 0) → MVP → v1 → vN
+(`plan-release/references/rolling-wave.md` §4) is one maturity position for the
+whole project, and step 6's `next_sketch` writes it there once, regardless of
+how many repos the closing release actually touched.
 
 ---
 
@@ -344,7 +358,7 @@ reads this key as its starting point.
 
 ## 8. Step 7 — the boundary audit, the last refusal
 
-**Every repository object the pairing manifest carries, each gated on its
+**Every repo the resolved topology declares, each gated on its
 observed visibility with per-role arms, fail-closed, and confirmed findings
 block the close.** The whole step — the repo set and its visibility gate and
 its two recorded deltas from the companion spec, the tracked-file audit
@@ -384,7 +398,164 @@ re-audited.
 
 ---
 
-## 9. Step 8 — the state writes, and only after every step above reached the end
+## 9. Step 8 — tag the release, then the state writes, and only after every step above reached the end
+
+**The tag first, because the tag is the release's only landing act.** The PR
+tier sits at the spine boundary (#339): every spine closed means every spine's
+hosting repos landed by PR and merged, so the base branches already carry the
+release — there is no release branch and no release-level merge to gate. Tag
+where it stands — **once per hosting repo this release landed in**, because a
+cross-repo release's code lives in every repo that hosted one of its spines,
+and a tag run from whatever directory the ceremony was invoked from tags
+whichever repo that happens to be:
+
+```bash
+# The repo set: the distinct target_repos across this release's spines' work
+# items - a repo that hosted nothing this release has no release to tag. Each
+# repo's base branch is recovered EXACTLY as spine close step 2 recovers it
+# (that repo's handoff `base_branch:` lines, cross-checked against SPINE.md's
+# base-branch table - spine-close.md §3) and arrives in $repo_base_branches,
+# one "<repo>:<base_branch>" line per repo. Nothing here guesses a default
+# branch, and nothing here runs unscoped git: release close is invoked from
+# the AI workspace as often as from a product repo, and a bare `git tag`
+# lands in whichever of those the caller stood in.
+# Root-bound, release-scoped, and read as a FAILING ASSIGNMENT (round 5,
+# T22/T23/T25): inside `.work_items[]` the jq input is a single work item, so
+# `.spines` must come from a captured root or jq fails - and a selector
+# failure in a process substitution is invisible, the loop tags NOTHING and
+# the pass still returns 0. jq variables crossing a shell double-quoted
+# string need the backslash (\$root, \$s); $rel is shell-expanded on purpose.
+tag_repos="$(oss get ". as \$root | .work_items[] | select(.spine as \$s | any(\$root.spines[]; .id == \$s and .status == \"closed\" and .release == \"$rel\")) | .target_repo" | sort -u)" \
+  || { echo "close: the release-tag repo set could not be read from state - halt"; exit 1; }
+
+while IFS= read -r repo; do
+  [ -n "$repo" ] || continue
+  repo_root="$(oss repo_root "$repo")" \
+    || { echo "close: $rel names undeclared repo '$repo' - halt"; exit 1; }
+  # The base must be UNAMBIGUOUS per repo: two closed spines recording
+  # different bases in the same repo is a halt, not a first-wins pick - the
+  # first-wins form silently tags one of the two landed lines and publishes a
+  # release the other line never reached.
+  _bases="$(printf '%s\n' "$repo_base_branches" | awk -F: -v r="$repo" '$1==r{print $2}' | sort -u)"
+  _nbases="$(printf '%s\n' "$_bases" | awk 'END{print NR}')"
+  if [ "$_nbases" -gt 1 ]; then
+    echo "close: conflicting base branches recorded for $rel in $repo: $(printf '%s' "$_bases" | tr '\n' ' ')- a human decides which line to tag - halt"; exit 1
+  fi
+  base_branch="$_bases"
+  [ -n "$base_branch" ] \
+    || { echo "close: no base_branch recorded for $rel in $repo - halt"; exit 1; }
+
+  # The remote, resolved: a SINGLE remote is used whatever its name; SEVERAL
+  # halt naming them, origin preference included (T36, fork shapes). NO remote
+  # at all is not an error here - it is the same no-remote world the landing
+  # tier serves: the repo landed its spines by local merge all release, and
+  # its tag is local too, verified by the same checks minus the remote leg.
+  remotes="$(git -C "$repo_root" remote)"
+  remote_name="$(printf '%s\n' "$remotes" | awk 'NR==1{first=$0} END{if(NR==1) print first; else print ""}')"
+  if [ -n "$remotes" ] && [ -z "$remote_name" ]; then
+    echo "close: $repo has several remotes (fork shapes included) - name the one to tag through and re-run - halt"; exit 1
+  fi
+
+  # THE BASE THE TAG WOULD MARK MUST BE THE PUBLISHED ONE (round 8, T31):
+  # unpushed local commits on the base would be tagged and the tag object
+  # published while the published base branch never carries the commit the
+  # tag claims to mark. The same D5 discipline as the stranded base: halt,
+  # name the state, name the remedy - never tag past the published line.
+  if [ -n "$remote_name" ]; then
+    git -C "$repo_root" fetch "$remote_name" "$base_branch" >/dev/null 2>&1 \
+      || { echo "close: cannot fetch '$base_branch' from '$remote_name' in $repo - halt"; exit 1; }
+    if ! git -C "$repo_root" merge-base --is-ancestor "$base_branch" "$remote_name/$base_branch"; then
+      echo "close: $repo's local '$base_branch' has commits the published line does not carry - a release tag would mark a commit '$remote_name/$base_branch' never receives - push the base or reset to it - halt"; exit 1
+    elif [ "$(git -C "$repo_root" rev-parse "$base_branch")" != "$(git -C "$repo_root" rev-parse "$remote_name/$base_branch")" ]; then
+      # BEHIND (round 10, T37): the round-9 fast-forward mutated the base AFTER
+      # the boundary audit had examined the stale tree - the tag then marked
+      # commits the audit never saw. A stale checkout REFUSES instead: pull
+      # and re-run the close. Nothing mutates the base after the audit.
+      echo "close: $repo's local '$base_branch' is behind the published tip - a stale checkout must not tag past what its boundary audit saw - pull and re-run the close - halt"; exit 1
+    fi
+  fi
+
+  # CONSULT THE REMOTE BEFORE CREATING (round 7, T28): an earlier halted
+  # close may already have pushed this tag, and this checkout - fresh, or
+  # cloned --no-tags - does not carry it. Creating anyway mints a second,
+  # different annotated object (tagger and timestamp differ) and the push is
+  # then refused as a non-fast-forward: the resume wedges on a tag that was
+  # correct all along. Fetching the remote's tag in installs it, and the
+  # verification below judges the REAL object.
+  if ! git -C "$repo_root" rev-parse -q --verify "refs/tags/$rel" >/dev/null 2>&1 \
+     && [ -n "$remote_name" ] \
+     && [ -n "$(git -C "$repo_root" ls-remote "$remote_name" "refs/tags/$rel")" ]; then
+    # A refspec with a DESTINATION: a bare `fetch <remote> <ref>` populates
+    # only FETCH_HEAD and installs no ref, which reads back as "no local tag"
+    # and re-enters the creation arm this exists to prevent.
+    git -C "$repo_root" fetch "$remote_name" "refs/tags/$rel:refs/tags/$rel" \
+      || { echo "close: tag '$rel' exists on '$remote_name' but cannot be fetched into $repo - halt"; exit 1; }
+  fi
+
+  if git -C "$repo_root" rev-parse -q --verify "refs/tags/$rel" >/dev/null 2>&1; then
+    # RESUME: a tag from an earlier run that stopped between here and the state
+    # writes. Continuable only when it points at this repo's base branch tip
+    # locally AND - for a remote repo - the remote carries the same object:
+    # anything else is a human decision, never a clobber. Two different shas
+    # are in play and comparing the wrong pair resumes a mismatched tag: the
+    # tag OBJECT (what ls-remote reports and what the remote comparison uses)
+    # and its PEELED commit (what the base comparison uses - `rev-parse
+    # refs/tags/x` yields the object, never the commit, for an annotated tag).
+    local_obj="$(git -C "$repo_root" rev-parse "refs/tags/$rel")"
+    # ANNOTATED, always - including on resume: a lightweight tag and its peel
+    # both resolve to the commit, so the target check alone would accept one,
+    # and the release would close over a tag with no release annotation.
+    tag_type="$(git -C "$repo_root" cat-file -t "$local_obj")"
+    [ "$tag_type" = "tag" ] \
+      || { echo "close: existing tag '$rel' in $repo is $tag_type, not an annotated release tag - a lightweight tag names a commit and says nothing about the release - halt"; exit 1; }
+    base_tip="$(git -C "$repo_root" rev-parse "$base_branch")"
+    local_target="$(git -C "$repo_root" rev-parse "refs/tags/$rel^{}")"
+    [ "$local_target" = "$base_tip" ] \
+      || { echo "close: tag '$rel' in $repo points at $local_target, not $base_branch ($base_tip) - a human decides - halt"; exit 1; }
+    if [ -n "$remote_name" ]; then
+      remote_line="$(git -C "$repo_root" ls-remote "$remote_name" "refs/tags/$rel")"
+      [ -n "$remote_line" ] \
+        || { echo "close: tag '$rel' exists in $repo but not on '$remote_name' - push it (never force) or delete it deliberately - halt"; exit 1; }
+      remote_tag="${remote_line%%[[:space:]]*}"
+      [ "$remote_tag" = "$local_obj" ] \
+        || { echo "close: tag '$rel' in $repo ($local_obj) and on '$remote_name' ($remote_tag) disagree - a human decides - halt"; exit 1; }
+    fi
+    echo "close: $repo already tagged $rel at $base_tip - not re-tagging"
+  else
+    # ANNOTATED, always: a lightweight tag names a commit and says nothing
+    # about the release.
+    git -C "$repo_root" tag -a "$rel" -m "release $rel" "$base_branch" \
+      || { echo "close: cannot tag $rel at $base_branch in $repo - halt"; exit 1; }
+    if [ -n "$remote_name" ]; then
+      # A FULLY QUALIFIED refspec: a branch named like the release makes a
+      # bare `<remote> $rel` ambiguous between refs/heads/$rel and
+      # refs/tags/$rel, and the push fails to resolve its own source.
+      git -C "$repo_root" push "$remote_name" "refs/tags/$rel:refs/tags/$rel" \
+        || { echo "close: tag push for $rel refused in $repo - surface the refusal verbatim, never force - halt"; exit 1; }
+    fi
+    echo "close: $repo tagged $rel"
+  fi
+done <<EOF
+$tag_repos
+EOF
+```
+
+**Resumable by construction, and narrowly so (#339 round 8):** the flat "an
+existing tag halts" rule made a re-invoked close unfinishable whenever the
+earlier run stopped between the tag and the state writes — the tag had landed,
+the writes had not, and the only way forward read as retagging. The recovery
+claimed here is exactly the one straightforward case — the tag this close
+created, matching the base tip, present locally and on the remote (fetched in
+when the checkout lacks it); every other existing-tag state, and any base
+ahead of the published line, halts naming the state and the manual remedy.
+Broader auto-recovery is not claimed — see spine-close.md §3's resume policy
+and the follow-up issue. The continuation condition is mechanical (the same
+object, locally and on the remote, at the recovered base); every other
+existing-tag state still halts, because a re-tag is history rewriting on a
+published ref and that is the operator's call. A refused tag push (a ruleset
+can protect tags the way it protects branches) surfaces the refusal verbatim
+and halts like any other blocked landing: never `--force`, never
+delete-and-retag.
 
 ```bash
 oss release_status "$rel" closed
@@ -436,6 +607,12 @@ executed.
 
 - **Reading `abandoned` as `closed`** — or hard-halting on it and making the
   release uncloseable (§2).
+- **Gating a release-level merge.** There is none to gate: the PR tier is the
+  spine boundary's, and this ceremony only tags the already-merged `main` (§1,
+  §9).
+- **Re-tagging, force-pushing, or delete-and-retagging a published release
+  tag.** An existing tag halts; rewriting a published ref is the operator's
+  call, made explicitly (§9).
 - **Testing the rc of `oss get` instead of its output.** An empty `select` exits
   0 (§2).
 - **Passing a spine id to `oss demo_user_lines` here.** The release walk takes no

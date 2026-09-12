@@ -184,7 +184,7 @@ The remedy differs by line, and the wrong one loops the operator:
 
 The rc rule SKILL.md §3 states — rc 0 unless a `fail:` line printed — holds only
 once the state path resolves. A resolution refusal exits 1 with **no** check
-line at all, and the surface emits `skip: state - no pairing manifest, so no
+line at all, and the surface emits `skip: state - no topology declaration, so no
 state file could be resolved`.
 
 **The table is a starting point keyed on the tag, and the tag is not the whole
@@ -215,20 +215,24 @@ New in v0.3, and the only check that reads the repository rather than the state
 file.
 
 ```bash
-# EVERY key in _oss_repo_root's enum, not a sample - the automatic loop that used
+# EVERY declared repo key, plus ai_workspace, not a sample - the automatic loop that used
 # to cover them is gone, so an omitted key costs its line and #156 comes back.
-# READ the enum from lib/worktree.sh rather than trusting a list written here: a
+# READ that set from the manifest at run time rather than trusting a list written here: a
 # transcribed copy is exactly the drift the deleted (12b) guard used to catch.
 # ALWAYS both arguments: the repo key AND the state this run is inspecting -
 # the same "$sf" the rest of the read-out uses (§2), never a fresh oss state_path.
-oss worktree_orphans <key> "$sf"     # once per key in the enum
+oss worktree_orphans <key> "$sf"     # once per declared key
 ```
 
-**Pass the key every time — the verb does not make you.** Omitting it silently
-resolves to `canonical` (`oss_cmd_worktree_orphans` and `oss_worktree_orphans`
-both default it), so a bare `oss worktree_orphans` answers a question about the
-public repo no matter which one you meant. That defaulting is how #156 happened
-in the first place. Making the argument mandatory is a breaking change to a
+**Pass the key every time — the verb does not make you.** Omitting it resolves
+to the sole declared repo under one, and refuses outright naming the declared
+set under more than one (`oss_cmd_worktree_orphans` and `oss_worktree_orphans`
+both default that way, #272/#310 Task 4 — never a silent guess). Relying on
+that default anyway is still how #156 happened: a habit formed on a
+single-repo project, carried unexamined into one with more, so a bare
+`oss worktree_orphans` answers a question about whichever repo happened to be
+sole when the habit formed, not the one you meant today. Making the argument
+mandatory is a breaking change to a
 shipped verb and is tracked separately; until then the discipline is yours, not
 the tool's.
 
@@ -238,8 +242,9 @@ exactly it, **or** when its basename is a work item's id — and only when that
 work item's `target_repo` is the repo being asked about, so a `private_core`
 item cannot claim a same-named directory sitting under the public root.
 
-**You run the selector once per repo key, and the keys are `_oss_repo_root`'s
-enum — read it from `lib/worktree.sh` at run time; no list here to go stale** —
+**You run the selector once per repo key, and the keys are every repo the
+manifest declares, plus `ai_workspace` — resolved from the manifest at run
+time; no list here to go stale** —
 printing `ok:`/`warn:`/`skip: worktrees(<key>)` for each. `oss doctor` used to
 do this and no longer does; the verb it called is unchanged. **Every key costs a line**, including the ones this
 project does not configure. A key the manifest does not configure gets the `skip:`, as does one

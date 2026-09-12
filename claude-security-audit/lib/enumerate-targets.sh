@@ -59,9 +59,35 @@ csa_enum_opencode_project_targets() {
   done
 }
 
+# _csa_enum_extensionless_hook_handlers <project-root>
+# Emit safe extensionless executable handlers or reject newline-containing ones.
+_csa_enum_extensionless_hook_handlers() {
+  local root="$1" hooks="$1/.claude/hooks"
+  [[ -d "$hooks" ]] || return 0
+
+  find "$hooks" -type f -print0 2>/dev/null | while IFS= read -r -d '' handler; do
+    case "${handler##*/}" in
+      *.*) : ;;
+      *) if [[ -x "$handler" ]]; then
+           if [[ "$handler" == *$'\n'* || "$handler" == *$'\t'* ]]; then
+             printf 'refusing newline-or-tab-containing executable hook handler\n' >&2
+             return 2
+           fi
+           printf '%s\n' "$handler"
+         else
+           :
+         fi
+         ;;
+    esac
+  done
+}
+
 csa_enum_project_targets() {
   local root="$1"
   if [[ -d "$root/.claude" ]]; then
+    if ! _csa_enum_extensionless_hook_handlers "$root"; then
+      return 2
+    fi
     # Exclude .claude/audits/ — it holds audit state/reports and must not be scanned.
     find "$root/.claude" -type f \
          -not -path "$root/.claude/audits/*" \
@@ -118,9 +144,12 @@ csa_enum_resolve_plugin_path() {
 }
 
 csa_enum_targets_all() {
-  local root="$1"
+  local root="$1" project_targets
+  if ! project_targets="$(csa_enum_project_targets "$root")"; then
+    return 2
+  fi
   {
-    csa_enum_project_targets "$root"
+    [[ -n "$project_targets" ]] && printf '%s\n' "$project_targets"
     while read -r plugin_name; do
       [[ -z "$plugin_name" ]] && continue
       local plugin_path
@@ -141,10 +170,11 @@ csa_enum_paranoid_candidates() {
   [[ -d "$cache" ]] || return 0
   local enabled
   enabled="$(csa_enum_enabled_plugins "${CSA_PROJECT_ROOT:-$PWD}" | sort -u)"
+  local enabled_lines=$'\n'"$enabled"$'\n'
   find "$cache" -maxdepth 1 -mindepth 1 -type d 2>/dev/null \
     | xargs -n1 basename 2>/dev/null \
     | sort -u \
     | while read -r p; do
-        printf '%s\n' "$enabled" | grep -qx "$p" || printf '%s\n' "$p"
+        [[ "$enabled_lines" == *$'\n'"$p"$'\n'* ]] || printf '%s\n' "$p"
       done
 }

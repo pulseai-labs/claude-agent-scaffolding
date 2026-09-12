@@ -1,0 +1,27 @@
+{
+  "name": "ossify",
+  "version": "1.8.0",
+  "description": "Skeleton-first lifecycle from Release 0 through MVP and v1. An alternate replacement for scaffold-onboard + scaffold-dev, not a stage alongside them. workspace-init is optional - /ossify:start and /ossify:adopt author the topology declaration themselves. Since 1.8.0 /ossify:run-spine accepts an optional --external-executor flag handing the work items of a round to a caller-supplied, provider-neutral in-session procedure; the no-flag command is unchanged.",
+  "author": {
+    "name": "Pras"
+  },
+  "repository": "https://github.com/draco28/claude-agent-scaffolding",
+  "license": "MIT",
+  "keywords": ["lifecycle", "skeleton-first", "release", "spine", "handoff"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Ossify",
+    "shortDescription": "Plan a release as a skeleton and drive it from Release 0 through MVP and v1.",
+    "longDescription": "Ossify plans a release as a skeleton, drives its spine round by round, and closes it with a ceremony that harvests what the round learned. It replaces the scaffold-onboard + scaffold-dev pair rather than composing with them — install one lifecycle or the other, not both. workspace-init is optional as of 1.3.0: the first entry point authors .ossify/topology.json itself when nothing resolves on the walk-up path, and reads a workspace-init .workspace/pairing.json as a translated fallback when one exists. The grill and the adversarial critic are internal (the challenge skill) since 1.1.0, so the release-planning veto and the spine-close audit run on every install; an external fresh-frame adversary joins close-depth audits when one is configured. One limit on Codex specifically: round execution dispatches an implementer subagent that only the Claude Code and OpenCode surfaces register.",
+    "developerName": "Pras",
+    "category": "Coding",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "defaultPrompt": [
+      "Onboard this project's spec core with ossify.",
+      "Open the next release and plan its spine.",
+      "Diagnose this repo's ossify state."
+    ],
+    "websiteURL": "https://github.com/draco28/claude-agent-scaffolding/tree/main/ossify",
+    "brandColor": "#57534E"
+  }
+}

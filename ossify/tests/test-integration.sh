@@ -40,4 +40,35 @@ t_capture oss_reg_touch_check "$S" src/domain/x.rs; t_assert_rc 0 "touch check h
 
 cd /
 rm -rf "$TMP"
+
+# ===========================================================================
+# TOPOLOGY TWIN (#272/#310 Task 11, spec decision O1): the IDENTICAL
+# skeleton-first fixture above, run again from a .ossify/topology.json
+# declaring a SOLE repo named "core" - never "canonical" - to prove the
+# whole lifecycle (demo, doctor, replay, touch_check) is source-agnostic as
+# a WHOLE ARC, not merely resolver-by-resolver in isolation.
+# ===========================================================================
+TMPX="$(mktemp -d)"; SX="$TMPX/.ossify/project-state.json"
+mkdir -p "$TMPX/.ossify" "$TMPX/core"
+cat > "$TMPX/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMPX/core"}},"well_known_paths":{}}
+JSON
+cd "$TMPX"
+
+oss_state_init "$SX" fixture >/dev/null
+RX="$(oss_entity_add_release "$SX" "Skeleton" "core loop usable")"
+SPX="$(oss_entity_add_spine "$SX" "$RX" "walking skeleton" bone core)"
+oss_entity_add_work_item "$SX" "$SPX" "wire the entry point" >/dev/null
+oss_reg_add_bone "$SX" ADR-0002 "domain boundary" "src/domain/**" "" >/dev/null
+oss_reg_add_fake "$SX" coach fake "shell for skeleton" "first refinement" r1 >/dev/null
+oss_ledger_add_auto "$SX" "$SPX" "golden journey" "echo journey-ok" "contains:journey-ok" >/dev/null
+oss_ledger_add_user "$SX" "$SPX" "Run a backtest from the chat panel" "results visible" >/dev/null
+
+t_capture oss_demo_run_auto "$SX";  t_assert_rc 0 "topology twin: fixture demo green"
+t_capture "$OSS" doctor "$SX";      t_assert_rc 0 "topology twin: doctor green on full fixture"
+t_capture oss_state_replay "$SX";   t_assert_rc 0 "topology twin: full fixture replays clean"
+t_capture oss_reg_touch_check "$SX" src/domain/x.rs; t_assert_rc 0 "topology twin: touch check hits bone"
+
+cd /
+rm -rf "$TMPX"
 t_summary

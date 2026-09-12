@@ -45,16 +45,15 @@ holds the ranking port, the private crate implements it"). It carries no
 **History passes** table at all.
 
 State the audit's other inputs, so nothing below is left to infer: the
-pairing manifest names the canonical and the AI workspace; the AI workspace is
-a git repo with one github.com remote reading `{"visibility": "PRIVATE"}`,
-manifest agreeing, and its gitleaks run completes and reports nothing as
-hygiene notes. The closing spines' handoffs record `base_branch: main` under
-`## 2. Spine context`, the manifest's `canonical.default_branch` reads
-`main`, and `git rev-parse HEAD` and `git rev-parse main` print the same
-object id; the AI workspace is at
-its own branch `main`; neither checkout carries staged or unstaged tracked changes,
-and neither
-repo carries a `.gitleaks.toml` of its own.
+pairing manifest names the canonical and the AI workspace, and carries no
+other repository object; the AI workspace is a git repo with one github.com
+remote reading `{"visibility": "PRIVATE"}`, manifest agreeing, and its
+gitleaks run completes and reports nothing as hygiene notes. The closing
+spines' handoffs record `base_branch: main` under `## 2. Spine context`, the
+manifest's `canonical.default_branch` reads `main`, and `git rev-parse HEAD`
+and `git rev-parse main` print the same object id; the AI workspace is at
+its own branch `main`; neither checkout carries staged or unstaged tracked
+changes, and neither repo carries a `.gitleaks.toml` of its own.
 
 Clone and index state, stated so nothing above infers it: neither the canonical's
 index nor the AI workspace's marks any tracked path `assume-unchanged` or
@@ -66,5 +65,10 @@ a git repo is a full clone — `git rev-parse --is-shallow-repository` prints
 
 Inventory, manifest and allowlist state, stated so nothing above infers it:
 the private boundary inventory carries no **Accepted disclosures** section; no
-manifest object records a `git_remote` beyond the remotes enumerated above;
+manifest object records a `git_remote` beyond the remotes this scenario enumerates;
 the working-tree hygiene allowlist is empty.
+
+Repo-set and submodule state, stated so nothing above infers it: `git remote
+-v` in the canonical lists exactly one remote, `origin`, on github.com;
+`vendor/internal-proto` tracks no submodule of its own — its `.gitmodules`
+is absent and no tracked entry of its is a gitlink.

@@ -24,7 +24,7 @@ The registry holds one registered architectural decision whose touch surface is
 `internal/billing/**` and one risk gate whose touch surface is
 `internal/payments/**`. The close-time check over the path list above returned
 no match. No demo line is quarantined anywhere in the ledger. The
-architect-critic pass ran and came back with no findings.
+the adversarial audit ran and came back with no findings.
 
 Still unrun: the retrospective, the memory-bank harvest, the worktree and
 branch cleanup, and the state writes.

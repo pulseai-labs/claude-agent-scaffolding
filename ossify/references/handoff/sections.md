@@ -36,6 +36,12 @@ for yourself tomorrow. If the work has a governing decision ("the freeze
 holds", "the design is locked"), it belongs here, restated in one line even if
 a reference holds the detail.
 
+If this effort is mapped, §1 carries one line — *"this effort is mapped at
+`<name+link>`; the frontier is a query, run it."* The handoff **points at the
+map and never copies a decision out of it**: a handoff carries session state,
+a map carries an effort's decision frontier, and a decision restated in both
+drifts by construction.
+
 ## 2. State — as checkable claims
 
 Where the work is, written so a fresh session can *verify* rather than trust.
@@ -47,10 +53,16 @@ The proven form is a two-column table:
 | canonical `main` at `7bf74f2` | `git log -1 --format='%h %s' origin/main` |
 | suite ALL GREEN, 1,321 assertions | `bash tests/run-all.sh` |
 | zero open PRs | `gh pr list --state open` |
+| 3 tickets on the frontier of "multi-tenant billing" | run the frontier query at `${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/references/tracker.md` §2 |
 ```
 
 **The contract: every command tests the whole claim on its row.** A row whose
-command checks half the claim reads as a full ✓ and hides the other half.
+command checks half the claim reads as a full ✓ and hides the other half. The
+frontier row applies that same contract, not a new one: a frontier **count**
+typed into the table is stale the moment it is written — the frontier moves
+every time a ticket resolves — so the row's command is the query itself, not
+a recount, and a resuming session verifies the live frontier rather than
+trusting a number this handoff happened to see.
 
 Three rules earned by practice:
 

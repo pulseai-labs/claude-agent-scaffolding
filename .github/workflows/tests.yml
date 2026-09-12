@@ -75,6 +75,12 @@ jobs:
           CSA_SKIP_PERF: "1"
         run: bash claude-security-audit/run-tests.sh
 
+      - name: code-judo suite
+        run: bash code-judo/run-tests.sh
+
+      - name: orca-crew suite
+        run: bash orca-crew/run-tests.sh
+
       - name: dual-publish parity (repo-root)
         run: bash tests/test-codex-dual-publish.sh
 

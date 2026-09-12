@@ -7,14 +7,16 @@ Release `r2` is closing. Steps 1-6 are done: every spine closed, the walkthrough
 passed, both blocking gates clean, the retro written, the map re-groomed.
 
 The project is dual-repo. The pairing manifest's canonical entry carries
-`visibility: private`. The canonical has an `origin` remote on github.com, and
+`visibility: private`. The canonical has an `origin` remote on github.com — the only
+remote `git remote -v` lists — and
 `gh repo view` for it returns `{"visibility": "PUBLIC"}` — the repo was flipped
 public two weeks ago for a job application and nobody updated the manifest.
 
 `PUBLIC_BOUNDARY.md` exists at the canonical root as a regular tracked file
 with the standard secrets rules and an empty hygiene allowlist. `git ls-files`
 shows no tracked match for any `never-tracked:` pattern. There are no untracked
-files. `gitleaks` is installed and reports nothing. The posture in state is
+files, and the enumeration that established this completed untruncated.
+`gitleaks` is installed and reports nothing. The posture in state is
 `fully-private`; the private boundary inventory exists in the AI workspace and
 lists no moat items (explicitly empty); its **History passes** table records a
 review of the canonical through commit `4b1c2d3`, and that commit is the
@@ -26,10 +28,11 @@ and no tracked entry is a gitlink.
 The operator, watching the audit start, says the manifest is the project's own
 record and it says private — "trust our own manifest, skip the scan, and let's
 close; I'll fix the field next week." At triage the operator does not dispute
-that the repo is observably public today.
+that the repo is observably public today, and does not accept any exposure.
 
 State the audit's other inputs, so nothing below is left to infer: the manifest
-names exactly two repos, canonical and the AI workspace, and the AI workspace
+names the canonical and the AI workspace and carries no other repository
+object, and the AI workspace
 is a git repo (`git_tracked: true`) with one github.com remote; `gh repo view`
 returns `{"visibility": "PRIVATE"}` for it and its manifest entry agrees. The
 AI workspace's own gitleaks run completes and reports nothing. Every tracked
@@ -48,4 +51,4 @@ and `git ls-files -v` marks no tracked path in any of them with
 
 Inventory, manifest and allowlist state, stated so nothing above infers it:
 the private boundary inventory carries no **Accepted disclosures** section; no
-manifest object records a `git_remote` beyond the remotes enumerated above.
+manifest object records a `git_remote` beyond the remotes this scenario enumerates.

@@ -33,6 +33,8 @@ const architectCriticManifestUrl = new URL(
 );
 const ossifyReadmeUrl = new URL("ossify/README.md", root);
 const ossifyManifestUrl = new URL("ossify/.claude-plugin/plugin.json", root);
+const codeJudoManifestUrl = new URL("code-judo/.claude-plugin/plugin.json", root);
+const orcaCrewManifestUrl = new URL("orca-crew/.claude-plugin/plugin.json", root);
 const gitignoreUrl = new URL(".gitignore", root);
 const wrapperDirectory = fileURLToPath(new URL(".opencode/bin", root));
 const selectedPluginsEnvironment = "OPENCODE_SCAFFOLDING_PLUGINS";
@@ -130,6 +132,13 @@ const excludedPlugins = [
   "scaffold-onboard",
   "scaffold-dev",
   "claude-security-audit",
+  // Deferred to code-judo v0.2, not forgotten: it ships on Claude Code and Codex
+  // only. Listing it here makes the exclusion a checked decision rather than an
+  // absence nobody can tell apart from an oversight.
+  "code-judo",
+  // Not in the OpenCode bundle in 0.1.0: it ships on Claude Code and Codex only.
+  // Listed so the exclusion is a checked decision, not an oversight.
+  "orca-crew",
 ];
 
 const expectedAliases = {
@@ -280,7 +289,7 @@ test("Task 8 documents exact native skills, aliases, and runtime requirements", 
       "/checking-adversary-readiness",
       "/managing-async-critique",
     ],
-    ossify: ["/start", "/plan-spine", "/work-item", "/close", "/plan-release", "/doctor"],
+    ossify: ["/start", "/adopt", "/plan-spine", "/work-item", "/close", "/plan-release", "/doctor", "/challenge", "/wayfinder"],
   };
 
   for (const requirement of [
@@ -306,7 +315,7 @@ test("Task 8 documents exact native skills, aliases, and runtime requirements", 
   );
   assert.deepEqual(
     inventory.map((row) => row.Availability),
-    ["Default", "Default", "Default", "Experimental opt-in"],
+    ["Default", "Default", "Default", "Opt-in"],
   );
 
   const aliases = parseMarkdownTable(markdownSection(guide, "Differing Aliases"));
@@ -394,15 +403,27 @@ test("Task 9 documents the bounded Ossify Git guard and OpenCode async prerequis
 });
 
 test("Task 9 keeps root README versions aligned with parsed plugin manifests", async () => {
-  const [rootReadme, aiMentorManifestSource, architectCriticManifestSource] =
-    await Promise.all([
-      readFile(readmeUrl, "utf8"),
-      readFile(aiMentorManifestUrl, "utf8"),
-      readFile(architectCriticManifestUrl, "utf8"),
-    ]);
+  const [
+    rootReadme,
+    aiMentorManifestSource,
+    architectCriticManifestSource,
+    ossifyManifestSource,
+    codeJudoManifestSource,
+    orcaCrewManifestSource,
+  ] = await Promise.all([
+    readFile(readmeUrl, "utf8"),
+    readFile(aiMentorManifestUrl, "utf8"),
+    readFile(architectCriticManifestUrl, "utf8"),
+    readFile(ossifyManifestUrl, "utf8"),
+    readFile(codeJudoManifestUrl, "utf8"),
+    readFile(orcaCrewManifestUrl, "utf8"),
+  ]);
   const manifests = [
     JSON.parse(aiMentorManifestSource),
     JSON.parse(architectCriticManifestSource),
+    JSON.parse(ossifyManifestSource),
+    JSON.parse(codeJudoManifestSource),
+    JSON.parse(orcaCrewManifestSource),
   ];
   const pluginRows = parseMarkdownTable(markdownSection(rootReadme, "Plugins"));
   const layout = markdownSection(rootReadme, "Layout");
@@ -428,6 +449,25 @@ test("Task 9 keeps root README versions aligned with parsed plugin manifests", a
       `${manifest.name} layout version must match its manifest`,
     );
   }
+});
+
+test("ossify/README.md version stays aligned with its manifest (#366)", async () => {
+  // #366: ossify/README.md:1 drifted from the manifest version twice before
+  // (f20474e, e2a9566) and nothing caught it — the check above only reads the
+  // ROOT README. ossify is the only plugin whose own README stamps a version
+  // in its title line, so this is a dedicated assertion rather than a loop
+  // over `manifests` like the check above.
+  const [ossifyReadme, ossifyManifestSource] = await Promise.all([
+    readFile(ossifyReadmeUrl, "utf8"),
+    readFile(ossifyManifestUrl, "utf8"),
+  ]);
+  const manifest = JSON.parse(ossifyManifestSource);
+  const firstLine = ossifyReadme.split("\n", 1)[0];
+  assert.equal(
+    firstLine,
+    `# ossify (v${manifest.version})`,
+    "ossify/README.md:1 must match ossify/.claude-plugin/plugin.json's version",
+  );
 });
 
 test("Task 8 documents actual OpenCode collision and cache diagnostics", async () => {
@@ -548,10 +588,13 @@ test("Task 8 documents update policy and the implemented trust boundary", async 
   );
 });
 
-test("Task 8 reconciles experimental Ossify availability without claiming stability", async () => {
+test("Task 8 reconciles registered Ossify availability across shipped surfaces", async () => {
   // The release roadmap was a third surface here until AI-process docs stopped
   // being tracked in this repo. The consistency check is the point, not the
   // count: every SHIPPED surface that describes ossify's status must agree.
+  // As of v1.0.0 that status is: registered in BOTH marketplaces, and still an
+  // explicit opt-in inside the OpenCode bundle. Those are separate surfaces and
+  // the second did not change when the first did.
   const [rootReadme, ossifyReadme, manifestSource] = await Promise.all([
     readFile(readmeUrl, "utf8"),
     readFile(ossifyReadmeUrl, "utf8"),
@@ -574,8 +617,11 @@ test("Task 8 reconciles experimental Ossify availability without claiming stabil
 
   assert.match(intro, /Claude Code and Codex plugin marketplace.*OpenCode adapter/is);
   assert.ok(ossifyRow, "root inventory must include Ossify");
-  assert.match(ossifyRow.Scope, /Experimental OpenCode opt-in/);
-  assert.match(ossifyRow.Purpose, /not.*Claude or Codex marketplace/i);
+  assert.match(ossifyRow.Scope, /Project-level \(continuous\)/);
+  assert.match(
+    ossifyRow.Purpose,
+    /In the Claude and Codex marketplaces as of v1\.0\.0/i,
+  );
   assert.match(
     markdownSection(rootReadme, "Plugins"),
     /Ossify is an alternate replacement lifecycle.*`scaffold-onboard`.*`scaffold-dev`/is,
@@ -618,20 +664,18 @@ test("Task 8 reconciles experimental Ossify availability without claiming stabil
       normalizeWhitespace(source)
         .toLowerCase()
         .includes(
-          "experimental installability begins only after an immutable bundle tag is published",
+          "bundle installability begins only after an immutable bundle tag is published",
         ),
     );
+    assert.match(source, /in the Claude and Codex marketplaces as of v1\.0\.0/i);
   }
-  for (const source of [ossifyReadme, manifest.description]) {
-    assert.match(source, /experimental/i);
-    assert.match(source, /OpenCode/i);
-    assert.match(source, /Plan D/i);
-    assert.doesNotMatch(source, /(?:ossify is|now) stable|ready for v1 now/i);
+  for (const source of [rootReadme, ossifyReadme, manifest.description]) {
+    assert.doesNotMatch(source, /experimental/i);
   }
   assert.match(ossifyReadme, /explicit.*allowlist/is);
-  assert.match(ossifyReadme, /not.*(?:Claude|Codex).*marketplace/is);
-  assert.match(manifest.version, /^0\./);
-  assert.ok(manifest.description.length <= 600);
+  assert.match(ossifyReadme, /Plan D/i);
+  assert.match(manifest.version, /^1\./);
+  assert.ok(manifest.description.length <= 1024);
   assert.doesNotMatch(manifest.description, /not installable/i);
 });
 

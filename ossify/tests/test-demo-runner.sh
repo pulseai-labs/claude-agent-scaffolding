@@ -10,7 +10,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/../lib/entities.sh"; . "$HERE/../lib/ledger.sh"; . "$HERE/../lib/verify.sh"; . "$HERE/../lib/worktree.sh"; . "$HERE/../lib/demo.sh"
 TMP="$(mktemp -d)"; S="$TMP/state.json"
 # Task 6: `oss_demo_run_auto` now resolves its working directory via a
-# pairing manifest (composition root when set, canonical root otherwise) -
+# pairing manifest (composition root when set, the sole declared repo's root
+# otherwise - #272/#310 Task 4 routed this through the sole-repo default rule,
+# never a literal `canonical`) -
 # a BEHAVIORAL CHANGE from "runs in the caller's cwd". Every call below that
 # omits the explicit workdir argument needs one on the walk-up path, so the
 # fixture goes in BEFORE the first such call (all eight pre-existing calls
@@ -135,6 +137,71 @@ oss_state_mutate "$S" set_composition "$(jq -n --arg c "$TMP/elsewhere" '{compos
 t_capture oss_demo_workdir "$S"
 t_assert_eq "$TMP/elsewhere" "$T_OUT" "an absolute composition_root is used verbatim, not joined onto the canonical root"
 
+# --- #272/#310 Task 4: oss_demo_workdir routes through the sole-repo default
+# rule, not a literal `canonical`. Precedence: explicit > composition_root >
+# sole-declared-repo > refuse listing repos. Two fresh topology fixtures,
+# deliberately NOT $TMP (single-repo "canonical" pairing manifest, which every
+# other assertion in this file depends on) - this block must not perturb it.
+
+# (1) N=1, but the sole repo is NOT named canonical - exactly the case the OLD
+# literal default could never resolve (it always looked up "canonical" by
+# name, so a workspace whose only repo was named something else refused even
+# though exactly one candidate existed). This is the direct fix this task
+# ships, and a fixture the old code would have refused (RED against the old
+# body: `_oss_repo_root canonical` fails because "core", not "canonical", is
+# declared).
+TMP3="$(mktemp -d)"
+mkdir -p "$TMP3/.ossify"
+cat > "$TMP3/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMP3/core"}},"well_known_paths":{}}
+JSON
+S3="$TMP3/state.json"; echo '{}' > "$S3"
+cd "$TMP3"
+t_capture oss_demo_workdir "$S3"
+t_assert_rc 0 "sole repo resolves even when it is not literally named canonical"
+t_assert_eq "$TMP3/core" "$T_OUT" "workdir is the sole declared repo's root"
+
+t_capture oss_demo_workdir "$S3" "$TMP3/explicit-wd"
+t_assert_rc 0 "explicit workdir still wins ahead of the default-repo tier"
+t_assert_eq "$TMP3/explicit-wd" "$T_OUT" "explicit workdir echoed verbatim, no repo resolution attempted"
+cd "$TMP"
+rm -rf "$TMP3"
+
+# (2) N>1, and one of the declared repos IS literally named canonical - the
+# fail-safe case this task exists for. The OLD literal default resolved this
+# SILENTLY (canonical happened to be declared, so it "worked" while ignoring
+# the sibling repo entirely - precisely the wrong-repo risk #272/#310 names).
+# The new rule must refuse rather than pick WHEN THE DEFAULT-REPO TIER IS
+# ACTUALLY NEEDED. Spec section 3's precedence is EXPLICIT > composition_root >
+# sole-declared-repo > refuse: an ABSOLUTE composition_root is a complete
+# answer on its own and outranks the sole-declared-repo tier entirely, so it
+# resolves even under N>1 (lib/demo.sh short-circuits on it before ever
+# consulting the default-repo key). A RELATIVE composition_root still joins
+# onto the DEFAULT repo's root (recorded deviation 2), so it still needs the
+# lookup and still refuses under N>1, same as no composition_root at all.
+TMP4="$(mktemp -d)"
+mkdir -p "$TMP4/.ossify"
+cat > "$TMP4/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$TMP4/canon"},"ui":{"root":"$TMP4/ui"}},"well_known_paths":{}}
+JSON
+S4="$TMP4/state.json"; echo '{}' > "$S4"
+cd "$TMP4"
+t_capture oss_demo_workdir "$S4"
+t_assert_rc 2 "N>1 refuses (no composition_root) even though one declared repo is literally named canonical (no silent pick)"
+t_assert_contains "$T_OUT" "canonical, ui" "refusal lists both declared repos"
+
+jq -n --arg c "$TMP4/abs-comp" '{project:{composition_root:$c}}' > "$S4"
+t_capture oss_demo_workdir "$S4"
+t_assert_rc 0 "an ABSOLUTE composition_root outranks the sole-declared-repo tier - resolves even under N>1 (spec section 3)"
+t_assert_eq "$TMP4/abs-comp" "$T_OUT" "the absolute composition_root is returned verbatim, no repo root ever consulted"
+
+jq -n --arg c "rel-comp" '{project:{composition_root:$c}}' > "$S4"
+t_capture oss_demo_workdir "$S4"
+t_assert_rc 2 "a RELATIVE composition_root still needs the default repo's root, so N>1 still refuses"
+t_assert_contains "$T_OUT" "canonical, ui" "same refusal, same listing"
+cd "$TMP"
+rm -rf "$TMP4"
+
 # Clear it back to unset so the rest of this file's explicit-workdir calls
 # keep resolving against $TMP/canon as they did before this sub-block.
 oss_state_mutate "$S" set_composition "$(jq -n '{composition_root:null}')" >/dev/null
@@ -175,4 +242,66 @@ t_assert_rc 0 "replay stays clean across add_close_record (and this file's other
 
 cd /
 rm -rf "$TMP"
+
+# ===========================================================================
+# TOPOLOGY TWIN (#272/#310 Task 11, spec decision O1): the opening fixture's
+# implicit-workdir demo-run sequence (all green / halt on first fail /
+# quarantine skip / vacuous-green catch), run again from a SOLE-repo
+# .ossify/topology.json named "core" - never "canonical". Every call below
+# OMITS the workdir argument, so each one re-resolves
+# `_oss_default_repo_key -> _oss_repo_root` through the topology shape
+# exactly as the opening fixture resolves it through the translated pairing
+# shape. TMP3/TMP4 further up already pin oss_demo_workdir's sole-repo/N>1
+# rule directly (added by #272/#310 Task 4); this proves the FULL RUNNER -
+# ledger read, halt, quarantine, vacuous-green - threads that resolution end
+# to end, which is what the opening fixture actually demonstrates and TMP3/
+# TMP4 do not (they call oss_demo_workdir alone, never oss_demo_run_auto).
+#
+# A fresh mktemp tree: none of this reuses $TMP (already rm -rf'd above) or
+# TMP3/TMP4 (already rm -rf'd earlier in this file).
+# ===========================================================================
+TMPD="$(mktemp -d)"
+mkdir -p "$TMPD/ws/.ossify" "$TMPD/core"
+cat > "$TMPD/ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMPD/core"}},"well_known_paths":{}}
+JSON
+cd "$TMPD/ws"
+SD="$TMPD/ws/.ossify/project-state.json"
+oss_state_init "$SD" demo-run-twin >/dev/null
+oss_entity_add_release "$SD" "demo" "goal" >/dev/null
+oss_entity_add_spine "$SD" r0 "demo spine" bone core >/dev/null
+
+oss_ledger_add_auto "$SD" r0.s1 "always true" "true" "exit:0" >/dev/null
+oss_ledger_add_auto "$SD" r0.s1 "greets" "echo hello-world" "contains:hello" >/dev/null
+t_capture oss_demo_run_auto "$SD"
+t_assert_rc 0 "topology twin: all green"
+t_assert_contains "$T_OUT" "PASS 2" "topology twin: pass count"
+
+oss_ledger_add_auto "$SD" r0.s1 "always false" "false" "exit:0" >/dev/null
+t_capture oss_demo_run_auto "$SD"
+t_assert_rc 1 "topology twin: halt on first fail"
+t_assert_contains "$T_OUT" "FAIL d3" "topology twin: failing line named"
+
+oss_ledger_quarantine "$SD" d3 "flaky env, fix by r1 close" >/dev/null
+t_capture oss_demo_run_auto "$SD"
+t_assert_rc 0 "topology twin: quarantined line skipped"
+t_assert_contains "$T_OUT" "SKIP" "topology twin: skip reported"
+
+oss_ledger_add_auto "$SD" r0.s1 "vacuous suite" "echo 'collected 0 items' # pytest" "exit:0" >/dev/null
+t_capture oss_demo_run_auto "$SD"
+t_assert_rc 1 "topology twin: vacuous green caught"
+t_assert_contains "$T_OUT" "vacuous-green" "topology twin: guard named"
+
+# Take the vacuous line (d4) out of the active run so the AND-gate-precision
+# check below can reach it - same reason the opening fixture quarantines its
+# own d4 before this exact assertion (review round 1, finding 3: the twin
+# had stopped one assertion short of the legacy sequence at :60-64).
+oss_ledger_quarantine "$SD" d4 "test cleanup" >/dev/null
+oss_ledger_add_auto "$SD" r0.s1 "legit zero-passing mention" "echo '0 passing warnings remain'" "contains:0 passing" >/dev/null
+t_capture oss_demo_run_auto "$SD"
+t_assert_rc 0 "topology twin: non-runner output mentioning a zero-tests phrase is NOT vacuous-green (AND-gate precision)"
+
+cd "$HERE"
+rm -rf "$TMPD"
+
 t_summary

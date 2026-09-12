@@ -3,6 +3,17 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/harness.sh"
 for lib in id state manifest commands entities registries ledger doctor; do . "$HERE/../lib/$lib.sh"; done
 TMP="$(mktemp -d)"; export OSS_STATE_FILE="$TMP/state.json"
+# #272/#310 Task 4: an omitted target_repo now routes through
+# _oss_default_repo_key, which needs a discoverable manifest even when
+# OSS_STATE_FILE pins the state path directly - the old default was a literal
+# `canonical`, never a lookup. well_known_paths.project_state is pinned to the
+# SAME path as OSS_STATE_FILE so _oss_resolve_state's override-notice never
+# fires and stays out of captured stdout below.
+mkdir -p "$TMP/.ossify"
+cat > "$TMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$TMP/canon"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
+cd "$TMP"
 oss_cmd_init "release-planning-demo" >/dev/null
 oss_cmd_release_add "MVP" "usable end to end" >/dev/null
 oss_cmd_spine_add r0 "trade entry" bone >/dev/null
@@ -13,9 +24,20 @@ t_capture oss_cmd_work_item_add r0.s1 "wire the entry point"
 t_assert_eq "r0.s1.w1" "$T_OUT" "work item minted"
 t_capture oss_cmd_get '.work_items[0].target_repo'
 t_assert_eq "canonical" "$T_OUT" "default target_repo is canonical"
+# The default-key assertions above need EXACTLY ONE declared repo; this one
+# needs a second, or "explicit" is indistinguishable from "default". Widening
+# the fixture up front satisfies this and disarms those, and leaving it widened
+# makes every LATER omitted-key call in this file refuse - so the second repo is
+# declared here and withdrawn immediately after.
+cat > "$TMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$TMP/canon"},"private_core":{"root":"$TMP/priv"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
 t_capture oss_cmd_work_item_add r0.s1 "private adapter" private_core
 t_capture oss_cmd_get '.work_items[1].target_repo'
 t_assert_eq "private_core" "$T_OUT" "explicit target_repo stored"
+cat > "$TMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$TMP/canon"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
 
 # release meta: exit criteria + DAG + budget + next sketch + real-use findings.
 t_capture oss_cmd_release_set_meta r0 \
@@ -91,6 +113,7 @@ t_assert_contains "$T_OUT" "ok: shape" "doctor shape green"
 t_capture oss_state_replay "$OSS_STATE_FILE"
 t_assert_rc 0 "replay clean after release-planning ops"
 
+cd "$HERE"
 unset OSS_STATE_FILE
 rm -rf "$TMP"
 
@@ -116,6 +139,11 @@ rm -rf "$TMP2"
 # exercises the dispatcher's strict mode or its arg-passthrough.
 OSS="$HERE/../bin/oss"
 DTMP="$(mktemp -d)"; export OSS_STATE_FILE="$DTMP/state.json"
+mkdir -p "$DTMP/.ossify"
+cat > "$DTMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$DTMP/canon"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
+cd "$DTMP"
 
 t_capture "$OSS" init release-planning-dispatcher-demo
 t_assert_rc 0 "dispatcher: init ok"
@@ -147,6 +175,7 @@ t_assert_rc 2 "dispatcher: veto_add invalid disposition is rc 2 through the real
 t_capture "$OSS" release_set_meta r9 '{"exit_criteria":["ghost"]}'
 t_assert_rc 7 "dispatcher: release_set_meta on unknown release is rc 7 through the real binary"
 
+cd "$HERE"
 unset OSS_STATE_FILE
 rm -rf "$DTMP"
 t_summary

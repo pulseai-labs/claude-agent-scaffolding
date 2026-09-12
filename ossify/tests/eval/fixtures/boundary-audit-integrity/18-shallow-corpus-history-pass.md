@@ -25,7 +25,8 @@ Read from the checkout as it stands, the canonical is otherwise ordinary.
 `PUBLIC_BOUNDARY.md` is a regular tracked file whose `never-tracked:` block
 parses and carries every rule the template ships plus
 `**/SPEC.md, docs/planning/**`. `git ls-files` matches no rule.
-`git ls-files --others` (ignored files included) returns only `node_modules/`.
+`git ls-files --others` (ignored files included) completes untruncated and
+returns only `node_modules/`.
 Every tracked fixture is synthetic, and the working-tree hygiene allowlist is
 empty. The canonical's checkout carries no staged or unstaged tracked
 changes, and no tracked path of its carries an `assume-unchanged` or
@@ -63,4 +64,7 @@ tree, and does not accept any exposure.
 
 Inventory, manifest and allowlist state, stated so nothing above infers it:
 the private boundary inventory carries no **Accepted disclosures** section; no
-manifest object records a `git_remote` beyond the remotes enumerated above.
+manifest object records a `git_remote` beyond the remotes this scenario enumerates.
+
+Remote state, stated so nothing above infers it: `git remote -v` in the
+canonical lists exactly one remote, `origin`, on github.com.

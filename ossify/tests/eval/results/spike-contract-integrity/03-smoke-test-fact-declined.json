@@ -1,0 +1,1 @@
+{"scores":{"offer_bar":5,"hypothesis_falsifier":5,"code_fate_discard":5,"timebox_evidence_decision":5,"risk_gate_inheritance":5},"pass":true,"notes":"The skill correctly declined the spike and routed the crate/version/API-surface fact to smoke-test-pass.md, and correctly withheld all four contract fields by never engaging the contract machinery."}

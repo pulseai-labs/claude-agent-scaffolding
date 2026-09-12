@@ -1,0 +1,29 @@
+{
+  "control": "old-contract detection control",
+  "surface": "external-executor",
+  "fixture": "02-external-request-result-handling",
+  "why_this_fixture": "The most discriminating of the seven: it is the core in-session contract, so an invoke agent reading prose that predates the seam cannot answer it correctly by accident. The negative control 01 is deliberately NOT used here - it would pass against the old prose, which is what makes it a control rather than a discriminator.",
+  "pre_change_sha": "3e3a2f3",
+  "pre_change_prose": [
+    "ossify/skills/work-item/SKILL.md",
+    "ossify/skills/work-item/references/round-orchestration.md",
+    "ossify/skills/close/references/work-item-close.md",
+    "ossify/commands/run-spine.md"
+  ],
+  "note_on_prose_set": "references/external-executor.md and references/correction-continuation.md do not exist at 3e3a2f3; their absence is the change under test.",
+  "must_fail": true,
+  "observed_pass": false,
+  "result": {
+    "scores": {
+      "mode_split": 1,
+      "round_sequencing": 2,
+      "result_validation": 1,
+      "gaps_routing": 2,
+      "correction_and_layer4": 2
+    },
+    "pass": false,
+    "notes": "The output denies that an external-executor mode exists at all - it refuses the flag, never builds an external_execution_request or invokes the caller-supplied procedure, and drives the ordinary nested ossify:implementer-agent path instead (mode_split); it treats the caller's whole-round capability as a violation of decomposition order rather than preserving ordering across the seam (round_sequencing); it requires only the two ordinary return shapes with no *_oid fields and has close consume report_path/stage_status verbatim, exactly the trust-the-declared-values failure the fixture falsifies, with no recomputed four-part identity check against the request (result_validation); it never routes a gaps record through the section 6 loop as a replacement single-item request through the caller and instead prescribes re-dispatch to ossify:implementer-agent (gaps_routing); and it says nothing about a same-executor correction continuation or inline Layer 4, while its re-dispatch instruction contradicts the same-executor rule (correction_and_layer4)."
+  },
+  "verdict": "DETECTS - control failed as required. Scores are at or below the round-three run on every criterion (1/2/1/2/2 against 1/1/1/2/2): the old prose has no notion of the seam at all, so criterion 4's new branch-identity clause cannot make it any weaker than it already was.",
+  "rerun_reason": "orca-crew 0.4.0 (#435) added 'the checked-out branch equals the request's branch' to criterion 4's pre-replacement check, so the previous control no longer evidences THIS rubric. Re-run against the same 3e3a2f3 prose with fresh invoke and judge agents."
+}

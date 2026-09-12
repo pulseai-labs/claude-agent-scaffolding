@@ -24,6 +24,23 @@ t_capture oss_cmd_get '.project.overlay_wiring'; t_assert_eq '$PULSE_PROMPT_DIR'
 
 t_capture oss_cmd_release_add "Skeleton" "core loop usable"
 t_assert_eq "r0" "$T_OUT" "release via wrapper mints r0"
+
+# #272/#310 Task 4: an omitted target_repo now routes through
+# _oss_default_repo_key, which needs a discoverable manifest even when
+# OSS_STATE_FILE pins the state path directly - a bare temp dir with no
+# manifest on the walk-up path used to be enough (the old default was a
+# literal `canonical`, never a lookup). well_known_paths.project_state is
+# pinned to the SAME path as OSS_STATE_FILE so _oss_resolve_state's
+# override-notice never fires and stays out of captured stdout below. Scoped
+# to just the calls below that need it - "manifest_require refuses with no
+# manifest on the walk-up path" further down needs the OPPOSITE, so this
+# fixture is deliberately NOT installed at the top of the block.
+mkdir -p "$TMP/.ossify"
+cat > "$TMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$TMP/canon"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
+cd "$TMP"
+
 t_capture oss_cmd_spine_add r0 "walking skeleton" bone
 t_assert_eq "r0.s1" "$T_OUT" "spine via wrapper (default target_repo)"
 t_capture oss_cmd_get '.spines[0].target_repo'; t_assert_eq "canonical" "$T_OUT" "spine wrapper defaults target_repo to canonical"
@@ -55,7 +72,10 @@ t_assert_eq "other-project" "$T_OUT" "get honors an explicit state-file argument
 t_capture "$OSS" get '.project.name'
 t_assert_eq "wrapper-demo" "$T_OUT" "get with no argument still resolves via the env/manifest"
 
-# manifest verbs are reachable through the dispatcher at all.
+# manifest verbs are reachable through the dispatcher at all. Deliberately back
+# in $HERE, which the fixture above never touched - this assertion's whole
+# point is the ABSENCE of a manifest on the walk-up path.
+cd "$HERE"
 t_capture "$OSS" manifest_require
 t_assert_rc 1 "manifest_require refuses with no manifest on the walk-up path"
 
@@ -76,6 +96,11 @@ t_assert_eq "docs/specs/r0/r0.s1-order-ticket" "$T_OUT" "spine dir grammar"
 # own fresh state file so it doesn't perturb the id/counter sequence the
 # assertions above depend on.
 DTMP="$(mktemp -d)"; export OSS_STATE_FILE="$DTMP/state.json"
+mkdir -p "$DTMP/.ossify"
+cat > "$DTMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$DTMP/canon"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
+cd "$DTMP"
 
 t_capture "$OSS" init dispatcher-demo
 t_assert_rc 0 "dispatcher: init ok"
@@ -95,9 +120,11 @@ t_assert_eq "r0" "$T_OUT" "dispatcher: get reads back r0"
 t_capture "$OSS" spine_add r9 ghost flesh
 t_assert_rc 7 "dispatcher: spine_add against unknown release propagates rc 7 (not collapsed) through the real binary"
 
+cd "$HERE"
 unset OSS_STATE_FILE
 rm -rf "$DTMP"
 
+cd "$HERE"
 unset OSS_STATE_FILE
 rm -rf "$TMP"
 
@@ -106,6 +133,11 @@ rm -rf "$TMP"
 # through the REAL dispatcher binary under set -euo pipefail - the coverage
 # added elsewhere for this task only exercises them via sourced lib calls.
 FTMP="$(mktemp -d)"; export OSS_STATE_FILE="$FTMP/state.json"
+mkdir -p "$FTMP/.ossify"
+cat > "$FTMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$FTMP/canon"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
+cd "$FTMP"
 t_capture "$OSS" init fake-status-demo
 t_assert_rc 0 "dispatcher: init ok (quarantine/fake_status block)"
 "$OSS" release_add "Skeleton" "goal" >/dev/null
@@ -126,8 +158,62 @@ t_assert_eq "r2" "$T_OUT" "dispatcher: fake_status renewal reaches state through
 t_capture "$OSS" fake_status "broker" bogus "x"
 t_assert_rc 2 "dispatcher: fake_status rejects a bad enum through the real binary"
 
+cd "$HERE"
 unset OSS_STATE_FILE
 rm -rf "$FTMP"
+
+# --- #272/#310 Task 5 review fix (Important 1): patch_add's repo-key
+# resolution through the REAL dispatcher binary. Every assertion this task
+# added elsewhere (test-ledger.sh) only calls oss_ledger_add_patch in-process
+# - it never reaches oss_cmd_patch_add or bin/oss's `set -euo pipefail`, so
+# the requirement that the N>1 refusal surfaces as rc 2 "from both the lib
+# function and the dispatcher, never flattened to 1" was unverified at the
+# dispatcher layer. Same gap this file's own header comment (line ~131)
+# describes for ledger_quarantine/fake_status; same fix shape.
+PTMP="$(mktemp -d)"; export OSS_STATE_FILE="$PTMP/state.json"
+mkdir -p "$PTMP/.ossify"
+cat > "$PTMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$PTMP/canon"},"ui":{"root":"$PTMP/ui"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
+cd "$PTMP"
+t_capture "$OSS" init patch-demo
+t_assert_rc 0 "dispatcher: init ok (patch_add block)"
+# `ui` is DECLARED above. It was not, and this block asserted that an
+# undeclared key reaches state and stays there - the exact defect the
+# explicit-key guard now refuses. A success case for an explicit key has to
+# use a key the declaration carries, or it tests the hole instead of the path.
+t_capture "$OSS" patch_add deadbeef "explicit repo key through the real binary" ui
+t_assert_rc 0 "dispatcher: patch_add with a DECLARED explicit repo key ok through the real binary"
+t_capture "$OSS" get '.patch_records[-1].repo'
+t_assert_eq "ui" "$T_OUT" "dispatcher: explicit repo key reaches state through the real binary"
+t_capture "$OSS" patch_add cafe1234 "undeclared repo key" nosuch
+t_assert_rc 2 "dispatcher: patch_add with an UNDECLARED repo key refuses at rc 2"
+t_assert_contains "$T_OUT" "is not declared" "dispatcher: the undeclared-key refusal names the declared set"
+t_capture "$OSS" get '[.patch_records[]] | length'
+t_assert_eq "1" "$T_OUT" "dispatcher: the refused patch record was not written"
+cd "$HERE"
+unset OSS_STATE_FILE
+rm -rf "$PTMP"
+
+# N>1 declared repos: an omitted repo key must refuse at rc 2 through the
+# real binary too, not just the sourced lib call - a fresh single-repo
+# fixture would never exercise this path at all.
+PMTMP="$(mktemp -d)"; export OSS_STATE_FILE="$PMTMP/state.json"
+mkdir -p "$PMTMP/.ossify"
+cat > "$PMTMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$PMTMP/canon"},"ui":{"root":"$PMTMP/ui"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
+cd "$PMTMP"
+t_capture "$OSS" init patch-multi-demo
+t_assert_rc 0 "dispatcher: init ok (patch_add N>1 block)"
+t_capture "$OSS" patch_add cafef00d "no repo key under N>1, through the real binary"
+t_assert_rc 2 "dispatcher: omitted repo key under N>1 declared repos refuses at rc 2 through the real binary, not flattened to 1"
+t_assert_contains "$T_OUT" "canonical, ui" "dispatcher: refusal lists both declared repos through the real binary"
+t_capture "$OSS" get '.patch_records | length'
+t_assert_eq "0" "$T_OUT" "dispatcher: no phantom patch record journaled after the N>1 refusal through the real binary"
+cd "$HERE"
+unset OSS_STATE_FILE
+rm -rf "$PMTMP"
 
 # critic_detect is a pure filesystem probe (no state file, no manifest) - it
 # must answer on any machine, installed or not, so the assertion accepts any

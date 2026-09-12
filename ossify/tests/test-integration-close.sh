@@ -20,8 +20,9 @@
 #     both blocking gates' full rc contracts: `tests/test-close.sh` sections
 #     C, D, E and F. This file records `work_items[].branch` as a VALUE and
 #     never runs `git merge`.
-#   * The router, the three-layer gate's ordering, the halt semantics and the
-#     recovery menu: PROSE contracts with no executable surface
+#   * The router, the four-layer gate's ordering, the halt semantics and the
+#     recovery menu: PROSE contracts with no executable surface, except Layer
+#     4's workflow script, covered separately by `test-workflows.sh`
 #     (`test-close.sh`'s own header says so). Task 13's bash-block harness
 #     (`test-skill-bash-blocks.sh`) checks that every `oss` verb they name
 #     resolves; beyond that they have no automated coverage in this release.

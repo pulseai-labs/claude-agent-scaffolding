@@ -71,7 +71,7 @@ libs break. Use `oss help` for discovery.
 
 ```bash
 if ! sp="$(oss state_path 2>/dev/null)"; then
-  printf '%s\n' "ossify requires a workspace-init pairing manifest; run /init-workspace or /pair-workspace first."
+  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands."
   exit 0
 fi
 # Later bare verbs resolve state alone and would honor this override —
@@ -154,9 +154,11 @@ item behind one bullet is still one bullet hiding four items.)
 oss work_item_add "$spine" "<title>" [target_repo]      # prints r1.s2.w1, …
 ```
 
-`target_repo` defaults to `canonical`; pass the private-side repo (e.g.
-`private_core`) for an item that lands there — only `canonical` executes this
-release (`work-item/references/round-orchestration.md` §3, in the work-item skill, halts otherwise).
+`target_repo` defaults to the sole declared repo, refusing outright once more
+than one is declared; pass the target's key (e.g.
+`private_core`) for an item that lands somewhere else — any declared repo
+executes (`work-item/references/round-orchestration.md` §3, in the work-item
+skill, halts only an undeclared name or `ai_workspace`).
 **Each work item targets exactly one
 repo** — an item that spans two repos is two items. Full rules in
 `references/cross-repo.md`. An unknown spine id exits **7** and writes nothing.
@@ -240,22 +242,11 @@ prior releases' increments; Release 0 specs cite the spec and the bones only.
 Re-verification is **mandatory across every live spine spec after any bone
 change**. Full rules in `references/citation-foldin.md`.
 
-**Adversarial pass (optional, at the full plan).** Probe `oss critic_detect`
-(warn-and-proceed on `absent`), then invoke architect-critic through its **only**
-contract — the *exported* env-var bridge, one quoted absolute path, `--close`
-inside the string, then a bare plugin-qualified skill call:
-
-```bash
-export ARCHITECT_CRITIC_ARGS="--spec \"<absolute path to the spine plan>\" --close"
-```
-
-```text
-Skill(architect-critic:critiquing-spec)
-```
-
-There is **no** `target=` / `depth=` / `artifact_path=` parameter; all three fail
-silently, resolving the wrong artifact at the wrong depth. Full grammar,
-sections, and the audit's placement in `references/spec-authoring.md` §6.
+**Adversarial pass (optional, at the full plan).** Run ossify's own audit —
+read `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end
+and follow it with the spine plan as the artifact at close depth. The audit
+always runs; the adversary ladder decides whether an external fresh-frame
+joins. Placement and detail in `references/spec-authoring.md` §6.
 
 ---
 
@@ -270,14 +261,11 @@ from state (§3) — do not re-derive it, and do not offer the gate because the 
 "feels architectural". Adding grill gates to a flesh spine is ceremony inflation,
 and ceremony inflation is what trains people to skip checklists wholesale.
 
-```text
-Skill(ai-mentor:grill-me)
-```
-
-Bare and plugin-qualified. There is no `oss` probe for ai-mentor — offer it, and
-if the skill cannot be resolved in this host treat it as absent: skip silently and
-continue. grill-me is enrichment, not a contract. On **yes**, loop back to §4 with
-whatever it surfaced; on **no**, record the skip and proceed.
+On **yes**, run ossify's own interview: read
+`${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/interview.md` end to end and
+follow it, then loop back to §4 with whatever it surfaced. The grill ships with
+ossify, so it always resolves — the offer, and the user's yes/no, are the whole
+contract. On **no**, record the skip and proceed.
 
 ---
 
@@ -488,9 +476,9 @@ infer a spine from a name when the id missed (§3).
   every verb this skill and its references call is in `oss help`; none of them
   holds judgment. `ledger_add_user`'s
   prefix check is a typo guard, not the journey-line floor.
-- **`ai-mentor:grill-me`** and **`architect-critic:critiquing-spec`** are invoked
-  as unmodified peer skills, bare and plugin-qualified. Neither gains a new
-  interface here.
+- **`challenge`** is ossify's own grill and critic: the §7 gate reads its
+  `references/interview.md` and the §6 pass reads its `references/audit.md`,
+  both by path. Neither mode gains a new interface here.
 - **Peer entry skills:** `start` owns spec-core, the bones registry, and the
   journey map; `plan-release` owns spine selection, exit criteria, the inter-spine
   DAG, the class declaration under the critic veto, and the ledger budget; `close`

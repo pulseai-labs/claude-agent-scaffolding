@@ -41,7 +41,7 @@ what `plan-spine` actually wrote.
 — it must be prefixed with the ai_workspace root, exactly as every sibling
 consumer in `close` does. Used bare it resolves against whatever directory the
 agent happens to be standing in, which during a round is usually a worktree
-under the canonical repo — so the read silently misses, or worse, finds a
+under a declared repo — so the read silently misses, or worse, finds a
 different project's file. (`oss release_dir <release-id>` returns the release
 level of the same tree already absolute, if that is all you need.)
 
@@ -67,40 +67,76 @@ rounds are stored; do not imply the read is machine-backed.
 
 ---
 
-## 2. Before round 1 — cut **and check out** the spine integration branch
+## 2. Before round 1 — cut **and check out** the spine integration branch in every hosting repo
 
-Once per spine. This block runs on **every** `/run-spine`, so an already-existing
-spine branch means an earlier invocation got here first — halt rather than
-re-cutting it or half-reusing it:
+Once per spine, per hosting repo — the distinct `target_repo` values across the
+spine's work items, read from state. This block runs on **every** `/run-spine`,
+so an already-existing spine branch in any hosting repo means an earlier
+invocation got here first — halt rather than re-cutting it or half-reusing it:
 
 ```bash
-canonical="$(oss repo_root canonical)"
-[ -z "$(git -C "$canonical" status --porcelain)" ] || { echo "canonical is dirty - halt"; exit 1; }
 spine_branch="$(oss branch_name "<spine-id>" "<spine-slug>")"
+repo_list="$(mktemp)"; repo_bases="$(mktemp)"
+oss get '.work_items[] | select(.spine=="<spine-id>") | .target_repo' | sort -u > "$repo_list"
 
-if git -C "$canonical" show-ref --verify --quiet "refs/heads/$spine_branch"; then
-  echo "halt: $spine_branch already exists - an earlier run of this spine cut it."
-  echo "      Resuming a halted spine is not supported in this release (issue 133)."
-  exit 1
-fi
+# PASS 1 - CHECK every hosting repo. Mutate nothing. A halt here leaves every
+# repo exactly as it was found.
+while IFS= read -r repo; do
+  [ -n "$repo" ] || continue
+  root="$(oss repo_root "$repo")" || exit 1     # undeclared repo halts HERE
+  [ -z "$(git -C "$root" status --porcelain)" ] || { echo "halt: $repo is dirty"; exit 1; }
+  if git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch"; then
+    echo "halt: $spine_branch already exists in $repo - an earlier run cut it (issue 133)."; exit 1
+  fi
+  base_branch="$(git -C "$root" rev-parse --abbrev-ref HEAD)"
+  [ "$base_branch" != "HEAD" ] || { echo "halt: $repo is in DETACHED HEAD"; exit 1; }
+  printf '%s\t%s\n' "$repo" "$base_branch" >> "$repo_bases"
+done < "$repo_list"
 
-# base_branch is the branch canonical is parked on RIGHT NOW - see the caveat
-# below. Reading the PLANNED base out of SPINE.md is issue 133.
-base_branch="$(git -C "$canonical" rev-parse --abbrev-ref HEAD)"
-[ "$base_branch" != "HEAD" ] \
-  || { echo "halt: canonical is in DETACHED HEAD - no base_branch to record"; exit 1; }
-git -C "$canonical" checkout -q -b "$spine_branch"
+# PASS 2 - every repo passed; now cut, in the same order.
+while IFS="$(printf '\t')" read -r repo base_branch; do
+  [ -n "$repo" ] || continue
+  git -C "$(oss repo_root "$repo")" checkout -q -b "$spine_branch" || exit 1
+done < "$repo_bases"
 ```
 
-Five things here, each load-bearing:
+Each of these is load-bearing:
 
-**`oss repo_root canonical`, never a bare `<canonical>` placeholder.** The verb
-reads `.canonical.root` from the pairing manifest and fails rc 2 rather than
-defaulting to the working directory. A placeholder that a reader fills in by hand
-is how a spine gets built in whichever repo the session happened to start in.
+**A spine branch cut here is local until spine close pushes it.** The branch is
+created, never pushed — rounds land work items onto it locally, and only spine
+close's PR arm pushes it and opens the PR against the repo's base branch
+(`close/references/spine-close.md` §3, #339). Nothing in the lane pushes, and
+nothing else should: a premature push creates a PR-shaped artifact the close's
+resume probe would then find and have to reason about.
+
+**Check every repo before cutting a branch in any of them.** This was one loop
+that checked and mutated per repo. With an earlier-sorted repo clean and a later
+one dirty, detached, or already carrying the spine branch, the first repo's
+branch was already cut when the halt fired — and re-running then failed that
+repo's own already-exists guard, which this document says is not resumable. A
+condition that should merely block dispatch instead wedged the spine until
+someone repaired the repos by hand. The checks are cheap and read-only; the
+`checkout -b` only runs once all of them have passed.
+
+**`$repo_bases` is a per-repo MAPPING, not a variable.** `base_branch` was a
+single name overwritten on every iteration, so only the last repo's value
+survived the loop — and the handoff authored afterwards has to record *each*
+target repo's observed base branch (`handoff-contract.md` §2), which spine close
+then treats as its primary merge destination. Writing one repo's base into
+another repo's handoff either halts the close or merges into a same-named branch
+that happens to exist there. Read this file when authoring each handoff; never
+carry a surviving `$base_branch`.
+
+**`oss repo_root "$repo"`, never a bare `<repo-root>` placeholder.** The verb
+resolves the declared repo's root from the topology declaration
+(`.ossify/topology.json`, or a translated `.workspace/pairing.json` fallback)
+and fails rc 2 — naming the declared set — rather than defaulting to the
+working directory. A
+placeholder that a reader fills in by hand is how a spine gets built in
+whichever repo the session happened to start in.
 
 **`checkout -b`, not `branch`.** `git branch` creates the ref and leaves you
-standing where you were. Canonical then stays on its previous branch for the
+standing where you were. The repo then stays on its previous branch for the
 whole spine, and every consequence is rc 0:
 
 | Step | With the checkout | With `git branch` only |
@@ -110,33 +146,36 @@ whole spine, and every consequence is rc 0:
 | `oss worktree_remove` | deletes a merged branch | deletes it too — it *is* merged, into the wrong target |
 | Cumulative demo | measures the spine's work | measures a tree assembled by accident, green |
 
-Nothing in that column reports a failure. **Canonical stays parked on
-`$spine_branch` for the duration of the spine**, and spine close is what moves it
-off.
+Nothing in that column reports a failure. **Each hosting repo stays parked on
+`$spine_branch` for the duration of the spine**, and spine close is what moves
+it off, in that repo.
 
 **An existing spine branch halts the run; it does not resume it.** A first
-invocation that stopped — a gap returned, a round deferred, a session interrupted
-— leaves the branch cut, per-item worktrees on disk, and item status journaled.
-Reusing the branch alone buys exactly one step: `oss worktree_add` returns **rc 8**
-for every item already spawned (`oss_worktree_add`'s already-exists guard in
-`lib/worktree.sh`), and nothing routes
-completed or active items to close or to redispatch from their recorded state.
-Resuming means reconciling all four at once — that is issue 133, not this block.
-Until it lands, halting with the branch named beats a lane that half-restarts.
+invocation that stopped — a gap returned, a round deferred, a session
+interrupted, or the loop halting on one hosting repo before it reaches the next
+— leaves the branch cut in every repo the loop already reached, per-item
+worktrees on disk, and item status journaled. Reusing the branch alone buys
+exactly one step per repo: `oss worktree_add` returns **rc 8** for every item
+already spawned (`oss_worktree_add`'s already-exists guard in
+`lib/worktree.sh`), and nothing routes completed or active items to close or to
+redispatch from their recorded state. Resuming means reconciling all of that at
+once, across every hosting repo — that is issue 133, not this block. Until it
+lands, halting with the branch named beats a lane that half-restarts.
 
 **`base_branch` is taken from HEAD in this release, and that is a known
-limitation — park canonical on the intended base before you run the lane.**
-`plan-spine` authors the planned base into `SPINE.md`'s spine-context section at
-planning time (`plan-spine/references/spec-authoring.md` §1). **Close reads both** —
-`close/references/spine-close.md` §3 takes the handoffs' recorded
-`base_branch:` lines (what the lane ACTUALLY cut from) as primary with
-`SPINE.md`'s planned base as the cross-check, halting on disagreement, and
-`close/references/code-review.md` reuses the ceremony's resolved value. This lane does not read
-either source: it takes HEAD (issue 133). **That asymmetry is the hazard.** If
-canonical was parked anywhere but the planned base when you ran, the spine is
-cut from one branch and merged into another, and every guard downstream passes.
-Park canonical on the intended base before you run the lane, and cross-check
-the handoff's recorded `base_branch` (`handoff-contract.md` §2) against
+limitation — park each hosting repo on its intended base before you run the
+lane.** `plan-spine` authors the planned base into `SPINE.md`'s spine-context
+section at planning time (`plan-spine/references/spec-authoring.md` §1).
+**Close reads both** — `close/references/spine-close.md` §3 takes the
+handoffs' recorded `base_branch:` lines (what the lane ACTUALLY cut from) as
+primary with `SPINE.md`'s planned base as the cross-check, halting on
+disagreement, and `close/references/code-review.md` reuses the ceremony's
+resolved value. This lane does not read either source: it takes HEAD (issue
+133). **That asymmetry is the hazard.** If a hosting repo was parked anywhere
+but the planned base when you ran, the spine in that repo is cut from one
+branch and merged into another, and every guard downstream passes. Park each
+hosting repo on the intended base before you run the lane, and cross-check the
+handoff's recorded `repo` and `base_branch` (`handoff-contract.md` §2) against
 `SPINE.md`'s before the first dispatch — a mismatch is a halt, not a note.
 
 **The slug is not in state.** Spines store `name`, work items store `title`;
@@ -178,10 +217,10 @@ the order returns arrive.
 
 ```bash
 target_repo="$(oss get '.work_items[] | select(.id=="<wi-id>") | .target_repo')"
-# FIRST — before anything is created or journaled. `_oss_repo_root` accepts
-# ai_workspace and private_core, so worktree_add would succeed against them.
-[ "$target_repo" = "canonical" ] \
-  || { echo "halt: work item <wi-id> targets '$target_repo'; only canonical executes in this release"; exit 1; }
+# FIRST - before anything is created or journaled. Any DECLARED repo executes;
+# ai_workspace never does (it is the process record, not an execution target).
+[ "$target_repo" != "ai_workspace" ] && oss repo_root "$target_repo" >/dev/null 2>&1 \
+  || { echo "halt: work item <wi-id> targets '$target_repo' - not a declared repo (or is ai_workspace)"; exit 1; }
 wt="$(oss worktree_add "$target_repo" "<wi-id>" "<wi-slug>" "$spine_branch")"
 branch="$(git -C "$wt" rev-parse --abbrev-ref HEAD)"
 oss work_item_exec "<wi-id>" "$branch" "$wt" "$(git -C "$wt" rev-parse HEAD)"
@@ -205,24 +244,26 @@ removing a worktree and reversing two state mutations.
   with an id and derives its scope from the id's shape — it has no slug and
   cannot re-derive the branch. Skip this call and the merge target is
   unrecoverable.
-- **`target_repo` comes from state, not from you**, and **only `canonical` is a
-  supported execution target today.** Cross-repo execution is a later release;
-  the field is carried now so that release changes one resolver rather than every
-  call site.
+- **`target_repo` comes from state, not from you.** Any declared repo is a
+  supported execution target; the assertion above is what turns an undeclared
+  name — or `ai_workspace` — into a halt instead of a worktree spawned
+  somewhere wrong.
 
   **The halt is yours to make — the lib will not make it for you**, which is
   why the assertion is the first line of the spawn block above rather than a
-  note here. `_oss_repo_root` accepts `canonical`, `ai_workspace` and
-  `private_core`, so `oss worktree_add ai_workspace …` **returns rc 0 and
-  creates a worktree inside the AI workspace** (reproduced). `private_core` is
-  unconfigured in a normal manifest and does fail at rc 2, which is what makes
-  the gap easy to miss: two of the three unsupported values behave as
-  documented and the third does not.
+  note here. `_oss_repo_root` resolves `ai_workspace` as a reserved key and
+  every other name against the declared repo set, so `oss worktree_add
+  ai_workspace …` **returns rc 0 and creates a worktree inside the AI
+  workspace** (reproduced) — the reserved key resolves exactly as a declared
+  repo would, and the prose halt above is the only thing standing between a
+  work item and that outcome. A genuinely undeclared name fails `oss repo_root`
+  at rc 2 and is caught by the same assertion, for the different reason of
+  never having been declared at all.
 
   Skipped, the failure is quiet and awkward to undo: the work lands in a
   worktree under the AI workspace, `.worktrees/` appears in the repo that holds
-  the specs, and the spine's merge step then looks for a branch in canonical
-  that was never cut there.
+  the specs, and the spine's merge step then looks for a branch in the target
+  repo that was never cut there.
 
 ---
 
@@ -246,6 +287,19 @@ its pre-flight expects the file to exist.
 ---
 
 ## 5. Dispatch
+
+**This step, and only this step, has two forms.** Which one you are in was
+decided by the command that started you and never changes mid-spine:
+
+- **`/run-spine <spine-id>`** — the default, below. The lane dispatches its own
+  nested implementer per work item.
+- **`/run-spine <spine-id> --external-executor`** — the caller supplies the
+  execution procedure. **Read `references/external-executor.md` and follow it**
+  instead of the block below; it owns the round sequencing, the two records, the
+  validation and the halts. Come back here for §6 and §7, which it does not
+  change. That mode calls no subagent and never falls back to one.
+
+### The default dispatch
 
 ```text
 Task(subagent_type="ossify:implementer-agent", prompt=<invocation block naming the absolute handoff path>)
@@ -359,6 +413,11 @@ yet. It binds here, where it costs something: when a concurrent round's items
 come back out of order, **work item N+1 is not verified, closed or merged until
 N is fully committed and merged**. Hold the early return and wait.
 
+**The barrier is identical in both dispatch forms.** An external caller may run
+a round's items concurrently — that is expected, not a variation — and it
+changes nothing here: the returns still queue into close in declared order, the
+merges are still serial, and the next round still waits.
+
 This is spec §6's strict-order verification, and dispatching concurrently is
 exactly what makes it easy to violate — an orchestrator that closes items as
 they arrive is following §3 to the letter and breaking the contract anyway. The
@@ -384,9 +443,9 @@ exercises them either.
 The mechanical half *is* covered — `tests/test-worktree.sh` asserts that a
 worktree spawned off the spine branch starts at the spine branch's tip, that two
 work items in one spine get distinct branches and distinct worktrees, and that a
-work-item branch merged while canonical is parked on the spine branch is
+work-item branch merged while its target repo is parked on the spine branch is
 **reachable from the spine branch afterwards** (with a negative control proving
-the assertion fails when canonical is parked anywhere else).
+the assertion fails when it is parked anywhere else).
 
 A bash test asserting agent behaviour here would be testing a fixture, not the
 contract. The honest statement is that the judgment half is uncovered.

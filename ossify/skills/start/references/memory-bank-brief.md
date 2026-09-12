@@ -87,8 +87,10 @@ belongs.
 - **`PUBLIC_BOUNDARY.md`** → each **public repo root**.
 - **Lean MASTER-SPEC** → AI workspace. **EXECUTIVE-SUMMARY** → per the project's
   manifest routing.
-- Resolve every destination through the pairing manifest. Never hardcode against
-  `$(pwd)`, and never write product code into the AI workspace.
+- Resolve every destination through the topology declaration — `oss repo_root
+  <name>` per declared repo, `oss repo_root ai_workspace` for the workspace.
+  Never hardcode against `$(pwd)`, and never write product code into the AI
+  workspace.
 
 ---
 

@@ -45,7 +45,15 @@
 #   block unfindable and the failure read as "vacuous" rather than as wrong
 #   behaviour. Pick the anchor from the block's SCAFFOLDING, never from its FIX.
 #
-# Totals: 172 blocks - 59 operative (11 covered, 48 deferred), 113 illustrative.
+# Totals: 180 blocks - 70 operative (11 covered, 59 deferred), 110 illustrative.
+# DERIVED, never hand-counted: check 2's report line gives the total from a walk
+# of the TREE ("179 blocks accounted for"); one awk pass over the rows below
+# gives the split. Two independent routes, agreeing at 179 - that agreement IS
+# the check. The previous headline (172 = 11/48/113) was ALREADY STALE BEFORE
+# the wayfinder branch: the retirements narrated in the parentheticals below
+# were never subtracted from it. So "172 + 8 new D rows = 180" corrects a figure
+# that was never true; do not re-derive 180 from that arithmetic. Nothing
+# asserts this line, which is why it drifted across several releases.
 # (the harvest conversion retired two: impl-check.md's harvest_dir read and
 # rule-authoring.md's deferred path composition; the rules conversion retired
 # three more: doctor/SKILL.md's rules_types call and rule-authoring.md's last
@@ -86,26 +94,34 @@
 #   plan-release/SKILL.md   rel  -> spine_add + release_set_meta
 #   class-declaration.md    sid  -> class_set
 #   spine-close.md          `oss critic_detect || true` - rc-handling, not decoration
+#     (retired at 1.1.0 with the critic probe itself - Batch S moved the critic
+#     in-tree and deleted both the probe and the ARGS bridge from the skills)
 # The fourth was caught two rounds after the first three, by the same rule.
 # The lesson is worth keeping: when a stated rule and a case-by-case instinct
 # disagree, the rule wins or the rule gets rewritten - a ledger whose value is
 # that someone else can apply it and get the same answer cannot have exceptions
 # that live only in the author's head.)
 #
+I	skills/adopt/SKILL.md	1	single-verb calls with <placeholder> args: release_add, release_status (the C4 retroactive baseline pair)
+D	skills/challenge/references/adversaries.md	3	#138	the plugin-root resolution (oss-dispatcher shape, the budget-check workaround), and the codex and claude adversary invocation recipes - schema-backed exec forms the close-depth audit runs; documented shell the agent runs, never executed by the suite, and a wrong shape fails loudly into host-only
 O	skills/close/references/spine-close.md	work items that are not complete	tests/test-close.sh	the open-work-item gate refuses to close a spine with incomplete items
-O	skills/close/references/spine-close.md	is-ancestor	tests/test-close.sh	the merge guard: the spine tip must actually reach the base branch
+O	skills/close/references/spine-close.md	merge --no-ff	tests/test-close.sh	the landing pass: the local arm's merge guard (the spine tip must actually reach the base branch) and the PR arm's push/create with the gh-inoperable third-leg halt. #339 re-anchored this row from 'is-ancestor' - the record pass added its own --is-ancestor lineage guard and the harness refuses a duplicated anchor
+O	skills/close/references/spine-close.md	mergeCommit	tests/test-close.sh	the record pass (#339): a MERGED PR is proven locally - head identity (mergeCommit^2 == headRefOid, a rebase/squash landing halts), lineage (the pushed tip from the PR body is an ANCESTOR of the merged head, so fix rounds pass and rewrites halt), the stranded-merge guard (local base ahead of origin halts, repair named, never run), then repo:mergeCommit lands in $merge_shas
 O	skills/close/references/spine-close.md	touch_check	tests/test-close.sh	bone-touch at close re-classifies the spine rather than trusting the plan
-D	skills/close/references/spine-close.md	3	#138	the architect-critic ARGS bridge (export form, quoting, absolute --spec), and `oss critic_detect || true` - the `|| true` is rc-handling, not decoration: rc 1 means "not installed, carry on" and removing the guard aborts the whole close ceremony under set -e + the resume containment probe (audit #47, operative, unexecuted)
-I	skills/close/references/spine-close.md	5	single-verb calls with <placeholder> args: ledger_apply_pending, class_set, risk-gate read, worktree_remove, spine_status
+D	skills/close/references/spine-close.md	1	#138	the resume containment probe inside the local arm (audit #47, operative, unexecuted). #272/#310 Task 9 turned the once-per-spine probe into a loop over every hosting repo, same shape as round-orchestration.md's `checkout -q -b` conversion
+I	skills/close/references/spine-close.md	4	single-verb calls with <placeholder> args: ledger_apply_pending, class_set, risk-gate read, worktree_remove, spine_status
 O	skills/close/references/release-close.md	spines that are not closed	tests/test-close.sh	the release gate blocks on any spine still open
 O	skills/close/references/release-close.md	expired_fakes	tests/test-close.sh	the fake-expiry gate blocks on fakes past their expiry release
 O	skills/close/references/release-close.md	expired_quarantines	tests/test-close.sh	the quarantine gate blocks on quarantines that have come due
 D	skills/close/references/release-close.md	1	#138	the ai_workspace path composition for the release retro is unexecuted
+O	skills/close/references/release-close.md	git tag	tests/test-close.sh	the #339 release-tag block, round 2 (T1/T2/T8): per hosting repo via oss repo_root + the recovered base branch, remote resolved never assumed origin, annotated always, resumable only when an existing tag matches the base tip locally AND on the remote (R1-R3 in test-close.sh)
 I	skills/close/references/release-close.md	6	single-verb calls: demo_user_lines, ledger_retire, release goal read, feature_list, release_status, release_dir (the retro destination became a release_dir call - the verb is test-worktree.sh's)
 O	skills/close/references/patch-lane.md	touch_check	tests/test-close.sh	a patch touching a bone surface must escalate out of the patch lane
-D	skills/close/references/patch-lane.md	1	#138	the patch commit's branch placement block - CL-1 says the target branch is unspecified, so executing it needs the design decision first
+D	skills/close/references/patch-lane.md	1	#138	the patch commit's branch placement block - CL-1 says the target branch is unspecified, so executing it needs the design decision first. #272/#310 Task 9 keyed the block to a `repo_key` (any declared repo, not only canonical); the underlying CL-1 gap is unchanged
 I	skills/close/references/patch-lane.md	1	single patch_add call with <placeholder> args
-O	skills/close/references/work-item-close.md	abbrev-ref	tests/test-close.sh	W1: the merge guard fires when canonical is parked on the wrong branch
+O	skills/close/references/work-item-close.md	abbrev-ref	tests/test-close.sh	W1: the merge guard fires when the item's own repo (target_repo, not always canonical since #272/#310 Task 9) is parked on the wrong branch
+O	skills/close/references/work-item-close.md	before the delegated call	tests/test-close.sh	W3: the Layer 4 staged-index identity guard prints the pre-call tree before the delegated Workflow call
+O	skills/close/references/work-item-close.md	post_fp=	tests/test-close.sh	W3: ...and halts naming possible injection if any fingerprinted input changed during that call (round 9 PR #380; redesigned round 10 for the tool-call boundary; extended round 12 to fingerprint report.md/spec.md/handoff.md/03-code-patterns.md; narrowed round 16 to write-tree + HEAD + report.md via git hash-object, ratified policy #3; corrected round 17 (policy #3 rev 2) to put spec.md back - handoff.md/03-code-patterns.md are the documented unfingerprinted residual; round 18 removed the dead, injection-shaped `patterns` placeholder assignment from the pre-block (H3) and added the guard's claim-boundary prose (persistent mutation only, not in-flight reads or agent honesty - H1, documented residual))
 D	skills/close/references/work-item-close.md	4	#138	path resolution, the spec-exists halt, the staged-changes read, and the Route A/B close sequence
 I	skills/close/references/work-item-close.md	1	a single <placeholder> assignment showing the report path's origin
 O	skills/close/references/cumulative-demo.md	elapsed=	tests/test-close.sh	D1-D4: the demo measurement block preserves the runner's rc instead of flattening it
@@ -113,8 +129,10 @@ D	skills/close/references/cumulative-demo.md	1	#138	the ledger-budget comparison
 I	skills/close/references/cumulative-demo.md	4	single-verb calls: demo_run, ledger_quarantine, budget read, demo_record
 O	skills/close/references/impl-check.md	while IFS=	tests/test-close.sh	the halt loop exits nonzero on the first failing AC and names the row
 I	skills/close/references/impl-check.md	2	single-verb calls: verify_acs, report_cross_check (the harvest_dir resolve went with the verb - the bank path is prose-resolved per close/references/harvest.md §7 now)
-O	skills/work-item/references/round-orchestration.md	checkout -q -b	tests/test-close.sh	W2: the cut runs clean under set -u with NOTHING injected, leaves canonical checked out on the spine branch, halts on an existing spine branch (W2b) and on a detached HEAD (W2c). It cuts from the branch canonical is PARKED ON - reading the planned base from SPINE.md is deferred to #133, and 07a0bd8 reverted an attempt at it. An earlier revision of this row claimed planned-base coverage, which is behaviour the block deliberately does not have
+O	skills/work-item/references/round-orchestration.md	checkout -q -b	tests/test-close.sh	W2: the cut runs clean under set -u with NOTHING injected, leaves the hosting repo checked out on the spine branch, halts on an existing spine branch (W2b) and on a detached HEAD (W2c). It cuts from the branch the repo is PARKED ON - reading the planned base from SPINE.md is deferred to #133, and 07a0bd8 reverted an attempt at it. Task 8 (#272/#310) turned the once-per-spine cut into a loop over every repo hosting the spine's items; the test exercises the loop body's three guards against a single hosting repo, not the multi-repo iteration itself. An earlier revision of this row claimed planned-base coverage, which is behaviour the block deliberately does not have
 D	skills/work-item/references/round-orchestration.md	4	#138	spine-dir resolution, per-item spec path derivation, target_repo worktree spawn, and the dirty-worktree halt
+D	commands/adopt.md	1	#267	the $ARGUMENTS env-var bridge
+D	commands/challenge.md	1	#267	the $ARGUMENTS env-var bridge
 D	commands/close.md	1	#138	the $ARGUMENTS env-var bridge - a positional-substitution regression here silently drops every argument
 D	commands/doctor.md	1	#138	the $ARGUMENTS env-var bridge
 D	commands/plan-release.md	1	#138	the $ARGUMENTS env-var bridge
@@ -125,10 +143,10 @@ D	commands/work-item.md	1	#138	the $ARGUMENTS env-var bridge
 I	skills/doctor/SKILL.md	2	a single doctor call (interop_check's block went with its verb - §7 is performed by reading; rules_types' block went the same way - §6's type table is the reference's §3 prose now) and the surface-token placeholder assignment (the broken $ARGS parse became the family's prose-placeholder form - there is no parse logic left to cover; §12 owns $ARGUMENTS)
 I	skills/doctor/references/state-inspection.md	3	the reads the agent-performed half works from, now that doctor emits only its four gate lines: the four advisory counts, the `| type` guard that must precede them (jq's length answers on strings too, so a corrupt field returns a plausible number at rc 0), and the worktree_orphans call shapes one per repo key (#156). Each is a single read whose OUTPUT the prose interprets - the judgement is the prose
 I	skills/doctor/references/spec-validation.md	2	a spec_path resolve and a bones-count get bound to an explicit state path
-I	skills/doctor/references/interop-check.md	3	the resolution calls the agent-performed check reads FROM, now that the verb is gone: the two repo_root reads, the canonical git probe, and state_path vs $OSS_STATE_FILE. Each is a single call whose OUTPUT the prose interprets - the judgement is the prose, so executing these would test the fixture rather than the check
+I	skills/doctor/references/interop-check.md	3	the resolution calls the agent-performed check reads FROM, now that the verb is gone: the ai_workspace + declared-repo root reads, the declared-repo git work-tree probe (#272/#310 Task 10: was canonical-only), and state_path vs $OSS_STATE_FILE. Each is a single call whose OUTPUT the prose interprets - the judgement is the prose, so executing these would test the fixture rather than the check
 D	skills/doctor/references/budget-check.md	2	#138	both budget probes now self-locate the ossify root from the `oss` dispatcher and consume it on the next line - operative by the stated rule. The two forms they replaced (a repo-relative path, then ${CLAUDE_PLUGIN_ROOT}) both failed SILENTLY, the second by expanding to empty and reading /tests/..., so a regression here looks exactly like a working command
 D	skills/close/SKILL.md	2	#138	the id-shape router and the manifest-refusal + doctor gate
-D	skills/close/references/code-review.md	1	#138	consumes $base_branch and $spine_branch assuming an earlier step assigned them - the exact round-7 shape
+D	skills/close/references/code-review.md	1	#138	consumes $repo_base_branches and $spine_branch assuming an earlier step assigned them, and loops every hosting repo rather than canonical alone (#272/#310 Task 10) - the exact round-7 shape extended to N repos
 D	skills/close/references/fake-expiry.md	1	#138	the expired-fakes branch whose rc contract folds rc 2 into neither pass nor block
 I	skills/close/references/fake-expiry.md	2	an active-fakes read and a single fake_status call
 D	skills/close/references/harvest.md	2	#138	the empty-items halt guard and the memory-bank path composition
@@ -136,19 +154,19 @@ D	skills/close/references/routing.md	1	#138	the id_parse scope router - shares i
 I	skills/close/references/routing.md	1	a single spine_list call
 I	skills/close/references/retrospective.md	1	a single quarantine read
 D	skills/plan-release/SKILL.md	3	#138	the state-absent refusal, the touch_check rc-capture, and the release_add capture whose $rel feeds spine_add and release_set_meta
-I	skills/plan-release/SKILL.md	8	single-verb calls with <placeholder> args: release_set_meta x4, feature_add, release_add, class_set, the critic ARGS export, the release_dir resolve+mkdir
+I	skills/plan-release/SKILL.md	7	single-verb calls with <placeholder> args: release_set_meta x4, feature_add, release_add, class_set, the release_dir resolve+mkdir
 D	skills/plan-release/references/bone-touch-judge.md	2	#138	the two-branch if that folds rc 2 into clean, and the rc-capture form that does not - REL-9 flags the first as a copy trap
 I	skills/plan-release/references/bone-touch-judge.md	3	single-verb calls: class_set x2 and a risk-gate controls read
 D	skills/plan-release/references/class-declaration.md	1	#138	sid=$(oss spine_add ...) consumed by class_set - assigned then consumed, the same rule that reclassified release-md-emission.md
 I	skills/plan-release/references/class-declaration.md	1	a single feature_add return
-I	skills/plan-release/references/critic-veto.md	4	the critic ARGS export and three single-verb disposition calls
+I	skills/plan-release/references/critic-veto.md	3	three single-verb disposition calls
 I	skills/plan-release/references/feature-map-grooming.md	1	a single feature_list call
 I	skills/plan-release/references/real-use-findings.md	3	three worked release_set_meta / feature_add calls
 D	skills/plan-release/references/release-md-emission.md	1	#138	rel -> oss release_dir -> mkdir -p: a variable one step assigns and two later steps consume, and it creates a directory. Operative by this file's own rule; an earlier revision called it "a release-id read", describing only its first line
 I	skills/plan-release/references/rolling-wave.md	1	a single next_sketch write
 I	skills/plan-release/references/spine-sequencing-dag.md	1	a single spine_dag write
 D	skills/plan-spine/SKILL.md	3	#138	the state-absent refusal, the spine-id resolution, and the touch_check branch
-I	skills/plan-spine/SKILL.md	7	single-verb calls with <placeholder> args: work_item_add, class_set, the critic ARGS export, ledger_add_user, ledger_supersede, fake_add, feature_add
+I	skills/plan-spine/SKILL.md	6	single-verb calls with <placeholder> args: work_item_add, class_set, ledger_add_user, ledger_supersede, fake_add, feature_add
 D	skills/plan-spine/references/cross-repo.md	1	#138	the worktree_path read and cross-repo dispatch
 I	skills/plan-spine/references/cross-repo.md	2	a work_item_add shape and a work-items-by-spine read
 D	skills/plan-spine/references/decomposition.md	1	#138	the bone-touch re-check at decomposition
@@ -158,15 +176,13 @@ I	skills/plan-spine/references/demo-authoring.md	7	worked ledger_add_auto exampl
 I	skills/plan-spine/references/demo-amendments.md	3	single-verb calls: supersede, ledger read, quarantine
 I	skills/plan-spine/references/fake-ledger-discipline.md	3	single-verb calls: fake_add, fake_status, feature_add
 I	skills/plan-spine/references/citation-foldin.md	2	two ADR reads used to check citations by eye
-I	skills/plan-spine/references/spec-authoring.md	1	the critic ARGS export
-D	skills/start/SKILL.md	1	#138	the state-absent bootstrap refusal
-I	skills/start/SKILL.md	7	single-verb calls with <placeholder> args: feature_add, bone_add, risk_gate_add, posture_set, overlay_set, the critic ARGS export, doctor
+D	skills/start/SKILL.md	1	#138	the topology-absent refusal, printed verbatim (the author/re-probe/halt remedy is prose outside this block)
+I	skills/start/SKILL.md	6	single-verb calls with <placeholder> args: feature_add, bone_add, risk_gate_add, posture_set, overlay_set, doctor
 D	skills/start/references/bones-registry.md	1	#138	the ADR-number minting block - two sed forms, a sort -n tail, and 10# base-10 forcing, all silently wrong on an empty or odd-named dir
 I	skills/start/references/bones-registry.md	2	a bone_add shape and a worked bone_add example
-I	skills/start/references/critic-moment.md	2	a critic_detect probe and the ARGS export
 I	skills/start/references/journey-map.md	1	a single feature_add call
 I	skills/start/references/posture-block.md	4	single-verb calls: posture_set, overlay_set, bone_add, composition_set
-I	skills/start/references/risk-gates.md	2	a risk_gate_add shape and a worked example
+I	skills/start/references/risk-gates.md	3	a risk_gate_add shape, a worked example (one control escapes its commas, #340), and the risk_gate_set_controls corrective append
 D	skills/work-item/references/pre-flight.md	1	#138	the verify_acs read loop that Gate 2 uses to detect a malformed AC table
 I	skills/work-item/references/pre-flight.md	2	a verify_acs call and a porcelain cleanliness read
 I	skills/work-item/SKILL.md	5	single-verb calls with <placeholder> args: verify_acs, porcelain read, redgate, verify_step, git add
@@ -174,57 +190,68 @@ I	skills/work-item/references/debugging.md	3	worked pytest invocations teaching 
 I	skills/work-item/references/tdd-loop.md	4	worked RED-GREEN examples: a redgate call, two test invocations, a zero_tests_guard pipe
 I	skills/work-item/references/handoff-contract.md	1	a single verify_step call
 I	skills/work-item/references/report-contract.md	1	a single report_cross_check call
+O	skills/wayfinder/references/tracker.md	oss repo_root ai_workspace	tests/test-wayfinder-tracker.sh	the tracker-resolution ladder's branch 1: oss repo_root and git remote get-url resolve the live origin (rc swallowed, since an unpaired repo or a workspace without one is branch 2, not a failure), then the sed pipeline normalizes it across all FOUR documented remote spellings - scp-style, ssh://, plain https, and https carrying userinfo - into $OWNER_REPO/$OWNER/$REPO. #337: the fourth spelling (an authenticated https remote) matched none of the original three rules and rode straight through unstripped, leaking the credential into every later failure message. ROUND 2: the userinfo class excluded @ as well as /, so it stopped at the FIRST @ rather than the last one before the host; and the ssh strip was anchored to a literal github.com host, so userinfo on any other ssh host rode through untouched. ROUND 3: rounds 1-2 fixed one scheme at a time (ssh, then ssh+https) and each round the scheme NOT enumerated (http://, git://) leaked exactly like the original report - now ONE scheme-agnostic rule (matching any RFC-3986-shaped scheme before ://, not an enumeration) replaces both prior per-scheme strips. The test extracts this exact block and runs it against all four spellings plus nine userinfo shapes (bare token, percent-encoded password, raw multi-@ password on both https and ssh, non-github ssh host, empty userinfo, http:// and git:// schemes, and combinations), and fails against the pre-fix, round-1, and round-2 sed in turn (proven by revert each round). Branch 0's actual conflict-stop and branches 2/3's no-origin dotfile path are NOT exercised by this row - see the test file's own header for the boundary. DEFERRED, not exercised, neither a credential issue: port-bearing/IPv6 origins leave $OWNER_REPO malformed (fails closed at the reachability guard) and a trailing slash after .git defeats the .git$ anchor - see the test file header
+D	skills/wayfinder/references/tracker.md	3	#138	the tracker-reachability probe (a non-empty $OWNER_REPO guard that STOPS rather than letting an unbuilt probe read as branch 4, then gh repo view --json hasIssuesEnabled CAPTURED and compared to true, because --jq prints a value rather than testing one), and the GraphQL frontier query (subIssues plus pageInfo plus assignees plus labels plus blockedBy, CAPTURED raw into MAP_JSON and then filtered four ways by jq - the frontier view, the unfiltered nodes, one named ticket's node, the pagination gate, and viewer.login for the resume-vs-skip claim comparison - plus a separate label check that stops on any ticket not carrying exactly one of the SIX allowed ticket labels AND no other wayfinder:-prefixed label, intersecting rather than counting the prefix so wayfinder:map on a child and a typo both fail, alone or riding alongside a valid type - because --jq at the call would print only the view and discard everything the other three readers need) - gh commands the agent runs against the live tracker once branch 1 above (now covered by tests/test-wayfinder-tracker.sh) or the dotfile branches have resolved $OWNER_REPO, covered by no suite; a bad jq path or a malformed GraphQL query fails loudly at the API or a jq parse error, never silently
+D	skills/wayfinder/references/charting.md	3	#138	the wayfinder:* label bootstrap loop (idempotent gh label create per type with || true, followed by a gh label list end-state verify that stops before the first issue mutation, because || true cannot tell already-exists from a transient failure), the map-plus-ticket creation pair (gh issue create with the body on stdin via --body-file -, the ticket parented by --parent AND wired to already-created blockers by --blocked-by in the same call, shown twice because a ticket with no blocker drops the flag rather than passing an empty value, and each issue number captured out of the URL gh prints because every later call needs it), and the second-pass blocking wiring (gh issue edit --add-blocked-by, needed only for a FORWARD reference to a sibling the map has not created yet) - gh tracker mutations the agent runs once per chart, covered by no suite; a wrong label or a wrong relationship flag fails loudly against the live API
+D	skills/wayfinder/references/working.md	1	#138	the resolve cycle: load the map's body, labels and state (gh issue view, whose labels and state fields are the only sources for the wayfinder:map check and the closed-map refusal), claim before any work (gh issue edit --add-assignee @me), then record and close in order (gh issue comment with the resolution on stdin via --body-file -, gh issue close), then the MAP-BODY write that records the decision (gh issue view --json body re-read after the resolve, a build_map_update shell function that first counts the named heading and refuses anything but exactly one - zero leaves no section to append to, two would append the entry to both copies and split the record - wrapping an awk that takes $HEADING and $ENTRY through ENVIRON rather than -v, because -v expands escape sequences and a resolution containing a backslash-n would SPLIT the recorded line that appends the entry as the last line of the named heading and drops that section's trailing blanks, returning non-zero on an unchanged body because a no-op write looks exactly like a recorded decision; it is called TWICE - once as a dry run before the comment and close so a moved heading fails while everything is still recoverable, once for real against a fresh read - then gh issue edit --body-file - because gh cannot append to an issue body) - gh tracker mutations the agent runs once per resolved ticket, covered by no suite; the ordering is the contract (claim precedes work, comment precedes close, close precedes the map write) and a wrong shape fails loudly at the API. The map write's lost-update window is closed by ticket-types.md §3 making the dispatcher the sole writer, not by the command
+D	skills/wayfinder/references/preflight.md	1	#138	the wayfinder:map count query (gh issue list --label wayfinder:map --state all --limit 500, the limit raised off gh's default 30 because this count BRANCHES and a truncated page changes which row fires) both start and plan-release branch their pre-flight on - a gh tracker read the agent runs once per ceremony, covered by no suite; an empty result IS the zero-map answer, and a malformed flag fails loudly at the API rather than returning a silently wrong count
+H	commands/adopt.md	3550582653-140
+H	commands/challenge.md	2670379828-144
 H	commands/close.md	1986596502-140
 H	commands/plan-release.md	3197413462-147
 H	commands/plan-spine.md	3747955391-145
 H	commands/run-spine.md	2545938813-144
 H	commands/start.md	3557017349-140
 H	commands/work-item.md	2378584622-144
-H	skills/close/SKILL.md	2598283696-409
-H	skills/close/references/code-review.md	477087775-527
-H	skills/close/references/cumulative-demo.md	2610898515-1543
+H	skills/adopt/SKILL.md	3508802419-191
+H	skills/challenge/references/adversaries.md	2951141406-862
+H	skills/close/SKILL.md	1410923543-370
+H	skills/close/references/code-review.md	2814585538-1688
+H	skills/close/references/cumulative-demo.md	3359471733-4727
 H	skills/close/references/fake-expiry.md	3542365026-715
 H	skills/close/references/harvest.md	1726645723-663
 H	skills/close/references/impl-check.md	3364110005-836
-H	skills/close/references/patch-lane.md	1477508772-1735
-H	skills/close/references/release-close.md	3882829569-2451
+H	skills/close/references/patch-lane.md	3173812713-2590
+H	skills/close/references/release-close.md	1294179990-11159
 H	skills/close/references/retrospective.md	2875153190-110
 H	skills/close/references/routing.md	948295148-232
-H	skills/close/references/spine-close.md	251174316-3806
-H	skills/close/references/work-item-close.md	575441835-2387
+H	skills/close/references/spine-close.md	3412651679-21470
+H	skills/close/references/work-item-close.md	2031506912-5296
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	630905567-126
 H	skills/doctor/references/budget-check.md	582880737-316
-H	skills/doctor/references/interop-check.md	3672515018-357
+H	skills/doctor/references/interop-check.md	2793373443-799
 H	skills/doctor/references/spec-validation.md	2541080060-102
-H	skills/doctor/references/state-inspection.md	622871202-1192
-H	skills/plan-release/SKILL.md	1589553138-2187
-H	skills/plan-release/references/bone-touch-judge.md	3236126632-1199
+H	skills/doctor/references/state-inspection.md	3685287945-1206
+H	skills/plan-release/SKILL.md	2916155576-2312
+H	skills/plan-release/references/bone-touch-judge.md	3552761506-1221
 H	skills/plan-release/references/class-declaration.md	119880498-302
-H	skills/plan-release/references/critic-veto.md	3621408746-561
+H	skills/plan-release/references/critic-veto.md	179374432-460
 H	skills/plan-release/references/feature-map-grooming.md	2982982503-158
 H	skills/plan-release/references/real-use-findings.md	2699050376-489
 H	skills/plan-release/references/release-md-emission.md	3198314590-173
 H	skills/plan-release/references/rolling-wave.md	767614811-211
 H	skills/plan-release/references/spine-sequencing-dag.md	3469132072-141
-H	skills/plan-spine/SKILL.md	592471900-2423
+H	skills/plan-spine/SKILL.md	1955748934-2547
 H	skills/plan-spine/references/citation-foldin.md	3602525984-347
-H	skills/plan-spine/references/cross-repo.md	522633753-880
-H	skills/plan-spine/references/decomposition.md	1060876370-667
+H	skills/plan-spine/references/cross-repo.md	1538931332-891
+H	skills/plan-spine/references/decomposition.md	904324617-642
 H	skills/plan-spine/references/demo-amendments.md	3004605912-329
 H	skills/plan-spine/references/demo-authoring.md	11800694-1544
 H	skills/plan-spine/references/fake-ledger-discipline.md	3569334562-372
-H	skills/plan-spine/references/spec-authoring.md	210504779-102
-H	skills/start/SKILL.md	1619692905-765
-H	skills/start/references/bones-registry.md	179051130-727
-H	skills/start/references/critic-moment.md	2109289951-214
+H	skills/start/SKILL.md	2296906047-1003
+H	skills/start/references/bones-registry.md	2885489214-1035
 H	skills/start/references/journey-map.md	3044115941-97
-H	skills/start/references/posture-block.md	79955184-463
-H	skills/start/references/risk-gates.md	358848091-369
+H	skills/start/references/posture-block.md	3185799305-572
+H	skills/start/references/risk-gates.md	918098467-563
 H	skills/work-item/SKILL.md	3727345778-528
 H	skills/work-item/references/debugging.md	2424723308-562
 H	skills/work-item/references/handoff-contract.md	797876821-82
 H	skills/work-item/references/pre-flight.md	713514376-609
 H	skills/work-item/references/report-contract.md	4244866935-82
-H	skills/work-item/references/round-orchestration.md	2055697790-3117
+H	skills/work-item/references/round-orchestration.md	1653964939-3526
 H	skills/work-item/references/tdd-loop.md	3273402540-842
+H	skills/wayfinder/references/tracker.md	3845051230-10050
+H	skills/wayfinder/references/charting.md	3417135513-1905
+H	skills/wayfinder/references/working.md	3848150488-4160
+H	skills/wayfinder/references/preflight.md	1423898469-134

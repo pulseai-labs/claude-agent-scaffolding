@@ -54,16 +54,21 @@ this contract) and skimming is how they get missed.
 ### `## 2. Spine context`
 
 The spine id, its class (`bone` / `flesh`), the release it belongs to, and a
-one-paragraph statement of what the spine is for. Then two branch facts:
+one-paragraph statement of what the spine is for. Then three branch facts:
 
-- `spine_branch:` the integration branch canonical is parked on.
-- `base_branch:` the branch canonical was on when the spine branch was cut.
+- `repo:` the repo this work item targets — the same value as `target_repo` in
+  §3. The spine branch is cut in every repo hosting at least one of the
+  spine's items (`round-orchestration.md` §2), so `spine_branch:` and
+  `base_branch:` below describe *this* repo, not necessarily every repo the
+  spine touches.
+- `spine_branch:` the integration branch this repo is parked on.
+- `base_branch:` the branch this repo was on when the spine branch was cut.
 
 `base_branch` is carried here because **no state field holds it** and spine close
 needs it to switch back before merging. Copy it into every handoff in the spine,
-including re-dispatches. **This is the branch the spine was actually cut from;
-`SPINE.md`'s spine-context section holds the branch it was *planned* to be cut
-from. They can differ** — the lane takes HEAD, not the plan
+including re-dispatches. **This is the branch the spine was actually cut from,
+in this repo; `SPINE.md`'s spine-context section holds the branch it was
+*planned* to be cut from. They can differ** — the lane takes HEAD, not the plan
 (`round-orchestration.md` §2) — and spine close reads **this field first**,
 cross-checking against `SPINE.md`'s planned base and halting on disagreement
 (`close/references/spine-close.md` §3). A value copied from the plan instead of
@@ -238,6 +243,10 @@ are both evidence, and the retrospective reads them.
   Gate 1 does not infer paths; every dispatch returns gaps and no work starts.
 - **Copying `SPINE.md`'s planned base into `base_branch`** instead of reading the
   worktree's actual base. The cross-check then compares a value against itself.
+- **A §2 `repo:` that does not match §3's `target_repo`.** They record the same
+  fact twice on purpose — one as spine-context, one as a work-item identifier —
+  and a drift between them means one was copied from the wrong place rather
+  than read off this item.
 - **Paraphrasing the return shapes** in §10 instead of copying them. Same
   deadlock, harder to see.
 - **A §8 titled as authoritative.** Second source of truth, silently drifting.

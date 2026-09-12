@@ -1,0 +1,5 @@
+interface:
+  display_name: "Deep Review"
+  short_description: "Strict maintainability review of a diff"
+policy:
+  allow_implicit_invocation: false

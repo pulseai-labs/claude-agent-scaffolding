@@ -4,11 +4,18 @@ Depth for SKILL.md §6 (spec §6.1) — but **read this whenever work arrives wi
 no open spine**: the lane is scope-less and runs *between* ceremonies, any time,
 after SKILL.md §3's common pre-flight (the lane mutates state too); SKILL.md §6
 is where it is described, not the only moment it runs. The documented lane
-commits to the **canonical** (§5 resolves `oss repo_root canonical`, and
-`patch_add` records no repository key) — an out-of-spine change in another repo
-is outside this lane's contract. The lane exists so that a typo fix does not
-need a spine, and it is bounded so that "it was only a typo" does not become
-the way real work escapes the ceremony.
+commits to **exactly one repo per patch — never two in the same commit** — but
+that repo is not fixed to canonical: §5 resolves the repo the patch actually
+targets via `oss repo_root <repo-key>`, and `oss patch_add` records that same
+key on the record (Task 5, #272/#310: the `[repo-key]` argument — a caller who
+omits it gets the sole declared repo, or a refusal naming the declared set when
+more than one is declared; a record with no `repo` key at all, from before this
+argument existed, reads as `canonical`). A single out-of-spine change spanning
+two repos is still outside this lane's contract regardless of which repos they
+are — split it, the same way a work item spanning two repos is split
+(`plan-spine/references/cross-repo.md` §1). The lane exists so that a typo fix
+does not need a spine, and it is bounded so that "it was only a typo" does not
+become the way real work escapes the ceremony.
 
 **The verb already exists.** `oss patch_add` has shipped since the ledger layer;
 what has never existed is the routing judgment that decides when to reach for it.
@@ -108,27 +115,41 @@ answer.
 
 **A patch never lands on a spine branch.** Spec §6.1's "may commit directly"
 names no branch, and the obvious reading is wrong here, because
-`work-item-close.md` §4 parks canonical **on the spine branch for the whole
-spine**. Committed there, an out-of-spine change lands inside that spine's diff:
-it is swept into the spine's changed-path list at close, feeds its `touch_check`,
-and gets attributed to its demo contribution. The one lane defined by *not*
-belonging to a spine ends up inside one.
+`work-item-close.md` §4 parks **every repo hosting one of a spine's items** on
+the spine branch for the whole spine (`round-orchestration.md` §2 cuts it there
+in each). Committed on that branch, in that repo, an out-of-spine change lands
+inside that spine's diff: it is swept into the spine's changed-path list at
+close, feeds its `touch_check`, and gets attributed to its demo contribution.
+The one lane defined by *not* belonging to a spine ends up inside one.
 
-**Assert the branch before you commit — check the name, never the rc:**
+**Assert the branch before you commit — check the name, never the rc — in the
+repo the patch actually targets:**
 
 ```bash
-canonical="$(oss repo_root canonical)"
+# The repo this patch is going into - decide it before you commit, and pass the
+# SAME key to patch_add below (§5b). There is no state field naming a patch's
+# repo ahead of time - a patch is not a work item, so nothing records one for
+# you to read back.
+repo_key="<the repo this patch targets>"
+repo_root="$(oss repo_root "$repo_key")" \
+  || { echo "halt: '$repo_key' is not a declared repo"; exit 1; }
 # The project's integration branch. There is no state field for it in v0.2, so
 # resolve it from the remote's default and let the user correct it if wrong.
-base_branch="$(git -C "$canonical" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
-[ -n "$base_branch" ] || { echo "halt: cannot resolve canonical's base branch - name it explicitly"; exit 1; }
-br="$(git -C "$canonical" rev-parse --abbrev-ref HEAD)"
+# `|| true` on the assignment, not decoration: under `set -o pipefail`, a repo
+# with no `origin` (or no remote HEAD set) makes `symbolic-ref` fail, and that
+# failure propagates through the pipe to `sed` and then to this assignment -
+# which, under `set -e`, would abort the whole block right here, silently,
+# never reaching the halt message below that explains why. The empty
+# `base_branch` this leaves behind is exactly what that halt already tests for.
+base_branch="$(git -C "$repo_root" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')" || true
+[ -n "$base_branch" ] || { echo "halt: cannot resolve $repo_key's base branch - name it explicitly"; exit 1; }
+br="$(git -C "$repo_root" rev-parse --abbrev-ref HEAD)"
 case "$br" in
-  spine/*|work/*) echo "halt: canonical is parked on '$br' - a patch does not land in a spine's diff"; exit 1 ;;
-  HEAD)           echo "halt: canonical is in DETACHED HEAD - a patch commit here belongs to no branch"; exit 1 ;;
-  '')             echo "halt: could not resolve canonical's branch"; exit 1 ;;
-  "$base_branch") echo "ok: patching on the base branch '$br'" ;;
-  *)              echo "halt: canonical is on '$br', not the base branch '$base_branch'"; exit 1 ;;
+  spine/*|work/*) echo "halt: $repo_key is parked on '$br' - a patch does not land in a spine's diff"; exit 1 ;;
+  HEAD)           echo "halt: $repo_key is in DETACHED HEAD - a patch commit here belongs to no branch"; exit 1 ;;
+  '')             echo "halt: could not resolve $repo_key's branch"; exit 1 ;;
+  "$base_branch") echo "ok: patching on $repo_key's base branch '$br'" ;;
+  *)              echo "halt: $repo_key is on '$br', not the base branch '$base_branch'"; exit 1 ;;
 esac
 ```
 
@@ -139,6 +160,12 @@ no ref at all: `oss patch_add` records a sha that exists only until the next gc,
 the change never reaches the base branch, and `doctor`'s patch count reports a
 record whose commit is unreachable. Every arm above fires on something real — a
 parked spine, a work-item branch, a detached checkout, an unresolvable HEAD.
+
+**Checking the WRONG repo's branch is the multi-repo shape of the same
+failure.** Some OTHER declared repo may resolve fine and its branch may well
+be clean — that proves nothing about `$repo_key` when a project declares
+more than one repo. Assert the branch in the repo the commit is actually going
+into, never in whichever repo happens to be easiest to ask.
 
 **If a spine is parked, halt and put it to the user** — two options, and it is
 their call:
@@ -154,19 +181,30 @@ splits the patch lane across two places and the second one has no record.
 ## 5b. Recording it
 
 ```bash
-oss patch_add "<commit-sha>" "<one line: what changed and why it took no spine>"
+oss patch_add "<commit-sha>" "<one line: what changed and why it took no spine>" "$repo_key"
 ```
 
-**Two arguments, and the sha comes first.** It is recorded **after** the commit,
-because the sha does not exist until then — commit, then read the sha, then
-record. A patch committed and never recorded is the lane's actual failure mode:
-the drift is real and invisible, and `doctor` cannot count what was never
-written.
+**Three arguments, and the sha comes first.** It is recorded **after** the
+commit, because the sha does not exist until then — commit, then read the sha,
+then record. `$repo_key` is the SAME key §5 just asserted the branch against,
+never re-derived or re-typed — passing a different one records a patch against
+a repo the ceremony never actually checked. The key is optional at the
+dispatcher (`oss patch_add <commit> <text> [repo-key]`, Task 5, #272/#310): a
+caller who omits it gets the sole declared repo, or a refusal at rc 2 naming
+the declared set when more than one is declared — never a silent guess at which
+repo a multi-repo project meant. A patch committed and never recorded is the
+lane's actual failure mode: the drift is real and invisible, and `doctor`
+cannot count what was never written.
 
 The one-liner is **self-declared**. The ossify:doctor read-out surfaces only a
 **count** of patch records (`doctor/references/state-inspection.md` §2; bare
 `oss doctor` is the four-check gate and shows none) — the one-liner itself is read
-by whoever runs `oss get '[.patch_records[] | {commit, text, at}]'`, so write it
+by whoever runs `oss get '[.patch_records[] | {commit, repo, text, at}]'` — the
+`repo` field records which checkout owns the commit, and without it an auditor
+in a multi-repo project cannot tell that the recorded commit matches the
+repository whose branch was checked out before committing. Records written
+before the field existed have no `repo` key and read as `null`; treat that as
+`canonical`, the sole repo those records could have targeted. So write it
 so that read is auditable. Write the second half — *why it took no spine* — as
 the three-part test's answer, not as a restatement of the diff. *"comment typo in
 the export path — no bone, no gate, no line observes it"* is a record; *"fix
@@ -217,5 +255,8 @@ default rather than a threat.
   (§5).
 - **Inventing a new verb.** `oss patch_add` is the record; nothing else is
   needed (§5).
+- **Asserting a different declared repo's branch than the one the patch
+  targets**, or recording it under a repo key other than the one the branch guard
+  actually checked (§5).
 - **Treating the patch lane as a way past a red demo.** The next spine close runs
   it anyway (§6).

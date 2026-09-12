@@ -15,7 +15,7 @@ and is it the code the spine was supposed to write?**
 
 | | Reviews | Asks |
 |---|---|---|
-| **architect-critic** | specs, plans, `SPINE.md` | is the *design* sound? |
+| **challenge (audit mode)** | specs, plans, `SPINE.md` | is the *design* sound? |
 | **impl-check** Layer 1/2 | AC commands, the report | did every AC *pass*? |
 | **impl-check** Layer 3 | the diff vs `03-code-patterns.md` | does it violate a **documented** pattern? |
 | **bone-touch judge** | changed paths vs the registry | did a flesh spine touch a **bone**? |
@@ -23,7 +23,7 @@ and is it the code the spine was supposed to write?**
 
 The gap is real and each neighbour leaves it open on purpose:
 
-- **architect-critic never sees code.** It audits `SPINE.md` before the work
+- **The audit never sees code.** It audits `SPINE.md` before the work
   exists, so it cannot know what was built.
 - **impl-check Layer 3 is bounded by what is written down.** If
   `03-code-patterns.md` is silent, Layer 3 is silent — correctly, because
@@ -61,27 +61,93 @@ contaminated by the other.
 ### Getting the diff
 
 ```bash
-canonical="$(oss repo_root canonical)"
-# $base_branch and $spine_branch are ALREADY RESOLVED by the ceremony — step 2
-# resolves base_branch from the handoffs' recorded value with SPINE.md's planned
-# base as the cross-check, halting on disagreement, and derives the spine branch
-# with `oss branch_name` (spine-close.md §3). Reuse them.
-git -C "$canonical" diff --stat "$base_branch...$spine_branch"   # scope first
-git -C "$canonical" diff "$base_branch...$spine_branch"          # the review surface
+# $spine_branch and $repo_base_branches (one "<repo>:<base_branch>" pair per
+# line, one line per hosting repo) are ALREADY RESOLVED by the ceremony —
+# spine-close.md §3 recovers both, once, before sending you here. Reuse them;
+# re-deriving either is a SECOND resolver for the same fact, which is exactly
+# what "one resolver, one halt, one source of truth" below is protecting.
+#
+# EVERY hosting repo, never canonical alone: the distinct target_repo values
+# across the spine's work items, the same set spine-close.md §3's merge loop
+# iterates. A cross-repo spine's diff spans every one of them, and reading
+# only one repo's diff reviews PART of the spine dressed up as the whole of
+# it — which is worse than skipping the review, because it reads as done.
+hosting_repos="$(oss get ".work_items[] | select(.spine==\"$spine_id\") | .target_repo" | sort -u)"
+[ -n "$hosting_repos" ] \
+  || { echo "code-review: no work items found for $spine_id - halt, cannot scope the diff"; exit 1; }
+while IFS= read -r repo; do
+  [ -n "$repo" ] || continue
+  repo_root="$(oss repo_root "$repo")" \
+    || { echo "code-review: $spine_id names undeclared repo '$repo' - halt"; exit 1; }
+  base_branch="$(printf '%s\n' "$repo_base_branches" | awk -F: -v r="$repo" '$1==r{print $2; exit}')"
+  [ -n "$base_branch" ] \
+    || { echo "code-review: no base_branch recorded for $spine_id in $repo - halt"; exit 1; }
+  echo "=== $repo ($base_branch...$spine_branch) ==="
+  git -C "$repo_root" diff --stat "$base_branch...$spine_branch"   # scope first
+  git -C "$repo_root" diff "$base_branch...$spine_branch"          # the review surface
+done < <(printf '%s\n' "$hosting_repos")
 ```
 
 **Do not re-parse `SPINE.md` here.** A private `grep -A5 … | sed` reads a fixed
 window and a fixed shape, so a spine-context block that runs past five lines,
 writes the field as a paragraph, or wraps it in Markdown emphasis yields an
-empty or markup-laden value. Both `git diff` calls then fail, and this review —
+empty or markup-laden value. The `git diff` calls then fail, and this review —
 which is advisory and does not halt — is **silently skipped** on a spine whose
-merge step resolves the same field perfectly well one step later. One resolver,
+merge step resolves the same fields perfectly well one step later. One resolver,
 one halt, one source of truth.
 
 **`base...spine_branch` (three dots), not `base..spine_branch`.** Three dots diffs
 against the merge base, so you see what the spine *added*; two dots also shows
 everything that landed on the base branch meanwhile, which is not this spine's
 work and not yours to review.
+
+### Reading Layer 4's advisories
+
+Layer 4's findings are additional input to the two axes below, not a third
+axis — but they carry the same rationalization risk §2's axis order exists to
+prevent, so read them in **two passes, not one**. Each spine work item's
+`<work-item-dir>/verify.md`, if one exists, is resolved the way
+`work-item-close.md` §1 Route B does (the spine dir, glob-recovered, then
+`work-<wi>/`); every item has already closed by the time you run, so Route B's
+reconstruction is always the one in scope here, never Route A's return
+payload. Absent is a clean signal, not a gap — not every close writes one
+(impl-check.md §4b: `pattern`, `absence`, and a declared `fidelity` finding,
+never a halt).
+
+**Before Axis A:** read only each file's `pattern`-tagged findings and fold
+them into your Axis A findings. Leave the rest of the file unread.
+
+**Before Axis B, once Axis A is written down:** go back to the same files and
+read the `absence` and declared-`fidelity` findings you skipped — spec
+material, exactly what §2 says not to hold in mind while judging Axis A. Fold
+each into your Axis B findings.
+
+Either pass: do not re-print Layer 4's text verbatim as if it were your own
+reading, and do not re-judge whether Layer 4 was right — that already happened
+at work-item close; this pass reads it as evidence, not as something to
+re-litigate.
+
+**Before folding either pass's findings in, revalidate against the final
+tree.** A `verify.md` finding is evidence about the work item's own staged
+diff, frozen at that item's own close time; by spine close every item has
+already merged, and a later item may have reshaped or already fixed the code
+a finding cites. Check only whether the finding's cited evidence still holds
+in the spine diff resolved above (`base...spine_branch`) — a mechanical
+citation check, not a second read of whether Layer 4 was right. If the cited
+evidence no longer holds in that form, mark the finding **superseded** and do
+not fold it into either axis as current.
+
+**This check is deliberately citation-level, on purpose, not an oversight.**
+A later item can also moot a finding's underlying claim through a different
+path than the one it cites — rerouting a call through a guard added
+elsewhere, for instance — leaving the citation intact while the claim no
+longer holds. Re-judging that is out of scope here: it is the same
+rationalization channel §2's axis order exists to prevent, reopened one
+layer down. A carried advisory that survives the citation check is a lead
+for your own Axis A/B judgment, never a verdict — you read the code either
+way, so the failure mode of under-checking here is wasted attention, not a
+wrong or missed halt. Widening this into a full re-judgment of the claim is
+refusal-by-design territory; do not soften it on a future review's say-so.
 
 ---
 

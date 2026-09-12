@@ -20,9 +20,11 @@ this directory is `docs/specs/release-N/`; under the ID grammar that renders as
 `docs/specs/rN/`. Do not invent a prettier name — a parity test enforces the
 derivation, and a hand-named directory breaks every downstream lookup.
 
-Route the path through the **pairing manifest** like every other ossify artifact:
-release specs are process artifacts and live in the AI workspace, not in the
-canonical repo.
+Route the path through `oss release_dir`, which resolves the **topology
+declaration** like every other ossify artifact — `.ossify/topology.json` first,
+a `.workspace/pairing.json` as the translated fallback, so a topology-only
+workspace needs no pairing manifest to emit a release spec. Release specs are
+process artifacts and live in the AI workspace, not in any declared repo.
 
 ```bash
 rel="$(oss get '.releases[-1].id')"          # e.g. r0
@@ -53,6 +55,16 @@ findings** that shaped selection, and the **next-release sketch**.
 
 Nothing else. No work items, no demo lines, no specs, no schedule, no estimates —
 those are `plan-spine`'s or they do not exist in this methodology at all.
+
+**Exit criteria are phrased against the settled landing tier (#339).** A
+spine's hosting repos merge to their base branches **by PR where a remote
+exists**; a repo with no remote lands by the local `--no-ff` merge instead —
+work-item merges stay local either way, and a release is a tag on each landed
+base branch, not a merge of its own. So an exit criterion that says "merged"
+means merged by whichever arm that repo's topology selects, and nothing in a
+release's phrasing implies a release-level branch or a release-level merge. A
+criterion that cannot be judged on a PR-landed spine is a planning defect to fix
+here, not a landing detail to work out at close.
 
 ---
 
@@ -152,5 +164,5 @@ journey, and its one spine is the skeleton spine (`bone`, by definition). The
   without it, the next planner re-derives it wrongly.
 - **Detailing the next release** beyond goal + candidates
   (`references/rolling-wave.md`).
-- **Emitting it to the canonical repo.** Process artifact; manifest-routed to the
+- **Emitting it to any declared repo.** Process artifact; manifest-routed to the
   AI workspace.

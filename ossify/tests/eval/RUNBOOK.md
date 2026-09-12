@@ -4,7 +4,7 @@ Executed by Claude Code in an interactive session. No API runner.
 
 ## Procedure (Claude executes)
 
-For each `surface` in `[posture-derivation, journey-line-floor, spine-class-declaration, bone-touch-check, critic-veto-interpretation, close-gate-integrity, harvest-apply-integrity, rule-authoring-integrity, boundary-audit-integrity, handoff-compose, handoff-resume, work-pr-disposition]`:
+For each `surface` in `[posture-derivation, spike-contract-integrity, risk-gate-registration, start-topology-authoring, adopt-multi-repo, adopt-completion-floor, journey-line-floor, spine-class-declaration, release-ladder-labels, bone-touch-check, critic-veto-interpretation, run-spine-declared-repo, close-gate-integrity, close-per-repo, harvest-apply-integrity, rule-authoring-integrity, doctor-declared-repos, doctor-provenance, boundary-audit-integrity, handoff-compose, handoff-resume, work-pr-disposition, external-executor]`:
 
   For each `fixture.md` in `tests/eval/fixtures/<surface>/`:
 

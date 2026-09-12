@@ -2,33 +2,54 @@
 # Per-work-item worktrees. rc 8 = git/worktree operation failure (see the plan's
 # rc-taxonomy note); rc 2 = usage / unknown repo key; rc 1 = not found.
 #
-# D4: every entry point takes a REPO KEY as its first argument, even though only
-# `canonical` resolves today. `target_repo` has been written into state since B4
-# with no reader; this is its first. Plan D adds `private_core` by extending
-# _oss_repo_root alone - retrofitting the parameter later would mean changing
-# every call site and every path-shape assertion in this file.
+# D4: every entry point takes a REPO KEY as its first argument. `target_repo`
+# has been written into state since B4 with no reader; this is its first.
+# #272/#310 generalized `_oss_repo_root` to resolve any repo the manifest
+# declares, not `canonical` alone - every call site and path-shape assertion
+# in this file already took the parameter, so that generalization needed no
+# signature change here.
 
 _oss_repo_root() { # $1=repo-key
-  local key="${1:-canonical}" root
-  case "$key" in
-    canonical|ai_workspace|private_core) ;;
-    *) echo "oss: unknown repo key '$key' (canonical|ai_workspace|private_core)" >&2; return 2 ;;
-  esac
-  root="$(oss_manifest_get ".${key}.root" 2>/dev/null)" || root=""
-  # An unconfigured key must NOT fall back to canonical: silently building a
-  # private_core worktree inside the public repo is precisely the leak the
-  # companion spec exists to prevent.
-  [ -n "$root" ] && [ "$root" != "null" ] \
-    || { echo "oss: repo '$key' is not configured in the pairing manifest" >&2; return 2; }
-  # `oss_manifest_get` is a RAW jq read, so a manifest storing a root as
+  local key root shape
+  if [ -z "${1:-}" ]; then key="$(_oss_default_repo_key)" || return $?; else key="$1"; fi
+  shape="$(_oss_shape_file)" || return 1
+  if [ "$key" = "ai_workspace" ]; then
+    root="$(printf '%s' "$shape" | jq -r '.workspace // empty')"
+  else
+    _oss_repo_key_valid "$key" || {
+      echo "oss: invalid repo key '$key' - names match [a-z][a-z0-9_-]* (ai_workspace is reserved)" >&2; return 2; }
+    root="$(printf '%s' "$shape" | jq -r --arg k "$key" '.repos[$k].root // empty')"
+    # An unconfigured key must NOT fall back to canonical: silently building a
+    # private_core worktree inside the public repo is precisely the leak the
+    # companion spec exists to prevent.
+    if [ -z "$root" ] || [ "$root" = "null" ]; then
+      echo "oss: repo '$key' is not declared (declared: $(printf '%s' "$shape" | jq -r '.repos | keys | join(", ")'))" >&2; return 2
+    fi
+  fi
+  # This is a RAW jq read off the shape, so a repo root stored as
   # `${HOME}/workspace` returns the token verbatim. Every consumer treats this
   # as an absolute path — `oss release_dir` composes on it, worktree paths are
   # built from it — so an unresolved token becomes a relative-looking path that
   # resolves against the caller's cwd and writes artifacts in the wrong place.
-  # Resolve here, once, and refuse anything still holding a `${...}` rather than
-  # handing a caller a path that only looks absolute.
-  local mroot; mroot="$(oss_manifest_discover)" || return 1
-  root="$(_oss_manifest_resolve "$(dirname "$(dirname "$mroot")")" "$root")" || return 1
+  # Resolve here, once, against the shape's own workspace root - $shape already
+  # carries it (topology-declared, or translated from a pairing manifest), so
+  # this does not re-discover a manifest of its own - and refuse anything still
+  # holding a `${...}` rather than handing a caller a path that only looks
+  # absolute.
+  #
+  # Unconditional as of Task 3 (#272/#310): the call used to be gated behind a
+  # `*'${'*)` case, because `_oss_manifest_resolve` required
+  # `.workspace/pairing.json` to exist even for a token-free string, which
+  # refused every topology-only lookup outright. Task 3 made the resolver
+  # source its vocabulary from the shape instead of re-discovering a pairing
+  # manifest, so a plain literal root - the common case - now passes through
+  # as a no-op (the substitution loop only replaces what actually appears in
+  # the string) rather than failing. MEASURED, not assumed: the full suite
+  # (`bash tests/run-all.sh`, 1418 assertions) was run once with the old gate
+  # in place and once with it removed - identical ALL GREEN both times - before
+  # this simplification was kept.
+  local ai_root; ai_root="$(printf '%s' "$shape" | jq -r '.workspace // empty')"
+  root="$(_oss_manifest_resolve "$ai_root" "$root")" || return 1
   # Mirrors `_oss_manifest_wellknown_guard` (#165) and shares its grammar test, so
   # the two refusals cannot drift the way their wording already did. Same reasoning:
   # the token is documented workspace-init vocabulary that ossify deliberately does
@@ -75,7 +96,7 @@ oss_worktree_add() { # $1=repo-key $2=work-item-id $3=slug $4=base-ref ; echoes 
 }
 
 # The worktree root lives INSIDE the repo, so without this every spawn leaves
-# `?? .worktrees/` in the canonical repo's status - a dirty tree ossify itself
+# `?? .worktrees/` in that repo's status - a dirty tree ossify itself
 # created, in the very repo whose cleanliness the close ceremony checks. The
 # leading dot already keeps most test runners out (pytest's default
 # `norecursedirs` includes `.*`; `go test ./...` skips dirs beginning with `.`
@@ -95,7 +116,7 @@ _oss_worktree_ignore() { # $1=repo-root ; best-effort, never fatal
   # `.git` FILE pointing elsewhere — its info/exclude lives at the common dir,
   # not at `$1/.git/info/exclude`. The old `[ -d "$1/.git" ] || return 0`
   # guard skipped those repos, leaving `.worktrees/` permanently un-excluded
-  # and the canonical tree dirty on every spawn. (Codex P2 finding #5.)
+  # and that repo's tree dirty on every spawn. (Codex P2 finding #5.)
   local cd
   cd="$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
     || { echo "oss: cannot resolve git common dir for $1 - .worktrees/ not excluded" >&2; return 1; }
@@ -140,7 +161,8 @@ oss_worktree_resolve() { # $1=repo-key $2=work-item-id
 # polarity, which close/SKILL.md §7 already lists as a trap for exactly this
 # reason.
 oss_worktree_orphans() { # $1=repo-key [$2=state-file] ; echoes one abs path per orphan
-  local key="${1:-canonical}" root sf dir path
+  local key root sf dir path default_key
+  if [ -z "${1:-}" ]; then key="$(_oss_default_repo_key)" || return $?; else key="$1"; fi
   root="$(_oss_repo_root "$key")" || return $?
   sf="$(_oss_resolve_state "${2:-}")" || return $?
   [ -f "$sf" ] || { echo "oss: state file not found at $sf" >&2; return 1; }
@@ -172,7 +194,7 @@ oss_worktree_orphans() { # $1=repo-key [$2=state-file] ; echoes one abs path per
   # there for why splitting them was the thing that kept going wrong.
   # A CONFIGURED ROOT THAT DOES NOT EXIST HAS NOT BEEN INSPECTED, and must not
   # reach the early return below. `_oss_repo_root` validates the manifest VALUE
-  # - enum, non-empty, token-free, absolute - but never that the directory is
+  # - non-empty, token-free, absolute - but never that the directory is
   # there, so an unmounted volume or a moved repo resolved cleanly, failed
   # `[ -d "$dir" ]`, and exited 0 with no output. That is indistinguishable from
   # "inspected, nothing orphaned", and it violates this function's own contract
@@ -264,9 +286,38 @@ oss_worktree_orphans() { # $1=repo-key [$2=state-file] ; echoes one abs path per
   # `canonical/.worktrees/r0.s1.w1` look claimed - which suppresses exactly the
   # wrong-repository directory the repo-key design exists to expose, and in the
   # worst case leaves private work sitting under the public canonical root.
-  # Items predating the field default to `canonical`, matching how
-  # `oss_cmd_work_item_add` defaults it. (Codex P2, PR #149 rounds 1-4.)
-  printf '%s\n' "${cands[@]}" | jq -R -s -r --arg k "$key" --slurpfile st "$sf" '
+  # Items predating the field default to the sole-repo default rule's answer,
+  # matching how `oss_cmd_work_item_add` defaults it (#272/#310 Task 4 - was a
+  # literal `canonical`).
+  #
+  # LAZY, deliberately: `default_key` is only needed when some record actually
+  # lacks `target_repo` - never, for anything written since #272/#310 Task 4,
+  # because `oss_entity_add_work_item` now always fills the field (explicit or
+  # resolved). Computing it UNCONDITIONALLY would make every orphan check
+  # refuse outright under N>1 declared repos, even one scoped to a perfectly
+  # valid EXPLICIT key with no legacy record in sight - the declared-membership
+  # check above already proved `$key` is real; ambiguity in the DEFAULT must
+  # not veto a call that never asked for the default. (Measured: this broke
+  # `private_core`-scoped orphan detection under the two-repo PRIV/QRT fixtures
+  # in test-worktree.sh when implemented as the brief's literal unconditional
+  # precompute - fixed here rather than left broken.)
+  local needs_default
+  needs_default="$(jq -r '([.work_items[]? | select(.target_repo == null)] | length) > 0' "$sf" 2>/dev/null)" || needs_default=true
+  if [ "$needs_default" = "true" ]; then
+    # The refusal itself is the spec's fail-safe rule (#272/#310 Task 4): a
+    # record predating `target_repo` is genuinely ambiguous under N>1 and
+    # guessing a repo for it is worse than stopping. What was wrong is the
+    # MESSAGE. `_oss_default_repo_key` says "no repo key given" - and here one
+    # WAS given; the ambiguity is in the legacy records, not in the call. A
+    # caller who reads that refusal re-runs with the key they already passed.
+    if ! default_key="$(_oss_default_repo_key 2>/dev/null)"; then
+      echo "oss: $(jq -r '[.work_items[]? | select(.target_repo == null)] | length' "$sf" 2>/dev/null) work item(s) in '$sf' carry no target_repo, and with [$(printf '%s' "$(_oss_shape_file 2>/dev/null)" | jq -r '.repos | keys | join(", ")' 2>/dev/null)] declared there is no safe repo to attribute them to - refusing rather than guessing. This is not about the repo key you passed. Set target_repo on those records (they predate the field) and re-run." >&2
+      return 2
+    fi
+  else
+    default_key=""
+  fi
+  printf '%s\n' "${cands[@]}" | jq -R -s -r --arg k "$key" --arg dk "$default_key" --slurpfile st "$sf" '
       ($st[0].work_items // []) as $all
       | (if ($all | type) != "array" then
            error(".work_items is not an array")
@@ -278,7 +329,7 @@ oss_worktree_orphans() { # $1=repo-key [$2=state-file] ; echoes one abs path per
                or (.worktree_path != null and (.worktree_path | type) != "string"))) then
            error(".work_items holds a record whose id, target_repo or worktree_path is not a string")
          else . end)
-      | ($all | map(select((.target_repo // "canonical") == $k))) as $mine
+      | ($all | map(select((.target_repo // $dk) == $k))) as $mine
       | split("\n") | map(select(length > 0))
       | map(select(
           . as $p

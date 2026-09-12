@@ -1,6 +1,6 @@
 {
   "name": "claude-security-audit",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Static-analysis security audit for agent project configs, marketplaces, hooks, MCP, and secrets.",
   "author": {
     "name": "Pras"

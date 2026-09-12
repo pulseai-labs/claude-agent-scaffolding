@@ -30,6 +30,12 @@ parses them, and every deviation below is a contract violation on its own:
 `complete-with-fail`, or `clarification-needed` (preamble). There is no third
 mode; the nuance you would invent one for belongs in `summary` and in the report.
 
+**A correction continuation returns this same complete shape.** The one flow
+that might look like it needs a third mode — a rejected item handed back for
+targeted repair (`references/correction-continuation.md`) — does not get one:
+the loop ran, the report was updated, the work was staged, so `mode` is
+`complete` and what changed is described in `summary` and in the report.
+
 ---
 
 ## 2. Complete-mode fields

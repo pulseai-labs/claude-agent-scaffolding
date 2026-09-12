@@ -5,14 +5,118 @@ set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MARKETPLACE="$ROOT/.agents/plugins/marketplace.json"
-V0_PLUGINS="ai-mentor architect-critic workspace-init scaffold-onboard scaffold-dev claude-security-audit"
+CLAUDE_MARKETPLACE="$ROOT/.claude-plugin/marketplace.json"
 DEFERRED_PLUGINS="scaffold"
+
+# THE INVENTORY IS THE FILESYSTEM, NOT A MARKETPLACE.
+#
+# Three rounds of findings landed on this derivation, and each fix moved the blind
+# spot instead of closing it, because every source tried was itself a marketplace
+# while the failure being caught is a marketplace omission. A hand list missed a
+# plugin added to both marketplaces. Deriving from Codex missed one deleted from
+# Codex. Comparing Claude against Codex missed one deleted from BOTH — the two
+# agreed, and the plugin left every loop below with its manifests still on disk.
+#
+# The inventory is now the set of top-level directories carrying
+# .claude-plugin/plugin.json. That file is the artifact a plugin cannot be
+# installed without, not an index of artifacts, so the inventory cannot be
+# shortened by editing a marketplace. Both marketplaces are CHECKED against it
+# rather than trusted as it.
+#
+# What this still cannot see: deleting a whole plugin directory. Then the
+# inventory, both marketplaces and both manifest sets agree on the smaller set and
+# every assertion passes — correctly, since nothing in the repo claims that plugin
+# exists any more. Catching that needs an expectation stored outside the tree,
+# which is the hand-maintained list this shape exists to remove. A directory
+# deletion is also a visible diff hunk, unlike the one-line marketplace edit above.
+inventory=""
+for _d in "$ROOT"/*/; do
+  _n="$(basename "$_d")"
+  [ -f "$_d.claude-plugin/plugin.json" ] || continue
+  inventory="$inventory $_n"
+done
+INVENTORY="$(printf '%s\n' $inventory | sort | tr '\n' ' ')"
+
+CLAUDE_PLUGINS="$(jq -r '[.plugins[].name] | sort | join(" ")' "$CLAUDE_MARKETPLACE" 2>/dev/null)"
+CODEX_PLUGINS="$(jq -r '[.plugins[].name] | sort | join(" ")' "$MARKETPLACE" 2>/dev/null)"
+
+# The expected Codex set is the inventory minus the declared exceptions.
+expected=""
+for _n in $INVENTORY; do
+  case " $DEFERRED_PLUGINS " in *" $_n "*) continue ;; esac
+  expected="$expected $_n"
+done
+EXPECTED_PLUGINS="$(printf '%s\n' $expected | sort | tr '\n' ' ')"
+V0_PLUGINS="$EXPECTED_PLUGINS"
+
+# Every top-level .codex-plugin manifest, so an extra one cannot hide either.
+codex_manifests=""
+for _d in "$ROOT"/*/; do
+  _n="$(basename "$_d")"
+  [ -f "$_d.codex-plugin/plugin.json" ] || continue
+  codex_manifests="$codex_manifests $_n"
+done
+CODEX_MANIFESTS="$(printf '%s\n' $codex_manifests | sort | tr '\n' ' ')"
+
+# set_diff <a> <b> — members of a absent from b. Bash 3.2: no arrays, no mapfile.
+set_diff() {
+  _out=""
+  for _x in $1; do
+    case " $2 " in *" $_x "*) ;; *) _out="$_out $_x" ;; esac
+  done
+  printf '%s' "$_out"
+}
 
 PASS=0
 FAIL=0
 
 pass() { PASS=$((PASS + 1)); printf '  ok  %s\n' "$1"; }
 fail() { FAIL=$((FAIL + 1)); printf '  not ok  %s\n' "$1"; }
+
+# An empty inventory would make every loop below iterate zero times and report
+# ALL GREEN having checked nothing. Fail closed before any of them run.
+if [[ -z "${INVENTORY// /}" ]]; then
+  fail "plugin inventory derived from */.claude-plugin/plugin.json is non-empty"
+  printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
+  exit 1
+fi
+pass "plugin inventory derived from the filesystem ($(printf '%s' "$INVENTORY" | wc -w | tr -d ' ') plugins)"
+
+# 1. Inventory vs the Claude marketplace, both directions. A plugin on disk and
+#    unpublished never ships; one published without a manifest cannot install.
+_m="$(set_diff "$INVENTORY" "$CLAUDE_PLUGINS")"
+_e="$(set_diff "$CLAUDE_PLUGINS" "$INVENTORY")"
+if [[ -z "$_m" ]]; then pass "every plugin on disk is in the Claude marketplace"
+else fail "every plugin on disk is in the Claude marketplace" "absent from Claude:$_m"; fi
+if [[ -z "$_e" ]]; then pass "the Claude marketplace publishes nothing that is not on disk"
+else fail "the Claude marketplace publishes nothing that is not on disk" "no manifest for:$_e"; fi
+
+# 2. Each declared exception must name a plugin that exists — a stale name would
+#    silently shrink the expectation. Existence ONLY: group 4 owns manifests.
+for deferred in $DEFERRED_PLUGINS; do
+  case " $INVENTORY " in
+    *" $deferred "*) pass "deferred exception '$deferred' names a plugin that exists" ;;
+    *)               fail "deferred exception '$deferred' names a plugin that exists" "not in the inventory — stale exception" ;;
+  esac
+done
+
+# 3. Expected set vs the Codex marketplace, both directions. Sole owner of Codex
+#    marketplace membership, deferred plugins included.
+_m="$(set_diff "$EXPECTED_PLUGINS" "$CODEX_PLUGINS")"
+_e="$(set_diff "$CODEX_PLUGINS" "$EXPECTED_PLUGINS")"
+if [[ -z "$_m" ]]; then pass "every expected plugin is published to the Codex marketplace"
+else fail "every expected plugin is published to the Codex marketplace" "absent from Codex:$_m"; fi
+if [[ -z "$_e" ]]; then pass "the Codex marketplace publishes nothing beyond the expected set"
+else fail "the Codex marketplace publishes nothing beyond the expected set" "unexpected in Codex:$_e"; fi
+
+# 4. Expected set vs the .codex-plugin manifests on disk, both directions. Sole
+#    owner of manifest presence and extras, deferred plugins included.
+_m="$(set_diff "$EXPECTED_PLUGINS" "$CODEX_MANIFESTS")"
+_e="$(set_diff "$CODEX_MANIFESTS" "$EXPECTED_PLUGINS")"
+if [[ -z "$_m" ]]; then pass "every expected plugin carries a .codex-plugin manifest"
+else fail "every expected plugin carries a .codex-plugin manifest" "no manifest for:$_m"; fi
+if [[ -z "$_e" ]]; then pass "no .codex-plugin manifest exists outside the expected set"
+else fail "no .codex-plugin manifest exists outside the expected set" "unexpected manifest:$_e"; fi
 
 json_get() {
   jq -r "$1" "$2" 2>/dev/null
@@ -53,13 +157,6 @@ if [[ -f "$MARKETPLACE" ]]; then
     assert_jq_plugin "$plugin" '.plugins[] | select(.name == $p) | .source.path == ("./" + $p)' "$MARKETPLACE" "$plugin source path points to top-level plugin directory"
   done
 
-  for plugin in $DEFERRED_PLUGINS; do
-    if jq -e --arg p "$plugin" '.plugins[] | select(.name == $p)' "$MARKETPLACE" >/dev/null 2>&1; then
-      fail "marketplace excludes deferred/deprecated plugin $plugin"
-    else
-      pass "marketplace excludes deferred/deprecated plugin $plugin"
-    fi
-  done
 fi
 
 for plugin in $V0_PLUGINS; do
@@ -91,14 +188,6 @@ for plugin in $V0_PLUGINS; do
   assert_jq 'has("hooks") | not' "$manifest" "$plugin manifest omits unsupported hooks field"
   assert_jq 'has("apps") | not' "$manifest" "$plugin manifest omits apps unless .app.json exists"
   assert_jq 'has("mcpServers") | not' "$manifest" "$plugin manifest omits mcpServers unless .mcp.json exists"
-done
-
-for plugin in $DEFERRED_PLUGINS; do
-  if [[ -f "$ROOT/$plugin/.codex-plugin/plugin.json" ]]; then
-    fail "$plugin has no Codex manifest in v0"
-  else
-    pass "$plugin has no Codex manifest in v0"
-  fi
 done
 
 # --- SKILL.md frontmatter must parse as valid YAML (issue #35) ---

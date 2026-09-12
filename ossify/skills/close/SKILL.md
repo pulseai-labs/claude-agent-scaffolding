@@ -38,7 +38,7 @@ recorded, and the recovery is the user's to pick.
 
 **Trigger phrases (description-match):**
 
-- `/close <id>` (slash command — see §8 for the `$ARGUMENTS` bridge)
+- `/close <id>` (slash command — see §9 for the `$ARGUMENTS` bridge)
 - "close work item r1.s2.w3", "close the spine", "close spine r1.s2", "close the
   release", "run the close ceremony", "run the impl-check gate"
 
@@ -88,14 +88,12 @@ passed and show the three shapes:
 **With no id at all, refuse and list what is open** — `oss spine_list`, or
 `oss get` with a status filter. Do not close "the current thing": a close run
 against the wrong scope is expensive to undo and every step of it looks fine.
-And if what arrived is a **canonical** change belonging to no open spine or
-work item — a typo fix, a doc touch-up — it is not a close at all: run §3's
-pre-flight (the lane reads the registries and mutates state too), then route
-it to the patch lane (`references/patch-lane.md`), never a forced ceremony.
-An AI-workspace edit needs no lane — no ceremony governs that repo. An
-out-of-spine change in any *other* product repo has no documented lane
-(`patch_add` records no repository key) — surface it rather than improvising
-one.
+And if what arrived is a change to **any declared repo** belonging to no open
+spine or work item — a typo fix, a doc touch-up — it is not a close at all:
+run §3's pre-flight (the lane reads the registries and mutates state too),
+then route it to the patch lane (`references/patch-lane.md`), which resolves
+and records which declared repo the patch targets, never a forced ceremony.
+An AI-workspace edit needs no lane — no ceremony governs that repo.
 
 Full routing rules — the id grammar, the no-argument refusal, the shapes that are
 deliberately not ids, and the routing anti-patterns — in
@@ -110,13 +108,16 @@ Runs before any scope's first step, every time.
 ```bash
 oss manifest_require || exit 0        # refuse: run /init-workspace or /pair-workspace first
 oss doctor                            # schema + replay must be green
-canonical="$(oss repo_root canonical)"
 ai_root="$(oss repo_root ai_workspace)"
 ```
 
-1. **Manifest.** `oss manifest_require` fails when there is no workspace-init
-   pairing manifest. Refuse naming the literal tokens **`/init-workspace`** and
-   **`/pair-workspace`** — do not paraphrase them.
+1. **Manifest.** `oss manifest_require` resolves `.ossify/topology.json` first
+   and a workspace-init `.workspace/pairing.json` as the translated fallback; it
+   fails only when neither is on the walk-up path. On failure print its refusal
+   verbatim — the literal tokens **`/ossify:start`**, **`/ossify:adopt`**,
+   **`/init-workspace`** and **`/pair-workspace`** are all load-bearing, and a
+   refusal naming only the workspace-init pair sends a topology-only project to
+   the wrong remedy. Do not paraphrase it.
 2. **`oss doctor` must be green on `schema` and `replay`.** A close *mutates*
    state; running one over a drifted state compounds the drift into the record
    that every later ceremony reads.
@@ -184,11 +185,11 @@ Six steps, in **binding order**:
    by one of two routes (the round flow's return payload, or a standalone
    reconstruction from the id). Neither is optional to know: `/close <id>` is
    supported with no round in scope.
-2. **Run the gate** (§4's three layers, below).
+2. **Run the gate** (§4's four layers, below).
 3. **Prove there is something to commit** — a green gate over an empty index
    means the work is not where the commit will look for it.
 4. **On green:** commit **in the worktree**, merge its branch into the spine
-   branch canonical is parked on — reading the branch from `work_items[].branch`,
+   branch that item's own target repo is parked on — reading the branch from `work_items[].branch`,
    never re-deriving it from a slug you do not have — halting on conflict
    (resolution discipline: `references/merge-conflict-resolution.md`), and set
    the work item `complete` **last**, after the merge is verified landed. Spine close reads
@@ -201,7 +202,7 @@ Full step detail — both path-resolution routes, the staging proof, the merge
 block with its merge-target check, and why cleanup is deliberately absent — in
 **`references/work-item-close.md`**.
 
-The gate itself — the three layers, their halt semantics, the literal error tags
+The gate itself — the four layers, their halt semantics, the literal error tags
 and the recovery menu — is in **`references/impl-check.md`**. Read it before
 running step 2; it is what "impl-check" means everywhere else in this plugin.
 
@@ -224,16 +225,22 @@ steps, in **binding order**:
 
 1. **Every work item `complete`**, else refuse and **name the offender**. Test
    the *output* of the `oss get` — a `select` matching nothing exits 0.
-2. **Switch canonical back to its `base_branch`, then merge the spine branch in**,
-   halting on conflict (at that halt, `references/merge-conflict-resolution.md`
-   is the resolution discipline — operator-sanctioned, never automatic). **Derive the spine branch with `oss branch_name` and
-   assert HEAD matches it — never read it off HEAD**; then assert the switch-back
-   actually moved HEAD, and check reachability after the merge. Each of those
-   guards catches a distinct failure that is otherwise rc 0 all the way to a
-   green close. **Read `references/code-review.md` before this merge** — the last
-   moment the spine's diff is reviewable as one thing, and the only reader that
-   judges craft and fidelity rather than whether the ACs passed. Advisory: it
-   yields findings and a per-finding decision, never a halt.
+2. **Land each hosting repo on its own `base_branch` — by PR where a remote
+   exists, locally where none does (#339)**. The PR arm pushes the spine branch,
+   opens the PR, and hands it to `/ossify:work-pr`; the record pass proves the
+   remote merge locally (identity, lineage, base-contained) before anything is
+   recorded. A remote `gh` cannot operate on halts — never a silent local
+   fall-through. The local arm keeps all four guards: **derive the spine branch
+   with `oss branch_name` and assert HEAD matches it — never read it off HEAD**;
+   assert the switch-back actually moved HEAD; check reachability after the
+   merge. Each catches a distinct failure that is otherwise rc 0 all the way to
+   a green close. Halting on conflict (at that halt,
+   `references/merge-conflict-resolution.md` is the resolution discipline —
+   operator-sanctioned, never automatic). **Read `references/code-review.md`
+   before the merge happens** — the last moment the spine's diff is reviewable
+   as one thing, and the only reader that judges craft and fidelity rather than
+   whether the ACs passed. Advisory: it yields findings and a per-finding
+   decision, never a halt.
 3. **`oss ledger_apply_pending <spine>`** — after the merge, before the demo.
 4. **The cumulative demo**: `oss demo_run` for every active `auto:` line, then
    walk **this spine's own** `user:` lines (`oss demo_user_lines <spine>`) with
@@ -244,16 +251,16 @@ steps, in **binding order**:
    (three arguments — the reason is required).
 6. **Risk-gate escalation**, distinguished from a bone hit by the printed prefix,
    and it escalates regardless of class.
-7. **architect-critic**, class-scoped: `--close` on bone, **absent on flesh**.
-   Guard `oss critic_detect` — it prints `absent` and returns rc 1.
+7. **The adversarial audit** (`challenge`, audit mode), class-scoped: close
+   depth on bone, a light host-only pass on flesh.
 8. **The retrospective**, against a fixed section contract.
 9. **Memory-bank harvest** — always before cleanup.
 10. **Worktree + branch cleanup**, per work item. Only now.
 11. **State updates**: `oss spine_status <spine> closed` and `oss demo_record`.
 
-Full step detail — the merge block with its four guards, the changed-path
-computation, the class-scoped critic bridge, and the bone/flesh column from spec
-§6.1 as a table — in **`references/spine-close.md`**.
+Full step detail — the two landing passes and their guards, the PR handoff
+contract, the changed-path computation, the class-scoped critic bridge, and the
+bone/flesh column from spec §6.1 as a table — in **`references/spine-close.md`**.
 
 The demo layer — the cumulative `auto:` half, the spine-scoped `user:` half, the
 halt discipline, quarantine as a parking ticket, and the ledger's wall-clock
@@ -294,7 +301,8 @@ enforceable at a release boundary). Eight steps, in **binding order**:
 6. **Feature-map re-groom + next-release sketch** — the rolling-wave crank, via
    `oss feature_list` and `oss release_set_meta`.
 7. **The boundary audit** (companion §6, re-derived under the skill-first
-   freeze) — **every repository object the pairing manifest carries, each
+   freeze) — **every repo the resolved topology declares (`.ossify/topology.json`
+   first, a translated `.workspace/pairing.json` as the fallback), each
    gated on its observed visibility with per-role arms**, fail-closed: the
    tracked rules of `PUBLIC_BOUNDARY.md`, the secrets scan, the scan-first
    untracked sweep, the semantic pass over tracked prose against the
@@ -313,21 +321,30 @@ enforceable at a release boundary). Eight steps, in **binding order**:
    verdict).
    The whole step is
    **`references/boundary-audit.md`**.
-8. **State updates**: `oss release_status <rel> closed` and
-   `oss demo_record release <rel> <passed> <line-count> "<notes>"` — never
-   after a halt in any step above.
+8. **The release tag, then the state writes** — tag **each hosting repo this
+   release landed in**, at that repo's recovered base branch, and push the tag
+   where a remote exists (a no-remote repo's tag is local, verified the same
+   way minus the remote leg): the PR tier lives at the spine boundary (#339),
+   so by the time every spine has closed the base branches already carry the
+   release; the tag is the only release-level landing there is, and it is
+   repo-scoped because a cross-repo release's code lives in every repo that
+   hosted one of its spines. Then the state writes — `oss release_status <rel>
+   closed` and `oss demo_record release <rel> <passed> <line-count>
+   "<notes>"` — never after a halt in any step above.
 
 **Both blocking gates are rc 0 = CLEAN / 1 = BLOCKING / 2 = could-not-check —
 the opposite polarity from `oss touch_check`, where rc 0 is a hit.** Copying the
 touch-check branch shape inverts the judge and passes exactly the releases the
 gates exist to block. rc 2 halts in both; it is never folded into clean.
 
-**Three of spec §6.2's steps are deliberately not shipped** and are named as
+**Two of spec §6.2's steps are deliberately not shipped** and are named as
 such rather than left to read as executed: the **docs increment** (§8's trigger
-table), **handoff cleanup** for the closed release (session handoffs are
+table), and **handoff cleanup** for the closed release (session handoffs are
 `/ossify:handoff`'s, a standalone utility with no retention policy by design —
-handoffs accumulate and the user prunes), and the **release tag / PR gate**
-(the spine→release / release→main tier question is unsettled).
+handoffs accumulate and the user prunes). The **release tag** ships: the PR tier
+is settled at the spine boundary (#339 — each spine lands its hosting repos by
+PR through `/ossify:work-pr`), so a release close tags the merged `main` rather
+than gating a merge of its own.
 
 Full step detail — the two-arm spine gate, the walkthrough's scoping and its
 derived feature grouping, both blocking gates' branch blocks, the retro's
@@ -359,8 +376,8 @@ exists; what that file adds is when to reach for it.
   status is written, nothing is recorded as closed.
 - **Auto-selecting from the recovery menu** (§4).
 - **Reading the spine branch off HEAD** instead of deriving it and asserting the
-  match, or merging without switching canonical back first (§5). Both failures
-  are rc 0 and green.
+  match, or merging without switching every hosting repo back first (§5). Both
+  failures are rc 0 and green.
 - **Folding `oss touch_check`'s rc 2 into "clean"**, or reading rc 0 as clean
   (§5).
 - **Copying `touch_check`'s branch shape onto `oss expired_fakes` or
@@ -377,8 +394,8 @@ exists; what that file adds is when to reach for it.
   demo lines carry a feature field to group on (§6).
 - **Routing a change through the patch lane without `oss touch_check`**, or
   using diff size as the criterion (§6).
-- **Carrying `--close` on a flesh spine's critic pass**, or dropping it on a
-  bone's (§5).
+- **Running the close audit at close depth on a flesh spine**, or at shallow
+  depth on a bone's (§5).
 - **Closing a scope whose children are not closed** — a spine with an unfinished
   work item, a release with an open spine (§5, §6).
 - **`cd`-ing mid-ceremony**, or exporting `OSS_STATE_FILE` to compensate (§3).
@@ -452,7 +469,7 @@ It carries, in this order:
 1. **What closed** — the id and scope, and whether every step ran or the ceremony
    halted partway.
 2. **Gate outcomes** — each blocking gate with its verdict, source-tagged the way
-   the step reported it (`[AC]`, `[report cross-check]`, `[rule]`).
+   the step reported it (`[AC]`, `[report cross-check]`, `[rule]`, `[fidelity]`).
 3. **Anything a step told you to record here.** Several steps route their output
    to the summary rather than to a file: `harvest.md` §2's missing-report gaps,
    §5's rule-authoring referrals, and §8's harvest outcomes. If a step says "record it in the

@@ -12,7 +12,7 @@ has both a unit suite and a live-loader integration test. `scaffold` is delibera
 from the Codex v0 set — check the deferred list before assuming a plugin ships everywhere.
 
 Shipped: `workspace-init`, `scaffold-onboard`, `scaffold-dev`, `scaffold`, `ai-mentor`,
-`architect-critic`, `claude-security-audit`. In development: `ossify`.
+`architect-critic`, `claude-security-audit`, `ossify`, `code-judo`, `orca-crew`.
 
 This repo is the **public canonical half** of a dual-repo project. Design specs, session
 handoffs, review records and process exhaust live in a private sibling workspace and must
@@ -188,9 +188,9 @@ discovers only `tests/unit/` and `tests/integration/`, so its evaluator never ru
 them against what its own runner actually executes.** Whatever the runner does not execute is
 a gate you walk by hand.
 
-**Do not expect a consistent filename.** Across the seven shipped plugins the gate document is
-variously a `RUNBOOK.md`, a `tests/README.md`, or a directory of markdown fixtures — and two
-plugins have none at all. That is why this says *look* rather than naming a file to open:
+**Do not expect a consistent filename.** Across the shipped plugins the gate document is
+variously a `RUNBOOK.md`, a `tests/README.md`, or a directory of markdown fixtures — and some
+have none at all. That is why this says *look* rather than naming a file to open:
 naming one is how the deleted command block started, and a pointer to a file that does not
 exist fails the same way a stale list does.
 

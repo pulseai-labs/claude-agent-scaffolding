@@ -1,0 +1,37 @@
+{
+  "name": "orca-crew",
+  "version": "0.4.0",
+  "description": "The orchestrator/worker session model over Orca orchestration: roles by alias and complexity class, the thirteen-step run with a verify step per work item, a session budget of one implementer and one verifier per work item, brief templates, one review per PR. Since 0.3.0 a spine planned in that session runs in three layers with an operator-ratified per-item implementer/verifier sidecar, one spine session owning a child Run and both item terminals, nested depth 2 with no fallback, and no inherited-runtime subagent. Since 0.4.0 the spine-session seat is a ratified sidecar block, the first verifier failure blocks and asks, the close and every PR loop run in fresh sessions the top dispatches, and the record pass is single and conditional.",
+  "author": {
+    "name": "Pras"
+  },
+  "repository": "https://github.com/pulseai-labs/claude-agent-scaffolding",
+  "license": "MIT",
+  "keywords": [
+    "orchestration",
+    "orca",
+    "multi-agent",
+    "code-review",
+    "skills"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Orca Crew",
+    "shortDescription": "Orchestrator/worker session model over Orca.",
+    "longDescription": "Orca Crew states who does what when one orchestrator session drives GLM worker sessions through Orca orchestration: which alias fills each role, what a brief must carry, where the orchestrator stops and dispatches instead, one code review per PR with findings returned through worker_done, GitHub threads worked to zero, and a merge only on the operator's explicit word. It defers every other Orca command to the Orca binary's own version-matched guide.",
+    "developerName": "Pras",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Start an orchestrator run for this objective.",
+      "Spawn a claude-glm worker for this task.",
+      "Review PR 123 in a flash session."
+    ],
+    "websiteURL": "https://github.com/pulseai-labs/claude-agent-scaffolding/tree/main/orca-crew",
+    "brandColor": "#1D4ED8"
+  }
+}

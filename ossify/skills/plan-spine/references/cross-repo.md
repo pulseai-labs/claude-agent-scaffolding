@@ -3,24 +3,27 @@
 Depth for SKILL.md §4/§5. A spine may span repos; **each work item targets exactly
 one repo.**
 
-**Not executable in this release.** Only `target_repo: canonical` runs —
-`work-item/references/round-orchestration.md` §3 halts any other value by name
-("only canonical executes in this release"). Plan cross-repo spines against
-this file for when the field ships; do not dispatch one today.
+**Executable since #272/#310 Task 9.** Any declared repo runs — the execution
+lane (`work-item/references/round-orchestration.md` §3) halts an undeclared
+name or `ai_workspace` by name, never a declared repo. What is still unshipped
+is narrower than the whole field, and named where it applies below: the
+dependency-override discipline (§3) and release close's one-PR-per-touched-repo
+gate (§4) do not exist yet.
 
 ---
 
 ## 1. The field
 
 ```bash
-oss work_item_add "$spine" "<title>" [target_repo]     # defaults to "canonical"
+oss work_item_add "$spine" "<title>" [target_repo]     # defaults to the sole declared repo
 ```
 
-`target_repo` is stored on the work item and defaults to `canonical`. A project
-with a private side passes that repo's key (e.g. `private_core`) for items that
-land there. The spine itself also carries a `target_repo` (set at `plan-release`);
-the item's value is what the execution engine reads, because the item is what gets
-a worktree.
+`target_repo` is stored on the work item and defaults to the sole declared
+repo, refusing outright — naming the declared set — once more than one is
+declared (#272/#310 Task 4). A project with more than one repo passes the
+target's key (e.g. `private_core`) for items that land there. The spine itself
+also carries a `target_repo` (set at `plan-release`); the item's value is what
+the execution engine reads, because the item is what gets a worktree.
 
 Read them back:
 
@@ -61,9 +64,9 @@ published, not tagged, not on a registry. So the private side cannot resolve it
 through its normal dependency declaration.
 
 The resolution (companion spec §4.2): the private worktree gets a
-**worktree-scoped local dependency override** pointing at the canonical repo's
-current spine state — Cargo `[patch]` / path override, pip editable or path
-install, npm `file:` / `overrides`, as the stack requires.
+**worktree-scoped local dependency override** pointing at the contract-owning
+repo's current spine state — Cargo `[patch]` / path override, pip editable or
+path install, npm `file:` / `overrides`, as the stack requires.
 
 Two properties of that override matter at **planning** time, because they change
 what the plan must contain:

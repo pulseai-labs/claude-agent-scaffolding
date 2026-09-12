@@ -161,7 +161,15 @@ oss_ledger_expired_quarantines() { # $1=state $2=release ; rc 0 clean, 1 blockin
   return 1
 }
 
-oss_ledger_add_patch() { # $1=state $2=commit $3=one-liner
+oss_ledger_add_patch() { # $1=state $2=commit $3=one-liner $4=repo-key
+  local repo
+  # #272/#310 Task 5: same if-form default resolution as the nine Task 4
+  # sites - command substitution inside a default expansion (`${4:-$(...)}`)
+  # would swallow _oss_default_repo_key's rc 2 refusal and its stderr, so the
+  # caller never learns why. No state schema bump: `add_patch_record`
+  # (state.sh) is untouched, and replaying an old journal produces patch
+  # records with no `repo` key at all - readers treat that as `canonical`.
+  if [ -z "${4:-}" ]; then repo="$(_oss_default_repo_key)" || return $?; else repo="$4"; fi
   oss_state_mutate "$1" add_patch_record \
-    "$(jq -n --arg c "$2" --arg t "$3" --arg ts "$(_oss_now)" '{commit:$c,text:$t,at:$ts}')"
+    "$(jq -n --arg c "$2" --arg t "$3" --arg repo "$repo" --arg ts "$(_oss_now)" '{commit:$c,text:$t,repo:$repo,at:$ts}')"
 }

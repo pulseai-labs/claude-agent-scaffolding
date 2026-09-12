@@ -1,0 +1,37 @@
+{
+  "name": "code-judo",
+  "version": "0.1.0",
+  "description": "Strict quality review and architecture deepening: deep-review, deepen-architecture, codebase-design, and domain-modeling skills.",
+  "author": {
+    "name": "Pras"
+  },
+  "repository": "https://github.com/pulseai-labs/claude-agent-scaffolding",
+  "license": "MIT",
+  "keywords": [
+    "code-review",
+    "architecture",
+    "refactoring",
+    "maintainability",
+    "skills"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Code Judo",
+    "shortDescription": "Strict quality review and architecture deepening.",
+    "longDescription": "Code Judo reviews a diff for maintainability with an unusually strict bar, and scans a codebase for shallow modules worth deepening. It is ambitious about structure: it hunts for restructurings that delete complexity rather than rearrange it. Ships the deep-module design vocabulary and a domain-modeling discipline the other two skills speak.",
+    "developerName": "Pras",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Deep review this branch for structure, not bugs.",
+      "Where is this codebase shallow?",
+      "Is this abstraction earning its keep?"
+    ],
+    "websiteURL": "https://github.com/pulseai-labs/claude-agent-scaffolding/tree/main/code-judo",
+    "brandColor": "#0F766E"
+  }
+}

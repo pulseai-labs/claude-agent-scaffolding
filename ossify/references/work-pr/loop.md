@@ -52,15 +52,58 @@ line ending in exactly one of `fixed in <sha>` / `deferred → #N` /
 `invalid — <why>`. The ledger is the loop's working memory and its terminus
 report; a finding missing from it was never dispositioned.
 
+## 2.5 Read the findings as a set before each edit pass
+
+§2 hands you a list; editing straight down it is this loop's main failure mode.
+Independent fixes to overlapping prose re-anchor the sentences the next finding
+cites, and round N+1 arrives built out of round N's own fixes.
+
+So before each edit pass — the first one, and again after every re-review —
+collapse the ledger into **classes**. A class is one
+defect however many findings name it: the same mistake at several sites, two
+reviewers on one site, or several symptoms of one wrong condition. Fix a class
+in one commit, or record why it splits.
+
+Three obligations follow. Each is a requirement, not a procedure — how you
+satisfy it is yours:
+
+- **You close the class, not the finding.** A finding names one site; the class
+  is every site reachable at that boundary. The reviewers saw a sample, so
+  enumerate the rest yourself and close them together. What you name and leave
+  must be non-blocking: a member of a blocking class — correctness, security,
+  data loss, a broken contract — is fixed or the change is cut (§3), never
+  left. A fix that closes only the cited site guarantees the class returns.
+- **Grep the condition's old form first.** When a fix changes a rule, the
+  defects that remain are phrased in what you replaced, not in what you wrote.
+  The old form is the search term, and the fix is often deleting a stale clause
+  rather than adding a new one.
+- **Order by collision, not by severity.** Two fixes that rewrite the same
+  prose are one edit. Where they genuinely are not, apply the one that moves
+  the anchor first, then re-read the other finding against the new text before
+  touching it — its quoted line may no longer exist.
+
+A fourth obligation applies to what you just wrote. **Sweep the fix diff before
+you push it**, against the same class you set out to close. Most of round N's
+findings are on round N-1's fixes, so the cheapest round to remove is the one
+you are about to cause.
+
+Then ask one question of the whole set, which no single finding can answer:
+**is the PR's headline claim still true?** A round of fixes can leave the
+description, a changelog entry, a commit message, any doc line, or any
+release-metadata field the diff touched promising work the diff no longer
+does.
+
+The ledger stays one line per finding. Classes are how you **fix**; the ledger
+is how you **report**.
+
 ## 3. The disposition contract
 
-This section is authoritative for this lane. (scaffold-dev's gate keeps its
-own copy of the same rules; what another stack does with them is that stack's
-contract.)
+This section is authoritative for this lane.
 
 - **P1 / blocking** — correctness, security, data loss, a broken public
-  contract: **must be fixed before merge.** Never ack-to-merge, never
-  deferrable, no matter which review round surfaced it or who asks.
+  contract: **must be fixed before merge, or refuted with evidence like any
+  other false finding.** Never ack-to-merge, never deferrable, no matter
+  which review round surfaced it or who asks.
 - **Non-blocking** — fix it or defer it. A deferral is a **tracked issue in
   the target repo** recorded as `deferred → #N`; a silent pass is not a
   disposition. File it with `gh issue create` and enough body that a stranger
@@ -79,8 +122,54 @@ contract.)
   current head. Do not busy-wait a queued reviewer: say it is pending and let
   the operator decide.
 
-Loop §2→§3 until every finding is dispositioned, every P1 is fixed, and the
-reviewer signal is complete on the current head.
+Loop §2→§2.5→§3 until every finding is dispositioned, every P1 is fixed or
+evidence-refuted, never deferred, and the reviewer signal is complete on the
+current head.
+
+**The second exit — stop looping and change the change.** The line above is the
+normal terminus. This one is categorical, not a round count:
+
+- **Rounds stop shrinking *and* the fixes are generating the findings.** When a
+  round is mostly fallout from the previous round's own fixes, more rounds will
+  not converge; the shape of the change is wrong. Cut it or narrow it, and say
+  so — do not restructure twice.
+- **A claim the change cannot honour ends the loop by being unclaimed.**
+  Designing under review pressure at round N produces round N+1; a documented
+  refusal is complete, an unhonoured promise is not. Unclaiming is two edits,
+  not one: the findings behind the claim keep their ledger lines — the
+  unclaiming commit is the fix — and the claim itself comes out of every
+  artifact that promises it: the PR description, the changelog, and any
+  README, doc, or release-metadata line the diff wrote it into. A claim
+  baked into a commit message comes out only by rewriting history; a rewrite
+  re-mints every descendant sha, so remap each `fixed in <sha>` line onto the
+  rewritten head before the terminus, or the ledger cites commits no head
+  contains. A rewrite pushes non-fast-forward, so lease it —
+  `git push --force-with-lease=<branch>:<current-remote-oid>`, captured
+  immediately before the rewrite rather than at the original preflight,
+  which rounds of fix pushes have already moved — and a refused lease
+  re-enters §1: someone advanced the branch, and a bare force would discard
+  their commits. A refusal still promised is the same unhonoured promise.
+- **A plateau of *original-design* findings is not a cut signal.** When rounds
+  stop shrinking but the findings have shifted off your fixes and onto the
+  design the PR always had, the reviewers are excavating, not reacting. That
+  loop ends by dispositioning — fix or refute the P1s, and give the rest their
+  per-finding disposition, fixing, refuting, or deferring each on its own
+  merits, never a bulk deferral because the count plateaued — not by waiting
+  for a clean round that will not come.
+  Measured on PR #349: findings ran 17 → 4 → 6 → 5 → 7 across five rounds, and
+  the categorical exit closed it, not convergence.
+
+Sort by failure direction before acting on either: a finding that the boundary
+**refuses a valid input** is a fix — the boundary is breaking its own contract;
+a finding that it **correctly refuses an unsupported input** is invalid or
+deferred; a finding that it **admits what it cannot handle** is a fix.
+Incoherence this diff introduced is always this diff's to fix.
+
+Neither exit touches the P1 rail. A P1 is fixed, evidence-refuted, or the
+change is cut. It is never merged. And neither exit bypasses staleness: cutting, narrowing, or
+unclaiming lands commits like any other fix — prior verdicts go stale, the
+loop re-runs on the new head, and the reviewer signal must be complete on the
+head that carries the final shape before the terminus ask.
 
 ## 4. Terminus — surface everything, then ask
 
@@ -116,6 +205,12 @@ report the PR URL and stop — the loop does not poll.
 
 - **Growing the loop into tooling.** No wrapper scripts, no state files — the
   ledger lives in the conversation and the terminus report.
+- **Editing straight down the ledger.** N findings are not N fixes. Classify
+  before each edit pass (§2.5).
+- **Closing only the site the reviewer cited**, when the same defect sits at
+  three more the reviewer never reached.
+- **Counting rounds instead of reading them.** Round six is not a signal;
+  round six built out of round five's fixes is.
 - **Ack-to-merging a P1**, or letting a "just merge it" instruction reclassify
   a correctness finding as style.
 - **Silent-passing a non-blocking finding** — untracked is undispositioned.

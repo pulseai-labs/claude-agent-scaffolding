@@ -177,7 +177,8 @@ mandatory citation re-verification.
 enumerating every private asset is self-defeating — that was the v1 draft's
 defect. Rules, patterns, and prose only.
 
-**Routing:** one file per public-facing repo root — the canonical always,
+**Routing:** one file per public-facing repo root — every declared product
+repo (`canonical` when a project names one that; any other, however named),
 and any product-adjacent repo the pairing carries (`tooling_repo`) at its own
 root when the project volunteers one; never the AI workspace or a
 `private_core`, which hold the moat by design. Even a fully-private project
@@ -327,16 +328,26 @@ intent here, written by workspace-init later.
 
 ## 10. Composition root
 
-`start` normally leaves `project.composition_root` unset — multi-repo
-composition is Plan D's ceremony. Set it here **only** when Release 0 is
-trivially single-repo and the root is therefore canonical and unambiguous:
+**With more than one declared repo, this is REQUIRED and it must be absolute.**
+The rule used to read the other way round — set it only when Release 0 is
+"trivially single-repo" — which is exactly backwards: one declared repo is the
+case the demo runner already defaults correctly, and N>1 is the case where it
+cannot. The cumulative demo is a mandatory gate at spine and release close and
+it is invoked as a bare `oss demo_run`, so a multi-repo project onboarded under
+the old rule could not close at all.
 
 ```bash
-oss composition_set "<repo-relative composition root>"
+oss composition_set "/abs/path/to/composition/root"   # N>1: required, absolute
+oss composition_set "<repo-relative composition root>" # exactly one repo: optional
 ```
 
-When in doubt, leave it unset. A wrong composition root silently misdirects the
-demo runner at release close.
+Absolute under N>1 because a relative value composes against the sole declared
+repo's root, and there is no sole repo. With exactly one declared repo the field
+stays optional and a repo-relative value is correct; unset means the repo root.
+
+A wrong composition root silently misdirects the demo runner at release close,
+so it is worth asking rather than guessing — but under N>1 leaving it unset is
+not the safe choice, it is the one that blocks the close.
 
 ---
 

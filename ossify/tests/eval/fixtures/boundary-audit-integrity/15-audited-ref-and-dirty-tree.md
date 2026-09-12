@@ -33,7 +33,8 @@ Read from the checkout as it stands, everything else looks ordinary:
 `PUBLIC_BOUNDARY.md` is a regular tracked file whose block parses,
 `git ls-files` matches no `never-tracked:` pattern, `gitleaks` runs to
 completion over the repository and reports nothing, `git ls-files --others`
-returns only `node_modules/`, and every tracked fixture is synthetic.
+completes untruncated and returns only `node_modules/`, and every tracked
+fixture is synthetic.
 
 The AI workspace is a git repo with one github.com remote reading
 `{"visibility": "PRIVATE"}`, manifest agreeing; its checkout is clean at its
@@ -63,5 +64,13 @@ and `git ls-files -v` marks no tracked path in any of them with
 
 Inventory, manifest and allowlist state, stated so nothing above infers it:
 the private boundary inventory carries no **Accepted disclosures** section; no
-manifest object records a `git_remote` beyond the remotes enumerated above;
+manifest object records a `git_remote` beyond the remotes this scenario enumerates;
 the working-tree hygiene allowlist is empty.
+
+Repo-set, remote and scan-scope state, stated so nothing above infers it:
+the pairing manifest names the canonical and the AI workspace, and carries
+no other repository object; `git remote -v` in the canonical lists exactly
+one remote, `origin`, on github.com; the `--no-git` read over the working
+tree spans every path in it — tracked, untracked and gitignored,
+`node_modules/` included — and no file under `node_modules/` carries a
+credential, a key or a token.

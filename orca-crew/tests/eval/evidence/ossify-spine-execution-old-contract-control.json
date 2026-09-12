@@ -1,0 +1,84 @@
+{
+  "control": "old-contract detection control",
+  "surface": "ossify-spine-execution",
+  "fixtures": [
+    "04-pair-reuse-within-one-item-only",
+    "05-reviewer-chosen-later",
+    "09-remote-less-first-close-no-record-pass",
+    "10-sidecar-edited-between-rounds-halts"
+  ],
+  "why_these_fixtures": "The four the 0.4.0 amendments touch: 04 carries D25's blocking first-failure ask, 05 carries D26's work-PR seat ownership, 09 carries D27's conditional record pass, 10 carries D24's ratified spine-session block under D28's per-launch revalidation. 01, 02, 03, 06, 07 and 08 are 0.3.0 fixtures whose contract did not change, so they are not controls for this amendment.",
+  "pre_change_sha": "502282c",
+  "pre_change_prose": [
+    "orca-crew/skills/orchestrate/SKILL.md",
+    "orca-crew/skills/orchestrate/references/ossify-execution.md",
+    "orca-crew/skills/orchestrate/references/ossify-briefs.md",
+    "orca-crew/skills/orchestrate/references/roles.md",
+    "orca-crew/skills/orchestrate/references/lifecycle.md"
+  ],
+  "note_on_prose_set": "references/ossify-nested-run.md and references/ossify-pr-briefs.md do not exist at 502282c; ossify-nested-run.md is commit 1's split and ossify-pr-briefs.md is new in commit 2.",
+  "must_fail": true,
+  "observed_pass": false,
+  "results": {
+    "04-pair-reuse-within-one-item-only": {
+      "scores": {
+        "activation_and_layers": 4,
+        "run_routing": 4,
+        "profile_binding": 5,
+        "pair_lifecycle": 2,
+        "no_fallback_and_reviewer_timing": 4
+      },
+      "pass": false,
+      "notes": "handles the first verifier failure on its own authority instead of raising one blocking ask up the parent Run with the three options and idling the pair, and on the second failure reports open-endedly rather than asking again with the same three options."
+    },
+    "05-reviewer-chosen-later": {
+      "scores": {
+        "activation_and_layers": 2,
+        "run_routing": 3,
+        "profile_binding": 2,
+        "pair_lifecycle": 4,
+        "no_fallback_and_reviewer_timing": 3
+      },
+      "pass": false,
+      "notes": "dispatches close to the spine driver's own terminal rather than a fresh one and never creates a work-PR session; writes 'no spine-session row' and defers the spine seat to lane-driver policy; records the four reviewer facts in a reviewer task's brief instead of the work-PR session's."
+    },
+    "09-remote-less-first-close-no-record-pass": {
+      "scores": {
+        "activation_and_layers": 3,
+        "run_routing": 4,
+        "profile_binding": 4,
+        "pair_lifecycle": 4,
+        "no_fallback_and_reviewer_timing": 4
+      },
+      "pass": false,
+      "notes": "the record-pass refusal is right, but the output treats the sanctioned `closed` return as a contract-incomplete report and invents a bounded correction round to recover from it, then conditions teardown on that invented correction."
+    },
+    "10-sidecar-edited-between-rounds-halts": {
+      "scores": {
+        "activation_and_layers": 4,
+        "run_routing": 4,
+        "profile_binding": 2,
+        "pair_lifecycle": 4,
+        "no_fallback_and_reviewer_timing": 4
+      },
+      "pass": false,
+      "notes": "reaches its halt on a tampering rationale while explicitly asserting the missing `## Spine session` block is not part of the sidecar schema, never governed anything, and is supplied by ordinary lane-driver policy - the exact 'absence is a default rather than a halt' wrong answer the fixture falsifies."
+    }
+  },
+  "verdict": "DETECTS - all four controls failed as required.",
+  "retired_fixture": {
+    "id": "10-sidecar-edited-between-rounds-halts, first version",
+    "drift_tested": "SPINE.md gained an item between rounds, so the recomputed plan digest no longer matched spine_plan_oid.",
+    "control_result": {
+      "scores": {
+        "activation_and_layers": 4,
+        "run_routing": 4,
+        "profile_binding": 5,
+        "pair_lifecycle": 4,
+        "no_fallback_and_reviewer_timing": 4
+      },
+      "pass": true
+    },
+    "why_retired": "The control PASSED. Measured cause: the rule it tested already existed at 502282c - ossify-execution.md's 'Reading it' paragraph opened 'Before dispatching the spine session, and again before every item launch', wrapped across lines 80-81, so a contiguous grep for the phrase returns zero and it reads as new. D28's actual new content is that the spine BRIEF repeats the rule (`git show 502282c:...ossify-briefs.md | grep 'immediately before each item terminal'` returns nothing), but the invoke agent reads the reference. Rewritten to pin the drift to the deleted `## Spine session` block, which has zero occurrences in the 502282c file and therefore cannot be answered from the old prose."
+  }
+}

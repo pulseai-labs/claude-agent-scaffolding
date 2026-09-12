@@ -1,5 +1,12 @@
 # claude-security-audit changelog
 
+## 0.1.4 (2026-09-04)
+
+### Fixed
+- **Public dispatcher delivery.** Both manifests now publish the dispatcher environment setup required for `csa rule_engine_scan_all` to discover rules without ambient `CSA_*` variables.
+- **Hook handler safety rails.** The scanner covers executable extensionless handlers under `.claude/hooks/`, including plaintext-secret detection, while non-executable hook documents are skipped safely.
+- **Pipefail false negatives.** Hook network-exfiltration, MCP literal-secret matching, and paranoid-plugin membership avoid producer-to-`grep -q` pipelines.
+
 ## 0.1.3 (2026-06-21)
 
 CI hardening (#71) — keep the wall-clock perf benchmark out of blocking PR CI.

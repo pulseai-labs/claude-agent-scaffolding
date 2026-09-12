@@ -15,7 +15,8 @@ fetched, and the remote's only refs are `main` and the release tags.
 `PUBLIC_BOUNDARY.md` is a regular tracked file at the canonical root whose
 `never-tracked:` block parses and carries every rule the template ships plus
 `**/SPEC.md, docs/planning/**`. `git ls-files` matches no rule.
-`git ls-files --others` (ignored files included) returns only `node_modules/`.
+`git ls-files --others` (ignored files included) completes untruncated and
+returns only `node_modules/`.
 Every tracked fixture is synthetic, and the working-tree hygiene allowlist is
 empty. The canonical's checkout carries no staged or unstaged tracked
 changes, and no tracked path of its carries an `assume-unchanged` or
@@ -65,4 +66,9 @@ is in the history, and does not accept any exposure.
 
 Inventory, manifest and allowlist state, stated so nothing above infers it:
 the private boundary inventory carries no **Accepted disclosures** section; no
-manifest object records a `git_remote` beyond the remotes enumerated above.
+manifest object records a `git_remote` beyond the remotes this scenario enumerates.
+
+Remote and clone state, stated so nothing above infers it: `git remote -v`
+in the canonical lists exactly one remote, `origin`, on github.com; the AI
+workspace is a full clone too — `git rev-parse --is-shallow-repository`
+prints `false` in it and every remote branch of its is fetched.

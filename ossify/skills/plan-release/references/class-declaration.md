@@ -6,7 +6,7 @@ axis, no weight axis, no "small bone" — a spine's class answers one question:
 
 | Class | Definition | Ceremony |
 |---|---|---|
-| **bone** | Creates or modifies a bone — the skeleton itself, a new boundary, a new cross-cutting contract, a data-ownership change, a stack decision | Full: grill gates at planning, full architect-critic audit with the external adversary at close, full retro, ADR required |
+| **bone** | Creates or modifies a bone — the skeleton itself, a new boundary, a new cross-cutting contract, a data-ownership change, a stack decision | Full: grill gates at planning, full close-depth audit with the external adversary when one is configured, full retro, ADR required |
 | **flesh** | Lands entirely on existing bones — features, deepening passes, polish | Core rows only, plus a light host-only critic pass that includes a mandatory bone-touch check |
 | **internal-enabler** | Not a user-facing spine at all: no actor-to-outcome journey. Rare, and admission-gated | See §4 — it is a *verdict*, and admission is a separate judgment |
 
@@ -18,7 +18,13 @@ rows *above* the core, not whether the core runs.
 
 ## 1. The ladder (run in this order)
 
-Order matters: an earlier rung's verdict is not revisited by a later one.
+Order matters, and it decides two separate things. **An earlier rung's verdict
+is never overridden by a later one** — once a rung sets the class, no later rung
+changes it. **Every rung still runs anyway**, because the later rungs carry
+obligations of their own that an earlier verdict does not discharge — rung 3 is
+the only source of the new-bone obligation, and skipping it is how the registry
+rots. The one exception is rung 1: an `internal-enabler` verdict stops the
+ladder outright, and its own text says so.
 
 ### Rung 1 — the journey gate
 

@@ -2,23 +2,52 @@
 # Cumulative auto-demo runner (spec §6.1 core row). Halt-on-first-fail.
 
 # §6.1 + companion §4.3: the demo runs against the real product build — the
-# composition root when one is declared, canonical otherwise. Resolved ONCE,
-# BEFORE any cd, because oss_manifest_discover walks up from $PWD and every
-# manifest/state read after a cd would otherwise resolve somewhere else.
-# Precedence is EXPLICIT > composition_root > canonical root — the same
-# explicit-beats-derived shape as _oss_resolve_state. The explicit leg is not a
-# convenience: without it this function would require a pairing manifest, and
-# every existing demo test (test-demo-runner.sh, test-integration.sh) runs
-# against a bare temp state with no manifest on the walk-up path. A
-# manifest-only resolver would break them all, and "fall back to $PWD when there
-# is no manifest" would silently reinstate the very bug this task fixes.
+# composition root when one is declared, the sole declared repo's root
+# otherwise (#272/#310 Task 4: routed through the sole-repo default rule, not
+# a literal `canonical` - N>1 declared repos refuses rather than guessing).
+# Resolved ONCE, BEFORE any cd, because oss_manifest_discover walks up from
+# $PWD and every manifest/state read after a cd would otherwise resolve
+# somewhere else.
+#
+# Precedence is EXPLICIT > composition_root > sole-declared-repo root, refusing
+# under N>1 unless one of the first two already answered - the same
+# explicit-beats-derived shape as _oss_resolve_state. An ABSOLUTE
+# composition_root short-circuits BEFORE the default-repo key is ever
+# consulted: it names a complete path and needs no repo root at all, so it
+# answers even under N>1 declared repos. A RELATIVE composition_root still
+# joins onto the DEFAULT repo's root (recorded deviation 2), so it still needs
+# the lookup and still refuses under N>1 - only an absolute value or an
+# explicit workdir bypasses that tier (spec section 3).
+#
+# The explicit leg is not a convenience: without it, every caller that omits a
+# workdir would need a discoverable manifest even when it already knows
+# exactly where to run, and "fall back to $PWD when there is no manifest"
+# would silently reinstate the very bug this task fixes.
 oss_demo_workdir() { # $1=state-file [$2=explicit-workdir]
-  local sf="$1" explicit="${2:-}" root comp
+  local sf="$1" explicit="${2:-}" root comp dk shape
   [ -n "$explicit" ] && { printf '%s\n' "$explicit"; return 0; }
   comp="$(jq -r '.project.composition_root // empty' "$sf" 2>/dev/null)" || comp=""
-  root="$(_oss_repo_root canonical)" || return $?
+  # An ABSOLUTE composition_root is a complete answer on its own - short-circuit
+  # before touching the default-repo tier, so it resolves even under N>1
+  # declared repos.
+  case "$comp" in /*) printf '%s\n' "$comp"; return 0 ;; esac
+  # Under N>1 the default tier cannot answer, and the generic
+  # `_oss_default_repo_key` refusal names repo keys - which is the wrong remedy
+  # here. `oss demo_run` is called bare by spine close, so a caller reading
+  # "name one" has nowhere to name it. The missing thing is the FIELD.
+  shape="$(_oss_shape_file 2>/dev/null)" || shape=""
+  if [ "$(printf '%s' "$shape" | jq -r '.repos | length' 2>/dev/null || echo 0)" -gt 1 ]; then
+    # Both facts, deliberately. The declared set is what the caller needs to
+    # CHOOSE a root, and the field name is what they need to record it - an
+    # earlier form printed only the set, and a caller of a bare `oss demo_run`
+    # had nowhere to "name one".
+    echo "oss: no repo key given and [$(printf '%s' "$shape" | jq -r '.repos | keys | join(", ")')] are declared - the cumulative demo runs at the composition root, so record it rather than naming a repo here: oss composition_set /abs/path/to/composition/root${comp:+ (project.composition_root is currently '$comp', which is relative and would compose against a default repo root that does not exist - it must be absolute)}" >&2
+    return 2
+  fi
+  dk="$(_oss_default_repo_key)" || return $?
+  root="$(_oss_repo_root "$dk")" || return $?
   if [ -n "$comp" ]; then
-    case "$comp" in /*) printf '%s\n' "$comp" ;; *) printf '%s\n' "$root/$comp" ;; esac
+    printf '%s\n' "$root/$comp"
   else
     printf '%s\n' "$root"
   fi

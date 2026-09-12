@@ -1,0 +1,5 @@
+---
+scenario_id: 06-service-split-measured-pressure
+expected_class: bone
+---
+A spine proposes extracting the order-matching engine into a separately-deployed service with its own process, image, pipeline, and on-call surface. The spine carries an actor-to-outcome journey — an order is submitted through the new service boundary and reaches a matched outcome — so it is not an architectural layer with no journey. The measured-pressure evidence is contemporaneous and checkable: a production outage last month where the matcher's failure took the rest of the service down (recorded in the postmortem), and a load profile showing the matcher is the bottleneck at peak and cannot meet the figure in-process. The extraction creates a new load-bearing, hard-to-reverse system-shape decision and touches no already-registered bone's touch surface, so the spine is `bone`, and the evidence is what its ADR records as the decision's grounds. The governing rule the decision cites is the deployment-evidence bar: measured pressure admits the split as bone.

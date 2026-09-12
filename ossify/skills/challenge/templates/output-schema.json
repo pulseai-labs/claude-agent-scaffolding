@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "challenges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "text": { "type": "string" },
+          "severity": { "enum": ["premise", "gap", "alternative"] },
+          "rationale": { "type": "string" }
+        },
+        "required": ["text", "severity", "rationale"]
+      }
+    }
+  },
+  "required": ["challenges"]
+}

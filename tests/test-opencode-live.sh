@@ -371,7 +371,7 @@ const pluginSkills = {
     "checking-adversary-readiness",
     "managing-async-critique",
   ],
-  ossify: ["start", "plan-spine", "work-item", "close", "plan-release", "doctor"],
+  ossify: ["start", "adopt", "plan-spine", "work-item", "close", "plan-release", "doctor", "challenge", "wayfinder"],
 };
 
 function command(description, skill, hasArguments = true) {
@@ -601,6 +601,8 @@ function assertSelection(config, skills, selected, caseRoot, expectedSpec) {
     "scaffold-onboard",
     "scaffold-dev",
     "claude-security-audit",
+    "code-judo",
+    "orca-crew",
   ]) {
     const excludedRoot = path.join(root, excluded) + path.sep;
     assert.ok(!config.skills.paths.some((entry) => entry.startsWith(excludedRoot)));

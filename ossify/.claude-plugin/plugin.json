@@ -1,5 +1,5 @@
 {
   "name": "ossify",
-  "version": "0.5.0",
-  "description": "Experimental OpenCode opt-in for a skeleton-first lifecycle from Release 0 through MVP and v1. The v0.x engine, six entry skills, and close ceremonies are packaged through the root bundle's explicit allowlist; /ossify:run-spine drives a planned spine's rounds, /ossify:doctor diagnoses state, spec, rules, interop and budgets, and the any-repo utilities /ossify:handoff + /ossify:handoff-resume (session handoff) and /ossify:work-pr (review-fix-merge loop) round out the set. Outside stable marketplaces until Plan D's eval and pilot gate."
+  "version": "1.8.0",
+  "description": "Skeleton-first lifecycle from Release 0 through MVP and v1, replacing scaffold-onboard + scaffold-dev, not staging alongside them. workspace-init is optional: /ossify:start and /ossify:adopt author .ossify/topology.json themselves, reading a pairing manifest as a fallback. Grill/critic ship as /ossify:challenge. /ossify:start onboards, /ossify:adopt takes on an existing repo, /ossify:plan-release and /ossify:plan-spine plan, /ossify:run-spine drives rounds, /ossify:close closes, /ossify:doctor diagnoses, /ossify:wayfinder charts tickets, plus the any-repo /ossify:handoff and /ossify:work-pr. Since 1.8.0 /ossify:run-spine accepts an optional --external-executor flag that hands a round's work items to a caller-supplied, provider-neutral in-session procedure; the no-flag command is unchanged."
 }

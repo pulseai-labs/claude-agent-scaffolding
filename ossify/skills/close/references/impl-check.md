@@ -1,10 +1,10 @@
-# impl-check — the three-layer work-item gate
+# impl-check — the four-layer work-item gate
 
 Depth for SKILL.md §4, step 2. This is the orchestrator-side gate over one work
 item's output (spec §6, last bullet). It runs on the resolved `$spec`, `$report`
 and `$wt` from `work-item-close.md` §1 — **never on a placeholder**.
 
-Three layers, in order. **Halt on the first failure in any layer**, and a halt is
+Four layers, in order. **Halt on the first failure in any layer**, and a halt is
 terminal: no later layer runs, no commit, no merge, no status write.
 
 ---
@@ -161,7 +161,7 @@ line, not a silent pass.
 
 ### Where the file is
 
-The memory bank, in the **AI workspace** — not the canonical repo, and not
+The memory bank, in the **AI workspace** — not any declared repo, and not
 beside the code being reviewed. The bank is manifest-routed: resolve it exactly
 as `references/harvest.md` §7 does (the pairing manifest's
 `.well_known_paths.memory_bank`, token-expanded; a relative or unresolved route
@@ -203,6 +203,160 @@ by interpretation at a close gate is how a rule set stops meaning anything.
 
 ---
 
+## 4b. Layer 4 — the three semantic lenses
+
+Layer 3 asked whether the diff violates a pattern the project *wrote down*. Layer 4
+is the semantic pass nothing else in the gate can do: **does the diff implement the
+spec, follow the repo's patterns, and omit nothing the spec requires.** It runs
+after Layer 3, on the same staged diff, and its findings are judged by the same
+verdict rule no matter which execution path produced them (`work-item-close.md` §2
+chooses the path; this section owns the lenses).
+
+### The lenses
+
+Each lens is a reading of the staged diff. Apply them as written — they are the
+contract, not a summary of one:
+
+- `fidelity` — the diff does something `spec.md` does not ask for, or does
+  something it asks for **in a way that contradicts the description** — existing
+  behaviour that diverges, not behaviour that was never attempted. **An outright
+  absence is never a fidelity finding**, however naturally "fails to do something
+  it asks for" reads as covering it too — that case belongs to `absence`, below,
+  full stop; a fidelity finding needs a hunk that does the wrong thing, not the
+  lack of one. Report **every** genuine drift as a finding, whether or not report
+  §7 discloses it — declaration is not a gate on whether this is a finding, it is
+  a field *on* the finding. Set `declared_in_report_s7` from the report's own §7
+  text, not your reconstruction of what the implementer meant; the verdict rule
+  below, not this lens, decides what a `true` or `false` value means for the
+  close.
+- `pattern` — the diff contradicts a convention the repo follows **in fact**, not
+  one written down — which means the diff and the four documents alone cannot
+  answer this lens; **read the relevant neighbouring files from the committed
+  tree** (`git show HEAD:<path>`, never the raw worktree filesystem — an
+  explained `partial` stage, `work-item-close.md` §3, can leave uncommitted
+  edits sitting there that were never meant to inform this judgment) to
+  establish what the repo actually does before judging against it. (This is the
+  one lens the inline path and the delegated path both need read access
+  beyond the diff for — the input list below is a floor, not a ceiling, here.)
+  The written half is `03-code-patterns.md`, and that half is Layer 3's — do not
+  re-run it. What is left is the defect classes a documented rule never captures:
+  guards that cannot fire (or fire always), ordering that inverts the contract,
+  two files contradicted by the same change, usage strings that disagree with
+  what the code does, prose claiming behaviour nothing implements, a gate whose
+  status is discarded. Same calibration rule as Layer 3: judge against what is
+  there, not what you would have written.
+- `absence` — the spec requires an artifact, command, or wiring the diff does not
+  contain at all. Not "could be better" — **absent**. Every case where the diff
+  never attempted something the spec required lands here, even one that could
+  also be read as "fails to do something spec.md asks for" — `fidelity` excludes
+  it by definition, above; there is no finding that legitimately belongs to both.
+
+### The finding schema
+
+Every finding, from either execution path, is exactly:
+
+```text
+{id, lens, claim, evidence: {file, line?}, declared_in_report_s7}
+```
+
+`id` is a stable identifier the reader assigns (delegated path only — see the
+refuter note below; the inline path has no separate refuter pass to key
+against, so `id` is not load-bearing there). `lens` is one of the three ids
+above; `claim` is one sentence naming the deviation and what it costs;
+`evidence.file` points into the staged diff, always, for `fidelity` and
+`pattern` findings. For `absence`, it names the path where the missing
+artifact should exist instead — which may not appear in the staged diff at
+all, since the whole point of an absence finding is something the diff never
+contains. `line` is required for `fidelity` and `pattern` findings but
+optional for `absence`, same reason: there may be no line to cite, only the
+file (real or prospective) where it should exist. Never invent a line number,
+or a diff-anchored file, to satisfy the shape. `declared_in_report_s7` is answered from report
+§7's own text.
+
+### The verdict rule — identical on both paths
+
+A `fidelity` finding with `declared_in_report_s7: false` **halts** with the
+`[fidelity]` tag and §6's recovery menu — the report is wrong about the one thing
+this gate exists to check. Everything else — `pattern`, `absence`, and a
+`fidelity` finding §7 *does* declare — is **advisory**: the surviving findings are
+written to `<work-item-dir>/verify.md` and echoed in the close summary, and
+spine-close code review (`references/code-review.md`) reads that file as an input.
+Advisory means advisory: no pattern or absence finding halts, delays, or re-runs
+this close (D5).
+
+**If a `fidelity` and an `absence` finding land on the same underlying gap**
+(independent readers can both notice it despite the lenses' partition above) —
+normalize before applying the halt: an absence-shaped gap is `absence`, never
+`fidelity`, regardless of which lens's reader produced it. Re-tag rather than
+drop; the claim and evidence carry over.
+
+**Truncation itself halts, independent of any individual finding's content.**
+The delegated fidelity reader is capped at 5 findings (a cost bound, not a
+completeness claim); on a diff with more genuine deviations than that, an
+omitted one being undeclared would defeat this gate's one hard guarantee
+silently. `fidelity_truncated: true` on the delegated return means the reader
+could not certify it reported every genuine fidelity deviation — treat that
+as a `[fidelity]` halt on its own, naming truncation as the reason, even when
+every finding actually returned is declared. The inline path has no schema
+cap to hit — a free-form judgment reports what it finds, so this halt class
+does not arise there.
+
+### The relationship to its neighbours, so no axis ships twice
+
+| | Reads | Asks | Stops the close? |
+|---|---|---|---|
+| Layer 3 | diff vs `03-code-patterns.md` | a **documented** pattern violated | yes (`[rule]`) |
+| Layer 4 `fidelity` | diff vs `spec.md` + report §7 | is it the code the item was supposed to write, and does the report say so honestly | yes, undeclared only (`[fidelity]`) |
+| Layer 4 `pattern` / `absence` | diff vs conventions-in-fact / spec artifacts | what a documented rule never captures | no — advisory to `verify.md` |
+| code-review (spine close) | the spine's whole diff | is it **good** code; did the *intent* drift | no — advisory, dispositioned |
+
+Layer 4 catches a defect while the item is still open that code review would only
+see once the spine's diff is one thing; code review still owns craft and
+spine-level intent. Neither re-runs the other.
+
+### Inline path — every harness
+
+After Layer 3, read the staged diff, `spec.md`, `handoff.md`, report §7 and the
+patterns file, apply the three lenses yourself, and emit findings in the schema.
+`pattern`'s neighbouring-files read (§4b above) comes from the COMMITTED tree
+only (`git show HEAD:<path>`), never the raw worktree filesystem — an
+explained `partial` stage (`work-item-close.md` §3) can leave uncommitted
+edits sitting there that were never meant to inform this judgment, in either
+direction. This is not a degraded mode — it is the same judgment with the
+host's own context, and it is the universal fallback (`work-item-close.md`
+§2).
+
+### Delegated path — Claude Code on Anthropic only
+
+`ossify/workflows/verify-work-item.js`: one reader and one refuter per lens, six
+Sonnet agents, models pinned in the script (readers medium, refuters low). The
+script carries no lens text — the close passes the three lenses and the input
+paths in `args`. Every reader and refuter has ordinary tool access to the
+worktree beyond the fixed input list — the `pattern` reader specifically is
+told to use it, reading relevant neighbouring files before judging, the same
+requirement as the inline path above. It returns
+`{findings, agents_run, fidelity_truncated}`; it writes nothing, calls no
+`oss` verb, touches no git. Apply the verdict rule
+above to what returns exactly as if you had read the diff yourself: a
+delegated run changes who read the diff, never what the close asserts.
+
+**Refuter output is never trusted as free text.** The reader assigns each
+finding a stable `id`; the refuter is given the same findings back and returns
+exactly one verdict per `id` — `{id, retain, declared_in_report_s7}` — never a
+re-serialized finding, and never fewer or more verdicts than there are
+findings. The script accepts a survivor only if coverage is exact (every
+reader `id` gets one verdict, no extra ids, no duplicates) and its `id` is
+actually a member of what that lens's reader produced; a fabricated id, a
+truncated response, or a duplicate nulls the whole lens rather than being
+silently absorbed. `claim` and `evidence` always come from the reader's own
+object — the refuter's only write access is `declared_in_report_s7`, so it can
+correct a reader's mistagging of that one field without having to discard an
+otherwise-real finding to do it, and it can never touch anything else. This is
+deterministic verdict-checking, not judgment, and it is enforced in the script
+— see `tests/test-workflows.sh` T3.
+
+---
+
 ## 5. Source-tagged errors
 
 Every surfaced error starts with a **literal** tag naming which layer produced
@@ -213,10 +367,14 @@ criterion:
 [AC]                 AC-3 `<command>` expected `exit 0`, observed rc 1
 [report cross-check] report does not account for: AC-2
 [rule]               <file>:<line> - <the documented pattern it violates>
+[fidelity]           <file>:<line> - the diff deviates from spec.md: <claim>; report §7 does not declare it
+[fidelity]           the delegated reader hit its 5-finding cap and could not certify every genuine deviation is reported (truncated:true)
 ```
 
-Do not invent a fourth tag, do not translate one into prose, and do not merge two
-layers' findings under one tag. Three tags, spelled exactly as above.
+Do not invent a fifth tag, do not translate one into prose, and do not merge two
+layers' findings under one tag. Four tags, spelled exactly as above — the two
+`[fidelity]` lines are the same tag on two distinct triggers (an undeclared
+finding, or unresolvable truncation), not a fifth.
 
 ---
 
@@ -237,14 +395,15 @@ consequences and stop:
    code is wrong. Rewriting a criterion to match what was built is how a gate
    becomes decorative, and it is silent: every later run passes.
 
-   **Which criterion depends on the layer that halted**, because the three layers
-   are judged against three different documents:
+   **Which criterion depends on the layer that halted**, because the four layers
+   are judged against four different documents:
 
    | Halting layer | The criterion is | Fixing it means |
    |---|---|---|
    | `[AC]` — Layer 1 | the AC in `spec.md` | re-author the AC: a malformed expectation, or a command that never tested what the AC describes |
    | `[report cross-check]` — Layer 2 | the report's AC table | the report under-accounts; the fix is in `report.md`, not the spec |
    | `[rule]` — Layer 3 | the pattern in `03-code-patterns.md` | amend the pattern in the memory bank — with the user, since it binds every future spine |
+   | `[fidelity]` — Layer 4 | the deviation is real and §7 does not declare it | re-dispatch: the code aligns to the spec, or §7 declares the deviation honestly; only where the *spec itself* is wrong, back through `/plan-spine` — never amended at this gate |
 
    A Layer 3 halt offered "re-author the AC" is being offered the wrong document:
    no AC is involved, and the honest options are amend the pattern, or fix the
@@ -269,3 +428,9 @@ reach it (`work-item-close.md` §5).
 - **Auto-selecting a recovery option**, or presenting only one (§6).
 - **Re-authoring an AC because the code failed it** (§6).
 - **Running `user:` rows here** (§2).
+- **Halting on a pattern or absence finding.** Advisory by decision (§4b); the
+  only Layer 4 halts are an undeclared fidelity deviation and the delegated
+  fidelity reader's own truncation (`fidelity_truncated: true`) — both under
+  the same `[fidelity]` tag.
+- **Letting `verify.md` advisories evaporate.** They are spine-close code
+  review's input; advisory does not mean disposable.

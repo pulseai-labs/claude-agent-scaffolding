@@ -8,9 +8,11 @@
 # runtime does not accept, or a block that does not parse, and every gate stays
 # green. This file is that gate.
 #
-# SCOPE - check, do not execute. Six mechanical facts: parse-validity, verb
+# SCOPE - check, do not execute. Seven mechanical facts: parse-validity, verb
 # resolution, Skill() arity, the command-body arg bridge, reference
-# reachability, and the SKILL.md line budget. Executing skill prose would need
+# reachability, the SKILL.md line budget, and shadowed Skill(ossify:) tokens.
+# (Route-pointer integrity was the eighth; it was removed at #284 round 2 -
+# see the tombstone at check 8's old site.) Executing skill prose would need
 # a fixture per ceremony, would have side effects, and would test the fixture
 # instead of the contract.
 #
@@ -27,7 +29,7 @@
 # have is how the next phantom entry point ships.
 #
 # THE SELF-TEST IS THE POINT. This artifact is itself a test, so an extractor
-# that silently stops extracting goes green forever and takes all six checks
+# that silently stops extracting goes green forever and takes all seven checks
 # with it - and nothing downstream can notice. Every check therefore runs twice:
 # once against the shipped tree (expect zero findings) and once against a
 # purpose-built fixture carrying exactly one planted defect per check (expect
@@ -60,7 +62,13 @@ t_assert_grep() { # $1=file $2=ERE $3=label
 
 _md_files() { # $1=ossify-root -> every markdown file the harness owns
   local r="$1" d
-  for d in skills commands agents; do
+  # references/ included since the route gates landed: three wrappers load
+  # the plugin-root references tree directly (handoff, handoff-resume,
+  # work-pr), so its prose is shipped contract with the same claim to scanning
+  # as skills/. Blast radius measured before widening: the four shipped files
+  # carry zero bash fences, zero Skill( forms, zero oss tokens, so checks 1-3
+  # widen with no new findings (Codex r1 finding on #283).
+  for d in skills commands agents references; do
     [ -d "$r/$d" ] && find "$r/$d" -type f -name '*.md'
   done | sort
 }
@@ -288,20 +296,40 @@ check_5_refs() { # $1=ossify-root $2=workdir; writes $2/check5-{crossskill,point
     while IFS= read -r p; do
       [ -n "$p" ] || continue
       echo "$p" >> "$w/check5-pointers.txt"
-      case "$p" in
-        skills/*)       base="$r" ;;
-        */references/*) base="$r/skills" ;;
-        *)              base="$skill" ;;
+      case "$f" in
+        # A citing file under the plugin-root references/ tree: its BARE
+        # references/... pointers resolve against the plugin root (Codex r1
+        # on #284 - before this arm those files had base "" and every valid
+        # root-relative pointer reported dangling), while the QUALIFIED forms
+        # keep their generic bases (Codex r2 on #284 - the round-1 arm had
+        # dropped them, dangling valid citations like start/references/x.md).
+        "$r"/references/*) case "$p" in
+                              references/*)   base="$r" ;;
+                              skills/*)       base="$r" ;;
+                              */references/*) base="$r/skills" ;;
+                              *)              base="" ;;
+                            esac ;;
+        *) case "$p" in
+             skills/*)       base="$r" ;;
+             */references/*) base="$r/skills" ;;
+             *)              base="$skill" ;;
+           esac ;;
       esac
       if [ -n "$base" ] && [ -f "$base/$p" ]; then continue; fi
       # Bare form only: does the named file exist under some sibling skill?
-      case "$p" in
-        references/*)
-          if ls "$r"/skills/*/"$p" >/dev/null 2>&1; then
-            echo "$f: cross-skill pointer '$p' (resolves under a sibling skill; base named in prose)" >> "$w/check5-crossskill.txt"
-            continue
-          fi ;;
-      esac
+      # NOT for plugin-root reference files (Codex r2 on #284): a root-relative
+      # pointer that only exists under some skill is dangling at RUNTIME - the
+      # root file loads by wrapper route, never through a skill dir - so the
+      # sibling fallback must not swallow the miss.
+      if ! case "$f" in "$r"/references/*) true ;; *) false ;; esac; then
+        case "$p" in
+          references/*)
+            if ls "$r"/skills/*/"$p" >/dev/null 2>&1; then
+              echo "$f: cross-skill pointer '$p' (resolves under a sibling skill; base named in prose)" >> "$w/check5-crossskill.txt"
+              continue
+            fi ;;
+        esac
+      fi
       echo "$f: dangling pointer '$p' resolves to no file (base ${base:-<no skill dir>})"
     done < <({ grep -ohE '(^|[^A-Za-z0-9_/${}-])(skills/)?([A-Za-z0-9_-]+/)?references/[A-Za-z0-9_.-]+\.md' "$f" || true; } \
                | sed -E 's#^[^A-Za-z0-9_]##' | sort -u)
@@ -326,35 +354,122 @@ check_6_budget() { # $1=ossify-root $2=workdir; writes $2/check6-report.txt
 }
 
 # ---------------------------------------------------------------------------
-# check 7 - the EVERY-CALL listing budget.
+# check 7 - the EVERY-CALL listing budget, over the strings that LOAD.
 #
 # check 6 guards the SKILL.md *body* (500 lines), which costs nothing until a
-# skill is entered. This guards the frontmatter *descriptions*, which are the
-# only thing loaded on every single call - the cost the whole progressive-
-# disclosure design exists to protect. Nothing enforced it before: Plan C1
-# trimmed the five descriptions 4180 -> 3121 chars (0.52% -> 0.39% of a 200k
-# window) to get inside the §9.1 band, and with no test holding it there they
-# had already drifted back to 3135 by v0.2 planning. Uncaught, because a
-# budget nobody measures is not a budget.
+# skill is entered. This guards the listing that loads on every single call -
+# and that listing carries the COMMAND descriptions, not the SKILL.md ones:
+# measured 2026-08-22 from a live session's own recorded skill_listing
+# attachment (issue #263), all ten commands/*.md descriptions load verbatim
+# and none of the six skills/*/SKILL.md descriptions load at all -
+# commands/<name>.md shadows skills/<name>/SKILL.md on the ossify:<name>
+# token, and the #274 fix changed the loading ROUTE, not the listing SOURCE.
+# Until this re-point the check summed strings that never load: a green gate
+# certifying nothing, the same shadowing one level up.
+#
+# CEILING - derived from the spec band, never from history. §9.1
+# (poc-first-lifecycle-design.md :115-119, :467) targets every-call listing
+# cost at 0.3-0.4% of the window: 0.4% of 200k tokens = 800 tokens; at the
+# 4.0 chars/token ratio the C1 numbers embed (3121 bytes = 0.39% = 780
+# tokens - internally consistent), the band edge is 800 x 4.0 = 3200 bytes.
+# The previous constant 3121 was the C1 trim's LANDING POINT (4180 -> 3121,
+# 0.52% -> 0.39%), 79 bytes inside the edge: a historical accident, not the
+# band. Nothing enforced any of it before C1, and the trim had drifted back
+# to 3135 by v0.2 planning - a budget nobody measures is not a budget.
+#
+# MEASUREMENT is description-only, in bytes under the LC_ALL=C exported at
+# the top of this file - the same method the ceiling is derived in. The
+# listing's "- ossify:<name>: " prefixes add real cost (230 bytes at the
+# twelve-command set measured in #263, name-length-dependent) but are harness
+# rendering this test does not own; recorded here, not measured.
+#
+# HONESTY LINE: the thirteen-command surface measures 2278/3200 = 0.28% of
+# the window - 1.4x headroom, and just under §9.1's 0.3-0.4% band, because
+# three of the thirteen are standalone utilities §9.1 intended to surface
+# name-only (issue #282 records that divergence and why trimming is the
+# wrong fix: budget nobody is short of, traded against routing triggers).
+# This check is a regression guard against growth, not a tight budget; it
+# cannot fire until the surface grows another 40%. Know that is what it is.
+#
+# DIVERGENCES recorded here, fixed elsewhere:
+#   D-2: §9.1 says "<=6 fully-described entry skills" and lists six;
+#        run-spine is a de-facto seventh full entry (lifecycle baton target),
+#        #267's adopt is an eighth, and Batch S's challenge is a ninth,
+#        unless §9.1 is amended deliberately -
+#        the amendment is #267's to make. This check enforces bytes, not
+#        count, on purpose.
+#   D-3: §9.1's doctor row still allocates the phase-2 migration entry point
+#        the adopt-forward spec rejected on doctor's report-only contract;
+#        falls to the same §9.1 amendment.
 #
 # The floor assertion is not decoration: a glob that silently matches nothing
 # sums to 0, which sails under any ceiling. That is the same vacuity mode
 # check 5 guards against, and it is why this reports rather than just totals.
+# The floor moved with the glob (skills -> commands) at this re-point.
 # ---------------------------------------------------------------------------
 check_7_descriptions() { # $1=ossify-root $2=workdir; writes $2/check7-report.txt
   local f d n total=0
   mkdir -p "$2"; : > "$2/check7-report.txt"
-  for f in "$1"/skills/*/SKILL.md; do
+  for f in "$1"/commands/*.md; do
     [ -e "$f" ] || continue
-    d="$(sed -n 's/^description: //p' "$f" | head -1)"
+    # Frontmatter-scoped on purpose: the listing loads the frontmatter value,
+    # and a `description: ` line in the BODY is prose. The old whole-file sed
+    # counted body lines (Codex r1 on #283) - a wrapper whose frontmatter
+    # description was lost but whose body happened to carry such a line kept
+    # a green budget and a silent no-description miss.
+    d="$(awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} NR>1 && /^description: / {sub(/^description: /,""); print; exit}' "$f")"
     [ -n "$d" ] || { echo "$f: no frontmatter description"; continue; }
-    echo "     ${#d}  $(basename "$(dirname "$f")")/SKILL.md" >> "$2/check7-report.txt"
+    echo "     ${#d}  commands/$(basename "$f")" >> "$2/check7-report.txt"
     total=$(( total + ${#d} ))
   done
-  echo "     TOTAL $total  (budget 3121, headroom $((3121 - total)))" >> "$2/check7-report.txt"
-  [ "$total" -le 3121 ] || echo "entry-skill descriptions total $total chars, over the 3121 every-call budget by $(( total - 3121 ))"
-  n="$(ls -1 "$1"/skills/*/SKILL.md 2>/dev/null | wc -l | tr -d ' ')"
-  [ "$n" -ge 5 ] || echo "check 7 saw only $n SKILL.md files; the budget loop is not measuring the whole set"
+  echo "     TOTAL $total  (budget 3200, headroom $((3200 - total)))" >> "$2/check7-report.txt"
+  [ "$total" -le 3200 ] || echo "command descriptions total $total bytes, over the 3200 every-call budget by $(( total - 3200 ))"
+  n="$(ls -1 "$1"/commands/*.md 2>/dev/null | wc -l | tr -d ' ')"
+  [ "$n" -ge 13 ] || echo "check 7 saw only $n command files; the budget loop is not measuring the whole set"
+}
+
+# ---------------------------------------------------------------------------
+# Check 8 - REMOVED at round 2, per the pre-agreed fallback. Route-pointer
+# integrity drew seven precision findings across three review passes (#283 r1:
+# non-disjoint arms; #284 r1: Read-substring match, suffix truncation,
+# cross-wiring; #284 r2: no left boundary on Read, first-entry-only
+# validation, backtick inconsistency between instruction regex and extractor).
+# A gate still finding new ways to be wrong on its third pass is not ready to
+# block every future PR. Deferred to its own issue carrying this history; the
+# entry-route surface returns to unguarded, its pre-PR state, until that issue
+# lands. Check 9 keeps the cheap half of the route protection.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Check 9 - no shadowed Skill(ossify:<name>) tokens anywhere the harness owns.
+#
+# The bare form that CAUSED #262: Skill(ossify:close) is shadowed by
+# commands/close.md, so the call loads the ~20-line wrapper, not the skill
+# body, and dead-ends. Check 3 catches only comma-bearing invocations
+# (Skill\(x, target=y\)); a prose edit restoring a bare token - from git
+# history, a regenerated wrapper, a reference doc - passes every gate
+# (#263's review, finding 2). The sanctioned route is the wrapper's
+# path-routing Read line or a cross-PLUGIN call into another plugin's
+# skill. The scan owns the plugin-root references/
+# tree too, because three wrappers load it directly (Codex r1 on #283).
+#
+# SHADOW-CONDITIONED (Codex r2 on #284): the dead-end exists only where
+# commands/<name>.md actually shadows a same-named skill. A future skill
+# with no same-named command is NOT shadowed and invoking it by token is
+# legal - the check extracts the name and fires only on the collision.
+# ---------------------------------------------------------------------------
+check_9_shadowed_tokens() { # $1=ossify-root
+  local f hit rest name
+  while IFS= read -r f; do
+    while IFS= read -r hit; do
+      [ -n "$hit" ] || continue
+      rest="${hit#*:}"
+      name="$(printf '%s' "$hit" | sed -nE 's/.*Skill\(ossify:([A-Za-z0-9_-]+).*/\1/p')"
+      [ -n "$name" ] || continue
+      [ -f "$1/commands/$name.md" ] || continue
+      echo "$f:${hit%%:*}: shadowed token $rest - commands/$name.md shadows the skill this call means (#262); route by the wrapper's path-routing Read line instead"
+    done < <({ grep -nE 'Skill\(ossify:[A-Za-z0-9_-]+' "$f" || true; })
+  done < <(_md_files "$1")
 }
 
 # ===========================================================================
@@ -411,10 +526,14 @@ t_assert_eq 0 "$(_count "$C6")" "check 6: every SKILL.md is within the 500-line 
 t_assert_ge 5 "$(_lines "$WORK/check6-report.txt")" "check 6: the budget loop saw every entry skill"
 
 C7="$(check_7_descriptions "$OSSIFY" "$WORK")"
-echo "-- check 7: entry-skill description budget (the every-call listing cost)"
+echo "-- check 7: command-description budget (the every-call listing cost)"
 cat "$WORK/check7-report.txt"
-t_assert_eq 0 "$(_count "$C7")" "check 7: entry-skill descriptions are within the 3121-char every-call budget${C7:+ -- $C7}"
-t_assert_ge 6 "$(_lines "$WORK/check7-report.txt")" "check 7: the description loop saw every entry skill (5 rows + the total)"
+t_assert_eq 0 "$(_count "$C7")" "check 7: command descriptions are within the 3200-byte every-call budget${C7:+ -- $C7}"
+t_assert_ge 14 "$(_lines "$WORK/check7-report.txt")" "check 7: the description loop saw every command (13 rows + the total)"
+
+C9="$(check_9_shadowed_tokens "$OSSIFY")"
+echo "-- check 9: shadowed Skill(ossify:) tokens"
+t_assert_eq 0 "$(_count "$C9")" "check 9: no shadowed Skill(ossify:) tokens anywhere the harness owns${C9:+ -- $C9}"
 
 # ===========================================================================
 # PART 2 - the permanent self-test.
@@ -496,6 +615,17 @@ Read `references/c5dref.md`, then `references/nowhere.md`.
 EOF
 echo "# c5dref" > "$FIX/skills/c5d/references/c5dref.md"
 
+# check 5 root-reference plants (Codex r1+r2 on #284): rr resolves bare
+# (silent) and carries a QUALIFIED pointer that must keep its generic base
+# (silent); rq dangles bare (fires); rs cites a file that exists ONLY under a
+# sibling skill (fires - the sibling fallback must not swallow a root miss).
+# Created HERE, before the F5 assertions run - plant order is execution order.
+mkdir -p "$FIX/references"
+echo "# root target" > "$FIX/references/rtarget.md"
+printf -- '# rr\nSee `references/rtarget.md`; the skill-local form is `c5d/references/c5dref.md`.\n' > "$FIX/references/rr.md"
+printf -- '# rq\nSee `references/rnothing.md`.\n' > "$FIX/references/rq.md"
+printf -- '# rs\nSee `references/c5dref.md`.\n' > "$FIX/references/rs.md"
+
 # --- check 6 plant: 501 lines -----------------------------------------------
 {
   echo "# c6"
@@ -507,24 +637,32 @@ echo "# c6ref" > "$FIX/skills/c6/references/c6ref.md"
 echo "# agent" > "$FIX/agents/a.md"
 
 # --- check 7 plants: TWO DEDICATED ROOTS, deliberately not the shared $FIX ---
-# The shared fixture's six skills carry no frontmatter description at all, so
-# running check 7 against it would emit six "no frontmatter description"
-# findings and couple this plant's count to every other check's fixture - the
-# fixtures-coupled-through-shared-state vacuity mode. Separate roots keep the
-# count exact and stable when a check 8 is added later.
+# The shared fixture's commands/c4.md carries no frontmatter description (it
+# is check 4's plant), so running check 7 against $FIX would emit a
+# no-description finding and couple this plant's count to check 4's fixture -
+# the fixtures-coupled-through-shared-state vacuity mode. Separate roots keep
+# the count exact and stable when a check 8 is added later.
 FIX7="$WORK/fixture7"; FIX7B="$WORK/fixture7b"
-_c7_skill() { # $1=root $2=name $3=description-length
-  mkdir -p "$1/skills/$2"
+_c7_command() { # $1=root $2=name $3=description-length
+  mkdir -p "$1/commands"
   { echo "---"; echo "name: $2"
     printf 'description: '; printf 'd%.0s' $(seq 1 "$3"); echo
-    echo "---"; echo "# $2"; } > "$1/skills/$2/SKILL.md"
+    echo "---"; echo "# $2"; } > "$1/commands/$2.md"
 }
-# Plant A: 5 skills x 700 chars = 3500, over the 3121 budget by 379.
-for s in c7a c7b c7c c7d c7e; do _c7_skill "$FIX7" "$s" 700; done
-# Plant B: only 2 skills, each comfortably under budget - the TOTAL passes, so
-# the only thing that can fire is the floor guard. That is the assertion that
-# makes check 7 unable to pass by measuring nothing.
-for s in c7f c7g; do _c7_skill "$FIX7B" "$s" 100; done
+# Plant A: 13 commands = 3800 bytes (12 x 300 + 1 x 200), over the 3200 budget
+# by 600 - and at the full thirteen-file count, so ONLY the ceiling arm fires.
+for s in c7a c7b c7c c7d c7e c7f c7h c7i c7j c7k c7l c7n; do _c7_command "$FIX7" "$s" 300; done
+_c7_command "$FIX7" c7m2 200
+# Plant B: only 2 commands, each comfortably under budget - the TOTAL passes,
+# so the only thing that can fire is the floor guard. That is the assertion
+# that makes check 7 unable to pass by measuring nothing.
+for s in c7f c7g; do _c7_command "$FIX7B" "$s" 100; done
+# Plant C: description only in the BODY, frontmatter empty of one - the whole
+# file sed counted it and stayed green; the frontmatter-scoped extractor must
+# call it what it is (no description, not counted).
+FIX7C="$WORK/fixture7c"
+mkdir -p "$FIX7C/commands"
+printf -- '---\nname: c7m\n---\ndescription: %s\n# c7m\n' "$(printf 'd%.0s' $(seq 1 60))" > "$FIX7C/commands/c7m.md"
 
 echo "-- self-test fixture: $FIX"
 
@@ -551,23 +689,50 @@ t_assert_eq 1 "$(_count "$F4")" "self-test: check 4 finds exactly its 1 planted 
 t_assert_contains "$F4" "c4.md:3" "self-test: check 4 names the planted line, not line 2's backticked warning"
 
 F5="$(check_5_refs "$FIX" "$WORK/fix5")"
-t_assert_eq 2 "$(_count "$F5")" "self-test: check 5 finds exactly its 2 planted defects (1 orphan, 1 dangling)${F5:+ -- $F5}"
+t_assert_eq 4 "$(_count "$F5")" "self-test: check 5 finds exactly its 4 planted defects (1 orphan, 1 skill dangling, 1 root bare dangling, 1 sibling-swallowed root miss)${F5:+ -- $F5}"
 t_assert_contains "$F5" "orphan.md: orphan" "self-test: check 5 names the planted orphan"
 t_assert_contains "$F5" "dangling pointer 'references/nowhere.md'" "self-test: check 5 names the planted dangling pointer"
+t_assert_contains "$F5" "dangling pointer 'references/rnothing.md'" "self-test: check 5 names the root-reference dangling pointer"
+t_assert_contains "$F5" "dangling pointer 'references/c5dref.md'" "self-test: a root citation that exists only under a sibling skill still dangles"
 
 F6="$(check_6_budget "$FIX" "$WORK/fix6")"
 t_assert_eq 1 "$(_count "$F6")" "self-test: check 6 finds exactly its 1 planted over-budget SKILL.md${F6:+ -- $F6}"
 t_assert_contains "$F6" "c6/SKILL.md:501" "self-test: check 6 names the planted file and its line count"
 
 F7="$(check_7_descriptions "$FIX7" "$WORK/fix7")"
-t_assert_eq 1 "$(_count "$F7")" "self-test: check 7 finds exactly its 1 planted over-budget description set${F7:+ -- $F7}"
-t_assert_contains "$F7" "total 3500 chars" "self-test: check 7 names the measured total, not just that it is over"
-t_assert_contains "$F7" "over the 3121 every-call budget by 379" "self-test: check 7 names the exact overage"
+t_assert_eq 1 "$(_count "$F7")" "self-test: check 7 finds exactly its 1 planted over-budget command set${F7:+ -- $F7}"
+t_assert_contains "$F7" "total 3800 bytes" "self-test: check 7 names the measured total, not just that it is over"
+t_assert_contains "$F7" "over the 3200 every-call budget by 600" "self-test: check 7 names the exact overage"
 # The floor guard: a root the loop under-measures must RED even though its
 # total is far under budget. Without this, a glob that matched nothing would
 # sum to 0 and sail through - the way a budget check ends up unable to fail.
 F7B="$(check_7_descriptions "$FIX7B" "$WORK/fix7b")"
 t_assert_eq 1 "$(_count "$F7B")" "self-test: check 7 fires on an under-measured set even though its total passes${F7B:+ -- $F7B}"
-t_assert_contains "$F7B" "saw only 2 SKILL.md files" "self-test: check 7's floor guard names how many it actually saw"
+t_assert_contains "$F7B" "saw only 2 command files" "self-test: check 7's floor guard names how many it actually saw"
+F7C="$(check_7_descriptions "$FIX7C" "$WORK/fix7c")"
+t_assert_eq 2 "$(_count "$F7C")" "self-test: check 7 flags a body-only description AND its floor (2 findings, not a green budget)${F7C:+ -- $F7C}"
+t_assert_contains "$F7C" "c7m.md: no frontmatter description" "self-test: check 7 names the body-only-description wrapper"
+t_assert_grep "$WORK/fix7c/check7-report.txt" 'TOTAL 0 ' "self-test: the 60-byte body line is NOT counted toward the budget"
+
+# --- check 9 plants: a DEDICATED ROOT, for the same coupling reason as check
+# 7's - the shared fixture cannot host this: skills/c3's body (check 3's plant)
+# literally contains Skill(ossify:c3, ...) and would cross-fire.
+FIX9="$WORK/fixture9"
+mkdir -p "$FIX9/skills/c9" "$FIX9/skills/c9u" "$FIX9/references" "$FIX9/commands"
+printf -- '# c9\nInvoke Skill(ossify:c9) and wait.\n' > "$FIX9/skills/c9/SKILL.md"
+# r9 (Codex r1 on #284): a shadowed token in the plugin-root references tree
+# that _md_files did not own before the widening.
+printf -- '# r9\nAlso invoke Skill(ossify:r9) here.\n' > "$FIX9/references/r9.md"
+# The shadow condition (Codex r2): both plants are shadowed because their
+# same-named COMMANDS exist. c9u has no command - its token is legal and must
+# NOT fire; the exact-count assertion is that control.
+echo "# wrapper c9" > "$FIX9/commands/c9.md"
+echo "# wrapper r9" > "$FIX9/commands/r9.md"
+printf -- '# c9u\nCompose Skill(ossify:c9u) freely - no command shadows it.\n' > "$FIX9/skills/c9u/SKILL.md"
+
+F9="$(check_9_shadowed_tokens "$FIX9")"
+t_assert_eq 2 "$(_count "$F9")" "self-test: check 9 fires on both shadowed plants AND stays silent on the unshadowed control (count 2, not 3)${F9:+ -- $F9}"
+t_assert_contains "$F9" "c9/SKILL.md:2" "self-test: check 9 names the skills-tree plant"
+t_assert_contains "$F9" "references/r9.md:2" "self-test: check 9 names the references-tree plant"
 
 t_summary

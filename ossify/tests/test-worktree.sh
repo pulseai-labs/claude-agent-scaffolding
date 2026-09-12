@@ -508,8 +508,8 @@ cd /; rm -rf "$ORPH"
 # one surface the public/private boundary exists to protect — private work
 # accumulating under a root no ceremony and no check ever reads.
 #
-# The loop is driven off `_oss_repo_root`'s key enum rather than a hardcoded
-# pair, and an unconfigured key costs a `skip:` line (asserted at (7)) rather
+# The loop is driven off every repo the manifest declares rather than a
+# hardcoded pair, and an unconfigured key costs a `skip:` line (asserted at (7)) rather
 # than silence — so "not configured" and "configured and clean" stay
 # distinguishable in the read-out.
 # ---------------------------------------------------------------------------
@@ -564,9 +564,30 @@ t_assert_eq "$PRIV/priv/.worktrees/r9.s9.w9" "$REMEDY_OUT" "orphans: ...and it n
 # claim it.
 rm -rf "$PRIV/priv/.worktrees/r9.s9.w9"
 
+# --- #272/#310 Task 4, Finding 3: the FAIL-SAFE half of the sole-repo default
+# rule. A work-item record that predates the `target_repo` field (the legacy
+# jq fallback in oss_worktree_orphans) is genuinely AMBIGUOUS once N>1 repos
+# are declared - there is no safe repo to attribute it to, so the whole call
+# must refuse rather than guess which repo it belongs to. The SUCCESS half (a
+# legacy record resolves fine when exactly one repo is declared) is already
+# pinned above at "orphans: a record with absent worktree_path/target_repo is
+# still VALID"; this is its N>1 counterpart - nothing else in the suite
+# exercises it, so the refusal half of "with N>1 an unset target must refuse"
+# was previously unasserted.
+mkdir -p "$PRIV/canon/.worktrees/legacy-candidate"
+printf '{"work_items":[{"id":"r9.s9.w9"}]}' > "$PRIV/legacy-state.json"
+t_capture oss_worktree_orphans canonical "$PRIV/legacy-state.json"
+t_assert_rc 2 "orphans: a target_repo-less (legacy) work item under N>1 declared repos refuses - no safe default to fall back on"
+# The refusal used to reuse `_oss_default_repo_key`'s "no repo key given"
+# wording verbatim - on a call that gave one. The rc and the fail-safe rule are
+# unchanged; only the diagnosis is now the legacy records rather than the
+# caller's argument.
+t_assert_contains "$T_OUT" "carry no target_repo" "orphans: the refusal names the legacy records as the ambiguity"
+rm -rf "$PRIV/canon/.worktrees" "$PRIV/legacy-state.json"
+
 # (12c) A CONFIGURED ROOT THAT DOES NOT EXIST HAS NOT BEEN INSPECTED.
 #
-# `_oss_repo_root` validates the manifest value — enum, non-empty, token-free,
+# `_oss_repo_root` validates the manifest value — non-empty, token-free,
 # absolute — but never that the directory is THERE. So an unmounted volume or a
 # moved repo resolved fine, `[ -d "$root/.worktrees" ]` was false, and the
 # "nothing spawned yet is not a finding" early return exited 0 with no output.
@@ -659,11 +680,12 @@ rm -rf "$PRIV/priv"
 
 # (12b) The DRIFT GUARD that lived here is DELETED with doctor's repo-key loop.
 # It asserted that doctor's hand-spelled `for key in ...` matched
-# `_oss_repo_root`'s enum, because two enumerations that can diverge reintroduce
-# #156 for whichever key only one of them knows. doctor no longer enumerates repo
-# keys - the repo-vs-state comparison is prose now - so there is no second copy to
-# drift from, and a guard asserting agreement between one list and nothing would
-# pass while checking nothing. The enum itself stays covered by (5) and (12).
+# `_oss_repo_root`'s closed key list, because two lists that can diverge
+# reintroduce #156 for whichever key only one of them knows. doctor no longer
+# enumerates repo keys - the repo-vs-state comparison is prose now - so there
+# is no second copy to drift from, and a guard asserting agreement between one
+# list and nothing would pass while checking nothing. Key validation itself
+# stays covered by (5) and (12).
 
 cd /; rm -rf "$PRIV"
 
@@ -704,6 +726,173 @@ oss_entity_add_work_item "$QS" "$QSPN" "a work item" canonical >/dev/null
 QOUT="$( export OSS_WEIRD=BROKEN; "$OSS" worktree_orphans private_core "$QS" 2>/dev/null )"; QRC=$?
 t_assert_eq "0" "$QRC" "quoting: worktree_orphans runs against a state path holding \$ and a space"
 t_assert_eq "$QRT/priv/.worktrees/r9.s9.w9" "$QOUT" "quoting: and it names the orphan rather than a wrong or empty path"
+
+# ===========================================================================
+# TOPOLOGY TWIN (#272/#310 Task 11, spec decision O1): the repo-SCOPED
+# resolution and worktree-orphan-scoping this file pins throughout against a
+# .workspace/pairing.json two-role manifest ("canonical" / "private_core"),
+# run again from a NATIVE .ossify/topology.json declaring two repos under
+# names that are neither of those - "svc_a" / "svc_b" - so nothing below can
+# pass because of a magic name. Cross-repo non-attribution is the actual
+# multi-canonical feature #272/#310 ships; this is where it is proven to
+# hold from a native declaration, not only from a translated legacy one.
+#
+# SIX orphan-scoping arms, matching the legacy ORPH fixture's own six: no
+# .worktrees dir at all (:323-327), claimed-by-id (:329-338), an unclaimed
+# directory is the finding (:340-344), the DISJOINT claim path - a directory
+# whose basename is not a work-item id but whose PATH is journaled
+# (:346-353, which the legacy comment calls out as a code path disjoint from
+# the id-claim arm), cross-repo non-attribution (:397-406), and the
+# dispatcher-path invocation under real `set -euo pipefail` (:359-364, whose
+# own comment says the unmatched-glob guard and the `jq -e || printf` pair
+# behave differently under strict mode). Review round 1, finding 2: an
+# earlier draft of this twin covered only 3 of the 6 and did not name the
+# other 3 as excluded - not a defensible triage, so all 6 are here now.
+#
+# SCOPED DELIBERATELY everywhere else, not a line-for-line replay of the
+# whole file: the git-hook-chatter, dirty-worktree-halt, unmerged-branch,
+# spine-branch-lifecycle, permission-bit and path-quoting assertions above
+# test git/filesystem semantics that run entirely AFTER a repo root is
+# already resolved - none of them touch `_oss_shape_file` or
+# `_oss_repo_root`, so they behave identically regardless of manifest source
+# and duplicating them here would prove nothing new (task-11-report.md's
+# triage names the same reasoning for the files this task excludes
+# wholesale).
+# ===========================================================================
+TWT="$(mktemp -d)"
+mkdir -p "$TWT/ws/.ossify" "$TWT/svc_a" "$TWT/svc_b"
+for r in svc_a svc_b; do
+  git -C "$TWT/$r" init -q
+  git -C "$TWT/$r" config user.email t@t; git -C "$TWT/$r" config user.name t
+  echo seed > "$TWT/$r/f.txt"
+  git -C "$TWT/$r" add .; git -C "$TWT/$r" commit -qm seed
+done
+cat > "$TWT/ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"svc_a":{"root":"$TWT/svc_a"},"svc_b":{"root":"$TWT/svc_b"}},"well_known_paths":{}}
+JSON
+cd "$TWT/ws"
+
+t_capture _oss_repo_root svc_a
+t_assert_eq "$TWT/svc_a" "$T_OUT" "topology twin: svc_a repo root resolves"
+t_capture _oss_repo_root nonsense
+t_assert_rc 2 "topology twin: an unknown repo key is rc 2"
+
+# State minted BEFORE any worktree touches the filesystem, so the very next
+# check - orphans against a repo whose .worktrees/ does not exist yet - is
+# genuine, not incidentally true because state itself is absent.
+TWS="$TWT/ws/.ossify/project-state.json"
+oss_state_init "$TWS" "topology-twin" >/dev/null
+TWREL="$(oss_entity_add_release "$TWS" "twin-rel" "a goal")"
+TWSPN="$(oss_entity_add_spine "$TWS" "$TWREL" "twin-spine" flesh svc_a)"
+TWWI_A="$(oss_entity_add_work_item "$TWS" "$TWSPN" "svc_a item" svc_a)"
+TWWI_B="$(oss_entity_add_work_item "$TWS" "$TWSPN" "svc_b item" svc_b)"
+
+# (0) No `.worktrees` directory at all is not a finding.
+t_capture oss_worktree_orphans svc_a "$TWS"
+t_assert_rc 0 "topology twin: a repo with no .worktrees dir at all is rc 0"
+t_assert_eq "" "$T_OUT" "topology twin: no .worktrees dir reports nothing"
+
+t_capture oss_worktree_add svc_a t0.s1.w1 "first-ticket" HEAD
+t_assert_rc 0 "topology twin: worktree_add ok"
+TWA="$T_OUT"
+t_assert_eq "$TWT/svc_a/.worktrees/t0.s1.w1" "$TWA" "topology twin: worktree path convention"
+
+t_capture "$OSS" repo_root svc_b
+t_assert_eq "$TWT/svc_b" "$T_OUT" "topology twin: dispatcher repo_root resolves the second declared repo"
+t_capture "$OSS" worktree_add svc_b t0.s1.w2 "second-ticket" HEAD
+t_assert_rc 0 "topology twin: dispatcher worktree_add ok on the second repo"
+TWB="$T_OUT"
+t_assert_eq "$TWT/svc_b/.worktrees/t0.s1.w2" "$TWB" "topology twin: the second repo's worktree lands under ITS OWN root, not svc_a's"
+
+# Both worktrees above are claimed by NOTHING TWWI_A/TWWI_B carry (different
+# ids) - clean them before the orphan-scoping arms below, which start from
+# an empty .worktrees/ on svc_a and assert exact output sets.
+git -C "$TWT/svc_a" worktree remove --force "$TWA" >/dev/null 2>&1
+git -C "$TWT/svc_b" worktree remove --force "$TWB" >/dev/null 2>&1
+
+# (a) a spawned-but-not-yet-journaled worktree is claimed by its work item's id.
+oss_worktree_add svc_a "$TWWI_A" "svc_a-slug" HEAD >/dev/null
+t_capture oss_worktree_orphans svc_a "$TWS"
+t_assert_eq "" "$T_OUT" "topology twin: a spawned-but-not-yet-journaled worktree is claimed by its work item's id"
+
+# (b) a directory no work item claims, under svc_a, is the finding.
+mkdir -p "$TWT/svc_a/.worktrees/x9.s9.w9"
+t_capture oss_worktree_orphans svc_a "$TWS"
+t_assert_eq "$TWT/svc_a/.worktrees/x9.s9.w9" "$T_OUT" "topology twin: an unclaimed directory under svc_a is reported"
+
+# (d) the DISJOINT claim path: a directory whose basename is NOT a work-item
+# id, claimed because a work item's journaled worktree_path IS it. x9.s9.w9
+# from (b) stays present and stays reported - proving the path arm silences
+# only hand-named-dir, not everything (drop the path arm and this assertion
+# is the one that goes red while (a) stays green - the two arms cover
+# disjoint failures, same as the legacy pair).
+mkdir -p "$TWT/svc_a/.worktrees/hand-named-dir"
+oss_entity_set_work_item_exec "$TWS" "$TWWI_A" "work/$TWWI_A-svc_a-slug" \
+  "$TWT/svc_a/.worktrees/hand-named-dir" "$(git -C "$TWT/svc_a" rev-parse HEAD)" >/dev/null
+t_capture oss_worktree_orphans svc_a "$TWS"
+t_assert_eq "$TWT/svc_a/.worktrees/x9.s9.w9" "$T_OUT" "topology twin: a dir claimed by a journaled worktree_path is not reported"
+rm -rf "$TWT/svc_a/.worktrees/x9.s9.w9" "$TWT/svc_a/.worktrees/hand-named-dir"
+
+# (c) cross-repo non-attribution: an svc_b work item's id must NOT claim a
+# same-named directory that happens to sit under svc_a's root.
+mkdir -p "$TWT/svc_a/.worktrees/$TWWI_B"
+t_capture oss_worktree_orphans svc_a "$TWS"
+t_assert_eq "$TWT/svc_a/.worktrees/$TWWI_B" "$T_OUT" "topology twin: an svc_b work item does NOT claim an svc_a-rooted directory of the same id"
+rm -rf "$TWT/svc_a/.worktrees/$TWWI_B"
+
+# (e) dispatcher-path - bin/oss runs `set -euo pipefail`; every arm above
+# only sourced the lib. The unmatched-glob guard and the `jq -e || printf`
+# pair are both shapes that behave differently under strict mode.
+mkdir -p "$TWT/svc_a/.worktrees/x9.s9.w9"
+t_capture "$OSS" worktree_orphans svc_a "$TWS"
+t_assert_rc 0 "topology twin: dispatcher worktree_orphans under strict mode is rc 0"
+t_assert_eq "$TWT/svc_a/.worktrees/x9.s9.w9" "$T_OUT" "topology twin: dispatcher worktree_orphans reports the same single orphan"
+rm -rf "$TWT/svc_a/.worktrees/x9.s9.w9"
+
+# An unconfigured repo key must not degrade to a silent guess.
+t_capture oss_worktree_orphans svcC "$TWS"
+t_assert_rc 2 "topology twin: an unconfigured repo key is rc 2, never a silent fallback"
+
+cd /
+rm -rf "$TWT"
+
+# ===========================================================================
+# LEGACY RECORDS UNDER N>1. Every pre-#272 journal holds work items with no
+# `target_repo` at all. `oss_worktree_orphans` computes a default key to
+# attribute those, and under more than one declared repo `_oss_default_repo_key`
+# refuses. The REFUSAL is correct and deliberate - #272/#310 Task 4's fail-safe
+# rule, pinned by the PRIV fixture below: guessing a repo for an unattributable
+# record is worse than stopping. What was wrong is that it borrowed
+# `_oss_default_repo_key`'s "no repo key given" wording on a call that gave one,
+# sending the caller to re-run with the argument they already passed.
+# ===========================================================================
+LGT="$(mktemp -d)"; mkdir -p "$LGT/ws/.ossify" "$LGT/canon" "$LGT/priv"
+for r in canon priv; do
+  git -C "$LGT/$r" init -q
+  git -C "$LGT/$r" config user.email t@t; git -C "$LGT/$r" config user.name t
+  echo seed > "$LGT/$r/f.txt"; git -C "$LGT/$r" add .; git -C "$LGT/$r" commit -qm seed
+done
+cat > "$LGT/ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$LGT/canon"},"private_core":{"root":"$LGT/priv"}},"well_known_paths":{}}
+JSON
+cd "$LGT/ws"
+LGS="$LGT/state.json"
+oss_state_init "$LGS" legacy-under-n >/dev/null
+LGREL="$(oss_entity_add_release "$LGS" "legacy-rel" "a goal")"
+LGSPN="$(oss_entity_add_spine "$LGS" "$LGREL" "legacy-spine" flesh canonical)"
+# A pre-#272 record: no target_repo key at all, not a null one.
+jq '.work_items += [{"id":"r0.s1.w9","spine":"r0.s1","title":"legacy","status":"planned","created_at":"2026-01-01T00:00:00Z"}]'   "$LGS" > "$LGS.tmp" && mv "$LGS.tmp" "$LGS"
+t_assert_eq "1" "$(jq '[.work_items[] | select(.target_repo == null)] | length' "$LGS")"   "legacy fixture really holds a record with no target_repo - the arm below is otherwise vacuous"
+mkdir -p "$LGT/canon/.worktrees/x9.s9.w9"
+t_capture oss_worktree_orphans canonical "$LGS"
+t_assert_rc 2 "legacy record under N>1 refuses - the spec's fail-safe rule, unchanged"
+t_assert_contains "$T_OUT" "carry no target_repo" "the refusal names the LEGACY RECORDS as the ambiguity"
+t_assert_contains "$T_OUT" "not about the repo key you passed" "and says explicitly that the explicit key was not the problem"
+case "$T_OUT" in
+  *"no repo key given"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: the refusal still says 'no repo key given' on a call that gave one - that message sends the caller to re-run with the argument they already passed";;
+  *) T_PASS=$((T_PASS+1));;
+esac
+cd /; rm -rf "$LGT"
 
 cd /; rm -rf "$QRT" "$TMP"
 t_summary

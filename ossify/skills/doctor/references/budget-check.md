@@ -16,7 +16,7 @@ room, open the check that enforces the budget you mean.**
 
 | Budget | Sums | Enforced by | Effect of a `references/` edit |
 |---|---|---|---|
-| **Every-call description** | the `description:` frontmatter of `skills/*/SKILL.md` | `check 7` — a red test | **none** |
+| **Every-call description** | the `description:` frontmatter of `commands/*.md` — what the skill listing actually loads (the SKILL.md descriptions never load; measured from a live session's listing, #263) | `check 7` — a red test | **none** |
 | **SKILL.md body** | line count, per file, cap 500 | `check 6` — a red test | **none** |
 | **Agent listing** | `agents/*.md` descriptions | **nothing** | **none** |
 
@@ -57,7 +57,8 @@ the budget is actually about.
 
 ### What moves them
 
-- `check 7`: **only** a `description:` line in a `skills/*/SKILL.md` frontmatter.
+- `check 7`: **only** a `description:` line in a `commands/*.md` frontmatter —
+  the listing loads the command descriptions, never the SKILL.md ones.
 - `check 6`: **only** the line count of a `SKILL.md` body.
 
 ---
@@ -71,12 +72,14 @@ exceeds it.
 
 Two properties worth knowing before you touch a description:
 
-- **It is a total, not a per-file cap.** Headroom is shared. One skill's
-  generous description is another skill's missing room, which is why a
+- **It is a total, not a per-file cap.** Headroom is shared. One wrapper's
+  generous description is another wrapper's missing room, which is why a
   description edit is never a local decision.
-- **The loop counts `skills/*/SKILL.md`, whatever is there.** Adding an entry
-  skill adds its description automatically; nothing needs registering. This is
-  how `doctor` entered the budget.
+- **The loop counts `commands/*.md`, whatever is there.** Adding a command
+  wrapper adds its description automatically; nothing needs registering. The
+  surface sits well under the band today (0.18% against §9.1's 0.3-0.4% —
+  three utilities carry full descriptions the spec meant to be name-only,
+  #282), so the check is a growth guard, not a tight budget.
 
 **Never edit a `description:` without re-running the check.** `check 7` is a red
 test, so an overrun does not degrade — it fails the suite. And headroom that

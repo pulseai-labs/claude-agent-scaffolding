@@ -21,7 +21,7 @@ The registry holds exactly one registered architectural decision — ADR-0007,
 "one queue per tenant", touch surface `pkg/scheduler/**` — and no risk gates.
 The close-time check over the path list above returned a match naming ADR-0007.
 
-Still unrun: the architect-critic pass, the retrospective, the memory-bank
+Still unrun: the adversarial audit, the retrospective, the memory-bank
 harvest, the worktree and branch cleanup, and the state writes. The operator
 observes that the plan document says `flesh`, so the light host-only critic
 pass and the shorter retrospective section set are the ones to use, and

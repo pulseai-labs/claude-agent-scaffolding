@@ -11,7 +11,8 @@ manifest agreeing; posture `open-core`). Steps 1-6 are done.
 parses and carries every template rule plus `**/SPEC.md, docs/planning/**`.
 `git ls-files` matches no rule. `gitleaks` is installed, runs to completion
 over the canonical and reports nothing. `git ls-files --others` (ignored files
-included) returns only `node_modules/`. Every tracked fixture is synthetic.
+included) completes untruncated and returns only `node_modules/`. Every tracked
+fixture is synthetic.
 The closing spines' handoffs record `base_branch: main` under
 `## 2. Spine context`, the manifest's `canonical.default_branch` reads
 `main`, and `git rev-parse HEAD` and `git rev-parse main` print the same
@@ -60,5 +61,10 @@ and `git ls-files -v` marks no tracked path in any of them with
 
 Inventory, manifest and allowlist state, stated so nothing above infers it:
 the private boundary inventory carries no **Accepted disclosures** section; no
-manifest object records a `git_remote` beyond the remotes enumerated above;
+manifest object records a `git_remote` beyond the remotes this scenario enumerates;
 the working-tree hygiene allowlist is empty.
+
+Repo-set and remote state, stated so nothing above infers it: the pairing
+manifest names the canonical and the AI workspace, and carries no other
+repository object; `git remote -v` in the canonical lists exactly one
+remote, `origin`, on github.com.

@@ -9,7 +9,8 @@ canonical is observed PUBLIC on gh, the manifest agreeing; state posture is
 
 `PUBLIC_BOUNDARY.md` is a regular tracked file whose rules block parses with
 every template rule; `git ls-files` matches no rule; `gitleaks` runs to
-completion and reports nothing; the untracked set is empty; every tracked
+completion and reports nothing; the untracked set is empty, its enumeration
+completing untruncated; every tracked
 fixture is synthetic.
 
 The private boundary inventory exists in the AI workspace with two moat
@@ -41,15 +42,15 @@ Its **History passes** table records a review of the canonical through commit
 `8a7b6c5`, and that commit is the canonical's current tip on every ref.
 
 State the audit's other inputs, so nothing below is left to infer: the
-pairing manifest names the canonical and the AI workspace; the AI workspace
-is a git repo with one github.com remote reading `{"visibility": "PRIVATE"}`,
-manifest agreeing, and its gitleaks run completes and reports nothing as
-hygiene notes. The closing spines' handoffs record `base_branch: main` under
-`## 2. Spine context`, the manifest's `canonical.default_branch` reads
-`main`, and `git rev-parse HEAD` and `git rev-parse main` print the same
-object id; the canonical's checkout carries no
-staged or unstaged tracked changes; the AI workspace's
-checkout is clean at its own branch `main` with no staged or unstaged tracked changes
+pairing manifest names the canonical and the AI workspace, and carries no
+other repository object; the AI workspace is a git repo with one github.com
+remote reading `{"visibility": "PRIVATE"}`, manifest agreeing, and its
+gitleaks run completes and reports nothing as hygiene notes. The closing
+spines' handoffs record `base_branch: main` under `## 2. Spine context`, the
+manifest's `canonical.default_branch` reads `main`, and `git rev-parse HEAD`
+and `git rev-parse main` print the same object id; the canonical's checkout
+carries no staged or unstaged tracked changes; the AI workspace's checkout
+is clean at its own branch `main` with no staged or unstaged tracked changes
 of its own, and neither repo carries a `.gitleaks.toml` of its own.
 
 Clone and index state, stated so nothing above infers it: every repo in the
@@ -59,5 +60,11 @@ and `git ls-files -v` marks no tracked path in any of them with
 `assume-unchanged` or `skip-worktree`.
 
 Inventory, manifest and allowlist state, stated so nothing above infers it: no
-manifest object records a `git_remote` beyond the remotes enumerated above;
+manifest object records a `git_remote` beyond the remotes this scenario enumerates;
 the working-tree hygiene allowlist is empty.
+
+Remote and surface state, stated so nothing above infers it: `git remote -v`
+in the canonical lists exactly one remote, `origin`, on github.com; no
+tracked file in the canonical other than `README.md` names or describes
+either moat item; `README.md`'s content hash, read at the canonical's
+current tip `8a7b6c5`, is `c3d4e5f`.

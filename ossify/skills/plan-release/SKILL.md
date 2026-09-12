@@ -1,6 +1,6 @@
 ---
 name: plan-release
-description: Plan an ossify release — groom the feature map into spines, phrase exit criteria as user journeys, sequence spines by DAG, declare each spine bone or flesh under a fail-closed architect-critic veto, and emit RELEASE.md. Use when the user wants to plan a release, groom the feature map, pick spines for the next release, plan Release 0 (the skeleton), or runs /plan-release. Requires a project onboarded via /start. Not spec-core onboarding (/start) or spine decomposition (/plan-spine).
+description: Plan an ossify release — groom the feature map into spines, phrase exit criteria as user journeys, sequence spines by DAG, declare each spine bone or flesh under a fail-closed internal critic veto, and emit RELEASE.md. Use when the user wants to plan a release, groom the feature map, pick spines for the next release, plan Release 0 (the skeleton), or runs /plan-release. Requires a project onboarded via /start. Not spec-core onboarding (/start) or spine decomposition (/plan-spine).
 ---
 
 # plan-release
@@ -72,7 +72,7 @@ libs break. Use `oss help` for discovery.
 
 ```bash
 if ! sp="$(oss state_path 2>/dev/null)"; then
-  printf '%s\n' "ossify requires a workspace-init pairing manifest; run /init-workspace or /pair-workspace first."
+  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands."
   exit 0
 fi
 # Later bare verbs resolve state alone and would honor this override —
@@ -111,6 +111,10 @@ it reintroduces a silent cross-project read that looks exactly like success.
 amendments, quarantined lines, outstanding fakes, patch records, a held lock or
 orphan worktrees. Run it if the state itself looks inconsistent; invoke **`ossify:doctor`**
 if you want the advisory surfaces, which this skill does not invoke.
+
+**Wayfinder pre-flight.** If a map exists for this repo, its resolved decisions
+pre-fill stations below rather than being re-elicited. Branch logic:
+`${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/references/preflight.md` — do not restate it here.
 
 ---
 
@@ -189,8 +193,11 @@ oss release_set_meta "$rel" '{"exit_criteria":["At close, a trader can …"]}'
 prints the minted spine id (`r0.s1`, …). Capture both — every later call is keyed
 by them. `spine_add`'s class argument accepts **only** `bone` or `flesh` (anything
 else exits 2); the class you pass here is the *declared* class, and §7 may
-overrule it. An optional 4th argument sets `target_repo` (defaults to
-`canonical`); pass the private-side repo for a spine that lands there.
+overrule it. The 4th argument sets `target_repo`. It is **optional only when exactly
+one repo is declared** — the default resolves to that sole repo. With **two or
+more declared it is REQUIRED**, and omitting it refuses at rc 2 *after* the
+release has been created, leaving a release with no spines: pass the target's
+key on every `spine_add` in a multi-repo project.
 
 **Release 0:** normal ceremony, no shortcuts — with the **skeleton spine
 pre-seeded** from `start`'s skeleton-cut. It is `bone` class by definition (it
@@ -319,26 +326,25 @@ On no hit: change nothing, record nothing. Full usage in
 ### 7c. Critic veto (fail-closed)
 
 Submit `RELEASE.md` + the bones registry (with touch surfaces) + each spine's plan
-to a **standard** architect-critic pass and interpret its findings plugin-side.
-architect-critic gains no new interface — the veto is entirely our reading of
-ordinary findings.
+to the internal adversarial audit — ossify's own `challenge` skill in audit
+mode — and interpret its findings plugin-side. The veto is entirely our reading
+of ordinary findings. **The audit always runs**; there is no plugin whose
+absence skips it, so the class declaration is never critic-free.
 
-1. **Probe:** `oss critic_detect`. If `absent`, warn once — *"architect-critic not
-   installed — skipping the class-declaration veto. Install via `/plugin install
-   architect-critic` (v0.2+)."* — and continue with the §7a/§7b judgments only.
-2. **Invoke** via the env-var bridge — `export` it, one quoted absolute path,
-   `--close` inside the string, plugin-qualified skill name:
-
-   ```bash
-   export ARCHITECT_CRITIC_ARGS="--spec \"<absolute path to RELEASE.md>\" --close"
-   ```
-
-   ```text
-   Skill(architect-critic:critiquing-spec)
-   ```
-
-   There is **no** `target=` / `depth=` / `artifact_path=` parameter. All three
-   details fail silently when wrong (see `references/critic-veto.md` §2).
+1. **Render the draft first.** The audit reads a real file on disk, and §8's
+   emission is what creates `RELEASE.md` — so emit §8's draft **now** (the
+   release directory, the five-part render at the classes the ladder declared),
+   audit the draft, then re-render at §8 with the veto's dispositions folded
+   in. Auditing a file that does not exist yet is a halt, not a no-findings
+   pass.
+2. **Run the audit.** Read
+   `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end and
+   follow it: the draft `RELEASE.md` is the artifact, the depth is `close`,
+   the target label is the release id. The registry and spine plans go into
+   the conversation alongside it. Whether an external fresh-frame adversary
+   joins is the ladder's decision (`challenge/references/adversaries.md`);
+   the summary names what ran. Full submission rules in
+   `references/critic-veto.md`.
 3. **Interpret each finding** — the fail-closed ladder:
 
 | Finding | Disposition | Action |
@@ -366,7 +372,9 @@ Full input contract, the veto-grade test, and the three ESCALATE triggers in
 
 ## 8. Emit RELEASE.md
 
-Create the release spec directory and write `RELEASE.md` into it:
+Runs **twice**: §7c renders the draft the veto audits; this pass re-renders
+with the dispositions folded in. Create the release spec directory and write
+`RELEASE.md` into it:
 
 ```bash
 rel_dir="$(oss release_dir "$rel")"   # ABSOLUTE, manifest-rooted — never paste the <ai-workspace> shape
@@ -375,8 +383,9 @@ mkdir -p "$rel_dir"                   # e.g. docs/specs/r0/RELEASE.md lives here
 
 The directory name is the release id **verbatim** — ossify's ID grammar has one
 owner (spec §9.2), and release directories, branch names, worktree paths, and
-ledger keys all derive from it without transformation. Route the path through the
-pairing manifest like every other ossify artifact.
+ledger keys all derive from it without transformation. Route the path through
+`oss release_dir`, which resolves the topology declaration like every other
+ossify artifact — never a hand-built path.
 
 `RELEASE.md` carries five things and no more: the **goal** (the user-journey
 promise), the **spine order + dependencies** (rendered from `spine_dag`), each
@@ -466,10 +475,10 @@ that cites it.
   the verbs `oss help` lists: state CRUD, registry adds, and probes. It
   holds no judgment and never should — `touch_check` matches globs, it does not
   decide what the match means.
-- **`architect-critic:critiquing-spec`** is invoked as an unmodified peer skill.
-  It runs its own rebuttal loop and returns a summary of standing challenges; the
-  veto is **our** interpretation of that summary (spec §12: the critic gains no
-  new interface or obligations). Do not ask it for a verdict; ask it for findings.
+- **`challenge` (audit mode)** is ossify's own critic. As a ceremony caller
+  it returns every consolidated finding unwalked — no internal rebuttal
+  (audit.md §7) — and the veto below is **our** interpretation of that
+  returned set. Do not ask it for a verdict; ask it for findings.
 - **Peer entry skills:** `start` owns spec-core, the bones registry, and the
   *advisory* spec-core critic moment — do not import its disposition-triage
   semantics into this fail-closed veto, and do not export the veto's semantics

@@ -103,14 +103,13 @@ work-item close against the wrong work item succeeds — the gate runs, a commit
 lands, a branch merges — and nothing reports a problem until a later ceremony
 finds a spine it cannot reconcile.
 
-One disposition is not a refusal: a **canonical** change belonging to no open
-spine or work item — a typo fix, a doc touch-up — is not a close at all. Run
-SKILL.md §3's pre-flight (the lane reads the registries and mutates state
-too), then route it to the patch lane (`references/patch-lane.md`), never a
+One disposition is not a refusal: a change to **any declared repo** belonging
+to no open spine or work item — a typo fix, a doc touch-up — is not a close at
+all. Run SKILL.md §3's pre-flight (the lane reads the registries and mutates
+state too), then route it to the patch lane (`references/patch-lane.md`),
+which resolves and records which declared repo the patch targets, never a
 forced ceremony. An AI-workspace edit needs no lane — no ceremony governs
-that repo; an out-of-spine change in any other product repo has no documented
-lane — surface it rather than improvising one. (SKILL.md §2 states the same
-rule at the routing table.)
+that repo. (SKILL.md §2 states the same rule at the routing table.)
 
 `oss get` is `jq -r` without `-e`: a `select` matching nothing exits **0** with
 an empty string. Test the *output*, not the rc, whenever you resolve an id
@@ -124,8 +123,9 @@ against state — `oss get … || …` never fires on a typo.
 - **Inferring scope from the phrasing** — "close the spine" with a work-item id
   is a work-item close. The words are how the skill was reached; the id is what
   it operates on.
-- **Inferring scope from the environment** — the branch canonical is on, the last
-  thing closed, the newest spine. All three are guesses dressed as context.
+- **Inferring scope from the environment** — the branch a repo happens to be
+  on, the last thing closed, the newest spine. All three are guesses dressed
+  as context.
 - **Comparing `oss id_parse`'s whole line against a bare scope word** (§2).
 - **Calling `oss_id_parse`** (the lib function) instead of `oss id_parse` (the
   dispatcher verb).

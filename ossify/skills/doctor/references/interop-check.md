@@ -37,11 +37,12 @@ ok: manifest - /path/to/.workspace/pairing.json
 fail: agents_md - no AGENTS.md at /path/AGENTS.md; a Codex session gets no project instructions at all
 ```
 
-Check names, in this order: `manifest`, `canonical`, `ai_workspace`,
-`state_path`, `agents_md`. **If any line is `fail:`, say so explicitly at the
-end** — there is no exit code to carry it now, so the summary is what the reader
-acts on. Report every failing line, not just the first, except where §3 says to
-stop.
+Check names, in this order: `manifest`, `ai_workspace`, one `ok:`/`fail:`
+line per declared repo — named by its own key, `canonical` for a project that
+declares one that way — `state_path`, `agents_md`. **If any line is `fail:`,
+say so explicitly at the end** — there is no exit code to carry it now, so the
+summary is what the reader acts on. Report every failing line, not just the
+first, except where §3 says to stop.
 
 ---
 
@@ -70,22 +71,42 @@ ceremony read it?** If nothing reads it, its absence is not a finding.
 
 ### `manifest`
 
-Walk up from `$PWD` for `.workspace/pairing.json` and read it. That walk is a
+Walk up from `$PWD` for `.ossify/topology.json` **first**, then for
+`.workspace/pairing.json` if no topology file turns up — the identical order
+`oss_topology_discover` resolves through (`lib/manifest.sh`), which is what
+every mutating verb and `oss manifest_require` itself already routes on. When
+both exist on the walk-up, topology wins; read whichever file you actually
+found. That walk is a
 few directory checks; do it yourself.
 
+**This is not a cosmetic ordering choice.** The declared-repo loop the next
+check runs already reads either manifest kind (`.repos` under a native
+topology, or every top-level `.root`-carrying object under a legacy pairing
+manifest). A `manifest` check that only ever looks for `.workspace/pairing.json`
+would STOP here — before that loop ever runs — on every project `/start`'s A1
+topology probe onboarded the normal way, which is `.ossify/topology.json` with
+no pairing manifest at all.
+
 `oss manifest_require` is the *refusal*, not the finder — it returns rc 1 and
-prints the project's canonical refusal text to **stderr**, and discards the path
+prints the project's canonical refusal text to **stderr** (already worded for
+both manifest kinds — `/ossify:start`/`/ossify:adopt` for a topology
+declaration, `/init-workspace`/`/pair-workspace` for a pairing manifest), and
+discards the path
 on success. Use it when you want that exact wording; do not expect a path from
 it. There is no dispatcher verb that echoes the manifest path.
 
-**Absent → `fail:`, and STOP.** Do not run the remaining checks. Every one of
+**Absent (neither file found anywhere on the walk-up) → `fail:`, and STOP.**
+Do not run the remaining checks. Every one of
 them reads this file, so continuing emits four derived failures for one root
 cause and buries the only thing that has to be fixed first. Remedy:
-`/init-workspace` (new workspace) or `/pair-workspace` (existing canonical
-repo) — name those tokens literally, do not paraphrase them.
+`/ossify:start` or `/ossify:adopt` (authors `.ossify/topology.json`) for a new
+or adopted project, or `/init-workspace`/`/pair-workspace` (authors
+`.workspace/pairing.json`) for an existing dual-repo workspace — name those
+tokens literally, do not paraphrase them.
 
-**Present but unreadable → `fail:`, and STOP**, for the same reason. Read the
-file and satisfy yourself it is **exactly one JSON object**. Three ways it is
+**Present but unreadable → `fail:`, and STOP**, for the same reason. Read
+whichever file you found and satisfy yourself it is **exactly one JSON
+object**. Three ways it is
 not, all of which used to reach the later checks and produce nonsense:
 
 - Malformed JSON.
@@ -98,13 +119,18 @@ not, all of which used to reach the later checks and produce nonsense:
   and every later line is nonsense about a path nobody configured. Count the
   top-level values. (#169)
 
-### `canonical` and `ai_workspace`
+### `ai_workspace` and every declared repo
 
-Both roots must resolve, and both must be real directories.
+`ai_workspace`'s root must resolve and be a real directory, and so must every
+repo the manifest declares — the same repo set the `manifest` check above
+already read the file for (a native topology's `.repos` object; every top-level
+object carrying a `root` other than `ai_workspace` under a legacy pairing
+manifest, translated the same way `_oss_topology_shape` does). Emit one
+`ok:`/`fail:` line per key, tagged with that key.
 
 ```bash
-oss repo_root canonical
 oss repo_root ai_workspace
+oss repo_root "<repo-key>"            # once per declared repo
 ```
 
 Use the verb, not the raw JSON value. It substitutes `${...}` tokens and refuses
@@ -124,26 +150,59 @@ Distinguish the two failures — they have different causes and different fixes:
 The second is the one that happens to real projects, usually after a repo is
 renamed or moved.
 
-**`canonical` must also be a git work tree.** Probe it:
+**Every declared repo must also be a git work tree — and its OWN top level.**
+Probe each:
 
 ```bash
-git -C "$(oss repo_root canonical)" rev-parse --is-inside-work-tree
+root="$(oss repo_root "<repo-key>")"
+# `-P` because git resolves symlinks in --show-toplevel; comparing an
+# unresolved manifest root against a resolved toplevel reports drift that
+# is not there.
+top="$(git -C "$root" rev-parse --show-toplevel 2>/dev/null)"
+[ "$top" = "$(cd "$root" 2>/dev/null && pwd -P)" ] \
+  && echo "ok: worktree(<repo-key>)" \
+  || echo "fail: worktree(<repo-key>) - resolved root is not this repo's top level (git says '${top:-<no work tree>}')"
 ```
 
-The probe must print `true` — rc 0 alone is not the pass. A canonical root that
-is an ordinary directory (`.git` removed, the manifest hand-edited) fails the
+**`--show-toplevel` compared against the root, not `--is-inside-work-tree`.**
+A declared root that is a *subdirectory* of another repo's work tree answers
+`true` to `--is-inside-work-tree`, so the check reports the repo healthy while
+every later `git -C "$root"` branch, worktree, checkout and merge targets the
+**parent** repository. Two topology entries pointing inside one repo then mutate
+the same repository while reading as separate. `boundary-audit.md` §2 already
+specifies the exact-root form and says why; this is the same check, and the two
+must not disagree about what "is a repo" means.
+
+The comparison must hold — rc 0 alone is not the pass.
+
+**And the top levels must be DISTINCT across declared repos.** Two keys whose
+roots resolve to the same git top level are accepted everywhere else as
+independent repos: the two-pass branch setup in
+`work-item/references/round-orchestration.md` §2 sees the spine branch absent
+for both, cuts it on the first key's iteration, and fails `checkout -b` on the
+second — and re-running hits the existing-branch guard, which that document says
+is not resumable. Collect the resolved top levels and report a duplicate as a
+`fail:` line naming both keys.
+
+This check lives HERE and not in `_oss_topology_shape` deliberately. Distinctness
+is a filesystem question — it needs a `git rev-parse` per declared repo — and the
+shape function runs on every `oss` invocation, so answering it there would put N
+git subprocesses behind every state read. Doctor is the surface that already
+walks the roots. A declared repo whose
+root is an ordinary directory (`.git` removed, the manifest hand-edited) fails the
 probe outright; a **bare repository or a `.git` directory** answers rc 0 to
 weaker probes like `--git-dir` — and even *survives* `oss worktree_add`, since
 git happily adds worktrees from a bare repo — so the first break comes later
 and worse: spine close's checkouts and merges run against the root itself and
 need a work tree there. A probe that certifies switch-ready and defers the
 failure to mid-ceremony is the #153 shape one level in. Line:
-`fail: canonical - resolved root is not a git work tree: <path>`. (#153, #183)
+`fail: <repo-key> - resolved root is not a git work tree: <path>`. (#153, #183)
 
 **Do not apply the git probe to `ai_workspace`.** That workspace is legitimately
 allowed to be untracked, so the same probe there is a false failure. This is the
-one place the two roots are deliberately *not* treated alike — a check that
-loops over both keys uniformly is wrong.
+one place `ai_workspace` and a declared repo are deliberately *not* treated
+alike — a check that loops over `ai_workspace` with the declared repos is
+wrong.
 
 ### `state_path`
 
@@ -273,7 +332,7 @@ Stated so a green result is not over-read:
 - **Whether the two agents agree on anything else** — model config, tool
   availability, or which branch is checked out.
 - **Anything about `.codex` memory.** There is no Codex memory mirror and there
-  should not be one: the shared source of truth is the pairing manifest, the
+  should not be one: the shared source of truth is the topology declaration, the
   lean spec, the memory bank and `project-state.json`. If you find a `.codex`
   memory tree, that is drift worth reporting in the read-out, not a thing to
   create.

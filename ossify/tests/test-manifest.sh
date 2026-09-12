@@ -294,4 +294,164 @@ t_assert_eq 'a${T}b'  "$(_oss_subst_literal 'a${T}b' '${T}' '${T}')" "subst: a r
 t_assert_eq "plain"   "$(_oss_subst_literal 'plain' '${T}' 'Z')"    "subst: no occurrence leaves the string alone"
 
 rm -rf "$TMP"
+
+# ===========================================================================
+# TOPOLOGY TWIN (#272/#310 Task 11, spec decision O1): pairing.json is
+# normalized on read into ONE internal shape, so the manifest-resolution
+# mechanics this file pins against .workspace/pairing.json above must hold
+# byte-for-byte against .ossify/topology.json too - if they diverged, the
+# fallback would be a second dialect, not a genuine adapter.
+#
+# A FRESH temp tree ($TMPT, never $TMP above) and a repo named "core" -
+# deliberately never "canonical" - so nothing below can pass by coincidence
+# of a magic name. "ai_workspace" resolves throughout even though
+# topology.json carries no `ai_workspace` KEY at all: it is derived
+# structurally (the parent of `.ossify/`), not read off a field the way the
+# pairing arm reads `.ai_workspace.root`.
+#
+# SCOPED to the assertions that actually read the manifest: discovery, the
+# convention default, a routed well_known_paths token, the unresolved-token
+# guard, the RELATIVE-path guard, the dispatcher smoke check, spec_path's
+# convention/override/unresolved-token/relative-path refusal quartet, and
+# the '&' literalness guarantee. Left untwinned, with the reason at each:
+#   - _oss_resolve_state's OSS_STATE_FILE precedence and override-notice
+#     wording (:59-154 above) - no manifest read at all in those assertions,
+#     just a bare `/explicit/x.json` and a raw env var.
+#   - the `_oss_manifest_wellknown_guard`/PLUGIN_DATA/`_oss_subst_literal`
+#     blocks (:156-294 above) - pure functions over an already-resolved
+#     string, no discovery, no shape, no manifest source involved.
+#   - `oss_manifest_get '.ai_workspace.root'` and the removed-`manifest_get`-
+#     verb coverage (:80-98 above) - `.ai_workspace.root` is pairing-specific
+#     read vocabulary with no topology analog (topology has no such field to
+#     read; `_oss_manifest_ai_root` reads `.workspace` off the SHAPE
+#     instead, which is what this twin's own dispatcher `repo_root
+#     ai_workspace` check just below already exercises for the topology
+#     source.
+# ===========================================================================
+TMPT="$(mktemp -d)"
+mkdir -p "$TMPT/ws/.ossify"
+cat > "$TMPT/ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMPT/core"}},"well_known_paths":{}}
+JSON
+
+# Discovery + convention default (walk up from a nested dir).
+mkdir -p "$TMPT/ws/sub/deep"
+cd "$TMPT/ws/sub/deep"
+t_capture oss_topology_discover
+t_assert_rc 0 "topology twin: manifest discovered from nested dir"
+t_assert_eq "$TMPT/ws/.ossify/topology.json" "$T_OUT" "topology twin: discovered path"
+t_capture oss_manifest_state_path
+t_assert_rc 0 "topology twin: state path resolved"
+t_assert_eq "$TMPT/ws/.ossify/project-state.json" "$T_OUT" "topology twin: convention default state path"
+cd "$HERE"
+
+# Honor an explicit well_known_paths.project_state with a resolvable token.
+cat > "$TMPT/ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMPT/core"}},"well_known_paths":{"project_state":"\${ai_workspace.root}/.ossify/ps.json"}}
+JSON
+cd "$TMPT/ws"
+t_capture oss_manifest_state_path
+t_assert_rc 0 "topology twin: routed state path resolved"
+t_assert_eq "$TMPT/ws/.ossify/ps.json" "$T_OUT" "topology twin: routed path token resolved"
+cd "$HERE"
+
+# The silent-literal trap: an UNKNOWN token must be refused, not passed through.
+cat > "$TMPT/ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMPT/core"}},"well_known_paths":{"project_state":"\${repos.private_core.root}/ps.json"}}
+JSON
+cd "$TMPT/ws"
+t_capture oss_manifest_state_path
+t_assert_rc 1 "topology twin: unresolved token refused (not passed through as literal)"
+t_assert_contains "$T_OUT" "unresolved" "topology twin: refusal names the unresolved path"
+cd "$HERE"
+
+# Dispatcher-path smoke check: `oss state_path` works through bin/oss under
+# REAL strict mode, and `oss repo_root ai_workspace` resolves the derived key.
+cat > "$TMPT/ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMPT/core"}},"well_known_paths":{}}
+JSON
+cd "$TMPT/ws"
+t_capture "$HERE/../bin/oss" state_path
+t_assert_rc 0 "topology twin: oss state_path works through the dispatcher under strict mode"
+t_assert_eq "$TMPT/ws/.ossify/project-state.json" "$T_OUT" "topology twin: dispatcher state_path matches convention default"
+t_capture "$HERE/../bin/oss" repo_root ai_workspace
+t_assert_rc 0 "topology twin: dispatcher repo_root resolves ai_workspace with no ai_workspace KEY in the source file"
+t_assert_eq "$TMPT/ws" "$T_OUT" "topology twin: ai_workspace root, derived structurally rather than read off a field"
+cd "$HERE"
+
+# ---------------------------------------------------------------------------
+# The RELATIVE-path trap: a routed value must be refused, not resolved
+# against the caller's cwd.
+# ---------------------------------------------------------------------------
+cat > "$TMPT/ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMPT/core"}},"well_known_paths":{"project_state":"ps.json"}}
+JSON
+cd "$TMPT/ws"
+t_capture oss_manifest_state_path
+t_assert_rc 1 "topology twin: a RELATIVE routed state path is refused, not resolved against the cwd"
+t_assert_contains "$T_OUT" "not absolute" "topology twin: the refusal names absoluteness, not tokens"
+cd "$HERE"
+
+# ---------------------------------------------------------------------------
+# `oss spec_path` twin - the convention default, a CUSTOMIZED routed
+# destination winning over it, and the same unresolved/relative refusals.
+# ---------------------------------------------------------------------------
+cat > "$TMPT/ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMPT/core"}},"well_known_paths":{}}
+JSON
+cd "$TMPT/ws"
+t_capture oss_manifest_spec_path
+t_assert_rc 0 "topology twin: spec path resolved with no routing key"
+t_assert_eq "$TMPT/ws/docs/MASTER-SPEC.md" "$T_OUT" "topology twin: convention default matches workspace-init's own default destination"
+cd "$HERE"
+
+cat > "$TMPT/ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMPT/core"}},"well_known_paths":{"master_spec":"\${ai_workspace.root}/specs/LEAN-SPEC.md"}}
+JSON
+cd "$TMPT/ws"
+t_capture oss_manifest_spec_path
+t_assert_rc 0 "topology twin: routed spec path resolved"
+t_assert_eq "$TMPT/ws/specs/LEAN-SPEC.md" "$T_OUT" "topology twin: the ROUTED destination wins over the convention"
+cd "$HERE"
+
+# The same two guards apply, because they are the same guard (review round 1,
+# finding 1: the legacy case tests the UNRESOLVED-token refusal at :247-254 as
+# a scenario distinct from the RELATIVE-path refusal below - dropping it left
+# the twin one refusal short of its original).
+cat > "$TMPT/ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMPT/core"}},"well_known_paths":{"master_spec":"\${repos.private_core.root}/S.md"}}
+JSON
+cd "$TMPT/ws"
+t_capture oss_manifest_spec_path
+t_assert_rc 1 "topology twin: an unresolved token in the spec path is refused"
+cd "$HERE"
+
+cat > "$TMPT/ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMPT/core"}},"well_known_paths":{"master_spec":"docs/S.md"}}
+JSON
+cd "$TMPT/ws"
+t_capture oss_manifest_spec_path
+t_assert_rc 1 "topology twin: a relative spec path is refused"
+t_capture "$HERE/../bin/oss" spec_path
+t_assert_rc 1 "topology twin: dispatcher spec_path propagates the refusal under strict mode"
+cd "$HERE"
+
+# ---------------------------------------------------------------------------
+# A workspace root containing '&' - the hand-rolled substituter's literal-
+# replacement guarantee must hold from a topology source too, not only from
+# a pairing-translated one.
+# ---------------------------------------------------------------------------
+mkdir -p "$TMPT/amp&ws/.ossify"
+cat > "$TMPT/amp&ws/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"core":{"root":"$TMPT/core"}},"well_known_paths":{"master_spec":"\${ai_workspace.root}/docs/MASTER-SPEC.md"}}
+JSON
+cd "$TMPT/amp&ws"
+t_capture oss_manifest_spec_path
+t_assert_rc 0 "topology twin: a workspace root containing '&' still resolves"
+t_assert_eq "$TMPT/amp&ws/docs/MASTER-SPEC.md" "$T_OUT" "topology twin: the '&' survives verbatim instead of re-expanding to the matched token"
+t_capture oss_manifest_state_path
+t_assert_eq "$TMPT/amp&ws/.ossify/project-state.json" "$T_OUT" "topology twin: the same holds for the state resolver"
+cd "$HERE"
+
+rm -rf "$TMPT"
 t_summary

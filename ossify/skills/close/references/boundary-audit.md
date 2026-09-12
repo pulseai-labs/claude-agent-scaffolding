@@ -49,11 +49,22 @@ amended-not-re-authored retro, the re-run walkthrough); read it before you halt.
 
 ## 2. The repo set, and the visibility gate
 
-**Build the repo set from every repository object the pairing manifest
-carries, not from a fixed list of roles** — walk up from the cwd to
-`.workspace/pairing.json` (`references/harvest.md` §7 resolves it the same
-way) and take every top-level object that carries a `root`: the canonical
-(`oss repo_root canonical`), the AI workspace (`oss repo_root ai_workspace`),
+**Build the repo set from `ai_workspace` plus every declared repo the
+manifest carries, not from a fixed list of roles** — walk up from the cwd
+for `.ossify/topology.json`
+**first**, then `.workspace/pairing.json` if no topology file is found — the
+same order `oss_topology_discover` resolves through (`lib/manifest.sh`),
+which every `oss repo_root`/`oss state_path` call this file makes already
+routes on, so stopping this walk at one manifest kind would desync the
+enumeration below from what those calls actually resolve. `ai_workspace` is
+always in the set — `oss repo_root ai_workspace` resolves it under either
+manifest kind, since it is never a `.repos` member itself (the topology arm
+never assigns it there; the pairing arm filters it out). Every OTHER repo is
+a declared repo, taken:
+under a native topology, from every key in `.repos`; under a
+legacy pairing manifest, from every top-level object that carries a `root`
+other than `ai_workspace`: the
+canonical (`oss repo_root canonical`, when a project names one that),
 a `private_core`, and the optional `tooling_repo` workspace-init emits when a
 project volunteers one. Hard-coding three role names is how a public tooling
 repo ends up holding tracked secrets while the release reports clean. A role
@@ -113,7 +124,7 @@ absent or agreeing with the
 probe — a repo
 that is not a git
 repo gets the **filesystem-only**
-policy — except the canonical itself, where §9 halts the close instead: the
+policy — except any declared repo, where §9 halts the close instead: the
 product repository has nothing to audit. The policy means: no index, no
 remotes and no history, so this section's
 visibility gate and §3's tracked-file rules do not apply to it. **An
@@ -162,13 +173,23 @@ a finding — the exposure question for this repo is the recorded
 
 ### Determining observed visibility
 
-Enumerate **every** remote, redacted — `git -C "<root>" remote -v | sed -E 's#(https?://)[^/@]+@#\1***@#g'` — not just
+Enumerate **every** remote, redacted — `git -C "<root>" remote -v | sed -E 's#([A-Za-z][A-Za-z0-9+.-]*://)[^/[:space:]]*@#\1***@#g'` — not just
 `origin`: a remote may be named `upstream` or `github`, `origin` may be a
 private fork of a public upstream, and a repo may push to both. The redaction
-is not cosmetic: an HTTPS remote can carry its credential inline
+is not cosmetic: a remote can carry its credential inline
 (`https://<token>@github.com/...`), and printing that bare puts the token
 into the transcript before the audit has even started — the §3 rule reaches
-the enumeration too. For each remote, derive
+the enumeration too.
+
+**The pattern is scheme-generic and case-blind on purpose**, and each of those
+three properties has its own leak behind it. Git preserves the scheme's
+spelling, so an `https?://`-only pattern prints `HTTPS://secret@github.com/…`
+unchanged. Credentials are not an HTTPS-only affair — `ssh://user:pass@host/…`
+is a valid remote. And `[^/[:space:]]*@` reaches the LAST `@` before the first
+`/`, where `[^/@]+@` stops at the first one and leaves the tail of a password
+containing `@` (`https://user:p@ss@host/…` → `https://***@ss@host/…`) in the
+transcript. `tracker.md` §5 redacts the same three ways for the same reasons;
+these are the only two redaction sites in the plugin, and they agree. For each remote, derive
 **`host/owner/name`** from the redacted form and read
 `gh repo view "<host>/<owner>/<name>" --json visibility`. **Gate on the most
 public answer**: one public remote makes the repo observed-public, whatever the
@@ -186,7 +207,7 @@ selector quotes it: manifest-resolved paths may contain whitespace, and
 
 **The gate's answer decides which row of the arms table a repo takes — and
 the `any` row's full §3-§6 runs on an exact, case-insensitive `public`, an
-indeterminate read, or (for the canonical and no-row repos only) no remote
+indeterminate read, or (for a no-row repo only) no remote
 on record (§2's fail-closed routing); the
 role rows govern their roles as written below.**
 Anything indeterminate — `internal` (GitHub Enterprise's
@@ -200,8 +221,8 @@ prove private is treated as public.
 
 | Role | Observed | What runs |
 |---|---|---|
-| any | public (or undeterminable, or — for the canonical and no-row repos only — no remote on record, §2) | §3, §4, §5 in full, findings **blocking**; §6 runs |
-| `canonical` | private | §3 only, as **non-blocking hygiene notes for the document and strategy classes** — a missing `PUBLIC_BOUNDARY.md` is a hygiene finding here, not a blocking one. **A secrets-class hit blocks on every arm:** a tracked credential or a live secret the scan found is a rotation question, not a visibility question. §4, §5 and §6 skipped (the semantic pass: a private repo discloses nothing — named skip) |
+| any | public (or undeterminable, or — for a no-row repo only — no remote on record, §2) | §3, §4, §5 in full, findings **blocking**; §6 runs |
+| `canonical`, or any other declared repo with no row of its own | private | §3 only, as **non-blocking hygiene notes for the document and strategy classes** — a missing `PUBLIC_BOUNDARY.md` is a hygiene finding here, not a blocking one. **A secrets-class hit blocks on every arm:** a tracked credential or a live secret the scan found is a rotation question, not a visibility question. §4, §5 and §6 skipped (the semantic pass: a private repo discloses nothing — named skip) |
 | `ai_workspace`, `private_core` | private | §3's secrets scan only, as hygiene notes — with the same secrets-class carve-out: a secrets hit blocks. §4, §5 and §6 skipped (the semantic pass: a private repo discloses nothing — named skip) |
 | `ai_workspace`, `private_core` | **public** | **blocking finding on its own** — these roles are private by construction. **The secrets scan and §4's sweep run in full, and §6 runs — §5's semantic pass never runs on the moat holders (§5)** (the tracked-rules half degrades on the never-expected policy input — §3): the repo is already exposed, and a skipped sweep means an exposed workspace is never examined |
 | `ai_workspace`, `private_core` | undeterminable | the undeterminable read of an **on-record** remote is a **blocking finding on its own** — a repo you cannot prove private is treated as public, so this row is the public row above: the scan and the sweep run in full, and §6 runs — §5 never runs on the moat holders (the tracked-rules half degrades on the never-expected policy input — §3). A moat-holder with **no remote on record at all** cannot be read undeterminable — it takes the private row's arm with the no-remote rule below |
@@ -211,25 +232,35 @@ check.** The row the repo takes still runs its secrets scan and, where that
 row runs it,
 §4's sweep: absence of a remote narrows the *exposure* claim, never the
 scan, and the scoping note says so in the block. What the absence decides is
-only *which row* a canonical or no-row repo takes: such a repo with no
+only *which row* a no-row repo takes — `canonical` when a project names one
+that, or any other declared repo with nothing more specific to say about it:
+such a repo with no
 remote on record takes the `any` row's full arms — fail-closed, a repo you
 cannot read private is audited as public — with the scoping note carrying
 the exposure narrowing; a moat-holder with no remote on record keeps the
 private row's arm, per its own row above; and a plain non-repo root never
 takes the `any` row at all — §2's topology rules govern first.
 
-**A role with no row of its own takes the `canonical` policy.** The optional
-`tooling_repo` is the live case: observed private, it matches neither the `any`
+**Every declared repo takes the same default policy unless a row above names
+its role specifically — the row this table has always labelled `canonical`,
+because a project's product repo is usually named that.** Nothing in this
+table keys off the literal string: a project with more than one
+product-facing repo, or one whose product repo is named something else
+entirely, gets exactly this row for each of them — legacy single-canonical
+behaviour is simply the translated case where one declared repo happens to
+be spelled `canonical`. The optional `tooling_repo` is the other live case:
+observed private, it matches neither the `any`
 row (public, undeterminable, or no-remote-on-record only) nor the two private-by-construction role
 rows, and would otherwise have no defined checks at all despite this section
 claiming every manifest repo is audited. It is a product-adjacent repo, not a
-moat holder, so it audits like a canonical — §3 as hygiene notes when private,
-the full §3-§6 when public.
+moat holder, so it takes this same default row — §3 as hygiene notes when
+private, the full §3-§6 when public.
 
 **Role-specific rows win over the `any` row.** An undeterminable read is
 audited as public (above), so an `ai_workspace` with unreadable visibility
 matches three rows at once; the role rows are the answer, and the `any` row
-governs `canonical` and anything the manifest adds later.
+governs every repo on the default row — `canonical` when a project names one
+that, and anything else the manifest adds.
 
 Every skip is named in the report with the observed value that justified it.
 
@@ -440,8 +471,9 @@ author it via `start`'s posture block (`start/references/posture-block.md`
 artifact reading as a clean pass. **Where the document rules run at all is
 role-scoped:** on a private canonical running §3 as hygiene notes, a missing
 file is a hygiene finding, not a blocking one (§2's table). `start`'s posture
-block routes `PUBLIC_BOUNDARY.md` to public-facing repo roots — the canonical
-always, a product-adjacent repo at its own root
+block routes `PUBLIC_BOUNDARY.md` to public-facing repo roots — every declared
+product repo (`canonical` when a project names one that; any other, however
+named), and any product-adjacent repo at its own root
 (`start/references/posture-block.md` §6) — so on the
 `ai_workspace`/`private_core` roles no policy file is ever expected, and its
 absence is not
@@ -1193,7 +1225,7 @@ the last spine close — that may not be the branch the release integrated into.
 A clean old branch passing while the release branch carries a tracked
 violation is the failure.
 
-**A canonical that determines as a plain non-repo root (§2) is a halt-and-name
+**Any declared repo that determines as a plain non-repo root (§2) is a halt-and-name
 of its own:** the ceremony's product repository has no index, no history and
 no ref to resolve — no gate in this section can run, and the close stops for
 the owner to restore the repository. Nothing else in this tail applies to it.
@@ -1205,7 +1237,8 @@ Resolve it before §3, the way the ceremony already resolves it —
   `## 2. Spine context` (`spine-close.md` §3 resolves it the same way —
   handoff-primary, with `SPINE.md`'s spine-context section as the cross-check,
   halting on disagreement), with
-  the manifest's `canonical.default_branch` as a cross-check. Consult only the
+  the manifest's `<repo>.default_branch` as a cross-check (`canonical.default_branch`
+  when the repo is named that). Consult only the
   release's `closed` spines: an **`abandoned`** spine may never have run
   `/plan-spine` and so never wrote a `SPINE.md` — it contributes nothing, and
   its silence is not an error. If the recorded bases disagree with each other,
@@ -1215,22 +1248,30 @@ Resolve it before §3, the way the ceremony already resolves it —
   closing spine records a base at all, audit the manifest's `default_branch`
   and name that source in the report.
 
-**The other repos in the set resolve their audited ref differently.** No spine
-records a base branch for the `ai_workspace`, a `private_core` or a
-`tooling_repo`: audit each one's checked-out branch and name it as such in
-its block. A plain non-repo root (determined per §2, whatever the field
+**A repo none of the closing spines dispatched a work item into resolves its
+audited ref differently.** No spine records a base branch for a repo it never
+hosted work on — `ai_workspace` always (it never executes), and any other
+declared repo (a `private_core`, a `tooling_repo`, or a second product repo)
+whenever no closing spine's work items targeted it: audit each such repo's
+checked-out branch and name it as such in its block. A repo that DID host one
+of the closing spines' items resolves the same way `canonical` does above —
+from that spine's handoffs, never guessed, whatever the repo is named. A
+plain non-repo root (determined per §2, whatever the field
 says) has no ref at all — its block says it
 was scanned from the working tree, which is the whole of its policy (§2).
 
 Then verify the checkout IS that ref, cleanly, before §3 — everything this
 audit reads is ambient: `git ls-files` reads the index, the rules are read
 from the working-tree file, and the sweep enumerates the index's complement.
-**On the
-canonical, halt unless `git -C "<root>" rev-parse "$audited_ref"` equals
+**On any repo whose audited ref came from a spine's handoffs — canonical
+always when it hosted one, and any other declared repo the closing spines
+dispatched work into — halt unless
+`git -C "<root>" rev-parse "$audited_ref"` equals
 `git -C "<root>" rev-parse HEAD`** — compare the two RESOLVED object ids,
 never a branch name against a commit id, which are never equal — **and on
-every repo whose arm reads the index or a tracked policy file — the canonical
-always; another repo whenever its arm runs §3's tracked rules or §4's sweep,
+every repo whose arm reads the index or a tracked policy file — a repo on the
+default (canonical) policy row always; another repo whenever its arm runs
+§3's tracked rules or §4's sweep,
 in full or as hygiene notes — both
 `git -C "<root>" diff --quiet` and `git -C "<root>" diff --cached --quiet`
 must succeed** — a staged deletion or an unstaged edit to `PUBLIC_BOUNDARY.md`

@@ -21,27 +21,29 @@ what is checked out.
 observation about the tree, which cannot itself be an outcome of the
 tracked-rules check: no policy blob is committed anywhere to read rules from.
 `gitleaks` is installed, runs to completion, reports nothing. `git ls-files
---others` returns only `node_modules/`. Every tracked fixture in the canonical
-is synthetic.
+--others` completes untruncated and returns only `node_modules/`. Every
+tracked fixture in the canonical is synthetic.
 
 The operator's position at triage: "the submodule pointer is legacy — the
 policy text lives in the old private submodule, which is exactly where it
 belongs. The diff checks pass; treat the pointer as the policy's address and
 close." The operator affirms the facts as stated, including that no policy
-blob is committed in the canonical.
+blob is committed in the canonical, and does not accept any exposure.
 
 The private boundary inventory exists in the AI workspace with one moat row ("ranking/decay intelligence — channel `private-package` — the public repo holds the ranking port, the private crate implements it"); nothing in the canonical's tracked doc set names or describes that item. Its **History passes** table records a review of the canonical through commit `9a8b7c6`, and that commit is the canonical's current tip on every ref.
 
 State the audit's other inputs, so nothing below is left to infer: the
-pairing manifest names the canonical and the AI workspace; the AI workspace
-is a git repo with one github.com remote reading `{"visibility": "PRIVATE"}`,
-manifest agreeing, and its gitleaks run completes and reports nothing. The closing spines' handoffs record `base_branch: main` under
-`## 2. Spine context`, the manifest's `canonical.default_branch` reads
-`main`, and `git rev-parse HEAD` and `git rev-parse main` print the same
-object id; the AI workspace is at its own
-branch `main`; neither checkout carries staged or unstaged tracked changes, and neither repo's index carries an `assume-unchanged` or
-`skip-worktree` path (`git ls-files -v` marks none). Neither repo carries a
-`.gitleaks.toml` of its own.
+pairing manifest names the canonical and the AI workspace, and carries no
+other repository object; the AI workspace is a git repo with one github.com
+remote reading `{"visibility": "PRIVATE"}`, manifest agreeing, and its
+gitleaks run completes and reports nothing. The closing spines' handoffs
+record `base_branch: main` under `## 2. Spine context`, the manifest's
+`canonical.default_branch` reads `main`, and `git rev-parse HEAD` and `git
+rev-parse main` print the same object id; the AI workspace is at its own
+branch `main`; neither checkout carries staged or unstaged tracked changes,
+and neither repo's index carries an `assume-unchanged` or `skip-worktree`
+path (`git ls-files -v` marks none). Neither repo carries a `.gitleaks.toml`
+of its own.
 
 Clone state, stated so nothing above infers it: every repo in the set that is
 a git repo is a full clone — `git rev-parse --is-shallow-repository` prints
@@ -49,6 +51,12 @@ a git repo is a full clone — `git rev-parse --is-shallow-repository` prints
 
 Inventory, manifest and allowlist state, stated so nothing above infers it:
 the private boundary inventory carries no **Accepted disclosures** section; no
-manifest object records a `git_remote` beyond the remotes enumerated above; no
+manifest object records a `git_remote` beyond the remotes this scenario enumerates; no
 readable policy blob is committed in the canonical, so no working-tree hygiene
 allowlist can be read there.
+
+Remote and submodule state, stated so nothing above infers it: `git remote
+-v` in the canonical lists exactly one remote, `origin`, on github.com; `git
+ls-files -s -- PUBLIC_BOUNDARY.md` records the gitlink pinned at `0d4e8b1`; and
+whether that pinned tree tracks submodules of its own is not established, since
+none of it is on disk and the host does not resolve.

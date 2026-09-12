@@ -58,7 +58,7 @@ export const PLUGIN_CATALOG = Object.freeze([
   definePlugin({
     name: "ossify",
     defaultEnabled: false,
-    skills: ["start", "plan-spine", "work-item", "close", "plan-release", "doctor"],
+    skills: ["start", "adopt", "plan-spine", "work-item", "close", "plan-release", "doctor", "challenge", "wayfinder"],
   }),
 ]);
 

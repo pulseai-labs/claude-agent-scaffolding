@@ -10,6 +10,7 @@ _tmp="$(mktemp -d "${TMPDIR:-/tmp}/csa-test.XXXXXX")"
 trap 'rm -rf "$_tmp"' EXIT
 
 run_rule() { ( source "$1"; detect "$2" ); }
+run_rule_pipefail() { ( set -o pipefail; source "$1"; detect "$2" ); }
 
 # Helper: write a .mcp.json fixture
 make_mcp() {
@@ -87,6 +88,19 @@ test_env_var_leak_detects_literal_token() {
   assert_contains "$out" "MCP-003" || return 1
 }
 
+test_env_var_leak_detects_large_literal_token_under_pipefail() {
+  local f="$_tmp/.mcp.json"
+  {
+    printf '{"mcpServers":{"leaky":{"env":{"TOKEN":"sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+    awk 'BEGIN { for (i = 0; i < 1048576; i++) printf "!" }'
+    printf '"}}}}\n'
+  } > "$f"
+
+  local out; out="$(run_rule_pipefail "$CSA_RULES_DIR/mcp/env-var-leak.sh" "$f")"
+  assert_contains "$out" "MCP-003" \
+    "large early secret-shaped MCP value under pipefail" || return 1
+}
+
 test_env_var_leak_negative_env_ref() {
   local f; f="$(make_mcp ".mcp.json" '{
     "mcpServers": {
@@ -109,6 +123,7 @@ csa_test_run test_untrusted_endpoint_negative_https        || _csa_failed=$((_cs
 csa_test_run test_missing_auth_detects_unauthenticated     || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_missing_auth_negative_with_auth_header   || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_env_var_leak_detects_literal_token       || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_env_var_leak_detects_large_literal_token_under_pipefail || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_env_var_leak_negative_env_ref            || _csa_failed=$((_csa_failed + 1))
 
 [[ "$_csa_failed" -eq 0 ]] || exit 1

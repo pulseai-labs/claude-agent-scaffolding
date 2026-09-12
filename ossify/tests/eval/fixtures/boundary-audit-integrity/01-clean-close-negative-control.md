@@ -5,8 +5,10 @@ expected_findings: none — the allowlisted `.env` is a standing warning recappe
 ---
 Release `r4` is closing; steps 1-6 are done.
 
-The canonical has `origin` on github.com, and `gh repo view` returns
-`{"visibility": "PUBLIC"}`. The manifest carries no visibility field. State
+The canonical has `origin` on github.com — the only remote `git remote -v`
+lists — and `gh repo view` returns
+`{"visibility": "PUBLIC"}`. The pairing manifest records a `visibility` for
+neither repo — the fields were never written. State
 posture is `open-core`.
 
 `PUBLIC_BOUNDARY.md` is a regular tracked file at the canonical root and
@@ -19,16 +21,17 @@ canonical is synthetic.
 `gitleaks` is installed, runs to completion, and reports nothing. GitHub push
 protection reads enabled.
 
-`git ls-files --others` (ignored files included) returns `.env` (untracked,
-matching the hygiene allowlist's `.env*` entry) and the files under
-`node_modules/` — a recognizable dependency tree, which §4's bound collapses
-to one entry read by name.
+`git ls-files --others` (ignored files included) completes untruncated and
+returns `.env` (untracked, matching the hygiene allowlist's `.env*` entry)
+and the files under `node_modules/` — a recognizable dependency tree, which
+§4's bound collapses to one entry read by name.
 
-The pairing manifest names the canonical and the AI workspace; the AI
-workspace is a git repo with one github.com remote reading
-`{"visibility": "PRIVATE"}`, and its own gitleaks run completes and reports
-nothing — its block records the secrets scan as hygiene notes with the sweep, the
-semantic pass and the disposition as named skips.
+The pairing manifest names the canonical and the AI workspace, and carries
+no other repository object; the AI workspace is a git repo with one
+github.com remote reading `{"visibility": "PRIVATE"}`, and its own gitleaks
+run completes and reports nothing — its block records the secrets scan as
+hygiene notes with the sweep, the semantic pass and the disposition as named
+skips.
 
 The private boundary inventory exists in the AI workspace with one moat row ("ranking/decay intelligence — channel `private-package` — the public repo holds the ranking port, the private crate implements it"); the canonical's tracked doc set, swept against it per the semantic pass, names nothing — clean throughout. Its **History passes** table records a review of the canonical through commit `c7d8e9f`, and that commit is the canonical's current tip on every ref.
 
@@ -54,4 +57,4 @@ and `git ls-files -v` marks no tracked path in any of them with
 
 Inventory, manifest and allowlist state, stated so nothing above infers it:
 the private boundary inventory carries no **Accepted disclosures** section; no
-manifest object records a `git_remote` beyond the remotes enumerated above.
+manifest object records a `git_remote` beyond the remotes this scenario enumerates.

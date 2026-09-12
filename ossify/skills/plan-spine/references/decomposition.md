@@ -69,12 +69,12 @@ deliver another. That seam is the spine boundary you are looking for.
 | **Title** | What it delivers, in the product's vocabulary. Not "part 2 of 4" |
 | **Expected paths** | The files/modules it will touch. Feeds the §4c bone-touch check |
 | **Dependencies** | Sibling item ids it cannot start without. Feeds the round DAG |
-| **`target_repo`** | Exactly one repo. Defaults to `canonical`; see `cross-repo.md` |
+| **`target_repo`** | Exactly one repo. Defaults to the sole declared repo; see `cross-repo.md` |
 | **Rationale** | Why this item, at this size. One line |
 
 ```bash
 w1="$(oss work_item_add "$spine" "order-ticket form + validation")"
-w2="$(oss work_item_add "$spine" "paper-fill adapter" private_core)"   # NOT DISPATCHABLE — only canonical executes in this release (cross-repo.md's banner); shown for the field's shape only
+w2="$(oss work_item_add "$spine" "paper-fill adapter" private_core)"   # dispatchable since #272/#310 Task 9 (cross-repo.md's banner); shown for the field's shape only
 ```
 
 Each call prints the minted id (`r1.s2.w1`, …); capture it. An unknown spine id

@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/harness.sh"
-. "$HERE/../lib/id.sh"; . "$HERE/../lib/state.sh"; . "$HERE/../lib/entities.sh"
+. "$HERE/../lib/id.sh"; . "$HERE/../lib/state.sh"; . "$HERE/../lib/manifest.sh"; . "$HERE/../lib/entities.sh"
 TMP="$(mktemp -d)"; S="$TMP/state.json"
+# #272/#310 Task 4: oss_entity_add_work_item's omitted-target_repo default now
+# routes through _oss_default_repo_key (manifest.sh, sourced above), which
+# needs a discoverable manifest even for this direct lib-level call - the old
+# default was a literal `canonical`, never a lookup. $S is passed explicitly
+# throughout this file (never via OSS_STATE_FILE/manifest routing), so the
+# fixture below only needs to be DISCOVERABLE, not aligned to any state path.
+mkdir -p "$TMP/.ossify"
+cat > "$TMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$TMP/canon"}},"well_known_paths":{}}
+JSON
+cd "$TMP"
 oss_state_init "$S" ent-demo >/dev/null
 
 t_capture oss_entity_add_release "$S" "Skeleton" "core loop usable end-to-end"
@@ -135,5 +146,6 @@ t_assert_rc 0 "work item exec fields recorded"
 t_capture oss_state_replay "$S"
 t_assert_rc 0 "replay stays clean across the new status + exec ops"
 
+cd "$HERE"
 rm -rf "$TMP"
 t_summary

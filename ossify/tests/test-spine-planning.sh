@@ -15,6 +15,17 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 for lib in id state manifest commands entities registries ledger demo doctor; do . "$HERE/../lib/$lib.sh"; done
 OSS="$HERE/../bin/oss"
 TMP="$(mktemp -d)"; export OSS_STATE_FILE="$TMP/state.json"
+# #272/#310 Task 4: an omitted target_repo now routes through
+# _oss_default_repo_key, which needs a discoverable manifest even when
+# OSS_STATE_FILE pins the state path directly - the old default was a literal
+# `canonical`, never a lookup. well_known_paths.project_state is pinned to the
+# SAME path as OSS_STATE_FILE so _oss_resolve_state's override-notice never
+# fires and stays out of captured stdout below.
+mkdir -p "$TMP/.ossify"
+cat > "$TMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$TMP/canon"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
+cd "$TMP"
 
 "$OSS" init spine-planning-demo >/dev/null
 "$OSS" release_add "MVP" "a trader can place a paper trade" >/dev/null
@@ -48,10 +59,21 @@ t_capture "$OSS" work_item_add r0.s1 "order-ticket form"
 t_assert_eq "r0.s1.w1" "$T_OUT" "dispatcher: work_item_add mints r0.s1.w1"
 t_capture "$OSS" get '.work_items[0].target_repo'
 t_assert_eq "canonical" "$T_OUT" "dispatcher: target_repo defaults to canonical"
+# The default-key assertions above need EXACTLY ONE declared repo; this one
+# needs a second, or "explicit" is indistinguishable from "default". Widening
+# the fixture up front satisfies this and disarms those, and leaving it widened
+# makes every LATER omitted-key call in this file refuse - so the second repo is
+# declared here and withdrawn immediately after.
+cat > "$TMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$TMP/canon"},"private_core":{"root":"$TMP/priv"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
 t_capture "$OSS" work_item_add r0.s1 "paper-fill adapter" private_core
 t_assert_eq "r0.s1.w2" "$T_OUT" "dispatcher: second work item minted"
 t_capture "$OSS" get '.work_items[1].target_repo'
 t_assert_eq "private_core" "$T_OUT" "dispatcher: explicit target_repo stored"
+cat > "$TMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$TMP/canon"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
 
 # §4a: an unknown spine id is rc 7 and writes nothing (the body tells the skill
 # to resolve the spine at pre-flight instead of minting against a typo).
@@ -301,6 +323,7 @@ t_assert_rc 0 "replay clean after spine-planning ops"
 t_capture "$OSS" doctor
 t_assert_contains "$T_OUT" "ok: shape" "doctor shape green after spine-planning ops"
 
+cd "$HERE"
 unset OSS_STATE_FILE
 rm -rf "$TMP"
 t_summary

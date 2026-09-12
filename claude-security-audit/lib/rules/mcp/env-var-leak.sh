@@ -38,10 +38,11 @@ detect() {
 
   [[ -n "$values" ]] || return 0
 
+  local secret_re='sk-[A-Za-z0-9_-]{20,}|gh[psorau]_[A-Za-z0-9]{36,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|AKIA[0-9A-Z]{16}|[A-Za-z0-9+/=]{40,}'
   while IFS= read -r val; do
     [[ -n "$val" ]] || continue
     # Match secret-shaped patterns: sk- prefix, ghp_, eyJ (JWT), AKIA, or 40+ char alnum/+/= blob
-    if echo "$val" | grep -qE 'sk-[A-Za-z0-9_-]{20,}|gh[psorau]_[A-Za-z0-9]{36,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|AKIA[0-9A-Z]{16}|[A-Za-z0-9+/=]{40,}'; then
+    if [[ "$val" =~ $secret_re ]]; then
       local preview; preview="$(csa_redact "$val")"
       local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$val")"
       jq -nc \

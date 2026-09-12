@@ -9,7 +9,8 @@ returns `{"visibility": "PUBLIC"}` and the pairing manifest's canonical entry
 records `visibility: public`, agreeing — and it is clean end to end
 (`PUBLIC_BOUNDARY.md` a regular tracked file with every template rule,
 `git ls-files` matching no rule, `git ls-files --others` with ignored files
-included returning only `node_modules/`, `gitleaks` installed and running to
+included completing untruncated and returning only `node_modules/`, `gitleaks`
+installed and running to
 completion with nothing reported, posture `open-core`, every fixture
 synthetic).
 
@@ -56,5 +57,11 @@ and `git ls-files -v` marks no tracked path in any of them with
 
 Inventory, manifest and allowlist state, stated so nothing above infers it:
 the private boundary inventory carries no **Accepted disclosures** section; no
-manifest object records a `git_remote` beyond the one named above; the
+manifest object records a `git_remote` beyond the one this scenario names; the
 working-tree hygiene allowlist is empty.
+
+Repo-set, manifest and remote state, stated so nothing above infers it: the
+pairing manifest names the canonical and the AI workspace, and carries no
+other repository object; the AI workspace's manifest object carries no
+`visibility` field at all; `git remote -v` in the canonical lists exactly
+one remote, `origin`, on github.com.

@@ -36,8 +36,10 @@ the first place anyone notices a regression in an older journey.
 
 Both halves run against **composition-root post-merge state**, which is why the
 demo is step 4 and the merge is step 2. The runner resolves its working directory itself:
-the declared composition root when the project has one, the canonical repo root
-otherwise. Do not `cd` to help it — the manifest walk starts at `$PWD` and a `cd`
+the declared composition root when the project has one, the sole declared
+repo's root otherwise — refusing rather than guessing under more than one
+declared repo (#272/#310 Task 4), never a literal `canonical`. Do not `cd` to
+help it — the manifest walk starts at `$PWD` and a `cd`
 re-points every later state read (SKILL.md §3).
 
 ---
@@ -122,16 +124,75 @@ blind spot:
 The read-aloud test above catches the obvious abuse. It does not *establish*
 innocence, and the abuse it misses is the sincere one: an agent that genuinely
 believes the failure is unrelated and is wrong. There is a mechanical check —
-run it from the same workdir the runner resolved (§1; a declared composition
-root when there is one — the block below shows the canonical-root case):
+run it from the same workdir the runner resolved (§1 — the composition root,
+which is required and absolute once more than one repo is declared, and the sole
+declared repo's root when exactly one is):
 
 ```bash
+# $wd is NOT ambient. `oss demo_run` resolves its workdir internally and never
+# exports it, and neither spine-close.md nor this file ever assigned it - so
+# under the close's `set -u` this block aborted on the first reference, and
+# without it BOTH runs did `cd ""`, failed identically, and the matching output
+# read as "already broken" - manufacturing the quarantine evidence. Bind it
+# from the same resolution the runner uses before either invocation.
+wd="$(oss demo_workdir)" \
+  || { echo "halt: cannot resolve the demo working directory - see cumulative-demo.md section 1; the comparison is void without it"; exit 1; }
+[ -d "$wd" ] || { echo "halt: resolved demo workdir '$wd' does not exist"; exit 1; }
+
 # same command, both trees, and diff the OUTPUT before believing the rc
 cmd="$(oss get ".demo_ledger[] | select(.id==\"<line-id>\") | .command")"
-( cd "$canonical" && bash -c "$cmd" ) > /tmp/oss-head.txt 2>&1; echo "head rc=$?"
-git -C "$canonical" checkout --detach "$merge_sha^1"
-( cd "$canonical" && bash -c "$cmd" ) > /tmp/oss-parent.txt 2>&1; echo "parent rc=$?"
-git -C "$canonical" checkout -
+( cd "$wd" && bash -c "$cmd" ) > /tmp/oss-head.txt 2>&1; echo "head rc=$?"
+
+# EVERY hosting repo to its own first parent - not just the one $wd sits in.
+# $wd is the composition ROOT, which may be in any hosting repo or none of the
+# ones this line exercises, and the spine changed every repo $merge_shas names.
+# Detaching one and leaving the rest at post-merge state compares a tree that is
+# half before and half after this spine, and both wrong answers - "already
+# broken" and "this spine broke it" - come back looking like evidence.
+pairs="$(mktemp)"; restore="$(mktemp)"
+printf '%s\n' "$merge_shas" > "$pairs"
+# The restore runs on EVERY exit path, not just the happy one. Without the trap
+# a repo that cannot reach its first parent halts here with the repos ahead of
+# it still detached - a diagnostic check leaving the workspace half rolled back,
+# which is worse than the failure it was reporting.
+# A failed restore is a HALT, not a warning. `checkout || echo` returns zero, so
+# a repo whose checkout refuses - the parent demo run dirtied a file that
+# differs on the base branch is the ordinary way - left the trap satisfied, the
+# trap cleared, and the close continuing with that repo detached at a first
+# parent. Every repo is still ATTEMPTED before the halt, so one stuck repo does
+# not strand the rest.
+_oss_restore_failed=0
+_oss_restore_checkouts() {
+  while IFS="$(printf '\t')" read -r r w; do
+    [ -n "$r" ] || continue
+    git -C "$r" checkout -q "$w" || {
+      echo "close: cannot restore $r to '$w' - it is left detached; resolve it by hand"
+      _oss_restore_failed=1
+    }
+  done < "$restore"
+  [ "$_oss_restore_failed" -eq 0 ]
+}
+trap _oss_restore_checkouts EXIT
+while IFS=: read -r repo sha; do
+  [ -n "$repo" ] || continue
+  root="$(oss repo_root "$repo")" \
+    || { echo "halt: \$merge_shas names undeclared repo '$repo'"; exit 1; }
+  # Record the branch BEFORE detaching. `git checkout -` cannot restore N repos:
+  # it is per-repo and only remembers one step, and a second detach in the same
+  # repo would lose the original.
+  printf '%s\t%s\n' "$root" "$(git -C "$root" rev-parse --abbrev-ref HEAD)" >> "$restore"
+  git -C "$root" checkout --detach "$sha^1" \
+    || { echo "halt: cannot reach $sha^1 in $repo - the comparison is void"; exit 1; }
+done < "$pairs"
+
+( cd "$wd" && bash -c "$cmd" ) > /tmp/oss-parent.txt 2>&1; echo "parent rc=$?"
+
+# Restore every checkout before judging anything. A repo left detached is a
+# close that continues against a tree nobody meant to be on.
+_oss_restore_checkouts \
+  || { echo "close: the quarantine comparison left a repo detached - HALT before judging anything, the workspace is not in the state this check assumes"; exit 1; }
+trap - EXIT
+
 diff /tmp/oss-head.txt /tmp/oss-parent.txt
 ```
 
