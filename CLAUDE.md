@@ -1,15 +1,19 @@
 # claude-agent-scaffolding
 
-A **plugin marketplace** published to three surfaces: Claude Code (`/plugin install`, from
+A **plugin marketplace** published to four surfaces: Claude Code (`/plugin install`, from
 `.claude-plugin/marketplace.json`), Codex (`.agents/plugins/marketplace.json`, the v0
-dual-publish contract), and an OpenCode adapter bundle (`.opencode/`). There is no
-application — the plugins *are* the product.
+dual-publish contract), Devin (a root `.devin-plugin/plugin.json` meta-plugin over
+`git-subdir` sources; see `.devin/INSTALL.md`), and an OpenCode adapter bundle
+(`.opencode/`). There is no application — the plugins *are* the product.
 
 **A change to a plugin manifest or to packaging has to be carried to every surface that
 plugin ships on**, and CI enforces it rather than advising it: `tests/test-codex-dual-publish.sh`
-checks version and frontmatter parity across the two marketplaces, and the OpenCode adapter
-has both a unit suite and a live-loader integration test. `scaffold` is deliberately absent
-from the Codex v0 set — check the deferred list before assuming a plugin ships everywhere.
+checks version and frontmatter parity across the two marketplaces,
+`tests/test-devin-publish.sh` pins the Devin baseline set, per-plugin version parity, and the
+install doc's contract, and the OpenCode adapter has both a unit suite and a live-loader
+integration test. `scaffold` is deliberately absent from the Codex v0 set, and the Devin
+baseline is exactly five plugins — check the deferred lists before assuming a plugin ships
+everywhere.
 
 Shipped: `workspace-init`, `scaffold-onboard`, `scaffold-dev`, `scaffold`, `ai-mentor`,
 `architect-critic`, `claude-security-audit`, `ossify`, `code-judo`, `orca-crew`.

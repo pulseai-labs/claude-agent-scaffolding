@@ -1,7 +1,7 @@
 # claude-agent-scaffolding
 
-Personal Claude Code and Codex plugin marketplace, plus an OpenCode adapter
-bundle.
+Personal Claude Code, Codex, and Devin plugin marketplace, plus an OpenCode
+adapter bundle.
 
 ## Plugins
 
@@ -93,6 +93,24 @@ package spec. GitHub transport begins only after the first gated immutable
 `bundle-v<semver>` tag is published. See [the OpenCode installation, trust,
 update, and troubleshooting guide](./.opencode/INSTALL.md).
 
+### Devin
+
+Devin CLI and Devin Desktop >= `3000.10.21` load the repository itself: the
+root `.devin-plugin/plugin.json` is a meta-plugin whose `requiredPlugins`
+installs the five-plugin baseline — `workspace-init`, `ai-mentor`,
+`architect-critic`, `ossify`, and `code-judo`. Cloud sessions are outside the
+support claim, and `scaffold`, `scaffold-onboard`, `scaffold-dev`,
+`claude-security-audit`, and `orca-crew` are not published to Devin. Skills
+invoke namespaced as `/<plugin>:<skill>`.
+
+```
+devin plugins install --local .                            # meta-plugin linked; baseline deps still resolve from the remote repo
+devin plugins install pulseai-labs/claude-agent-scaffolding # remote, post-merge
+```
+
+`.devin/INSTALL.md` carries the installation, trust, update, and support
+contract that governs.
+
 ### Local Claude Code Development
 
 ```
@@ -167,6 +185,8 @@ Don't run `/grill-me` and `/council` in the same session — different interacti
 .
 ├── .claude-plugin/marketplace.json    # Claude Code marketplace manifest
 ├── .agents/plugins/marketplace.json   # Codex v0 marketplace manifest
+├── .devin-plugin/plugin.json           # Devin meta-plugin manifest
+├── .devin/INSTALL.md                   # Devin install and support guide
 ├── .opencode/                          # OpenCode adapter, runtime, and install guide
 ├── package.json                        # OpenCode bundle package contract
 ├── workspace-init/                    # workspace-init plugin (v0.5.0)

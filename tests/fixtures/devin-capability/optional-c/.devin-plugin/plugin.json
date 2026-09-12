@@ -1,0 +1,5 @@
+{
+  "name": "optional-c",
+  "version": "0.0.1",
+  "description": "Optional plugin that must NOT be auto-installed by the meta-plugin"
+}

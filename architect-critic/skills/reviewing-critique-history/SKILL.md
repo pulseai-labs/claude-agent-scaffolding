@@ -15,8 +15,10 @@ This skill is intentionally narrow: read, format, display. No judgment, no rebut
 
 Resolve the state file through the dispatcher, never a hardcoded path — `ac_state_path` resolves `ac_data_dir` (which honors a `CLAUDE_PLUGIN_DATA` override) and appends `state.json`, so this read path always matches the write path other skills use.
 
+Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+
 ```bash
-STATE_FILE="$(arc state_path)"
+STATE_FILE="$("$arc_bin" state_path)"
 ```
 
 If the file does not exist at that path, stop here and output:
@@ -29,7 +31,7 @@ Do not error. Do not try to create the file. Exit gracefully.
 
 ## Step 2: Parse `--limit N` from `$ARCHITECT_CRITIC_ARGS`
 
-The slash-command wrapper (`commands/critique-list.md`) exports the raw argument string as `$ARCHITECT_CRITIC_ARGS`. Read that env var — do not reference bash positionals like `$1` or `$2`, which get silently corrupted by Claude Code's template substitution at render time.
+The slash-command wrapper (`commands/critique-list.md`) exports the raw argument string as `$ARCHITECT_CRITIC_ARGS`. Read that env var — do not reference bash positionals like `$1` or `$2`, which get silently corrupted by Claude Code's template substitution at render time. On shim-less channels — Devin, `Skill()`, natural language — nothing exports it; read `--limit N` as a literal token in the invocation/request text.
 
 Parse the limit with:
 
@@ -95,6 +97,7 @@ Use Bash for the relative-time conversion if you need it, but keep the computati
 
 - `["claude"]` → `claude`
 - `["claude","codex"]` → `claude+codex`
+- `["devin"]` → `devin` (Devin host-only run)
 
 **`timeout?` column.** Only render this column if at least one row in the result set has `codex_timeout: true`. If no row has it, omit the column entirely to keep the table clean.
 
@@ -113,8 +116,8 @@ If `TOTAL <= LIMIT`, no annotation needed.
 After the `recent_runs` table, or immediately after the empty completed-run message when there are no completed runs, surface any background close-depth audits. These are dispatched by `/critique --close --async` and tracked in `external_runs[]`.
 
 ```bash
-arc state_external_run_list                 # all background runs
-arc state_external_run_list --status running   # just the in-flight ones
+"$arc_bin" state_external_run_list                 # all background runs
+"$arc_bin" state_external_run_list --status running   # just the in-flight ones
 ```
 
 If the array is empty, render nothing for this section (no header). Otherwise, emit a short second table — **running jobs first** — with columns: `run_id`, `status`, `artifact_path` (basename), `started_at` (relative), and a `resumed?` mark (`*` when `resolved_run_request_id` is non-null). End with a one-line pointer: *"Manage background audits with `/critique-jobs status|result|cancel|resume`."* This section is read-only — it never polls, cancels, or resumes (that is `managing-async-critique`).
@@ -218,7 +221,7 @@ Coupled to these `recent_runs[]` and `external_runs[]` fields in schema v3. If `
 
 **Removed in v2 — do not reference:** `in_flight` (top-level, async dropped), `cost_usd` (per-run, dropped).
 
-If `schema_version == 1`, emit: "state.json is schema v1 (pre-v0.2). Run `arc migration_check_v01_state` to see what the v0.1→v0.2 migration will do — `/critique` will not upgrade a v1 file." Then render with missing v2 fields blank.
+If `schema_version == 1`, emit: "state.json is schema v1 (pre-v0.2). Run `"$arc_bin" migration_check_v01_state` to see what the v0.1→v0.2 migration will do — `/critique` will not upgrade a v1 file." Then render with missing v2 fields blank.
 
 ---
 

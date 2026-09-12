@@ -43,10 +43,12 @@ is then equally suspect.
 
 ### Gate 2 — the spec reads and its ACs parse
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 Read the spec end to end (Read tool, absolute path), then:
 
 ```bash
-oss verify_acs "<abs spec path>"
+"$oss_bin" verify_acs "<abs spec path>"
 ```
 
 One TSV row per `auto:` AC — `label <tab> command <tab> expectation` — in
@@ -68,7 +70,7 @@ Two malformations still produce a row: an ASCII `->` where the grammar wants
 unusable. Check every row:
 
 ```bash
-oss verify_acs "<abs spec path>" | while IFS=$'\t' read -r label cmd exp; do
+"$oss_bin" verify_acs "<abs spec path>" | while IFS=$'\t' read -r label cmd exp; do
   case "$exp" in
     "exit "*)            case "${exp#exit }" in ''|*[!0-9]*) echo "GAP $label: 'exit' takes digits only, got '$exp'";; esac ;;
     "output contains "?*) ;;
@@ -80,8 +82,8 @@ done
 **Any `GAP` line is a blocking gap — return gaps-mode.** Do not "fix" the AC by
 reading past the garbage: the spec is what the close gate reads too, so an AC
 that is wrong here is wrong there. Left alone it costs the whole TDD loop —
-`oss redgate` answers rc 2 (malformed) rather than rc 0 (RED), so the loop
-cannot even start honestly, and `oss verify_step` rejects the same row at rc 2
+`"$oss_bin" redgate` answers rc 2 (malformed) rather than rc 0 (RED), so the loop
+cannot even start honestly, and `"$oss_bin" verify_step` rejects the same row at rc 2
 two ceremonies later at the close gate, where recovery option 1 ("re-dispatch
 the implementer — the default when the code is wrong") points at code that was
 never the problem.
@@ -105,7 +107,7 @@ Three ways this fails, all gaps:
 3. **Dirty** — *any* line of `--porcelain` output counts: modified, staged, or
    untracked alike.
 
-`oss work_item_branch "<work-item-id>" "<slug>"` prints the branch name the id
+`"$oss_bin" work_item_branch "<work-item-id>" "<slug>"` prints the branch name the id
 grammar implies, which is a cheap cross-check on what the handoff declared.
 
 **Never clean it yourself.** No `git stash`, no `git reset`, no `git checkout --`.
@@ -166,7 +168,7 @@ into the RED gate.
 The announcement is worse than noise. In Mode B it lands in the orchestrator's
 transcript as a status update it did not ask for and cannot act on; in Mode A it
 trains the user to skim your output. The evidence that pre-flight ran is the
-tool-call log — two Reads, the `oss verify_acs` parse with its row-shape check,
+tool-call log — two Reads, the `"$oss_bin" verify_acs` parse with its row-shape check,
 and two `git -C` probes, in order.
 
 ---

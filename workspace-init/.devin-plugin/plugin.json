@@ -1,0 +1,12 @@
+{
+  "name": "workspace-init",
+  "version": "0.5.0",
+  "description": "Bootstrap a dual-repo workspace (AI workspace + canonical) with pairing manifest and AI-trace commit-msg filter.",
+  "author": {
+    "name": "Praveen Kumar Singh",
+    "email": "praveensingh2897@gmail.com"
+  },
+  "homepage": "https://github.com/draco28/claude-agent-scaffolding/tree/main/workspace-init",
+  "repository": "https://github.com/draco28/claude-agent-scaffolding",
+  "license": "MIT"
+}

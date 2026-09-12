@@ -56,8 +56,10 @@ an empty section reads as "considered, nothing to say", a missing section reads 
 **Every `auto:` AC in the spec appears in this table**, whatever happened to it.
 That is not a style preference — the orchestrator runs
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss report_cross_check "<abs report path>" "<abs spec path>"
+"$oss_bin" report_cross_check "<abs report path>" "<abs spec path>"
 ```
 
 which parses the spec's ACs and greps this report for each label. A label it

@@ -145,7 +145,7 @@ test_bug_96_scorer_agent_inline() {
   local arc_bin="$PLUGIN_DIR/bin/arc"
   [[ -f "$skill_body" ]] || { assert_fail "skill body missing"; return; }
   # (a) SKILL.md must not prescribe any 'arc scorer_score...' invocation (the #96 phantom)
-  if grep -qE 'arc[[:space:]]+scorer_score' "$skill_body"; then
+  if grep -qE '(arc|arc_bin)"?[[:space:]]+scorer_score' "$skill_body"; then
     assert_fail "critiquing-spec/SKILL.md still prescribes 'arc scorer_score' (phantom command)"
   else
     assert_pass "critiquing-spec/SKILL.md prescribes no 'arc scorer_score' command"

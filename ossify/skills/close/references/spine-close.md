@@ -46,14 +46,16 @@ known gap rather than papered over.
 
 `$spine_id` is the id `/close` was invoked with, carried from §2's routing.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-open="$(oss get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"complete\") | .id] | join(\", \")")"
+open="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"complete\") | .id] | join(\", \")")"
 [ -z "$open" ] \
   || { echo "close: $spine_id has work items that are not complete: $open - halt"; exit 1; }
 ```
 
-**Test the output, never the rc.** `oss get` is `jq -r` without `-e`: a `select`
-matching nothing exits **0** with an empty string, so `oss get … || halt` never
+**Test the output, never the rc.** `"$oss_bin" get` is `jq -r` without `-e`: a `select`
+matching nothing exits **0** with an empty string, so `"$oss_bin" get … || halt` never
 fires and a spine with three unfinished items closes clean (`routing.md` §4).
 
 `complete` means "this item's work is on the spine branch" — §4 sets it *last*,
@@ -132,7 +134,7 @@ The two facts this step needs are not in state and are recovered, not guessed:
 # DERIVE the spine branch; never read it off HEAD. HEAD is durable git state
 # that a session boundary, a hotfix or a halted close can move. One value for
 # every hosting repo - the branch name carries no repo in it.
-spine_branch="$(oss branch_name "$spine_id" "$spine_slug")"
+spine_branch="$("$oss_bin" branch_name "$spine_id" "$spine_slug")"
 
 # $repo_base_branches is NOT ambient either: one "<repo>:<base_branch>" pair per
 # line, one line per hosting repo, recovered by the cross-check above and
@@ -142,7 +144,7 @@ spine_branch="$(oss branch_name "$spine_id" "$spine_slug")"
 # THE REPO SET IS READ AS AN ASSIGNMENT, never from a process substitution
 # (round 5 sweep): a selector failure inside `< <(...)` is invisible - the
 # loop receives zero repos and the pass succeeds having landed nothing.
-landing_repos="$(oss get ".work_items[] | select(.spine==\"$spine_id\") | .target_repo" | sort -u)" \
+landing_repos="$("$oss_bin" get ".work_items[] | select(.spine==\"$spine_id\") | .target_repo" | sort -u)" \
   || { echo "close: the hosting-repo set could not be read from state - halt"; exit 1; }
 
 merge_shas=""
@@ -150,7 +152,7 @@ pr_lines=""
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue
 
-  repo_root="$(oss repo_root "$repo")" \
+  repo_root="$("$oss_bin" repo_root "$repo")" \
     || { echo "close: $spine_id names undeclared repo '$repo' - halt"; exit 1; }
   _bases="$(printf '%s\n' "$repo_base_branches" | awk -F: -v r="$repo" '$1==r{print $2}' | sort -u)"
   _nbases="$(printf '%s\n' "$_bases" | awk 'END{print NR}')"
@@ -366,8 +368,8 @@ open, the close halts here, recording nothing**: surface the PR URLs, say which
 steps remain, and stop. That is the named halt state; re-invoke `/close
 <spine-id>` once the PR has merged.
 
-**On a surface that does not carry `/ossify:work-pr` — OpenCode today, where the
-utility commands are a Claude Code-only surface (#131) — the operator drives the
+**On a surface that does not carry `/ossify:work-pr` — OpenCode and Devin today,
+where the utility is not published (#131) — the operator drives the
 review-fix-merge loop by their own means and says so.** What this ceremony
 REQUIRES is a merge-commit landing of the PR it opened; who drove the loop to
 that merge is the operator's affair. The record pass below still proves the
@@ -385,7 +387,7 @@ work-pr lane to the remaining surfaces is #131's scope, not this step's.
 # PR that had one fix round.
 while IFS=: read -r repo pr_num; do
   [ -n "$repo" ] || continue
-  repo_root="$(oss repo_root "$repo")" \
+  repo_root="$("$oss_bin" repo_root "$repo")" \
     || { echo "close: pr_lines names undeclared repo '$repo' - halt"; exit 1; }
   _bases="$(printf '%s\n' "$repo_base_branches" | awk -F: -v r="$repo" '$1==r{print $2}' | sort -u)"
   _nbases="$(printf '%s\n' "$_bases" | awk 'END{print NR}')"
@@ -536,7 +538,7 @@ this.
 ## 4. Step 3 — apply the pending demo amendments
 
 ```bash
-oss ledger_apply_pending "$spine_id"
+"$oss_bin" ledger_apply_pending "$spine_id"
 ```
 
 `supersede` and `retire` are **planning** verbs: they record intent and leave the
@@ -552,8 +554,8 @@ An unknown spine id is rc 7 with a message, not a silent no-op.
 
 ## 5. Step 4 — the cumulative demo
 
-`oss demo_run` for every active `auto:` line, then walk
-`oss demo_user_lines "$spine_id"` — **this spine's own `user:` lines only** — with
+`"$oss_bin" demo_run` for every active `auto:` line, then walk
+`"$oss_bin" demo_user_lines "$spine_id"` — **this spine's own `user:` lines only** — with
 the human. Full detail, the §6.1-vs-§6.2 scoping, quarantine handling and the
 ledger's wall-clock budget in **`references/cumulative-demo.md`**.
 
@@ -586,7 +588,7 @@ parent**.
 paths="$(mktemp)"; : > "$paths"
 while IFS=: read -r repo sha; do
   [ -n "$repo" ] || continue
-  root="$(oss repo_root "$repo")" \
+  root="$("$oss_bin" repo_root "$repo")" \
     || { echo "close: \$merge_shas names undeclared repo '$repo' - the changed-path list would be INCOMPLETE - halt"; exit 1; }
   git -C "$root" diff --name-only "$sha^1" "$sha" >> "$paths" \
     || { echo "close: cannot diff $sha against its first parent in $repo - the changed-path list would be INCOMPLETE - halt"; exit 1; }
@@ -603,7 +605,7 @@ done < "$paths"
 [ "$#" -gt 0 ] \
   || { echo "close: the merge changed no paths in any hosting repo - the touch check is INCONCLUSIVE, not clean - halt"; exit 1; }
 
-tc=0; touch_hits="$(oss touch_check "$@")" || tc=$?
+tc=0; touch_hits="$("$oss_bin" touch_check "$@")" || tc=$?
 case "$tc" in
   0) printf '%s\n' "$touch_hits" ;;          # HIT - §7 and §8 act on these lines
   1) echo "touch check: clean" ;;            # clean - change nothing, record nothing
@@ -619,7 +621,7 @@ so a bone is never MISSED, only spuriously hit, and a spurious hit routes the
 spine to extra scrutiny rather than past it. When a hit looks wrong for the
 spine at hand, check which repo actually changed the path before acting on it.
 
-**One `oss touch_check` call over the union of every repo's paths, never one call
+**One `"$oss_bin" touch_check` call over the union of every repo's paths, never one call
 per repo.** A bone or a risk gate is a project-wide surface, not a per-repo one,
 and `touch_check`'s own rc contract (0 = HIT, 1 = clean, 2 = could-not-check) has
 no way to combine three separate verdicts into one close decision. Calling it
@@ -632,7 +634,7 @@ the same discipline §3's loop already established for the merge itself.
 `repo:sha` list, one pair per line — exactly what §3 built, one line appended
 per repo at that repo's own merge. A single `while IFS=: read -r repo sha` loop
 splits each line on its first colon (git ref names cannot contain `:`, so the
-split is unambiguous) and calls `oss repo_root` fresh for each — there is no
+split is unambiguous) and calls `"$oss_bin" repo_root` fresh for each — there is no
 `$merge_sha_by_repo[$repo]`-style lookup anywhere in this file, because bash 3.2
 has no associative arrays to hold one. The outer `while IFS= read -r p` loop is
 unchanged from the single-repo form: it still collects one path per line into
@@ -681,7 +683,7 @@ close-time check).
 ### 6.1 On a bone hit — reclassify mid-flight
 
 ```bash
-oss class_set "$spine_id" bone "bone-touch at close: <ADR-ref> (<matched surface>)"
+"$oss_bin" class_set "$spine_id" bone "bone-touch at close: <ADR-ref> (<matched surface>)"
 ```
 
 **Three arguments; the reason is required** and is the audit trail for a class
@@ -704,7 +706,7 @@ for a gate. A gate hit escalates to the bone path **plus that gate's controls**,
 one-liner inside a guarded surface is still a Risk event.
 
 ```bash
-oss get '.risk_gates[] | select(.name=="<name>") | .controls'
+"$oss_bin" get '.risk_gates[] | select(.name=="<name>") | .controls'
 ```
 
 Those are the `controls` recorded when the gate was registered. **Walk each one
@@ -716,7 +718,7 @@ both a bone and a gate; then both apply.
 ## 7. Step 7 — the adversarial audit, and the depth differs by class
 
 Run ossify's own audit — `challenge` in audit mode. Read
-`${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end and
+`skills/challenge/references/audit.md` (relative to the plugin root) end to end and
 follow it. The audit always runs; there is no plugin whose absence skips it,
 and nothing here blocks the close on an adversary that is not configured.
 
@@ -728,15 +730,15 @@ and nothing here blocks the close on an adversary that is not configured.
 - **flesh** — the light host-only pass: the same reference, shallow depth.
 
 The artifact is the spine's `SPINE.md` under
-`oss spine_dir "<release-id>" "<spine-id>" "<slug>"` — the same artifact
+`"$oss_bin" spine_dir "<release-id>" "<spine-id>" "<slug>"` — the same artifact
 `plan-spine` hands the audit (`plan-spine/references/spec-authoring.md` §6).
 That verb returns a **relative** path, so prefix it with
-`oss repo_root ai_workspace`; the audit wants one absolute path.
+`"$oss_bin" repo_root ai_workspace`; the audit wants one absolute path.
 
 The findings come back as **disposition rows**, and this is where spec §6.1's
 triage policy applies: spec-aligned recommendations auto-apply, and only
 load-bearing escalations reach the user. Record a class-moving disposition with
-`oss veto_add "$spine_id" "<finding>" auto-bone|override|escalate "<reason>"`.
+`"$oss_bin" veto_add "$spine_id" "<finding>" auto-bone|override|escalate "<reason>"`.
 
 ---
 
@@ -765,7 +767,7 @@ honest, not a failure to re-run) and where the outcomes are recorded — is in
 **Step 10 — worktree + branch cleanup, per work item, and only now:**
 
 ```bash
-oss worktree_remove "$(oss get ".work_items[] | select(.id==\"$wi\") | .target_repo")" "$wi"
+"$oss_bin" worktree_remove "$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .target_repo")" "$wi"
 ```
 
 **Already per repo, because the target is per item.** Walking every work item
@@ -781,8 +783,8 @@ argument, and the false one it is often confused with, are in `harvest.md` §1.
 **Step 11 — state updates:**
 
 ```bash
-oss spine_status "$spine_id" closed
-oss demo_record spine "$spine_id" "<true|false>" "<line-count>" "<notes>"
+"$oss_bin" spine_status "$spine_id" closed
+"$oss_bin" demo_record spine "$spine_id" "<true|false>" "<line-count>" "<notes>"
 ```
 
 `demo_record` takes `passed` as the literal `true` or `false` and rejects
@@ -819,7 +821,7 @@ clean, and an unreadable registry.
 ## 11. Anti-patterns
 
 - **Reading the spine branch off HEAD** instead of deriving it with
-  `oss branch_name` and asserting the match (§3).
+  `"$oss_bin" branch_name` and asserting the match (§3).
 - **Merging without switching back** — the spine merges into itself at rc 0.
 - **Trusting the checkout's rc alone.** A tracked file name checks out clean and
   leaves HEAD where it was (§3).
@@ -836,7 +838,7 @@ clean, and an unreadable registry.
   risk gate is a project-wide surface; the touch check judges the union, not a
   repo at a time (§6).
 - **Folding `touch_check`'s rc 2 into clean**, or reading rc 0 as clean (§6).
-- **Calling `oss class_set` with two arguments.** The reason is required, and a
+- **Calling `"$oss_bin" class_set` with two arguments.** The reason is required, and a
   missing one is a crash, not a default (§6.1).
 - **Assuming a touch hit is a bone.** Read the printed prefix (§6.2).
 - **Carrying close depth onto the flesh path** — the light host-only pass is

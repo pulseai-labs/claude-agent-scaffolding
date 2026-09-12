@@ -27,10 +27,12 @@ citing `SRS-4.2` is citing an artifact ossify does not produce. Catch it here.
 
 Two kinds, and only the first is a command:
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 **Mechanical** — the path exists, the ADR id exists, the quoted signature matches:
 
 ```bash
-oss get '[.bones[].adr]'                                  # the ADR ids that exist
+"$oss_bin" get '[.bones[].adr]'                                  # the ADR ids that exist
 test -f src/app/orders.rs                                 # the path exists
 grep -n 'fn submit_order' src/app/orders.rs || true       # the signature is still there
 ```
@@ -45,9 +47,9 @@ resolve
 from there, not from a remembered rule: file paths and signatures in the work
 item's declared `target_repo` when it carries one, the sole declared repo
 otherwise
-(`oss repo_root <name>`); bone ADRs in whichever declared repo the bone
+(`"$oss_bin" repo_root <name>`); bone ADRs in whichever declared repo the bone
 concerns
-(`start/references/bones-registry.md`); the lean spec wherever `oss spec_path` prints; release
+(`start/references/bones-registry.md`); the lean spec wherever `"$oss_bin" spec_path` prints; release
 increment records under the AI workspace's `docs/specs/<release-id>/`
 (`plan-release/references/release-md-emission.md` §1). A check run from the wrong root reports a false
 citation miss — the path is fine, the cwd was not.
@@ -78,7 +80,7 @@ being executed against architecture that no longer exists. Registered touch
 surfaces make the blast radius findable:
 
 ```bash
-oss get '.bones[] | select(.adr == "ADR-0002") | .touch'
+"$oss_bin" get '.bones[] | select(.adr == "ADR-0002") | .touch'
 ```
 
 ---

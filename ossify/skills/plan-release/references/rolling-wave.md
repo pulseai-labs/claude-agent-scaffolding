@@ -19,8 +19,10 @@ claiming authority it had lost.
 
 A goal line plus candidate spine names. That is the whole artifact.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss release_set_meta "$rel" '{"next_sketch":{"goal":"a trader can run a saved strategy against paper fills","candidates":["save a named strategy","paper-execution loop","positions list"]}}'
+"$oss_bin" release_set_meta "$rel" '{"next_sketch":{"goal":"a trader can run a saved strategy against paper fills","candidates":["save a named strategy","paper-execution loop","positions list"]}}'
 ```
 
 The sketch is recorded on the **current** release (it is the current planning
@@ -34,7 +36,7 @@ and 3 both read the *plan*, so there is nothing to run them against yet.
 
 The candidates are **names from the feature map**, not new inventions. If the
 sketch names something the map does not carry, add it to the map first
-(`oss feature_add`) — otherwise it exists only inside one release record and
+(`"$oss_bin" feature_add`) — otherwise it exists only inside one release record and
 disappears when that record is closed.
 
 ---

@@ -1,0 +1,14 @@
+{
+  "name": "ossify",
+  "version": "1.8.0",
+  "description": "Skeleton-first lifecycle from Release 0 through MVP and v1. Devin surface claims six skills — start, plan-release, plan-spine, work-item, close, doctor — plus the local work-item-worker subagent. adopt, challenge, and wayfinder are not advertised on this surface.",
+  "skills": [
+    "skills/start",
+    "skills/plan-release",
+    "skills/plan-spine",
+    "skills/work-item",
+    "skills/close",
+    "skills/doctor",
+    ".devin/skills"
+  ]
+}

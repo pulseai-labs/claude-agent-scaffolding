@@ -61,15 +61,17 @@ about it) and the `user:` walk — which journeys the human drove and whether ea
 outcome matched. Name any line that was **quarantined during this close**, with
 its expiry release.
 
-*Read it from:* step 4's `oss demo_run` output for the `auto:` half and the
-`oss demo_user_lines` walk for the `user:` half — both from this close, not from
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
+*Read it from:* step 4's `"$oss_bin" demo_run` output for the `auto:` half and the
+`"$oss_bin" demo_user_lines` walk for the `user:` half — both from this close, not from
 scrollback of an earlier one.
 
 **Quarantines: name the ones YOU quarantined, from step 4's own decisions.**
 The obvious selector returns every quarantine the ledger holds:
 
 ```bash
-oss get '.demo_ledger[] | select(.status=="quarantined")'    # ALL of them, all releases
+"$oss_bin" get '.demo_ledger[] | select(.status=="quarantined")'    # ALL of them, all releases
 ```
 
 Used as-is it attributes earlier spines' still-open tickets to this spine, and
@@ -83,7 +85,7 @@ the spine, is the finest provenance the state actually holds.
 
 Whether the class changed and why. If step 5 reclassified this spine mid-flight,
 record the `bone <adr>` or `risk_gate <name>` line `touch_check` printed and the
-reason string given to `oss class_set`. If the class did not move, one line
+reason string given to `"$oss_bin" class_set`. If the class did not move, one line
 saying so — an absent section reads as an omission, not as "nothing happened".
 
 ### `## 5. Bone and risk-surface findings`
@@ -105,7 +107,7 @@ indistinguishable from a clean pass.
 
 *Read it from:* step 7's critic return — the run's own summary, not a
 recollection of it — and the dispositions this close recorded,
-`oss get '.veto_dispositions[] | select(.spine=="<spine-id>")'`. Reconstructing
+`"$oss_bin" get '.veto_dispositions[] | select(.spine=="<spine-id>")'`. Reconstructing
 either from scrollback is how an auto-applied disposition goes unrecorded.
 
 ### `## 7. Fakes, deferrals and quarantines still standing`

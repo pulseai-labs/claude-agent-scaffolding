@@ -38,10 +38,12 @@ silently disagree with it.**
 3. **Correct the map if the answer is no** — go back to `journey-map.md` §3 and
    fix the marks there. Do not patch the set here; the map is the record.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
    **By the time you are reading this, the harvest has already run.** This file
    is depth for SKILL.md **§6**, and §5's "Harvest before moving on" step
    committed every non-`skeleton` step to the feature map before §6 began. The
-   map is **append-only** — `oss feature_add` has no remove or update sibling
+   map is **append-only** — `"$oss_bin" feature_add` has no remove or update sibling
    (`plan-release/references/feature-map-grooming.md` §2) — so a promotion here cannot retract the entry
    that already exists. The pre-harvest check belongs one station earlier and
    lives there: `journey-map.md` §3, "before you leave this block".
@@ -49,7 +51,7 @@ silently disagree with it.**
    So handle the two directions differently, because only one is recoverable:
 
    - **Demotion** (a `skeleton` step is really `next`/`later`): re-run §5's
-     `oss feature_add` for that step, or it never reaches the map at all.
+     `"$oss_bin" feature_add` for that step, or it never reaches the map at all.
    - **Promotion** (a `next`/`later` step belongs in the skeleton): its feature-
      map entry is already committed and **stays**. Do not hand-edit state to
      remove it. Say so now, and let the next groom prune it with a reason —
@@ -116,7 +118,7 @@ The cut pre-seeds Release 0 but does not plan it. Concretely it hands
 
 Release 0 still goes through the normal `plan-release` ceremony — with the retro
 input `n/a` and a possibly sparse feature map. `start` does not create the
-release; do not call `oss release_add` from this skill.
+release; do not call `"$oss_bin" release_add` from this skill.
 
 ---
 

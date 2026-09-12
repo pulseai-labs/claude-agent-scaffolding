@@ -20,8 +20,10 @@ Ids are used **verbatim**. ossify's ID grammar has one owner (spec §9.2): relea
 keys all derive from it without transformation — no re-shaping, no `VS-` forms, no
 zero-padding a work-item number to look tidy.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 The kebab slug comes from the spine's recorded name
-(`oss get '.spines[] | select(.id=="…") | .name'`). If it sanitizes to empty, stop
+(`"$oss_bin" get '.spines[] | select(.id=="…") | .name'`). If it sanitizes to empty, stop
 and fix the spine's name in state rather than inventing a directory slug.
 
 ### Authoring `SPINE.md` — the step that is easy to skip
@@ -85,7 +87,7 @@ zero-ACs class of bugs.
 
 ### The AC grammar — exact, because a parser reads it
 
-`oss verify_acs` parses these lines at the worker's pre-flight Gate 2. A line
+`"$oss_bin" verify_acs` parses these lines at the worker's pre-flight Gate 2. A line
 that does not match yields **no row**, and a spec whose ACs all miss the grammar
 reaches the worker as a spec with zero ACs:
 
@@ -111,7 +113,7 @@ no colon.** This is the one to get wrong, because §8's ledger lines take the
 batch of ledger lines will carry the habit straight into the spec. They are
 different grammars read by different parsers:
 
-| | Spec AC (`oss verify_acs`) | Ledger line (`oss ledger_add_auto`) |
+| | Spec AC (`"$oss_bin" verify_acs`) | Ledger line (`"$oss_bin" ledger_add_auto`) |
 |---|---|---|
 | Expectation | `expected: exit 0` | `exit:0` |
 | Arrow | `→` required | no arrow |
@@ -157,7 +159,7 @@ actually landed, and only then does the lane spawn round *K*.
 
 **How the lane knows to pause.** It checks, rather than assuming. Before spawning
 a round, the spec each work item names must exist and parse — that is the same
-`oss verify_acs` the worker's Gate 2 runs, just run one step earlier where the
+`"$oss_bin" verify_acs` the worker's Gate 2 runs, just run one step earlier where the
 recovery is cheap. A missing or unparseable spec is **not** a gap for the worker
 to surface: it means the round was dispatched before it was planned. Halt and
 re-enter `plan-spine` for that round.
@@ -178,7 +180,7 @@ the cumulative ledger with per-item scaffolding:
 | Scope | One work item | The whole product |
 | Lifetime | Until the item merges | Forever, until superseded/retired |
 | Run by | `close`'s work-item gate (`close/references/impl-check.md`) | The cumulative demo, at every future spine close |
-| Authored in | `spec.md` (§2) | `oss ledger_add_auto` / `ledger_add_user` (§8) |
+| Authored in | `spec.md` (§2) | `"$oss_bin" ledger_add_auto` / `ledger_add_user` (§8) |
 
 An item AC that asserts an internal helper returns the right shape is a good AC
 and a terrible ledger line. Promote to the ledger only what states something
@@ -201,7 +203,7 @@ If the user wants the plan audited before build, run ossify's own audit —
 specs that exist), after the plan settles.
 
 1. **Run the audit.** Read
-   `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end and
+   `skills/challenge/references/audit.md` (relative to the plugin root) end to end and
    follow it: `SPINE.md`'s absolute path is the artifact, the depth is `close`,
    the target label is the spine id. The audit always runs — there is no
    plugin whose absence skips it. Whether an external fresh-frame adversary

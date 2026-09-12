@@ -173,13 +173,15 @@ lists are judgment work, not helper work:
 The heart of the user experience — **for a standalone invocation.** You ask in
 your turn; the user replies in theirs. Never capture answers through bash.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 **A ceremony caller skips this cycle entirely.** When the invoking prose is a
 lifecycle moment that dispositions findings itself — the release veto's
 fail-closed ladder, close's triage, start's disposition pass — the rebuttal
 here would consume findings before the caller's own machinery sees them: an
 `accept` inside this cycle marks a concession and drops the challenge from
 the closing line, and the veto never learns a class-bearing finding existed.
-Those callers' ladders ARE the rebuttal, and their records (`oss veto_add`,
+Those callers' ladders ARE the rebuttal, and their records (`"$oss_bin" veto_add`,
 the close report, the spec fold-in) are where acceptance is applied. So: a
 ceremony invocation returns **every** consolidated challenge unwalked — the
 closing line reads `<N> challenges stood:` with all of them, no triage, no

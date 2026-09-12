@@ -25,7 +25,7 @@ After the five voices, **propose a Chairman synthesis by default (#93)** under a
 
 **Opt-out.** Under `--neutral` (or "no recommendations" / "I'll synthesize"), do **not** pre-synthesize — close instead with **"Chairman, your synthesis?"** and let the user write the verdict (the pre-#93 behavior). Note: a request for *you* to synthesize ("you synthesize", "propose a verdict") is the **opposite** of neutral — it wants the recommended synthesis, so honor it (do not treat it as an opt-out).
 
-Do not run a peer-review round between personas (deferred to a future version). Full recommendation policy: `${CLAUDE_PLUGIN_ROOT}/references/recommendation-policy.md`.
+Do not run a peer-review round between personas (deferred to a future version). Full recommendation policy: `recommendation-policy.md` (next to this `SKILL.md`).
 
 Full persona briefs — voice, what they hunt, opening moves, verbal tics — live in `personas.md`. **Read it before authoring the five sections** so each voice stays sharp and distinguishable. One-line summaries here for orientation only:
 

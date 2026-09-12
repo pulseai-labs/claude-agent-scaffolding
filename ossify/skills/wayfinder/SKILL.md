@@ -15,7 +15,7 @@ tracker and picks a mode, and nothing else.
 ## 1. Route
 
 Resolve the tracker first, either way — read
-`${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/references/tracker.md` §1 and follow
+`skills/wayfinder/references/tracker.md` (relative to the plugin root) §1 and follow
 its ladder before doing anything else.
 
 - **No argument, or a loose idea** → **chart mode.** The operator has a
@@ -32,15 +32,15 @@ its ladder before doing anything else.
 
 Charting that question into a map — the six steps, the fog-or-ticket
 test, and the commands that create it — is read from
-`${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/references/charting.md`.
+`skills/wayfinder/references/charting.md` (relative to the plugin root).
 
 Working an existing map — the claim that makes it safe to pick up a
 ticket, the resolve-then-record cycle, and what a resolved ticket
 graduates or rules out of scope — is read from
-`${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/references/working.md`.
+`skills/wayfinder/references/working.md` (relative to the plugin root).
 
 A ticket's type decides how it resolves — read
-`${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/references/ticket-types.md` for the
+`skills/wayfinder/references/ticket-types.md` (relative to the plugin root) for the
 six types, which of ossify's uncertainty instruments each one points at, and
 whether it runs AFK or needs a human in the loop.
 

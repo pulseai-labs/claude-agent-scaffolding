@@ -13,18 +13,20 @@ schema is*; this one is the authority on *how a validation run reports*.
 
 ## 1. Routing to the file
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 The spec is manifest-routed, not conventionally placed:
 
 ```bash
-oss spec_path
+"$oss_bin" spec_path
 ```
 
-**Use that verb; do not compose the path from `oss repo_root ai_workspace`.**
+**Use that verb; do not compose the path from `"$oss_bin" repo_root ai_workspace`.**
 workspace-init writes `.well_known_paths.master_spec` into the manifest — its
 default is `${ai_workspace.root}/docs/MASTER-SPEC.md`, but a project may route
 it anywhere. Resolving only the workspace root and then guessing (or searching)
 misses a customized destination, and the symptom is this surface reporting *"no
-MASTER-SPEC.md"* for a properly initialised project. `oss spec_path` reads the
+MASTER-SPEC.md"* for a properly initialised project. `"$oss_bin" spec_path` reads the
 routed key, expands its `${...}` tokens, falls back to the same convention when
 the key is absent, and refuses a value that is not absolute.
 
@@ -78,13 +80,13 @@ in `doctor` rather than in `/start`: it is a comparison between two artifacts,
 and only one of them is the spec.
 
 ```bash
-oss get '.bones | length' "$(oss state_path)"
+"$oss_bin" get '.bones | length' "$("$oss_bin" state_path)"
 ```
 
-**Pass the state path explicitly.** A bare `oss get` honours an exported
+**Pass the state path explicitly.** A bare `"$oss_bin" get` honours an exported
 `$OSS_STATE_FILE`, so with an override in play this would read *another
-project's* bones while `oss spec_path` read this one's spec — reporting drift
-between two unrelated projects. `oss state_path` is the manifest-routed answer
+project's* bones while `"$oss_bin" spec_path` read this one's spec — reporting drift
+between two unrelated projects. `"$oss_bin" state_path` is the manifest-routed answer
 regardless of the override, which binds both halves of the comparison to the
 same project. (The interop surface, §7 of the skill body, reports the override
 separately; this comparison must not depend on the user having run it first.)

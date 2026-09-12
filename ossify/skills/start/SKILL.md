@@ -62,23 +62,21 @@ spec?"*
 
 ## 3. Pre-flight
 
-All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`, on
-`$PATH` because Claude Code adds each plugin's `bin/` automatically; the
-dispatcher's bash shebang forces a bash runtime under it regardless of the
-calling shell — required because Claude Code's Bash tool runs zsh by default on
-macOS). Call form: `oss <subcommand> [args...]` resolves to `oss_cmd_<subcommand>`.
-Never `source` the lib files directly from a skill body — under zsh
-`BASH_SOURCE` is unset and the libs break. Use `oss help` for discovery.
+All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`):
+`oss <subcommand>` → `oss_cmd_<subcommand>` under a forced bash shebang —
+never `source` the libs (zsh leaves `BASH_SOURCE` unset). Resolve `oss` once
+into `oss_bin` per `rules/dispatcher-path.md`; every `oss` below and in
+references is `"$oss_bin"` — `"$oss_bin" help` for discovery.
 
 **Topology probe (resolves, authors, or refuses fail-closed).** ossify's state lives in
 the AI workspace: walk up for `.ossify/topology.json`, then `.workspace/pairing.json`:
 
 ```bash
-if probe="$(oss state_path 2>&1)"; then
+if probe="$("$oss_bin" state_path 2>&1)"; then
   printf '%s\n' "topology: resolved - author nothing, proceed to the journey map"
 else
   printf '%s\n' "$probe"   # the verb's OWN diagnostic, never swallowed
-  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands."
+  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands. On Devin, adopt is not published - run it on Claude Code or Codex against the same checkout; the .ossify state it authors is surface-agnostic."
 fi
 ```
 
@@ -91,22 +89,23 @@ alternatives and the Codex surface. To author: `.ossify/topology.json` at the
 AI-workspace root, schema v1 `{schema_version, repos:{<name>:{root}},
 well_known_paths:{}}`, names `[a-z][a-z0-9_-]*`, roots absolute, from the repo
 set the journey-map station asks about next (`canonical` only if that is
-genuinely the name). Then re-probe `oss state_path` and `oss repo_root <name>`
+genuinely the name). Then re-probe `"$oss_bin" state_path` and `"$oss_bin" repo_root <name>`
 for every declared repo, halting only if one still refuses.
 
 **Canonical-content gate (refuses fail-fast).** `/start` is pre-code ceremony:
-establish whether any declared repo (`oss repo_root <name>` per name) already
+establish whether any declared repo (`"$oss_bin" repo_root <name>` per name) already
 carries the product's own source or its own history — either alone refuses,
 and a bare pairing scaffold is neither. If so, author nothing and refuse,
-naming what you found and routing to **`/ossify:adopt` — the adopt-forward
-path for a project that already has code (on Codex/OpenCode, the native
-`adopt` skill).** Those tokens are load-bearing too. Past both gates:
-`oss init "<project-name>"`, which refuses if ossify state already exists — the
+naming what you found and routing to **`/ossify:adopt`** — the adopt-forward
+path for a project that already has code (native `adopt` on Codex/OpenCode;
+on Devin run `adopt` on Claude Code or Codex — `.ossify` state is shared).
+Those tokens are load-bearing too. Past both gates:
+`"$oss_bin" init "<project-name>"`, which refuses if ossify state already exists — the
 "already onboarded" signal; route per §2 rather than forcing past it.
 
 **Wayfinder pre-flight.** If a map exists for this repo, its resolved decisions
 pre-fill stations below rather than being re-elicited. Branch logic:
-`${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/references/preflight.md` — do not restate it here.
+`skills/wayfinder/references/preflight.md` (relative to the plugin root) — do not restate it here.
 
 ---
 
@@ -122,7 +121,7 @@ demotion is deliberate: in the predecessor stack the vision fed a multi-year
 roadmap that was obsolete within a sprint and then quietly ignored.
 
 Its only structured descendants are feature-map entries harvested from the
-conversation (`oss feature_add ... spec`).
+conversation (`"$oss_bin" feature_add ... spec`).
 
 While you are here, you are also choosing **which questions to ask at all**.
 Upfront: vision, domain model + data ownership, security/trust boundaries +
@@ -161,7 +160,7 @@ developer with a debugger.
 candidate spine:
 
 ```bash
-oss feature_add "<name>" "<one-line user value>" "<bone|flesh>" journey-map
+"$oss_bin" feature_add "<name>" "<one-line user value>" "<bone|flesh>" journey-map
 ```
 
 Full grammar + worked example in `references/journey-map.md`.
@@ -214,7 +213,7 @@ Each answered category becomes **an ADR from birth** (default status protocol:
 date.
 
 ```bash
-oss bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
+"$oss_bin" bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
 ```
 
 Touch surfaces use bash `case` glob semantics (`*` matches `/`, so
@@ -236,7 +235,7 @@ Record each hazard whose harm a test failure cannot undo — **money**,
 touch surface and **the controls its family attaches**:
 
 ```bash
-oss risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"
+"$oss_bin" risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"
 ```
 
 Control menu: paper/sandbox env · human confirm (naming the concrete effect) ·
@@ -326,17 +325,17 @@ With a clear, non-conflicting intent the posture reads off the value set
 `fully-private` | `source-available` | `open-core` | `fully-open`:
 
 ```bash
-oss posture_set "<posture>"
+"$oss_bin" posture_set "<posture>"
 ```
 
 Revenue intent (`none|license|saas`) is not its own field — it seeds the posture
 bone's revisit trigger. On a `data-overlay` channel, record the seam:
 
 ```bash
-oss overlay_set '<seam>'      # e.g. '$PULSE_PROMPT_DIR'
+"$oss_bin" overlay_set '<seam>'      # e.g. '$PULSE_PROMPT_DIR'
 ```
 
-Then, per posture-block §5-§10: register the posture as a bone (`oss bone_add`;
+Then, per posture-block §5-§10: register the posture as a bone (`"$oss_bin" bone_add`;
 touch surface = private-side modules + the seam files + composition root,
 revisit trigger from the revenue intent); author `PUBLIC_BOUNDARY.md` at **each
 public repo root** — **no moat item is ever named there**, and even a
@@ -345,7 +344,7 @@ fully-private project authors it; route the **private boundary inventory** (item
 deferred to Plan D: never call `add-private-core`, never edit the pairing
 manifest (ossify writes `project-state.json`; workspace-init owns the manifest).
 Set `project.composition_root` — **required and absolute** when more than one repo is declared, optional when exactly one is (posture-block §10)
-and the root is unambiguous (then `oss composition_set "<root>"`).
+and the root is unambiguous (then `"$oss_bin" composition_set "<root>"`).
 
 ---
 
@@ -363,7 +362,7 @@ absence skips it.
    to §12. In a non-interactive run the default is to proceed — `skip` is the
    only bypass.
 3. **Run the audit.** Read
-   `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end and
+   `skills/challenge/references/audit.md` (relative to the plugin root) end to end and
    follow it: the lean MASTER-SPEC is the artifact, the depth is `close`.
    Whether an external fresh-frame adversary joins is the adversary ladder's
    decision (`challenge/references/adversaries.md`), and the audit's summary
@@ -407,7 +406,7 @@ Full minima in `references/lean-spec-schema.md`.
 | EXECUTIVE-SUMMARY | per manifest routing |
 | Memory bank (14 files) + `CLAUDE.md` | AI workspace |
 | Bones-registry ADRs | the project's ADR directory |
-| Seed feature map | `project-state.json` (already written via `oss feature_add`) |
+| Seed feature map | `project-state.json` (already written via `"$oss_bin" feature_add`) |
 | `PUBLIC_BOUNDARY.md` | **each public repo root** |
 | Private boundary inventory | AI workspace |
 
@@ -421,7 +420,7 @@ Full derivation brief in `references/memory-bank-brief.md`; section schema in
 Before handing off, run the state gate and surface anything it reports:
 
 ```bash
-oss doctor
+"$oss_bin" doctor
 ```
 
 **That is the gate, not a sweep** — `state`, `schema`, `replay`, `shape`, and
@@ -437,12 +436,13 @@ the skeleton spine pre-seeded from the cut.
 
 ## 14. Slash-command interaction
 
-The `/start` slash command (`commands/start.md`) exports the raw argument string
-as `$ARGUMENTS` via an env-var bridge. **Parse `$ARGUMENTS` in bash; never
-reference `$1` / `$2` / `$N`** — Claude Code substitutes positional tokens in
-command bodies at template-render time and silently corrupts them.
+The `/start` slash command (`commands/start.md`) exports the raw argument as
+`$ARGUMENTS` via an env-var bridge — on shim-less channels (Devin, `Skill()`,
+natural language) nothing exports it; read the name from the invocation text.
+**Parse `$ARGUMENTS` in bash; never reference `$1`/`$2`/`$N`** — Claude Code
+substitutes positionals at render time and corrupts them.
 
-The only argument is an optional project name, passed to `oss init`. When it is
+The only argument is an optional project name, passed to `"$oss_bin" init`. When it is
 absent, ask for it before initializing — the name is the project's identity in
 state and is awkward to change later.
 
@@ -483,7 +483,7 @@ state and is awkward to change later.
   `not-applicable`, whether an uncertainty deserves a spike, which posture the
   intent signal supports, how to triage a critic challenge.
 - **`oss`** (the dispatcher over `lib/*.sh`) handles mechanical state only —
-  the verbs `oss help` lists: state CRUD, registry adds, and probes. It holds
+  the verbs `"$oss_bin" help` lists: state CRUD, registry adds, and probes. It holds
   no judgment and never should.
 - **`challenge` (audit mode)** is ossify's own critic. As a ceremony caller
   it hands back every consolidated finding unwalked — no internal rebuttal —

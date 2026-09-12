@@ -77,10 +77,12 @@ The skill verifies all fresh-mode preconditions PLUS pair-with-specific checks:
 
 ## Canonical metadata detection
 
+_Dispatcher invocations below are `"$wi_bin" …` — the calling skill resolves `wi_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 Before creating the AI workspace, the skill detects the canonical's git configuration:
 
 ```bash
-detected_branch="$(wi git_detect_default_branch "/Users/example/projects/foo")"
+detected_branch="$("$wi_bin" git_detect_default_branch "/Users/example/projects/foo")"
 ```
 
 The fallback chain (per SPEC §8.4) executes:
@@ -88,7 +90,7 @@ The fallback chain (per SPEC §8.4) executes:
 2. (no need to try further fallbacks)
 
 ```bash
-detected_remote="$(wi git_detect_remote "/Users/example/projects/foo")"
+detected_remote="$("$wi_bin" git_detect_remote "/Users/example/projects/foo")"
 ```
 
 Returns `git@github.com:example/foo.git` (from the origin remote in .git/config).
@@ -107,7 +109,7 @@ Already done. Values: `name=foo`, `parent=/Users/example/projects`, `canonical_r
 **Difference from fresh mode:** skip creating canonical (it already exists).
 
 ```bash
-wi skeleton_create_root_ai_only "/Users/example/projects" "foo"
+"$wi_bin" skeleton_create_root_ai_only "/Users/example/projects" "foo"
 ```
 
 Only creates `/Users/example/projects/foo-ai/` (empty).
@@ -119,7 +121,7 @@ Init-log entry: `MKDIR /Users/example/projects/foo-ai`. NO entry for canonical m
 Same as fresh mode:
 
 ```bash
-wi skeleton_seed_subdirs "/Users/example/projects/foo-ai"
+"$wi_bin" skeleton_seed_subdirs "/Users/example/projects/foo-ai"
 ```
 
 Creates `.workspace/`, `.claude/`, `docs/`, `docs/specs/`, `.superpowers/`, `.archive/` with `.gitkeep` files
@@ -130,7 +132,7 @@ and renders `.gitignore`.
 **Difference from fresh mode:** pass detected metadata to populate canonical fields:
 
 ```bash
-wi manifest_write "/Users/example/projects/foo-ai" \
+"$wi_bin" manifest_write "/Users/example/projects/foo-ai" \
   "/Users/example/projects/foo" \
   "work" \
   --git-remote "git@github.com:example/foo.git" \
@@ -153,7 +155,7 @@ Three sub-steps:
 1. **Init AI workspace only** (canonical already has .git):
 
    ```bash
-   wi git_init_ai_only "/Users/example/projects/foo-ai"
+   "$wi_bin" git_init_ai_only "/Users/example/projects/foo-ai"
    ```
 
    Init-log entry: `GIT-INIT /Users/example/projects/foo-ai`. NO canonical git-init.
@@ -161,7 +163,7 @@ Three sub-steps:
 2. **Install commit-msg hook in BOTH repos:**
 
    ```bash
-   wi trace_filter_install_pair "/Users/example/projects/foo-ai" "/Users/example/projects/foo"
+   "$wi_bin" trace_filter_install_pair "/Users/example/projects/foo-ai" "/Users/example/projects/foo"
    ```
 
    Renders the hook template (substituting AI workspace path `/Users/example/projects/foo-ai`)
@@ -178,7 +180,7 @@ Three sub-steps:
 3. **Stage AI workspace only:**
 
    ```bash
-   wi git_stage_ai_workspace "/Users/example/projects/foo-ai"
+   "$wi_bin" git_stage_ai_workspace "/Users/example/projects/foo-ai"
    ```
 
    Runs `git -C /Users/example/projects/foo-ai add .` to stage all files.

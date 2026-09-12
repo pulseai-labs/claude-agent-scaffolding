@@ -1,0 +1,8 @@
+{
+  "name": "architect-critic",
+  "version": "0.6.0",
+  "description": "Anti-sycophancy reviewer. Six skills: critiquing-spec, reviewing-critique-history, listing-principles, promoting-principle, checking-adversary-readiness, managing-async-critique. Host-only under Devin.",
+  "author": {
+    "name": "Pras"
+  }
+}

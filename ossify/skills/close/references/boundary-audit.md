@@ -31,10 +31,12 @@ executable-prose harness to extract.
 
 ## 1. When it runs, and what a halt means
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 At **every release close**, after the feature-map re-groom and next-release
 sketch, **before the state writes** — the audit is the last thing that can
 refuse the close. A confirmed finding halts the ceremony, and the halt reaches
-the close record: `oss release_status <rel> closed` and the `demo_record` line
+the close record: `"$oss_bin" release_status <rel> closed` and the `demo_record` line
 never run. A release therefore cannot be closed "with a leak noted" — it is
 closed after the finding is fixed, or the disclosure is accepted on the record
 §6 requires — never on a note in the summary. (The second unblock, the
@@ -54,17 +56,17 @@ manifest carries, not from a fixed list of roles** — walk up from the cwd
 for `.ossify/topology.json`
 **first**, then `.workspace/pairing.json` if no topology file is found — the
 same order `oss_topology_discover` resolves through (`lib/manifest.sh`),
-which every `oss repo_root`/`oss state_path` call this file makes already
+which every `"$oss_bin" repo_root`/`"$oss_bin" state_path` call this file makes already
 routes on, so stopping this walk at one manifest kind would desync the
 enumeration below from what those calls actually resolve. `ai_workspace` is
-always in the set — `oss repo_root ai_workspace` resolves it under either
+always in the set — `"$oss_bin" repo_root ai_workspace` resolves it under either
 manifest kind, since it is never a `.repos` member itself (the topology arm
 never assigns it there; the pairing arm filters it out). Every OTHER repo is
 a declared repo, taken:
 under a native topology, from every key in `.repos`; under a
 legacy pairing manifest, from every top-level object that carries a `root`
 other than `ai_workspace`: the
-canonical (`oss repo_root canonical`, when a project names one that),
+canonical (`"$oss_bin" repo_root canonical`, when a project names one that),
 a `private_core`, and the optional `tooling_repo` workspace-init emits when a
 project volunteers one. Hard-coding three role names is how a public tooling
 repo ends up holding tracked secrets while the release reports clean. A role
@@ -433,7 +435,7 @@ hole that delta would otherwise open: workspace-init does not write those
 fields yet (`start/references/posture-block.md` §9 — recorded as intent, written later), so
 today the field is unset in every real project and the mismatch rule above
 would never fire. **So the posture is the second intent source, and it is
-always present:** read `oss get ".project.posture"`. A **`fully-private` or
+always present:** read `"$oss_bin" get ".project.posture"`. A **`fully-private` or
 unset posture over an observed-public repo is the same mismatch** and blocks
 identically. **And a posture that is not one of the four values reads as
 unset** — `posture_set` does not validate its argument, so a slip like
@@ -855,7 +857,7 @@ is arguable whether a hit is the covered one, it is a fresh finding.** A row
 that pins nothing checkable covers nothing: report it as a standing warning
 whose scope cannot be verified, and treat the hit as fresh.
 
-Then read the posture (`oss get ".project.posture"`):
+Then read the posture (`"$oss_bin" get ".project.posture"`):
 
 - Posture implies protected value (`open-core`, `source-available`, a
   `fully-private` project with declared overlay seams) **or is
@@ -1231,7 +1233,7 @@ no ref to resolve — no gate in this section can run, and the close stops for
 the owner to restore the repository. Nothing else in this tail applies to it.
 
 Resolve it before §3, the way the ceremony already resolves it —
-**`base_branch` is not in state**, so do not reach for `oss get`:
+**`base_branch` is not in state**, so do not reach for `"$oss_bin" get`:
 
 - Consult the **`base_branch` the closing spines' handoffs recorded** under
   `## 2. Spine context` (`spine-close.md` §3 resolves it the same way —

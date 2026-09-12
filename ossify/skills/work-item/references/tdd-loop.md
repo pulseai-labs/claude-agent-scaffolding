@@ -1,6 +1,8 @@
 # The TDD loop, per AC
 
-Depth for SKILL.md §5. One AC at a time, in the order `oss verify_acs` printed
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
+Depth for SKILL.md §5. One AC at a time, in the order `"$oss_bin" verify_acs` printed
 them, each driven RED→GREEN before the next one starts.
 
 ---
@@ -8,7 +10,7 @@ them, each driven RED→GREEN before the next one starts.
 ## 1. Worked walk-through
 
 A work item on a Markdown table-of-contents generator. Its spec declares four
-`auto:` ACs, and `oss verify_acs` prints them in this order:
+`auto:` ACs, and `"$oss_bin" verify_acs` prints them in this order:
 
 ```
 AC-1  pytest tests/test_slugify.py::test_ascii_slug        exit 0
@@ -20,10 +22,10 @@ AC-4  pytest tests/                                        exit 0
 ### RED gate first (SKILL.md §4)
 
 ```bash
-oss redgate "<worktree-abs>" "pytest tests/test_slugify.py::test_ascii_slug" "exit 0"
+"$oss_bin" redgate "<worktree-abs>" "pytest tests/test_slugify.py::test_ascii_slug" "exit 0"
 # rc 2 — tests/test_slugify.py does not exist yet. ADVISORY. Recorded, proceed.
 
-oss redgate "<worktree-abs>" "python -m tocgen sample.md" "output contains - [Install](#install)"
+"$oss_bin" redgate "<worktree-abs>" "python -m tocgen sample.md" "output contains - [Install](#install)"
 # rc 0 — RED. The generator runs but emits no anchor links yet. Proceed.
 ```
 
@@ -150,7 +152,7 @@ gaps-mode return is a stranded work item.
   reads as a pass:
 
   ```bash
-  cd "<worktree-abs>" && pytest tests/ 2>&1 | oss zero_tests_guard "pytest tests/"
+  cd "<worktree-abs>" && pytest tests/ 2>&1 | "$oss_bin" zero_tests_guard "pytest tests/"
   # rc 0 = VACUOUS — the command is a test runner and it ran nothing
   # rc 1 = a real run
   ```

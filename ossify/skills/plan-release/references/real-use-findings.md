@@ -55,24 +55,26 @@ observation is what has planning value.
 
 ## 3. Recording them
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 Attach them to the release being planned:
 
 ```bash
-oss release_set_meta "$rel" '{"real_use_findings":["backtest takes ~4 min so iteration stopped","had to hand-edit the saved strategy JSON to change a rule","no way to compare two runs side by side"]}'
+"$oss_bin" release_set_meta "$rel" '{"real_use_findings":["backtest takes ~4 min so iteration stopped","had to hand-edit the saved strategy JSON to change a rule","no way to compare two runs side by side"]}'
 ```
 
 The release record must exist first — collect the findings in §4 of the flow, then
-write them once `oss release_add` has minted the id. `release_set_meta` accepts
+write them once `"$oss_bin" release_add` has minted the id. `release_set_meta` accepts
 only the five known patch keys (`exit_criteria`, `spine_dag`, `ledger_budget`,
 `next_sketch`, `real_use_findings`) and silently drops anything else, so a typo in
 the key looks exactly like success — check it back with
-`oss get '.releases[-1].real_use_findings'` if you are unsure.
+`"$oss_bin" get '.releases[-1].real_use_findings'` if you are unsure.
 
 Findings that describe missing or broken **value** also become feature-map entries
 immediately, so they compete for selection on equal terms:
 
 ```bash
-oss feature_add "compare two backtest runs" "iterate on a strategy without losing the previous result" flesh real-use
+"$oss_bin" feature_add "compare two backtest runs" "iterate on a strategy without losing the previous result" flesh real-use
 ```
 
 The `real-use` source tag matters at the next groom: it marks entries that came
@@ -88,7 +90,7 @@ deepening pass (`references/feature-map-grooming.md` §4).
   not evidence; "I stopped iterating because it takes four minutes" is — and it
   carries the before-measurement the deepening pass will need.
 - **Fake-ledger pressure.** A finding that lands on a known fake is its
-  replacement trigger firing. Check the fake ledger (`oss get '.fakes'`) against
+  replacement trigger firing. Check the fake ledger (`"$oss_bin" get '.fakes'`) against
   the findings and move any fired trigger onto the map.
 - **Risk-gate and bone review.** A finding that reveals a surface nobody
   registered is a bones-registry gap — the fix belongs in the registry (via the
@@ -113,7 +115,7 @@ Record the empty case rather than omitting the key, so the next groom can see th
 run:
 
 ```bash
-oss release_set_meta "$rel" '{"real_use_findings":["none reported - product used, no friction surfaced"]}'
+"$oss_bin" release_set_meta "$rel" '{"real_use_findings":["none reported - product used, no friction surfaced"]}'
 ```
 
 ---

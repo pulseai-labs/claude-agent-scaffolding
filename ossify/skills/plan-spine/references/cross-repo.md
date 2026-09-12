@@ -14,8 +14,10 @@ gate (§4) do not exist yet.
 
 ## 1. The field
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss work_item_add "$spine" "<title>" [target_repo]     # defaults to the sole declared repo
+"$oss_bin" work_item_add "$spine" "<title>" [target_repo]     # defaults to the sole declared repo
 ```
 
 `target_repo` is stored on the work item and defaults to the sole declared
@@ -28,7 +30,7 @@ the execution engine reads, because the item is what gets a worktree.
 Read them back:
 
 ```bash
-oss get '[.work_items[] | select(.spine == "r1.s2") | {id, title, target_repo}]'
+"$oss_bin" get '[.work_items[] | select(.spine == "r1.s2") | {id, title, target_repo}]'
 ```
 
 **Why one repo per item, strictly:** the item is the unit that gets a worktree, a
@@ -85,7 +87,7 @@ what the plan must contain:
   ```bash
   # The override is staged in the worktree the ITEM executes in, not in
   # canonical - read the path the execution lane journaled for that item.
-  wt="$(oss get '.work_items[] | select(.id=="<wi-id>") | .worktree_path')"
+  wt="$("$oss_bin" get '.work_items[] | select(.id=="<wi-id>") | .worktree_path')"
   # oss get is jq -r: an absent or JSON-null field prints the four bytes
   # `null`, which is non-empty and passes a bare [ -n ] test.
   [ -n "$wt" ] && [ "$wt" != "null" ] && [ -d "$wt" ] \

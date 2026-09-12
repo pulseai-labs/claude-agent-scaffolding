@@ -60,19 +60,21 @@ do **not** decompose spines into work items, author demo lines, or author specs 
 
 ## 3. Pre-flight
 
+Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+
 All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`, on `$PATH`
 because Claude Code adds each plugin's `bin/` automatically; the dispatcher's bash
 shebang forces a bash runtime under it regardless of the calling shell — required
 because Claude Code's Bash tool runs zsh by default on macOS). Call form:
 `oss <subcommand> [args...]` resolves to `oss_cmd_<subcommand>`. Never `source` the
 lib files directly from a skill body — under zsh `BASH_SOURCE` is unset and the
-libs break. Use `oss help` for discovery.
+libs break. Use `"$oss_bin" help` for discovery.
 
 **Two probes, both fail-fast.**
 
 ```bash
-if ! sp="$(oss state_path 2>/dev/null)"; then
-  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands."
+if ! sp="$("$oss_bin" state_path 2>/dev/null)"; then
+  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands. On Devin, adopt is not published - run it on Claude Code or Codex against the same checkout; the .ossify state it authors is surface-agnostic."
   exit 0
 fi
 # Later bare verbs resolve state alone and would honor this override —
@@ -81,14 +83,14 @@ if [ -n "${OSS_STATE_FILE:-}" ]; then
   printf '%s\n' "plan-release plans the manifest's project; OSS_STATE_FILE='${OSS_STATE_FILE}' is set - unset it and re-run."
   exit 0
 fi
-bones="$(oss get '.bones | length' "$sp" 2>/dev/null)" || bones=""
+bones="$("$oss_bin" get '.bones | length' "$sp" 2>/dev/null)" || bones=""
 printf 'bones=%s\n' "${bones:-<no state>}"
 ```
 
 The literal tokens `/init-workspace` and `/pair-workspace` are load-bearing — do
 not paraphrase the refusal.
 
-`oss state_path` echoes the path whether or not the file exists, so it proves the
+`"$oss_bin" state_path` echoes the path whether or not the file exists, so it proves the
 *manifest*, not the project. The second probe is what proves the project: if
 `bones` comes back empty (no state file) or `0` (state with an empty registry),
 the project was never onboarded. Refuse with:
@@ -97,8 +99,8 @@ release planning needs the bones' touch surfaces to declare spine classes."*
 Author nothing, create no release, stop.
 
 Both probes are manifest-proof, and the second one only because it is written
-this way. `oss state_path` reads the manifest and nothing else, so an exported
-`$OSS_STATE_FILE` cannot satisfy it. `oss get` routes through `_oss_resolve_state`
+this way. `"$oss_bin" state_path` reads the manifest and nothing else, so an exported
+`$OSS_STATE_FILE` cannot satisfy it. `"$oss_bin" get` routes through `_oss_resolve_state`
 (precedence `explicit-arg > $OSS_STATE_FILE > manifest`) — so calling it bare
 would let a stale `OSS_STATE_FILE` from an unrelated session answer the bones
 probe from *that* project's state and report a false "onboarded". Passing `"$sp"`
@@ -106,7 +108,7 @@ probe from *that* project's state and report a false "onboarded". Passing `"$sp"
 both probes on the same project by construction. **Keep the argument.** Dropping
 it reintroduces a silent cross-project read that looks exactly like success.
 
-`oss doctor` is available at any point, but it is the state **gate** — `state`,
+`"$oss_bin" doctor` is available at any point, but it is the state **gate** — `state`,
 `schema`, `replay`, `shape` — not a read-out. It says nothing about pending
 amendments, quarantined lines, outstanding fakes, patch records, a held lock or
 orphan worktrees. Run it if the state itself looks inconsistent; invoke **`ossify:doctor`**
@@ -114,7 +116,7 @@ if you want the advisory surfaces, which this skill does not invoke.
 
 **Wayfinder pre-flight.** If a map exists for this repo, its resolved decisions
 pre-fill stations below rather than being re-elicited. Branch logic:
-`${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/references/preflight.md` — do not restate it here.
+`skills/wayfinder/references/preflight.md` (relative to the plugin root) — do not restate it here.
 
 ---
 
@@ -125,9 +127,9 @@ is asked.
 
 | Input | Source | Release 0 |
 |---|---|---|
-| **Feature map** | `oss feature_list` | may be three lines — legitimate |
-| **Bones registry + risk gates** (touch surfaces) | `oss get '.bones'` / `oss get '.risk_gates'` | seeded by `/start` |
-| **Previous release retro** | the closed release's retrospective | `oss release_dir "<prev>"` → `release-retrospective.md` |
+| **Feature map** | `"$oss_bin" feature_list` | may be three lines — legitimate |
+| **Bones registry + risk gates** (touch surfaces) | `"$oss_bin" get '.bones'` / `"$oss_bin" get '.risk_gates'` | seeded by `/start` |
+| **Previous release retro** | the closed release's retrospective | `"$oss_bin" release_dir "<prev>"` → `release-retrospective.md` |
 | **Real-use findings since the last release** | **ask the user — mandatory** | **n/a** |
 
 **Real-use findings are a mandatory input, not a nicety.** What broke, what
@@ -137,17 +139,17 @@ a release planned without it is planned from memory of the plan rather than from
 the product. Record them:
 
 ```bash
-oss release_set_meta "<release-id>" '{"real_use_findings":["<finding>","<finding>"]}'
+"$oss_bin" release_set_meta "<release-id>" '{"real_use_findings":["<finding>","<finding>"]}'
 ```
 
 (Chronology note: the release record must exist before you can patch it — collect
-the findings now, write them in §5 once `oss release_add` has minted the id.)
+the findings now, write them in §5 once `"$oss_bin" release_add` has minted the id.)
 
 Findings that describe missing or broken value become feature-map entries
 immediately, so they compete for selection like everything else:
 
 ```bash
-oss feature_add "<name>" "<one-line user value>" "<bone|flesh>" real-use
+"$oss_bin" feature_add "<name>" "<one-line user value>" "<bone|flesh>" real-use
 ```
 
 Full input contract in `references/real-use-findings.md`.
@@ -184,12 +186,12 @@ strike it.
 **5c. Create the release and its spines.**
 
 ```bash
-rel="$(oss release_add "<name>" "<goal phrased as what a user can do at close>")"
-sid="$(oss spine_add "$rel" "<spine name>" "<bone|flesh>")"   # one per spine; keep each id
-oss release_set_meta "$rel" '{"exit_criteria":["At close, a trader can …"]}'
+rel="$("$oss_bin" release_add "<name>" "<goal phrased as what a user can do at close>")"
+sid="$("$oss_bin" spine_add "$rel" "<spine name>" "<bone|flesh>")"   # one per spine; keep each id
+"$oss_bin" release_set_meta "$rel" '{"exit_criteria":["At close, a trader can …"]}'
 ```
 
-`oss release_add` prints the minted release id (`r0`, `r1`, …); `oss spine_add`
+`"$oss_bin" release_add` prints the minted release id (`r0`, `r1`, …); `"$oss_bin" spine_add`
 prints the minted spine id (`r0.s1`, …). Capture both — every later call is keyed
 by them. `spine_add`'s class argument accepts **only** `bone` or `flesh` (anything
 else exits 2); the class you pass here is the *declared* class, and §7 may
@@ -211,14 +213,14 @@ precisely so that exceeding it forces a **prune / parallelize / deepen** decisio
 *at planning time*, never silent growth at close time.
 
 ```bash
-oss release_set_meta "$rel" '{"ledger_budget":"600s"}'
+"$oss_bin" release_set_meta "$rel" '{"ledger_budget":"600s"}'
 ```
 
 Ask the user for the number; propose one if they have none (a few minutes is a
 sane starting budget for a young ledger). Then check it against reality —
-`oss ledger_active_auto` lists the `auto:` lines the ledger already carries;
-`oss demo_run` emits no timing of its own, so time it **capturing the runner's
-rc** — `start=$(date +%s); demo_rc=0; oss demo_run || demo_rc=$?; elapsed=$(( $(date +%s) - start ))` —
+`"$oss_bin" ledger_active_auto` lists the `auto:` lines the ledger already carries;
+`"$oss_bin" demo_run` emits no timing of its own, so time it **capturing the runner's
+rc** — `start=$(date +%s); demo_rc=0; "$oss_bin" demo_run || demo_rc=$?; elapsed=$(( $(date +%s) - start ))` —
 a nonzero `demo_rc` is a failing ledger line, and the budget conversation happens
 with that fact on the table, not after it (under `errexit` the bare form aborts
 before `elapsed` is assigned; without it the assignment quietly swallows the
@@ -243,7 +245,7 @@ not work-item granularity (that is `plan-spine`'s round DAG). An edge means *thi
 spine cannot start until that one closes*, for a real reason you can name.
 
 ```bash
-oss release_set_meta "$rel" '{"spine_dag":[["r1.s1",[]],["r1.s2",["r1.s1"]],["r1.s3",[]]]}'
+"$oss_bin" release_set_meta "$rel" '{"spine_dag":[["r1.s1",[]],["r1.s2",["r1.s1"]],["r1.s3",[]]]}'
 ```
 
 Shape: `[[<spine-id>,[<dep-id>,…]],…]`. Every spine in the release appears exactly
@@ -292,7 +294,7 @@ Full rules, the enabler/bone contrast, and worked examples in
 For each spine, collect the paths its plan expects to change and check them:
 
 ```bash
-oss touch_check src/domain/order.rs src/ui/export.rs; tc=$?
+"$oss_bin" touch_check src/domain/order.rs src/ui/export.rs; tc=$?
 case "$tc" in
   0) : ;;   # HIT - prints "bone <adr>" / "risk_gate <name>" per match
   1) : ;;   # clean
@@ -310,12 +312,12 @@ On a hit, reclassify and record — regardless of the spine's declared class and
 regardless of what the critic says:
 
 ```bash
-oss class_set "<spine>" bone "bone-touch: <ADR-ref> (<matched surface>)"
-oss veto_add  "<spine>" "bone-touch: <ADR-ref> (<matched surface>)" auto-bone "touch-surface overlap"
+"$oss_bin" class_set "<spine>" bone "bone-touch: <ADR-ref> (<matched surface>)"
+"$oss_bin" veto_add  "<spine>" "bone-touch: <ADR-ref> (<matched surface>)" auto-bone "touch-surface overlap"
 ```
 
 A **risk-gate** hit does the same *and* attaches that gate's control checklist
-(`oss get '.risk_gates'`) to the spine's close path as required work — paper/
+(`"$oss_bin" get '.risk_gates'`) to the spine's close path as required work — paper/
 sandbox env, human confirm, kill switch, audit trail, progressive exposure, as
 the gate lists them. Harm is orthogonal to reversibility: a one-line flesh change
 inside the live-order path is still a Risk event.
@@ -338,7 +340,7 @@ absence skips it, so the class declaration is never critic-free.
    in. Auditing a file that does not exist yet is a halt, not a no-findings
    pass.
 2. **Run the audit.** Read
-   `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end and
+   `skills/challenge/references/audit.md` (relative to the plugin root) end to end and
    follow it: the draft `RELEASE.md` is the artifact, the depth is `close`,
    the target label is the release id. The registry and spine plans go into
    the conversation alongside it. Whether an external fresh-frame adversary
@@ -349,18 +351,18 @@ absence skips it, so the class declaration is never critic-free.
 
 | Finding | Disposition | Action |
 |---|---|---|
-| **Clear, specific, current** veto-grade finding (the spine moves a bone / breaks a contract / crosses a trust boundary its class does not admit) | `auto-bone` | `oss class_set <spine> bone "critic veto: <finding>"` + `oss veto_add <spine> "<finding>" auto-bone "<reason>"` |
-| **Ambiguous** (hedged, names no mechanism), **contradictory** (two findings that cannot both hold), or **stale** (cites scope not in the current plan) | `escalate` | `oss veto_add <spine> "<finding>" escalate "ambiguous\|contradictory\|stale - fail-closed"` **and surface it to the user.** NEVER auto-pass |
-| **User explicitly overrides** an auto-bone back to flesh | `override` | `oss class_set <spine> flesh "<the user's reason>"` + `oss veto_add <spine> "<finding>" override "<the user's reason>"` — recorded, never silent |
+| **Clear, specific, current** veto-grade finding (the spine moves a bone / breaks a contract / crosses a trust boundary its class does not admit) | `auto-bone` | `"$oss_bin" class_set <spine> bone "critic veto: <finding>"` + `"$oss_bin" veto_add <spine> "<finding>" auto-bone "<reason>"` |
+| **Ambiguous** (hedged, names no mechanism), **contradictory** (two findings that cannot both hold), or **stale** (cites scope not in the current plan) | `escalate` | `"$oss_bin" veto_add <spine> "<finding>" escalate "ambiguous\|contradictory\|stale - fail-closed"` **and surface it to the user.** NEVER auto-pass |
+| **User explicitly overrides** an auto-bone back to flesh | `override` | `"$oss_bin" class_set <spine> flesh "<the user's reason>"` + `"$oss_bin" veto_add <spine> "<finding>" override "<the user's reason>"` — recorded, never silent |
 | **No veto-grade finding at all** (clean review, or only cosmetic/`alternative`-severity remarks) | **none** | **Write nothing.** No `veto_add` call, no class change; the spine keeps its declared class |
 
 An `escalate` row is **not finished when the record is written.** Once the user
-rules — or declines to — issue the `oss class_set` call that realizes the outcome.
+rules — or declines to — issue the `"$oss_bin" class_set` call that realizes the outcome.
 The fail-closed default (`bone`) is a class change, not just a note; the class in
 state is what RELEASE.md and `plan-spine` read. Full resolution table in
 `references/critic-veto.md` §4.6.
 
-`none` is an answer, not a value — `oss veto_add` accepts only
+`none` is an answer, not a value — `"$oss_bin" veto_add` accepts only
 `auto-bone|override|escalate` (anything else exits 2), and a spine that must exist
 (exit 7 otherwise). Never manufacture a veto the critic did not raise; never let
 one it did raise through as a pass.
@@ -377,14 +379,14 @@ with the dispositions folded in. Create the release spec directory and write
 `RELEASE.md` into it:
 
 ```bash
-rel_dir="$(oss release_dir "$rel")"   # ABSOLUTE, manifest-rooted — never paste the <ai-workspace> shape
+rel_dir="$("$oss_bin" release_dir "$rel")"   # ABSOLUTE, manifest-rooted — never paste the <ai-workspace> shape
 mkdir -p "$rel_dir"                   # e.g. docs/specs/r0/RELEASE.md lives here
 ```
 
 The directory name is the release id **verbatim** — ossify's ID grammar has one
 owner (spec §9.2), and release directories, branch names, worktree paths, and
 ledger keys all derive from it without transformation. Route the path through
-`oss release_dir`, which resolves the topology declaration like every other
+`"$oss_bin" release_dir`, which resolves the topology declaration like every other
 ossify artifact — never a hand-built path.
 
 `RELEASE.md` carries five things and no more: the **goal** (the user-journey
@@ -406,7 +408,7 @@ beyond.** The sketch is a goal plus candidate spines — no exit criteria, no DA
 no classes, no specs.
 
 ```bash
-oss release_set_meta "$rel" '{"next_sketch":{"goal":"<one line>","candidates":["<spine>","<spine>"]}}'
+"$oss_bin" release_set_meta "$rel" '{"next_sketch":{"goal":"<one line>","candidates":["<spine>","<spine>"]}}'
 ```
 
 The sketch is the only thing entitled to look past this release, and the
@@ -421,12 +423,15 @@ in the DAG.
 ## 10. Slash-command interaction
 
 The `/plan-release` slash command (`commands/plan-release.md`) exports the raw
-argument string as `$ARGUMENTS` via an env-var bridge. **Parse `$ARGUMENTS` in
-bash; never reference `$1` / `$2` / `$N`** — Claude Code substitutes positional
-tokens in command bodies at template-render time and silently corrupts them.
+argument string as `$ARGUMENTS` via an env-var bridge — on shim-less channels
+(Devin, `Skill()`, natural language) nothing exports it; the release name
+arrives as a literal token in the invocation/request text. **Parse `$ARGUMENTS`
+in bash; never reference `$1` / `$2` / `$N`** — Claude Code substitutes
+positional tokens in command bodies at template-render time and silently
+corrupts them.
 
 The only argument is an optional release name (`"Release 0"`, `"MVP"`, `"v1"`),
-passed to `oss release_add`. When it is absent, ask for it before creating the
+passed to `"$oss_bin" release_add`. When it is absent, ask for it before creating the
 release — the name is the release's identity in RELEASE.md and in every retro
 that cites it.
 
@@ -438,21 +443,21 @@ that cites it.
   veto's false-negative posture is fail-closed: all three ESCALATE. "Probably
   fine" is the failure mode this rule exists to block.
 - **Silently overriding a veto.** An override is a user decision, recorded with
-  the user's own reason via `oss veto_add … override`. An agent-initiated
+  the user's own reason via `"$oss_bin" veto_add … override`. An agent-initiated
   downgrade with no recorded reason is not an override, it is a deletion.
 - **Manufacturing a veto the critic never raised.** A clean review resolves to
   *none* — no disposition record, no class change. A skill that escalates
   everything is as broken as one that passes everything.
 - **Letting the critic clear a bone-touch hit.** Different judges. The touch check
   is mechanical and runs regardless of the critic's verdict.
-- **Reading `oss touch_check`'s exit code backwards**, or folding its rc 2 into
+- **Reading `"$oss_bin" touch_check`'s exit code backwards**, or folding its rc 2 into
   "clean". rc 0 = matched, 1 = clean, 2 = could not check.
 - **Skipping the real-use findings input** because the last release was recent.
   It is mandatory from Release 1 onward; n/a only for Release 0.
 - **Accepting a horizontal build as a spine.** No actor-to-outcome journey →
   `internal-enabler`, and admitted only with a named consuming spine in this
   release or the next.
-- **Passing `internal-enabler` to `oss spine_add`.** The dispatcher accepts only
+- **Passing `internal-enabler` to `"$oss_bin" spine_add`.** The dispatcher accepts only
   `bone|flesh` (exit 2). The enabler judgment is a planning verdict; see
   `references/class-declaration.md` §5 for how an admitted one is recorded.
 - **Detailing more than the next release.** The sketch is a goal plus candidates.
@@ -472,7 +477,7 @@ that cites it.
   real, whether a spine has an actor-to-outcome journey, whether a critic finding
   is veto-grade, and whether it is clear or ambiguous/contradictory/stale.
 - **`oss`** (the dispatcher over `lib/*.sh`) handles mechanical state only —
-  the verbs `oss help` lists: state CRUD, registry adds, and probes. It
+  the verbs `"$oss_bin" help` lists: state CRUD, registry adds, and probes. It
   holds no judgment and never should — `touch_check` matches globs, it does not
   decide what the match means.
 - **`challenge` (audit mode)** is ossify's own critic. As a ceremony caller

@@ -36,7 +36,7 @@ PRINCIPLE_TEXT="${PRINCIPLE_TEXT#\"}"
 PRINCIPLE_TEXT="${PRINCIPLE_TEXT%\"}"
 ```
 
-If the user invoked the skill via natural language (no `$ARCHITECT_CRITIC_ARGS`), the principle text and scope come from the conversation. If the user has not yet stated the principle text, ask: *"What principle text would you like to promote, and which scope — `user` (global across projects) or `project` (this repo only)?"* Wait for a reply before proceeding.
+If the user invoked the skill via natural language (no `$ARCHITECT_CRITIC_ARGS` — this includes Devin and `Skill()` invocations, where the request text is the conversation), the principle text and scope come from the conversation. If the user has not yet stated the principle text, ask: *"What principle text would you like to promote, and which scope — `user` (global across projects) or `project` (this repo only)?"* Wait for a reply before proceeding.
 
 ---
 
@@ -68,16 +68,18 @@ Stop. Do not write to any file.
 
 Determine the target `principles.md` path based on scope.
 
+Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+
 **`user` scope:**
 
 ```bash
-USER_PRINCIPLES="$(arc principles_user_path)"
+USER_PRINCIPLES="$("$arc_bin" principles_user_path)"
 ```
 
 If this file does not exist, create it by copying the shipped-defaults header from the plugin template:
 
 ```bash
-PLUGIN_TEMPLATE="${CLAUDE_PLUGIN_ROOT}/templates/principles.md"
+PLUGIN_TEMPLATE="$("$arc_bin" principles_shipped_path)"
 mkdir -p "$(dirname "$USER_PRINCIPLES")"
 cp "$PLUGIN_TEMPLATE" "$USER_PRINCIPLES"
 ```
@@ -173,16 +175,16 @@ Example formatted entry:
 
 ## Step 6: Record in state.json
 
-Initialize state via the `arc` dispatcher (`architect-critic/bin/arc`, on `$PATH` because Claude Code adds each plugin's `bin/` automatically; the dispatcher's bash shebang forces a bash runtime for the lib regardless of the caller shell, fixing the BASH_SOURCE crash that bare `source` triggers under zsh):
+Initialize state via the `arc` dispatcher (`architect-critic/bin/arc`; on Claude Code `arc` is on `$PATH` automatically, on Devin `arc_bin` is resolved per `rules/dispatcher-path.md`; the dispatcher's bash shebang forces a bash runtime for the lib regardless of the caller shell, fixing the BASH_SOURCE crash that bare `source` triggers under zsh):
 
 ```bash
-arc state_init
+"$arc_bin" state_init
 ```
 
 Then append the promotion record with the dispatcher:
 
 ```bash
-arc state_append_promotion manual "$PRINCIPLE_TEXT" "$SCOPE"
+"$arc_bin" state_append_promotion manual "$PRINCIPLE_TEXT" "$SCOPE"
 ```
 
 `ac_state_append_promotion` (`lib/state.sh`) acquires the state lock, stamps the
@@ -194,7 +196,7 @@ write is the exact path this verb exists to keep closed.
 
 ## Step 7: Auto-link to active challenge — not shipped
 
-The design sketched a challenge link: `critiquing-spec` would export `ARCHITECT_CRITIC_CURRENT_CHALLENGE_FINGERPRINT` during a rebuttal cycle, and the promotion record would carry `linked_challenge` for auto-promotion dedup. **None of that machinery ships** — nothing in the plugin sets that env var, no lib code reads a `linked_challenge` field, and the record `arc state_append_promotion` writes (`{timestamp, source, text, scope}`) carries no id to link on. Do not hand-roll a `jq` amend to force one — an unlocked raw write is exactly the path Step 6's verb exists to keep closed. If the user wants the provenance, name the originating challenge in your confirmation message as prose.
+The design sketched a challenge link: `critiquing-spec` would export `ARCHITECT_CRITIC_CURRENT_CHALLENGE_FINGERPRINT` during a rebuttal cycle, and the promotion record would carry `linked_challenge` for auto-promotion dedup. **None of that machinery ships** — nothing in the plugin sets that env var, no lib code reads a `linked_challenge` field, and the record `"$arc_bin" state_append_promotion` writes (`{timestamp, source, text, scope}`) carries no id to link on. Do not hand-roll a `jq` amend to force one — an unlocked raw write is exactly the path Step 6's verb exists to keep closed. If the user wants the provenance, name the originating challenge in your confirmation message as prose.
 
 ---
 

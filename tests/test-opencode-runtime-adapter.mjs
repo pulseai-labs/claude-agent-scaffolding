@@ -615,7 +615,7 @@ test("Task 8 reconciles registered Ossify availability across shipped surfaces",
   const localCodex = markdownSection(rootReadme, "Local Codex Development", 3);
   const layout = markdownSection(rootReadme, "Layout");
 
-  assert.match(intro, /Claude Code and Codex plugin marketplace.*OpenCode adapter/is);
+  assert.match(intro, /Claude Code, Codex, and Devin plugin marketplace.*OpenCode\s+adapter/is);
   assert.ok(ossifyRow, "root inventory must include Ossify");
   assert.match(ossifyRow.Scope, /Project-level \(continuous\)/);
   assert.match(
@@ -1019,12 +1019,35 @@ test("Ossify selection registers the translated canonical implementer agent", as
     [join(ossifyRoot, "**")]: "allow",
   };
 
-  assert.equal(agent.description, frontmatter.description);
+  // The description goes through translatePrompt like the prompt — assert the
+  // translated form directly: plugin-root-relative refs absolutized, no bare
+  // relative ref left, no canonical token.
+  assert.ok(
+    agent.description.includes(`\`${ossifyRoot}/skills/work-item/SKILL.md\``),
+  );
+  assert.ok(
+    !/`(?:skills|references|templates|lib|agents|bin)\/(?!\*)/.test(
+      agent.description,
+    ),
+  );
+  assert.ok(!agent.description.includes("CLAUDE_PLUGIN_ROOT"));
   assert.equal(agent.mode, "subagent");
   assert.ok(!Object.hasOwn(agent, "model"));
-  assert.equal(
-    agent.prompt,
-    body.replaceAll("${CLAUDE_PLUGIN_ROOT}", ossifyRoot),
+  // Independent pins (not a re-derived expected string): every backticked
+  // plugin-root-relative ref in the installed prompt must be absolutized, none
+  // may remain relative, and the canonical token must be gone.
+  assert.ok(
+    agent.prompt.includes(`\`${ossifyRoot}/skills/work-item/SKILL.md\``),
+  );
+  assert.ok(
+    agent.prompt.includes(
+      `\`${ossifyRoot}/skills/work-item/references/report-contract.md\``,
+    ),
+  );
+  assert.ok(
+    !/`(?:skills|references|templates|lib|agents|bin)\/(?!\*)/.test(
+      agent.prompt,
+    ),
   );
   assert.ok(!agent.prompt.includes("CLAUDE_PLUGIN_ROOT"));
   assert.ok(
@@ -1179,6 +1202,47 @@ test("prompt translation resolves package placeholders in either shell form", as
       "/opt/plugins/ai-mentor/templates/default.md\n" +
       "/var/data/ai-mentor/cache.json",
   );
+});
+
+test("prompt translation absolutizes existing plugin-relative refs", async () => {
+  const { translatePrompt } = await import(translateUrl);
+  const ossifyRoot = fileURLToPath(new URL("ossify", root)).replace(/\/$/, "");
+
+  const translated = translatePrompt(
+    "Read `skills/work-item/SKILL.md` first.\n" +
+      "Then `skills/work-item/references/report-contract.md`.\n" +
+      "Run `workflows/verify-work-item.js` via node.\n" +
+      "The wrapper at `commands/close.md` reads its own SKILL.md.\n" +
+      "A missing ref `skills/no-such-dir/SKILL.md` stays relative.\n" +
+      "So does a descriptive glob `agents/*.md`.\n" +
+      "A consumer-side path `tests/test_slugify.py` stays relative too.\n" +
+      "And a non-plugin path `docs/something.md`.",
+    { root: ossifyRoot },
+  );
+
+  assert.ok(
+    translated.includes(`\`${ossifyRoot}/skills/work-item/SKILL.md\``),
+  );
+  assert.ok(
+    translated.includes(
+      `\`${ossifyRoot}/skills/work-item/references/report-contract.md\``,
+    ),
+  );
+  // Every shipped plugin-root dir is in scope — not just the original six —
+  // so `workflows/` (verify-work-item.js), `commands/` (command wrappers),
+  // `rules/`, `tests/`, and hooks dirs absolutize the same way.
+  assert.ok(
+    translated.includes(`\`${ossifyRoot}/workflows/verify-work-item.js\``),
+  );
+  assert.ok(translated.includes(`\`${ossifyRoot}/commands/close.md\``));
+  // Existence gate: refs that do not resolve under the plugin root must not
+  // be rewritten — they are not plugin-root-relative (e.g. skill-dir-relative
+  // `references/x` inside a skill's own references/ file, consumer-side
+  // `tests/` paths the plugin does not ship, or descriptive globs).
+  assert.ok(translated.includes("`skills/no-such-dir/SKILL.md`"));
+  assert.ok(translated.includes("`agents/*.md`"));
+  assert.ok(translated.includes("`tests/test_slugify.py`"));
+  assert.ok(translated.includes("`docs/something.md`"));
 });
 
 test("prompt path substitution preserves replacement tokens literally", async () => {

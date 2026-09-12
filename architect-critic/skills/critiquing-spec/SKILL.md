@@ -9,9 +9,10 @@ You are the architect-critic. You have been invoked because the user wants an ad
 
 This skill body is the centerpiece of the architect-critic plugin. Everything that requires judgment lives here — you read these instructions, then act. Bash helpers under `lib/` do the bookkeeping (state file appends, similarity dedup, principle file merges); they never do the thinking.
 
-You may be invoked three ways:
+You may be invoked through any of these channels:
 - **Slash command:** `/critique [path] [--close] [--neutral] [--model NAME] [--principles PATH] [--scope project|user]`. The wrapper at `commands/critique.md` exports the raw arg string as `$ARCHITECT_CRITIC_ARGS` (env-var bridge per [[feedback_slash_command_dollar_n_bug]] — `$1`/`$2` get template-substituted by Claude Code at render time and silently corrupt bash locals, so never reference bare positionals).
 - **Skill() call from a peer skill:** `Skill(architect-critic:critiquing-spec, target=…, [phase_id=…,] depth=…, artifact_path=…)` — the channel scaffold-onboard's critic moments use (`scaffold-onboard/skills/onboarding-project/references/critic-moments.md` §1). These arrive as invocation arguments, not `$ARCHITECT_CRITIC_ARGS`: `artifact_path` is this channel's Step-1 path source, and `target`/`phase_id` feed the Step-10 closing line. `depth` names the caller's intent (`premise-audit`/`close`); no shipped step parses it — close-depth comes only from `--close` in `$ARCHITECT_CRITIC_ARGS`.
+- **Devin and other shim-less channels:** no `commands/critique.md` wrapper runs on Devin, so nothing exports `$ARCHITECT_CRITIC_ARGS`. Flags and the artifact path arrive as literal tokens in the invocation/request text itself — parse them from there exactly as if the env var had carried them. The same applies to `Skill()` and natural-language invocations.
 - **Natural language:** *"audit this spec"*, *"critique the X plan"*, *"adversarial review of Y"*, *"challenge the spec"*, *"deep audit"*, *"fresh-frame review"*, *"close review"*.
 
 Walk these ten steps in order. Do not skip steps. Do not bash-orchestrate the judgment work.
@@ -22,8 +23,8 @@ Walk these ten steps in order. Do not skip steps. Do not bash-orchestrate the ju
 
 You need the absolute path of the artifact to audit. Try sources in this exact order; stop at the first one that yields a readable file.
 
-**1a. Explicit CLI argument.** If the slash command supplied a path:
-- Read `$ARCHITECT_CRITIC_ARGS` (env var the slash wrapper exports).
+**1a. Explicit invocation argument.** If the invocation carried a path:
+- Read `$ARCHITECT_CRITIC_ARGS` when present (env var the slash wrapper exports). On shim-less channels — Devin, `Skill()`, natural language — nothing exports it: read the path as a literal token in the invocation/request text instead.
 - Extract `--spec PATH` if present, else the first positional argument.
 - Strip a leading `@` if present (Claude Code uses `@path` to load file content into context — fs access wants the bare path).
 - If the resolved path exists and is readable, use it.
@@ -61,14 +62,17 @@ Once you have a path: `Read` the artifact end-to-end. Hold its contents in your 
 
 Principles are the lens you audit through. Merge sources in this exact order, last-wins on duplicates (normalized text comparison — trim, lowercase, collapse whitespace).
 
-1. **Shipped defaults** — `${CLAUDE_PLUGIN_ROOT}/templates/principles.md`. Always loaded. Contains the **Ghost Notes principle** (what is absent from the spec is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy as the tone for every challenge raised).
-2. **User-global** — the user's promoted principles across all projects, at the path `arc principles_user_path` resolves (`~/.claude/architect-critic/principles.md`, under `$HOME` — unlike `arc state_path`, this one does not consult `CLAUDE_PLUGIN_DATA`).
-3. **Project-scoped** — `<repo>/.claude/architect-critic/principles.md` if it exists. Project-specific principles override user-global on conflict.
-4. **Memory-bank patterns** — included only when `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` points at a readable file; every `- ` bullet in it becomes a principle. `arc principles_merge` handles all four sources; it is authoritative for resolution order.
+Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
-Run the `arc` dispatcher to do the file merge (the dispatcher is on `$PATH` because Claude Code adds each plugin's `bin/` automatically; its bash shebang forces a bash runtime for the lib regardless of the calling shell — required because Claude Code's Bash tool runs zsh by default on macOS and bare `source` of these libs crashes with `BASH_SOURCE[0]: parameter not set`):
+1. **Shipped defaults** — `templates/principles.md` (relative to the plugin root). Always loaded. Contains the **Ghost Notes principle** (what is absent from the spec is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy as the tone for every challenge raised).
+2. **User-global** — the user's promoted principles across all projects, at the path `"$arc_bin" principles_user_path` resolves (`~/.claude/architect-critic/principles.md`, under `$HOME` — unlike `"$arc_bin" state_path`, this one does not consult `CLAUDE_PLUGIN_DATA`).
+3. **Project-scoped** — `<repo>/.claude/architect-critic/principles.md` if it exists. Project-specific principles override user-global on conflict.
+4. **Memory-bank patterns** — included only when `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` points at a readable file; every `- ` bullet in it becomes a principle. `"$arc_bin" principles_merge` handles all four sources; it is authoritative for resolution order.
+
+Run the `arc` dispatcher to do the file merge (on Claude Code, `arc` is on `$PATH` automatically; on Devin, `arc_bin` is resolved per `rules/dispatcher-path.md`; its bash shebang forces a bash runtime for the lib regardless of the calling shell — required because bare `source` of these libs crashes with `BASH_SOURCE[0]: parameter not set` under zsh):
+
 ```bash
-arc principles_merge
+"$arc_bin" principles_merge
 ```
 
 That returns the merged principles block to stdout. Hold it in context for Step 5; you will apply each principle when generating challenges.
@@ -96,24 +100,24 @@ Skip CORE and your challenges get dismissed defensively even when they're correc
 
 You need four values: `HOST_AGENT`, `codex_available`, `claude_available`, and `close_depth`.
 
-**HOST_AGENT detection:** If this skill is being read by Codex (for example, Codex plugin context, `CODEX_HOME` is present, or the active tool/runtime is Codex), set `HOST_AGENT=codex`. Otherwise set `HOST_AGENT=claude`. Do not ask the user; infer it from the running agent context.
+**HOST_AGENT detection:** `HOST_AGENT` is the runtime that loaded this skill — the agent knows its own host. Codex plugin context → `codex` (`CODEX_HOME` present corroborates). Devin plugin context — the skill arrived via Devin's plugin loader under the Devin CLI/Desktop runtime → `devin`. Otherwise → `claude`. Environment or binary presence never decides alone: a `devin` binary on `$PATH` or an exported `CODEX_HOME` is common on machines whose active session is a different host. Do not ask the user; infer it from the running agent context.
 
 **Codex availability:** Run `command -v codex` in a Bash tool call. Capture the return code. If the binary resolves, also capture `codex --version` for the status message in Step 4.
 
 **Claude availability:** Run `command -v claude` in a Bash tool call. Capture the return code. If the binary resolves, also capture `claude --version` for the status message in Step 4.
 
 **Close-depth detection.** Set `close_depth = true` if ANY of:
-- `--close` slash flag present in `$ARCHITECT_CRITIC_ARGS`
-- `--deep` slash flag present
+- `--close` slash flag present in `$ARCHITECT_CRITIC_ARGS` — or as a literal token in the invocation/request text on shim-less channels (Devin, `Skill()`, natural language)
+- `--deep` slash flag present (same dual source)
 - The user's natural-language invocation matched any of: *"deep audit"*, *"close review"*, *"deeper look"*, *"adversarial fresh-frame"*, *"fresh-frame review"*
 
 Otherwise `close_depth = false` (shallow = claude-only audit, the default).
 
-**Async detection (#39).** Set `async_mode = true` if `--async` is present in `$ARCHITECT_CRITIC_ARGS`. Async is only meaningful for a **close-depth** audit with `HOST_AGENT=claude` (the Codex companion is the only proven background backend; Codex-host keeps the synchronous path). If `--async` is set but `close_depth=false` or `HOST_AGENT=codex`, ignore it and run synchronously, telling the user why. When `async_mode=true` and applicable, Step 6 takes the **defer-to-resume** path (dispatch now, resume later) instead of the inline invocation.
+**Async detection (#39).** Set `async_mode = true` if `--async` is present in `$ARCHITECT_CRITIC_ARGS` — or as a literal token in the invocation/request text on shim-less channels. This second source is what makes the Devin refusal below reachable: on Devin nothing exports the env var, so the `--async` a Devin user typed lives only in the request text. Async is only meaningful for a **close-depth** audit with `HOST_AGENT=claude` (the Codex companion is the only proven background backend; Codex-host keeps the synchronous path). If `--async` is set but `close_depth=false` or `HOST_AGENT=codex`, ignore it and run synchronously, telling the user why. When `async_mode=true` and applicable, Step 6 takes the **defer-to-resume** path (dispatch now, resume later) instead of the inline invocation. **`HOST_AGENT=devin` hard-refuses `--async`:** Devin has no external adversary backend and no background job infrastructure for architect-critic. If `--async` is present and `HOST_AGENT=devin`, do NOT enter the foreground critique path either — refuse immediately with a clear message: *"`--async` is not supported on Devin. Devin runs host-only audits with no external adversary. Run `/critique` without `--async`."* Do not append to `external_runs[]`, do not dispatch any job, and do not mutate state.
 
-**Neutral mode (#93).** Set `neutral_mode = true` if `--neutral` is present in `$ARCHITECT_CRITIC_ARGS`, or the user's natural-language invocation matched *"no recommendations"* / *"just list the challenges"* / *"don't recommend"*. When `neutral_mode=true`, Step 8 omits the per-challenge **recommended disposition** and presents challenges neutrally (the pre-#93 behavior). Default is `false` — recommend by default. Opt-out is per-invocation, not sticky.
+**Neutral mode (#93).** Set `neutral_mode = true` if `--neutral` is present in `$ARCHITECT_CRITIC_ARGS` or as a literal token in the invocation/request text, or the user's natural-language invocation matched *"no recommendations"* / *"just list the challenges"* / *"don't recommend"*. When `neutral_mode=true`, Step 8 omits the per-challenge **recommended disposition** and presents challenges neutrally (the pre-#93 behavior). Default is `false` — recommend by default. Opt-out is per-invocation, not sticky.
 
-**Walk mode (pulse360#15).** Set `walk_mode = true` if `--walk` is present in `$ARCHITECT_CRITIC_ARGS`, or the user's natural-language invocation matched *"walk them"* / *"walk them one at a time"* / *"no auto-accept"*. When `walk_mode=true`, Step 8.0 triage is skipped entirely — every challenge is walked sequentially (the #93 behavior). Default is `false`; per-invocation, not sticky. `--neutral` also disables triage transitively: with no recommendations there is nothing grounded to auto-apply.
+**Walk mode (pulse360#15).** Set `walk_mode = true` if `--walk` is present in `$ARCHITECT_CRITIC_ARGS` or as a literal token in the invocation/request text, or the user's natural-language invocation matched *"walk them"* / *"walk them one at a time"* / *"no auto-accept"*. When `walk_mode=true`, Step 8.0 triage is skipped entirely — every challenge is walked sequentially (the #93 behavior). Default is `false`; per-invocation, not sticky. `--neutral` also disables triage transitively: with no recommendations there is nothing grounded to auto-apply.
 
 The close-depth adversary is host-aware:
 
@@ -123,6 +127,10 @@ The close-depth adversary is host-aware:
 | claude     | false       | codex_available | claude-self-audit only |
 | codex      | true        | claude_available | codex-self-audit + claude fresh-frame |
 | codex      | false       | claude_available | codex-self-audit only |
+| devin      | true        | n/a              | devin-self-audit only (host-only, no external adversary) |
+| devin      | false       | n/a              | devin-self-audit only (host-only, no external adversary) |
+
+On `HOST_AGENT=devin`, `close_depth` does not change the audit shape — Devin always runs host-only self-audit with `adversaries_used=["devin"]`. No `external_runs[]` append occurs. The `--close` flag is accepted but does not dispatch an external adversary; it simply runs the same host-only audit at close-depth rigor.
 
 ---
 
@@ -150,6 +158,7 @@ Pick the matching message and emit it as a normal turn message (not a tool call 
 - **HOST_AGENT=codex && claude_available && close_depth →** *"Claude Code detected; will run fresh-frame audit (~60s)"* (substitute the real version string from `claude --version`).
 - **HOST_AGENT=codex && !claude_available →** *"Claude Code not detected; running codex-self-audit only. Install Claude Code CLI for adversarial fresh-frame."*
 - **HOST_AGENT=codex && claude_available && !close_depth →** *"Claude Code available but depth=shallow; running codex-self-audit only. Use --close for fresh-frame."*
+- **HOST_AGENT=devin →** *"Devin host-only audit: no external adversary. Running devin-self-audit."* (regardless of close_depth — Devin has no fresh-frame backend)
 
 Do not phrase this as a tool-progress message ("Running detection..."). Phrase it as a status declaration the user can act on — they may want to abort and re-run with `--close`, or stop to install codex first.
 
@@ -216,12 +225,12 @@ The external adversary is a separate model talking to a separate session — it 
 **If `async_mode=true` AND `close_depth=true` AND `HOST_AGENT=claude`, take this branch instead of the synchronous invocation below — then STOP (do not consolidate or run the rebuttal now).** The Codex audit runs in the background and is consumed later via `/critique-jobs resume`. This is the **defer-to-resume (unified)** model: turn 1 produces *no conclusions* (only a read-only preview + a dispatched job), so resume mutates nothing.
 
 1. **Show the host self-audit as a read-only PREVIEW.** You already produced the host-agent self-audit JSON in Step 5. Present it to the user as a preview only — do **not** enter the rebuttal cycle.
-2. **Persist the self-audit** so resume can consolidate it without re-running Step 5. Write the Step-5 challenge JSON to `$(arc data_dir)/async/<run_id>/claude-audit.json` (create the dir; `<run_id>` is the job id from step 6). Practically: dispatch first to get the job id, then write the file under that id; if the directory or write fails after dispatch, cancel the job before stopping.
-3. **Size hint (advisory).** Surface the recommendation: `arc codex_size_hint "<artifact-path>"` → `foreground` or `background`. (For a `foreground` recommendation on a small spec, you may suggest the user re-run without `--async`; still honor their `--async` choice.)
+2. **Persist the self-audit** so resume can consolidate it without re-running Step 5. Write the Step-5 challenge JSON to `$("$arc_bin" data_dir)/async/<run_id>/claude-audit.json` (create the dir; `<run_id>` is the job id from step 6). Practically: dispatch first to get the job id, then write the file under that id; if the directory or write fails after dispatch, cancel the job before stopping.
+3. **Size hint (advisory).** Surface the recommendation: `"$arc_bin" codex_size_hint "<artifact-path>"` → `foreground` or `background`. (For a `foreground` recommendation on a small spec, you may suggest the user re-run without `--async`; still honor their `--async` choice.)
 4. **Pre-flight — hard-fail, NO silent foreground fallback.** The user explicitly chose async; quietly degrading to foreground would violate intent. Resolve the target root and pre-flight; on failure, surface the remediation and STOP (tell the user the synchronous `/critique --close` is the foreground option):
    ```bash
-   target_root="$(arc codex_target_root "<artifact-path>")"
-   arc codex_preflight "$target_root"   # rc≠0 → hard-fail with remediation; do NOT fall back
+   target_root="$("$arc_bin" codex_target_root "<artifact-path>")"
+   "$arc_bin" codex_preflight "$target_root"   # rc≠0 → hard-fail with remediation; do NOT fall back
    ```
 5. **Build the adversarial prompt + embed the return contract**, then write it to a prompt-file OUTSIDE any repo output tree (e.g. under `${CLAUDE_PLUGIN_DATA}` or `mktemp`). The companion runs a bare prompt-file and never sees this skill, so the `{challenges,gaps}` return contract MUST be embedded verbatim:
    ```bash
@@ -237,20 +246,20 @@ The external adversary is a separate model talking to a separate session — it 
    ```
 6. **Dispatch + record, then STOP.**
    ```bash
-   data_dir="$(arc data_dir)"
-   job="$(arc codex_dispatch "$target_root" "$pf")"; rm -f "$pf"
+   data_dir="$("$arc_bin" data_dir)"
+   job="$("$arc_bin" codex_dispatch "$target_root" "$pf")"; rm -f "$pf"
    job_dir="${data_dir}/async/${job}"
    if ! mkdir -p "$job_dir"; then
-     arc codex_cancel "$target_root" "$job" >/dev/null 2>&1 || true
+     "$arc_bin" codex_cancel "$target_root" "$job" >/dev/null 2>&1 || true
      echo "Failed to create async job directory; cancelled job $job." >&2
      return 1
    fi
    # ... write the Step-5 self-audit JSON to "$job_dir/claude-audit.json" ...
    # If that write fails, cancel the dispatched job and stop before continuing.
-   if ! arc state_external_run_add --run-id "$job" --host claude --adversary codex \
+   if ! "$arc_bin" state_external_run_add --run-id "$job" --host claude --adversary codex \
      --artifact "<artifact-path>" --depth close --neutral-mode "$neutral_mode" --walk-mode "$walk_mode" \
      --result-path "$job_dir/result.json"; then
-     arc codex_cancel "$target_root" "$job" >/dev/null 2>&1 || true
+     "$arc_bin" codex_cancel "$target_root" "$job" >/dev/null 2>&1 || true
      echo "Failed to persist async job metadata; cancelled job $job." >&2
      return 1
    fi
@@ -268,7 +277,7 @@ Everything below is the **synchronous** path (the default, unchanged).
 The implementation lives at `lib/codex.sh:ac_codex_run_audit` — call the helper rather than re-constructing the invocation inline. Signature: `ac_codex_run_audit <prompt> <output_dir> [--model NAME] [--timeout SECS]`. The helper computes its own `REQ_ID`, resolves the schema through `_ac_codex_schema_path`, and writes the parsed JSON to stdout; the raw `--output-last-message` file lands in `<output_dir>/codex-audit-<req-id>.json`. The invocation is **synchronous** (no background mode, no async polling); default timeout 5 minutes, configurable via env var `ARCHITECT_CRITIC_CODEX_TIMEOUT_S`.
 
 ```bash
-arc codex_run_audit "$ADVERSARIAL_PROMPT" "$TMP" ${MODEL_OVERRIDE:+--model "$MODEL_OVERRIDE"}
+"$arc_bin" codex_run_audit "$ADVERSARIAL_PROMPT" "$TMP" ${MODEL_OVERRIDE:+--model "$MODEL_OVERRIDE"}
 ```
 
 **If HOST_AGENT=codex, invoke Claude Code.** Display a progress message first:
@@ -278,9 +287,10 @@ arc codex_run_audit "$ADVERSARIAL_PROMPT" "$TMP" ${MODEL_OVERRIDE:+--model "$MOD
 Then invoke Claude Code via the shell with this pattern, using the same `ADVERSARIAL_PROMPT` and `templates/output-schema.json` schema:
 
 ```bash
+SCHEMA_PATH="$(dirname "$("$arc_bin" principles_shipped_path)")/output-schema.json"
 claude --print \
   --output-format json \
-  --json-schema "$(cat "${CLAUDE_PLUGIN_ROOT}/templates/output-schema.json")" \
+  --json-schema "$(cat "$SCHEMA_PATH")" \
   --permission-mode dontAsk \
   --no-session-persistence \
   "$ADVERSARIAL_PROMPT"
@@ -303,15 +313,15 @@ Steps 7 (consolidate), 8 (rebuttal cycle), and 9 (append run) form one reusable 
 
 ## Step 7: Consolidate challenges
 
-You now have one or two challenge lists (claude-only, or claude + codex). Merge them via the bash helper:
+You now have one or two challenge lists (claude-only, claude + codex, or the single devin self-audit). Merge them via the bash helper — **except on `HOST_AGENT=devin`**: a lone self-audit has nothing to merge, and the helper's `source`/`adversaries_used` vocabulary only knows claude/codex, so it would mislabel a devin run. On Devin the self-audit list plays the merged-list role directly:
 
 ```bash
-arc consolidator_merge "$CLAUDE_AUDIT_JSON" "$CODEX_AUDIT_JSON"
+"$arc_bin" consolidator_merge "$CLAUDE_AUDIT_JSON" "$CODEX_AUDIT_JSON"
 ```
 
 The consolidator's algorithm:
 - **Similarity dedup.** Text overlap >70% between two challenges means they are the same challenge. Use shingle/Jaccard similarity (the helper handles this).
-- **Adversary attribution.** Each surviving challenge gets a `source` field: `["claude"]`, `["codex"]`, or `["claude", "codex"]` for cross-confirmed challenges. **Cross-confirmed challenges are the strongest signal** — both an adversary that read your spec and a fresh-frame adversary that did not landed on the same issue. Surface those first in the rebuttal cycle.
+- **Adversary attribution.** Each surviving challenge gets a `source` field: `["claude"]`, `["codex"]`, or `["claude", "codex"]` for cross-confirmed challenges — `["devin"]` under a Devin host-only run. **Cross-confirmed challenges are the strongest signal** — both an adversary that read your spec and a fresh-frame adversary that did not landed on the same issue. Surface those first in the rebuttal cycle.
 - **Severity reconciliation.** If both adversaries flagged the same challenge with different severities, preserve the **highest** severity (`premise` > `gap` > `alternative`).
 
 The merged list is what you walk in Step 8.
@@ -348,7 +358,7 @@ Final list: 3 challenges, one cross-confirmed at premise level (surface first in
 This step is the heart of the user experience. It is also the bug #4 fix: **never use bash `read` to capture user input here.** Bash `read` blocks on stdin, which doesn't exist in non-TTY Claude Code sessions (subagent, hooks, headless), and the rebuttal cycle silently skips. Use Claude's native turn handling instead — you ask, the user replies in the next turn, you process.
 
 **Recommend-by-default (#93).** Per the recommendation policy
-(`${CLAUDE_PLUGIN_ROOT}/templates/recommendation-policy.md`), each challenge you surface
+(`templates/recommendation-policy.md`, relative to the plugin root), each challenge you surface
 carries **one recommended disposition** — your honest, CORE-toned lean on how the
 user should dispose of it (`accept`, `rebut`, or `defer`) plus a one-line
 rationale, grounded in the artifact (Step 1) and principles (Step 2) and cited
@@ -359,7 +369,7 @@ doesn't ground it, say *"(general best practice)"*. When `neutral_mode=true`
 (Step 3, `--neutral`), omit the recommended-disposition line and present each
 challenge neutrally.
 
-**Step 8.0 — Triage (disposition triage, pulse360#15).** Skip this step when `walk_mode=true` or `neutral_mode=true` — then every challenge is walked below. Otherwise, before walking anything, initialize `AUTO_APPLIED_COUNT=0`, `ESCALATED_COUNT=0`, `DEFERRED_CHALLENGES_JSON=[]`, and `DEFERRED_COUNT=0`, then classify every challenge in the consolidated list against the escalation predicate in the policy's *Disposition triage* section (`${CLAUDE_PLUGIN_ROOT}/templates/recommendation-policy.md`): UNGROUNDED / VISION/SCOPE-TOUCHING / ONE-WAY DOOR / TOP SEVERITY (`premise` is this surface's top class) / CONTESTED (recommended disposition is `rebut`, or the two adversaries disagree on the finding).
+**Step 8.0 — Triage (disposition triage, pulse360#15).** Skip this step when `walk_mode=true` or `neutral_mode=true` — then every challenge is walked below. Otherwise, before walking anything, initialize `AUTO_APPLIED_COUNT=0`, `ESCALATED_COUNT=0`, `DEFERRED_CHALLENGES_JSON=[]`, and `DEFERRED_COUNT=0`, then classify every challenge in the consolidated list against the escalation predicate in the policy's *Disposition triage* section (`templates/recommendation-policy.md`, relative to the plugin root): UNGROUNDED / VISION/SCOPE-TOUCHING / ONE-WAY DOOR / TOP SEVERITY (`premise` is this surface's top class) / CONTESTED (recommended disposition is `rebut`, or the two adversaries disagree on the finding).
 
 - **Clears the predicate** → apply the recommended disposition now, incrementing `AUTO_APPLIED_COUNT`: `accept` → mark as concession; `defer` → append `{index,text,severity,rationale}` to `DEFERRED_CHALLENGES_JSON` and increment `DEFERRED_COUNT`.
 - **Trips the predicate** → add to the escalated list, incrementing `ESCALATED_COUNT`.
@@ -418,10 +428,11 @@ When you land on a 3 (the borderline case), default to "stands" but soften the f
 
 ## Step 9: Bash bookkeeping — append run + check auto-promotion
 
-State updates happen in bash because they are pure I/O. Append the run record with the **flag form** — it is the only form that carries the deferred-challenge fields (`--deferred-count` / `--deferred-challenges`), so use it whenever any challenge was deferred (they default to `0`/`[]` when omitted):
+State updates happen in bash because they are pure I/O. Initialize state first — `state_init` is idempotent and a no-op when `state.json` already exists, but without it the append below cannot take `state.lock` on a fresh install (the lock's parent directory is created only here). Then append the run record with the **flag form** — it is the only form that carries the deferred-challenge fields (`--deferred-count` / `--deferred-challenges`), so use it whenever any challenge was deferred (they default to `0`/`[]` when omitted):
 
 ```bash
-arc state_append_run \
+"$arc_bin" state_init   # idempotent — creates the data dir + state.json on first run
+"$arc_bin" state_append_run \
   --request-id "$REQUEST_ID" \
   --depth "$DEPTH" \
   --adversaries "$ADVERSARIES_JSON" \
@@ -435,13 +446,13 @@ arc state_append_run \
   --elapsed-ms "$ELAPSED_MS"
 ```
 
-`--adversaries` accepts either a JSON array such as `["claude","codex"]` or a CSV string such as `claude,codex`.
+`--adversaries` accepts either a JSON array such as `["claude","codex"]` or a CSV string such as `claude,codex` — on `HOST_AGENT=devin` the value is `["devin"]`.
 
 The schema v3 `recent_runs[]` entry includes:
 - `request_id` — `crit-<ISO8601>-<entropy>` generated upstream
 - `completed_at` — ISO8601 UTC
 - `depth` — `shallow` or `close`
-- `adversaries_used` — `["claude"]` or `["claude","codex"]`
+- `adversaries_used` — `["claude"]`, `["claude","codex"]`, or `["devin"]` on a Devin host-only run
 - `challenge_count` — total surviving challenges after consolidation
 - `concessions` — count of challenges the user conceded
 - `auto_applied_count` — challenges auto-applied by Step 8.0 triage (0 under `--walk`/`--neutral`)
@@ -452,7 +463,7 @@ The schema v3 `recent_runs[]` entry includes:
 Then run the auto-promotion candidate check:
 
 ```bash
-arc promotion_check_candidates
+"$arc_bin" promotion_check_candidates
 ```
 
 The helper inspects `recent_runs[]` for patterns (same challenge fingerprint surfacing across ≥3 runs) and emits any candidates. If candidates exist, surface them to the user as a separate turn message asking whether to promote — but only when the rebuttal cycle in Step 8 is fully complete (don't interrupt mid-cycle).
@@ -469,7 +480,7 @@ Auto-promotion candidates from this audit:
   2. "..."
 ```
 
-Wait for the user's pick per candidate. Pass their decision to the real verbs: promote → `arc promotion_promote <fingerprint> <basis>` (`lib/promotion.sh` records the promotion in state; the chosen scope's `principles.md` write is `promoting-principle` Step 5's); dismiss → `arc promotion_apply_suppression <fingerprint> <reason_score>` (suppression window is 30/90 days, selected from `reason_score`). There is no single `ac_promotion_apply` — the promote and suppress paths are separate functions.
+Wait for the user's pick per candidate. Pass their decision to the real verbs: promote → `"$arc_bin" promotion_promote <fingerprint> <basis>` (`lib/promotion.sh` records the promotion in state; the chosen scope's `principles.md` write is `promoting-principle` Step 5's); dismiss → `"$arc_bin" promotion_apply_suppression <fingerprint> <reason_score>` (suppression window is 30/90 days, selected from `reason_score`). There is no single `ac_promotion_apply` — the promote and suppress paths are separate functions.
 
 **On the "candidates pile" from Step 8.** Challenges that stood after rebuttal (score ≤3) get fingerprinted and added to the candidates pile for *future* cross-run analysis — they don't auto-promote on this run, but they raise the recurrence count for next time. This is the FULL auto-promotion model per [[project_architect_critic_v01_settlements]] — three recurrences across runs trigger the promotion offer.
 
@@ -482,7 +493,7 @@ Final turn message, plain prose. Format:
 ```
 Audit complete for <target>.
 
-  Adversaries used : <claude | claude + codex>
+  Adversaries used : <claude | claude + codex | devin>
   Challenges       : <N> total (<X> premise, <Y> gap, <Z> alternative)
   Concessions      : <C> of <N>
   Auto-applied     : <A> of <N> (disposition triage)

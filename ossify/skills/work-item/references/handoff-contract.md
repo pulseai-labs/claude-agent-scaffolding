@@ -88,14 +88,16 @@ branch:         work/r1.s2.w1-toc-anchors
 spec_path:      /abs/path/to/ai-workspace/docs/specs/r1/r1.s2-toc/work-r1.s2.w1/spec.md
 ```
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 **`spec_path` is not optional and lives nowhere else.** Pre-flight's Gate 2 runs
-`oss verify_acs "<abs spec path>"` against it and the whole TDD loop works the
+`"$oss_bin" verify_acs "<abs spec path>"` against it and the whole TDD loop works the
 ordered rows that come back. A handoff whose only mention of the spec is a
 sentence like "see the spec in this directory" is malformed at Gate 1.
 
 `branch` must be the branch that is **actually checked out** in the worktree —
 read it back with `git -C "$wt" rev-parse --abbrev-ref HEAD` rather than
-re-deriving it, and record the same value into state with `oss work_item_exec`.
+re-deriving it, and record the same value into state with `"$oss_bin" work_item_exec`.
 
 ### `## 4. Pre-flight calibration`
 
@@ -137,7 +139,7 @@ what it was for" without re-reading the whole spine plan.
 An orientation aid **and the prose must say so, in the heading and in the body.**
 
 The worker never takes its ACs from here. It reads the spec end to end and parses
-the ordered `auto:` rows out of it with `oss verify_acs`, and *that* TSV order is
+the ordered `auto:` rows out of it with `"$oss_bin" verify_acs`, and *that* TSV order is
 the binding working order for the RED gate and the loop. Titling this section as
 if it were authoritative creates a second source of truth that nothing reads and
 that drifts from the spec the moment either is edited.
@@ -152,7 +154,7 @@ the same grammar the ACs use, because the worker runs them through the same
 predicate:
 
 ```bash
-oss verify_step "<worktree-abs>" "<command>" "<expectation>"
+"$oss_bin" verify_step "<worktree-abs>" "<command>" "<expectation>"
 ```
 
 State that these run **without halting on first fail** — all of them, every time,

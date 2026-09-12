@@ -37,7 +37,7 @@ imports the other's semantics.
    the spec-core gets.
 
 3. **Run the audit.** Read
-   `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end and
+   `skills/challenge/references/audit.md` (relative to the plugin root) end to end and
    follow it: the lean MASTER-SPEC is the artifact, the depth is `close`, the
    target label is the spec's name. You are a ceremony caller: the audit
    consolidates and returns **every finding unwalked** — it runs no internal
@@ -100,4 +100,6 @@ is recorded and the flow continues. The critic's findings do not gate
   spec-aligned mechanics only.
 - **Do not retry on a failed audit.** If it errors or returns a malformed
   summary, log it and continue; the user can re-run `/ossify:challenge`
-  against the spec directly.
+  against the spec directly (not published on Devin — there, re-read
+  `skills/challenge/references/audit.md` under the plugin root and run it
+  inline).

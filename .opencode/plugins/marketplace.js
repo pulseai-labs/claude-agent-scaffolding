@@ -38,6 +38,10 @@ export async function ScaffoldingPlugin(input, options = {}) {
     implementerAgent = {
       description: translatePrompt(frontmatter.description, ossify),
       mode: "subagent",
+      // Canonical bodies reference skills/ paths relative to the plugin root
+      // (CLAUDE_PLUGIN_ROOT-free); translatePrompt absolutizes them against the
+      // plugin root so the installed prompt resolves real files, not the
+      // consumer's cwd.
       prompt: translatePrompt(body, ossify),
       permission: {
         "*": "deny",

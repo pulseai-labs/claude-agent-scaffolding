@@ -59,13 +59,15 @@ recorded, and the recovery is the user's to pick.
 The scope is derived **mechanically from the id's shape**. Never ask which scope
 the user meant, and never infer it from the wording of the request.
 
+Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+
 ```bash
 id="<the id from $ARGUMENTS>"
-parts="$(oss id_parse "$id")" || parts=""
+parts="$("$oss_bin" id_parse "$id")" || parts=""
 scope="$(printf '%s\n' "$parts" | awk '{print $1}')"
 ```
 
-`oss id_parse` echoes **one space-separated line whose first field is the scope
+`"$oss_bin" id_parse` echoes **one space-separated line whose first field is the scope
 and whose remaining fields are the numeric components** — `r1.s2.w3` yields
 `work_item 1 2 3`, `r1.s2` yields `spine 1 2`, `r1` yields `release 1`.
 
@@ -85,8 +87,8 @@ passed and show the three shapes:
 > `close`: `<what was passed>` is not an ossify id. Work item `r1.s2.w3`, spine
 > `r1.s2`, release `r1`.
 
-**With no id at all, refuse and list what is open** — `oss spine_list`, or
-`oss get` with a status filter. Do not close "the current thing": a close run
+**With no id at all, refuse and list what is open** — `"$oss_bin" spine_list`, or
+`"$oss_bin" get` with a status filter. Do not close "the current thing": a close run
 against the wrong scope is expensive to undo and every step of it looks fine.
 And if what arrived is a change to **any declared repo** belonging to no open
 spine or work item — a typo fix, a doc touch-up — it is not a close at all:
@@ -106,19 +108,19 @@ deliberately not ids, and the routing anti-patterns — in
 Runs before any scope's first step, every time.
 
 ```bash
-oss manifest_require || exit 0        # refuse: run /init-workspace or /pair-workspace first
-oss doctor                            # schema + replay must be green
-ai_root="$(oss repo_root ai_workspace)"
+"$oss_bin" manifest_require || exit 0        # refuse: run /init-workspace or /pair-workspace first
+"$oss_bin" doctor                            # schema + replay must be green
+ai_root="$("$oss_bin" repo_root ai_workspace)"
 ```
 
-1. **Manifest.** `oss manifest_require` resolves `.ossify/topology.json` first
+1. **Manifest.** `"$oss_bin" manifest_require` resolves `.ossify/topology.json` first
    and a workspace-init `.workspace/pairing.json` as the translated fallback; it
    fails only when neither is on the walk-up path. On failure print its refusal
    verbatim — the literal tokens **`/ossify:start`**, **`/ossify:adopt`**,
    **`/init-workspace`** and **`/pair-workspace`** are all load-bearing, and a
    refusal naming only the workspace-init pair sends a topology-only project to
    the wrong remedy. Do not paraphrase it.
-2. **`oss doctor` must be green on `schema` and `replay`.** A close *mutates*
+2. **`"$oss_bin" doctor` must be green on `schema` and `replay`.** A close *mutates*
    state; running one over a drifted state compounds the drift into the record
    that every later ceremony reads.
 
@@ -127,16 +129,16 @@ ai_root="$(oss repo_root ai_workspace)"
 
    | doctor line | Remedy |
    |---|---|
-   | `fail: replay` | **`oss state_restore`** — rebuilds live state from base + journal |
-   | `fail: shape` | **`oss state_restore`** — a required key is missing; same rebuild |
-   | `fail: schema`, version **below** this build | **`oss migrate`** — the state predates this build |
+   | `fail: replay` | **`"$oss_bin" state_restore`** — rebuilds live state from base + journal |
+   | `fail: shape` | **`"$oss_bin" state_restore`** — a required key is missing; same rebuild |
+   | `fail: schema`, version **below** this build | **`"$oss_bin" migrate`** — the state predates this build |
    | `fail: schema`, version **above** this build | **upgrade ossify** — `migrate` accepts v1/v2 only |
-   | `fail: state` | **`oss init <name>`** — this project was never initialised |
+   | `fail: state` | **`"$oss_bin" init <name>`** — this project was never initialised |
 
    Naming `state_restore` for every line wedges the close on a schema failure:
    against a v1/v2 state it prints `restore: state is already clean - nothing to
    do` at **rc 0**, leaves `schema_version` untouched, and `oss doctor` fails
-   identically on the retry. The operator loops. `oss migrate` is the verb that
+   identically on the retry. The operator loops. `"$oss_bin" migrate` is the verb that
    moves the version, and doctor already names it in its own output — which is
    why echoing the line beats paraphrasing it.
 
@@ -147,7 +149,7 @@ ai_root="$(oss repo_root ai_workspace)"
    anything. `doctor/references/state-inspection.md` §3, in this plugin, carries
    the full treatment.
 
-   **`oss doctor` no longer reports the advisories.** A held lock, a pending
+   **`"$oss_bin" doctor` no longer reports the advisories.** A held lock, a pending
    amendment, an outstanding fake and out-of-spine patch records are read by the
    `doctor` SKILL now, not by the verb this pre-flight shells out to — so they
    will not appear here at all. They were never blockers; they are inputs the
@@ -156,7 +158,7 @@ ai_root="$(oss repo_root ai_workspace)"
    this command: it cannot emit one.
 
    **Read the lock yourself, before any scope's first step:** if
-   `"$(oss state_path).lock"` exists as a directory,
+   `"$("$oss_bin" state_path).lock"` exists as a directory,
    halt naming it and route to `doctor/references/state-inspection.md` §2's
    staleness rule — the close mutates, and the merge at spine step 2 precedes
    the first mutation, so a leaked lock lands the irreversible merge and then
@@ -164,8 +166,8 @@ ai_root="$(oss repo_root ai_workspace)"
 3. **Resolve every path to an absolute one up front, and never `cd`.** The
    manifest walk starts at `$PWD` and the dispatcher re-runs it on every call that
    takes no explicit state path, so a `cd` mid-ceremony silently re-points the
-   state file rather than failing. Probe once with `oss state_path` and
-   `oss repo_root <key>`, carry the results as absolute paths, and reach every
+   state file rather than failing. Probe once with `"$oss_bin" state_path` and
+   `"$oss_bin" repo_root <key>`, carry the results as absolute paths, and reach every
    repo with `git -C "<abs>"`. Do **not** work around this by exporting
    `OSS_STATE_FILE`: that changes resolution precedence for every nested call and
    is not what the other lanes do.
@@ -224,14 +226,16 @@ The middle scope, and the one the ceremony is named for (spec §6.1). Eleven
 steps, in **binding order**:
 
 1. **Every work item `complete`**, else refuse and **name the offender**. Test
-   the *output* of the `oss get` — a `select` matching nothing exits 0.
+   the *output* of the `"$oss_bin" get` — a `select` matching nothing exits 0.
 2. **Land each hosting repo on its own `base_branch` — by PR where a remote
    exists, locally where none does (#339)**. The PR arm pushes the spine branch,
-   opens the PR, and hands it to `/ossify:work-pr`; the record pass proves the
+   opens the PR, and hands it to `/ossify:work-pr` — not published on
+   Devin/OpenCode, where the operator drives the merge loop manually
+   (`spine-close.md` §3); the record pass proves the
    remote merge locally (identity, lineage, base-contained) before anything is
    recorded. A remote `gh` cannot operate on halts — never a silent local
    fall-through. The local arm keeps all four guards: **derive the spine branch
-   with `oss branch_name` and assert HEAD matches it — never read it off HEAD**;
+   with `"$oss_bin" branch_name` and assert HEAD matches it — never read it off HEAD**;
    assert the switch-back actually moved HEAD; check reachability after the
    merge. Each catches a distinct failure that is otherwise rc 0 all the way to
    a green close. Halting on conflict (at that halt,
@@ -241,13 +245,13 @@ steps, in **binding order**:
    as one thing, and the only reader that judges craft and fidelity rather than
    whether the ACs passed. Advisory: it yields findings and a per-finding
    decision, never a halt.
-3. **`oss ledger_apply_pending <spine>`** — after the merge, before the demo.
-4. **The cumulative demo**: `oss demo_run` for every active `auto:` line, then
-   walk **this spine's own** `user:` lines (`oss demo_user_lines <spine>`) with
+3. **`"$oss_bin" ledger_apply_pending <spine>`** — after the merge, before the demo.
+4. **The cumulative demo**: `"$oss_bin" demo_run` for every active `auto:` line, then
+   walk **this spine's own** `user:` lines (`"$oss_bin" demo_user_lines <spine>`) with
    the human. **Halt on the first failure** — no later step runs.
-5. **The changed-path list, then `oss touch_check`.** The list is the merge's own
+5. **The changed-path list, then `"$oss_bin" touch_check`.** The list is the merge's own
    diff. **rc 0 = hit, rc 1 = clean, rc 2 = could-not-check, and rc 2 is not
-   clean.** A bone hit reclassifies the spine mid-flight via `oss class_set`
+   clean.** A bone hit reclassifies the spine mid-flight via `"$oss_bin" class_set`
    (three arguments — the reason is required).
 6. **Risk-gate escalation**, distinguished from a bone hit by the printed prefix,
    and it escalates regardless of class.
@@ -256,7 +260,7 @@ steps, in **binding order**:
 8. **The retrospective**, against a fixed section contract.
 9. **Memory-bank harvest** — always before cleanup.
 10. **Worktree + branch cleanup**, per work item. Only now.
-11. **State updates**: `oss spine_status <spine> closed` and `oss demo_record`.
+11. **State updates**: `"$oss_bin" spine_status <spine> closed` and `"$oss_bin" demo_record`.
 
 Full step detail — the two landing passes and their guards, the PR handoff
 contract, the changed-path computation, the class-scoped critic bridge, and the
@@ -282,24 +286,24 @@ The outermost scope (spec §6.2, plus the two §6.1 contracts that only become
 enforceable at a release boundary). Eight steps, in **binding order**:
 
 1. **Every spine `closed`**, else refuse and **name the offender with its
-   status**. Test the *output* of the `oss get` — a `select` matching nothing
+   status**. Test the *output* of the `"$oss_bin" get` — a `select` matching nothing
    exits 0. **`abandoned` is not `closed`**: it neither passes silently nor
    hard-halts, it is surfaced by name for the user to confirm.
-2. **The full cumulative walkthrough**: `oss demo_run` for every accumulated
+2. **The full cumulative walkthrough**: `"$oss_bin" demo_run` for every accumulated
    `auto:` line, then walk **every** active `user:` line with the human —
-   `oss demo_user_lines` with **no argument**. The amendments are already
+   `"$oss_bin" demo_user_lines` with **no argument**. The amendments are already
    applied; the spines applied them. Grouping by feature is **derived** from
-   `source_spine` and `oss feature_list`, not read off a field.
-3. **Blocking finding — fake expiry.** `oss expired_fakes "$rel"`, plus the
+   `source_spine` and `"$oss_bin" feature_list`, not read off a field.
+3. **Blocking finding — fake expiry.** `"$oss_bin" expired_fakes "$rel"`, plus the
    judgment pass over each remaining fake's `replacement_trigger` (§6's second
    reference). The only unblocks are replace or explicitly renew.
 4. **Blocking finding — outstanding quarantines.**
-   `oss expired_quarantines "$rel"` — every line quarantined in a **strictly
+   `"$oss_bin" expired_quarantines "$rel"` — every line quarantined in a **strictly
    earlier** release is a parking ticket now due.
 5. **The release retrospective**, aggregating the spine retros. **Refuses,
    naming the spine, if any lacks `retrospective.md`.**
 6. **Feature-map re-groom + next-release sketch** — the rolling-wave crank, via
-   `oss feature_list` and `oss release_set_meta`.
+   `"$oss_bin" feature_list` and `"$oss_bin" release_set_meta`.
 7. **The boundary audit** (companion §6, re-derived under the skill-first
    freeze) — **every repo the resolved topology declares (`.ossify/topology.json`
    first, a translated `.workspace/pairing.json` as the fallback), each
@@ -333,7 +337,7 @@ enforceable at a release boundary). Eight steps, in **binding order**:
    "<notes>"` — never after a halt in any step above.
 
 **Both blocking gates are rc 0 = CLEAN / 1 = BLOCKING / 2 = could-not-check —
-the opposite polarity from `oss touch_check`, where rc 0 is a hit.** Copying the
+the opposite polarity from `"$oss_bin" touch_check`, where rc 0 is a hit.** Copying the
 touch-check branch shape inverts the judge and passes exactly the releases the
 gates exist to block. rc 2 halts in both; it is never folded into clean.
 
@@ -356,8 +360,8 @@ why the comparison is at-or-before and numeric, and the **judgment arm** over
 **`references/fake-expiry.md`**.
 
 Out-of-spine work has its own lane and its own routing judgment — the
-three-part test, `oss touch_check` as its mechanical two thirds, and the
-`oss patch_add` record — in **`references/patch-lane.md`**. The verb already
+three-part test, `"$oss_bin" touch_check` as its mechanical two thirds, and the
+`"$oss_bin" patch_add` record — in **`references/patch-lane.md`**. The verb already
 exists; what that file adds is when to reach for it.
 
 ---
@@ -366,7 +370,7 @@ exists; what that file adds is when to reach for it.
 
 - **Routing on anything but the id's shape.** Not the phrasing of the request,
   not what closed last, not the branch you happen to be on (§2).
-- **Comparing `oss id_parse`'s whole output against a bare scope word.** The
+- **Comparing `"$oss_bin" id_parse`'s whole output against a bare scope word.** The
   numeric components share the line; take the first field (§2).
 - **Guessing a scope when no id was given.** Refuse and list what is open (§2).
 - **Running a layer's steps out of order.** Every layer's order is binding
@@ -378,10 +382,10 @@ exists; what that file adds is when to reach for it.
 - **Reading the spine branch off HEAD** instead of deriving it and asserting the
   match, or merging without switching every hosting repo back first (§5). Both
   failures are rc 0 and green.
-- **Folding `oss touch_check`'s rc 2 into "clean"**, or reading rc 0 as clean
+- **Folding `"$oss_bin" touch_check`'s rc 2 into "clean"**, or reading rc 0 as clean
   (§5).
-- **Copying `touch_check`'s branch shape onto `oss expired_fakes` or
-  `oss expired_quarantines`.** rc 0 is a hit there and CLEAN here, so the copy
+- **Copying `touch_check`'s branch shape onto `"$oss_bin" expired_fakes` or
+  `"$oss_bin" expired_quarantines`.** rc 0 is a hit there and CLEAN here, so the copy
   passes precisely the releases the gates exist to block (§6).
 - **Selecting expired fakes on `active` alone**, comparing the expiry for
   identity, or comparing release ids as strings — `"r2" <= "r10"` is false.
@@ -390,9 +394,9 @@ exists; what that file adds is when to reach for it.
   `replacement_trigger` is free text and its pass is yours (§6).
 - **Blocking on a quarantine raised during this release.** Strictly earlier
   (§6).
-- **Passing a spine id to `oss demo_user_lines` at release close**, or implying
+- **Passing a spine id to `"$oss_bin" demo_user_lines` at release close**, or implying
   demo lines carry a feature field to group on (§6).
-- **Routing a change through the patch lane without `oss touch_check`**, or
+- **Routing a change through the patch lane without `"$oss_bin" touch_check`**, or
   using diff size as the criterion (§6).
 - **Running the close audit at close depth on a flesh spine**, or at shallow
   depth on a bone's (§5).
@@ -447,7 +451,9 @@ exists; what that file adds is when to reach for it.
 ## 9. Slash-command interaction
 
 `/close <id>` (`commands/close.md`) exports the raw argument string as
-`$ARGUMENTS` through an env-var bridge. **Parse `$ARGUMENTS` in bash; never
+`$ARGUMENTS` through an env-var bridge — on shim-less channels (Devin,
+`Skill()`, natural language) nothing exports it; the id arrives as a literal
+token in the invocation/request text. **Parse `$ARGUMENTS` in bash; never
 reference `$1` / `$2` / `$N`** — Claude Code substitutes positional tokens in
 command bodies at template-render time and silently corrupts them.
 

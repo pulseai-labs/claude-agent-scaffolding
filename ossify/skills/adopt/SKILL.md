@@ -28,6 +28,8 @@ restated here.
 - `/adopt` (slash command — §8 for the `$ARGUMENTS` bridge)
 - "adopt this project into ossify", "onboard a project that already has code"
 
+Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+
 **Do NOT auto-invoke when:**
 
 - The project is greenfield — that is `/start`.
@@ -35,7 +37,7 @@ restated here.
   active-context cursor, no legacy spec. This version adopts THAT stack;
   anything else is out of scope today.
 - Ossify state already exists at the routed path — route to `doctor`.
-- The ask is state-schema migration — `oss migrate` is a dispatcher concern,
+- The ask is state-schema migration — `"$oss_bin" migrate` is a dispatcher concern,
   not a ceremony.
 - A slice is open on the legacy stack — §3 A5 refuses.
 
@@ -71,7 +73,7 @@ slice close, then re-run — never "clean your tree", which fixes a symptom.
   nothing.
 - **A3 — every tree adoption will edit is clean, tracked and untracked.**
   Sweep every repo the topology declares (A1 only confirms it resolves) plus
-  the AI workspace: `git -C "$(oss repo_root <name>)" status --porcelain`
+  the AI workspace: `git -C "$("$oss_bin" repo_root <name>)" status --porcelain`
   each. Any line, in any one, is work in flight; refuse, naming the legacy
   stack's slice close. Each declared repo, never the AI workspace, must also
   be on its default branch — require it where the manifest declares one
@@ -99,7 +101,7 @@ slice close, then re-run — never "clean your tree", which fixes a symptom.
 Once all five pass, **record a baseline SHA per declared repo** — `git -C
 "$(oss repo_root <name>)" rev-parse HEAD` for each; the adoption record
 cites a **baseline table**, not one SHA, and everything downstream is
-relative to each repo's own baseline. Then `oss init "<project-name>"` —
+relative to each repo's own baseline. Then `"$oss_bin" init "<project-name>"` —
 its state-exists refusal is A2 made mechanical, and every verb below mints
 into the state it creates. Nothing hand-authors `project-state.json`.
 
@@ -111,7 +113,7 @@ into the state it creates. Nothing hand-authors `project-state.json`.
 
 - **Vision — confirm, do not elicit** (`/start` §4): read it back for correction.
 - **Risk gates — derive from existing constraints** (`/start` §8 owns the
-  families and the control menu); mint with `oss risk_gate_add`.
+  families and the control menu); mint with `"$oss_bin" risk_gate_add`.
 - **Smoke — narrowed** (`/start` §9) to **unverified external pins** —
   shipped tests already cover the code's own claims.
 - **Spike — unchanged** (`/start` §9a). Rarely fires on an adopted project.
@@ -193,8 +195,8 @@ not a bone to write.
 ### C4 — The adopted baseline is Release 0, retroactively closed
 
 ```bash
-oss release_add "Release 0" "adopted baseline: everything shipped under <legacy-stack> through <baseline-sha-per-declared-repo>"
-oss release_status "<release-id>" closed
+"$oss_bin" release_add "Release 0" "adopted baseline: everything shipped under <legacy-stack> through <baseline-sha-per-declared-repo>"
+"$oss_bin" release_status "<release-id>" closed
 ```
 
 The skeleton exists — it was built before ossify arrived; `release_status`
@@ -202,7 +204,7 @@ accepts `closed`. **Do not reconstruct per-slice history as spines and work
 items** — unearned records. The first ossify-planned release is Release 1.
 
 Then author the **stub retrospective** at
-`"$(oss release_dir r0)/release-retrospective.md"` — recording the adoption,
+`"$("$oss_bin" release_dir r0)/release-retrospective.md"` — recording the adoption,
 not a spine retro. That filename is `plan-release` §4's previous-release
 input — the one thing it lacks after a retroactively-closed Release 0.
 
@@ -222,7 +224,7 @@ no blank destinations — an adopted project is all occupied surface.
 
 ### C6 — Record the demo-ledger seed candidates
 
-The only ledger verb, `oss ledger_add_auto`, keys every line to a spine, and
+The only ledger verb, `"$oss_bin" ledger_add_auto`, keys every line to a spine, and
 C4 deliberately creates none — adoption cannot mint them, and **no ceremony
 consumes the candidates yet** (#293 wires the first post-adoption spine
 to). Record them in the adoption record anyway — small, end-to-end, from
@@ -240,13 +242,13 @@ exists the vacuous-window risk stands, named rather than hidden.
 | Bones ADRs | each declared repo's `docs/adr/` | append, continuing the series |
 | Bones / risk gates / feature map / posture / Release 0 closed | `project-state.json` | `oss` verbs — into §3's init state |
 | `PUBLIC_BOUNDARY.md` | each public repo root | author |
-| Stub retrospective | `"$(oss release_dir r0)/release-retrospective.md"` | author — records the adoption |
+| Stub retrospective | `"$("$oss_bin" release_dir r0)/release-retrospective.md"` | author — records the adoption |
 | **Adoption record** | `<ai-workspace>/ADOPTION.md` | author — baseline table, gates passed, merged-vs-authored, **every C2 gap**, the C6 seed candidates, and the per-station lines the floor requires: `feature_add`/`bone_add`/`risk_gate_add`/`posture_set` counts; each C3 category `answered` (bone ref) or `not-applicable` **operator-ruled** with its reason; critic `ran\|skip`, a skip being the operator's typed bypass; smoke verified/unverified counts; **a zero names what produced it** — the §8 family walk behind `risk_gate_add: 0`, the empty external-pin inventory behind `smoke 0/0` |
 
 The adoption record is the point: the only artifact saying what adoption
 did; `doctor` consults it when spec and state disagree (doctor §1).
 
-**The completion floor comes first — `oss doctor` proves integrity, not
+**The completion floor comes first — `"$oss_bin" doctor` proves integrity, not
 completeness; it is green at two mutations and an empty registry (#303).**
 Refuse to declare completion, naming the station that never ran, when:
 
@@ -263,14 +265,14 @@ Refuse to declare completion, naming the station that never ran, when:
   must be visible and answered, never unasked (`/start` §12: thin succeeds
   provided every category was asked).
 
-Close with `oss doctor` (the state gate: `state`, `schema`, `replay`,
+Close with `"$oss_bin" doctor` (the state gate: `state`, `schema`, `replay`,
 `shape`) and name the next step: **`/plan-release`** for Release 1.
 
 ---
 
 ## 7. Never
 
-- **State-schema migration.** `oss migrate` is a different thing. Do not
+- **State-schema migration.** `"$oss_bin" migrate` is a different thing. Do not
   overload the word.
 - **Touching the legacy stack's STATE** — roadmap position, cursor, slice
   and worktree structure: read, never written. Reconciling the legacy
@@ -286,8 +288,11 @@ Close with `oss doctor` (the state gate: `state`, `schema`, `replay`,
 ## 8. Slash-command interaction
 
 The `/adopt` command exports the raw argument as `$ARGUMENTS` via the env-var
-bridge — parse it in bash; never reference `$1`/`$2`/`$N`. The only argument
-is an optional project name, passed to `oss init`; when absent, ask before
+bridge — parse it in bash; never reference `$1`/`$2`/`$N`. On shim-less
+channels (Devin, `Skill()`, natural language) nothing exports `$ARGUMENTS` —
+the argument arrives as a literal token in the invocation/request text; read
+it from there. The only argument
+is an optional project name, passed to `"$oss_bin" init`; when absent, ask before
 initializing. The command is Claude-Code-only; the skill body reaches
 OpenCode by path as the native `adopt` skill (#131 tracks the command gap
 for all eleven).

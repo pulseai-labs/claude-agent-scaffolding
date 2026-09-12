@@ -26,10 +26,11 @@ auto-commits (SPEC §7.4).
 
 This skill delegates bookkeeping to bash modules under
 `workspace-init/lib/`. Those modules expose stable function names; this skill
-calls them via the `wi` dispatcher (`workspace-init/bin/wi`, on `$PATH`
-because Claude Code adds every plugin's `bin/` automatically). The dispatcher
-has a bash shebang so the libs always run under bash even when the calling
-Bash tool subprocess is zsh (Claude Code's default on macOS). Never `source`
+calls them via the `wi` dispatcher (`workspace-init/bin/wi`). On Claude Code,
+`wi` is on `$PATH` automatically (every plugin's `bin/` is added); on Devin,
+locate it at the plugin's source directory + `/bin/wi` and invoke via the
+`exec` tool with the full path. The dispatcher has a bash shebang so the libs
+always run under bash even when the calling shell is zsh. Never `source`
 the lib files directly from skill body — under zsh `${BASH_SOURCE[0]}` is
 unset and the libs crash. Always go through `wi`.
 
@@ -65,7 +66,9 @@ Slash-command grammar:
 ```
 
 Read the raw slash-command text from the `$ARGUMENTS` env-var bridge — never
-from `$1`/`$2`, per the slash-command `$N` substitution bug. Interpret exactly
+from `$1`/`$2`, per the slash-command `$N` substitution bug. On shim-less
+channels (Devin, `Skill()`, natural language) nothing exports `$ARGUMENTS`;
+read the name and `--wrapper` tokens from the invocation/request text. Interpret exactly
 one positional project name plus the optional `--wrapper <existing-dir>` pair.
 Reject an unknown option, duplicate `--wrapper`, a missing/empty wrapper value,
 or more than one positional name with a concise usage error. A wrapper path
@@ -106,10 +109,12 @@ the repository state matches the manifest default on every machine.
 
 ## 4. Validate via lib/
 
+Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
+
 Run preflight via the `wi` dispatcher:
 
 ```
-wi skeleton_preflight "$parent" "$name"
+"$wi_bin" skeleton_preflight "$parent" "$name"
 ```
 
 The dispatcher (`workspace-init/bin/wi`) sources every `lib/*.sh` module
@@ -127,9 +132,9 @@ preflight error to stderr and exit non-zero.
 ## 5. The 8 pre-onboard tasks
 
 Execute the tasks in the order below. After each task, append an entry to
-`<ai-workspace>/.workspace/init-log` via `wi log_op …` so rollback can undo
+`<ai-workspace>/.workspace/init-log` via `"$wi_bin" log_op …` so rollback can undo
 the work in reverse order. **On ANY task failure**, immediately invoke
-`wi rollback "${ai_root}/.workspace/init-log"` and exit non-zero. Per
+`"$wi_bin" rollback "${ai_root}/.workspace/init-log"` and exit non-zero. Per
 **SPEC §8** and **SPEC §8.9**, rollback walks the log in reverse and
 inverts each op (`mkdir` → `rmdir`, file create → `rm`, `git init` →
 remove `.git/`, hook install → remove hook file).
@@ -149,7 +154,7 @@ mode, `<parent>` is the existing wrapper; the operation creates/logs only the
 two inner roots and `<name>-ai/.workspace`, never the wrapper itself.
 
 ```
-wi skeleton_create_root_pair "$parent" "$name"
+"$wi_bin" skeleton_create_root_pair "$parent" "$name"
 ```
 
 Expected init-log entries: `mkdir <ai_root>` and `mkdir <canonical_root>`.
@@ -161,7 +166,7 @@ Creates `.workspace/`, `.claude/`, `docs/`, `docs/specs/`, `.superpowers/`,
 template to `<ai_root>/.gitignore`.
 
 ```
-wi skeleton_seed_subdirs "$ai_root"
+"$wi_bin" skeleton_seed_subdirs "$ai_root"
 ```
 
 Expected init-log entries: `mkdir <ai_root>/.workspace`, `mkdir <ai_root>/.claude`,
@@ -176,7 +181,7 @@ is passed; `wi_manifest_write` defaults `default_branch` to `"main"` and
 `git_remote` to `null`.
 
 ```
-wi manifest_write "$ai_root" "$canonical_root" "$project_type"
+"$wi_bin" manifest_write "$ai_root" "$canonical_root" "$project_type"
 ```
 
 **Optional — tooling repo (#48 Stage 2).** If the user volunteers a separate
@@ -193,7 +198,7 @@ Renders the CLAUDE.md router stub. scaffold-onboard's `/scaffold-project`
 will overwrite this later.
 
 ```
-wi stub_claude_md "$ai_root" "$name"
+"$wi_bin" stub_claude_md "$ai_root" "$name"
 ```
 
 Expected init-log entry: `file <ai_root>/CLAUDE.md`.
@@ -203,7 +208,7 @@ Expected init-log entry: `file <ai_root>/CLAUDE.md`.
 Renders the cross-tool AGENTS.md stub.
 
 ```
-wi stub_agents_md "$ai_root"
+"$wi_bin" stub_agents_md "$ai_root"
 ```
 
 Expected init-log entry: `file <ai_root>/AGENTS.md`.
@@ -213,7 +218,7 @@ Expected init-log entry: `file <ai_root>/AGENTS.md`.
 Renders the AI workspace README.
 
 ```
-wi stub_readme "$ai_root" "$name"
+"$wi_bin" stub_readme "$ai_root" "$name"
 ```
 
 Expected init-log entry: `file <ai_root>/README.md`.
@@ -222,14 +227,14 @@ Expected init-log entry: `file <ai_root>/README.md`.
 
 Three sequential sub-steps; any failure triggers full rollback:
 
-1. `wi git_init_pair "$ai_root" "$canonical_root"` — `git init` both repos
+1. `"$wi_bin" git_init_pair "$ai_root" "$canonical_root"` — `git init` both repos
    with the unborn branch explicitly set to `main`, independent of the user's
    `init.defaultBranch` configuration.
-2. `wi trace_filter_install_pair "$ai_root" "$canonical_root"` — render
+2. `"$wi_bin" trace_filter_install_pair "$ai_root" "$canonical_root"` — render
    `hooks/commit-msg.tmpl` with the baked AI workspace path and install to
    `<ai_root>/.git/hooks/commit-msg` AND `<canonical_root>/.git/hooks/commit-msg`,
    `chmod +x` on both.
-3. `wi git_stage_ai_workspace "$ai_root"` — `git -C "$ai_root" add .` (stages
+3. `"$wi_bin" git_stage_ai_workspace "$ai_root"` — `git -C "$ai_root" add .` (stages
    the skeleton; does NOT commit).
 
 Expected init-log entries: `git-init <ai_root>`, `git-init <canonical_root>`,

@@ -7,7 +7,14 @@ runtime verb and mutates nothing.
 
 **Answering binary.** Run `command -v oss`. Accept an identity only when the
 result is an absolute executable path which, after symlink resolution, is the
-`bin/oss` child of a readable plugin root. Read that root's
+`bin/oss` child of a readable plugin root. On Devin `oss` is never on `$PATH` —
+read `devin plugins info ossify`'s `source:` field: a `--local` install reports
+the linked path directly (candidate = `source` + `/bin/oss`), while a remote
+install reports a git URL and the tree materializes under the plugin cache —
+glob `${XDG_DATA_HOME:-$HOME/.local/share}/devin/cli/plugins/cache/*/*/
+.devin-plugin/plugin.json` for the manifest whose `name` is `ossify`; its
+grandparent dir is the plugin root (measured layout on 3000.10.21). Apply the
+same checks to that root's `bin/oss`. Read that root's
 `.claude-plugin/plugin.json` for the version. A function, alias, relative path,
 non-executable path, unexpected layout, unreadable manifest, or failed symlink
 resolution makes this role unavailable. Never derive the version from a
@@ -33,9 +40,12 @@ record is applicable; a project/local record is applicable only when its
 record must remain. It must supply `version` and a readable `installPath`, and
 that root's manifest version must agree with the record. No candidate, multiple
 candidates, an unreadable root, or record/manifest disagreement makes expected
-unavailable. Codex and OpenCode have no installed-reference arm in this
+unavailable. Codex, OpenCode, and Devin have no installed-reference arm in this
 release; an OpenCode wrapper-style install stays unresolved (`partial`) with
-the wrapper named as the boundary, and #396 owns that adapter.
+the wrapper named as the boundary, and #396 owns that adapter. On Devin the
+expected role is `partial` by construction — `devin plugins list` shows the
+installed version but is not the Claude install-record contract this arm
+verifies.
 
 Print one line per role. A resolved line carries role, version, and path; an
 unresolved line names the failed condition.

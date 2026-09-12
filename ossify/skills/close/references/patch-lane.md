@@ -1,12 +1,14 @@
 # The patch lane — out-of-spine work
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 Depth for SKILL.md §6 (spec §6.1) — but **read this whenever work arrives with
 no open spine**: the lane is scope-less and runs *between* ceremonies, any time,
 after SKILL.md §3's common pre-flight (the lane mutates state too); SKILL.md §6
 is where it is described, not the only moment it runs. The documented lane
 commits to **exactly one repo per patch — never two in the same commit** — but
 that repo is not fixed to canonical: §5 resolves the repo the patch actually
-targets via `oss repo_root <repo-key>`, and `oss patch_add` records that same
+targets via `"$oss_bin" repo_root <repo-key>`, and `"$oss_bin" patch_add` records that same
 key on the record (Task 5, #272/#310: the `[repo-key]` argument — a caller who
 omits it gets the sole declared repo, or a refusal naming the declared set when
 more than one is declared; a record with no `repo` key at all, from before this
@@ -17,7 +19,7 @@ are — split it, the same way a work item spanning two repos is split
 does not need a spine, and it is bounded so that "it was only a typo" does not
 become the way real work escapes the ceremony.
 
-**The verb already exists.** `oss patch_add` has shipped since the ledger layer;
+**The verb already exists.** `"$oss_bin" patch_add` has shipped since the ledger layer;
 what has never existed is the routing judgment that decides when to reach for it.
 That judgment is this file, and it is the whole content — there is no new
 machinery here.
@@ -32,7 +34,7 @@ sends the change to a flesh spine.
 
 | Condition | How it is decided |
 |---|---|
-| Touches no **bone** | **mechanical** — `oss touch_check` (§2) |
+| Touches no **bone** | **mechanical** — `"$oss_bin" touch_check` (§2) |
 | Touches no **risk surface** | **mechanical** — the same call, different printed prefix (§2) |
 | Changes no **demo-relevant behaviour** | **judgment** — yours (§3) |
 
@@ -51,7 +53,7 @@ Feed it the paths the change actually touches, one argument per path:
 # "$@" = the paths this change touches, ONE ARGUMENT PER PATH. `set -- a b c`
 # builds that without breaking on a path containing a space; an array is the
 # obvious alternative and is worse, for the reason `spine-close.md` §6 gives.
-tc=0; hits="$(oss touch_check "$@")" || tc=$?
+tc=0; hits="$("$oss_bin" touch_check "$@")" || tc=$?
 case "$tc" in
   0) printf '%s\n' "$hits"
      echo "patch lane: this change touches a declared surface - it is a spine, not a patch" ;;
@@ -131,7 +133,7 @@ repo the patch actually targets:**
 # repo ahead of time - a patch is not a work item, so nothing records one for
 # you to read back.
 repo_key="<the repo this patch targets>"
-repo_root="$(oss repo_root "$repo_key")" \
+repo_root="$("$oss_bin" repo_root "$repo_key")" \
   || { echo "halt: '$repo_key' is not a declared repo"; exit 1; }
 # The project's integration branch. There is no state field for it in v0.2, so
 # resolve it from the remote's default and let the user correct it if wrong.
@@ -156,7 +158,7 @@ esac
 **Allow-list the destination; do not deny-list the bad cases.** `rev-parse
 --abbrev-ref HEAD` prints the literal string **`HEAD`** on a detached checkout,
 which a bare `*)` arm waves through as a valid branch. The patch then commits to
-no ref at all: `oss patch_add` records a sha that exists only until the next gc,
+no ref at all: `"$oss_bin" patch_add` records a sha that exists only until the next gc,
 the change never reaches the base branch, and `doctor`'s patch count reports a
 record whose commit is unreachable. Every arm above fires on something real — a
 parked spine, a work-item branch, a detached checkout, an unresolvable HEAD.
@@ -181,7 +183,7 @@ splits the patch lane across two places and the second one has no record.
 ## 5b. Recording it
 
 ```bash
-oss patch_add "<commit-sha>" "<one line: what changed and why it took no spine>" "$repo_key"
+"$oss_bin" patch_add "<commit-sha>" "<one line: what changed and why it took no spine>" "$repo_key"
 ```
 
 **Three arguments, and the sha comes first.** It is recorded **after** the
@@ -189,7 +191,7 @@ commit, because the sha does not exist until then — commit, then read the sha,
 then record. `$repo_key` is the SAME key §5 just asserted the branch against,
 never re-derived or re-typed — passing a different one records a patch against
 a repo the ceremony never actually checked. The key is optional at the
-dispatcher (`oss patch_add <commit> <text> [repo-key]`, Task 5, #272/#310): a
+dispatcher (`"$oss_bin" patch_add <commit> <text> [repo-key]`, Task 5, #272/#310): a
 caller who omits it gets the sole declared repo, or a refusal at rc 2 naming
 the declared set when more than one is declared — never a silent guess at which
 repo a multi-repo project meant. A patch committed and never recorded is the
@@ -198,8 +200,8 @@ cannot count what was never written.
 
 The one-liner is **self-declared**. The ossify:doctor read-out surfaces only a
 **count** of patch records (`doctor/references/state-inspection.md` §2; bare
-`oss doctor` is the four-check gate and shows none) — the one-liner itself is read
-by whoever runs `oss get '[.patch_records[] | {commit, repo, text, at}]'` — the
+`"$oss_bin" doctor` is the four-check gate and shows none) — the one-liner itself is read
+by whoever runs `"$oss_bin" get '[.patch_records[] | {commit, repo, text, at}]'` — the
 `repo` field records which checkout owns the commit, and without it an auditor
 in a multi-repo project cannot tell that the recorded commit matches the
 repository whose branch was checked out before committing. Records written
@@ -253,7 +255,7 @@ default rather than a threat.
 - **Committing without recording**, or recording without the sha (§5).
 - **A one-liner that restates the diff** instead of answering the three-part test
   (§5).
-- **Inventing a new verb.** `oss patch_add` is the record; nothing else is
+- **Inventing a new verb.** `"$oss_bin" patch_add` is the record; nothing else is
   needed (§5).
 - **Asserting a different declared repo's branch than the one the patch
   targets**, or recording it under a repo key other than the one the branch guard

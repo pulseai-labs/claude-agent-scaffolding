@@ -17,7 +17,8 @@ item claims. Whether a rule block is well-formed is yours since the skill-first
 conversion — checked by reading against the reference's field table (§6). The
 judgment — is this drift the record's fault or the repo's, is this rule the
 right rule for this project, is this warning worth acting on today — happens
-here, in your reasoning.
+here, in your reasoning. Resolve `oss` once into `oss_bin` per
+`rules/dispatcher-path.md`; every `oss` below and in references is `"$oss_bin"`.
 
 ---
 
@@ -43,7 +44,7 @@ Six surfaces:
 already carries code (it authors a topology rather than refusing for a missing
 one);
 `plan-release` requires an onboarded project; `close` refuses without a green
-`oss doctor`. This skill **never refuses for the condition it exists to report**.
+`"$oss_bin" doctor`. This skill **never refuses for the condition it exists to report**.
 An uninitialised project, a corrupt state file, a missing manifest — each is a
 *finding*, reported with its remedy, not a reason to stop. When a missing
 manifest is the cause of more than one surface's skip, name it once at the top
@@ -54,7 +55,7 @@ refuse is a request to *change* something you were not asked to change.
 **`doctor` reports; it does not mutate state.** Five of the six surfaces are
 strictly read-only. **Exactly one thing writes** — **rule authoring** (§6),
 which appends to `03-code-patterns.md`, and only because the user asked for a
-rule. Everything else names a remedy and stops. Running `oss state_restore`
+rule. Everything else names a remedy and stops. Running `"$oss_bin" state_restore`
 because replay failed is not your call to make silently: surface the line, name
 the verb, let the user run it.
 
@@ -76,9 +77,9 @@ the verb, let the user run it.
   release's blocking findings. Those are `/close`, and they halt; you do not.
 - The user wants to **author or amend the spec itself**. Fresh authoring is
   `/start`, which refuses on a declared repo that already carries code; a
-  project that already has code adopts via `/ossify:adopt`. Amending an
-  existing spec
-  is not this surface's job — you validate what exists and never edit it.
+  project that already has code adopts via `/ossify:adopt` — not on Devin
+  (run `adopt` there on Claude Code or Codex — `.ossify` state is shared).
+  Amending an existing spec is not this surface's job — you validate it.
 - The user wants to **plan, decompose, or execute** anything. Those are
   `/plan-release`, `/plan-spine`, `/work-item`.
 - The user asks to **fix** a finding you reported. Name the verb and let them
@@ -128,7 +129,7 @@ An operator with a corrupt state file still needs to know their interop is also
 broken — telling them one problem at a time is how a two-hour repair becomes
 three sessions.
 
-The corollary: **a surface that cannot run still emits a line.** `oss doctor`
+The corollary: **a surface that cannot run still emits a line.** `"$oss_bin" doctor`
 already models this internally with `skip:` (see §4). Do the same at skill level
 — "spec validation: skipped, no MASTER-SPEC.md at the manifest-routed path" is a
 result. Silence is indistinguishable from a pass, and this skill exists to make
@@ -152,7 +153,7 @@ Close with the read-out in §14.
 **Four checks are the verb's; the other five are yours.**
 
 ```bash
-oss doctor
+"$oss_bin" doctor
 ```
 
 runs `state`, `schema`, `replay`, `shape`, tagged `ok:` / `fail:` / `skip:`, and
@@ -196,7 +197,7 @@ directory's manifest does not route to — and each emits a single **unkeyed**
 `skip: worktrees` line, because the cause is the run rather than any one repo.
 An unkeyed line means the surface did not run at all, and it names why.
 
-`oss worktree_orphans <repo-key> <state>` names the directories individually.
+`"$oss_bin" worktree_orphans <repo-key> <state>` names the directories individually.
 **Pass both arguments, every time.** doctor used to print this line for you with
 both pinned; it does not any more, so the discipline is yours. Omitting the
 key resolves to the sole declared repo under one, and refuses outright —
@@ -205,17 +206,16 @@ that default is still the #156 habit, because a project that grows a second
 repo turns every omitted call into a refusal instead of the per-repo
 read-out this section exists to produce. Omitting the state lets an exported
 `$OSS_STATE_FILE` answer about a different project.
-Pin it once with `sf="${OSS_STATE_FILE:-$(oss state_path)}"` — **override first**,
-matching what `oss doctor` itself resolves — and pass `"$sf"` to every read,
-including to `oss doctor`. `references/state-inspection.md` §2 carries the
+Pin it once with `sf="${OSS_STATE_FILE:-$("$oss_bin" state_path)}"` — **override first**,
+matching what `"$oss_bin" doctor` itself resolves — and pass `"$sf"` to every read,
+including to `"$oss_bin" doctor`. `references/state-inspection.md` §2 carries the
 measurement, and the why-override-first account with it.
-**It is a pure selector: the finding is its OUTPUT, and rc 0 means the check ran,
-not that the tree is clean.** Branch on the rc and you will report every project
-as orphan-free.
+**It is a pure selector: the finding is its OUTPUT — rc 0 means the check ran,
+not that the tree is clean.** Branch on the rc and every project reads orphan-free.
 
 Full detail — the four-line remedy table and why you echo doctor's own line
 rather than substituting a fixed remedy, the advisory-vs-blocking split, the
-state-vs-repo drift checks that `oss doctor` cannot make mechanically, the
+state-vs-repo drift checks that `"$oss_bin" doctor` cannot make mechanically, the
 orphan-worktree remedy, and the feature map's inspection surface — is in
 **`references/state-inspection.md`**.
 
@@ -291,10 +291,10 @@ interchangeably, mid-project?**
 **You perform this one by reading. There is no dispatcher verb for it** — the
 `interop_check` subcommand was removed. It was 175 lines of bash that opened
 files and described what it found, which is work you do directly. Path
-*resolution* stays deterministic (`oss repo_root`, `oss state_path`), because
+*resolution* stays deterministic (`"$oss_bin" repo_root`, `"$oss_bin" state_path`), because
 every mutating verb routes through it.
 
-Emit the same line grammar as `oss doctor` — `ok:` / `fail:` per check — and,
+Emit the same line grammar as `"$oss_bin" doctor` — `ok:` / `fail:` per check — and,
 since there is no exit code now, **state plainly at the end whether anything
 failed**. Checks, in order: the resolved topology declaration —
 `.ossify/topology.json` first, `.workspace/pairing.json` as the translated
@@ -357,7 +357,7 @@ same wrong claim in three documents — is in **`references/budget-check.md`**.
 Named here rather than left to read as executed:
 
 - **Migration.** Spec §9.1 allocates `doctor` the `migrate` entry point in
-  **phase 2**. `oss migrate` exists and moves a state file's schema version;
+  **phase 2**. `"$oss_bin" migrate` exists and moves a state file's schema version;
   the artifact-converting `migrate` *flow* does not ship in this release.
 - **Rule evaluation.** §6 authors and validates rule blocks. Running them
   against a codebase mechanically is **wontfix** (settled 2026-08-15): the
@@ -386,21 +386,21 @@ Named here rather than left to read as executed:
   downstream is unsafe. Report all six surfaces (§3).
 - **Letting a surface that could not run print nothing.** Silence reads as a
   pass (§3).
-- **Branching on `oss worktree_orphans`' rc.** rc 0 means it ran. The finding is
+- **Branching on `"$oss_bin" worktree_orphans`' rc.** rc 0 means it ran. The finding is
   the output (§4).
-- **Echoing `oss worktree_orphans canonical` when the warn line named a
+- **Echoing `"$oss_bin" worktree_orphans canonical` when the warn line named a
   different repo.** The verb takes a repo key. The wrong one sends the operator
   to search a repository that has nothing wrong with it, and they come back
   believing doctor was mistaken (§4).
 - **Collapsing the per-repo `worktrees(...)` lines into one verdict.** Their
   separateness *is* the finding: one repo clean and another unconfigured is not
   the same state as both clean (§4).
-- **Copying `oss touch_check`'s rc polarity onto anything here.** rc 0 is a
+- **Copying `"$oss_bin" touch_check`'s rc polarity onto anything here.** rc 0 is a
   *hit* there. Nothing on this skill's surface shares that convention.
-- **Substituting a fixed remedy for `oss doctor`'s own line.** The remedy
+- **Substituting a fixed remedy for `"$oss_bin" doctor`'s own line.** The remedy
   differs by which line failed, and naming `state_restore` for a schema failure
   loops the operator forever (§4).
-- **Running `oss state_restore`, `oss migrate`, or any repair verb on your own
+- **Running `"$oss_bin" state_restore`, `"$oss_bin" migrate`, or any repair verb on your own
   initiative.** Name it; let the user run it (§1).
 - **Treating a missing FR/NFR table as a spec error.** The lean schema does not
   require one (§5).
@@ -435,7 +435,7 @@ Named here rather than left to read as executed:
   `feature_list`, `critic_detect`, `state_restore` and `migrate` (**named to the
   user, not run by you**).
 - **`git`** is reached only as `git -C "<absolute path>"`. Resolve paths once
-  with `oss state_path` / `oss repo_root <key>` and never `cd`: the manifest walk
+  with `"$oss_bin" state_path` / `"$oss_bin" repo_root <key>` and never `cd`: the manifest walk
   starts at `$PWD`, so a `cd` mid-run silently re-points the state file rather
   than failing.
 - **Peer entry skills:** `start` owns spec-core authoring and the bones registry;
@@ -448,10 +448,11 @@ Named here rather than left to read as executed:
 
 ## 12. Slash-command interaction
 
-`/ossify:doctor [surface]` (`commands/doctor.md`) exports the raw argument string as
-`$ARGUMENTS` through an env-var bridge. **Parse `$ARGUMENTS` in bash; never
-reference `$1` / `$2` / `$N`** — Claude Code substitutes positional tokens in
-command bodies at template-render time and silently corrupts them.
+`/ossify:doctor [surface]` (`commands/doctor.md`) exports the raw argument as
+`$ARGUMENTS` via an env-var bridge — on shim-less channels (Devin, `Skill()`,
+natural language) nothing exports it; read the surface token from the
+invocation/request text. **Parse `$ARGUMENTS` in bash; never reference
+`$1`/`$2`/`$N`** — Claude Code substitutes positionals at render time.
 
 The only argument is an optional surface name (§2). Absent or unrecognised, run
 the full sweep.

@@ -24,11 +24,11 @@ carries no uncertainty at all and just wants doing.
 | `grilling` | HITL | `challenge` interview + `start/references/domain-modeling.md` | none; it is the grill |
 | `task` | either | no instrument | none; manual work unblocking a decision |
 
-Resolver paths are read cross-skill via
-`${CLAUDE_PLUGIN_ROOT}/skills/start/references/<file>`. This is the
+Resolver paths are read cross-skill relative to the plugin root —
+`skills/start/references/<file>`. This is the
 established pattern — `challenge/SKILL.md` already reads references that
 way, and the absorption spec sanctions it. **The grill is reached the same
-way** — read `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/interview.md`,
+way** — read `skills/challenge/references/interview.md` (relative to the plugin root),
 as every other ossify caller of the grill does. Never name the slash command:
 `/ossify:challenge` is the Claude Code spelling, and wayfinder now ships on
 the OpenCode bundle too, where the same skill is registered as a native

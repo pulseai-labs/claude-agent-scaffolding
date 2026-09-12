@@ -19,22 +19,24 @@ Auto-invokes on phrases like "pair my existing AI workspace", "both repos alread
 
 If any fail, exit non-zero with a clear error; do NOT write the manifest or install any hook.
 
+Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
+
 - `command -v jq` and `command -v git` on PATH.
 - **AI workspace path absolute + exists + non-empty.** It is already populated; an empty or missing directory is the wrong target (or means the user wants Scenario A fresh-pair instead).
 - **Canonical path absolute + exists + is a git repo.** `git -C "$canonical_root" rev-parse --git-dir`.
 - AI workspace and canonical must be different paths (no self-pairing).
 
-These are validated by `wi skeleton_preflight_existing_dual "$ai_root" "$canonical_root"` (lib/skeleton.sh) — call it through the `wi` dispatcher; never `source` lib files from the skill body (under zsh `${BASH_SOURCE[0]}` is unset and the libs crash).
+These are validated by `"$wi_bin" skeleton_preflight_existing_dual "$ai_root" "$canonical_root"` (lib/skeleton.sh) — call it through the `wi` dispatcher (`workspace-init/bin/wi`; on Claude Code `wi` is on `$PATH` automatically, on Devin `wi_bin` is resolved per `rules/dispatcher-path.md`); never `source` lib files from the skill body (under zsh `${BASH_SOURCE[0]}` is unset and the libs crash).
 
 ## 3. Input collection
 
-Inputs (prompt the user OR read from `$ARGUMENTS` for the slash command — never positional `$1`/`$2` per the slash-command `$N` substitution bug):
+Inputs (prompt the user OR read from `$ARGUMENTS` for the slash command — never positional `$1`/`$2` per the slash-command `$N` substitution bug; on shim-less channels like Devin nothing exports `$ARGUMENTS`, so read the values as literal tokens in the invocation/request text):
 
 - **existing AI workspace absolute path** (already populated; first `/pair-existing-dual` arg).
 - **existing canonical absolute path** (already a git repo; second `/pair-existing-dual` arg).
 - **project_type** — `personal` or `work` (per **SPEC §7.1**: *"Is this a personal project or a work/company project?"*). Both enforce the trace filter; the distinction is a forward hook for v0.2.
 
-Resolve to shell variables (canonicalize via `wi realpath` to avoid `/var` → `/private/var` surprises):
+Resolve to shell variables (canonicalize via `"$wi_bin" realpath` to avoid `/var` → `/private/var` surprises):
 
 - `ai_root="$resolved_ai_abs"`
 - `canonical_root="$resolved_canonical_abs"`
@@ -45,7 +47,7 @@ There is **no `name` or `parent` input** — unlike Scenario A, both directories
 ## 4. Preflight + detect existing scaffolding state (no abort)
 
 ```bash
-wi skeleton_preflight_existing_dual "$ai_root" "$canonical_root" || exit 1
+"$wi_bin" skeleton_preflight_existing_dual "$ai_root" "$canonical_root" || exit 1
 ```
 
 Then **detect and surface** the existing AI-workspace scaffolding so the user can confirm this is the right directory before anything is written. Scan for (and report which are present):
@@ -66,8 +68,8 @@ If `${ai_root}/.workspace/pairing.json` already exists, the workspace is already
 Detect the default branch + remote from the existing canonical via the `wi` dispatcher (per **SPEC §8.4** the fallback chain is robust to oddly-configured repos):
 
 ```bash
-detected_branch="$(wi git_detect_default_branch "$canonical_root")"
-detected_remote="$(wi git_detect_remote "$canonical_root")"
+detected_branch="$("$wi_bin" git_detect_default_branch "$canonical_root")"
+detected_remote="$("$wi_bin" git_detect_remote "$canonical_root")"
 ```
 
 `wi_git_detect_default_branch` tries `git symbolic-ref refs/remotes/origin/HEAD` → `git symbolic-ref HEAD` → `git branch --show-current` → interactive prompt → ultimate fallback `"main"`. `wi_git_detect_remote` returns `origin`'s URL if set, else empty (manifest records `null`).
@@ -83,18 +85,18 @@ Two operations only — both idempotent and non-destructive to existing AI-works
 # (Scenario C is the only path where it may NOT be). Use the same predicate as
 # `wi trace_filter_install`, so nested subdirs, bare repos, and linked worktrees
 # record false while standard repos and separate-git-dir/submodule roots record true.
-if wi trace_filter_is_installable_repo_root "$ai_root"; then
+if "$wi_bin" trace_filter_is_installable_repo_root "$ai_root"; then
   ai_git_tracked=true
 else
   ai_git_tracked=false
 fi
 
 if [[ -n "$detected_remote" ]]; then
-  wi manifest_write "$ai_root" "$canonical_root" "$project_type" \
+  "$wi_bin" manifest_write "$ai_root" "$canonical_root" "$project_type" \
     --canonical-git-remote "$detected_remote" --default-branch "$detected_branch" \
     --ai-git-tracked "$ai_git_tracked"
 else
-  wi manifest_write "$ai_root" "$canonical_root" "$project_type" \
+  "$wi_bin" manifest_write "$ai_root" "$canonical_root" "$project_type" \
     --default-branch "$detected_branch" \
     --ai-git-tracked "$ai_git_tracked"
 fi
@@ -109,9 +111,9 @@ fi
 The canonical hook is the load-bearing one (it guards the production repo's commits going forward). The AI-workspace hook is installed only when the AI workspace is itself a git repo:
 
 ```bash
-wi trace_filter_install "$ai_root" "$canonical_root"          # canonical: always
+"$wi_bin" trace_filter_install "$ai_root" "$canonical_root"          # canonical: always
 if [[ "$ai_git_tracked" == true ]]; then
-  wi trace_filter_install "$ai_root" "$ai_root"               # AI workspace: only if a git repo
+  "$wi_bin" trace_filter_install "$ai_root" "$ai_root"               # AI workspace: only if a git repo
 fi
 ```
 
@@ -133,7 +135,7 @@ Because the AI workspace is already populated with the user's content, this skil
 
 - **Preflight fails** → nothing written; surface the specific failure (missing/empty AI workspace, canonical not a git repo, self-pairing) and stop.
 - **Manifest write fails** → atomic write leaves no partial file; surface the error and stop. Re-running is safe.
-- **Hook install fails** (permissions, symlink loop, `chmod +x`) → the manifest is already valid and stays in place; surface which hook failed and the manual remediation (`wi trace_filter_install` can be re-run, or the user can inspect `.git/hooks/`). Do NOT delete the manifest or any AI-workspace content.
+- **Hook install fails** (permissions, symlink loop, `chmod +x`) → the manifest is already valid and stays in place; surface which hook failed and the manual remediation (`"$wi_bin" trace_filter_install` can be re-run, or the user can inspect `.git/hooks/`). Do NOT delete the manifest or any AI-workspace content.
 - **`pairing.json` already present** → §4 surfaced it and got confirmation; the atomic write overwrites only that one file.
 
 ## 9. Surface summary + next steps

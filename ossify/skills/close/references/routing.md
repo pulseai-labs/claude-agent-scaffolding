@@ -17,11 +17,13 @@ validates, or invents an id shape.
 | Spine | `r<N>.s<K>` | `r2.s1` |
 | Work item | `r<N>.s<K>.w<J>` | `r2.s1.w3` |
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 `<N>`, `<K>` and `<J>` are unbounded digit runs. Two branch namespaces derive
 from those ids and neither is an id itself:
 
-- **spine branch** — `spine/<spine-id>-<slug>` (`oss branch_name`)
-- **work-item branch** — `work/<wi-id>-<slug>` (`oss work_item_branch`)
+- **spine branch** — `spine/<spine-id>-<slug>` (`"$oss_bin" branch_name`)
+- **work-item branch** — `work/<wi-id>-<slug>` (`"$oss_bin" work_item_branch`)
 
 Work items get their own namespace on purpose: sharing the spine's would make N
 concurrent work-item worktrees fight over one ref.
@@ -36,7 +38,7 @@ number, a branch name, a worktree path, a spine's `name`, a work item's `title`.
 ## 2. The call, and what comes back
 
 ```bash
-parts="$(oss id_parse "$id")" || parts=""
+parts="$("$oss_bin" id_parse "$id")" || parts=""
 scope="$(printf '%s\n' "$parts" | awk '{print $1}')"
 ```
 
@@ -44,7 +46,7 @@ scope="$(printf '%s\n' "$parts" | awk '{print $1}')"
 `oss_cmd_*`; skill prose cannot reach a bare lib function, and a snippet that
 tries produces "command not found" at the first line of the ceremony.
 
-`oss id_parse` echoes **one line**: the scope, then the numeric components,
+`"$oss_bin" id_parse` echoes **one line**: the scope, then the numeric components,
 space-separated.
 
 | Input | stdout | rc |
@@ -81,7 +83,7 @@ One line, naming what was passed and showing all three shapes:
 Then stop. Do not fall back to "the most recent thing", do not fuzzy-match
 against spine names, and do not offer to close something adjacent.
 
-**Guard the capture under strict mode.** `parts="$(oss id_parse "$id")"` is a
+**Guard the capture under strict mode.** `parts="$("$oss_bin" id_parse "$id")"` is a
 bare assignment from a command that is *expected* to fail on bad input; under
 `set -e` that aborts the block before the message can be emitted. Use
 `|| parts=""` and test emptiness, as §2 does.
@@ -93,8 +95,8 @@ bare assignment from a command that is *expected* to fail on bad input; under
 `/close` with no id **refuses and lists what is open.** It does not guess.
 
 ```bash
-oss spine_list
-oss get '[.work_items[] | select(.status != "complete") | {id, title, status}]'
+"$oss_bin" spine_list
+"$oss_bin" get '[.work_items[] | select(.status != "complete") | {id, title, status}]'
 ```
 
 Then ask for the id explicitly. The reason to refuse rather than guess: a close
@@ -111,9 +113,9 @@ which resolves and records which declared repo the patch targets, never a
 forced ceremony. An AI-workspace edit needs no lane — no ceremony governs
 that repo. (SKILL.md §2 states the same rule at the routing table.)
 
-`oss get` is `jq -r` without `-e`: a `select` matching nothing exits **0** with
+`"$oss_bin" get` is `jq -r` without `-e`: a `select` matching nothing exits **0** with
 an empty string. Test the *output*, not the rc, whenever you resolve an id
-against state — `oss get … || …` never fires on a typo.
+against state — `"$oss_bin" get … || …` never fires on a typo.
 
 ---
 
@@ -126,8 +128,8 @@ against state — `oss get … || …` never fires on a typo.
 - **Inferring scope from the environment** — the branch a repo happens to be
   on, the last thing closed, the newest spine. All three are guesses dressed
   as context.
-- **Comparing `oss id_parse`'s whole line against a bare scope word** (§2).
-- **Calling `oss_id_parse`** (the lib function) instead of `oss id_parse` (the
+- **Comparing `"$oss_bin" id_parse`'s whole line against a bare scope word** (§2).
+- **Calling `oss_id_parse`** (the lib function) instead of `"$oss_bin" id_parse` (the
   dispatcher verb).
 - **Treating rc 1 as "the lib will have said something".** It said nothing (§3).
 - **Accepting a `VS-` id by stripping the prefix.** It is a different grammar

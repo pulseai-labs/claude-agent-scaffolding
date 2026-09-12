@@ -29,15 +29,17 @@ burns time, and buries it.
 
 ## 2. Layer 1 — `auto:` ACs, halt-on-first-fail
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss verify_acs "$spec"    # TSV: label <tab> command <tab> expectation, in declared order
+"$oss_bin" verify_acs "$spec"    # TSV: label <tab> command <tab> expectation, in declared order
 ```
 
 Then, per row, in the order it printed. The fields are tab-separated (commands
 contain spaces), and the rows are consumed by **redirection, never by a pipe**:
 
 ```bash
-rows="$(oss verify_acs "$spec")" \
+rows="$("$oss_bin" verify_acs "$spec")" \
   || { echo "[AC] cannot read the spec '$spec' - the gate would otherwise pass by reading nothing"; exit 2; }
 [ -n "$rows" ] \
   || { echo "[AC] the spec '$spec' yields zero auto: ACs - verify the spec path and the AC grammar"; exit 2; }
@@ -45,7 +47,7 @@ rows="$(oss verify_acs "$spec")" \
 rc=0
 while IFS="$(printf '\t')" read -r label cmd exp; do
   [ -n "$label" ] || continue
-  oss verify_step "$wt" "$cmd" "$exp" || rc=$?
+  "$oss_bin" verify_step "$wt" "$cmd" "$exp" || rc=$?
   [ "$rc" -eq 0 ] || { echo "[AC] $label \`$cmd\` did not satisfy '$exp' (rc $rc)"; break; }
 done <<EOF
 $rows
@@ -64,13 +66,13 @@ reported **green having read nothing**. A gate that passes when it is blind is
 worse than no gate. Capture the rows first, fail closed on an unreadable spec,
 and treat "zero auto ACs" as a defect to surface rather than a vacuous pass.
 
-**`|| rc=$?`, never `if ! oss verify_step …; then rc=$?`.** After a negated test
+**`|| rc=$?`, never `if ! "$oss_bin" verify_step …; then rc=$?`.** After a negated test
 `$?` is the *negation's* status — zero — so `rc` records a pass, the halt check
 below never fires, and the loop runs every remaining AC before falling into layer
 2. The `||` form captures the command's own rc, and as an OR-list it is
 errexit-exempt.
 
-**`oss verify_acs … | while …` is the other trap.** The last element of a pipeline runs
+**`"$oss_bin" verify_acs … | while …` is the other trap.** The last element of a pipeline runs
 in a **subshell**: `rc` is set in a child and lost, `break` leaves only the
 subshell, and the ceremony sails past the halt into layer 2 with a failing AC
 behind it — at rc 0. Feeding the loop from the captured `$rows` by heredoc (as
@@ -105,7 +107,7 @@ directions bite:
 
 `user:` rows are not parsed here at all — and no ossify gate parses them
 anywhere. The human-walked half of acceptance lives in the demo ledger
-(`oss ledger_add_user`, keyed by spine), walked at the cumulative demo; a
+(`"$oss_bin" ledger_add_user`, keyed by spine), walked at the cumulative demo; a
 spec's `user:` line is documentation for the implementer only.
 
 ---
@@ -113,7 +115,7 @@ spec's `user:` line is documentation for the implementer only.
 ## 3. Layer 2 — report cross-check
 
 ```bash
-oss report_cross_check "$report" "$spec"    # 0 accounted-for | 1 missing | 2 report not found
+"$oss_bin" report_cross_check "$report" "$spec"    # 0 accounted-for | 1 missing | 2 report not found
 ```
 
 Every `auto:` AC in the spec must appear in the report's AC table

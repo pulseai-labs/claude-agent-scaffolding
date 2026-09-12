@@ -205,6 +205,9 @@ t_assert_rc 1 "a failing row driven with verify_acs's OWN output is rc 1 - disti
 # halt never fires). Either mistake sails past a failing AC into layer 2 at rc 0.
 SHIM="$TMP/shim"; mkdir -p "$SHIM"
 printf '#!/usr/bin/env bash\nexec bash "%s" "$@"\n' "$OSS" > "$SHIM/oss"; chmod +x "$SHIM/oss"
+# Extracted blocks invoke the dispatcher as "$oss_bin" — bind it to the shim so
+# every `env "PATH=$SHIM:$PATH" bash -c '. <block>'` below runs the real dispatcher.
+export oss_bin="$SHIM/oss"
 HALT_SPEC="$TMP/halt-spec.md"
 printf '%s\n' \
   '- [ ] AC-1 auto: `true` → expected: exit 0' \
@@ -817,7 +820,7 @@ t_assert_contains "$(git -C "$W1_WT" diff --cached --name-only)" "export.txt" \
   "W1 setup: the worktree has a staged change, so the block reaches the merge rather than dying at commit"
 _wshim "$W1" "spine/r0.s1-ledger-export" "work/r0.s1.w1-emit" "$TMP/shim-w1"
 
-t_capture env "PATH=$TMP/shim-w1:$PATH" bash -c \
+t_capture env "PATH=$TMP/shim-w1:$PATH" "oss_bin=$TMP/shim-w1/oss" bash -c \
   "set -euo pipefail; wi='r0.s1.w1'; wt='$W1_WT'; spine_id='r0.s1'; spine_slug='ledger-export'; . '$W_GUARD'"
 t_assert_rc 1 "W1: the merge block HALTS when canonical is not on the spine branch"
 t_assert_contains "$T_OUT" "not 'spine/r0.s1-ledger-export'" "W1: ...naming the branch it expected"
@@ -858,7 +861,7 @@ _wshim "$W2" "spine/r0.s9-demo" "canonical" "$TMP/shim-w2"
 # assigning the variable at all - the lane then halted on every fresh run and
 # every assertion here still passed. Under `set -u` a self-sufficient block is
 # the thing under test, so supply it nothing.
-t_capture env "PATH=$TMP/shim-w2:$PATH" bash -c "set -euo pipefail; . '$W_CUT'"
+t_capture env "PATH=$TMP/shim-w2:$PATH" "oss_bin=$TMP/shim-w2/oss" bash -c "set -euo pipefail; . '$W_CUT'"
 t_assert_rc 0 "W2: the shipped spine cut runs clean on a clean canonical with NOTHING injected"
 t_assert_eq "spine/r0.s9-demo" "$(git -C "$W2" rev-parse --abbrev-ref HEAD)" \
   "W2: ...and leaves canonical CHECKED OUT on the spine branch - 'git branch' alone would leave it on w2-parked"
@@ -868,7 +871,7 @@ t_assert_eq "$W2_PARKED_SHA" "$(git -C "$W2" rev-parse spine/r0.s9-demo)" \
 # W2b — resuming is NOT supported in this release. An existing spine branch halts
 # rather than being re-cut or half-reused: branch reuse alone gets one step
 # further and then dies at `worktree_add` rc 8 for every already-spawned item.
-t_capture env "PATH=$TMP/shim-w2:$PATH" bash -c "set -euo pipefail; . '$W_CUT'"
+t_capture env "PATH=$TMP/shim-w2:$PATH" "oss_bin=$TMP/shim-w2/oss" bash -c "set -euo pipefail; . '$W_CUT'"
 t_assert_rc 1 "W2b: a second run HALTS because the spine branch already exists"
 t_assert_contains "$T_OUT" "already exists" "W2b: ...naming the collision"
 t_assert_contains "$T_OUT" "133" "W2b: ...and pointing at the resume issue"
@@ -880,7 +883,7 @@ git -C "$W2C" config user.email t@t; git -C "$W2C" config user.name t
 echo seed > "$W2C/f"; git -C "$W2C" add .; git -C "$W2C" commit -qm seed
 git -C "$W2C" checkout -q --detach HEAD
 _wshim "$W2C" "spine/r0.s9-demo" "canonical" "$TMP/shim-w2c"
-t_capture env "PATH=$TMP/shim-w2c:$PATH" bash -c "set -euo pipefail; . '$W_CUT'"
+t_capture env "PATH=$TMP/shim-w2c:$PATH" "oss_bin=$TMP/shim-w2c/oss" bash -c "set -euo pipefail; . '$W_CUT'"
 t_assert_rc 1 "W2c: a DETACHED HEAD halts - there is no branch name to record as base_branch"
 t_assert_contains "$T_OUT" "DETACHED HEAD" "W2c: ...naming the condition"
 t_assert_eq "" "$(git -C "$W2C" branch --list 'spine/*')" \
@@ -1112,7 +1115,7 @@ CUMDEMO="$SKILLS/close/references/cumulative-demo.md"
 # make the block unfindable and the failure would read as "vacuous" instead of
 # as the wrong behaviour it is.
 DEMO_BLOCK="$TMP/cum-demo.sh"; _extract_block "$CUMDEMO" 'elapsed=' "$DEMO_BLOCK"
-if [ -s "$DEMO_BLOCK" ] && grep -Fq 'oss demo_run' "$DEMO_BLOCK"; then
+if [ -s "$DEMO_BLOCK" ] && grep -Fq 'oss_bin" demo_run' "$DEMO_BLOCK"; then
   T_PASS=$((T_PASS+1))
 else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: could not extract the demo measurement block - D1-D4 are vacuous"
@@ -1128,14 +1131,14 @@ _dshim() { # $1=budget-to-echo $2=demo_run-rc $3=shim-dir
 }
 
 _dshim '60s' 0 "$TMP/shim-d0"
-t_capture env "PATH=$TMP/shim-d0:$PATH" bash -c ". '$DEMO_BLOCK'"
+t_capture env "PATH=$TMP/shim-d0:$PATH" "oss_bin=$TMP/shim-d0/oss" "oss_bin=$TMP/shim-d0/oss" bash -c ". '$DEMO_BLOCK'"
 t_assert_rc 0 "D1: a PASSING cumulative demo leaves the measurement block green"
 t_assert_contains "$T_OUT" "within the 60s budget" "D1: ...and reports the timing"
 
 # THE LOAD-BEARING ASSERTION. Drop the `|| demo_rc=$?` capture and the re-raise
 # and this is the one that goes red - D1 stays green either way.
 _dshim '60s' 1 "$TMP/shim-d1"
-t_capture env "PATH=$TMP/shim-d1:$PATH" bash -c ". '$DEMO_BLOCK'"
+t_capture env "PATH=$TMP/shim-d1:$PATH" "oss_bin=$TMP/shim-d1/oss" "oss_bin=$TMP/shim-d1/oss" bash -c ". '$DEMO_BLOCK'"
 t_assert_rc 1 "D2: a FAILING cumulative demo RE-RAISES its status - the close gate does not pass"
 t_assert_contains "$T_OUT" "within the 60s budget" "D2: ...after the timing was still reported"
 t_assert_contains "$T_OUT" "FAILED rc 1" "D2: ...naming the failure"
@@ -1143,14 +1146,14 @@ t_assert_contains "$T_OUT" "FAILED rc 1" "D2: ...naming the failure"
 # D3 - the runner's exact status survives rather than being flattened to 1, and
 # the no-budget branch does not mask it.
 _dshim 'null' 3 "$TMP/shim-d3"
-t_capture env "PATH=$TMP/shim-d3:$PATH" bash -c ". '$DEMO_BLOCK'"
+t_capture env "PATH=$TMP/shim-d3:$PATH" "oss_bin=$TMP/shim-d3/oss" "oss_bin=$TMP/shim-d3/oss" bash -c ". '$DEMO_BLOCK'"
 t_assert_rc 3 "D3: the runner's exact status survives an absent budget"
 t_assert_contains "$T_OUT" "no budget recorded" "D3: ...with the no-budget branch still taken"
 
 # D4 - the capture must also survive `errexit`, where an unprotected `oss
 # demo_run` would abort the block before the timing is ever reported.
 _dshim '60s' 1 "$TMP/shim-d4"
-t_capture env "PATH=$TMP/shim-d4:$PATH" bash -c "set -euo pipefail; . '$DEMO_BLOCK'"
+t_capture env "PATH=$TMP/shim-d4:$PATH" "oss_bin=$TMP/shim-d4/oss" "oss_bin=$TMP/shim-d4/oss" bash -c "set -euo pipefail; . '$DEMO_BLOCK'"
 t_assert_rc 1 "D4: the same failing demo re-raises under errexit"
 t_assert_contains "$T_OUT" "within the 60s budget" "D4: ...and the timing is still reported first"
 
@@ -1270,7 +1273,7 @@ _pr_main_unreached() { # $1=label — the spine must NOT be on the LOCAL main
 # must not merge locally. Against the old block this is RED in the intended
 # direction: the old ceremony merges local main at rc 0 and never calls gh.
 _pr_fixture p1
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'; printf 'PRLINES%s\n' \"\$pr_lines\""
 t_assert_rc 0 "P1: the PR-arm pass runs clean on a repo with a remote"
 t_assert_contains "$T_OUT" "PR #7 opened against main" "P1: ...announcing the PR it opened for /ossify:work-pr"
@@ -1288,7 +1291,7 @@ t_assert_eq "$(git -C "$PR_REPO" rev-parse "$PR_BRANCH")" "$(cat "$PR_STATE/push
 # P2. THE THIRD LEG (A1): gh cannot operate on the remote — fail closed. The
 # probe runs before any push, and the halt never falls through to a local merge.
 _pr_fixture p2; touch "$PR_STATE/nongithub"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'"
 t_assert_rc 1 "P2: a gh-inoperable remote halts the close"
 t_assert_contains "$T_OUT" "silent local fall-through" "P2: ...naming that a local merge was NOT silently taken"
@@ -1306,7 +1309,7 @@ fi
 _pr_fixture p3
 MAIN_BEFORE="$(git -C "$PR_REPO" rev-parse main)"
 PUSHED_TIP="$(git -C "$PR_REPO" rev-parse "$PR_BRANCH")"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'" >/dev/null
 # The loop, as work-pr drives it: a fix commit lands on the spine branch and is
 # pushed to the PR head.
@@ -1327,7 +1330,7 @@ _pr_simulate_merge "$MERGED_HEAD"
 SIM_MERGE="$(cat "$PR_STATE/merge_commit")"
 # RESUME FLOW, as a re-invoked close runs it: pass one re-probes (PR exists —
 # not re-opened), pass two records against freshly fetched refs.
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'; . '$PRRECORD_BLOCK'; printf 'PAIRS%s\n' \"\$merge_shas\""
 t_assert_rc 0 "P3: a merged PR with a fix round records clean (ancestry, not equality)"
 t_assert_contains "$T_OUT" "already has PR #7" "P3: ...the resume probe recognises the existing PR"
@@ -1345,7 +1348,7 @@ case "$DIFF_LIST" in *fix.txt*) T_PASS=$((T_PASS+1));; *) T_FAIL=$((T_FAIL+1)); 
 # P4. THE PR-OPEN HALT (D9): the operator has not merged; the ceremony halts
 # recording nothing, and local main stays untouched.
 _pr_fixture p4
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'; . '$PRRECORD_BLOCK'"
 t_assert_rc 1 "P4: an OPEN PR halts the record pass"
 t_assert_contains "$T_OUT" "still open" "P4: ...saying the merge is the operator's, via work-pr"
@@ -1357,7 +1360,7 @@ _pr_main_unreached "P4: no local merge while the PR is open"
 # the P3 fixture — re-point the globals P4's fixture call moved.
 PR_REPO="$TMP/p3"; PR_ORIGIN="$TMP/p3-origin.git"; PR_STATE="$TMP/p3-gh"; PR_SHIM="$TMP/p3-shim"
 printf "%s\n" "$MAIN_BEFORE" > "$PR_STATE/merge_commit"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'; . '$PRRECORD_BLOCK'"
 t_assert_rc 1 "P5: a non-merge landing halts the record pass"
 t_assert_contains "$T_OUT" "two-parent merge commit" "P5: ...naming the shape the touch check needs"
@@ -1370,7 +1373,7 @@ case "$T_OUT" in *"landed PR"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: P5 - a non-mer
 git --git-dir="$PR_ORIGIN" rev-parse main > "$PR_STATE/merge_commit"
 UNRELATED="$(git -C "$PR_REPO" commit-tree 'HEAD^{tree}' -m forged)"
 printf "%s\n" "$UNRELATED" > "$PR_STATE/pushed_tip"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'; . '$PRRECORD_BLOCK'"
 t_assert_rc 1 "P6: a head that does not descend from the pushed tip halts"
 t_assert_contains "$T_OUT" "rewritten or diverged" "P6: ...naming the lineage failure"
@@ -1381,7 +1384,7 @@ printf "%s\n" "$PUSHED_TIP" > "$PR_STATE/pushed_tip"
 # the pre-PR ceremony's signature. The halt names the repair and NEVER runs it.
 echo stranded > "$PR_REPO/stranded.txt"; git -C "$PR_REPO" add stranded.txt; git -C "$PR_REPO" commit -qm stranded
 STRANDED_SHA="$(git -C "$PR_REPO" rev-parse main)"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'; . '$PRRECORD_BLOCK'"
 t_assert_rc 1 "P7: a local base ahead of origin halts the record pass"
 t_assert_contains "$T_OUT" "reset --hard origin/main" "P7: ...naming the repair command, not running it"
@@ -1394,7 +1397,7 @@ t_assert_eq "$STRANDED_SHA" "$(git -C "$PR_REPO" rev-parse main)" "P7: ...and lo
 # branch, which is not necessarily the spine branch this pass just pushed.
 _pr_fixture p8
 git -C "$PR_REPO" remote rename origin upstream
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'"
 t_assert_rc 0 "P8: an upstream-named remote runs the PR arm, not a push failure"
 t_assert_contains "$T_OUT" "PR #7 opened against main" "P8: ...opening the PR"
@@ -1417,7 +1420,7 @@ printf "7 MERGED\n" > "$PR_STATE/pr"
 git -C "$PR_REPO" rev-parse "$PR_BRANCH" > "$PR_STATE/head_oid"
 git -C "$PR_REPO" rev-parse "$PR_BRANCH" > "$PR_STATE/merge_commit"
 printf "other\n" > "$PR_STATE/pr_base"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'"
 t_assert_rc 0 "P9: the landing pass runs clean when the only PR targets another base"
 case "$T_OUT" in
@@ -1430,7 +1433,7 @@ t_assert_contains "$(cat "$PR_STATE/create_args")" "--base main" "P9: the probe'
 # discovery-and-record case the probe cannot see).
 printf "7 MERGED\n" > "$PR_STATE/pr"
 printf "other\n" > "$PR_STATE/pr_base"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; pr_lines='canonical:7'; . '$PRRECORD_BLOCK'"
 t_assert_rc 1 "P9: a PR merged into another base halts the record pass"
 t_assert_contains "$T_OUT" "targets 'other', not 'main'" "P9: ...naming both branches"
@@ -1451,7 +1454,7 @@ fi
 
 _pr_fixture r1
 # R1. Fresh tag: created on the repo's base, pushed, ANNOTATED, per repo.
-t_capture env "PATH=$PR_SHIM:$PATH" bash -c \
+t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main'; . '$TAG_BLOCK'"
 t_assert_rc 0 "R1: the tag pass tags a fresh release"
 t_assert_contains "$T_OUT" "tagged r9" "R1: ...saying so per repo"
@@ -1467,7 +1470,7 @@ TAG_BEFORE="$(git --git-dir="$PR_ORIGIN" rev-parse 'refs/tags/r9')"
 
 # R2. RESUME (T2): an existing tag pointing at base, present on the remote, is
 # continuable - the state writes failed last time, not the tag. No re-tag.
-t_capture env "PATH=$PR_SHIM:$PATH" bash -c \
+t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main'; . '$TAG_BLOCK'"
 t_assert_rc 0 "R2: a matching existing tag resumes instead of halting"
 t_assert_contains "$T_OUT" "already tagged" "R2: ...and says so"
@@ -1477,7 +1480,7 @@ t_assert_eq "$TAG_BEFORE" "$(git --git-dir="$PR_ORIGIN" rev-parse 'refs/tags/r9'
 # somewhere else - that is a human decision, never a clobber.
 git -C "$PR_REPO" tag -d r9 >/dev/null
 git -C "$PR_REPO" tag -a r9 -m moved "$PR_BRANCH"
-t_capture env "PATH=$PR_SHIM:$PATH" bash -c \
+t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main'; . '$TAG_BLOCK'"
 t_assert_rc 1 "R3: a tag pointing away from base halts"
 t_assert_contains "$T_OUT" "points at" "R3: ...naming where it points and where it should"
@@ -1492,7 +1495,7 @@ echo seed > "$TMP/r4/seed.txt"; git -C "$TMP/r4" add seed.txt; git -C "$TMP/r4" 
 git -C "$TMP/r4" branch -m main
 PR_REPO="$TMP/r4"; PR_ORIGIN=""; PR_STATE="$TMP/r4-gh"; PR_SHIM="$TMP/r4-shim"
 _wshim "$PR_REPO" "$PR_BRANCH" "canonical" "$PR_SHIM"
-t_capture env "PATH=$PR_SHIM:$PATH" bash -c \
+t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main'; . '$TAG_BLOCK'"
 t_assert_rc 0 "R4: a no-remote repo tags its release locally"
 t_assert_contains "$T_OUT" "tagged r9" "R4: ...saying so, same as a remote repo"
@@ -1505,7 +1508,7 @@ fi
 t_assert_eq "$(git -C "$PR_REPO" rev-parse main)" "$(git -C "$PR_REPO" rev-parse -q --verify 'refs/tags/r9^{}')" \
   "R4: the local tag points at the base branch tip"
 R4_TAG_OBJ="$(git -C "$PR_REPO" rev-parse 'refs/tags/r9')"
-t_capture env "PATH=$PR_SHIM:$PATH" bash -c \
+t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main'; . '$TAG_BLOCK'"
 t_assert_rc 0 "R4: the no-remote resume arm continues on a matching local tag"
 t_assert_contains "$T_OUT" "already tagged" "R4: ...without re-tagging"
@@ -1521,7 +1524,7 @@ printf "7 OPEN\n" > "$PR_STATE/pr"
 git -C "$PR_REPO" rev-parse "$PR_BRANCH" > "$PR_STATE/head_oid"
 UNRELATED10="$(git -C "$PR_REPO" commit-tree 'HEAD^{tree}' -m forged10)"
 printf "%s\n" "$UNRELATED10" > "$PR_STATE/pushed_tip"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'"
 t_assert_rc 1 "P10: a resumed PR whose head does not descend from the pushed tip halts at discovery"
 t_assert_contains "$T_OUT" "rewritten or diverged" "P10: ...naming the lineage failure before work-pr touches it"
@@ -1534,7 +1537,7 @@ case "$T_OUT" in *"hand it to"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: P10 - the div
 _pr_fixture r5
 git -C "$PR_REPO" tag r9 main
 git -C "$PR_REPO" push -q origin r9
-t_capture env "PATH=$PR_SHIM:$PATH" bash -c \
+t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main'; . '$TAG_BLOCK'"
 t_assert_rc 1 "R5: a lightweight existing tag halts the resume arm"
 t_assert_contains "$T_OUT" "annotated" "R5: ...naming the ANNOTATED-always contract it violates"
@@ -1544,7 +1547,7 @@ t_assert_contains "$T_OUT" "annotated" "R5: ...naming the ANNOTATED-always contr
 # their repos into the tag pass. The block's selector must filter to spines
 # whose landing actually completed - asserted on the query the block actually
 # runs, via the shim's argument log.
-t_capture env "PATH=$PR_SHIM:$PATH" bash -c \
+t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main'; . '$TAG_BLOCK'" >/dev/null 2>&1 || true
 _last_get="$(grep 'get ' "$PR_SHIM/args.log" | tail -1)"
 case "$_last_get" in
@@ -1555,7 +1558,7 @@ esac
 # R7. CONFLICTING BASE BRANCHES IN ONE REPO (round 4, T16): two closed spines
 # recording different bases in the same repo must halt - first-wins silently
 # tags one of the two landed lines.
-t_capture env "PATH=$PR_SHIM:$PATH" bash -c \
+t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main
 canonical:release-line'; . '$TAG_BLOCK'"
 t_assert_rc 1 "R7: two recorded bases for one repo halt the tag pass"
@@ -1566,7 +1569,7 @@ t_assert_contains "$T_OUT" "conflicting base" "R7: ...naming the conflict, not s
 # record pass rejects CLOSED - a wedge. Only OPEN and MERGED resume.
 _pr_fixture p11
 printf "7 CLOSED\n" > "$PR_STATE/pr"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'"
 t_assert_rc 0 "P11: a closed-unmerged PR does not wedge the landing pass"
 case "$T_OUT" in
@@ -1584,7 +1587,7 @@ _pr_fixture p12
 # already on record - no network, and the host pinning is what the stub saw.
 git -C "$PR_REPO" remote set-url origin https://ghe.example.com/owner/repo.git
 touch "$PR_STATE/nongithub"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'"
 t_assert_rc 1 "P12: an unreachable Enterprise host halts at the third leg (before any push)"
 t_assert_contains "$T_OUT" "silent local fall-through" "P12: ...the gh-inoperable halt, not a network attempt"
@@ -1631,7 +1634,7 @@ t_assert_eq "current" "$SEL_OUT" "R8: the selector yields EXACTLY the current re
 # it is consumed - the tag pass fixed this in round 4; the landing and record
 # passes still first-wins.
 _pr_fixture p13
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main
 canonical:release-line'; . '$MERGE_BLOCK'"
 t_assert_rc 1 "P13: conflicting bases halt the LANDING pass"
@@ -1641,7 +1644,7 @@ printf "7 MERGED\n" > "$PR_STATE/pr"
 git -C "$PR_REPO" rev-parse "$PR_BRANCH" > "$PR_STATE/head_oid"
 git -C "$PR_REPO" rev-parse "$PR_BRANCH" > "$PR_STATE/merge_commit"
 printf "%s\n" "$(git -C "$PR_REPO" rev-parse "$PR_BRANCH")" > "$PR_STATE/pushed_tip"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; spine_branch='spine/r0.s5-tier'; repo_base_branches='canonical:main
 canonical:release-line'; pr_lines='canonical:7'; . '$PRRECORD_BLOCK'"
 t_assert_rc 1 "P13b: conflicting bases halt the RECORD pass"
@@ -1654,7 +1657,7 @@ t_assert_contains "$T_OUT" "conflicting base" "P13b: ...same guard, same halt"
 mkdir -p "$TMP/p14-shim"
 { printf '#!/usr/bin/env bash\ncase "$1 $2" in\n  "repo_root canonical") echo %s ;;\n  "branch_name "*) echo %s ;;\n  *"target_repo"*) exit 5 ;;\n  *) exit 5 ;;\nesac\n' "$TMP/p13" "$PR_BRANCH"; } > "$TMP/p14-shim/oss"
 chmod +x "$TMP/p14-shim/oss"
-t_capture env "PATH=$TMP/p14-shim:$PATH" bash -c \
+t_capture env "PATH=$TMP/p14-shim:$PATH" "oss_bin=$TMP/p14-shim/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'"
 if [ "$T_RC" -eq 0 ]; then
   T_FAIL=$((T_FAIL+1)); echo "FAIL: P14 - a repo-list read failure succeeded silently, landing nothing"
@@ -1688,7 +1691,7 @@ printf "7 OPEN\n" > "$PR_STATE/pr"
 printf "%s\n" "$REMOTE_HEAD15" > "$PR_STATE/head_oid"
 P15_LOCAL_TIP="$(git -C "$PR_REPO" rev-parse "$PR_BRANCH")"
 git -C "$PR_REPO" rev-parse "$PR_BRANCH" > /tmp/p15-tip; mv /tmp/p15-tip "$PR_STATE/pushed_tip"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'"
 t_assert_rc 0 "P15: a remotely-only resumed head is fetched and lineage-checked, not halted as unknown"
 t_assert_contains "$T_OUT" "already has PR #7" "P15: ...and the resume proceeds to the handoff"
@@ -1716,7 +1719,7 @@ if git -C "$PR_REPO" rev-parse -q --verify 'refs/tags/r9' >/dev/null 2>&1; then
 else
   T_PASS=$((T_PASS+1))
 fi
-t_capture env "PATH=$PR_SHIM:$PATH" bash -c \
+t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main'; . '$TAG_BLOCK'"
 t_assert_rc 0 "R9: a remote-only existing tag is fetched and resumed, not re-created"
 t_assert_contains "$T_OUT" "already tagged" "R9: ...through the same verification arm"
@@ -1738,7 +1741,7 @@ printf "%s\n" "$P16_PUBLISHED_TIP" > "$PR_STATE/pushed_tip"
 printf "%s\n" "$P16_PUBLISHED_TIP" > "$PR_STATE/head_oid"
 # The local spine branch advances AFTER the PR was opened - not pushed.
 echo late > "$PR_REPO/late.txt"; git -C "$PR_REPO" add late.txt; git -C "$PR_REPO" commit -qm "late local work"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'"
 t_assert_rc 1 "P16: a resumed PR missing the current local tip halts"
 t_assert_contains "$T_OUT" "advanced past" "P16: ...naming the local tip the PR does not contain"
@@ -1748,7 +1751,7 @@ t_assert_contains "$T_OUT" "advanced past" "P16: ...naming the local tip the PR 
 # source. The push uses a fully qualified tag refspec.
 _pr_fixture r10
 git -C "$PR_REPO" branch r9
-t_capture env "PATH=$PR_SHIM:$PATH" bash -c \
+t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main'; . '$TAG_BLOCK'"
 t_assert_rc 0 "R10: the tag push resolves under a branch/tag name collision"
 t_assert_contains "$T_OUT" "tagged r9" "R10: ...and lands"
@@ -1763,7 +1766,7 @@ _pr_fixture r11
 git -C "$PR_REPO" checkout -q main
 echo unpushed > "$PR_REPO/unpushed.txt"; git -C "$PR_REPO" add unpushed.txt
 git -C "$PR_REPO" commit -qm unpushed
-t_capture env "PATH=$PR_SHIM:$PATH" bash -c \
+t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main'; . '$TAG_BLOCK'"
 t_assert_rc 1 "R11: a base ahead of the remote halts before tagging"
 t_assert_contains "$T_OUT" "published line does not carry" "R11: ...naming what the tag would falsely mark"
@@ -1786,7 +1789,7 @@ echo final > "$CL12/final.txt"; git -C "$CL12" add final.txt; git -C "$CL12" com
 git -C "$CL12" push -q origin main
 R12_REMOTE_TIP="$(git --git-dir="$PR_ORIGIN" rev-parse main)"
 R12_STALE_TIP="$(git -C "$PR_REPO" rev-parse main)"
-t_capture env "PATH=$PR_SHIM:$PATH" bash -c \
+t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main'; . '$TAG_BLOCK'"
 t_assert_rc 1 "R12: a base behind the published tip halts - never mutated after the audit"
 t_assert_contains "$T_OUT" "behind the published tip" "R12: ...naming the state and the pull-and-re-run remedy"
@@ -1804,7 +1807,7 @@ t_assert_eq "$R12_STALE_TIP" "$(git -C "$PR_REPO" rev-parse main)" "R12: the loc
 _pr_fixture p17
 git -C "$PR_REPO" config --unset "url.$PR_ORIGIN.insteadOf"
 git -C "$PR_REPO" remote set-url origin "$PR_ORIGIN"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'"
 t_assert_rc 1 "P17: a filesystem-path remote halts instead of deriving a selector"
 t_assert_contains "$T_OUT" "cannot derive an owner/repo" "P17: ...naming the derivation failure, not acting on a wrong repo"
@@ -1820,7 +1823,7 @@ fi
 # them; the single-remote case (whatever its name) is the straightforward one.
 _pr_fixture p18
 git -C "$PR_REPO" remote add upstream "$PR_ORIGIN"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'"
 t_assert_rc 1 "P18: a two-remote (fork-shaped) repo halts the landing pass"
 t_assert_contains "$T_OUT" "several remotes" "P18: ...naming them, never silently preferring origin"

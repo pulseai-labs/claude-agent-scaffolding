@@ -11,8 +11,10 @@ Any work item that **introduces or retains** a shell, stub, or fake records one 
 including fakes inherited from the skeleton and deliberately left in place. "It
 was already there" is the most common way a fake becomes permanent.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
-oss fake_add "<boundary>" "<real|fake|deferred>" "<reason>" "<replacement trigger>" "<expiry release>"
+"$oss_bin" fake_add "<boundary>" "<real|fake|deferred>" "<reason>" "<replacement trigger>" "<expiry release>"
 ```
 
 | Field | Meaning |
@@ -54,7 +56,7 @@ trigger, and it is the one that will actually fire.
 ## 3. Changing a fake's status later
 
 ```bash
-oss fake_status "<boundary>" "<active|replaced|renewed>" "<reason>" ["<new-expiry-release>"]
+"$oss_bin" fake_status "<boundary>" "<active|replaced|renewed>" "<reason>" ["<new-expiry-release>"]
 ```
 
 An unknown boundary exits **7**; a status outside `active|replaced|renewed`
@@ -89,7 +91,7 @@ So the replacement competes for selection like everything else, rather than livi
 only inside a fake record nobody re-reads:
 
 ```bash
-oss feature_add "replace the <boundary> fake" "<the value the real one unlocks>" "<bone|flesh>" fake-replacement
+"$oss_bin" feature_add "replace the <boundary> fake" "<the value the real one unlocks>" "<bone|flesh>" fake-replacement
 ```
 
 Write the **value**, not the task: *"real fills so P&L is trustworthy"* earns
