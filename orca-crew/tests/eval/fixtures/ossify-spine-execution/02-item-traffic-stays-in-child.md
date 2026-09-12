@@ -10,7 +10,8 @@ expected_reason: 'Routing, in both directions. The two item plan questions arriv
   inbox - note that this verifier exists at all only because w1 already returned complete,
   which is when its terminal is created; a verifier standing by before any complete
   return would itself be a contract violation. The spine sessions own final completion
-  uses the INJECTED parent task and dispatch ids, which settles the tops Dispatch
+  uses the parent task and dispatch ids its Orca preamble injected — captured before
+  the child Run was bound — which settles the tops Dispatch
   while the child Run stays bound - and before sending it the spine session releases
   every item pair and names the child Run id in the body, so nothing of its own outlives
   the spine and the top can still find the Run. The wrong answers this fixture falsifies
@@ -20,13 +21,14 @@ expected_reason: 'Routing, in both directions. The two item plan questions arriv
   a close-the-Run step, which the CLI does not expose'
 ---
 
-You are the spine session for `r6.s1`. Your brief injected these parent
-identities and you created and bound a child Run, `run_child77`, for item tasks:
+You are the spine session for `r6.s1`. Your brief injected these scope
+identities, and the Orca preamble injected with your dispatch carried your own
+task and dispatch identities — you captured all of them before creating and
+binding a child Run, `run_child77`, for item tasks:
 
     PARENT_RUN_ID=run_parent41
-    SPINE_TASK_ID=task_spine08
-    SPINE_DISPATCH_ID=ctx_spine08
     ORCA_EXECUTION_PATH=/repos/product-ai/docs/specs/r6/r6.s1-ledger-export/orca-execution.md
+    (from your preamble) task task_spine08, dispatch ctx_spine08
 
 Round 1 holds three items. `r6.s1.w1` has already come back complete; you
 captured its four-part fingerprint and created its verifier terminal at that
