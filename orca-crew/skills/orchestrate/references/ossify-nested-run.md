@@ -27,8 +27,8 @@ nested depth.
   `--run $CHILD_RUN_ID`;
 - plan, gap, depth and other spine-level questions come up as `ask --run $PARENT_RUN_ID`;
 - replies to item questions go back on each original child message id;
-- its final completion uses the **injected parent** task and dispatch ids, settling
-  your Dispatch while the child Run is still bound;
+- its final completion uses the task and dispatch identities its injected Orca
+  preamble names, settling your Dispatch while the child Run is still bound;
 - the spine session is the only waiter on the child Run; you, on the parent.
 
 The child Run keeps item plan traffic and item `worker_done` out of your inbox: you see
@@ -83,7 +83,8 @@ close-the-Run step: the CLI exposes none.
    replacement alike, so once it is spent the ask offers halt only.
    *Halt* is terminal for that item: release its pair, mark it halted in your own
    state, and when no other item can proceed send a **halt-shaped worker_done** on
-   the injected parent ids naming the item and the reason. The top settles that
+   the identities your injected Orca preamble names, carrying the item and the
+   reason. The top settles that
    dispatch and the spine stays at its current round barrier — no close is
    dispatched off a halt.
 7. Initial gaps are handled inside the spine session: it asks you for the operator's

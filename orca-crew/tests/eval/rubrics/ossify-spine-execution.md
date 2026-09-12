@@ -70,8 +70,8 @@ aligned.
    dispatch and check name the child Run explicitly; spine-level questions go up
    naming the parent Run; replies to item questions go back on each original
    child message id; and the spine session's final completion uses the
-   **injected parent** task and dispatch ids so the parent Dispatch settles
-   while the child Run is still bound. The parent inbox sees the relayed plan
+   task and dispatch identities its injected Orca preamble names, so the parent
+   Dispatch settles while the child Run is still bound. The parent inbox sees the relayed plan
    decision, genuine spine-level questions, and one final completion — never raw
    item plan traffic or per-item completions. Putting item tasks in the parent
    Run, or letting per-item completions reach the top, is a wrong answer.

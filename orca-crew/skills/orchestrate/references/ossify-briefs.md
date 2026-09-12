@@ -75,8 +75,8 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      an item — the initial run, each correction, each replacement — counts against
      ossify's three-iteration cap, and once it is spent the ask offers halt only.
      On halt, release that item's pair, mark the item halted, and if no other item
-     can proceed send a halt-shaped worker_done on the injected parent ids naming
-     the item and the reason; the spine stays at its current round barrier.
+     can proceed send a halt-shaped worker_done on the identities your injected
+     Orca preamble names, with the item and reason; the spine stays at its barrier.
   6. Return accepted results to the lane in declared decomposition order, closing
      each item before the next feeds: the lane gates, commits and merges
      `work/<wi>` into the spine branch — the per-item close, distinct from the

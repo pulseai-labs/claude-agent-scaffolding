@@ -257,6 +257,14 @@ absent "$PRBRIEFS_MD" 'per spine at most' \
   "the close-dispatch cap contradiction is gone"
 pin "$BRIEFS_MD" 'orca terminal close --terminal' \
   "the spine brief names the exact terminal-close command"
+# R7: the halt path and the completion bullet must spend the preamble's
+# identities, not the deleted declaration slots' phrase.
+absent "$BRIEFS_MD" 'injected parent ids' \
+  "the spine brief's halt path names no 'injected parent ids'"
+absent "$NESTED_MD" 'injected parent ids' \
+  "the nested Run's halt path names no 'injected parent ids'"
+absent "$NESTED_MD" 'the **injected parent**' \
+  "the nested Run's completion bullet names preamble identities"
 pin "$GENERIC_BRIEFS_MD" 'Reviewed head: <sha>' \
   "the reviewer DONE carries its reviewed-head line exactly once"
 
