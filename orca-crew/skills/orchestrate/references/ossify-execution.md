@@ -25,7 +25,7 @@ is not authority — the phase begins because *this* session planned *this* spin
 
 | Layer | Owns | Never |
 |---|---|---|
-| **Top orchestrator** (you) | ratifying one implementer/verifier profile per item and the three session blocks — spine, close, work-PR — writing the sidecar, launching the spine terminal from `spine_command` with its model confirmed from the banner and first reply and `spine_effort` passed as the launch argument — a mismatch is a failed launch, exactly as for an item row — approving or amending each relayed worker plan, deciding the reviewer and PR-fix seats at the PR transition, dispatching the close and one work-PR session per returned PR, each launched from its own ratified block with the model confirmed as an item row's, assigning each work-PR dispatch's merge executor (`MERGE_EXECUTOR`) and supplying its `PRIOR_REVIEW` — `none` only for a PR no earlier work-PR dispatch has covered, `covered` when one has but persisted no record, otherwise the durable record that PR's last `open:` result persisted — asking for a writer profile and dispatching a fresh close-review writer when a close returns `halted: close-review`, relaying the merge word, dispatching the record pass, and the teardown | launching or supervising an item terminal; reading raw child completion traffic; reviewing, fixing or merging a spine PR itself |
+| **Top orchestrator** (you) | ratifying one implementer/verifier profile per item and the three session blocks — spine, close, work-PR — writing the sidecar, launching the spine terminal from `spine_command` with its model confirmed from the banner and first reply and `spine_effort` passed as the launch argument — a mismatch is a failed launch, exactly as for an item row — approving or amending each relayed worker plan, deciding the reviewer and PR-fix seats at the PR transition, dispatching the close and one work-PR session per returned PR, each launched from its own ratified block with the model confirmed as an item row's, assigning each work-PR dispatch's merge executor (`MERGE_EXECUTOR`) and supplying its `PRIOR_REVIEW` — `none` only for a PR no earlier work-PR dispatch has covered, `covered` when one has but persisted no record, otherwise the durable record that PR's last `open:` result persisted — asking for a writer profile and dispatching one fresh close-review writer per affected hosting repo when a close returns `halted: close-review`, relaying the merge word, dispatching the record pass, and the teardown | launching or supervising an item terminal; reading raw child completion traffic; reviewing, fixing or merging a spine PR itself |
 | **Spine session** | the ossify lane, a nested child Run, launching and supervising both item terminals per item, relaying plans up, item-local corrections | changing any ossify contract; moving item tasks into the parent Run |
 | **Item terminals** | one item each: implement, verify | crossing into another item |
 | **Close session** | one dispatch of `/ossify:close`, returning every PR it opened | creating any terminal; driving a PR it opened |
@@ -39,11 +39,10 @@ layer.** And every dispatched session returns a checkable artifact — a PR list
 ledger comment id, a merge SHA — never narrative.
 
 **Depth is confirmed with the operator, twice over.** Before the spine session
-launches, ask the operator to confirm nested worker depth is `2`; a brief that
-asserts the setting is not confirmation, and no CLI read can substitute. If the
-runtime later refuses a child dispatch with `nested_worker_depth_exceeded`, the
-report reaching you is relayed to the operator as an ask — you never answer it
-yourself and never record your own choice as an operator decision.
+launches, ask the operator to confirm nested worker depth is `2`; a brief
+asserting the setting is not confirmation, and no CLI read substitutes. A
+runtime `nested_worker_depth_exceeded` is relayed to the operator as an ask —
+you never answer it yourself or record your own choice as an operator decision.
 
 The nested Run's mechanics — depth, routing, the round procedure and the close — are
 in `references/ossify-nested-run.md`.
@@ -107,9 +106,9 @@ review.
 ```
 
 **Only the terminal command, expected model and effort vary.** The three procedures
-above are fixed for every item on every spine, recorded so the spine session can check
-them rather than choose among them. No reviewer row — §5 says why; the spine
-session is a block beside the table, never a row in it.
+above are fixed for every item on every spine, recorded so the spine session
+checks rather than chooses. No reviewer row — §5 says why; every session block
+sits beside the table, never a row in it.
 
 **Authoring it.** After `/plan-spine`, recommend one implementer and one verifier
 profile per item from its scope, risk and cost. Present **every** row to the operator in
@@ -144,9 +143,9 @@ beside the item rows, and **its absence halts on an activated spine**. **The
 `## Close session` and `## Work-PR session` blocks are read identically** — four keys
 each, value-checked beside the item rows, either one's absence halting the same way —
 and all three are recommended and **ratified with the item rows in the same phase**,
-touching nothing about the item-set equality check above. The close terminal launches
-from the Close-session block and each work-PR session from the Work-PR-session block,
-the model confirmed from the banner and first reply exactly as an item row's is.
+touching nothing about the item-set equality check above. The close terminal
+and each work-PR session launch from their own ratified blocks, the model
+confirmed from the banner and first reply exactly as an item row's is.
 
 **A v1 sidecar is not a v2 sidecar with defaults missing.** A sidecar whose `schema:` reads
 `orca-execution/v1` halts any new v2 launch: you rewrite it — adding the two blocks, moving
@@ -177,7 +176,6 @@ model, effort and `/code-review` level, and put **all four** into the **work-PR
 session's** brief (`ossify-pr-briefs.md`) — that session creates the reviewer from the
 decided command and confirms its model from the banner and first reply exactly as an
 item row is; step 8's `claude-glm-flash` is the default only outside such a spine.
-Neither the spine session nor the sidecar selects it.
 
 **Decide the PR-fix implementer in the same breath.** Every item pair was released at
 its item's close and the spine session was a coordinator, not a writer — so step 10's
@@ -189,12 +187,14 @@ brief** rather than the planned-implementer brief, whose DONE opens a new PR: it
 the PR that already exists. One seat per PR, released at merge.
 
 **A close-review writer is not this seat.** When a close halts on its own review
-(`ossify-nested-run.md` §4), ask the operator for that writer's profile at the halt —
-a fresh seat with a bounded edit scope in the spine worktree, not the PR-fix seat this
-section chooses at the PR transition and not an early selection of it.
+(`ossify-nested-run.md` §4), ask the operator for that writer's profile at the
+halt and dispatch one writer per affected hosting repo, each from
+`references/ossify-close-writer.md`, bounded to its own repo's worktree — not
+the PR-fix seat, chosen at the transition or early.
 
 ## 6. Briefs
 
-The spine and item briefs are in `references/ossify-briefs.md`, the close and work-PR
-briefs in `references/ossify-pr-briefs.md`; `references/briefs.md`'s templates are
-unchanged and still apply elsewhere, its fix-round brief included (§5).
+The spine and item briefs are in `references/ossify-briefs.md`, the close and
+work-PR briefs in `references/ossify-pr-briefs.md`, the close-review writer's
+in `references/ossify-close-writer.md`; `references/briefs.md`'s templates still
+apply elsewhere, its fix-round brief included (§5).

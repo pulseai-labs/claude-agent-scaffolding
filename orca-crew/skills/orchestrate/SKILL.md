@@ -27,8 +27,9 @@ Your own turns take these kinds of action, and no others:
 
 1. Probe live state with single commands: `git status`, `gh pr view`,
    `orca orchestration task-list`, `orca status`.
-2. Write briefs from the templates in `references/briefs.md`, `references/ossify-briefs.md`
-   and `references/ossify-pr-briefs.md`, dispositions, the handoff, and — on an activated
+2. Write briefs from the templates in `references/briefs.md`, `references/ossify-briefs.md`,
+   `references/ossify-pr-briefs.md` and `references/ossify-close-writer.md`, dispositions,
+   the handoff, and — on an activated
    ossify spine — the `orca-execution.md` sidecar.
 3. Read `worker_done` bodies.
 4. Decide.

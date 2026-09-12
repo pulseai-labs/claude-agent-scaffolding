@@ -38,7 +38,8 @@ the close review the ceremony itself runs over the accumulated diff before any P
 opens — that is `/ossify:close` doing its job, not a `/code-review` you dispatch.
 Its findings are yours to report, never to fix: a `fix now` disposition ends this
 dispatch as `halted: close-review — <ledger>` carrying each finding, its decision
-and the reason; the top dispatches the writer and a fresh close. On a record
+and the reason; the top dispatches the writer — per `ossify-close-writer.md`,
+one per affected hosting repo — and a fresh close. On a record
 pass, write the accepted findings CLOSE_REVIEW_LEDGER carries into the
 retrospective's carried-and-lessons section, by class.
 
@@ -59,8 +60,8 @@ Then:
 
 NEVER: create a terminal, merge, ask the operator anything (questions go up to
 the top with `ask`), or re-invoke `/ossify:close` yourself — a halt settles
-this dispatch, and once the blocker is remediated
-the top dispatches a fresh close session. Report a refusal verbatim.
+this dispatch; remediated, the top dispatches a fresh close session. Report a
+refusal verbatim.
 ```
 
 ---
@@ -105,9 +106,8 @@ binding your child Run.
 
 TASK: drive PR_NUMBER to a merge on the top's word.
   1. Capture your own preamble identities and PARENT_RUN_ID, then bind a CHILD
-     Run for your two seats. Every seat's task-create, worker-start, dispatch
-     and check names --run <child run id>; every question for the top names
-     --run PARENT_RUN_ID.
+     Run for your two seats — every seat's task-create, worker-start, dispatch
+     and check names --run <child run id>, every top question --run PARENT_RUN_ID.
   2. Decide your startup branches BEFORE any seat exists. MERGE_EXECUTOR must
      read exactly `session` or `operator` — a missing, invalid or unknown
      assignment is asked upward and nothing is created. Then branch on

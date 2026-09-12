@@ -41,6 +41,7 @@ EXEC_MD="$REF/ossify-execution.md"
 BRIEFS_MD="$REF/ossify-briefs.md"
 NESTED_MD="$REF/ossify-nested-run.md"
 PRBRIEFS_MD="$REF/ossify-pr-briefs.md"
+WRITER_MD="$REF/ossify-close-writer.md"
 LIFECYCLE_MD="$REF/lifecycle.md"
 ROLES_MD="$REF/roles.md"
 GENERIC_BRIEFS_MD="$REF/briefs.md"
@@ -191,7 +192,8 @@ section "no subagent invocation in the activated path"
 nonempty "$BRIEFS_MD" "references/ossify-briefs.md exists"
 nonempty "$NESTED_MD" "references/ossify-nested-run.md exists"
 nonempty "$PRBRIEFS_MD" "references/ossify-pr-briefs.md exists"
-for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD"; do
+nonempty "$WRITER_MD" "references/ossify-close-writer.md exists"
+for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD"; do
   for form in 'Task(' 'Agent(' 'subagent_type'; do
     absent "$f" "$form" "${f##*/} invokes no subagent ('$form')"
   done
@@ -243,6 +245,14 @@ pin "$PRBRIEFS_MD" 'MERGE_EXECUTOR=' \
   "the work-PR brief injects the top's merge-executor assignment exactly once"
 pin "$PRBRIEFS_MD" 'halted: close-review' \
   "a close-review halt has its own result shape"
+# #449/R3+C1+C2: the close-review writer is a contracted seat — a brief of
+# its own with a model gate, budgeted in roles.md, allocated one per affected
+# hosting repo. Mechanical: the file exists, the gate is injected once, and the
+# allocation rule is stated where the halt remediation lives.
+pin "$WRITER_MD" 'WRITER_EXPECTED_MODEL=' \
+  "the writer brief gates its ratified expected model"
+pin "$NESTED_MD" 'one writer per affected hosting repo' \
+  "fix-now findings spanning repos get a writer each"
 absent "$PRBRIEFS_MD" 'per spine at most' \
   "the close-dispatch cap contradiction is gone"
 pin "$BRIEFS_MD" 'orca terminal close --terminal' \
@@ -414,8 +424,10 @@ pin "$LIFECYCLE_MD" 'dispatch a work-PR session' \
   "1b dispatches a work-PR session per returned PR"
 pin "$SKILL_MD" 'the `orca-execution.md` sidecar' \
   "SKILL.md's write set names the sidecar"
-pin "$ROLES_MD" 'three seats' \
-  "roles.md budgets three seats outside the per-item budget"
+pin "$ROLES_MD" 'four seats' \
+  "roles.md budgets four seats outside the per-item budget"
+pin "$ROLES_MD" 'a close-review writer' \
+  "the budget names the close-review writer seat"
 
 # R1-5/R1-6/R1-9. The record pass has a precondition a `closed` return fails; the
 # spine seat is launched from its ratified block, not the generic policy; and the
@@ -467,5 +479,6 @@ budget "$EXEC_MD" "ossify-execution.md is within the reference budget"
 budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
 budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget"
 budget "$BRIEFS_MD" "ossify-briefs.md is within the reference budget"
+budget "$WRITER_MD" "ossify-close-writer.md is within the reference budget"
 
 report

@@ -139,9 +139,11 @@ A halt settles that dispatch only: remediate the blocker it names, then dispatch
 **A close that halts on its own review returns `halted: close-review` with the
 ledger.** The ceremony's accumulated-diff review is the close seat's to run, never to
 fix: a `fix now` disposition ends that dispatch. The top asks the operator for a
-writer profile, dispatches a fresh writer in the spine worktree with the accepted
-ledger and a bounded edit scope, then dispatches a fresh close, which re-runs the
-review over the amended diff. Neither the close nor the work-PR session applies these
+writer profile and dispatches one writer per affected hosting repo — each in
+that repo's own spine worktree with its slice of the accepted ledger and a
+bounded edit scope, per `references/ossify-close-writer.md` — then dispatches
+a fresh close, which re-runs the review over every amended diff. Neither the
+close nor the work-PR session applies these
 fixes, and no seat is created for this permanently.
 
 **Then one work-PR session per returned PR**, each created in that PR's own

@@ -118,8 +118,8 @@ session` and `## Work-PR session` blocks beside the Spine-session block and vers
 operator re-ratifies; nothing auto-upgrades and no live seat is replaced. The spine
 session closes each item through the lane — gate, commit, merge — before the barrier, and
 an item still active there is a halt, not a completion. A `fix now` close-review finding
-halts the close with its ledger; the top asks for a writer profile, dispatches a fresh
-writer, then a fresh close re-reviews. Clean delegated reviews carry their reviewed head;
+halts the close with its ledger; the top asks for a writer profile, dispatches fresh
+writers — one per affected hosting repo — then a fresh close re-reviews. Clean delegated reviews carry their reviewed head;
 a left-open PR resumes on `PRIOR_REVIEW` — branched before any reviewer exists, zero
 additional reviews, fresh dispatch identities. The merge executor is the top's explicit
 `MERGE_EXECUTOR` assignment, never inferred or probed. Brief lifecycle identities come

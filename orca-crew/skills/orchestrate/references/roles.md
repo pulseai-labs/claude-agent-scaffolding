@@ -77,12 +77,15 @@ seat it replaces. Any session outside those seats is a planning defect: stop and
 re-plan the item. A further read-only question goes to the existing verifier or
 implementer by `send`, never to a new session.
 
-**Activated ossify spines add three seats, all outside the per-item budget above:
+**Activated ossify spines add four seats, all outside the per-item budget above:
 the spine session, one per spine; a close
-session, a fresh terminal per close dispatch; and a work-PR session, one per returned
+session, a fresh terminal per close dispatch; a work-PR session, one per returned
 PR — each launched from its own ratified sidecar block (`## Spine session`,
 `## Close session`, `## Work-PR session`), the model confirmed from the banner and
-first reply as an item row's is.** The work-PR session owns the reviewer and the
+first reply as an item row's is — and a close-review writer, one per affected
+hosting repo at a `halted: close-review`, launched from the profile the operator
+names at that halt (`ossify-close-writer.md`), never a sidecar block.** The
+work-PR session owns the reviewer and the
 PR-fix seat inside a child Run of
 its own, so those two are budgeted there rather than here — the top decides both
 profiles at the PR transition and injects them, and neither survives the merge. No

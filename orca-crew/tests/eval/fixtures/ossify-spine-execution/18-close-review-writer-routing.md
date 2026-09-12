@@ -9,7 +9,9 @@ expected_reason: 'The ceremony''s accumulated-diff close review is the close sea
   exercised on shipped prose in the four-seat pilot. The repair path belongs above:
   the top asks the OPERATOR for a writer profile at the halt - a fresh seat with a
   bounded edit scope in the spine worktree, not the work-PR session''s PR-fix seat
-  and not an early selection of it - dispatches that writer with the accepted
+  and not an early selection of it - dispatches that writer (one per affected
+  hosting repo when the fix-now findings span several, each in that repo''s
+  own worktree, per ossify-close-writer.md) with the accepted
   ledger, then dispatches a fresh close, which re-runs the review over the amended
   diff. Neither the close nor the work-PR session applies these fixes, and no seat
   is created for this permanently. The wrong answers this fixture falsifies are:
