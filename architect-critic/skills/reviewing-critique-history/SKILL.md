@@ -31,7 +31,7 @@ Do not error. Do not try to create the file. Exit gracefully.
 
 ## Step 2: Parse `--limit N` from `$ARCHITECT_CRITIC_ARGS`
 
-The slash-command wrapper (`commands/critique-list.md`) exports the raw argument string as `$ARCHITECT_CRITIC_ARGS`. Read that env var — do not reference bash positionals like `$1` or `$2`, which get silently corrupted by Claude Code's template substitution at render time.
+The slash-command wrapper (`commands/critique-list.md`) exports the raw argument string as `$ARCHITECT_CRITIC_ARGS`. Read that env var — do not reference bash positionals like `$1` or `$2`, which get silently corrupted by Claude Code's template substitution at render time. On shim-less channels — Devin, `Skill()`, natural language — nothing exports it; read `--limit N` as a literal token in the invocation/request text.
 
 Parse the limit with:
 

@@ -423,9 +423,12 @@ in the DAG.
 ## 10. Slash-command interaction
 
 The `/plan-release` slash command (`commands/plan-release.md`) exports the raw
-argument string as `$ARGUMENTS` via an env-var bridge. **Parse `$ARGUMENTS` in
-bash; never reference `$1` / `$2` / `$N`** — Claude Code substitutes positional
-tokens in command bodies at template-render time and silently corrupts them.
+argument string as `$ARGUMENTS` via an env-var bridge — on shim-less channels
+(Devin, `Skill()`, natural language) nothing exports it; the release name
+arrives as a literal token in the invocation/request text. **Parse `$ARGUMENTS`
+in bash; never reference `$1` / `$2` / `$N`** — Claude Code substitutes
+positional tokens in command bodies at template-render time and silently
+corrupts them.
 
 The only argument is an optional release name (`"Release 0"`, `"MVP"`, `"v1"`),
 passed to `"$oss_bin" release_add`. When it is absent, ask for it before creating the

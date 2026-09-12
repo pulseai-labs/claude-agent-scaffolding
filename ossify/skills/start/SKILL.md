@@ -436,10 +436,11 @@ the skeleton spine pre-seeded from the cut.
 
 ## 14. Slash-command interaction
 
-The `/start` slash command (`commands/start.md`) exports the raw argument string
-as `$ARGUMENTS` via an env-var bridge. **Parse `$ARGUMENTS` in bash; never
-reference `$1` / `$2` / `$N`** — Claude Code substitutes positional tokens in
-command bodies at template-render time and silently corrupts them.
+The `/start` slash command (`commands/start.md`) exports the raw argument as
+`$ARGUMENTS` via an env-var bridge — on shim-less channels (Devin, `Skill()`,
+natural language) nothing exports it; read the name from the invocation text.
+**Parse `$ARGUMENTS` in bash; never reference `$1`/`$2`/`$N`** — Claude Code
+substitutes positionals at render time and corrupts them.
 
 The only argument is an optional project name, passed to `"$oss_bin" init`. When it is
 absent, ask for it before initializing — the name is the project's identity in

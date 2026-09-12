@@ -210,9 +210,8 @@ Pin it once with `sf="${OSS_STATE_FILE:-$("$oss_bin" state_path)}"` — **overri
 matching what `"$oss_bin" doctor` itself resolves — and pass `"$sf"` to every read,
 including to `"$oss_bin" doctor`. `references/state-inspection.md` §2 carries the
 measurement, and the why-override-first account with it.
-**It is a pure selector: the finding is its OUTPUT, and rc 0 means the check ran,
-not that the tree is clean.** Branch on the rc and you will report every project
-as orphan-free.
+**It is a pure selector: the finding is its OUTPUT — rc 0 means the check ran,
+not that the tree is clean.** Branch on the rc and every project reads orphan-free.
 
 Full detail — the four-line remedy table and why you echo doctor's own line
 rather than substituting a fixed remedy, the advisory-vs-blocking split, the
@@ -449,10 +448,11 @@ Named here rather than left to read as executed:
 
 ## 12. Slash-command interaction
 
-`/ossify:doctor [surface]` (`commands/doctor.md`) exports the raw argument string as
-`$ARGUMENTS` through an env-var bridge. **Parse `$ARGUMENTS` in bash; never
-reference `$1` / `$2` / `$N`** — Claude Code substitutes positional tokens in
-command bodies at template-render time and silently corrupts them.
+`/ossify:doctor [surface]` (`commands/doctor.md`) exports the raw argument as
+`$ARGUMENTS` via an env-var bridge — on shim-less channels (Devin, `Skill()`,
+natural language) nothing exports it; read the surface token from the
+invocation/request text. **Parse `$ARGUMENTS` in bash; never reference
+`$1`/`$2`/`$N`** — Claude Code substitutes positionals at render time.
 
 The only argument is an optional surface name (§2). Absent or unrecognised, run
 the full sweep.

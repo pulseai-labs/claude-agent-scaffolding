@@ -423,7 +423,9 @@ Full list with the reasoning and worked cases in
 ## 10. Slash-command interaction
 
 The `/plan-spine` slash command (`commands/plan-spine.md`) exports the raw
-argument string as `$ARGUMENTS` via an env-var bridge. **Parse `$ARGUMENTS` in
+argument string as `$ARGUMENTS` via an env-var bridge — on shim-less channels
+(Devin, `Skill()`, natural language) nothing exports it; the spine id arrives
+as a literal token in the invocation/request text. **Parse `$ARGUMENTS` in
 bash; never reference `$1` / `$2` / `$N`** — Claude Code substitutes positional
 tokens in command bodies at template-render time and silently corrupts them.
 

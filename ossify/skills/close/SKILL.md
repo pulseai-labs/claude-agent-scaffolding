@@ -451,7 +451,9 @@ exists; what that file adds is when to reach for it.
 ## 9. Slash-command interaction
 
 `/close <id>` (`commands/close.md`) exports the raw argument string as
-`$ARGUMENTS` through an env-var bridge. **Parse `$ARGUMENTS` in bash; never
+`$ARGUMENTS` through an env-var bridge — on shim-less channels (Devin,
+`Skill()`, natural language) nothing exports it; the id arrives as a literal
+token in the invocation/request text. **Parse `$ARGUMENTS` in bash; never
 reference `$1` / `$2` / `$N`** — Claude Code substitutes positional tokens in
 command bodies at template-render time and silently corrupts them.
 

@@ -11,7 +11,7 @@ You have been invoked because the user wants to see all principles currently in 
 
 ## Step 1: Parse `--source` filter
 
-Read `$ARCHITECT_CRITIC_ARGS` (the env-var bridge the slash-command wrapper exports — do not reference bash positionals `$1`/`$2`, which Claude Code corrupts at template-render time). Extract `--source VALUE` if present; default to `all`.
+Read `$ARCHITECT_CRITIC_ARGS` (the env-var bridge the slash-command wrapper exports — do not reference bash positionals `$1`/`$2`, which Claude Code corrupts at template-render time). On shim-less channels — Devin, `Skill()`, natural language — nothing exports it; read `--source VALUE` as a literal token in the invocation/request text. Extract `--source VALUE` if present; default to `all`.
 
 ```bash
 SOURCE_FILTER="$(printf "%s" "${ARCHITECT_CRITIC_ARGS:-}" \

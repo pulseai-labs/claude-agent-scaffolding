@@ -66,7 +66,9 @@ Slash-command grammar:
 ```
 
 Read the raw slash-command text from the `$ARGUMENTS` env-var bridge — never
-from `$1`/`$2`, per the slash-command `$N` substitution bug. Interpret exactly
+from `$1`/`$2`, per the slash-command `$N` substitution bug. On shim-less
+channels (Devin, `Skill()`, natural language) nothing exports `$ARGUMENTS`;
+read the name and `--wrapper` tokens from the invocation/request text. Interpret exactly
 one positional project name plus the optional `--wrapper <existing-dir>` pair.
 Reject an unknown option, duplicate `--wrapper`, a missing/empty wrapper value,
 or more than one positional name with a concise usage error. A wrapper path

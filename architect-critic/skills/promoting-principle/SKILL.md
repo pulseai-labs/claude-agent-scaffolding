@@ -36,7 +36,7 @@ PRINCIPLE_TEXT="${PRINCIPLE_TEXT#\"}"
 PRINCIPLE_TEXT="${PRINCIPLE_TEXT%\"}"
 ```
 
-If the user invoked the skill via natural language (no `$ARCHITECT_CRITIC_ARGS`), the principle text and scope come from the conversation. If the user has not yet stated the principle text, ask: *"What principle text would you like to promote, and which scope — `user` (global across projects) or `project` (this repo only)?"* Wait for a reply before proceeding.
+If the user invoked the skill via natural language (no `$ARCHITECT_CRITIC_ARGS` — this includes Devin and `Skill()` invocations, where the request text is the conversation), the principle text and scope come from the conversation. If the user has not yet stated the principle text, ask: *"What principle text would you like to promote, and which scope — `user` (global across projects) or `project` (this repo only)?"* Wait for a reply before proceeding.
 
 ---
 

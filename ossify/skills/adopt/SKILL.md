@@ -288,7 +288,10 @@ Close with `"$oss_bin" doctor` (the state gate: `state`, `schema`, `replay`,
 ## 8. Slash-command interaction
 
 The `/adopt` command exports the raw argument as `$ARGUMENTS` via the env-var
-bridge — parse it in bash; never reference `$1`/`$2`/`$N`. The only argument
+bridge — parse it in bash; never reference `$1`/`$2`/`$N`. On shim-less
+channels (Devin, `Skill()`, natural language) nothing exports `$ARGUMENTS` —
+the argument arrives as a literal token in the invocation/request text; read
+it from there. The only argument
 is an optional project name, passed to `"$oss_bin" init`; when absent, ask before
 initializing. The command is Claude-Code-only; the skill body reaches
 OpenCode by path as the native `adopt` skill (#131 tracks the command gap

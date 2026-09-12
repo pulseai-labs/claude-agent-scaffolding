@@ -30,7 +30,7 @@ These are validated by `"$wi_bin" skeleton_preflight_existing_dual "$ai_root" "$
 
 ## 3. Input collection
 
-Inputs (prompt the user OR read from `$ARGUMENTS` for the slash command — never positional `$1`/`$2` per the slash-command `$N` substitution bug):
+Inputs (prompt the user OR read from `$ARGUMENTS` for the slash command — never positional `$1`/`$2` per the slash-command `$N` substitution bug; on shim-less channels like Devin nothing exports `$ARGUMENTS`, so read the values as literal tokens in the invocation/request text):
 
 - **existing AI workspace absolute path** (already populated; first `/pair-existing-dual` arg).
 - **existing canonical absolute path** (already a git repo; second `/pair-existing-dual` arg).

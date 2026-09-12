@@ -399,19 +399,19 @@ you here.
 ## 11. Slash-command interaction
 
 `/work-item <handoff-path>` (`commands/work-item.md`) exports the raw argument
-string as `$ARGUMENTS` through an env-var bridge. **Parse `$ARGUMENTS` in bash;
-never reference `$1` / `$2` / `$N`** — Claude Code substitutes positional tokens in
-command bodies at template-render time and silently corrupts them.
+as `$ARGUMENTS` via an env-var bridge — on shim-less channels (Devin, `Skill()`,
+natural language) nothing exports it; the handoff path arrives as a literal
+token in the invocation/request text. **Parse `$ARGUMENTS` in bash; never
+reference `$1`/`$2`/`$N`** — Claude Code substitutes positionals at render time.
 
 The only argument is the absolute handoff path. When it is missing, emit one line
 and stop:
 
 > `/work-item` needs an absolute handoff path — e.g. `/work-item <abs path>/handoff.md`
 
-In Mode B there is no slash command; the orchestrator's invocation block names the
-path directly. Orchestrator mode's own entry point is `/run-spine <spine-id>`
-(`commands/run-spine.md`) — its missing-argument message is that command's to
-emit, not this body's.
+In Mode B there is no slash command; the orchestrator's invocation block names
+the path directly. `/run-spine <spine-id>`'s missing-argument message is that
+command's to emit, not this body's.
 
 ---
 
