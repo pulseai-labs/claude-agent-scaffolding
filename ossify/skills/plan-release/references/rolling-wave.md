@@ -36,7 +36,7 @@ and 3 both read the *plan*, so there is nothing to run them against yet.
 
 The candidates are **names from the feature map**, not new inventions. If the
 sketch names something the map does not carry, add it to the map first
-(`oss feature_add`) — otherwise it exists only inside one release record and
+(`"$oss_bin" feature_add`) — otherwise it exists only inside one release record and
 disappears when that record is closed.
 
 ---

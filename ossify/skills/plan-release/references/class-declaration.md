@@ -77,7 +77,9 @@ becomes unable to demonstrate any. `plan-spine/references/demo-authoring.md`
 
 > **Does the spine's plan touch a registered bone or risk-gate surface?**
 
-`oss touch_check <paths…>` — rc 0 means matched. A hit → **`bone`**, regardless of
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
+`"$oss_bin" touch_check <paths…>` — rc 0 means matched. A hit → **`bone`**, regardless of
 the declared class, regardless of the critic. rc 2 means the judge could not run
 (no paths, or an unreadable state) and is **not** a clean verdict — fix the state
 before declaring. Full usage in `references/bone-touch-judge.md`.
@@ -134,7 +136,7 @@ never pushes `bone → flesh`; only an explicit, recorded user override does tha
 ## 2. Stating the rationale
 
 Every declaration carries a one-line reason naming **the rule that decided it**.
-The reason is written into state (`oss class_set`'s 3rd argument, or the spine's
+The reason is written into state (`"$oss_bin" class_set`'s 3rd argument, or the spine's
 line in `RELEASE.md`) and read back at close.
 
 | Rule | Reason shape |
@@ -190,14 +192,14 @@ scheduled in the **current or next release** — the one-release-ahead cap.
   "the UI, eventually" → **not admitted**. **Silence is not a named consumer:**
   if the plan in front of you does not name one, the answer is not-admitted — do
   not assume a consumer exists because one plausibly could. If §5c already
-  minted it, retire the spine first: `oss spine_status "<sid>" abandoned` —
+  minted it, retire the spine first: `"$oss_bin" spine_status "<sid>" abandoned` —
   there is no delete verb, and a spine left `planned` either appears in
   `spine_dag` as work nobody will do or is omitted from it, which
   `spine-sequencing-dag.md` §3 reads as *missing from the plan*. It returns to the
   feature map:
 
   ```bash
-  oss feature_add "<name>" "<the value it would enable>" bone feature-map-return
+  "$oss_bin" feature_add "<name>" "<the value it would enable>" bone feature-map-return
   ```
 
 - If the consuming spine is later **dropped**, the internal spine returns to the
@@ -214,15 +216,13 @@ rule along with the demo-line floors. Do not merge them into one verdict.
 non-admitted enabler never gets a spine id at all — it goes back to the feature
 map (§4), and the verdict you report is `internal-enabler`, full stop.
 
-`oss spine_add` and `oss class_set` validate their class argument against
+`"$oss_bin" spine_add` and `"$oss_bin" class_set` validate their class argument against
 `bone|flesh` and **exit 2** on anything else. `internal-enabler` is a planning
 verdict, not a state value — do not try to write it as a class.
 
 An **admitted** internal-enabler is therefore recorded under its structural class
 — run rungs 2-4 on it to find out which — with its enabler status carried in the
 spine's name and its RELEASE.md line:
-
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
 
 ```bash
 sid="$("$oss_bin" spine_add "$rel" "[internal] event-store schema" bone)"
@@ -263,5 +263,5 @@ a plan — send it back to `start`'s cut question.
   ladder.** The guess was made before the plan existed; the ladder reads the plan.
 - **A new bone with no touch surface.** Then the next spine's rung 2 cannot see
   it, and the registry silently stops working.
-- **Passing `internal-enabler` to `oss spine_add` / `oss class_set`.** Exit 2
+- **Passing `internal-enabler` to `"$oss_bin" spine_add` / `"$oss_bin" class_set`.** Exit 2
   (§5).

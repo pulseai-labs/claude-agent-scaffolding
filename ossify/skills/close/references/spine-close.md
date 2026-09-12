@@ -54,8 +54,8 @@ open="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .statu
   || { echo "close: $spine_id has work items that are not complete: $open - halt"; exit 1; }
 ```
 
-**Test the output, never the rc.** `oss get` is `jq -r` without `-e`: a `select`
-matching nothing exits **0** with an empty string, so `oss get … || halt` never
+**Test the output, never the rc.** `"$oss_bin" get` is `jq -r` without `-e`: a `select`
+matching nothing exits **0** with an empty string, so `"$oss_bin" get … || halt` never
 fires and a spine with three unfinished items closes clean (`routing.md` §4).
 
 `complete` means "this item's work is on the spine branch" — §4 sets it *last*,
@@ -554,8 +554,8 @@ An unknown spine id is rc 7 with a message, not a silent no-op.
 
 ## 5. Step 4 — the cumulative demo
 
-`oss demo_run` for every active `auto:` line, then walk
-`oss demo_user_lines "$spine_id"` — **this spine's own `user:` lines only** — with
+`"$oss_bin" demo_run` for every active `auto:` line, then walk
+`"$oss_bin" demo_user_lines "$spine_id"` — **this spine's own `user:` lines only** — with
 the human. Full detail, the §6.1-vs-§6.2 scoping, quarantine handling and the
 ledger's wall-clock budget in **`references/cumulative-demo.md`**.
 
@@ -621,7 +621,7 @@ so a bone is never MISSED, only spuriously hit, and a spurious hit routes the
 spine to extra scrutiny rather than past it. When a hit looks wrong for the
 spine at hand, check which repo actually changed the path before acting on it.
 
-**One `oss touch_check` call over the union of every repo's paths, never one call
+**One `"$oss_bin" touch_check` call over the union of every repo's paths, never one call
 per repo.** A bone or a risk gate is a project-wide surface, not a per-repo one,
 and `touch_check`'s own rc contract (0 = HIT, 1 = clean, 2 = could-not-check) has
 no way to combine three separate verdicts into one close decision. Calling it
@@ -634,7 +634,7 @@ the same discipline §3's loop already established for the merge itself.
 `repo:sha` list, one pair per line — exactly what §3 built, one line appended
 per repo at that repo's own merge. A single `while IFS=: read -r repo sha` loop
 splits each line on its first colon (git ref names cannot contain `:`, so the
-split is unambiguous) and calls `oss repo_root` fresh for each — there is no
+split is unambiguous) and calls `"$oss_bin" repo_root` fresh for each — there is no
 `$merge_sha_by_repo[$repo]`-style lookup anywhere in this file, because bash 3.2
 has no associative arrays to hold one. The outer `while IFS= read -r p` loop is
 unchanged from the single-repo form: it still collects one path per line into
@@ -730,15 +730,15 @@ and nothing here blocks the close on an adversary that is not configured.
 - **flesh** — the light host-only pass: the same reference, shallow depth.
 
 The artifact is the spine's `SPINE.md` under
-`oss spine_dir "<release-id>" "<spine-id>" "<slug>"` — the same artifact
+`"$oss_bin" spine_dir "<release-id>" "<spine-id>" "<slug>"` — the same artifact
 `plan-spine` hands the audit (`plan-spine/references/spec-authoring.md` §6).
 That verb returns a **relative** path, so prefix it with
-`oss repo_root ai_workspace`; the audit wants one absolute path.
+`"$oss_bin" repo_root ai_workspace`; the audit wants one absolute path.
 
 The findings come back as **disposition rows**, and this is where spec §6.1's
 triage policy applies: spec-aligned recommendations auto-apply, and only
 load-bearing escalations reach the user. Record a class-moving disposition with
-`oss veto_add "$spine_id" "<finding>" auto-bone|override|escalate "<reason>"`.
+`"$oss_bin" veto_add "$spine_id" "<finding>" auto-bone|override|escalate "<reason>"`.
 
 ---
 
@@ -821,7 +821,7 @@ clean, and an unreadable registry.
 ## 11. Anti-patterns
 
 - **Reading the spine branch off HEAD** instead of deriving it with
-  `oss branch_name` and asserting the match (§3).
+  `"$oss_bin" branch_name` and asserting the match (§3).
 - **Merging without switching back** — the spine merges into itself at rc 0.
 - **Trusting the checkout's rc alone.** A tracked file name checks out clean and
   leaves HEAD where it was (§3).
@@ -838,7 +838,7 @@ clean, and an unreadable registry.
   risk gate is a project-wide surface; the touch check judges the union, not a
   repo at a time (§6).
 - **Folding `touch_check`'s rc 2 into clean**, or reading rc 0 as clean (§6).
-- **Calling `oss class_set` with two arguments.** The reason is required, and a
+- **Calling `"$oss_bin" class_set` with two arguments.** The reason is required, and a
   missing one is a crash, not a default (§6.1).
 - **Assuming a touch hit is a bone.** Read the printed prefix (§6.2).
 - **Carrying close depth onto the flesh path** — the light host-only pass is

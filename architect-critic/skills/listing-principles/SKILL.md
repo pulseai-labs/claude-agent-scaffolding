@@ -29,9 +29,9 @@ You read up to four sources in this exact order. Each is optional except shipped
 
 **Source 1 — Shipped defaults** (`shipped`)
 
-The plugin ships `templates/principles.md`. It always exists. Resolve it through the `arc` dispatcher, which self-locates the installed plugin root on every surface (on Claude Code `arc` is on `$PATH`; on Devin invoke `<plugin-source>/bin/arc` via `exec` with the full path — see `rules/dispatcher-path.md`):
-
 Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+
+The plugin ships `templates/principles.md`. It always exists. Resolve it through the `arc` dispatcher — `arc_bin` above — which self-locates the installed plugin root on every surface:
 
 ```bash
 SHIPPED_PATH="$("$arc_bin" principles_shipped_path)"

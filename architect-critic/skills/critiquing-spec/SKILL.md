@@ -62,13 +62,14 @@ Once you have a path: `Read` the artifact end-to-end. Hold its contents in your 
 
 Principles are the lens you audit through. Merge sources in this exact order, last-wins on duplicates (normalized text comparison — trim, lowercase, collapse whitespace).
 
-1. **Shipped defaults** — `templates/principles.md` (relative to the plugin root). Always loaded. Contains the **Ghost Notes principle** (what is absent from the spec is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy as the tone for every challenge raised).
-2. **User-global** — the user's promoted principles across all projects, at the path `arc principles_user_path` resolves (`~/.claude/architect-critic/principles.md`, under `$HOME` — unlike `arc state_path`, this one does not consult `CLAUDE_PLUGIN_DATA`).
-3. **Project-scoped** — `<repo>/.claude/architect-critic/principles.md` if it exists. Project-specific principles override user-global on conflict.
-4. **Memory-bank patterns** — included only when `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` points at a readable file; every `- ` bullet in it becomes a principle. `arc principles_merge` handles all four sources; it is authoritative for resolution order.
-
-Run the `arc` dispatcher to do the file merge (on Claude Code, `arc` is on `$PATH` automatically; on Devin, invoke via `exec` with the full path `<plugin-source>/bin/arc`; its bash shebang forces a bash runtime for the lib regardless of the calling shell — required because bare `source` of these libs crashes with `BASH_SOURCE[0]: parameter not set` under zsh):
 Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+
+1. **Shipped defaults** — `templates/principles.md` (relative to the plugin root). Always loaded. Contains the **Ghost Notes principle** (what is absent from the spec is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy as the tone for every challenge raised).
+2. **User-global** — the user's promoted principles across all projects, at the path `"$arc_bin" principles_user_path` resolves (`~/.claude/architect-critic/principles.md`, under `$HOME` — unlike `"$arc_bin" state_path`, this one does not consult `CLAUDE_PLUGIN_DATA`).
+3. **Project-scoped** — `<repo>/.claude/architect-critic/principles.md` if it exists. Project-specific principles override user-global on conflict.
+4. **Memory-bank patterns** — included only when `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` points at a readable file; every `- ` bullet in it becomes a principle. `"$arc_bin" principles_merge` handles all four sources; it is authoritative for resolution order.
+
+Run the `arc` dispatcher to do the file merge (on Claude Code, `arc` is on `$PATH` automatically; on Devin, `arc_bin` is resolved per `rules/dispatcher-path.md`; its bash shebang forces a bash runtime for the lib regardless of the calling shell — required because bare `source` of these libs crashes with `BASH_SOURCE[0]: parameter not set` under zsh):
 
 ```bash
 "$arc_bin" principles_merge
@@ -224,12 +225,12 @@ The external adversary is a separate model talking to a separate session — it 
 **If `async_mode=true` AND `close_depth=true` AND `HOST_AGENT=claude`, take this branch instead of the synchronous invocation below — then STOP (do not consolidate or run the rebuttal now).** The Codex audit runs in the background and is consumed later via `/critique-jobs resume`. This is the **defer-to-resume (unified)** model: turn 1 produces *no conclusions* (only a read-only preview + a dispatched job), so resume mutates nothing.
 
 1. **Show the host self-audit as a read-only PREVIEW.** You already produced the host-agent self-audit JSON in Step 5. Present it to the user as a preview only — do **not** enter the rebuttal cycle.
-2. **Persist the self-audit** so resume can consolidate it without re-running Step 5. Write the Step-5 challenge JSON to `$(arc data_dir)/async/<run_id>/claude-audit.json` (create the dir; `<run_id>` is the job id from step 6). Practically: dispatch first to get the job id, then write the file under that id; if the directory or write fails after dispatch, cancel the job before stopping.
-3. **Size hint (advisory).** Surface the recommendation: `arc codex_size_hint "<artifact-path>"` → `foreground` or `background`. (For a `foreground` recommendation on a small spec, you may suggest the user re-run without `--async`; still honor their `--async` choice.)
+2. **Persist the self-audit** so resume can consolidate it without re-running Step 5. Write the Step-5 challenge JSON to `$("$arc_bin" data_dir)/async/<run_id>/claude-audit.json` (create the dir; `<run_id>` is the job id from step 6). Practically: dispatch first to get the job id, then write the file under that id; if the directory or write fails after dispatch, cancel the job before stopping.
+3. **Size hint (advisory).** Surface the recommendation: `"$arc_bin" codex_size_hint "<artifact-path>"` → `foreground` or `background`. (For a `foreground` recommendation on a small spec, you may suggest the user re-run without `--async`; still honor their `--async` choice.)
 4. **Pre-flight — hard-fail, NO silent foreground fallback.** The user explicitly chose async; quietly degrading to foreground would violate intent. Resolve the target root and pre-flight; on failure, surface the remediation and STOP (tell the user the synchronous `/critique --close` is the foreground option):
    ```bash
-   target_root="$(arc codex_target_root "<artifact-path>")"
-   arc codex_preflight "$target_root"   # rc≠0 → hard-fail with remediation; do NOT fall back
+   target_root="$("$arc_bin" codex_target_root "<artifact-path>")"
+   "$arc_bin" codex_preflight "$target_root"   # rc≠0 → hard-fail with remediation; do NOT fall back
    ```
 5. **Build the adversarial prompt + embed the return contract**, then write it to a prompt-file OUTSIDE any repo output tree (e.g. under `${CLAUDE_PLUGIN_DATA}` or `mktemp`). The companion runs a bare prompt-file and never sees this skill, so the `{challenges,gaps}` return contract MUST be embedded verbatim:
    ```bash
@@ -245,20 +246,20 @@ The external adversary is a separate model talking to a separate session — it 
    ```
 6. **Dispatch + record, then STOP.**
    ```bash
-   data_dir="$(arc data_dir)"
-   job="$(arc codex_dispatch "$target_root" "$pf")"; rm -f "$pf"
+   data_dir="$("$arc_bin" data_dir)"
+   job="$("$arc_bin" codex_dispatch "$target_root" "$pf")"; rm -f "$pf"
    job_dir="${data_dir}/async/${job}"
    if ! mkdir -p "$job_dir"; then
-     arc codex_cancel "$target_root" "$job" >/dev/null 2>&1 || true
+     "$arc_bin" codex_cancel "$target_root" "$job" >/dev/null 2>&1 || true
      echo "Failed to create async job directory; cancelled job $job." >&2
      return 1
    fi
    # ... write the Step-5 self-audit JSON to "$job_dir/claude-audit.json" ...
    # If that write fails, cancel the dispatched job and stop before continuing.
-   if ! arc state_external_run_add --run-id "$job" --host claude --adversary codex \
+   if ! "$arc_bin" state_external_run_add --run-id "$job" --host claude --adversary codex \
      --artifact "<artifact-path>" --depth close --neutral-mode "$neutral_mode" --walk-mode "$walk_mode" \
      --result-path "$job_dir/result.json"; then
-     arc codex_cancel "$target_root" "$job" >/dev/null 2>&1 || true
+     "$arc_bin" codex_cancel "$target_root" "$job" >/dev/null 2>&1 || true
      echo "Failed to persist async job metadata; cancelled job $job." >&2
      return 1
    fi
@@ -478,7 +479,7 @@ Auto-promotion candidates from this audit:
   2. "..."
 ```
 
-Wait for the user's pick per candidate. Pass their decision to the real verbs: promote → `arc promotion_promote <fingerprint> <basis>` (`lib/promotion.sh` records the promotion in state; the chosen scope's `principles.md` write is `promoting-principle` Step 5's); dismiss → `arc promotion_apply_suppression <fingerprint> <reason_score>` (suppression window is 30/90 days, selected from `reason_score`). There is no single `ac_promotion_apply` — the promote and suppress paths are separate functions.
+Wait for the user's pick per candidate. Pass their decision to the real verbs: promote → `"$arc_bin" promotion_promote <fingerprint> <basis>` (`lib/promotion.sh` records the promotion in state; the chosen scope's `principles.md` write is `promoting-principle` Step 5's); dismiss → `"$arc_bin" promotion_apply_suppression <fingerprint> <reason_score>` (suppression window is 30/90 days, selected from `reason_score`). There is no single `ac_promotion_apply` — the promote and suppress paths are separate functions.
 
 **On the "candidates pile" from Step 8.** Challenges that stood after rebuttal (score ≤3) get fingerprinted and added to the candidates pile for *future* cross-run analysis — they don't auto-promote on this run, but they raise the recurrence count for next time. This is the FULL auto-promotion model per [[project_architect_critic_v01_settlements]] — three recurrences across runs trigger the promotion offer.
 

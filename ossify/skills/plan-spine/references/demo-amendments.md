@@ -20,7 +20,7 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 | **supersede** | This line is replaced by a line this spine adds | The flow still exists but is reached differently — a redesign, a moved entry point, a deepening pass that subsumes the old check |
 | **retire** | This line describes a flow the product no longer has | The capability was removed, or the journey it walked no longer exists |
 
-Both are keyed by the **line id** (`d3`, `d7`) — the value `oss ledger_add_auto` /
+Both are keyed by the **line id** (`d3`, `d7`) — the value `"$oss_bin" ledger_add_auto` /
 `ledger_add_user` printed when the line was created. Not the text. An unknown line
 id exits **7** and writes nothing.
 
@@ -59,7 +59,7 @@ for a line someone removed because it was inconvenient.
 
 Consequences worth knowing:
 
-- `oss ledger_active_auto` returns only `active` `auto:` lines. A **planned**
+- `"$oss_bin" ledger_active_auto` returns only `active` `auto:` lines. A **planned**
   amendment does not change that — the line keeps running until this spine's
   close applies it, so a sibling spine closing in between still exercises the
   flow. Coverage is never dropped for work that has not landed.
@@ -155,7 +155,7 @@ inconvenient stops being evidence about the product.
 - **Retiring a failing line instead of fixing the spine that broke it** (§5).
 - **Planning an amendment and never closing the spine.** A pending amendment is
   consumed by `close`. If the spine is replanned or abandoned, clear it with
-  `oss ledger_unplan <line-id> <spine>` — the spine argument is required (a
+  `"$oss_bin" ledger_unplan <line-id> <spine>` — the spine argument is required (a
   line can hold more than one spine's pending amendment, so clearing without
   saying which one is the same silent-coverage-loss footgun the list exists to
   prevent) and an unknown line, or a spine with nothing pending on that line, is

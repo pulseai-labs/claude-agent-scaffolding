@@ -4,8 +4,10 @@ Depth for SKILL.md §7b. The mechanical, non-skippable half of class declaration
 **a spine whose plan touches a registered touch surface is reclassified to `bone`
 automatically.**
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 It is called a *judge* rather than a *check* because it returns a verdict nobody
-argues with. `oss touch_check` matches globs; the meaning of a match is fixed by
+argues with. `"$oss_bin" touch_check` matches globs; the meaning of a match is fixed by
 the methodology, not negotiated per spine.
 
 ---
@@ -32,8 +34,6 @@ consequence. Overrides are for critic findings; a glob is not a finding.
 ---
 
 ## 2. Running it
-
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
 
 ```bash
 if "$oss_bin" touch_check src/domain/order.rs src/ui/export.rs docs/guide.md; then

@@ -1,6 +1,8 @@
 # State inspection
 
-The depth behind `doctor/SKILL.md` §4. **`oss doctor` is now its four-check
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
+The depth behind `doctor/SKILL.md` §4. **`"$oss_bin" doctor` is now its four-check
 gate** — the ones a close blocks a mutation on. The other **five** advisory
 areas are yours to read, and this file is how.
 
@@ -8,7 +10,7 @@ areas are yours to read, and this file is how.
 
 ## 1. What the verb does, and what you do
 
-`oss doctor` runs four checks: `state`, `schema`, `replay`, `shape`. A healthy run
+`"$oss_bin" doctor` runs four checks: `state`, `schema`, `replay`, `shape`. A healthy run
 prints **three** lines — `schema`, `replay`, `shape`. `state` has only a failure
 arm: if the file is not there you get `fail: state` and nothing else, because
 every later check would read it. So do not count lines to decide whether a check
@@ -45,7 +47,7 @@ Two properties are load-bearing:
   hypothetical: the worktree check shipped in v0.3 asking only about `canonical`,
   so a project with a configured `private_core` got a clean read-out about a repo
   nobody had opened (#156).
-- **`warn:` never changes the rc.** `oss doctor` exiting 0 means "nothing broken",
+- **`warn:` never changes the rc.** `"$oss_bin" doctor` exiting 0 means "nothing broken",
   not "nothing to report" — and it now says nothing at all about the five
   advisory areas. A close pre-flight that checks only the rc is still correct;
   it is deliberately not the whole picture.
@@ -70,8 +72,6 @@ line exists.
 **Yours to read.** Each is a count or a directory check; report one line each in
 the same grammar. Run them after the verb, so a broken state fails first:
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
-
 ```bash
 # ONE path for the whole read-out, and pass it to doctor too.
 sf="${OSS_STATE_FILE:-$("$oss_bin" state_path)}"
@@ -83,22 +83,22 @@ sf="${OSS_STATE_FILE:-$("$oss_bin" state_path)}"
 ```
 
 **Resolve `sf` once, with `$OSS_STATE_FILE` first, and pass it to everything —
-including `oss doctor`.** `oss state_path` alone is **wrong** here: it returns the
-*manifest-routed* path and ignores the environment, while `oss doctor` resolves
+including `"$oss_bin" doctor`.** `"$oss_bin" state_path` alone is **wrong** here: it returns the
+*manifest-routed* path and ignores the environment, while `"$oss_bin" doctor` resolves
 through `_oss_resolve_state`, which gives an exported `$OSS_STATE_FILE`
-precedence. Pin to `oss state_path` and your read-out mixes two projects — gate
+precedence. Pin to `"$oss_bin" state_path` and your read-out mixes two projects — gate
 lines about the override, advisories about the manifest's project. Measured: with
-`OSS_STATE_FILE` pointing at another workspace, `oss doctor` reports `projB`
-while `oss get … "$(oss state_path)"` reports `projA`.
+`OSS_STATE_FILE` pointing at another workspace, `"$oss_bin" doctor` reports `projB`
+while `"$oss_bin" get … "$("$oss_bin" state_path)"` reports `projA`.
 
-Passing `"$sf"` to `oss doctor` as well is what makes this robust rather than a
+Passing `"$sf"` to `"$oss_bin" doctor` as well is what makes this robust rather than a
 transcription of its precedence: one explicit path, used everywhere, so the two
 halves cannot diverge even if the resolver changes.
 
 **This is the opposite of what `spec-validation.md` §3 does, and both are right.**
-There, the bones-vs-spec comparison deliberately pins to `oss state_path`
+There, the bones-vs-spec comparison deliberately pins to `"$oss_bin" state_path`
 *regardless* of the override, because it is binding two different artifacts to one
-project. Here the job is to describe **the state `oss doctor` just gated**, so the
+project. Here the job is to describe **the state `"$oss_bin" doctor` just gated**, so the
 read must follow doctor's own resolution. Do not harmonise them; the difference is
 the point.
 
@@ -160,7 +160,7 @@ either. Say the field could not be read as a list. Reporting a count there is th
 same lie as omitting the line.
 
 **Where is `<state>.lock`?** Beside the state file — `"$sf.lock"`, using the same
-`$sf` as every other read here. **Not** `"$(oss state_path).lock"`: that is the
+`$sf` as every other read here. **Not** `"$("$oss_bin" state_path).lock"`: that is the
 manifest-routed path, so under an override you would report the lock of a project
 the rest of the read-out is not describing.
 It is a directory, and its mtime is how you tell stale from held — more than
@@ -177,11 +177,11 @@ The remedy differs by line, and the wrong one loops the operator:
 | `doctor` line | Remedy |
 |---|---|
 | no tagged line, nonzero rc, refusal on stderr | echo the refusal verbatim; remedy is `/init-workspace` (new workspace) or `/pair-workspace` (existing canonical) — the manifest is missing, and no check ran |
-| `fail: replay` | **`oss state_restore`** — rebuilds live state from base + journal |
-| `fail: shape` | **`oss state_restore`** — a required key is missing; same rebuild |
-| `fail: schema`, version **below** this build | **`oss migrate`** — the state predates this build |
+| `fail: replay` | **`"$oss_bin" state_restore`** — rebuilds live state from base + journal |
+| `fail: shape` | **`"$oss_bin" state_restore`** — a required key is missing; same rebuild |
+| `fail: schema`, version **below** this build | **`"$oss_bin" migrate`** — the state predates this build |
 | `fail: schema`, version **above** this build | **upgrade ossify.** `migrate` accepts v1/v2 only; there is no downgrade |
-| `fail: state` | **`oss init <name>`** — this project was never initialised |
+| `fail: state` | **`"$oss_bin" init <name>`** — this project was never initialised |
 | `warn: lock` (stale) | `rmdir '<state>.lock'`, **only** if no ceremony is running |
 
 The rc rule SKILL.md §3 states — rc 0 unless a `fail:` line printed — holds only
@@ -193,16 +193,16 @@ state file could be resolved`.
 finding.** Read the rest of doctor's line before recommending anything — the
 same four tags cover conditions these verbs cannot repair:
 
-- **A schema version *newer* than this build.** `oss migrate` accepts v1/v2; a
+- **A schema version *newer* than this build.** `"$oss_bin" migrate` accepts v1/v2; a
   future version is an ossify upgrade, not a migration. doctor already says
   *"requires a newer ossify"* in its own line, which is exactly why you echo it.
-- **A corrupt journal, or a missing base snapshot.** `oss state_restore`
+- **A corrupt journal, or a missing base snapshot.** `"$oss_bin" state_restore`
   refuses both by name. Recommending it anyway sends the operator around a loop
   whose every lap looks like progress.
 
-Why this is not pedantry: against a v1/v2 state, `oss state_restore` prints
+Why this is not pedantry: against a v1/v2 state, `"$oss_bin" state_restore` prints
 `restore: state is already clean - nothing to do` at **rc 0**, leaves
-`schema_version` untouched, and the next `oss doctor` fails identically. A
+`schema_version` untouched, and the next `"$oss_bin" doctor` fails identically. A
 remedy that exits 0 while changing nothing is the worst kind of wrong answer,
 because the operator has no signal that they are stuck.
 
@@ -232,7 +232,7 @@ set under more than one (`oss_cmd_worktree_orphans` and `oss_worktree_orphans`
 both default that way, #272/#310 Task 4 — never a silent guess). Relying on
 that default anyway is still how #156 happened: a habit formed on a
 single-repo project, carried unexamined into one with more, so a bare
-`oss worktree_orphans` answers a question about whichever repo happened to be
+`"$oss_bin" worktree_orphans` answers a question about whichever repo happened to be
 sole when the habit formed, not the one you meant today. Making the argument
 mandatory is a breaking change to a
 shipped verb and is tracked separately; until then the discipline is yours, not
@@ -247,7 +247,7 @@ item cannot claim a same-named directory sitting under the public root.
 **You run the selector once per repo key, and the keys are every repo the
 manifest declares, plus `ai_workspace` — resolved from the manifest at run
 time; no list here to go stale** —
-printing `ok:`/`warn:`/`skip: worktrees(<key>)` for each. `oss doctor` used to
+printing `ok:`/`warn:`/`skip: worktrees(<key>)` for each. `"$oss_bin" doctor` used to
 do this and no longer does; the verb it called is unchanged. **Every key costs a line**, including the ones this
 project does not configure. A key the manifest does not configure gets the `skip:`, as does one
 whose root does not exist on this machine **or cannot be traversed** — an
@@ -282,9 +282,9 @@ work accumulating under an unchecked root is the exact failure the public/privat
 boundary exists to prevent, so a *false clean* here is worse than no check at
 all. Fixed as #156; the per-key lines are what make the difference visible.
 
-**Why the second arm exists:** `oss worktree_add` names the directory for its
+**Why the second arm exists:** `"$oss_bin" worktree_add` names the directory for its
 work item but writes nothing to state — `worktree_path` appears only once
-`oss work_item_exec` journals it. Matching on the path alone would report every
+`"$oss_bin" work_item_exec` journals it. Matching on the path alone would report every
 freshly-spawned worktree as an orphan, i.e. it would be loudest exactly when the
 project is behaving correctly.
 
@@ -297,7 +297,7 @@ failing for a reason that has nothing to do with the spine being closed.
 **The rc trap.** This is a **pure selector**: the finding is its OUTPUT.
 `rc 0` means the check *ran*, not that the tree is clean. Branch on the rc and
 every project reports as orphan-free. This deliberately does **not** copy
-`oss touch_check`'s rc-0-is-a-hit polarity — that convention exists for a gate,
+`"$oss_bin" touch_check`'s rc-0-is-a-hit polarity — that convention exists for a gate,
 and nothing on this surface is a gate.
 
 **The remedy is a judgment call, which is why it is not automated.** An orphan
@@ -310,10 +310,10 @@ may be:
 - someone's hand-made scratch directory that happens to live there.
 
 Never remove one on the user's behalf. Report the paths, and note that
-`oss worktree_remove` refuses on a dirty worktree by design.
+`"$oss_bin" worktree_remove` refuses on a dirty worktree by design.
 
 **The inverse drift — a state record whose directory is gone — is not part of
-this check.** `oss worktree_resolve canonical <wi-id>` returns rc 1 for exactly
+this check.** `"$oss_bin" worktree_resolve canonical <wi-id>` returns rc 1 for exactly
 that case, per work item. Reach for it when a close has already failed on a
 missing worktree; it is a targeted probe, not part of the sweep.
 
@@ -340,7 +340,7 @@ Report these as findings with their evidence. Do not repair them.
 
 ## 6. The feature map
 
-`oss feature_list` reads it. Inspection only.
+`"$oss_bin" feature_list` reads it. Inspection only.
 
 **Settled, v0.3: the feature map does not get a persisted rank or a prune
 verb.** `plan-release/references/feature-map-grooming.md` §2 left this open —
@@ -359,7 +359,7 @@ earn its keep:
   *inspectable*, which was the only thing the deferral was waiting on. An
   inspectable append-only log does not become a ranked queue by being readable.
 
-So the map keeps its two verbs, `oss feature_add` and `oss feature_list`. If the
+So the map keeps its two verbs, `"$oss_bin" feature_add` and `"$oss_bin" feature_list`. If the
 question returns, it needs new evidence — a groom that demonstrably lost
 information the two verbs could have kept — not a second re-litigation of the
 same argument.

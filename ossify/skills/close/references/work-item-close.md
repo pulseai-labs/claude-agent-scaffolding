@@ -29,14 +29,14 @@ wt="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .worktree_path")"
   || { echo "close: no recorded worktree for $wi - halt"; exit 1; }
 ```
 
-**Test for `null`, not just emptiness.** `oss get` is `jq -r`: a field that is
+**Test for `null`, not just emptiness.** `"$oss_bin" get` is `jq -r`: a field that is
 absent or JSON-null prints the four characters `null`, which is non-empty and
 passes `[ -n … ]`. Every state read in this layer is guarded that way, and the
 merge target in step 4 is the one where it matters most — `git merge null`
 resolves nothing and the guard that was supposed to catch it already passed.
 
-A missing `worktree_path` means the lane skipped `oss work_item_exec`. That is a
-halt, not something to reconstruct: `oss worktree_resolve <target_repo> <wi>`
+A missing `worktree_path` means the lane skipped `"$oss_bin" work_item_exec`. That is a
+halt, not something to reconstruct: `"$oss_bin" worktree_resolve <target_repo> <wi>`
 will happily echo a conventional path whether or not it is the one this item was
 built in.
 
@@ -69,7 +69,7 @@ byte-identical, because a drift between them has no runtime signal:
 ```
 
 The release and spine ids come out of
-`oss id_parse`'s numeric components (`routing.md` §2); the **spine slug** does
+`"$oss_bin" id_parse`'s numeric components (`routing.md` §2); the **spine slug** does
 not — nothing persists one (spines store `name`, work items store `title`), so it
 is recovered by globbing the spine directory, exactly as the execution lane
 recovers it for the spine branch.
@@ -93,7 +93,7 @@ report="$wi_dir/report.md"
 
 Three things that look like shortcuts and are not:
 
-- **`oss spine_dir` returns a RELATIVE path** — `docs/specs/<rel>/<spine>-<slug>`
+- **`"$oss_bin" spine_dir` returns a RELATIVE path** — `docs/specs/<rel>/<spine>-<slug>`
   — and it takes the slug as an argument, so it cannot *find* the directory. Once
   the glob has recovered the slug it re-composes the same relative path, which
   makes it a useful cross-check against `$spine_dir_abs`; it is never the way in.
@@ -109,7 +109,7 @@ Three things that look like shortcuts and are not:
 [ -f "$spec" ] || { echo "close: no spec.md for $wi at $spec - halt"; exit 1; }
 ```
 
-**A missing or wrong spec path is a halt, named.** `oss verify_acs` returns rc 2
+**A missing or wrong spec path is a halt, named.** `"$oss_bin" verify_acs` returns rc 2
 on a spec it cannot find, and a silently wrong path therefore fails the gate for
 the wrong reason — the run reports a verification problem when what it has is a
 path problem, and the recovery menu sends someone to fix code that is fine.
@@ -338,7 +338,7 @@ git -C "$repo_root" merge-base --is-ancestor "$wi_sha" HEAD \
 invoked with an id only and derives its scope from the id's shape — it has no
 work-item slug, and none is persisted. The execution lane writes the branch it
 actually created into `work_items[].branch` precisely so this step can read it
-back. `oss work_item_branch "$wi" "$slug"` needs a `$slug` that does not exist
+back. `"$oss_bin" work_item_branch "$wi" "$slug"` needs a `$slug` that does not exist
 here; it is the id grammar's name generator, not a lookup.
 
 **Verify the merge target before merging.** `git merge` lands on whatever
@@ -365,7 +365,7 @@ re-running the layer: the commit already landed on the work-item branch, so a
 re-run halts at step 3 with an empty index and reports the wrong problem.
 
 **This merge is not optional bookkeeping.** Without it the commits live only on a
-branch that spine close cannot delete — `oss worktree_remove` refuses an unmerged
+branch that spine close cannot delete — `"$oss_bin" worktree_remove` refuses an unmerged
 branch (rc 8) — so the round halts at cleanup, *after* the cumulative demo has
 already reported green against a tree in `$target_repo` that never received the
 work.
@@ -394,6 +394,6 @@ costs and different blast radii.
 It happens at **spine close, as the last step**, and the reason is the branch —
 not the report.
 
-`oss worktree_remove` refuses an unmerged branch at **rc 8**, so cleanup can
+`"$oss_bin" worktree_remove` refuses an unmerged branch at **rc 8**, so cleanup can
 only succeed after step 4's merge — the full ordering argument, and the false
 one it is often confused with, are in `harvest.md` §1.

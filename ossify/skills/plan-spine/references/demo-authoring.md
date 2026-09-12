@@ -81,7 +81,7 @@ typed field is ever added, it supersedes the prefix.)
 
 ## 2. The read-out
 
-Judge the whole contribution once, out loud, before any `oss ledger_add_*` call:
+Judge the whole contribution once, out loud, before any `ledger_add_*` call:
 
 ```text
 Demo contribution — <spine-id> "<name>"   [user-facing | internal]
@@ -197,7 +197,7 @@ nobody can actually walk.
 
 ### 3.5 The mechanical backstop and its exact scope
 
-`oss ledger_add_user <spine> <text> <outcome>` lowercases `<text>`, trims leading
+`"$oss_bin" ledger_add_user <spine> <text> <outcome>` lowercases `<text>`, trims leading
 whitespace, and rejects it **only if it begins with** `inspect `, `view `, or
 `open ` — exit **2**, nothing written.
 
@@ -339,7 +339,7 @@ setup is required, the command performs it.
 **A line that can't state its command doesn't enter the ledger.** "We'll figure
 out how to test this later" is a rejected line, not a recorded one.
 
-Watch the cost: `oss ledger_active_auto` lists what the ledger already carries,
+Watch the cost: `"$oss_bin" ledger_active_auto` lists what the ledger already carries,
 and the release's `ledger_budget` (set at `plan-release`) is the wall-clock
 ceiling. A contribution that will not fit forces a prune / parallelize / deepen
 decision — raise it now, with the user, rather than letting the suite grow past

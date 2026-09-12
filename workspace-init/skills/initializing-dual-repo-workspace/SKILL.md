@@ -107,9 +107,9 @@ the repository state matches the manifest default on every machine.
 
 ## 4. Validate via lib/
 
-Run preflight via the `wi` dispatcher:
-
 Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
+
+Run preflight via the `wi` dispatcher:
 
 ```
 "$wi_bin" skeleton_preflight "$parent" "$name"
@@ -130,9 +130,9 @@ preflight error to stderr and exit non-zero.
 ## 5. The 8 pre-onboard tasks
 
 Execute the tasks in the order below. After each task, append an entry to
-`<ai-workspace>/.workspace/init-log` via `wi log_op …` so rollback can undo
+`<ai-workspace>/.workspace/init-log` via `"$wi_bin" log_op …` so rollback can undo
 the work in reverse order. **On ANY task failure**, immediately invoke
-`wi rollback "${ai_root}/.workspace/init-log"` and exit non-zero. Per
+`"$wi_bin" rollback "${ai_root}/.workspace/init-log"` and exit non-zero. Per
 **SPEC §8** and **SPEC §8.9**, rollback walks the log in reverse and
 inverts each op (`mkdir` → `rmdir`, file create → `rm`, `git init` →
 remove `.git/`, hook install → remove hook file).
@@ -225,14 +225,14 @@ Expected init-log entry: `file <ai_root>/README.md`.
 
 Three sequential sub-steps; any failure triggers full rollback:
 
-1. `wi git_init_pair "$ai_root" "$canonical_root"` — `git init` both repos
+1. `"$wi_bin" git_init_pair "$ai_root" "$canonical_root"` — `git init` both repos
    with the unborn branch explicitly set to `main`, independent of the user's
    `init.defaultBranch` configuration.
-2. `wi trace_filter_install_pair "$ai_root" "$canonical_root"` — render
+2. `"$wi_bin" trace_filter_install_pair "$ai_root" "$canonical_root"` — render
    `hooks/commit-msg.tmpl` with the baked AI workspace path and install to
    `<ai_root>/.git/hooks/commit-msg` AND `<canonical_root>/.git/hooks/commit-msg`,
    `chmod +x` on both.
-3. `wi git_stage_ai_workspace "$ai_root"` — `git -C "$ai_root" add .` (stages
+3. `"$wi_bin" git_stage_ai_workspace "$ai_root"` — `git -C "$ai_root" add .` (stages
    the skeleton; does NOT commit).
 
 Expected init-log entries: `git-init <ai_root>`, `git-init <canonical_root>`,

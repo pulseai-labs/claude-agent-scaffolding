@@ -77,9 +77,9 @@ The skill verifies all fresh-mode preconditions PLUS pair-with-specific checks:
 
 ## Canonical metadata detection
 
-Before creating the AI workspace, the skill detects the canonical's git configuration:
-
 _Dispatcher invocations below are `"$wi_bin" …` — the calling skill resolves `wi_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
+Before creating the AI workspace, the skill detects the canonical's git configuration:
 
 ```bash
 detected_branch="$("$wi_bin" git_detect_default_branch "/Users/example/projects/foo")"
@@ -155,7 +155,7 @@ Three sub-steps:
 1. **Init AI workspace only** (canonical already has .git):
 
    ```bash
-   wi git_init_ai_only "/Users/example/projects/foo-ai"
+   "$wi_bin" git_init_ai_only "/Users/example/projects/foo-ai"
    ```
 
    Init-log entry: `GIT-INIT /Users/example/projects/foo-ai`. NO canonical git-init.
@@ -163,7 +163,7 @@ Three sub-steps:
 2. **Install commit-msg hook in BOTH repos:**
 
    ```bash
-   wi trace_filter_install_pair "/Users/example/projects/foo-ai" "/Users/example/projects/foo"
+   "$wi_bin" trace_filter_install_pair "/Users/example/projects/foo-ai" "/Users/example/projects/foo"
    ```
 
    Renders the hook template (substituting AI workspace path `/Users/example/projects/foo-ai`)
@@ -180,7 +180,7 @@ Three sub-steps:
 3. **Stage AI workspace only:**
 
    ```bash
-   wi git_stage_ai_workspace "/Users/example/projects/foo-ai"
+   "$wi_bin" git_stage_ai_workspace "/Users/example/projects/foo-ai"
    ```
 
    Runs `git -C /Users/example/projects/foo-ai add .` to stage all files.

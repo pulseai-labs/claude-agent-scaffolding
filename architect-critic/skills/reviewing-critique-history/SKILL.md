@@ -221,7 +221,7 @@ Coupled to these `recent_runs[]` and `external_runs[]` fields in schema v3. If `
 
 **Removed in v2 — do not reference:** `in_flight` (top-level, async dropped), `cost_usd` (per-run, dropped).
 
-If `schema_version == 1`, emit: "state.json is schema v1 (pre-v0.2). Run `arc migration_check_v01_state` to see what the v0.1→v0.2 migration will do — `/critique` will not upgrade a v1 file." Then render with missing v2 fields blank.
+If `schema_version == 1`, emit: "state.json is schema v1 (pre-v0.2). Run `"$arc_bin" migration_check_v01_state` to see what the v0.1→v0.2 migration will do — `/critique` will not upgrade a v1 file." Then render with missing v2 fields blank.
 
 ---
 

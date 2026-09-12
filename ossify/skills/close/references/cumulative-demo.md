@@ -30,7 +30,7 @@ the spec's, not an optimization:
 | `user:` lines | **this spine's own contribution only** | **every** accumulated line, grouped by feature |
 | Who drives the `user:` half | the human, here, now | the human, at the release gate |
 
-One verb serves both: `oss demo_user_lines` **with** a spine argument filters to
+One verb serves both: `"$oss_bin" demo_user_lines` **with** a spine argument filters to
 `source_spine == <spine>`; **without** one it returns every active `user:` line.
 Passing no argument at spine close silently turns a spine gate into a release
 walkthrough — the run gets longer and longer, and the release gate stops being
@@ -48,7 +48,7 @@ re-points every later state read (SKILL.md §3).
 
 ## 2. Halt on the first failure, and the halt is terminal
 
-`oss demo_run` stops at the first failing line and returns non-zero. It prints
+`"$oss_bin" demo_run` stops at the first failing line and returns non-zero. It prints
 the failing line's id and text, why it failed, and the **last five lines of that
 command's output**:
 
@@ -81,7 +81,7 @@ close halted meanwhile.
 
 ## 3. The `user:` walk
 
-`oss demo_user_lines "$spine_id"` returns a JSON array; each element carries the
+`"$oss_bin" demo_user_lines "$spine_id"` returns a JSON array; each element carries the
 line's `id`, its `text` (the journey, phrased as something a user does for value)
 and its `outcome` (what they should observe).
 
@@ -244,7 +244,7 @@ is to *notice and say so*: surface an overshoot with the close's result and poin
 at `plan-release`. Do not prune the ledger to fit; dropping a line is a coverage
 decision with an owner, and that owner is not the close ceremony.
 
-**Measure it — `oss demo_run` emits no timing of its own.** There is no verb for
+**Measure it — `"$oss_bin" demo_run` emits no timing of its own.** There is no verb for
 this and none is needed; the shell already has one, so "visibly overshoots" does
 not have to mean "felt slow":
 
@@ -266,7 +266,7 @@ esac
 ```
 
 **Capture the runner's status and re-raise it last.** Timing is advisory; the
-demo result is the **gate**. Written as a bare `oss demo_run` with the budget
+demo result is the **gate**. Written as a bare `"$oss_bin" demo_run` with the budget
 report after it, the block's exit status becomes the status of that trailing
 `echo` — so in any shell without `errexit` a **failing** cumulative demo returns
 **0** and the close walks straight past the one gate it must not. `|| demo_rc=$?`
@@ -301,7 +301,7 @@ records nothing at all.
 
 ## 7. Anti-patterns
 
-- **Calling `oss demo_user_lines` with no spine argument at spine close.** That
+- **Calling `"$oss_bin" demo_user_lines` with no spine argument at spine close.** That
   is the release scope (§1).
 - **Running only this spine's `auto:` lines.** The cumulative half is the point;
   a spine that passes its own lines and breaks an older one has broken the

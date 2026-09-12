@@ -39,10 +39,12 @@ must still cross the product end to end; a split that leaves one half unable to
 reach an outcome has produced an `internal-enabler`, which is a different
 conversation (`plan-release/references/class-declaration.md` §4).
 
-Concretely, on the spine already in state: `oss spine_status <spine> abandoned`,
-then `oss spine_add` each half at `plan-release` with its own class and DAG
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
+Concretely, on the spine already in state: `"$oss_bin" spine_status <spine> abandoned`,
+then `"$oss_bin" spine_add` each half at `plan-release` with its own class and DAG
 position; carry any ledger line already planned against the old spine with
-`oss ledger_unplan <line-id> <old-spine>` first (`demo-amendments.md` §6). The old spine stays in
+`"$oss_bin" ledger_unplan <line-id> <old-spine>` first (`demo-amendments.md` §6). The old spine stays in
 state, abandoned, so the release close can report it
 (`close/references/release-close.md` §2 names abandoned spines explicitly).
 
@@ -53,7 +55,7 @@ What **not** to do, in order of how tempting each is:
   neither cleanly.
 - **Do not defer the sixth item to "a follow-up spine" without planning it.** An
   unplanned follow-up is a deferral with no record; if it is real work, it
-  belongs on the feature map (`oss feature_add`).
+  belongs on the feature map (`"$oss_bin" feature_add`).
 - **Do not quietly ship six.** The bound exists so this conversation happens.
 
 The signal is reliable in practice: a six-item decomposition almost always has a
@@ -71,8 +73,6 @@ deliver another. That seam is the spine boundary you are looking for.
 | **Dependencies** | Sibling item ids it cannot start without. Feeds the round DAG |
 | **`target_repo`** | Exactly one repo. Defaults to the sole declared repo; see `cross-repo.md` |
 | **Rationale** | Why this item, at this size. One line |
-
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
 
 ```bash
 w1="$("$oss_bin" work_item_add "$spine" "order-ticket form + validation")"
@@ -150,7 +150,7 @@ the bone close path (full audit with the external adversary, full retro, an ADR)
 and the §7 grill-me gate now applies.
 
 A **risk-gate** hit does the same *and* attaches that gate's controls
-(`oss get '.risk_gates'`) to the spine's close path as required work — paper/
+(`"$oss_bin" get '.risk_gates'`) to the spine's close path as required work — paper/
 sandbox env, human confirm, kill switch, audit trail, progressive exposure, as the
 gate lists them. A one-line flesh change inside the live-order path is still a
 Risk event.

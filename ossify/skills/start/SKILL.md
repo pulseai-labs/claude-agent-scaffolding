@@ -64,9 +64,9 @@ spec?"*
 
 All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`):
 `oss <subcommand>` → `oss_cmd_<subcommand>` under a forced bash shebang —
-never `source` the libs (zsh leaves `BASH_SOURCE` unset); `oss help` for
-discovery. Resolve `oss` once into `oss_bin` per `rules/dispatcher-path.md`;
-every `oss` below and in references is `"$oss_bin"`.
+never `source` the libs (zsh leaves `BASH_SOURCE` unset). Resolve `oss` once
+into `oss_bin` per `rules/dispatcher-path.md`; every `oss` below and in
+references is `"$oss_bin"` — `"$oss_bin" help` for discovery.
 
 **Topology probe (resolves, authors, or refuses fail-closed).** ossify's state lives in
 the AI workspace: walk up for `.ossify/topology.json`, then `.workspace/pairing.json`:
@@ -89,18 +89,18 @@ alternatives and the Codex surface. To author: `.ossify/topology.json` at the
 AI-workspace root, schema v1 `{schema_version, repos:{<name>:{root}},
 well_known_paths:{}}`, names `[a-z][a-z0-9_-]*`, roots absolute, from the repo
 set the journey-map station asks about next (`canonical` only if that is
-genuinely the name). Then re-probe `oss state_path` and `oss repo_root <name>`
+genuinely the name). Then re-probe `"$oss_bin" state_path` and `"$oss_bin" repo_root <name>`
 for every declared repo, halting only if one still refuses.
 
 **Canonical-content gate (refuses fail-fast).** `/start` is pre-code ceremony:
-establish whether any declared repo (`oss repo_root <name>` per name) already
+establish whether any declared repo (`"$oss_bin" repo_root <name>` per name) already
 carries the product's own source or its own history — either alone refuses,
 and a bare pairing scaffold is neither. If so, author nothing and refuse,
 naming what you found and routing to **`/ossify:adopt`** — the adopt-forward
 path for a project that already has code (native `adopt` on Codex/OpenCode;
 on Devin run `adopt` on Claude Code or Codex — `.ossify` state is shared).
 Those tokens are load-bearing too. Past both gates:
-`oss init "<project-name>"`, which refuses if ossify state already exists — the
+`"$oss_bin" init "<project-name>"`, which refuses if ossify state already exists — the
 "already onboarded" signal; route per §2 rather than forcing past it.
 
 **Wayfinder pre-flight.** If a map exists for this repo, its resolved decisions
@@ -121,7 +121,7 @@ demotion is deliberate: in the predecessor stack the vision fed a multi-year
 roadmap that was obsolete within a sprint and then quietly ignored.
 
 Its only structured descendants are feature-map entries harvested from the
-conversation (`oss feature_add ... spec`).
+conversation (`"$oss_bin" feature_add ... spec`).
 
 While you are here, you are also choosing **which questions to ask at all**.
 Upfront: vision, domain model + data ownership, security/trust boundaries +
@@ -335,7 +335,7 @@ bone's revisit trigger. On a `data-overlay` channel, record the seam:
 "$oss_bin" overlay_set '<seam>'      # e.g. '$PULSE_PROMPT_DIR'
 ```
 
-Then, per posture-block §5-§10: register the posture as a bone (`oss bone_add`;
+Then, per posture-block §5-§10: register the posture as a bone (`"$oss_bin" bone_add`;
 touch surface = private-side modules + the seam files + composition root,
 revisit trigger from the revenue intent); author `PUBLIC_BOUNDARY.md` at **each
 public repo root** — **no moat item is ever named there**, and even a
@@ -344,7 +344,7 @@ fully-private project authors it; route the **private boundary inventory** (item
 deferred to Plan D: never call `add-private-core`, never edit the pairing
 manifest (ossify writes `project-state.json`; workspace-init owns the manifest).
 Set `project.composition_root` — **required and absolute** when more than one repo is declared, optional when exactly one is (posture-block §10)
-and the root is unambiguous (then `oss composition_set "<root>"`).
+and the root is unambiguous (then `"$oss_bin" composition_set "<root>"`).
 
 ---
 
@@ -406,7 +406,7 @@ Full minima in `references/lean-spec-schema.md`.
 | EXECUTIVE-SUMMARY | per manifest routing |
 | Memory bank (14 files) + `CLAUDE.md` | AI workspace |
 | Bones-registry ADRs | the project's ADR directory |
-| Seed feature map | `project-state.json` (already written via `oss feature_add`) |
+| Seed feature map | `project-state.json` (already written via `"$oss_bin" feature_add`) |
 | `PUBLIC_BOUNDARY.md` | **each public repo root** |
 | Private boundary inventory | AI workspace |
 
@@ -441,7 +441,7 @@ as `$ARGUMENTS` via an env-var bridge. **Parse `$ARGUMENTS` in bash; never
 reference `$1` / `$2` / `$N`** — Claude Code substitutes positional tokens in
 command bodies at template-render time and silently corrupts them.
 
-The only argument is an optional project name, passed to `oss init`. When it is
+The only argument is an optional project name, passed to `"$oss_bin" init`. When it is
 absent, ask for it before initializing — the name is the project's identity in
 state and is awkward to change later.
 
@@ -482,7 +482,7 @@ state and is awkward to change later.
   `not-applicable`, whether an uncertainty deserves a spike, which posture the
   intent signal supports, how to triage a critic challenge.
 - **`oss`** (the dispatcher over `lib/*.sh`) handles mechanical state only —
-  the verbs `oss help` lists: state CRUD, registry adds, and probes. It holds
+  the verbs `"$oss_bin" help` lists: state CRUD, registry adds, and probes. It holds
   no judgment and never should.
 - **`challenge` (audit mode)** is ossify's own critic. As a ceremony caller
   it hands back every consolidated finding unwalked — no internal rebuttal —

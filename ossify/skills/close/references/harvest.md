@@ -18,10 +18,12 @@ derived from the lean spec and is off limits here.
 Step 8 authors the retrospective. **Step 9 is this.** Step 10 is worktree +
 branch cleanup. The harvest runs **before cleanup, always**.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 **The reason is that cleanup is terminal, not that the inputs live in the
 worktree.** They do not: `report.md` and `handoff.md` sit beside `spec.md` in the
 work item's docs directory under the AI workspace (`work-item/SKILL.md` §7), which
-worktree removal never touches. `oss worktree_remove` runs `git branch -d`, refuses
+worktree removal never touches. `"$oss_bin" worktree_remove` runs `git branch -d`, refuses
 an unmerged branch at rc 8 and a **dirty** worktree at rc 8 rather than forcing
 (an rc 8 there is a real signal, never something to force past), and once it
 succeeds the branch is gone — so every step
@@ -41,14 +43,12 @@ harvest". Resolve the paths deliberately.
 
 **The work items come from state:**
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
-
 ```bash
 items="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\") | .id] | join(\" \")")"
 [ -n "$items" ] || { echo "close: no work items recorded for $spine_id - halt"; exit 1; }
 ```
 
-**Test the output, never the rc.** `oss get` is `jq -r` without `-e`: a `select`
+**Test the output, never the rc.** `"$oss_bin" get` is `jq -r` without `-e`: a `select`
 matching nothing exits **0** with an empty string (`routing.md` §4).
 
 **The directory comes from a glob, and it is hoisted once per spine.** Nothing in
@@ -76,9 +76,9 @@ item's paths:
 <spine_dir_abs>/work-<wi-id>/handoff.md
 ```
 
-`oss spine_dir "<release-id>" "<spine-id>" "<slug>"` re-composes the same path
+`"$oss_bin" spine_dir "<release-id>" "<spine-id>" "<slug>"` re-composes the same path
 **relatively** once the glob has recovered the slug, which makes it a useful
-cross-check against `$spine_dir_abs`. Prefix it with `oss repo_root ai_workspace`;
+cross-check against `$spine_dir_abs`. Prefix it with `"$oss_bin" repo_root ai_workspace`;
 it is never the way in.
 
 A work item whose `report.md` is missing is **named, not skipped silently** — a
@@ -259,7 +259,7 @@ names the destination instead of leaving it to be inferred.
 - **Cleaning up before the harvest.** Step 10 is terminal (§1).
 - **Justifying that order with "the report is in the worktree".** It is not (§1).
 - **Enumerating from the directory tree instead of from state**, or trusting
-  `oss get`'s rc instead of its output (§2).
+  `"$oss_bin" get`'s rc instead of its output (§2).
 - **Re-globbing the spine directory per work item**, or `head -1`-ing an
   ambiguous glob instead of halting (§2).
 - **Hunting for session handoffs.** They are not harvest inputs (§3).

@@ -20,13 +20,13 @@ this directory is `docs/specs/release-N/`; under the ID grammar that renders as
 `docs/specs/rN/`. Do not invent a prettier name — a parity test enforces the
 derivation, and a hand-named directory breaks every downstream lookup.
 
-Route the path through `oss release_dir`, which resolves the **topology
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
+Route the path through `"$oss_bin" release_dir`, which resolves the **topology
 declaration** like every other ossify artifact — `.ossify/topology.json` first,
 a `.workspace/pairing.json` as the translated fallback, so a topology-only
 workspace needs no pairing manifest to emit a release spec. Release specs are
 process artifacts and live in the AI workspace, not in any declared repo.
-
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
 
 ```bash
 rel="$("$oss_bin" get '.releases[-1].id')"          # e.g. r0
@@ -34,7 +34,7 @@ rel_dir="$("$oss_bin" release_dir "$rel")"          # ABSOLUTE, ai_workspace-roo
 mkdir -p "$rel_dir"
 ```
 
-`oss release_dir` resolves the manifest root for you, so the `<ai-workspace>`
+`"$oss_bin" release_dir` resolves the manifest root for you, so the `<ai-workspace>`
 in the diagram above is a **shape**, never something to paste into a command.
 Running `mkdir -p "<ai-workspace>/..."` literally creates a directory named
 `<ai-workspace>` under wherever the agent happens to be standing, and every
@@ -122,7 +122,7 @@ Render the **dispositions** block from `veto_dispositions` in state, plus the
 class-override reasons from `class_overrides`. **Both arrays are global across
 all releases** — filter by this release's spine-id prefix or prior releases'
 records leak into this document:
-`oss get '.veto_dispositions | map(select(.spine | startswith("<release-id>.")))'`
+`"$oss_bin" get '.veto_dispositions | map(select(.spine | startswith("<release-id>.")))'`
 (same shape for `.class_overrides`). It is the part a reader six months later
 actually needs: not just what class each spine has, but which judge decided it.
 

@@ -65,9 +65,9 @@ is **`fully-private`**, and the public repo is a migration task, not a posture.
 | `open-core` | The core is open; specific **intelligence** stays private. | `license` (e.g. AGPL + commercial dual-license) |
 | `fully-open` | All code open; no functionality moat. Doc routing may still tighten. | `none` |
 
-Record it:
-
 _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
+Record it:
 
 ```bash
 "$oss_bin" posture_set "<fully-private|source-available|open-core|fully-open>"
@@ -335,7 +335,7 @@ The rule used to read the other way round — set it only when Release 0 is
 "trivially single-repo" — which is exactly backwards: one declared repo is the
 case the demo runner already defaults correctly, and N>1 is the case where it
 cannot. The cumulative demo is a mandatory gate at spine and release close and
-it is invoked as a bare `oss demo_run`, so a multi-repo project onboarded under
+it is invoked as a bare `"$oss_bin" demo_run`, so a multi-repo project onboarded under
 the old rule could not close at all.
 
 ```bash
@@ -356,7 +356,7 @@ not the safe choice, it is the one that blocks the close.
 ## 11. Release-0 minimum
 
 The posture block may be as small as: *"default-private, revisit at MVP"* — one
-`oss posture_set fully-private`, an empty moat inventory, a `PUBLIC_BOUNDARY.md`
+`"$oss_bin" posture_set fully-private`, an empty moat inventory, a `PUBLIC_BOUNDARY.md`
 with the standard secrets rules, and one bone with a revisit trigger. That is a
 complete Release-0 posture block.
 

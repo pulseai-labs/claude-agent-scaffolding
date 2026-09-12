@@ -90,10 +90,12 @@ list is a two-way sort and they fall out of it producing **nothing** — not a
 veto, not a digest line, not a mention. A real problem with the release, found
 and then dropped, because the only machinery on this page is about class.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 **So route them: surface substantive non-class findings to the user as ordinary
 critique, and fold the accepted ones into the plan before the final render**
 (`release-md-emission.md`). They do not enter the veto ladder, they are not
-`oss veto_add` rows — that verb records *class* dispositions and a non-class
+`"$oss_bin" veto_add` rows — that verb records *class* dispositions and a non-class
 finding in it corrupts the record the class audit reads. They are planning
 feedback, and this is the last moment the plan is cheap to change.
 
@@ -109,12 +111,12 @@ can affirmatively identify as class-irrelevant fall out here. Uncertainty moves
 **If no finding on a spine passes Gate A** — the review was clean, or its only
 remarks were cosmetic — the disposition is **`none`**:
 
-- write **no** disposition record (`oss veto_add` is not called);
+- write **no** disposition record (`"$oss_bin" veto_add` is not called);
 - change **no** class; the spine keeps the class §7a/§7b gave it;
 - say so in the digest: *"critic raised no veto-grade finding on `r0.s7`; class
   stands as declared (`flesh`)."*
 
-`none` is a fixture/answer vocabulary word, never an argument: `oss veto_add`
+`none` is a fixture/answer vocabulary word, never an argument: `"$oss_bin" veto_add`
 validates its disposition against `auto-bone|override|escalate` and exits 2 on
 anything else. **Do not manufacture a veto to look thorough.** A skill that
 escalates every clean review is exactly as broken as one that passes every veto —
@@ -132,8 +134,6 @@ The finding is **specific** (it names the mechanism: which contract, which
 module, which surface), **current** (the scope it cites is in this spine's plan),
 and **decidable** (you can state in one sentence why the spine's declared class
 understates the change).
-
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
 
 ```bash
 "$oss_bin" class_set "<spine>" bone "critic veto: <finding, condensed>"
@@ -194,9 +194,9 @@ default §4.5 just promised. Every escalation therefore ends in one of three cal
 
 | The user's ruling | Class call | Disposition record |
 |---|---|---|
-| "yes, it is a bone" | `oss class_set "<spine>" bone "escalation resolved: <the ruling>"` | the original `escalate` record stands |
-| "no, it stays flesh" | `oss class_set "<spine>" flesh "<the user's reason>"` | `oss veto_add "<spine>" "<finding>" override "<the user's reason>"` — §5's shape, because the user is reversing a fail-closed default |
-| declines to rule, or the session ends unresolved | `oss class_set "<spine>" bone "escalation unresolved - fail-closed default"` | the original `escalate` record stands |
+| "yes, it is a bone" | `"$oss_bin" class_set "<spine>" bone "escalation resolved: <the ruling>"` | the original `escalate` record stands |
+| "no, it stays flesh" | `"$oss_bin" class_set "<spine>" flesh "<the user's reason>"` | `"$oss_bin" veto_add "<spine>" "<finding>" override "<the user's reason>"` — §5's shape, because the user is reversing a fail-closed default |
+| declines to rule, or the session ends unresolved | `"$oss_bin" class_set "<spine>" bone "escalation unresolved - fail-closed default"` | the original `escalate` record stands |
 
 Issue the class call even when it does not change the value: `class_set` appends
 to `class_overrides`, and that append is the audit trail showing a human was asked
@@ -281,9 +281,9 @@ Both are true at once, and the asymmetry is deliberate.
   escalate. This is the whole rule.
 - **Manufacturing a veto or an escalation from a clean review.** `none` writes
   nothing.
-- **Passing `none` to `oss veto_add`.** Exit 2. It is an answer, not a value.
+- **Passing `none` to `"$oss_bin" veto_add`.** Exit 2. It is an answer, not a value.
 - **Calling `veto_add` for a spine that does not exist yet.** Exit 7 — create the
-  spine first (`oss spine_add`), then record against its minted id.
+  spine first (`"$oss_bin" spine_add`), then record against its minted id.
 - **Overriding on your own initiative, or without recording the reason.**
 - **Letting a clean critic clear a bone-touch hit** (or vice versa) — independent
   judges.

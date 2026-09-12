@@ -59,17 +59,17 @@ implementer dispatch, verification, and merge belong to the execution engine
 
 ## 3. Pre-flight
 
+Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+
 All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`, on `$PATH`
 because Claude Code adds each plugin's `bin/` automatically; the dispatcher's bash
 shebang forces a bash runtime under it regardless of the calling shell — required
 because Claude Code's Bash tool runs zsh by default on macOS). Call form:
 `oss <subcommand> [args...]` resolves to `oss_cmd_<subcommand>`. Never `source` the
 lib files directly from a skill body — under zsh `BASH_SOURCE` is unset and the
-libs break. Use `oss help` for discovery.
+libs break. Use `"$oss_bin" help` for discovery.
 
 **Three probes, all fail-fast.**
-
-Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
 
 ```bash
 if ! sp="$("$oss_bin" state_path 2>/dev/null)"; then
@@ -90,7 +90,7 @@ printf 'bones=%s releases=%s\n' "${bones:-<no state>}" "${rels:-<no state>}"
 The literal tokens `/init-workspace` and `/pair-workspace` are load-bearing — do
 not paraphrase the refusal.
 
-1. **Manifest** — `oss state_path` echoes the path whether or not the file exists,
+1. **Manifest** — `"$oss_bin" state_path` echoes the path whether or not the file exists,
    so it proves the *manifest*, not the project.
 2. **Project** — `bones` empty (no state file) or `0` means the project was never
    onboarded. Refuse: *"No ossify project state here — run `/start` first."*
@@ -112,24 +112,24 @@ if [ -z "$class" ]; then
 fi
 ```
 
-**Test the output, not the rc.** `oss get` is `jq -r` without `-e`: a `select`
-that matches nothing exits **0** with an empty string, so `oss get … || …` never
+**Test the output, not the rc.** `"$oss_bin" get` is `jq -r` without `-e`: a `select`
+that matches nothing exits **0** with an empty string, so `"$oss_bin" get … || …` never
 fires on an unknown id and would silently plan against a typo. Only an unreadable
-state file makes `oss get` itself fail — which is what probes 2 and 3 above catch.
+state file makes `"$oss_bin" get` itself fail — which is what probes 2 and 3 above catch.
 
 `class` is `bone`/`flesh` as `plan-release` recorded it — §7 reads it and nothing
 here re-derives it. `rel` is the spine's release (§8 reads its ledger budget).
 `name` carries the `[internal]` marker `.class` cannot express — §8b F3 reads it.
 
 The probes resolve differently, and only the first is manifest-proof:
-`oss state_path` reads the manifest and nothing else, so an exported
-`$OSS_STATE_FILE` cannot satisfy it. `oss get` routes through `_oss_resolve_state`
+`"$oss_bin" state_path` reads the manifest and nothing else, so an exported
+`$OSS_STATE_FILE` cannot satisfy it. `"$oss_bin" get` routes through `_oss_resolve_state`
 (precedence `explicit-arg > $OSS_STATE_FILE > manifest`) and *can* be satisfied
 by one — a stale
 export from an unrelated session makes probes 2 and 3 read *that* project, which
 is why the pre-flight refuses a set `OSS_STATE_FILE` outright — passing the bound
-`$sp` to the `oss get` calls above is defense in depth, not the whole guard, because
-every later verb resolves state on its own. **`oss doctor` is the state GATE, not a full read-out** — four checks
+`$sp` to the `"$oss_bin" get` calls above is defense in depth, not the whole guard, because
+every later verb resolves state on its own. **`"$oss_bin" doctor` is the state GATE, not a full read-out** — four checks
 (`state`, `schema`, `replay`, `shape`). It says nothing about pending
 amendments, quarantined lines, outstanding fakes, patch records, a held lock or
 orphan worktrees; those are the `ossify:doctor` skill's, and invoking this skill does
@@ -193,7 +193,7 @@ then tell the user what changed:
 ```
 
 A **risk-gate** hit additionally attaches that gate's control checklist
-(`oss get '.risk_gates'`) to the spine's close path as required work — harm is
+(`"$oss_bin" get '.risk_gates'`) to the spine's close path as required work — harm is
 orthogonal to reversibility.
 
 Full worked example in `references/decomposition.md`. Where the cut creates or
@@ -277,7 +277,7 @@ Demo criteria are authored **here**, at planning time, with implementation conte
 in hand. The ledger is **cumulative**: every `auto:` line is re-run at every future
 spine close, every `user:` line walked by a human at every release close. You spend
 runtime against the release's ledger budget — set at `plan-release`, read here with
-`oss get ".releases[] | select(.id == \"$rel\") | .ledger_budget"` — and attention
+`"$oss_bin" get ".releases[] | select(.id == \"$rel\") | .ledger_budget"` — and attention
 against the release-close walkthrough. Author accordingly.
 
 ### 8a. The floor rules (binding)
@@ -286,7 +286,7 @@ against the release-close walkthrough. Author accordingly.
   that changes nothing a demo can observe is not a spine.
 - **A user-facing spine MUST contribute ≥1 `user:` journey line** = a **verb +
   observable outcome** (an action the user performs for value). Inspector phrasing
-  ("inspect", "view", "open the record/file/schema") is banned — `oss ledger_add_user`
+  ("inspect", "view", "open the record/file/schema") is banned — `"$oss_bin" ledger_add_user`
   rejects the obvious case mechanically (rc 2); phrase for value.
 - **An internal spine** (rare; declared at release planning) **may contribute
   `auto:` lines only**, and is admitted **ONLY** if it names the committed
@@ -303,7 +303,7 @@ against the release-close walkthrough. Author accordingly.
   is a standing regression test and not a walkthrough someone performs once
   (`start` derives the skeleton cut against this bar and hands the obligation
   here). The r0 spine owning the journey's entry point authors it; any other r0
-  spine either finds it already in the ledger (`oss ledger_active_auto`) or names
+  spine either finds it already in the ledger (`"$oss_bin" ledger_active_auto`) or names
   the spine that will. Release 0 does not close without it.
 
 ### 8b. Emit the floor read-out before you write anything
@@ -327,7 +327,7 @@ spine; **F3** only for a user-facing spine; **F4** only for a spine claiming no
 measured quality; **F6** only for a spine outside Release 0. `n/a` is never a way
 to skip a floor that applies.
 
-**A REJECT means no `oss ledger_add_*` call happens.** The contribution goes back:
+**A REJECT means no `ledger_add_*` call happens.** The contribution goes back:
 re-phrase (F2), name a consumer or return the spine to the feature map (F3), add
 the measurement (F4), state the command (F5), or author the golden-journey line
 (F6). Do not record a line and plan to fix it later — the ledger is cumulative,
@@ -358,7 +358,7 @@ comparison form** — a threshold ("p50 under 40ms") lives inside the command, w
 exits non-zero when it is missed; that is how F4's after-number becomes
 machine-checkable.
 
-**The mechanical floor is a backstop, not the judge.** `oss ledger_add_user`
+**The mechanical floor is a backstop, not the judge.** `"$oss_bin" ledger_add_user`
 rejects **prefix-only** — `inspect `, `view `, or `open ` at the *start* of the
 text, rc 2 — so *"review the generated schema"* or *"confirm the audit table
 exists"* passes the lib and is still an inspector line. **A rc 0 is not a verdict;
@@ -372,7 +372,7 @@ floors (§1), the backstop's exact scope and its accepted-but-still-inspector li
 A spine's plan may declare that it **supersedes** or **retires** accumulated lines
 whose flow this spine changes — with a reason. They are **recorded now and
 applied at this spine's close**, so a sibling spine closing first still runs the
-line. `oss ledger_unplan <line-id> <spine>` clears this spine's one if replanned:
+line. `"$oss_bin" ledger_unplan <line-id> <spine>` clears this spine's one if replanned:
 
 ```bash
 "$oss_bin" ledger_supersede d3 "$spine" "the order ticket replaced the CLI entry point"
@@ -428,7 +428,7 @@ bash; never reference `$1` / `$2` / `$N`** — Claude Code substitutes positiona
 tokens in command bodies at template-render time and silently corrupts them.
 
 The only argument is the spine id (`r1.s2`). When it is absent, list the planned
-spines (`oss spine_list`) and ask which one — never pick for the user, and never
+spines (`"$oss_bin" spine_list`) and ask which one — never pick for the user, and never
 infer a spine from a name when the id missed (§3).
 
 ---
@@ -457,7 +457,7 @@ infer a spine from a name when the id missed (§3).
   bad line is re-run at every future close.
 - **Deleting a demo line.** Supersede or retire it with a reason; archived, never
   deleted (§8e).
-- **Reading `oss touch_check`'s exit code backwards**, or folding its rc 2 into
+- **Reading `"$oss_bin" touch_check`'s exit code backwards**, or folding its rc 2 into
   "clean". rc 0 = matched, 1 = clean, 2 = could not check (§4c).
 - **Re-deriving the spine's class.** `plan-release` declared it; you read it.
 - **Authoring the release's exit criteria, selecting spines, or running the
@@ -475,7 +475,7 @@ infer a spine from a name when the id missed (§3).
   range, whether a deepening pass's evidence is evidence, whether Release 0's
   golden-journey line really drives the journey, and whether a fake is admissible.
 - **`oss`** (the dispatcher over `lib/*.sh`) handles mechanical state only —
-  every verb this skill and its references call is in `oss help`; none of them
+  every verb this skill and its references call is in `"$oss_bin" help`; none of them
   holds judgment. `ledger_add_user`'s
   prefix check is a typo guard, not the journey-line floor.
 - **`challenge`** is ossify's own grill and critic: the §7 gate reads its

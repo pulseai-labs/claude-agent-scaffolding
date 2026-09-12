@@ -20,6 +20,8 @@ room, open the check that enforces the budget you mean.**
 | **SKILL.md body** | line count, per file, cap 500 | `check 6` — a red test | **none** |
 | **Agent listing** | `agents/*.md` descriptions | **nothing** | **none** |
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"
 # Devin: bin/ is not on PATH — resolve the installed source instead. For a
@@ -61,10 +63,10 @@ fail silently:
 
 `oss` is on `$PATH` on Claude Code (which adds each plugin's `bin/`
 automatically), and `command -v` finds it in the subprocess where the env var
-does not survive. On Devin, `bin/` is NOT on `$PATH` — resolve the plugin root
-from `devin plugins info ossify` and invoke `oss` via `exec` with the full path.
-Resolving from there also measures the **installed** plugin, which is the thing
-the budget is actually about.
+does not survive. On Devin, `bin/` is NOT on `$PATH` — resolve `oss` into
+`oss_bin` per `rules/dispatcher-path.md` (the plugin-cache manifest glob covers
+remote installs, where `source:` is a URL, not a path). Resolving against the
+installed plugin also measures the thing the budget is actually about.
 
 ### What does *not* move either budget
 

@@ -16,10 +16,10 @@ handoff, this file is context, not instruction — your contract is SKILL.md §3
 
 ## 1. Where the rounds come from
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 The work-item rounds live in the **spine plan document** that `plan-spine`
 authored, under:
-
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
 
 ```bash
 # /run-spine hands you ONLY the spine id. The release id and the slug are not
@@ -39,12 +39,12 @@ an ambiguity guard and the slug falls out of the directory name. Inventing it
 from the spine's `name`, or asking the user, produces a path that does not match
 what `plan-spine` actually wrote.
 
-**`oss spine_dir` returns a RELATIVE path** (`docs/specs/<release-id>/<spine-id>-<slug>`)
+**`"$oss_bin" spine_dir` returns a RELATIVE path** (`docs/specs/<release-id>/<spine-id>-<slug>`)
 — it must be prefixed with the ai_workspace root, exactly as every sibling
 consumer in `close` does. Used bare it resolves against whatever directory the
 agent happens to be standing in, which during a round is usually a worktree
 under a declared repo — so the read silently misses, or worse, finds a
-different project's file. (`oss release_dir <release-id>` returns the release
+different project's file. (`"$oss_bin" release_dir <release-id>` returns the release
 level of the same tree already absolute, if that is all you need.)
 
 Read them from there. Two ways to get this wrong, both silent:
@@ -129,7 +129,7 @@ another repo's handoff either halts the close or merges into a same-named branch
 that happens to exist there. Read this file when authoring each handoff; never
 carry a surviving `$base_branch`.
 
-**`oss repo_root "$repo"`, never a bare `<repo-root>` placeholder.** The verb
+**`"$oss_bin" repo_root "$repo"`, never a bare `<repo-root>` placeholder.** The verb
 resolves the declared repo's root from the topology declaration
 (`.ossify/topology.json`, or a translated `.workspace/pairing.json` fallback)
 and fails rc 2 — naming the declared set — rather than defaulting to the
@@ -145,7 +145,7 @@ whole spine, and every consequence is rc 0:
 |---|---|---|
 | Work-item merge (`close`) | lands on the spine branch | lands on the *previous* branch, rc 0 |
 | Spine-close merge (`close`) | a real merge | "Already up to date", rc 0 |
-| `oss worktree_remove` | deletes a merged branch | deletes it too — it *is* merged, into the wrong target |
+| `"$oss_bin" worktree_remove` | deletes a merged branch | deletes it too — it *is* merged, into the wrong target |
 | Cumulative demo | measures the spine's work | measures a tree assembled by accident, green |
 
 Nothing in that column reports a failure. **Each hosting repo stays parked on
@@ -157,7 +157,7 @@ invocation that stopped — a gap returned, a round deferred, a session
 interrupted, or the loop halting on one hosting repo before it reaches the next
 — leaves the branch cut in every repo the loop already reached, per-item
 worktrees on disk, and item status journaled. Reusing the branch alone buys
-exactly one step per repo: `oss worktree_add` returns **rc 8** for every item
+exactly one step per repo: `"$oss_bin" worktree_add` returns **rc 8** for every item
 already spawned (`oss_worktree_add`'s already-exists guard in
 `lib/worktree.sh`), and nothing routes completed or active items to close or to
 redispatch from their recorded state. Resuming means reconciling all of that at
@@ -235,12 +235,12 @@ journaled its path through `work_item_exec`, and marked the item `active` — so
 the "prevention" is a report of damage already done, and undoing it means
 removing a worktree and reversing two state mutations.
 
-- `oss worktree_add` derives and cuts `work/<wi-id>-<slug>` internally and echoes
+- `"$oss_bin" worktree_add` derives and cuts `work/<wi-id>-<slug>` internally and echoes
   the worktree's absolute path. Its **stdout is its return value** — capture it,
   do not let anything else write to that stream.
 - **Read the branch back off the worktree; do not re-derive it.** The name git
   actually checked out is the only version that cannot be wrong.
-- **`oss work_item_exec` is load-bearing beyond bookkeeping.** It persists
+- **`"$oss_bin" work_item_exec` is load-bearing beyond bookkeeping.** It persists
   `branch`, `worktree_path` and `base_sha` into state, and the work-item close
   layer reads `branch` back from there to pick its merge target. Close is invoked
   with an id and derives its scope from the id's shape — it has no slug and
@@ -258,7 +258,7 @@ removing a worktree and reversing two state mutations.
   ai_workspace …` **returns rc 0 and creates a worktree inside the AI
   workspace** (reproduced) — the reserved key resolves exactly as a declared
   repo would, and the prose halt above is the only thing standing between a
-  work item and that outcome. A genuinely undeclared name fails `oss repo_root`
+  work item and that outcome. A genuinely undeclared name fails `"$oss_bin" repo_root`
   at rc 2 and is caught by the same assertion, for the different reason of
   never having been declared at all.
 
@@ -465,7 +465,7 @@ contract. The honest statement is that the judgment half is uncovered.
 
 - **`git branch` without the checkout** (§2). The whole failure chain is rc 0.
 - **Reading rounds from `releases[].spine_dag`**, or re-deriving them (§1).
-- **Skipping `oss work_item_exec`** because the worktree path is already in
+- **Skipping `"$oss_bin" work_item_exec`** because the worktree path is already in
   scope. Close cannot recover the branch without it (§3).
 - **Passing `isolation: "worktree"` to Task** (§5).
 - **Appending clarifications anywhere but the handoff** (§6).

@@ -325,13 +325,13 @@ do
   fi
 
   # Positive: the skill must give Devin a working invocation path —
-  # it mentions Devin, the dispatcher path, and exec-based invocation.
+  # it mentions Devin, the wi_bin convention, and the shared resolution recipe.
   if grep -qi 'devin' "$skill_md" 2>/dev/null \
-    && grep -q 'bin/wi' "$skill_md" 2>/dev/null \
-    && grep -qi 'exec' "$skill_md" 2>/dev/null; then
-    pass "$skill_name carries Devin full-path invocation guidance"
+    && grep -q 'wi_bin' "$skill_md" 2>/dev/null \
+    && grep -q 'rules/dispatcher-path.md' "$skill_md" 2>/dev/null; then
+    pass "$skill_name carries Devin wi_bin invocation guidance"
   else
-    fail "$skill_name lacks Devin invocation guidance (devin+bin/wi+exec)"
+    fail "$skill_name lacks Devin invocation guidance (devin+wi_bin+dispatcher-path)"
   fi
 done
 

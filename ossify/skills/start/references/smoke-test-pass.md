@@ -73,9 +73,11 @@ Then, in the bone's ADR:
 - `<claim>` — unverified (<why>). Revisit trigger: <the event that forces it>.
 ```
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 An `unverified` claim **must** get a revisit trigger, and it is a strong
 candidate for the bone's own `revisit_trigger` field. It is also good
-feature-map material (`oss feature_add "verify <claim>" ... spec`) when the
+feature-map material (`"$oss_bin" feature_add "verify <claim>" ... spec`) when the
 verification will itself be work.
 
 ---
@@ -84,7 +86,7 @@ verification will itself be work.
 
 - **Verified / unverified lines → the bone's ADR.** That is the durable record;
   it is what a later reader checks when the bone is questioned.
-- **The registry entry** (`oss bone_add`) carries the index, not the evidence.
+- **The registry entry** (`"$oss_bin" bone_add`) carries the index, not the evidence.
 - **Nothing goes into the project tree** from the smoke test itself.
 
 ---

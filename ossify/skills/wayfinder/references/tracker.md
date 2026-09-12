@@ -71,10 +71,10 @@ them from the workspace remote below; branches 2 and 3 derive them from
 no branch that leaves them unbound: **wayfinder requires a reachable issue
 tracker**, and every path that cannot produce one stops.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 Resolve the workspace root with the shipped resolver, then read its remote
 **from git, never from the manifest**:
-
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
 
 ```bash
 # `oss repo_root` walks up from $PWD and refuses by name when unpaired: a
@@ -206,7 +206,7 @@ future reader who "fixes" this back to a manifest read is reintroducing the
 dependency this design deliberately avoided.
 
 **Why the resolver and not a hand-rolled `jq` read of the manifest.**
-`oss repo_root ai_workspace` is the walk-up branch 1 describes — a raw
+`"$oss_bin" repo_root ai_workspace` is the walk-up branch 1 describes — a raw
 `jq -r '.ai_workspace.root' .workspace/pairing.json` only ever finds a
 manifest sitting in `$PWD`, so branch 1 misses on a correctly paired repo
 invoked from any subdirectory. The resolver also substitutes the manifest's

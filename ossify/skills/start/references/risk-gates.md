@@ -98,7 +98,7 @@ repaired NOT by editing state but by a corrective append:
 A risk gate behaves like a bone with an attached checklist:
 
 - A spine whose plan touches a gate's surface **auto-reclassifies to `bone`**
-  (same mechanical check as bones, `oss touch_check`), *and* inherits that
+  (same mechanical check as bones, `"$oss_bin" touch_check`), *and* inherits that
   gate's control checklist as required work in the spine's plan.
 - The gate's exposure is a **docs trigger** at release close: the first release
   where a gate's surface becomes reachable requires threat/failure notes plus an

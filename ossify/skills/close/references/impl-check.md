@@ -66,13 +66,13 @@ reported **green having read nothing**. A gate that passes when it is blind is
 worse than no gate. Capture the rows first, fail closed on an unreadable spec,
 and treat "zero auto ACs" as a defect to surface rather than a vacuous pass.
 
-**`|| rc=$?`, never `if ! oss verify_step …; then rc=$?`.** After a negated test
+**`|| rc=$?`, never `if ! "$oss_bin" verify_step …; then rc=$?`.** After a negated test
 `$?` is the *negation's* status — zero — so `rc` records a pass, the halt check
 below never fires, and the loop runs every remaining AC before falling into layer
 2. The `||` form captures the command's own rc, and as an OR-list it is
 errexit-exempt.
 
-**`oss verify_acs … | while …` is the other trap.** The last element of a pipeline runs
+**`"$oss_bin" verify_acs … | while …` is the other trap.** The last element of a pipeline runs
 in a **subshell**: `rc` is set in a child and lost, `break` leaves only the
 subshell, and the ceremony sails past the halt into layer 2 with a failing AC
 behind it — at rc 0. Feeding the loop from the captured `$rows` by heredoc (as
@@ -107,7 +107,7 @@ directions bite:
 
 `user:` rows are not parsed here at all — and no ossify gate parses them
 anywhere. The human-walked half of acceptance lives in the demo ledger
-(`oss ledger_add_user`, keyed by spine), walked at the cumulative demo; a
+(`"$oss_bin" ledger_add_user`, keyed by spine), walked at the cumulative demo; a
 spec's `user:` line is documentation for the implementer only.
 
 ---

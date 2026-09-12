@@ -34,9 +34,9 @@ and has its own contract):
   at it. On Devin the same lane invokes the **`ossify:work-item-worker`** skill
   (a `subagent: true` registration under `.devin/skills/`); the
   `implementer-agent` file is the Claude Code registration and its `tools` list
-  is Claude-namespaced. The dispatcher is **not** `plan-spine` — that skill plans
-  and says so in its own body; it authors your spec and the spine's demo lines
-  and stops there.
+  is Claude-namespaced. The dispatcher is **not** `plan-spine` — it authors your
+  spec and the spine's demo lines and stops there. Resolve `oss` into `oss_bin`
+  per `rules/dispatcher-path.md`; every `oss` call below is `"$oss_bin"`.
 
 **On Claude Code, `ossify:implementer-agent` is the only worker ossify itself
 dispatches** — on Devin it is `ossify:work-item-worker` — and
@@ -80,7 +80,7 @@ dispatch, and the handoff path arrives in the invocation block.
 
 **Read `references/round-orchestration.md` in full and follow it.** It owns the
 whole lane: the spine-branch cut-and-checkout, one worktree per work item,
-`oss work_item_exec`, dispatching `ossify:implementer-agent` per item, the
+`"$oss_bin" work_item_exec`, dispatching `ossify:implementer-agent` per item, the
 3-iteration cap, and the round barrier. **Do not ask for a handoff path** — the
 lane authors one per work item as it goes. `plan-spine` ends where this begins;
 `/close <spine-id>` takes over when the final round clears its barrier.
@@ -134,7 +134,7 @@ carries each field above — is in `references/handoff-contract.md`. Read it whe
 you need to name a missing field precisely. It is the **author's** contract, not a
 licence to supply the field yourself.
 
-Then read the spec end to end and extract the ordered `auto:` AC list — every `oss` below and in references is `"$oss_bin"` (resolve it once per `rules/dispatcher-path.md`):
+Then read the spec end to end and extract the ordered `auto:` AC list:
 
 ```bash
 "$oss_bin" verify_acs "<abs spec path>"      # TSV: label <tab> command <tab> expectation
@@ -148,7 +148,7 @@ cumulative demo; they are `close`'s to run, and you skip them here.
 
 1. **Handoff complete** — the fields above resolve, Constraints carry both
    required items.
-2. **Spec readable and its ACs parse** — an empty `oss verify_acs` result on a
+2. **Spec readable and its ACs parse** — an empty `"$oss_bin" verify_acs` result on a
    spec that visibly has ACs means the AC grammar is malformed; that is a gap, not
    a licence to hand-parse.
 3. **Worktree exists, is clean, and is on the declared branch:**
@@ -159,7 +159,7 @@ cumulative demo; they are `close`'s to run, and you skip them here.
    ```
 
    Any line of `--porcelain` output — modified, staged, or untracked — is dirty,
-   and dirty is a gap. **Never auto-clean** (§10). `oss work_item_branch "<work-item-id>" "<slug>"`
+   and dirty is a gap. **Never auto-clean** (§10). `"$oss_bin" work_item_branch "<work-item-id>" "<slug>"`
    prints the branch the id grammar implies, if you want to cross-check what the
    handoff declared.
 4. **No blocking ambiguity in the spec.** The bar is exactly: *"can a competent
@@ -184,7 +184,7 @@ Runs on the success path out of §3, before any implementation. Its job: prove t
 work item is genuinely unstarted, so completing it is a real RED→GREEN flip rather
 than a no-op or an implementation with tests written afterwards.
 
-Every row `oss verify_acs` returned carries a command — a spec line without one
+Every row `"$oss_bin" verify_acs` returned carries a command — a spec line without one
 was already a Gate 2 gap. So run the probe on all of them, in declared order. An
 AC whose command is a non-invocable probe (a `test -f`, a `! grep`) is not a
 special case; the rc table below covers it. Per AC:
@@ -269,7 +269,7 @@ list are in `references/tdd-loop.md`.
 ## 6. Verification
 
 After the loop, run **every** verification command embedded in the handoff, in the
-worktree. `oss verify_step` applies the same expectation predicate the ACs were
+worktree. `"$oss_bin" verify_step` applies the same expectation predicate the ACs were
 parsed with, and fails closed on a malformed expectation:
 
 ```bash
@@ -367,7 +367,7 @@ gaps-mode is *not* for are in `references/returns.md`.
 **These bind you as the implementer — §3 through §9.** In orchestrator mode (§2)
 you are not executing a work item; `references/round-orchestration.md` is your
 contract and owns its own boundaries, including the `Task` dispatch and the
-`oss work_item_exec`/`work_item_status` state writes the two items below forbid
+`"$oss_bin" work_item_exec`/`work_item_status` state writes the two items below forbid
 you here.
 - **`git commit`, `git push`, `git pull`, `git fetch` — anywhere in your tool-call
   log**, including inside a Bash comment, a heredoc body, or a piped subcommand.

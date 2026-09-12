@@ -77,7 +77,7 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 ## 4. Deriving the order
 
 1. **List the spines** the release selected
-   (`oss get '.spines | map(select(.release == "'"$rel"'")) | map(.id)'` —
+   (`"$oss_bin" get '.spines | map(select(.release == "'"$rel"'")) | map(.id)'` —
    `spine_list` itself returns every spine in the project).
 2. **For each pair, ask §1's test.** Record only the edges that pass.
 3. **Find the roots** — spines with `[]`. The release starts with all of them; if
@@ -101,7 +101,7 @@ the wrong place.
 Fix it by re-cutting, not by deleting an edge to make the graph acyclic:
 
 - **Merge** them into one spine if the journey is genuinely one journey — and
-  `oss spine_status "<orphaned-sid>" abandoned` the half that no longer exists;
+  `"$oss_bin" spine_status "<orphaned-sid>" abandoned` the half that no longer exists;
   or
 - **Re-cut** so the shared seam lands entirely inside the first spine; or
 - **Extract** the shared seam — and if the extraction has no actor-to-outcome

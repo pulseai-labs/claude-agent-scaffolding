@@ -76,6 +76,8 @@ seam. The disposable spike plus a lean Release 0 covers both tracks without it.
 
 ## 4. Running one
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 1. Write the contract (§2). Show it to the user; get an explicit go.
 2. Create a scratch branch or throwaway worktree, clearly named
    (`spike/<hypothesis-slug>`).
@@ -86,12 +88,12 @@ seam. The disposable spike plus a lean Release 0 covers both tracks without it.
    the decision, the evidence links.
 6. **Delete the code.** Fold the decision into the bone's ADR (and, if it
    changed the plan, into the lean MASTER-SPEC).
-7. If the spike surfaced work, `oss feature_add "<name>" "<value>" "<class>" spec`.
+7. If the spike surfaced work, `"$oss_bin" feature_add "<name>" "<value>" "<class>" spec`.
 
 ### Where the contract and the note are written
 
 Steps 1 and 5 say *write* without saying **where**, and it matters: there is no
-`oss spike_*` verb and the §9.2 state schema has no spike entity, so nothing
+`spike_*` dispatcher verb and the §9.2 state schema has no spike entity, so nothing
 persists a spike automatically. Left in conversation, a contract whose entire
 point is enforceability evaporates at the end of the session — and a spike that
 is declined or interrupted leaves no trace at all.

@@ -5,9 +5,11 @@ ledger's promise enforceable exactly here: *deferred truth never becomes
 permanent silently*. A fake reduces **breadth, not truth**, and the only thing
 keeping that sentence honest is a gate that fires at a release boundary.
 
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
 `plan-spine` authors these entries (`plan-spine/references/fake-ledger-discipline.md`).
 This file is the first **close-time** reader of them — until this layer existed,
-`oss fake_status` had prose callers at planning time and none at a close, which
+`"$oss_bin" fake_status` had prose callers at planning time and none at a close, which
 meant the expiry column was written by everyone and read by nobody.
 
 ---
@@ -20,10 +22,10 @@ conditions, joined by an **or**, and they are not the same kind of thing:
 
 | Arm | Kind | Who decides |
 |---|---|---|
-| **Expiry reached** | a **checked fact** | `oss expired_fakes` — a jq selector over `status` and `expiry_release` (§2) |
+| **Expiry reached** | a **checked fact** | `"$oss_bin" expired_fakes` — a jq selector over `status` and `expiry_release` (§2) |
 | **Trigger fired** | a **judgment** | you, reading each remaining fake's `replacement_trigger` against what the product now does (§4) |
 
-**`replacement_trigger` is free text.** `oss fake_add` stores whatever its fourth
+**`replacement_trigger` is free text.** `"$oss_bin" fake_add` stores whatever its fourth
 argument was — *"when the vendor ships a sandbox"*, *"the first live order"*,
 *"the first user who isn't me"* (`oss_reg_add_fake` in `lib/registries.sh`). No selector can evaluate
 whether that has happened. Running only the mechanical arm and reporting "fake
@@ -34,9 +36,7 @@ judgment arm loses the one part of it a machine can be trusted with.
 
 ---
 
-## 2. The mechanical arm — `oss expired_fakes`
-
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+## 2. The mechanical arm — `"$oss_bin" expired_fakes`
 
 ```bash
 ef=0; fakes_due="$("$oss_bin" expired_fakes "$rel")" || ef=$?
@@ -56,10 +56,10 @@ esac
 | **1** | **BLOCKING** — at least one fake is due | one TSV row per fake: `boundary`, `status`, `expiry_release`, `replacement_trigger` |
 | **2** | **could-not-check** — the release argument is not `r<N>`, or `.fakes` is unreadable | the reason, on stderr |
 
-**rc 0 is CLEAN here and rc 0 is a HIT in `oss touch_check`.** The polarity is
+**rc 0 is CLEAN here and rc 0 is a HIT in `"$oss_bin" touch_check`.** The polarity is
 deliberately opposite: `touch_check` answers *"did anything match"*, this gate
 answers *"may the close proceed"* — the same polarity as
-`oss report_cross_check`. A ceremony that copies the touch-check branch shape
+`"$oss_bin" report_cross_check`. A ceremony that copies the touch-check branch shape
 inverts the judge and passes exactly the releases this gate exists to block, at
 rc 0, with nothing on stdout to say so.
 
@@ -69,7 +69,7 @@ state is broken exactly when degrading to the permissive answer is least
 acceptable.
 
 The release argument is validated for **shape only**, never for existence. This
-is a read-only selector and the id reaches it from `oss id_parse`; an existence
+is a read-only selector and the id reaches it from `"$oss_bin" id_parse`; an existence
 check would add an rc-7 arm the ceremony has no branch for.
 
 ---
@@ -204,7 +204,7 @@ Two side effects worth taking while you are here, neither of them an unblock:
 
 - **Feed the replacement into the feature map** so it competes for selection like
   everything else, rather than living only in a record nobody re-reads:
-  `oss feature_add "replace the <boundary> fake" "<the value the real one unlocks>" "<bone|flesh>" fake-replacement`.
+  `"$oss_bin" feature_add "replace the <boundary> fake" "<the value the real one unlocks>" "<bone|flesh>" fake-replacement`.
 - **A fake renewed twice is a finding about the plan**, not about the fake. Say
   so in the release retrospective's still-standing roll-up
   (`release-close.md` §6).

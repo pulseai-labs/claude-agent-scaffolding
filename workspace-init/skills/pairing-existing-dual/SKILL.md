@@ -19,12 +19,14 @@ Auto-invokes on phrases like "pair my existing AI workspace", "both repos alread
 
 If any fail, exit non-zero with a clear error; do NOT write the manifest or install any hook.
 
+Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
+
 - `command -v jq` and `command -v git` on PATH.
 - **AI workspace path absolute + exists + non-empty.** It is already populated; an empty or missing directory is the wrong target (or means the user wants Scenario A fresh-pair instead).
 - **Canonical path absolute + exists + is a git repo.** `git -C "$canonical_root" rev-parse --git-dir`.
 - AI workspace and canonical must be different paths (no self-pairing).
 
-These are validated by `wi skeleton_preflight_existing_dual "$ai_root" "$canonical_root"` (lib/skeleton.sh) — call it through the `wi` dispatcher (`workspace-init/bin/wi`; on Claude Code `wi` is on `$PATH` automatically, on Devin invoke via `exec` with the full path `<plugin-source>/bin/wi`); never `source` lib files from the skill body (under zsh `${BASH_SOURCE[0]}` is unset and the libs crash).
+These are validated by `"$wi_bin" skeleton_preflight_existing_dual "$ai_root" "$canonical_root"` (lib/skeleton.sh) — call it through the `wi` dispatcher (`workspace-init/bin/wi`; on Claude Code `wi` is on `$PATH` automatically, on Devin `wi_bin` is resolved per `rules/dispatcher-path.md`); never `source` lib files from the skill body (under zsh `${BASH_SOURCE[0]}` is unset and the libs crash).
 
 ## 3. Input collection
 
@@ -34,7 +36,7 @@ Inputs (prompt the user OR read from `$ARGUMENTS` for the slash command — neve
 - **existing canonical absolute path** (already a git repo; second `/pair-existing-dual` arg).
 - **project_type** — `personal` or `work` (per **SPEC §7.1**: *"Is this a personal project or a work/company project?"*). Both enforce the trace filter; the distinction is a forward hook for v0.2.
 
-Resolve to shell variables (canonicalize via `wi realpath` to avoid `/var` → `/private/var` surprises):
+Resolve to shell variables (canonicalize via `"$wi_bin" realpath` to avoid `/var` → `/private/var` surprises):
 
 - `ai_root="$resolved_ai_abs"`
 - `canonical_root="$resolved_canonical_abs"`
@@ -43,8 +45,6 @@ Resolve to shell variables (canonicalize via `wi realpath` to avoid `/var` → `
 There is **no `name` or `parent` input** — unlike Scenario A, both directories already exist, and the manifest derives `ai_workspace.name` / `canonical.name` from the existing directory basenames.
 
 ## 4. Preflight + detect existing scaffolding state (no abort)
-
-Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
 
 ```bash
 "$wi_bin" skeleton_preflight_existing_dual "$ai_root" "$canonical_root" || exit 1
@@ -135,7 +135,7 @@ Because the AI workspace is already populated with the user's content, this skil
 
 - **Preflight fails** → nothing written; surface the specific failure (missing/empty AI workspace, canonical not a git repo, self-pairing) and stop.
 - **Manifest write fails** → atomic write leaves no partial file; surface the error and stop. Re-running is safe.
-- **Hook install fails** (permissions, symlink loop, `chmod +x`) → the manifest is already valid and stays in place; surface which hook failed and the manual remediation (`wi trace_filter_install` can be re-run, or the user can inspect `.git/hooks/`). Do NOT delete the manifest or any AI-workspace content.
+- **Hook install fails** (permissions, symlink loop, `chmod +x`) → the manifest is already valid and stays in place; surface which hook failed and the manual remediation (`"$wi_bin" trace_filter_install` can be re-run, or the user can inspect `.git/hooks/`). Do NOT delete the manifest or any AI-workspace content.
 - **`pairing.json` already present** → §4 surfaced it and got confirmation; the atomic write overwrites only that one file.
 
 ## 9. Surface summary + next steps

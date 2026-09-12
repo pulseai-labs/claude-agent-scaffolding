@@ -107,13 +107,13 @@ Exit non-zero. Do NOT touch anything (no mkdirs, no manifest, no hook).
 
 Detect default branch + remote from the existing repo via the `wi`
 dispatcher (`workspace-init/bin/wi`; bash shebang forces a bash
-runtime even when the calling shell is zsh). On Claude Code, `wi` is on
-`$PATH` automatically; on Devin, invoke via `exec` with the full path
-(`<plugin-source>/bin/wi`). Per
+runtime even when the calling shell is zsh). Resolve `wi` once into
+`wi_bin` per `rules/dispatcher-path.md` (on Devin, `bin/` is never on
+`$PATH`); every `wi` in this skill and its references is `"$wi_bin"`. Per
 **SPEC §8.4** the fallback chain is robust to oddly-configured repos:
 
-- `detected_branch="$(wi git_detect_default_branch "$canonical_root")"`
-- `detected_remote="$(wi git_detect_remote "$canonical_root")"`
+- `detected_branch="$("$wi_bin" git_detect_default_branch "$canonical_root")"`
+- `detected_remote="$("$wi_bin" git_detect_remote "$canonical_root")"`
 
 Never `source` lib files directly from skill body — under zsh
 `${BASH_SOURCE[0]}` is unset and the libs crash. Always go through `wi`.
@@ -130,8 +130,8 @@ records `null`).
 
 Same skeleton as `initializing-dual-repo-workspace` but with three
 pair-with-specific differences (8.2, 8.4, 8.8). After each task, append to
-`${ai_root}/.workspace/init-log` via `wi log_op …`. On ANY task failure,
-call `wi rollback "${ai_root}/.workspace/init-log" --pair-with "$canonical_root"`
+`${ai_root}/.workspace/init-log` via `"$wi_bin" log_op …`. On ANY task failure,
+call `"$wi_bin" rollback "${ai_root}/.workspace/init-log" --pair-with "$canonical_root"`
 (the `--pair-with` flag tells rollback to skip ops against the existing
 canonical — see section 7).
 
@@ -144,8 +144,6 @@ Already collected in section 3. Reference `name`, `parent`, `canonical_root`,
 
 **Difference vs. fresh mode:** the canonical already exists, so skip
 `mkdir <canonical>`. Only create the new AI workspace:
-
-Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi`, else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
 
 ```
 "$wi_bin" skeleton_create_root_ai_only "$parent" "$name"
@@ -217,21 +215,21 @@ Expected init-log entry: `file <ai_root>/README.md`.
    only the AI workspace:
 
    ```
-   wi git_init_ai_only "$ai_root"
+   "$wi_bin" git_init_ai_only "$ai_root"
    ```
 
 2. **DO** install the commit-msg hook in BOTH AI workspace and canonical
    (the trace filter must guard canonical commits going forward):
 
    ```
-   wi trace_filter_install_pair "$ai_root" "$canonical_root"
+   "$wi_bin" trace_filter_install_pair "$ai_root" "$canonical_root"
    ```
 
 3. **STAGE ONLY** in the AI workspace; do NOT run `git add` against the
    canonical (its working tree is the user's; we never touch it):
 
    ```
-   wi git_stage_ai_workspace "$ai_root"
+   "$wi_bin" git_stage_ai_workspace "$ai_root"
    ```
 
 Expected init-log entries: `git-init <ai_root>` (no canonical git-init),
@@ -242,7 +240,7 @@ Expected init-log entries: `git-init <ai_root>` (no canonical git-init),
 
 Per **SPEC §8.9 step 3**, rollback in pair-with mode **NEVER** undoes ops
 on the existing canonical. Pass the `--pair-with "$canonical_root"` flag to
-`wi rollback`; the helper then filters out ops whose target lies under
+`"$wi_bin" rollback`; the helper then filters out ops whose target lies under
 `$canonical_root` when walking the init-log in reverse.
 
 **Pair-with-safe to reverse** (rollback DOES undo these):

@@ -87,12 +87,12 @@ mechanical checks read.
 
 ### Authoring the ADR file
 
-`oss bone_add` writes **the index row only**. Nothing writes the ADR file, and
+`"$oss_bin" bone_add` writes **the index row only**. Nothing writes the ADR file, and
 ossify ships no `/adr` utility — that is a settled decision, not a pending
 gap — so **this section is the convention, permanently**:
 
 **Where:** each declared repo's `docs/adr/` — resolve the repo the decision
-concerns with `oss repo_root <name>` (the sole declared repo when there is
+concerns with `"$oss_bin" repo_root <name>` (the sole declared repo when there is
 only one; under more than one, the repo the bone's touch-glob actually
 covers — ask if that is not obvious from the surface named). Bones are
 decisions about the *product's* architecture, so they live with the product,
@@ -173,7 +173,7 @@ What was chosen, stated in the present tense.
 What this makes easy, what it makes hard, and what it forecloses.
 ```
 
-Mint the number **before** `oss bone_add`, so the index reference and the file
+Mint the number **before** `"$oss_bin" bone_add`, so the index reference and the file
 agree. An index row pointing at a file that was never written is the failure
 this section exists to prevent: the mechanical checks read the index and pass,
 while the prose the decision actually lives in does not exist.
@@ -183,7 +183,7 @@ while the prose the decision actually lives in does not exist.
 ## 4. Touch-surface glob semantics
 
 Touch surfaces are matched with **bash `case` glob semantics**, evaluated by
-`oss touch_check <path>...`:
+`"$oss_bin" touch_check <path>...`:
 
 - `*` matches **any characters including `/`**. So `src/domain/**` behaves as a
   plain prefix wildcard: it matches `src/domain/order.rs` *and*
@@ -192,7 +192,7 @@ Touch surfaces are matched with **bash `case` glob semantics**, evaluated by
 - `?` matches one character; `[abc]` matches a character class.
 - Paths are matched as written in the spine plan — keep them repo-relative and
   consistent with how plans list changed paths.
-- `oss touch_check` returns **rc 0 when a path matched** (a hit) and **rc 1 when
+- `"$oss_bin" touch_check` returns **rc 0 when a path matched** (a hit) and **rc 1 when
   clean** — the inversion is deliberate and callers depend on it. It prints
   `bone <adr>` / `risk_gate <name>` per match. **rc 2 is a third answer, not a
   clean one**: no paths were given, or the state could not be read. It says why

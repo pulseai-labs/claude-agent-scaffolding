@@ -44,9 +44,9 @@ FILE	/Users/example/projects/foo-ai/AGENTS.md
 
 ## The failure
 
-During Task 8.7, `wi_stub_readme` attempts to write `/Users/example/projects/foo-ai/README.md`:
-
 _Dispatcher invocations below are `"$wi_bin" …` — the calling skill resolves `wi_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+
+During Task 8.7, `wi_stub_readme` attempts to write `/Users/example/projects/foo-ai/README.md`:
 
 ```bash
 "$wi_bin" stub_readme "$ai_root" "$name"
