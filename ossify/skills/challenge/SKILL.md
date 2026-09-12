@@ -14,7 +14,7 @@ dependencies. This body is a router: it picks the mode and nothing else.
 
 - **An artifact path is present** (a command argument, or the invoking prose
   names a file to audit) → **audit mode.** Read
-  `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end and
+  `skills/challenge/references/audit.md` (relative to the plugin root) end to end and
   follow it, with the artifact and the depth the caller named.
 - **Audit intent with no path** — the invocation says *audit / critique /
   adversarial review / deep audit* of material that sits in the conversation
@@ -24,7 +24,7 @@ dependencies. This body is a router: it picks the mode and nothing else.
   Explicit audit intent never falls through to an interview.
 - **A plan or design sits in conversation, to be stress-tested interactively**
   → **interview mode.** Read
-  `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/interview.md` end to end
+  `skills/challenge/references/interview.md` (relative to the plugin root) end to end
   and follow it.
 - **Ambiguous** → ask one question: audit this artifact, or grill this plan?
 

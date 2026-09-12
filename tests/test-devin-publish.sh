@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # test-devin-publish.sh — Devin native publish contract
 #
-# Validates the root meta-plugin and four native plugin manifests against the
-# approved design spec.  One authoritative data block defines baseline,
-# experimental, and excluded plugins.  No prose maintains a competing list.
+# Validates the root meta-plugin and five native plugin manifests against the
+# approved design spec as amended 2026-09-12 (five-plugin baseline: ossify
+# promoted from optional, code-judo admitted).  One authoritative data block
+# defines baseline, experimental, and excluded plugins.  No prose maintains a
+# competing list.
 #
 # Test-first: this test is written before any production manifest and must
 # fail (RED) when manifests are absent.
@@ -48,9 +50,13 @@ assert_jq_str() {
 ###############################################################################
 GITHUB_REPO="https://github.com/pulseai-labs/claude-agent-scaffolding.git"
 
-BASELINE_PLUGINS="workspace-init ai-mentor architect-critic"
-EXPERIMENTAL_PLUGINS="ossify"
-EXCLUDED_PLUGINS="scaffold scaffold-onboard scaffold-dev claude-security-audit"
+BASELINE_PLUGINS="workspace-init ai-mentor architect-critic ossify code-judo"
+EXPERIMENTAL_PLUGINS=""
+EXCLUDED_PLUGINS="scaffold scaffold-onboard scaffold-dev claude-security-audit orca-crew"
+
+# Ossify's Devin claim is exactly six canonical skills plus the local worker;
+# adopt, challenge, and wayfinder are deferred on this surface.
+OSSIFY_DEVIN_SKILLS='["skills/start","skills/plan-release","skills/plan-spine","skills/work-item","skills/close","skills/doctor",".devin/skills"]'
 
 ALL_TARGET_PLUGINS="$BASELINE_PLUGINS $EXPERIMENTAL_PLUGINS"
 
@@ -93,16 +99,10 @@ if [[ -f "$ROOT_MANIFEST" ]]; then
     fi
   done
 
-  # Optional set is exactly Ossify
-  for plugin in $EXPERIMENTAL_PLUGINS; do
-    if jq -e --arg p "$plugin" \
-      '.optionalPlugins[] | select(. == $p or .path == $p or .subdir == $p or .repo == $p or .source == $p)' \
-      "$ROOT_MANIFEST" >/dev/null 2>&1; then
-      pass "root optionalPlugins includes $plugin"
-    else
-      fail "root optionalPlugins includes $plugin"
-    fi
-  done
+  # Optional set is empty — the field must be absent, not an empty list,
+  # so that absence rather than an empty array is the tested contract.
+  assert_jq 'has("optionalPlugins") | not' "$ROOT_MANIFEST" \
+    "root manifest has no optionalPlugins (five-plugin baseline)"
 
   # Optional set must NOT include baseline or excluded plugins
   for plugin in $BASELINE_PLUGINS $EXCLUDED_PLUGINS; do
@@ -163,6 +163,15 @@ for plugin in $ALL_TARGET_PLUGINS; do
     fi
   fi
 done
+
+# Ossify's skills selection is exactly the six-skill Devin claim plus the
+# .devin/skills worker directory — adopt/challenge/wayfinder stay unadvertised.
+if [[ "$(json_get '.skills | sort | join(",")' "$ROOT/ossify/.devin-plugin/plugin.json")" == \
+     "$(printf '%s' "$OSSIFY_DEVIN_SKILLS" | jq -r 'sort | join(",")')" ]]; then
+  pass "ossify skills array is the six-skill claim plus .devin/skills"
+else
+  fail "ossify skills array mismatch (got: $(json_get '.skills' "$ROOT/ossify/.devin-plugin/plugin.json"))"
+fi
 
 ###############################################################################
 # Excluded plugins must NOT have .devin-plugin/plugin.json

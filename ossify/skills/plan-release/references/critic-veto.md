@@ -29,7 +29,7 @@ hexagonal core, and its findings degrade to generic advice.
 
 ## 2. Running the audit (the only supported shape)
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end
+Read `skills/challenge/references/audit.md` (relative to the plugin root) end to end
 and follow it: `RELEASE.md` is the artifact (one absolute path), the depth is
 `close`, the target label is the release id. The bones registry and the spine
 plans go into the conversation alongside it, not into a flag — the audit reads

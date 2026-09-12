@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test-devin-smoke.sh — Credentialed four-plugin behavior smokes
+# test-devin-smoke.sh — Credentialed five-plugin behavior smokes
 #
 # Exercises one real behavior per plugin target and records checkable evidence.
 # Uses temporary HOME/project/state. Never touches real user configuration.
@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-EXPECTED_DEVIN_VERSION="3000.5.20"
+EXPECTED_DEVIN_VERSION="3000.10.21"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
@@ -94,25 +94,28 @@ run_devin() {
 }
 
 ###############################################################################
-# Install all four plugins individually from the local worktree
+# Install all five plugins individually from the local worktree
 # (not via the meta-plugin, which fetches from GitHub)
 ###############################################################################
 run_devin plugins install --local -y "$ROOT/workspace-init" >/dev/null 2>&1
 run_devin plugins install --local -y "$ROOT/ai-mentor" >/dev/null 2>&1
 run_devin plugins install --local -y "$ROOT/architect-critic" >/dev/null 2>&1
 run_devin plugins install --local -y "$ROOT/ossify" >/dev/null 2>&1
+run_devin plugins install --local -y "$ROOT/code-judo" >/dev/null 2>&1
 
 # For locally-installed plugins, the source IS the local worktree path
 WI_SOURCE="$ROOT/workspace-init"
 AIM_SOURCE="$ROOT/ai-mentor"
 ARC_SOURCE="$ROOT/architect-critic"
 OSS_SOURCE="$ROOT/ossify"
+JUDO_SOURCE="$ROOT/code-judo"
 
 evidence "Devin version: $DEVIN_VERSION"
 evidence "workspace-init source: $WI_SOURCE"
 evidence "ai-mentor source: $AIM_SOURCE"
 evidence "architect-critic source: $ARC_SOURCE"
 evidence "ossify source: $OSS_SOURCE"
+evidence "code-judo source: $JUDO_SOURCE"
 
 ###############################################################################
 # Smoke 1: Workspace Init — dispatcher works from installed path
@@ -408,9 +411,47 @@ else
 fi
 
 ###############################################################################
+# Smoke 5: Code Judo — four skills advertised, skill-local references readable
+# from installed source
+###############################################################################
+printf '\nSmoke 5: Code Judo — skills advertised, references readable\n'
+
+if [ -n "$JUDO_SOURCE" ]; then
+  # All four canonical skills present at installed source
+  for skill in codebase-design deep-review deepen-architecture domain-modeling; do
+    if [ -f "$JUDO_SOURCE/skills/$skill/SKILL.md" ]; then
+      pass "code-judo/$skill SKILL.md exists at installed source"
+    else
+      fail "code-judo/$skill SKILL.md absent at installed source"
+    fi
+  done
+
+  # Skill-local references are read from the installed plugin source, not
+  # the developer's canonical checkout — deep-review's rubric + disposition.
+  for ref in rubric.md disposition.md; do
+    if [ -f "$JUDO_SOURCE/skills/deep-review/references/$ref" ]; then
+      pass "deep-review references/$ref readable at installed source"
+      evidence "deep-review ref: $JUDO_SOURCE/skills/deep-review/references/$ref"
+    else
+      fail "deep-review references/$ref absent at installed source"
+    fi
+  done
+
+  # No CLAUDE_PLUGIN_ROOT tokens in skill bodies — Devin never expands it
+  judo_token_hits="$(grep -rl 'CLAUDE_PLUGIN_ROOT' "$JUDO_SOURCE/skills/" 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "$judo_token_hits" = "0" ]; then
+    pass "no CLAUDE_PLUGIN_ROOT in code-judo skill bodies"
+  else
+    fail "CLAUDE_PLUGIN_ROOT found in code-judo skills ($judo_token_hits files)"
+  fi
+else
+  fail "code-judo source not found"
+fi
+
+###############################################################################
 # Cleanup
 ###############################################################################
-for plugin in workspace-init ai-mentor architect-critic ossify; do
+for plugin in workspace-init ai-mentor architect-critic ossify code-judo; do
   run_devin plugins remove -y "$plugin" >/dev/null 2>&1 || true
 done
 

@@ -716,7 +716,7 @@ both a bone and a gate; then both apply.
 ## 7. Step 7 — the adversarial audit, and the depth differs by class
 
 Run ossify's own audit — `challenge` in audit mode. Read
-`${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end and
+`skills/challenge/references/audit.md` (relative to the plugin root) end to end and
 follow it. The audit always runs; there is no plugin whose absence skips it,
 and nothing here blocks the close on an adversary that is not configured.
 

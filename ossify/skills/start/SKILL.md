@@ -106,7 +106,7 @@ path for a project that already has code (on Codex/OpenCode, the native
 
 **Wayfinder pre-flight.** If a map exists for this repo, its resolved decisions
 pre-fill stations below rather than being re-elicited. Branch logic:
-`${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/references/preflight.md` — do not restate it here.
+`skills/wayfinder/references/preflight.md` (relative to the plugin root) — do not restate it here.
 
 ---
 
@@ -363,7 +363,7 @@ absence skips it.
    to §12. In a non-interactive run the default is to proceed — `skip` is the
    only bypass.
 3. **Run the audit.** Read
-   `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end and
+   `skills/challenge/references/audit.md` (relative to the plugin root) end to end and
    follow it: the lean MASTER-SPEC is the artifact, the depth is `close`.
    Whether an external fresh-frame adversary joins is the adversary ladder's
    decision (`challenge/references/adversaries.md`), and the audit's summary

@@ -243,7 +243,7 @@ Re-verification is **mandatory across every live spine spec after any bone
 change**. Full rules in `references/citation-foldin.md`.
 
 **Adversarial pass (optional, at the full plan).** Run ossify's own audit —
-read `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end
+read `skills/challenge/references/audit.md` (relative to the plugin root) end to end
 and follow it with the spine plan as the artifact at close depth. The audit
 always runs; the adversary ladder decides whether an external fresh-frame
 joins. Placement and detail in `references/spec-authoring.md` §6.
@@ -262,7 +262,7 @@ from state (§3) — do not re-derive it, and do not offer the gate because the 
 and ceremony inflation is what trains people to skip checklists wholesale.
 
 On **yes**, run ossify's own interview: read
-`${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/interview.md` end to end and
+`skills/challenge/references/interview.md` (relative to the plugin root) end to end and
 follow it, then loop back to §4 with whatever it surfaced. The grill ships with
 ossify, so it always resolves — the offer, and the user's yes/no, are the whole
 contract. On **no**, record the skip and proceed.

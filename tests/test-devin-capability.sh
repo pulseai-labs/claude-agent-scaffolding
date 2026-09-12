@@ -11,10 +11,10 @@
 # It never writes to the real user's Devin state.  A sentinel on the real
 # config and credentials files is checked before and after the run.
 #
-# Pinned to devin 3000.4.25.  A different version is a re-baseline, not a pass.
+# Pinned to devin 3000.10.21.  A different version is a re-baseline, not a pass.
 set -euo pipefail
 
-EXPECTED_DEVIN_VERSION="3000.5.20"
+EXPECTED_DEVIN_VERSION="3000.10.21"
 COMMAND_TIMEOUT_MS=60000
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"

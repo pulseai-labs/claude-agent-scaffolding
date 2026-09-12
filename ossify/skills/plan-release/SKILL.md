@@ -114,7 +114,7 @@ if you want the advisory surfaces, which this skill does not invoke.
 
 **Wayfinder pre-flight.** If a map exists for this repo, its resolved decisions
 pre-fill stations below rather than being re-elicited. Branch logic:
-`${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/references/preflight.md` — do not restate it here.
+`skills/wayfinder/references/preflight.md` (relative to the plugin root) — do not restate it here.
 
 ---
 
@@ -338,7 +338,7 @@ absence skips it, so the class declaration is never critic-free.
    in. Auditing a file that does not exist yet is a halt, not a no-findings
    pass.
 2. **Run the audit.** Read
-   `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end and
+   `skills/challenge/references/audit.md` (relative to the plugin root) end to end and
    follow it: the draft `RELEASE.md` is the artifact, the depth is `close`,
    the target label is the release id. The registry and spine plans go into
    the conversation alongside it. Whether an external fresh-frame adversary

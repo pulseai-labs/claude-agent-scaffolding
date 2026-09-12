@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-EXPECTED_DEVIN_VERSION="3000.5.20"
+EXPECTED_DEVIN_VERSION="3000.10.21"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 OS_ROOT="$ROOT/ossify"

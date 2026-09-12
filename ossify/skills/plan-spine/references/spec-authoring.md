@@ -201,7 +201,7 @@ If the user wants the plan audited before build, run ossify's own audit —
 specs that exist), after the plan settles.
 
 1. **Run the audit.** Read
-   `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/audit.md` end to end and
+   `skills/challenge/references/audit.md` (relative to the plugin root) end to end and
    follow it: `SPINE.md`'s absolute path is the artifact, the depth is `close`,
    the target label is the spine id. The audit always runs — there is no
    plugin whose absence skips it. Whether an external fresh-frame adversary

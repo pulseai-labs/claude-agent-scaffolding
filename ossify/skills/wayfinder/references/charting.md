@@ -17,7 +17,7 @@ that is work mode's job, once the map exists, not this one's.
 ## 1. The six steps
 
 1. **Name the destination.** Run ossify's own grill in interview mode —
-   read `${CLAUDE_PLUGIN_ROOT}/skills/challenge/references/interview.md` end
+   read `skills/challenge/references/interview.md` (relative to the plugin root) end
    to end and follow it — plus `start/references/domain-modeling.md`. Read the
    reference, never a slash command: `/ossify:challenge` is the Claude Code
    spelling and wayfinder also ships on the OpenCode bundle, where that

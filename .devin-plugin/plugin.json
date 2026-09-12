@@ -1,13 +1,12 @@
 {
   "name": "claude-agent-scaffolding-devin",
   "version": "0.1.0",
-  "description": "Devin surface for claude-agent-scaffolding: baseline three plugins (workspace-init, ai-mentor, architect-critic) with experimental ossify opt-in.",
+  "description": "Devin surface for claude-agent-scaffolding: five-plugin baseline (workspace-init, ai-mentor, architect-critic, ossify, code-judo).",
   "requiredPlugins": [
     { "source": "git-subdir", "url": "https://github.com/pulseai-labs/claude-agent-scaffolding.git", "path": "workspace-init" },
     { "source": "git-subdir", "url": "https://github.com/pulseai-labs/claude-agent-scaffolding.git", "path": "ai-mentor" },
-    { "source": "git-subdir", "url": "https://github.com/pulseai-labs/claude-agent-scaffolding.git", "path": "architect-critic" }
-  ],
-  "optionalPlugins": [
-    { "source": "git-subdir", "url": "https://github.com/pulseai-labs/claude-agent-scaffolding.git", "path": "ossify" }
+    { "source": "git-subdir", "url": "https://github.com/pulseai-labs/claude-agent-scaffolding.git", "path": "architect-critic" },
+    { "source": "git-subdir", "url": "https://github.com/pulseai-labs/claude-agent-scaffolding.git", "path": "ossify" },
+    { "source": "git-subdir", "url": "https://github.com/pulseai-labs/claude-agent-scaffolding.git", "path": "code-judo" }
   ]
 }
