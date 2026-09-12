@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: The orchestrator/worker session model over Orca — one orchestrator session (claude on Fable, or claude-sol) that spends its context on decisions and dispatches everything else to GLM worker sessions launched by alias (claude-glm, claude-glm-flash) through Orca orchestration. One /code-review per PR in a flash session, findings returned by worker_done, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, it ratifies a per-item implementer/verifier profile into an orca-execution sidecar and starts one spine session that runs the items in fresh external terminals. Use when the user says orchestrator session, spawn a worker, dispatch to a session, claude-glm, claude-glm-flash, orca worker, review this PR in a session, execution assignments for a spine, or runs /orca-crew:orchestrate. Not Orca's command reference (orca skills get orchestration owns that), and not a PR loop of its own where ossify's work-pr is installed.
+description: The orchestrator/worker session model over Orca — one orchestrator session (claude on Fable, or claude-sol) that spends its context on decisions and dispatches everything else to GLM worker sessions launched by alias (claude-glm, claude-glm-flash) through Orca orchestration. One /code-review per PR in a flash session, findings returned by worker_done, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, it ratifies per-item implementer/verifier profiles plus the three session blocks into an orca-execution sidecar and starts one spine session that runs the items in fresh external terminals. Use when the user says orchestrator session, spawn a worker, dispatch to a session, claude-glm, claude-glm-flash, orca worker, review this PR in a session, execution assignments for a spine, or runs /orca-crew:orchestrate. Not Orca's command reference (orca skills get orchestration owns that), and not a PR loop of its own where ossify's work-pr is installed.
 ---
 
 # Orchestrate — the orchestrator/worker session model
@@ -27,8 +27,9 @@ Your own turns take these kinds of action, and no others:
 
 1. Probe live state with single commands: `git status`, `gh pr view`,
    `orca orchestration task-list`, `orca status`.
-2. Write briefs from the templates in `references/briefs.md`, `references/ossify-briefs.md`
-   and `references/ossify-pr-briefs.md`, dispositions, the handoff, and — on an activated
+2. Write briefs from the templates in `references/briefs.md`, `references/ossify-briefs.md`,
+   `references/ossify-pr-briefs.md` and `references/ossify-close-writer.md`, dispositions,
+   the handoff, and — on an activated
    ossify spine — the `orca-execution.md` sidecar.
 3. Read `worker_done` bodies.
 4. Decide.
@@ -128,8 +129,9 @@ Two cases are named because they look like clashes and are not:
 - **`run-spine`, when this session just planned the spine.** Then the items deserve
   their own models, and inherited-runtime subagents cannot give them that.
   **Read `references/ossify-execution.md` and follow it**: you ratify one
-  implementer/verifier profile per item with the operator, write the
-  `orca-execution/v1` sidecar, and start one spine session that creates a child Run
+  implementer/verifier profile per item and the spine, close and work-PR session
+  blocks with the operator, write the
+  `orca-execution/v2` sidecar, and start one spine session that creates a child Run
   and drives fresh external terminals per item — no subagent anywhere in that path.
   Its four briefs are in `references/ossify-briefs.md`. Activation needs all four facts
   that file lists; installation alone is not one of them, so an ossify spine you did

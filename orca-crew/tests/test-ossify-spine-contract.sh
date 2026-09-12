@@ -41,6 +41,7 @@ EXEC_MD="$REF/ossify-execution.md"
 BRIEFS_MD="$REF/ossify-briefs.md"
 NESTED_MD="$REF/ossify-nested-run.md"
 PRBRIEFS_MD="$REF/ossify-pr-briefs.md"
+WRITER_MD="$REF/ossify-close-writer.md"
 LIFECYCLE_MD="$REF/lifecycle.md"
 ROLES_MD="$REF/roles.md"
 GENERIC_BRIEFS_MD="$REF/briefs.md"
@@ -113,7 +114,7 @@ section "the sidecar schema"
 
 nonempty "$EXEC_MD" "references/ossify-execution.md exists"
 
-pin "$EXEC_MD" 'schema: orca-execution/v1' \
+pin "$EXEC_MD" 'schema: orca-execution/v2' \
   "the sidecar declares its schema version exactly once"
 
 assert_set "$(keys "$EXEC_MD" '# Orca execution assignments' '')" \
@@ -142,6 +143,15 @@ pin "$EXEC_MD" 'verifier_procedure: all-claims-work-item-verify/v1' \
 assert_set "$(keys "$EXEC_MD" '## Spine session' '')" \
   "spine_command spine_effort spine_expected_model spine_profile_reason" \
   "the spine-session block carries exactly its four keys"
+
+# S3a/#446: the close and work-PR coordinator seats are ratified sidecar blocks the
+# same way — four keys each, beside the table, never rows in it.
+assert_set "$(keys "$EXEC_MD" '## Close session' '')" \
+  "close_command close_effort close_expected_model close_profile_reason" \
+  "the close-session block carries exactly its four keys"
+assert_set "$(keys "$EXEC_MD" '## Work-PR session' '')" \
+  "workpr_command workpr_effort workpr_expected_model workpr_profile_reason" \
+  "the work-PR-session block carries exactly its four keys"
 
 pin "$EXEC_MD" 'ratified with the item rows in the same phase' \
   "the spine-session block is ratified with the item rows, not separately"
@@ -182,7 +192,8 @@ section "no subagent invocation in the activated path"
 nonempty "$BRIEFS_MD" "references/ossify-briefs.md exists"
 nonempty "$NESTED_MD" "references/ossify-nested-run.md exists"
 nonempty "$PRBRIEFS_MD" "references/ossify-pr-briefs.md exists"
-for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD"; do
+nonempty "$WRITER_MD" "references/ossify-close-writer.md exists"
+for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD"; do
   for form in 'Task(' 'Agent(' 'subagent_type'; do
     absent "$f" "$form" "${f##*/} invokes no subagent ('$form')"
   done
@@ -195,9 +206,10 @@ pin "$BRIEFS_MD" '/ossify:run-spine $SPINE_ID --external-executor' \
 # SPINE_ID is in this list because the brief's TASK spends it — `/ossify:run-spine
 # $SPINE_ID --external-executor` — and a brief that spends a name it never injects
 # leaves the worker to rediscover it, which is the one thing the block forbids.
-# `SPINE_ID=` is not a substring of `SPINE_TASK_ID=` or `SPINE_DISPATCH_ID=`, so the
-# exactly-once count is unambiguous.
-for id in PARENT_RUN_ID SPINE_TASK_ID SPINE_DISPATCH_ID SPINE_ID ORCA_EXECUTION_PATH; do
+# S3a/#446 RF9: the lifecycle id slots are GONE — a brief cannot know its own
+# task/dispatch ids before `dispatch --inject` exists, so the spine session takes
+# them from the Orca preamble instead. The absence controls live one section down.
+for id in PARENT_RUN_ID SPINE_ID ORCA_EXECUTION_PATH; do
   pin "$BRIEFS_MD" "$id=" "the brief injects $id exactly once"
 done
 # D24/D28: the ratified model the banner must match, and the revalidation that
@@ -206,6 +218,60 @@ pin "$BRIEFS_MD" 'SPINE_EXPECTED_MODEL=' \
   "the spine brief injects the ratified expected model exactly once"
 pin "$BRIEFS_MD" 'immediately before each item terminal is created' \
   "the sidecar is revalidated before every item launch"
+
+section "lifecycle ids come from the preamble, not from brief slots"
+
+# S3a/#446 RF9 + #454 + #447/#450 + #449, mechanical only: the removed declaration
+# slots are gone, the new injected identities exist exactly once, the close-review
+# halt has a result shape, the contradiction is deleted, and the spine brief names
+# the terminal-close command that #455 requires. The BEHAVIOUR around each (who
+# validates what, which branch runs first) is the rubric's, not this file's.
+absent "$BRIEFS_MD" 'SPINE_TASK_ID=' \
+  "the spine brief no longer declares its own task id"
+absent "$BRIEFS_MD" 'SPINE_DISPATCH_ID=' \
+  "the spine brief no longer declares its own dispatch id"
+for k in 'CLOSE_TASK_ID=' 'CLOSE_DISPATCH_ID=' 'WORKPR_TASK_ID=' 'WORKPR_DISPATCH_ID='; do
+  absent "$PRBRIEFS_MD" "$k" "the PR briefs no longer declare '$k'"
+done
+pin "$PRBRIEFS_MD" 'CLOSE_EXPECTED_MODEL=' \
+  "the close brief injects its ratified expected model exactly once"
+pin "$PRBRIEFS_MD" 'WORKPR_EXPECTED_MODEL=' \
+  "the work-PR brief injects its ratified expected model exactly once"
+pin "$PRBRIEFS_MD" 'PRIOR_REVIEW=' \
+  "the work-PR brief injects the prior review record exactly once"
+pin "$PRBRIEFS_MD" '"covered"' \
+  "PRIOR_REVIEW has a third value for a covered-but-recordless PR"
+# N1 (Codex, round 2): "covered" is evidence-gated — a dispatch that crashed
+# before its reviewer existed cannot be labelled covered, or the PR merges
+# with zero reviews.
+pin "$PRBRIEFS_MD" 'durable evidence its delegated review ran' \
+  "'covered' is spent only on durable evidence the review ran"
+pin "$PRBRIEFS_MD" 'MERGE_EXECUTOR=' \
+  "the work-PR brief injects the top's merge-executor assignment exactly once"
+pin "$PRBRIEFS_MD" 'halted: close-review' \
+  "a close-review halt has its own result shape"
+# #449/R3+C1+C2: the close-review writer is a contracted seat — a brief of
+# its own with a model gate, budgeted in roles.md, allocated one per affected
+# hosting repo. Mechanical: the file exists, the gate is injected once, and the
+# allocation rule is stated where the halt remediation lives.
+pin "$WRITER_MD" 'WRITER_EXPECTED_MODEL=' \
+  "the writer brief gates its ratified expected model"
+pin "$NESTED_MD" 'one writer per affected hosting repo' \
+  "fix-now findings spanning repos get a writer each"
+absent "$PRBRIEFS_MD" 'per spine at most' \
+  "the close-dispatch cap contradiction is gone"
+pin "$BRIEFS_MD" 'orca terminal close --terminal' \
+  "the spine brief names the exact terminal-close command"
+# R7: the halt path and the completion bullet must spend the preamble's
+# identities, not the deleted declaration slots' phrase.
+absent "$BRIEFS_MD" 'injected parent ids' \
+  "the spine brief's halt path names no 'injected parent ids'"
+absent "$NESTED_MD" 'injected parent ids' \
+  "the nested Run's halt path names no 'injected parent ids'"
+absent "$NESTED_MD" 'the **injected parent**' \
+  "the nested Run's completion bullet names preamble identities"
+pin "$GENERIC_BRIEFS_MD" 'Reviewed head: <sha>' \
+  "the reviewer DONE carries its reviewed-head line exactly once"
 
 section "the nested Run's mechanical values"
 
@@ -337,6 +403,17 @@ absent "$PRBRIEFS_MD" 'run a review or a fix' \
   "the NEVER no longer forbids the ceremony its own review"
 pin "$PRBRIEFS_MD" 'CLOSE_REVIEW_LEDGER=' \
   "the record pass receives the close-review ledger exactly once"
+# R1/R15: the halt rule reconciles with ossify's advisory-review prose instead
+# of contradicting it, and the ledger slot names the most recent reviewing
+# close — every fresh close carries the newest ledger forward.
+pin "$PRBRIEFS_MD" 'ossify keeps that review advisory' \
+  "the halt rule names its relation to the ceremony's advisory review"
+absent "$PRBRIEFS_MD" 'from the first close' \
+  "the ledger slot names the most recent reviewing close, not the first"
+# R5: the close DONE's PR-list rule carries the product-hosting-repo
+# qualifier (RF7), not the bare phrase every other site had to disambiguate.
+absent "$PRBRIEFS_MD" 'one line per hosting repo' \
+  "the close DONE counts product hosting repos only"
 pin "$PRBRIEFS_MD" 'the top dispatches a fresh close session' \
   "a halt settles the dispatch; the top re-dispatches after remediation"
 absent "$PRBRIEFS_MD" 're-invoke close after a halt' \
@@ -365,12 +442,16 @@ pin "$PRBRIEFS_MD" 'REVIEW_LEVEL=' \
   "the work-PR brief injects the decided review level"
 pin "$PRBRIEFS_MD" 'merge bound to the named SHA' \
   "the work-PR session merges bound to the SHA the top relayed"
+pin "$PRBRIEFS_MD" 'never a squash or rebase' \
+  "the operator merge path is bound to the merge-commit convention too"
 pin "$LIFECYCLE_MD" 'dispatch a work-PR session' \
   "1b dispatches a work-PR session per returned PR"
 pin "$SKILL_MD" 'the `orca-execution.md` sidecar' \
   "SKILL.md's write set names the sidecar"
-pin "$ROLES_MD" 'three seats' \
-  "roles.md budgets three seats outside the per-item budget"
+pin "$ROLES_MD" 'four seats' \
+  "roles.md budgets four seats outside the per-item budget"
+pin "$ROLES_MD" 'a close-review writer' \
+  "the budget names the close-review writer seat"
 
 # R1-5/R1-6/R1-9. The record pass has a precondition a `closed` return fails; the
 # spine seat is launched from its ratified block, not the generic policy; and the
@@ -405,9 +486,9 @@ section "the release is declared once and agreed everywhere"
 # checked AGAINST it rather than against a literal repeated here, so a bump edits
 # one file. The literal below is what stops that from being a round trip.
 CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
-pin "$CHANGELOG_MD" '## 0.4.0' "the CHANGELOG opens a 0.4.0 section"
-for d in D24 D25 D26 D27 D28; do
-  pin "$CHANGELOG_MD" "- **$d" "the CHANGELOG records $d exactly once"
+pin "$CHANGELOG_MD" '## 0.5.0' "the CHANGELOG opens a 0.5.0 section"
+for b in '#446' '#447' '#453' '#454' '#455' '#448' '#449'; do
+  pin "$CHANGELOG_MD" "- **$b" "the CHANGELOG records $b exactly once"
 done
 head_ver="$(awk '/^## /{sub(/^## /, ""); print; exit}' "$CHANGELOG_MD")"
 for m in "$PLUGIN_ROOT/.claude-plugin/plugin.json" "$PLUGIN_ROOT/.codex-plugin/plugin.json"; do
@@ -422,5 +503,6 @@ budget "$EXEC_MD" "ossify-execution.md is within the reference budget"
 budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
 budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget"
 budget "$BRIEFS_MD" "ossify-briefs.md is within the reference budget"
+budget "$WRITER_MD" "ossify-close-writer.md is within the reference budget"
 
 report

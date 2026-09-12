@@ -80,12 +80,14 @@ TASK: run `/code-review <number> <level>` — the level the orchestrator decided
 one you pick; outside an activated ossify spine the level is `medium` unless the
 orchestrator names another. Your first reply must state the model you are running; it is expected to
 be <expected-model>, and a mismatch is a failed launch to report, not to work around.
-Let the review finish, then send worker_done with
-`Findings: none` on a clean review, else every finding in this body, one per line:
+Let the review finish, then send worker_done carrying, in this order:
+`Findings: none` on a clean review, or else every finding in this body, one per line
   <file>:<line> | P0|P1|P2|P3 | <claim in one sentence>
-followed by:
+then, in either case:
   Reviewed head: <sha>
   Summary: <two sentences>
+The head line is not optional on a clean review: nothing ties a verdict to a SHA
+without it.
 
 NEVER: edit any file, post anything to GitHub, or run a second review. Your findings
 travel only in worker_done. If `/code-review` refuses or errors, report its output

@@ -17,7 +17,7 @@ the file this harness copies.
 
 | Surface | Owning prose | The judgment |
 |---|---|---|
-| `ossify-spine-execution` | `skills/orchestrate/SKILL.md` + `references/ossify-execution.md` + `references/ossify-nested-run.md` + `references/ossify-briefs.md` + `references/ossify-pr-briefs.md` + `references/roles.md` + `references/lifecycle.md` | the three-layer spine execution phase: four-fact activation and who owns which layer (the top ratifies, writes the sidecar and starts exactly one spine session, launching no item terminal; the spine session creates a child Run and owns both item terminals per item); Run routing that keeps item plan traffic and per-item completions in the child while the parent sees a relayed plan decision, spine-level questions and one final completion settled with the injected parent ids; profiles bound by the ratified sidecar row with the model confirmed from banner and first reply and no dispatch-time substitution, and a stale-`SPINE.md` or incomplete row halting; pairs fresh per item, retained only through that item's corrections, never crossing items, with generic retention unchanged outside an activated spine; and the two no-fallback rules — nested depth `2` with a depth error halting rather than degrading to an inherited-runtime subagent, the parent Run, a replacement writer or a lane restart, and the reviewer chosen only at the PR transition |
+| `ossify-spine-execution` | `skills/orchestrate/SKILL.md` + `references/ossify-execution.md` + `references/ossify-nested-run.md` + `references/ossify-briefs.md` + `references/ossify-pr-briefs.md` + `references/ossify-close-writer.md` + `references/roles.md` + `references/lifecycle.md` | the three-layer spine execution phase: four-fact activation and who owns which layer (the top ratifies, writes the sidecar and starts exactly one spine session, launching no item terminal; the spine session creates a child Run and owns both item terminals per item); Run routing that keeps item plan traffic and per-item completions in the child while the parent sees a relayed plan decision, spine-level questions and one final completion settled on the identities its injected Orca preamble names; profiles bound by the ratified sidecar row with the model confirmed from banner and first reply and no dispatch-time substitution, and a stale-`SPINE.md` or incomplete row halting; pairs fresh per item, retained only through that item's corrections, never crossing items, with generic retention unchanged outside an activated spine; and the two no-fallback rules — nested depth `2` with a depth error halting rather than degrading to an inherited-runtime subagent, the parent Run, a replacement writer or a lane restart, and the reviewer chosen only at the PR transition |
 
 ## Procedure (Claude executes)
 
@@ -35,11 +35,19 @@ For each `fixture.md` in `tests/eval/fixtures/<surface>/`:
    cannot serve as its invoke agent** — dispatch fresh agents for both steps.
    Tell the invoke agent not to read anything under `tests/eval/`.
 
-2. **Score.** Dispatch a fresh judge `Agent`: "You are an LLM-as-judge. Score the
-   SKILL OUTPUT against the RUBRIC. Return one JSON object in exactly the shape
-   the RUBRIC's last line pins — that line is the authority on the `notes`
-   contract. Pass = all criteria ≥4. JSON only. RUBRIC: <paste
-   rubrics/<surface>.md>  FIXTURE: <paste fixture>  SKILL OUTPUT: <paste>."
+2. **Score.** Dispatch a fresh judge `Agent`: "You are an LLM-as-judge. Read the
+   owning prose for `<surface>` end to end — the same eight files the invoke
+   agent read — then the RUBRIC, the complete FIXTURE (frontmatter included),
+   and this pair's own SKILL OUTPUT. The fixture body supplies scenario facts
+   only; every material decision rule the output applies must come from the
+   supplied source prose, and matching the answer key is not evidence that it
+   did. Score the output against the rubric, including its source-fidelity
+   floor. Return one JSON object in exactly the shape the RUBRIC's last line
+   pins — that line is the authority on the `notes` and `source_support`
+   contract. Pass = all criteria ≥4 and a `supported` source verdict. JSON
+   only. SOURCE: <the eight owning-prose paths the invoke read>  RUBRIC:
+   <paste rubrics/<surface>.md>  FIXTURE: <paste fixture>  SKILL OUTPUT:
+   <paste>."
    Write the JSON to `tests/eval/results/<surface>/<fixture_id>.json`.
 
 After all surfaces: run `bash orca-crew/tests/eval/lib/aggregate-scores.sh` and
@@ -62,23 +70,29 @@ guess. State inputs as facts about the scenario, never as a check's outcome.
 ## Rubric format
 
 `rubrics/<surface>.md` lists that surface's criteria; the judge scores each 1-5;
-**pass = ≥4 on every criterion**; the rubric's last line pins the JSON output
-contract including the `notes` contract. `lib/aggregate-scores.sh` reads only
+**pass = ≥4 on every criterion and a `supported` source verdict**; the rubric's
+last line pins the JSON output contract including the `notes` and
+`source_support` contract. `lib/aggregate-scores.sh` reads only
 `.pass`/`.notes` and validates neither, so that line is the whole contract.
 
 **An unexercised criterion caps at 4** — consistent with the contract, not
 demonstrated by the scenario. A 5 requires the fixture to have exercised it.
 
-## Detection control
+## Evidence scope
 
-Before a surface's results are treated as coverage, prove the rubric detects the
-change the surface exists to guard: materialize the pre-change prose
-(`git show <pre-change-sha>:<path>`) into a scratch directory, run one fresh
-invoke agent against **that** prose on the surface's most discriminating fixture
-and one fresh judge, and record the result under
-`tests/eval/evidence/<surface>-old-contract-control.json`. **The control must
-fail.** A control that passes means the fixture does not discriminate — rewrite
-it before running the surface.
+This interactive harness samples how fresh isolated agents apply the current
+owning prose. Its model outputs are advisory diagnostics, not comparative or
+release-gate evidence on their own.
+
+A seat launched through Orca also receives Orca's current injected lifecycle
+preamble. Replacing only the source files with a pre-change snapshot therefore
+does not isolate the product version: the runtime can supply current task,
+dispatch and authority rules alongside old source. Do not treat such a
+prompt-substituted run as old-contract discrimination or a causal old/new
+comparison, even when its judge reads the same snapshot.
+
+A comparative claim requires actual versioned execution under otherwise equal
+runtime conditions. This runbook does not define that experiment.
 
 ## Cost
 

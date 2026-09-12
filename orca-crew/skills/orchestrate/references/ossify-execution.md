@@ -17,20 +17,19 @@ Four facts, **all** of them, and each about the session you are in right now:
 4. a concrete spine directory exists on disk.
 
 Absent any one, this file does not apply and ossify runs as `SKILL.md` §6 says.
-**None of these activates it**: orca-crew or ossify merely installed; an environment
-variable; an `orca-execution.md` on disk; a `/plan-spine` in a session that is not the
-top. Discovery is not authority — the phase begins because *this* session planned
-*this* spine.
+**None of these activates it**: mere installation, an environment variable, an
+`orca-execution.md` on disk, a `/plan-spine` in a session that is not the top. Discovery
+is not authority — the phase begins because *this* session planned *this* spine.
 
 ## 2. Four seats, one voice
 
 | Layer | Owns | Never |
 |---|---|---|
-| **Top orchestrator** (you) | ratifying one implementer/verifier profile per item and the spine session's own seat, writing the sidecar, launching the spine terminal from `spine_command` with its model confirmed from the banner and first reply and `spine_effort` passed as the launch argument — a mismatch is a failed launch, exactly as for an item row — approving or amending each relayed worker plan, deciding the reviewer and PR-fix seats at the PR transition, dispatching the close and one work-PR session per returned PR, relaying the merge word, dispatching the record pass, and the teardown | launching or supervising an item terminal; reading raw child completion traffic; reviewing, fixing or merging a spine PR itself |
+| **Top orchestrator** (you) | ratifying one implementer/verifier profile per item and the three session blocks — spine, close, work-PR — writing the sidecar, launching the spine terminal from `spine_command` with its model confirmed from the banner and first reply and `spine_effort` passed as the launch argument — a mismatch is a failed launch, exactly as for an item row — approving or amending each relayed worker plan, deciding the reviewer and PR-fix seats at the PR transition, dispatching the close and one work-PR session per returned PR, each launched from its own ratified block with the model confirmed as an item row's, assigning each work-PR dispatch's merge executor (`MERGE_EXECUTOR`) and supplying its `PRIOR_REVIEW` — `none` only for a PR no earlier work-PR dispatch has covered, `covered` when one has and left durable evidence its review ran but persisted no record, otherwise the durable record that PR's last `open:` result persisted — asking for a writer profile and dispatching one fresh close-review writer per affected hosting repo when a close returns `halted: close-review`, relaying the merge word, dispatching the record pass, and the teardown | launching or supervising an item terminal; reading raw child completion traffic; reviewing, fixing or merging a spine PR itself |
 | **Spine session** | the ossify lane, a nested child Run, launching and supervising both item terminals per item, relaying plans up, item-local corrections | changing any ossify contract; moving item tasks into the parent Run |
 | **Item terminals** | one item each: implement, verify | crossing into another item |
 | **Close session** | one dispatch of `/ossify:close`, returning every PR it opened | creating any terminal; driving a PR it opened |
-| **Work-PR session** | one returned PR: the reviewer seat, the PR-fix seat, dispositions, ledgers, and the merge on the top's relayed word | talking to the operator; merging without that word |
+| **Work-PR session** | one returned PR: the reviewer seat, the PR-fix seat, dispositions, ledgers, and the merge on the top's relayed word under its `MERGE_EXECUTOR` assignment — always a merge commit on the named SHA, whoever executes | talking to the operator; merging without that word |
 
 ossify owns worktrees, handoffs, closes, merges and the round barrier, and knows
 nothing about the above.
@@ -38,6 +37,12 @@ nothing about the above.
 **Only the top talks to the operator; every other seat asks upward, one hop per
 layer.** And every dispatched session returns a checkable artifact — a PR list, a
 ledger comment id, a merge SHA — never narrative.
+
+**Depth is confirmed with the operator, twice over.** Before the spine session
+launches, ask the operator to confirm nested worker depth is `2`; a brief
+asserting the setting is not confirmation, and no CLI read substitutes. A
+runtime `nested_worker_depth_exceeded` is relayed to the operator as an ask —
+you never answer it yourself or record your own choice as an operator decision.
 
 The nested Run's mechanics — depth, routing, the round procedure and the close — are
 in `references/ossify-nested-run.md`.
@@ -49,7 +54,7 @@ in `references/ossify-nested-run.md`.
 ```markdown
 # Orca execution assignments
 
-schema: orca-execution/v1
+schema: orca-execution/v2
 spine_id: r7.s2
 spine_plan: ./SPINE.md
 spine_plan_oid: 1111111111111111111111111111111111111111
@@ -62,6 +67,20 @@ spine_command: claude-glm --effort max
 spine_expected_model: glm-5.3
 spine_effort: max
 spine_profile_reason: lane-driver default; this driver coordinates, it does not write.
+
+## Close session
+
+close_command: claude-glm --effort max
+close_expected_model: glm-5.3
+close_effort: max
+close_profile_reason: lane-driver default; the close is ceremony and judgment, not writing.
+
+## Work-PR session
+
+workpr_command: claude-glm --effort max
+workpr_expected_model: glm-5.3
+workpr_effort: max
+workpr_profile_reason: lane-driver default; this seat coordinates two seats and dispositions.
 
 ## Fixed procedures
 
@@ -87,19 +106,19 @@ review.
 ```
 
 **Only the terminal command, expected model and effort vary.** The three procedures
-above are fixed for every item on every spine, recorded so the spine session can check
-them rather than choose among them. No reviewer row — §5 says why; the spine
-session is a block beside the table, never a row in it.
+above are fixed for every item on every spine, recorded so the spine session
+checks rather than chooses. No reviewer row — §5 says why; every session block
+sits beside the table, never a row in it.
 
 **Authoring it.** After `/plan-spine`, recommend one implementer and one verifier
 profile per item from its scope, risk and cost. Present **every** row to the operator in
 one ratification phase and write nothing until every row is decided — a half-ratified
 sidecar looks binding and is not. Record the recommendation and any override.
 **On writing the ratified file, hash it** — `git hash-object` on the sidecar — and keep
-that value: the brief injects it as `SIDECAR_OID` and the spine session proves equality
-before it does anything. A child that sampled its own baseline after launch would
-adopt an edit made between your ratification and its first read;
-**the top records that blob id as SIDECAR_OID**, so the baseline is the operator-approved file.
+that value: the brief injects it as `SIDECAR_OID` and every launcher proves equality
+against it before spending a profile. A child that sampled its own baseline would adopt
+any edit made before its first read; **the top records that blob id as SIDECAR_OID**, so
+the baseline is the operator-approved file.
 
 **Reading it.** Before dispatching the spine session, and again before every
 item launch, the reader checks: the plan's blob id **at its real path** —
@@ -109,18 +128,32 @@ item launch, the reader checks: the plan's blob id **at its real path** —
 an item the plan does not; `ratification` reads exactly `operator-approved`;
 `ratified_in_run` equals the injected `PARENT_RUN_ID`; `spine_id` equals the
 spine being run. **Those last three are value checks, not presence checks** — a field
-that merely exists admits `rejected`, another Run's ratification, and another spine's
-sidecar, each reading as authority it never had. Any failure halts; a profile that needs
+that merely exists admits `rejected`, another Run's ratification and another spine's
+sidecar as authority. Any failure halts; a profile that needs
 to change is a new operator decision and a rewrite by you, never a substitution. **Those
-checks establish validity, not identity** — an edited but still-valid row passes every
-one — so the spine session also pins the sidecar's own blob id at step 1 and requires it
-unchanged at each launch (`ossify-nested-run.md` §3).
+checks establish validity, not identity** — an edited but still-valid row or block passes
+every one — so the sidecar's blob id is pinned against the **top-recorded `SIDECAR_OID`**
+at every launch that spends a sidecar profile: the spine session before each item
+terminal (`ossify-nested-run.md` §3), and the top before the spine session, each
+close, work-PR session and record pass. A mismatch halts that launch and asks; only
+your rewrite, the operator's re-ratification and a newly recorded oid move it.
 
 **The `## Spine session` block is read the same way** — its four keys value-checked
-beside the item rows, and **its absence halts on an activated spine**. It is
-recommended and **ratified with the item rows in the same phase**, and it changes
-nothing about the item-set equality check above: the block sits beside the table,
-never as a row in it.
+beside the item rows, and **its absence halts on an activated spine**. **The
+`## Close session` and `## Work-PR session` blocks are read identically** — four keys
+each, value-checked beside the item rows, either one's absence halting the same way —
+and all three are recommended and **ratified with the item rows in the same phase**,
+touching nothing about the item-set equality check above. The close terminal
+and each work-PR session launch from their own ratified blocks, the model
+confirmed from the banner and first reply exactly as an item row's is.
+
+**A v1 sidecar is not a v2 sidecar with defaults missing.** A sidecar whose `schema:` reads
+`orca-execution/v1` halts any new v2 launch: you rewrite it — adding the two blocks, moving
+the schema line — the operator re-ratifies it in one phase, and only a new `SIDECAR_OID`
+moves anything. No session upgrades, completes or rewrites a sidecar itself. A plugin
+update replaces no live seat — terminals already launched run to their boundaries — but
+the next governed launch (close, work-PR, record pass, new spine) still requires v2 under
+that explicit re-ratification.
 
 ## 4. Scope of the fresh-pair rule
 
@@ -143,7 +176,6 @@ model, effort and `/code-review` level, and put **all four** into the **work-PR
 session's** brief (`ossify-pr-briefs.md`) — that session creates the reviewer from the
 decided command and confirms its model from the banner and first reply exactly as an
 item row is; step 8's `claude-glm-flash` is the default only outside such a spine.
-Neither the spine session nor the sidecar selects it.
 
 **Decide the PR-fix implementer in the same breath.** Every item pair was released at
 its item's close and the spine session was a coordinator, not a writer — so step 10's
@@ -154,8 +186,15 @@ session**, only once its disposition ledger exists, on `briefs.md`'s **fix-round
 brief** rather than the planned-implementer brief, whose DONE opens a new PR: it works
 the PR that already exists. One seat per PR, released at merge.
 
+**A close-review writer is not this seat.** When a close halts on its own review
+(`ossify-nested-run.md` §4), ask the operator for that writer's profile at the
+halt and dispatch one writer per affected hosting repo, each from
+`references/ossify-close-writer.md`, bounded to its own repo's worktree — not
+the PR-fix seat, chosen at the transition or early.
+
 ## 6. Briefs
 
-The spine and item briefs are in `references/ossify-briefs.md`, the close and work-PR
-briefs in `references/ossify-pr-briefs.md`; `references/briefs.md`'s templates are
-unchanged and still apply elsewhere, its fix-round brief included (§5).
+The spine and item briefs are in `references/ossify-briefs.md`, the close and
+work-PR briefs in `references/ossify-pr-briefs.md`, the close-review writer's
+in `references/ossify-close-writer.md`; `references/briefs.md`'s templates still
+apply elsewhere, its fix-round brief included (§5).

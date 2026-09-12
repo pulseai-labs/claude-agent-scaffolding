@@ -6,15 +6,18 @@ expected_reason: 'Two halves. The refusal: the reviewers command, model, effort 
   PR does not exist yet, and a reviewer profile chosen before there is a diff to read
   is a guess recorded as a decision. So the operators request to settle it now, however
   efficient, is declined and the sidecar is written with its seven item columns and
-  no reviewer column. Note that a spine_session block IS ratified in that same phase
-  - the spine seat is a ratified block beside the table - so declining the reviewer
+  no reviewer column. Note that the three SESSION blocks - spine, close and work-PR -
+  ARE ratified in that same phase, each a ratified block beside the table, so declining
+  the reviewer
   is not a general rule that nothing but item rows may be ratified. The positive half:
   at the spines PR transition the top asks separately for reviewer command, expected
   model, effort and /code-review level, and TWO profiles are decided there, not one
   - alongside the reviewer the top also decides a single PR-fix implementer, because
   every item pair was released at its items close and no implementer survives to the
   PR. Both go into the WORK-PR SESSIONS brief, not into a reviewer task the top runs:
-  the top dispatches one work-PR session per returned PR, that session creates the
+  the top dispatches one work-PR session per returned PR - launched from the sidecars
+  ratified Work-PR session block, which is why that seat needs no PR-transition
+  decision of its own - and that session creates the
   reviewer and the PR-fix seat inside its own child Run and runs the whole review-fix
   loop, and the top only relays the merge word it gets from the operator. The wrong
   answers this fixture falsifies are: adding a reviewer column or a reviewer row because
