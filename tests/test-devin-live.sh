@@ -1,18 +1,25 @@
 #!/usr/bin/env bash
 # test-devin-live.sh — Hermetic real Devin loader integration gate
 #
-# Installs the real root meta-plugin and the four real plugins from the
-# local worktree, asserts exact plugin versions and complete skill
-# inventories, verifies Ossify opt-in exclusion, checks that plugins info
+# Builds a throwaway git "remote" carrying this worktree's exact tracked and
+# untracked tree (dep URLs rewritten to file://), installs the root
+# meta-plugin through real git-subdir transport, and asserts exact plugin
+# versions and complete skill inventories.  This is deliberately NOT the
+# GitHub remote — git-subdir deps in the real manifest fetch over the
+# network, which made an earlier revision of this gate assert remote content
+# while claiming to test local.  file:// + GIT_ALLOW_PROTOCOL keeps the
+# transport real and the content local.
+#
+# Also verifies the five-plugin baseline install, checks that plugins info
 # advertises only approved assets, verifies linked-edit visibility, removes
 # all plugins, and asserts no contamination of real user config.
 #
-# Pinned to devin 3000.4.25. Fails (not skips) when the binary is unavailable.
+# Pinned to devin 3000.10.21. Fails (not skips) when the binary is unavailable.
 # Never touches real user configuration — uses isolated HOME/XDG/data/cache.
 
 set -euo pipefail
 
-EXPECTED_DEVIN_VERSION="3000.5.20"
+EXPECTED_DEVIN_VERSION="3000.10.21"
 COMMAND_TIMEOUT_SECS=60
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
@@ -51,7 +58,8 @@ for REQUIRED in \
   "workspace-init/.devin-plugin/plugin.json" \
   "ai-mentor/.devin-plugin/plugin.json" \
   "architect-critic/.devin-plugin/plugin.json" \
-  "ossify/.devin-plugin/plugin.json"
+  "ossify/.devin-plugin/plugin.json" \
+  "code-judo/.devin-plugin/plugin.json"
 do
   if [ ! -f "$ROOT/$REQUIRED" ]; then
     printf 'FAIL: fixture absent: %s\n' "$REQUIRED" >&2
@@ -168,35 +176,52 @@ run_devin() {
     XDG_CACHE_HOME="$ISOLATED_CACHE" \
     PATH="$SAFE_PATH" \
     NO_COLOR=1 TERM=dumb DEVIN_AUTO_UPDATE=0 \
+    GIT_ALLOW_PROTOCOL="file:git:https:ssh" \
     "$DEVIN_BIN" "$@"
 }
 
 ###############################################################################
-# Probe 1: Install root meta-plugin → exactly three baseline plugins
+# Hermetic remote — a temp git repo carrying this worktree's exact tree so
+# git-subdir dependencies resolve over real git transport without network.
 ###############################################################################
-printf 'Probe 1: Install meta-plugin, assert three baseline plugins\n'
+REMOTE_REPO="$TEST_ROOT/marketplace-remote"
+mkdir -p "$REMOTE_REPO"
 
-run_devin plugins install --local -y "$ROOT" >/dev/null 2>&1
+# Copy every tracked + untracked-not-ignored file (no .git), preserving layout.
+( cd "$ROOT" && git ls-files -co --exclude-standard ) | while IFS= read -r rel; do
+  mkdir -p "$REMOTE_REPO/$(dirname "$rel")"
+  cp "$ROOT/$rel" "$REMOTE_REPO/$rel"
+done
+
+# Rewrite dep URLs to the hermetic remote, then commit the exact tree.
+jq '.requiredPlugins |= map(.url = "file://'"$REMOTE_REPO"'")' \
+  "$REMOTE_REPO/.devin-plugin/plugin.json" > "$REMOTE_REPO/.devin-plugin/plugin.json.tmp" \
+  && mv "$REMOTE_REPO/.devin-plugin/plugin.json.tmp" "$REMOTE_REPO/.devin-plugin/plugin.json"
+
+git -C "$REMOTE_REPO" init -q
+git -C "$REMOTE_REPO" add -A
+git -C "$REMOTE_REPO" -c user.email=devin-live@test -c user.name=devin-live \
+  commit -qm "hermetic remote snapshot" >/dev/null
+
+###############################################################################
+# Probe 1: Install root meta-plugin → exactly five baseline plugins
+###############################################################################
+printf 'Probe 1: Install meta-plugin, assert five baseline plugins\n'
+
+run_devin plugins install --local -y "$REMOTE_REPO" >/dev/null 2>&1
 
 # List installed plugins (text output, not --json)
 installed_text="$(run_devin plugins list 2>&1)"
 installed_names="$(plugins_list_names "$installed_text")"
 
-# Assert exactly three baseline plugins are present
-for expected in workspace-init ai-mentor architect-critic; do
+# Assert exactly five baseline plugins are present
+for expected in workspace-init ai-mentor architect-critic ossify code-judo; do
   if printf '%s\n' "$installed_names" | grep -qx "$expected"; then
     pass "baseline plugin installed: $expected"
   else
     fail "baseline plugin missing: $expected"
   fi
 done
-
-# Assert Ossify is absent (optional, not auto-installed)
-if printf '%s\n' "$installed_names" | grep -qx "ossify"; then
-  fail "ossify should be absent (optional, not auto-installed)"
-else
-  pass "ossify absent (optional, not auto-installed)"
-fi
 
 # Assert the meta-plugin itself is present
 if printf '%s\n' "$installed_names" | grep -qx "claude-agent-scaffolding-devin"; then
@@ -205,13 +230,21 @@ else
   fail "meta-plugin missing"
 fi
 
+# Exactness: nothing beyond the five baseline plugins plus the meta-plugin
+installed_count="$(printf '%s\n' "$installed_names" | grep -c '^.')"
+if [ "$installed_count" = "6" ]; then
+  pass "exactly six entries installed (five baseline + meta)"
+else
+  fail "expected 6 installed entries (five baseline + meta), got $installed_count"
+fi
+
 ###############################################################################
 # Probe 2: Assert plugin versions
 ###############################################################################
 printf '\nProbe 2: Plugin versions\n'
 
 # Read versions from the native manifests and compare with plugins list output
-for plugin in workspace-init ai-mentor architect-critic; do
+for plugin in workspace-init ai-mentor architect-critic ossify code-judo; do
   manifest="$ROOT/$plugin/.devin-plugin/plugin.json"
   expected_version="$(jq -r '.version' "$manifest" 2>/dev/null || echo '?')"
   # Extract version from the plugins list text output
@@ -287,15 +320,47 @@ do
   fi
 done
 
-# Ossify skills should be absent
+# Ossify: the six-skill Devin claim plus the local worker
 for expected in \
   "ossify:start" \
-  "ossify:work-item"
+  "ossify:plan-release" \
+  "ossify:plan-spine" \
+  "ossify:work-item" \
+  "ossify:close" \
+  "ossify:doctor" \
+  "ossify:work-item-worker"
 do
   if printf '%s\n' "$skill_names" | grep -qx "$expected"; then
-    fail "ossify skill should be absent: $expected"
+    pass "skill advertised: $expected"
   else
-    pass "ossify skill absent: $expected"
+    fail "skill missing: $expected"
+  fi
+done
+
+# Deferred ossify skills must NOT advertise on this surface
+for unexpected in \
+  "ossify:adopt" \
+  "ossify:challenge" \
+  "ossify:wayfinder"
+do
+  if printf '%s\n' "$skill_names" | grep -qx "$unexpected"; then
+    fail "deferred ossify skill advertised: $unexpected"
+  else
+    pass "deferred ossify skill absent: $unexpected"
+  fi
+done
+
+# Code Judo: 4 skills
+for expected in \
+  "code-judo:codebase-design" \
+  "code-judo:deep-review" \
+  "code-judo:deepen-architecture" \
+  "code-judo:domain-modeling"
+do
+  if printf '%s\n' "$skill_names" | grep -qx "$expected"; then
+    pass "skill advertised: $expected"
+  else
+    fail "skill missing: $expected"
   fi
 done
 
@@ -304,7 +369,7 @@ done
 ###############################################################################
 printf '\nProbe 4: plugins info approved assets\n'
 
-for plugin in workspace-init ai-mentor architect-critic; do
+for plugin in workspace-init ai-mentor architect-critic ossify code-judo; do
   info="$(run_devin plugins info "$plugin" 2>&1)"
   # Should show skills
   if printf '%s' "$info" | grep -qi 'skill'; then
@@ -312,7 +377,11 @@ for plugin in workspace-init ai-mentor architect-critic; do
   else
     fail "$plugin info does not show skills"
   fi
-  # Should show rules (dispatcher-path)
+done
+
+# Rules sections only where rules ship (dispatcher-path overlays)
+for plugin in workspace-init architect-critic ossify; do
+  info="$(run_devin plugins info "$plugin" 2>&1)"
   if printf '%s' "$info" | grep -qi 'rule\|dispatcher'; then
     pass "$plugin info shows rules"
   else
@@ -321,44 +390,47 @@ for plugin in workspace-init ai-mentor architect-critic; do
 done
 
 ###############################################################################
-# Probe 5: Install Ossify → fourth plugin and six-skill inventory
+# Probe 5: Independent installability — one baseline plugin alone in a fresh
+# isolated HOME installs without the meta-plugin
 ###############################################################################
-printf '\nProbe 5: Install Ossify, assert six skills\n'
+printf '\nProbe 5: Independent plugin install\n'
 
-run_devin plugins install --local -y "$ROOT/ossify" >/dev/null 2>&1
+IND_HOME="$TEST_ROOT/home-ind"
+mkdir -p \
+  "$IND_HOME/.config/devin" \
+  "$IND_HOME/.local/share/devin" \
+  "$IND_HOME/.cache"
+cp "$ISOLATED_CONFIG/devin/config.json" "$IND_HOME/.config/devin/config.json"
+cp "$ISOLATED_DATA/devin/credentials.toml" "$IND_HOME/.local/share/devin/credentials.toml"
+chmod 600 "$IND_HOME/.local/share/devin/credentials.toml"
 
-# Re-list installed plugins
-installed_after="$(run_devin plugins list 2>&1)"
-installed_names_after="$(plugins_list_names "$installed_after")"
+env -i \
+  HOME="$IND_HOME" \
+  XDG_CONFIG_HOME="$IND_HOME/.config" \
+  XDG_DATA_HOME="$IND_HOME/.local/share" \
+  XDG_CACHE_HOME="$IND_HOME/.cache" \
+  PATH="$SAFE_PATH" \
+  NO_COLOR=1 TERM=dumb DEVIN_AUTO_UPDATE=0 \
+  GIT_ALLOW_PROTOCOL="file:git:https:ssh" \
+  "$DEVIN_BIN" plugins install --local -y "$ROOT/code-judo" >/dev/null 2>&1
 
-if printf '%s\n' "$installed_names_after" | grep -qx "ossify"; then
-  pass "ossify installed after explicit install"
+ind_text="$(env -i \
+  HOME="$IND_HOME" \
+  XDG_CONFIG_HOME="$IND_HOME/.config" \
+  XDG_DATA_HOME="$IND_HOME/.local/share" \
+  XDG_CACHE_HOME="$IND_HOME/.cache" \
+  PATH="$SAFE_PATH" \
+  NO_COLOR=1 TERM=dumb DEVIN_AUTO_UPDATE=0 \
+  GIT_ALLOW_PROTOCOL="file:git:https:ssh" \
+  "$DEVIN_BIN" plugins list 2>&1)"
+ind_names="$(plugins_list_names "$ind_text")"
+ind_count="$(printf '%s\n' "$ind_names" | grep -c '^.')"
+
+if printf '%s\n' "$ind_names" | grep -qx "code-judo" && [ "$ind_count" = "1" ]; then
+  pass "code-judo installs independently (exactly one plugin in fresh HOME)"
 else
-  fail "ossify not installed after explicit install"
+  fail "code-judo independent install failed (count=$ind_count): $ind_names"
 fi
-
-# Re-list skills
-skills_json_after="$(run_devin skills list --json 2>/dev/null)"
-skill_names_after="$(printf '%s' "$skills_json_after" | "$NODE_BIN" -e '
-  const data = JSON.parse(require("fs").readFileSync(0,"utf8"));
-  for (const s of data) console.log(s.name);
-')"
-
-# Ossify: 6 skills
-for expected in \
-  "ossify:start" \
-  "ossify:plan-release" \
-  "ossify:plan-spine" \
-  "ossify:work-item" \
-  "ossify:close" \
-  "ossify:doctor"
-do
-  if printf '%s\n' "$skill_names_after" | grep -qx "$expected"; then
-    pass "ossify skill advertised: $expected"
-  else
-    fail "ossify skill missing: $expected"
-  fi
-done
 
 ###############################################################################
 # Probe 6: Remove all four plugins, assert no plugin remains
@@ -368,7 +440,7 @@ printf '\nProbe 6: Remove all plugins, assert clean state\n'
 # Remove meta-plugin first (required plugins can't be removed while it's installed)
 run_devin plugins remove -y claude-agent-scaffolding-devin >/dev/null 2>&1 || true
 # Then remove each individual plugin
-for plugin in workspace-init ai-mentor architect-critic ossify; do
+for plugin in workspace-init ai-mentor architect-critic ossify code-judo; do
   run_devin plugins remove -y "$plugin" >/dev/null 2>&1 || true
 done
 
