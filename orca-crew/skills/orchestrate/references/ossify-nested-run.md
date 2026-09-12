@@ -148,7 +148,8 @@ fixes, and no seat is created for this permanently.
 hosting-repo worktree, launched from the sidecar's ratified Work-PR-session block, and
 briefed with the two profiles you decided at the PR transition
 (`ossify-execution.md` §5), the merge-executor assignment, and `PRIOR_REVIEW` — `none`
-for a PR no earlier work-PR dispatch has covered, otherwise the durable record that
+for a PR no earlier work-PR dispatch has covered, `covered` when one has but left
+no record, otherwise the durable record that
 PR's last `open:` result persisted. It owns both PR seats in a child Run of its own,
 relays one summary per round, and asks you for the merge word; you ask the operator,
 and the merge lands under the reply's executor — a merge commit on the SHA the reply

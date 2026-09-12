@@ -237,6 +237,8 @@ pin "$PRBRIEFS_MD" 'WORKPR_EXPECTED_MODEL=' \
   "the work-PR brief injects its ratified expected model exactly once"
 pin "$PRBRIEFS_MD" 'PRIOR_REVIEW=' \
   "the work-PR brief injects the prior review record exactly once"
+pin "$PRBRIEFS_MD" '"covered"' \
+  "PRIOR_REVIEW has a third value for a covered-but-recordless PR"
 pin "$PRBRIEFS_MD" 'MERGE_EXECUTOR=' \
   "the work-PR brief injects the top's merge-executor assignment exactly once"
 pin "$PRBRIEFS_MD" 'halted: close-review' \

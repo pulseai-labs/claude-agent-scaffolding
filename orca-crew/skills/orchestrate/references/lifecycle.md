@@ -25,7 +25,8 @@ Every command's syntax comes from `orca skills get orchestration`.
    PR's own hosting-repo worktree, launched from the sidecar's ratified Work-PR-session
    block, carrying the reviewer **and** PR-fix profiles you
    decide now, the merge-executor assignment, and `PRIOR_REVIEW` (`none` for a PR no
-   earlier work-PR dispatch has covered, otherwise the record its last `open:` result
+   earlier work-PR dispatch has covered, `covered` when one has but left no record,
+   otherwise the record its last `open:` result
    persisted): steps 8-12 are that session's loop, and you relay the merge word to it
    rather than merging yourself. Once every returned PR has merged, dispatch the record
    pass — a second close — and only then tear down: **step 12's worker release and

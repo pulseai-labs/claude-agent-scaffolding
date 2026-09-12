@@ -141,7 +141,9 @@ aligned.
    fix task waits for the disposition ledger and rides the fix-round brief.
    The work-PR session branches **initial versus resumed before any reviewer
    exists**, on the top-supplied `PRIOR_REVIEW`: `none` is an initial run;
-   a record whose reviewed head equals the current PR head resumes disposition
+   `covered` — a dispatch worked the PR but persisted no record — resumes the
+   same way, no reviewer created, the live GitHub signals as the baseline; a
+   record whose reviewed head equals the current PR head resumes disposition
    with **no reviewer created**, and a moved head re-fetches the GitHub signals
    with the prior review and its unresolved findings as the baseline — same head
    or moved, **zero additional delegated reviews**; a record inconsistent with

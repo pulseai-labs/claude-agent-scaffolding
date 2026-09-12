@@ -12,8 +12,7 @@ see, angle brackets are slots, fill every slot and delete nothing else.
 
 ## Close session (one fresh terminal per dispatch, created by the top)
 
-It creates nothing and returns a list. Dispatched fresh every time: for the
-ceremony, again for every halt remediated, and once for the record pass — only
+It creates nothing, returns a list, and is dispatched fresh every time — only
 the successful record pass is single and conditional.
 
 ```text
@@ -50,12 +49,11 @@ carrying exactly one of three results: EVERY PR the close opened — one line pe
 #<number> <url>`; the single word `closed` when it recorded the spine with no PR
 open; or `halted: <step> — <evidence>` when it stopped, naming the failing step and
 repo and, on its own line, what it had already opened: `opened: <repo> #<n> <url> …`
-or `opened: none`. A multi-repo close can open in one repo and halt on the next:
-a halt that hides those PRs strands them, and the top settles it without
-advancing the lifecycle. Whenever the
-close review ran, carry its ledger verbatim too — each finding, its decision and
-the reason: the record pass runs in a different session and cannot
-reconstruct it, and the close-review halt's evidence is that ledger.
+or `opened: none`. A multi-repo close can open in one repo and halt on the
+next: a halt that hides those PRs strands them, and the top settles it
+without advancing the lifecycle. Whenever the close review ran, carry its
+ledger verbatim too — each finding, its decision and the reason: the record
+pass runs in a different session and cannot reconstruct it.
 Then:
   Changed / Evidence / Open / Files.
 
@@ -97,7 +95,7 @@ PRFIX_COMMAND=<exact launch command>
 PRFIX_EXPECTED_MODEL=<model id the banner must show>
 PRFIX_EFFORT=<exact launch argument>
 PRIOR_REVIEW=<the prior dispatch's durable review record — ran, reviewed head,
-clean/findings state, summary, ledger/comment refs — or "none">
+clean/findings state, summary, ledger/comment refs — "none", or "covered">
 MERGE_EXECUTOR=<session|operator — the top's explicit assignment>
 STOPPING_RULE=<the rule agreed before the PR opened>
 TASK/DISPATCH: your task and dispatch identities come from the Orca preamble
@@ -112,10 +110,13 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      --run PARENT_RUN_ID.
   2. Decide your startup branches BEFORE any seat exists. MERGE_EXECUTOR must
      read exactly `session` or `operator` — a missing, invalid or unknown
-     assignment is asked upward and nothing is created. Then branch on PRIOR_REVIEW:
-     `none` means the top dispatched you onto a PR no earlier
+     assignment is asked upward and nothing is created. Then branch on
+     PRIOR_REVIEW. `none` means the top dispatched you onto a PR no earlier
      work-PR dispatch has covered — an initial run, and step 3 creates the
-     reviewer. A record whose reviewed head equals the current PR head is a
+     reviewer. `covered` means a dispatch worked this PR but persisted no
+     record — a resumed run with no reviewer created, the GitHub signals on
+     the current head as your baseline. A record whose
+     reviewed head equals the current PR head is a
      resumed run: skip only step 3's reviewer creation — the review already
      ran — and enter step 4 with the record and its unresolved findings as
      your disposition baseline. A record whose reviewed head differs is a
@@ -148,8 +149,8 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      return — post the ledger, file deferrals as tracked issues in PR_REPO, and
      dispatch fix tasks to a PR-fix seat — briefed from `briefs.md`'s fix-round
      brief but **without the ossify replacement clause**, which would start a
-     second review-fix-merge loop with a merge ask of its own inside this one; it
-     works the fix list you give it, pushes, and returns `fixed in <sha>` per
+     second merge loop inside this one; it works the fix list you give it,
+     pushes, and returns `fixed in <sha>` per
      finding, never running work-pr and never asking for a merge — created from
      PRFIX_COMMAND at PRFIX_EFFORT — confirm PRFIX_EXPECTED_MODEL from its banner
      and first reply before the first fix task; a mismatch is a failed launch
@@ -189,8 +190,7 @@ delegated review ran, its reviewed head, its clean/findings state and summary,
 and the durable ledger/comment references — the next fresh work-PR dispatch
 receives that record as PRIOR_REVIEW, with fresh dispatch identities even
 though the review state is reused. Both settle this dispatch and release both
-seats — checkable artifacts, never narrative. On the open shape the top does
-not advance to the record pass, and a
+seats. On the open shape the top does not advance to the record pass, and a
 later merge is a new work-PR dispatch, not a resumption of this one.
 Then: Changed / Evidence / Open / Files.
 
