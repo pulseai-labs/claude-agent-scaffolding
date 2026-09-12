@@ -136,8 +136,9 @@ Every command's syntax comes from `orca skills get orchestration`.
     exists whose head OID equals the branch tip — on an activated ossify spine (1b) the
     merge lands on the word you relay under that dispatch's `MERGE_EXECUTOR`
     assignment — always a merge commit on the named SHA, session or operator —
-    and both of these wait until the
-    second close's record pass has returned. **A closed spine has no PR to confirm**,
+    and the wait for that record pass covers the top's spine-level teardown
+    alone: the work-PR session's own seats released when their work finished,
+    never held here. **A closed spine has no PR to confirm**,
     so its teardown validates the close's own result instead — the local landing it
     recorded in each hosting repo — and waits for no record pass.
 13. **Handoff.** If the Run outlives the session, write a handoff naming the Run id,

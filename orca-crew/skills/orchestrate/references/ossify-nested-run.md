@@ -161,7 +161,8 @@ session's loop, not yours.
 **Then, once every returned PR has merged, one record pass** — a second
 `/ossify:close <spine-id>`, to another fresh close session. **Hold step 12's teardown —
 worker release, branch deletion — until that pass returns:** it resolves the spine
-branch again.
+branch again. That hold is the top's spine-level teardown; the work-PR
+session's own seats released when their work finished (#448).
 
 That second dispatch is **conditional and single**: it happens
 only when the first returned at its open-PR halt naming at least one PR, and only once
