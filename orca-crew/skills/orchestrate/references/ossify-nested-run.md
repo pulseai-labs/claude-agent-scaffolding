@@ -12,12 +12,15 @@ dispatch is the runtime proof.
 If a child dispatch returns `nested_worker_depth_exceeded`, the spine session stays
 the lane owner, reports the blocker, and waits for an operator decision. It does not
 substitute a Claude subagent, move item tasks into the parent Run, create a
-replacement writer, or restart the lane.
+replacement writer, or restart the lane. The report goes up as an ask the top relays
+to the operator — the top does not answer a depth refusal itself.
 
 ## 2. The nested Run
 
-Your brief injects the spine session's identities explicitly (`ossify-briefs.md`); that
-session then creates and binds a **child Run** for item tasks, which does not reset
+Your brief injects the spine session's scope identities explicitly (`ossify-briefs.md`);
+its task and dispatch identities arrive in the Orca preamble injected with its
+dispatch, and it captures them — with `PARENT_RUN_ID` — **before** binding anything
+below. It then creates and binds a **child Run** for item tasks, which does not reset
 nested depth.
 
 - child `task-create`, `worker-start`/`dispatch` and `check` always name
@@ -86,9 +89,13 @@ close-the-Run step: the CLI exposes none.
 7. Initial gaps are handled inside the spine session: it asks you for the operator's
    answers, remains the handoff writer, appends clarifications, and re-requests the item
    within ossify's three-attempt cap.
-8. Feed accepted results into the lane in declared decomposition order. Keep each pair
-   until its item closes or escalates, then release it. **No terminal is ever
-   transferred to another item.**
+8. Feed accepted results into the lane in declared decomposition order, **closing each
+   item before the next feeds**: the lane gates the result, commits it in the worktree
+   and merges `work/<wi>` into the spine branch — the per-item close, driven from here
+   and not the spine-close ceremony §4 dispatches. An item whose close has not landed
+   (still `active`, nothing merged) is not accepted. Keep each pair until its own item
+   closes or escalates, then release it. **No terminal is ever transferred to another
+   item.**
 
 Same-round pairs may run concurrently. Closes and merges stay serial and the
 round barrier is ossify's, unchanged.
@@ -104,10 +111,24 @@ creates nothing, runs the close, and returns what the close opened
 (`ossify-pr-briefs.md`). You do not run it here — SKILL.md §6 lists `close` among the
 dispatched commands, and the delegation floor keeps suites out of your session.
 
+**Before reporting the barrier, the spine session verifies every item of the spine is
+closed** — no `active` item, each merge landed on the spine branch. An item still
+active at the proposed barrier is a halt naming the item and the missing close, never
+success; remediation is the top's to decide, and a fresh spine-level completion is
+required before this section runs.
+
 **The first close opens one PR per hosting repo and halts while any is open**,
 recording nothing (`close/references/spine-close.md`); its `worker_done` names **every**
 PR it opened, repo and number — or the single word `closed`, when every hosting repo
 was remote-less and it recorded the spine outright.
+
+**Hosting repo means a declared product `target_repo`** — the distinct product repos
+the spine's work items declare. An AI workspace carrying the spine's ceremony records
+is not one: its records stay on that repo's record branch and integrate under its own
+policy, outside the PR list this lane returns; nobody pushes them to its `main`
+directly, and no session claims ossify opened a PR there. Ossify's own landing rule —
+a repo with a remote lands by PR, a remote-less one merges locally — is unchanged and
+decides each product repo's arm.
 
 A multi-repo close can also open a PR in one repo and then halt on a later one, so it
 returns `halted:` naming what it opened so far. **Dispatch nothing downstream — no
@@ -115,9 +136,20 @@ work-PR session, no record pass — until a close returns a complete PR list or 
 A halt settles that dispatch only: remediate the blocker it names, then dispatch a
 **fresh** close session, as many times as that takes.
 
+**A close that halts on its own review returns `halted: close-review` with the
+ledger.** The ceremony's accumulated-diff review is the close seat's to run, never to
+fix: a `fix now` disposition ends that dispatch. The top asks the operator for a
+writer profile, dispatches a fresh writer in the spine worktree with the accepted
+ledger and a bounded edit scope, then dispatches a fresh close, which re-runs the
+review over the amended diff. Neither the close nor the work-PR session applies these
+fixes, and no seat is created for this permanently.
+
 **Then one work-PR session per returned PR**, each created in that PR's own
-hosting-repo worktree and briefed with the two profiles you decided at the PR
-transition (`ossify-execution.md` §5). It owns both PR seats in a child Run of its own,
+hosting-repo worktree, launched from the sidecar's ratified Work-PR-session block, and
+briefed with the two profiles you decided at the PR transition
+(`ossify-execution.md` §5), the merge-executor assignment, and `PRIOR_REVIEW` — `none`
+for a PR no earlier work-PR dispatch has covered, otherwise the durable record that
+PR's last `open:` result persisted. It owns both PR seats in a child Run of its own,
 relays one summary per round, and asks you for the merge word; you ask the operator,
 and it merges bound to the SHA the reply names. `lifecycle.md` steps 8-12 are that
 session's loop, not yours.

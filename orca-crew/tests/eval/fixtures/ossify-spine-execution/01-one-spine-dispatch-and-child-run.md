@@ -2,7 +2,9 @@
 scenario_id: 01-one-spine-dispatch-and-child-run
 expected_outcome: proceed
 expected_reason: 'All four activation facts hold, so the phase applies. The top ratifies
-  every row with the operator in ONE phase and writes nothing until every row is decided,
+  every row AND the three session blocks - spine, close and work-PR session, each a
+  ratified block beside the item table - with the operator in ONE phase and writes nothing
+  until every row and block is decided,
   writes the sidecar, confirms nested worker depth is 2 (no CLI read proves it), and
   starts EXACTLY ONE spine session - it launches no item terminal itself - injecting
   that sessions identities including the spine id it will spend. The spine session

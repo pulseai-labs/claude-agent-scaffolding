@@ -62,15 +62,16 @@ ossify's ceremonies (`start`, `adopt`, `plan-release`, `plan-spine`, `wayfinder`
 (`run-spine`, `work-item`, `close`, `work-pr`, `doctor`) are dispatched to Orca sessions.
 No ossify contract changes.
 
-## Spine execution assignments (0.3.0, amended 0.4.0)
+## Spine execution assignments (0.3.0, amended 0.4.0 and 0.5.0)
 
 When this session has just planned an ossify spine — and only then; installation, an
 environment variable, or a sidecar found on disk activate nothing — the run takes three
 layers instead of one dispatched lane driver:
 
 1. The **top orchestrator** recommends one implementer and one verifier profile per work
-   item, has the operator ratify every row in a single phase, writes
-   `$SPINE_DIR/orca-execution.md` (`orca-execution/v1`), and starts one spine session. It
+   item, has the operator ratify every row and the three session blocks in a single
+   phase, writes `$SPINE_DIR/orca-execution.md` (`orca-execution/v2`), and starts one
+   spine session. It
    approves each relayed worker plan and later chooses the reviewer. It launches no item
    terminal.
 2. The **spine session** runs the ossify lane in external-executor mode and creates a
@@ -110,6 +111,22 @@ first close that halted naming PRs, and only once all of them have merged (D27).
 phase's prose is three references now: `ossify-execution.md` (the contract),
 `ossify-nested-run.md` (the mechanics) and `ossify-pr-briefs.md` (the close and work-PR
 briefs).
+
+**0.5.0 amends the coordinator contracts.** The sidecar gains ratified `## Close
+session` and `## Work-PR session` blocks beside the Spine-session block and versions to
+`orca-execution/v2` — a v1 sidecar halts a new launch until the top rewrites it and the
+operator re-ratifies; nothing auto-upgrades and no live seat is replaced. The spine
+session closes each item through the lane — gate, commit, merge — before the barrier, and
+an item still active there is a halt, not a completion. A `fix now` close-review finding
+halts the close with its ledger; the top asks for a writer profile, dispatches a fresh
+writer, then a fresh close re-reviews. Clean delegated reviews carry their reviewed head;
+a left-open PR resumes on `PRIOR_REVIEW` — branched before any reviewer exists, zero
+additional reviews, fresh dispatch identities. The merge executor is the top's explicit
+`MERGE_EXECUTOR` assignment, never inferred or probed. Brief lifecycle identities come
+from the injected Orca preamble, never from pre-filled slots; alias-launched item
+terminals are closed explicitly and their absence verified at teardown; the PR seats are
+exempt from the record-pass hold; and the close's PR list covers product hosting repos
+only — an AI-workspace record arm is not one.
 
 ## Requirements
 

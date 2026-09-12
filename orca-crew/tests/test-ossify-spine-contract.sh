@@ -113,7 +113,7 @@ section "the sidecar schema"
 
 nonempty "$EXEC_MD" "references/ossify-execution.md exists"
 
-pin "$EXEC_MD" 'schema: orca-execution/v1' \
+pin "$EXEC_MD" 'schema: orca-execution/v2' \
   "the sidecar declares its schema version exactly once"
 
 assert_set "$(keys "$EXEC_MD" '# Orca execution assignments' '')" \
@@ -142,6 +142,15 @@ pin "$EXEC_MD" 'verifier_procedure: all-claims-work-item-verify/v1' \
 assert_set "$(keys "$EXEC_MD" '## Spine session' '')" \
   "spine_command spine_effort spine_expected_model spine_profile_reason" \
   "the spine-session block carries exactly its four keys"
+
+# S3a/#446: the close and work-PR coordinator seats are ratified sidecar blocks the
+# same way — four keys each, beside the table, never rows in it.
+assert_set "$(keys "$EXEC_MD" '## Close session' '')" \
+  "close_command close_effort close_expected_model close_profile_reason" \
+  "the close-session block carries exactly its four keys"
+assert_set "$(keys "$EXEC_MD" '## Work-PR session' '')" \
+  "workpr_command workpr_effort workpr_expected_model workpr_profile_reason" \
+  "the work-PR-session block carries exactly its four keys"
 
 pin "$EXEC_MD" 'ratified with the item rows in the same phase' \
   "the spine-session block is ratified with the item rows, not separately"
@@ -195,9 +204,10 @@ pin "$BRIEFS_MD" '/ossify:run-spine $SPINE_ID --external-executor' \
 # SPINE_ID is in this list because the brief's TASK spends it — `/ossify:run-spine
 # $SPINE_ID --external-executor` — and a brief that spends a name it never injects
 # leaves the worker to rediscover it, which is the one thing the block forbids.
-# `SPINE_ID=` is not a substring of `SPINE_TASK_ID=` or `SPINE_DISPATCH_ID=`, so the
-# exactly-once count is unambiguous.
-for id in PARENT_RUN_ID SPINE_TASK_ID SPINE_DISPATCH_ID SPINE_ID ORCA_EXECUTION_PATH; do
+# S3a/#446 RF9: the lifecycle id slots are GONE — a brief cannot know its own
+# task/dispatch ids before `dispatch --inject` exists, so the spine session takes
+# them from the Orca preamble instead. The absence controls live one section down.
+for id in PARENT_RUN_ID SPINE_ID ORCA_EXECUTION_PATH; do
   pin "$BRIEFS_MD" "$id=" "the brief injects $id exactly once"
 done
 # D24/D28: the ratified model the banner must match, and the revalidation that
@@ -206,6 +216,37 @@ pin "$BRIEFS_MD" 'SPINE_EXPECTED_MODEL=' \
   "the spine brief injects the ratified expected model exactly once"
 pin "$BRIEFS_MD" 'immediately before each item terminal is created' \
   "the sidecar is revalidated before every item launch"
+
+section "lifecycle ids come from the preamble, not from brief slots"
+
+# S3a/#446 RF9 + #454 + #447/#450 + #449, mechanical only: the removed declaration
+# slots are gone, the new injected identities exist exactly once, the close-review
+# halt has a result shape, the contradiction is deleted, and the spine brief names
+# the terminal-close command that #455 requires. The BEHAVIOUR around each (who
+# validates what, which branch runs first) is the rubric's, not this file's.
+absent "$BRIEFS_MD" 'SPINE_TASK_ID=' \
+  "the spine brief no longer declares its own task id"
+absent "$BRIEFS_MD" 'SPINE_DISPATCH_ID=' \
+  "the spine brief no longer declares its own dispatch id"
+for k in 'CLOSE_TASK_ID=' 'CLOSE_DISPATCH_ID=' 'WORKPR_TASK_ID=' 'WORKPR_DISPATCH_ID='; do
+  absent "$PRBRIEFS_MD" "$k" "the PR briefs no longer declare '$k'"
+done
+pin "$PRBRIEFS_MD" 'CLOSE_EXPECTED_MODEL=' \
+  "the close brief injects its ratified expected model exactly once"
+pin "$PRBRIEFS_MD" 'WORKPR_EXPECTED_MODEL=' \
+  "the work-PR brief injects its ratified expected model exactly once"
+pin "$PRBRIEFS_MD" 'PRIOR_REVIEW=' \
+  "the work-PR brief injects the prior review record exactly once"
+pin "$PRBRIEFS_MD" 'MERGE_EXECUTOR=' \
+  "the work-PR brief injects the top's merge-executor assignment exactly once"
+pin "$PRBRIEFS_MD" 'halted: close-review' \
+  "a close-review halt has its own result shape"
+absent "$PRBRIEFS_MD" 'per spine at most' \
+  "the close-dispatch cap contradiction is gone"
+pin "$BRIEFS_MD" 'orca terminal close --terminal' \
+  "the spine brief names the exact terminal-close command"
+pin "$GENERIC_BRIEFS_MD" 'Reviewed head: <sha>' \
+  "the reviewer DONE carries its reviewed-head line exactly once"
 
 section "the nested Run's mechanical values"
 
@@ -405,9 +446,9 @@ section "the release is declared once and agreed everywhere"
 # checked AGAINST it rather than against a literal repeated here, so a bump edits
 # one file. The literal below is what stops that from being a round trip.
 CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
-pin "$CHANGELOG_MD" '## 0.4.0' "the CHANGELOG opens a 0.4.0 section"
-for d in D24 D25 D26 D27 D28; do
-  pin "$CHANGELOG_MD" "- **$d" "the CHANGELOG records $d exactly once"
+pin "$CHANGELOG_MD" '## 0.5.0' "the CHANGELOG opens a 0.5.0 section"
+for b in '#446' '#447' '#453' '#454' '#455' '#448' '#449'; do
+  pin "$CHANGELOG_MD" "- **$b" "the CHANGELOG records $b exactly once"
 done
 head_ver="$(awk '/^## /{sub(/^## /, ""); print; exit}' "$CHANGELOG_MD")"
 for m in "$PLUGIN_ROOT/.claude-plugin/plugin.json" "$PLUGIN_ROOT/.codex-plugin/plugin.json"; do

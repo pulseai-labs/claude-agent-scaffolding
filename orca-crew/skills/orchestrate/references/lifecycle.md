@@ -11,19 +11,28 @@ Every command's syntax comes from `orca skills get orchestration`.
 1b. **Ossify spine planned here?** If this session just completed `/ossify:plan-spine`
    against a concrete spine directory with a Run bound, step 2 is replaced by
    `references/ossify-execution.md`: ratify one implementer/verifier profile per work
-   item with the operator, write the sidecar, confirm nested worker depth is 2, and
+   item and the three session blocks with the operator, write the sidecar, ask the
+   operator to confirm nested worker depth is 2, and
    start **one** spine session that creates its own child Run and launches every item
    pair. You approve relayed worker plans and wait on that one completion; you launch
    no item terminal. **That completion is the final round barrier, not a PR.** When it
-   lands you **dispatch** `/ossify:close <spine-id>` to a **fresh** close session, never
+   lands you **dispatch** `/ossify:close <spine-id>` to a **fresh** close session —
+   launched from the sidecar's ratified Close-session block — never
    the spine driver's terminal, and wait on its `worker_done`, which returns **every** PR
-   it opened, one per hosting repo, or `closed`; `close` is a dispatched command (§6),
+   it opened, one per product hosting repo — an AI-workspace record arm is not one —
+   or `closed`; `close` is a dispatched command (§6),
    not one you run here. Then **dispatch a work-PR session** per returned PR, in that
-   PR's own hosting-repo worktree, carrying the reviewer **and** PR-fix profiles you
-   decide now: steps 8-12 are that session's loop, and you relay the merge word to it
+   PR's own hosting-repo worktree, launched from the sidecar's ratified Work-PR-session
+   block, carrying the reviewer **and** PR-fix profiles you
+   decide now, the merge-executor assignment, and `PRIOR_REVIEW` (`none` for a PR no
+   earlier work-PR dispatch has covered, otherwise the record its last `open:` result
+   persisted): steps 8-12 are that session's loop, and you relay the merge word to it
    rather than merging yourself. Once every returned PR has merged, dispatch the record
    pass — a second close — and only then tear down: **step 12's worker release and
-   branch deletion wait for that pass**. **But a closed return skips the record pass**
+   branch deletion wait for that pass** — the work-PR session's own reviewer and PR-fix
+   seats are exempt: it releases them when their work finishes, and the hold covers the
+   top's spine-level teardown, not seats inside a work-PR child Run; post-merge product
+   fixes take a new PR and fresh seats. **But a closed return skips the record pass**
    and goes straight to teardown: the pass exists to record PRs, and that return named
    none. Absent any of those four facts, continue at step 2.
 2. **Decompose.** One `task-create` per brief, `--deps` for the DAG, each carrying

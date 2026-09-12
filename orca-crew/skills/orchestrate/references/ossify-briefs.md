@@ -13,8 +13,7 @@ every slot and delete nothing else.
 ## Spine session (one per spine, dispatched by the top orchestrator)
 
 The lane driver, launched **from the ratified spine_session block** in the
-sidecar, not from this skill's generic lane-driver policy. It is also a
-coordinator, which is why its brief carries parent identities.
+sidecar. It is also a coordinator, which is why its brief carries scope identities.
 
 ```text
 ROLE: ossify spine session and nested coordinator. State the model you are
@@ -24,12 +23,13 @@ PLACEMENT: <abs path of the repo or worktree the lane runs from>.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 PARENT_RUN_ID=<run id>
-SPINE_TASK_ID=<task id>
-SPINE_DISPATCH_ID=<dispatch id>
 SPINE_ID=<spine id>
 SPINE_EXPECTED_MODEL=<model id the banner must show>
 ORCA_EXECUTION_PATH=<abs path to $SPINE_DIR/orca-execution.md>
 SIDECAR_OID=<blob id the top recorded when it wrote the ratified sidecar>
+TASK/DISPATCH: your task and dispatch identities come from the Orca preamble injected
+into this terminal; spend those verbatim — never placeholders, never ids predicted
+before it existed. Capture them, and PARENT_RUN_ID, before binding your child Run.
 
 TASK: drive spine SPINE_ID to its final round barrier. A first reply whose model
 is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
@@ -54,12 +54,11 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      or effort. The verifier is not created here; step 5 creates it, once there
      is a complete return to verify. Confirm each model from the launch banner
      and the first reply; the effort is the launch argument you were given.
-     Re-run step 1's validation, the spine_session block included,
+     Re-run step 1's validation, the three session blocks included,
      immediately before each item terminal is created, and
-     require the hash to still equal the baseline;
-     any drift halts that launch and asks. Only a top reply
-     naming a new SIDECAR_OID, after it rewrote and the operator re-ratified,
-     moves it.
+     require the hash to still equal the baseline; any drift halts that launch
+     and asks. Only a top reply naming a new SIDECAR_OID, after rewrite and
+     operator re-ratification, moves it.
   4. Gather the round's implementation plans into ONE ordered ask to the top and
      wait. Relay the top's per-item decision to each implementer on its own
      original message id before any edit starts.
@@ -78,15 +77,24 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      On halt, release that item's pair, mark the item halted, and if no other item
      can proceed send a halt-shaped worker_done on the injected parent ids naming
      the item and the reason; the spine stays at its current round barrier.
-  6. Return accepted results to the lane in declared decomposition order. Keep
-     each pair until its item closes or escalates; never move a terminal to
-     another item.
+  6. Return accepted results to the lane in declared decomposition order, closing
+     each item before the next feeds: the lane gates, commits and merges
+     `work/<wi>` into the spine branch — the per-item close, distinct from the
+     spine-close ceremony the top dispatches to a fresh close session. An item
+     still `active` at a proposed barrier is a halt naming it, never a
+     completion. Keep each pair until its item closes or escalates; never move a
+     terminal to another item.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
-DONE: release every item pair first — no terminal of yours outlives the spine —
-then one worker_done using SPINE_TASK_ID and SPINE_DISPATCH_ID, the injected
-parent ids, so the top's Dispatch settles while your child Run stays bound:
+DONE: release every item pair, then close each of your item terminals explicitly —
+worker-release performs no process cleanup on an alias-launched terminal, so run
+`orca terminal close --terminal <handle>` on each exact terminal you created and
+verify `orca terminal list` shows none of them, closing only terminals you can
+prove are yours — never an active, reused, unrelated or unprovable identity — and
+reporting any teardown you cannot complete rather than claiming it. Then one
+worker_done on the identities your injected Orca preamble names, so the top's
+Dispatch settles while your child Run stays bound:
   Changed / Evidence / Open / Files, and the child Run id you bound.
 The spine is at its final round barrier when you finish; the close ceremony is
 the top's, in a fresh close session that is never this terminal.
@@ -94,9 +102,8 @@ the top's, in a fresh close session that is never this terminal.
 NEVER: launch an item terminal in the parent Run; run a Claude subagent for a
 work item; fall back to the default nested dispatch after a depth error;
 restart the lane; select the reviewer; run `/ossify:close` at all — the top
-dispatches it to a fresh close session, never to you. On
-`nested_worker_depth_exceeded`, stay alive, report it to the top, and wait for
-the operator's decision.
+dispatches it to a fresh close session. On `nested_worker_depth_exceeded`, stay
+alive, report it to the top, and wait for the operator's decision.
 ```
 
 ---
@@ -187,8 +194,7 @@ failures:
 - <one finding per line>
 ```
 
-The implementer's own contract says what to do with it. Do not restate that
-contract here, and do not send a second packet while the first is being worked.
-This packet is for a *correct* decision only. A *replace* sends none: it resets the
-worktree to the request's `base_sha` and re-requests the item, so the fresh pair has
-nothing to adopt and starts as an ordinary first run.
+The implementer's own contract says what to do with it. Do not restate that contract
+here, and do not send a second packet while the first is being worked. This packet is
+for a *correct* decision only; a *replace* sends none — it resets the worktree to the
+request's `base_sha` and re-requests the item, so the fresh pair starts from clean.

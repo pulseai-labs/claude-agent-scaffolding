@@ -2,6 +2,58 @@
 
 All notable changes to the `orca-crew` plugin.
 
+## 0.5.0
+
+The **coordinator contracts**: every seat a spine spends is now ratified, completions are
+checkable against durable state, and the PR lane's review state survives fresh dispatches.
+**Everywhere else nothing moves:** standalone ossify is untouched and the generic role
+table, class routing and retention still govern every session outside an activated spine.
+
+- **#446** — the sidecar versions to `orca-execution/v2` and gains ratified
+  `## Close session` and `## Work-PR session` blocks beside the item table (command,
+  expected model, effort, reason; recommended defaults, operator-ratified per spine), each
+  seat launched from its block with the model confirmed as an item row's. A v1 sidecar
+  halts any new v2 launch until the top rewrites it and the operator re-ratifies — no
+  auto-completion, no in-session rewrite; a plugin update replaces no live seat, but the
+  next governed launch requires v2. The pilot facets: depth 2 is asked of the operator
+  before launch and a runtime depth refusal is relayed as an ask, the top never deciding
+  or relabelling (RF4/RF6); the close's PR list covers product `target_repo` hosting
+  repos only — an AI-workspace record arm is not one, its records stay on a record branch
+  and never reach its `main` (RF7); a post-disposition P0/P1 returns through the blocking
+  ask before any seat acts (RF8); and briefs stop declaring their own task/dispatch ids —
+  lifecycle identities come from the injected Orca preamble, captured before a child Run
+  binds (RF9).
+- **#447**/**#450** — one review record across fresh dispatches. The reviewer's DONE is a
+  single ordered shape — findings line(s), then `Reviewed head:` and `Summary:`, the head
+  line never optional on a clean review; the work-PR session validates the reviewed head
+  against the PR head, a mismatch making the review historical (signals re-fetched, never
+  a second delegated review, absent signals never satisfying the gate). An `open:` result
+  persists the record; the next fresh dispatch branches on `PRIOR_REVIEW` **before any
+  reviewer exists** — same head resumes disposition, moved head refreshes signals, either
+  way zero additional reviews, fresh dispatch identities throughout, an inconsistent
+  record asked upward.
+- **#453** — the spine session closes each item through the lane — gate, commit, merge
+  into the spine branch — before the barrier, distinct from the top-dispatched spine-close
+  ceremony; an item still `active` at the proposed barrier is a halt naming it, never a
+  completion.
+- **#454** — the work-PR session's merge executor is the top's explicit assignment
+  (`MERGE_EXECUTOR=session|operator`), validated at startup, never inferred, never probed
+  by attempting a merge; a runtime denial is surfaced verbatim, never bypassed.
+- **#455** — alias-launched item terminals get explicit, verified teardown:
+  `orca terminal close --terminal <handle>` per provable own terminal after
+  `worker-release` (which performs no process cleanup there), absence verified against
+  `orca terminal list`, unprovable identities never closed, unresolved teardown reported.
+- **#448** — the work-PR session's reviewer and PR-fix seats are exempt from the
+  record-pass hold and release when their work finishes; the hold covers the top's
+  spine-level teardown, and the branches/worktrees the record pass needs are preserved —
+  a post-merge product fix takes a new PR with fresh seats.
+- **#449** — a `fix now` close-review disposition ends the close as
+  `halted: close-review` carrying the ledger; the top asks the operator for a writer
+  profile at the halt, dispatches a fresh writer with a bounded edit scope, then a fresh
+  close re-reviews. The close seat never applies its own review's fixes, and the
+  contradictory "twice per spine at most" close-dispatch cap is gone — retries are fresh
+  dispatches; only the successful record pass is single and conditional.
+
 ## 0.4.0
 
 The seats an activated spine spends are now **ratified, surfaced and separated**. 0.3.0

@@ -35,11 +35,19 @@ For each `fixture.md` in `tests/eval/fixtures/<surface>/`:
    cannot serve as its invoke agent** — dispatch fresh agents for both steps.
    Tell the invoke agent not to read anything under `tests/eval/`.
 
-2. **Score.** Dispatch a fresh judge `Agent`: "You are an LLM-as-judge. Score the
-   SKILL OUTPUT against the RUBRIC. Return one JSON object in exactly the shape
-   the RUBRIC's last line pins — that line is the authority on the `notes`
-   contract. Pass = all criteria ≥4. JSON only. RUBRIC: <paste
-   rubrics/<surface>.md>  FIXTURE: <paste fixture>  SKILL OUTPUT: <paste>."
+2. **Score.** Dispatch a fresh judge `Agent`: "You are an LLM-as-judge. Read the
+   owning prose for `<surface>` end to end — the same seven files the invoke
+   agent read — then the RUBRIC, the complete FIXTURE (frontmatter included),
+   and this pair's own SKILL OUTPUT. The fixture body supplies scenario facts
+   only; every material decision rule the output applies must come from the
+   supplied source prose, and matching the answer key is not evidence that it
+   did. Score the output against the rubric, including its source-fidelity
+   floor. Return one JSON object in exactly the shape the RUBRIC's last line
+   pins — that line is the authority on the `notes` and `source_support`
+   contract. Pass = all criteria ≥4 and a `supported` source verdict. JSON
+   only. SOURCE: <the seven owning-prose paths the invoke read>  RUBRIC:
+   <paste rubrics/<surface>.md>  FIXTURE: <paste fixture>  SKILL OUTPUT:
+   <paste>."
    Write the JSON to `tests/eval/results/<surface>/<fixture_id>.json`.
 
 After all surfaces: run `bash orca-crew/tests/eval/lib/aggregate-scores.sh` and
@@ -62,23 +70,29 @@ guess. State inputs as facts about the scenario, never as a check's outcome.
 ## Rubric format
 
 `rubrics/<surface>.md` lists that surface's criteria; the judge scores each 1-5;
-**pass = ≥4 on every criterion**; the rubric's last line pins the JSON output
-contract including the `notes` contract. `lib/aggregate-scores.sh` reads only
+**pass = ≥4 on every criterion and a `supported` source verdict**; the rubric's
+last line pins the JSON output contract including the `notes` and
+`source_support` contract. `lib/aggregate-scores.sh` reads only
 `.pass`/`.notes` and validates neither, so that line is the whole contract.
 
 **An unexercised criterion caps at 4** — consistent with the contract, not
 demonstrated by the scenario. A 5 requires the fixture to have exercised it.
 
-## Detection control
+## Evidence scope
 
-Before a surface's results are treated as coverage, prove the rubric detects the
-change the surface exists to guard: materialize the pre-change prose
-(`git show <pre-change-sha>:<path>`) into a scratch directory, run one fresh
-invoke agent against **that** prose on the surface's most discriminating fixture
-and one fresh judge, and record the result under
-`tests/eval/evidence/<surface>-old-contract-control.json`. **The control must
-fail.** A control that passes means the fixture does not discriminate — rewrite
-it before running the surface.
+This interactive harness samples how fresh isolated agents apply the current
+owning prose. Its model outputs are advisory diagnostics, not comparative or
+release-gate evidence on their own.
+
+A seat launched through Orca also receives Orca's current injected lifecycle
+preamble. Replacing only the source files with a pre-change snapshot therefore
+does not isolate the product version: the runtime can supply current task,
+dispatch and authority rules alongside old source. Do not treat such a
+prompt-substituted run as old-contract discrimination or a causal old/new
+comparison, even when its judge reads the same snapshot.
+
+A comparative claim requires actual versioned execution under otherwise equal
+runtime conditions. This runbook does not define that experiment.
 
 ## Cost
 

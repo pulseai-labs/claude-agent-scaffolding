@@ -1,6 +1,7 @@
 # Rubric: ossify-spine-execution
 
-Score each 1-5 (5 criteria). Pass = all ≥4. `expected_outcome` vocabulary:
+Score each 1-5 (5 criteria). Pass = all ≥4 and a `supported` source verdict
+(floor below). `expected_outcome` vocabulary:
 `proceed` | `refuse` | `halt`. `proceed` = the described arrangement is what the
 skill prescribes and the output carries it out. `refuse` = the arrangement the
 scenario proposes is wrong and the output declines it and states the prescribed
@@ -17,6 +18,23 @@ actually exercised it.** There is no N/A.
 fact, an output that does not decide it is not penalised; an output that invents
 that fact and decides on it is.
 
+**Source fidelity floor.** The invoke was given a fixed set of source prose as
+its only authority, and the judge is given the same files. Every decisive rule
+the output applies must be authorized by that supplied source — matching the
+fixture's answer key is not evidence that the invoke followed its source.
+Verdicts:
+
+- `supported` — every decisive rule the output applies is authorized by the
+  supplied source
+- `unsupported` — a decisive rule is absent from the supplied source
+- `contradicted` — the supplied source assigns the opposite action or owner
+- `mixed` — decisive claims span supported and unsupported/contradicted states
+
+Scenario facts select which clause fires but never supply the clause itself.
+Only `supported` can pass; any decisive unsupported, contradicted or mixed
+claim caps the owning criterion at 2, even when the output is answer-key
+aligned.
+
 1. **Activation and the three layers.** The phase applies only when all four
    facts hold about the current session — orca-crew is the top orchestrator, a
    Run is bound, this session just completed `/ossify:plan-spine`, and a
@@ -26,12 +44,20 @@ that fact and decides on it is.
    terminal; the spine session owns both item terminals for each item; each item
    terminal works one item. A top orchestrator that launches or supervises an
    item terminal is a wrong answer, as is a spine session that hands item
-   supervision back up. The spine session stops at the final round barrier and
-   never runs the close on its own initiative; **the top dispatches
+   supervision back up. The spine session **closes each item through the lane
+   before the barrier** — gate, commit, merge into the spine branch, in declared
+   order — and that per-item close is distinct from the spine-close ceremony,
+   which the top dispatches and the spine session never runs on its own
+   initiative; **an item still `active` at the proposed final barrier is a halt
+   naming it, never a completion**. **The top dispatches
    `/ossify:close` as a task** — to a fresh terminal it creates, never the spine
    driver's — and waits on its `worker_done` for every PR it opened, one per
-   hosting repo, or `closed`. Each returned PR then gets its own **work-PR
-   session**, created by the top in that PR's hosting-repo worktree, which owns
+   **product hosting repo** (a declared product `target_repo`; an AI workspace
+   carrying ceremony records is not one — its records stay on that repo's record
+   branch under its own policy, never pushed to its `main`, never claimed as a
+   PR), or `closed`. Each returned PR then gets its own **work-PR
+   session**, created by the top in that PR's hosting-repo worktree **from the
+   sidecar's ratified Work-PR-session block**, which owns
    the reviewer and PR-fix seats in a child Run of its own and merges on the word
    the top relays; **only the top talks to the operator**, and every other seat
    asks upward one hop. The top running the close itself is a wrong answer
@@ -55,7 +81,19 @@ that fact and decides on it is.
    launch argument. The spine session's own seat is ratified the same way, as a
    `## Spine session` block **beside** the item table — command, expected model,
    effort, reason — whose absence halts and whose presence changes nothing about
-   the item-set check. Validation runs **immediately before each item terminal is
+   the item-set check; **the close and work-PR coordinator seats are ratified as
+   their own blocks the same way** (`## Close session`, `## Work-PR session`),
+   each launched from its block with the model confirmed as an item row's is.
+   A sidecar whose `schema:` still reads `orca-execution/v1` halts any new v2
+   launch until the top rewrites it and the operator re-ratifies — completing
+   missing blocks from defaults, or rewriting in-session, is a wrong answer, and
+   so is replacing a live seat mid-run because the plugin updated; terminals
+   already launched run to their boundaries, but the next launch the contract
+   governs requires the sidecar at v2. **The top proves the sidecar's blob id
+   still equals the recorded `SIDECAR_OID` before every launch it makes** — the
+   spine session, each close, each work-PR session, the record pass; a
+   still-valid-looking edited block is not launch authority, and a mismatch
+   halts that launch for rewrite and re-ratification. Validation runs **immediately before each item terminal is
    created**, not once at the start: `git hash-object SPINE.md` against the
    recorded plan digest, one complete row per planned item, no row for an item the
    plan does not have, and three **value** checks — `ratification` reading exactly
@@ -100,6 +138,28 @@ that fact and decides on it is.
    of them reach the **work-PR session's** brief, which creates both seats and
    confirms each model from the banner and first reply as an item row's is; the
    fix task waits for the disposition ledger and rides the fix-round brief.
+   The work-PR session branches **initial versus resumed before any reviewer
+   exists**, on the top-supplied `PRIOR_REVIEW`: `none` is an initial run;
+   a record whose reviewed head equals the current PR head resumes disposition
+   with **no reviewer created**, and a moved head re-fetches the GitHub signals
+   with the prior review and its unresolved findings as the baseline — same head
+   or moved, **zero additional delegated reviews**; a record inconsistent with
+   the PR's live state is asked upward, never repaired or guessed. A clean
+   delegated review carries `Findings: none` **plus** `Reviewed head` **plus**
+   `Summary` — a headless clean body is malformed, and a reviewed head that does
+   not match the current PR head makes the review historical, not current, which
+   re-fetches signals rather than commissioning another review; absent or
+   untriaged signals never satisfy the merge gate. A resumed run still invokes
+   the owning work-PR procedure and all its gates — only the duplicate reviewer
+   creation is skipped; jumping past the ceremony into an ad-hoc disposition or
+   merge loop is a wrong answer. The session's **merge executor is the top's
+   explicit assignment** (`MERGE_EXECUTOR`), established at startup — a missing,
+   invalid or unknown assignment asks upward — never inferred from visible rules
+   or a launch profile, never tested by attempting a merge, and naming the
+   session as executor never overrides actual permissions: a runtime denial is
+   surfaced verbatim, never bypassed. A post-disposition finding — a P0/P1
+   included — returns through the blocking ask before any seat acts on it;
+   the session fixing it itself or deferring it silently is a wrong answer.
    Separately, the record pass is **conditional and single**: a second close is
    dispatched only after a first close that halted naming at least one PR, and
    only once every one of them has merged, while a first close returning `closed`
@@ -110,4 +170,9 @@ that fact and decides on it is.
    invention.
 
 ## Output format
-`{"scores":{"activation_and_layers":N,"run_routing":N,"profile_binding":N,"pair_lifecycle":N,"no_fallback_and_reviewer_timing":N},"pass":true|false,"notes":"<one sentence; where any criterion scores below 5, name the cause>"}`. Pass = all ≥4. JSON only.
+`pass=true` requires all five scores ≥4 and `source_support.verdict` equal to
+`supported`. `citations` is non-empty and names the source path plus the section
+or line range for every decisive support or conflict claim. JSON only — the
+last line pins the contract:
+
+`{"scores":{"activation_and_layers":N,"run_routing":N,"profile_binding":N,"pair_lifecycle":N,"no_fallback_and_reviewer_timing":N},"source_support":{"verdict":"supported|unsupported|contradicted|mixed","citations":["<source path>:<section or line range> — <support or conflict>"]},"pass":true|false,"notes":"<one sentence naming every score below 5 and any source-grounding failure>"}`
