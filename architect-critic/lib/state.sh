@@ -104,7 +104,7 @@ ac_state_write_field() {
 
 # Append a completed run to recent_runs (schema v2+), then trim to the last 20 entries.
 # Args: <request_id> <depth> <adversaries_used_json> <challenge_count> <concessions> <skill_invoked> <elapsed_ms>
-#   adversaries_used_json: a JSON array literal, e.g. '["claude"]' or '["claude","codex"]'
+#   adversaries_used_json: a JSON array literal, e.g. '["claude"]', '["claude","codex"]', or '["devin"]' (Devin host-only run)
 #   Optional flags: --auto-applied-count <int> (default 0), --escalated-count <int> (default 0)
 ac_state_append_run() {
   local request_id="" depth="" adversaries_json="" challenge_count="" concessions="" skill_invoked="" elapsed_ms=""

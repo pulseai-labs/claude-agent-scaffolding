@@ -22,16 +22,22 @@ room, open the check that enforces the budget you mean.**
 
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"
-# Devin: bin/ is not on PATH — resolve the installed source instead. The
-# source: field is a filesystem path for --local installs; a remote install
-# reports a file:// URL, which is not a path — fail early rather than
-# deriving a phantom /bin/oss.
+# Devin: bin/ is not on PATH — resolve the installed source instead. For a
+# --local install `source:` is the linked filesystem path; a remote install
+# reports a git URL and the tree materializes under the plugin cache —
+# measured on 3000.10.21: cache/<source-id>-<hash>/<version>/ under
+# ${XDG_DATA_HOME:-~/.local/share}/devin/cli/plugins/.
 [ -n "$oss_bin" ] || {
   oss_src="$(devin plugins info ossify | awk '/^  source:/{print $2}')"
   case "$oss_src" in
     /*) oss_bin="$oss_src/bin/oss" ;;
-    *)  echo "cannot resolve ossify plugin root (source: '${oss_src:-none}')" >&2; exit 1 ;;
+    *)  for mf in "${XDG_DATA_HOME:-$HOME/.local/share}"/devin/cli/plugins/cache/*/*/.devin-plugin/plugin.json; do
+          [ -f "$mf" ] || continue
+          [ "$(jq -r .name "$mf" 2>/dev/null)" = "ossify" ] || continue
+          oss_bin="${mf%/.devin-plugin/plugin.json}/bin/oss"; break
+        done ;;
   esac
+  [ -n "$oss_bin" ] && [ -x "$oss_bin" ] || { echo "cannot resolve ossify plugin root (source: '${oss_src:-none}')" >&2; exit 1; }
 }
 oss_root="$(cd "$(dirname "$oss_bin")/.." && pwd)"
 bash "$oss_root/tests/test-skill-bash-blocks.sh"
@@ -117,14 +123,20 @@ So measure it rather than quoting a remembered figure:
 
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"
-# Devin: bin/ is not on PATH — resolve the installed source instead (see the
-# guarded recipe above: source: must be an absolute path, not a file:// URL).
+# Devin: bin/ is not on PATH — resolve the installed source instead (same
+# guarded recipe as above: absolute source: path, else the materialized
+# plugin-cache manifest for remote installs).
 [ -n "$oss_bin" ] || {
   oss_src="$(devin plugins info ossify | awk '/^  source:/{print $2}')"
   case "$oss_src" in
     /*) oss_bin="$oss_src/bin/oss" ;;
-    *)  echo "cannot resolve ossify plugin root (source: '${oss_src:-none}')" >&2; exit 1 ;;
+    *)  for mf in "${XDG_DATA_HOME:-$HOME/.local/share}"/devin/cli/plugins/cache/*/*/.devin-plugin/plugin.json; do
+          [ -f "$mf" ] || continue
+          [ "$(jq -r .name "$mf" 2>/dev/null)" = "ossify" ] || continue
+          oss_bin="${mf%/.devin-plugin/plugin.json}/bin/oss"; break
+        done ;;
   esac
+  [ -n "$oss_bin" ] && [ -x "$oss_bin" ] || { echo "cannot resolve ossify plugin root (source: '${oss_src:-none}')" >&2; exit 1; }
 }
 oss_root="$(cd "$(dirname "$oss_bin")/.." && pwd)"
 awk -F'description: ' '/^description: /{print length($2); exit}' "$oss_root/agents/implementer-agent.md"

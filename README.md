@@ -104,7 +104,7 @@ support claim, and `scaffold`, `scaffold-onboard`, `scaffold-dev`,
 invoke namespaced as `/<plugin>:<skill>`.
 
 ```
-devin plugins install --local .                            # local, linked
+devin plugins install --local .                            # meta-plugin linked; baseline deps still resolve from the remote repo
 devin plugins install pulseai-labs/claude-agent-scaffolding # remote, post-merge
 ```
 

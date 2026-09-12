@@ -22,8 +22,12 @@ canonical skill body is the single source of truth.
 The plugin root: this file lives at `<plugin-root>/.devin/skills/
 work-item-worker/SKILL.md`, so the plugin root is three directories up from
 this file. Independently, `exec devin plugins info ossify` reports a `source:`
-field carrying the same path. Resolve it once, then all `skills/`,
-`references/`, and `bin/` paths below are relative to it.
+field — the linked path for a `--local` install, or a git URL for a remote
+install (then the tree materializes under
+`${XDG_DATA_HOME:-~/.local/share}/devin/cli/plugins/cache/<id>-<hash>/<ver>/`;
+glob `cache/*/*/.devin-plugin/plugin.json` for `name: "ossify"` — measured on
+3000.10.21). Resolve it once, then all `skills/`, `references/`, and `bin/`
+paths below are relative to it.
 
 ## Tool allowlist (binding)
 

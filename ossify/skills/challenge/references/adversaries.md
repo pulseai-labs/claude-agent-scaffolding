@@ -47,16 +47,22 @@ further up, beside it. Two steps, loud on failure:
 
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"
-# Devin: bin/ is not on PATH — resolve the installed source instead. The
-# source: field is a filesystem path for --local installs; a remote install
-# reports a file:// URL, which is not a path — fail early rather than
-# deriving a phantom /bin/oss.
+# Devin: bin/ is not on PATH — resolve the installed source instead. For a
+# --local install `source:` is the linked filesystem path; a remote install
+# reports a git URL (file://… or https://…#ossify) and the tree materializes
+# under the plugin cache — measured on 3000.10.21:
+# ${XDG_DATA_HOME:-~/.local/share}/devin/cli/plugins/cache/<id>-<hash>/<ver>/
 [ -n "$oss_bin" ] || {
   oss_src="$(devin plugins info ossify | awk '/^  source:/{print $2}')"
   case "$oss_src" in
     /*) oss_bin="$oss_src/bin/oss" ;;
-    *)  echo "cannot resolve ossify plugin root (source: '${oss_src:-none}')" >&2; exit 1 ;;
+    *)  for mf in "${XDG_DATA_HOME:-$HOME/.local/share}"/devin/cli/plugins/cache/*/*/.devin-plugin/plugin.json; do
+          [ -f "$mf" ] || continue
+          [ "$(jq -r .name "$mf" 2>/dev/null)" = "ossify" ] || continue
+          oss_bin="${mf%/.devin-plugin/plugin.json}/bin/oss"; break
+        done ;;
   esac
+  [ -n "$oss_bin" ] && [ -x "$oss_bin" ] || { echo "cannot resolve ossify plugin root (source: '${oss_src:-none}')" >&2; exit 1; }
 }
 plugin_root="$(cd "$(dirname "$oss_bin")/.." && pwd)"          # direct install / Devin
 schema="$plugin_root/skills/challenge/templates/output-schema.json"

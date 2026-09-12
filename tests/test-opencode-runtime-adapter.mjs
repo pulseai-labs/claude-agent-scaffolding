@@ -1211,8 +1211,11 @@ test("prompt translation absolutizes existing plugin-relative refs", async () =>
   const translated = translatePrompt(
     "Read `skills/work-item/SKILL.md` first.\n" +
       "Then `skills/work-item/references/report-contract.md`.\n" +
+      "Run `workflows/verify-work-item.js` via node.\n" +
+      "The wrapper at `commands/close.md` reads its own SKILL.md.\n" +
       "A missing ref `skills/no-such-dir/SKILL.md` stays relative.\n" +
       "So does a descriptive glob `agents/*.md`.\n" +
+      "A consumer-side path `tests/test_slugify.py` stays relative too.\n" +
       "And a non-plugin path `docs/something.md`.",
     { root: ossifyRoot },
   );
@@ -1225,11 +1228,20 @@ test("prompt translation absolutizes existing plugin-relative refs", async () =>
       `\`${ossifyRoot}/skills/work-item/references/report-contract.md\``,
     ),
   );
+  // Every shipped plugin-root dir is in scope — not just the original six —
+  // so `workflows/` (verify-work-item.js), `commands/` (command wrappers),
+  // `rules/`, `tests/`, and hooks dirs absolutize the same way.
+  assert.ok(
+    translated.includes(`\`${ossifyRoot}/workflows/verify-work-item.js\``),
+  );
+  assert.ok(translated.includes(`\`${ossifyRoot}/commands/close.md\``));
   // Existence gate: refs that do not resolve under the plugin root must not
   // be rewritten — they are not plugin-root-relative (e.g. skill-dir-relative
-  // `references/x` inside a skill's own references/ file, or consumer paths).
+  // `references/x` inside a skill's own references/ file, consumer-side
+  // `tests/` paths the plugin does not ship, or descriptive globs).
   assert.ok(translated.includes("`skills/no-such-dir/SKILL.md`"));
   assert.ok(translated.includes("`agents/*.md`"));
+  assert.ok(translated.includes("`tests/test_slugify.py`"));
   assert.ok(translated.includes("`docs/something.md`"));
 });
 

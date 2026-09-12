@@ -51,12 +51,13 @@ export function translatePrompt(text, context) {
       () => root,
     );
     // Plugin-root-relative refs (the token-free convention): a backticked
-    // `skills/`, `references/`, `templates/`, `lib/`, `agents/`, or `bin/` path
-    // resolves against the owning plugin's root, not the consumer's cwd.
-    // Existence-gated so skill-dir-relative refs (e.g. `references/x` inside a
-    // skill's own references/ file) pass through untouched.
+    // path under a shipped plugin-root dir resolves against the owning
+    // plugin's root, not the consumer's cwd. Existence-gated so
+    // skill-dir-relative refs (e.g. `references/x` inside a skill's own
+    // references/ file) and consumer-side paths (e.g. `tests/x` the plugin
+    // does not ship) pass through untouched.
     translated = translated.replace(
-      /`((?:skills|references|templates|lib|agents|bin)\/[^`\s]+)`/g,
+      /`((?:skills|references|templates|lib|agents|bin|workflows|commands|rules|tests|hooks|hooks-handlers)\/[^`\s]+)`/g,
       (match, rel) =>
         existsSync(join(root, rel)) ? `\`${root}/${rel}\`` : match,
     );

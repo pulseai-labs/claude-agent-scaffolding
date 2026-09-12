@@ -39,12 +39,21 @@ Installing the meta-plugin installs exactly these five, and nothing else:
 
 ## Installation
 
-From a local checkout (linked — edits apply on the next session):
+From a local checkout:
 
 ```bash
 devin plugins install --local .            # the repo root: meta-plugin + baseline
 devin plugins install --local ./code-judo  # or any single plugin directory
 ```
+
+`--local .` links only the meta-plugin. Its `requiredPlugins` are `git-subdir`
+sources that **always resolve from the pinned remote repository — never from
+your checkout** — so edits to the five local plugin directories do not apply,
+and before the manifests reach the default branch the deps convention-load
+that branch's plugin dirs (a different inventory than the table above: no
+per-plugin `.devin-plugin` manifests, no `work-item-worker`, and ossify
+advertises all nine skills). For a fully linked local baseline, install each
+plugin directory with `--local` individually.
 
 From GitHub, once this branch is merged to the default branch:
 
@@ -111,6 +120,7 @@ would give the Claude or Codex manifests.
   `challenge`, and `wayfinder` absent is correct, not a load failure.
 - `ossify:doctor` reports its loaded-body versus expected version and bounds
   any mismatch to ossify activity already evidenced in the session.
-- A local `--local` install is linked to the checkout; if an edited skill does
-  not appear, start a new session — installed-plugin state is read at session
-  start.
+- A per-plugin `--local` install is linked to that checkout directory; if an
+  edited skill does not appear, start a new session — installed-plugin state
+  is read at session start. (`--local .` links the meta-plugin only — its
+  baseline deps still resolve from the remote repo, per Installation.)

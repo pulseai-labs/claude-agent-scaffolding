@@ -95,6 +95,7 @@ Use Bash for the relative-time conversion if you need it, but keep the computati
 
 - `["claude"]` → `claude`
 - `["claude","codex"]` → `claude+codex`
+- `["devin"]` → `devin` (Devin host-only run)
 
 **`timeout?` column.** Only render this column if at least one row in the result set has `codex_timeout: true`. If no row has it, omit the column entirely to keep the table clean.
 

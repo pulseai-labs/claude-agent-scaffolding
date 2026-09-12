@@ -10,7 +10,12 @@ NOT added to `$PATH`. Always invoke `oss` via the `exec` tool with its full path
 never as a bare `oss` command.
 
 To discover the plugin source path, run `devin plugins info ossify` and read
-the `source:` field.
+the `source:` field. A `--local` install reports the linked filesystem path
+directly. A remote install reports a git URL (`https://…#ossify` or
+`file://…`) — not a path; the plugin tree then lives under the plugin cache:
+glob `${XDG_DATA_HOME:-~/.local/share}/devin/cli/plugins/cache/*/*/
+.devin-plugin/plugin.json` for the manifest whose `name` is `ossify`; its
+parent's parent is the plugin root (measured layout on 3000.10.21).
 
 Example:
 

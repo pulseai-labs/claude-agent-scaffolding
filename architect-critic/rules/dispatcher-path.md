@@ -11,7 +11,12 @@ never as a bare `arc` command.
 
 To discover the plugin source path, run `devin plugins info architect-critic`
 and read the `source:` field, or use the skill's own base directory and
-append `../../bin/arc`.
+append `../../bin/arc`. A `--local` install reports the linked filesystem
+path directly; a remote install reports a git URL (`https://…#architect-critic`
+or `file://…`) — not a path. The remote tree lives under the plugin cache:
+glob `${XDG_DATA_HOME:-~/.local/share}/devin/cli/plugins/cache/*/*/
+.devin-plugin/plugin.json` for the manifest whose `name` is `architect-critic`;
+its parent's parent is the plugin root (measured layout on 3000.10.21).
 
 Example:
 

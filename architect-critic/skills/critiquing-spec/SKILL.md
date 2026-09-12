@@ -96,7 +96,7 @@ Skip CORE and your challenges get dismissed defensively even when they're correc
 
 You need four values: `HOST_AGENT`, `codex_available`, `claude_available`, and `close_depth`.
 
-**HOST_AGENT detection:** If this skill is being read by Codex (for example, Codex plugin context, `CODEX_HOME` is present, or the active tool/runtime is Codex), set `HOST_AGENT=codex`. If this skill is being read by Devin (Devin plugin context, `command -v devin` resolves in the exec environment, or the active tool/runtime is Devin CLI), set `HOST_AGENT=devin`. Otherwise set `HOST_AGENT=claude`. Do not ask the user; infer it from the running agent context.
+**HOST_AGENT detection:** `HOST_AGENT` is the runtime that loaded this skill — the agent knows its own host. Codex plugin context → `codex` (`CODEX_HOME` present corroborates). Devin plugin context — the skill arrived via Devin's plugin loader under the Devin CLI/Desktop runtime → `devin`. Otherwise → `claude`. Environment or binary presence never decides alone: a `devin` binary on `$PATH` or an exported `CODEX_HOME` is common on machines whose active session is a different host. Do not ask the user; infer it from the running agent context.
 
 **Codex availability:** Run `command -v codex` in a Bash tool call. Capture the return code. If the binary resolves, also capture `codex --version` for the status message in Step 4.
 
@@ -309,7 +309,7 @@ Steps 7 (consolidate), 8 (rebuttal cycle), and 9 (append run) form one reusable 
 
 ## Step 7: Consolidate challenges
 
-You now have one or two challenge lists (claude-only, or claude + codex). Merge them via the bash helper:
+You now have one or two challenge lists (claude-only, claude + codex, or the single devin self-audit). Merge them via the bash helper — **except on `HOST_AGENT=devin`**: a lone self-audit has nothing to merge, and the helper's `source`/`adversaries_used` vocabulary only knows claude/codex, so it would mislabel a devin run. On Devin the self-audit list plays the merged-list role directly:
 
 ```bash
 arc consolidator_merge "$CLAUDE_AUDIT_JSON" "$CODEX_AUDIT_JSON"
@@ -317,7 +317,7 @@ arc consolidator_merge "$CLAUDE_AUDIT_JSON" "$CODEX_AUDIT_JSON"
 
 The consolidator's algorithm:
 - **Similarity dedup.** Text overlap >70% between two challenges means they are the same challenge. Use shingle/Jaccard similarity (the helper handles this).
-- **Adversary attribution.** Each surviving challenge gets a `source` field: `["claude"]`, `["codex"]`, or `["claude", "codex"]` for cross-confirmed challenges. **Cross-confirmed challenges are the strongest signal** — both an adversary that read your spec and a fresh-frame adversary that did not landed on the same issue. Surface those first in the rebuttal cycle.
+- **Adversary attribution.** Each surviving challenge gets a `source` field: `["claude"]`, `["codex"]`, or `["claude", "codex"]` for cross-confirmed challenges — `["devin"]` under a Devin host-only run. **Cross-confirmed challenges are the strongest signal** — both an adversary that read your spec and a fresh-frame adversary that did not landed on the same issue. Surface those first in the rebuttal cycle.
 - **Severity reconciliation.** If both adversaries flagged the same challenge with different severities, preserve the **highest** severity (`premise` > `gap` > `alternative`).
 
 The merged list is what you walk in Step 8.
@@ -441,13 +441,13 @@ arc state_append_run \
   --elapsed-ms "$ELAPSED_MS"
 ```
 
-`--adversaries` accepts either a JSON array such as `["claude","codex"]` or a CSV string such as `claude,codex`.
+`--adversaries` accepts either a JSON array such as `["claude","codex"]` or a CSV string such as `claude,codex` — on `HOST_AGENT=devin` the value is `["devin"]`.
 
 The schema v3 `recent_runs[]` entry includes:
 - `request_id` — `crit-<ISO8601>-<entropy>` generated upstream
 - `completed_at` — ISO8601 UTC
 - `depth` — `shallow` or `close`
-- `adversaries_used` — `["claude"]` or `["claude","codex"]`
+- `adversaries_used` — `["claude"]`, `["claude","codex"]`, or `["devin"]` on a Devin host-only run
 - `challenge_count` — total surviving challenges after consolidation
 - `concessions` — count of challenges the user conceded
 - `auto_applied_count` — challenges auto-applied by Step 8.0 triage (0 under `--walk`/`--neutral`)
@@ -488,7 +488,7 @@ Final turn message, plain prose. Format:
 ```
 Audit complete for <target>.
 
-  Adversaries used : <claude | claude + codex>
+  Adversaries used : <claude | claude + codex | devin>
   Challenges       : <N> total (<X> premise, <Y> gap, <Z> alternative)
   Concessions      : <C> of <N>
   Auto-applied     : <A> of <N> (disposition triage)

@@ -396,6 +396,25 @@ for plugin in workspace-init architect-critic ossify; do
   fi
 done
 
+# Remote (git-subdir) deps materialize under the plugin cache; the skill
+# recipes resolve them by manifest name-match — pin that premise here:
+# cache/<source-id>-<hash>/<version>/.devin-plugin/plugin.json exists, and
+# bin/<dispatcher> is executable inside that root.
+for pair in workspace-init:wi architect-critic:arc ossify:oss; do
+  plugin="${pair%%:*}"; disp="${pair##*:}"
+  found=""
+  for mf in "$ISOLATED_DATA"/devin/cli/plugins/cache/*/*/.devin-plugin/plugin.json; do
+    [ -f "$mf" ] || continue
+    [ "$(jq -r .name "$mf" 2>/dev/null)" = "$plugin" ] || continue
+    found="${mf%/.devin-plugin/plugin.json}"; break
+  done
+  if [ -n "$found" ] && [ -x "$found/bin/$disp" ]; then
+    pass "remote cache resolves $plugin root with executable bin/$disp"
+  else
+    fail "remote cache did not resolve $plugin root with executable bin/$disp"
+  fi
+done
+
 ###############################################################################
 # Probe 5: Independent installability — one baseline plugin alone in a fresh
 # isolated HOME installs without the meta-plugin

@@ -8,8 +8,13 @@ runtime verb and mutates nothing.
 **Answering binary.** Run `command -v oss`. Accept an identity only when the
 result is an absolute executable path which, after symlink resolution, is the
 `bin/oss` child of a readable plugin root. On Devin `oss` is never on `$PATH` —
-take the candidate from `devin plugins info ossify`'s `source:` field plus
-`/bin/oss`, and apply the same checks. Read that root's
+read `devin plugins info ossify`'s `source:` field: a `--local` install reports
+the linked path directly (candidate = `source` + `/bin/oss`), while a remote
+install reports a git URL and the tree materializes under the plugin cache —
+glob `${XDG_DATA_HOME:-~/.local/share}/devin/cli/plugins/cache/*/*/
+.devin-plugin/plugin.json` for the manifest whose `name` is `ossify`; its
+grandparent dir is the plugin root (measured layout on 3000.10.21). Apply the
+same checks to that root's `bin/oss`. Read that root's
 `.claude-plugin/plugin.json` for the version. A function, alias, relative path,
 non-executable path, unexpected layout, unreadable manifest, or failed symlink
 resolution makes this role unavailable. Never derive the version from a
