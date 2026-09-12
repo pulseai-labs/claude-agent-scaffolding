@@ -48,8 +48,10 @@ retrospective's carried-and-lessons section, by class.
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
 DONE: one worker_done on the identities your injected Orca preamble names,
-carrying exactly one of three results: EVERY PR the close opened — one line per hosting repo, `<repo>
-#<number> <url>`; the single word `closed` when it recorded the spine with no PR
+carrying exactly one of three results: EVERY PR the close opened — one line
+per product hosting repo (a declared product `target_repo`, never the AI
+workspace), `<repo> #<number> <url>`; the single word `closed` when it
+recorded the spine with no PR
 open; or `halted: <step> — <evidence>` when it stopped, naming the failing step and
 repo and, on its own line, what it had already opened: `opened: <repo> #<n> <url> …`
 or `opened: none`. A multi-repo close can open in one repo and halt on the

@@ -405,6 +405,10 @@ pin "$PRBRIEFS_MD" 'ossify keeps that review advisory' \
   "the halt rule names its relation to the ceremony's advisory review"
 absent "$PRBRIEFS_MD" 'from the first close' \
   "the ledger slot names the most recent reviewing close, not the first"
+# R5: the close DONE's PR-list rule carries the product-hosting-repo
+# qualifier (RF7), not the bare phrase every other site had to disambiguate.
+absent "$PRBRIEFS_MD" 'one line per hosting repo' \
+  "the close DONE counts product hosting repos only"
 pin "$PRBRIEFS_MD" 'the top dispatches a fresh close session' \
   "a halt settles the dispatch; the top re-dispatches after remediation"
 absent "$PRBRIEFS_MD" 're-invoke close after a halt' \
