@@ -53,7 +53,7 @@ oss_bin="$(command -v oss 2>/dev/null || true)"
 # --local install `source:` is the linked filesystem path; a remote install
 # reports a git URL (file://… or https://…#ossify) and the tree materializes
 # under the plugin cache — measured on 3000.10.21:
-# ${XDG_DATA_HOME:-~/.local/share}/devin/cli/plugins/cache/<id>-<hash>/<ver>/
+# ${XDG_DATA_HOME:-$HOME/.local/share}/devin/cli/plugins/cache/<id>-<hash>/<ver>/
 [ -n "$oss_bin" ] || {
   oss_src="$(devin plugins info ossify | sed -n 's/^ *source: *//p')"
   case "$oss_src" in

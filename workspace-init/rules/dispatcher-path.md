@@ -14,7 +14,7 @@ and read the `source:` field, or use the skill's own base directory and
 append `../../bin/wi`. A `--local` install reports the linked filesystem
 path directly; a remote install reports a git URL (`https://…#workspace-init`
 or `file://…`) — not a path. The remote tree lives under the plugin cache:
-glob `${XDG_DATA_HOME:-~/.local/share}/devin/cli/plugins/cache/*/*/
+glob `${XDG_DATA_HOME:-$HOME/.local/share}/devin/cli/plugins/cache/*/*/
 .devin-plugin/plugin.json` for the manifest whose `name` is `workspace-init`;
 its parent's parent is the plugin root (measured layout on 3000.10.21).
 

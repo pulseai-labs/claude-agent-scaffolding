@@ -24,7 +24,7 @@ work-item-worker/SKILL.md`, so the plugin root is three directories up from
 this file. Independently, `exec devin plugins info ossify` reports a `source:`
 field — the linked path for a `--local` install, or a git URL for a remote
 install (then the tree materializes under
-`${XDG_DATA_HOME:-~/.local/share}/devin/cli/plugins/cache/<id>-<hash>/<ver>/`;
+`${XDG_DATA_HOME:-$HOME/.local/share}/devin/cli/plugins/cache/<id>-<hash>/<ver>/`;
 glob `cache/*/*/.devin-plugin/plugin.json` for `name: "ossify"` — measured on
 3000.10.21). Resolve it once, then all `skills/`, `references/`, and `bin/`
 paths below are relative to it.

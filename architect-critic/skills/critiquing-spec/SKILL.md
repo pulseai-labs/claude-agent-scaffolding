@@ -428,9 +428,10 @@ When you land on a 3 (the borderline case), default to "stands" but soften the f
 
 ## Step 9: Bash bookkeeping — append run + check auto-promotion
 
-State updates happen in bash because they are pure I/O. Append the run record with the **flag form** — it is the only form that carries the deferred-challenge fields (`--deferred-count` / `--deferred-challenges`), so use it whenever any challenge was deferred (they default to `0`/`[]` when omitted):
+State updates happen in bash because they are pure I/O. Initialize state first — `state_init` is idempotent and a no-op when `state.json` already exists, but without it the append below cannot take `state.lock` on a fresh install (the lock's parent directory is created only here). Then append the run record with the **flag form** — it is the only form that carries the deferred-challenge fields (`--deferred-count` / `--deferred-challenges`), so use it whenever any challenge was deferred (they default to `0`/`[]` when omitted):
 
 ```bash
+"$arc_bin" state_init   # idempotent — creates the data dir + state.json on first run
 "$arc_bin" state_append_run \
   --request-id "$REQUEST_ID" \
   --depth "$DEPTH" \
