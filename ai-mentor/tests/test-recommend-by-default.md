@@ -9,9 +9,10 @@ best-practice and **labelled as such** — never a fabricated citation. `--neutr
 (or "no recommendations") suppresses recommendations per invocation.
 
 Covers `grill-me` and `council` here (ai-mentor owns the convention). The shared
-policy is `references/recommendation-policy.md` (a byte-identical copy of the
-marketplace SoT `docs/conventions/recommendation-policy.md`, guarded by the
-repo-root parity test). `architect-critic`'s `critiquing-spec` and `scaffold-dev`'s
+policy ships as `recommendation-policy.md` next to each skill's `SKILL.md` (a
+byte-identical copy of the marketplace SoT
+`docs/conventions/recommendation-policy.md`, guarded by the repo-root parity
+test). `architect-critic`'s `critiquing-spec` and `scaffold-dev`'s
 `planning-vertical-slice` carry the same convention — verify those in their own
 plugins.
 
@@ -119,6 +120,6 @@ Total fixtures: **7.** Target GREEN: **7 / 7**. Currently validated: **5 / 7** (
 instruction is embedded in `skills/grill-me/SKILL.md` Rule #3 and
 `skills/council/SKILL.md` Mechanic as of #93). These are **manual** behavioral checks
 — not automated — consistent with ai-mentor's skill-first, agent-driven design (the
-recommendation is produced by the agent, never by a script). The shipped policy copy
-at `references/recommendation-policy.md` is parity-guarded by the repo-root
-`tests/test-recommendation-policy-parity.sh`.
+recommendation is produced by the agent, never by a script). The shipped policy
+copies under `skills/grill-me/` and `skills/council/` are parity-guarded by the
+repo-root `tests/test-recommendation-policy-parity.sh`.

@@ -49,7 +49,8 @@ for REQUIRED in \
   "skills/council/SKILL.md" \
   "skills/eli10/SKILL.md" \
   "skills/fool/SKILL.md" \
-  "references/recommendation-policy.md" \
+  "skills/grill-me/recommendation-policy.md" \
+  "skills/council/recommendation-policy.md" \
   "skills/council/personas.md" \
   "skills/grill-me/escape-valves.md"
 do
@@ -195,19 +196,23 @@ fi
 ###############################################################################
 printf '\nProbe 3: Recommendation-policy reference readable\n'
 
-policy_path="$AM_ROOT/references/recommendation-policy.md"
-if [ -f "$policy_path" ]; then
-  pass "recommendation-policy.md exists at references/"
-  # Verify it has substantive content (not empty)
-  content_size="$(wc -c < "$policy_path")"
-  if [ "$content_size" -gt 100 ]; then
-    pass "recommendation-policy.md has content ($content_size bytes)"
+for policy_path in \
+  "$AM_ROOT/skills/grill-me/recommendation-policy.md" \
+  "$AM_ROOT/skills/council/recommendation-policy.md"
+do
+  if [ -f "$policy_path" ]; then
+    pass "${policy_path#"$AM_ROOT"/} exists"
+    # Verify it has substantive content (not empty)
+    content_size="$(wc -c < "$policy_path")"
+    if [ "$content_size" -gt 100 ]; then
+      pass "${policy_path#"$AM_ROOT"/} has content ($content_size bytes)"
+    else
+      fail "${policy_path#"$AM_ROOT"/} is too small ($content_size bytes)"
+    fi
   else
-    fail "recommendation-policy.md is too small ($content_size bytes)"
+    fail "${policy_path#"$AM_ROOT"/} absent"
   fi
-else
-  fail "recommendation-policy.md absent from references/"
-fi
+done
 
 ###############################################################################
 # Probe 4: Skill-local references are readable
@@ -260,7 +265,7 @@ printf '\nProbe 6: Negative control (absent reference)\n'
 # the test does not accidentally read the developer's canonical checkout.
 COPY_ROOT="$TEST_ROOT/ai-mentor-copy"
 cp -R "$AM_ROOT" "$COPY_ROOT"
-rm -f "$COPY_ROOT/references/recommendation-policy.md"
+rm -f "$COPY_ROOT/skills/grill-me/recommendation-policy.md"
 
 # Install from the copy
 run_devin plugins remove -y ai-mentor >/dev/null 2>&1
@@ -280,7 +285,7 @@ else
 fi
 
 if [ -n "$installed_source" ] \
-  && [ ! -f "$installed_source/references/recommendation-policy.md" ] \
+  && [ ! -f "$installed_source/skills/grill-me/recommendation-policy.md" ] \
   && [ -f "$installed_source/skills/grill-me/SKILL.md" ]; then
   pass "policy absent and skill present at the reported installed source"
 else
@@ -288,7 +293,7 @@ else
 fi
 
 # Verify the original canonical checkout still has it (we didn't delete it)
-if [ -f "$AM_ROOT/references/recommendation-policy.md" ]; then
+if [ -f "$AM_ROOT/skills/grill-me/recommendation-policy.md" ]; then
   pass "original canonical checkout retains the reference"
 else
   fail "original canonical checkout lost the reference (test mutated canonical!)"

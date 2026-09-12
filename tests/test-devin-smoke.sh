@@ -186,22 +186,27 @@ fi
 printf '\nSmoke 2: AI Mentor — references readable from installed path\n'
 
 if [ -n "$AIM_SOURCE" ]; then
-  # Check that the recommendation policy reference exists at the plugin root
-  if [ -f "$AIM_SOURCE/references/recommendation-policy.md" ]; then
-    pass "recommendation-policy.md exists at plugin root"
-    evidence "policy path: $AIM_SOURCE/references/recommendation-policy.md"
+  # Check that the recommendation policy ships next to each consuming skill
+  for policy_rel in \
+    "skills/grill-me/recommendation-policy.md" \
+    "skills/council/recommendation-policy.md"
+  do
+    if [ -f "$AIM_SOURCE/$policy_rel" ]; then
+      pass "recommendation-policy.md exists at $policy_rel"
+      evidence "policy path: $AIM_SOURCE/$policy_rel"
 
-    # Verify it has content (not empty)
-    policy_size="$(wc -c < "$AIM_SOURCE/references/recommendation-policy.md")"
-    if [ "$policy_size" -gt 100 ]; then
-      pass "recommendation-policy.md has content (${policy_size} bytes)"
-      evidence "policy size: ${policy_size} bytes"
+      # Verify it has content (not empty)
+      policy_size="$(wc -c < "$AIM_SOURCE/$policy_rel")"
+      if [ "$policy_size" -gt 100 ]; then
+        pass "recommendation-policy.md has content (${policy_size} bytes)"
+        evidence "policy size: ${policy_size} bytes"
+      else
+        fail "recommendation-policy.md is too small (${policy_size} bytes)"
+      fi
     else
-      fail "recommendation-policy.md is too small (${policy_size} bytes)"
+      fail "recommendation-policy.md absent at $policy_rel"
     fi
-  else
-    fail "recommendation-policy.md absent at plugin root"
-  fi
+  done
 
   # Check council personas reference
   if [ -f "$AIM_SOURCE/skills/council/personas.md" ]; then
