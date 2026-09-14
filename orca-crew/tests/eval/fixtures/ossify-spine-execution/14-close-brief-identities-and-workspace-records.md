@@ -18,10 +18,10 @@ expected_reason: 'First, ids: the close session''s final worker_done spends the
   that prose spends task_stale_r13s1 and ctx_stale_r13s1. Second, repos: the
   spine''s declared product target_repos - the canonical repos its work items
   name - are the hosting repos the close''s PR list covers. The paired AI
-  workspace is not one: it carries the spine''s ceremony records, which stay
-  on that repo''s record branch and integrate under that repo''s own policy,
-  outside the PR list; nobody pushes them to its main directly, and no
-  session claims ossify opened a PR there. Ossify''s own landing rule - a
+  workspace is not one: the close writes its records
+  where ossify resolves ai_workspace, and committing and integrating them
+  follow that repo''s own policy, outside the PR list; nobody pushes them to
+  its main directly, and no session claims ossify opened a PR there. Ossify''s own landing rule - a
   repo with a remote lands by PR, a remote-less one merges locally - is
   unchanged and decides each product repo''s arm; that beat is retained
   candidate coverage and is not claimed to discriminate by itself. The wrong

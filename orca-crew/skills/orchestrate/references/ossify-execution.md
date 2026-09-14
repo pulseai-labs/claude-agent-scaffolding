@@ -136,8 +136,8 @@ spine session before each item terminal (`ossify-nested-run.md` §3), and the to
 the spine session, each close, work-PR session and record pass. A mismatch halts that
 launch and asks; only your rewrite, the operator's re-ratification and a newly recorded
 oid move it. A handoff the top writes carries the recorded `SIDECAR_OID`; a resumed top
-proves the sidecar against that recorded value, never a fresh hash — a handoff lacking
-it asks the operator before any launch that spends a sidecar profile.
+proves the sidecar against that recorded value, never a fresh hash.
+A resumed top whose handoff lacks it asks the operator before any launch that spends a sidecar profile.
 
 **The `## Spine session` block is read the same way** — its four keys value-checked beside the
 item rows, and **its absence halts on an activated spine**. **The `## Close session` and

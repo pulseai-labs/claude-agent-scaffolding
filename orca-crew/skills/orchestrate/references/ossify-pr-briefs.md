@@ -46,22 +46,22 @@ section, by class.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
-DONE: one worker_done on the identities your injected Orca preamble names,
-carrying exactly one of three results: EVERY PR the close opened — one line
-per opened PR, `<repo> #<number> <url>`: only a remote product hosting repo
-(a declared `target_repo`) gets one, a remote-less repo lands locally in the
-same close and is never a PR; the single word `closed` when it recorded the
-spine with no PR open; or `halted: <step> — <evidence>` when it stopped, naming
-the failing step and repo and, on its own line, what it had already opened:
-`opened: <repo> #<n> <url> …` or `opened: none`. A multi-repo close can halt
-after opening in one repo — a halt that hides those PRs strands them.
-Whenever the close review ran, carry its ledger verbatim too,
-naming each finding, its `target_repo`, its decision and the reason: the
-record pass cannot reconstruct it. Then: Changed / Evidence / Open / Files.
+DONE: one worker_done on the identities your injected Orca preamble names, carrying
+exactly one of three results: EVERY PR the close opened — one line per opened PR,
+`<repo> #<number> <url>`: only a remote product hosting repo (a declared
+`target_repo`) gets one, a remote-less repo lands locally in the same close and is
+never a PR; the single word `closed` when it recorded the spine with no PR open; or
+`halted: <step> — <evidence>` when it stopped, naming the failing step and repo and,
+on its own line, what it had already opened: `opened: <repo> #<n> <url> …` or
+`opened: none`. A multi-repo close can halt after opening in one repo — hiding those
+PRs strands them. Whenever the close review ran, carry its ledger verbatim too,
+naming each finding, its `target_repo`, its decision and the reason: the record pass
+cannot reconstruct it. Then: Changed / Evidence / Open / Files.
 
-NEVER: create a terminal, merge, ask the operator anything (questions go up
-with `ask`), or re-invoke `/ossify:close` — a halt settles this dispatch;
-remediated, the top dispatches a fresh close session. Report a refusal verbatim.
+NEVER: create a terminal, merge, ask the operator anything
+(questions go up to the top with `ask`), or re-invoke `/ossify:close` — a halt
+settles this dispatch; remediated, the top dispatches a fresh close session.
+Report a refusal verbatim.
 ```
 
 ---
@@ -175,8 +175,8 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      rather than adopting it. Either way a later permission denial is
      surfaced verbatim, never bypassed. Then release both seats and close each
      terminal this session created — `orca terminal close --terminal <handle>`,
-     `orca terminal list` showing none — only terminals you can prove are
-     yours; report any teardown you cannot complete rather than claiming it.
+     `orca terminal list` showing none of them — only terminals you can prove
+     are yours; report any teardown you cannot complete rather than claiming it.
      You are exempt from any record-pass hold; the spine branch and spine
      worktree stay the top's to hold, never yours to delete.
 

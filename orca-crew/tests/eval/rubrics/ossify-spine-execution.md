@@ -55,8 +55,9 @@ aligned.
    **remote product hosting repo** — a remote-less repo lands locally in the
    same close and is never a PR (a declared product `target_repo` either way;
    an AI workspace
-   carrying ceremony records is not one — its records stay on that repo's record
-   branch under its own policy, never pushed to its `main`, never claimed as a
+   carrying ceremony records is not one — the close writes its records
+   where ossify resolves `ai_workspace`, committing and integrating them under
+   that repo's own policy, never pushed to its `main`, never claimed as a
    PR), or `closed`. Each returned PR then gets its own **work-PR
    session**, created by the top in that PR's hosting-repo worktree **from the
    sidecar's ratified Work-PR-session block**, which owns

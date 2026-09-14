@@ -46,6 +46,8 @@ LIFECYCLE_MD="$REF/lifecycle.md"
 ROLES_MD="$REF/roles.md"
 GENERIC_BRIEFS_MD="$REF/briefs.md"
 SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
+EVAL_FIXTURE14="$PLUGIN_ROOT/tests/eval/fixtures/ossify-spine-execution/14-close-brief-identities-and-workspace-records.md"
+EVAL_RUBRIC_MD="$PLUGIN_ROOT/tests/eval/rubrics/ossify-spine-execution.md"
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -262,6 +264,12 @@ pin "$WRITER_MD" 'declared `target_repo` identifier' \
   "the writer's REPO= takes the declared target_repo, not owner/name"
 absent "$WRITER_MD" 'owner/name' \
   "the owner/name slot wording is gone"
+# PR #470 row 3: the writer groups findings by the declared `target_repo` —
+# the key the nested-run slice uses — never by the repo a file lives in.
+pin "$WRITER_MD" 'by their declared `target_repo`' \
+  "writer findings group by the declared target_repo key"
+absent "$WRITER_MD" 'each file lives in' \
+  "the by-file-location grouping is gone"
 pin "$NESTED_MD" 'one writer per affected hosting repo' \
   "fix-now findings spanning repos get a writer each"
 absent "$PRBRIEFS_MD" 'per spine at most' \
@@ -324,6 +332,15 @@ pin "$EXEC_MD" 'carries the recorded `SIDECAR_OID`' \
   "a top handoff persists the recorded sidecar oid"
 pin "$EXEC_MD" 'asks the operator before any launch that spends a sidecar profile' \
   "a resumed top without the oid asks before spending a profile"
+# PR #470 row 2: the handoff is the carrier — lifecycle's step 13 lists the
+# recorded oid and the accumulated close-review ledger on an activated spine,
+# and the ask's subject is the resumed top, not the handoff.
+pin "$LIFECYCLE_MD" 'the recorded `SIDECAR_OID`' \
+  "the top's handoff lists the recorded sidecar oid"
+pin "$LIFECYCLE_MD" 'close-review ledger' \
+  "the top's handoff lists the accumulated close-review ledger"
+pin "$EXEC_MD" 'A resumed top whose handoff lacks it asks the operator' \
+  "the resumed top, not the handoff, asks before spending a profile"
 
 section "the first verifier failure blocks and asks"
 
@@ -408,6 +425,13 @@ pin "$PRBRIEFS_MD" 'orca terminal close --terminal <handle>' \
   "the work-PR session closes each terminal it created"
 pin "$PRBRIEFS_MD" 'orca terminal list' \
   "the work-PR session verifies its terminals are gone"
+# PR #470 row 4 (settles ledger row 9): the list always shows the top's and
+# this session's own terminals — the check is none OF THEM, never none at all.
+pin "$PRBRIEFS_MD" 'orca terminal list` showing none of them' \
+  "the teardown check is none of the session's terminals, not none at all"
+# PR #470 row 5: the budget ate the close seat's ask target — restore it.
+pin "$PRBRIEFS_MD" 'questions go up to the top with `ask`' \
+  "the close seat's questions still route to the top"
 absent "$PRBRIEFS_MD" 'review a head twice' \
   "the per-head review that contradicted the reviewer template is gone"
 
@@ -458,6 +482,20 @@ pin "$NESTED_MD" 'where ossify resolves `ai_workspace`' \
   "workspace records land where ossify resolves ai_workspace"
 absent "$NESTED_MD" 'record branch' \
   "the never-established record-branch claim is gone"
+# PR #470 row 1: the eval oracle tracks the same #466 contract — records are
+# written where ossify resolves ai_workspace, never a "record branch" no step
+# establishes. The rubric wraps the old claim across a line, so its pin is the
+# contiguous tail of the old wording.
+nonempty "$EVAL_FIXTURE14" "eval fixture 14 exists"
+pin "$EVAL_FIXTURE14" 'where ossify resolves ai_workspace' \
+  "fixture 14's oracle lands records where ossify resolves ai_workspace"
+absent "$EVAL_FIXTURE14" 'record branch' \
+  "fixture 14's record-branch claim is gone"
+nonempty "$EVAL_RUBRIC_MD" "the spine-execution rubric exists"
+pin "$EVAL_RUBRIC_MD" 'where ossify resolves `ai_workspace`' \
+  "rubric criterion 1 lands records where ossify resolves ai_workspace"
+absent "$EVAL_RUBRIC_MD" 'branch under its own policy' \
+  "rubric criterion 1's record-branch wording is gone"
 
 section "four seats, one voice"
 

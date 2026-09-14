@@ -9,7 +9,8 @@ before the moment that creates it.
 **One writer per affected hosting repo.** The close review aggregates every
 hosting repo's accumulated diff, and the one-writer-per-worktree rule means a
 writer placed in one repo's spine worktree may not edit another's. Group the
-accepted `fix now` findings by the repo each file lives in and dispatch one
+accepted `fix now` findings by their declared `target_repo` — the key
+`ossify-nested-run.md` slices the accepted ledger by — and dispatch one
 writer per repo with findings, each in that repo's own spine worktree, all
 from the one profile the operator named. Each writer is released when its
 `worker_done` validates; no seat survives the halt, and a later halt asks
@@ -30,8 +31,8 @@ REPO=<the declared `target_repo` identifier for this writer's repo — it exists
 for remote and remote-less repos alike>
 REPO_ROOT=<abs path of this repo's spine worktree>
 WRITER_EXPECTED_MODEL=<model id the banner must show>
-ACCEPTED_LEDGER=<this repo's accepted fix-now findings, verbatim from the
-close review's ledger>
+ACCEPTED_LEDGER=<the accepted fix-now findings whose `target_repo` is this
+repo, verbatim from the close review's ledger>
 TASK/DISPATCH: your task and dispatch identities come from the Orca preamble
 injected into this terminal; spend those verbatim — never placeholders, never
 ids predicted before it existed.
