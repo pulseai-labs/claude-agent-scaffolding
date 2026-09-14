@@ -5,8 +5,7 @@ The two briefs the PR lane needs (`ossify-execution.md` §2, `ossify-nested-run.
 see, angle brackets are slots, fill every slot and delete nothing else.
 
 > **Editing note.** Asserted to contain no subagent invocation form
-> (`tests/test-ossify-spine-contract.sh`). Say the prohibition; never paste the
-> call shape.
+> (`tests/test-ossify-spine-contract.sh`). Say the prohibition; never paste the call shape.
 
 ---
 
@@ -25,24 +24,25 @@ INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 PARENT_RUN_ID=<run id>
 SPINE_ID=<spine id>
 CLOSE_EXPECTED_MODEL=<model id the banner must show>
-CLOSE_REVIEW_LEDGER=<verbatim ledger from the most recent close that ran its
-review, or "none">
+CLOSE_REVIEW_LEDGER=<every close review's ledger for this spine, oldest first,
+verbatim — or "none">
 TASK/DISPATCH: your task and dispatch identities come from the Orca preamble
 injected into this terminal; spend those verbatim — never placeholders, never
 ids predicted before it existed.
 
 TASK: run `/ossify:close SPINE_ID` and let it complete or halt. Whatever it hands
-off, you do not drive: if it opens PRs and halts, that halt is your result.
-The ceremony's own steps are yours to perform, including
+off, you do not drive: if it opens PRs and halts, that halt is your result. The
+ceremony's own steps are yours to perform, including
 the close review the ceremony itself runs over the accumulated diff before any PR
-opens — that is `/ossify:close` doing its job, not a `/code-review` you dispatch.
-Its findings are yours to report, never to fix: ossify keeps that review advisory —
-it halts no ceremony gate — but this dispatch is stricter, and a `fix now` disposition
-ends this dispatch as `halted: close-review — <ledger>` carrying each finding, its
-decision and the reason; the top dispatches the writer — per `ossify-close-writer.md`,
-one per affected hosting repo — and a fresh close. On a record
-pass, write the accepted findings CLOSE_REVIEW_LEDGER carries into the
-retrospective's carried-and-lessons section, by class.
+opens — `/ossify:close` doing its job, not a `/code-review` you dispatch. Its
+findings are yours to report, never to fix: ossify keeps that review advisory —
+it halts no ceremony gate — but this dispatch is stricter, and a `fix now`
+disposition ends this dispatch as `halted: close-review — <ledger>`,
+carrying each finding, its `target_repo`, its decision and the reason; the top
+dispatches the writer — per `ossify-close-writer.md`, one per affected hosting
+repo — and a fresh close. On a record pass, write the accepted findings
+CLOSE_REVIEW_LEDGER carries into the retrospective's carried-and-lessons
+section, by class.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
@@ -51,18 +51,17 @@ carrying exactly one of three results: EVERY PR the close opened — one line
 per opened PR, `<repo> #<number> <url>`: only a remote product hosting repo
 (a declared `target_repo`) gets one, a remote-less repo lands locally in the
 same close and is never a PR; the single word `closed` when it recorded the
-spine with no PR
-open; or `halted: <step> — <evidence>` when it stopped, naming the failing step and
-repo and, on its own line, what it had already opened: `opened: <repo> #<n> <url> …`
-or `opened: none`. A multi-repo close can halt after opening in one repo —
-a halt that hides those PRs strands them. Whenever the close review ran,
-carry its ledger verbatim too — each finding, its decision and the reason:
-the record pass cannot reconstruct it. Then: Changed / Evidence / Open / Files.
+spine with no PR open; or `halted: <step> — <evidence>` when it stopped, naming
+the failing step and repo and, on its own line, what it had already opened:
+`opened: <repo> #<n> <url> …` or `opened: none`. A multi-repo close can halt
+after opening in one repo — a halt that hides those PRs strands them.
+Whenever the close review ran, carry its ledger verbatim too,
+naming each finding, its `target_repo`, its decision and the reason: the
+record pass cannot reconstruct it. Then: Changed / Evidence / Open / Files.
 
-NEVER: create a terminal, merge, ask the operator anything (questions go up to
-the top with `ask`), or re-invoke `/ossify:close` yourself — a halt settles
-this dispatch; remediated, the top dispatches a fresh close session. Report a
-refusal verbatim.
+NEVER: create a terminal, merge, ask the operator anything (questions go up
+with `ask`), or re-invoke `/ossify:close` — a halt settles this dispatch;
+remediated, the top dispatches a fresh close session. Report a refusal verbatim.
 ```
 
 ---
@@ -110,61 +109,59 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      Run for your two seats — every seat's task-create, worker-start, dispatch
      and check names --run <child run id>, every top question --run PARENT_RUN_ID.
   2. Decide your startup branches BEFORE any seat exists. MERGE_EXECUTOR must read
-     exactly `session` or `operator` — a missing, invalid or unknown assignment is asked
-     upward and nothing is created. Then branch on PRIOR_REVIEW. `none` means the top
-     dispatched you onto a PR no earlier work-PR dispatch has covered — an initial run,
-     and step 3 creates the reviewer. `covered` means a dispatch worked this
-     PR and left durable evidence its delegated review ran — a ledger
-     comment, a bot review — but persisted no record: a resumed run, no
-     reviewer created, the current head's signals as your baseline; evidence
-     absent the value is not spent — `ask` the top and create nothing.
-     A record whose reviewed head equals the current PR
-     head is a resumed run: skip only step 3's reviewer creation — the review already ran
-     — and enter step 4 with the record and its unresolved findings as your disposition
-     baseline. A record on a moved head is a resumed run too: re-fetch the GitHub
-     signals; the prior review and its unresolved findings still baseline the
-     disposition. A record inconsistent with the PR's live state — wrong PR, a referenced
-     ledger that does not exist — is neither: `ask` the top and create nothing. You did
-     not open this PR; the record and the dispatch decide.
+     exactly `session` or `operator` — a missing, invalid or unknown assignment is
+     asked upward and nothing is created. Then branch on PRIOR_REVIEW. `none` means
+     the top dispatched you onto a PR no earlier work-PR dispatch has covered — an
+     initial run, and step 3 creates the reviewer. `covered` means a dispatch worked
+     this PR and left durable evidence its delegated review ran — a ledger comment,
+     a bot review — but persisted no record: a resumed run, no reviewer created,
+     the current head's signals as your baseline; evidence absent the value is not
+     spent — `ask` the top and create nothing. A record whose reviewed head equals
+     the current PR head is a resumed run: skip only step 3's reviewer creation —
+     the review already ran — and enter step 4 with the record and its unresolved
+     findings as your disposition baseline. A record on a moved head is a resumed
+     run too: re-fetch the GitHub signals; the prior review and its unresolved
+     findings still baseline the disposition. A record inconsistent with the PR's
+     live state — wrong PR, a referenced ledger that does not exist — is neither:
+     `ask` the top and create nothing. You did not open this PR; the record and
+     the dispatch decide.
   3. Initial runs only: create the reviewer FIRST, from REVIEWER_COMMAND at
      REVIEWER_EFFORT, confirm REVIEWER_EXPECTED_MODEL from its banner and
      first reply, and brief it to run `/code-review PR_NUMBER REVIEW_LEVEL`.
-     Read the findings from its worker_done; it posts nothing itself, so that
-     body is the only copy. Validate it against the reviewer brief's schema —
+     Read the findings from its worker_done — it posts nothing; that body is
+     the only copy. Validate it against the reviewer brief's schema —
      `Findings: none` with `Reviewed head:` and `Summary:`, or finding lines
      plus both — before you pass anything on; on a malformed body send
      ONE bounded correction request to that reviewer and re-validate, and
      escalate a second malformed body to the top. A mismatched reviewed head
-     makes the review historical — re-fetch
-     the GitHub signals rather than commissioning another; absent or
-     untriaged signals never satisfy the merge gate.
+     makes the review historical — re-fetch the GitHub signals rather than
+     commissioning another; absent or untriaged signals never satisfy the
+     merge gate.
   4. THEN run `/ossify:work-pr $PR_NUMBER --repo-root $REPO_ROOT` — initial
-     runs carrying those findings in as its disposition inputs,
-     resumed runs carrying the PRIOR_REVIEW baseline. It owns the whole
-     loop, so started first it would reach its merge
-     ask on pre-existing signals with your review never run. In this seat its
-     "drive the fixes" dispatches to the PR-fix seat — you edit nothing
-     yourself — and its merge ask is the `ask` to the top in step 6.
+     runs carrying those findings in as its disposition inputs, resumed runs
+     carrying the PRIOR_REVIEW baseline. It owns the whole loop — started first
+     it would reach its merge ask on pre-existing signals, your review never
+     run. In this seat its "drive the fixes" dispatches to the PR-fix seat —
+     you edit nothing yourself — and its merge ask is the `ask` to the top in
+     step 6.
   5. Disposition every finding — the reviewer's, the bot threads, and the
      review bodies and top-level PR comments that `reviewThreads` does not
      return — post the ledger, file deferrals as tracked issues in PR_REPO, and
      dispatch fix tasks to a PR-fix seat — briefed from `briefs.md`'s fix-round
      brief but **without the ossify replacement clause**, which would start a
      second merge loop inside this one; it works the fix list you give it,
-     pushes, and returns `fixed in <sha>` per
-     finding, never running work-pr and never asking for a merge — created from
-     PRFIX_COMMAND at PRFIX_EFFORT — confirm PRFIX_EXPECTED_MODEL from its banner
-     and first reply before the first fix task; a mismatch is a failed launch
-     to ask about, never to work around. The delegated review ran once,
-     on the head it was briefed with, and that seat is
-     released after its worker_done validates. Each push moves the head under
-     that verdict: before the next disposition round,
+     pushes, and returns `fixed in <sha>` per finding, never running work-pr or
+     asking a merge — created from PRFIX_COMMAND at PRFIX_EFFORT —
+     confirm PRFIX_EXPECTED_MODEL from its banner and first reply before the
+     first fix task; a mismatch is a failed launch to ask about, never to work
+     around. The delegated review ran once, on the head it was briefed with, and
+     that seat is released after its worker_done validates. Each push moves the
+     head under that verdict: before the next disposition round,
      re-fetch the GitHub review signals and the thread state on the new head —
-     the bots review every push, so the current-head verdict is there to be read
-     rather than re-commissioned.
-     A post-disposition finding — a P0/P1 included — returns through the
-     blocking `ask` before any seat acts on it, never fixed by you or
-     silently deferred. Relay ONE batched summary per round; STOPPING_RULE
+     the bots review every push, so the current-head verdict is read there, not
+     re-commissioned. A post-disposition finding — a P0/P1 included — returns
+     through the blocking `ask` before any seat acts on it, never fixed by you
+     or silently deferred. Relay ONE batched summary per round; STOPPING_RULE
      decides when fixing stops.
   6. When the gate is clean, `ask` the top for the merge word. MERGE_EXECUTOR
      is the top's explicit assignment, not something you infer — never parse
@@ -176,9 +173,12 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      is a merge commit on that same SHA — never a squash or rebase — and you
      confirm and report the resulting merge SHA, surfacing any deviation
      rather than adopting it. Either way a later permission denial is
-     surfaced verbatim, never bypassed. Then release both seats — you are
-     exempt from any record-pass hold, but the spine branch and spine worktree
-     are the top's to hold, never yours to delete.
+     surfaced verbatim, never bypassed. Then release both seats and close each
+     terminal this session created — `orca terminal close --terminal <handle>`,
+     `orca terminal list` showing none — only terminals you can prove are
+     yours; report any teardown you cannot complete rather than claiming it.
+     You are exempt from any record-pass hold; the spine branch and spine
+     worktree stay the top's to hold, never yours to delete.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
@@ -189,10 +189,10 @@ open. On the open shape, persist the review record with it — whether the
 delegated review ran, its reviewed head, its clean/findings state and summary,
 and the durable ledger/comment references — the next fresh work-PR dispatch
 receives that record as PRIOR_REVIEW, with fresh dispatch identities even
-though the review state is reused. Both settle this dispatch and release both
-seats. On the open shape the top does not advance to the record pass, and a
-later merge is a new work-PR dispatch, not a resumption of this one.
-Then: Changed / Evidence / Open / Files.
+though the review state is reused. Both settle this dispatch, release both
+seats and close their terminals as step 6 directs. On the open shape the top
+does not advance to the record pass — a later merge is a new work-PR dispatch,
+not a resumption of this one. Then: Changed / Evidence / Open / Files.
 
 NEVER: talk to the operator — every question goes up to the top; squash; merge
 without the top's relayed word; delete a branch; or dispatch a second review —

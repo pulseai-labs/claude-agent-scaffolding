@@ -26,7 +26,8 @@ PLACEMENT: REPO_ROOT — the worktree holding this repo's spine branch.
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 PARENT_RUN_ID=<run id>
 SPINE_ID=<spine id>
-REPO=<owner/name of this writer's hosting repo>
+REPO=<the declared `target_repo` identifier for this writer's repo — it exists
+for remote and remote-less repos alike>
 REPO_ROOT=<abs path of this repo's spine worktree>
 WRITER_EXPECTED_MODEL=<model id the banner must show>
 ACCEPTED_LEDGER=<this repo's accepted fix-now findings, verbatim from the
