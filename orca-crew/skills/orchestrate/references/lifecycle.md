@@ -148,3 +148,27 @@ Every command's syntax comes from `orca skills get orchestration`.
     spine, also the recorded `SIDECAR_OID` and the accumulated close-review ledger
     (every close review's ledger so far, oldest first). With ossify installed, that
     is `/ossify:handoff`.
+
+## Rotation past the context ceiling
+
+orca-crew's hook tells a session its own context figure once it reaches the ceiling (the
+plugin setting `context_ceiling`, default 500000 tokens). The top, the spine session and the
+work-PR session act on it; a close session and every leaf seat simply finish their unit.
+Past the ceiling a seat finishes the unit in hand and starts no new one, never stopping
+mid-item. At its next boundary it settles its dispatch with a return that carries its state
+forward, and its parent launches a fresh seat to resume: the spine session writes
+`/ossify:handoff`, returns `rotate: <handoff path>`, and resumes from the same ratified
+block with that path as `HANDOFF_PATH`; a work-PR session returns `open: <PR url> at
+<head sha>` with its review record, and its successor resumes from `PRIOR_REVIEW` — it
+takes no `HANDOFF_PATH`. A figure the hook reports as unavailable is relayed upward once,
+never guessed. The spine session's and work-PR session's boundaries and returns are in
+their briefs (`ossify-briefs.md`, `ossify-pr-briefs.md`); your handling of a spine
+`rotate:` is `ossify-nested-run.md` §4.
+
+**Your own rotation.** Your boundary is a fully acknowledged delivery with no dispatch and no
+operator question in flight. Write the handoff, recording your own launch command. Open a new
+terminal with the launch command your resumed handoff recorded — ask the operator once when
+none did, because an alias carries provider settings a process listing does not show. Send
+it `/ossify:handoff-resume <path>`, confirm its turn started, then tell the operator which
+terminal to use and that this one can close. Live children keep running throughout.
+The new top first runs `orca orchestration run-use --id <parent run> --json`, then `check`.

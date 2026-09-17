@@ -106,6 +106,11 @@ round barrier is ossify's, unchanged.
 The spine session stops at the final round barrier — where `/ossify:run-spine` hands
 the baton to `/ossify:close <spine-id>` — and never runs the close on its own
 initiative.
+**A `rotate: <handoff path>` completion is not the final barrier.** The spine session
+stopped at an earlier round barrier past the context ceiling (`lifecycle.md`). Confirm the
+handoff path resolves, then dispatch a fresh spine session from the same `## Spine session`
+block — `SIDECAR_OID` proved as before every launch — with `HANDOFF_PATH` set. The close
+waits for a completion at the final barrier.
 When its `worker_done` lands, **you dispatch** `/ossify:close <spine-id>` to a close
 session that is **always a fresh terminal** you create, never the spine driver's: it
 creates nothing, runs the close, and returns what the close opened

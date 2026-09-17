@@ -575,6 +575,15 @@ for m in "$PLUGIN_ROOT/.claude-plugin/plugin.json" "$PLUGIN_ROOT/.codex-plugin/p
   else fail "${m%/*.json} manifest version matches the CHANGELOG head" "manifest '$mv_' vs CHANGELOG '$head_ver'"; fi
 done
 
+section "rotation past the context ceiling (0.6.0)"
+
+pin "$LIFECYCLE_MD" "## Rotation past the context ceiling" "lifecycle.md carries the rotation section"
+pin "$LIFECYCLE_MD" "orca orchestration run-use --id <parent run> --json" "a new top rebinds the parent Run with plain run-use"
+pin "$BRIEFS_MD" "HANDOFF_PATH=<" "the spine brief takes HANDOFF_PATH"
+pin "$BRIEFS_MD" "rotate: <handoff path>" "the spine brief returns rotate: past the ceiling"
+pin "$NESTED_MD" "rotate: <handoff path>" "the top's spine-completion step handles rotate:"
+pin "$PRBRIEFS_MD" "context-ceiling notice" "the work-PR brief returns open: past the ceiling"
+
 section "reference line budgets"
 
 budget "$EXEC_MD" "ossify-execution.md is within the reference budget"

@@ -96,7 +96,7 @@ PRFIX_COMMAND=<exact launch command>
 PRFIX_EXPECTED_MODEL=<model id the banner must show>
 PRFIX_EFFORT=<exact launch argument>
 PRIOR_REVIEW=<the prior dispatch's durable review record — ran, reviewed head,
-clean/findings state, summary, ledger/comment refs — "none", or "covered">
+clean/findings state, summary, fix rounds run, ledger/comment refs — "none", or "covered">
 MERGE_EXECUTOR=<session|operator — the top's explicit assignment>
 STOPPING_RULE=<the rule agreed before the PR opened>
 TASK/DISPATCH: your task and dispatch identities come from the Orca preamble
@@ -131,12 +131,11 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      Read the findings from its worker_done — it posts nothing; that body is
      the only copy. Validate it against the reviewer brief's schema —
      `Findings: none` with `Reviewed head:` and `Summary:`, or finding lines
-     plus both — before you pass anything on; on a malformed body send
-     ONE bounded correction request to that reviewer and re-validate, and
-     escalate a second malformed body to the top. A mismatched reviewed head
-     makes the review historical — re-fetch the GitHub signals rather than
-     commissioning another; absent or untriaged signals never satisfy the
-     merge gate.
+     plus both — before passing anything on; on a malformed body send
+     ONE bounded correction request and re-validate, escalating a second
+     malformed body to the top. A mismatched reviewed head makes the review
+     historical — re-fetch the GitHub signals rather than commissioning
+     another; absent or untriaged signals never satisfy the merge gate.
   4. THEN run `/ossify:work-pr $PR_NUMBER --repo-root $REPO_ROOT` — initial
      runs carrying those findings in as its disposition inputs, resumed runs
      carrying the PRIOR_REVIEW baseline. It owns the whole loop — started first
@@ -162,7 +161,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      re-commissioned. A post-disposition finding — a P0/P1 included — returns
      through the blocking `ask` before any seat acts on it, never fixed by you
      or silently deferred. Relay ONE batched summary per round; STOPPING_RULE
-     decides when fixing stops.
+     decides when fixing stops, counting the fix rounds PRIOR_REVIEW carries.
   6. When the gate is clean, `ask` the top for the merge word. MERGE_EXECUTOR
      is the top's explicit assignment, not something you infer — never parse
      permission settings, never probe by attempting a merge. On `session`: on
@@ -185,14 +184,15 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 DONE: one worker_done on the identities your injected Orca preamble names,
 returning PR_REPO, PR_NUMBER and every ledger comment id, plus one of two outcomes: the merge SHA; or
 `open: <PR url> at <head sha>` when the word you were relayed was wait or leave
-open. On the open shape, persist the review record with it — whether the
+open, or when the context-ceiling notice has fired and a fix round has just
+settled. On the open shape, persist the review record with it — whether the
 delegated review ran, its reviewed head, its clean/findings state and summary,
-and the durable ledger/comment references — the next fresh work-PR dispatch
-receives that record as PRIOR_REVIEW, with fresh dispatch identities even
-though the review state is reused. Both settle this dispatch, release both
-seats and close their terminals as step 6 directs. On the open shape the top
-does not advance to the record pass — a later merge is a new work-PR dispatch,
-not a resumption of this one. Then: Changed / Evidence / Open / Files.
+the fix rounds run, and the durable ledger/comment references — the next fresh
+work-PR dispatch receives that record as PRIOR_REVIEW, with fresh dispatch
+identities even though the review state is reused. Both settle this dispatch,
+release both seats and close their terminals as step 6 directs. On the open shape
+the top does not advance to the record pass — a later merge is a new work-PR
+dispatch, not a resumption of this one. Then: Changed / Evidence / Open / Files.
 
 NEVER: talk to the operator — every question goes up to the top; squash; merge
 without the top's relayed word; delete a branch; or dispatch a second review —

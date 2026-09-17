@@ -27,11 +27,13 @@ SPINE_ID=<spine id>
 SPINE_EXPECTED_MODEL=<model id the banner must show>
 ORCA_EXECUTION_PATH=<abs path to $SPINE_DIR/orca-execution.md>
 SIDECAR_OID=<blob id the top recorded when it wrote the ratified sidecar>
+HANDOFF_PATH=<a prior spine session's handoff path, or "none">
 TASK/DISPATCH: your task and dispatch identities come from the Orca preamble injected
 into this terminal; spend those verbatim — never placeholders, never ids predicted
 before it existed. Capture them, and PARENT_RUN_ID, before binding your child Run.
 
-TASK: drive spine SPINE_ID to its final round barrier. A first reply whose model
+TASK: drive spine SPINE_ID to its final round barrier. With HANDOFF_PATH set, read that
+handoff first; ossify's own state says which round runs next. A first reply whose model
 is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
   1. Read ORCA_EXECUTION_PATH and validate it against SPINE.md before anything
      else: `git hash-object "$(dirname "$ORCA_EXECUTION_PATH")/SPINE.md"` (the
@@ -41,24 +43,20 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      ratified_in_run must equal PARENT_RUN_ID; and spine_id must equal SPINE_ID.
      Any failure halts — ask, never substitute. Then
      `git hash-object "$ORCA_EXECUTION_PATH"` must equal SIDECAR_OID: the checks
-     above prove the file valid, not the file the operator ratified, and an
-     edited-but-valid row passes every one of them. That value is the baseline
-     for every launch below.
-  2. Create and bind a CHILD Run for item tasks. Every child task-create,
-     worker-start, dispatch and check names --run <child run id>. Every question
-     for the top names --run PARENT_RUN_ID. Replies to item questions go on each
-     original child message id.
-  3. Run `/ossify:run-spine $SPINE_ID --external-executor`. When it hands you a
-     round's execution requests, launch one fresh IMPLEMENTER terminal per item
-     from that item's exact sidecar command — never a substitute command, model
-     or effort. The verifier is not created here; step 5 creates it, once there
-     is a complete return to verify. Confirm each model from the launch banner
-     and the first reply; the effort is the launch argument you were given.
-     Re-run step 1's validation, the three session blocks included,
+     prove the file valid, not the ratified one — an edited-but-valid row
+     passes them all. That is the baseline for every launch.
+  2. Create and bind a CHILD Run for item tasks. Child task-create, worker-start,
+     dispatch and check name --run <child run id>, questions for the top name
+     --run PARENT_RUN_ID; item replies go on each original child message id.
+  3. Run `/ossify:run-spine $SPINE_ID --external-executor`. On the round's
+     execution requests, launch a fresh IMPLEMENTER terminal per item from its
+     exact sidecar command — never a substitute command, model or effort. The
+     verifier is created at step 5, once a complete return exists. Confirm each
+     model from the banner and first reply; the effort is the given launch
+     argument. Re-run step 1's validation, the three session blocks included,
      immediately before each item terminal is created, and
-     require the hash to still equal the baseline; any drift halts that launch
-     and asks. Only a top reply naming a new SIDECAR_OID, after rewrite and
-     operator re-ratification, moves it.
+     require the hash to still equal the baseline; drift halts that launch and
+     asks. Only a top reply naming a new SIDECAR_OID after re-ratification moves it.
   4. Gather the round's implementation plans into ONE ordered ask to the top and
      wait. Relay the top's per-item decision to each implementer on its own
      original message id before any edit starts.
@@ -77,25 +75,27 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      On halt, release that item's pair, mark the item halted, and if no other item
      can proceed send a halt-shaped worker_done on the identities your injected
      Orca preamble names, with the item and reason; the spine stays at its barrier.
-  6. Return accepted results to the lane in declared decomposition order, closing
-     each item before the next feeds: the lane gates, commits and merges
-     `work/<wi>` into the spine branch — the per-item close, distinct from the
-     spine-close ceremony the top dispatches to a fresh close session. An item
-     still `active` at a proposed barrier is a halt naming it, never a
-     completion. Keep each pair until its item closes or escalates; never move a
-     terminal to another item.
+  6. Return accepted results in declared decomposition order, closing each item
+     before the next feeds: the lane gates, commits and merges `work/<wi>` into
+     the spine branch — the per-item close, not the spine-close ceremony the top
+     dispatches to a fresh close session. An item still `active` at a proposed
+     barrier is a halt naming it, never a completion. Keep each pair until its
+     item closes or escalates; never move a terminal to another item.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
-DONE: release every item pair, then close each of your item terminals explicitly —
-worker-release performs no process cleanup on an alias-launched terminal, so run
-`orca terminal close --terminal <handle>` on each exact terminal you created and
+DONE: release every item pair, then close each item terminal — worker-release
+does no cleanup on an alias-launched terminal, so run
+`orca terminal close --terminal <handle>` on each terminal you created and
 verify `orca terminal list` shows none of them, closing only terminals you can
 prove are yours — never an active, reused, unrelated or unprovable identity — and
-reporting any teardown you cannot complete rather than claiming it. Then one
-worker_done on the identities your injected Orca preamble names, so the top's
-Dispatch settles while your child Run stays bound:
+report teardown you cannot complete rather than claiming it. Then one
+worker_done on the identities your injected Orca preamble names, settling the
+top's Dispatch while your child Run stays bound:
   Changed / Evidence / Open / Files, and the child Run id you bound.
+ROTATE instead once the context-ceiling notice has fired: stop at the next round
+barrier, do the same teardown, write `/ossify:handoff`, and send worker_done
+`rotate: <handoff path>` with the child Run id. Never stop mid-round.
 The spine is at its final round barrier when you finish; the close ceremony is
 the top's, in a fresh close session that is never this terminal.
 

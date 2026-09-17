@@ -58,6 +58,8 @@ Three consequences:
   failure. A heartbeat means alive, not done. Beyond those `worker-read` cases, the only
   bounded reads are the launch-banner `terminal read` in `roles.md` and the one
   `/context` reply at each task boundary.
+- **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
+  and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
 - **Verifying a worker's claim is a verifier dispatch**, not an orchestrator read. "Tests
   pass" in a `worker_done` is a claim until CI on that head SHA, or a verifier, says so.
   One narrow exception: lifecycle step 6's PR gate — `gh pr view` for identity and
