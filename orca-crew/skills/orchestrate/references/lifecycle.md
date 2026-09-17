@@ -144,5 +144,7 @@ Every command's syntax comes from `orca skills get orchestration`.
     so its teardown validates the close's own result instead — the local landing it
     recorded in each hosting repo — and waits for no record pass.
 13. **Handoff.** If the Run outlives the session, write a handoff naming the Run id,
-    task ids, terminal handles, head SHA, and the next step. With ossify installed, that
+    task ids, terminal handles, head SHA, and the next step — on an activated ossify
+    spine, also the recorded `SIDECAR_OID` and the accumulated close-review ledger
+    (every close review's ledger so far, oldest first). With ossify installed, that
     is `/ossify:handoff`.

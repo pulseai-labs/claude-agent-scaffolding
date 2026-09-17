@@ -46,6 +46,8 @@ LIFECYCLE_MD="$REF/lifecycle.md"
 ROLES_MD="$REF/roles.md"
 GENERIC_BRIEFS_MD="$REF/briefs.md"
 SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
+EVAL_FIXTURE14="$PLUGIN_ROOT/tests/eval/fixtures/ossify-spine-execution/14-close-brief-identities-and-workspace-records.md"
+EVAL_RUBRIC_MD="$PLUGIN_ROOT/tests/eval/rubrics/ossify-spine-execution.md"
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -256,6 +258,18 @@ pin "$PRBRIEFS_MD" 'halted: close-review' \
 # allocation rule is stated where the halt remediation lives.
 pin "$WRITER_MD" 'WRITER_EXPECTED_MODEL=' \
   "the writer brief gates its ratified expected model"
+# N5/#467: REPO= takes the declared target_repo identifier, which exists for a
+# remote-less hosting repo too — owner/name assumed a remote.
+pin "$WRITER_MD" 'declared `target_repo` identifier' \
+  "the writer's REPO= takes the declared target_repo, not owner/name"
+absent "$WRITER_MD" 'owner/name' \
+  "the owner/name slot wording is gone"
+# PR #470 row 3: the writer groups findings by the declared `target_repo` —
+# the key the nested-run slice uses — never by the repo a file lives in.
+pin "$WRITER_MD" 'by their declared `target_repo`' \
+  "writer findings group by the declared target_repo key"
+absent "$WRITER_MD" 'each file lives in' \
+  "the by-file-location grouping is gone"
 pin "$NESTED_MD" 'one writer per affected hosting repo' \
   "fix-now findings spanning repos get a writer each"
 absent "$PRBRIEFS_MD" 'per spine at most' \
@@ -312,6 +326,21 @@ pin "$BRIEFS_MD" 'must equal SIDECAR_OID' \
   "step 1 proves the file on disk is the ratified one"
 pin "$EXEC_MD" 'records that blob id as SIDECAR_OID' \
   "the top records the oid at write time, not the child at read time"
+# N7/#467: the recorded oid survives the top's own handoff — a resumed top
+# proves against it and never re-derives a baseline.
+pin "$EXEC_MD" 'carries the recorded `SIDECAR_OID`' \
+  "a top handoff persists the recorded sidecar oid"
+pin "$EXEC_MD" 'asks the operator before any launch that spends a sidecar profile' \
+  "a resumed top without the oid asks before spending a profile"
+# PR #470 row 2: the handoff is the carrier — lifecycle's step 13 lists the
+# recorded oid and the accumulated close-review ledger on an activated spine,
+# and the ask's subject is the resumed top, not the handoff.
+pin "$LIFECYCLE_MD" 'the recorded `SIDECAR_OID`' \
+  "the top's handoff lists the recorded sidecar oid"
+pin "$LIFECYCLE_MD" 'close-review ledger' \
+  "the top's handoff lists the accumulated close-review ledger"
+pin "$EXEC_MD" 'A resumed top whose handoff lacks it asks the operator' \
+  "the resumed top, not the handoff, asks before spending a profile"
 
 section "the first verifier failure blocks and asks"
 
@@ -390,6 +419,19 @@ pin "$PRBRIEFS_MD" 'released after its worker_done validates' \
   "the delegated review runs once and its seat is released"
 pin "$PRBRIEFS_MD" 're-fetch the GitHub review signals' \
   "each new head is covered by re-fetching the signals, not by a second review"
+# N8/#467: the work-PR session's alias-launched seats get the #455 teardown —
+# close each terminal it created, then prove the list shows none of them.
+pin "$PRBRIEFS_MD" 'orca terminal close --terminal <handle>' \
+  "the work-PR session closes each terminal it created"
+pin "$PRBRIEFS_MD" 'orca terminal list' \
+  "the work-PR session verifies its terminals are gone"
+# PR #470 row 4 (settles ledger row 9): the list always shows the top's and
+# this session's own terminals — the check is none OF THEM, never none at all.
+pin "$PRBRIEFS_MD" 'orca terminal list` showing none of them' \
+  "the teardown check is none of the session's terminals, not none at all"
+# PR #470 row 5: the budget ate the close seat's ask target — restore it.
+pin "$PRBRIEFS_MD" 'questions go up to the top with `ask`' \
+  "the close seat's questions still route to the top"
 absent "$PRBRIEFS_MD" 'review a head twice' \
   "the per-head review that contradicted the reviewer template is gone"
 
@@ -404,12 +446,23 @@ absent "$PRBRIEFS_MD" 'run a review or a fix' \
 pin "$PRBRIEFS_MD" 'CLOSE_REVIEW_LEDGER=' \
   "the record pass receives the close-review ledger exactly once"
 # R1/R15: the halt rule reconciles with ossify's advisory-review prose instead
-# of contradicting it, and the ledger slot names the most recent reviewing
-# close — every fresh close carries the newest ledger forward.
+# of contradicting it. N6/#467: the ledger slot is cumulative — every close
+# review's ledger for the spine, oldest first, verbatim — so a clean retry
+# drops nothing an earlier review accepted.
 pin "$PRBRIEFS_MD" 'ossify keeps that review advisory' \
   "the halt rule names its relation to the ceremony's advisory review"
-absent "$PRBRIEFS_MD" 'from the first close' \
-  "the ledger slot names the most recent reviewing close, not the first"
+pin "$PRBRIEFS_MD" 'oldest first' \
+  "the ledger slot accumulates every close review's ledger, oldest first"
+absent "$PRBRIEFS_MD" 'the most recent close' \
+  "the 0.5.0 newest-only ledger choice is gone"
+# N4/#467: a close-review ledger row names the repo its finding lands in, so a
+# multi-repo close splits fix-now findings into per-writer ledgers cleanly.
+pin "$PRBRIEFS_MD" 'carrying each finding, its `target_repo`' \
+  "the halted close-review ledger names each finding's target_repo"
+pin "$PRBRIEFS_MD" 'naming each finding, its `target_repo`' \
+  "the verbatim ledger carry names each finding's target_repo"
+pin "$NESTED_MD" 'the accepted findings whose `target_repo` is that repo' \
+  "a writer's ledger slice is the findings landing in its repo"
 # R5: the close DONE's PR-list rule carries the product-hosting-repo
 # qualifier (RF7), not the bare phrase every other site had to disambiguate.
 absent "$PRBRIEFS_MD" 'one line per hosting repo' \
@@ -422,6 +475,27 @@ pin "$NESTED_MD" 'a complete PR list or `closed`' \
   "nothing downstream starts on a partial close"
 pin "$NESTED_MD" 'one SUCCESSFUL record pass' \
   "single means one that succeeded, not one attempt"
+# #466: the AI-workspace record arm claims no "record branch" — the close writes
+# its records where ossify resolves `ai_workspace`, and that repo's own policy
+# governs them outside the returned PR list.
+pin "$NESTED_MD" 'where ossify resolves `ai_workspace`' \
+  "workspace records land where ossify resolves ai_workspace"
+absent "$NESTED_MD" 'record branch' \
+  "the never-established record-branch claim is gone"
+# PR #470 row 1: the eval oracle tracks the same #466 contract — records are
+# written where ossify resolves ai_workspace, never a "record branch" no step
+# establishes. The rubric wraps the old claim across a line, so its pin is the
+# contiguous tail of the old wording.
+nonempty "$EVAL_FIXTURE14" "eval fixture 14 exists"
+pin "$EVAL_FIXTURE14" 'where ossify resolves ai_workspace' \
+  "fixture 14's oracle lands records where ossify resolves ai_workspace"
+absent "$EVAL_FIXTURE14" 'record branch' \
+  "fixture 14's record-branch claim is gone"
+nonempty "$EVAL_RUBRIC_MD" "the spine-execution rubric exists"
+pin "$EVAL_RUBRIC_MD" 'where ossify resolves `ai_workspace`' \
+  "rubric criterion 1 lands records where ossify resolves ai_workspace"
+absent "$EVAL_RUBRIC_MD" 'branch under its own policy' \
+  "rubric criterion 1's record-branch wording is gone"
 
 section "four seats, one voice"
 
@@ -488,6 +562,10 @@ section "the release is declared once and agreed everywhere"
 CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 pin "$CHANGELOG_MD" '## 0.5.0' "the CHANGELOG opens a 0.5.0 section"
 for b in '#446' '#447' '#453' '#454' '#455' '#448' '#449'; do
+  pin "$CHANGELOG_MD" "- **$b" "the CHANGELOG records $b exactly once"
+done
+pin "$CHANGELOG_MD" '## 0.5.1' "the CHANGELOG opens a 0.5.1 section"
+for b in '#466' '#467'; do
   pin "$CHANGELOG_MD" "- **$b" "the CHANGELOG records $b exactly once"
 done
 head_ver="$(awk '/^## /{sub(/^## /, ""); print; exit}' "$CHANGELOG_MD")"

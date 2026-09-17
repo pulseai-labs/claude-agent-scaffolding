@@ -2,6 +2,32 @@
 
 All notable changes to the `orca-crew` plugin.
 
+## 0.5.1
+
+The PR-#464 review residuals: six contract corrections to the spine references —
+the AI-workspace record claim made honest, the close-review ledger carrying repo
+and history, the top's handoff keeping the sidecar baseline, and the work-PR
+session's teardown made verifiable. Prose and contract pins only.
+
+- **#466** — the AI-workspace record arm claims no "record branch" ossify never
+  establishes: the close writes its records where ossify resolves `ai_workspace`,
+  committing and integrating them follow that repo's own policy outside the PR
+  list the lane returns, nobody pushes them to its `main` directly, and no
+  session claims ossify opened a PR there.
+- **#467** — five residuals. The close-review ledger names each finding's
+  `target_repo` beside its decision and reason, and a writer's slice is the
+  accepted findings whose `target_repo` is that repo (N4); the writer brief's
+  `REPO=` slot takes the declared `target_repo` identifier, which exists for
+  remote and remote-less repos alike (N5); `CLOSE_REVIEW_LEDGER=` is cumulative —
+  every close review's ledger for the spine, oldest first, verbatim — so a clean
+  retry drops nothing an earlier review accepted (N6); every handoff the top
+  writes carries the recorded `SIDECAR_OID`, a resumed top proves against that
+  recorded value and never a fresh hash, and a handoff lacking it asks the
+  operator before any launch that spends a sidecar profile (N7); and the
+  work-PR session's seat release also closes each terminal the session created —
+  `orca terminal close --terminal <handle>`, verified against `orca terminal
+  list`, provable own terminals only, unresolved teardown reported (N8).
+
 ## 0.5.0
 
 The **coordinator contracts**: every seat a spine spends is now ratified, completions are

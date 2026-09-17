@@ -125,11 +125,12 @@ was remote-less and it recorded the spine outright.
 
 **Hosting repo means a declared product `target_repo`** — the distinct product repos
 the spine's work items declare. An AI workspace carrying the spine's ceremony records
-is not one: its records stay on that repo's record branch and integrate under its own
-policy, outside the PR list this lane returns; nobody pushes them to its `main`
-directly, and no session claims ossify opened a PR there. Ossify's own landing rule —
-a repo with a remote lands by PR, a remote-less one merges locally — is unchanged and
-decides each product repo's arm.
+is not one: the close writes its records where ossify resolves `ai_workspace`, and
+committing and integrating them follow that repo's own policy — no ossify ceremony
+governs that repo — outside the PR list this lane returns; nobody pushes them to
+its `main` directly, and no session claims ossify opened a PR there. Ossify's own
+landing rule — a repo with a remote lands by PR, a remote-less one merges locally —
+is unchanged and decides each product repo's arm.
 
 A multi-repo close can also open a PR in one repo and then halt on a later one, so it
 returns `halted:` naming what it opened so far. **Dispatch nothing downstream — no
@@ -141,11 +142,12 @@ A halt settles that dispatch only: remediate the blocker it names, then dispatch
 ledger.** The ceremony's accumulated-diff review is the close seat's to run, never to
 fix: a `fix now` disposition ends that dispatch. The top asks the operator for a
 writer profile and dispatches one writer per affected hosting repo — each in
-that repo's own spine worktree with its slice of the accepted ledger and a
-bounded edit scope, per `references/ossify-close-writer.md` — then dispatches
-a fresh close, which re-runs the review over every amended diff. Neither the
-close nor the work-PR session applies these
-fixes, and no seat is created for this permanently.
+that repo's own spine worktree with a bounded edit scope, per
+`references/ossify-close-writer.md` — carrying
+the accepted findings whose `target_repo` is that repo — then dispatches a
+fresh close, which re-runs the review over every amended diff. Neither the
+close nor the work-PR session applies these fixes, and no seat is created for
+this permanently.
 
 **Then one work-PR session per returned PR**, each created in that PR's own
 hosting-repo worktree, launched from the sidecar's ratified Work-PR-session block, and

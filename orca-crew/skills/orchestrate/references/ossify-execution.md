@@ -110,42 +110,42 @@ above are fixed for every item on every spine, recorded so the spine session
 checks rather than chooses. No reviewer row — §5 says why; every session block
 sits beside the table, never a row in it.
 
-**Authoring it.** After `/plan-spine`, recommend one implementer and one verifier
-profile per item from its scope, risk and cost. Present **every** row to the operator in
-one ratification phase and write nothing until every row is decided — a half-ratified
-sidecar looks binding and is not. Record the recommendation and any override.
-**On writing the ratified file, hash it** — `git hash-object` on the sidecar — and keep
-that value: the brief injects it as `SIDECAR_OID` and every launcher proves equality
-against it before spending a profile. A child that sampled its own baseline would adopt
-any edit made before its first read; **the top records that blob id as SIDECAR_OID**, so
-the baseline is the operator-approved file.
+**Authoring it.** After `/plan-spine`, recommend one implementer and one verifier profile per
+item from its scope, risk and cost. Present **every** row to the operator in one ratification
+phase and write nothing until every row is decided — a half-ratified sidecar looks binding and
+is not. Record the recommendation and any override. **On writing the ratified file, hash it** —
+`git hash-object` on the sidecar — and keep that value: the brief injects it as `SIDECAR_OID`
+and every launcher proves equality against it before spending a profile. A child sampling its
+own baseline would adopt any edit made before its first read;
+**the top records that blob id as SIDECAR_OID**, so the baseline is the operator-approved file.
 
-**Reading it.** Before dispatching the spine session, and again before every
-item launch, the reader checks: the plan's blob id **at its real path** —
-`git hash-object "$(dirname "$ORCA_EXECUTION_PATH")/SPINE.md"`, which resolves
-`spine_plan` against the sidecar's own directory exactly as authoring did — equals
-`spine_plan_oid`; every planned item has exactly one complete row; no row names
-an item the plan does not; `ratification` reads exactly `operator-approved`;
-`ratified_in_run` equals the injected `PARENT_RUN_ID`; `spine_id` equals the
-spine being run. **Those last three are value checks, not presence checks** — a field
-that merely exists admits `rejected`, another Run's ratification and another spine's
-sidecar as authority. Any failure halts; a profile that needs
-to change is a new operator decision and a rewrite by you, never a substitution. **Those
-checks establish validity, not identity** — an edited but still-valid row or block passes
-every one — so the sidecar's blob id is pinned against the **top-recorded `SIDECAR_OID`**
-at every launch that spends a sidecar profile: the spine session before each item
-terminal (`ossify-nested-run.md` §3), and the top before the spine session, each
-close, work-PR session and record pass. A mismatch halts that launch and asks; only
-your rewrite, the operator's re-ratification and a newly recorded oid move it.
+**Reading it.** Before dispatching the spine session, and again before every item
+launch, the reader checks: the plan's blob id **at its real path** — `git hash-object
+"$(dirname "$ORCA_EXECUTION_PATH")/SPINE.md"`, which resolves `spine_plan` against the
+sidecar's own directory exactly as authoring did — equals `spine_plan_oid`; every
+planned item has exactly one complete row; no row names an item the plan does not;
+`ratification` reads exactly `operator-approved`; `ratified_in_run` equals the injected
+`PARENT_RUN_ID`; `spine_id` equals the spine being run. **Those last three are value
+checks, not presence checks** — a field that merely exists admits `rejected`, another
+Run's ratification and another spine's sidecar as authority. Any failure halts; a
+profile that needs to change is a new operator decision and a rewrite by you, never a
+substitution. **Those checks establish validity, not identity** — an edited but
+still-valid row or block passes every one — so the sidecar's blob id is pinned against
+the **top-recorded `SIDECAR_OID`** at every launch that spends a sidecar profile: the
+spine session before each item terminal (`ossify-nested-run.md` §3), and the top before
+the spine session, each close, work-PR session and record pass. A mismatch halts that
+launch and asks; only your rewrite, the operator's re-ratification and a newly recorded
+oid move it. A handoff the top writes carries the recorded `SIDECAR_OID`; a resumed top
+proves the sidecar against that recorded value, never a fresh hash.
+A resumed top whose handoff lacks it asks the operator before any launch that spends a sidecar profile.
 
-**The `## Spine session` block is read the same way** — its four keys value-checked
-beside the item rows, and **its absence halts on an activated spine**. **The
-`## Close session` and `## Work-PR session` blocks are read identically** — four keys
-each, value-checked beside the item rows, either one's absence halting the same way —
-and all three are recommended and **ratified with the item rows in the same phase**,
-touching nothing about the item-set equality check above. The close terminal
-and each work-PR session launch from their own ratified blocks, the model
-confirmed from the banner and first reply exactly as an item row's is.
+**The `## Spine session` block is read the same way** — its four keys value-checked beside the
+item rows, and **its absence halts on an activated spine**. **The `## Close session` and
+`## Work-PR session` blocks are read identically** — four keys each, value-checked beside the
+item rows, either one's absence halting the same way — and all three are recommended and
+**ratified with the item rows in the same phase**, touching nothing about the item-set equality
+check above. The close terminal and each work-PR session launch from their own ratified blocks,
+the model confirmed from the banner and first reply exactly as an item row's is.
 
 **A v1 sidecar is not a v2 sidecar with defaults missing.** A sidecar whose `schema:` reads
 `orca-execution/v1` halts any new v2 launch: you rewrite it — adding the two blocks, moving
