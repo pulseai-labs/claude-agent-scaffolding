@@ -53,13 +53,16 @@ Every command's syntax comes from `orca skills get orchestration`.
 4. **Plan gate, planned work only.** The `claude-glm` brief says: post your plan with
    `orca orchestration ask`, wait for the reply, then implement. Approve or amend via
    `reply`. Flash briefs skip this.
-5. **Wait.** Rolling `check --wait --types worker_done,escalation,question`. Process the
-   whole Delivery, answer every `question`, ack, wait again. A timeout is a checkpoint.
-   `worker-read` only on `escalation` or a failed `worker_done`. At each task boundary
-   for a retained implementer, send `/context` and read the one reply before attaching
-   the next task (the threshold is in `roles.md`).
-6. **Implementer finishes.** Its `worker_done` names the branch, head SHA, the test
-   command with its result, and the PR it opened. Check the PR with one
+5. **Wait.** Rolling `check --wait --types worker_done,escalation,question
+   --timeout-ms 900000` (Orca's 15-minute window). Process the whole Delivery, answer
+   every `question`, ack, wait again. A timeout is a checkpoint: exactly one probe,
+   then wait again. `worker-read` only on `escalation` or a failed `worker_done`. At
+   each task boundary for a retained implementer, send `/context` and read the one
+   reply before attaching the next task (the threshold is in `roles.md`).
+6. **Implementer finishes.** Its `worker_done` carries the completion body its
+   brief defined — the commit SHAs and file count, each test command's pass and
+   fail counts with the full output in the report file, the PR it opened with
+   its head SHA, and any open ids. Check the PR with one
    `gh pr view <number> --repo <owner/repo>` and read CI from
    `commits/<sha>/check-runs` plus the commit statuses when the repo's CI reports
    through the Status API instead of Checks, never the status rollup, both fetched
@@ -148,3 +151,31 @@ Every command's syntax comes from `orca skills get orchestration`.
     spine, also the recorded `SIDECAR_OID` and the accumulated close-review ledger
     (every close review's ledger so far, oldest first). With ossify installed, that
     is `/ossify:handoff`.
+
+## Rotation past the context ceiling
+
+orca-crew's hook tells a session its own context figure once it reaches the ceiling (the
+plugin setting `context_ceiling`, default 500000 tokens). The top, the spine session and the
+work-PR session act on it; a close session and every leaf seat simply finish their unit.
+Past the ceiling a seat finishes the unit in hand and starts no new one, never stopping
+mid-item. At its next boundary it settles its dispatch with a return that carries its state
+forward, and its parent launches a fresh seat to resume: the spine session writes
+`/ossify:handoff`, returns `rotate: <handoff path>`, and resumes from the same ratified
+block with that path as `HANDOFF_PATH`; a work-PR session returns `open: <PR url> at
+<head sha>` with its review record, and its successor resumes from `PRIOR_REVIEW` — it
+takes no `HANDOFF_PATH`. A figure the hook reports as unavailable is relayed upward once,
+never guessed. The spine session's and work-PR session's boundaries and returns are in
+their briefs (`ossify-briefs.md`, `ossify-pr-briefs.md`); your handling of a spine
+`rotate:` is `ossify-nested-run.md` §4.
+
+**Your own rotation.** Your boundary is a fully acknowledged delivery with no
+operator question in flight — live child dispatches keep running throughout and
+your successor inherits them by rebinding the parent Run. Write the handoff,
+recording your own launch command — `/ossify:handoff` with ossify installed, the
+same file by hand without it. Open a new terminal with the launch command your
+resumed handoff recorded — ask the operator once when none did, because an alias
+carries provider settings a process listing does not show. Send the new top its
+resume — `/ossify:handoff-resume <path>` with ossify, or the handoff path as its
+first instruction without — confirm its turn started, then tell the operator
+which terminal to use and that this one can close.
+The new top first runs `orca orchestration run-use --id <parent run> --json`, then `check`.

@@ -2,6 +2,29 @@
 
 All notable changes to the `orca-crew` plugin.
 
+## 0.6.0
+
+The **coordinator context ceiling** (#456) and the top's wait discipline (#452 R1–R3).
+Standalone ossify and every session outside an Orca terminal are untouched; the sidecar
+schema does not change.
+
+- **#456** — one fail-open hook, `hooks-handlers/context-ceiling.sh`, on PreToolUse (Bash)
+  and UserPromptSubmit, inert outside an Orca terminal. It reads the session's own context
+  figure from the transcript Claude Code names — the latest assistant record's input and
+  cache tokens, never a sum — and, at or past the new `context_ceiling` setting (default
+  500000 tokens, half a 1M window), adds one line telling the seat to finish the unit in
+  hand, start no new one and rotate at its next boundary. It never allows, denies or asks,
+  and an unreadable figure is reported as unavailable. The spine session rotates at a round
+  barrier with `rotate: <handoff path>`; the work-PR session returns `open:` after a settled
+  fix round, its review record now carrying the fix rounds run; the top relaunches from its
+  recorded launch command and the new top rebinds the parent Run with `run-use --id`.
+- **#452 R1–R3** — a heartbeat-only wake gets one `check --ack … --wait` command; the
+  rolling wait uses Orca's 15-minute window and a timeout checkpoint is one probe; every
+  completion body carries ids, SHAs, counts and a report path, with narrative only in the
+  report. R4 stays with ossify.
+- Not built, by decision: wake suppression (H28), keepalive stripping (H29), a
+  completion-shape check (H30), and #456's model-judged eval fixtures.
+
 ## 0.5.1
 
 The PR-#464 review residuals: six contract corrections to the spine references —
