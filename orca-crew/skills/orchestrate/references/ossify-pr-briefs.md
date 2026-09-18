@@ -184,15 +184,15 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 DONE: one worker_done on the identities your injected Orca preamble names,
 returning PR_REPO, PR_NUMBER and every ledger comment id, plus one of two outcomes: the merge SHA; or
 `open: <PR url> at <head sha>` when the word you were relayed was wait or leave
-open, or when the context-ceiling notice has fired and a fix round has just
-settled. On the open shape, persist the review record with it — whether the
-delegated review ran, its reviewed head, its clean/findings state and summary,
-the fix rounds run, and the durable ledger/comment references — the next fresh
-work-PR dispatch receives that record as PRIOR_REVIEW, with fresh dispatch
-identities even though the review state is reused. Both settle this dispatch,
-release both seats and close their terminals as step 6 directs. On the open shape
-the top does not advance to the record pass — a later merge is a new work-PR
-dispatch, not a resumption of this one. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
+open, or at a fix-round boundary once the context-ceiling notice has fired — a round
+settled or the next not yet begun. On the open shape, persist its review record —
+whether the delegated review ran, its reviewed head, its clean/findings state and
+summary, the fix rounds run, and the durable ledger/comment references — the next
+fresh work-PR dispatch receives it as PRIOR_REVIEW under fresh dispatch identities,
+the review state reused. Both settle this dispatch, release both seats and close
+their terminals as step 6 directs. On the open shape the top does not advance to
+the record pass — a later merge is a new work-PR dispatch, not a resumption of this
+one. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: talk to the operator — every question goes up to the top; squash; merge
 without the top's relayed word; delete a branch; or dispatch a second review —

@@ -59,8 +59,10 @@ Every command's syntax comes from `orca skills get orchestration`.
    then wait again. `worker-read` only on `escalation` or a failed `worker_done`. At
    each task boundary for a retained implementer, send `/context` and read the one
    reply before attaching the next task (the threshold is in `roles.md`).
-6. **Implementer finishes.** Its `worker_done` names the branch, head SHA, the test
-   command with its result, and the PR it opened. Check the PR with one
+6. **Implementer finishes.** Its `worker_done` carries the completion body its
+   brief defined — the commit SHAs and file count, each test command's pass and
+   fail counts with the full output in the report file, the PR it opened with
+   its head SHA, and any open ids. Check the PR with one
    `gh pr view <number> --repo <owner/repo>` and read CI from
    `commits/<sha>/check-runs` plus the commit statuses when the repo's CI reports
    through the Status API instead of Checks, never the status rollup, both fetched
@@ -166,10 +168,14 @@ never guessed. The spine session's and work-PR session's boundaries and returns 
 their briefs (`ossify-briefs.md`, `ossify-pr-briefs.md`); your handling of a spine
 `rotate:` is `ossify-nested-run.md` §4.
 
-**Your own rotation.** Your boundary is a fully acknowledged delivery with no dispatch and no
-operator question in flight. Write the handoff, recording your own launch command. Open a new
-terminal with the launch command your resumed handoff recorded — ask the operator once when
-none did, because an alias carries provider settings a process listing does not show. Send
-it `/ossify:handoff-resume <path>`, confirm its turn started, then tell the operator which
-terminal to use and that this one can close. Live children keep running throughout.
+**Your own rotation.** Your boundary is a fully acknowledged delivery with no
+operator question in flight — live child dispatches keep running throughout and
+your successor inherits them by rebinding the parent Run. Write the handoff,
+recording your own launch command — `/ossify:handoff` with ossify installed, the
+same file by hand without it. Open a new terminal with the launch command your
+resumed handoff recorded — ask the operator once when none did, because an alias
+carries provider settings a process listing does not show. Send the new top its
+resume — `/ossify:handoff-resume <path>` with ossify, or the handoff path as its
+first instruction without — confirm its turn started, then tell the operator
+which terminal to use and that this one can close.
 The new top first runs `orca orchestration run-use --id <parent run> --json`, then `check`.
