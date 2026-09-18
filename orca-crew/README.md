@@ -129,9 +129,21 @@ exempt from the record-pass hold; and the close's PR list covers remote product
 hosting repos only — a remote-less repo lands locally and is never a PR; an
 AI-workspace record arm is not one.
 
+## Context ceiling (0.6.0)
+
+A coordinator seat — the top, a spine session, a work-PR session — cannot see its own
+context figure. `hooks-handlers/context-ceiling.sh` reads it from the transcript Claude Code
+names and, once it reaches the `context_ceiling` setting (default 500000 tokens), adds one
+line to that seat's context: finish the unit in hand, start no new one, rotate at the next
+boundary. The rotation itself is prose (`skills/orchestrate/references/lifecycle.md`,
+"Rotation past the context ceiling"). The hook runs only inside Orca terminals, never
+blocks a command, and says so when it cannot read the figure. Set `context_ceiling` in the
+plugin's configuration.
+
 ## Requirements
 
 - Orca running with the orchestration feature enabled.
+- `jq` on PATH for the context-ceiling hook; without it the hook reports the figure as unavailable.
 - The aliases `claude-glm` and `claude-glm-flash` defined in the shell Orca's terminals
   inherit.
 - The `/code-review` skill available to the reviewer session. If it is unavailable, the
@@ -145,4 +157,4 @@ AI-workspace record arm is not one.
 bash orca-crew/run-tests.sh
 ```
 
-Frontmatter lint (skill, command, and Codex posture agree) and five fidelity pins.
+Frontmatter lint (skill, command, and Codex posture agree), five fidelity pins, the spine-execution contract, and the context-ceiling hook's behaviour.
