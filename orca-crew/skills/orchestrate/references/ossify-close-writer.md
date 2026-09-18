@@ -47,7 +47,7 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 DONE: one worker_done on the identities your injected Orca preamble names,
 carrying ACCEPTED_LEDGER back with one line per finding — `fixed in <sha>` or
 `blocked: <reason>` — plus:
-  Changed / Evidence / Open / Files.
+  Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: push, open a PR, merge, edit outside this worktree, run the close or
 any review, dispatch or create anything, or work around a finding you cannot

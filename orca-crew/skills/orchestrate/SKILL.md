@@ -55,7 +55,9 @@ Three consequences:
   leave no Orca provenance. Every helper is an Orca session.
 - **`worker-read` only on `escalation` or a failed `worker_done`**, never to watch
   progress. Rolling `check --wait` is the wait primitive. A timeout is a checkpoint, not a
-  failure. A heartbeat means alive, not done. Beyond those `worker-read` cases, the only
+  failure. A heartbeat means alive, not done; a wake carrying only heartbeats gets one command,
+  `check --ack <delivery> --wait --types worker_done,escalation,question --timeout-ms 900000`,
+  and no probe or narrative. Beyond those `worker-read` cases, the only
   bounded reads are the launch-banner `terminal read` in `roles.md` and the one
   `/context` reply at each task boundary.
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,

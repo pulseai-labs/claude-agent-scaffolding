@@ -56,7 +56,7 @@ on its own line, what it had already opened: `opened: <repo> #<n> <url> …` or
 `opened: none`. A multi-repo close can halt after opening in one repo — hiding those
 PRs strands them. Whenever the close review ran, carry its ledger verbatim too,
 naming each finding, its `target_repo`, its decision and the reason: the record pass
-cannot reconstruct it. Then: Changed / Evidence / Open / Files.
+cannot reconstruct it. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: create a terminal, merge, ask the operator anything
 (questions go up to the top with `ask`), or re-invoke `/ossify:close` — a halt
@@ -192,7 +192,7 @@ work-PR dispatch receives that record as PRIOR_REVIEW, with fresh dispatch
 identities even though the review state is reused. Both settle this dispatch,
 release both seats and close their terminals as step 6 directs. On the open shape
 the top does not advance to the record pass — a later merge is a new work-PR
-dispatch, not a resumption of this one. Then: Changed / Evidence / Open / Files.
+dispatch, not a resumption of this one. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: talk to the operator — every question goes up to the top; squash; merge
 without the top's relayed word; delete a branch; or dispatch a second review —

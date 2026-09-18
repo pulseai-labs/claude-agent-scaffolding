@@ -584,6 +584,12 @@ pin "$BRIEFS_MD" "rotate: <handoff path>" "the spine brief returns rotate: past 
 pin "$NESTED_MD" "rotate: <handoff path>" "the top's spine-completion step handles rotate:"
 pin "$PRBRIEFS_MD" "context-ceiling notice" "the work-PR brief returns open: past the ceiling"
 
+section "#452: waits and completion bodies (0.6.0)"
+
+pin "$LIFECYCLE_MD" "--timeout-ms 900000" "the rolling wait uses Orca's 15-minute window"
+pin "$SKILL_MD" "check --ack <delivery> --wait --types worker_done,escalation,question --timeout-ms 900000" "a heartbeat-only wake gets one command"
+pin "$GENERIC_BRIEFS_MD" "Files: <paths, including the report file" "the planned brief's body names its report file"
+
 section "reference line budgets"
 
 budget "$EXEC_MD" "ossify-execution.md is within the reference budget"

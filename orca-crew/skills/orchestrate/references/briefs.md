@@ -38,11 +38,11 @@ touch, order, tests first) and wait for the reply. Implement only what the reply
 DONE: commit on <branch> with messages written to a file and `git commit -F`; push;
 open the PR from the worktree with `gh pr create --repo <owner/repo> --base
 <base-branch> --head <branch>`. Then send worker_done with this body:
-  Changed: <what, in prose>
-  Evidence: <each test command and its result, verbatim>
+  Changed: <commit SHAs and the count of files touched>
+  Evidence: <each test command with its pass and fail counts; full output in the report>
   PR: <number and head SHA>
-  Open: <anything unfinished or uncertain>
-  Files: <paths>
+  Open: <issue or finding ids, one per line>
+  Files: <paths, including the report file that holds any narrative>
 
 NEVER: merge, delete a branch, force-push, edit files outside the worktree, or run any
 subagent. Ask with `orca orchestration ask` when blocked; send `escalation` when stuck.

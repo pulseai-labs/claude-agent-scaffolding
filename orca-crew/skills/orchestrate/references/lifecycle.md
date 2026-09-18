@@ -53,11 +53,12 @@ Every command's syntax comes from `orca skills get orchestration`.
 4. **Plan gate, planned work only.** The `claude-glm` brief says: post your plan with
    `orca orchestration ask`, wait for the reply, then implement. Approve or amend via
    `reply`. Flash briefs skip this.
-5. **Wait.** Rolling `check --wait --types worker_done,escalation,question`. Process the
-   whole Delivery, answer every `question`, ack, wait again. A timeout is a checkpoint.
-   `worker-read` only on `escalation` or a failed `worker_done`. At each task boundary
-   for a retained implementer, send `/context` and read the one reply before attaching
-   the next task (the threshold is in `roles.md`).
+5. **Wait.** Rolling `check --wait --types worker_done,escalation,question
+   --timeout-ms 900000` (Orca's 15-minute window). Process the whole Delivery, answer
+   every `question`, ack, wait again. A timeout is a checkpoint: exactly one probe,
+   then wait again. `worker-read` only on `escalation` or a failed `worker_done`. At
+   each task boundary for a retained implementer, send `/context` and read the one
+   reply before attaching the next task (the threshold is in `roles.md`).
 6. **Implementer finishes.** Its `worker_done` names the branch, head SHA, the test
    command with its result, and the PR it opened. Check the PR with one
    `gh pr view <number> --repo <owner/repo>` and read CI from

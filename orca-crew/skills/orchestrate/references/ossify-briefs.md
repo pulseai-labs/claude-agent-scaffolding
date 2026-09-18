@@ -92,7 +92,7 @@ prove are yours â€” never an active, reused, unrelated or unprovable identity â€
 report teardown you cannot complete rather than claiming it. Then one
 worker_done on the identities your injected Orca preamble names, settling the
 top's Dispatch while your child Run stays bound:
-  Changed / Evidence / Open / Files, and the child Run id you bound.
+  Changed / Evidence / Open / Files as ids, SHAs, counts and a report path, and the child Run id you bound.
 ROTATE instead once the context-ceiling notice has fired: stop at the next round
 barrier, do the same teardown, write `/ossify:handoff`, and send worker_done
 `rotate: <handoff path>` with the child Run id. Never stop mid-round.
@@ -137,7 +137,7 @@ contract binds you: stage, never commit; return its structured JSON.
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
 DONE: worker_done carrying the work-item return verbatim, plus:
-  Changed / Evidence / Open / Files.
+  Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: commit, push, merge, edit outside this worktree, run a subagent, or work
 a second work item. The one exception to that scope is this item's own
