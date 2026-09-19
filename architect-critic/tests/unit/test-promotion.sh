@@ -299,14 +299,16 @@ assert_eq "stderr names the missing fingerprint" "0" "$?"
 assert_file_missing "$(ac_data_dir)/state.lock"
 
 # ---------------------------------------------------------------------------
-# T12: an instinct-only fingerprint promotes through bin/arc (#483 R1).
+# T12: an instinct-only fingerprint is REFUSED through bin/arc (#483 N2).
 # Instinct candidates are surfaced by ac_promotion_instinct_signal from
-# recent_runs[].instinct_observations[] and never land in candidate_promotions[].
-# Schema: instinct_observations[] entries are bare fingerprint strings, so the
-# promoted principle's text is the observation itself.
+# recent_runs[].instinct_observations[], whose entries are bare fingerprint
+# strings — they carry no principle text, so an instinct-only fingerprint has
+# no text-bearing source and must not be promoted into a hash-as-text record.
+# Refusal names the fingerprint and the reason; state.json is byte-identical.
+# A fingerprint present in BOTH sources promotes normally (text from texts[0]).
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- T12: instinct-only fingerprint promotes via bin/arc (#483 R1) ---"
+echo "--- T12: instinct-only fingerprint promote is refused via bin/arc (#483 N2) ---"
 setup_tmp_repo > /dev/null
 ac_state_init
 state_file="$(ac_state_path)"
@@ -319,14 +321,28 @@ for i in 1 2 3; do
     "$state_file" > "${state_file}.tmp" && mv "${state_file}.tmp" "$state_file"
 done
 
-"$TESTS_DIR/../bin/arc" promotion_promote "$FP_INST" instinct-recurrence
-assert_eq "instinct-only fingerprint promote rc=0" "0" "$?"
-inst_count="$(jq --arg fp "$FP_INST" '[.principle_promotions[] | select(.fingerprint == $fp)] | length' "$state_file")"
-assert_eq "instinct promote lands one principle_promotions entry" "1" "$inst_count"
-inst_text="$(jq -r --arg fp "$FP_INST" '.principle_promotions[] | select(.fingerprint == $fp) | .text' "$state_file")"
-assert_eq "promoted text is the instinct observation" "$FP_INST" "$inst_text"
-inst_basis="$(jq -r --arg fp "$FP_INST" '.principle_promotions[] | select(.fingerprint == $fp) | .promotion_basis' "$state_file")"
-assert_eq "instinct basis stamped" "instinct-recurrence" "$inst_basis"
+inst_sha_before="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+inst_err="$("$TESTS_DIR/../bin/arc" promotion_promote "$FP_INST" instinct-recurrence 2>&1 >/dev/null)"
+inst_rc=$?
+[[ "$inst_rc" -ne 0 ]]
+assert_eq "instinct-only fingerprint promote exits non-zero" "0" "$?"
+printf '%s' "$inst_err" | grep -qF "$FP_INST"
+assert_eq "refusal names the fingerprint" "0" "$?"
+printf '%s' "$inst_err" | grep -q "no text-bearing source"
+assert_eq "refusal names the reason" "0" "$?"
+inst_sha_after="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+assert_eq "state.json byte-identical after instinct refusal" "$inst_sha_before" "$inst_sha_after"
+assert_file_missing "$(ac_data_dir)/state.lock"
+
+# Same fingerprint ALSO present as a vote candidate → promotes with texts[0].
+FP_BOTH="$(ac_promotion_fingerprint "dual-source challenge")"
+_seed_votes_for_fingerprint "$FP_BOTH" 4
+jq --arg fp "$FP_BOTH" '.recent_runs[0].instinct_observations = [$fp]' \
+  "$state_file" > "${state_file}.tmp" && mv "${state_file}.tmp" "$state_file"
+"$TESTS_DIR/../bin/arc" promotion_promote "$FP_BOTH" instinct-recurrence
+assert_eq "dual-source fingerprint promotes rc=0" "0" "$?"
+both_text="$(jq -r --arg fp "$FP_BOTH" '.principle_promotions[] | select(.fingerprint == $fp) | .text' "$state_file")"
+assert_eq "dual-source promote takes text from texts[0]" "challenge-text-1" "$both_text"
 assert_file_missing "$(ac_data_dir)/state.lock"
 
 # ---------------------------------------------------------------------------

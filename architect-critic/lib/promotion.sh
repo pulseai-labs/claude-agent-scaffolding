@@ -217,13 +217,13 @@ ac_promotion_instinct_signal() {
 #
 # Idempotent move: if principle_promotions[] already contains an entry with
 # matching fingerprint, no-op. Else append a new principle_promotions[] entry
-# stamped with promotion_basis=<basis>. Text is taken from the source that
-# surfaced the fingerprint:
-#   - candidate_promotions[] (vote/pattern recurrence) → texts[0]
-#   - recent_runs[].instinct_observations[] (instinct recurrence) → the
-#     observation itself, which the schema stores as a bare fingerprint string
-# Scope defaults to "user" — the skill body can override by writing directly
-# via state.sh helpers when it knows the right scope.
+# stamped with promotion_basis=<basis>. Text comes from candidate_promotions[]
+# texts[0] — the only promotable source that carries principle text. An
+# instinct-only fingerprint (present solely as a bare string in
+# recent_runs[].instinct_observations[]) is refused: the observation carries
+# no principle text, so promoting it would write a hash as the principle
+# (#483). Scope defaults to "user" — the skill body can override by writing
+# directly via state.sh helpers when it knows the right scope.
 #
 # Note: this function does NOT remove the candidate_promotions[] entry —
 # that is left for a future garbage-collect (or implicit re-vote that won't
@@ -239,31 +239,44 @@ ac_promotion_promote() {
   now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
   ac_lock_acquire "$lock_path" || return 1
-  # A fingerprint present in no promotable source is refused up front with a
-  # message naming it (#451); the funnel's output check is the safety net,
-  # this precheck is the usable error. The check must distinguish the two
-  # ways jq can fail (#483): exit 1 means the fingerprint is absent; exit >= 2
-  # means state.json itself is missing, unreadable, or corrupt — a state
-  # problem, reported with jq's own stderr, not a fingerprint miss.
-  local jq_stderr jq_rc
-  if jq_stderr="$(jq -e --arg fp "$fingerprint" '
-      ([(.candidate_promotions // [])[] | select(.fingerprint == $fp)] | length) > 0
-      or ([(.principle_promotions // [])[] | select(.fingerprint == $fp)] | length) > 0
-      or ([.recent_runs // [] | .[] | .instinct_observations // [] | .[] | select(. == $fp)] | length) > 0
-    ' "$state_file" 2>&1 >/dev/null)"; then
-    jq_rc=0
+  # Classify the fingerprint in one read: "promotable" (present in a
+  # text-bearing source — candidate_promotions[] or an existing
+  # principle_promotions[] entry), "instinct-only" (present solely as a bare
+  # fingerprint string in recent_runs[].instinct_observations[] — promotable
+  # in principle but the observation carries no principle text, so it is
+  # refused rather than written with a hash as text), or absent entirely.
+  # jq -e exit codes keep the cases apart: rc 0 carries the classification;
+  # rc 1 (false) means the fingerprint is unknown — refused with a message
+  # naming it (#451); rc >= 2 means state.json itself is missing, unreadable,
+  # or corrupt — a state problem reported with jq's own stderr, not a
+  # fingerprint miss (#483 R2). The funnel's output check remains the safety
+  # net; this precheck is the usable error.
+  local kind_out kind_rc
+  if kind_out="$(jq -e -r --arg fp "$fingerprint" '
+      ([(.candidate_promotions // [])[] | select(.fingerprint == $fp)] | length) > 0 as $cand |
+      ([(.principle_promotions // [])[] | select(.fingerprint == $fp)] | length) > 0 as $promo |
+      ([.recent_runs // [] | .[] | .instinct_observations // [] | .[] | select(. == $fp)] | length) > 0 as $inst |
+      if $cand or $promo then "promotable"
+      elif $inst then "instinct-only"
+      else false end
+    ' "$state_file" 2>&1)"; then
+    kind_rc=0
   else
-    jq_rc=$?
+    kind_rc=$?
   fi
-  if [[ $jq_rc -ge 2 ]]; then
-    if [[ -n "$jq_stderr" ]]; then
-      printf '%s\n' "$jq_stderr" >&2
+  if [[ $kind_rc -ge 2 ]]; then
+    if [[ -n "$kind_out" ]]; then
+      printf '%s\n' "$kind_out" >&2
     fi
     ac_log_error "ac_promotion_promote: cannot read $state_file"
     ac_lock_release "$lock_path"
     return 1
-  elif [[ $jq_rc -ne 0 ]]; then
+  elif [[ $kind_rc -ne 0 ]]; then
     ac_log_error "ac_promotion_promote: no candidate or existing promotion with fingerprint: $fingerprint"
+    ac_lock_release "$lock_path"
+    return 1
+  elif [[ "$kind_out" == "instinct-only" ]]; then
+    ac_log_error "ac_promotion_promote: fingerprint $fingerprint has no text-bearing source — instinct observations carry no principle text"
     ac_lock_release "$lock_path"
     return 1
   fi
@@ -278,22 +291,16 @@ ac_promotion_promote() {
     else
       (.candidate_promotions // []) as $cands |
       (first($cands[] | select(.fingerprint == $fp)) // null) as $cand |
-      (if $cand != null then
-         ($cand.texts // [""])[0]
-       else
-         first(.recent_runs // [] | .[] | .instinct_observations // [] | .[]
-               | select(. == $fp)) // null
-       end) as $text |
-      if $text == null then
-        # Unreachable via this function — the precheck above has already
-        # confirmed the fingerprint under the same lock — but keeps the
-        # program from ever emitting a non-object on a miss.
-        error("ac_promotion_promote: fingerprint not found in any candidate source")
+      if $cand == null then
+        # Unreachable via this function — the precheck above already confirmed
+        # a text-bearing source under the same lock — but keeps the program
+        # from ever emitting a non-object on a miss.
+        error("ac_promotion_promote: fingerprint has no text-bearing source")
       else
         .principle_promotions = $promos + [{
           timestamp: $now,
           source: "auto",
-          text: $text,
+          text: ($cand.texts // [""])[0],
           scope: "user",
           fingerprint: $fp,
           promotion_basis: $basis

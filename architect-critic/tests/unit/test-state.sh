@@ -433,4 +433,96 @@ assert_eq "next write succeeds after jq-fail refusal" "0" "$?"
 assert_eq "no 5s lock stall after jq-fail refusal" "0" "$?"
 
 # ---------------------------------------------------------------------------
+# T21: no code path may remove a state.lock this process does not hold
+# (#483 N1). Release is ownership-gated: the path must still be the lock we
+# acquired AND its content must still be our owner token.
+#   (a) a refusal inside an if-form caller, after which ac_lock_release runs —
+#       a lock file planted by "another owner" in the gap must survive. The gap
+#       is simulated by wrapping the funnel so it plants a foreign lock between
+#       the refusal and the caller's own release.
+#   (b) a second ac_lock_release after ours cleared is a no-op.
+#   (c) through bin/arc: a lock we never acquired survives an acquire-timeout
+#       refusal untouched.
+# ---------------------------------------------------------------------------
+echo "T21: lock release is ownership-gated (#483 N1)"
+setup_tmp_repo > /dev/null
+ac_state_init
+state_file="$(ac_state_path)"
+lock_file="$(ac_data_dir)/state.lock"
+printf '{bad' > "$state_file"   # corrupt: the funnel's jq fails inside the caller
+
+# (a) wrap ac_guarded_jq_write: run the real funnel, then plant a foreign lock
+#     at the path before the caller's ac_lock_release executes.
+eval "$(declare -f ac_guarded_jq_write | sed 's/^ac_guarded_jq_write ()/_ac_orig_guarded_write ()/')"
+ac_guarded_jq_write() {
+  _ac_orig_guarded_write "$@"
+  local rc=$?
+  if [[ $rc -ne 0 ]]; then
+    printf 'foreign-owner-token' > "$(ac_data_dir)/state.lock"
+  fi
+  return $rc
+}
+ac_state_append_run "gap-run" "close" '["claude"]' 1 0 "critiquing-spec" 10 2>/dev/null
+T21_RC=$?
+[[ "$T21_RC" -ne 0 ]]
+assert_eq "if-form caller refusal still exits non-zero" "0" "$?"
+[[ -f "$lock_file" && "$(cat "$lock_file")" == "foreign-owner-token" ]]
+assert_eq "foreign lock planted in the gap survives caller release" "0" "$?"
+source "$LIB_DIR/_helpers.sh"   # restore the unwrapped funnel
+rm -f "$lock_file"
+
+# (b) second release after ours cleared → no-op against a foreign file
+ac_lock_acquire "$lock_file"
+ac_lock_release "$lock_file"
+assert_file_missing "$lock_file"
+printf 'foreign-owner-token' > "$lock_file"
+ac_lock_release "$lock_file"   # we hold nothing — must not remove theirs
+[[ -f "$lock_file" && "$(cat "$lock_file")" == "foreign-owner-token" ]]
+assert_eq "second release is a no-op: foreign lock survives" "0" "$?"
+rm -f "$lock_file"
+
+# (c) a lock we never acquired survives an acquire-timeout through bin/arc
+printf 'foreign-owner-token' > "$lock_file"
+"$TESTS_DIR/../bin/arc" state_append_run "blocked-run" "close" '["claude"]' 1 0 "critiquing-spec" 10 2>/dev/null
+T21_RC=$?
+[[ "$T21_RC" -ne 0 ]]
+assert_eq "acquire-timeout exits non-zero" "0" "$?"
+[[ -f "$lock_file" && "$(cat "$lock_file")" == "foreign-owner-token" ]]
+assert_eq "foreign lock survives acquire-timeout" "0" "$?"
+rm -f "$lock_file"
+
+# ---------------------------------------------------------------------------
+# T22: an errexit inside a locked region that is NOT a funnel refusal still
+# releases the lock (#483 N1) — the acquire-side EXIT trap covers every exit
+# path, and only at subshell depth 0 so command substitutions cannot release
+# the parent's lock.
+#   (a) harness: set -e process acquires the lock then dies on `false` in the
+#       locked region → no state.lock left behind.
+#   (b) through bin/arc: `arc lock_acquire` returns rc=0 yet the lock is gone
+#       once the dispatcher process exits.
+# ---------------------------------------------------------------------------
+echo "T22: errexit inside a locked region releases the lock (#483 N1)"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+lock_file="$(ac_data_dir)/state.lock"
+arc_lib_dir="$(cd "$TESTS_DIR/../lib" && pwd)"
+
+bash -c '
+  set -euo pipefail
+  source "'"$arc_lib_dir"'/_helpers.sh"
+  source "'"$arc_lib_dir"'/state.sh"
+  ac_lock_acquire "'"$lock_file"'"
+  false
+  echo unreachable
+' 2>/dev/null
+T22_RC=$?
+[[ "$T22_RC" -ne 0 ]]
+assert_eq "errexit inside locked region exits non-zero" "0" "$?"
+assert_file_missing "$lock_file"
+
+"$TESTS_DIR/../bin/arc" lock_acquire "$lock_file"
+assert_eq "arc lock_acquire returns 0" "0" "$?"
+assert_file_missing "$lock_file"
+
+# ---------------------------------------------------------------------------
 report_results
