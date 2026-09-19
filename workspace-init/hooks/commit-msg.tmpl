@@ -33,9 +33,11 @@ if [[ ! -f "$MANIFEST_PATH" ]]; then
   exit 1
 fi
 
-# Malformed manifest → block.
-if ! jq empty "$MANIFEST_PATH" 2>/dev/null; then
-  echo "ERROR: workspace-init trace filter: manifest at $MANIFEST_PATH is not valid JSON; commit blocked." >&2
+# Malformed manifest → block. `jq empty` is not sufficient: jq accepts a
+# STREAM of inputs, so an empty file, whitespace-only file, or two
+# concatenated documents all pass it. Require exactly one JSON object.
+if ! jq -ne 'input as $doc | ([inputs] | length == 0) and ($doc | type == "object")' "$MANIFEST_PATH" >/dev/null 2>&1; then
+  echo "ERROR: workspace-init trace filter: manifest at $MANIFEST_PATH is not a single JSON object; commit blocked." >&2
   _wi_repair_hint
   exit 1
 fi
