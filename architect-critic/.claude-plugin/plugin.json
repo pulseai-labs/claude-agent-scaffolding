@@ -1,6 +1,6 @@
 {
   "name": "architect-critic",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Anti-sycophancy reviewer. 6 skills (gerund-named): critiquing-spec (audit + sequential rebuttal with T=4 concession scoring), managing-async-critique (background Codex audits: status/result/cancel/resume), checking-adversary-readiness (doctor), reviewing-critique-history, listing-principles, promoting-principle. Ships ghost-notes + CORE shipped-default principles. Full auto-promotion (vote-recurrence + instinct-style signal + 30/90-day suppression). Codex 0.125+ adversarial fresh-frame at close-depth, synchronous OR async (defer-to-resume unified rebuttal, durable state.json v3 job memory). Standalone-invocable; consumer plugins invoke skills in-conversation (no file IPC).",
   "author": {
     "name": "Pras"

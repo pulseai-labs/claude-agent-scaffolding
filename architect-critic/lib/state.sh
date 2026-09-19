@@ -31,15 +31,26 @@ ac_state_path() {
 # than this build knows (>3) is preserved untouched with an info log
 # (forward-compatibility tolerance). Files < 2 are the v0.1→v0.2 filesystem
 # migration's responsibility (lib/migration.sh), not touched here.
+# A 0-byte state.json is the aftermath of an emptied write (#451): it holds
+# nothing to lose, so it is re-seeded with a warning. A non-empty file that is
+# not exactly one JSON object is refused — re-seeding it could destroy data.
 ac_state_init() {
   local state_file
   state_file="$(ac_state_path)"
   local data_dir
   data_dir="$(ac_data_dir)"
+  local seed='{"schema_version":3,"recent_runs":[],"external_runs":[],"principle_promotions":[],"candidate_promotions":[],"declined_candidates":[],"auto_promote_suppressions":[]}'
   if [[ ! -f "$state_file" ]]; then
     mkdir -p "$data_dir"
-    printf '%s\n' '{"schema_version":3,"recent_runs":[],"external_runs":[],"principle_promotions":[],"candidate_promotions":[],"declined_candidates":[],"auto_promote_suppressions":[]}' > "$state_file"
+    printf '%s\n' "$seed" > "$state_file"
+  elif [[ ! -s "$state_file" ]]; then
+    ac_log_warn "state.json is empty (0 bytes); re-seeding with a fresh schema v3 document"
+    printf '%s\n' "$seed" > "$state_file"
   else
+    if ! jq -e -s 'length == 1 and (.[0] | type == "object")' "$state_file" >/dev/null 2>&1; then
+      ac_log_error "state.json exists but is not a single parseable JSON object; refusing to touch it: $state_file"
+      return 1
+    fi
     local on_disk_ver
     on_disk_ver="$(jq -r '.schema_version // 0' "$state_file" 2>/dev/null || echo 0)"
     if [[ "$on_disk_ver" -gt 3 ]] 2>/dev/null; then
