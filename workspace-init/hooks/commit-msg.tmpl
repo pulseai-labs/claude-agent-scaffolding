@@ -52,22 +52,33 @@ if ! enforce="$(jq -r '.git_policy.trace_filter.enforce | if type == "boolean" t
 fi
 if [[ "$enforce" != "true" ]]; then exit 0; fi
 
-# enforce:true but unreadable patterns (missing key or non-array) → block.
-# An explicit empty array is a deliberate allow-everything and still exits 0.
-if ! patterns="$(jq -r '.git_policy.trace_filter.blocked_patterns | if type == "array" then .[] else error("blocked_patterns is not an array") end' "$MANIFEST_PATH" 2>/dev/null)"; then
+# enforce:true but unreadable patterns (missing key, non-array, or non-string
+# elements) → block. An explicit empty array is a deliberate allow-everything
+# and still exits 0.
+if ! patterns="$(jq -r '.git_policy.trace_filter.blocked_patterns | if type == "array" then (if ([.[] | type == "string"] | all) then .[] else error("blocked_patterns contains non-string entries") end) else error("blocked_patterns is not an array") end' "$MANIFEST_PATH" 2>/dev/null)"; then
   echo "ERROR: workspace-init trace filter: cannot read git_policy.trace_filter.blocked_patterns in $MANIFEST_PATH; commit blocked." >&2
   _wi_repair_hint
   exit 1
 fi
 if [[ -z "$patterns" ]]; then exit 0; fi
 
-# Scan commit message against each pattern
+# Scan commit message against each pattern. grep exit status 2 is an ERE
+# evaluation error, NOT "no match" — a pattern the filter cannot apply is a
+# broken policy, and a broken policy fails closed (naming the pattern).
 while IFS= read -r pattern; do
   [[ -z "$pattern" ]] && continue
-  if grep -qE "$pattern" "$commit_msg_file"; then
+  if grep -qE -e "$pattern" -- "$commit_msg_file"; then
     echo "ERROR: commit message contains blocked AI-trace pattern: $pattern" >&2
     echo "       Edit the message and try again, or run with --no-verify to bypass (not recommended)." >&2
     exit 1
+  else
+    grc=$?
+    if [[ $grc -ne 1 ]]; then
+      echo "ERROR: workspace-init trace filter: blocked_patterns entry is not a valid extended regex: $pattern" >&2
+      echo "       Fix or remove the pattern in $MANIFEST_PATH." >&2
+      _wi_repair_hint
+      exit 1
+    fi
   fi
 done <<< "$patterns"
 
