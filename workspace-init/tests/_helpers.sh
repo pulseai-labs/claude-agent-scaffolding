@@ -10,6 +10,21 @@ export WI_PLUGIN_ROOT
 export WI_LIB_DIR="$WI_PLUGIN_ROOT/lib"
 export WI_TEMPLATES_DIR="$WI_PLUGIN_ROOT/templates"
 export WI_HOOKS_DIR="$WI_PLUGIN_ROOT/hooks"
+# Dispatcher entry point — install/repair-path tests go through bin/wi (bash
+# shebang + set -euo pipefail) exactly as the skills invoke it.
+export WI_BIN="$WI_PLUGIN_ROOT/bin/wi"
+
+# _with_timeout <seconds> <cmd...> — run a command under `timeout` where it
+# exists (GNU coreutils); bare otherwise. Guards the placeholder-in-path render
+# test against an infinite substitution loop on hosts without `timeout`.
+_with_timeout() {
+  local t="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$t" "$@"
+  else
+    "$@"
+  fi
+}
 
 # --- counters ---
 WI_TESTS_PASSED=0

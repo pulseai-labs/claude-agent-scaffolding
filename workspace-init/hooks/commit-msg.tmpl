@@ -1,26 +1,62 @@
 #!/usr/bin/env bash
 # workspace-init: commit-msg AI-trace filter (auto-installed)
+# workspace-init:managed-hook
 # DO NOT EDIT — regenerated on workspace-init runs.
 # Embedded AI workspace path: __AI_WORKSPACE_PATH__
 
-AI_WORKSPACE_PATH="__AI_WORKSPACE_PATH__"
+# The AI workspace path is baked in shell-quoted form at install time, so any
+# character in the path (" $ ` ' & | \ space …) arrives here literally.
+AI_WORKSPACE_PATH=__AI_WORKSPACE_PATH__
 MANIFEST_PATH="${AI_WORKSPACE_PATH}/.workspace/pairing.json"
 
 commit_msg_file="$1"
 if [[ ! -f "$commit_msg_file" ]]; then exit 0; fi
 
-# If manifest missing (AI workspace moved/deleted), fail-open with warning to stderr
+# The filter exists to keep AI traces out of public canonical history: a leak
+# is permanent while a blocked commit costs one repair command. When it cannot
+# evaluate its policy — manifest missing, malformed, or incomplete — it fails
+# CLOSED and names the working repair (#458, #481).
+_wi_repair_hint() {
+  local repo
+  repo="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  echo "       Repair: <workspace-init plugin dir>/bin/wi trace_filter_install_pair <ai-workspace> $repo" >&2
+  echo "               (single repo: .../bin/wi trace_filter_install <ai-workspace> $repo if the AI" >&2
+  echo "                workspace is not a git repo; if the workspace moved, pass its NEW path.)" >&2
+  echo "               Plugin dir e.g. ~/.claude/plugins/cache/<marketplace>/workspace-init/<version>" >&2
+  echo "               or ~/.codex/plugins/cache/<marketplace>/workspace-init/<version>." >&2
+}
+
+# Missing manifest (AI workspace moved/deleted) → block.
 if [[ ! -f "$MANIFEST_PATH" ]]; then
-  echo "warning: workspace-init manifest not found at $MANIFEST_PATH; trace filter disabled. Re-run /init-workspace --repair." >&2
-  exit 0
+  echo "ERROR: workspace-init trace filter: manifest not found at $MANIFEST_PATH; commit blocked." >&2
+  _wi_repair_hint
+  exit 1
 fi
 
-# Trace filter disabled in manifest? exit clean
-enforce="$(jq -r '.git_policy.trace_filter.enforce // false' "$MANIFEST_PATH" 2>/dev/null || echo "false")"
+# Malformed manifest → block.
+if ! jq empty "$MANIFEST_PATH" 2>/dev/null; then
+  echo "ERROR: workspace-init trace filter: manifest at $MANIFEST_PATH is not valid JSON; commit blocked." >&2
+  _wi_repair_hint
+  exit 1
+fi
+
+# Only an explicit `enforce: false` disables the filter. Every manifest written
+# by wi_manifest_write carries the key; a missing or non-boolean value means a
+# corrupt manifest → block.
+if ! enforce="$(jq -r '.git_policy.trace_filter.enforce | if type == "boolean" then . else error("enforce is not a boolean") end' "$MANIFEST_PATH" 2>/dev/null)"; then
+  echo "ERROR: workspace-init trace filter: git_policy.trace_filter.enforce missing or not a boolean in $MANIFEST_PATH; commit blocked." >&2
+  _wi_repair_hint
+  exit 1
+fi
 if [[ "$enforce" != "true" ]]; then exit 0; fi
 
-# Read patterns; handle empty array gracefully
-patterns="$(jq -r '.git_policy.trace_filter.blocked_patterns[]?' "$MANIFEST_PATH" 2>/dev/null || true)"
+# enforce:true but unreadable patterns (missing key or non-array) → block.
+# An explicit empty array is a deliberate allow-everything and still exits 0.
+if ! patterns="$(jq -r '.git_policy.trace_filter.blocked_patterns | if type == "array" then .[] else error("blocked_patterns is not an array") end' "$MANIFEST_PATH" 2>/dev/null)"; then
+  echo "ERROR: workspace-init trace filter: cannot read git_policy.trace_filter.blocked_patterns in $MANIFEST_PATH; commit blocked." >&2
+  _wi_repair_hint
+  exit 1
+fi
 if [[ -z "$patterns" ]]; then exit 0; fi
 
 # Scan commit message against each pattern

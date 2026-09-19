@@ -242,9 +242,11 @@ test_PK1_both_repos_have_baked_hook() {
 
   local ai_root_canon
   ai_root_canon="$(wi_realpath "$parent/proj1-ai")"
+  # The path is baked shell-quoted (printf %q) so any byte survives — evaluate
+  # the assignment line exactly as bash would rather than unpicking quotes.
   local baked_ai baked_cn
-  baked_ai="$(grep -E '^AI_WORKSPACE_PATH=' "$ai_hook" | head -1 | sed 's/^AI_WORKSPACE_PATH="\(.*\)"$/\1/')"
-  baked_cn="$(grep -E '^AI_WORKSPACE_PATH=' "$cn_hook" | head -1 | sed 's/^AI_WORKSPACE_PATH="\(.*\)"$/\1/')"
+  baked_ai="$(eval "$(grep -m1 -E '^AI_WORKSPACE_PATH=' "$ai_hook")"; printf '%s' "$AI_WORKSPACE_PATH")"
+  baked_cn="$(eval "$(grep -m1 -E '^AI_WORKSPACE_PATH=' "$cn_hook")"; printf '%s' "$AI_WORKSPACE_PATH")"
   local baked_ai_canon baked_cn_canon
   baked_ai_canon="$(wi_realpath "$baked_ai")"
   baked_cn_canon="$(wi_realpath "$baked_cn")"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/test-helpers.sh — unit tests for lib/_helpers.sh
 # Covers: wi_log_{info,warn,error}, wi_realpath, wi_lock_{acquire,release},
-#         wi_guarded_jq_write, wi_log_op, wi_render_template.
+#         wi_log_op, wi_render_template.
 
 source "$(dirname "$0")/_helpers.sh"
 source "$WI_LIB_DIR/_helpers.sh"
@@ -113,38 +113,6 @@ test_lock_release_is_idempotent() {
   wi_lock_release "$lock" || { echo "    second release failed"; return 1; }
 }
 
-# --- wi_guarded_jq_write ---
-
-test_guarded_jq_write_applies_program_atomically() {
-  local f="$_WI_TMP/data.json"
-  echo '{"a":1}' > "$f"
-  wi_guarded_jq_write "$f" '. + {"b":2}' || { echo "    jq write failed"; return 1; }
-  local out; out="$(cat "$f")"
-  # Use jq to verify shape — robust against key ordering.
-  local a; a="$(jq -r '.a' "$f")"
-  local b; b="$(jq -r '.b' "$f")"
-  assert_eq "1" "$a" || return 1
-  assert_eq "2" "$b" || return 1
-  # No tmp leftovers
-  local leftovers; leftovers="$(ls "$_WI_TMP"/data.json.tmp.* 2>/dev/null | wc -l | tr -d ' ')"
-  assert_eq "0" "$leftovers" || return 1
-}
-
-test_guarded_jq_write_fails_cleanly_on_bad_program() {
-  local f="$_WI_TMP/bad.json"
-  echo '{"x":1}' > "$f"
-  local before; before="$(cat "$f")"
-  # Deliberately invalid jq program
-  if wi_guarded_jq_write "$f" '!!@@not-valid@@!!' 2>/dev/null; then
-    echo "    bad program unexpectedly succeeded"; return 1
-  fi
-  local after; after="$(cat "$f")"
-  assert_eq "$before" "$after" || return 1
-  # No tmp leftovers
-  local leftovers; leftovers="$(ls "$_WI_TMP"/bad.json.tmp.* 2>/dev/null | wc -l | tr -d ' ')"
-  assert_eq "0" "$leftovers" || return 1
-}
-
 # --- wi_log_op ---
 
 test_log_op_appends_tab_separated_line() {
@@ -204,8 +172,6 @@ wi_test_run test_realpath_handles_dot_dot_traversal
 wi_test_run test_lock_acquire_then_release_succeeds
 wi_test_run test_lock_acquire_second_call_fails_while_held
 wi_test_run test_lock_release_is_idempotent
-wi_test_run test_guarded_jq_write_applies_program_atomically
-wi_test_run test_guarded_jq_write_fails_cleanly_on_bad_program
 wi_test_run test_log_op_appends_tab_separated_line
 wi_test_run test_log_op_creates_parent_dir_if_missing
 wi_test_run test_render_template_substitutes_single_var

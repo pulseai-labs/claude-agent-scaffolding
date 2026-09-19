@@ -95,7 +95,7 @@ Downstream plugins read the manifest via `wi_manifest_resolve` to find any artif
 
 A `commit-msg` hook is installed into `<canonical>/.git/hooks/commit-msg` with the AI workspace path **baked in at install time** (so the hook keeps working even if your shell's cwd is elsewhere). On every commit to the canonical:
 
-1. Reads `<ai-workspace>/.workspace/pairing.json` (fail-open with a stderr warning if missing — re-run `/init-workspace --repair` to restore).
+1. Reads `<ai-workspace>/.workspace/pairing.json`. If the manifest is missing, malformed, or its trace-filter policy is unreadable, the hook **blocks the commit** and names the repair — the filter fails closed, because a permanent trace leak into public history costs more than a blocked commit.
 2. If `git_policy.trace_filter.enforce: false`, exits clean.
 3. Otherwise, scans the commit message against `git_policy.trace_filter.blocked_patterns` (extended regex). Default patterns:
    - `^Co-Authored-By:`
@@ -103,6 +103,16 @@ A `commit-msg` hook is installed into `<canonical>/.git/hooks/commit-msg` with t
    - `<noreply@anthropic\.com>`
    - `<noreply@openai\.com>`
 4. If any pattern matches, refuses the commit with a pointer error.
+
+The install only replaces hooks it wrote — recognised by a `# workspace-init:managed-hook` marker line (or the pre-0.5.1 `auto-installed` header). Any other existing `commit-msg` hook is preserved and the install refuses, so a user hook is never silently displaced.
+
+**Repair after a workspace move or a broken manifest:** re-run the pairing recipe (`/workspace-init:pair-existing-dual` or `/workspace-init:pair-canonical-repo`) so the hook is re-baked against the workspace's new location, or run the deterministic form directly:
+
+```
+<workspace-init plugin dir>/bin/wi trace_filter_install_pair <ai-workspace> <canonical-repo>
+```
+
+The plugin dir is wherever your plugin host installed workspace-init, e.g. `~/.claude/plugins/cache/<marketplace>/workspace-init/<version>` or `~/.codex/plugins/cache/<marketplace>/workspace-init/<version>`. If the AI workspace is not a git repo, use `wi trace_filter_install <ai-workspace> <repo>` per target — the pair form installs the AI-side hook first and stops there.
 
 ### Bypass
 
