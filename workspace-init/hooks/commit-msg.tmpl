@@ -3,10 +3,12 @@
 # workspace-init:managed-hook
 # DO NOT EDIT — regenerated on workspace-init runs.
 # Embedded AI workspace path: __AI_WORKSPACE_PATH__
+# Embedded wi dispatcher path: __WI_BIN_PATH__
 
-# The AI workspace path is baked in shell-quoted form at install time, so any
-# character in the path (" $ ` ' & | \ space …) arrives here literally.
+# The AI workspace path and wi dispatcher path are baked in shell-quoted form
+# at install time, so any character (" $ ` ' & | \ space …) arrives literally.
 AI_WORKSPACE_PATH=__AI_WORKSPACE_PATH__
+WI_BIN=__WI_BIN_PATH__
 MANIFEST_PATH="${AI_WORKSPACE_PATH}/.workspace/pairing.json"
 
 commit_msg_file="$1"
@@ -16,17 +18,59 @@ if [[ ! -f "$commit_msg_file" ]]; then exit 0; fi
 # is permanent while a blocked commit costs one repair command. When it cannot
 # evaluate its policy — manifest missing, malformed, or incomplete — it fails
 # CLOSED and names the working repair (#458, #481).
-_wi_repair_hint() {
-  local repo
-  repo="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-  echo "       Repair: <workspace-init plugin dir>/bin/wi trace_filter_install_pair <ai-workspace> $repo" >&2
-  echo "               (single repo: .../bin/wi trace_filter_install <ai-workspace> $repo if the AI" >&2
-  echo "                workspace is not a git repo; if the workspace moved, pass its NEW path.)" >&2
-  echo "               Plugin dir e.g. ~/.claude/plugins/cache/<marketplace>/workspace-init/<version>" >&2
-  echo "               or ~/.codex/plugins/cache/<marketplace>/workspace-init/<version>." >&2
+
+# The main worktree root of the repo this hook guards. `git rev-parse
+# --git-common-dir` resolves to the main worktree's .git even when the hook
+# runs inside a linked worktree (the hook file lives in the common hooks dir);
+# the dirname fallback reaches the same place via the hook's own path.
+_wi_main_worktree_root() {
+  local common
+  common="$(git rev-parse --git-common-dir 2>/dev/null)" || common=""
+  [[ -n "$common" ]] || common="$(dirname "$0")/.."
+  ( cd "$common/.." 2>/dev/null && pwd -P )
 }
 
-# Missing manifest (AI workspace moved/deleted) → block.
+# Every repair line names a real wi verb with %q-quoted absolute paths, so it
+# can be typed verbatim. Which repair fixes the failure depends on whether the
+# baked workspace path still exists, so the hint branches on that.
+_wi_repair_hint() {
+  local canon q_ai q_canon q_wi
+  canon="$(_wi_main_worktree_root)"
+  [[ -n "$canon" ]] || canon="$(pwd -P 2>/dev/null)" || canon="."
+  printf -v q_ai '%q' "$AI_WORKSPACE_PATH"
+  printf -v q_canon '%q' "$canon"
+  printf -v q_wi '%q' "$WI_BIN"
+  if [[ -d "$AI_WORKSPACE_PATH" ]]; then
+    echo "       Repair — rewrite the manifest, then re-bake the hooks:" >&2
+    echo "         $q_wi manifest_write $q_ai $q_canon personal   # project_type: personal or work" >&2
+    echo "         $q_wi trace_filter_install_pair $q_ai $q_canon" >&2
+    echo "         (or $q_wi trace_filter_install $q_ai $q_canon to repair only this repo's hook)" >&2
+  else
+    echo "       Repair — the baked path does not exist; the workspace may have moved." >&2
+    echo "       Run from the workspace's NEW parent directory:" >&2
+    echo "         $q_wi trace_filter_install_pair <new-ai-root> $q_canon" >&2
+    echo "         (or $q_wi trace_filter_install <new-ai-root> $q_canon to repair only this repo's hook)" >&2
+  fi
+}
+
+# jq evaluates every policy check below; without it none of them can run.
+# Detect it explicitly so the failure names the actual missing tool rather
+# than surfacing as a JSON parse error.
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ERROR: workspace-init trace filter: jq is missing (not installed or not on PATH); the manifest cannot be evaluated; commit blocked." >&2
+  echo "       Repair: install jq (e.g. apt-get install jq, brew install jq), then retry." >&2
+  exit 1
+fi
+
+# Baked AI workspace path unreachable (workspace moved/deleted) → block,
+# naming the path itself rather than a JSON error.
+if [[ ! -d "$AI_WORKSPACE_PATH" ]]; then
+  echo "ERROR: workspace-init trace filter: AI workspace path is unreachable: $AI_WORKSPACE_PATH; commit blocked." >&2
+  _wi_repair_hint
+  exit 1
+fi
+
+# Missing manifest → block.
 if [[ ! -f "$MANIFEST_PATH" ]]; then
   echo "ERROR: workspace-init trace filter: manifest not found at $MANIFEST_PATH; commit blocked." >&2
   _wi_repair_hint

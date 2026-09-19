@@ -43,6 +43,20 @@ wi_realpath() {
   fi
 }
 
+# wi_resolve_root <path>
+# Canonicalize to an absolute physical path, like wi_realpath, but also anchor
+# relative input at $PWD first so the result is absolute even when the target
+# (or a parent) does not yet exist. Always prints a non-empty line for
+# non-empty input; empty input prints empty.
+wi_resolve_root() {
+  local p="$1"
+  [[ -z "$p" ]] && { printf '\n'; return 0; }
+  [[ "$p" != /* ]] && p="${PWD}/${p}"
+  local resolved
+  resolved="$(wi_realpath "$p")"
+  printf '%s\n' "${resolved:-$p}"
+}
+
 # --- File-based locking via `set -o noclobber` ----------------------------
 # Mirror of architect-critic's ac_lock_acquire pattern. Retry budget is
 # configurable via WI_LOCK_RETRIES (default 5, one second between attempts)

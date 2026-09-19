@@ -63,18 +63,28 @@ wi_trace_filter_render() {
     wi_log_error "wi_trace_filter_render: could not read template: $tmpl"
     return 1
   fi
-  # Bake the path shell-quoted (the template assigns it unquoted), so every
-  # byte — & | \ " $ ` ' space — survives literally into the generated bash.
-  # Splice left-to-right with %%/# ops, NOT ${var//…} or sed: under bash 5.2+
-  # patsub_replacement (and always under sed), '&' in the replacement expands
-  # to the matched text. Building a separate output accumulator also means a
-  # path that itself contains the placeholder text terminates cleanly.
-  local quoted
-  quoted="$(printf '%q' "$ai_root")"
+  # Bake both paths shell-quoted (the template assigns them unquoted), so
+  # every byte — & | \ " $ ` ' space — survives literally into the generated
+  # bash. Splice left-to-right with %%/# ops, NOT ${var//…} or sed: under bash
+  # 5.2+ patsub_replacement (and always under sed), '&' in the replacement
+  # expands to the matched text. One pass handling both tokens, always taking
+  # the earliest next occurrence, means a substituted value is never rescanned
+  # — even a path that itself contains either placeholder terminates cleanly.
+  local quoted_ai quoted_wi wi_bin
+  quoted_ai="$(printf '%q' "$ai_root")"
+  wi_bin="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/bin/wi"
+  quoted_wi="$(printf '%q' "$wi_bin")"
   local rendered="" rest="$content"
-  while [[ "$rest" == *__AI_WORKSPACE_PATH__* ]]; do
-    rendered+="${rest%%__AI_WORKSPACE_PATH__*}${quoted}"
-    rest="${rest#*__AI_WORKSPACE_PATH__}"
+  while [[ "$rest" == *__AI_WORKSPACE_PATH__* || "$rest" == *__WI_BIN_PATH__* ]]; do
+    local pre_ai="${rest%%__AI_WORKSPACE_PATH__*}"
+    local pre_wi="${rest%%__WI_BIN_PATH__*}"
+    if [[ "$rest" == *__WI_BIN_PATH__* && ( "$rest" != *__AI_WORKSPACE_PATH__* || ${#pre_wi} -lt ${#pre_ai} ) ]]; then
+      rendered+="${pre_wi}${quoted_wi}"
+      rest="${rest#*__WI_BIN_PATH__}"
+    else
+      rendered+="${pre_ai}${quoted_ai}"
+      rest="${rest#*__AI_WORKSPACE_PATH__}"
+    fi
   done
   printf '%s\n' "${rendered}${rest}"
 }
@@ -107,6 +117,18 @@ wi_trace_filter_is_installable_repo_root() {
 wi_trace_filter_install() {
   local ai_root="$1"
   local target_repo="$2"
+  # Canonicalize to absolute physical paths before baking or validating: a
+  # hand-typed relative repair (from the workspace's parent dir) must produce
+  # a hook that can find the manifest.
+  local resolved
+  if [[ -n "$ai_root" ]]; then
+    resolved="$(wi_resolve_root "$ai_root")"
+    [[ -n "$resolved" ]] && ai_root="$resolved"
+  fi
+  if [[ -n "$target_repo" ]]; then
+    resolved="$(wi_resolve_root "$target_repo")"
+    [[ -n "$resolved" ]] && target_repo="$resolved"
+  fi
   if ! wi_trace_filter_is_installable_repo_root "$target_repo"; then
     wi_log_error "wi_trace_filter_install: target is not an installable git repo root: $target_repo"
     return 1
@@ -160,11 +182,18 @@ wi_trace_filter_install() {
 }
 
 # wi_trace_filter_install_pair <ai-workspace-root> <canonical-root>
-# Install in both AI workspace and canonical.
+# Install in both canonical and AI workspace. The canonical hook is the
+# load-bearing one — it guards the history that gets published — so it is
+# repaired FIRST: an AI-side refusal (e.g. a foreign hook in the workspace)
+# must not leave canonical unfiltered. An AI-side failure is reported and
+# still returns non-zero.
 wi_trace_filter_install_pair() {
   local ai_root="$1"
   local canonical_root="$2"
-  wi_trace_filter_install "$ai_root" "$ai_root" || return 1
   wi_trace_filter_install "$ai_root" "$canonical_root" || return 1
+  if ! wi_trace_filter_install "$ai_root" "$ai_root"; then
+    wi_log_error "wi_trace_filter_install_pair: canonical hook updated; AI-side install refused or failed (see above)"
+    return 1
+  fi
   return 0
 }

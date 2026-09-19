@@ -106,13 +106,13 @@ A `commit-msg` hook is installed into `<canonical>/.git/hooks/commit-msg` with t
 
 The install only replaces hooks it wrote — recognised by a `# workspace-init:managed-hook` marker line (or the pre-0.5.1 `auto-installed` header). Any other existing `commit-msg` hook is preserved and the install refuses, so a user hook is never silently displaced.
 
-**Repair after a workspace move or a broken manifest:** re-run the pairing recipe (`/workspace-init:pair-existing-dual` or `/workspace-init:pair-canonical-repo`) so the hook is re-baked against the workspace's new location, or run the deterministic form directly:
+**Repair after a workspace move or a broken manifest:** re-run the pairing recipe (`/workspace-init:pair-existing-dual` or `/workspace-init:pair-workspace`) so the hook is re-baked against the workspace's new location, or run the deterministic form directly from the workspace's parent directory:
 
 ```
 <workspace-init plugin dir>/bin/wi trace_filter_install_pair <ai-workspace> <canonical-repo>
 ```
 
-The plugin dir is wherever your plugin host installed workspace-init, e.g. `~/.claude/plugins/cache/<marketplace>/workspace-init/<version>` or `~/.codex/plugins/cache/<marketplace>/workspace-init/<version>`. If the AI workspace is not a git repo, use `wi trace_filter_install <ai-workspace> <repo>` per target — the pair form installs the AI-side hook first and stops there.
+The plugin dir is wherever your plugin host installed workspace-init, e.g. `~/.claude/plugins/cache/<marketplace>/workspace-init/<version>` or `~/.codex/plugins/cache/<marketplace>/workspace-init/<version>`. Both arguments may be relative — they are canonicalised to absolute physical paths before being baked into the hook. The pair form repairs the canonical hook first, so an AI-side refusal (a foreign hook, or the workspace not being a git repo) still leaves canonical protected and reports the refusal; to repair only one repo's hook, use `wi trace_filter_install <ai-workspace> <repo>`. A corrupt or missing `pairing.json` is repaired by `wi manifest_write <ai-workspace> <canonical-repo> <personal|work>`, which rewrites the manifest.
 
 ### Bypass
 
