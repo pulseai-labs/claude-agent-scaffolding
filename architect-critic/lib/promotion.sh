@@ -236,6 +236,17 @@ ac_promotion_promote() {
   now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
   ac_lock_acquire "$lock_path" || return 1
+  # A fingerprint present in neither list makes the jq program below emit zero
+  # documents — refuse up front with a message naming it (#451); the funnel's
+  # output check is the safety net, this precheck is the usable error.
+  if ! jq -e --arg fp "$fingerprint" '
+      ([(.candidate_promotions // [])[] | select(.fingerprint == $fp)] | length) > 0
+      or ([(.principle_promotions // [])[] | select(.fingerprint == $fp)] | length) > 0
+    ' "$state_file" >/dev/null 2>&1; then
+    ac_log_error "ac_promotion_promote: no candidate or existing promotion with fingerprint: $fingerprint"
+    ac_lock_release "$lock_path"
+    return 1
+  fi
   ac_guarded_jq_write "$state_file" \
     --arg fp "$fingerprint" \
     --arg basis "$basis" \

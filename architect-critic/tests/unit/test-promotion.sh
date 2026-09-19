@@ -272,4 +272,30 @@ SURFACED_COUNT="$(printf '%s' "$SURFACED" | jq --arg fp "$FP_D" '[.[] | select(.
 assert_eq "4 votes from 1 run → NOT surfaced" "0" "$SURFACED_COUNT"
 
 # ---------------------------------------------------------------------------
+# T11: promoting a fingerprint absent from candidate_promotions[] is refused at
+# the dispatched interface — rc != 0, stderr names the fingerprint, and
+# state.json is left byte-identical (#451: the promote jq program emits zero
+# documents for an unknown fingerprint, which must never reach the file).
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- T11: missing-fingerprint promote via bin/arc is refused (#451) ---"
+setup_tmp_repo > /dev/null
+ac_state_init
+
+FP_OK="$(ac_promotion_fingerprint "a real promoted principle")"
+_seed_votes_for_fingerprint "$FP_OK" 4
+state_file="$(ac_state_path)"
+before_sha="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+
+MISSING_FP="deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+promote_err="$("$TESTS_DIR/../bin/arc" promotion_promote "$MISSING_FP" auto 2>&1 >/dev/null)"
+promote_rc=$?
+[[ "$promote_rc" -ne 0 ]]
+assert_eq "missing-fingerprint promote exits non-zero" "0" "$?"
+after_sha="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+assert_eq "state.json byte-identical after refused promote" "$before_sha" "$after_sha"
+printf '%s' "$promote_err" | grep -qF "$MISSING_FP"
+assert_eq "stderr names the missing fingerprint" "0" "$?"
+
+# ---------------------------------------------------------------------------
 report_results

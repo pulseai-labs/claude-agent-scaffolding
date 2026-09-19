@@ -10,19 +10,28 @@ ac_data_dir() {
   echo "${CLAUDE_PLUGIN_DATA:-$HOME/.claude/architect-critic}"
 }
 
-# jq-then-mv guard: if jq succeeds, atomically mv tmp to target; else rm tmp.
-# Args: <jq command pieces...> > tmp; then mv tmp target; else rm tmp; log; return 1
+# jq-then-mv guard: the replacement is written to a temp file and atomically
+# mv'd to target only when it is exactly one JSON object. jq exits 0 on an
+# empty or multi-document stream, so exit status alone is not a guard (#451):
+# a generator-shaped program that emits nothing would otherwise mv a 0-byte
+# file over state.json. On any refusal the tmp file is removed, the target is
+# left byte-identical, and rc is non-zero.
+# Args: <target> <jq command pieces...>
 ac_guarded_jq_write() {
   local target="$1"; shift
   local tmp
   tmp="$(mktemp "${target}.XXXXXX")" || return 1
-  if jq "$@" > "$tmp"; then
-    mv "$tmp" "$target"
-  else
+  if ! jq "$@" > "$tmp"; then
     rm -f "$tmp"
     ac_log_error "jq failed during write to $target"
     return 1
   fi
+  if ! jq -e -s 'length == 1 and (.[0] | type == "object")' "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    ac_log_error "refusing to write $target: jq output is not exactly one JSON object"
+    return 1
+  fi
+  mv "$tmp" "$target"
 }
 
 # Lock-file pattern (mirror of scaffold-onboard's compose.lock).

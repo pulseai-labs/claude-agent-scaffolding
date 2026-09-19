@@ -337,4 +337,55 @@ expected_expires_90="$(_ac_date_add_days "$sup_at_90" 90)"
 assert_eq "expires_at = suppressed_at + 90d for reason_score=5" "$expected_expires_90" "$exp_at_90"
 
 # ---------------------------------------------------------------------------
+# T17: ac_state_init re-seeds a 0-byte state.json (#451)
+# A guarded write that emptied state.json must be recoverable — a zero-byte
+# file holds nothing to lose, so init re-seeds it with a warning.
+# ---------------------------------------------------------------------------
+echo "T17: ac_state_init re-seeds a 0-byte state.json"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+state_file="$(ac_state_path)"
+: > "$state_file"
+init_out="$("$TESTS_DIR/../bin/arc" state_init 2>&1)"
+init_rc=$?
+assert_eq "state_init on 0-byte file exits 0" "0" "$init_rc"
+reseeded_ver="$(jq -r '.schema_version' "$state_file")"
+assert_eq "re-seeded file is schema_version=3" "3" "$reseeded_ver"
+printf '%s' "$init_out" | grep -q "re-seed"
+assert_eq "re-seed warning emitted" "0" "$?"
+
+# ---------------------------------------------------------------------------
+# T18 (control): ac_state_init leaves a non-empty VALID state.json
+# byte-identical — the new branches must not disturb a healthy file.
+# ---------------------------------------------------------------------------
+echo "T18: ac_state_init on non-empty valid file is a byte-identical no-op"
+setup_tmp_repo > /dev/null
+ac_state_init
+state_file="$(ac_state_path)"
+jq '.schema_version = 99' "$state_file" > "${state_file}.tmp" && mv "${state_file}.tmp" "$state_file"
+before_sha="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+"$TESTS_DIR/../bin/arc" state_init >/dev/null 2>&1
+assert_eq "state_init rc=0 on valid file" "0" "$?"
+after_sha="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+assert_eq "valid file byte-identical after init" "$before_sha" "$after_sha"
+
+# ---------------------------------------------------------------------------
+# T19 (control): ac_state_init REFUSES a non-empty unparseable state.json —
+# re-seeding it would destroy data, so it must fail with rc != 0 and leave
+# the file byte-identical.
+# ---------------------------------------------------------------------------
+echo "T19: ac_state_init refuses a non-empty unparseable file"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+state_file="$(ac_state_path)"
+printf 'this is not json {{{\n' > "$state_file"
+before_sha="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+"$TESTS_DIR/../bin/arc" state_init >/dev/null 2>&1
+refuse_rc=$?
+[[ "$refuse_rc" -ne 0 ]]
+assert_eq "unparseable file refused (rc != 0)" "0" "$?"
+after_sha="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+assert_eq "unparseable file byte-identical after refusal" "$before_sha" "$after_sha"
+
+# ---------------------------------------------------------------------------
 report_results

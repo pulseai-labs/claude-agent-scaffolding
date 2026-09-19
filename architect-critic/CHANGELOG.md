@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.6.1 — 2026-09-19
+
+**Fix:** a state write can never empty state.json (#451).
+
+### Fixed
+- **Missing-fingerprint promote emptied state.json (#451).** `ac_promotion_promote`'s jq program binds `($cands[] | select(.fingerprint == $fp)) as $cand`; a fingerprint absent from `candidate_promotions[]` produces zero outputs, and `ac_guarded_jq_write` treated jq's exit 0 as sufficient — `mv`-ing a 0-byte temp file over `state.json`. Once emptied, every later guarded write kept it empty and `ac_state_init` would not repair it. Promote now refuses an unknown fingerprint up front with an error naming it, and `ac_state_init` re-seeds a 0-byte `state.json` with a warning so the emptied aftermath is recoverable.
+- **The write funnel no longer trusts jq's exit status alone (#451).** `ac_guarded_jq_write` now refuses any replacement that is not exactly one JSON object — an empty stream or a multi-document stream — leaving the target byte-identical, removing the temp file, and returning non-zero. All twelve state.json writers funnel through it; promote's generator-shaped program was the only one that could emit zero output, and the guard now covers the class for any future caller.
+- **`ac_state_init` refuses a non-empty unparseable state.json** (previously a silent no-op returning 0): re-seeding it could destroy data, so it now exits non-zero and leaves the file byte-identical.
+
+### Tests
+- New `tests/unit/test-guarded-write.sh` pins the funnel contract (empty and multi-document output refused byte-identically; a valid single-object write still lands). `test-promotion.sh` gains a dispatched-interface regression (`bin/arc promotion_promote` on a missing fingerprint). `test-state.sh` gains the 0-byte re-seed plus adjacent controls: a non-empty valid file stays byte-identical, a non-empty unparseable file is refused byte-identical.
+
 ## v0.6.0 — 2026-07-10
 
 ### Added
