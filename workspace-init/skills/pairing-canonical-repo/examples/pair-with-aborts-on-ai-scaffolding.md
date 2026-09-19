@@ -118,4 +118,5 @@ For v0.1, if the user needs to convert a single-repo to a dual-repo, the steps a
    to have workspace-init install the commit-msg hook and validate the setup.
 
 This workaround is tedious but safe — it avoids the risk of ambiguous dual-repo state.
-v0.2 will automate this entire flow via `/init-workspace --repair` or a dedicated migration command.
+v0.2 will automate this entire flow via a dedicated migration command; today
+the path is re-running the pairing recipe after the canonical is clean.

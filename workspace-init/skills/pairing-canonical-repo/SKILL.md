@@ -166,16 +166,23 @@ Expected init-log entries: subdir mkdirs + `.gitkeep` files + `.gitignore`.
 ### 6.4 — Task 8.4: Write the pairing manifest (with detected metadata)
 
 **Difference vs. fresh mode:** pass the detected default branch and remote
-through to `wi_manifest_write`:
+through to `wi_manifest_write`. The detected remote is the CANONICAL's — it
+belongs to `--canonical-git-remote` (the AI workspace's own `git_remote` stays
+`null`; nothing captures it at pair time):
 
 ```
-"$wi_bin" manifest_write "$ai_root" "$canonical_root" "$project_type" \
-  --git-remote "$detected_remote" \
-  --default-branch "$detected_branch"
+if [[ -n "$detected_remote" ]]; then
+  "$wi_bin" manifest_write "$ai_root" "$canonical_root" "$project_type" \
+    --canonical-git-remote "$detected_remote" --default-branch "$detected_branch"
+else
+  "$wi_bin" manifest_write "$ai_root" "$canonical_root" "$project_type" \
+    --default-branch "$detected_branch"
+fi
 ```
 
-If `$detected_remote` is empty, the helper records `null`. If
-`$detected_branch` is empty, the helper falls back to `"main"`.
+If `$detected_remote` is empty the flag is omitted and the helper records
+`null`. If `$detected_branch` is empty the write fails — re-run
+`wi git_detect_default_branch` or pass an explicit branch name.
 
 **Optional — tooling repo (#48 Stage 2).** If the user keeps a separate *tooling/marketplace*
 repo (so `/defer --tooling` can route tech-debt there instead of the project repo), append
@@ -334,9 +341,13 @@ To override trace filter for a specific commit: git commit --no-verify
   side is removed; the canonical-side hook (if it was installed before
   the failure) is LEFT IN PLACE per section 7's conservatism, with a
   warning telling the user how to remove it.
-- **`jq` produces malformed JSON** during manifest write → caught by
-  `wi_guarded_jq_write` (tempfile + `jq empty` validation + rename); on
-  failure, rollback.
+- **`jq` produces malformed JSON** during manifest write → `wi_manifest_write`
+  builds via `jq -n` into a tempfile and renames only on success, so a failed
+  write leaves no partial manifest; on failure, rollback.
+- **Canonical already has a `commit-msg` hook** → the trace-filter install
+  refuses rather than overwriting a hook it did not install (hooks written by
+  workspace-init carry a marker line and are replaced). Surface the refusal;
+  the user decides whether to remove or chain their existing hook.
 - **Concurrent invocation** against the same canonical →
   `wi_lock_acquire` on `<ai_root>` (locks the new workspace dir). A
   separate lock on canonical isn't taken — workspace-init does not own

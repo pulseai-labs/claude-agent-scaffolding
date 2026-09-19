@@ -135,11 +135,14 @@ and renders `.gitignore`.
 "$wi_bin" manifest_write "/Users/example/projects/foo-ai" \
   "/Users/example/projects/foo" \
   "work" \
-  --git-remote "git@github.com:example/foo.git" \
+  --canonical-git-remote "git@github.com:example/foo.git" \
   --default-branch "main"
 ```
 
-The manifest is written to `/Users/example/projects/foo-ai/.workspace/pairing.json` with:
+The detected remote is the CANONICAL's — it goes to `--canonical-git-remote`.
+The AI workspace's own `git_remote` stays `null` (nothing captures it at pair
+time). The manifest is written to
+`/Users/example/projects/foo-ai/.workspace/pairing.json` with:
 - `canonical.git_remote` = `"git@github.com:example/foo.git"`
 - `canonical.default_branch` = `"main"`
 - `git_policy.project_type` = `"work"`

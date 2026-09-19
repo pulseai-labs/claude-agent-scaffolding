@@ -1,5 +1,18 @@
 # workspace-init changelog
 
+## 0.5.1 (2026-09-19)
+
+Trace-filter hardening: the hook installs safely, renders any path, and fails closed instead of silently going dark (#457, #458, #481), plus a Scenario A manifest-write flag fix (#173).
+
+### Fixed
+- **#457 — installing the `commit-msg` hook can no longer destroy a foreign hook.** `wi_trace_filter_install` renders to a temp file and moves it into place only after a successful render, so a render failure leaves the existing hook byte-identical. It now refuses to overwrite any existing hook it did not write, recognising its own by a `# workspace-init:managed-hook` marker line (or the pre-0.5.1 `auto-installed` header) so a previously installed filter stays re-bakeable. `wi_rollback`'s HOOK_INSTALL inverse now removes only a hook carrying that ownership evidence — a foreign `commit-msg` is left in place with a warning instead of being deleted.
+- **#458 — the baked AI-workspace path survives any character.** `wi_trace_filter_render` replaces `sed` substitution with a left-to-right splice of the shell-quoted path (`printf %q`), so paths containing `&`, `|`, `\`, `"`, `$`, backticks, spaces, or `'` render literally — `&` no longer expands to the matched text, `"` no longer produces an unparseable hook, and a path containing the literal placeholder text terminates cleanly.
+- **#481 — the hook fails closed and names a real repair.** A missing manifest, malformed JSON, a missing or non-boolean `git_policy.trace_filter.enforce`, or unreadable `blocked_patterns` now blocks the commit with an error naming `<plugin dir>/bin/wi trace_filter_install_pair <ai-workspace> <repo>` (single-target `wi trace_filter_install` for a non-git AI workspace) — replacing the previous fail-open warning that pointed at the non-existent `/init-workspace --repair`. The README documents the moved-workspace repair flow.
+- **#173 — Scenario A records the canonical remote under the right flag.** `pairing-canonical-repo` §6.4 and the `pair-with-existing-clean` example now pass the detected remote via `--canonical-git-remote` instead of `--git-remote`, so it lands on `canonical.git_remote` rather than `ai_workspace.git_remote`.
+
+### Removed
+- **`wi_guarded_jq_write` deleted.** The helper had no production callers — `wi_manifest_write` has always written via its own `jq -n` tempfile path — and the skill prose claiming it guarded manifest writes now describes the actual mechanism.
+
 ## 0.5.0 (2026-07-10)
 
 ### Added

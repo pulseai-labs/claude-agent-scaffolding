@@ -68,23 +68,6 @@ wi_lock_release() {
   return 0
 }
 
-# --- Atomic JSON write via jq ---------------------------------------------
-# Usage: wi_guarded_jq_write <file> <jq-program> [extra jq args...]
-# Reads <file>, applies <jq-program>, writes to <file>.tmp.$$, mv on success.
-# Returns 0 on success, 1 on jq failure (and removes the tmp file).
-wi_guarded_jq_write() {
-  local file="$1"; shift
-  local jq_program="$1"; shift
-  local tmp="${file}.tmp.$$"
-  if jq "$jq_program" "$@" "$file" > "$tmp" 2>/dev/null; then
-    mv "$tmp" "$file"
-    return 0
-  fi
-  rm -f "$tmp"
-  wi_log_error "jq failed during write to $file"
-  return 1
-}
-
 # --- Init-log entry append ------------------------------------------------
 # Format: OP\tPATH[\tDETAIL]\n
 # Appends one line; creates parent directory if missing.

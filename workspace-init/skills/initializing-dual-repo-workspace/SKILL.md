@@ -330,9 +330,9 @@ where indicated.
   elsewhere. Per **SPEC §8.4** it walks the chain
   `symbolic-ref refs/remotes/origin/HEAD` → `symbolic-ref HEAD` →
   `branch --show-current` → user prompt → ultimate fallback `"main"`.
-- **`jq` produces malformed JSON** during manifest write → covered by
-  `wi_guarded_jq_write` (writes to a tempfile, validates with `jq empty`,
-  then renames). On failure: rollback.
+- **`jq` produces malformed JSON** during manifest write → `wi_manifest_write`
+  builds via `jq -n` into a tempfile and renames only on success, so a failed
+  write leaves no partial manifest. On failure: rollback.
 - **Concurrent invocation** (rare for fresh init, but possible) →
   `wi_lock_acquire` on the AI workspace root prevents two
   `initializing-dual-repo-workspace` runs from racing. Lock release in
