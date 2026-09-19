@@ -49,6 +49,22 @@ _run_hook() {
   echo $?
 }
 
+# The narrowed block contract (round 2): every fail-closed branch states that
+# the filter fails closed, gives the specific reason, and points at the
+# README's Repair section — and computes NO repair command or path itself.
+_assert_fails_closed() {
+  local err="$1"
+  grep -q 'fails closed' "$err" || {
+    echo "    block does not state the filter fails closed"
+    cat "$err"; return 1; }
+  grep -qF 'See Repair in the workspace-init README' "$err" || {
+    echo "    missing pointer to the README Repair section"
+    cat "$err"; return 1; }
+  ! grep -qE 'wi [a-z_]+|bin/wi|trace_filter_|manifest_write' "$err" || {
+    echo "    hook still computes a repair command"
+    cat "$err"; return 1; }
+}
+
 # ---------------------------------------------------------------------------
 # Positive (must block) — 6 tests
 # ---------------------------------------------------------------------------
@@ -171,14 +187,9 @@ test_E1_manifest_missing_fails_closed_with_repair() {
     echo "    got: $(cat "$d/stderr")"
     return 1
   fi
-  # The failure must name a repair that exists (#481) — see test_R1 for the
-  # verb-contract check.
-  if ! grep -q 'bin/wi trace_filter_install' "$d/stderr"; then
-    echo "    expected stderr to name the wi trace_filter_install repair"
-    echo "    got: $(cat "$d/stderr")"
-    return 1
-  fi
-  return 0
+  # Round 2: the hook states the reason and points at the README's Repair
+  # section — it no longer computes a repair command itself.
+  _assert_fails_closed "$d/stderr"
 }
 
 test_E2_enforce_false_allows_everything() {
@@ -212,12 +223,10 @@ test_E4_malformed_json_manifest_fails_closed() {
   local msg; msg="$(_write_msg "$d" $'fix: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n')"
   local rc; rc="$(_run_hook "$hook" "$msg" "$d")"
   assert_eq "1" "$rc" "malformed JSON manifest must fail closed (exit 1)" || return 1
-  if ! grep -q 'bin/wi trace_filter_install' "$d/stderr"; then
-    echo "    expected stderr to name the wi trace_filter_install repair"
-    echo "    got: $(cat "$d/stderr")"
-    return 1
-  fi
-  return 0
+  grep -q 'single JSON object' "$d/stderr" || {
+    echo "    expected the single-JSON-object manifest error"
+    echo "    got: $(cat "$d/stderr")"; return 1; }
+  _assert_fails_closed "$d/stderr"
 }
 
 test_E9_missing_or_nonboolean_enforce_blocks() {
@@ -232,14 +241,13 @@ test_E9_missing_or_nonboolean_enforce_blocks() {
   local msg; msg="$(_write_msg "$d" $'fix: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n')"
   local rc; rc="$(_run_hook "$hook" "$msg" "$d")"
   assert_eq "1" "$rc" "missing enforce key must fail closed (exit 1)" || return 1
-  grep -q 'bin/wi trace_filter_install' "$d/stderr" || {
-    echo "    expected stderr to name the wi trace_filter_install repair"
-    echo "    got: $(cat "$d/stderr")"; return 1; }
+  _assert_fails_closed "$d/stderr" || return 1
   # Non-boolean enforce is equally corrupt.
   tmp="$(mktemp)"
   jq '.git_policy.trace_filter.enforce = "yes"' "$manifest" > "$tmp" && mv "$tmp" "$manifest"
   rc="$(_run_hook "$hook" "$msg" "$d")"
   assert_eq "1" "$rc" "non-boolean enforce must fail closed (exit 1)" || return 1
+  _assert_fails_closed "$d/stderr"
 }
 
 test_E10_unreadable_blocked_patterns_blocks() {
@@ -254,13 +262,12 @@ test_E10_unreadable_blocked_patterns_blocks() {
   local msg; msg="$(_write_msg "$d" $'fix: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n')"
   local rc; rc="$(_run_hook "$hook" "$msg" "$d")"
   assert_eq "1" "$rc" "missing blocked_patterns must fail closed (exit 1)" || return 1
-  grep -q 'bin/wi trace_filter_install' "$d/stderr" || {
-    echo "    expected stderr to name the wi trace_filter_install repair"
-    echo "    got: $(cat "$d/stderr")"; return 1; }
+  _assert_fails_closed "$d/stderr" || return 1
   tmp="$(mktemp)"
   jq '.git_policy.trace_filter.blocked_patterns = "not-an-array"' "$manifest" > "$tmp" && mv "$tmp" "$manifest"
   rc="$(_run_hook "$hook" "$msg" "$d")"
   assert_eq "1" "$rc" "non-array blocked_patterns must fail closed (exit 1)" || return 1
+  _assert_fails_closed "$d/stderr"
 }
 
 test_E5_trailer_at_line_start_in_multiline_blocks() {
@@ -610,24 +617,16 @@ test_SC9_placeholder_text_in_path()  { _assert_e2e_trace_filter_blocks 'wk-__AI_
 # ---------------------------------------------------------------------------
 
 test_R1_hook_repair_names_existing_wi_verb() {
-  # Every fail-closed branch prints the repair; the verb it names must exist —
-  # a message naming a command that does not exist is the original #481 defect.
+  # Round 2 (skill-first): the hook states the fail-closed reason and points at
+  # the README's Repair section — it computes no repair command or path. The
+  # verb-existence contract moved to the README pin (test_H6).
   local d; d="$(wi_tmpdir)"
   mkdir -p "$d/foo-ai"
   local hook; hook="$(_render_hook "$d")"
   local msg; msg="$(_write_msg "$d" $'x\n\nCo-Authored-By: A <a@b>\n')"
   local rc; rc="$(_run_hook "$hook" "$msg" "$d")"
   assert_eq "1" "$rc" || return 1
-  grep -qF 'bin/wi trace_filter_install_pair' "$d/stderr" || {
-    echo "    repair line does not name trace_filter_install_pair"
-    cat "$d/stderr"; return 1; }
-  grep -qF 'bin/wi trace_filter_install ' "$d/stderr" || {
-    echo "    single-target repair form missing"
-    cat "$d/stderr"; return 1; }
-  "$WI_BIN" --list | grep -qx 'trace_filter_install_pair' || {
-    echo "    trace_filter_install_pair not in wi --list"; return 1; }
-  "$WI_BIN" --list | grep -qx 'trace_filter_install' || {
-    echo "    trace_filter_install not in wi --list"; return 1; }
+  _assert_fails_closed "$d/stderr"
 }
 
 test_M1_moved_workspace_repair_restores_filter() {
@@ -650,6 +649,7 @@ test_M1_moved_workspace_repair_restores_filter() {
     echo "    expected the unreachable-path failure"; cat "$d/moved-err"; return 1; }
   grep -qF "$ai" "$d/moved-err" || {
     echo "    failure does not name the stale path"; cat "$d/moved-err"; return 1; }
+  _assert_fails_closed "$d/moved-err" || return 1
   # The named repair re-bakes both hooks against the moved workspace.
   "$WI_BIN" trace_filter_install_pair "$moved" "$cn" 2>/dev/null || {
     echo "    repair (trace_filter_install_pair) failed"; return 1; }
@@ -691,6 +691,7 @@ _assert_single_object_block() {
   grep -q 'single JSON object' "$d/stderr" || {
     echo "    $desc: expected the single-JSON-object manifest error"
     echo "    got: $(cat "$d/stderr")"; return 1; }
+  _assert_fails_closed "$d/stderr"
 }
 
 test_O1_empty_manifest_blocks()            { _assert_single_object_block "" "0-byte manifest"; }
@@ -720,6 +721,7 @@ test_F7_invalid_ere_blocks_without_trailer() {
   grep -qE 'regex.*\(' "$d/stderr" || {
     echo "    expected stderr to name the bad pattern"
     echo "    got: $(cat "$d/stderr")"; return 1; }
+  _assert_fails_closed "$d/stderr"
 }
 
 test_F8_invalid_ere_blocks_with_trailer() {
@@ -735,6 +737,7 @@ test_F8_invalid_ere_blocks_with_trailer() {
   grep -qE 'regex.*\(' "$d/stderr" || {
     echo "    expected stderr to name the invalid pattern"
     echo "    got: $(cat "$d/stderr")"; return 1; }
+  _assert_fails_closed "$d/stderr"
 }
 
 test_F9_non_string_pattern_blocks() {
@@ -745,6 +748,7 @@ test_F9_non_string_pattern_blocks() {
   local msg; msg="$(_write_msg "$d" $'fix: clean\n')"
   local rc; rc="$(_run_hook "$hook" "$msg" "$d")"
   assert_eq "1" "$rc" "a non-string blocked_patterns element must fail closed" || return 1
+  _assert_fails_closed "$d/stderr"
 }
 
 # ---------------------------------------------------------------------------
@@ -768,9 +772,10 @@ test_H1_missing_jq_blocks_naming_jq() {
   grep -q 'jq' "$d/stderr" || {
     echo "    expected stderr to name jq as the missing tool"
     echo "    got: $(cat "$d/stderr")"; return 1; }
-  ! grep -q 'valid JSON' "$d/stderr" || {
+  ! grep -qE 'valid JSON|single JSON object' "$d/stderr" || {
     echo "    jq absence must not be reported as manifest corruption"
     echo "    got: $(cat "$d/stderr")"; return 1; }
+  _assert_fails_closed "$d/stderr"
 }
 
 test_H2_relative_path_repair_restores_filter() {
@@ -782,12 +787,10 @@ test_H2_relative_path_repair_restores_filter() {
   "$WI_BIN" manifest_write "$ai" "$cn" work --default-branch main >/dev/null 2>&1 || return 1
   "$WI_BIN" trace_filter_install_pair "$ai" "$cn" 2>/dev/null || return 1
   mv "$ai" "$moved"
-  # Repair exactly as a human standing in the parent dir would type it, using
-  # the wi path baked into the installed hook (what the repair hint prints).
-  local baked_wi
-  baked_wi="$(eval "$(grep -m1 '^WI_BIN=' "$cn/.git/hooks/commit-msg")"; printf '%s' "$WI_BIN")"
-  [[ -x "$baked_wi" ]] || { echo "    baked WI_BIN is not executable: $baked_wi"; return 1; }
-  ( cd "$d" && "$baked_wi" trace_filter_install_pair "proj-ai-MOVED" "proj" ) 2>/dev/null || {
+  # Repair exactly as a human standing in the parent dir would type it: the
+  # README's Repair section names <plugin dir>/bin/wi — the same dispatcher
+  # $WI_BIN resolves here.
+  ( cd "$d" && "$WI_BIN" trace_filter_install_pair "proj-ai-MOVED" "proj" ) 2>/dev/null || {
     echo "    relative-path repair failed"; return 1; }
   git -C "$cn" -c user.email=t@t -c user.name=t commit -q --allow-empty \
       -m $'y\n\nCo-Authored-By: Bot <bot@x>' 2>"$d/after-err"
@@ -822,11 +825,12 @@ test_H3_hint_names_main_worktree_not_linked() {
       -m $'x\n\nCo-Authored-By: Bot <bot@x>' 2>"$d/wt-err"
   local rc=$?
   [[ "$rc" -ne 0 ]] || { echo "    trailer commit allowed from linked worktree"; return 1; }
-  grep -qF "<new-ai-root> $cn" "$d/wt-err" || {
-    echo "    hint's repair lines do not name the main worktree $cn"
-    cat "$d/wt-err"; return 1; }
+  _assert_fails_closed "$d/wt-err" || return 1
   ! grep -qF "$wt" "$d/wt-err" || {
-    echo "    hint names the linked worktree — install rejects that path"
+    echo "    block still computes a path (names the linked worktree)"
+    cat "$d/wt-err"; return 1; }
+  ! grep -qF "$cn" "$d/wt-err" || {
+    echo "    block still computes a path (names the canonical root)"
     cat "$d/wt-err"; return 1; }
 }
 
@@ -839,11 +843,10 @@ test_H4_manifest_repair_verb_rewrites_manifest() {
   local msg; msg="$(_write_msg "$d" $'x\n\nCo-Authored-By: Bot <bot@x>\n')"
   local rc; rc="$(_run_hook "$hook" "$msg" "$d")"
   assert_eq "1" "$rc" || return 1
-  grep -q 'manifest_write' "$d/stderr" || {
-    echo "    corrupt-manifest block does not name manifest_write"
-    cat "$d/stderr"; return 1; }
-  # Prove the named repair end to end: rewrite the manifest, re-bake the hook,
-  # then the pattern (not the manifest error) is what blocks the next trailer.
+  _assert_fails_closed "$d/stderr" || return 1
+  # Prove the README-documented repair end to end: rewrite the manifest,
+  # re-bake the hook, then the pattern (not the manifest error) is what blocks
+  # the next trailer.
   local ai="$d/foo-ai" cn="$d/foo"
   git -C "$cn" init -q 2>/dev/null
   "$WI_BIN" manifest_write "$ai" "$cn" work --default-branch main >/dev/null 2>&1 || {
@@ -901,7 +904,86 @@ test_H6_workspace_init_mentions_resolve_to_real_commands() {
     [[ -f "$WI_PLUGIN_ROOT/commands/$name.md" ]] || {
       echo "    $m has no commands/$name.md"; missing=1; }
   done <<< "$mentions"
+  [[ "$missing" -eq 0 ]] || return 1
+  # And every `wi <verb>` the README names must be a real dispatcher verb.
+  local verbs v
+  verbs="$(grep -oE '\bwi [a-z_]+\b' "$WI_PLUGIN_ROOT/README.md" | awk '{print $2}' | sort -u)"
+  while IFS= read -r v; do
+    [[ -z "$v" ]] && continue
+    "$WI_BIN" --list | grep -qx "$v" || {
+      echo "    README names 'wi $v' but it is not in wi --list"; missing=1; }
+  done <<< "$verbs"
   [[ "$missing" -eq 0 ]]
+}
+
+# ---------------------------------------------------------------------------
+# Q5 — pair install validates the AI root before touching either hook — 1 test
+# ---------------------------------------------------------------------------
+
+test_Q5_pair_install_validates_ai_root_before_writes() {
+  # A mistyped/moved AI root must fail BEFORE the canonical hook is rewritten —
+  # the round-1 canonical-first ordering otherwise bakes a dead path into the
+  # load-bearing hook (and wi_log_op even creates <bad>/.workspace).
+  local d; d="$(wi_tmpdir)"; mkdir -p "$d"
+  local ai="$d/ai-side" cn="$d/canonical"
+  mkdir -p "$ai" "$cn"
+  git -C "$ai" init -q 2>/dev/null; git -C "$cn" init -q 2>/dev/null
+  "$WI_BIN" manifest_write "$ai" "$cn" work --default-branch main >/dev/null 2>&1 || return 1
+  "$WI_BIN" trace_filter_install_pair "$ai" "$cn" 2>/dev/null || return 1
+  cp "$cn/.git/hooks/commit-msg" "$d/canon.orig"
+  # Leg 1: nonexistent AI root → nonzero, canonical hook byte-identical, and
+  # nothing created at the bad path.
+  if "$WI_BIN" trace_filter_install_pair "$d/ai-TYPO" "$cn" 2>"$d/err"; then
+    echo "    pair accepted a nonexistent AI root"; return 1; fi
+  cmp -s "$d/canon.orig" "$cn/.git/hooks/commit-msg" || {
+    echo "    canonical hook rewritten despite a bad AI root"; return 1; }
+  [[ ! -e "$d/ai-TYPO" ]] || {
+    echo "    repair created a directory at the mistyped path"; return 1; }
+  grep -qiE 'workspace|directory|exist' "$d/err" || {
+    echo "    failure does not name the AI-root problem"; cat "$d/err"; return 1; }
+  # Leg 2: existing AI root whose manifest is corrupt → same contract.
+  local ai2="$d/ai-corrupt"
+  mkdir -p "$ai2/.workspace"
+  echo '{ not json' > "$ai2/.workspace/pairing.json"
+  if "$WI_BIN" trace_filter_install_pair "$ai2" "$cn" 2>"$d/err2"; then
+    echo "    pair accepted a corrupt manifest"; return 1; fi
+  cmp -s "$d/canon.orig" "$cn/.git/hooks/commit-msg" || {
+    echo "    canonical hook rewritten despite a corrupt manifest"; return 1; }
+  grep -qiE 'manifest|json' "$d/err2" || {
+    echo "    failure does not name the manifest problem"; cat "$d/err2"; return 1; }
+  # Leg 3: existing AI root with NO manifest at all → same contract.
+  local ai3="$d/ai-nomanifest"
+  mkdir -p "$ai3"
+  if "$WI_BIN" trace_filter_install_pair "$ai3" "$cn" 2>"$d/err3a"; then
+    echo "    pair accepted a missing manifest"; return 1; fi
+  cmp -s "$d/canon.orig" "$cn/.git/hooks/commit-msg" || {
+    echo "    canonical hook rewritten despite a missing manifest"; return 1; }
+  grep -qiE 'manifest' "$d/err3a" || {
+    echo "    failure does not name the manifest problem"; cat "$d/err3a"; return 1; }
+  # Leg 4: AI root exists but is a regular FILE — the -d branch's distinct
+  # catch (downstream checks would misreport it as a missing manifest).
+  touch "$d/ai-file"
+  if "$WI_BIN" trace_filter_install_pair "$d/ai-file" "$cn" 2>"$d/err4"; then
+    echo "    pair accepted a non-directory AI root"; return 1; fi
+  cmp -s "$d/canon.orig" "$cn/.git/hooks/commit-msg" || {
+    echo "    canonical hook rewritten despite a non-directory AI root"; return 1; }
+  grep -qiE 'directory' "$d/err4" || {
+    echo "    failure does not name the not-a-directory problem"; cat "$d/err4"; return 1; }
+  # Adjacent control (CB5 stays): a VALID root + foreign AI-side hook still
+  # repairs canonical and reports the refusal. Removing canonical's hook first
+  # makes the repair observable (same bytes would re-render identically).
+  local fh="$ai/.git/hooks/commit-msg"
+  _write_foreign_hook "$fh"
+  cp "$fh" "$d/foreign.orig"
+  rm -f "$cn/.git/hooks/commit-msg"
+  if "$WI_BIN" trace_filter_install_pair "$ai" "$cn" 2>"$d/err3"; then
+    echo "    pair must still report the AI-side refusal"; return 1; fi
+  grep -qF "$ai" "$cn/.git/hooks/commit-msg" || {
+    echo "    canonical hook not re-installed for the valid root"; return 1; }
+  grep -qF 'workspace-init:managed-hook' "$cn/.git/hooks/commit-msg" || {
+    echo "    canonical hook missing the managed marker"; return 1; }
+  cmp -s "$d/foreign.orig" "$fh" || {
+    echo "    foreign AI hook was destroyed"; return 1; }
 }
 
 # ---------------------------------------------------------------------------
@@ -1027,6 +1109,7 @@ wi_test_run test_H5_pair_repair_updates_canonical_despite_foreign_ai_hook
 wi_test_run test_H6_workspace_init_mentions_resolve_to_real_commands
 
 # Foreign-hook destruction edges (CB3, RB4)
+wi_test_run test_Q5_pair_install_validates_ai_root_before_writes
 wi_test_run test_D1_dangling_symlink_hook_never_destroyed
 wi_test_run test_D2_scenario_c_skill_documents_foreign_hook_refusal
 
