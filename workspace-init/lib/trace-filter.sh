@@ -154,7 +154,10 @@ wi_trace_filter_install() {
   # Never displace a hook we did not install (#457). Our own hook (marker line,
   # or the pre-0.5.1 legacy header) stays replaceable so the moved-workspace
   # repair can re-bake it; anything else is refused before a byte is touched.
-  if [[ -f "$out" ]] && ! _wi_trace_filter_is_our_hook "$out"; then
+  # The existence test must see every directory entry: -e alone misses a
+  # DANGLING symlink (-e follows the link), and a symlink is still the user's
+  # hook whether or not its target exists.
+  if [[ -e "$out" || -L "$out" ]] && ! _wi_trace_filter_is_our_hook "$out"; then
     wi_log_error "wi_trace_filter_install: refusing to overwrite existing commit-msg hook not installed by workspace-init: $out"
     return 1
   fi

@@ -7,6 +7,7 @@ source "$(dirname "$0")/_helpers.sh"
 source "$WI_LIB_DIR/_helpers.sh"
 source "$WI_LIB_DIR/manifest.sh"
 source "$WI_LIB_DIR/trace-filter.sh"
+source "$WI_LIB_DIR/rollback.sh"
 
 # ---------------------------------------------------------------------------
 # Shared fixture setup
@@ -639,13 +640,16 @@ test_M1_moved_workspace_repair_restores_filter() {
   "$WI_BIN" manifest_write "$ai" "$cn" work --default-branch main >/dev/null 2>&1 || return 1
   "$WI_BIN" trace_filter_install_pair "$ai" "$cn" 2>/dev/null || return 1
   mv "$ai" "$moved"
-  # Moved workspace → manifest missing → fail CLOSED with the manifest error.
+  # Moved workspace → baked path unreachable → fail CLOSED, naming the path
+  # (the new contract: the unreachable path is named, not a JSON error).
   git -C "$cn" -c user.email=t@t -c user.name=t commit -q --allow-empty \
       -m $'x\n\nCo-Authored-By: Bot <bot@x>' 2>"$d/moved-err"
   local rc=$?
   [[ "$rc" -ne 0 ]] || { echo "    trailer commit allowed after workspace move"; return 1; }
-  grep -q 'manifest not found' "$d/moved-err" || {
-    echo "    expected the manifest-missing failure"; cat "$d/moved-err"; return 1; }
+  grep -q 'unreachable' "$d/moved-err" || {
+    echo "    expected the unreachable-path failure"; cat "$d/moved-err"; return 1; }
+  grep -qF "$ai" "$d/moved-err" || {
+    echo "    failure does not name the stale path"; cat "$d/moved-err"; return 1; }
   # The named repair re-bakes both hooks against the moved workspace.
   "$WI_BIN" trace_filter_install_pair "$moved" "$cn" 2>/dev/null || {
     echo "    repair (trace_filter_install_pair) failed"; return 1; }
@@ -664,6 +668,278 @@ test_M1_moved_workspace_repair_restores_filter() {
   # And the AI-workspace-side hook was re-baked too (pair form).
   grep -qF "$moved" "$cn/.git/hooks/commit-msg" || {
     echo "    canonical hook not re-baked to the moved path"; return 1; }
+}
+
+# ---------------------------------------------------------------------------
+# Manifest must be exactly ONE JSON object (round-1 RB1/CB2) — 4 tests
+#
+# `jq empty` accepts a stream: 0-byte files, whitespace-only files, and
+# concatenated documents all exit 0, and a top-level array parses fine too.
+# Each is a corrupt manifest — the hook must fail closed naming the manifest.
+# ---------------------------------------------------------------------------
+
+# Corrupt the fixture manifest with $1's exact bytes, render, run a trailer
+# commit-msg, assert the block came from the manifest policy (not the pattern).
+_assert_single_object_block() {
+  local content="$1" desc="$2"
+  local d; d="$(_make_fixture)"
+  printf '%s' "$content" > "$d/foo-ai/.workspace/pairing.json"
+  local hook; hook="$(_render_hook "$d")"
+  local msg; msg="$(_write_msg "$d" $'fix: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n')"
+  local rc; rc="$(_run_hook "$hook" "$msg" "$d")"
+  assert_eq "1" "$rc" "$desc: must fail closed (exit 1)" || return 1
+  grep -q 'single JSON object' "$d/stderr" || {
+    echo "    $desc: expected the single-JSON-object manifest error"
+    echo "    got: $(cat "$d/stderr")"; return 1; }
+}
+
+test_O1_empty_manifest_blocks()            { _assert_single_object_block "" "0-byte manifest"; }
+test_O2_whitespace_only_manifest_blocks()  { _assert_single_object_block $'  \n\t \n' "whitespace-only manifest"; }
+test_O3_concatenated_documents_block()     { _assert_single_object_block '{"a":1}
+{"b":2}' "two concatenated JSON documents"; }
+test_O4_top_level_array_manifest_blocks()  { _assert_single_object_block '[1,2,3]' "top-level JSON array"; }
+
+# ---------------------------------------------------------------------------
+# Error status is never read as "no match" (round-1 CB1) — 3 tests
+#
+# `grep -qE` exits 2 on an invalid ERE — that is a policy evaluation failure,
+# not "the trailer was absent". A non-string element in blocked_patterns is
+# the same class: the filter cannot apply it, so it must not silently pass.
+# ---------------------------------------------------------------------------
+
+test_F7_invalid_ere_blocks_without_trailer() {
+  local d; d="$(_make_fixture)"
+  local manifest="$d/foo-ai/.workspace/pairing.json" tmp; tmp="$(mktemp)"
+  jq '.git_policy.trace_filter.blocked_patterns = ["("]' "$manifest" > "$tmp" && mv "$tmp" "$manifest"
+  local hook; hook="$(_render_hook "$d")"
+  local msg; msg="$(_write_msg "$d" $'fix: perfectly clean subject\n')"
+  local rc; rc="$(_run_hook "$hook" "$msg" "$d")"
+  assert_eq "1" "$rc" "invalid ERE must fail closed even on a clean message" || return 1
+  # The message must name the unevaluatable pattern on one line — a bare grep
+  # for '(' passes vacuously on the '(not recommended)' boilerplate.
+  grep -qE 'regex.*\(' "$d/stderr" || {
+    echo "    expected stderr to name the bad pattern"
+    echo "    got: $(cat "$d/stderr")"; return 1; }
+}
+
+test_F8_invalid_ere_blocks_with_trailer() {
+  local d; d="$(_make_fixture)"
+  local manifest="$d/foo-ai/.workspace/pairing.json" tmp; tmp="$(mktemp)"
+  jq '.git_policy.trace_filter.blocked_patterns = ["(", "^Co-Authored-By:"]' "$manifest" > "$tmp" && mv "$tmp" "$manifest"
+  local hook; hook="$(_render_hook "$d")"
+  local msg; msg="$(_write_msg "$d" $'fix: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n')"
+  local rc; rc="$(_run_hook "$hook" "$msg" "$d")"
+  assert_eq "1" "$rc" || return 1
+  # The block must identify the unevaluatable pattern, not merely report the
+  # trailer match — otherwise a broken policy masquerades as a working filter.
+  grep -qE 'regex.*\(' "$d/stderr" || {
+    echo "    expected stderr to name the invalid pattern"
+    echo "    got: $(cat "$d/stderr")"; return 1; }
+}
+
+test_F9_non_string_pattern_blocks() {
+  local d; d="$(_make_fixture)"
+  local manifest="$d/foo-ai/.workspace/pairing.json" tmp; tmp="$(mktemp)"
+  jq '.git_policy.trace_filter.blocked_patterns = [42]' "$manifest" > "$tmp" && mv "$tmp" "$manifest"
+  local hook; hook="$(_render_hook "$d")"
+  local msg; msg="$(_write_msg "$d" $'fix: clean\n')"
+  local rc; rc="$(_run_hook "$hook" "$msg" "$d")"
+  assert_eq "1" "$rc" "a non-string blocked_patterns element must fail closed" || return 1
+}
+
+# ---------------------------------------------------------------------------
+# Every block names a repair that fixes THAT condition (round-1 H class) —
+# 6 tests
+# ---------------------------------------------------------------------------
+
+test_H1_missing_jq_blocks_naming_jq() {
+  # jq absent from PATH is an environment failure, not "manifest is not valid
+  # JSON" — the message must say so. Run the rendered hook under a PATH that
+  # has bash but no jq.
+  local d; d="$(_make_fixture)"
+  local hook; hook="$(_render_hook "$d")"
+  local fakebin="$d/fakebin"; mkdir -p "$fakebin"
+  ln -s "$(command -v bash)" "$fakebin/bash"
+  ln -s "$(command -v env)" "$fakebin/env" 2>/dev/null || true
+  local msg; msg="$(_write_msg "$d" $'fix: x\n\nCo-Authored-By: Bot <bot@x>\n')"
+  PATH="$fakebin" "$hook" "$msg" 2>"$d/stderr"
+  local rc=$?
+  assert_eq "1" "$rc" "missing jq must fail closed" || return 1
+  grep -q 'jq' "$d/stderr" || {
+    echo "    expected stderr to name jq as the missing tool"
+    echo "    got: $(cat "$d/stderr")"; return 1; }
+  ! grep -q 'valid JSON' "$d/stderr" || {
+    echo "    jq absence must not be reported as manifest corruption"
+    echo "    got: $(cat "$d/stderr")"; return 1; }
+}
+
+test_H2_relative_path_repair_restores_filter() {
+  # The repair must work as a human types it — relative paths included (CB6).
+  local d; d="$(wi_tmpdir)"
+  local ai="$d/proj-ai" moved="$d/proj-ai-MOVED" cn="$d/proj"
+  mkdir -p "$ai" "$cn"
+  git -C "$ai" init -q 2>/dev/null; git -C "$cn" init -q 2>/dev/null
+  "$WI_BIN" manifest_write "$ai" "$cn" work --default-branch main >/dev/null 2>&1 || return 1
+  "$WI_BIN" trace_filter_install_pair "$ai" "$cn" 2>/dev/null || return 1
+  mv "$ai" "$moved"
+  # Repair exactly as a human standing in the parent dir would type it, using
+  # the wi path baked into the installed hook (what the repair hint prints).
+  local baked_wi
+  baked_wi="$(eval "$(grep -m1 '^WI_BIN=' "$cn/.git/hooks/commit-msg")"; printf '%s' "$WI_BIN")"
+  [[ -x "$baked_wi" ]] || { echo "    baked WI_BIN is not executable: $baked_wi"; return 1; }
+  ( cd "$d" && "$baked_wi" trace_filter_install_pair "proj-ai-MOVED" "proj" ) 2>/dev/null || {
+    echo "    relative-path repair failed"; return 1; }
+  git -C "$cn" -c user.email=t@t -c user.name=t commit -q --allow-empty \
+      -m $'y\n\nCo-Authored-By: Bot <bot@x>' 2>"$d/after-err"
+  local rc=$?
+  [[ "$rc" -ne 0 ]] || { echo "    trailer commit allowed after relative-path repair"; return 1; }
+  grep -q 'blocked AI-trace pattern' "$d/after-err" || {
+    echo "    post-repair block is not the filter's (relative path was baked un-resolved)"
+    cat "$d/after-err"; return 1; }
+  git -C "$cn" -c user.email=t@t -c user.name=t commit -q --allow-empty \
+      -m 'clean' 2>"$d/clean-err"
+  rc=$?
+  [[ "$rc" -eq 0 ]] || { echo "    clean commit blocked after repair"; cat "$d/clean-err"; return 1; }
+}
+
+test_H3_hint_names_main_worktree_not_linked() {
+  # Commits from a linked worktree share this hook; the repair must name the
+  # MAIN worktree root — the only path wi_trace_filter_install accepts (RB5).
+  local d; d="$(wi_tmpdir)"; mkdir -p "$d"
+  # Names chosen so none is a substring of another: a bare grep -F for the
+  # canonical root cannot be satisfied by the AI path or the worktree path.
+  local ai="$d/ai-side" cn="$d/canonical-repo" wt="$d/worktree-linked"
+  mkdir -p "$ai" "$cn"
+  git -C "$ai" init -q 2>/dev/null; git -C "$cn" init -q 2>/dev/null
+  "$WI_BIN" manifest_write "$ai" "$cn" work --default-branch main >/dev/null 2>&1 || return 1
+  "$WI_BIN" trace_filter_install_pair "$ai" "$cn" 2>/dev/null || return 1
+  git -C "$cn" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init 2>/dev/null
+  git -C "$cn" worktree add -q -b wt2 "$wt" 2>/dev/null || {
+    echo "    could not create linked worktree"; return 1; }
+  # Break the manifest path so the hook blocks and prints the hint.
+  mv "$ai" "$d/ai-side-elsewhere"
+  git -C "$wt" -c user.email=t@t -c user.name=t commit -q --allow-empty \
+      -m $'x\n\nCo-Authored-By: Bot <bot@x>' 2>"$d/wt-err"
+  local rc=$?
+  [[ "$rc" -ne 0 ]] || { echo "    trailer commit allowed from linked worktree"; return 1; }
+  grep -qF "<new-ai-root> $cn" "$d/wt-err" || {
+    echo "    hint's repair lines do not name the main worktree $cn"
+    cat "$d/wt-err"; return 1; }
+  ! grep -qF "$wt" "$d/wt-err" || {
+    echo "    hint names the linked worktree — install rejects that path"
+    cat "$d/wt-err"; return 1; }
+}
+
+test_H4_manifest_repair_verb_rewrites_manifest() {
+  # A corrupt-manifest block must name a repair that actually rewrites
+  # pairing.json — the hook re-bake verbs cannot fix a bad manifest (CB4).
+  local d; d="$(_make_fixture)"
+  echo '{ not json' > "$d/foo-ai/.workspace/pairing.json"
+  local hook; hook="$(_render_hook "$d")"
+  local msg; msg="$(_write_msg "$d" $'x\n\nCo-Authored-By: Bot <bot@x>\n')"
+  local rc; rc="$(_run_hook "$hook" "$msg" "$d")"
+  assert_eq "1" "$rc" || return 1
+  grep -q 'manifest_write' "$d/stderr" || {
+    echo "    corrupt-manifest block does not name manifest_write"
+    cat "$d/stderr"; return 1; }
+  # Prove the named repair end to end: rewrite the manifest, re-bake the hook,
+  # then the pattern (not the manifest error) is what blocks the next trailer.
+  local ai="$d/foo-ai" cn="$d/foo"
+  git -C "$cn" init -q 2>/dev/null
+  "$WI_BIN" manifest_write "$ai" "$cn" work --default-branch main >/dev/null 2>&1 || {
+    echo "    named repair (manifest_write) failed"; return 1; }
+  "$WI_BIN" trace_filter_install "$ai" "$cn" 2>/dev/null || {
+    echo "    hook install after manifest repair failed"; return 1; }
+  git -C "$cn" -c user.email=t@t -c user.name=t commit -q --allow-empty \
+      -m $'z\n\nCo-Authored-By: Bot <bot@x>' 2>"$d/after-err"
+  rc=$?
+  [[ "$rc" -ne 0 ]] || { echo "    trailer allowed after manifest repair"; return 1; }
+  grep -q 'blocked AI-trace pattern' "$d/after-err" || {
+    echo "    post-repair block is not the pattern match"; cat "$d/after-err"; return 1; }
+}
+
+test_H5_pair_repair_updates_canonical_despite_foreign_ai_hook() {
+  # CB5: when the AI workspace carries a foreign commit-msg hook, the pair
+  # repair must still fix the load-bearing canonical hook — and still report
+  # the refusal (non-zero exit).
+  local d; d="$(wi_tmpdir)"; mkdir -p "$d"
+  local ai="$d/proj-ai" moved="$d/proj-ai-MOVED" cn="$d/proj"
+  mkdir -p "$ai" "$cn"
+  git -C "$ai" init -q 2>/dev/null; git -C "$cn" init -q 2>/dev/null
+  "$WI_BIN" manifest_write "$ai" "$cn" work --default-branch main >/dev/null 2>&1 || return 1
+  "$WI_BIN" trace_filter_install_pair "$ai" "$cn" 2>/dev/null || return 1
+  mv "$ai" "$moved"
+  # The moved workspace now carries a FOREIGN commit-msg hook (user's own).
+  local fh="$moved/.git/hooks/commit-msg"
+  _write_foreign_hook "$fh"
+  cp "$fh" "$d/foreign.orig"
+  if "$WI_BIN" trace_filter_install_pair "$moved" "$cn" 2>"$d/pair-err"; then
+    echo "    pair repair must report the AI-side refusal (non-zero)"; return 1
+  fi
+  cmp -s "$d/foreign.orig" "$fh" || { echo "    foreign AI hook was destroyed"; return 1; }
+  # …but the canonical hook was still re-baked to the moved workspace.
+  grep -qF "$moved" "$cn/.git/hooks/commit-msg" || {
+    echo "    canonical hook was not re-baked to the moved path"; return 1; }
+  git -C "$cn" -c user.email=t@t -c user.name=t commit -q --allow-empty \
+      -m $'z\n\nCo-Authored-By: Bot <bot@x>' 2>"$d/after-err"
+  local rc=$?
+  [[ "$rc" -ne 0 ]] || { echo "    trailer allowed after pair repair"; return 1; }
+  grep -q 'blocked AI-trace pattern' "$d/after-err" || {
+    echo "    post-repair block is not the pattern match"; cat "$d/after-err"; return 1; }
+}
+
+test_H6_workspace_init_mentions_resolve_to_real_commands() {
+  # Every /workspace-init:<name> written in shipped files must name a command
+  # that exists — commands/<name>.md (CB8). A dead name is the original #481
+  # defect shape in prose form.
+  local mentions missing=0 m name
+  mentions="$(grep -rhoE '/workspace-init:[a-z0-9-]+' "$WI_PLUGIN_ROOT" \
+      --exclude-dir=tests 2>/dev/null | sort -u)"
+  while IFS= read -r m; do
+    [[ -z "$m" ]] && continue
+    name="${m#/workspace-init:}"
+    [[ -f "$WI_PLUGIN_ROOT/commands/$name.md" ]] || {
+      echo "    $m has no commands/$name.md"; missing=1; }
+  done <<< "$mentions"
+  [[ "$missing" -eq 0 ]]
+}
+
+# ---------------------------------------------------------------------------
+# Foreign-hook destruction edge cases (round-1 D class) — 2 tests
+# ---------------------------------------------------------------------------
+
+test_D1_dangling_symlink_hook_never_destroyed() {
+  # A dangling symlink is not a regular file (-f fails) but it is still the
+  # user's hook: install must refuse, and rollback must leave the link intact.
+  local d; d="$(wi_tmpdir)"; mkdir -p "$d"
+  local ai="$d/foo-ai" cn="$d/foo"
+  mkdir -p "$ai/.workspace" "$cn"
+  git -C "$cn" init -q 2>/dev/null
+  "$WI_BIN" manifest_write "$ai" "$cn" personal >/dev/null 2>&1 || return 1
+  ln -s "$d/nonexistent-target" "$cn/.git/hooks/commit-msg"
+  local want; want="$(readlink "$cn/.git/hooks/commit-msg")"
+  if "$WI_BIN" trace_filter_install "$ai" "$cn" 2>/dev/null; then
+    echo "    install overwrote a dangling foreign symlink"; return 1
+  fi
+  [[ "$(readlink "$cn/.git/hooks/commit-msg")" == "$want" ]] || {
+    echo "    dangling symlink changed by refused install"; return 1; }
+  # Rollback of a logged HOOK_INSTALL must not remove the link either (the
+  # HOOK_INSTALL inverse must see -L, not just -f).
+  local log="$ai/.workspace/init-log"
+  wi_log_op "$log" HOOK_INSTALL "$cn"
+  wi_rollback "$log" >/dev/null 2>&1
+  [[ -L "$cn/.git/hooks/commit-msg" ]] || {
+    echo "    rollback deleted the dangling symlink"; return 1; }
+  [[ "$(readlink "$cn/.git/hooks/commit-msg")" == "$want" ]] || {
+    echo "    rollback rewrote the dangling symlink"; return 1; }
+}
+
+test_D2_scenario_c_skill_documents_foreign_hook_refusal() {
+  # Scenario C pairs populated repos — a foreign commit-msg hook is likely.
+  # The skill must carry the refusal guidance as one contiguous line (RB4).
+  grep -qF 'the trace-filter install refuses rather than overwriting a hook it did not install' \
+      "$WI_PLUGIN_ROOT/skills/pairing-existing-dual/SKILL.md" || {
+    echo "    pairing-existing-dual does not document the foreign-hook refusal"; return 1; }
 }
 
 # ---------------------------------------------------------------------------
@@ -730,5 +1006,28 @@ wi_test_run test_SC9_placeholder_text_in_path
 # Named-repair contract + moved-workspace repair (#481)
 wi_test_run test_R1_hook_repair_names_existing_wi_verb
 wi_test_run test_M1_moved_workspace_repair_restores_filter
+
+# Single-JSON-object manifest policy (RB1, CB2)
+wi_test_run test_O1_empty_manifest_blocks
+wi_test_run test_O2_whitespace_only_manifest_blocks
+wi_test_run test_O3_concatenated_documents_block
+wi_test_run test_O4_top_level_array_manifest_blocks
+
+# Error status is never a pass (CB1)
+wi_test_run test_F7_invalid_ere_blocks_without_trailer
+wi_test_run test_F8_invalid_ere_blocks_with_trailer
+wi_test_run test_F9_non_string_pattern_blocks
+
+# Repairs that actually repair (RB2/RB3/RB5, CB4/CB5/CB6/CB8)
+wi_test_run test_H1_missing_jq_blocks_naming_jq
+wi_test_run test_H2_relative_path_repair_restores_filter
+wi_test_run test_H3_hint_names_main_worktree_not_linked
+wi_test_run test_H4_manifest_repair_verb_rewrites_manifest
+wi_test_run test_H5_pair_repair_updates_canonical_despite_foreign_ai_hook
+wi_test_run test_H6_workspace_init_mentions_resolve_to_real_commands
+
+# Foreign-hook destruction edges (CB3, RB4)
+wi_test_run test_D1_dangling_symlink_hook_never_destroyed
+wi_test_run test_D2_scenario_c_skill_documents_foreign_hook_refusal
 
 wi_test_summary
