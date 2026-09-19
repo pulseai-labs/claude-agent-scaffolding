@@ -296,6 +296,129 @@ after_sha="$(shasum -a 256 "$state_file" | awk '{print $1}')"
 assert_eq "state.json byte-identical after refused promote" "$before_sha" "$after_sha"
 printf '%s' "$promote_err" | grep -qF "$MISSING_FP"
 assert_eq "stderr names the missing fingerprint" "0" "$?"
+assert_file_missing "$(ac_data_dir)/state.lock"
+
+# ---------------------------------------------------------------------------
+# T12: an instinct-only fingerprint promotes through bin/arc (#483 R1).
+# Instinct candidates are surfaced by ac_promotion_instinct_signal from
+# recent_runs[].instinct_observations[] and never land in candidate_promotions[].
+# Schema: instinct_observations[] entries are bare fingerprint strings, so the
+# promoted principle's text is the observation itself.
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- T12: instinct-only fingerprint promotes via bin/arc (#483 R1) ---"
+setup_tmp_repo > /dev/null
+ac_state_init
+state_file="$(ac_state_path)"
+
+FP_INST="$(ac_promotion_fingerprint "instinct-surfaced challenge text")"
+for i in 1 2 3; do
+  "$TESTS_DIR/../bin/arc" state_append_run "inst-promo-$i" "close" '["claude"]' 1 0 "critiquing-spec" 100
+  jq --arg fp "$FP_INST" --arg rid "inst-promo-$i" \
+    '.recent_runs |= map(if .request_id == $rid then .instinct_observations = [$fp] else . end)' \
+    "$state_file" > "${state_file}.tmp" && mv "${state_file}.tmp" "$state_file"
+done
+
+"$TESTS_DIR/../bin/arc" promotion_promote "$FP_INST" instinct-recurrence
+assert_eq "instinct-only fingerprint promote rc=0" "0" "$?"
+inst_count="$(jq --arg fp "$FP_INST" '[.principle_promotions[] | select(.fingerprint == $fp)] | length' "$state_file")"
+assert_eq "instinct promote lands one principle_promotions entry" "1" "$inst_count"
+inst_text="$(jq -r --arg fp "$FP_INST" '.principle_promotions[] | select(.fingerprint == $fp) | .text' "$state_file")"
+assert_eq "promoted text is the instinct observation" "$FP_INST" "$inst_text"
+inst_basis="$(jq -r --arg fp "$FP_INST" '.principle_promotions[] | select(.fingerprint == $fp) | .promotion_basis' "$state_file")"
+assert_eq "instinct basis stamped" "instinct-recurrence" "$inst_basis"
+assert_file_missing "$(ac_data_dir)/state.lock"
+
+# ---------------------------------------------------------------------------
+# T13: every other promotable source through bin/arc (#483 R1 coverage)
+#   - vote-recurrence candidate: text comes from candidate_promotions[].texts[0]
+#   - already-promoted fingerprint: idempotent rc=0, still one entry
+#   - basis string is a pass-through (any basis the caller supplies is stamped)
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- T13: candidate-source + idempotent + basis pass-through via bin/arc ---"
+setup_tmp_repo > /dev/null
+ac_state_init
+state_file="$(ac_state_path)"
+
+FP_CAND="$(ac_promotion_fingerprint "voted challenge")"
+_seed_votes_for_fingerprint "$FP_CAND" 4
+"$TESTS_DIR/../bin/arc" promotion_promote "$FP_CAND" pattern-recurrence
+assert_eq "candidate fingerprint promote rc=0" "0" "$?"
+cand_text="$(jq -r --arg fp "$FP_CAND" '.principle_promotions[] | select(.fingerprint == $fp) | .text' "$state_file")"
+assert_eq "candidate promote takes text from texts[0]" "challenge-text-1" "$cand_text"
+cand_basis="$(jq -r --arg fp "$FP_CAND" '.principle_promotions[] | select(.fingerprint == $fp) | .promotion_basis' "$state_file")"
+assert_eq "candidate basis stamped" "pattern-recurrence" "$cand_basis"
+
+"$TESTS_DIR/../bin/arc" promotion_promote "$FP_CAND" pattern-recurrence
+assert_eq "re-promote through dispatcher rc=0" "0" "$?"
+cand_count="$(jq --arg fp "$FP_CAND" '[.principle_promotions[] | select(.fingerprint == $fp)] | length' "$state_file")"
+assert_eq "idempotent re-promote keeps one entry" "1" "$cand_count"
+
+FP_MAN="$(ac_promotion_fingerprint "manual basis challenge")"
+_seed_votes_for_fingerprint "$FP_MAN" 4
+"$TESTS_DIR/../bin/arc" promotion_promote "$FP_MAN" manual
+assert_eq "arbitrary basis promote rc=0" "0" "$?"
+man_basis="$(jq -r --arg fp "$FP_MAN" '.principle_promotions[] | select(.fingerprint == $fp) | .promotion_basis' "$state_file")"
+assert_eq "basis string passes through" "manual" "$man_basis"
+
+# ---------------------------------------------------------------------------
+# T14: state.json missing or corrupt names the STATE problem, not the
+# fingerprint (#483 R2) — jq exit >= 2 must not masquerade as "not found".
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- T14: missing/corrupt state.json diagnosis via bin/arc (#483 R2) ---"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+state_file="$(ac_state_path)"
+FP_STATE="$(ac_promotion_fingerprint "any challenge")"
+
+state_err="$("$TESTS_DIR/../bin/arc" promotion_promote "$FP_STATE" auto 2>&1 >/dev/null)"
+state_rc=$?
+[[ "$state_rc" -ne 0 ]]
+assert_eq "missing state.json promote exits non-zero" "0" "$?"
+printf '%s' "$state_err" | grep -q "state.json"
+assert_eq "missing state.json: stderr names the state file" "0" "$?"
+printf '%s' "$state_err" | grep -q "no candidate"
+assert_eq "missing state.json: no fingerprint misdiagnosis" "1" "$?"
+assert_file_missing "$(ac_data_dir)/state.lock"
+
+printf '{bad' > "$state_file"
+state_err="$("$TESTS_DIR/../bin/arc" promotion_promote "$FP_STATE" auto 2>&1 >/dev/null)"
+state_rc=$?
+[[ "$state_rc" -ne 0 ]]
+assert_eq "corrupt state.json promote exits non-zero" "0" "$?"
+printf '%s' "$state_err" | grep -q "state.json"
+assert_eq "corrupt state.json: stderr names the state file" "0" "$?"
+printf '%s' "$state_err" | grep -q "no candidate"
+assert_eq "corrupt state.json: no fingerprint misdiagnosis" "1" "$?"
+assert_file_missing "$(ac_data_dir)/state.lock"
+
+# ---------------------------------------------------------------------------
+# T15: two candidate entries sharing one fingerprint — the reviewer fixture
+# that made the old generator emit two documents (#483 C1 repro). With the
+# rewrite the first candidate wins: rc=0, one entry, lock released.
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- T15: duplicate-fingerprint candidates promote once (#483 C1) ---"
+setup_tmp_repo > /dev/null
+ac_state_init
+state_file="$(ac_state_path)"
+
+FP_DUP="$(ac_promotion_fingerprint "duplicated candidate")"
+jq --arg fp "$FP_DUP" '
+  .candidate_promotions += [
+    {fingerprint: $fp, first_seen_at: "t", last_seen_at: "t", vote_count: 4, appeared_in_runs: ["r1"], texts: ["dup text one"]},
+    {fingerprint: $fp, first_seen_at: "t", last_seen_at: "t", vote_count: 4, appeared_in_runs: ["r2"], texts: ["dup text two"]}
+  ]' "$state_file" > "${state_file}.tmp" && mv "${state_file}.tmp" "$state_file"
+
+"$TESTS_DIR/../bin/arc" promotion_promote "$FP_DUP" pattern-recurrence
+assert_eq "duplicate-fingerprint promote rc=0" "0" "$?"
+dup_count="$(jq --arg fp "$FP_DUP" '[.principle_promotions[] | select(.fingerprint == $fp)] | length' "$state_file")"
+assert_eq "duplicate candidates promote once" "1" "$dup_count"
+dup_text="$(jq -r --arg fp "$FP_DUP" '.principle_promotions[] | select(.fingerprint == $fp) | .text' "$state_file")"
+assert_eq "first candidate entry supplies the text" "dup text one" "$dup_text"
+assert_file_missing "$(ac_data_dir)/state.lock"
 
 # ---------------------------------------------------------------------------
 report_results

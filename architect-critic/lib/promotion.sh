@@ -217,10 +217,13 @@ ac_promotion_instinct_signal() {
 #
 # Idempotent move: if principle_promotions[] already contains an entry with
 # matching fingerprint, no-op. Else append a new principle_promotions[] entry
-# stamped with promotion_basis=<basis>. Text and scope are derived from the
-# candidate_promotions[] entry (text = first cached text; scope = "user" as
-# default — the skill body can override by writing directly via state.sh
-# helpers when it knows the right scope).
+# stamped with promotion_basis=<basis>. Text is taken from the source that
+# surfaced the fingerprint:
+#   - candidate_promotions[] (vote/pattern recurrence) → texts[0]
+#   - recent_runs[].instinct_observations[] (instinct recurrence) → the
+#     observation itself, which the schema stores as a bare fingerprint string
+# Scope defaults to "user" — the skill body can override by writing directly
+# via state.sh helpers when it knows the right scope.
 #
 # Note: this function does NOT remove the candidate_promotions[] entry —
 # that is left for a future garbage-collect (or implicit re-vote that won't
@@ -236,13 +239,30 @@ ac_promotion_promote() {
   now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
   ac_lock_acquire "$lock_path" || return 1
-  # A fingerprint present in neither list makes the jq program below emit zero
-  # documents — refuse up front with a message naming it (#451); the funnel's
-  # output check is the safety net, this precheck is the usable error.
-  if ! jq -e --arg fp "$fingerprint" '
+  # A fingerprint present in no promotable source is refused up front with a
+  # message naming it (#451); the funnel's output check is the safety net,
+  # this precheck is the usable error. The check must distinguish the two
+  # ways jq can fail (#483): exit 1 means the fingerprint is absent; exit >= 2
+  # means state.json itself is missing, unreadable, or corrupt — a state
+  # problem, reported with jq's own stderr, not a fingerprint miss.
+  local jq_stderr jq_rc
+  if jq_stderr="$(jq -e --arg fp "$fingerprint" '
       ([(.candidate_promotions // [])[] | select(.fingerprint == $fp)] | length) > 0
       or ([(.principle_promotions // [])[] | select(.fingerprint == $fp)] | length) > 0
-    ' "$state_file" >/dev/null 2>&1; then
+      or ([.recent_runs // [] | .[] | .instinct_observations // [] | .[] | select(. == $fp)] | length) > 0
+    ' "$state_file" 2>&1 >/dev/null)"; then
+    jq_rc=0
+  else
+    jq_rc=$?
+  fi
+  if [[ $jq_rc -ge 2 ]]; then
+    if [[ -n "$jq_stderr" ]]; then
+      printf '%s\n' "$jq_stderr" >&2
+    fi
+    ac_log_error "ac_promotion_promote: cannot read $state_file"
+    ac_lock_release "$lock_path"
+    return 1
+  elif [[ $jq_rc -ne 0 ]]; then
     ac_log_error "ac_promotion_promote: no candidate or existing promotion with fingerprint: $fingerprint"
     ac_lock_release "$lock_path"
     return 1
@@ -257,16 +277,28 @@ ac_promotion_promote() {
       .   # idempotent — already promoted
     else
       (.candidate_promotions // []) as $cands |
-      ($cands[] | select(.fingerprint == $fp)) as $cand |
-      ($cand.texts // [""])[0] as $text |
-      .principle_promotions = $promos + [{
-        timestamp: $now,
-        source: "auto",
-        text: $text,
-        scope: "user",
-        fingerprint: $fp,
-        promotion_basis: $basis
-      }]
+      (first($cands[] | select(.fingerprint == $fp)) // null) as $cand |
+      (if $cand != null then
+         ($cand.texts // [""])[0]
+       else
+         first(.recent_runs // [] | .[] | .instinct_observations // [] | .[]
+               | select(. == $fp)) // null
+       end) as $text |
+      if $text == null then
+        # Unreachable via this function — the precheck above has already
+        # confirmed the fingerprint under the same lock — but keeps the
+        # program from ever emitting a non-object on a miss.
+        error("ac_promotion_promote: fingerprint not found in any candidate source")
+      else
+        .principle_promotions = $promos + [{
+          timestamp: $now,
+          source: "auto",
+          text: $text,
+          scope: "user",
+          fingerprint: $fp,
+          promotion_basis: $basis
+        }]
+      end
     end
     ' \
     "$state_file"

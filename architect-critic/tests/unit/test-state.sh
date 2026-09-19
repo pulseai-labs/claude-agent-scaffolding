@@ -388,4 +388,49 @@ after_sha="$(shasum -a 256 "$state_file" | awk '{print $1}')"
 assert_eq "unparseable file byte-identical after refusal" "$before_sha" "$after_sha"
 
 # ---------------------------------------------------------------------------
+# T20: a funnel refusal while state.lock is held must release it (#483 C1).
+# Under bin/arc's `set -euo pipefail`, a failing funnel call aborts the
+# dispatcher before the caller's ac_lock_release runs — unless the funnel
+# itself releases the lock it was invoked under. Both refusal branches are
+# exercised through real locked callers:
+#   (a) shape refusal — state_write_field with a jq path that emits two
+#       documents
+#   (b) jq failure — state_add_suppression with an unparseable --argjson
+# In both cases: rc != 0, state.json byte-identical, no state.lock left, and
+# the next write succeeds immediately (not after the 5s acquire timeout).
+# ---------------------------------------------------------------------------
+echo "T20: funnel refusal under lock leaves no state.lock"
+setup_tmp_repo > /dev/null
+ac_state_init
+state_file="$(ac_state_path)"
+lock_file="$(ac_data_dir)/state.lock"
+
+t20_before="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+"$TESTS_DIR/../bin/arc" state_write_field '.a, .b' '1' 2>/dev/null
+T20_RC=$?
+[[ "$T20_RC" -ne 0 ]]
+assert_eq "multi-doc funnel refusal exits non-zero" "0" "$?"
+t20_after="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+assert_eq "state.json byte-identical after locked refusal" "$t20_before" "$t20_after"
+assert_file_missing "$lock_file"
+
+SECONDS=0
+"$TESTS_DIR/../bin/arc" state_append_run "post-refusal-a" "close" '["claude"]' 1 0 "critiquing-spec" 10
+assert_eq "next write succeeds after shape refusal" "0" "$?"
+[[ $SECONDS -lt 4 ]]
+assert_eq "no 5s lock stall after shape refusal" "0" "$?"
+
+"$TESTS_DIR/../bin/arc" state_add_suppression "deadbeef1234" "notanint" 2>/dev/null
+T20_RC=$?
+[[ "$T20_RC" -ne 0 ]]
+assert_eq "jq-fail funnel refusal exits non-zero" "0" "$?"
+assert_file_missing "$lock_file"
+
+SECONDS=0
+"$TESTS_DIR/../bin/arc" state_append_run "post-refusal-b" "close" '["claude"]' 1 0 "critiquing-spec" 10
+assert_eq "next write succeeds after jq-fail refusal" "0" "$?"
+[[ $SECONDS -lt 4 ]]
+assert_eq "no 5s lock stall after jq-fail refusal" "0" "$?"
+
+# ---------------------------------------------------------------------------
 report_results
