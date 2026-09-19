@@ -244,34 +244,36 @@ ac_promotion_promote() {
   # principle_promotions[] entry), "instinct-only" (present solely as a bare
   # fingerprint string in recent_runs[].instinct_observations[] — promotable
   # in principle but the observation carries no principle text, so it is
-  # refused rather than written with a hash as text), or absent entirely.
-  # jq -e exit codes keep the cases apart: rc 0 carries the classification;
-  # rc 1 (false) means the fingerprint is unknown — refused with a message
-  # naming it (#451); rc >= 2 means state.json itself is missing, unreadable,
-  # or corrupt — a state problem reported with jq's own stderr, not a
-  # fingerprint miss (#483 R2). The funnel's output check remains the safety
-  # net; this precheck is the usable error.
+  # refused rather than written with a hash as text), or "absent" entirely.
+  # The classification is the program's output VALUE, never its exit status:
+  # `jq -e`'s rc-1-vs-rc-2+ split is not portable (jq 1.7 vs 1.8 differ, and
+  # `EXPR > 0 as $x` itself parses differently across those versions — the
+  # comparisons must be parenthesized). Any non-zero exit here means
+  # state.json itself is missing, unreadable, or corrupt — a state problem
+  # reported with jq's own stderr, not a fingerprint miss (#451, #483 R2).
+  # The funnel's output check remains the safety net; this precheck is the
+  # usable error.
   local kind_out kind_rc
-  if kind_out="$(jq -e -r --arg fp "$fingerprint" '
-      ([(.candidate_promotions // [])[] | select(.fingerprint == $fp)] | length) > 0 as $cand |
-      ([(.principle_promotions // [])[] | select(.fingerprint == $fp)] | length) > 0 as $promo |
-      ([.recent_runs // [] | .[] | .instinct_observations // [] | .[] | select(. == $fp)] | length) > 0 as $inst |
+  if kind_out="$(jq -r --arg fp "$fingerprint" '
+      (([(.candidate_promotions // [])[] | select(.fingerprint == $fp)] | length) > 0) as $cand |
+      (([(.principle_promotions // [])[] | select(.fingerprint == $fp)] | length) > 0) as $promo |
+      (([.recent_runs // [] | .[] | .instinct_observations // [] | .[] | select(. == $fp)] | length) > 0) as $inst |
       if $cand or $promo then "promotable"
       elif $inst then "instinct-only"
-      else false end
+      else "absent" end
     ' "$state_file" 2>&1)"; then
     kind_rc=0
   else
     kind_rc=$?
   fi
-  if [[ $kind_rc -ge 2 ]]; then
+  if [[ $kind_rc -ne 0 ]]; then
     if [[ -n "$kind_out" ]]; then
       printf '%s\n' "$kind_out" >&2
     fi
     ac_log_error "ac_promotion_promote: cannot read $state_file"
     ac_lock_release "$lock_path"
     return 1
-  elif [[ $kind_rc -ne 0 ]]; then
+  elif [[ "$kind_out" == "absent" ]]; then
     ac_log_error "ac_promotion_promote: no candidate or existing promotion with fingerprint: $fingerprint"
     ac_lock_release "$lock_path"
     return 1
