@@ -337,4 +337,192 @@ expected_expires_90="$(_ac_date_add_days "$sup_at_90" 90)"
 assert_eq "expires_at = suppressed_at + 90d for reason_score=5" "$expected_expires_90" "$exp_at_90"
 
 # ---------------------------------------------------------------------------
+# T17: ac_state_init re-seeds a 0-byte state.json (#451)
+# A guarded write that emptied state.json must be recoverable — a zero-byte
+# file holds nothing to lose, so init re-seeds it with a warning.
+# ---------------------------------------------------------------------------
+echo "T17: ac_state_init re-seeds a 0-byte state.json"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+state_file="$(ac_state_path)"
+: > "$state_file"
+init_out="$("$TESTS_DIR/../bin/arc" state_init 2>&1)"
+init_rc=$?
+assert_eq "state_init on 0-byte file exits 0" "0" "$init_rc"
+reseeded_ver="$(jq -r '.schema_version' "$state_file")"
+assert_eq "re-seeded file is schema_version=3" "3" "$reseeded_ver"
+printf '%s' "$init_out" | grep -q "re-seed"
+assert_eq "re-seed warning emitted" "0" "$?"
+
+# ---------------------------------------------------------------------------
+# T18 (control): ac_state_init leaves a non-empty VALID state.json
+# byte-identical — the new branches must not disturb a healthy file.
+# ---------------------------------------------------------------------------
+echo "T18: ac_state_init on non-empty valid file is a byte-identical no-op"
+setup_tmp_repo > /dev/null
+ac_state_init
+state_file="$(ac_state_path)"
+jq '.schema_version = 99' "$state_file" > "${state_file}.tmp" && mv "${state_file}.tmp" "$state_file"
+before_sha="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+"$TESTS_DIR/../bin/arc" state_init >/dev/null 2>&1
+assert_eq "state_init rc=0 on valid file" "0" "$?"
+after_sha="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+assert_eq "valid file byte-identical after init" "$before_sha" "$after_sha"
+
+# ---------------------------------------------------------------------------
+# T19 (control): ac_state_init REFUSES a non-empty unparseable state.json —
+# re-seeding it would destroy data, so it must fail with rc != 0 and leave
+# the file byte-identical.
+# ---------------------------------------------------------------------------
+echo "T19: ac_state_init refuses a non-empty unparseable file"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+state_file="$(ac_state_path)"
+printf 'this is not json {{{\n' > "$state_file"
+before_sha="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+"$TESTS_DIR/../bin/arc" state_init >/dev/null 2>&1
+refuse_rc=$?
+[[ "$refuse_rc" -ne 0 ]]
+assert_eq "unparseable file refused (rc != 0)" "0" "$?"
+after_sha="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+assert_eq "unparseable file byte-identical after refusal" "$before_sha" "$after_sha"
+
+# ---------------------------------------------------------------------------
+# T20: a funnel refusal while state.lock is held must release it (#483 C1).
+# Under bin/arc's `set -euo pipefail`, a failing funnel call aborts the
+# dispatcher before the caller's ac_lock_release runs — unless the funnel
+# itself releases the lock it was invoked under. Both refusal branches are
+# exercised through real locked callers:
+#   (a) shape refusal — state_write_field with a jq path that emits two
+#       documents
+#   (b) jq failure — state_add_suppression with an unparseable --argjson
+# In both cases: rc != 0, state.json byte-identical, no state.lock left, and
+# the next write succeeds immediately (not after the 5s acquire timeout).
+# ---------------------------------------------------------------------------
+echo "T20: funnel refusal under lock leaves no state.lock"
+setup_tmp_repo > /dev/null
+ac_state_init
+state_file="$(ac_state_path)"
+lock_file="$(ac_data_dir)/state.lock"
+
+t20_before="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+"$TESTS_DIR/../bin/arc" state_write_field '.a, .b' '1' 2>/dev/null
+T20_RC=$?
+[[ "$T20_RC" -ne 0 ]]
+assert_eq "multi-doc funnel refusal exits non-zero" "0" "$?"
+t20_after="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+assert_eq "state.json byte-identical after locked refusal" "$t20_before" "$t20_after"
+assert_file_missing "$lock_file"
+
+SECONDS=0
+"$TESTS_DIR/../bin/arc" state_append_run "post-refusal-a" "close" '["claude"]' 1 0 "critiquing-spec" 10
+assert_eq "next write succeeds after shape refusal" "0" "$?"
+[[ $SECONDS -lt 4 ]]
+assert_eq "no 5s lock stall after shape refusal" "0" "$?"
+
+"$TESTS_DIR/../bin/arc" state_add_suppression "deadbeef1234" "notanint" 2>/dev/null
+T20_RC=$?
+[[ "$T20_RC" -ne 0 ]]
+assert_eq "jq-fail funnel refusal exits non-zero" "0" "$?"
+assert_file_missing "$lock_file"
+
+SECONDS=0
+"$TESTS_DIR/../bin/arc" state_append_run "post-refusal-b" "close" '["claude"]' 1 0 "critiquing-spec" 10
+assert_eq "next write succeeds after jq-fail refusal" "0" "$?"
+[[ $SECONDS -lt 4 ]]
+assert_eq "no 5s lock stall after jq-fail refusal" "0" "$?"
+
+# ---------------------------------------------------------------------------
+# T21: no code path may remove a state.lock this process does not hold
+# (#483 N1). Release is ownership-gated: the path must still be the lock we
+# acquired AND its content must still be our owner token.
+#   (a) a refusal inside an if-form caller, after which ac_lock_release runs —
+#       a lock file planted by "another owner" in the gap must survive. The gap
+#       is simulated by wrapping the funnel so it plants a foreign lock between
+#       the refusal and the caller's own release.
+#   (b) a second ac_lock_release after ours cleared is a no-op.
+#   (c) through bin/arc: a lock we never acquired survives an acquire-timeout
+#       refusal untouched.
+# ---------------------------------------------------------------------------
+echo "T21: lock release is ownership-gated (#483 N1)"
+setup_tmp_repo > /dev/null
+ac_state_init
+state_file="$(ac_state_path)"
+lock_file="$(ac_data_dir)/state.lock"
+printf '{bad' > "$state_file"   # corrupt: the funnel's jq fails inside the caller
+
+# (a) wrap ac_guarded_jq_write: run the real funnel, then plant a foreign lock
+#     at the path before the caller's ac_lock_release executes.
+eval "$(declare -f ac_guarded_jq_write | sed 's/^ac_guarded_jq_write ()/_ac_orig_guarded_write ()/')"
+ac_guarded_jq_write() {
+  _ac_orig_guarded_write "$@"
+  local rc=$?
+  if [[ $rc -ne 0 ]]; then
+    printf 'foreign-owner-token' > "$(ac_data_dir)/state.lock"
+  fi
+  return $rc
+}
+ac_state_append_run "gap-run" "close" '["claude"]' 1 0 "critiquing-spec" 10 2>/dev/null
+T21_RC=$?
+[[ "$T21_RC" -ne 0 ]]
+assert_eq "if-form caller refusal still exits non-zero" "0" "$?"
+[[ -f "$lock_file" && "$(cat "$lock_file")" == "foreign-owner-token" ]]
+assert_eq "foreign lock planted in the gap survives caller release" "0" "$?"
+source "$LIB_DIR/_helpers.sh"   # restore the unwrapped funnel
+rm -f "$lock_file"
+
+# (b) second release after ours cleared → no-op against a foreign file
+ac_lock_acquire "$lock_file"
+ac_lock_release "$lock_file"
+assert_file_missing "$lock_file"
+printf 'foreign-owner-token' > "$lock_file"
+ac_lock_release "$lock_file"   # we hold nothing — must not remove theirs
+[[ -f "$lock_file" && "$(cat "$lock_file")" == "foreign-owner-token" ]]
+assert_eq "second release is a no-op: foreign lock survives" "0" "$?"
+rm -f "$lock_file"
+
+# (c) a lock we never acquired survives an acquire-timeout through bin/arc
+printf 'foreign-owner-token' > "$lock_file"
+"$TESTS_DIR/../bin/arc" state_append_run "blocked-run" "close" '["claude"]' 1 0 "critiquing-spec" 10 2>/dev/null
+T21_RC=$?
+[[ "$T21_RC" -ne 0 ]]
+assert_eq "acquire-timeout exits non-zero" "0" "$?"
+[[ -f "$lock_file" && "$(cat "$lock_file")" == "foreign-owner-token" ]]
+assert_eq "foreign lock survives acquire-timeout" "0" "$?"
+rm -f "$lock_file"
+
+# ---------------------------------------------------------------------------
+# T22: an errexit inside a locked region that is NOT a funnel refusal still
+# releases the lock (#483 N1) — the acquire-side EXIT trap covers every exit
+# path, and only at subshell depth 0 so command substitutions cannot release
+# the parent's lock.
+#   (a) harness: set -e process acquires the lock then dies on `false` in the
+#       locked region → no state.lock left behind.
+#   (b) through bin/arc: `arc lock_acquire` returns rc=0 yet the lock is gone
+#       once the dispatcher process exits.
+# ---------------------------------------------------------------------------
+echo "T22: errexit inside a locked region releases the lock (#483 N1)"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+lock_file="$(ac_data_dir)/state.lock"
+arc_lib_dir="$(cd "$TESTS_DIR/../lib" && pwd)"
+
+bash -c '
+  set -euo pipefail
+  source "'"$arc_lib_dir"'/_helpers.sh"
+  source "'"$arc_lib_dir"'/state.sh"
+  ac_lock_acquire "'"$lock_file"'"
+  false
+  echo unreachable
+' 2>/dev/null
+T22_RC=$?
+[[ "$T22_RC" -ne 0 ]]
+assert_eq "errexit inside locked region exits non-zero" "0" "$?"
+assert_file_missing "$lock_file"
+
+"$TESTS_DIR/../bin/arc" lock_acquire "$lock_file"
+assert_eq "arc lock_acquire returns 0" "0" "$?"
+assert_file_missing "$lock_file"
+
+# ---------------------------------------------------------------------------
 report_results
