@@ -189,7 +189,7 @@ Don't run `/grill-me` and `/council` in the same session — different interacti
 ├── .devin/INSTALL.md                   # Devin install and support guide
 ├── .opencode/                          # OpenCode adapter, runtime, and install guide
 ├── package.json                        # OpenCode bundle package contract
-├── workspace-init/                    # workspace-init plugin (v0.5.0)
+├── workspace-init/                    # workspace-init plugin (v0.5.1)
 ├── ai-mentor/                         # ai-mentor plugin (v2.4.0)
 ├── scaffold-onboard/                  # scaffold-onboard plugin (v0.13.0)
 ├── scaffold-dev/                      # scaffold-dev plugin (v0.17.2)
