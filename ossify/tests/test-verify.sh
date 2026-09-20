@@ -235,4 +235,58 @@ t_assert_eq "1" "$?" "#460 control: a 200KB output with a real result is NOT fla
 bash "$OSSB" verify_step "$TMP" "cat $BIGCT" "output contains ABSENT-STRING" >/dev/null 2>&1
 t_assert_eq "1" "$?" "#460 control: a genuinely-absent string at 200KB still fails 'output contains'"
 
+# ===========================================================================
+# #402 - a zero-marker means vacuous only when the output carries NO
+# positive-execution marker. Aggregate multi-suite output mixes both: cargo's
+# empty Doc-tests target prints `running 0 tests` beside real passes, a
+# `go test ./...` filter miss prints `no tests to run` beside `--- PASS:`,
+# one empty pytest package prints `collected 0 items` beside another's run.
+# ===========================================================================
+cat > "$TMP/cargo-multi.out" <<'EOF'
+running 1 test
+test unit_works ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+running 1 test
+test it_integrates ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests probe402
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+EOF
+t_capture bash "$OSSB" zero_tests_guard "cargo test" < "$TMP/cargo-multi.out"
+t_assert_rc 1 "#402: cargo multi-target (2 passed + empty Doc-tests) is NOT vacuous"
+
+# The ONLY positive marker in this fixture is the `--- PASS:` line - the `ok`
+# package lines must NOT count (a filter-missed go package prints `ok` too).
+# That keeps this fixture sensitive to the `---`-led alternative itself.
+printf 'testing: warning: no tests to run\nPASS\nok\texample.com/empty\t0.002s\n--- PASS: TestReal (0.00s)\nPASS\nok\texample.com/real\t0.003s\n' > "$TMP/go-multi.out"
+t_capture bash "$OSSB" zero_tests_guard "go test" < "$TMP/go-multi.out"
+t_assert_rc 1 "#402: go ./... filter-miss beside a real PASS is NOT vacuous"
+
+printf 'collected 0 items\n\ncollected 4 items\n\n============ 4 passed in 0.02s ============\n' > "$TMP/pytest-multi.out"
+t_capture bash "$OSSB" zero_tests_guard "pytest a/ b/" < "$TMP/pytest-multi.out"
+t_assert_rc 1 "#402: pytest two-package run (0 collected + 4 passed) is NOT vacuous"
+
+# Negative controls: the suppression must not become a no-op. A single-target
+# all-zero cargo run flags; collection is not execution, so a second package
+# that collected-but-skipped everything still flags; and a FILE count is not
+# a TEST count - `Test Files  2 passed` must not mask the zero-marker.
+printf 'running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n' > "$TMP/cargo-zero.out"
+t_capture bash "$OSSB" zero_tests_guard "cargo test" < "$TMP/cargo-zero.out"
+t_assert_rc 0 "#402 control: a single-target all-zero cargo run still flags"
+
+printf 'collected 0 items\n\ncollected 4 items\n\n============ 4 skipped in 0.01s ============\n' > "$TMP/pytest-skip.out"
+t_capture bash "$OSSB" zero_tests_guard "pytest a/ b/" < "$TMP/pytest-skip.out"
+t_assert_rc 0 "#402 control: collected-but-all-skipped still flags"
+
+printf 'Test Files  2 passed (2)\ncollected 0 items\n' > "$TMP/filecount.out"
+t_capture bash "$OSSB" zero_tests_guard "pytest a/ b/" < "$TMP/filecount.out"
+t_assert_rc 0 "#402 control: a file-count line is not test-execution evidence"
+
 rm -rf "$TMP"; t_summary

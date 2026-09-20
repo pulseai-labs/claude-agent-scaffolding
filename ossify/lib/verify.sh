@@ -115,6 +115,19 @@ oss_verify_zero_tests_guard() { # $1=command ; output on STDIN
   local out; out="$(cat)"
   grep -Eq 'pytest|cargo test|npm test|npm run test|go test|jest|vitest|bash .*test|ctest|dotnet test' <<<"$1" || return 1
   grep -Eq 'collected 0 items|running 0 tests|0 passing|no tests to run|0 tests? ran|No tests found|testing: warning: no tests to run' <<<"$out" || return 1
+  # A zero-marker means vacuous only when the output carries NO marker of real
+  # execution - aggregate multi-suite output mixes both: cargo's empty
+  # Doc-tests target prints `running 0 tests` beside real passes, a
+  # `go test ./...` filter miss prints `no tests to run` beside `--- PASS:`,
+  # one empty pytest package prints `collected 0 items` beside another's run.
+  # The marker list is deliberately execution-shaped: `running [1-9]` and
+  # `collected [1-9]` announce intent/collection rather than a result, and a
+  # bare `ok` is ambiguous under go (a filter-missed package prints it too).
+  # File counts are not test counts - vitest/jest print `Test Files  1 passed`
+  # beside `Tests  0 passed` - so those summary lines are carved out of the
+  # positive scan or the zero-marker can never fire on that shape.
+  local scan; scan="$(grep -v -e 'Test Files' -e 'Test Suites' <<<"$out" || true)"
+  grep -Eq -e '--- (PASS|FAIL):|[1-9][0-9]* (passed|passing|failed)' <<<"$scan" && return 1
   return 0
 }
 
