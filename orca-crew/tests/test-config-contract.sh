@@ -93,4 +93,23 @@ else
   fail "config.md exists" "no such file"
 fi
 
+section "briefs carry their seat inline"
+BRIEFS_MD="$PLUGIN_ROOT/skills/orchestrate/references/briefs.md"
+brief_pin() {
+  needle="$1"; label="$2"; want="$3"
+  count="$(awk -v needle="$needle" '
+    { line = $0
+      while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
+    END { print n+0 }' "$BRIEFS_MD")"
+  if [ "$count" -eq "$want" ]; then pass "$label ($count)"
+  else fail "$label" "found $count, expected $want: $needle"; fi
+}
+# Five dispatched templates: planned implementer, fast implementer, reviewer,
+# verifier, fix round. The correction-request template is a send, not a launch,
+# so it carries no seat.
+brief_pin 'SEAT_COMMAND=' "every dispatched template names its seat's command" 5
+brief_pin 'SEAT_EXPECTED_MODEL=' "every dispatched template names its expected model" 5
+brief_pin 'SEAT_EFFORT=' "every dispatched template names its effort" 5
+brief_pin 'claude-glm' "no alias name survives in briefs.md" 0
+
 report
