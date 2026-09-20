@@ -91,13 +91,9 @@ REPO_ROOT=<abs path of this terminal's worktree>
 WORKPR_COMMAND=<the command this seat was launched with, from its machine entry>
 WORKPR_EXPECTED_MODEL=<model id the banner must show>
 WORKPR_EFFORT=<the effort this seat was launched at>
-REVIEWER_COMMAND=<exact launch command>
-REVIEWER_EXPECTED_MODEL=<model id the banner must show>
-REVIEWER_EFFORT=<exact launch argument>
+REVIEWER=<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
 REVIEW_LEVEL=<the /code-review level the top decided>
-PRFIX_COMMAND=<exact launch command>
-PRFIX_EXPECTED_MODEL=<model id the banner must show>
-PRFIX_EFFORT=<exact launch argument>
+PRFIX=<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
 PRIOR_REVIEW=<the prior dispatch's durable review record — ran, reviewed head,
 clean/findings state, summary, fix rounds run, ledger/comment refs — "none", or "covered">
 MERGE_EXECUTOR=<session|operator — the top's explicit assignment>
@@ -127,8 +123,8 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      findings still baseline the disposition. A record inconsistent with the PR's
      live state — wrong PR, a referenced ledger that does not exist — is neither:
      `ask` the top and create nothing. You did not open this PR.
-  3. Initial runs only: create the reviewer FIRST, from REVIEWER_COMMAND at
-     REVIEWER_EFFORT, confirm REVIEWER_EXPECTED_MODEL from its banner and
+  3. Initial runs only: create the reviewer FIRST from its REVIEWER row —
+     confirm the model as its row's `model_shows` says and from the
      first reply, and brief it to run `/code-review PR_NUMBER REVIEW_LEVEL`.
      Read the findings from its worker_done — it posts nothing; that body is
      the only copy. Validate it against the reviewer brief's schema —
@@ -152,8 +148,8 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      brief but **without the ossify replacement clause**, which would start a
      second merge loop inside this one; it works the fix list you give it,
      pushes, and returns `fixed in <sha>` per finding, never running work-pr or
-     asking a merge — created from PRFIX_COMMAND at PRFIX_EFFORT —
-     confirm PRFIX_EXPECTED_MODEL from its banner and first reply before the
+     asking a merge — created from its PRFIX row —
+     confirm its model as the row's `model_shows` says and from the first reply before the
      first fix task; a mismatch is a failed launch to ask about, never to work
      around. The delegated review ran once, on the head it was briefed with, and
      that seat is released after its worker_done validates. Each push moves the

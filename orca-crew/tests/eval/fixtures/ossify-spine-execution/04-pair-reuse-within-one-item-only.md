@@ -40,12 +40,12 @@ Round 1's other item, `r5.s2.w2`, has already closed and its pair was released.
 Your brief's SEATS block reads:
 
     SEATS — the operator-approved seats for this spine. Use them verbatim.
-    r5.s2.w1 implementer: claude --model claude-opus-5 --effort xhigh | model: claude-opus-5 | effort: xhigh
-    r5.s2.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high
-    r5.s2.w2 implementer: fast-coder | model: fast-v1 | effort: (agent default)
-    r5.s2.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high
-    r5.s2.w3 implementer: strong-coder --effort max | model: strong-v2 | effort: max
-    r5.s2.w3 verifier:    strong-coder --effort high | model: strong-v2 | effort: high
+    r5.s2.w1 implementer: claude --model claude-opus-5 --effort xhigh | model: claude-opus-5 | effort: xhigh | model_shows: banner | brief_delivery: inject
+    r5.s2.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r5.s2.w2 implementer: fast-coder | model: fast-v1 | effort: (agent default) | model_shows: banner | brief_delivery: inject
+    r5.s2.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r5.s2.w3 implementer: strong-coder --effort max | model: strong-v2 | effort: max | model_shows: banner | brief_delivery: inject
+    r5.s2.w3 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
 
 Round 2 holds only `r5.s2.w3`, which depends on both round-1 items.
 

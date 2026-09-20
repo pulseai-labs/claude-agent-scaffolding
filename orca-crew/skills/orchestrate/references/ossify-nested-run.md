@@ -44,8 +44,8 @@ close-the-Run step: the CLI exposes none.
    brief injected** (`ossify-execution.md` §3): every planned item has exactly
    one implementer row and one verifier row, and no row names an item the plan
    does not. A failure halts — ask, never substitute.
-   **Every item launch spends its SEATS row verbatim** — command, expected model
-   and effort. A seat the block does not list, or lists twice, halts that item
+   **Every item launch spends its SEATS row verbatim** — the whole resolved
+   profile. A seat the block does not list, or lists twice, halts that item
    and asks; you **never re-read the project file** or invent a value. When the
    top changes a seat, its reply carries the replacement rows, and those become
    the block.
@@ -54,7 +54,7 @@ close-the-Run step: the CLI exposes none.
 3. For each item, launch a **fresh implementer terminal** from its SEATS row's
    exact command — the verifier is not created yet; it has nothing to verify until
    step 5. Where a custom alias is required, create the terminal directly and
-   inject the Dispatch.
+   deliver the Dispatch as its row's `brief_delivery` says.
 4. Each implementer confirms its model, reads, and posts a detailed plan, then waits.
    Gather the round's plans into **one** ordered ask to you; return an independent
    approve-or-amend per item; reply on each original child id, before which no edit

@@ -23,10 +23,10 @@ You are now at round 2, about to create the implementer terminal for
 Your brief's SEATS block reads:
 
     SEATS — the operator-approved seats for this spine. Use them verbatim.
-    r9.s2.w1 implementer: strong-coder --effort high | model: strong-v2 | effort: high
-    r9.s2.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high
-    r9.s2.w2 implementer: fast-coder | model: fast-v1 | effort: (agent default)
-    r9.s2.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high
+    r9.s2.w1 implementer: strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r9.s2.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r9.s2.w2 implementer: fast-coder | model: fast-v1 | effort: (agent default) | model_shows: banner | brief_delivery: inject
+    r9.s2.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
 
 While round 1 ran, the operator edited `.orca-crew/roles.md` in the checkout —
 you can see the file's mtime moved and the section for `r9.s2` now names a

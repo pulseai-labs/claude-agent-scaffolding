@@ -9,7 +9,8 @@ expected_reason: 'THE DISCRIMINATING FIXTURE for this surface. Each item gets it
   is NOT created at round launch, because it has nothing to verify until that items
   complete return and fingerprint exist; it is created and dispatched later, from
   its own row command. Both terminals live in the child Run and the two items may
-  run concurrently. The model is confirmed from the launch banner and the first reply;
+  run concurrently. The model is confirmed as each row's `model_shows` says —
+  the banner here — and from the first reply;
   the effort is the launch argument, with no runtime attestation. The wrong answers
   this fixture falsifies are: dispatching one lane-driver session that spawns per-item
   subagents through the Agent tool (which is what the pre-change contract prescribed);
@@ -28,10 +29,10 @@ them independent within the round.
 Your brief's SEATS block reads:
 
     SEATS — the operator-approved seats for this spine. Use them verbatim.
-    r5.s2.w1 implementer: claude --model claude-opus-5 --effort xhigh | model: claude-opus-5 | effort: xhigh
-    r5.s2.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high
-    r5.s2.w2 implementer: fast-coder | model: fast-v1 | effort: (agent default)
-    r5.s2.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high
+    r5.s2.w1 implementer: claude --model claude-opus-5 --effort xhigh | model: claude-opus-5 | effort: xhigh | model_shows: banner | brief_delivery: inject
+    r5.s2.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r5.s2.w2 implementer: fast-coder | model: fast-v1 | effort: (agent default) | model_shows: banner | brief_delivery: inject
+    r5.s2.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
 
 You checked the block against `SPINE.md` at step 1: both items have exactly
 one implementer row and one verifier row, and no row names an item the plan does

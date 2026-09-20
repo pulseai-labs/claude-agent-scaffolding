@@ -302,6 +302,49 @@ pin "$NESTED_MD" 'its reply carries the replacement rows' \
 pin "$NESTED_MD" 'never re-read the project file' \
   "the spine session does not re-open the project file mid-run"
 
+section "the resolved profile is one contract, stated once"
+
+# Round 2, findings 1-5: a resolved profile carries all five launch fields
+# wherever it travels — config.md defines the row once and every carrier
+# conforms rather than restating a field list that can drift.
+ROW='model_shows: <banner|screen> | brief_delivery: <inject|file>'
+pin "$CONFIG_MD" "$ROW" "config.md defines the resolved-profile row"
+n_eq() { c="$(occurrences "$1" "$2")"; if [ "$c" -eq "$3" ]; then pass "$4 ($c)"; else fail "$4" "found $c, expected $3"; fi; }
+n_eq "$BRIEFS_MD" "$ROW" 2 "the SEATS rows carry the full resolved profile"
+n_eq "$PRBRIEFS_MD" "$ROW" 2 "the work-PR launched profiles carry the full resolved profile"
+# Any profile carrier anywhere is complete — no partial rows, and no partial
+# enumerations either: prose listing "command, expected model …" without the
+# delivery fields is the same defect in a sentence. The sweep runs over every
+# shipped surface and the evals, so a seventh site cannot land.
+for f in "$REF"/*.md "$SKILL_MD" "$PLUGIN_README_MD" "$COMMAND_MD" \
+         "$PLUGIN_ROOT"/tests/eval/fixtures/ossify-spine-execution/*.md \
+         "$EVAL_RUBRIC_MD"; do
+  n=$(awk 'index($0, "| model:") > 0 && index($0, "brief_delivery") == 0' "$f" | wc -l | tr -d ' ')
+  m=$(awk 'index($0, "command, expected model") + index($0, "expected model and effort") > 0 && index($0, "brief-delivery") + index($0, "brief_delivery") == 0' "$f" | wc -l | tr -d ' ')
+  if [ "$n" -eq 0 ] && [ "$m" -eq 0 ]; then pass "no partial profile carrier in ${f##*/}"
+  else fail "no partial profile carrier in ${f##*/}" "$n partial row(s), $m partial enumeration(s)"; fi
+done
+# The handoff persists the coordinator profiles beside the item rows — a
+# resumed top launches them all without a fresh read.
+pin "$EXEC_MD" 'resolved coordinator profiles' \
+  "the handoff persists the coordinator profiles beside the item rows"
+pin "$LIFECYCLE_MD" 'resolved coordinator' \
+  "lifecycle's handoff persists the coordinator profiles"
+# can: is a per-role approval check, not a reviewer-only one.
+pin "$CONFIG_MD" 'a role whose shipped or declared brief invokes a slash command' \
+  "the can: requirement is per role, checked at approval"
+pin "$CONFIG_MD" '/ossify:run-spine' \
+  "the capability table names the spine session's command"
+# The effort cell names a seat choice, never a runtime override.
+pin "$ROLES_MD" 'the machine entry is the only source of effort' \
+  "a marked item is a seat choice, not a command edit"
+# The close-review writer is a halt-time profile, not a project-file seat.
+pin "$CONFIG_MD" 'close session, work-PR session)' \
+  "the writer is not a project-file seat"
+# All three missing-file states are stated, not inferred.
+pin "$CONFIG_MD" 'Machine file only' "the machine-only state is stated"
+pin "$CONFIG_MD" 'Project file only' "the project-only state is stated"
+
 section "the handoff carries the approved seats"
 
 # R2-1/R2-3, re-expressed: the child is never the source of its own seats — the
@@ -367,7 +410,7 @@ section "the PR lane runs the review before the command that consumes it"
 # result shape, and the full signal set a disposition covers.
 pin "$PRBRIEFS_MD" 'carrying those findings in as its disposition inputs' \
   "the reviewer runs before work-pr, whose disposition takes its findings"
-pin "$PRBRIEFS_MD" 'confirm PRFIX_EXPECTED_MODEL from its banner' \
+pin "$PRBRIEFS_MD" 'its model as the row'"'"'s `model_shows` says and from the first reply' \
   "the PR-fix seat's ratified model is spent, not merely injected"
 pin "$PRBRIEFS_MD" 'halted: <step>' \
   "the close brief has a third result shape for a halt before any PR opens"

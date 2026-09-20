@@ -77,11 +77,11 @@ run takes three layers instead of one dispatched lane driver:
 2. The **spine session** runs the ossify lane in external-executor mode and creates a
    child Run of its own, which keeps item plan traffic and item completions out of the
    parent inbox. It launches and supervises both terminals for each item.
-3. Each **work item** gets a fresh implementer terminal and a fresh verifier terminal at
-   its exact approved command, model and effort. A pair is retained across that item's
+3. Each **work item** gets a fresh implementer terminal and a fresh verifier terminal
+   from its approved SEATS row, verbatim. A pair is retained across that item's
    corrections and never crosses work items.
 
-SEATS rows vary only the command, the expected model, and the effort. The
+SEATS rows carry each seat's resolved profile (`config.md`). The
 implementation-plan gate, the implementer entry point (`/ossify:work-item`) and the
 verifier procedure are fixed. There is no reviewer row and no whole-spine seat: the
 reviewer is chosen when the spine's PR reaches review, because before that there is no
@@ -97,7 +97,7 @@ Outside an activated spine, the role table, complexity-class routing and retenti
 are unchanged.
 
 **0.4.0 amends the seats, not the activation.** The approved set gains the spine
-session's own seat — command, expected model, effort, reason — approved with the
+session's own seat — its resolved profile and reason — approved with the
 item seats and halting on its absence (D24), and every item launch spends its own
 row verbatim rather than re-reading the file (D28). The first verifier failure no
 longer resolves itself: it sends one blocking `ask` carrying the verifier's summary and

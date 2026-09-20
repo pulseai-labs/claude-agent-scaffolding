@@ -2,8 +2,9 @@
 scenario_id: 12-close-seat-model-mismatch-fails-launch-negative
 expected_outcome: halt
 expected_reason: 'The close seat is launched from its approved seat values, carried
-  in the close brief, and its model is confirmed from the launch banner and the first
-  reply exactly as an item row''s is.
+  in the close brief, and its model is confirmed as its `model_shows` says —
+  the banner here — and the first
+  reply, exactly as an item row''s is.
   The banner here shows strong-v2 while CLOSE_EXPECTED_MODEL reads strong-v1, so this is a
   FAILED LAUNCH: the terminal is released and the mismatch reported, and nothing is
   dispatched into that terminal. Both offered repairs are wrong: continuing because

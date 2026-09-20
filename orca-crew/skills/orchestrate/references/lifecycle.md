@@ -151,9 +151,9 @@ Every command's syntax comes from `orca skills get orchestration`.
     recorded in each hosting repo — and waits for no record pass.
 13. **Handoff.** If the Run outlives the session, write a handoff naming the Run id,
     task ids, terminal handles, head SHA, and the next step — on an activated ossify
-    spine, also the spine's approved `SEATS` block and the accumulated close-review ledger
-    (every close review's ledger so far, oldest first). With ossify installed, that
-    is `/ossify:handoff`.
+    spine, also the spine's approved `SEATS` block, the resolved coordinator
+    profiles and the accumulated close-review ledger (oldest first). With ossify
+    installed, that is `/ossify:handoff`.
 
 ## Roles of the operator's own
 
@@ -190,7 +190,7 @@ their briefs (`ossify-briefs.md`, `ossify-pr-briefs.md`); your handling of a spi
 **Your own rotation.** Your boundary is a fully acknowledged delivery with no
 operator question in flight — live child dispatches keep running throughout and
 your successor inherits them by rebinding the parent Run. Write the handoff,
-recording your own launch command, expected model and effort — `/ossify:handoff`
+recording your own resolved profile — `/ossify:handoff`
 with ossify installed, the same file by hand without it. Open a new terminal
 with the launch command the handoff recorded — ask the operator once when none
 did; an alias carries provider settings `ps` does not show. Send the new top its

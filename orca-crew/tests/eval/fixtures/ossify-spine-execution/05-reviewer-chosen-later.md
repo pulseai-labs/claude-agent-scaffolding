@@ -1,7 +1,7 @@
 ---
 scenario_id: 05-reviewer-chosen-later
 expected_outcome: refuse
-expected_reason: 'Two halves. The refusal: the reviewers command, model, effort and
+expected_reason: 'Two halves. The refusal: the reviewers resolved profile and
   review level are NOT approved during spine planning and get no SEATS row - the
   PR does not exist yet, and a reviewer profile chosen before there is a diff to read
   is a guess recorded as a decision. So the operators request to settle it now, however
@@ -10,8 +10,9 @@ expected_reason: 'Two halves. The refusal: the reviewers command, model, effort 
   spine, close and work-PR - ARE approved in that same phase, each a seat beside the
   item rows, so declining the reviewer
   is not a general rule that nothing but item seats may be approved. The positive half:
-  at the spines PR transition the top asks separately for reviewer command, expected
-  model, effort and /code-review level, and TWO profiles are decided there, not one
+  at the spines PR transition the top asks separately for the reviewers resolved
+  profile - command, expected model, effort, model-shows and brief-delivery - and
+  /code-review level, and TWO profiles are decided there, not one
   - alongside the reviewer the top also decides a single PR-fix implementer, because
   every item pair was released at its items close and no implementer survives to the
   PR. Both go into the WORK-PR SESSIONS brief, not into a reviewer task the top runs:

@@ -1,7 +1,7 @@
 # Configuration
 
-Every seat, command, model and effort a run uses is a value the operator edits, not a
-fact the plugin hard-codes. orca-crew ships no agents of its own: a coordinator reads
+Every seat a run uses, and every value in its profile, is a value the operator
+edits, not a fact the plugin hard-codes. orca-crew ships no agents of its own: a coordinator reads
 two markdown files the way it reads any other file, and nothing anywhere parses them.
 
 ## The two files
@@ -74,10 +74,52 @@ Each field exists because a measured case needs it:
 - `brief_delivery:` — `brief_delivery: inject` is the ordinary dispatch;
   `brief_delivery: file` writes the brief to a file and sends one line pointing at it,
   for an agent whose composer fragments a multi-line inject.
-- `can:` — what the agent is able to run; a reviewer seat needs `slash-commands` for
-  `/code-review`. It is checked when the operator approves the project file, not
-  discovered at dispatch.
+- `can:` — what the agent is able to run; the per-role requirement is in the
+  resolved-profile table below, checked at approval, never at dispatch.
 - `note:` — free prose the coordinator reads when it uses that agent.
+
+## What a resolved profile carries
+
+An agent name resolves through the machine file to a **profile** — the values a
+launch needs. This table is the whole contract for which travels where: every
+surface carrying a profile conforms rather than restating a field list.
+
+| field | set by | consumed at | travels |
+|---|---|---|---|
+| `command:` | the machine entry | `terminal create` | every resolved profile |
+| `expected_model:` | the machine entry | the model read and the first reply | every resolved profile |
+| `effort:` | the machine entry | the launch | every resolved profile |
+| `model_shows:` | the machine entry | the model read | every resolved profile — the launching session never opens this file |
+| `brief_delivery:` | the machine entry | the brief's delivery | every resolved profile |
+| `can:` | the machine entry | the seat's approval | never — checked where a seat is approved |
+| `note:` | the machine entry | the coordinator's read | never |
+
+A resolved profile renders as one row wherever it travels — a SEATS row, a
+coordinator profile in a brief, a handoff line:
+
+`<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>`
+
+A brief's record of its own seat's launch is the row's first three values only —
+a session launches nothing with its own profile.
+
+`can:` is checked where a seat is approved — the project-file approval, the
+spine-seat approval, the PR-transition ask, the close-review halt ask — never at
+dispatch. The requirement is per role: a role whose shipped or declared brief invokes a slash command needs
+`can: slash-commands` on the agent that fills it.
+
+| role | its brief invokes | needs `slash-commands` |
+|---|---|---|
+| reviewer | `/code-review` | yes |
+| implementer, verifier | no command | no |
+| fix-round implementer | `/ossify:work-pr` when ossify is installed | yes then |
+| ossify item implementer | `/ossify:work-item` | yes |
+| item verifier | no command | no |
+| spine session | `/ossify:run-spine` | yes |
+| close session | `/ossify:close` | yes |
+| work-PR session | `/ossify:work-pr` | yes |
+| PR-fix seat inside work-PR | none — the clause is removed | no |
+| close-review writer | no command | no |
+| an operator-defined role | whatever its `brief:` invokes | as declared |
 
 ## The project file
 
@@ -99,9 +141,10 @@ Three sections. `## Seats` is a table of role, agent name and when:
 `## My roles` holds the operator's own roles as blocks (next section). `## Conditions`
 is free text: conditions are sentences the coordinator reads when it picks a seat, and
 nothing parses them. The plugin ships the role list — orchestrator, implementer,
-verifier, reviewer and the coordinator seats (spine session, close session, work-PR
-session, close-review writer); the project file fills them and does not define new
-built-ins.
+verifier, reviewer and the coordinator seats (spine session,
+close session, work-PR session); the project file fills them and does not define new
+built-ins. The close-review writer is not a project-file seat — the operator names
+its profile at the halt that creates it (`ossify-close-writer.md`).
 
 ## Roles of the operator's own
 
@@ -137,12 +180,21 @@ default is one, and anything beyond the declared number is a planning defect.
 ## When a file is missing
 
 What the session does itself — reading, planning, the ceremonies it runs in its
-own context — needs no setup: with no files at all, every role
+own context — needs no setup in any of the three states: every role
 falls back to the agent this session is already running, and orca-crew works on
-install. A session cannot recover its own launch command, so
-the first delegated dispatch halts with a message naming the machine file and
-the one entry the operator must add, in the shape above — a run never writes
-machine-level configuration itself.
+install. Delegation is where each state meets its missing half — a session
+cannot recover its own launch command, so
+the first delegated dispatch halts; which file it names depends on what exists:
+
+- **Neither file.** It names the machine file and the one entry the operator
+  must add, in the shape above.
+- **Machine file only.** Agent names have launch details but no role mapping;
+  it names the project file and the `## Seats` section to add, in the shape
+  above.
+- **Project file only.** Roles name agents nothing resolves; it names the
+  machine file and the entry to add.
+
+A run never writes machine-level configuration itself.
 A name the files do not define is never guessed:
 a seat name that neither file defines halts the run and is reported, exactly as
 a missing alias did.

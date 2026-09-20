@@ -10,7 +10,7 @@ The seat names below are examples: the project file (`.orca-crew/roles.md`,
 | Role | Seat | Effort | Lifetime | Class |
 |---|---|---|---|---|
 | Orchestrator | you — the operator launched this session | | one per Run | |
-| Implementer, planned | `strong-coder` | the seat's; `max` when the plan (spine plan or decompose) marks the item, or a prior attempt on it failed | retained across work items and the PR's fix rounds, to the threshold below | `contract`: an interface, schema, contract, or architectural change, or a plan gate; the default when the item is not `bounded` |
+| Implementer, planned | `strong-coder` | the seat's — a marked item or a retry fills a higher-effort seat the project file's conditions name, and the machine entry is the only source of effort: never the same command edited | retained across work items and the PR's fix rounds, to the threshold below | `contract`: an interface, schema, contract, or architectural change, or a plan gate; the default when the item is not `bounded` |
 | Implementer, fast | `fast-coder` | the seat's | retained if a fix round follows, else released | `bounded` only when the item is one-file, mechanical, or read-only |
 | Reviewer | `sonnet-review` — once per PR; first task `/code-review <PR>`; never implements | the seat's | disposable; released after `worker_done` validates | |
 | Verifier | `strong-coder` — the work-item verify; `fast-coder` for read-only probes and mechanical runs outside it (a suite, a count, a fact) | the seat's | retained until its item passes or escalates to the operator | |
@@ -72,7 +72,7 @@ On a spine this session planned (`ossify-execution.md`), two rows above are
 superseded **for that spine's work items only**: the implementer and the verifier
 are launched from the spine's operator-approved SEATS rows, whose values may name
 a native `claude --model <id> --effort <level>` command rather than an alias; the
-model is confirmed from the banner and the first reply exactly as *The launch*
+model is confirmed as the row's `model_shows` says and from the first reply, exactly as *The launch*
 requires; and each item gets a
 **fresh** pair, retained across that item's corrections and released when it closes or
 escalates. A pair never crosses work items there.
@@ -102,8 +102,8 @@ seat lingering past its span, is the planning defect the rule still catches.
 the spine session, one per spine; a close
 session, a fresh terminal per close dispatch; a work-PR session, one per returned
 PR — each launched from its own seat in the project file (`spine session`,
-`close session`, `work-PR session`), the model confirmed from the banner and
-first reply as an item row's is — and a close-review writer, one per affected
+`close session`, `work-PR session`), the model confirmed as its profile's
+`model_shows` says and from the first reply, as an item row's is — and a close-review writer, one per affected
 hosting repo at a `halted: close-review`, launched from the profile the operator
 names at that halt (`ossify-close-writer.md`), never a seat the file pre-defines.** The
 work-PR session owns the reviewer and the

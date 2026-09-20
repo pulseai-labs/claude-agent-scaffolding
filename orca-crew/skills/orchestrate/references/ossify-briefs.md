@@ -13,7 +13,7 @@ every slot and delete nothing else.
 ## Spine session (one per spine, dispatched by the top orchestrator)
 
 The lane driver, launched **from the `spine session` seat the project file names** —
-the top copies its approved command, model and effort into the brief.
+the top copies its approved profile into the brief.
 It is also a coordinator, which is why its brief carries scope identities.
 
 ```text
@@ -29,8 +29,8 @@ SPINE_COMMAND=<the command this seat was launched with, from its machine entry>
 SPINE_EXPECTED_MODEL=<model id the banner must show>
 SPINE_EFFORT=<the effort this seat was launched at>
 SEATS — the operator-approved seats for this spine. Use them verbatim.
-<item id> implementer: <command> | model: <expected model> | effort: <effort>
-<item id> verifier:    <command> | model: <expected model> | effort: <effort>
+<item id> implementer: <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
+<item id> verifier:    <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
 A seat this block does not list halts the item and asks.
 HANDOFF_PATH=<a prior spine session's handoff path, or "none">
 TASK/DISPATCH: your task and dispatch identities come from the Orca preamble injected
@@ -48,9 +48,9 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      --run PARENT_RUN_ID; item replies go on each original child message id.
   3. Run `/ossify:run-spine $SPINE_ID --external-executor`. On the round's
      execution requests, launch a fresh IMPLEMENTER terminal per item from its SEATS row, verbatim —
-     never a substitute command, model or effort. The
+     never a substitute value. The
      verifier is created at step 5, once a complete return exists. Confirm each
-     model from the banner and first reply; the effort is the given launch
+     model as its row's `model_shows` says and from the first reply; the effort is the given launch
      argument. A row that is missing or ambiguous halts that launch and asks;
      only a top reply carrying replacement rows moves the block.
   4. Gather the round's implementation plans into ONE ordered ask to the top and

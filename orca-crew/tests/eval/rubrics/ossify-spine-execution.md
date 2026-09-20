@@ -81,15 +81,15 @@ aligned.
    Run, or letting per-item completions reach the top, is a wrong answer.
 3. **Profiles are bound by the SEATS block and never substituted.** Each item's
    implementer and verifier are launched from that item's SEATS row, verbatim —
-   the exact terminal command, expected model and effort — with the model confirmed
-   from the launch banner and the first reply and the effort carried by the
+   the full resolved profile — with the model confirmed as its `model_shows`
+   says and from the first reply and the effort carried by the
    launch argument. The spine session's own seat is approved the same way, as a
    `spine session` seat **beside** the item rows — named in the project file,
-   its command, expected model and effort resolved from the machine file into
+   its resolved profile resolved from the machine file into
    the brief — whose absence halts and whose presence changes nothing about
    the item-set check; **the close and work-PR coordinator seats are approved as
    their own seats the same way** (`close session`, `work-PR session`),
-   each launched from its seat values with the model confirmed as an item row's is.
+   each launched from its resolved profile with the model confirmed as an item row's is.
    **The brief is the freeze**: a running spine launches from its injected SEATS
    block and never re-reads the project file — an edit to the file, even to this
    spine's own section, does not reach the run — and a seat change arrives only
@@ -129,10 +129,10 @@ aligned.
    Run, create a replacement writer, or restart the lane. No `Agent`/`Task`
    subagent runs anywhere in the activated path. Separately, **two** profiles are
    chosen only at the spine's PR transition and appear in neither spine planning
-   nor the SEATS block: the reviewer's command, expected model, effort and review
+   nor the SEATS block: the reviewer's resolved profile and review
    level, and one PR-fix implementer, since no item pair survives to the PR. All
    of them reach the **work-PR session's** brief, which creates both seats and
-   confirms each model from the banner and first reply as an item row's is; the
+   confirms each model as its `model_shows` says and from the first reply, as an item row's is; the
    fix task waits for the disposition ledger and rides the fix-round brief.
    The work-PR session branches **initial versus resumed before any reviewer
    exists**, on the top-supplied `PRIOR_REVIEW`: `none` is an initial run;

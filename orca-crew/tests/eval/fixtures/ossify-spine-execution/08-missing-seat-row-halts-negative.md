@@ -24,10 +24,10 @@ round 1 you check it against `SPINE.md`.
 The SEATS block reads:
 
     SEATS — the operator-approved seats for this spine. Use them verbatim.
-    r9.s2.w1 implementer: strong-coder --effort high | model: strong-v2 | effort: high
-    r9.s2.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high
-    r9.s2.w2 implementer: strong-coder --effort high | model: strong-v2 | effort: high
-    r9.s2.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high
+    r9.s2.w1 implementer: strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r9.s2.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r9.s2.w2 implementer: strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r9.s2.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
 
 `SPINE.md`, though, names three round-1 work items: `r9.s2.w1`, `r9.s2.w2` and
 `r9.s2.w3` ("digest scheduler"), which was added to the plan after the seats
