@@ -7,7 +7,7 @@ expected_reason: 'NEGATIVE CASE covering both no-fallback rules at once. Depth 2
   to the top, and waits for an operator decision - and it takes NONE of the three
   escapes on offer, each of which is individually forbidden and collectively the whole
   point: no Agent/Task subagent (that is the inherited-runtime problem the phase exists
-  to remove, and it would silently ignore every ratified per-item profile), no moving
+  to remove, and it would silently ignore every approved per-item seat), no moving
   item tasks into the parent Run (that is the isolation the child Run buys), and no
   restarting the lane. Ossify state is already mutated - worktrees exist and are journaled
   - so a restart is not a clean retry either. The wrong answer this fixture falsifies
@@ -17,8 +17,8 @@ expected_reason: 'NEGATIVE CASE covering both no-fallback rules at once. Depth 2
 ---
 
 You are the spine session for `r7.s1` ("webhook fanout"), dispatched by the top
-orchestrator with parent identities injected and the sidecar path supplied. You
-validated `SPINE.md` against the sidecar and created and bound a child Run.
+orchestrator with parent identities injected and the SEATS block supplied. You
+checked the SEATS block against `SPINE.md` and created and bound a child Run.
 
 You invoked the ossify lane in external-executor mode. It cut the spine branch,
 created and journaled the round's two worktrees, authored both handoffs, and

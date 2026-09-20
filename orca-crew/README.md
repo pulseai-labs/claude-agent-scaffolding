@@ -3,12 +3,12 @@
 The orchestrator/worker session model over Orca orchestration. One prose skill, no
 runtime library.
 
-One orchestrator session (`claude` on Fable, or `claude-sol`) keeps its context for
-decisions and dispatches everything else to GLM sessions launched by alias through Orca.
-`claude-glm` implements planned work, `claude-glm-flash` implements bounded work, one
-`claude-glm-flash` session runs `/code-review` once per PR and returns findings through
-`worker_done`, the retained implementer works GitHub threads to zero, and the merge waits
-for the operator's word.
+One orchestrator session keeps its context for
+decisions and dispatches everything else to worker sessions launched by seat name through
+Orca — the seats defined in the operator's own files, not in this plugin. A planned-work
+seat and a bounded-work seat implement by complexity class, one reviewer seat runs
+`/code-review` once per PR and returns findings through `worker_done`, the retained
+implementer works GitHub threads to zero, and the merge waits for the operator's word.
 
 ## Skill
 
@@ -32,17 +32,17 @@ verifier session.
 
 ## Roles
 
-| Role | Alias | Class |
+| Role | Seat | Class |
 |---|---|---|
-| Orchestrator | `claude` or `claude-sol` | |
-| Implementer, planned | `claude-glm` (high; `--effort max` on demand) | `contract`, and the default when unclassified |
-| Implementer, fast | `claude-glm-flash` | `bounded` |
-| Reviewer | `claude-glm-flash`, `/code-review <PR>` once | |
-| Verifier | `claude-glm` at high — the work-item verify; `claude-glm-flash` for read-only probes and mechanical runs outside it. Read-only | |
+| Orchestrator | this session — the operator launches it | |
+| Implementer, planned | a seat the project file names | `contract`, and the default when unclassified |
+| Implementer, fast | a seat the project file names | `bounded` |
+| Reviewer | a seat with `slash-commands`, `/code-review <PR>` once | |
+| Verifier | a seat the project file names — the work-item verify; read-only probes and mechanical runs may take a lighter one. Read-only | |
 | Operator | the human: the merge word | |
 
-Aliases are shell profiles that carry provider routing and pinned defaults. The skill
-never substitutes `claude --model`.
+Seats are names the operator's two configuration files define — `config.md` in the
+skill's references is the authority. The skill never substitutes `claude --model`.
 
 ## Session budget
 
@@ -65,25 +65,25 @@ No ossify contract changes.
 ## Spine execution assignments (0.3.0, amended 0.4.0 and 0.5.0)
 
 When this session has just planned an ossify spine — and only then; installation, an
-environment variable, or a sidecar found on disk activate nothing — the run takes three
-layers instead of one dispatched lane driver:
+environment variable, or a `.orca-crew/roles.md` found on disk activate nothing — the
+run takes three layers instead of one dispatched lane driver:
 
-1. The **top orchestrator** recommends one implementer and one verifier profile per work
-   item, has the operator ratify every row and the three session blocks in a single
-   phase, writes `$SPINE_DIR/orca-execution.md` (`orca-execution/v2`), and starts one
-   spine session. It
+1. The **top orchestrator** recommends one implementer and one verifier seat per work
+   item — the three coordinator seats beside them — presents the whole set to the
+   operator in one approval phase, writes the decided set into the project file, and
+   starts one spine session whose brief carries the approved set as its SEATS block. It
    approves each relayed worker plan and later chooses the reviewer. It launches no item
    terminal.
 2. The **spine session** runs the ossify lane in external-executor mode and creates a
    child Run of its own, which keeps item plan traffic and item completions out of the
    parent inbox. It launches and supervises both terminals for each item.
-3. Each **work item** gets a fresh implementer terminal and a fresh verifier terminal at
-   its exact ratified command, model and effort. A pair is retained across that item's
+3. Each **work item** gets a fresh implementer terminal and a fresh verifier terminal
+   from its approved SEATS row, verbatim. A pair is retained across that item's
    corrections and never crosses work items.
 
-Sidecar rows vary only the terminal command, the expected model, and the effort. The
+SEATS rows carry each seat's resolved profile (`config.md`). The
 implementation-plan gate, the implementer entry point (`/ossify:work-item`) and the
-verifier procedure are fixed. There is no reviewer row and no whole-spine profile: the
+verifier procedure are fixed. There is no reviewer row: the
 reviewer is chosen when the spine's PR reaches review, because before that there is no
 diff to choose against.
 
@@ -96,10 +96,10 @@ Agent or Task subagent runs anywhere in this path.
 Outside an activated spine, the role table, complexity-class routing and retention above
 are unchanged.
 
-**0.4.0 amends the seats, not the activation.** The sidecar gains a `## Spine session`
-block beside the item table — command, expected model, effort, reason — ratified with
-the item rows and halting on its absence (D24), and it is revalidated immediately before
-**every** item launch rather than once at the start (D28). The first verifier failure no
+**0.4.0 amends the seats, not the activation.** The approved set gains the spine
+session's own seat — its resolved profile and reason — approved with the
+item seats and halting on its absence (D24), and every item launch spends its own
+row verbatim rather than re-reading the file (D28). The first verifier failure no
 longer resolves itself: it sends one blocking `ask` carrying the verifier's summary and
 three options — correct with the same pair, replace the pair, halt — and *replace*
 releases the old pair before creating its successor (D25). The close and every PR loop
@@ -112,10 +112,9 @@ phase's prose is three references now: `ossify-execution.md` (the contract),
 `ossify-nested-run.md` (the mechanics) and `ossify-pr-briefs.md` (the close and work-PR
 briefs).
 
-**0.5.0 amends the coordinator contracts.** The sidecar gains ratified `## Close
-session` and `## Work-PR session` blocks beside the Spine-session block and versions to
-`orca-execution/v2` — a v1 sidecar halts a new launch until the top rewrites it and the
-operator re-ratifies; nothing auto-upgrades and no live seat is replaced. The spine
+**0.5.0 amends the coordinator contracts.** The approved set gains the `close
+session` and `work-PR session` seats beside the spine session's — coordinator seats
+the operator approves with the rest, never defaults the plugin picks. The spine
 session closes each item through the lane — gate, commit, merge — before the barrier, and
 an item still active there is a halt, not a completion. A `fix now` close-review finding
 halts the close with its ledger; the top asks for a writer profile, dispatches fresh
@@ -140,12 +139,23 @@ boundary. The rotation itself is prose (`skills/orchestrate/references/lifecycle
 blocks a command, and says so when it cannot read the figure. Set `context_ceiling` in the
 plugin's configuration.
 
+## Configuration
+
+Two operator-owned markdown files, read as prose — nothing parses them.
+`~/.claude/orca-crew/agents.md` is the machine file: the agents this machine can launch, one block each — `command`, `expected_model`, `effort`, `model_shows`, `brief_delivery`, `can`, `note`; the field table in `skills/orchestrate/references/config.md` says what each means and where it travels.
+`<project root>/.orca-crew/roles.md` is the project file: which agent fills each role,
+the operator's own roles, and the conditions that choose between seats — it wins for
+anything it names. With neither file the session's own work needs no setup, and the
+first delegated dispatch halts naming the file to add; a seat name neither defines
+halts the run. The contract and field
+reference are `skills/orchestrate/references/config.md`.
+
 ## Requirements
 
 - Orca running with the orchestration feature enabled.
 - `jq` on PATH for the context-ceiling hook; without it the hook reports the figure as unavailable.
-- The aliases `claude-glm` and `claude-glm-flash` defined in the shell Orca's terminals
-  inherit.
+- The agents named in `~/.claude/orca-crew/agents.md` resolvable in the shell Orca's
+  terminals inherit.
 - The `/code-review` skill available to the reviewer session. If it is unavailable, the
   reviewer reports that in its `worker_done` and the operator decides.
 - The target repository's ruleset requires conversation resolution before merge, so

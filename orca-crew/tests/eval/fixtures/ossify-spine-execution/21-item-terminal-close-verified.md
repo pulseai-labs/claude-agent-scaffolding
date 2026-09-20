@@ -23,7 +23,7 @@ items closed and merged, barrier verified, final `worker_done` drafted. Your
 terminal census from `orca terminal list`:
 
 - `impl-w1`, `verify-w1`, `impl-w2`, `verify-w2` — your four item terminals,
-  all alias-launched via `terminal create` + `dispatch --inject`, all
+  all alias-launched via `terminal create` + `worker-start`, all
   `worker_done` and released; each `worker-release` receipt reads
   `no_owned_resource`, and all four processes are still alive on the list.
 - `fix-correction-r16` — a correction terminal created by the PREVIOUS spine on

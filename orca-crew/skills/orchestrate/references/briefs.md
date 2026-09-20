@@ -12,7 +12,9 @@ injected preamble plus this text and nothing else. Every brief carries, in this 
    never retried around.
 6. Planned implementer only: the plan gate.
 
-Angle brackets are slots. Fill every slot; delete nothing else.
+Angle brackets are slots. Fill every slot; delete nothing else. The `SEAT_` lines are
+the operator's approved seat, copied into the brief at launch; a worker that finds its
+model is not `SEAT_EXPECTED_MODEL` reports a failed launch and stops.
 
 **An activated ossify spine has four briefs of its own** — spine session, item
 implementer, item verifier, and the correction message — in
@@ -20,9 +22,12 @@ implementer, item verifier, and the correction message — in
 every other dispatch; the item verifier there reuses this file's verifier CLAIMS body
 verbatim rather than restating it.
 
-## Planned implementer (`claude-glm`)
+## Planned implementer
 
 ```text
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
+SEAT_EFFORT=<the effort this seat was launched at>
 ROLE: implementer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path>, branch <branch>, base <base-branch>. Use git -C for every
@@ -49,9 +54,12 @@ subagent. Ask with `orca orchestration ask` when blocked; send `escalation` when
 If a tool or policy refuses you, report it verbatim and stop that step.
 ```
 
-## Fast implementer (`claude-glm-flash`)
+## Fast implementer
 
 ```text
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
+SEAT_EFFORT=<the effort this seat was launched at>
 ROLE: implementer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path>, branch <branch>, base <base-branch>. Use git -C for every
@@ -69,9 +77,12 @@ NEVER: merge, delete a branch, force-push, edit files outside the worktree, or r
 subagent. Ask when blocked; escalate when stuck; report refusals verbatim.
 ```
 
-## Reviewer (`claude-glm-flash`)
+## Reviewer
 
 ```text
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
+SEAT_EFFORT=<the effort this seat was launched at>
 ROLE: reviewer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path> checked out at PR <number>'s head <sha>.
@@ -79,7 +90,7 @@ PLACEMENT: worktree <abs-path> checked out at PR <number>'s head <sha>.
 TASK: run `/code-review <number> <level>` — the level the orchestrator decided, not
 one you pick; outside an activated ossify spine the level is `medium` unless the
 orchestrator names another. Your first reply must state the model you are running; it is expected to
-be <expected-model>, and a mismatch is a failed launch to report, not to work around.
+be SEAT_EXPECTED_MODEL, and a mismatch is a failed launch to report, not to work around.
 Let the review finish, then send worker_done carrying, in this order:
 `Findings: none` on a clean review, or else every finding in this body, one per line
   <file>:<line> | P0|P1|P2|P3 | <claim in one sentence>
@@ -94,9 +105,12 @@ travel only in worker_done. If `/code-review` refuses or errors, report its outp
 verbatim and stop. Use `ask` for a blocking question and `escalation` when stuck.
 ```
 
-## Verifier (`claude-glm` at high)
+## Verifier (read-only)
 
 ```text
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
+SEAT_EFFORT=<the effort this seat was launched at>
 ROLE: verifier, read-only. State the model you are running in your first reply, then
 continue.
 
@@ -120,13 +134,16 @@ Scratch output is fine — write it, never commit it — and run in a disposable
 worktree. Any other write: stop and escalate instead.
 ```
 
-## Fix-round brief (retained implementer, after disposition)
+## Fix round (retained implementer, after disposition)
 
 Attach it to the same terminal with `worker-start --task <next_task_id> --terminal
 <handle>` so Orca transfers the task's ownership with the terminal. The body is the
-fast-implementer brief with this TASK:
+fast-implementer brief with the seat lines and TASK replaced by:
 
 ```text
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
+SEAT_EFFORT=<the effort this seat was launched at>
 TASK: work PR <number> to zero unresolved review threads. Inputs, in priority order:
   1. Disposition: <list>. Fix every item on it as dispositioned; defer or reject
      nothing on it yourself.

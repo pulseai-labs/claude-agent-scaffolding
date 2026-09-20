@@ -19,7 +19,7 @@ expected_reason: 'The second close is CONDITIONAL, and its condition did not fir
 ---
 
 You are the top orchestrator. Spine `r8.s1` ("ledger exports") is planned,
-ratified and finished: the spine session returned at the final round barrier,
+approved and finished: the spine session returned at the final round barrier,
 you dispatched `/ossify:close r8.s1` to a fresh close session, and that
 session's `worker_done` came back with the single word `closed`.
 

@@ -27,7 +27,13 @@ task and dispatch identities — you captured all of them before creating and
 binding a child Run, `run_child77`, for item tasks:
 
     PARENT_RUN_ID=run_parent41
-    ORCA_EXECUTION_PATH=/repos/product-ai/docs/specs/r6/r6.s1-ledger-export/orca-execution.md
+    SEATS — the operator-approved seats for this spine. Use them verbatim.
+    r6.s1.w1 implementer: strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r6.s1.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r6.s1.w2 implementer: fast-coder | model: fast-v1 | effort: (agent default) | model_shows: banner | brief_delivery: inject
+    r6.s1.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r6.s1.w3 implementer: strong-coder --effort max | model: strong-v2 | effort: max | model_shows: banner | brief_delivery: inject
+    r6.s1.w3 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
     (from your preamble) task task_spine08, dispatch ctx_spine08
 
 Round 1 holds three items. `r6.s1.w1` has already come back complete; you

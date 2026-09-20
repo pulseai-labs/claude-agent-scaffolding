@@ -2,6 +2,46 @@
 
 All notable changes to the `orca-crew` plugin.
 
+## 0.7.0
+
+The **config-driven crew** — seats, agent commands, roles and conditions move out
+of shipped prose and into the operator's own files. The spine sidecar is deleted;
+the approved seats travel inside the spine session's brief, so a configuration
+edit cannot reach a spine already in flight.
+
+- **Two files, nothing parses them** — `~/.claude/orca-crew/agents.md` on the
+  machine names each seat's command, the model its banner must show, how its
+  brief is delivered and what it may do; `<project>/.orca-crew/roles.md` assigns
+  seats to roles, may declare operator-defined roles, and wins over the machine
+  file. The orchestrator reads both as prose — no parser, no schema, no new
+  deterministic code — and with neither file present every role falls back to
+  the session running it. An undefined seat name halts the run rather than
+  guessing at a substitute.
+- **Operator-defined roles** — a project role may run at a named point
+  (`after-implementer`, `before-review`, `after-disposition`, `before-merge-ask`,
+  `at-teardown`), block the run until it passes or the operator overrides, be
+  dispatched on demand within a session-budget allowance of one, or replace a
+  built-in role with the handoff stating which step it replaced.
+- **The spine sidecar is deleted** — no `orca-execution.md`, no schema, no hash
+  pinning, no ratification phase. The top recommends item and coordinator seats
+  from the project file, the operator approves all of them in one phase, and the
+  approved set is recorded in the project file and injected into the spine
+  session's brief as its SEATS block. Every launch spends its row verbatim — a
+  missing or ambiguous row halts the item and asks — and a seat change reaches a
+  running spine only as replacement rows in a reply after a new operator
+  decision; no session re-reads the file for it.
+- **Inline seat values in every brief and handoff** — launch briefs carry the
+  approved seat's command, expected model and effort inline
+  (`SEAT_COMMAND`/`SEAT_EXPECTED_MODEL`/`SEAT_EFFORT`), a handoff preserves them
+  verbatim, and a model mismatch at the banner is a failed launch, not a
+  parameter to correct.
+- **Neutral shipped prose** — no operator's aliases or model names ship in the
+  plugin; the role table, lifecycle, briefs and manifests speak in seat names,
+  and the contract suite sweeps for the old names mechanically. The
+  ossify-spine-execution eval surface follows the same contract: its fixtures,
+  rubric and RUNBOOK describe seats, and results written against the retired
+  contract are deleted rather than reused.
+
 ## 0.6.0
 
 The **coordinator context ceiling** (#456) and the top's wait discipline (#452 R1–R3).

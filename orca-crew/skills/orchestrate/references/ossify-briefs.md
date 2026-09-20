@@ -12,8 +12,9 @@ every slot and delete nothing else.
 
 ## Spine session (one per spine, dispatched by the top orchestrator)
 
-The lane driver, launched **from the ratified spine_session block** in the
-sidecar. It is also a coordinator, which is why its brief carries scope identities.
+The lane driver, launched **from the `spine session` seat the project file names** —
+the top copies its approved profile into the brief.
+It is also a coordinator, which is why its brief carries scope identities.
 
 ```text
 ROLE: ossify spine session and nested coordinator. State the model you are
@@ -24,9 +25,13 @@ PLACEMENT: <abs path of the repo or worktree the lane runs from>.
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 PARENT_RUN_ID=<run id>
 SPINE_ID=<spine id>
+SPINE_COMMAND=<the command this seat was launched with, from its machine entry>
 SPINE_EXPECTED_MODEL=<model id the banner must show>
-ORCA_EXECUTION_PATH=<abs path to $SPINE_DIR/orca-execution.md>
-SIDECAR_OID=<blob id the top recorded when it wrote the ratified sidecar>
+SPINE_EFFORT=<the effort this seat was launched at>
+SEATS — the operator-approved seats for this spine. Use them verbatim.
+<item id> implementer: <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
+<item id> verifier:    <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
+A seat this block does not list halts the item and asks.
 HANDOFF_PATH=<a prior spine session's handoff path, or "none">
 TASK/DISPATCH: your task and dispatch identities come from the Orca preamble injected
 into this terminal; spend those verbatim — never placeholders, never ids predicted
@@ -35,33 +40,24 @@ before it existed. Capture them, and PARENT_RUN_ID, before binding your child Ru
 TASK: drive spine SPINE_ID to its final round barrier. With HANDOFF_PATH set, read that
 handoff first; ossify's own state says which round runs next. A first reply whose model
 is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
-  1. Read ORCA_EXECUTION_PATH and validate it against SPINE.md before anything
-     else: `git hash-object "$(dirname "$ORCA_EXECUTION_PATH")/SPINE.md"` (the
-     plan's blob id beside the sidecar) must equal spine_plan_oid; every planned
-     item must have exactly one complete row; no row may name an item the plan
-     does not; ratification must read exactly `operator-approved`;
-     ratified_in_run must equal PARENT_RUN_ID; and spine_id must equal SPINE_ID.
-     Any failure halts — ask, never substitute. Then
-     `git hash-object "$ORCA_EXECUTION_PATH"` must equal SIDECAR_OID: the checks
-     prove the file valid, not the ratified one — an edited-but-valid row
-     passes them all. That is the baseline for every launch.
+  1. Check the SEATS block against SPINE.md before anything else: every planned
+     item has exactly one implementer row and one verifier row, and no row names
+     an item the plan does not. A failure halts — ask, never substitute.
   2. Create and bind a CHILD Run for item tasks. Child task-create, worker-start,
      dispatch and check name --run <child run id>, questions for the top name
      --run PARENT_RUN_ID; item replies go on each original child message id.
   3. Run `/ossify:run-spine $SPINE_ID --external-executor`. On the round's
-     execution requests, launch a fresh IMPLEMENTER terminal per item from its
-     exact sidecar command — never a substitute command, model or effort. The
+     execution requests, launch a fresh IMPLEMENTER terminal per item from its SEATS row, verbatim —
+     never a substitute value. The
      verifier is created at step 5, once a complete return exists. Confirm each
-     model from the banner and first reply; the effort is the given launch
-     argument. Re-run step 1's validation, the three session blocks included,
-     immediately before each item terminal is created, and
-     require the hash to still equal the baseline; drift halts that launch and
-     asks. Only a top reply naming a new SIDECAR_OID after re-ratification moves it.
+     model as its row's `model_shows` says and from the first reply; the effort is the given launch
+     argument. A row that is missing or ambiguous halts that launch and asks;
+     only a top reply carrying replacement rows moves the block.
   4. Gather the round's implementation plans into ONE ordered ask to the top and
      wait. Relay the top's per-item decision to each implementer on its own
      original message id before any edit starts.
   5. On each complete return, create and dispatch that item's fresh VERIFIER
-     terminal from its exact sidecar command and run the fixed all-claims
+     terminal from its SEATS row's verifier command and run the fixed all-claims
      procedure; `cannot determine` counts as fail. On the FIRST failure ask the
      top, with the verifier's summary and the three options — correct, replace,
      halt — and block: the pair idles until the reply. Correct sends one
@@ -110,7 +106,7 @@ alive, report it to the top, and wait for the operator's decision.
 
 ## Item implementer (one fresh terminal per work item)
 
-Launched from the sidecar row's `implementer_terminal_command` exactly.
+Launched from its SEATS row's implementer command, verbatim.
 
 ```text
 ROLE: ossify work-item implementer for <work-item-id>. State the model you are
@@ -150,7 +146,7 @@ blocked; escalate when stuck; report a refusal verbatim.
 
 ## Item verifier (one fresh terminal per work item, retained through corrections)
 
-Launched from the sidecar row's `verifier_terminal_command` exactly. The
+Launched from its SEATS row's verifier command, verbatim. The
 procedure is this skill's existing all-claims work-item verification — the
 `briefs.md` verifier body, with these placements and this retention.
 
