@@ -25,7 +25,9 @@ PLACEMENT: <abs path of the repo or worktree the lane runs from>.
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 PARENT_RUN_ID=<run id>
 SPINE_ID=<spine id>
+SPINE_COMMAND=<the command this seat was launched with, from its machine entry>
 SPINE_EXPECTED_MODEL=<model id the banner must show>
+SPINE_EFFORT=<the effort this seat was launched at>
 SEATS — the operator-approved seats for this spine. Use them verbatim.
 <item id> implementer: <command> | model: <expected model> | effort: <effort>
 <item id> verifier:    <command> | model: <expected model> | effort: <effort>

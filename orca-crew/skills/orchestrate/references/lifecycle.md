@@ -46,11 +46,13 @@ Every command's syntax comes from `orca skills get orchestration`.
    mechanical, or read-only; everything else — including an item that classifies
    nowhere — is `contract`. One implementer per worktree. Items within a round may
    run in parallel; their merges are serial.
-3. **Launch.** `terminal create --command "<alias>"` in the target worktree, then
-   `terminal wait --for tui-idle`, then one `terminal read` of the banner to confirm
-   the model, then `dispatch --inject` (the mechanic in `roles.md`). The "state your
-   model" line in the worker's first reply is the second check. Wrong model: release
-   and report.
+3. **Launch.** `terminal create --command "<the seat's command from agents.md>"`
+   in the target worktree, `terminal wait --for tui-idle`, one `terminal read` of
+   the banner or screen as `model_shows` says to confirm the model, then
+   `worker-start` — `--worktree path:<its worktree>` when the terminal sits
+   outside yours — the brief delivered as `brief_delivery` says, inject or file
+   (the mechanic in `roles.md`). The "state your model" line in the worker's
+   first reply is the second check. Wrong model: release and report.
 4. **Plan gate, planned work only.** The planned implementer's brief says: post your
    plan with `orca orchestration ask`, wait for the reply, then implement. Approve or
    amend via `reply`. Fast briefs skip this.
@@ -157,14 +159,17 @@ Every command's syntax comes from `orca skills get orchestration`.
 
 A role the operator defines in the project file (`config.md`) runs at a named point of
 the run above: `after-implementer` (after step 6), `before-review` (before step 8),
-`after-disposition` (after step 9), `before-merge-ask` (before step 12), `at-teardown`
-(step 13). `at: on-demand` has no fixed point and is dispatched when wanted — its seat
-counts against the session budget, the project file says how many may exist at once,
-and the default is one. A role with `blocks: yes` holds the run at its point until it
-returns a pass or the operator overrules it: the orchestrator relays its summary and
-the operator's word settles it, and everything else it returns is advice recorded in
-the disposition. A role with `replaces:` takes a step the plugin owns, and the handoff
-says which step was the operator's, so no reader infers a guarantee that was not given.
+`after-disposition` (after step 9), `before-merge-ask` (before step 12's ask),
+`at-teardown` (step 12's teardown — release and branch deletion, not step 13's
+handoff). `at: on-demand` has no fixed point, dispatched when wanted — its seat
+counts against the allowance the project file declares, one by default. A declared
+role's seat lives for its dispatch — launched at its point or on demand, released on
+return — never a standing seat. A role with `blocks: yes` holds the run at its point
+until it passes or the operator overrules it — the orchestrator relays its summary,
+the operator's word settles it, anything else is advice in the disposition. A role
+with `replaces:` takes a plugin step — `implementer`, `verifier`, `reviewer`:
+the named seat is not launched, the role runs at its point in its place, and the
+handoff says which step was the operator's.
 
 ## Rotation past the context ceiling
 
@@ -185,11 +190,11 @@ their briefs (`ossify-briefs.md`, `ossify-pr-briefs.md`); your handling of a spi
 **Your own rotation.** Your boundary is a fully acknowledged delivery with no
 operator question in flight — live child dispatches keep running throughout and
 your successor inherits them by rebinding the parent Run. Write the handoff,
-recording your own launch command — `/ossify:handoff` with ossify installed, the
-same file by hand without it. Open a new terminal with the launch command your
-resumed handoff recorded — ask the operator once when none did, because an alias
-carries provider settings a process listing does not show. Send the new top its
-resume — `/ossify:handoff-resume <path>` with ossify, or the handoff path as its
-first instruction without — confirm its turn started, then tell the operator
+recording your own launch command, expected model and effort — `/ossify:handoff`
+with ossify installed, the same file by hand without it. Open a new terminal
+with the launch command the handoff recorded — ask the operator once when none
+did; an alias carries provider settings `ps` does not show. Send the new top its
+resume — `/ossify:handoff-resume <path>` with ossify, or the path as its first
+instruction without — confirm its turn started, then tell the operator
 which terminal to use and that this one can close.
 The new top first runs `orca orchestration run-use --id <parent run> --json`, then `check`.

@@ -84,8 +84,9 @@ aligned.
    the exact terminal command, expected model and effort — with the model confirmed
    from the launch banner and the first reply and the effort carried by the
    launch argument. The spine session's own seat is approved the same way, as a
-   `spine session` seat **beside** the item rows — command, expected model,
-   effort — whose absence halts and whose presence changes nothing about
+   `spine session` seat **beside** the item rows — named in the project file,
+   its command, expected model and effort resolved from the machine file into
+   the brief — whose absence halts and whose presence changes nothing about
    the item-set check; **the close and work-PR coordinator seats are approved as
    their own seats the same way** (`close session`, `work-PR session`),
    each launched from its seat values with the model confirmed as an item row's is.

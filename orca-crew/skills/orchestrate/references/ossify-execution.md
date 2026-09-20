@@ -61,9 +61,12 @@ to the operator in one approval phase and write nothing until all of it is decid
 override.
 
 **Writing.** On approval, record the set in the project file's section for this
-spine — each item's implementer and verifier command, expected model and effort,
-keyed by item, and the three coordinator seats' beside them — then inject it into
-the spine session's brief as its SEATS block (`ossify-briefs.md`) — the approved seats travel in the brief,
+spine — each item's implementer and verifier agent name, keyed by item, and the
+three coordinator seats' beside them. The project file
+names agents, never commands, so no machine detail reaches the repo. The triple resolves at
+injection: build the spine session's SEATS block by looking each approved name
+up in the machine file for its command, expected model and effort, then inject
+the block into the spine session's brief (`ossify-briefs.md`) — the approved seats travel in the brief,
 so an edit made for another spine cannot reach a
 spine already running. A seat that needs to change mid-spine is a new operator
 decision you relay down through the reply; no session re-reads the file for it.

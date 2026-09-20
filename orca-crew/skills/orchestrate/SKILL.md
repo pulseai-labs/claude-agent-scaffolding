@@ -43,7 +43,8 @@ or research. **The test: if the answer needs more than one command's output, dis
 a verifier session.
 
 How many sessions may exist is the session budget in `references/roles.md` — one
-implementer seat and one verifier seat per work item, one reviewer per PR — stated
+implementer seat and one verifier seat per work item, one reviewer per PR, plus
+the seats the project file declares for the operator's own roles — stated
 once there; any session outside those seats is a planning defect. A malformed or
 incomplete report is corrected by the correction-request template in
 `references/briefs.md` — one bounded `send` to the live session that wrote it; a

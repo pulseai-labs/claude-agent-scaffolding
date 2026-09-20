@@ -46,6 +46,7 @@ LIFECYCLE_MD="$REF/lifecycle.md"
 ROLES_MD="$REF/roles.md"
 GENERIC_BRIEFS_MD="$REF/briefs.md"
 SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
+CONFIG_MD="$REF/config.md"
 PLUGIN_README_MD="$PLUGIN_ROOT/README.md"
 COMMAND_MD="$PLUGIN_ROOT/commands/orchestrate.md"
 EVAL_FIXTURE14="$PLUGIN_ROOT/tests/eval/fixtures/ossify-spine-execution/14-close-brief-identities-and-workspace-records.md"
@@ -142,6 +143,10 @@ pin "$EXEC_MD" 'one implementer and one verifier seat per item' \
   "the top recommends one implementer and one verifier seat per item"
 pin "$EXEC_MD" 'the approved seats travel in the brief' \
   "the freeze is the injected brief, not a file on disk"
+pin "$EXEC_MD" 'names agents, never commands' \
+  "the project file records agent names; the SEATS block resolves the triple"
+absent "$LIFECYCLE_MD" 'dispatch --inject' \
+  "the lifecycle never launches a seat by inject"
 
 # The three procedures were never the sidecar's: they survive the deletion
 # byte-exact, still recorded so the spine session checks rather than chooses.
@@ -202,6 +207,10 @@ done
 # becomes the verbatim rule: every item terminal launches from its SEATS row.
 pin "$BRIEFS_MD" 'SPINE_EXPECTED_MODEL=' \
   "the spine brief injects the approved expected model exactly once"
+pin "$BRIEFS_MD" 'SPINE_COMMAND=' \
+  "the spine brief injects its own command exactly once"
+pin "$BRIEFS_MD" 'SPINE_EFFORT=' \
+  "the spine brief injects its own effort exactly once"
 pin "$BRIEFS_MD" 'from its SEATS row, verbatim' \
   "every item launch spends its SEATS row, not a re-read file"
 
@@ -496,6 +505,18 @@ pin "$ROLES_MD" 'four seats' \
   "roles.md budgets four seats outside the per-item budget"
 pin "$ROLES_MD" 'a close-review writer' \
   "the budget names the close-review writer seat"
+pin "$ROLES_MD" 'the allowance the project file declares' \
+  "the budget grants declared operator roles an explicit allowance"
+
+# R-8. `replaces:` names one identifier set in both files — `implementer`,
+# `verifier`, `reviewer` and no synonyms — and the named seat is suppressed, not
+# run beside the operator's role.
+pin "$CONFIG_MD" '`implementer`, `verifier`, `reviewer`' \
+  "the replaces contract names its only valid targets in config.md"
+pin "$LIFECYCLE_MD" '`implementer`, `verifier`, `reviewer`' \
+  "the replaces contract names its only valid targets in lifecycle.md"
+pin "$LIFECYCLE_MD" 'the named seat is not launched' \
+  "a replaced built-in is suppressed, not run beside"
 
 # R1-5/R1-6/R1-9. The record pass has a precondition a `closed` return fails; the
 # spine seat is launched from its ratified block, not the generic policy; and the

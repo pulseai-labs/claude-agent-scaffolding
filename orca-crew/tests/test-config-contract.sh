@@ -58,7 +58,7 @@ pin '~/.claude/orca-crew/agents.md' "the machine file's path is stated once"
 pin '`.orca-crew/roles.md`' "the project file's path is stated once"
 
 section "the agent entry"
-for field in 'command:' 'model_shows:' 'brief_delivery:' 'can:' 'note:'; do
+for field in 'command:' 'expected_model:' 'effort:' 'model_shows:' 'brief_delivery:' 'can:' 'note:'; do
   present "$field" "agent field $field is documented"
 done
 present 'model_shows: banner' "banner is a documented value"
@@ -83,6 +83,8 @@ pin 'Workers never read either file' \
   "the readers rule survives"
 pin 'The project file wins' \
   "precedence survives"
+pin 'the first delegated dispatch' \
+  "the no-config halt lands at the first delegated dispatch"
 
 section "budget"
 if [ -f "$CONFIG_MD" ]; then

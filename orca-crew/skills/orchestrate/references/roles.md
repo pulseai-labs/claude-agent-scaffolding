@@ -90,6 +90,14 @@ seat it replaces. Any session outside those seats is a planning defect: stop and
 re-plan the item. A further read-only question goes to the existing verifier or
 implementer by `send`, never to a new session.
 
+One further seat the budget admits on declaration, and only for its declared span:
+a role the operator pins to a named point occupies a seat for that point's
+dispatch — launched when the run reaches the point, released when the role
+returns, blocking or advisory — and an `at: on-demand` role occupies a seat for
+the dispatch it was wanted for, against the allowance the project file declares,
+one at once by default. A declared role past that allowance, or a declared-role
+seat lingering past its span, is the planning defect the rule still catches.
+
 **Activated ossify spines add four seats, all outside the per-item budget above:
 the spine session, one per spine; a close
 session, a fresh terminal per close dispatch; a work-PR session, one per returned

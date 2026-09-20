@@ -32,12 +32,16 @@ The machine file is one block per agent, named by a `###` heading:
 ```markdown
 ### fast-coder
 command: <the launch command on this machine — an alias, a binary, flags and all>
+expected_model: <the model id its banner or screen must show>
+effort: <the effort it runs at — the embedded flag's value, or (agent default)>
 model_shows: banner
 brief_delivery: inject
 can: slash-commands
 
 ### devin-impl
 command: devin-implementer --effort max
+expected_model: <the model id its banner or screen must show>
+effort: max
 model_shows: screen
 brief_delivery: inject
 can: —
@@ -45,6 +49,8 @@ note: the seat guard only arms through this launcher; never define a bare `devin
 
 ### mcode-glm
 command: mcode-glm
+expected_model: <the model id its banner or screen must show>
+effort: (agent default)
 model_shows: screen
 brief_delivery: file
 can: —
@@ -53,6 +59,15 @@ can: —
 Each field exists because a measured case needs it:
 
 - `command:` — the exact command Orca runs to open this seat's terminal.
+- `expected_model:` — the model id the seat must show where `model_shows` reads
+  it, and the only source for a brief's `SEAT_EXPECTED_MODEL` — never parsed out
+  of `command:`. When the command carries a `--model` flag the two must agree;
+  a disagreement is a config defect named at approval, never a value reconciled
+  at launch.
+- `effort:` — the effort the seat runs at, and the only source for a brief's
+  `SEAT_EFFORT`. When `command:` embeds the flag, `effort:` records the same
+  value; when it embeds none, `effort:` is the operator's declaration —
+  `(agent default)` when the seat just runs its own default.
 - `model_shows:` — where the launched model is verified. `model_shows: banner` reads
   the emitted stream; `model_shows: screen` reads the rendered screen — an agent that
   paints its model into a status bar returns nothing on the default read.
@@ -107,13 +122,27 @@ brief: ./briefs/security-audit.md
 - `blocks:` — `yes` holds the run at its point until the role passes or the operator
   overrules it; anything else it returns is advice the orchestrator records.
 - `brief:` — the file the coordinator sends as that role's brief.
-- `replaces:` — hands the role a step the plugin owns; the handoff then states that
-  the step was the operator's, so no reader infers a guarantee that was not given.
+- `replaces:` — hands the role a step the plugin owns. The valid targets are
+  `implementer`, `verifier`, `reviewer`, and only those — the session roles this
+  lane owns. The named seat is not launched for that run: the operator's role runs
+  at the step's point in its place, and the handoff then states that the step was
+  the operator's, so no reader infers a guarantee that was not given. The merge
+  ask, teardown and the coordinator's own decisions are not seats and are not
+  replaceable; a spine's seats need no `replaces:` — each is already the
+  operator's choice at approval.
 
 On-demand seats cost sessions: the project file says how many may exist at once, the
 default is one, and anything beyond the declared number is a planning defect.
 
 ## When a file is missing
 
-With no files at all, every role falls back to the agent this session is already running — orca-crew works on install with no setup.
-A name the files do not define is never guessed: a seat name that neither file defines halts the run and is reported, exactly as a missing alias did.
+What the session does itself — reading, planning, the ceremonies it runs in its
+own context — needs no setup: with no files at all, every role
+falls back to the agent this session is already running, and orca-crew works on
+install. A session cannot recover its own launch command, so
+the first delegated dispatch halts with a message naming the machine file and
+the one entry the operator must add, in the shape above — a run never writes
+machine-level configuration itself.
+A name the files do not define is never guessed:
+a seat name that neither file defines halts the run and is reported, exactly as
+a missing alias did.
