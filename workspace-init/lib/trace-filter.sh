@@ -29,9 +29,27 @@ _wi_trace_filter_template() {
   fi
 }
 
+# Ownership marker lines baked into every hook this plugin installs. The
+# pre-0.5.1 template had no dedicated marker; its auto-installed header line is
+# the legacy recognition line (field installs must stay re-bakeable so the
+# moved-workspace repair keeps working).
+_WI_TRACE_FILTER_MARKER='# workspace-init:managed-hook'
+_WI_TRACE_FILTER_LEGACY='# workspace-init: commit-msg AI-trace filter (auto-installed)'
+
+# _wi_trace_filter_is_our_hook <hook-file>
+# True iff the file is a hook this plugin installed: a whole line equal to the
+# marker, or the legacy header. A hook that merely *mentions* workspace-init,
+# or quotes a marker inside a longer line, is foreign.
+_wi_trace_filter_is_our_hook() {
+  local hook="$1"
+  [[ -f "$hook" ]] || return 1
+  grep -qxF "$_WI_TRACE_FILTER_MARKER" "$hook" 2>/dev/null && return 0
+  grep -qxF "$_WI_TRACE_FILTER_LEGACY" "$hook" 2>/dev/null
+}
+
 # wi_trace_filter_render <ai-workspace-root>
 # Render the template substituting __AI_WORKSPACE_PATH__ with the given absolute path.
-# Output goes to stdout. Returns 1 if the template is missing.
+# Output goes to stdout. Returns 1 if the template is missing or unreadable.
 wi_trace_filter_render() {
   local ai_root="$1"
   local tmpl
@@ -40,10 +58,25 @@ wi_trace_filter_render() {
     wi_log_error "wi_trace_filter_render: template not found: $tmpl"
     return 1
   fi
-  # Use | as sed delimiter since absolute paths contain /.
-  # Note: if ai_root contains | this would break, but paths rarely do; for safety
-  # we use sed's c-escape via printf-quoting if needed.
-  sed "s|__AI_WORKSPACE_PATH__|${ai_root}|g" "$tmpl"
+  local content
+  if ! content="$(cat "$tmpl")"; then
+    wi_log_error "wi_trace_filter_render: could not read template: $tmpl"
+    return 1
+  fi
+  # Bake the path shell-quoted (the template assigns it unquoted), so every
+  # byte — & | \ " $ ` ' space — survives literally into the generated bash.
+  # Splice left-to-right with %%/# ops, NOT ${var//…} or sed: under bash 5.2+
+  # patsub_replacement (and always under sed), '&' in the replacement expands
+  # to the matched text. Building a separate output accumulator also means a
+  # path that itself contains the placeholder text terminates cleanly.
+  local quoted
+  quoted="$(printf '%q' "$ai_root")"
+  local rendered="" rest="$content"
+  while [[ "$rest" == *__AI_WORKSPACE_PATH__* ]]; do
+    rendered+="${rest%%__AI_WORKSPACE_PATH__*}${quoted}"
+    rest="${rest#*__AI_WORKSPACE_PATH__}"
+  done
+  printf '%s\n' "${rendered}${rest}"
 }
 
 # wi_trace_filter_is_installable_repo_root <target-repo>
@@ -74,6 +107,18 @@ wi_trace_filter_is_installable_repo_root() {
 wi_trace_filter_install() {
   local ai_root="$1"
   local target_repo="$2"
+  # Canonicalize to absolute physical paths before baking or validating: a
+  # hand-typed relative repair (from the workspace's parent dir) must produce
+  # a hook that can find the manifest.
+  local resolved
+  if [[ -n "$ai_root" ]]; then
+    resolved="$(wi_resolve_root "$ai_root")"
+    [[ -n "$resolved" ]] && ai_root="$resolved"
+  fi
+  if [[ -n "$target_repo" ]]; then
+    resolved="$(wi_resolve_root "$target_repo")"
+    [[ -n "$resolved" ]] && target_repo="$resolved"
+  fi
   if ! wi_trace_filter_is_installable_repo_root "$target_repo"; then
     wi_log_error "wi_trace_filter_install: target is not an installable git repo root: $target_repo"
     return 1
@@ -96,13 +141,32 @@ wi_trace_filter_install() {
     return 1
   }
   local out="${hooks_dir}/commit-msg"
-  if ! wi_trace_filter_render "$ai_root" > "$out" 2>/dev/null; then
-    rm -f "$out"
+  # Never displace a hook we did not install (#457). Our own hook (marker line,
+  # or the pre-0.5.1 legacy header) stays replaceable so the moved-workspace
+  # repair can re-bake it; anything else is refused before a byte is touched.
+  # The existence test must see every directory entry: -e alone misses a
+  # DANGLING symlink (-e follows the link), and a symlink is still the user's
+  # hook whether or not its target exists.
+  if [[ -e "$out" || -L "$out" ]] && ! _wi_trace_filter_is_our_hook "$out"; then
+    wi_log_error "wi_trace_filter_install: refusing to overwrite existing commit-msg hook not installed by workspace-init: $out"
+    return 1
+  fi
+  # Render to a temp file and move it into place — a failed render must never
+  # destroy an existing hook (#457).
+  local tmp="${out}.tmp.$$"
+  if ! wi_trace_filter_render "$ai_root" > "$tmp" 2>/dev/null; then
+    rm -f "$tmp"
     wi_log_error "wi_trace_filter_install: render failed"
     return 1
   fi
-  chmod +x "$out" || {
-    wi_log_error "wi_trace_filter_install: chmod failed: $out"
+  chmod +x "$tmp" || {
+    rm -f "$tmp"
+    wi_log_error "wi_trace_filter_install: chmod failed: $tmp"
+    return 1
+  }
+  mv -f "$tmp" "$out" || {
+    rm -f "$tmp"
+    wi_log_error "wi_trace_filter_install: could not install hook: $out"
     return 1
   }
   local log="${ai_root}/.workspace/init-log"
@@ -111,11 +175,38 @@ wi_trace_filter_install() {
 }
 
 # wi_trace_filter_install_pair <ai-workspace-root> <canonical-root>
-# Install in both AI workspace and canonical.
+# Install in both canonical and AI workspace. The canonical hook is the
+# load-bearing one — it guards the history that gets published — so it is
+# repaired FIRST: an AI-side refusal (e.g. a foreign hook in the workspace)
+# must not leave canonical unfiltered. An AI-side failure is reported and
+# still returns non-zero.
 wi_trace_filter_install_pair() {
   local ai_root="$1"
   local canonical_root="$2"
-  wi_trace_filter_install "$ai_root" "$ai_root" || return 1
-  wi_trace_filter_install "$ai_root" "$canonical_root" || return 1
+  # Validate the AI root BEFORE writing either hook: a mistyped or moved path
+  # must fail here, not after canonical's hook has been re-baked to a dead
+  # path (and wi_log_op would even create <bad-root>/.workspace).
+  local resolved_ai manifest
+  resolved_ai="$(wi_resolve_root "$ai_root")"
+  [[ -n "$resolved_ai" ]] || resolved_ai="$ai_root"
+  if [[ ! -d "$resolved_ai" ]]; then
+    wi_log_error "wi_trace_filter_install_pair: AI workspace root is not a directory: $ai_root"
+    return 1
+  fi
+  manifest="${resolved_ai%/}/.workspace/pairing.json"
+  if [[ ! -f "$manifest" ]]; then
+    wi_log_error "wi_trace_filter_install_pair: pairing manifest not found: $manifest"
+    return 1
+  fi
+  if ! jq -ne 'input as $doc | ([inputs] | length == 0) and ($doc | type == "object")' \
+      "$manifest" >/dev/null 2>&1; then
+    wi_log_error "wi_trace_filter_install_pair: pairing manifest is not a single JSON object: $manifest"
+    return 1
+  fi
+  wi_trace_filter_install "$resolved_ai" "$canonical_root" || return 1
+  if ! wi_trace_filter_install "$resolved_ai" "$resolved_ai"; then
+    wi_log_error "wi_trace_filter_install_pair: canonical hook updated; AI-side install refused or failed (see above)"
+    return 1
+  fi
   return 0
 }

@@ -53,8 +53,11 @@ _build_fresh_workspace() {
   git -C "$ai"  init -q
   git -C "$can" init -q
   mkdir -p "${ai}/.git/hooks" "${can}/.git/hooks"
-  : > "${ai}/.git/hooks/commit-msg"; chmod +x "${ai}/.git/hooks/commit-msg"
-  : > "${can}/.git/hooks/commit-msg"; chmod +x "${can}/.git/hooks/commit-msg"
+  # Installed hooks carry the workspace-init marker line; rollback only removes
+  # marker-bearing hooks (it must never delete a foreign one).
+  printf '#!/usr/bin/env bash\n# workspace-init:managed-hook\nexit 0\n' > "${ai}/.git/hooks/commit-msg"
+  printf '#!/usr/bin/env bash\n# workspace-init:managed-hook\nexit 0\n' > "${can}/.git/hooks/commit-msg"
+  chmod +x "${ai}/.git/hooks/commit-msg" "${can}/.git/hooks/commit-msg"
 
   {
     printf 'MKDIR\t%s\n'        "$ai"
@@ -243,7 +246,9 @@ test_7_hook_install_inverse_removes_hook_keeps_dir() {
   mkdir -p "$repo"
   git -C "$repo" init -q
   mkdir -p "$repo/.git/hooks"
-  : > "$repo/.git/hooks/commit-msg"; chmod +x "$repo/.git/hooks/commit-msg"
+  # A hook workspace-init installed (marker line) — the inverse may remove it.
+  printf '#!/usr/bin/env bash\n# workspace-init:managed-hook\nexit 0\n' > "$repo/.git/hooks/commit-msg"
+  chmod +x "$repo/.git/hooks/commit-msg"
   # Sibling hook to verify we don't blow away the whole hooks/ dir.
   : > "$repo/.git/hooks/pre-push.sample"
 
@@ -352,6 +357,36 @@ test_10_user_facing_tally_message() {
 }
 
 # ---------------------------------------------------------------------------
+# 12. HOOK_INSTALL inverse never deletes a hook it did not write (#457)
+# ---------------------------------------------------------------------------
+
+test_12_hook_install_inverse_spares_foreign_hook() {
+  local parent="$_WI_TMP/t12"
+  mkdir -p "$parent"
+  local repo="$parent/repo"
+  mkdir -p "$repo"
+  git -C "$repo" init -q
+  mkdir -p "$repo/.git/hooks"
+  # A hook NOT installed by workspace-init (no marker line) — the log claims a
+  # HOOK_INSTALL but the bytes are the user's; rollback must leave them alone.
+  printf '#!/bin/sh\necho "PREEXISTING-HOOK-MARKER"\nexit 0\n' > "$repo/.git/hooks/commit-msg"
+  chmod +x "$repo/.git/hooks/commit-msg"
+  cp "$repo/.git/hooks/commit-msg" "$parent/hook.orig"
+
+  local log="$parent/init-log"
+  printf 'HOOK_INSTALL\t%s\n' "$repo" > "$log"
+
+  local out
+  out="$(wi_rollback "$log" 2>&1)" || {
+    echo "    rollback returned non-zero"
+    return 1
+  }
+  cmp -s "$parent/hook.orig" "$repo/.git/hooks/commit-msg" || {
+    echo "    foreign hook deleted or modified by rollback"; return 1; }
+  assert_contains "not installed by workspace-init" "$out" || return 1
+}
+
+# ---------------------------------------------------------------------------
 # 11. Corrupted op line → warn + skip + continue
 # ---------------------------------------------------------------------------
 
@@ -396,5 +431,6 @@ wi_test_run test_8_git_init_inverse_removes_dot_git_only
 wi_test_run test_9_reverse_order_execution
 wi_test_run test_10_user_facing_tally_message
 wi_test_run test_11_corrupted_op_line_skipped_with_warning
+wi_test_run test_12_hook_install_inverse_spares_foreign_hook
 
 wi_test_summary

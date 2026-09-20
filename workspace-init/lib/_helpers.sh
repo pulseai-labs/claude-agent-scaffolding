@@ -43,6 +43,20 @@ wi_realpath() {
   fi
 }
 
+# wi_resolve_root <path>
+# Canonicalize to an absolute physical path, like wi_realpath, but also anchor
+# relative input at $PWD first so the result is absolute even when the target
+# (or a parent) does not yet exist. Always prints a non-empty line for
+# non-empty input; empty input prints empty.
+wi_resolve_root() {
+  local p="$1"
+  [[ -z "$p" ]] && { printf '\n'; return 0; }
+  [[ "$p" != /* ]] && p="${PWD}/${p}"
+  local resolved
+  resolved="$(wi_realpath "$p")"
+  printf '%s\n' "${resolved:-$p}"
+}
+
 # --- File-based locking via `set -o noclobber` ----------------------------
 # Mirror of architect-critic's ac_lock_acquire pattern. Retry budget is
 # configurable via WI_LOCK_RETRIES (default 5, one second between attempts)
@@ -66,23 +80,6 @@ wi_lock_release() {
   # Idempotent: -f swallows "no such file" so re-release is safe.
   rm -f "$1"
   return 0
-}
-
-# --- Atomic JSON write via jq ---------------------------------------------
-# Usage: wi_guarded_jq_write <file> <jq-program> [extra jq args...]
-# Reads <file>, applies <jq-program>, writes to <file>.tmp.$$, mv on success.
-# Returns 0 on success, 1 on jq failure (and removes the tmp file).
-wi_guarded_jq_write() {
-  local file="$1"; shift
-  local jq_program="$1"; shift
-  local tmp="${file}.tmp.$$"
-  if jq "$jq_program" "$@" "$file" > "$tmp" 2>/dev/null; then
-    mv "$tmp" "$file"
-    return 0
-  fi
-  rm -f "$tmp"
-  wi_log_error "jq failed during write to $file"
-  return 1
 }
 
 # --- Init-log entry append ------------------------------------------------

@@ -74,6 +74,41 @@ test_readme_uses_canonical_ai_suffix_in_both_fresh_modes() {
   ! grep -qF 'existing-project-ai-workspace/' "$readme"
 }
 
+# --- #173: Scenario A writes the detected remote to canonical.git_remote ---
+
+test_pair_skill_manifest_write_uses_canonical_git_remote_flag() {
+  # Scoped to the §6.4 manifest_write block only — `--git-remote` remains a
+  # valid flag elsewhere (it records the AI workspace's OWN remote).
+  local sec
+  sec="$(awk '/### 6\.4/,/### 6\.5/' "$PAIR_SKILL")"
+  assert_contains '--canonical-git-remote "$detected_remote"' "$sec" || return 1
+  assert_not_contains ' --git-remote "' "$sec" || return 1
+}
+
+test_pair_example_uses_canonical_git_remote_flag() {
+  local ex="$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/examples/pair-with-existing-clean.md"
+  grep -qF -- '--canonical-git-remote "git@github.com:example/foo.git"' "$ex" || {
+    echo "    example does not pass --canonical-git-remote"; return 1; }
+  ! grep -qF -- ' --git-remote "' "$ex" || {
+    echo "    bare --git-remote still present in example"; return 1; }
+}
+
+# --- #481: nothing names the non-existent `/init-workspace --repair` ---
+
+test_no_site_references_dead_repair_flag() {
+  local sites=(
+    "$WI_PLUGIN_ROOT/README.md"
+    "$WI_PLUGIN_ROOT/hooks/commit-msg.tmpl"
+    "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/examples/pair-with-aborts-on-ai-scaffolding.md"
+  )
+  local f
+  for f in "${sites[@]}"; do
+    [[ -f "$f" ]] || { echo "    pinned site missing: $f"; return 1; }
+  done
+  ! grep -Hn 'init-workspace --repair' "${sites[@]}" || {
+    echo "    a site still names the non-existent --repair flag"; return 1; }
+}
+
 # --- run all ---
 wi_test_run test_init_skill_file_exists
 wi_test_run test_pair_skill_file_exists
@@ -89,5 +124,8 @@ wi_test_run test_pair_command_uses_arguments_bridge
 wi_test_run test_init_skill_documents_explicit_wrapper_mode
 wi_test_run test_init_command_forwards_wrapper_grammar
 wi_test_run test_readme_uses_canonical_ai_suffix_in_both_fresh_modes
+wi_test_run test_pair_skill_manifest_write_uses_canonical_git_remote_flag
+wi_test_run test_pair_example_uses_canonical_git_remote_flag
+wi_test_run test_no_site_references_dead_repair_flag
 
 wi_test_summary

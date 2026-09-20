@@ -95,7 +95,7 @@ Downstream plugins read the manifest via `wi_manifest_resolve` to find any artif
 
 A `commit-msg` hook is installed into `<canonical>/.git/hooks/commit-msg` with the AI workspace path **baked in at install time** (so the hook keeps working even if your shell's cwd is elsewhere). On every commit to the canonical:
 
-1. Reads `<ai-workspace>/.workspace/pairing.json` (fail-open with a stderr warning if missing — re-run `/init-workspace --repair` to restore).
+1. Reads `<ai-workspace>/.workspace/pairing.json`. If the manifest is missing, malformed, or its trace-filter policy is unreadable, the hook **blocks the commit** and names the repair — the filter fails closed, because a permanent trace leak into public history costs more than a blocked commit.
 2. If `git_policy.trace_filter.enforce: false`, exits clean.
 3. Otherwise, scans the commit message against `git_policy.trace_filter.blocked_patterns` (extended regex). Default patterns:
    - `^Co-Authored-By:`
@@ -103,6 +103,39 @@ A `commit-msg` hook is installed into `<canonical>/.git/hooks/commit-msg` with t
    - `<noreply@anthropic\.com>`
    - `<noreply@openai\.com>`
 4. If any pattern matches, refuses the commit with a pointer error.
+
+The install only replaces hooks it wrote — recognised by a `# workspace-init:managed-hook` marker line (or the pre-0.5.1 `auto-installed` header). Any other existing `commit-msg` hook is preserved and the install refuses, so a user hook is never silently displaced.
+
+### Repair
+
+The hook fails closed when it cannot evaluate its policy: the commit is blocked with the specific reason and a pointer here. Find the matching reason below; every command named is a real `wi` verb (see `wi --list`) at `<workspace-init plugin dir>/bin/wi`, where the plugin dir is wherever your plugin host installed workspace-init — e.g. `~/.claude/plugins/cache/<marketplace>/workspace-init/<version>` or `~/.codex/plugins/cache/<marketplace>/workspace-init/<version>`.
+
+**`jq is not installed or not on PATH`.** The hook needs `jq` to evaluate the manifest. Install it (`apt-get install jq`, `brew install jq`, or your package manager) and retry the commit.
+
+**`AI workspace path is unreachable: <path>`.** The workspace moved or was renamed; the hook's baked path is stale. Re-bake the hooks against the new location — from the workspace's new parent directory the arguments may be typed relative (they are canonicalised to absolute physical paths before baking):
+
+```
+<plugin dir>/bin/wi trace_filter_install_pair <ai-workspace> <canonical-repo>
+```
+
+The pair form repairs the load-bearing canonical hook first; an AI-side refusal (a foreign hook, or the workspace not being a git repo) is reported and still leaves canonical protected. To repair only one repo's hook, use `wi trace_filter_install <ai-workspace> <repo>`. Re-running the pairing recipe (`/workspace-init:pair-existing-dual` or `/workspace-init:pair-workspace`) does the same through the guided flow. Note: re-baking updates the hooks only — the `ai_workspace.root` recorded inside `pairing.json` is not rewritten by this repair (tracked as #491); the pairing recipe rewrites it.
+
+**`manifest not found`, `not a single JSON object`, `enforce missing or not a boolean`, or `cannot read … blocked_patterns`.** The manifest at `<ai-workspace>/.workspace/pairing.json` is missing or corrupt. Repair it without losing canonical metadata — `project_type`, `canonical.git_remote`, `canonical.default_branch`, and any customised `git_policy` are the fields to keep. If the file still parses, read them first:
+
+```
+jq '{project_type, canonical, git_policy}' <ai-workspace>/.workspace/pairing.json
+```
+
+then rewrite with those values passed through explicitly:
+
+```
+<plugin dir>/bin/wi manifest_write <ai-workspace> <canonical-repo> <personal|work> \
+  --canonical-git-remote <remote> --default-branch <branch>
+```
+
+If the file does not parse, recover the values from the canonical repo itself: `git -C <canonical> remote get-url origin` for the remote and `git -C <canonical> symbolic-ref refs/remotes/origin/HEAD --short` (or the repo's actual default branch) for `--default-branch` — `manifest_write` defaults it to `main`, which may be wrong for this repo. A customised `git_policy` (e.g. extra `blocked_patterns`) is regenerated to defaults by `manifest_write`; re-apply customisations afterwards or hand-edit the file — it must remain a single JSON object. Re-running the pairing recipe is the guided alternative and performs the same metadata detection the original pairing used.
+
+**`<pattern> is not a valid extended regex`.** An entry in `git_policy.trace_filter.blocked_patterns` cannot be evaluated — the error names the offending pattern. Edit the manifest, fix or remove that entry, and keep the file a single JSON object; no hook reinstall is needed since the hook reads the manifest on every commit.
 
 ### Bypass
 

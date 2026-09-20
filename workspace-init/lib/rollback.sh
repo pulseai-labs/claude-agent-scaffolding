@@ -25,6 +25,10 @@ if ! declare -F wi_log_op >/dev/null 2>&1; then
   # shellcheck disable=SC1091
   source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
 fi
+if ! declare -F _wi_trace_filter_is_our_hook >/dev/null 2>&1; then
+  # shellcheck disable=SC1091
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/trace-filter.sh"
+fi
 
 # ---------------------------------------------------------------------------
 # wi_rollback <init-log-path> [--pair-with <existing-canonical>]
@@ -171,10 +175,20 @@ wi_rollback() {
           warnings=$((warnings + 1))
           continue
         fi
-        if rm -f -- "${target_path}/.git/hooks/commit-msg" 2>/dev/null; then
+        local hook="${target_path}/.git/hooks/commit-msg"
+        # Never delete a hook we did not write: install refuses foreign hooks,
+        # so a foreign commit-msg here means the user replaced ours (or the log
+        # line is stale). Leave it and warn (#457). The existence test sees a
+        # dangling symlink too — -e alone follows the link and misses it.
+        if [[ -e "$hook" || -L "$hook" ]] && ! _wi_trace_filter_is_our_hook "$hook"; then
+          wi_log_warn "wi_rollback: commit-msg hook not installed by workspace-init; leaving in place: $hook"
+          warnings=$((warnings + 1))
+          continue
+        fi
+        if rm -f -- "$hook" 2>/dev/null; then
           reverted=$((reverted + 1))
         else
-          wi_log_warn "wi_rollback: rm -f hook failed: ${target_path}/.git/hooks/commit-msg"
+          wi_log_warn "wi_rollback: rm -f hook failed: $hook"
           warnings=$((warnings + 1))
         fi
         ;;

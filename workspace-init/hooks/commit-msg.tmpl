@@ -1,35 +1,89 @@
 #!/usr/bin/env bash
 # workspace-init: commit-msg AI-trace filter (auto-installed)
+# workspace-init:managed-hook
 # DO NOT EDIT — regenerated on workspace-init runs.
 # Embedded AI workspace path: __AI_WORKSPACE_PATH__
 
-AI_WORKSPACE_PATH="__AI_WORKSPACE_PATH__"
+# The AI workspace path is baked in shell-quoted form at install time, so any
+# character in the path (" $ ` ' & | \ space …) arrives here literally.
+AI_WORKSPACE_PATH=__AI_WORKSPACE_PATH__
 MANIFEST_PATH="${AI_WORKSPACE_PATH}/.workspace/pairing.json"
 
 commit_msg_file="$1"
 if [[ ! -f "$commit_msg_file" ]]; then exit 0; fi
 
-# If manifest missing (AI workspace moved/deleted), fail-open with warning to stderr
-if [[ ! -f "$MANIFEST_PATH" ]]; then
-  echo "warning: workspace-init manifest not found at $MANIFEST_PATH; trace filter disabled. Re-run /init-workspace --repair." >&2
-  exit 0
+# The filter exists to keep AI traces out of public canonical history: a leak
+# is permanent while a blocked commit costs one repair command. When it cannot
+# evaluate its policy — manifest missing, malformed, or incomplete — it fails
+# CLOSED and states the reason (#458, #481). Repairs are prose, not computed
+# paths: see the Repair section of the workspace-init README.
+_wi_block() {
+  echo "       See Repair in the workspace-init README." >&2
+  exit 1
+}
+
+# jq evaluates every policy check below; without it none of them can run.
+# Detect it explicitly so the failure names the actual missing tool rather
+# than surfacing as a JSON parse error.
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ERROR: workspace-init trace filter fails closed: jq is not installed or not on PATH; the manifest cannot be evaluated; commit blocked." >&2
+  _wi_block
 fi
 
-# Trace filter disabled in manifest? exit clean
-enforce="$(jq -r '.git_policy.trace_filter.enforce // false' "$MANIFEST_PATH" 2>/dev/null || echo "false")"
+# Baked AI workspace path unreachable (workspace moved/deleted) → block,
+# naming the path itself rather than a JSON error.
+if [[ ! -d "$AI_WORKSPACE_PATH" ]]; then
+  echo "ERROR: workspace-init trace filter fails closed: AI workspace path is unreachable: $AI_WORKSPACE_PATH; commit blocked." >&2
+  _wi_block
+fi
+
+# Missing manifest → block.
+if [[ ! -f "$MANIFEST_PATH" ]]; then
+  echo "ERROR: workspace-init trace filter fails closed: manifest not found at $MANIFEST_PATH; commit blocked." >&2
+  _wi_block
+fi
+
+# Malformed manifest → block. `jq empty` is not sufficient: jq accepts a
+# STREAM of inputs, so an empty file, whitespace-only file, or two
+# concatenated documents all pass it. Require exactly one JSON object.
+if ! jq -ne 'input as $doc | ([inputs] | length == 0) and ($doc | type == "object")' "$MANIFEST_PATH" >/dev/null 2>&1; then
+  echo "ERROR: workspace-init trace filter fails closed: manifest at $MANIFEST_PATH is not a single JSON object; commit blocked." >&2
+  _wi_block
+fi
+
+# Only an explicit `enforce: false` disables the filter. Every manifest written
+# by wi_manifest_write carries the key; a missing or non-boolean value means a
+# corrupt manifest → block.
+if ! enforce="$(jq -r '.git_policy.trace_filter.enforce | if type == "boolean" then . else error("enforce is not a boolean") end' "$MANIFEST_PATH" 2>/dev/null)"; then
+  echo "ERROR: workspace-init trace filter fails closed: git_policy.trace_filter.enforce missing or not a boolean in $MANIFEST_PATH; commit blocked." >&2
+  _wi_block
+fi
 if [[ "$enforce" != "true" ]]; then exit 0; fi
 
-# Read patterns; handle empty array gracefully
-patterns="$(jq -r '.git_policy.trace_filter.blocked_patterns[]?' "$MANIFEST_PATH" 2>/dev/null || true)"
+# enforce:true but unreadable patterns (missing key, non-array, or non-string
+# elements) → block. An explicit empty array is a deliberate allow-everything
+# and still exits 0.
+if ! patterns="$(jq -r '.git_policy.trace_filter.blocked_patterns | if type == "array" then (if ([.[] | type == "string"] | all) then .[] else error("blocked_patterns contains non-string entries") end) else error("blocked_patterns is not an array") end' "$MANIFEST_PATH" 2>/dev/null)"; then
+  echo "ERROR: workspace-init trace filter fails closed: cannot read git_policy.trace_filter.blocked_patterns in $MANIFEST_PATH; commit blocked." >&2
+  _wi_block
+fi
 if [[ -z "$patterns" ]]; then exit 0; fi
 
-# Scan commit message against each pattern
+# Scan commit message against each pattern. grep exit status 2 is an ERE
+# evaluation error, NOT "no match" — a pattern the filter cannot apply is a
+# broken policy, and a broken policy fails closed (naming the pattern).
 while IFS= read -r pattern; do
   [[ -z "$pattern" ]] && continue
-  if grep -qE "$pattern" "$commit_msg_file"; then
+  if grep -qE -e "$pattern" -- "$commit_msg_file"; then
     echo "ERROR: commit message contains blocked AI-trace pattern: $pattern" >&2
     echo "       Edit the message and try again, or run with --no-verify to bypass (not recommended)." >&2
     exit 1
+  else
+    grc=$?
+    if [[ $grc -ne 1 ]]; then
+      echo "ERROR: workspace-init trace filter fails closed: blocked_patterns entry is not a valid extended regex: $pattern" >&2
+      _wi_block
+    fi
   fi
 done <<< "$patterns"
 
