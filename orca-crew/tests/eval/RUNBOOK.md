@@ -17,7 +17,7 @@ the file this harness copies.
 
 | Surface | Owning prose | The judgment |
 |---|---|---|
-| `ossify-spine-execution` | `skills/orchestrate/SKILL.md` + `references/ossify-execution.md` + `references/ossify-nested-run.md` + `references/ossify-briefs.md` + `references/ossify-pr-briefs.md` + `references/ossify-close-writer.md` + `references/roles.md` + `references/lifecycle.md` | the three-layer spine execution phase: four-fact activation and who owns which layer (the top ratifies, writes the sidecar and starts exactly one spine session, launching no item terminal; the spine session creates a child Run and owns both item terminals per item); Run routing that keeps item plan traffic and per-item completions in the child while the parent sees a relayed plan decision, spine-level questions and one final completion settled on the identities its injected Orca preamble names; profiles bound by the ratified sidecar row with the model confirmed from banner and first reply and no dispatch-time substitution, and a stale-`SPINE.md` or incomplete row halting; pairs fresh per item, retained only through that item's corrections, never crossing items, with generic retention unchanged outside an activated spine; and the two no-fallback rules — nested depth `2` with a depth error halting rather than degrading to an inherited-runtime subagent, the parent Run, a replacement writer or a lane restart, and the reviewer chosen only at the PR transition |
+| `ossify-spine-execution` | `skills/orchestrate/SKILL.md` + `references/ossify-execution.md` + `references/ossify-nested-run.md` + `references/ossify-briefs.md` + `references/ossify-pr-briefs.md` + `references/ossify-close-writer.md` + `references/roles.md` + `references/lifecycle.md` | the three-layer spine execution phase: four-fact activation and who owns which layer (the top agrees the seats with the operator, records them in the project file and starts exactly one spine session, launching no item terminal; the spine session creates a child Run and owns both item terminals per item); Run routing that keeps item plan traffic and per-item completions in the child while the parent sees a relayed plan decision, spine-level questions and one final completion settled on the identities its injected Orca preamble names; profiles bound by the injected SEATS block — the freeze a running spine never looks past — with the model confirmed from banner and first reply and no dispatch-time substitution, and a missing or ambiguous row halting; pairs fresh per item, retained only through that item's corrections, never crossing items, with generic retention unchanged outside an activated spine; and the two no-fallback rules — nested depth `2` with a depth error halting rather than degrading to an inherited-runtime subagent, the parent Run, a replacement writer or a lane restart, and the reviewer chosen only at the PR transition |
 
 ## Procedure (Claude executes)
 
@@ -52,6 +52,15 @@ For each `fixture.md` in `tests/eval/fixtures/<surface>/`:
 
 After all surfaces: run `bash orca-crew/tests/eval/lib/aggregate-scores.sh` and
 report the summary.
+
+**Results predating a contract change are deleted, not reused.** When the owning
+prose's contract changes — a rule added, removed, or rewritten — every JSON
+under `results/<surface>/` written against the old contract is stale: it scores
+the invoke against authority that no longer exists. Delete the whole directory's
+JSON for the affected surface before the next run; do not carry results forward
+and do not keep them for comparison. The same applies to fixture files the
+change retires and to any control records under `evidence/` built on the old
+contract.
 
 ## Fixture format
 

@@ -17,7 +17,7 @@ expected_reason: 'Retention is item-local, has an end, and its first failure is 
   and a fresh session could not adopt another''s staged tree anyway, because that
   entry point''s pre-flight requires an empty porcelain. Never two pairs live on one
   item. When w1 passes, that pair is released. Round 2''s w3 then gets a FRESH pair
-  from its own ratified row, even though w1''s implementer is alive, idle, well-warmed
+  from its own SEATS row, even though w1''s implementer is alive, idle, well-warmed
   on this spine and cheaper to reuse. A second failure asks again with the same three
   options rather than escalating silently. The wrong answers this fixture falsifies
   are: correcting on the first failure without asking, which is the pre-0.4.0 behaviour;
@@ -37,13 +37,15 @@ export honours the column order the spec fixes).
 `r5.s2.w1`'s implementer terminal and verifier terminal are both still alive.
 Round 1's other item, `r5.s2.w2`, has already closed and its pair was released.
 
-The sidecar's rows for this spine are:
+Your brief's SEATS block reads:
 
-| work_item_id | implementer_terminal_command | verifier_terminal_command |
-|---|---|---|
-| r5.s2.w1 | claude --model claude-opus-5 --effort xhigh | claude-glm --effort high |
-| r5.s2.w2 | claude-glm-flash | claude-glm --effort high |
-| r5.s2.w3 | claude-glm --effort max | claude-glm --effort high |
+    SEATS — the operator-approved seats for this spine. Use them verbatim.
+    r5.s2.w1 implementer: claude --model claude-opus-5 --effort xhigh | model: claude-opus-5 | effort: xhigh
+    r5.s2.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high
+    r5.s2.w2 implementer: fast-coder | model: fast-v1 | effort: (agent default)
+    r5.s2.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high
+    r5.s2.w3 implementer: strong-coder --effort max | model: strong-v2 | effort: max
+    r5.s2.w3 verifier:    strong-coder --effort high | model: strong-v2 | effort: high
 
 Round 2 holds only `r5.s2.w3`, which depends on both round-1 items.
 

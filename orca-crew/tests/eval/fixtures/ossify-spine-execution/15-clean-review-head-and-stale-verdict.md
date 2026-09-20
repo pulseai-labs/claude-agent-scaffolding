@@ -18,7 +18,7 @@ expected_reason: 'A clean delegated review is Findings: none PLUS Reviewed head 
 
 You are the work-PR session for PR #57 in `product-core`. Events in order:
 
-1. You created the reviewer from the ratified PR-transition profile; it reviewed
+1. You created the reviewer from the approved PR-transition profile; it reviewed
    the PR at head `a1b2c3d` and returned exactly:
    `Findings: none`.
    No `Reviewed head:` line, no summary.
