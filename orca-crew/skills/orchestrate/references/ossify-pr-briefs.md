@@ -94,6 +94,7 @@ WORKPR_EFFORT=<the effort this seat was launched at>
 REVIEWER=<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
 REVIEW_LEVEL=<the /code-review level the top decided>
 PRFIX=<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
+OPERATOR_ROLES=<each declared role at its point — before-review (before step 3's reviewer), after-disposition (after the ledger), before-merge-ask (before the merge-ready return): <name> | agent: <resolved profile row> | blocks: <yes|no> | brief: <path> — or "none">
 PRIOR_REVIEW=<the prior dispatch's durable review record — ran, reviewed head,
 clean/findings state, summary, fix rounds run, ledger/comment refs — "none", or "covered">
 MERGE_EXECUTOR=<session|operator — the top's explicit assignment>
@@ -103,7 +104,8 @@ injected into this terminal; spend those verbatim — never placeholders, never
 ids predicted before it existed. Capture them, and PARENT_RUN_ID, before
 binding your child Run.
 
-TASK: drive PR_NUMBER to a merge on the top's word.
+TASK: drive PR_NUMBER to a merge on the top's word. At each OPERATOR_ROLES point,
+dispatch the role's seat from its row with its `brief:` file — `blocks: yes` holds the session: relay the summary to the top and wait for its reply.
   1. Capture your own preamble identities and PARENT_RUN_ID, then bind a CHILD
      Run for your two seats — every seat's task-create, worker-start, dispatch
      and check names --run <child run id>, every top question --run PARENT_RUN_ID.

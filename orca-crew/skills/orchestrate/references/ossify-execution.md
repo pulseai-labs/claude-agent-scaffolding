@@ -26,7 +26,7 @@ planned *this* spine.
 
 | Layer | Owns | Never |
 |---|---|---|
-| **Top orchestrator** (you) | agreeing one implementer/verifier seat per item and the three coordinator seats — spine, close, work-PR — with the operator into the project file, injecting them into the spine session's brief as its SEATS block, launching the spine terminal from that seat's command with its model confirmed as its `model_shows` says and from the first reply and its effort passed as the launch argument — a mismatch is a failed launch, exactly as for an item row — approving or amending each relayed worker plan, deciding the reviewer and PR-fix seats at the PR transition, dispatching the close and one work-PR session per returned PR, each launched from its project-file seat with the model confirmed as an item row's, assigning each work-PR dispatch's merge executor (`MERGE_EXECUTOR`) and supplying its `PRIOR_REVIEW` — `none` only for a PR no earlier work-PR dispatch has covered, `covered` when one has and left durable evidence its review ran but persisted no record, otherwise the durable record that PR's last `open:` result persisted — asking for a writer profile and dispatching one fresh close-review writer per affected hosting repo when a close returns `halted: close-review`, relaying the merge word, dispatching the record pass, and the teardown | launching or supervising an item terminal; reading raw child completion traffic; reviewing, fixing or merging a spine PR itself |
+| **Top orchestrator** (you) | agreeing one implementer/verifier seat per item and the three coordinator seats — spine, close, work-PR — with the operator into the project file, injecting them into the spine session's brief as its SEATS block, launching the spine terminal from that seat's resolved profile, verbatim — a model mismatch is a failed launch, exactly as for an item row — approving or amending each relayed worker plan, deciding the reviewer and PR-fix seats at the PR transition, dispatching the close and one work-PR session per returned PR, each launched from its project-file seat with the model confirmed as an item row's, assigning each work-PR dispatch's merge executor (`MERGE_EXECUTOR`) and supplying its `PRIOR_REVIEW` — `none` only for a PR no earlier work-PR dispatch has covered, `covered` when one has and left durable evidence its review ran but persisted no record, otherwise the durable record that PR's last `open:` result persisted — asking for a writer profile and dispatching one fresh close-review writer per affected hosting repo when a close returns `halted: close-review`, relaying the merge word, dispatching the record pass, and the teardown | launching or supervising an item terminal; reading raw child completion traffic; reviewing, fixing or merging a spine PR itself |
 | **Spine session** | the ossify lane, a nested child Run, launching and supervising both item terminals per item, relaying plans up, item-local corrections | changing any ossify contract; moving item tasks into the parent Run |
 | **Item terminals** | one item each: implement, verify | crossing into another item |
 | **Close session** | one dispatch of `/ossify:close`, returning every PR it opened | creating any terminal; driving a PR it opened |
@@ -68,7 +68,8 @@ injection: build the spine session's SEATS block by looking each approved name
 up in the machine file for its resolved profile, then inject
 the block into the spine session's brief (`ossify-briefs.md`) — the approved seats travel in the brief,
 so an edit made for another spine cannot reach a
-spine already running. A seat that needs to change mid-spine is a new operator
+spine already running. With it go this spine's declared `after-implementer` role
+blocks as the brief's `OPERATOR_ROLES`, each `agent:` resolved into its row the same way. A seat that needs to change mid-spine is a new operator
 decision you relay down through the reply; no session re-reads the file for it.
 
 A handoff the top writes **carries the approved seats verbatim** — the item rows
@@ -112,7 +113,8 @@ item row is; step 8's reviewer seat is the default only outside such a spine.
 its item's close and the spine session was a coordinator, not a writer — so step 10's
 *retained implementer* does not exist here. Ask for one PR-fix resolved profile
 alongside the reviewer's, and inject it into the same work-PR
-brief. The seat is **decided** by you and **created and dispatched by the work-PR
+brief — with the declared roles at that session's points (`before-review`,
+`after-disposition`, `before-merge-ask`) as its `OPERATOR_ROLES`, resolved the same way. The seat is **decided** by you and **created and dispatched by the work-PR
 session**, only once its disposition ledger exists, on `briefs.md`'s **fix-round
 brief** rather than the planned-implementer brief, whose DONE opens a new PR: it works
 the PR that already exists. One seat per PR, released at merge.

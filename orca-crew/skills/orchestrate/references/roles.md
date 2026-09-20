@@ -111,7 +111,9 @@ PR-fix seat inside a child Run of
 its own, so those two are budgeted there rather than here — the top decides both
 profiles at the PR transition and injects them, and neither survives the merge. No
 implementer is retained into a spine PR: every item pair was released at its item's
-close. None of these seats exists anywhere else.
+close. None of these seats exists anywhere else. A `doctor session` — one fresh
+terminal per `/ossify:doctor` dispatch, released on return — sits outside the
+budget too, launched from the project-file seat of the same name.
 
 ## Placement
 

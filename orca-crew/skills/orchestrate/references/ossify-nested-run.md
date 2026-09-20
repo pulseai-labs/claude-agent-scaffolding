@@ -59,7 +59,8 @@ close-the-Run step: the CLI exposes none.
    Gather the round's plans into **one** ordered ask to you; return an independent
    approve-or-amend per item; reply on each original child id, before which no edit
    starts.
-5. On each complete return, capture the item's four-part fingerprint, then create and
+5. On each complete return, capture the item's four-part fingerprint, spend every
+   `OPERATOR_ROLES` role at your brief's spend rule, then create and
    dispatch that item's **fresh verifier terminal** from its SEATS row's exact
    command, in the same worktree, against the fixed all-claims procedure.
    `cannot determine` = fail.

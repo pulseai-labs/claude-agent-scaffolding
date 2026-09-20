@@ -161,15 +161,15 @@ A role the operator defines in the project file (`config.md`) runs at a named po
 the run above: `after-implementer` (after step 6), `before-review` (before step 8),
 `after-disposition` (after step 9), `before-merge-ask` (before step 12's ask),
 `at-teardown` (step 12's teardown — release and branch deletion, not step 13's
-handoff). `at: on-demand` has no fixed point, dispatched when wanted — its seat
-counts against the allowance the project file declares, one by default. A declared
-role's seat lives for its dispatch — launched at its point or on demand, released on
-return — never a standing seat. A role with `blocks: yes` holds the run at its point
-until it passes or the operator overrules it — the orchestrator relays its summary,
-the operator's word settles it, anything else is advice in the disposition. A role
-with `replaces:` takes a plugin step — `implementer`, `verifier`, `reviewer`:
-the named seat is not launched, the role runs at its point in its place, and the
-handoff says which step was the operator's.
+handoff). `at: on-demand` has no fixed point — dispatched when wanted, against the
+project file's allowance of one. A declared role's seat lives for its dispatch
+only — launched at its point, released on return. A role with `blocks: yes` holds
+the run at its point until it passes or the operator overrules it — on a delegated
+path the role rides that session's brief, and its summary relays through the top
+to the operator, whose word returns through the reply (`config.md` names who
+carries each point); anything else is advice in the disposition. A role with
+`replaces:` takes a plugin step — `implementer`, `verifier`, `reviewer` — and
+the named seat is not launched, the handoff saying which step was the operator's.
 
 ## Rotation past the context ceiling
 

@@ -142,12 +142,12 @@ plugin's configuration.
 ## Configuration
 
 Two operator-owned markdown files, read as prose — nothing parses them.
-`~/.claude/orca-crew/agents.md` is the machine file: the agents this machine can
-launch, one block each — `command`, `model_shows`, `brief_delivery`, `can`, `note`.
+`~/.claude/orca-crew/agents.md` is the machine file: the agents this machine can launch, one block each — `command`, `expected_model`, `effort`, `model_shows`, `brief_delivery`, `can`, `note`; the field table in `skills/orchestrate/references/config.md` says what each means and where it travels.
 `<project root>/.orca-crew/roles.md` is the project file: which agent fills each role,
 the operator's own roles, and the conditions that choose between seats — it wins for
-anything it names. With neither file, every role falls back to the agent the session
-is already running; a seat name neither defines halts the run. The contract and field
+anything it names. With neither file the session's own work needs no setup, and the
+first delegated dispatch halts naming the file to add; a seat name neither defines
+halts the run. The contract and field
 reference are `skills/orchestrate/references/config.md`.
 
 ## Requirements

@@ -74,7 +74,8 @@ Three consequences:
 ## 3. Roles
 
 The plugin ships the role list — orchestrator, planned and fast implementer, reviewer,
-verifier, the operator, and the coordinator seats an activated spine adds — and
+verifier, the operator, the coordinator seats an activated spine adds, and a
+`doctor session` — and
 `references/roles.md` is the table. Which agent fills each role comes from the
 operator's two files (`references/config.md`), never from this plugin's prose. A seat
 name neither file defines halts the run rather than guessing.
@@ -108,10 +109,13 @@ command by the delegation floor: does it need the operator turn by turn?
 Two cases are named because they look like clashes and are not:
 
 - **`run-spine`, by default.** Dispatch `/ossify:run-spine <id>` to one lane-driver
-  session — the seat the project file names for it. From ossify's point of view that
-  session is its orchestrator: it holds the state lock, spawns
-  `ossify:implementer-agent` subagents through the `Agent` tool, commits at each close,
-  merges at the barrier. The `Agent`-tool ban in §2 applies to this session only. You
+  session — the seat the project file names for it, `can: subagents` on its machine
+  entry since the lane spawns `ossify:implementer-agent` subagents through the
+  `Agent` tool. From ossify's point of view that
+  session is its orchestrator: it holds the state lock, commits at each close,
+  merges at the barrier. Its dispatch brief carries the declared roles for the
+  points its path crosses, as `config.md` rules. The `Agent`-tool ban in §2 applies
+  to this session only. You
   wait on one `worker_done` per spine.
 - **`run-spine`, when this session just planned the spine.** Then the items deserve
   their own models, and inherited-runtime subagents cannot give them that.

@@ -345,6 +345,61 @@ pin "$CONFIG_MD" 'close session, work-PR session)' \
 pin "$CONFIG_MD" 'Machine file only' "the machine-only state is stated"
 pin "$CONFIG_MD" 'Project file only' "the project-only state is stated"
 
+# Round 3, finding 2: a machine-entry field list that names the
+# launch-transport fields must name the launch fields too — a partial
+# enumeration is the same defect as a partial row.
+for f in "$REF"/*.md "$SKILL_MD" "$PLUGIN_README_MD" "$COMMAND_MD" \
+         "$PLUGIN_ROOT"/tests/eval/fixtures/ossify-spine-execution/*.md \
+         "$EVAL_RUBRIC_MD"; do
+  l=$(awk 'index($0, "| model:") > 0 { next }
+      { c = (index($0,"command")>0) + (index($0,"expected_model")>0) + (index($0,"effort")>0) + (index($0,"model_shows")>0) + (index($0,"brief_delivery")>0)
+        if (c >= 3 && c < 5) print }' "$f" | wc -l | tr -d ' ')
+  if [ "$l" -eq 0 ]; then pass "no partial field-name enumeration in ${f##*/}"
+  else fail "no partial field-name enumeration in ${f##*/}" "$l line(s) name some launch fields but not all"; fi
+done
+
+section "declared roles fire inside delegated sessions"
+
+# Round 3, finding 1: a declared role runs at its point on every supported
+# path — the session whose path crosses it carries the block in its brief,
+# since a delegated session never reads either file.
+pin "$CONFIG_MD" 'crosses the point carries the block' \
+  "config names which session carries a declared role"
+pin "$BRIEFS_MD" 'OPERATOR_ROLES=' \
+  "the spine brief carries the declared roles for its points"
+pin "$PRBRIEFS_MD" 'OPERATOR_ROLES=' \
+  "the work-PR brief carries the declared roles for its points"
+pin "$LIFECYCLE_MD" 'rides that session' \
+  "lifecycle says the role travels in the session's brief"
+n_eq "$EXEC_MD" 'OPERATOR_ROLES' 2 \
+  "the top injects the declared role blocks"
+
+# Round 3, finding 3: the approval check covers every capability a role's
+# shipped brief needs — the default run-spine lane spawns subagents.
+n_eq "$CONFIG_MD" 'subagents' 3 \
+  "the can: vocabulary covers the default lane's Agent tool"
+pin "$CONFIG_MD" 'the default lane spawns' \
+  "the capability table names the default lane's need"
+
+# Round 3, finding 4: every dispatched command resolves to a role the project
+# file can fill — doctor gets its own seat.
+n_eq "$CONFIG_MD" 'doctor session' 2 \
+  "doctor session is a project-file role and in the capability table"
+pin "$ROLES_MD" 'doctor session' \
+  "the seat budget grants a doctor session"
+# Next-instance gate: every command SKILL.md lists as dispatched to an Orca
+# session must name its `/ossify:` invocation in config.md — a dispatched
+# command with no role to fill is the same defect.
+start=$(awk '/Dispatched to an Orca session/{print NR; exit}' "$SKILL_MD")
+missing=0
+for cmd in $(awk -v s="$start" 'NR>=s && NR<=s+1' "$SKILL_MD" | tr '\n' ' ' | tr '`' '\n' | awk 'NR%2==0' | tr -d ' ,'); do
+  [ -n "$cmd" ] || continue
+  if [ "$(occurrences "$CONFIG_MD" "/ossify:$cmd")" -eq 0 ]; then
+    missing=$((missing+1)); fail "dispatched command '$cmd' resolves to a role" "no /ossify:$cmd in config.md"
+  fi
+done
+if [ "$missing" -eq 0 ]; then pass "every dispatched command resolves to a role in config.md"; fi
+
 section "the handoff carries the approved seats"
 
 # R2-1/R2-3, re-expressed: the child is never the source of its own seats — the

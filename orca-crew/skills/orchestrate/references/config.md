@@ -18,8 +18,8 @@ repo. For a dual-repo project the project root is the AI workspace, which is whe
 orchestrators launch; for a single-repo project it is that repo.
 
 Resolution is a walk up from the session's working directory: the first project file
-found on that walk is the one in force. The pairing manifest is deliberately not
-consulted — it records absolute roots from another machine and is wrong on this host.
+found on that walk is the one in force. The pairing manifest is not consulted —
+its absolute roots are wrong on this host.
 
 The project file wins for anything it names — a seat, an extra role, a condition; it
 never redefines how an agent is launched. Workers never read either file — a brief is
@@ -61,28 +61,25 @@ Each field exists because a measured case needs it:
 - `command:` — the exact command Orca runs to open this seat's terminal.
 - `expected_model:` — the model id the seat must show where `model_shows` reads
   it, and the only source for a brief's `SEAT_EXPECTED_MODEL` — never parsed out
-  of `command:`. When the command carries a `--model` flag the two must agree;
-  a disagreement is a config defect named at approval, never a value reconciled
-  at launch.
+  of `command:`. A `--model` flag in the command must agree; a disagreement is a
+  config defect named at approval, never reconciled at launch.
 - `effort:` — the effort the seat runs at, and the only source for a brief's
-  `SEAT_EFFORT`. When `command:` embeds the flag, `effort:` records the same
-  value; when it embeds none, `effort:` is the operator's declaration —
-  `(agent default)` when the seat just runs its own default.
-- `model_shows:` — where the launched model is verified. `model_shows: banner` reads
-  the emitted stream; `model_shows: screen` reads the rendered screen — an agent that
-  paints its model into a status bar returns nothing on the default read.
-- `brief_delivery:` — `brief_delivery: inject` is the ordinary dispatch;
-  `brief_delivery: file` writes the brief to a file and sends one line pointing at it,
-  for an agent whose composer fragments a multi-line inject.
-- `can:` — what the agent is able to run; the per-role requirement is in the
-  resolved-profile table below, checked at approval, never at dispatch.
+  `SEAT_EFFORT` — the embedded flag's value, or the operator's declaration
+  (`(agent default)` when the seat just runs its own).
+- `model_shows:` — where the launched model is verified: `banner` reads the emitted
+  stream; `screen` the rendered screen — a status-bar agent returns nothing on the default read.
+- `brief_delivery:` — `inject` is the ordinary dispatch; `file` writes the brief to
+  a file and sends one line pointing at it, for an agent whose composer fragments injects.
+- `can:` — what the agent is able to run, comma-separated: `slash-commands`,
+  `subagents` (the lane's `Agent`-tool workers), or `—`. The per-role requirement
+  is in the resolved-profile table below, checked at approval, never at dispatch.
 - `note:` — free prose the coordinator reads when it uses that agent.
 
 ## What a resolved profile carries
 
 An agent name resolves through the machine file to a **profile** — the values a
-launch needs. This table is the whole contract for which travels where: every
-surface carrying a profile conforms rather than restating a field list.
+launch needs. This table is the contract for which travels where: every surface
+carrying a profile conforms rather than restating a field list.
 
 | field | set by | consumed at | travels |
 |---|---|---|---|
@@ -94,8 +91,7 @@ surface carrying a profile conforms rather than restating a field list.
 | `can:` | the machine entry | the seat's approval | never — checked where a seat is approved |
 | `note:` | the machine entry | the coordinator's read | never |
 
-A resolved profile renders as one row wherever it travels — a SEATS row, a
-coordinator profile in a brief, a handoff line:
+A resolved profile renders as one row wherever it travels:
 
 `<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>`
 
@@ -107,18 +103,19 @@ spine-seat approval, the PR-transition ask, the close-review halt ask — never 
 dispatch. The requirement is per role: a role whose shipped or declared brief invokes a slash command needs
 `can: slash-commands` on the agent that fills it.
 
-| role | its brief invokes | needs `slash-commands` |
+| role | its brief invokes | needs |
 |---|---|---|
-| reviewer | `/code-review` | yes |
-| implementer, verifier | no command | no |
-| fix-round implementer | `/ossify:work-pr` when ossify is installed | yes then |
-| ossify item implementer | `/ossify:work-item` | yes |
-| item verifier | no command | no |
-| spine session | `/ossify:run-spine` | yes |
-| close session | `/ossify:close` | yes |
-| work-PR session | `/ossify:work-pr` | yes |
-| PR-fix seat inside work-PR | none — the clause is removed | no |
-| close-review writer | no command | no |
+| reviewer | `/code-review` | `slash-commands` |
+| implementer, verifier | no command | — |
+| fix-round implementer | `/ossify:work-pr` when ossify is installed | `slash-commands` then |
+| ossify item implementer | `/ossify:work-item` | `slash-commands` |
+| item verifier | no command | — |
+| spine session | `/ossify:run-spine` — the default lane spawns `ossify:implementer-agent` subagents; the external-executor lane does not | `slash-commands, subagents` |
+| close session | `/ossify:close` | `slash-commands` |
+| work-PR session | `/ossify:work-pr` | `slash-commands` |
+| doctor session | `/ossify:doctor` | `slash-commands` |
+| PR-fix seat inside work-PR | none — the clause is removed | — |
+| close-review writer | no command | — |
 | an operator-defined role | whatever its `brief:` invokes | as declared |
 
 ## The project file
@@ -142,7 +139,8 @@ Three sections. `## Seats` is a table of role, agent name and when:
 is free text: conditions are sentences the coordinator reads when it picks a seat, and
 nothing parses them. The plugin ships the role list — orchestrator, implementer,
 verifier, reviewer and the coordinator seats (spine session,
-close session, work-PR session); the project file fills them and does not define new
+close session, work-PR session), plus a `doctor session` for `/ossify:doctor`
+dispatches; the project file fills them and does not define new
 built-ins. The close-review writer is not a project-file seat — the operator names
 its profile at the halt that creates it (`ossify-close-writer.md`).
 
@@ -165,36 +163,36 @@ brief: ./briefs/security-audit.md
 - `blocks:` — `yes` holds the run at its point until the role passes or the operator
   overrules it; anything else it returns is advice the orchestrator records.
 - `brief:` — the file the coordinator sends as that role's brief.
-- `replaces:` — hands the role a step the plugin owns. The valid targets are
-  `implementer`, `verifier`, `reviewer`, and only those — the session roles this
-  lane owns. The named seat is not launched for that run: the operator's role runs
-  at the step's point in its place, and the handoff then states that the step was
-  the operator's, so no reader infers a guarantee that was not given. The merge
-  ask, teardown and the coordinator's own decisions are not seats and are not
-  replaceable; a spine's seats need no `replaces:` — each is already the
-  operator's choice at approval.
+- `replaces:` — hands the role a step the plugin owns; the valid targets are
+  `implementer`, `verifier`, `reviewer` only. The named seat is not launched for
+  that run — the operator's role runs at the step's point in its place, and the
+  handoff states the step was the operator's, so no reader infers a guarantee not
+  given. The merge ask, teardown and the coordinator's decisions are not
+  replaceable; a spine's seats need none — each is already the operator's choice.
 
 On-demand seats cost sessions: the project file says how many may exist at once, the
 default is one, and anything beyond the declared number is a planning defect.
 
+A declared role runs at its point on every supported path. The session whose path
+crosses the point carries the block in its own brief — name, its agent's resolved
+profile, `blocks:` and `brief:` — injected by the top, since a delegated session
+never reads either file: `after-implementer` lands in the spine session,
+`before-review`, `after-disposition` and `before-merge-ask` in the work-PR
+session, `at-teardown` and `on-demand` stay with the top. A `blocks: yes` role
+holds whichever session it lands in — its summary relays to the top, the top asks
+the operator, and the word returns through the reply.
+
 ## When a file is missing
 
 What the session does itself — reading, planning, the ceremonies it runs in its
-own context — needs no setup in any of the three states: every role
-falls back to the agent this session is already running, and orca-crew works on
-install. Delegation is where each state meets its missing half — a session
-cannot recover its own launch command, so
-the first delegated dispatch halts; which file it names depends on what exists:
+own context — needs no setup in any state: every role falls back to the agent this session is already running, and orca-crew works on install. Delegation meets each state's missing half — a session cannot recover its own launch command, so the first delegated dispatch halts; which file it names depends on what exists:
 
-- **Neither file.** It names the machine file and the one entry the operator
-  must add, in the shape above.
-- **Machine file only.** Agent names have launch details but no role mapping;
-  it names the project file and the `## Seats` section to add, in the shape
-  above.
-- **Project file only.** Roles name agents nothing resolves; it names the
+- Neither file — the machine file and the one entry to add, in the shape above.
+- Machine file only — agent names have launch details but no role mapping; it
+  names the project file and the `## Seats` section to add.
+- Project file only — roles name agents nothing resolves; it names the
   machine file and the entry to add.
 
-A run never writes machine-level configuration itself.
-A name the files do not define is never guessed:
-a seat name that neither file defines halts the run and is reported, exactly as
-a missing alias did.
+A run never writes machine-level configuration itself. A name the files do not
+define is never guessed — a seat name that neither file defines halts the run
+and is reported, exactly as a missing alias did.
