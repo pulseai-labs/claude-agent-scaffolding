@@ -562,4 +562,25 @@ printf 'Tests:       4 skipped, 4 total\n' > "$TMP/jest-skip2.out"
 t_capture bash "$OSSB" zero_tests_guard "jest" < "$TMP/jest-skip2.out"
 t_assert_rc 0 "#496-R3 control: an all-skipped run still flags (0 executed)"
 
+# ===========================================================================
+# PR #496 round 4 (R4-2) - a skipped TAP record is not go execution evidence.
+# Node's TAP reporter emits `ok N - name # SKIP` per skipped test; an all-skip
+# `npm test` prints `# pass 0` (the round-1 zero marker) beside `ok ... # SKIP`
+# records the unscoped `^(ok|FAIL)` scan then read as a real run - suppressing
+# the marker. `# SKIP`/`# TODO` records are filtered out of the ok/FAIL scan;
+# genuinely-run TAP records still count.
+# ===========================================================================
+printf 'ok 1 - first # SKIP\nok 2 - second # SKIP\n# pass 0\n# skip 2\n' > "$TMP/tap-allskip.out"
+t_capture bash "$OSSB" zero_tests_guard "npm test" < "$TMP/tap-allskip.out"
+t_assert_rc 0 "#496-R4: an all-SKIP TAP run still flags - 'ok N # SKIP' is not execution"
+printf 'ok 1 - todo for later # TODO\n# pass 0\n# todo 1\n' > "$TMP/tap-todo.out"
+t_capture bash "$OSSB" zero_tests_guard "npm test" < "$TMP/tap-todo.out"
+t_assert_rc 0 "#496-R4: a TAP '# TODO' record is not execution either"
+printf 'ok 1 - a real test\nok 2 - another real test\n# pass 2\n' > "$TMP/tap-real.out"
+t_capture bash "$OSSB" zero_tests_guard "npm test" < "$TMP/tap-real.out"
+t_assert_rc 1 "#496-R4 control: genuinely-run TAP records still count as execution"
+printf 'ok 1 - real\nok 2 - skipped one # SKIP\n# pass 1\n# skip 1\n' > "$TMP/tap-mixed.out"
+t_capture bash "$OSSB" zero_tests_guard "npm test" < "$TMP/tap-mixed.out"
+t_assert_rc 1 "#496-R4 control: a real pass beside a SKIP still rescues"
+
 rm -rf "$TMP"; t_summary

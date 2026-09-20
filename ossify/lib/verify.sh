@@ -154,12 +154,16 @@ oss_verify_zero_tests_guard() { # $1=command ; output on STDIN
   # `FAIL pkg  0.012s` summary lines are the only execution evidence, and
   # only when the line lacks `[no test`/`[build failed]`/`[setup failed]` -
   # a filter-missed or unbuilt package did not run (the disambiguation at
-  # scaffold-dev/lib/verify.sh's go arm). Filter into a var, then exclude -
-  # a two-grep pipeline re-introduces the SIGPIPE hazard the header warns
-  # about. The `[ -n ]` is load-bearing: a herestring on an EMPTY var is one
-  # empty line, which `grep -v` counts as a surviving line and would read
-  # every output with zero ok/FAIL lines as execution evidence.
-  local ran; ran="$(grep -E '^(ok|FAIL)[[:space:]]' <<<"$out" || true)"
+  # scaffold-dev/lib/verify.sh's go arm). The `[ -n ]` is load-bearing: a
+  # herestring on an EMPTY var is one empty line, which `grep -v` counts as
+  # a surviving line and would read every output with zero ok/FAIL lines as
+  # execution evidence. The same `ok` shape collides with node TAP records
+  # `ok N - name # SKIP` / `# TODO` - a SKIP/TODO record is a test that did
+  # NOT run, so those lines are filtered out here or an all-skipped `npm
+  # test` reads as execution. The piped `grep -v` is SIGPIPE-safe because it
+  # consumes to EOF - the header's hazard is a `-q`/`-m` consumer that exits
+  # on first match while the producer still writes.
+  local ran; ran="$(grep -E '^(ok|FAIL)[[:space:]]' <<<"$out" | grep -vE '#[[:space:]]*(SKIP|TODO)([[:space:]]|$)' || true)"
   [ -n "$ran" ] && grep -vqE '\[no test|\[build failed\]|\[setup failed\]' <<<"$ran" && return 1
   # go -json: a test-level event carries a "Test" field; a package-level
   # {"Action":"pass","Package":…} does not, and is emitted even for an

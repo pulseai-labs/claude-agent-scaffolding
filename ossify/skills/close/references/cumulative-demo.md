@@ -150,13 +150,6 @@ cmd="$("$oss_bin" get ".demo_ledger[] | select(.id==\"<line-id>\") | .command")"
 # It is also DISPOSED below, on every exit path: the dir holds full command
 # output, which is large and can carry secrets, so an accumulating tmp dir
 # per close is its own defect.
-evd="$(mktemp -d)"
-
-# The trap is armed BEFORE the first command that can fail - the mktemps
-# below included - so an exit through `set -e` anywhere in the block disposes
-# of the dir. A failing head capture is the NORMAL case: this block exists to
-# investigate a quarantined (failing) line. The cleanup reads the scratch
-# files only under existence tests because they may not exist yet.
 # The restore runs on EVERY exit path, not just the happy one. Without the trap
 # a repo that cannot reach its first parent halts here with the repos ahead of
 # it still detached - a diagnostic check leaving the workspace half rolled back,
@@ -167,13 +160,13 @@ evd="$(mktemp -d)"
 # trap cleared, and the close continuing with that repo detached at a first
 # parent. Every repo is still ATTEMPTED before the halt, so one stuck repo does
 # not strand the rest.
-# The same trap disposes of the evidence dir and the two scratch files - a
-# halt inside the detach loop exits through it, and an unremoved mktemp -d
-# holding full head/parent output accumulates one directory per close. The
+# The cleanup also disposes of the evidence dir and the two scratch files. The
 # `[ -f ]` keeps a post-disposal exit from re-reading a $restore that is
 # already gone, and `|| true` keeps a FAILED restore from skipping the rm -
 # the command after a bare `&&` is not errexit-exempt, so under `set -e` a
-# nonzero restore would abort the trap before the disposal.
+# nonzero restore would abort the trap before the disposal. Every rm operand
+# is a `${name:+"$name"}` expansion so a fire before the scratch names exist
+# still removes the dir.
 _oss_restore_failed=0
 _oss_restore_checkouts() {
   while IFS="$(printf '\t')" read -r r w; do
@@ -187,8 +180,15 @@ _oss_restore_checkouts() {
 }
 _oss_close_cleanup() {
   if [ -f "${restore:-}" ]; then _oss_restore_checkouts || true; fi
-  rm -rf "$evd" ${pairs:+"$pairs"} ${restore:+"$restore"} 2>/dev/null
+  rm -rf ${evd:+"$evd"} ${pairs:+"$pairs"} ${restore:+"$restore"} 2>/dev/null
 }
+# The trap's armed span IS the evidence dir's lifespan: armed on the line after
+# the dir is created, disarmed on the line after it is removed. A failing head
+# capture is the NORMAL case - this block exists to investigate a quarantined
+# (failing) line - so every exit through `set -e`, and any signal anywhere in
+# between, disposes of the dir. The functions sit ABOVE the dir's creation so
+# nothing the trap can name is undefined at arm time.
+evd="$(mktemp -d)"
 trap _oss_close_cleanup EXIT
 
 pairs="$(mktemp)"; restore="$(mktemp)"
@@ -225,20 +225,22 @@ echo "parent rc=$parent_rc"
 # close that continues against a tree nobody meant to be on.
 _oss_restore_checkouts \
   || { echo "close: the quarantine comparison left a repo detached - HALT before judging anything, the workspace is not in the state this check assumes"; exit 1; }
-# The restore list is consumed - remove the scratch files BEFORE disarming so
+# The restore list is consumed - remove the scratch files BEFORE the diff so
 # a later exit through the trap cannot re-run the restore against a file that
-# no longer exists, then disarm so the diff below runs with no trap armed.
+# no longer exists. The trap itself stays ARMED through the diff: the diff
+# reads both captured outputs, which can be large, and a signal arriving there
+# would otherwise exit with the evidence dir still on disk.
 rm -f "$pairs" "$restore"
-trap - EXIT
 
-# The evidence dir's job ends at the diff. `diff` is the block's answer and
-# its status must be captured THROUGH the failure: under `set -e` a bare
-# `diff` that differs aborts before a following `diff_rc=$?` ever runs -
-# leaking the dir on exactly the differing path this check exists to detect.
-# The `if` guard survives errexit; the removal then runs on both outcomes
-# and the re-raise returns the diff's status as the block's result.
+# `diff` is the block's answer and its status must be captured THROUGH the
+# failure: under `set -e` a bare `diff` that differs aborts before a following
+# `diff_rc=$?` ever runs - leaking the dir on exactly the differing path this
+# check exists to detect. The `if` guard survives errexit; the removal then
+# runs on both outcomes, the trap disarms only once the dir is gone, and the
+# re-raise returns the diff's status as the block's result.
 if diff "$evd/oss-head.txt" "$evd/oss-parent.txt"; then diff_rc=0; else diff_rc=$?; fi
 rm -rf "$evd"
+trap - EXIT
 [ "$diff_rc" -eq 0 ]
 ```
 

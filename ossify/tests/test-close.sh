@@ -1274,6 +1274,20 @@ t_assert_rc 1 "F3f: an unresolvable demo command halts the block"
 t_assert_contains "$T_OUT" "cannot resolve the demo command" "F3f: ...naming it"
 t_assert_eq "0" "$(_qcount)" "F3f: nothing is left behind on the lookup-failure path"
 
+# Path 7 - a signal DURING the diff (round 4): the diff reads both captured
+# outputs, which can be large, so it is the plausible place a close gets
+# killed. The `diff` shim SIGTERMs the block's own subshell; with the EXIT
+# trap still armed through the diff the cleanup disposes of the evidence dir,
+# with the trap disarmed beforehand it leaks exactly when the run is killed.
+# rc 143 = 128+SIGTERM.
+_qshim "$TMP/qshim-sig" 'echo same-output'
+printf '#!/usr/bin/env bash\nkill -TERM "$PPID"\nsleep 2\n' > "$TMP/qshim-sig/diff"; chmod +x "$TMP/qshim-sig/diff"
+t_capture env "TMPDIR=$QTMP" "PATH=$TMP/qshim-sig:$PATH" "oss_bin=$TMP/qshim-sig/oss" "merge_shas=myrepo:$QSHA" "QBLOCK=$QBLOCK" \
+  bash -c 'set -euo pipefail; . "$QBLOCK"'
+t_assert_rc 143 "F3g: a signal mid-diff terminates the block (128+15)"
+t_assert_eq "0" "$(_qcount)" "F3g: the evidence dir is still disposed when the diff is killed"
+t_assert_eq "$QBR" "$(git -C "$QREPO" rev-parse --abbrev-ref HEAD)" "F3g: the repo is restored to its branch"
+
 # ---------------------------------------------------------------------------
 # P-series — the PR tier at spine close (#339). A repo WITH a remote merges
 # spine -> base by PR through /ossify:work-pr; the local --no-ff merge survives
