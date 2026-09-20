@@ -174,7 +174,9 @@ printf '%s\n' "$merge_shas" > "$pairs"
 # halt inside the detach loop exits through it, and an unremoved mktemp -d
 # holding full head/parent output accumulates one directory per close. The
 # `[ -f ]` keeps a post-disposal exit from re-reading a $restore that is
-# already gone.
+# already gone, and `|| true` keeps a FAILED restore from skipping the rm -
+# the command after a bare `&&` is not errexit-exempt, so under `set -e` a
+# nonzero restore would abort the trap before the disposal.
 _oss_restore_failed=0
 _oss_restore_checkouts() {
   while IFS="$(printf '\t')" read -r r w; do
@@ -187,7 +189,7 @@ _oss_restore_checkouts() {
   [ "$_oss_restore_failed" -eq 0 ]
 }
 _oss_close_cleanup() {
-  [ -f "$restore" ] && _oss_restore_checkouts
+  if [ -f "$restore" ]; then _oss_restore_checkouts || true; fi
   rm -rf "$evd" "$pairs" "$restore" 2>/dev/null
 }
 trap _oss_close_cleanup EXIT
@@ -215,11 +217,13 @@ _oss_restore_checkouts \
 rm -f "$pairs" "$restore"
 trap - EXIT
 
-# The evidence dir's job ends at the diff. Capture the diff's status first -
-# as the block's last bare command its rc IS the answer, and an `rm` placed
-# after it would never run on the differing (nonzero) path, leaking the dir
-# exactly when the check found something. Re-raise it after the removal.
-diff "$evd/oss-head.txt" "$evd/oss-parent.txt"; diff_rc=$?
+# The evidence dir's job ends at the diff. `diff` is the block's answer and
+# its status must be captured THROUGH the failure: under `set -e` a bare
+# `diff` that differs aborts before a following `diff_rc=$?` ever runs -
+# leaking the dir on exactly the differing path this check exists to detect.
+# The `if` guard survives errexit; the removal then runs on both outcomes
+# and the re-raise returns the diff's status as the block's result.
+if diff "$evd/oss-head.txt" "$evd/oss-parent.txt"; then diff_rc=0; else diff_rc=$?; fi
 rm -rf "$evd"
 [ "$diff_rc" -eq 0 ]
 ```

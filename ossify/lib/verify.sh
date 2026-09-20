@@ -123,8 +123,13 @@ oss_verify_zero_tests_guard() { # $1=command ; output on STDIN
   # `pass=0 fail=0`, and `node --test`'s TAP `# pass 0` (`pass 0$` is EOL-
   # anchored so a test NAME like `pass 0 args` cannot be the marker). A
   # substring hit on a real run is rescued by the positive scan below, not
-  # by the marker.
-  grep -Eq 'collected 0 items|no tests ran|running 0 tests|Starting 0 tests|0 tests run|0 passing|[1-9][0-9]* skipped|[1-9][0-9]* ignored|[1-9][0-9]* filtered out|no tests to run|no test files|testing: warning: no tests to run|0 tests? ran|No tests? (files )?found|No tests were found|No test (is available|matches)|Tests +0 passed|Tests:[[:space:]]+0 total|Total tests: 0|pass=0 fail=0|pass 0$' <<<"$out" || return 1
+  # by the marker. The round-2 pass added the OTHER non-executing
+  # dispositions: `todo`/`pending`/`deselected` (declared but never invoked),
+  # ctest's `did not run` list, and VSTest's count-before-word `Skipped: N`.
+  # Executed-but-labelled states are NOT here by design - pytest `xfailed`
+  # and go `--- SKIP:` ran their bodies; cargo `measured` is ambiguous
+  # (`--benches` runs them, plain `test` does not) and defers to an issue.
+  grep -Eq 'collected 0 items|no tests ran|running 0 tests|Starting 0 tests|0 tests run|0 passing|[1-9][0-9]* skipped|[1-9][0-9]* ignored|[1-9][0-9]* filtered out|[1-9][0-9]* todo|[1-9][0-9]* deselected|[1-9][0-9]* pending|did not run|Skipped:[[:space:]]*[1-9][0-9]*|no tests to run|no test files|testing: warning: no tests to run|0 tests? ran|No tests? (files )?found|No tests were found|No test (is available|matches)|Tests +0 passed|Tests:[[:space:]]+0 total|Total tests: 0|pass=0 fail=0|pass 0$' <<<"$out" || return 1
   # A zero-marker means vacuous only when the output carries NO marker of real
   # execution - aggregate multi-suite output mixes both: cargo's empty
   # Doc-tests target prints `running 0 tests` beside real passes, a
@@ -138,8 +143,9 @@ oss_verify_zero_tests_guard() { # $1=command ; output on STDIN
   local scan; scan="$(grep -v -e 'Test Files' -e 'Test Suites' <<<"$out" || true)"
   # `(pass|fail)[ =][1-9]` covers the harness `pass=N fail=M` and node TAP
   # `# pass N`/`# fail N` summaries; the (^|space) boundary keeps `compass=`
-  # and friends from reading as a count.
-  grep -Eq -e '--- (PASS|FAIL):|[1-9][0-9]* (passed|passing|failed)|Passed:[[:space:]]*[1-9][0-9]*|out of [1-9][0-9]*|(^|[[:space:]])(pass|fail)[ =][1-9][0-9]*' <<<"$scan" && return 1
+  # and friends from reading as a count. `Failed: N` is VSTest's word-before-
+  # count twin of `Passed:` - a run that failed tests still executed them.
+  grep -Eq -e '--- (PASS|FAIL):|[1-9][0-9]* (passed|passing|failed)|Passed:[[:space:]]*[1-9][0-9]*|Failed:[[:space:]]*[1-9][0-9]*|out of [1-9][0-9]*|(^|[[:space:]])(pass|fail)[ =][1-9][0-9]*' <<<"$scan" && return 1
   # go's non-verbose output has no per-test marker: `ok  pkg  0.012s` and
   # `FAIL pkg  0.012s` summary lines are the only execution evidence, and
   # only when the line lacks `[no test`/`[build failed]`/`[setup failed]` -

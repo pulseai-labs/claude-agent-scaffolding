@@ -478,4 +478,64 @@ printf '# pass 0\n# fail 0\n# pass 3\n' > "$TMP/npm-mixed.out"
 t_capture bash "$OSSB" zero_tests_guard "npm run test" < "$TMP/npm-mixed.out"
 t_assert_rc 1 "#496-sweep control: '# pass 3' beside a zero suite is NOT vacuous"
 
+# ===========================================================================
+# PR #496 round 2 (R2-3) - the OTHER non-executing dispositions. Round 1
+# swept the zero shapes; this pass sweeps the "counted but not executed"
+# states per runner: todo, pending, deselected, disabled/did-not-run, and
+# VSTest's count-before-word `Skipped: N`. Executed-but-labelled states are
+# deliberately NOT zero markers: pytest `xfailed`/`xpassed` and go `--- SKIP:`
+# ran their bodies, and both are already positive (`failed`/`passed` submatch,
+# the `ok pkg` summary). cargo `measured` is ambiguous - benches execute under
+# `cargo test --benches` but not under `cargo test` - deferred to an issue
+# rather than guessed.
+# ===========================================================================
+# jest/vitest all-todo exits 0 having run nothing; a todo-beside-passed mix
+# is real execution and must survive the positive scan.
+printf 'Tests:       1 todo, 1 total\n' > "$TMP/jest-todo.out"
+t_capture bash "$OSSB" zero_tests_guard "jest --passWithNoTests" < "$TMP/jest-todo.out"
+t_assert_rc 0 "#496-R2: jest's all-todo suite ('1 todo, 1 total') flags"
+printf '      Tests  1 todo (1)\n' > "$TMP/vitest-todo.out"
+t_capture bash "$OSSB" zero_tests_guard "npx vitest run" < "$TMP/vitest-todo.out"
+t_assert_rc 0 "#496-R2: vitest's all-todo suite ('Tests  1 todo (1)') flags"
+printf 'Tests:       1 todo, 3 passed, 4 total\n' > "$TMP/jest-todomix.out"
+t_capture bash "$OSSB" zero_tests_guard "jest" < "$TMP/jest-todomix.out"
+t_assert_rc 1 "#496-R2 control: '1 todo, 3 passed' is NOT vacuous"
+# pytest deselected: `-k`/`--deselect` output counts deselected tests that
+# never ran. `no tests ran` usually accompanies an all-deselected run, but
+# the count alone must mark it.
+printf 'collected 5 items / 5 deselected\n' > "$TMP/pytest-desel.out"
+t_capture bash "$OSSB" zero_tests_guard "pytest -k zz tests/" < "$TMP/pytest-desel.out"
+t_assert_rc 0 "#496-R2: pytest's '5 deselected' flags"
+printf 'collected 5 items / 2 deselected\n\n============ 3 passed in 0.02s ============\n' > "$TMP/pytest-deselmix.out"
+t_capture bash "$OSSB" zero_tests_guard "pytest tests/" < "$TMP/pytest-deselmix.out"
+t_assert_rc 1 "#496-R2 control: deselected-beside-passed is NOT vacuous"
+# mocha pending: `N pending` are declared but never invoked (the `npm test`
+# wrapper is how a mocha suite is normally reached).
+printf '  5 pending\n' > "$TMP/mocha-pending.out"
+t_capture bash "$OSSB" zero_tests_guard "npm test" < "$TMP/mocha-pending.out"
+t_assert_rc 0 "#496-R2: mocha's '5 pending' flags"
+printf '  2 passing\n  3 pending\n' > "$TMP/mocha-mixed.out"
+t_capture bash "$OSSB" zero_tests_guard "npm test" < "$TMP/mocha-mixed.out"
+t_assert_rc 1 "#496-R2 control: pending-beside-passing is NOT vacuous"
+# ctest disabled tests print a `did not run` list and exit 0.
+printf 'Test project /tmp/build\nThe following tests did not run:\n\t 1 - smoke (Disabled)\n' > "$TMP/ctest-disabled.out"
+t_capture bash "$OSSB" zero_tests_guard "ctest" < "$TMP/ctest-disabled.out"
+t_assert_rc 0 "#496-R2: ctest's 'did not run' (Disabled) flags"
+printf 'The following tests did not run:\n\t 1 - smoke (Disabled)\n100%% tests passed, 0 tests failed out of 4\n' > "$TMP/ctest-disabledmix.out"
+t_capture bash "$OSSB" zero_tests_guard "ctest" < "$TMP/ctest-disabledmix.out"
+t_assert_rc 1 "#496-R2 control: a 'did not run' list beside a real summary is NOT vacuous"
+# VSTest counts skipped BEFORE the word: `Skipped: N`. `Failed: N` is the
+# matching positive - a run that failed tests still executed them, and
+# without it a real failing run beside a `No test is available` sibling
+# would false-flag.
+printf '  Passed!  - Failed: 0, Passed: 0, Skipped: 5\n' > "$TMP/dotnet-skip.out"
+t_capture bash "$OSSB" zero_tests_guard "dotnet test" < "$TMP/dotnet-skip.out"
+t_assert_rc 0 "#496-R2: dotnet's 'Skipped: 5' flags"
+printf '  Passed!  - Failed: 0, Passed: 3, Skipped: 2\n' > "$TMP/dotnet-skipmix.out"
+t_capture bash "$OSSB" zero_tests_guard "dotnet test" < "$TMP/dotnet-skipmix.out"
+t_assert_rc 1 "#496-R2 control: 'Skipped: 2' beside 'Passed: 3' is NOT vacuous"
+printf 'No tests were found.\n  Failed!  - Failed: 3, Passed: 0, Skipped: 0\n' > "$TMP/dotnet-failmix.out"
+t_capture bash "$OSSB" zero_tests_guard "dotnet test" < "$TMP/dotnet-failmix.out"
+t_assert_rc 1 "#496-R2 control: 'Failed: 3' beside 'No tests were found' is execution, NOT vacuous"
+
 rm -rf "$TMP"; t_summary

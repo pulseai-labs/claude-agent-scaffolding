@@ -1206,7 +1206,7 @@ QTMP="$TMP/qtmp"; mkdir -p "$QTMP"
 # and nothing is left in TMPDIR.
 _qshim "$TMP/qshim-same" 'echo same-output'
 t_capture env "TMPDIR=$QTMP" "oss_bin=$TMP/qshim-same/oss" "merge_shas=myrepo:$QSHA" "QBLOCK=$QBLOCK" \
-  bash -c 'set -u; . "$QBLOCK"'
+  bash -c 'set -euo pipefail; . "$QBLOCK"'
 t_assert_rc 0 "F3a: same head/parent output closes the block green"
 t_assert_eq "0" "$(_qcount)" "F3a: the evidence dir is disposed on the green path"
 t_assert_eq "$QBR" "$(git -C "$QREPO" rev-parse --abbrev-ref HEAD)" "F3a: the repo is restored to its branch"
@@ -1216,7 +1216,7 @@ t_assert_eq "$QBR" "$(git -C "$QREPO" rev-parse --abbrev-ref HEAD)" "F3a: the re
 # (an rm placed after a bare `diff` would never run there).
 _qshim "$TMP/qshim-diff" 'cat f.txt'
 t_capture env "TMPDIR=$QTMP" "oss_bin=$TMP/qshim-diff/oss" "merge_shas=myrepo:$QSHA" "QBLOCK=$QBLOCK" \
-  bash -c 'set -u; . "$QBLOCK"'
+  bash -c 'set -euo pipefail; . "$QBLOCK"'
 t_assert_rc 1 "F3b: a real head/parent difference still propagates the nonzero diff"
 t_assert_eq "0" "$(_qcount)" "F3b: the evidence dir is disposed on the differing path too"
 t_assert_eq "$QBR" "$(git -C "$QREPO" rev-parse --abbrev-ref HEAD)" "F3b: the repo is restored to its branch"
@@ -1227,7 +1227,7 @@ t_assert_eq "$QBR" "$(git -C "$QREPO" rev-parse --abbrev-ref HEAD)" "F3b: the re
 _qshim "$TMP/qshim-halt" 'cat f.txt'
 t_capture env "TMPDIR=$QTMP" "oss_bin=$TMP/qshim-halt/oss" "merge_shas=myrepo:$QSHA
 otherrepo:$QSHA" "QBLOCK=$QBLOCK" \
-  bash -c 'set -u; . "$QBLOCK"'
+  bash -c 'set -euo pipefail; . "$QBLOCK"'
 t_assert_rc 1 "F3c: an undeclared repo halts the block"
 t_assert_contains "$T_OUT" "undeclared repo" "F3c: ...naming it"
 t_assert_eq "0" "$(_qcount)" "F3c: the evidence dir is disposed on the halt path"
