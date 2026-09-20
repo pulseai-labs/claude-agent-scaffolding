@@ -254,7 +254,7 @@ oss_cmd_critic_detect() {
 oss_cmd_verify_acs()          { _oss_need 1 verify_acs "<abs-spec-path>" "$@" || return 2; oss_verify_parse_acs "$1"; }
 oss_cmd_verify_step()         { _oss_need 3 verify_step "<workdir> <command> <expectation>" "$@" || return 2; oss_verify_auto_step "$1" "$2" "$3"; }
 oss_cmd_redgate()             { _oss_need 3 redgate "<workdir> <command> <expectation>" "$@" || return 2; oss_verify_redgate "$1" "$2" "$3"; }
-oss_cmd_zero_tests_guard()    { _oss_need 1 zero_tests_guard "<runner-command>" "$@" || return 2; oss_verify_zero_tests_guard "$1"; }
+oss_cmd_zero_tests_guard()    { _oss_need 1 zero_tests_guard "<runner-command>  # runner output on stdin" "$@" || return 2; oss_verify_zero_tests_guard "$1"; }
 oss_cmd_report_cross_check()  { _oss_need 2 report_cross_check "<report-path> <spec-path>" "$@" || return 2; oss_verify_report_cross_check "$1" "$2"; }
 
 # Per-work-item worktree layer (Task 4). D4: repo-parameterized - every

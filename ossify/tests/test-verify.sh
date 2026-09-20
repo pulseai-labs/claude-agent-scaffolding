@@ -289,4 +289,36 @@ printf 'Test Files  2 passed (2)\ncollected 0 items\n' > "$TMP/filecount.out"
 t_capture bash "$OSSB" zero_tests_guard "pytest a/ b/" < "$TMP/filecount.out"
 t_assert_rc 0 "#402 control: a file-count line is not test-execution evidence"
 
+# ===========================================================================
+# #347 - runner list and zero-marker phrasings: `cargo nextest` is a
+# recognized runner, and vitest's two zero shapes are markers.
+# ===========================================================================
+printf '    Starting 0 tests across 1 binary (1 test skipped)\n     Summary [   0.000s] 0 tests run: 0 passed, 1 skipped\nerror: no tests to run\n' > "$TMP/nextest-zero.out"
+t_capture bash "$OSSB" zero_tests_guard "cargo nextest run" < "$TMP/nextest-zero.out"
+t_assert_rc 0 "#347: a nextest zero-run is flagged under 'cargo nextest run'"
+
+printf 'No test files found, exiting with code 1\n' | oss_verify_zero_tests_guard "npx vitest run"
+t_assert_eq "0" "$?" "#347: vitest 'No test files found' is a zero-marker"
+
+# `Test Files  1 passed` beside `Tests  0 passed` MUST still flag - the file
+# count is carved out of the positive scan, so it cannot mask the zero-marker.
+printf 'Test Files  1 passed (1)\n      Tests  0 passed (0)\n' > "$TMP/vitest-files.out"
+t_capture bash "$OSSB" zero_tests_guard "npx vitest run" < "$TMP/vitest-files.out"
+t_assert_rc 0 "#347: 'Tests  0 passed' flags even beside a passed FILE count"
+
+# Negative controls.
+printf '     Summary [   0.412s] 5 tests run: 5 passed, 0 skipped\n' > "$TMP/nextest-real.out"
+t_capture bash "$OSSB" zero_tests_guard "cargo nextest run" < "$TMP/nextest-real.out"
+t_assert_rc 1 "#347 control: a real nextest run is NOT flagged"
+printf 'Tests  12 passed (12)\n' | oss_verify_zero_tests_guard "npx vitest run"
+t_assert_eq "1" "$?" "#347 control: 'Tests  12 passed' is not the zero-marker"
+printf 'No test files found\n' | oss_verify_zero_tests_guard "echo hi"
+t_assert_eq "1" "$?" "#347 control: a non-runner emitting the phrase does not flag (BOTH-conditions)"
+
+# The usage line names stdin - the guard's signature is `command as $1,
+# runner output on stdin`.
+t_capture bash "$OSSB" zero_tests_guard
+t_assert_rc 2 "#347: bare zero_tests_guard is a usage error"
+t_assert_contains "$T_OUT" "stdin" "#347: the usage line names stdin as the output source"
+
 rm -rf "$TMP"; t_summary
