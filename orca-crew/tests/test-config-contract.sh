@@ -124,4 +124,40 @@ for point in after-implementer before-review after-disposition before-merge-ask 
   else fail "point $point is in both" "lifecycle=$c_life config=$c_cfg"; fi
 done
 
+section "no personal alias or model name ships"
+PERSONAL='claude-glm claude-glm-flash claude-sol glm-5.3 Fable'
+SWEEP_FILES="$PLUGIN_ROOT/skills/orchestrate/SKILL.md
+$PLUGIN_ROOT/commands/orchestrate.md
+$PLUGIN_ROOT/README.md
+$PLUGIN_ROOT/.claude-plugin/plugin.json
+$PLUGIN_ROOT/.codex-plugin/plugin.json"
+# The marketplace listing is shipped prose too — same sweep, when the checkout
+# carries it (a standalone plugin clone has no repo root).
+if [ -f "$PLUGIN_ROOT/../.claude-plugin/marketplace.json" ]; then
+  SWEEP_FILES="$SWEEP_FILES
+$PLUGIN_ROOT/../.claude-plugin/marketplace.json"
+fi
+for f in $SWEEP_FILES "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
+  hits=0
+  for needle in $PERSONAL; do
+    c="$(awk -v needle="$needle" '
+      { line = $0
+        while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
+      END { print n+0 }' "$f")"
+    hits=$((hits + c))
+  done
+  rel="${f#"$PLUGIN_ROOT"/}"
+  if [ "$hits" -eq 0 ]; then pass "no personal name in $rel"
+  else fail "no personal name in $rel" "$hits occurrence(s)"; fi
+done
+# Control: the check can see a name when one is there.
+tmp_ctl="$(mktemp)"; printf 'claude-glm\n' > "$tmp_ctl"
+ctl="$(awk -v needle='claude-glm' '
+  { line = $0
+    while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
+  END { print n+0 }' "$tmp_ctl")"
+rm -f "$tmp_ctl"
+if [ "$ctl" -eq 1 ]; then pass "control: the sweep detects a personal name"
+else fail "control: the sweep detects a personal name" "control counted $ctl"; fi
+
 report
