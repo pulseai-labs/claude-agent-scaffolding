@@ -112,4 +112,16 @@ brief_pin 'SEAT_EXPECTED_MODEL=' "every dispatched template names its expected m
 brief_pin 'SEAT_EFFORT=' "every dispatched template names its effort" 5
 brief_pin 'claude-glm' "no alias name survives in briefs.md" 0
 
+section "the named points exist in the run"
+LIFECYCLE_MD="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
+for point in after-implementer before-review after-disposition before-merge-ask at-teardown; do
+  c_life="$(awk -v needle="$point" '
+    { line = $0
+      while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
+    END { print n+0 }' "$LIFECYCLE_MD")"
+  c_cfg="$(occurrences "$CONFIG_MD" "$point")"
+  if [ "$c_life" -ge 1 ] && [ "$c_cfg" -ge 1 ]; then pass "point $point is in both the run and config.md"
+  else fail "point $point is in both" "lifecycle=$c_life config=$c_cfg"; fi
+done
+
 report

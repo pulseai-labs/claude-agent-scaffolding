@@ -152,6 +152,19 @@ Every command's syntax comes from `orca skills get orchestration`.
     (every close review's ledger so far, oldest first). With ossify installed, that
     is `/ossify:handoff`.
 
+## Roles of the operator's own
+
+A role the operator defines in the project file (`config.md`) runs at a named point of
+the run above: `after-implementer` (after step 6), `before-review` (before step 8),
+`after-disposition` (after step 9), `before-merge-ask` (before step 12), `at-teardown`
+(step 13). `at: on-demand` has no fixed point and is dispatched when wanted — its seat
+counts against the session budget, the project file says how many may exist at once,
+and the default is one. A role with `blocks: yes` holds the run at its point until it
+returns a pass or the operator overrules it: the orchestrator relays its summary and
+the operator's word settles it, and everything else it returns is advice recorded in
+the disposition. A role with `replaces:` takes a step the plugin owns, and the handoff
+says which step was the operator's, so no reader infers a guarantee that was not given.
+
 ## Rotation past the context ceiling
 
 orca-crew's hook tells a session its own context figure once it reaches the ceiling (the
