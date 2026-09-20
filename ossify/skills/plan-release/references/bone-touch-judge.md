@@ -62,7 +62,7 @@ the state is broken — the one situation where degrading is least acceptable. W
 the class declaration turns on this verdict, test the rc explicitly:
 
 ```bash
-"$oss_bin" touch_check src/domain/order.rs src/ui/export.rs; tc=$?
+tc=0; "$oss_bin" touch_check src/domain/order.rs src/ui/export.rs || tc=$?
 case "$tc" in
   0) : ;;   # HIT — reclassify to bone
   1) : ;;   # clean

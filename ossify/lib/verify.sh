@@ -145,7 +145,11 @@ oss_verify_zero_tests_guard() { # $1=command ; output on STDIN
   # `# pass N`/`# fail N` summaries; the (^|space) boundary keeps `compass=`
   # and friends from reading as a count. `Failed: N` is VSTest's word-before-
   # count twin of `Passed:` - a run that failed tests still executed them.
-  grep -Eq -e '--- (PASS|FAIL):|[1-9][0-9]* (passed|passing|failed)|Passed:[[:space:]]*[1-9][0-9]*|Failed:[[:space:]]*[1-9][0-9]*|out of [1-9][0-9]*|(^|[[:space:]])(pass|fail)[ =][1-9][0-9]*' <<<"$scan" && return 1
+  # The count-word set is the EXECUTED side of the disposition sweep: pytest
+  # `xfailed`/`xpassed` and `rerun` and mocha `failing` all ran their tests -
+  # only `skipped`/`todo`/`pending`/`deselected`/`filtered`/`ignored` are
+  # zero markers, and they live on the other list.
+  grep -Eq -e '--- (PASS|FAIL):|[1-9][0-9]* (passed|passing|failed|failing|xfailed|xpassed|rerun)|Passed:[[:space:]]*[1-9][0-9]*|Failed:[[:space:]]*[1-9][0-9]*|out of [1-9][0-9]*|(^|[[:space:]])(pass|fail)[ =][1-9][0-9]*' <<<"$scan" && return 1
   # go's non-verbose output has no per-test marker: `ok  pkg  0.012s` and
   # `FAIL pkg  0.012s` summary lines are the only execution evidence, and
   # only when the line lacks `[no test`/`[build failed]`/`[setup failed]` -

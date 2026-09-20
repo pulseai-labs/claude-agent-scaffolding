@@ -142,7 +142,8 @@ wd="$("$oss_bin" demo_workdir)" \
 [ -d "$wd" ] || { echo "halt: resolved demo workdir '$wd' does not exist"; exit 1; }
 
 # same command, both trees, and diff the OUTPUT before believing the rc
-cmd="$("$oss_bin" get ".demo_ledger[] | select(.id==\"<line-id>\") | .command")"
+cmd="$("$oss_bin" get ".demo_ledger[] | select(.id==\"<line-id>\") | .command")" \
+  || { echo "halt: cannot resolve the demo command for <line-id> - the comparison is void without it"; exit 1; }
 # Per-invocation evidence dir - a fixed /tmp path collides across concurrent
 # closes, and a close that diffs ANOTHER invocation's head against its own
 # parent manufactures quarantine evidence from a cross-contaminated read.
@@ -150,16 +151,12 @@ cmd="$("$oss_bin" get ".demo_ledger[] | select(.id==\"<line-id>\") | .command")"
 # output, which is large and can carry secrets, so an accumulating tmp dir
 # per close is its own defect.
 evd="$(mktemp -d)"
-( cd "$wd" && bash -c "$cmd" ) > "$evd/oss-head.txt" 2>&1; echo "head rc=$?"
 
-# EVERY hosting repo to its own first parent - not just the one $wd sits in.
-# $wd is the composition ROOT, which may be in any hosting repo or none of the
-# ones this line exercises, and the spine changed every repo $merge_shas names.
-# Detaching one and leaving the rest at post-merge state compares a tree that is
-# half before and half after this spine, and both wrong answers - "already
-# broken" and "this spine broke it" - come back looking like evidence.
-pairs="$(mktemp)"; restore="$(mktemp)"
-printf '%s\n' "$merge_shas" > "$pairs"
+# The trap is armed BEFORE the first command that can fail - the mktemps
+# below included - so an exit through `set -e` anywhere in the block disposes
+# of the dir. A failing head capture is the NORMAL case: this block exists to
+# investigate a quarantined (failing) line. The cleanup reads the scratch
+# files only under existence tests because they may not exist yet.
 # The restore runs on EVERY exit path, not just the happy one. Without the trap
 # a repo that cannot reach its first parent halts here with the repos ahead of
 # it still detached - a diagnostic check leaving the workspace half rolled back,
@@ -189,10 +186,26 @@ _oss_restore_checkouts() {
   [ "$_oss_restore_failed" -eq 0 ]
 }
 _oss_close_cleanup() {
-  if [ -f "$restore" ]; then _oss_restore_checkouts || true; fi
-  rm -rf "$evd" "$pairs" "$restore" 2>/dev/null
+  if [ -f "${restore:-}" ]; then _oss_restore_checkouts || true; fi
+  rm -rf "$evd" ${pairs:+"$pairs"} ${restore:+"$restore"} 2>/dev/null
 }
 trap _oss_close_cleanup EXIT
+
+pairs="$(mktemp)"; restore="$(mktemp)"
+printf '%s\n' "$merge_shas" > "$pairs"
+
+# The captures are `if`/`else` for the same reason the diff is: under `set -e`
+# a bare `( ... ); rc=$?` aborts before the rc is read, and here the command
+# failing is the expected case - the quarantined line is a failing line.
+if ( cd "$wd" && bash -c "$cmd" ) > "$evd/oss-head.txt" 2>&1; then head_rc=0; else head_rc=$?; fi
+echo "head rc=$head_rc"
+
+# EVERY hosting repo to its own first parent - not just the one $wd sits in.
+# $wd is the composition ROOT, which may be in any hosting repo or none of the
+# ones this line exercises, and the spine changed every repo $merge_shas names.
+# Detaching one and leaving the rest at post-merge state compares a tree that is
+# half before and half after this spine, and both wrong answers - "already
+# broken" and "this spine broke it" - come back looking like evidence.
 while IFS=: read -r repo sha; do
   [ -n "$repo" ] || continue
   root="$("$oss_bin" repo_root "$repo")" \
@@ -205,7 +218,8 @@ while IFS=: read -r repo sha; do
     || { echo "halt: cannot reach $sha^1 in $repo - the comparison is void"; exit 1; }
 done < "$pairs"
 
-( cd "$wd" && bash -c "$cmd" ) > "$evd/oss-parent.txt" 2>&1; echo "parent rc=$?"
+if ( cd "$wd" && bash -c "$cmd" ) > "$evd/oss-parent.txt" 2>&1; then parent_rc=0; else parent_rc=$?; fi
+echo "parent rc=$parent_rc"
 
 # Restore every checkout before judging anything. A repo left detached is a
 # close that continues against a tree nobody meant to be on.

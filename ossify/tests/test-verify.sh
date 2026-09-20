@@ -538,4 +538,28 @@ printf 'No tests were found.\n  Failed!  - Failed: 3, Passed: 0, Skipped: 0\n' >
 t_capture bash "$OSSB" zero_tests_guard "dotnet test" < "$TMP/dotnet-failmix.out"
 t_assert_rc 1 "#496-R2 control: 'Failed: 3' beside 'No tests were found' is execution, NOT vacuous"
 
+# ===========================================================================
+# PR #496 round 3 (R3-2) - the POSITIVE side of the disposition sweep. Round 2
+# added non-executing markers; the executed-but-not-plain-passed outcomes were
+# not extended to match. pytest `N xfailed`/`N xpassed` RAN (expected-fail is
+# still an execution), mocha `N failing` ran and failed, and pytest-
+# rerunfailures `N rerun` ran more than once. Each needs a zero-marker sibling
+# in the fixture so the positive alternative is the sole rescuer.
+# ===========================================================================
+printf '1 skipped, 1 xfailed in 0.05s\n' > "$TMP/pytest-xfail.out"
+t_capture bash "$OSSB" zero_tests_guard "pytest tests/" < "$TMP/pytest-xfail.out"
+t_assert_rc 1 "#496-R3: '1 skipped, 1 xfailed' is NOT vacuous - the xfail ran"
+printf '1 skipped, 1 xpassed in 0.05s\n' > "$TMP/pytest-xpass.out"
+t_capture bash "$OSSB" zero_tests_guard "pytest tests/" < "$TMP/pytest-xpass.out"
+t_assert_rc 1 "#496-R3: '1 skipped, 1 xpassed' is NOT vacuous - the xpass ran"
+printf '  3 pending\n  3 failing\n' > "$TMP/mocha-failing.out"
+t_capture bash "$OSSB" zero_tests_guard "npm test" < "$TMP/mocha-failing.out"
+t_assert_rc 1 "#496-R3: '3 failing' beside pending is execution, NOT vacuous"
+printf 'collected 5 items / 5 deselected\n1 rerun\n' > "$TMP/pytest-rerun.out"
+t_capture bash "$OSSB" zero_tests_guard "pytest --reruns 2 tests/" < "$TMP/pytest-rerun.out"
+t_assert_rc 1 "#496-R3: '1 rerun' beside an all-deselected collect is execution, NOT vacuous"
+printf 'Tests:       4 skipped, 4 total\n' > "$TMP/jest-skip2.out"
+t_capture bash "$OSSB" zero_tests_guard "jest" < "$TMP/jest-skip2.out"
+t_assert_rc 0 "#496-R3 control: an all-skipped run still flags (0 executed)"
+
 rm -rf "$TMP"; t_summary

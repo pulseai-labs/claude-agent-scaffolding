@@ -62,7 +62,7 @@ few seconds if you can manage it.
 
 ```bash
 # the AC's own command, run three times — same rc every time or it is not reliable
-cd "<worktree-abs>" && pytest tests/test_orders.py::test_submit; echo "rc=$?"
+cd "<worktree-abs>" && rc=0; pytest tests/test_orders.py::test_submit || rc=$?; echo "rc=$rc"
 ```
 
 This is the step that pays for the rest. Without it:
@@ -137,7 +137,7 @@ first half by reverting the fix and watching it go red.
 
 ```bash
 # with the fix reverted, the NEW test must be red — this is the assertion
-cd "<worktree-abs>" && pytest tests/test_orders.py::test_submit_rejects_stale_id; echo "rc=$?"
+cd "<worktree-abs>" && rc=0; pytest tests/test_orders.py::test_submit_rejects_stale_id || rc=$?; echo "rc=$rc"
 ```
 
 This suite has been bitten five separate ways by tests that could not fail
