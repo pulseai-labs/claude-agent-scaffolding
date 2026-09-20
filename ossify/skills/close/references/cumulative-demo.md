@@ -146,6 +146,9 @@ cmd="$("$oss_bin" get ".demo_ledger[] | select(.id==\"<line-id>\") | .command")"
 # Per-invocation evidence dir - a fixed /tmp path collides across concurrent
 # closes, and a close that diffs ANOTHER invocation's head against its own
 # parent manufactures quarantine evidence from a cross-contaminated read.
+# It is also DISPOSED below, on every exit path: the dir holds full command
+# output, which is large and can carry secrets, so an accumulating tmp dir
+# per close is its own defect.
 evd="$(mktemp -d)"
 ( cd "$wd" && bash -c "$cmd" ) > "$evd/oss-head.txt" 2>&1; echo "head rc=$?"
 
@@ -167,6 +170,11 @@ printf '%s\n' "$merge_shas" > "$pairs"
 # trap cleared, and the close continuing with that repo detached at a first
 # parent. Every repo is still ATTEMPTED before the halt, so one stuck repo does
 # not strand the rest.
+# The same trap disposes of the evidence dir and the two scratch files - a
+# halt inside the detach loop exits through it, and an unremoved mktemp -d
+# holding full head/parent output accumulates one directory per close. The
+# `[ -f ]` keeps a post-disposal exit from re-reading a $restore that is
+# already gone.
 _oss_restore_failed=0
 _oss_restore_checkouts() {
   while IFS="$(printf '\t')" read -r r w; do
@@ -178,7 +186,11 @@ _oss_restore_checkouts() {
   done < "$restore"
   [ "$_oss_restore_failed" -eq 0 ]
 }
-trap _oss_restore_checkouts EXIT
+_oss_close_cleanup() {
+  [ -f "$restore" ] && _oss_restore_checkouts
+  rm -rf "$evd" "$pairs" "$restore" 2>/dev/null
+}
+trap _oss_close_cleanup EXIT
 while IFS=: read -r repo sha; do
   [ -n "$repo" ] || continue
   root="$("$oss_bin" repo_root "$repo")" \
@@ -197,9 +209,19 @@ done < "$pairs"
 # close that continues against a tree nobody meant to be on.
 _oss_restore_checkouts \
   || { echo "close: the quarantine comparison left a repo detached - HALT before judging anything, the workspace is not in the state this check assumes"; exit 1; }
+# The restore list is consumed - remove the scratch files BEFORE disarming so
+# a later exit through the trap cannot re-run the restore against a file that
+# no longer exists, then disarm so the diff below runs with no trap armed.
+rm -f "$pairs" "$restore"
 trap - EXIT
 
-diff "$evd/oss-head.txt" "$evd/oss-parent.txt"
+# The evidence dir's job ends at the diff. Capture the diff's status first -
+# as the block's last bare command its rc IS the answer, and an `rm` placed
+# after it would never run on the differing (nonzero) path, leaking the dir
+# exactly when the check found something. Re-raise it after the removal.
+diff "$evd/oss-head.txt" "$evd/oss-parent.txt"; diff_rc=$?
+rm -rf "$evd"
+[ "$diff_rc" -eq 0 ]
 ```
 
 - **Passes at the first parent** → **this spine broke it.** Not a quarantine

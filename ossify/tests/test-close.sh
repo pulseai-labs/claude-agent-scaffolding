@@ -1158,6 +1158,82 @@ t_assert_rc 1 "D4: the same failing demo re-raises under errexit"
 t_assert_contains "$T_OUT" "within the 60s budget" "D4: ...and the timing is still reported first"
 
 # ---------------------------------------------------------------------------
+# #461/#496-F3: the quarantine-comparison block disposes of its per-invocation
+# evidence dir on EVERY path. The mktemp -d holds full head/parent command
+# output; left behind it accumulates one directory of (possibly sensitive)
+# output per close. These drive the EXTRACTED block through its three exits -
+# same output, differing output, and a halt mid-detach - and count the temp
+# entries each leaves behind. The anchor is `evd=` (the mechanism), which
+# survives the regression under test (a missing disposal).
+# ---------------------------------------------------------------------------
+QBLOCK="$TMP/quar-block.sh"; _extract_block "$CUMDEMO" 'evd=' "$QBLOCK"
+if [ -s "$QBLOCK" ] && grep -Fq 'oss-head.txt' "$QBLOCK"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: could not extract the quarantine-comparison block - the F3 tests are vacuous"
+fi
+
+# A real repo with a merge commit: side changes f.txt, main adds main.txt, the
+# --no-ff merge has a clean first parent. `cat f.txt` differs between the
+# merge (side) and its first parent (base) without any conflict surgery.
+QREPO="$TMP/qrepo"; mkdir -p "$QREPO"
+git -C "$QREPO" init -q
+git -C "$QREPO" config user.email t@t; git -C "$QREPO" config user.name t
+echo base > "$QREPO/f.txt"; git -C "$QREPO" add f.txt; git -C "$QREPO" commit -qm base
+git -C "$QREPO" checkout -qb side; echo side > "$QREPO/f.txt"; git -C "$QREPO" commit -qam side
+git -C "$QREPO" checkout -q -; echo mainwork > "$QREPO/main.txt"
+git -C "$QREPO" add main.txt; git -C "$QREPO" commit -qm main
+git -C "$QREPO" merge --no-ff -qm "merge side" side
+QSHA="$(git -C "$QREPO" rev-parse HEAD)"; QBR="$(git -C "$QREPO" rev-parse --abbrev-ref HEAD)"
+
+# Shim oss_bin: demo_workdir -> the repo (composition root); get -> the demo
+# line's command; repo_root -> the repo path for the declared name, refusing
+# anything else so a bad $merge_shas entry halts like the real verb.
+_qshim() { # $1=shim-dir $2=command the demo line runs
+  mkdir -p "$1"
+  { printf '#!/usr/bin/env bash\ncase "$1" in\n'
+    printf '  demo_workdir) echo "%s" ;;\n' "$QREPO"
+    printf '  get) echo "%s" ;;\n' "$2"
+    printf '  repo_root) [ "$2" = myrepo ] && echo "%s" || exit 1 ;;\n' "$QREPO"
+    printf '  *) exit 2 ;;\nesac\n'
+  } > "$1/oss"; chmod +x "$1/oss"
+}
+
+_qcount() { find "$QTMP" -mindepth 1 | wc -l | tr -d ' '; }
+QTMP="$TMP/qtmp"; mkdir -p "$QTMP"
+
+# Path 1 - same output on both trees: the diff is empty, the block is green,
+# and nothing is left in TMPDIR.
+_qshim "$TMP/qshim-same" 'echo same-output'
+t_capture env "TMPDIR=$QTMP" "oss_bin=$TMP/qshim-same/oss" "merge_shas=myrepo:$QSHA" "QBLOCK=$QBLOCK" \
+  bash -c 'set -u; . "$QBLOCK"'
+t_assert_rc 0 "F3a: same head/parent output closes the block green"
+t_assert_eq "0" "$(_qcount)" "F3a: the evidence dir is disposed on the green path"
+t_assert_eq "$QBR" "$(git -C "$QREPO" rev-parse --abbrev-ref HEAD)" "F3a: the repo is restored to its branch"
+
+# Path 2 - genuinely different output: the diff is nonzero AND still the
+# block's answer, and the evidence is still disposed on the differing path
+# (an rm placed after a bare `diff` would never run there).
+_qshim "$TMP/qshim-diff" 'cat f.txt'
+t_capture env "TMPDIR=$QTMP" "oss_bin=$TMP/qshim-diff/oss" "merge_shas=myrepo:$QSHA" "QBLOCK=$QBLOCK" \
+  bash -c 'set -u; . "$QBLOCK"'
+t_assert_rc 1 "F3b: a real head/parent difference still propagates the nonzero diff"
+t_assert_eq "0" "$(_qcount)" "F3b: the evidence dir is disposed on the differing path too"
+t_assert_eq "$QBR" "$(git -C "$QREPO" rev-parse --abbrev-ref HEAD)" "F3b: the repo is restored to its branch"
+
+# Path 3 - a halt INSIDE the detach loop (second repo undeclared): the first
+# repo is already detached when the block exits, so this asserts the trap
+# restores it AND disposes of the evidence.
+_qshim "$TMP/qshim-halt" 'cat f.txt'
+t_capture env "TMPDIR=$QTMP" "oss_bin=$TMP/qshim-halt/oss" "merge_shas=myrepo:$QSHA
+otherrepo:$QSHA" "QBLOCK=$QBLOCK" \
+  bash -c 'set -u; . "$QBLOCK"'
+t_assert_rc 1 "F3c: an undeclared repo halts the block"
+t_assert_contains "$T_OUT" "undeclared repo" "F3c: ...naming it"
+t_assert_eq "0" "$(_qcount)" "F3c: the evidence dir is disposed on the halt path"
+t_assert_eq "$QBR" "$(git -C "$QREPO" rev-parse --abbrev-ref HEAD)" "F3c: the half-detached repo is restored"
+
+# ---------------------------------------------------------------------------
 # P-series — the PR tier at spine close (#339). A repo WITH a remote merges
 # spine -> base by PR through /ossify:work-pr; the local --no-ff merge survives
 # only where no remote exists (the E-series above already drives that arm on a

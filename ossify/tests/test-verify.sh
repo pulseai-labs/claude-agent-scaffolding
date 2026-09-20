@@ -262,10 +262,12 @@ EOF
 t_capture bash "$OSSB" zero_tests_guard "cargo test" < "$TMP/cargo-multi.out"
 t_assert_rc 1 "#402: cargo multi-target (2 passed + empty Doc-tests) is NOT vacuous"
 
-# The ONLY positive marker in this fixture is the `--- PASS:` line - the `ok`
-# package lines must NOT count (a filter-missed go package prints `ok` too).
-# That keeps this fixture sensitive to the `---`-led alternative itself.
-printf 'testing: warning: no tests to run\nPASS\nok\texample.com/empty\t0.002s\n--- PASS: TestReal (0.00s)\nPASS\nok\texample.com/real\t0.003s\n' > "$TMP/go-multi.out"
+# The ONLY positive marker in this fixture is the `--- PASS:` line. The empty
+# package carries the real filter-miss shape `ok pkg [no tests to run]`, and
+# the real package's `ok` line is DELIBERATELY absent: under F2 a bare `ok`
+# line is itself execution evidence, so leaving it would mask the `---`-led
+# alternative this fixture isolates.
+printf 'testing: warning: no tests to run\nok\texample.com/empty\t0.002s [no tests to run]\n--- PASS: TestReal (0.00s)\n' > "$TMP/go-multi.out"
 t_capture bash "$OSSB" zero_tests_guard "go test" < "$TMP/go-multi.out"
 t_assert_rc 1 "#402: go ./... filter-miss beside a real PASS is NOT vacuous"
 
@@ -320,5 +322,160 @@ t_assert_eq "1" "$?" "#347 control: a non-runner emitting the phrase does not fl
 t_capture bash "$OSSB" zero_tests_guard
 t_assert_rc 2 "#347: bare zero_tests_guard is a usage error"
 t_assert_contains "$T_OUT" "stdin" "#347: the usage line names stdin as the output source"
+
+# ===========================================================================
+# PR #496 round 1 - the marker lists must match the runners' REAL output
+# shapes. F1: nextest's exit-0 zero shape prints `Starting 0 tests across N
+# binaries` and `Summary ... 0 tests run: 0 passed` - NEITHER was a marker
+# (the :296 fixture only ever fired on its appended `error: no tests to run`,
+# so the nextest phrases were dead). This fixture carries ONLY the real
+# nextest lines - no error line - so the markers themselves are exercised.
+# ===========================================================================
+printf '    Starting 0 tests across 1 binary (5 binaries skipped)\n------------\n     Summary [   0.001s] 0 tests run: 0 passed, 0 skipped\n' > "$TMP/nextest-zero-clean.out"
+t_capture bash "$OSSB" zero_tests_guard "cargo nextest run" < "$TMP/nextest-zero-clean.out"
+t_assert_rc 0 "#496-F1: nextest's own zero-run output (Starting 0 tests / 0 tests run, no error line) flags"
+
+# F2 - a non-verbose `go test ./...` has no `--- PASS:` lines at all. Its only
+# execution evidence is the per-package `ok`/`FAIL` summary - and only when the
+# line lacks `[no test`/`[build failed]`/`[setup failed]` (a filter-missed or
+# unbuilt package did not run). Measured shape: `ok  pkg  0.012s` beside
+# `ok  pkg  0.001s [no tests to run]` = a real aggregate run.
+printf 'ok\texample.com/a\t0.012s\nok\texample.com/b\t0.001s [no tests to run]\n' > "$TMP/go-ok-mix.out"
+t_capture bash "$OSSB" zero_tests_guard "go test ./..." < "$TMP/go-ok-mix.out"
+t_assert_rc 1 "#496-F2: a non-verbose go run (bare ok beside a [no tests] sibling) is NOT vacuous"
+
+printf 'FAIL\texample.com/a\t0.012s\nok\texample.com/b\t0.001s [no tests to run]\nFAIL\n' > "$TMP/go-fail-mix.out"
+t_capture bash "$OSSB" zero_tests_guard "go test ./..." < "$TMP/go-fail-mix.out"
+t_assert_rc 1 "#496-F2: a 'FAIL pkg <time>' line is execution evidence too - tests ran and failed"
+
+# Negative controls for the same check: every package reported `[no tests]`
+# (no package ran), and a `[build failed]` FAIL is a compile error, not test
+# execution. Both must still flag.
+printf 'ok\texample.com/a\t0.012s [no tests to run]\nok\texample.com/b\t0.001s [no tests to run]\n' > "$TMP/go-all-miss.out"
+t_capture bash "$OSSB" zero_tests_guard "go test ./..." < "$TMP/go-all-miss.out"
+t_assert_rc 0 "#496-F2 control: every-'ok [no tests to run]' output still flags"
+
+printf 'FAIL\texample.com/a\t[build failed]\nok\texample.com/b\t0.001s [no tests to run]\n' > "$TMP/go-buildfail.out"
+t_capture bash "$OSSB" zero_tests_guard "go test ./..." < "$TMP/go-buildfail.out"
+t_assert_rc 0 "#496-F2 control: 'FAIL pkg [build failed]' is not execution evidence"
+
+# go -json: a test-level event carries a "Test" field; a package-level
+# `{"Action":"pass","Package":…}` does not, and is emitted even for an
+# all-filtered run - it is NOT evidence (same disambiguation as
+# scaffold-dev/lib/verify.sh's go arm).
+printf '{"Time":"t","Action":"output","Package":"example.com/a","Output":"testing: warning: no tests to run\\n"}\n{"Time":"t","Action":"run","Package":"example.com/b","Test":"TestX"}\n{"Time":"t","Action":"pass","Package":"example.com/b","Test":"TestX","Elapsed":0.01}\n{"Time":"t","Action":"pass","Package":"example.com/b","Elapsed":0.02}\n' > "$TMP/go-json-real.out"
+t_capture bash "$OSSB" zero_tests_guard "go test -json ./..." < "$TMP/go-json-real.out"
+t_assert_rc 1 "#496-F2: go -json test-level events beside a no-tests package are NOT vacuous"
+
+printf '{"Time":"t","Action":"output","Package":"example.com/a","Output":"testing: warning: no tests to run\\n"}\n{"Time":"t","Action":"pass","Package":"example.com/a","Elapsed":0.001}\n{"Time":"t","Action":"pass","Package":"example.com/b","Elapsed":0.002}\n' > "$TMP/go-json-pkg.out"
+t_capture bash "$OSSB" zero_tests_guard "go test -json ./..." < "$TMP/go-json-pkg.out"
+t_assert_rc 0 "#496-F2 control: package-level -json pass events (no \"Test\" field) still flag"
+
+# ===========================================================================
+# Runner sweep - every recognized runner's zero-run exit-0 shape must be a
+# marker, and every real-run shape must carry positive evidence. Fixtures below
+# pin each gap the sweep found; controls pin the adjacent must-still-fail or
+# must-still-pass.
+# ===========================================================================
+
+# go `?` shape: a package with no _test.go files prints `?   pkg [no test
+# files]` and exits 0 - an all-`?` run is vacuous and previously unflagged.
+printf '?\texample.com/a\t[no test files]\n?\texample.com/b\t[no test files]\n' > "$TMP/go-notestfiles.out"
+t_capture bash "$OSSB" zero_tests_guard "go test ./..." < "$TMP/go-notestfiles.out"
+t_assert_rc 0 "#496-sweep: an all-'? [no test files]' go run flags"
+printf '?\texample.com/a\t[no test files]\nok\texample.com/b\t0.012s\n' > "$TMP/go-qmark-mix.out"
+t_capture bash "$OSSB" zero_tests_guard "go test ./..." < "$TMP/go-qmark-mix.out"
+t_assert_rc 1 "#496-sweep control: a '?' line beside a real 'ok' is NOT vacuous"
+
+# cargo all-ignored / all-filtered: `running 3 tests` + `0 passed` with a
+# nonzero ignored/filtered count exits 0 having executed nothing. A PARTIALLY
+# filtered run (3 passed, 2 filtered out) is real execution and must survive.
+printf 'running 3 tests\n\ntest result: ok. 0 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out\n' > "$TMP/cargo-ignored.out"
+t_capture bash "$OSSB" zero_tests_guard "cargo test" < "$TMP/cargo-ignored.out"
+t_assert_rc 0 "#496-sweep: 'test result: ok. 0 passed; ... 3 ignored' flags"
+printf 'running 5 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out\n' > "$TMP/cargo-filtered.out"
+t_capture bash "$OSSB" zero_tests_guard "cargo test" < "$TMP/cargo-filtered.out"
+t_assert_rc 0 "#496-sweep: '0 passed; 5 filtered out' (filter matched nothing) flags"
+printf 'running 5 tests\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out\n' > "$TMP/cargo-subset.out"
+t_capture bash "$OSSB" zero_tests_guard "cargo test" < "$TMP/cargo-subset.out"
+t_assert_rc 1 "#496-sweep control: '3 passed; 2 filtered out' is a real subset run, not vacuous"
+
+# pytest all-deselected (`pytest -k <miss>` prints `no tests ran`; reachable
+# here through a `|| true`-wrapped command, which is exactly the false-green
+# the guard exists for).
+printf 'collected 5 items / 5 deselected\n\n============ no tests ran in 0.01s ============\n' > "$TMP/pytest-norun.out"
+t_capture bash "$OSSB" zero_tests_guard "pytest -k zz tests/" < "$TMP/pytest-norun.out"
+t_assert_rc 0 "#496-sweep: pytest's 'no tests ran' shape flags"
+printf 'collected 5 items / 2 deselected\n\n============ 3 passed, 2 skipped in 0.02s ============\n' > "$TMP/pytest-mixed.out"
+t_capture bash "$OSSB" zero_tests_guard "pytest -k zz tests/" < "$TMP/pytest-mixed.out"
+t_assert_rc 1 "#496-sweep control: a partially-deselected pytest run is NOT vacuous"
+
+# An all-skipped suite executed zero tests - `N skipped` is a zero marker now,
+# held honest by the positive scan (a run with passes beside skips survives).
+printf 'Tests:       4 skipped, 4 total\n' > "$TMP/jest-skipped.out"
+t_capture bash "$OSSB" zero_tests_guard "jest --passWithNoTests" < "$TMP/jest-skipped.out"
+t_assert_rc 0 "#496-sweep: an all-skipped suite ('4 skipped, 4 total') flags"
+printf 'Tests:       1 skipped, 4 passed, 5 total\n' > "$TMP/jest-mixed.out"
+t_capture bash "$OSSB" zero_tests_guard "jest" < "$TMP/jest-mixed.out"
+t_assert_rc 1 "#496-sweep control: skipped-beside-passed is NOT vacuous"
+
+# jest's `Tests: 0 total` (a suite file with no test bodies, exit 0 under
+# --passWithNoTests) - deferred as #494 during the release, fixed here in the
+# sweep. The `Test Suites` line is carved out of the positive scan, so it
+# cannot mask the marker.
+printf 'Test Suites: 1 passed, 1 total\nTests:       0 total\n' > "$TMP/jest-zero.out"
+t_capture bash "$OSSB" zero_tests_guard "jest --passWithNoTests" < "$TMP/jest-zero.out"
+t_assert_rc 0 "#496-sweep: jest's 'Tests: 0 total' flags (#494)"
+printf 'Tests:       3 passed, 3 total\n' > "$TMP/jest-real.out"
+t_capture bash "$OSSB" zero_tests_guard "jest" < "$TMP/jest-real.out"
+t_assert_rc 1 "#496-sweep control: 'Tests: 3 passed' is NOT vacuous"
+
+# ctest: `No tests were found!!!` is the exit-0 zero shape; a real run's
+# summary is `N% tests passed, M tests failed out of K`.
+printf 'Test project /tmp/build\nNo tests were found!!!\n' > "$TMP/ctest-zero.out"
+t_capture bash "$OSSB" zero_tests_guard "ctest --test-dir build" < "$TMP/ctest-zero.out"
+t_assert_rc 0 "#496-sweep: ctest's 'No tests were found' flags"
+printf 'No tests were found!!!\n100%% tests passed, 0 tests failed out of 4\n' > "$TMP/ctest-mixed.out"
+t_capture bash "$OSSB" zero_tests_guard "ctest" < "$TMP/ctest-mixed.out"
+t_assert_rc 1 "#496-sweep control: 'out of 4' beside a zero marker is NOT vacuous"
+
+# dotnet test: VSTest's zero shapes; `Passed: N` is the real-run evidence
+# (solution-level output mixes a testless project's `No tests were found`
+# with a sibling's real summary).
+printf 'No test is available in /x/tests.dll\n' > "$TMP/dotnet-zero.out"
+t_capture bash "$OSSB" zero_tests_guard "dotnet test" < "$TMP/dotnet-zero.out"
+t_assert_rc 0 "#496-sweep: dotnet's 'No test is available' flags"
+printf '  Determining projects to restore...\nNo tests were found.\n  Passed!  - Failed: 0, Passed: 5, Skipped: 0\n' > "$TMP/dotnet-mixed.out"
+t_capture bash "$OSSB" zero_tests_guard "dotnet test" < "$TMP/dotnet-mixed.out"
+t_assert_rc 1 "#496-sweep control: 'Passed: 5' beside 'No tests were found' is NOT vacuous"
+printf 'Total tests: 0\n     Passed: 0\n' > "$TMP/dotnet-total.out"
+t_capture bash "$OSSB" zero_tests_guard "dotnet test" < "$TMP/dotnet-total.out"
+t_assert_rc 0 "#496-sweep: dotnet's 'Total tests: 0' flags"
+
+# bash *test: output shape is harness-defined, but this repo's convention is
+# the `pass=N fail=M` summary (tests/harness.sh t_summary). `pass=0 fail=0`
+# exits 0 having run nothing and matched NO marker before this round - a real
+# false-green gap. `pass=[1-9]`/`fail=[1-9]` are the positive evidence (a
+# failed run is still an executed run). TAP-style `ok N`/`not ok N` lines are
+# already positive via the ok/FAIL check - it is deliberately not go-scoped.
+printf 'pass=0 fail=0\n' > "$TMP/bash-zero.out"
+t_capture bash "$OSSB" zero_tests_guard "bash run-tests.sh" < "$TMP/bash-zero.out"
+t_assert_rc 0 "#496-sweep: a bash harness's 'pass=0 fail=0' (zero tests ran) flags"
+printf 'pass=0 fail=0\npass=4 fail=0\n' > "$TMP/bash-mixed.out"
+t_capture bash "$OSSB" zero_tests_guard "bash tests/a.sh" < "$TMP/bash-mixed.out"
+t_assert_rc 1 "#496-sweep control: 'pass=4 fail=0' beside an empty suite is NOT vacuous"
+printf 'pass=0 fail=0\npass=0 fail=2\n' > "$TMP/bash-failmix.out"
+t_capture bash "$OSSB" zero_tests_guard "bash run-tests.sh" < "$TMP/bash-failmix.out"
+t_assert_rc 1 "#496-sweep control: 'fail=2' is execution evidence (ran and failed), not vacuous"
+
+# npm test / npm run test delegate to the configured script - jest/vitest/
+# mocha output is covered by those runners' markers, and `node --test`'s TAP
+# summary prints `# pass N`/`# fail N`. `# pass 0` is the exit-0 zero shape.
+printf '# pass 0\n# fail 0\n' > "$TMP/npm-zero.out"
+t_capture bash "$OSSB" zero_tests_guard "npm test" < "$TMP/npm-zero.out"
+t_assert_rc 0 "#496-sweep: node --test's '# pass 0' (under npm test) flags"
+printf '# pass 0\n# fail 0\n# pass 3\n' > "$TMP/npm-mixed.out"
+t_capture bash "$OSSB" zero_tests_guard "npm run test" < "$TMP/npm-mixed.out"
+t_assert_rc 1 "#496-sweep control: '# pass 3' beside a zero suite is NOT vacuous"
 
 rm -rf "$TMP"; t_summary
