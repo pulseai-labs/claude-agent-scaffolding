@@ -11,16 +11,17 @@ expected_reason: 'NEGATIVE CASE, two wrongs in one proposal. The top orchestrato
   the layers is what makes the top the supervisor of six terminals and floods the
   inbox the child Run exists to protect. The wrong answer this fixture falsifies is
   accepting the flattening as a reasonable simplification because it removes a hop
-  and the sidecar is already in the top''s hands'
+  and the approved seats are already in the top''s hands'
 ---
 
 You are the orchestrator session. Activation holds for spine `r4.s1` ("billing
 export"): a Run is bound, you have just completed `/ossify:plan-spine`, the
-spine directory exists, and you have written the ratified
-`orca-execution.md` covering the spine's three work items.
+spine directory exists, and you have recorded the approved
+seats in the project file's section for this spine, covering its three work
+items.
 
 The operator says: *"The spine session is an extra hop. You already hold the
-sidecar and you already know every profile — just create the six item tasks in
+approved seats and you already know every profile — just create the six item tasks in
 this Run yourself, launch the three implementer terminals and the three verifier
 terminals from here, and supervise them directly. We can still run
 `/ossify:run-spine` in a session for the worktrees and closes, but you own the

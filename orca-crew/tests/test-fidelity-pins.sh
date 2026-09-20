@@ -91,8 +91,8 @@ pin "skills/orchestrate/SKILL.md" \
   "2/5  the Agent-tool ban survives"
 
 pin "skills/orchestrate/references/roles.md" \
-  'Alias, never `--model`.' \
-  "3/5  alias-not-model survives"
+  'A seat is a name, never `--model`.' \
+  "3/5  seat-name-not-model survives"
 
 pin "skills/orchestrate/references/lifecycle.md" \
   "exactly once per PR" \

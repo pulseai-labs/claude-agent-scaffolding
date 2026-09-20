@@ -40,28 +40,29 @@ close-the-Run step: the CLI exposes none.
 
 ## 3. The round procedure, as the spine session runs it
 
-1. Validate `SPINE.md`, the sidecar and the round's item set
-   (`ossify-execution.md` §3), then prove the sidecar on disk is the ratified one:
-   its blob id must equal the **`SIDECAR_OID` your brief injected**, which the top
-   recorded when it wrote the file.
-   **Every item launch requires that same blob id.** The §3 checks are value
-   checks, so an edited-but-still-valid row — a
-   changed terminal command — passes them all; only the file's identity catches
-   it, and a baseline you sampled yourself would adopt any edit made before your
-   first read. A mismatch halts that launch and asks. When the top rewrites the
-   sidecar, its reply names the new `SIDECAR_OID`, and that becomes the baseline.
+1. Validate `SPINE.md` and the round's item set against the **SEATS block your
+   brief injected** (`ossify-execution.md` §3): every planned item has exactly
+   one implementer row and one verifier row, and no row names an item the plan
+   does not. A failure halts — ask, never substitute.
+   **Every item launch spends its SEATS row verbatim** — the whole resolved
+   profile. A seat the block does not list, or lists twice, halts that item
+   and asks; you **never re-read the project file** or invent a value. When the
+   top changes a seat, its reply carries the replacement rows, and those become
+   the block.
 2. Invoke the ossify lane in external-executor mode. ossify prepares every
    same-round worktree and handoff first, then hands over one request per item.
-3. For each item, launch a **fresh implementer terminal** from that row's exact command
-   — the verifier is not created yet; it has nothing to verify until step 5. Where a
-   custom alias is required, create the terminal directly and inject the Dispatch.
+3. For each item, launch a **fresh implementer terminal** from its SEATS row's
+   exact command — the verifier is not created yet; it has nothing to verify until
+   step 5. Where a custom alias is required, create the terminal directly and
+   deliver the Dispatch as its row's `brief_delivery` says.
 4. Each implementer confirms its model, reads, and posts a detailed plan, then waits.
    Gather the round's plans into **one** ordered ask to you; return an independent
    approve-or-amend per item; reply on each original child id, before which no edit
    starts.
 5. On each complete return, capture the item's four-part fingerprint, then create and
-   dispatch that item's **fresh verifier terminal** from its row's exact command, in the
-   same worktree, against the fixed all-claims procedure. `cannot determine` = fail.
+   dispatch that item's **fresh verifier terminal** from its SEATS row's exact
+   command, in the same worktree, against the fixed all-claims procedure.
+   `cannot determine` = fail.
 6. On the **first** verifier failure, send one `ask --run $PARENT_RUN_ID` with the
    verifier's summary and three options —
    correct with the same pair, replace the pair, halt — and it **blocks: the pair idles**
@@ -75,9 +76,9 @@ close-the-Run step: the CLI exposes none.
    `/ossify:work-item` entry from clean, because that entry's pre-flight requires an
    empty porcelain and no fresh session may adopt another's staged tree.
    The correction packet is for *correct* only — it is same-executor by
-   construction, and never two pairs live on one item. A replacement at a **different** profile is
-   a sidecar rewrite: the top rewrites the row, the operator ratifies it, the digest
-   updates, and you revalidate before launching. A second failure asks again, with the
+   construction, and never two pairs live on one item. A replacement at a **different**
+   seat is the operator's call — the top relays the approved row and it becomes the
+   block's value for that item. A second failure asks again, with the
    same three options — except that **every execution of an item counts against
    ossify's three-iteration cap**, the initial run and each correction and each
    replacement alike, so once it is spent the ask offers halt only.
@@ -109,8 +110,8 @@ initiative.
 
 **A `rotate: <handoff path>` completion is not the final barrier.** The spine session
 stopped at an earlier round barrier past the context ceiling (`lifecycle.md`). Confirm the
-handoff path resolves, then dispatch a fresh spine session from the same `## Spine session`
-block — `SIDECAR_OID` proved as before every launch — with `HANDOFF_PATH` set. The close
+handoff path resolves, then dispatch a fresh spine session on the same spine-session
+seat — the same approved SEATS block injected again — with `HANDOFF_PATH` set. The close
 waits for a completion at the final barrier.
 
 When its `worker_done` lands, **you dispatch** `/ossify:close <spine-id>` to a close
@@ -157,8 +158,8 @@ close nor the work-PR session applies these fixes, and no seat is created for
 this permanently.
 
 **Then one work-PR session per returned PR**, each created in that PR's own
-hosting-repo worktree, launched from the sidecar's ratified Work-PR-session block, and
-briefed with the two profiles you decided at the PR transition
+hosting-repo worktree, launched from the `work-PR session` seat the project file
+names, and briefed with the two profiles you decided at the PR transition
 (`ossify-execution.md` §5), the merge-executor assignment, and `PRIOR_REVIEW` — `none`
 for a PR no earlier work-PR dispatch has covered, `covered` when one has and left
 durable evidence its review ran but no record, otherwise the durable record that

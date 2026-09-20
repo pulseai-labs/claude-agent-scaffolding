@@ -2,7 +2,7 @@
 
 Dispatched by the top when a close returns `halted: close-review`
 (`ossify-nested-run.md` §4, `ossify-execution.md` §5). Not the PR-fix seat,
-and not a sidecar block: the profile is asked of the operator at the halt, as
+and not a project-file seat: the profile is asked of the operator at the halt, as
 the reviewer is asked at the PR transition, because the seat does not exist
 before the moment that creates it.
 
@@ -30,7 +30,9 @@ SPINE_ID=<spine id>
 REPO=<the declared `target_repo` identifier for this writer's repo — it exists
 for remote and remote-less repos alike>
 REPO_ROOT=<abs path of this repo's spine worktree>
+WRITER_COMMAND=<the command this seat was launched with, as the operator named it>
 WRITER_EXPECTED_MODEL=<model id the banner must show>
+WRITER_EFFORT=<the effort this seat was launched at>
 ACCEPTED_LEDGER=<the accepted fix-now findings whose `target_repo` is this
 repo, verbatim from the close review's ledger>
 TASK/DISPATCH: your task and dispatch identities come from the Orca preamble

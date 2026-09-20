@@ -4,36 +4,50 @@ One session owns each active role. A session's name or suffix is not its identit
 resuming, ask each candidate to state its role and assignment and wait for the reply
 before sending work.
 
-| Role | Alias | Effort | Lifetime | Class |
+The seat names below are examples: the project file (`.orca-crew/roles.md`,
+`references/config.md`) is the authority for which agent fills each role.
+
+| Role | Seat | Effort | Lifetime | Class |
 |---|---|---|---|---|
-| Orchestrator | `claude` (Fable) or `claude-sol` | alias default | one per Run; the operator launches it | |
-| Implementer, planned | `claude-glm` | high by default; `--effort max` when the plan (spine plan or decompose) marks the item, or a prior attempt on it failed | retained across work items and the PR's fix rounds, to the threshold below | `contract`: an interface, schema, contract, or architectural change, or a plan gate; the default when the item is not `bounded` |
-| Implementer, fast | `claude-glm-flash` | alias default | retained if a fix round follows, else released | `bounded` only when the item is one-file, mechanical, or read-only |
-| Reviewer | `claude-glm-flash` — once per PR; first task `/code-review <PR>`; never implements | alias default | disposable; released after `worker_done` validates | |
-| Verifier | `claude-glm` — the work-item verify; `claude-glm-flash` for read-only probes and mechanical runs outside it (a suite, a count, a fact) | high | retained until its item passes or escalates to the operator | |
+| Orchestrator | you — the operator launched this session | | one per Run | |
+| Implementer, planned | `strong-coder` | the seat's — a marked item or a retry fills a higher-effort seat the project file's conditions name, and the machine entry is the only source of effort: never the same command edited | retained across work items and the PR's fix rounds, to the threshold below | `contract`: an interface, schema, contract, or architectural change, or a plan gate; the default when the item is not `bounded` |
+| Implementer, fast | `fast-coder` | the seat's | retained if a fix round follows, else released | `bounded` only when the item is one-file, mechanical, or read-only |
+| Reviewer | `sonnet-review` — once per PR; first task `/code-review <PR>`; never implements | the seat's | disposable; released after `worker_done` validates | |
+| Verifier | `strong-coder` — the work-item verify; `fast-coder` for read-only probes and mechanical runs outside it (a suite, a count, a fact) | the seat's | retained until its item passes or escalates to the operator | |
 | Operator | the human — the merge word, and decisions no session can own | | | |
 
 ## The launch
 
-**Alias, never `--model`.** Bare `claude --model glm-*` routes to the Anthropic default
-and fails or silently serves the wrong model. `worker-start --agent claude` launches bare
-`claude` and takes no custom alias. The launch is therefore this sequence, and it is the
-one Orca mechanic this skill states itself (take the exact flags from
-`orca skills get orchestration`):
+A seat is a name, never `--model`. The command it resolves to lives in the operator's
+machine file; run-time surfaces carry the name only, and a name neither file defines
+halts the run. `worker-start --agent` cannot express a seat's command, so the launch is
+this sequence, and it is the one Orca mechanic this skill states itself (take the exact
+flags from `orca skills get orchestration`):
 
 ```bash
-orca terminal create --worktree <selector> --command "<alias> [--effort max]" --json
+orca terminal create --worktree <selector> --command "<the seat's command from agents.md>" --json
 orca terminal wait --for tui-idle --terminal <handle> --json
-orca terminal read --terminal <handle> --json
-orca orchestration dispatch --task <task_id> --to <handle> --inject --json
+orca terminal read --terminal <handle> --json            # model_shows: banner
+orca terminal read --terminal <handle> --screen --json   # model_shows: screen
+orca orchestration worker-start --task <task_id> --terminal <handle> \
+  --worktree path:<the seat terminal's worktree> --json
 ```
 
 Read `agentTerminalHandle` (or `startupTerminal.handle` on older runtimes) from the
-create receipt for `--to`. The `wait` parks until the banner is up; the single `read`
-of that banner confirms the model before anything is dispatched. Every brief also asks
-the worker to state its model in its first reply — a second check, not the only one.
-A wrong model is a failed launch: release the terminal and report it. Do not correct
-it with `--model`.
+create receipt for `--terminal`. The `wait` parks until the seat is up; the model is
+read from the emitted stream or the rendered screen as the seat's `model_shows` says,
+because an agent that paints its model into a status bar returns none on the default
+read. The brief is delivered by injection or by file as the seat's `brief_delivery`
+says. And acceptance of input is not the start of a turn: after dispatch, confirm the
+turn actually started — the read cursor advances — before waiting on `worker_done`; if
+it did not, `orca terminal send --terminal <handle> --enter` submits what is sitting in
+the composer. Every brief also asks the worker to state its model in its first reply —
+a second check, not the only one. A wrong model is a failed launch: release the
+terminal and report it.
+
+`--worktree path:<the seat terminal's worktree>` is required when that terminal lives
+outside the coordinator's worktree: a seat launched elsewhere fails
+`terminal_worktree_mismatch`, and nothing is created on that failure.
 
 ## Retention follows artifacts
 
@@ -56,18 +70,17 @@ close it with `orca terminal close`; read the release receipt rather than assumi
 
 On a spine this session planned (`ossify-execution.md`), two rows above are
 superseded **for that spine's work items only**: the implementer and the verifier
-are launched from the operator-ratified sidecar row, whose value may be a native
-`claude --model <id> --effort <level>` command rather than an alias; the model is
-confirmed from the banner and the first reply exactly as *The launch* requires; and
-each item gets a
+are launched from the spine's operator-approved SEATS rows, whose values may name
+a native `claude --model <id> --effort <level>` command rather than an alias; the
+model is confirmed as the row's `model_shows` says and from the first reply, exactly as *The launch*
+requires; and each item gets a
 **fresh** pair, retained across that item's corrections and released when it closes or
 escalates. A pair never crosses work items there.
 
 Everything else on this page — the class routing, the retention rule, the placement
 and writer rules, and the budget below — is unchanged and still governs every session
-outside such a spine. The spine session itself is launched
-**from the ratified spine_session block** in that spine's sidecar — a block beside the
-item table, never a row in it — so the generic lane-driver policy does not select it.
+outside such a spine. The spine session itself is launched **from the `spine session` seat the project file names**
+for that spine, so the generic lane-driver policy does not select it.
 
 ## Session budget
 
@@ -77,20 +90,30 @@ seat it replaces. Any session outside those seats is a planning defect: stop and
 re-plan the item. A further read-only question goes to the existing verifier or
 implementer by `send`, never to a new session.
 
+One further seat the budget admits on declaration, and only for its declared span:
+a role the operator pins to a named point occupies a seat for that point's
+dispatch — launched when the run reaches the point, released when the role
+returns, blocking or advisory — and an `at: on-demand` role occupies a seat for
+the dispatch it was wanted for, against the allowance the project file declares,
+one at once by default. A declared role past that allowance, or a declared-role
+seat lingering past its span, is the planning defect the rule still catches.
+
 **Activated ossify spines add four seats, all outside the per-item budget above:
 the spine session, one per spine; a close
 session, a fresh terminal per close dispatch; a work-PR session, one per returned
-PR — each launched from its own ratified sidecar block (`## Spine session`,
-`## Close session`, `## Work-PR session`), the model confirmed from the banner and
-first reply as an item row's is — and a close-review writer, one per affected
+PR — each launched from its own seat in the project file (`spine session`,
+`close session`, `work-PR session`), the model confirmed as its profile's
+`model_shows` says and from the first reply, as an item row's is — and a close-review writer, one per affected
 hosting repo at a `halted: close-review`, launched from the profile the operator
-names at that halt (`ossify-close-writer.md`), never a sidecar block.** The
+names at that halt (`ossify-close-writer.md`), never a seat the file pre-defines.** The
 work-PR session owns the reviewer and the
 PR-fix seat inside a child Run of
 its own, so those two are budgeted there rather than here — the top decides both
 profiles at the PR transition and injects them, and neither survives the merge. No
 implementer is retained into a spine PR: every item pair was released at its item's
-close. None of these seats exists anywhere else.
+close. None of these seats exists anywhere else. A `doctor session` — one fresh
+terminal per `/ossify:doctor` dispatch, released on return — sits outside the
+budget too, launched from the project-file seat of the same name.
 
 ## Placement
 

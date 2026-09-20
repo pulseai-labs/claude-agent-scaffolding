@@ -10,21 +10,22 @@ Every command's syntax comes from `orca skills get orchestration`.
    Run the operator names.
 1b. **Ossify spine planned here?** If this session just completed `/ossify:plan-spine`
    against a concrete spine directory with a Run bound, step 2 is replaced by
-   `references/ossify-execution.md`: ratify one implementer/verifier profile per work
-   item and the three session blocks with the operator, write the sidecar, ask the
+   `references/ossify-execution.md`: agree one implementer/verifier seat per work
+   item and the three coordinator seats with the operator into the project file,
+   inject them as the spine session's SEATS block, ask the
    operator to confirm nested worker depth is 2, and
    start **one** spine session that creates its own child Run and launches every item
    pair. You approve relayed worker plans and wait on that one completion; you launch
    no item terminal. **That completion is the final round barrier, not a PR.** When it
    lands you **dispatch** `/ossify:close <spine-id>` to a **fresh** close session —
-   launched from the sidecar's ratified Close-session block — never
+   launched from the project file's close-session seat — never
    the spine driver's terminal, and wait on its `worker_done`, which returns **every** PR
    it opened, one per remote product hosting repo — a remote-less repo lands
    locally and is never a PR; an AI-workspace record arm is not one —
    or `closed`; `close` is a dispatched command (§6),
    not one you run here. Then **dispatch a work-PR session** per returned PR, in that
-   PR's own hosting-repo worktree, launched from the sidecar's ratified Work-PR-session
-   block, carrying the reviewer **and** PR-fix profiles you
+   PR's own hosting-repo worktree, launched from the project file's work-PR
+   seat, carrying the reviewer **and** PR-fix profiles you
    decide now, the merge-executor assignment, and `PRIOR_REVIEW` (`none` for a PR no
    earlier work-PR dispatch has covered, `covered` when one has and left durable
    evidence its review ran but no record,
@@ -45,14 +46,16 @@ Every command's syntax comes from `orca skills get orchestration`.
    mechanical, or read-only; everything else — including an item that classifies
    nowhere — is `contract`. One implementer per worktree. Items within a round may
    run in parallel; their merges are serial.
-3. **Launch.** `terminal create --command "<alias>"` in the target worktree, then
-   `terminal wait --for tui-idle`, then one `terminal read` of the banner to confirm
-   the model, then `dispatch --inject` (the mechanic in `roles.md`). The "state your
-   model" line in the worker's first reply is the second check. Wrong model: release
-   and report.
-4. **Plan gate, planned work only.** The `claude-glm` brief says: post your plan with
-   `orca orchestration ask`, wait for the reply, then implement. Approve or amend via
-   `reply`. Flash briefs skip this.
+3. **Launch.** `terminal create --command "<the seat's command from agents.md>"`
+   in the target worktree, `terminal wait --for tui-idle`, one `terminal read` of
+   the banner or screen as `model_shows` says to confirm the model, then
+   `worker-start` — `--worktree path:<its worktree>` when the terminal sits
+   outside yours — the brief delivered as `brief_delivery` says, inject or file
+   (the mechanic in `roles.md`). The "state your model" line in the worker's
+   first reply is the second check. Wrong model: release and report.
+4. **Plan gate, planned work only.** The planned implementer's brief says: post your
+   plan with `orca orchestration ask`, wait for the reply, then implement. Approve or
+   amend via `reply`. Fast briefs skip this.
 5. **Wait.** Rolling `check --wait --types worker_done,escalation,question
    --timeout-ms 900000` (Orca's 15-minute window). Process the whole Delivery, answer
    every `question`, ack, wait again. A timeout is a checkpoint: exactly one probe,
@@ -73,13 +76,13 @@ Every command's syntax comes from `orca skills get orchestration`.
    listing every claim: each acceptance criterion of the work item's spec, the
    mutation of any new test, and the diff against the requirement. The suite result
    on the head is not a claim — the orchestrator reads that SHA's check-runs before
-   dispatching the verifier. `claude-glm` at high — the claims include judgment, and
-   `cannot determine` counts as fail. On a fail, attach a fix task to the retained
+   dispatching the verifier. The verifier seat carries the effort its project-file
+   entry names — the claims include judgment, and `cannot determine` counts as fail. On a fail, attach a fix task to the retained
    implementer with `worker-start --task <fix-task> --terminal <handle>`, wait for its
    `worker_done` naming the new head SHA, read that SHA's check-runs, then re-check on
    the retained verifier; a second fail on the same item goes to the operator. The
    verifier is released only at pass or escalation.
-8. **Review.** A review runs exactly once per PR: `claude-glm-flash` in a fresh worktree
+8. **Review.** A review runs exactly once per PR: the reviewer seat in a fresh worktree
    at the PR head, brief `/code-review <PR>`, every finding returned in the `worker_done`
    body as file, line, severity, claim. The reviewer posts nothing to GitHub and edits
    nothing, so that body is the sole copy of the review. Release the reviewer only after
@@ -93,11 +96,10 @@ Every command's syntax comes from `orca skills get orchestration`.
 10. **Fix rounds.** The retained implementer — on an activated ossify spine (1b) this
     whole step runs inside that PR's work-PR session, which creates the PR-fix seat from
     the profile the top decided at step 8's transition and dispatches its fix task here
-    once step 9's ledger exists; no implementer is retained into a spine PR — gets the
-    fix list plus the
-    GitHub thread
-    stream (Codex, CodeRabbit, humans) and works to zero unresolved threads by GraphQL
-    `reviewThreads` count, pushing as it goes. The unit that reaches a terminal state
+    once step 9's ledger exists; no implementer is retained into a spine PR — gets
+    the fix list plus the GitHub thread stream (Codex, CodeRabbit, humans) and works
+    to zero unresolved threads by GraphQL `reviewThreads` count, pushing as it goes.
+    The unit that reaches a terminal state
     is each finding, including each finding inside a review body or PR comment: every
     finding ends **fixed**, resolved only after the fix is on the head the reviewer
     can see; **deferred**, resolved with a comment linking the tracked issue; or
@@ -109,10 +111,10 @@ Every command's syntax comes from `orca skills get orchestration`.
     bot or human finding that arrives after the disposition returns to the
     orchestrator through the blocking `ask`, and the implementer waits — it
     resolves the finding only after the orchestrator's decision (#410). No second
-    `/code-review`. Bot comments
-    after each push stay in this stream, and review bodies and top-level PR
-    conversation comments are part of it too — `reviewThreads` does not return them —
-    refreshed after each push alongside the thread count. With ossify installed, this
+    `/code-review`. Bot comments after each push stay in this stream, and review
+    bodies and top-level PR conversation comments are part of it too —
+    `reviewThreads` does not return them — refreshed after each push alongside the
+    thread count. With ossify installed, this
     dispatch is `/ossify:work-pr <PR> --repo-root <worktree holding the PR branch>`
     with the disposition embedded as a third signal.
 11. **Stopping rule, agreed before the PR opens.** Default: when a round does not shrink
@@ -132,25 +134,42 @@ Every command's syntax comes from `orca skills get orchestration`.
     Merge only on that word, as a merge commit, never a squash, bound to the approved
     SHA: re-fetch the same full gate set for that SHA once more, then
     `gh pr merge <number> --repo <owner/repo> --merge --match-head-commit <sha>` —
-    the orchestrator often sits in a checkout other than the PR's repository, so every
-    read and the merge itself always name the repo. The read and the merge are two
-    operations, so a signal can still land between them: the operator's ruleset
-    requires conversation resolution, GitHub itself refuses the merge while any thread
-    is open, and a merge refused that way returns to step 10, never a retry. Then
+    the orchestrator often sits outside the PR's repository, so every
+    read and the merge name the repo. The read and merge are two
+    operations — a signal can still land between them: the ruleset
+    requires conversation resolution, GitHub refuses the merge while any thread
+    is open, and a refusal returns to step 10, never a retry. Then
     release every worker and delete the branch only after confirming a merged PR
     exists whose head OID equals the branch tip — on an activated ossify spine (1b) the
     merge lands on the word you relay under that dispatch's `MERGE_EXECUTOR`
     assignment — always a merge commit on the named SHA, session or operator —
-    and the wait for that record pass covers the top's spine-level teardown
-    alone: the work-PR session's own seats released when their work finished,
-    never held here. **A closed spine has no PR to confirm**,
+    and that wait covers the top's spine-level teardown alone — work-PR seats
+    released when their work finished. **A closed spine has no PR to confirm**,
     so its teardown validates the close's own result instead — the local landing it
     recorded in each hosting repo — and waits for no record pass.
 13. **Handoff.** If the Run outlives the session, write a handoff naming the Run id,
     task ids, terminal handles, head SHA, and the next step — on an activated ossify
-    spine, also the recorded `SIDECAR_OID` and the accumulated close-review ledger
-    (every close review's ledger so far, oldest first). With ossify installed, that
-    is `/ossify:handoff`.
+    spine, also the spine's approved `SEATS` block, the resolved coordinator
+    profiles and the accumulated close-review ledger (oldest first). With ossify
+    installed, that is `/ossify:handoff`.
+
+## Roles of the operator's own
+
+A role the operator defines in the project file (`config.md`) runs at a named point of
+the run above: `after-implementer` (after step 6), `before-review` (before step 8),
+`after-disposition` (after step 9), `before-merge-ask` (before step 12's ask),
+`at-teardown` (step 12's teardown — release and branch deletion, not step 13's
+handoff). `at: on-demand` has no fixed point, dispatched when wanted — its seat
+counts against the allowance the project file declares, one by default. A declared
+role's seat lives for its dispatch — launched at its point or on demand, released on
+return — never a standing seat. A role with `blocks: yes` holds the run at its point
+until it passes or the operator overrules it — the orchestrator relays its summary,
+the operator's word settles it, anything else is advice in the disposition. A role
+with `replaces:` takes a plugin step — `implementer`, `verifier`, `reviewer`:
+the named seat is not launched, the role runs at its point in its place, and the
+handoff says which step was the operator's. Every point above is the top's own — a
+declared role is not yet carried into a delegated spine or work-PR session, so a
+`before-merge-ask` role does not fire on an activated spine (issue #500 holds it).
 
 ## Rotation past the context ceiling
 
@@ -160,22 +179,22 @@ work-PR session act on it; a close session and every leaf seat simply finish the
 Past the ceiling a seat finishes the unit in hand and starts no new one, never stopping
 mid-item. At its next boundary it settles its dispatch with a return that carries its state
 forward, and its parent launches a fresh seat to resume: the spine session writes
-`/ossify:handoff`, returns `rotate: <handoff path>`, and resumes from the same ratified
-block with that path as `HANDOFF_PATH`; a work-PR session returns `open: <PR url> at
+`/ossify:handoff`, returns `rotate: <handoff path>`, and resumes from the same
+project-file seat with that path as `HANDOFF_PATH`; a work-PR session returns `open: <PR url> at
 <head sha>` with its review record, and its successor resumes from `PRIOR_REVIEW` — it
 takes no `HANDOFF_PATH`. A figure the hook reports as unavailable is relayed upward once,
-never guessed. The spine session's and work-PR session's boundaries and returns are in
-their briefs (`ossify-briefs.md`, `ossify-pr-briefs.md`); your handling of a spine
-`rotate:` is `ossify-nested-run.md` §4.
+never guessed. Both sessions' boundaries and returns are in their briefs
+(`ossify-briefs.md`, `ossify-pr-briefs.md`); a spine `rotate:` is
+`ossify-nested-run.md` §4.
 
 **Your own rotation.** Your boundary is a fully acknowledged delivery with no
 operator question in flight — live child dispatches keep running throughout and
 your successor inherits them by rebinding the parent Run. Write the handoff,
-recording your own launch command — `/ossify:handoff` with ossify installed, the
-same file by hand without it. Open a new terminal with the launch command your
-resumed handoff recorded — ask the operator once when none did, because an alias
-carries provider settings a process listing does not show. Send the new top its
-resume — `/ossify:handoff-resume <path>` with ossify, or the handoff path as its
-first instruction without — confirm its turn started, then tell the operator
+recording your own resolved profile — `/ossify:handoff`
+with ossify installed, the same file by hand without it. Open a new terminal
+with the launch command the handoff recorded — ask the operator once when none
+did; an alias carries provider settings `ps` does not show. Send the new top its
+resume — `/ossify:handoff-resume <path>` with ossify, or the path as its first
+instruction without — confirm its turn started, then tell the operator
 which terminal to use and that this one can close.
 The new top first runs `orca orchestration run-use --id <parent run> --json`, then `check`.
