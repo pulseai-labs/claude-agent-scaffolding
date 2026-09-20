@@ -472,6 +472,39 @@ check_9_shadowed_tokens() { # $1=ossify-root
   done < <(_md_files "$1")
 }
 
+# ---------------------------------------------------------------------------
+# Check 10 - every `=$?` status read in a shipped bash block is errexit-guarded.
+#
+# Under `set -e` a bare `cmd; rc=$?` (or `cmd; echo "rc=$?"`) aborts BEFORE the
+# read ever runs - the failing command is usually the expected case, so the
+# block exits with the rc unreported and any cleanup unrun. Four instances
+# shipped before this gate existed: cumulative-demo.md's head/parent command
+# captures (#496 round 3) and its diff, bone-touch-judge.md's touch_check, and
+# debugging.md's pytest probes. The guarded spellings are an `else` arm
+# (`if cmd; then rc=0; else rc=$?; fi`), an explicit `||`/`&&` chain
+# (`rc=0; cmd || rc=$?`), or a comment documenting the form - a comment cannot
+# abort. Any other line reading `$?` is a capture that cannot survive errexit.
+# ---------------------------------------------------------------------------
+check_10_errexit_captures() { # $1=blocks-dir holding blk-N.sh + manifest.tsv
+  local w="$1" n f fence line ln
+  while IFS=$'\t' read -r n f fence; do
+    [ -n "$n" ] || continue
+    while IFS= read -r line; do
+      ln="${line%%:*}"; line="${line#*:}"
+      # Strip every GUARDED read - `else x=$?`, `then x=$?`, `|| x=$?`,
+      # `&& x=$?` (the guard must directly precede the assignment: a `cd &&
+      # cmd; echo "rc=$?"` has && earlier in the line but the read still
+      # aborts) - then flag whatever `=$?` remains. The strip lands in a var:
+      # a `|| continue` at a pipeline tail is a subshell and cannot reach the
+      # loop.
+      local stripped
+      stripped="$(printf '%s\n' "$line" | sed -E 's/(else|then|\|\||\&\&)[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=[[:space:]]*\$\?//g')"
+      [[ "$stripped" =~ =[[:space:]]*\$\? ]] || continue
+      echo "$f:$((fence + ln)): unguarded '=\$?' status read - under set -e the command aborts before the read runs; use if/else or 'rc=0; cmd || rc=\$?'"
+    done < <({ grep -nE '=[[:space:]]*\$\?' "$w/blk-$n.sh" || true; } | { grep -vE '^[0-9]+:[[:space:]]*#' || true; })
+  done < "$w/manifest.tsv"
+}
+
 # ===========================================================================
 # PART 1 - the shipped tree. Expect zero findings from every check.
 # ===========================================================================
@@ -534,6 +567,10 @@ t_assert_ge 14 "$(_lines "$WORK/check7-report.txt")" "check 7: the description l
 C9="$(check_9_shadowed_tokens "$OSSIFY")"
 echo "-- check 9: shadowed Skill(ossify:) tokens"
 t_assert_eq 0 "$(_count "$C9")" "check 9: no shadowed Skill(ossify:) tokens anywhere the harness owns${C9:+ -- $C9}"
+
+C10="$(check_10_errexit_captures "$WORK/real/blocks")"
+echo "-- check 10: unguarded '=\$?' status reads in shipped blocks"
+t_assert_eq 0 "$(_count "$C10")" "check 10: every '=\$?' read in a shipped bash block is errexit-guarded (else-arm or ||/&&)${C10:+ -- $C10}"
 
 # ===========================================================================
 # PART 2 - the permanent self-test.
@@ -734,5 +771,28 @@ F9="$(check_9_shadowed_tokens "$FIX9")"
 t_assert_eq 2 "$(_count "$F9")" "self-test: check 9 fires on both shadowed plants AND stays silent on the unshadowed control (count 2, not 3)${F9:+ -- $F9}"
 t_assert_contains "$F9" "c9/SKILL.md:2" "self-test: check 9 names the skills-tree plant"
 t_assert_contains "$F9" "references/r9.md:2" "self-test: check 9 names the references-tree plant"
+
+# --- check 10 plant: a DEDICATED ROOT - a planted bash block in the shared
+# fixture would inflate fix1's exact block count, the same coupling check 7
+# and check 9 avoid. The guarded twins sit beside the defect: they must NOT
+# fire, and the exact count is the control.
+FIX10="$WORK/fixture10"; mkdir -p "$FIX10/skills/c10/references"
+cat > "$FIX10/skills/c10/SKILL.md" <<'EOF'
+# c10
+Read `references/c10ref.md`.
+
+```bash
+cd "<wt>" && pytest tests/test_x.py; echo "rc=$?"
+if ( cd "<wt>" && pytest tests/test_y.py ) > out.txt 2>&1; then rc=0; else rc=$?; fi
+rc=0; diff a.txt b.txt || rc=$?
+# comment documenting the bad form: cmd; rc=$?
+```
+EOF
+echo "# c10ref" > "$FIX10/skills/c10/references/c10ref.md"
+
+check_1_parse "$FIX10" "$WORK/fix10" >/dev/null
+F10="$(check_10_errexit_captures "$WORK/fix10/blocks")"
+t_assert_eq 1 "$(_count "$F10")" "self-test: check 10 finds exactly its 1 planted unguarded read - the else-arm, the || chain, and the comment do not fire${F10:+ -- $F10}"
+t_assert_contains "$F10" "c10/SKILL.md:5" "self-test: check 10 names the planted file and line"
 
 t_summary

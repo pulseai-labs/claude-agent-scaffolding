@@ -294,7 +294,7 @@ Full rules, the enabler/bone contrast, and worked examples in
 For each spine, collect the paths its plan expects to change and check them:
 
 ```bash
-"$oss_bin" touch_check src/domain/order.rs src/ui/export.rs; tc=$?
+tc=0; "$oss_bin" touch_check src/domain/order.rs src/ui/export.rs || tc=$?
 case "$tc" in
   0) : ;;   # HIT - prints "bone <adr>" / "risk_gate <name>" per match
   1) : ;;   # clean

@@ -107,6 +107,14 @@ oss_demo_run_auto() { # $1=state-file [$2=explicit-workdir]
     esac
     passed=$((passed+1)); i=$((i+1))
   done
+  # Vacuous floor: `n` counts active OR quarantined auto lines, so an empty,
+  # user-lines-only, or all-quarantined ledger executes nothing. A run that
+  # executed zero lines is not a pass - same refusal as report_cross_check's
+  # "nothing to cross-check" over a spec that yielded zero ACs.
+  if [ "$passed" -eq 0 ]; then
+    echo "oss: demo ledger executed zero lines ($n auto lines, all quarantined or none) - a vacuous run is not a pass" >&2
+    return 1
+  fi
   echo "PASS $passed lines"
 }
 

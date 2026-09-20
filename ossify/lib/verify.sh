@@ -70,11 +70,15 @@ oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail
         return 1
       fi ;;
     output\ contains\ ?*)
-      # `if ! pipeline` — NOT `pipeline | { … return 1; }`. See the idiom note
-      # below: a `return` inside the brace group would exit only the subshell,
-      # and this function would fall through to `return 0`, passing a demo line
-      # whose output does not contain the expected string.
-      if ! printf '%s' "$out" | grep -Fq -- "${exp#output contains }"; then
+      # `if ! grep -Fq … <<<"$out"` — NOT `pipeline | { … return 1; }`. See the
+      # idiom note below: a `return` inside the brace group would exit only the
+      # subshell, and this function would fall through to `return 0`, passing a
+      # demo line whose output does not contain the expected string. The
+      # herestring also removes the second hazard: `printf … | grep -q` under
+      # the dispatcher's pipefail lets grep exit on the first match while the
+      # producer still has bytes to write, the producer takes SIGPIPE, and the
+      # pipeline reports 141 — a TRUE match read as no match past ~64 KiB.
+      if ! grep -Fq -- "${exp#output contains }" <<<"$out"; then
         echo "oss: output missing '${exp#output contains }'" >&2
         printf '%s\n' "$out" | tail -5
         return 1
@@ -102,11 +106,71 @@ oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail
 # of a pipeline and therefore runs in a SUBSHELL, so `return 1` exits the
 # subshell, execution falls through, and the function returns 0 — reporting
 # EVERY input as vacuous green and failing every `exit:0` demo line. Verified
-# empirically. Use `pipeline || return 1` (the `||` binds outside the subshell).
+# empirically. Use `grep … <<<"$x" || return 1` (the `||` binds outside any
+# subshell). The herestring is load-bearing too: `printf … | grep -q` under
+# the dispatcher's pipefail lets grep exit on the first match while the
+# producer still has bytes to write, the producer takes SIGPIPE, and the
+# pipeline reports 141 — a TRUE match read as no match past ~64 KiB.
 oss_verify_zero_tests_guard() { # $1=command ; output on STDIN
   local out; out="$(cat)"
-  printf '%s' "$1" | grep -Eq 'pytest|cargo test|npm test|npm run test|go test|jest|vitest|bash .*test|ctest|dotnet test' || return 1
-  printf '%s' "$out" | grep -Eq 'collected 0 items|running 0 tests|0 passing|no tests to run|0 tests? ran|No tests found|testing: warning: no tests to run' || return 1
+  grep -Eq 'pytest|cargo test|cargo nextest|npm test|npm run test|go test|jest|vitest|bash .*test|ctest|dotnet test' <<<"$1" || return 1
+  # Zero markers are the runners' real exit-0 nothing-ran phrases, swept in PR
+  # #496 round 1: nextest's `Starting 0 tests`/`0 tests run`, go's `? pkg
+  # [no test files]`, ctest's `No tests were found`, VSTest's `No test is
+  # available`/`Total tests: 0`, jest's `Tests: 0 total`, pytest's `no tests
+  # ran`, nonzero `N skipped`/`N ignored`/`N filtered out` counts for
+  # all-skipped/all-ignored/all-filtered summaries, the repo harness's
+  # `pass=0 fail=0`, and `node --test`'s TAP `# pass 0` (`pass 0$` is EOL-
+  # anchored so a test NAME like `pass 0 args` cannot be the marker). A
+  # substring hit on a real run is rescued by the positive scan below, not
+  # by the marker. The round-2 pass added the OTHER non-executing
+  # dispositions: `todo`/`pending`/`deselected` (declared but never invoked),
+  # ctest's `did not run` list, and VSTest's count-before-word `Skipped: N`.
+  # Executed-but-labelled states are NOT here by design - pytest `xfailed`
+  # and go `--- SKIP:` ran their bodies; cargo `measured` is ambiguous
+  # (`--benches` runs them, plain `test` does not) and defers to an issue.
+  grep -Eq 'collected 0 items|no tests ran|running 0 tests|Starting 0 tests|0 tests run|0 passing|[1-9][0-9]* skipped|[1-9][0-9]* ignored|[1-9][0-9]* filtered out|[1-9][0-9]* todo|[1-9][0-9]* deselected|[1-9][0-9]* pending|did not run|Skipped:[[:space:]]*[1-9][0-9]*|no tests to run|no test files|testing: warning: no tests to run|0 tests? ran|No tests? (files )?found|No tests were found|No test (is available|matches)|Tests +0 passed|Tests:[[:space:]]+0 total|Total tests: 0|pass=0 fail=0|pass 0$' <<<"$out" || return 1
+  # A zero-marker means vacuous only when the output carries NO marker of real
+  # execution - aggregate multi-suite output mixes both: cargo's empty
+  # Doc-tests target prints `running 0 tests` beside real passes, a
+  # `go test ./...` filter miss prints `no tests to run` beside a sibling's
+  # run, one empty pytest package prints `collected 0 items` beside
+  # another's. The marker list is deliberately execution-shaped: `running
+  # [1-9]` and `collected [1-9]` announce intent/collection rather than a
+  # result. File counts are not test counts - vitest/jest print `Test Files
+  # 1 passed` beside `Tests  0 passed` - so those summary lines are carved
+  # out of the positive scan or the zero-marker can never fire on that shape.
+  local scan; scan="$(grep -v -e 'Test Files' -e 'Test Suites' <<<"$out" || true)"
+  # `(pass|fail)[ =][1-9]` covers the harness `pass=N fail=M` and node TAP
+  # `# pass N`/`# fail N` summaries; the (^|space) boundary keeps `compass=`
+  # and friends from reading as a count. `Failed: N` is VSTest's word-before-
+  # count twin of `Passed:` - a run that failed tests still executed them.
+  # The count-word set is the EXECUTED side of the disposition sweep: pytest
+  # `xfailed`/`xpassed` and `rerun` and mocha `failing` all ran their tests -
+  # only `skipped`/`todo`/`pending`/`deselected`/`filtered`/`ignored` are
+  # zero markers, and they live on the other list.
+  grep -Eq -e '--- (PASS|FAIL):|[1-9][0-9]* (passed|passing|failed|failing|xfailed|xpassed|rerun)|Passed:[[:space:]]*[1-9][0-9]*|Failed:[[:space:]]*[1-9][0-9]*|out of [1-9][0-9]*|(^|[[:space:]])(pass|fail)[ =][1-9][0-9]*' <<<"$scan" && return 1
+  # go's non-verbose output has no per-test marker: `ok  pkg  0.012s` and
+  # `FAIL pkg  0.012s` summary lines are the only execution evidence, and
+  # only when the line lacks `[no test`/`[build failed]`/`[setup failed]` -
+  # a filter-missed or unbuilt package did not run (the disambiguation at
+  # scaffold-dev/lib/verify.sh's go arm). The `[ -n ]` is load-bearing: a
+  # herestring on an EMPTY var is one empty line, which `grep -v` counts as
+  # a surviving line and would read every output with zero ok/FAIL lines as
+  # execution evidence. The same `ok` shape collides with node TAP records
+  # `ok N - name # SKIP` / `# TODO` - a SKIP/TODO record is a test that did
+  # NOT run, so those lines are filtered out here or an all-skipped `npm
+  # test` reads as execution. The piped `grep -v` is SIGPIPE-safe because it
+  # consumes to EOF - the header's hazard is a `-q`/`-m` consumer that exits
+  # on first match while the producer still writes.
+  local ran; ran="$(grep -E '^(ok|FAIL)[[:space:]]' <<<"$out" | grep -vE '#[[:space:]]*(SKIP|TODO)([[:space:]]|$)' || true)"
+  [ -n "$ran" ] && grep -vqE '\[no test|\[build failed\]|\[setup failed\]' <<<"$ran" && return 1
+  # go -json: a test-level event carries a "Test" field; a package-level
+  # {"Action":"pass","Package":…} does not, and is emitted even for an
+  # all-filtered run - it is not evidence. `[^}]*` keeps the match inside one
+  # object, and JSON-escaped inner quotes cannot reproduce the literal
+  # `"Test":"` the pattern requires.
+  grep -Eq '"Action":"(pass|run)"[^}]*"Test":"|"Test":"[^}]*"Action":"(pass|run)"' <<<"$out" && return 1
   return 0
 }
 

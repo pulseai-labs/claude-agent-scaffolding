@@ -125,7 +125,7 @@ O	skills/close/references/work-item-close.md	post_fp=	tests/test-close.sh	W3: ..
 D	skills/close/references/work-item-close.md	4	#138	path resolution, the spec-exists halt, the staged-changes read, and the Route A/B close sequence
 I	skills/close/references/work-item-close.md	1	a single <placeholder> assignment showing the report path's origin
 O	skills/close/references/cumulative-demo.md	elapsed=	tests/test-close.sh	D1-D4: the demo measurement block preserves the runner's rc instead of flattening it
-D	skills/close/references/cumulative-demo.md	1	#138	the ledger-budget comparison (the rc-only innocence-probe block was consolidated into the diff-the-output block)
+O	skills/close/references/cumulative-demo.md	evd=	tests/test-close.sh	F3a-g: the quarantine-comparison block disposes of its evidence dir on green, differing, halt, failing-command, lookup-failure, and signal-during-diff paths
 I	skills/close/references/cumulative-demo.md	4	single-verb calls: demo_run, ledger_quarantine, budget read, demo_record
 O	skills/close/references/impl-check.md	while IFS=	tests/test-close.sh	the halt loop exits nonzero on the first failing AC and names the row
 I	skills/close/references/impl-check.md	2	single-verb calls: verify_acs, report_cross_check (the harvest_dir resolve went with the verb - the bank path is prose-resolved per close/references/harvest.md §7 now)
@@ -207,7 +207,7 @@ H	skills/adopt/SKILL.md	1739936869-205
 H	skills/challenge/references/adversaries.md	755500974-2123
 H	skills/close/SKILL.md	505737925-398
 H	skills/close/references/code-review.md	3723747542-1702
-H	skills/close/references/cumulative-demo.md	3181633890-4797
+H	skills/close/references/cumulative-demo.md	398889074-7685
 H	skills/close/references/fake-expiry.md	3491573094-743
 H	skills/close/references/harvest.md	1956608162-684
 H	skills/close/references/impl-check.md	3998988429-864
@@ -223,8 +223,8 @@ H	skills/doctor/references/budget-check.md	3813294467-2669
 H	skills/doctor/references/interop-check.md	3316355601-827
 H	skills/doctor/references/spec-validation.md	906553258-123
 H	skills/doctor/references/state-inspection.md	1463118705-1262
-H	skills/plan-release/SKILL.md	1736808839-2553
-H	skills/plan-release/references/bone-touch-judge.md	3202528032-1270
+H	skills/plan-release/SKILL.md	1172871519-2561
+H	skills/plan-release/references/bone-touch-judge.md	3422967488-1278
 H	skills/plan-release/references/class-declaration.md	2145716635-323
 H	skills/plan-release/references/critic-veto.md	3678162678-495
 H	skills/plan-release/references/feature-map-grooming.md	1491236323-172
@@ -245,7 +245,7 @@ H	skills/start/references/journey-map.md	2970283972-104
 H	skills/start/references/posture-block.md	663882063-607
 H	skills/start/references/risk-gates.md	1883369797-591
 H	skills/work-item/SKILL.md	1649129982-549
-H	skills/work-item/references/debugging.md	2424723308-562
+H	skills/work-item/references/debugging.md	3357513431-594
 H	skills/work-item/references/handoff-contract.md	1777633753-89
 H	skills/work-item/references/pre-flight.md	998874162-623
 H	skills/work-item/references/report-contract.md	3145313531-89

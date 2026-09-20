@@ -240,6 +240,34 @@ t_capture oss_state_read "$S" '.close_records[-1].demo_passed'; t_assert_eq "tru
 t_capture oss_state_replay "$S"
 t_assert_rc 0 "replay stays clean across add_close_record (and this file's other demo-ledger ops)"
 
+# --- #269: the floor is on EXECUTED lines, not ledger lines. `n` counts
+# active OR quarantined auto lines, so an empty ledger, a user-lines-only
+# ledger, and an all-quarantined ledger each execute zero lines - and must
+# report a distinct non-pass verdict at rc != 0, never `PASS 0 lines` rc 0.
+# The `PASS 2` assertions above are the adjacent positive control: a run
+# with real executed lines still passes. ---
+TE="$(mktemp -d)"; SE="$TE/state.json"
+oss_state_init "$SE" demo-empty >/dev/null
+oss_entity_add_release "$SE" "demo" "goal" >/dev/null
+oss_entity_add_spine "$SE" r0 "demo spine" bone canonical >/dev/null
+t_capture oss_demo_run_auto "$SE" "$TMP/canon"
+t_assert_rc 1 "#269: an EMPTY demo ledger is not a pass"
+case "$T_OUT" in *"PASS 0"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: #269: vacuous 'PASS 0 lines' still emitted";; *) T_PASS=$((T_PASS+1));; esac
+t_assert_contains "$T_OUT" "zero" "...and the verdict names the zero-execution"
+
+oss_ledger_add_user "$SE" r0.s1 "look at the dashboard" "it loads" >/dev/null
+t_capture oss_demo_run_auto "$SE" "$TMP/canon"
+t_assert_rc 1 "#269: a user-lines-only ledger still executes zero auto lines"
+
+oss_ledger_add_auto "$SE" r0.s1 "flaky line" "true" "exit:0" >/dev/null
+# The user line above minted d1, so the auto line is d2 - select by type
+# rather than hardcoding, so the fixture survives an id-scheme change.
+oss_ledger_quarantine "$SE" "$(jq -r '[.demo_ledger[] | select(.type=="auto")][0].id' "$SE")" "quarantined for the fixture" >/dev/null
+t_capture oss_demo_run_auto "$SE" "$TMP/canon"
+t_assert_rc 1 "#269: an all-quarantined ledger executed zero lines - not a pass"
+t_assert_contains "$T_OUT" "SKIP" "...the quarantined line is still reported as skipped"
+rm -rf "$TE"
+
 cd /
 rm -rf "$TMP"
 
