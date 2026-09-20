@@ -184,4 +184,55 @@ t_assert_contains "$T_OUT" "AC-1" "X1 control setup: the well-formed AC line par
 t_capture oss_verify_report_cross_check "$XR" "$XS2"
 t_assert_rc 0 "X1 control: a spec whose every auto AC is accounted for is still CLEAN"
 
+# ===========================================================================
+# #460 - `producer | grep -q` under `set -o pipefail` inverts a TRUE match.
+# `grep -q` exits 0 at the first match; if the producer still has bytes to
+# write it takes SIGPIPE and the pipeline reports 141, so `|| return 1` fires
+# and a genuine match reads as NO match. Position-dependent, not size-dependent
+# - a match at the END of the same bytes detects fine - and the transition is a
+# race band around the 64 KiB pipe buffer, not a threshold. A single green run
+# is a race draw, so both fixtures pin >=200 KiB with the match at OFFSET 0 and
+# run 20x. Driven through bin/oss because pipefail only exists there - this
+# file sources the libs non-strict.
+# ===========================================================================
+BIGVAC="$TMP/vacuous-big.out"
+{ printf 'running 0 tests\n'; head -c 200000 /dev/zero | tr '\0' 'x'; printf '\n'; } > "$BIGVAC"
+inv=0
+for _i in $(seq 20); do
+  bash "$OSSB" zero_tests_guard "cargo test" < "$BIGVAC" >/dev/null 2>&1 || inv=$((inv+1))
+done
+t_assert_eq "0" "$inv" "#460: a 200KB vacuous run with the zero-marker at offset 0 is flagged on all 20 runs"
+
+# Same size, needle at offset 0, through the `output contains` arm (:77) - the
+# same idiom with the opposite polarity: the inverted match fails a line that
+# should pass.
+BIGCT="$TMP/contains-big.out"
+{ printf 'NEEDLE-at-start\n'; head -c 200000 /dev/zero | tr '\0' 'x'; printf '\n'; } > "$BIGCT"
+cinv=0
+for _i in $(seq 20); do
+  bash "$OSSB" verify_step "$TMP" "cat $BIGCT" "output contains NEEDLE" >/dev/null 2>&1 || cinv=$((cinv+1))
+done
+t_assert_eq "0" "$cinv" "#460: 'output contains' on a 200KB needle-at-offset-0 output passes on all 20 runs"
+
+# The runner check carries the same idiom on $1. Exposure needs the command
+# string past 64 KiB AND a newline right after the runner name (grep -q exits
+# early only once the match sits inside a complete line) - and under the argv
+# ceiling, since exec refuses a single argument past ~128 KiB. 70 KiB threads
+# both constraints.
+BIGCMD="$(printf 'cargo test\n'; head -c 70000 /dev/zero | tr '\0' ' ')"
+rinv=0
+for _i in $(seq 20); do
+  printf 'running 0 tests\n' | bash "$OSSB" zero_tests_guard "$BIGCMD" >/dev/null 2>&1 || rinv=$((rinv+1))
+done
+t_assert_eq "0" "$rinv" "#460: a 200KB command string still resolves its runner on all 20 runs"
+
+# Negative controls. A guard that detects nothing passes the two loops above
+# vacuously, so pin the failure side at the same size, plus the existing
+# small-output detection.
+{ printf 'test result: ok. 3 passed; 0 failed\n'; head -c 200000 /dev/zero | tr '\0' 'x'; printf '\n'; } > "$TMP/real-big.out"
+bash "$OSSB" zero_tests_guard "cargo test" < "$TMP/real-big.out" >/dev/null 2>&1
+t_assert_eq "1" "$?" "#460 control: a 200KB output with a real result is NOT flagged"
+bash "$OSSB" verify_step "$TMP" "cat $BIGCT" "output contains ABSENT-STRING" >/dev/null 2>&1
+t_assert_eq "1" "$?" "#460 control: a genuinely-absent string at 200KB still fails 'output contains'"
+
 rm -rf "$TMP"; t_summary

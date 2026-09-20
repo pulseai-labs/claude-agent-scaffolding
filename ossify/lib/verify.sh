@@ -70,11 +70,15 @@ oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail
         return 1
       fi ;;
     output\ contains\ ?*)
-      # `if ! pipeline` — NOT `pipeline | { … return 1; }`. See the idiom note
-      # below: a `return` inside the brace group would exit only the subshell,
-      # and this function would fall through to `return 0`, passing a demo line
-      # whose output does not contain the expected string.
-      if ! printf '%s' "$out" | grep -Fq -- "${exp#output contains }"; then
+      # `if ! grep -Fq … <<<"$out"` — NOT `pipeline | { … return 1; }`. See the
+      # idiom note below: a `return` inside the brace group would exit only the
+      # subshell, and this function would fall through to `return 0`, passing a
+      # demo line whose output does not contain the expected string. The
+      # herestring also removes the second hazard: `printf … | grep -q` under
+      # the dispatcher's pipefail lets grep exit on the first match while the
+      # producer still has bytes to write, the producer takes SIGPIPE, and the
+      # pipeline reports 141 — a TRUE match read as no match past ~64 KiB.
+      if ! grep -Fq -- "${exp#output contains }" <<<"$out"; then
         echo "oss: output missing '${exp#output contains }'" >&2
         printf '%s\n' "$out" | tail -5
         return 1
@@ -102,11 +106,15 @@ oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail
 # of a pipeline and therefore runs in a SUBSHELL, so `return 1` exits the
 # subshell, execution falls through, and the function returns 0 — reporting
 # EVERY input as vacuous green and failing every `exit:0` demo line. Verified
-# empirically. Use `pipeline || return 1` (the `||` binds outside the subshell).
+# empirically. Use `grep … <<<"$x" || return 1` (the `||` binds outside any
+# subshell). The herestring is load-bearing too: `printf … | grep -q` under
+# the dispatcher's pipefail lets grep exit on the first match while the
+# producer still has bytes to write, the producer takes SIGPIPE, and the
+# pipeline reports 141 — a TRUE match read as no match past ~64 KiB.
 oss_verify_zero_tests_guard() { # $1=command ; output on STDIN
   local out; out="$(cat)"
-  printf '%s' "$1" | grep -Eq 'pytest|cargo test|npm test|npm run test|go test|jest|vitest|bash .*test|ctest|dotnet test' || return 1
-  printf '%s' "$out" | grep -Eq 'collected 0 items|running 0 tests|0 passing|no tests to run|0 tests? ran|No tests found|testing: warning: no tests to run' || return 1
+  grep -Eq 'pytest|cargo test|npm test|npm run test|go test|jest|vitest|bash .*test|ctest|dotnet test' <<<"$1" || return 1
+  grep -Eq 'collected 0 items|running 0 tests|0 passing|no tests to run|0 tests? ran|No tests found|testing: warning: no tests to run' <<<"$out" || return 1
   return 0
 }
 
