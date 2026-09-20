@@ -10,21 +10,22 @@ Every command's syntax comes from `orca skills get orchestration`.
    Run the operator names.
 1b. **Ossify spine planned here?** If this session just completed `/ossify:plan-spine`
    against a concrete spine directory with a Run bound, step 2 is replaced by
-   `references/ossify-execution.md`: ratify one implementer/verifier profile per work
-   item and the three session blocks with the operator, write the sidecar, ask the
+   `references/ossify-execution.md`: agree one implementer/verifier seat per work
+   item and the three coordinator seats with the operator into the project file,
+   inject them as the spine session's SEATS block, ask the
    operator to confirm nested worker depth is 2, and
    start **one** spine session that creates its own child Run and launches every item
    pair. You approve relayed worker plans and wait on that one completion; you launch
    no item terminal. **That completion is the final round barrier, not a PR.** When it
    lands you **dispatch** `/ossify:close <spine-id>` to a **fresh** close session —
-   launched from the sidecar's ratified Close-session block — never
+   launched from the project file's close-session seat — never
    the spine driver's terminal, and wait on its `worker_done`, which returns **every** PR
    it opened, one per remote product hosting repo — a remote-less repo lands
    locally and is never a PR; an AI-workspace record arm is not one —
    or `closed`; `close` is a dispatched command (§6),
    not one you run here. Then **dispatch a work-PR session** per returned PR, in that
-   PR's own hosting-repo worktree, launched from the sidecar's ratified Work-PR-session
-   block, carrying the reviewer **and** PR-fix profiles you
+   PR's own hosting-repo worktree, launched from the project file's work-PR
+   seat, carrying the reviewer **and** PR-fix profiles you
    decide now, the merge-executor assignment, and `PRIOR_REVIEW` (`none` for a PR no
    earlier work-PR dispatch has covered, `covered` when one has and left durable
    evidence its review ran but no record,
@@ -148,7 +149,7 @@ Every command's syntax comes from `orca skills get orchestration`.
     recorded in each hosting repo — and waits for no record pass.
 13. **Handoff.** If the Run outlives the session, write a handoff naming the Run id,
     task ids, terminal handles, head SHA, and the next step — on an activated ossify
-    spine, also the recorded `SIDECAR_OID` and the accumulated close-review ledger
+    spine, also the spine's approved `SEATS` block and the accumulated close-review ledger
     (every close review's ledger so far, oldest first). With ossify installed, that
     is `/ossify:handoff`.
 
@@ -173,8 +174,8 @@ work-PR session act on it; a close session and every leaf seat simply finish the
 Past the ceiling a seat finishes the unit in hand and starts no new one, never stopping
 mid-item. At its next boundary it settles its dispatch with a return that carries its state
 forward, and its parent launches a fresh seat to resume: the spine session writes
-`/ossify:handoff`, returns `rotate: <handoff path>`, and resumes from the same ratified
-block with that path as `HANDOFF_PATH`; a work-PR session returns `open: <PR url> at
+`/ossify:handoff`, returns `rotate: <handoff path>`, and resumes from the same
+project-file seat with that path as `HANDOFF_PATH`; a work-PR session returns `open: <PR url> at
 <head sha>` with its review record, and its successor resumes from `PRIOR_REVIEW` — it
 takes no `HANDOFF_PATH`. A figure the hook reports as unavailable is relayed upward once,
 never guessed. The spine session's and work-PR session's boundaries and returns are in

@@ -11,15 +11,15 @@
 #
 # What IS mechanical, and is asserted:
 #
-#   - the sidecar's SCHEMA: its version string, its header key set, its three
-#     fixed-procedure keys, and its assignment table's column set — each by set
-#     equality, so a missing column and an added one are equally red
-#   - the reviewer's ABSENCE from that schema (the sidecar is not where the
-#     reviewer is chosen), scoped to the template block so prose about reviewer
+#   - the SEATS contract: the injected block exists, is used verbatim, halts on
+#     a missing row, and no sidecar token survives anywhere in shipped prose
+#   - the reviewer's ABSENCE from that block (the seats are not where the
+#     reviewer is chosen), scoped to the block itself so prose about reviewer
 #     timing cannot satisfy or break it
+#   - the three fixed-procedure keys, byte-exact
 #   - zero subagent-invocation forms in the activated path's own references
 #   - the exact command the spine session is briefed to run
-#   - the four parent identities its brief must carry
+#   - the parent identities its brief must carry
 #   - the nested Run's own mechanical values: the flag child traffic names and
 #     the required nested worker depth
 #   - the line budget these references are held to
@@ -46,6 +46,8 @@ LIFECYCLE_MD="$REF/lifecycle.md"
 ROLES_MD="$REF/roles.md"
 GENERIC_BRIEFS_MD="$REF/briefs.md"
 SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
+PLUGIN_README_MD="$PLUGIN_ROOT/README.md"
+COMMAND_MD="$PLUGIN_ROOT/commands/orchestrate.md"
 EVAL_FIXTURE14="$PLUGIN_ROOT/tests/eval/fixtures/ossify-spine-execution/14-close-brief-identities-and-workspace-records.md"
 EVAL_RUBRIC_MD="$PLUGIN_ROOT/tests/eval/rubrics/ossify-spine-execution.md"
 
@@ -112,17 +114,37 @@ assert_set() { # <observed> <expected space-separated> <label>
 
 printf '%sorca-crew — ossify spine execution seam (mechanical)%s\n\n' "$DIM" "$RST"
 
-section "the sidecar schema"
+section "the seats contract"
 
 nonempty "$EXEC_MD" "references/ossify-execution.md exists"
 
-pin "$EXEC_MD" 'schema: orca-execution/v2' \
-  "the sidecar declares its schema version exactly once"
+# Seats reach a spine session in its brief, not through a file. These are the
+# mechanical halves of that: the block exists, it is used verbatim, a missing
+# row halts, and no sidecar path survives anywhere in shipped prose.
+pin "$BRIEFS_MD" 'SEATS — the operator-approved seats for this spine' \
+  "the spine brief carries the seats block"
+pin "$BRIEFS_MD" 'A seat this block does not list halts the item and asks' \
+  "a missing seat row halts rather than substituting"
+for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" \
+         "$ROLES_MD" "$LIFECYCLE_MD" "$GENERIC_BRIEFS_MD" "$SKILL_MD" \
+         "$PLUGIN_README_MD" "$COMMAND_MD"; do
+  rel="${f#"$PLUGIN_ROOT"/}"
+  gone=0
+  for needle in 'sidecar' 'orca-execution.md' 'SIDECAR_OID' 'ORCA_EXECUTION_PATH' 'spine_plan_oid' 'orca-execution/v2'; do
+    c="$(occurrences "$f" "$needle")" || c=0
+    gone=$((gone + c))
+  done
+  if [ "$gone" -eq 0 ]; then pass "no sidecar reference survives in $rel"
+  else fail "no sidecar reference survives in $rel" "$gone occurrence(s)"; fi
+done
 
-assert_set "$(keys "$EXEC_MD" '# Orca execution assignments' '')" \
-  "schema spine_id spine_plan spine_plan_oid ratification ratified_in_run" \
-  "the sidecar header carries exactly its six identity fields"
+pin "$EXEC_MD" 'one implementer and one verifier seat per item' \
+  "the top recommends one implementer and one verifier seat per item"
+pin "$EXEC_MD" 'the approved seats travel in the brief' \
+  "the freeze is the injected brief, not a file on disk"
 
+# The three procedures were never the sidecar's: they survive the deletion
+# byte-exact, still recorded so the spine session checks rather than chooses.
 assert_set "$(keys "$EXEC_MD" '## Fixed procedures' '')" \
   "implementation_plan_gate implementer_entrypoint verifier_procedure" \
   "the fixed-procedure block carries exactly its three keys"
@@ -131,61 +153,23 @@ pin "$EXEC_MD" 'implementation_plan_gate: worker-authored/top-orchestrator-appro
   "the plan gate's value is byte-exact"
 pin "$EXEC_MD" 'implementer_entrypoint: /ossify:work-item <handoff path>' \
   "the implementer entry point's value is byte-exact"
-# #435: an angle-bracket slot, not a $NAME the sidecar never injects.
+# #435: an angle-bracket slot, not a $NAME nothing injects.
 absent "$EXEC_MD" '$HANDOFF_PATH' \
   "the entry point spends no uninjected \$NAME"
 pin "$EXEC_MD" 'verifier_procedure: all-claims-work-item-verify/v1' \
   "the verifier procedure's value is byte-exact"
 
-# D24: the spine-session seat is a ratified block BESIDE the item table, so the
-# table's item-set equality is untouched. Four keys by set equality — a fifth, or
-# a reviewer key smuggled in here, is as red as a missing one. This set is also
-# the control for dropping the two 'spine_*' needles from the template's absent
-# list below, which D24 turned from absences into real keys.
-assert_set "$(keys "$EXEC_MD" '## Spine session' '')" \
-  "spine_command spine_effort spine_expected_model spine_profile_reason" \
-  "the spine-session block carries exactly its four keys"
+section "the reviewer is not in the seats"
 
-# S3a/#446: the close and work-PR coordinator seats are ratified sidecar blocks the
-# same way — four keys each, beside the table, never rows in it.
-assert_set "$(keys "$EXEC_MD" '## Close session' '')" \
-  "close_command close_effort close_expected_model close_profile_reason" \
-  "the close-session block carries exactly its four keys"
-assert_set "$(keys "$EXEC_MD" '## Work-PR session' '')" \
-  "workpr_command workpr_effort workpr_expected_model workpr_profile_reason" \
-  "the work-PR-session block carries exactly its four keys"
-
-pin "$EXEC_MD" 'ratified with the item rows in the same phase' \
-  "the spine-session block is ratified with the item rows, not separately"
-pin "$EXEC_MD" 'its absence halts on an activated spine' \
-  "a sidecar with no spine-session block halts"
-absent "$EXEC_MD" "follows this skill's lane-driver policy" \
-  "the spine-session profile is no longer excluded from the sidecar"
-
-# The assignment table's columns, by set equality: an added reviewer_* or
-# spine_* column is as red as a dropped implementer_effort.
-hdr="$(awk '/^\| work_item_id \|/ { print; exit }' "$EXEC_MD")"
-if [ -n "$hdr" ]; then
-  cols="$(printf '%s\n' "$hdr" | tr '|' '\n' | sed 's/^ *//; s/ *$//' | grep -v '^$' | LC_ALL=C sort)"
-  assert_set "$cols" \
-    "work_item_id implementer_terminal_command implementer_expected_model implementer_effort verifier_terminal_command verifier_expected_model verifier_effort" \
-    "the assignment table carries exactly its seven columns"
-else
-  fail "the assignment table carries exactly its seven columns" "no '| work_item_id |' header row in ossify-execution.md"
-fi
-
-section "the reviewer is not in the sidecar"
-
-# Scoped to the template block, so prose stating WHEN the reviewer is chosen
+# Scoped to the SEATS block, so prose stating WHEN the reviewer is chosen
 # neither satisfies nor breaks this. Extract it, then assert on the extract.
 tmpl="$(mktemp)"
-awk '!seen && index($0, "# Orca execution assignments") > 0 { seen = 1 }
-     seen { print }
-     seen && /^```[[:space:]]*$/ && printed { exit }
-     seen { printed = 1 }' "$EXEC_MD" > "$tmpl"
-nonempty "$tmpl" "the sidecar template block extracts (control for the counts below)"
-for k in 'reviewer_' 'code_review'; do
-  absent "$tmpl" "$k" "the sidecar schema carries no '$k' field"
+awk '!seen && index($0, "SEATS — the operator-approved") > 0 { seen = 1 }
+     seen && /^[[:space:]]*$/ { exit }
+     seen { print }' "$BRIEFS_MD" > "$tmpl"
+nonempty "$tmpl" "the SEATS block extracts (control for the counts below)"
+for k in 'reviewer' 'code_review'; do
+  absent "$tmpl" "$k" "the SEATS block carries no '$k' row"
 done
 rm -f "$tmpl"
 
@@ -211,15 +195,15 @@ pin "$BRIEFS_MD" '/ossify:run-spine $SPINE_ID --external-executor' \
 # S3a/#446 RF9: the lifecycle id slots are GONE — a brief cannot know its own
 # task/dispatch ids before `dispatch --inject` exists, so the spine session takes
 # them from the Orca preamble instead. The absence controls live one section down.
-for id in PARENT_RUN_ID SPINE_ID ORCA_EXECUTION_PATH; do
+for id in PARENT_RUN_ID SPINE_ID; do
   pin "$BRIEFS_MD" "$id=" "the brief injects $id exactly once"
 done
-# D24/D28: the ratified model the banner must match, and the revalidation that
-# runs before EVERY item launch rather than once at step 1.
+# D24: the approved model the banner must match. D28's per-launch revalidation
+# becomes the verbatim rule: every item terminal launches from its SEATS row.
 pin "$BRIEFS_MD" 'SPINE_EXPECTED_MODEL=' \
-  "the spine brief injects the ratified expected model exactly once"
-pin "$BRIEFS_MD" 'immediately before each item terminal is created' \
-  "the sidecar is revalidated before every item launch"
+  "the spine brief injects the approved expected model exactly once"
+pin "$BRIEFS_MD" 'from its SEATS row, verbatim' \
+  "every item launch spends its SEATS row, not a re-read file"
 
 section "lifecycle ids come from the preamble, not from brief slots"
 
@@ -297,50 +281,36 @@ pin "$NESTED_MD" '--run $CHILD_RUN_ID' \
 pin "$NESTED_MD" 'must be `2`' \
   "the required nested worker depth is byte-exact"
 
-section "the sidecar is identical at every launch, not merely valid"
+section "the seats block is the freeze, not a file"
 
-# R1-1. The value checks pass on an edited-but-still-valid row, so identity of the
-# FILE is what catches a changed terminal command. Mechanical: a recorded blob id
-# and an equality requirement, plus the one way the baseline may move.
-pin "$NESTED_MD" 'Every item launch requires that same blob id' \
-  "the recorded sidecar blob id gates every item launch"
-# R2-3 re-words this rule around the injected name; the rule is unchanged.
-pin "$NESTED_MD" 'names the new `SIDECAR_OID`' \
-  "a sidecar rewrite moves the baseline through the reply, not by re-reading"
-pin "$BRIEFS_MD" 'require the hash to still equal the baseline' \
-  "the spine brief carries the same baseline into its per-launch check"
+# R1-1. The value checks used to pass on an edited-but-still-valid row; now
+# there is no file to re-read at all — the block in the brief is the whole
+# authority, and a change moves only through the top's reply.
+pin "$NESTED_MD" 'Every item launch spends its SEATS row verbatim' \
+  "the injected seats block gates every item launch"
+pin "$NESTED_MD" 'its reply carries the replacement rows' \
+  "a seat change moves through the top's reply, not by re-reading"
+pin "$NESTED_MD" 'never re-read the project file' \
+  "the spine session does not re-open the project file mid-run"
 
-section "the sidecar baseline is the top's, and it is quoted"
+section "the handoff carries the approved seats"
 
-# R2-1/R2-3. The child cannot be the source of its own baseline: a sidecar edited
-# between ratification and step 1 would become it. The top records the oid when it
-# writes the file and injects it; step 1 proves equality. And the hash is of the
-# PATH's contents, so the expansion must be quoted.
-pin "$BRIEFS_MD" 'git hash-object "$ORCA_EXECUTION_PATH"' \
-  "the sidecar hash reads the injected path, quoted"
-absent "$BRIEFS_MD" 'git hash-object ORCA_EXECUTION_PATH' \
-  "the unquoted literal-name form is gone"
-pin "$BRIEFS_MD" 'SIDECAR_OID=' \
-  "the spine brief injects the ratified sidecar oid exactly once"
-pin "$BRIEFS_MD" 'must equal SIDECAR_OID' \
-  "step 1 proves the file on disk is the ratified one"
-pin "$EXEC_MD" 'records that blob id as SIDECAR_OID' \
-  "the top records the oid at write time, not the child at read time"
-# N7/#467: the recorded oid survives the top's own handoff — a resumed top
-# proves against it and never re-derives a baseline.
-pin "$EXEC_MD" 'carries the recorded `SIDECAR_OID`' \
-  "a top handoff persists the recorded sidecar oid"
-pin "$EXEC_MD" 'asks the operator before any launch that spends a sidecar profile' \
-  "a resumed top without the oid asks before spending a profile"
+# R2-1/R2-3, re-expressed: the child is never the source of its own seats — the
+# top approves them and injects them; the handoff persists them so a resumed top
+# launches from what was approved, not from a fresh read of an edited file.
+pin "$EXEC_MD" 'carries the approved seats verbatim' \
+  "a top handoff persists the approved seats"
+pin "$EXEC_MD" 'asks the operator before any launch that spends an approved seat' \
+  "a resumed top without the seats asks before spending one"
 # PR #470 row 2: the handoff is the carrier — lifecycle's step 13 lists the
-# recorded oid and the accumulated close-review ledger on an activated spine,
+# approved seats and the accumulated close-review ledger on an activated spine,
 # and the ask's subject is the resumed top, not the handoff.
-pin "$LIFECYCLE_MD" 'the recorded `SIDECAR_OID`' \
-  "the top's handoff lists the recorded sidecar oid"
+pin "$LIFECYCLE_MD" 'the spine'"'"'s approved `SEATS` block' \
+  "the top's handoff lists the approved seats block"
 pin "$LIFECYCLE_MD" 'close-review ledger' \
   "the top's handoff lists the accumulated close-review ledger"
-pin "$EXEC_MD" 'A resumed top whose handoff lacks it asks the operator' \
-  "the resumed top, not the handoff, asks before spending a profile"
+pin "$EXEC_MD" 'A resumed top whose handoff lacks them asks the operator' \
+  "the resumed top, not the handoff, asks before spending a seat"
 
 section "the first verifier failure blocks and asks"
 
@@ -354,8 +324,8 @@ pin "$NESTED_MD" 'the old pair is released first' \
   "a replacement releases before it creates"
 pin "$NESTED_MD" 'never two pairs live on one item' \
   "one pair per item survives the replacement exception"
-pin "$NESTED_MD" 'a sidecar rewrite' \
-  "a replacement at a different profile goes back through ratification"
+pin "$NESTED_MD" 'the top relays the approved row' \
+  "a replacement at a different seat goes back through the operator"
 # The obvious needle here, 'A second failure escalates to you', spans a line wrap
 # in the prose it is meant to forbid, so it would have passed while the sentence
 # was still there. Pinned to the contiguous half instead, which counts 1 today.
@@ -520,8 +490,8 @@ pin "$PRBRIEFS_MD" 'never a squash or rebase' \
   "the operator merge path is bound to the merge-commit convention too"
 pin "$LIFECYCLE_MD" 'dispatch a work-PR session' \
   "1b dispatches a work-PR session per returned PR"
-pin "$SKILL_MD" 'the `orca-execution.md` sidecar' \
-  "SKILL.md's write set names the sidecar"
+pin "$SKILL_MD" 'the spine'"'"'s seats in `.orca-crew/roles.md`' \
+  "SKILL.md's write set names the project file"
 pin "$ROLES_MD" 'four seats' \
   "roles.md budgets four seats outside the per-item budget"
 pin "$ROLES_MD" 'a close-review writer' \
@@ -535,10 +505,10 @@ pin "$LIFECYCLE_MD" 'a closed return skips the record pass' \
 # R2-10. The teardown gate names a merged PR; a `closed` spine never had one.
 pin "$LIFECYCLE_MD" 'closed spine has no PR to confirm' \
   "teardown after a closed return validates the local landing instead"
-pin "$ROLES_MD" 'from the ratified spine_session block' \
-  "roles.md launches the spine seat from the sidecar block"
-pin "$BRIEFS_MD" 'from the ratified spine_session block' \
-  "the spine brief header launches from the sidecar block"
+pin "$ROLES_MD" 'the `spine session` seat the project file names' \
+  "roles.md launches the spine seat from the project file"
+pin "$BRIEFS_MD" 'the `spine session` seat the project file names' \
+  "the spine brief header launches from the project file"
 absent "$NESTED_MD" '/close <' \
   "the close is always named /ossify:close, never a bare /close"
 

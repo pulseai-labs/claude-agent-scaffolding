@@ -1,11 +1,10 @@
 # ossify spine PR briefs — the close and the work-PR sessions
 
-The two briefs the PR lane needs (`ossify-execution.md` §2, `ossify-nested-run.md`
-§4). Same rules as `briefs.md`: a brief is the whole contract its reader will ever
-see, angle brackets are slots, fill every slot and delete nothing else.
+The two briefs the PR lane needs. Same rules as `briefs.md`: a brief is the
+whole contract its reader will ever see — fill every slot, delete nothing else.
 
-> **Editing note.** Asserted to contain no subagent invocation form
-> (`tests/test-ossify-spine-contract.sh`). Say the prohibition; never paste the call shape.
+> **Editing note.** Asserted to contain no subagent invocation form (`tests/test-ossify-spine-contract.sh`).
+> Say the prohibition; never paste the call shape.
 
 ---
 
@@ -23,7 +22,9 @@ PLACEMENT: <abs path of the worktree the spine's lane ran from>.
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 PARENT_RUN_ID=<run id>
 SPINE_ID=<spine id>
+CLOSE_COMMAND=<the command this seat was launched with, from the project file>
 CLOSE_EXPECTED_MODEL=<model id the banner must show>
+CLOSE_EFFORT=<the effort this seat was launched at>
 CLOSE_REVIEW_LEDGER=<every close review's ledger for this spine, oldest first,
 verbatim — or "none">
 TASK/DISPATCH: your task and dispatch identities come from the Orca preamble
@@ -70,7 +71,7 @@ Report a refusal verbatim.
 
 Created by the top **in that PR's hosting-repo worktree**, so REPO_ROOT is
 the path this terminal already sits in, never a fixed canonical path.
-Launched from the sidecar's ratified Work-PR-session block with the top's
+Launched from the `work-PR session` seat the project file names, with the top's
 merge-executor assignment and PRIOR_REVIEW, it owns both PR seats inside a
 child Run of its own.
 
@@ -87,7 +88,9 @@ PARENT_RUN_ID=<run id>
 PR_REPO=<owner/repo>
 PR_NUMBER=<number>
 REPO_ROOT=<abs path of this terminal's worktree>
+WORKPR_COMMAND=<the command this seat was launched with, from the project file>
 WORKPR_EXPECTED_MODEL=<model id the banner must show>
+WORKPR_EFFORT=<the effort this seat was launched at>
 REVIEWER_COMMAND=<exact launch command>
 REVIEWER_EXPECTED_MODEL=<model id the banner must show>
 REVIEWER_EFFORT=<exact launch argument>
@@ -113,8 +116,8 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      asked upward and nothing is created. Then branch on PRIOR_REVIEW. `none` means
      the top dispatched you onto a PR no earlier work-PR dispatch has covered — an
      initial run, and step 3 creates the reviewer. `covered` means a dispatch worked
-     this PR and left durable evidence its delegated review ran — a ledger comment,
-     a bot review — but persisted no record: a resumed run, no reviewer created,
+     this PR and left durable evidence its delegated review ran
+     but persisted no record: a resumed run, no reviewer created,
      the current head's signals as your baseline; evidence absent the value is not
      spent — `ask` the top and create nothing. A record whose reviewed head equals
      the current PR head is a resumed run: skip only step 3's reviewer creation —
@@ -123,8 +126,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      run too: re-fetch the GitHub signals; the prior review and its unresolved
      findings still baseline the disposition. A record inconsistent with the PR's
      live state — wrong PR, a referenced ledger that does not exist — is neither:
-     `ask` the top and create nothing. You did not open this PR; the record and
-     the dispatch decide.
+     `ask` the top and create nothing. You did not open this PR.
   3. Initial runs only: create the reviewer FIRST, from REVIEWER_COMMAND at
      REVIEWER_EFFORT, confirm REVIEWER_EXPECTED_MODEL from its banner and
      first reply, and brief it to run `/code-review PR_NUMBER REVIEW_LEVEL`.
@@ -158,7 +160,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      head under that verdict: before the next disposition round,
      re-fetch the GitHub review signals and the thread state on the new head —
      the bots review every push, so the current-head verdict is read there, not
-     re-commissioned. A post-disposition finding — a P0/P1 included — returns
+     re-commissioned. A post-disposition finding returns
      through the blocking `ask` before any seat acts on it, never fixed by you
      or silently deferred. Relay ONE batched summary per round; STOPPING_RULE
      decides when fixing stops, counting the fix rounds PRIOR_REVIEW carries.
@@ -176,16 +178,14 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      terminal this session created — `orca terminal close --terminal <handle>`,
      `orca terminal list` showing none of them — only terminals you can prove
      are yours; report any teardown you cannot complete rather than claiming it.
-     You are exempt from any record-pass hold; the spine branch and spine
-     worktree stay the top's to hold, never yours to delete.
+     You are exempt from any record-pass hold.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
 DONE: one worker_done on the identities your injected Orca preamble names,
 returning PR_REPO, PR_NUMBER and every ledger comment id, plus one of two outcomes: the merge SHA; or
 `open: <PR url> at <head sha>` when the word you were relayed was wait or leave
-open, or at a fix-round boundary once the context-ceiling notice has fired — a round
-settled or the next not yet begun. On the open shape, persist its review record —
+open, or at a fix-round boundary once the context-ceiling notice has fired. On the open shape, persist its review record —
 whether the delegated review ran, its reviewed head, its clean/findings state and
 summary, the fix rounds run, and the durable ledger/comment references — the next
 fresh work-PR dispatch receives it as PRIOR_REVIEW under fresh dispatch identities,

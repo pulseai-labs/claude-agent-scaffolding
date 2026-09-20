@@ -65,25 +65,25 @@ No ossify contract changes.
 ## Spine execution assignments (0.3.0, amended 0.4.0 and 0.5.0)
 
 When this session has just planned an ossify spine — and only then; installation, an
-environment variable, or a sidecar found on disk activate nothing — the run takes three
-layers instead of one dispatched lane driver:
+environment variable, or a `.orca-crew/roles.md` found on disk activate nothing — the
+run takes three layers instead of one dispatched lane driver:
 
-1. The **top orchestrator** recommends one implementer and one verifier profile per work
-   item, has the operator ratify every row and the three session blocks in a single
-   phase, writes `$SPINE_DIR/orca-execution.md` (`orca-execution/v2`), and starts one
-   spine session. It
+1. The **top orchestrator** recommends one implementer and one verifier seat per work
+   item, writes them into the project file for the operator to approve in a single
+   phase — the three coordinator seats beside them — and starts one spine session
+   whose brief carries the approved set as its SEATS block. It
    approves each relayed worker plan and later chooses the reviewer. It launches no item
    terminal.
 2. The **spine session** runs the ossify lane in external-executor mode and creates a
    child Run of its own, which keeps item plan traffic and item completions out of the
    parent inbox. It launches and supervises both terminals for each item.
 3. Each **work item** gets a fresh implementer terminal and a fresh verifier terminal at
-   its exact ratified command, model and effort. A pair is retained across that item's
+   its exact approved command, model and effort. A pair is retained across that item's
    corrections and never crosses work items.
 
-Sidecar rows vary only the terminal command, the expected model, and the effort. The
+SEATS rows vary only the command, the expected model, and the effort. The
 implementation-plan gate, the implementer entry point (`/ossify:work-item`) and the
-verifier procedure are fixed. There is no reviewer row and no whole-spine profile: the
+verifier procedure are fixed. There is no reviewer row and no whole-spine seat: the
 reviewer is chosen when the spine's PR reaches review, because before that there is no
 diff to choose against.
 
@@ -96,10 +96,10 @@ Agent or Task subagent runs anywhere in this path.
 Outside an activated spine, the role table, complexity-class routing and retention above
 are unchanged.
 
-**0.4.0 amends the seats, not the activation.** The sidecar gains a `## Spine session`
-block beside the item table — command, expected model, effort, reason — ratified with
-the item rows and halting on its absence (D24), and it is revalidated immediately before
-**every** item launch rather than once at the start (D28). The first verifier failure no
+**0.4.0 amends the seats, not the activation.** The approved set gains the spine
+session's own seat — command, expected model, effort, reason — approved with the
+item seats and halting on its absence (D24), and every item launch spends its own
+row verbatim rather than re-reading the file (D28). The first verifier failure no
 longer resolves itself: it sends one blocking `ask` carrying the verifier's summary and
 three options — correct with the same pair, replace the pair, halt — and *replace*
 releases the old pair before creating its successor (D25). The close and every PR loop
@@ -112,10 +112,9 @@ phase's prose is three references now: `ossify-execution.md` (the contract),
 `ossify-nested-run.md` (the mechanics) and `ossify-pr-briefs.md` (the close and work-PR
 briefs).
 
-**0.5.0 amends the coordinator contracts.** The sidecar gains ratified `## Close
-session` and `## Work-PR session` blocks beside the Spine-session block and versions to
-`orca-execution/v2` — a v1 sidecar halts a new launch until the top rewrites it and the
-operator re-ratifies; nothing auto-upgrades and no live seat is replaced. The spine
+**0.5.0 amends the coordinator contracts.** The approved set gains the `close
+session` and `work-PR session` seats beside the spine session's — coordinator seats
+the operator approves with the rest, never defaults the plugin picks. The spine
 session closes each item through the lane — gate, commit, merge — before the barrier, and
 an item still active there is a halt, not a completion. A `fix now` close-review finding
 halts the close with its ledger; the top asks for a writer profile, dispatches fresh

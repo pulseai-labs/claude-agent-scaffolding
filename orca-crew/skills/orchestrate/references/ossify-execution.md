@@ -17,15 +17,16 @@ Four facts, **all** of them, and each about the session you are in right now:
 4. a concrete spine directory exists on disk.
 
 Absent any one, this file does not apply and ossify runs as `SKILL.md` §6 says.
-**None of these activates it**: mere installation, an environment variable, an
-`orca-execution.md` on disk, a `/plan-spine` in a session that is not the top. Discovery
-is not authority — the phase begins because *this* session planned *this* spine.
+**None of these activates it**: mere installation, an environment variable, a
+spine section in the project file, a `/plan-spine` in a session that is not the
+top. Discovery is not authority — the phase begins because *this* session
+planned *this* spine.
 
 ## 2. Four seats, one voice
 
 | Layer | Owns | Never |
 |---|---|---|
-| **Top orchestrator** (you) | ratifying one implementer/verifier profile per item and the three session blocks — spine, close, work-PR — writing the sidecar, launching the spine terminal from `spine_command` with its model confirmed from the banner and first reply and `spine_effort` passed as the launch argument — a mismatch is a failed launch, exactly as for an item row — approving or amending each relayed worker plan, deciding the reviewer and PR-fix seats at the PR transition, dispatching the close and one work-PR session per returned PR, each launched from its own ratified block with the model confirmed as an item row's, assigning each work-PR dispatch's merge executor (`MERGE_EXECUTOR`) and supplying its `PRIOR_REVIEW` — `none` only for a PR no earlier work-PR dispatch has covered, `covered` when one has and left durable evidence its review ran but persisted no record, otherwise the durable record that PR's last `open:` result persisted — asking for a writer profile and dispatching one fresh close-review writer per affected hosting repo when a close returns `halted: close-review`, relaying the merge word, dispatching the record pass, and the teardown | launching or supervising an item terminal; reading raw child completion traffic; reviewing, fixing or merging a spine PR itself |
+| **Top orchestrator** (you) | agreeing one implementer/verifier seat per item and the three coordinator seats — spine, close, work-PR — with the operator into the project file, injecting them into the spine session's brief as its SEATS block, launching the spine terminal from that seat's command with its model confirmed from the banner and first reply and its effort passed as the launch argument — a mismatch is a failed launch, exactly as for an item row — approving or amending each relayed worker plan, deciding the reviewer and PR-fix seats at the PR transition, dispatching the close and one work-PR session per returned PR, each launched from its project-file seat with the model confirmed as an item row's, assigning each work-PR dispatch's merge executor (`MERGE_EXECUTOR`) and supplying its `PRIOR_REVIEW` — `none` only for a PR no earlier work-PR dispatch has covered, `covered` when one has and left durable evidence its review ran but persisted no record, otherwise the durable record that PR's last `open:` result persisted — asking for a writer profile and dispatching one fresh close-review writer per affected hosting repo when a close returns `halted: close-review`, relaying the merge word, dispatching the record pass, and the teardown | launching or supervising an item terminal; reading raw child completion traffic; reviewing, fixing or merging a spine PR itself |
 | **Spine session** | the ossify lane, a nested child Run, launching and supervising both item terminals per item, relaying plans up, item-local corrections | changing any ossify contract; moving item tasks into the parent Run |
 | **Item terminals** | one item each: implement, verify | crossing into another item |
 | **Close session** | one dispatch of `/ossify:close`, returning every PR it opened | creating any terminal; driving a PR it opened |
@@ -47,40 +48,28 @@ you never answer it yourself or record your own choice as an operator decision.
 The nested Run's mechanics — depth, routing, the round procedure and the close — are
 in `references/ossify-nested-run.md`.
 
-## 3. The sidecar
+## 3. The seats
 
-`$SPINE_DIR/orca-execution.md`. **You are its only writer.**
+A spine's seats live in the project file, operator-approved — never in a file of
+this plugin's own.
 
-```markdown
-# Orca execution assignments
+**Recommending.** After `/plan-spine`, recommend one implementer and one verifier seat per item
+from the project file's seats and conditions — scope, risk and cost,
+item by item — and the three coordinator seats beside them. Present **every** seat
+to the operator in one approval phase and write nothing until all of it is decided
+— a half-approved set looks binding and is not. Record the recommendation and any
+override.
 
-schema: orca-execution/v2
-spine_id: r7.s2
-spine_plan: ./SPINE.md
-spine_plan_oid: 1111111111111111111111111111111111111111
-ratification: operator-approved
-ratified_in_run: run_parent123
+**Writing.** On approval, record the set in the project file's section for this
+spine — each item's implementer and verifier command, expected model and effort,
+keyed by item, and the three coordinator seats' beside them — then inject it into
+the spine session's brief as its SEATS block (`ossify-briefs.md`) — the approved seats travel in the brief,
+so an edit made for another spine cannot reach a
+spine already running. A seat that needs to change mid-spine is a new operator
+decision you relay down through the reply; no session re-reads the file for it.
 
-## Spine session
-
-spine_command: strong-coder --effort max
-spine_expected_model: strong-v2
-spine_effort: max
-spine_profile_reason: lane-driver default; this driver coordinates, it does not write.
-
-## Close session
-
-close_command: strong-coder --effort max
-close_expected_model: strong-v2
-close_effort: max
-close_profile_reason: lane-driver default; the close is ceremony and judgment, not writing.
-
-## Work-PR session
-
-workpr_command: strong-coder --effort max
-workpr_expected_model: strong-v2
-workpr_effort: max
-workpr_profile_reason: lane-driver default; this seat coordinates two seats and dispositions.
+A handoff the top writes **carries the approved seats verbatim**; a resumed top
+launches from those, never a fresh read. A resumed top whose handoff lacks them asks the operator before any launch that spends an approved seat.
 
 ## Fixed procedures
 
@@ -88,72 +77,10 @@ implementation_plan_gate: worker-authored/top-orchestrator-approved
 implementer_entrypoint: /ossify:work-item <handoff path>
 verifier_procedure: all-claims-work-item-verify/v1
 
-## Binding assignments
-
-| work_item_id | implementer_terminal_command | implementer_expected_model | implementer_effort | verifier_terminal_command | verifier_expected_model | verifier_effort |
-|---|---|---|---|---|---|---|
-| r7.s2.w1 | claude --model claude-opus-5 --effort xhigh | claude-opus-5 | xhigh | strong-coder --effort high | strong-v2 | high |
-
-## Recommendation record
-
-- r7.s2.w1 — interface work justifies Opus 5 xhigh; a second model checks it independently.
-- spine session — the lane-driver default, ratified as recommended.
-
-## Excluded decisions
-
-Reviewer profile and `/code-review` level are selected when the spine PR reaches
-review.
-```
-
-**Only the terminal command, expected model and effort vary.** The three procedures
-above are fixed for every item on every spine, recorded so the spine session
-checks rather than chooses. No reviewer row — §5 says why; every session block
-sits beside the table, never a row in it.
-
-**Authoring it.** After `/plan-spine`, recommend one implementer and one verifier profile per
-item from its scope, risk and cost. Present **every** row to the operator in one ratification
-phase and write nothing until every row is decided — a half-ratified sidecar looks binding and
-is not. Record the recommendation and any override. **On writing the ratified file, hash it** —
-`git hash-object` on the sidecar — and keep that value: the brief injects it as `SIDECAR_OID`
-and every launcher proves equality against it before spending a profile. A child sampling its
-own baseline would adopt any edit made before its first read;
-**the top records that blob id as SIDECAR_OID**, so the baseline is the operator-approved file.
-
-**Reading it.** Before dispatching the spine session, and again before every item
-launch, the reader checks: the plan's blob id **at its real path** — `git hash-object
-"$(dirname "$ORCA_EXECUTION_PATH")/SPINE.md"`, which resolves `spine_plan` against the
-sidecar's own directory exactly as authoring did — equals `spine_plan_oid`; every
-planned item has exactly one complete row; no row names an item the plan does not;
-`ratification` reads exactly `operator-approved`; `ratified_in_run` equals the injected
-`PARENT_RUN_ID`; `spine_id` equals the spine being run. **Those last three are value
-checks, not presence checks** — a field that merely exists admits `rejected`, another
-Run's ratification and another spine's sidecar as authority. Any failure halts; a
-profile that needs to change is a new operator decision and a rewrite by you, never a
-substitution. **Those checks establish validity, not identity** — an edited but
-still-valid row or block passes every one — so the sidecar's blob id is pinned against
-the **top-recorded `SIDECAR_OID`** at every launch that spends a sidecar profile: the
-spine session before each item terminal (`ossify-nested-run.md` §3), and the top before
-the spine session, each close, work-PR session and record pass. A mismatch halts that
-launch and asks; only your rewrite, the operator's re-ratification and a newly recorded
-oid move it. A handoff the top writes carries the recorded `SIDECAR_OID`; a resumed top
-proves the sidecar against that recorded value, never a fresh hash.
-A resumed top whose handoff lacks it asks the operator before any launch that spends a sidecar profile.
-
-**The `## Spine session` block is read the same way** — its four keys value-checked beside the
-item rows, and **its absence halts on an activated spine**. **The `## Close session` and
-`## Work-PR session` blocks are read identically** — four keys each, value-checked beside the
-item rows, either one's absence halting the same way — and all three are recommended and
-**ratified with the item rows in the same phase**, touching nothing about the item-set equality
-check above. The close terminal and each work-PR session launch from their own ratified blocks,
-the model confirmed from the banner and first reply exactly as an item row's is.
-
-**A v1 sidecar is not a v2 sidecar with defaults missing.** A sidecar whose `schema:` reads
-`orca-execution/v1` halts any new v2 launch: you rewrite it — adding the two blocks, moving
-the schema line — the operator re-ratifies it in one phase, and only a new `SIDECAR_OID`
-moves anything. No session upgrades, completes or rewrites a sidecar itself. A plugin
-update replaces no live seat — terminals already launched run to their boundaries — but
-the next governed launch (close, work-PR, record pass, new spine) still requires v2 under
-that explicit re-ratification.
+**Only the command, expected model and effort vary.** The three procedures above
+are fixed for every item on every spine, recorded so the spine session checks
+rather than chooses. No reviewer row — §5 says why; the coordinator seats sit
+beside the item rows, never among them.
 
 ## 4. Scope of the fresh-pair rule
 
@@ -169,7 +96,7 @@ ordinary first run of the item, not an inheritance of the rejected work.
 
 ## 5. Two profiles are chosen at the PR, not before
 
-Reviewer profile is absent from spine planning and from the sidecar on purpose: the PR
+Reviewer profile is absent from spine planning and from the SEATS block on purpose: the PR
 does not exist yet, and a profile chosen before there is a diff to read is a guess
 recorded as a decision. At the PR transition ask for the reviewer's command, expected
 model, effort and `/code-review` level, and put **all four** into the **work-PR

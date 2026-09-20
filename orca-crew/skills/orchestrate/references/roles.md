@@ -70,18 +70,17 @@ close it with `orca terminal close`; read the release receipt rather than assumi
 
 On a spine this session planned (`ossify-execution.md`), two rows above are
 superseded **for that spine's work items only**: the implementer and the verifier
-are launched from the operator-ratified sidecar row, whose value may be a native
-`claude --model <id> --effort <level>` command rather than an alias; the model is
-confirmed from the banner and the first reply exactly as *The launch* requires; and
-each item gets a
+are launched from the spine's operator-approved SEATS rows, whose values may name
+a native `claude --model <id> --effort <level>` command rather than an alias; the
+model is confirmed from the banner and the first reply exactly as *The launch*
+requires; and each item gets a
 **fresh** pair, retained across that item's corrections and released when it closes or
 escalates. A pair never crosses work items there.
 
 Everything else on this page — the class routing, the retention rule, the placement
 and writer rules, and the budget below — is unchanged and still governs every session
-outside such a spine. The spine session itself is launched
-**from the ratified spine_session block** in that spine's sidecar — a block beside the
-item table, never a row in it — so the generic lane-driver policy does not select it.
+outside such a spine. The spine session itself is launched **from the `spine session` seat the project file names**
+for that spine, so the generic lane-driver policy does not select it.
 
 ## Session budget
 
@@ -94,11 +93,11 @@ implementer by `send`, never to a new session.
 **Activated ossify spines add four seats, all outside the per-item budget above:
 the spine session, one per spine; a close
 session, a fresh terminal per close dispatch; a work-PR session, one per returned
-PR — each launched from its own ratified sidecar block (`## Spine session`,
-`## Close session`, `## Work-PR session`), the model confirmed from the banner and
+PR — each launched from its own seat in the project file (`spine session`,
+`close session`, `work-PR session`), the model confirmed from the banner and
 first reply as an item row's is — and a close-review writer, one per affected
 hosting repo at a `halted: close-review`, launched from the profile the operator
-names at that halt (`ossify-close-writer.md`), never a sidecar block.** The
+names at that halt (`ossify-close-writer.md`), never a seat the file pre-defines.** The
 work-PR session owns the reviewer and the
 PR-fix seat inside a child Run of
 its own, so those two are budgeted there rather than here — the top decides both
