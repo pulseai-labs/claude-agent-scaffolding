@@ -143,7 +143,11 @@ wd="$("$oss_bin" demo_workdir)" \
 
 # same command, both trees, and diff the OUTPUT before believing the rc
 cmd="$("$oss_bin" get ".demo_ledger[] | select(.id==\"<line-id>\") | .command")"
-( cd "$wd" && bash -c "$cmd" ) > /tmp/oss-head.txt 2>&1; echo "head rc=$?"
+# Per-invocation evidence dir - a fixed /tmp path collides across concurrent
+# closes, and a close that diffs ANOTHER invocation's head against its own
+# parent manufactures quarantine evidence from a cross-contaminated read.
+evd="$(mktemp -d)"
+( cd "$wd" && bash -c "$cmd" ) > "$evd/oss-head.txt" 2>&1; echo "head rc=$?"
 
 # EVERY hosting repo to its own first parent - not just the one $wd sits in.
 # $wd is the composition ROOT, which may be in any hosting repo or none of the
@@ -187,7 +191,7 @@ while IFS=: read -r repo sha; do
     || { echo "halt: cannot reach $sha^1 in $repo - the comparison is void"; exit 1; }
 done < "$pairs"
 
-( cd "$wd" && bash -c "$cmd" ) > /tmp/oss-parent.txt 2>&1; echo "parent rc=$?"
+( cd "$wd" && bash -c "$cmd" ) > "$evd/oss-parent.txt" 2>&1; echo "parent rc=$?"
 
 # Restore every checkout before judging anything. A repo left detached is a
 # close that continues against a tree nobody meant to be on.
@@ -195,7 +199,7 @@ _oss_restore_checkouts \
   || { echo "close: the quarantine comparison left a repo detached - HALT before judging anything, the workspace is not in the state this check assumes"; exit 1; }
 trap - EXIT
 
-diff /tmp/oss-head.txt /tmp/oss-parent.txt
+diff "$evd/oss-head.txt" "$evd/oss-parent.txt"
 ```
 
 - **Passes at the first parent** → **this spine broke it.** Not a quarantine
