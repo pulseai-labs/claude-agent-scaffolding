@@ -110,7 +110,8 @@ dispatch. The requirement is per role: a role whose shipped or declared brief in
 | fix-round implementer | `/ossify:work-pr` when ossify is installed | `slash-commands` then |
 | ossify item implementer | `/ossify:work-item` | `slash-commands` |
 | item verifier | no command | — |
-| spine session | `/ossify:run-spine` — the default lane spawns `ossify:implementer-agent` subagents; the external-executor lane does not | `slash-commands, subagents` |
+| spine session, default lane | `/ossify:run-spine`; spawns `ossify:implementer-agent` subagents through the `Agent` tool | `slash-commands, subagents` |
+| spine session, external-executor lane | `/ossify:run-spine` | `slash-commands` |
 | close session | `/ossify:close` | `slash-commands` |
 | work-PR session | `/ossify:work-pr` | `slash-commands` |
 | doctor session | `/ossify:doctor` | `slash-commands` |
@@ -172,15 +173,6 @@ brief: ./briefs/security-audit.md
 
 On-demand seats cost sessions: the project file says how many may exist at once, the
 default is one, and anything beyond the declared number is a planning defect.
-
-A declared role runs at its point on every supported path. The session whose path
-crosses the point carries the block in its own brief — name, its agent's resolved
-profile, `blocks:` and `brief:` — injected by the top, since a delegated session
-never reads either file: `after-implementer` lands in the spine session,
-`before-review`, `after-disposition` and `before-merge-ask` in the work-PR
-session, `at-teardown` and `on-demand` stay with the top. A `blocks: yes` role
-holds whichever session it lands in — its summary relays to the top, the top asks
-the operator, and the word returns through the reply.
 
 ## When a file is missing
 

@@ -69,9 +69,9 @@ environment variable, or a `.orca-crew/roles.md` found on disk activate nothing 
 run takes three layers instead of one dispatched lane driver:
 
 1. The **top orchestrator** recommends one implementer and one verifier seat per work
-   item, writes them into the project file for the operator to approve in a single
-   phase — the three coordinator seats beside them — and starts one spine session
-   whose brief carries the approved set as its SEATS block. It
+   item — the three coordinator seats beside them — presents the whole set to the
+   operator in one approval phase, writes the decided set into the project file, and
+   starts one spine session whose brief carries the approved set as its SEATS block. It
    approves each relayed worker plan and later chooses the reviewer. It launches no item
    terminal.
 2. The **spine session** runs the ossify lane in external-executor mode and creates a
@@ -83,7 +83,7 @@ run takes three layers instead of one dispatched lane driver:
 
 SEATS rows carry each seat's resolved profile (`config.md`). The
 implementation-plan gate, the implementer entry point (`/ossify:work-item`) and the
-verifier procedure are fixed. There is no reviewer row and no whole-spine seat: the
+verifier procedure are fixed. There is no reviewer row: the
 reviewer is chosen when the spine's PR reaches review, because before that there is no
 diff to choose against.
 

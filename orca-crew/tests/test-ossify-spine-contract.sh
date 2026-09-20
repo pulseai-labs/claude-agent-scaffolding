@@ -333,7 +333,7 @@ pin "$LIFECYCLE_MD" 'resolved coordinator' \
 # can: is a per-role approval check, not a reviewer-only one.
 pin "$CONFIG_MD" 'a role whose shipped or declared brief invokes a slash command' \
   "the can: requirement is per role, checked at approval"
-pin "$CONFIG_MD" '/ossify:run-spine' \
+n_eq "$CONFIG_MD" '/ossify:run-spine' 2 \
   "the capability table names the spine session's command"
 # The effort cell names a seat choice, never a runtime override.
 pin "$ROLES_MD" 'the machine entry is the only source of effort' \
@@ -358,28 +358,31 @@ for f in "$REF"/*.md "$SKILL_MD" "$PLUGIN_README_MD" "$COMMAND_MD" \
   else fail "no partial field-name enumeration in ${f##*/}" "$l line(s) name some launch fields but not all"; fi
 done
 
-section "declared roles fire inside delegated sessions"
+section "declared roles, capabilities, dispatched commands"
 
-# Round 3, finding 1: a declared role runs at its point on every supported
-# path — the session whose path crosses it carries the block in its brief,
-# since a delegated session never reads either file.
-pin "$CONFIG_MD" 'crosses the point carries the block' \
-  "config names which session carries a declared role"
-pin "$BRIEFS_MD" 'OPERATOR_ROLES=' \
-  "the spine brief carries the declared roles for its points"
-pin "$PRBRIEFS_MD" 'OPERATOR_ROLES=' \
-  "the work-PR brief carries the declared roles for its points"
-pin "$LIFECYCLE_MD" 'rides that session' \
-  "lifecycle says the role travels in the session's brief"
-n_eq "$EXEC_MD" 'OPERATOR_ROLES' 2 \
-  "the top injects the declared role blocks"
+# Round 4 cut: declared roles fire on the top's own paths only — the carry
+# mechanism is deferred to issue #500, and the limit is stated where the
+# declarer reads it. A return of the mechanism must not silently skip the
+# delegated paths again.
+pin "$LIFECYCLE_MD" 'not yet carried into a delegated spine or work-PR session' \
+  "lifecycle states declared roles do not fire inside delegated sessions"
+pin "$LIFECYCLE_MD" 'issue #500' \
+  "the limit names the issue holding the work"
+absent "$BRIEFS_MD" 'OPERATOR_ROLES' \
+  "the spine brief carries no delegated-role slot"
+absent "$PRBRIEFS_MD" 'OPERATOR_ROLES' \
+  "the work-PR brief carries no delegated-role slot"
+absent "$EXEC_MD" 'OPERATOR_ROLES' \
+  "the top injects no declared role blocks"
 
 # Round 3, finding 3: the approval check covers every capability a role's
 # shipped brief needs — the default run-spine lane spawns subagents.
 n_eq "$CONFIG_MD" 'subagents' 3 \
   "the can: vocabulary covers the default lane's Agent tool"
-pin "$CONFIG_MD" 'the default lane spawns' \
+pin "$CONFIG_MD" 'spine session, default lane' \
   "the capability table names the default lane's need"
+pin "$CONFIG_MD" 'spine session, external-executor lane' \
+  "the capability table names the external lane's need"
 
 # Round 3, finding 4: every dispatched command resolves to a role the project
 # file can fill — doctor gets its own seat.
@@ -392,7 +395,7 @@ pin "$ROLES_MD" 'doctor session' \
 # command with no role to fill is the same defect.
 start=$(awk '/Dispatched to an Orca session/{print NR; exit}' "$SKILL_MD")
 missing=0
-for cmd in $(awk -v s="$start" 'NR>=s && NR<=s+1' "$SKILL_MD" | tr '\n' ' ' | tr '`' '\n' | awk 'NR%2==0' | tr -d ' ,'); do
+for cmd in $(awk -v s="$start" 'NR<s{next} NR>s && (/^[[:space:]]*$/ || /^- / || /^#/) {exit} {print}' "$SKILL_MD" | tr '\n' ' ' | tr '`' '\n' | awk 'NR%2==0' | tr -d ' ,'); do
   [ -n "$cmd" ] || continue
   if [ "$(occurrences "$CONFIG_MD" "/ossify:$cmd")" -eq 0 ]; then
     missing=$((missing+1)); fail "dispatched command '$cmd' resolves to a role" "no /ossify:$cmd in config.md"

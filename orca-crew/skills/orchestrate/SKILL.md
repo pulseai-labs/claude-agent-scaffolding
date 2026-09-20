@@ -113,8 +113,7 @@ Two cases are named because they look like clashes and are not:
   entry since the lane spawns `ossify:implementer-agent` subagents through the
   `Agent` tool. From ossify's point of view that
   session is its orchestrator: it holds the state lock, commits at each close,
-  merges at the barrier. Its dispatch brief carries the declared roles for the
-  points its path crosses, as `config.md` rules. The `Agent`-tool ban in §2 applies
+  merges at the barrier. The `Agent`-tool ban in §2 applies
   to this session only. You
   wait on one `worker_done` per spine.
 - **`run-spine`, when this session just planned the spine.** Then the items deserve

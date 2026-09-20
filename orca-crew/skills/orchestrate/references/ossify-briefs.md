@@ -32,7 +32,6 @@ SEATS — the operator-approved seats for this spine. Use them verbatim.
 <item id> implementer: <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
 <item id> verifier:    <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
 A seat this block does not list halts the item and asks.
-OPERATOR_ROLES=<each declared after-implementer role: <name> | agent: <resolved profile row> | blocks: <yes|no> | brief: <path> — or "none">
 HANDOFF_PATH=<a prior spine session's handoff path, or "none">
 TASK/DISPATCH: your task and dispatch identities come from the Orca preamble injected
 into this terminal; spend those verbatim — never placeholders, never ids predicted
@@ -57,9 +56,7 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
   4. Gather the round's implementation plans into ONE ordered ask to the top and
      wait. Relay the top's per-item decision to each implementer on its own
      original message id before any edit starts.
-  5. On each complete return, spend every OPERATOR_ROLES role first — dispatch
-     its seat from its row with its `brief:` file; `blocks: yes` holds the item:
-     relay the summary to the top and wait for its reply — then create and dispatch that item's fresh VERIFIER
+  5. On each complete return, create and dispatch that item's fresh VERIFIER
      terminal from its SEATS row's verifier command and run the fixed all-claims
      procedure; `cannot determine` counts as fail. On the FIRST failure ask the
      top, with the verifier's summary and the three options — correct, replace,

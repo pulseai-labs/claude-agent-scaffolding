@@ -68,8 +68,7 @@ injection: build the spine session's SEATS block by looking each approved name
 up in the machine file for its resolved profile, then inject
 the block into the spine session's brief (`ossify-briefs.md`) — the approved seats travel in the brief,
 so an edit made for another spine cannot reach a
-spine already running. With it go this spine's declared `after-implementer` role
-blocks as the brief's `OPERATOR_ROLES`, each `agent:` resolved into its row the same way. A seat that needs to change mid-spine is a new operator
+spine already running. A seat that needs to change mid-spine is a new operator
 decision you relay down through the reply; no session re-reads the file for it.
 
 A handoff the top writes **carries the approved seats verbatim** — the item rows
@@ -113,8 +112,7 @@ item row is; step 8's reviewer seat is the default only outside such a spine.
 its item's close and the spine session was a coordinator, not a writer — so step 10's
 *retained implementer* does not exist here. Ask for one PR-fix resolved profile
 alongside the reviewer's, and inject it into the same work-PR
-brief — with the declared roles at that session's points (`before-review`,
-`after-disposition`, `before-merge-ask`) as its `OPERATOR_ROLES`, resolved the same way. The seat is **decided** by you and **created and dispatched by the work-PR
+brief. The seat is **decided** by you and **created and dispatched by the work-PR
 session**, only once its disposition ledger exists, on `briefs.md`'s **fix-round
 brief** rather than the planned-implementer brief, whose DONE opens a new PR: it works
 the PR that already exists. One seat per PR, released at merge.
