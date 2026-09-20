@@ -133,6 +133,11 @@ $PLUGIN_ROOT/.claude-plugin/plugin.json
 $PLUGIN_ROOT/.codex-plugin/plugin.json"
 # The marketplace listing is shipped prose too — same sweep, when the checkout
 # carries it (a standalone plugin clone has no repo root).
+# CHANGELOG.md is deliberately absent: its historical entries record what
+# 0.2.0-0.6.0 actually shipped, names included, and rewriting them would falsify
+# the record. The cost of that exclusion is a forward hole — a future entry that
+# names a personal alias in its head entry passes this gate. Accepted: head-entry
+# sweeping is machinery this release does not need.
 if [ -f "$PLUGIN_ROOT/../.claude-plugin/marketplace.json" ]; then
   SWEEP_FILES="$SWEEP_FILES
 $PLUGIN_ROOT/../.claude-plugin/marketplace.json"

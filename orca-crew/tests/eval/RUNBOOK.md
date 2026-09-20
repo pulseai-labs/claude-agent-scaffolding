@@ -62,6 +62,12 @@ and do not keep them for comparison. The same applies to fixture files the
 change retires and to any control records under `evidence/` built on the old
 contract.
 
+Retired with no successor at 0.7.0: `11-v1-sidecar-requires-re-ratification-halts`
+checked that a sidecar ratified under a superseded contract was not launch
+authority and that every governed launch proved the sidecar's blob id. Both
+mechanisms it guarded are deleted, so there is nothing left for a fixture to
+guard — the retirement is deliberate, not lost coverage.
+
 ## Fixture format
 
 `fixtures/<surface>/NN-description.md` with YAML frontmatter carrying
