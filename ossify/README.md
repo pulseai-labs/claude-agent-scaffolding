@@ -1,4 +1,4 @@
-# ossify (v1.8.0)
+# ossify (v1.9.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Nine entry skills (`start`, `adopt`,
@@ -27,6 +27,17 @@ rejected item is repaired through a correction continuation that returns the
 same `complete` shape, and Layer 4 runs inline there because the caller has
 already reviewed the item. **`/ossify:run-spine <spine-id>` with no flag is
 completely unchanged** and still dispatches `ossify:implementer-agent`.
+
+Since 1.9.0, the deterministic gates close the vacuous-green family: the
+zero-tests guard no longer inverts a true match past the pipe buffer, flags
+only when a zero-marker has no positive-execution marker beside it (an
+aggregate suite with one empty target is no longer misflagged), and
+recognizes `cargo nextest` plus vitest's `No test files found` and
+`Tests  0 passed` phrasings. `oss demo_run` fails a ledger that executed
+zero lines - empty, user-only, or all-quarantined - instead of printing
+`PASS 0 lines`, and the close ceremony's quarantine check writes its
+head/parent evidence into a per-invocation tempdir rather than fixed `/tmp`
+paths that collided across concurrent closes.
 
 Since 1.7.0 (#368), every bare `doctor` sweep includes plugin provenance and
 `doctor provenance` runs it alone. It reports the answering `oss` binary, the
