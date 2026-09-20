@@ -50,9 +50,9 @@ Every command's syntax comes from `orca skills get orchestration`.
    the model, then `dispatch --inject` (the mechanic in `roles.md`). The "state your
    model" line in the worker's first reply is the second check. Wrong model: release
    and report.
-4. **Plan gate, planned work only.** The `claude-glm` brief says: post your plan with
-   `orca orchestration ask`, wait for the reply, then implement. Approve or amend via
-   `reply`. Flash briefs skip this.
+4. **Plan gate, planned work only.** The planned implementer's brief says: post your
+   plan with `orca orchestration ask`, wait for the reply, then implement. Approve or
+   amend via `reply`. Fast briefs skip this.
 5. **Wait.** Rolling `check --wait --types worker_done,escalation,question
    --timeout-ms 900000` (Orca's 15-minute window). Process the whole Delivery, answer
    every `question`, ack, wait again. A timeout is a checkpoint: exactly one probe,
@@ -73,13 +73,13 @@ Every command's syntax comes from `orca skills get orchestration`.
    listing every claim: each acceptance criterion of the work item's spec, the
    mutation of any new test, and the diff against the requirement. The suite result
    on the head is not a claim — the orchestrator reads that SHA's check-runs before
-   dispatching the verifier. `claude-glm` at high — the claims include judgment, and
-   `cannot determine` counts as fail. On a fail, attach a fix task to the retained
+   dispatching the verifier. The verifier seat carries the effort its project-file
+   entry names — the claims include judgment, and `cannot determine` counts as fail. On a fail, attach a fix task to the retained
    implementer with `worker-start --task <fix-task> --terminal <handle>`, wait for its
    `worker_done` naming the new head SHA, read that SHA's check-runs, then re-check on
    the retained verifier; a second fail on the same item goes to the operator. The
    verifier is released only at pass or escalation.
-8. **Review.** A review runs exactly once per PR: `claude-glm-flash` in a fresh worktree
+8. **Review.** A review runs exactly once per PR: the reviewer seat in a fresh worktree
    at the PR head, brief `/code-review <PR>`, every finding returned in the `worker_done`
    body as file, line, severity, claim. The reviewer posts nothing to GitHub and edits
    nothing, so that body is the sole copy of the review. Release the reviewer only after

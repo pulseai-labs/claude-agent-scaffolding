@@ -63,22 +63,22 @@ ratified_in_run: run_parent123
 
 ## Spine session
 
-spine_command: claude-glm --effort max
-spine_expected_model: glm-5.3
+spine_command: strong-coder --effort max
+spine_expected_model: strong-v2
 spine_effort: max
 spine_profile_reason: lane-driver default; this driver coordinates, it does not write.
 
 ## Close session
 
-close_command: claude-glm --effort max
-close_expected_model: glm-5.3
+close_command: strong-coder --effort max
+close_expected_model: strong-v2
 close_effort: max
 close_profile_reason: lane-driver default; the close is ceremony and judgment, not writing.
 
 ## Work-PR session
 
-workpr_command: claude-glm --effort max
-workpr_expected_model: glm-5.3
+workpr_command: strong-coder --effort max
+workpr_expected_model: strong-v2
 workpr_effort: max
 workpr_profile_reason: lane-driver default; this seat coordinates two seats and dispositions.
 
@@ -92,11 +92,11 @@ verifier_procedure: all-claims-work-item-verify/v1
 
 | work_item_id | implementer_terminal_command | implementer_expected_model | implementer_effort | verifier_terminal_command | verifier_expected_model | verifier_effort |
 |---|---|---|---|---|---|---|
-| r7.s2.w1 | claude --model claude-opus-5 --effort xhigh | claude-opus-5 | xhigh | claude-glm --effort high | glm-5.3 | high |
+| r7.s2.w1 | claude --model claude-opus-5 --effort xhigh | claude-opus-5 | xhigh | strong-coder --effort high | strong-v2 | high |
 
 ## Recommendation record
 
-- r7.s2.w1 — interface work justifies Opus 5 xhigh; GLM high checks it independently.
+- r7.s2.w1 — interface work justifies Opus 5 xhigh; a second model checks it independently.
 - spine session — the lane-driver default, ratified as recommended.
 
 ## Excluded decisions
@@ -175,7 +175,7 @@ recorded as a decision. At the PR transition ask for the reviewer's command, exp
 model, effort and `/code-review` level, and put **all four** into the **work-PR
 session's** brief (`ossify-pr-briefs.md`) — that session creates the reviewer from the
 decided command and confirms its model from the banner and first reply exactly as an
-item row is; step 8's `claude-glm-flash` is the default only outside such a spine.
+item row is; step 8's reviewer seat is the default only outside such a spine.
 
 **Decide the PR-fix implementer in the same breath.** Every item pair was released at
 its item's close and the spine session was a coordinator, not a writer — so step 10's

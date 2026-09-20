@@ -3,12 +3,12 @@
 The orchestrator/worker session model over Orca orchestration. One prose skill, no
 runtime library.
 
-One orchestrator session (`claude` on Fable, or `claude-sol`) keeps its context for
-decisions and dispatches everything else to GLM sessions launched by alias through Orca.
-`claude-glm` implements planned work, `claude-glm-flash` implements bounded work, one
-`claude-glm-flash` session runs `/code-review` once per PR and returns findings through
-`worker_done`, the retained implementer works GitHub threads to zero, and the merge waits
-for the operator's word.
+One orchestrator session keeps its context for
+decisions and dispatches everything else to worker sessions launched by seat name through
+Orca — the seats defined in the operator's own files, not in this plugin. A planned-work
+seat and a bounded-work seat implement by complexity class, one reviewer seat runs
+`/code-review` once per PR and returns findings through `worker_done`, the retained
+implementer works GitHub threads to zero, and the merge waits for the operator's word.
 
 ## Skill
 
@@ -32,17 +32,17 @@ verifier session.
 
 ## Roles
 
-| Role | Alias | Class |
+| Role | Seat | Class |
 |---|---|---|
-| Orchestrator | `claude` or `claude-sol` | |
-| Implementer, planned | `claude-glm` (high; `--effort max` on demand) | `contract`, and the default when unclassified |
-| Implementer, fast | `claude-glm-flash` | `bounded` |
-| Reviewer | `claude-glm-flash`, `/code-review <PR>` once | |
-| Verifier | `claude-glm` at high — the work-item verify; `claude-glm-flash` for read-only probes and mechanical runs outside it. Read-only | |
+| Orchestrator | this session — the operator launches it | |
+| Implementer, planned | a seat the project file names | `contract`, and the default when unclassified |
+| Implementer, fast | a seat the project file names | `bounded` |
+| Reviewer | a seat with `slash-commands`, `/code-review <PR>` once | |
+| Verifier | a seat the project file names — the work-item verify; read-only probes and mechanical runs may take a lighter one. Read-only | |
 | Operator | the human: the merge word | |
 
-Aliases are shell profiles that carry provider routing and pinned defaults. The skill
-never substitutes `claude --model`.
+Seats are names the operator's two configuration files define — `config.md` in the
+skill's references is the authority. The skill never substitutes `claude --model`.
 
 ## Session budget
 
@@ -140,12 +140,23 @@ boundary. The rotation itself is prose (`skills/orchestrate/references/lifecycle
 blocks a command, and says so when it cannot read the figure. Set `context_ceiling` in the
 plugin's configuration.
 
+## Configuration
+
+Two operator-owned markdown files, read as prose — nothing parses them.
+`~/.claude/orca-crew/agents.md` is the machine file: the agents this machine can
+launch, one block each — `command`, `model_shows`, `brief_delivery`, `can`, `note`.
+`<project root>/.orca-crew/roles.md` is the project file: which agent fills each role,
+the operator's own roles, and the conditions that choose between seats — it wins for
+anything it names. With neither file, every role falls back to the agent the session
+is already running; a seat name neither defines halts the run. The contract and field
+reference are `skills/orchestrate/references/config.md`.
+
 ## Requirements
 
 - Orca running with the orchestration feature enabled.
 - `jq` on PATH for the context-ceiling hook; without it the hook reports the figure as unavailable.
-- The aliases `claude-glm` and `claude-glm-flash` defined in the shell Orca's terminals
-  inherit.
+- The agents named in `~/.claude/orca-crew/agents.md` resolvable in the shell Orca's
+  terminals inherit.
 - The `/code-review` skill available to the reviewer session. If it is unavailable, the
   reviewer reports that in its `worker_done` and the operator decides.
 - The target repository's ruleset requires conversation resolution before merge, so

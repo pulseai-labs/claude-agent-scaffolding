@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: The orchestrator/worker session model over Orca — one orchestrator session (claude on Fable, or claude-sol) that spends its context on decisions and dispatches everything else to GLM worker sessions launched by alias (claude-glm, claude-glm-flash) through Orca orchestration. One /code-review per PR in a flash session, findings returned by worker_done, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, it ratifies per-item implementer/verifier profiles plus the three session blocks into an orca-execution sidecar and starts one spine session that runs the items in fresh external terminals. Use when the user says orchestrator session, spawn a worker, dispatch to a session, claude-glm, claude-glm-flash, orca worker, review this PR in a session, execution assignments for a spine, or runs /orca-crew:orchestrate. Not Orca's command reference (orca skills get orchestration owns that), and not a PR loop of its own where ossify's work-pr is installed.
+description: The orchestrator/worker session model over Orca — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through Orca orchestration, the seats defined in the operator's own files (~/.claude/orca-crew/agents.md, .orca-crew/roles.md). One /code-review per PR, findings returned by worker_done, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that runs the items in fresh external terminals. Use when the user says orchestrator session, spawn a worker, dispatch to a session, orca worker, review this PR in a session, execution assignments for a spine, or runs /orca-crew:orchestrate. Not Orca's command reference (orca skills get orchestration owns that), and not a PR loop of its own where ossify's work-pr is installed.
 ---
 
 # Orchestrate — the orchestrator/worker session model
@@ -9,11 +9,11 @@ description: The orchestrator/worker session model over Orca — one orchestrato
 
 You are the orchestrator session. Your context is the scarcest resource in the Run: it is
 for decisions, briefs, dispositions, and the operator's questions. Every other kind of
-work goes to an Orca worker session launched by alias.
+work goes to an Orca worker session launched by seat name.
 
 Your first Orca command is `orca skills get orchestration`; take every command's
 syntax from that guide, not from this skill. This skill states one Orca mechanic
-itself — the alias launch in `references/roles.md` — because the guide's
+itself — the seat launch in `references/roles.md` — because the guide's
 `worker-start` cannot express it. Everything else here says what to do, and the guide
 says how to type it.
 
@@ -72,29 +72,11 @@ Three consequences:
 
 ## 3. Roles
 
-`references/roles.md` is the table. In one line each:
-
-- **Orchestrator** — you: `claude` (Fable) or `claude-sol`. One per Run.
-- **Implementer, planned** — `claude-glm` at high, `--effort max` on demand; the
-  `contract` class and the default when unclassified.
-- **Implementer, fast** — `claude-glm-flash`; the `bounded` class (one-file,
-  mechanical, read-heavy).
-- **Reviewer** — `claude-glm-flash` running `/code-review <PR>` once per PR. Disposable.
-- **Verifier** — `claude-glm` at high, read-only: it runs the work-item verify, whose
-  claims include judgment. `claude-glm-flash` covers read-only probes and mechanical
-  runs outside that verify. Retained until its item passes or escalates.
-- **Operator** — the human. The merge word, and every decision no session can own.
-
-Every worker is launched by its alias, never by `claude --model`. A work item's
-complexity class is assigned at plan time and read at dispatch, so picking the alias
-is a lookup, not a judgment. The mechanic and the retention, placement, and
-single-writer rules are in the reference.
-
-One phase overrides that lookup: on an **activated ossify spine** (§6) the item's
-implementer and verifier come from an operator-ratified sidecar row rather than from
-its complexity class, a native `claude --model … --effort …` command is a legitimate
-row value there, and each pair is fresh per item. That scope is exactly the activated
-spine; everywhere else the table above is unchanged.
+The plugin ships the role list — orchestrator, planned and fast implementer, reviewer,
+verifier, the operator, and the coordinator seats an activated spine adds — and
+`references/roles.md` is the table. Which agent fills each role comes from the
+operator's two files (`references/config.md`), never from this plugin's prose. A seat
+name neither file defines halts the run rather than guessing.
 
 ## 4. The run
 
@@ -124,19 +106,18 @@ command by the delegation floor: does it need the operator turn by turn?
 
 Two cases are named because they look like clashes and are not:
 
-- **`run-spine`, by default.** Dispatch `/ossify:run-spine <id>` to one
-  `claude-glm --effort max` session, the lane driver. From ossify's point of view that
+- **`run-spine`, by default.** Dispatch `/ossify:run-spine <id>` to one lane-driver
+  session — the seat the project file names for it. From ossify's point of view that
   session is its orchestrator: it holds the state lock, spawns
   `ossify:implementer-agent` subagents through the `Agent` tool, commits at each close,
   merges at the barrier. The `Agent`-tool ban in §2 applies to this session only. You
   wait on one `worker_done` per spine.
 - **`run-spine`, when this session just planned the spine.** Then the items deserve
   their own models, and inherited-runtime subagents cannot give them that.
-  **Read `references/ossify-execution.md` and follow it**: you ratify one
-  implementer/verifier profile per item and the spine, close and work-PR session
-  blocks with the operator, write the
-  `orca-execution/v2` sidecar, and start one spine session that creates a child Run
-  and drives fresh external terminals per item — no subagent anywhere in that path.
+  **Read `references/ossify-execution.md` and follow it**: the seats for the spine are
+  written into the project file and approved by the operator, and you inject them into
+  one spine session's brief — that session creates a child Run and drives fresh
+  external terminals per item, no subagent anywhere in that path.
   Its four briefs are in `references/ossify-briefs.md`. Activation needs all four facts
   that file lists; installation alone is not one of them, so an ossify spine you did
   not plan here stays on the bullet above. The nested Run's mechanics — depth, routing,
@@ -154,9 +135,9 @@ Two cases are named because they look like clashes and are not:
 
 - **Orca is not running** (`orca status --json` fails): say so and stop. Do not fall back
   to the `Agent` tool or to doing the work inline.
-- **An alias is missing** (the worker's first reply names the wrong model, or the terminal
-  shows `command not found`): report it to the operator and stop that dispatch. Never
-  substitute `claude --model`.
+- **A seat is undefined or its agent is missing** (the seat name is in neither file, the
+  terminal shows `command not found`, or the first reply names the wrong model): report
+  it to the operator and stop that dispatch. Never substitute `claude --model`.
 - **A worker refuses on policy:** report the refusal verbatim. Do not retry it around, and
   do not rephrase the brief to slip past it.
 - **`/code-review` is unavailable in the reviewer session:** the reviewer reports that in
