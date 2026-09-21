@@ -64,8 +64,13 @@ Every command's syntax comes from `herdr --skill`.
    answer with `herdr agent prompt <pane>`, then one fresh bounded wait on the answer.
    A timeout is a checkpoint, not a failure: a loop of waits, and restarting a wait
    after an empty timeout, both stay forbidden. `herdr pane read` only on a `blocked`
-   wake or a missing or malformed report, never to watch progress. At each task
-   boundary for a retained implementer,
+   wake or a missing or malformed report, never to watch progress. A round's N
+   parallel items are N sequential bounded waits, one per pane in dispatch order —
+   not the forbidden loop, since each targets a different pane rather than
+   re-entering the one that just timed out. What persists is the report file, not
+   the state a finished pane has since moved to, so parking on one pane while
+   another keeps working loses nothing; the round's barrier closes when every
+   item's report file is in hand. At each task boundary for a retained implementer,
    send `/context` and read the one reply before attaching the next task (the
    threshold is in `roles.md`).
 6. **Implementer finishes.** Its report file carries the completion body its
