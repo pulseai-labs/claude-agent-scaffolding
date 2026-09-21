@@ -2,12 +2,11 @@
 
 ## What this file is for
 
-`herdr --skill`, with the `--help` text it points to, is the command reference, and every
-command's syntax comes from it. This file states only what that guide cannot: how
-herdr-crew composes those commands into a seat, from launch through dispatch and
-completion to teardown. Role, retention and run decisions stay in `roles.md`,
-`lifecycle.md` and `config.md`. Where this file overrides a default in herdr's guide, it
-says so. Read every id from the creating command's JSON response; never predict one.
+`herdr --skill`, with the `--help` text it points to, is the command reference for every
+command's syntax. This file states only what that guide cannot: how herdr-crew composes
+those commands into a seat, from launch to teardown. Role, retention and run decisions
+stay in `roles.md`, `lifecycle.md` and `config.md`. Where this file overrides a default in
+herdr's guide, it says so. Read every id from the creating command's JSON response.
 
 ## The seat launch
 
@@ -31,7 +30,7 @@ is this sequence, in which `<seat label>` is `seat: <role> (<agent>)`:
 5. **The model.** `herdr pane read <pane>`, with `--source visible` (the rendered viewport)
    when `model_shows: screen`, must show `expected_model:`; `command not found` or another
    model is a failed launch (`roles.md`).
-6. **Dispatch**, with the turn-start check below.
+6. **Dispatch**, sent as below.
 
 ## The two readiness paths
 
@@ -51,7 +50,7 @@ is handled like any other `blocked` wake.
 `--source visible` when `model_shows: screen`. Every resolved profile carries
 `expected_model:` and `model_shows` says where on the pane it appears, so the string that
 confirms the model also shows the TUI is up, and existing entries need no edit. Without
-`--timeout` the wait never ends. One caveat: the wait searches existing output before it
+`--timeout` the wait has no bound. One caveat: the wait searches existing output before it
 polls, so if the seat's own command line contains its model string, the echoed command
 matches at once and the wait proves nothing.
 
@@ -68,25 +67,38 @@ out so it is not inherited. `--until` narrows: a wait without `blocked` sleeps t
 dialog to its timeout. `idle` and `done` both mean ready for input, told apart by whether
 the completion was seen, and a CLI read does not mark it seen, so an unfocused seat can
 settle in either. `unknown` is left out: herdr says it does not prove completion. Without
-`--timeout` the wait never ends; with it, a timeout is a checkpoint (`lifecycle.md` step 5).
+`--timeout` the wait has no bound; with it, a timeout is a checkpoint (`lifecycle.md`
+step 5). Every wait's `<ms>` must fit inside its host's cap on one shell call (Claude
+Code's Bash tool defaults to 120000 ms and caps at 600000), with that call's own timeout
+set to cover it: a wait the host cuts off looks like neither a wake nor a timeout.
 
 **A `blocked` wake** means herdr recognised an approval or question dialog. A blocked
 agent rejects `herdr agent prompt` with `agent_blocked` before sending any input, so a
 dialog is never answered with a prompt. Read it with `herdr pane read <pane>` and put it
 to the operator, because herdr's guide says to ask before answering one. Then give the
 answer with `herdr agent send-keys <pane> <keys>` and issue one fresh bounded wait. A
-question the worker asks in its reply is not a dialog: the seat settles `idle` or `done`
-with no new report, which is the missing-report case under Completion.
+question the worker writes to its report file is not a dialog: it rings the doorbell a
+report does (Completion).
 
-## Dispatch and the turn-start check
+## Sending a seat a message
 
-herdr prepends nothing: `herdr agent prompt` submits its text and Enter as one submission,
-and what herdr adds to a seat is environment (`HERDR_PANE_ID`, `HERDR_TAB_ID`,
-`HERDR_WORKSPACE_ID`), never prompt text. `brief_delivery: inject` prompts the brief itself;
-`file` writes it to an absolute path the seat can read and prompts one line pointing there.
+This is the one statement of how the orchestrator sends a seat anything (a brief, a fix
+task, an answer, a plan approval, a correction); other files say "send" and mean this.
 
-Acceptance of input is not the start of a turn; herdr's guide says the same of a
-successful submission. The check is herdr's own and runs inside the dispatch call:
+- **Detected:** `herdr agent prompt <pane> "<text>"`. herdr prepends nothing: it submits
+  the text and Enter as one submission, and what it adds to a seat is environment such as
+  `HERDR_PANE_ID`, never prompt text. A message that starts work takes the turn-start
+  check below. `brief_delivery: inject` prompts the brief itself; `file` writes it to an
+  absolute path the seat can read and prompts one line pointing there.
+- **Undetected:** no `agent` command reaches the pane, because those accept only a pane
+  that hosts a detected agent. Write the message to a file the seat can read and send a
+  one-line pointer to it with `herdr pane run <pane> "<line>"`, which sends the line and
+  Enter; only `agent prompt` is documented to honour a pane's bracketed-paste mode. A seat
+  set to `brief_delivery: inject` is reported to the operator, not improvised. This path
+  has no turn-start check.
+
+**The turn-start check.** Acceptance of input is not the start of a turn, as herdr's guide
+says of a successful submission; herdr's own check runs inside the send:
 
     herdr agent prompt <pane> "<brief>" --wait --until working --until blocked --timeout <ms>
 
@@ -94,39 +106,31 @@ When the seat starts from a non-working state, `--wait` requires an observed `wo
 `blocked` within five seconds of submission. `--until working --until blocked` returns at
 that first observation, not at the end of the turn, so the call stays a dispatch and the
 completion wait stays the one long wait. Its timeout counts from before submission, so
-set it in seconds above the five-second gate, never to the task's length. The check
-watches from submission, which a later `agent wait --until working` cannot do: a turn can
-be past `working` before that wait is issued.
+set it in seconds above the five-second gate, never to the task's length.
 
-- `agent_prompt_stalled`: the text was accepted but no turn started. Check its state with
-  `herdr agent get <pane>`. `working` means it started after all. Anything else:
-  `herdr pane send-keys <pane> enter` submits what sits in the composer. Never send the
-  prompt again, because a stall does not prove the text was not delivered. A `timeout`
-  from this call is read the same way.
+- `agent_prompt_stalled`: no activity was observed within five seconds of submission.
+  `herdr agent get <pane>` gives the state. `working`: it started. `blocked`: a `blocked`
+  wake. `idle` or `done`: `herdr pane send-keys <pane> enter` submits what sits in the
+  composer. `unknown`: report it to the operator. Never send the prompt again, because a
+  stall does not prove the text was not delivered; read a `timeout` the same way.
 - `agent_blocked` (the seat was already at a dialog, and nothing was sent) and `blocked`
   (the turn opened on one) are both handled as a `blocked` wake.
-
-**An undetected seat** is out of reach of every `agent` command, because those accept only
-a pane that hosts a detected agent. It is prompted through the pane instead:
-`herdr pane run <pane> "<one line>"` sends the line and Enter. Only `agent prompt` is
-documented to honour a pane's bracketed-paste mode, so a multi-line brief reaches such a
-seat only by `file`. A seat set to `inject` is reported to the operator, not improvised.
-This surface has no turn-start check, and its doorbell is the report file (see Completion).
 
 ## Completion
 
 A seat's result is its report file, at the `REPORT_PATH=` its brief names. herdr's `done`
 carries no body, so the file is the contract and the typed state is only the doorbell.
+The worker writes everything it says to the orchestrator there (its plan, a question, an
+escalation, a late finding, its report), so before every message that sends a seat to
+work, note the file's hash (`git hash-object <path>`), empty if absent.
 
-Before each dispatch, note the file's hash (`git hash-object <path>`), empty if absent;
-the plan gate uses the same file and doorbell, so the hash is noted again before the reply
-that approves a plan. For a detected seat the wake is the typed wait above. After it:
+For a detected seat the wake is the typed wait above. After it:
 
-- `idle` or `done`, and the file is new (absent at dispatch, or a different hash): read it.
-- `idle` or `done`, and nothing new: the worker stopped without a report, either with a
-  question in its reply or on a failure. This is the missing-report case, and it gets
-  one `herdr pane read`. A question is answered by `herdr agent prompt` with the
-  turn-start check, followed by one fresh bounded wait.
+- `idle` or `done`, and the file is new (absent at dispatch, or a different hash): read
+  it. A plan, a question or a late finding is answered with the seat's next message and
+  one fresh bounded wait; an escalation goes to the operator.
+- `idle` or `done`, and nothing new: the worker stopped without writing. This is the
+  missing-report case, and it gets one `herdr pane read`.
 - `blocked`: a dialog, handled as above.
 - A timeout: a checkpoint, and that pane is never re-waited (`lifecycle.md`, step 5).
 
@@ -134,30 +138,24 @@ Whether `done` ever fires for a Claude Code pane is unsettled, so nothing here d
 it. `idle` is in the set, and the hash tells a new report from an old one at the same path.
 
 **An undetected seat's doorbell is the report file itself**: one bounded shell wait that
-returns when `REPORT_PATH`'s hash differs from the one noted at dispatch, or at its timeout:
-
-    end=$((SECONDS + <seconds>))
-    while [ "$(git hash-object <REPORT_PATH> 2>/dev/null)" = "<hash at dispatch, or empty>" ] &&
-          [ "$SECONDS" -lt "$end" ]; do sleep 5; done
-
-A changed file is the report. This is not the loop of waits `lifecycle.md` forbids, which
-is a wait that re-enters the coordinator: one shell call that returns once re-enters
-nothing, and `pane wait-output` polls inside itself the same way. A timeout with no new
-report is the missing-report case above, and its one `herdr pane read` shows a question
-(answered with `herdr pane run`), a stop, or a seat still at work: a checkpoint, never
-re-waited.
+returns when `REPORT_PATH`'s hash differs from the one last noted, or at its
+timeout. A changed file is read as above. This is not the loop of waits `lifecycle.md`
+forbids, which is a wait that re-enters the coordinator: one shell call that returns once
+re-enters nothing, and `pane wait-output` polls inside itself the same way. A timeout with
+no new file is the missing-report case, and its one `herdr pane read` shows a stop or a
+seat still at work; a seat still at work is a checkpoint, never re-waited.
 
 ## Placement
 
-    workspace "run: <objective>"            one per run, created once
-      tab "seat: implementer (<agent>)"     one full-size pane
+    workspace "run: <objective>"            one per run, closed last
       tab "seat: verifier (<agent>)"        one full-size pane
+    workspace "<its label>"                 one per worktree a seat needs (step 2)
+      tab "seat: implementer (<agent>)"     one full-size pane
 
-One workspace per run, one tab per seat and one full-size pane per tab, plus a workspace
-for each worktree a seat needs (step 2). **herdr-crew places a seat with `tab create`,
-never `pane split`**, because panes sharing a tab make a multi-agent screen unreadable.
-This overrides `herdr --skill`, whose "Start and coordinate an agent" defaults to a
-sibling pane split in the current tab. A seat reading that guide does not split. The
+One tab per seat and one full-size pane per tab: **herdr-crew places a seat with
+`tab create`, never `pane split`**, because panes sharing a tab make a multi-agent screen
+unreadable. This overrides `herdr --skill`, whose "Start and coordinate an agent" defaults
+to a sibling pane split in the current tab; a seat reading that guide does not split. The
 labels name the run, and the role and agent in each tab.
 
 The orchestrator is not in that workspace. When the run starts it is already running in
@@ -167,10 +165,9 @@ pane takes a new id.
 A seat's tree is whatever `--cwd` names, so a seat may sit in a different repository from
 the orchestrator: in the dual-repo case, an orchestrator in the AI workspace repo places
 an implementer in the canonical tree. `--env` (on `tab create` and `workspace create`)
-carries only a seat's own scratch, such as `OSSIFY_SEAT`, and even that belongs to the
-launcher `command:` names. A lane's provider variables are invoked by name through
-`command:`, never replayed with `--env`: a replayed environment is the silent-reroute
-defect.
+carries nothing but a seat's own scratch, such as `OSSIFY_SEAT`. A lane's provider
+variables are invoked by name through `command:`, never replayed with `--env`: a replayed
+environment is the silent-reroute defect.
 
 `--trust-repository` on `herdr worktree` grants herdr's per-request Git trust. It is not
 Claude Code's folder-trust dialog and does not answer it. Pass it only for a repository
@@ -178,13 +175,14 @@ the operator has verified, and never as a retry for a failed worktree command.
 
 ## Teardown
 
-When a seat is released, its pane closes with `herdr pane close <pane>`. At the end of the
-run, each workspace herdr-crew opened (the run's, and each worktree's) closes with
-`herdr workspace close <id>`. Close only what the run created. Read each receipt rather
-than assume it: a failed close returns JSON on stderr with exit status 1, and a pane that
-did not close is still a live seat. Removing a worktree's checkout is a job for
-`herdr worktree remove`, and only after `lifecycle.md` step 12's merged-branch check.
-Never assume a close removed it.
+When a seat is released, its pane closes with `herdr pane close <pane>`. A worktree seat's
+checkout goes after `lifecycle.md` step 12's merged-branch check, with
+`herdr worktree remove --workspace <its id>`: that id is remove's only selector, so never
+close that workspace first, and confirm with `herdr workspace list` whether remove closed
+it, which is unverified. The run's own workspace closes last, `herdr workspace close <id>`,
+after every workspace linked to it. Close only what the run created, and read every
+receipt: a failed call returns JSON on stderr with exit status 1, and a pane that did not
+close is still a live seat.
 
 ## Machines
 

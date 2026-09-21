@@ -36,12 +36,12 @@ herdr agent prompt <pane> "<brief>"         # or brief_delivery: file
 `references/herdr-mechanics.md` holds the full sequence and the flags this block leaves
 out. The first seat takes the workspace's own tab rather than a new one; a seat that
 needs a new worktree opens it with `herdr worktree create`, whose options are in its
-`--help`; and a seat herdr does not detect waits on its screen and is prompted through
-the pane, never with the block's two `agent` lines. This file states only the role table
+`--help`; and a seat herdr does not detect waits on its screen and is sent its brief
+through the pane, never with an `agent` command. This file states only the role table
 and retention.
-Acceptance of input is not the start of a turn: after dispatch, confirm the turn
-actually started before the next `herdr agent wait`; if it did not, `herdr pane
-send-keys <pane> enter` submits what is sitting in the composer. Every brief also asks
+Acceptance of input is not the start of a turn: after a dispatch to a detected seat,
+confirm the turn actually started, by `herdr-mechanics.md`'s turn-start check and its
+`agent_prompt_stalled` bullet, before the next wait. Every brief also asks
 the worker to state its model in its first reply — a second check, not the only one. A
 wrong model is a failed launch: release the pane and report it.
 
@@ -49,9 +49,8 @@ wrong model is a failed launch: release the pane and report it.
 
 The session that built the PR fixes the PR, and an implementer is retained across
 consecutive work items. herdr has no ownership transfer: retain a seat by keeping its
-pane and prompting it again with the next task's brief, `herdr agent prompt <pane>
-"<next task's brief>"`. At each task boundary run `herdr agent prompt <pane>
-"/context"` and read the one reply with `herdr pane read <pane>` — the
+pane and sending it the next task's brief (`herdr-mechanics.md` says how). At each task
+boundary send `/context` and read the one reply with `herdr pane read <pane>` — the
 orchestrator's one context source: past half its window, as `/context`
 reports, or an auto-compact, the next item goes to a fresh implementer. The
 implementer returns its handoff inputs in its report file; the orchestrator writes the
@@ -86,7 +85,7 @@ One implementer seat and one verifier seat per work item; one reviewer per PR. A
 round may re-use the verifier seat, and a context-rotation replacement occupies the
 seat it replaces. Any session outside those seats is a planning defect: stop and
 re-plan the item. A further read-only question goes to the existing verifier or
-implementer by `send`, never to a new session.
+implementer as a send, never to a new session.
 
 One further seat the budget admits on declaration, and only for its declared span:
 a role the operator pins to a named point occupies a seat for that point's
@@ -124,7 +123,7 @@ worktree of it.
 
 ## Writers
 
-- **One writer per artifact.** A correction to a peer's file travels as `send`, never as
+- **One writer per artifact.** A correction to a peer's file travels as a send, never as
   a direct edit.
 - **One implementer per worktree.** Two writers never share a checkout. Parallel items
   get parallel worktrees.

@@ -56,6 +56,8 @@ present 'herdr worktree create' "a worktree seat names herdr worktree create"
 section "the two readiness paths"
 present 'herdr agent wait' "the detected path names agent wait"
 present 'herdr pane wait-output' "the undetected path names pane wait-output"
+present '--until done --until idle --until blocked' "the typed wait names all three settled states"
+present "--match '<expected_model:>'" "the undetected path waits on the seat's own expected_model:"
 pin 'herdr agent list' "the discriminator is named once"
 
 section "the rules that must survive a rewording"

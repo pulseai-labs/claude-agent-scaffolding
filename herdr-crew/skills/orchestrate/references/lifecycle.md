@@ -62,8 +62,9 @@ Every command's syntax comes from `herdr --skill`.
    detected seat
    `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>`,
    over a typed state (`idle｜working｜blocked｜done｜unknown`); for a seat herdr does not
-   detect, the report-file wait. Either is one shell call that returns once, never a
-   rolling poll. On a `done` or `idle` wake, read the report file its brief named, when
+   detect, the report-file wait. Either is one shell call that returns once: whatever
+   polling it does happens inside that call, never as a loop of the orchestrator's own
+   waits. On a `done` or `idle` wake, read the report file its brief named, when
    it is new since dispatch (`herdr-mechanics.md`) — the wake is only the doorbell, the
    file is the contract. A `blocked` wake is a dialog, and a blocked seat rejects
    `herdr agent prompt`: `herdr pane read <pane>` for it, answer it as
@@ -98,8 +99,8 @@ Every command's syntax comes from `herdr --skill`.
    on the head is not a claim — the orchestrator reads that SHA's check-runs before
    dispatching the verifier. The verifier seat carries the effort its project-file
    entry names — the claims include judgment, and `cannot determine` counts as fail.
-   On a fail, attach a fix task to the retained implementer by prompting its pane
-   again, `herdr agent prompt <pane> "<fix task's brief>"`, wait for its report file
+   On a fail, attach a fix task to the retained implementer by sending it the fix
+   task's brief (`herdr-mechanics.md` says how), wait for its report file
    naming the new head SHA, read that SHA's check-runs, then re-check on the retained
    verifier; a second fail on the same item goes to the operator. The verifier is
    released only at pass or escalation.

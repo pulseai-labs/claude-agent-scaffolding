@@ -12,9 +12,10 @@ for decisions, briefs, dispositions, and the operator's questions. Every other k
 work goes to a herdr worker session launched by seat name.
 
 Your first herdr command is `herdr --skill`; take every command's syntax from that guide,
-not from this skill. This skill states one herdr mechanic itself — the seat launch, in
-`references/herdr-mechanics.md` — because `herdr --skill` cannot express it. Everything
-else here says what to do, and the guide says how to type it.
+not from this skill. What that guide cannot express — the seat launch, the readiness and
+completion waits, how a seat is sent a message, and teardown — is stated once, in
+`references/herdr-mechanics.md`. Everything else here says what to do, and the guide says
+how to type it.
 
 If you were invoked with an objective, bind or create the run's `run.json` for it, then follow
 `references/lifecycle.md` from step 1. If you were invoked without one, ask the operator
@@ -32,7 +33,7 @@ Your own turns take these kinds of action, and no others:
    ossify spine — the spine's seats in `.herdr-crew/roles.md`.
 3. Read the seats' report files.
 4. Decide.
-5. Converse: operator questions, `reply`/`ask` with workers.
+5. Converse: operator questions, and answers to what workers write in their report files.
 6. Execute single authorized mutations: worktree, tab and pane creation, dispatch,
    the PR comment, the merge — and, after it, the teardown: releasing workers,
    closing panes and the run, and the verified branch delete.
@@ -46,7 +47,7 @@ implementer seat and one verifier seat per work item, one reviewer per PR, plus
 the seats the project file declares for the operator's own roles — stated
 once there; any session outside those seats is a planning defect. A malformed or
 incomplete report is corrected by the correction-request template in
-`references/briefs.md` — one bounded `send` to the live session that wrote it; a
+`references/briefs.md` — one bounded send to the live session that wrote it; a
 correction session is never created.
 
 Three consequences:
@@ -54,14 +55,15 @@ Three consequences:
 - **No `Agent` tool from the orchestrator.** Subagents spend orchestrator-tier tokens and
   leave no herdr provenance. Every helper is a herdr session.
 - **`herdr pane read` only on a `blocked` wake or a missing or malformed report**, never to watch
-  progress. A single bounded `herdr agent wait`, on the state set and with the `--timeout`
-  that `references/herdr-mechanics.md` states, is the wait primitive, over a typed state
-  (`idle｜working｜blocked｜done｜unknown`); a seat herdr does not detect waits on its report
-  file instead, as that file states — one shell call,
+  progress. A single bounded `herdr agent wait`, on the state set
+  `references/herdr-mechanics.md` states and always with a `--timeout`, is the wait
+  primitive, over a typed state (`idle｜working｜blocked｜done｜unknown`); a seat herdr does
+  not detect waits on its report file instead, as that file states — one shell call,
   no keepalive, no re-entry. A timeout is a checkpoint, not a failure. A loop of waits, and
   restarting a wait after an empty timeout, stays forbidden. Beyond those `herdr pane read`
-  cases, the only bounded reads are the launch-banner `pane read` in `roles.md` and the one
-  `/context` reply at each task boundary.
+  cases, the only bounded reads are the launch-banner `pane read` in `roles.md`, the
+  readiness `pane wait-output` of a seat herdr does not detect, and the one `/context`
+  reply at each task boundary.
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
   and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
 - **Verifying a worker's claim is a verifier dispatch**, not an orchestrator read. "Tests
@@ -91,7 +93,7 @@ merge gate, handoff. One run per objective. You drive the steps and nothing else
 
 `references/briefs.md` ships five dispatched briefs — planned implementer, fast
 implementer, fix round, reviewer, verifier — plus the correction-request message
-template, which is a `send`, not a session. A brief is the whole contract the worker
+template, which is a send, not a session. A brief is the whole contract the worker
 will ever see, because a worker session has no orchestration context and may be
 launched somewhere its project rules do not load. Every brief asks the worker to
 state its model in its first reply, and you read that line before sending anything

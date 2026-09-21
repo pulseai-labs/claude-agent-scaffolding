@@ -1,15 +1,16 @@
 # Briefs
 
 A brief is the whole contract the worker will ever see. The worker has no orchestration
-context, may be launched where the project's rules do not load, and `herdr agent
-prompt` delivers this text verbatim — no preamble, nothing prepended, nothing else.
+context, may be launched where the project's rules do not load, and herdr delivers this
+text verbatim (`herdr-mechanics.md`) — no preamble, nothing prepended, nothing else.
 Every brief carries, in this order:
 
 1. Role, and "state your model in your first reply".
 2. Placement: absolute worktree path, branch, base branch.
 3. The task, plus any project rule the worker's location will not load, pasted verbatim.
 4. The report file's shape, and the forbidden actions for the role.
-5. `ask` for a blocking question, `escalation` when stuck. A policy refusal is reported,
+5. Where the worker speaks: a blocking question is written to the report file, then it
+   waits; an escalation is written there, then it stops. A policy refusal is reported,
    never retried around.
 6. Planned implementer only: the plan gate.
 
@@ -53,8 +54,8 @@ open the PR from the worktree with `gh pr create --repo <owner/repo> --base
   Files: <paths touched, plus any separate file holding longer narrative>
 
 NEVER: merge, delete a branch, force-push, edit files outside the worktree, or run any
-subagent. When blocked, post the question in your reply and wait for the orchestrator's
-`herdr agent prompt`; send `escalation` when stuck.
+subagent. When blocked, write the question to your report file and wait; when stuck,
+write an escalation there and stop.
 If a tool or policy refuses you, report it verbatim and stop that step.
 ```
 
@@ -79,7 +80,8 @@ from the worktree with `gh pr create --repo <owner/repo> --base <base-branch> --
   Changed / Evidence / PR / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: merge, delete a branch, force-push, edit files outside the worktree, or run any
-subagent. Ask when blocked; escalate when stuck; report refusals verbatim.
+subagent. When blocked, write the question to your report file and wait; when stuck,
+write an escalation there and stop; report refusals verbatim.
 ```
 
 ## Reviewer
@@ -108,7 +110,8 @@ without it.
 
 NEVER: edit any file, post anything to GitHub, or run a second review. Your findings
 travel only in your report file. If `/code-review` refuses or errors, report its output
-verbatim and stop. Use `ask` for a blocking question and `escalation` when stuck.
+verbatim and stop. A blocking question goes in your report file, then wait; an
+escalation goes there too, then stop.
 ```
 
 ## Verifier (read-only)
@@ -138,14 +141,14 @@ DONE: write your report file, one line per claim, then the caveats:
 NEVER: commit or push, or edit a tracked file outside the mutation check. That check
 may temporarily edit one — in the disposable worktree, reverted before the report.
 Scratch output is fine — write it, never commit it — and run in a disposable
-worktree. Any other write: stop and escalate instead.
+worktree. Any other write: stop, and write an escalation to your report file instead.
 ```
 
 ## Fix round (retained implementer, after disposition)
 
-Attach it to the same pane by prompting it again with `herdr agent prompt <pane>
-"<this brief>"` — there is no attach or ownership-transfer call; the same session
-simply receives its next brief. The body is the fast-implementer brief with the seat
+Attach it to the same pane by sending it this brief (`herdr-mechanics.md` says how) —
+there is no attach or ownership-transfer call; the same session simply receives its
+next brief. The body is the fast-implementer brief with the seat
 lines and TASK replaced by:
 
 ```text
@@ -171,20 +174,20 @@ except inside a work-PR session, whose fix seat works the fix list only
 and would otherwise open a second merge loop inside the one that briefed it.>
 ```
 
-A finding that arrives after the disposition is not on that list: post it back to the
-orchestrator in your reply and wait, resolving only once its `herdr agent prompt`
-answer arrives; outside the TASK block so the ossify replacement keeps it.
+A finding that arrives after the disposition is not on that list: write it to your
+report file and wait, resolving it only once the orchestrator's answer arrives; outside
+the TASK block so the ossify replacement keeps it.
 
-## Correction request (one `send`, no new session)
+## Correction request (one send, no new session)
 
 A malformed, incomplete, or wrongly-shaped report from a live session is corrected in
-place, never by a new session: one `send` to that session, nothing else.
+place, never by a new session: one send to that session, nothing else.
 
 ```text
 Your report file for <task-id> is malformed or incomplete: <the missing or wrong
-field, and what is wrong with it>. Send the exact shape wanted: <the field, restated
+field, and what is wrong with it>. The exact shape wanted: <the field, restated
 from your brief>. No other work; rewrite your report file at <REPORT_PATH>, then stop
 — the orchestrator waits and rereads it.
 ```
 
-If one `send` does not fix the report, that is an `escalation`.
+If one send does not fix the report, it goes to the operator.
