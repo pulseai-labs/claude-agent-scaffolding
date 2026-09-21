@@ -134,10 +134,10 @@ For a detected seat that is not a coordinator (below), the wake is the typed wai
 **The two dead ends.** *A timeout is a checkpoint*: one `herdr pane read`, on any wait. The
 turn ends with the seat's observed state — stopped, at a dialog, or still at work —
 reported to the operator (a coordinator: to the top, in its report file); a further wait on
-that pane is the operator's decision, never the orchestrator's own re-entry. *A false wake*
-— that read showing a seat still at work (the backgrounded-shell case, measured live) — is
-not a timeout: its doorbell becomes the report file for the rest of that dispatch, one
-bounded background wait, as a coordinator is waited on — never a second typed wait.
+it is the operator's decision, never the orchestrator's own re-entry. *A false wake* — its
+own `pane read` showing a seat still at work (the backgrounded-shell case) — is not a
+timeout: the doorbell becomes the report file for the rest of that dispatch, one bounded
+background wait, as a coordinator is waited on — never a second typed wait.
 
 **An undetected seat's doorbell is the report file itself**, and so is a coordinator's: a
 seat running work of its own in the background (a spine or work-PR session's waits, a lane
