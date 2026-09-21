@@ -92,7 +92,8 @@ identity; report teardown you cannot complete, never claim it. Then write your r
   Changed / Evidence / Open / Files as ids, SHAs, counts and a report path, and the path of RUN_JSON.
 ROTATE instead once the context-ceiling notice has fired: stop at the next round barrier,
 do the same teardown, write `/ossify:handoff`, and write `rotate: <handoff path>` to your
-report file with the path of RUN_JSON. Never stop mid-round.
+report file with the path of RUN_JSON, then stand down your own armed waits before you
+return — one report must wake one session. Never stop mid-round.
 The spine is at its final round barrier when you finish; the close ceremony is
 the top's, in a fresh close session that is never this session.
 

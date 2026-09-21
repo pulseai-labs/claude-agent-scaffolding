@@ -234,9 +234,14 @@ and pane with the launch command the handoff recorded — ask the operator once 
 did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`,
 the top's own workspace, never the run's, which closes last. Send the new top its
 resume — `/ossify:handoff-resume <path>` with ossify, or the path as its first
-instruction without — confirm its turn started, then tell the operator
-which tab to use and that this one can close.
+instruction without — confirm its turn started, then **stand down**: kill this session's
+armed background waits before the successor re-arms the same panes, and take no dispatch
+action from here on. One report must wake one top — a live dispatch a successor is also
+waiting on otherwise advances twice, and a close, a PR or a merge runs twice with it. A
+wait that fires anyway is read and handed to the successor, never acted on. Then tell the
+operator which tab to use and that this one can close.
 The new top resumes by naming the parent's `run.json` path — there is no CLI call —
 and then, before the step the handoff named, issues one fresh bounded background
 wait per live pane the handoff listed: a new session's first wait, not a re-entry,
-which re-arms what the `run.json` cannot.
+which re-arms what the `run.json` cannot — and it can re-arm them because the
+predecessor stood down, so each pane has exactly one waiter.
