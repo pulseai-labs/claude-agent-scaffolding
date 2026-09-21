@@ -60,7 +60,7 @@ Once you have a path: `Read` the artifact end-to-end. Hold its contents in your 
 
 ## Step 2: Resolve principles
 
-Principles are the lens you audit through. You read each source file yourself with your file-reading tool and merge them in working context, in this exact order, last-wins on duplicates (normalized text comparison — trim, lowercase, collapse whitespace). An absent file is skipped, never created — reading principles must not write anything.
+Principles are the lens you audit through. You read each source file yourself with your file-reading tool and merge them in working context, in this exact order, last-wins on duplicates. An absent file is skipped, never created — reading principles must not write anything.
 
 Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
@@ -69,7 +69,9 @@ Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` 
 3. **Project-scoped** — `<repo>/.claude/architect-critic/principles.md` if it exists (`"$arc_bin" principles_project_path` resolves it; empty when cwd is outside a git repo). Project-specific principles override user-global on conflict.
 4. **Memory-bank patterns** — included only when `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` points at a readable file; every `- ` bullet in it becomes a principle.
 
-What counts as a principle: the entries under a file's principle sections — `## Shipped defaults`, `## Your principles (user-promoted)`, `## Project principles (scope=project)`. Each entry is one top-level `- ` bullet, or one plain non-empty line where a user wrote a principle without a bullet. Indented text under a bullet is that principle's elaboration, not a separate principle. A file's introductory prose, its `#`/`##` headers, its `<!-- ... -->` comments, and the commented-out `## Examples` lines are not principles. Strip a trailing `[promoted ...]` annotation (the v0.1.x format) if present. The memory-bank source has no sections — every `- ` bullet in it is a principle. Hold the merged set in context for Step 5; you will apply each principle when generating challenges.
+What counts as a principle: the entries under a file's principle sections — `## Shipped defaults`, `## Your principles` (with or without the `(user-promoted)` parenthetical — the bare form is the legacy heading and is still a user section), `## Project principles` (with or without `(scope=project)`). Each entry is one top-level `- ` bullet, or one plain non-empty line where a user wrote a principle without a bullet. Indented text under a bullet is that principle's elaboration, not a separate principle. A file's introductory prose, its `#`/`##` headers, its `<!-- ... -->` comments, and the commented-out `#`-prefixed lines under `## Examples` are not principles — `#`-prefixed lines are never principles anywhere. In a file carrying a `<!-- migrated from v0.1.x -->` marker, everything from that marker onward is the user's own content, and its entries under its own principle sections count by this same rule. A trailing `[promoted ...]` annotation (the v0.1.x format) is metadata, not part of the principle text — strip it for comparison, keep it for display. The memory-bank source has no sections — every `- ` bullet in it is a principle.
+
+Duplicates: two entries carrying the same `principle_id` in their `<!-- source: ... -->` comments are one principle, whatever their text — the later source wins and the survivor is annotated with the displaced source, with one exception: a `source: shipped-default` entry read outside the canonical shipped file is a copy, and the canonical shipped entry always wins over it, so a plugin update actually lands. Entries with no `principle_id` dedup on normalized text — trim, lowercase, collapse whitespace. Hold the merged set in context for Step 5; you will apply each principle when generating challenges.
 
 If no principles file exists anywhere, fall back to shipped defaults only — the audit still runs, just with the universal ghost-notes + CORE lens.
 
@@ -312,10 +314,12 @@ You now have one or two challenge lists (claude-only, claude + codex, or the sin
 - **Same issue, one challenge.** When two challenges — within one list or across both — raise the same underlying issue, merge them into a single challenge. Keep every rationale that differs.
 - **Adversary attribution.** Each surviving challenge gets a `source` field: `["claude"]`, `["codex"]`, or `["claude", "codex"]` for cross-confirmed challenges — `["devin"]` under a Devin host-only run. **Cross-confirmed challenges are the strongest signal** — both an adversary that read your spec and a fresh-frame adversary that did not landed on the same issue. Surface those first in the rebuttal cycle.
 - **Severity reconciliation.** If both adversaries flagged the same challenge with different severities, preserve the **highest** severity (`premise` > `gap` > `alternative`).
+- **Gaps are findings too.** Each audit result may also carry `gaps` — elements the adversary found absent rather than wrong. Collect them source-tagged alongside the challenges, with no dedup — two adversaries noting the same absence is itself signal, so keep both. A gap is not a challenge: it does not enter the Step 8 rebuttal walk, but it must never silently vanish — Step 10 reports the adversary-gap count, and an adversary that returned only gaps still counts as used (next bullet).
+- **Adversaries used.** An adversary counts as used when it contributed challenges OR gaps. A `{challenges: [], gaps: [...]}` result means the adversary ran and reported observations — `Adversaries used`, Step 9's `ADVERSARIES_JSON`, and the `adversaries_used` state field all include it; the audit never reads as if that adversary found nothing.
 
 On `HOST_AGENT=devin` a lone self-audit has nothing to merge — the self-audit list plays the merged-list role directly.
 
-The merged list is what you walk in Step 8.
+The merged list is what you walk in Step 8; the collected gaps are reported in Step 10.
 
 **Worked example.** Suppose claude-self-audit returned:
 
@@ -332,6 +336,9 @@ And codex returned:
 { "challenges": [
   { "text": "No retry/backoff strategy defined for upstream timeouts", "severity": "premise", "rationale": "..." },
   { "text": "Schema migration ordering ambiguous", "severity": "gap", "rationale": "..." }
+],
+  "gaps": [
+  { "text": "No load-shedding strategy under worker overload" }
 ]}
 ```
 
@@ -339,8 +346,9 @@ After consolidation:
 - Challenge 1 (claude's "retry policy" + codex's "no retry/backoff") merges — same underlying issue (what happens on retry/timeout), both adversaries → `source: ["claude", "codex"]`, severity upgraded to `premise` (codex's higher rating wins).
 - Challenge 2 (claude's "rate-limit propagation") → `source: ["claude"]`, severity `gap`.
 - Challenge 3 (codex's "schema migration ordering") → `source: ["codex"]`, severity `gap`.
+- Codex's `gaps` entry → one adversary gap tagged `codex`: not walked in Step 8, reported in Step 10 as `Adversary gaps : 1 reported (not rebuttal-walked)`.
 
-Final list: 3 challenges, one cross-confirmed at premise level (surface first in Step 8), two single-adversary at gap level.
+Final list: 3 challenges, one cross-confirmed at premise level (surface first in Step 8), two single-adversary at gap level, plus 1 adversary gap.
 
 ---
 
@@ -462,6 +470,7 @@ Audit complete for <target>.
 
   Adversaries used : <claude | claude + codex | devin>
   Challenges       : <N> total (<X> premise, <Y> gap, <Z> alternative)
+  Adversary gaps   : <G> reported (not rebuttal-walked; omit line when G=0)
   Concessions      : <C> of <N>
   Auto-applied     : <A> of <N> (disposition triage)
   Escalated        : <M> walked after triage
@@ -483,7 +492,7 @@ This is the structured handoff. Consumer plugins (scaffold-onboard, scaffold-dev
 **Stability contract for downstream consumers.** The following tokens MUST appear verbatim (case-sensitive) — the parsing consumers read them and the composing consumers must embed them:
 - The literal string `Audit complete for ` followed by the target (or the artifact path when no target was passed) — opening the summary and closing it.
 - The closing line `Audit complete for <target>[ phase_id=<N>]. <K> challenges stood:` followed immediately by one `- ` bullet per standing challenge — or `Audit complete for <target>. 0 challenges stood — recap is solid.` when none stood. scaffold-onboard parses this line for the standing-challenges list (`critic-moments.md` §5); its ` phase_id=<N>` segment appears only when the invocation passed one.
-- Field labels `Adversaries used`, `Challenges`, `Concessions`, `Auto-applied`, `Escalated`, `Deferred`, `Candidates piled`, `Principles`, `Elapsed` with `:` separator and exactly two spaces of indentation.
+- Field labels `Adversaries used`, `Challenges`, `Concessions`, `Auto-applied`, `Escalated`, `Deferred`, `Candidates piled`, `Principles`, `Elapsed` with `:` separator and exactly two spaces of indentation. `Adversary gaps` is a conditional label in the same format, present only when an adversary returned gap entries (`<G>` is their count, and a gaps-only adversary is why `Adversaries used` can exceed the challenge sources); it is omitted entirely when there are none, so consumers must treat it as optional.
 - The integer counts must be bare (no commas, no units inline — the unit goes outside the number, e.g. `seconds` after `Elapsed`).
 
 If you change this format, bump architect-critic minor version and coordinate with scaffold-onboard / scaffold-dev / ossify maintainers — their parsers and composers will break otherwise. Per [[feedback_v01_full_over_minimal]], this contract is design-locked and ships as-is; consumers parse against it.

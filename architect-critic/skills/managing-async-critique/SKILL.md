@@ -77,7 +77,7 @@ Default `run-id`: the most recent `completed` (else `running`) run for the curre
      --run-id "<run-id>" \
      --request-id "<request_id-from-step-5>" \
      --depth close \
-     --adversaries claude,codex \
+     --adversaries "$ADVERSARIES_JSON" \
      --challenge-count "<challenge_count>" \
      --concessions "<concessions>" \
      --deferred-count "$DEFERRED_COUNT" \

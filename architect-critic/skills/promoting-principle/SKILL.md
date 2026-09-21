@@ -99,7 +99,7 @@ If the file does not exist, create it the same way (copy from shipped template).
 
 ## Step 4: Uniqueness check
 
-Read all existing principles from both the target file and the other scope's file — an existing principle is an entry under a `## …` principle section, one per top-level `- ` bullet or plain line (indented text under a bullet is that entry's elaboration, not a separate principle). Normalize each for comparison: lowercase, strip punctuation, collapse whitespace to single spaces.
+Read all existing principles from both the target file and the other scope's file — an existing principle is an entry under a file's principle sections by the same rule `critiquing-spec` Step 2 and `listing-principles` Step 3 state: `## Shipped defaults`, `## Your principles` (with or without `(user-promoted)`), `## Project principles` (with or without `(scope=project)`), plus the `<!-- migrated from v0.1.x -->` tail as user content — while `#`-prefixed lines, headers, HTML comments, and `## Examples` content are not principles. Each entry is one top-level `- ` bullet or plain line (indented text under a bullet is that entry's elaboration, not a separate principle). Normalize each for comparison: lowercase, strip punctuation, collapse whitespace to single spaces.
 
 ```bash
 # Normalize helper (inline)
@@ -150,10 +150,10 @@ NOW_ISO="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 PRINCIPLE_ID="pp-$(printf "%s" "$PRINCIPLE_TEXT" | shasum -a 256 | cut -c1-16)"
 ```
 
-Find the correct section header in the target file and append the formatted entry immediately after it. The two section headers are:
+Find the correct section header in the target file and append the formatted entry immediately after it. The section headers are:
 
-- **user scope:** `## Your principles (user-promoted)`
-- **project scope:** `## Project principles (scope=project)`
+- **user scope:** `## Your principles (user-promoted)` — or its legacy bare form `## Your principles` in pre-v0.2 files; append under whichever exists
+- **project scope:** `## Project principles (scope=project)` — or its bare form `## Project principles`; same rule
 
 Append two lines after the section header (inserting before the next `##` heading or at end of file if no subsequent heading):
 
@@ -162,7 +162,7 @@ Append two lines after the section header (inserting before the next `##` headin
 - **<principle text>**
 ```
 
-Use the Edit tool for the append — do not use `>>` bash redirection into an arbitrary offset. Locate the section header with the Read tool first, then place the two new lines directly below it. If the section header does not exist in the file (corrupted template), append both the header and the entry at the end of the file.
+Use the Edit tool for the append — do not use `>>` bash redirection into an arbitrary offset. Locate the section header with the Read tool first, then place the two new lines directly below it. If neither form of the section header exists in the file (corrupted template), append the canonical parenthesized header and the entry at the end of the file.
 
 Example formatted entry:
 
