@@ -32,8 +32,8 @@ PR. Your injected brief fixes the PR, its hosting repository, the reviewer
 and PR-fix seats you coordinate, the gate that must read clean, and the word
 you wait for; on who is to run the merge itself it says nothing. Both seats
 are yours inside the `run.json` you own; the reviewer's validated report is
-long since processed and released; the fix seat pushed its last fix an hour
-ago and its rounds are settled.
+long since processed, and that seat released; the fix seat pushed its last fix an
+hour ago and its rounds are settled.
 
 The gate is clean and the word arrives for head `f00dca7`. Your draft says:
 *"I coordinate this PR end to end and the word names the SHA. Whether I can

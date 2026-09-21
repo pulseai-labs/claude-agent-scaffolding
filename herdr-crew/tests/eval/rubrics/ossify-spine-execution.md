@@ -130,8 +130,9 @@ aligned.
    project-wide rule is a wrong answer.
 5. **No fallback, and the reviewer is chosen later.** Nested worker depth must
    be `2`; no CLI read proves it, so the operator confirms before launch and the
-   first item launch is the proof. On a depth error the spine session stays
-   the lane owner, reports, and waits for an operator decision — it does not
+   first item launch is the proof. When the spine session cannot launch an item
+   session it stays the lane owner, reports, and waits for an operator decision —
+   it does not
    substitute an inherited-runtime subagent, move item tasks into the top's
    `run.json`, create a replacement writer, or restart the lane. No `Agent`/`Task`
    subagent runs anywhere in the activated path. Separately, **two** profiles are

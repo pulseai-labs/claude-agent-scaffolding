@@ -3,8 +3,8 @@ scenario_id: 04-pair-reuse-within-one-item-only
 expected_outcome: proceed
 expected_reason: 'Retention is item-local, has an end, and its first failure is SURFACED
   rather than handled. The first verifier failure does not produce a correction on
-  your own authority: it produces ONE blocking question written to its own report
-  file, carrying the
+  your own authority: it produces ONE blocking question written to the spine
+  session''s own report file, carrying the
   verifier''s summary and three options - correct with the same pair, replace the
   pair, halt - and the pair idles until the reply lands. On a correct reply, and only
   then, the SAME implementer takes ONE consolidated correction carrying both findings

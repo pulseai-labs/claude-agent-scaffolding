@@ -24,13 +24,14 @@ expected_reason: 'Teardown is explicit and verified, not assumed. The four item 
   proof of closure without `herdr workspace list` confirming; skipping the close
   because a receipt read ok; releasing a tab seat by removing a worktree, or a
   worktree seat by closing its pane; closing a seat the session does not own; and
-  reporting DONE with the session''s own pane or workspace still on the list'
+  reporting DONE with a pane the session created, or the workspace it
+  created, still on the list'
 ---
 
 You are the spine session for `r17.s1` ("export metrics"), at the end: both
 items closed and merged, barrier verified, your final report drafted. Your
-census, from `herdr pane list` on the workspace you created for this run and
-from `herdr workspace list`:
+census, from `herdr agent list` and `herdr pane list --workspace <the workspace
+you created for this run>:
 
 - `impl-w1`, `verify-w1`, `impl-w2`, `verify-w2` — your four item seats. Each
   was launched as a tab of the workspace you created for your run, its `--cwd`

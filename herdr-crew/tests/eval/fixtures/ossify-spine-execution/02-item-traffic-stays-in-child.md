@@ -1,25 +1,26 @@
 ---
 scenario_id: 02-item-traffic-stays-in-child
 expected_outcome: proceed
-expected_reason: 'Routing, in both directions. The two item plan questions reached the
-  spine session in each implementer''s own report file and are answered there - but not
-  by the spine session on its own authority: it gathers the rounds available plans into
+expected_reason: 'Routing, in both directions. The two item plan questions were written to each
+  implementer''s own report file, and neither is answered by the spine session on its
+  own authority: it gathers the rounds available plans into
   ONE ordered relay to the top in its own report file, the top returns an INDEPENDENT
   approve-or-amend per item, and the spine session sends each implementer its item''s
   decision as that seat''s next message. No edit starts before that reply lands. The w1
-  verifier''s per-item report and completion stay in the spine session''s own run.json and
-  never reach the top - note that this verifier exists at all only because w1 already
-  returned complete, which is when its pane is created; a verifier standing by before any
+  verifier''s per-item report stays in that seat''s report file, and the item''s task and
+  attempt stay in the spine session''s own run.json; neither reaches the top - note that
+  this verifier exists at all only because w1 already returned complete, which is
+  when its pane is created; a verifier standing by before any
   complete return would itself be a contract violation. The spine session''s own final
   report goes in its report file, naming RUN_JSON, which settles the top''s dispatch while
   the nested file stays the spine''s own record - and before writing it the spine session
   releases every item pair and closes the workspace it created for them, so nothing of
   its own outlives the spine and the top can still find the run. The wrong answers this
   fixture falsifies are: the spine session approving the plans itself because it can read
-  them; relaying two separate upward messages when one
-  ordered relay carries the round; folding both items into one decision send;
-  forwarding the verifier completion up as progress; and
-  inventing a close-the-run.json step, which no tool exposes'
+  them; relaying two separate upward messages when one ordered relay carries the
+  round; folding both items into one decision send; forwarding the verifier
+  completion up as progress; and inventing a close-the-run.json step, which no
+  tool exposes'
 ---
 
 You are the spine session for `r6.s1`. Your brief injected these identities —

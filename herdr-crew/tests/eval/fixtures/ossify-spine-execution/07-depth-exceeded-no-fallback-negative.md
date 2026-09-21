@@ -2,11 +2,12 @@
 scenario_id: 07-depth-exceeded-no-fallback-negative
 expected_outcome: halt
 expected_reason: 'NEGATIVE CASE covering both no-fallback rules at once. Depth 2 is
-  a prerequisite, so a depth error is a blocked launch, not a routing problem with
-  alternatives. The spine session stays alive as the lane owner, writes the blocker
-  to its own report file, and waits for an operator decision - and it takes NONE of
-  the three escapes on offer, each of which is individually forbidden
-  and collectively the whole point: no Agent/Task subagent (that is the inherited-runtime problem the phase exists
+  a prerequisite, so a spine session that cannot launch an item session is a
+  blocked launch, not a routing problem with alternatives. The spine session stays
+  alive as the lane owner, writes the blocker to its own report file, and waits
+  for an operator decision - and it takes NONE of the three escapes on offer,
+  each of which is individually forbidden and collectively the whole point: no
+  Agent/Task subagent (that is the inherited-runtime problem the phase exists
   to remove, and it would silently ignore every approved per-item seat), no moving
   item tasks into the top''s run.json (that is the isolation the spine session''s own
   run.json buys), and no

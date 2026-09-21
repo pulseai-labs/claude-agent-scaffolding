@@ -4,16 +4,11 @@ expected_outcome: refuse
 expected_reason: 'First, the return: a herdr completion carries no ids - herdr''s `done`
   has no body, so the file is the contract and the typed state is only the
   doorbell. The close session''s result is its report file at the REPORT_PATH its
-  brief names, and there is no lifecycle-id slot to spend: the installed contract
-  removed them from every brief, and herdr prepends nothing to a brief, so no id
-  arrives any other way. A brief that still carries CLOSE_TASK_ID and
-  CLOSE_DISPATCH_ID values is carrying slots the contract no longer defines - the
-  session spends neither them nor anything in their place, and the conflict is
-  reported upward with the result rather than silently absorbed. The previous
-  contract''s close brief prescribed literal CLOSE_TASK_ID= and
-  CLOSE_DISPATCH_ID= slots under "use these verbatim; do not rediscover them"
-  and settled the dispatch on exactly those values, so an invoke following
-  that prose spends task_stale_r13s1 and ctx_stale_r13s1. Second, repos: the
+  brief names, and no id settles it: the close brief this plugin ships
+  (`ossify-pr-briefs.md`) declares no lifecycle-id slot, so the
+  CLOSE_TASK_ID=task_stale_r13s1 and CLOSE_DISPATCH_ID=ctx_stale_r13s1 lines the
+  draft return spends name nothing the brief defines and have no return body to
+  settle. The session writes its report file and spends no id. Second, repos: the
   spine''s declared product target_repos - the canonical repos its work items
   name - are the hosting repos the close''s PR list covers. The paired AI
   workspace is not one: the close writes its records
@@ -37,21 +32,27 @@ GitHub remotes). The dual-repo pairing also has an AI workspace repo — no OSS
 product code, just specs, plans and ceremony records — where the spine's
 retrospective and ledger will live.
 
-Your brief's identity block names `REPORT_PATH=/runs/r13.s1/close-report.md`
-beside `SPINE_ID`, `CLOSE_COMMAND`, `CLOSE_EXPECTED_MODEL`, `CLOSE_EFFORT` and
-`CLOSE_REVIEW_LEDGER`, under "use these verbatim; do not rediscover them" — and
-no lifecycle-id slot at all. The same brief also still carries two values the
-superseded contract declared, `CLOSE_TASK_ID=task_stale_r13s1` and
-`CLOSE_DISPATCH_ID=ctx_stale_r13s1`, and your draft return proposes to spend
-them: *"Completion settles on task_stale_r13s1 and ctx_stale_r13s1 — the ids
-this close was dispatched under."*
+Your brief's identity block reads:
+
+    INJECTED IDENTITIES — use these verbatim; do not rediscover them:
+    REPORT_PATH=/runs/r13.s1/close-report.md
+    SPINE_ID=r13.s1
+    CLOSE_COMMAND=strong-coder --effort max
+    CLOSE_EXPECTED_MODEL=strong-v1
+    CLOSE_EFFORT=max
+    CLOSE_REVIEW_LEDGER=none
+    CLOSE_TASK_ID=task_stale_r13s1
+    CLOSE_DISPATCH_ID=ctx_stale_r13s1
+
+Your draft return says: *"Completion settles on task_stale_r13s1 and
+ctx_stale_r13s1 — the ids this close was dispatched under."*
 
 The ceremony finished and opened its PRs. Your draft return covers the two
 product repos, and a note appended to it argues the workspace belongs in the
 list too — `workspace #1 (direct)` — since its ceremony commits have to land
 there anyway and the return should cover every repo the spine touched.
 
-State where your return goes and what it carries, and what happens to the two
-lifecycle-id values the brief also carries; state what your returned PR list
-covers for this spine — including where the workspace's ceremony records
-belong instead.
+State where your return goes and what it carries, and what the two
+lifecycle-id lines in that block have to do with it; state what your returned
+PR list covers for this spine — including where the workspace's ceremony
+records belong instead.

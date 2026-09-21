@@ -17,7 +17,7 @@ the file this harness copies.
 
 | Surface | Owning prose | The judgment |
 |---|---|---|
-| `ossify-spine-execution` | `skills/orchestrate/SKILL.md` + `references/herdr-mechanics.md` + `references/ossify-execution.md` + `references/ossify-nested-run.md` + `references/ossify-briefs.md` + `references/ossify-pr-briefs.md` + `references/ossify-close-writer.md` + `references/roles.md` + `references/lifecycle.md` | the three-layer spine execution phase: four-fact activation and who owns which layer (the top agrees the seats with the operator, records them in the project file and starts exactly one spine session, launching no item pane itself; the spine session creates a `run.json` of its own and owns both item panes per item); run routing that keeps item plan traffic and per-item completions in the spine session's own `run.json` while the top sees a relayed plan decision, spine-level questions and one final report — every one of them in the answering seat's report file, because herdr prepends nothing to a brief and a seat has no other channel upward, and a seat that runs waits of its own (a spine session, a work-PR session) is waited on through that same file, never the typed wait, whose `done` and `idle` both mean only that a turn ended; profiles bound by the injected SEATS block — the freeze a running spine never looks past — with the model confirmed from banner and first reply and no dispatch-time substitution, and a missing or ambiguous row halting; pairs fresh per item, retained only through that item's corrections, never crossing items, with generic retention unchanged outside an activated spine; teardown that releases a tab seat by closing its pane and a worktree seat by removing its worktree, reads every receipt and confirms with `herdr workspace list`, never assuming; and the two no-fallback rules — nested depth `2` with a depth error halting rather than degrading to an inherited-runtime subagent, the top's `run.json`, a replacement writer or a lane restart, and the reviewer chosen only at the PR transition |
+| `ossify-spine-execution` | `skills/orchestrate/SKILL.md` + `references/herdr-mechanics.md` + `references/ossify-execution.md` + `references/ossify-nested-run.md` + `references/ossify-briefs.md` + `references/ossify-pr-briefs.md` + `references/ossify-close-writer.md` + `references/roles.md` + `references/lifecycle.md` | the three-layer spine execution phase: four-fact activation and who owns which layer (the top agrees the seats with the operator, records them in the project file and starts exactly one spine session, launching no item pane itself; the spine session creates a `run.json` of its own and owns both item panes per item); run routing that keeps item plan traffic and per-item completions in the spine session's own `run.json` while the top sees a relayed plan decision, spine-level questions and one final report — every one of them written by the reporting seat into its own report file, because herdr has no worker-to-orchestrator channel that carries them, and a seat that runs waits of its own (a spine session, a work-PR session) is waited on through that same file, never the typed wait, whose `done` and `idle` both mean only that a turn ended; profiles bound by the injected SEATS block — the freeze a running spine never looks past — with the model confirmed from banner and first reply and no dispatch-time substitution, and a missing or ambiguous row halting; pairs fresh per item, retained only through that item's corrections, never crossing items, with generic retention unchanged outside an activated spine; teardown that releases a tab seat by closing its pane and a worktree seat by removing its worktree, reads every receipt and confirms with `herdr workspace list`, never assuming; and the two no-fallback rules — nested depth `2` with a spine session that cannot launch an item session halting rather than degrading to an inherited-runtime subagent, the top's `run.json`, a replacement writer or a lane restart, and the reviewer chosen only at the PR transition |
 
 ## Procedure (Claude executes)
 
@@ -100,17 +100,36 @@ This interactive harness samples how fresh isolated agents apply the current
 owning prose. Its model outputs are advisory diagnostics, not comparative or
 release-gate evidence on their own.
 
-A seat launched through herdr gets no wrapper around its brief: herdr prepends
-nothing — it submits the text and Enter as one submission — and what it adds to
-a seat is environment such as `HERDR_PANE_ID`, never prompt
-text, so the brief is the whole contract. There is therefore no channel through
-which the runtime can supply current task, dispatch and authority rules
-alongside old source, and a prompt-substituted run is not the confounded
-experiment it would be under a runtime that injected such a wrapper.
+A seat launched through herdr receives no injected lifecycle preamble: herdr
+prepends nothing to a brief — it submits the text and Enter as one submission —
+and what it adds to a seat is environment such as `HERDR_PANE_ID`, never prompt
+text, so the brief is the whole contract. That confound is genuinely gone.
 
-That absence is not a comparative measurement either. A comparative claim
-requires actual versioned execution under otherwise equal runtime conditions.
-This runbook does not define that experiment.
+Three live channels remain, and they are why replacing only the source files
+with a pre-change snapshot still does not isolate the product version:
+
+- **the guide the seat reads.** Every coordinator brief makes `herdr --skill` the
+  seat's first herdr command (`ossify-briefs.md`, `ossify-pr-briefs.md`), and that
+  guide belongs to the installed binary, not the snapshot. It states dispatch and
+  authority rules of its own, and this plugin deliberately overrides some of them:
+  the guide starts an agent as a sibling pane in the current tab, where
+  `herdr-mechanics.md` places each seat in its own tab; the guide says not to
+  repeat the settled-state defaults with `--until`, where the typed wait writes
+  them out; and it tells a seat to ask the user before answering a blocked UI,
+  which `herdr-mechanics.md` adopts as its own. A seat reading it gets the live
+  rules whatever the snapshot says.
+- **the mechanics the seat is pointed at.** `MECHANICS=` names the installed
+  orchestrate skill's `references/herdr-mechanics.md`, not a substituted copy, so
+  the seat-launch, readiness, wait, send and teardown mechanics a seat reads come
+  from the live file.
+- **the installed plugin.** A seat launched from a seat row runs an installed
+  command and resolves this plugin's own slash commands against the installation,
+  not against the snapshot.
+
+Do not treat such a prompt-substituted run as old-contract discrimination or a
+causal old/new comparison, even when its judge reads the same snapshot. A
+comparative claim requires actual versioned execution under otherwise equal
+runtime conditions. This runbook does not define that experiment.
 
 ## Cost
 

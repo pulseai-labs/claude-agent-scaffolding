@@ -5,8 +5,8 @@ expected_reason: 'Three states, each scored on its own - a later state never rid
   an earlier one''s answer. (a) The open: result persists the review record - whether
   the delegated review ran, its reviewed head, its clean/findings state and summary,
   and the durable ledger/comment references - and the next fresh work-PR dispatch
-  receives it as PRIOR_REVIEW with FRESH dispatch identities even though the review
-  state is reused. (b) Resume, same head: the branch is taken BEFORE any reviewer
+  receives it as PRIOR_REVIEW in a fresh brief, the review
+  state reused. (b) Resume, same head: the branch is taken BEFORE any reviewer
   exists - PRIOR_REVIEW''s record head equals the current PR head, so no reviewer is
   created and zero additional delegated reviews are commissioned; the session enters
   the owning work-PR procedure and runs all its gates - only the duplicate reviewer
