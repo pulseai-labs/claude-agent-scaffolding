@@ -126,8 +126,8 @@ Two cases are named because they look like clashes and are not:
   wait on one spine report, through its report file: a lane driver whose subagents run
   in the background is a coordinator seat (`references/herdr-mechanics.md`, Completion).
   Its brief is composed from `references/briefs.md`'s fast-implementer template: that
-  template's four `SEAT_` lines and its RULES slot stand, and its ROLE, PLACEMENT, TASK,
-  DONE body and NEVER line are all replaced — the TASK by the dispatch; the DONE body by the
+  template's three `SEAT_` lines, its `REPORT_PATH` line and its RULES slot stand; its ROLE,
+  PLACEMENT, TASK, DONE body and NEVER line are all replaced — the TASK by the dispatch; the DONE body by the
   one `references/ossify-briefs.md`'s spine-session DONE block defines (ids, SHAs and counts;
   a lane driver on this path owns no run file of its own); the ROLE by the lane driver's, who
   is ossify's orchestrator for that spine rather than an implementer; the PLACEMENT by the
