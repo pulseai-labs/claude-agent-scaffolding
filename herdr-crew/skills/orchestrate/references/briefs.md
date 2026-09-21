@@ -28,6 +28,7 @@ verbatim rather than restating it.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
 SEAT_EFFORT=<the effort this seat was launched at>
+REPORT_PATH=<the absolute path this seat writes its report to>
 ROLE: implementer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path>, branch <branch>, base <base-branch>. Use git -C for every
@@ -62,6 +63,7 @@ If a tool or policy refuses you, report it verbatim and stop that step.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
 SEAT_EFFORT=<the effort this seat was launched at>
+REPORT_PATH=<the absolute path this seat writes its report to>
 ROLE: implementer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path>, branch <branch>, base <base-branch>. Use git -C for every
@@ -85,6 +87,7 @@ subagent. Ask when blocked; escalate when stuck; report refusals verbatim.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
 SEAT_EFFORT=<the effort this seat was launched at>
+REPORT_PATH=<the absolute path this seat writes its report to>
 ROLE: reviewer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path> checked out at PR <number>'s head <sha>.
@@ -113,6 +116,7 @@ verbatim and stop. Use `ask` for a blocking question and `escalation` when stuck
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
 SEAT_EFFORT=<the effort this seat was launched at>
+REPORT_PATH=<the absolute path this seat writes its report to>
 ROLE: verifier, read-only. State the model you are running in your first reply, then
 continue.
 
@@ -147,6 +151,7 @@ lines and TASK replaced by:
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
 SEAT_EFFORT=<the effort this seat was launched at>
+REPORT_PATH=<the absolute path this seat writes its report to>
 TASK: work PR <number> to zero unresolved review threads. Inputs, in priority order:
   1. Disposition: <list>. Fix every item on it as dispositioned; defer or reject
      nothing on it yourself.
@@ -177,8 +182,8 @@ place, never by a new session: one `send` to that session, nothing else.
 ```text
 Your report file for <task-id> is malformed or incomplete: <the missing or wrong
 field, and what is wrong with it>. Send the exact shape wanted: <the field, restated
-from your brief>. No other work; rewrite your report file at the same path, then stop
-— the orchestrator waits and rereads it.
+from your brief>. No other work; rewrite your report file at REPORT_PATH, then stop —
+the orchestrator waits and rereads it.
 ```
 
 If one `send` does not fix the report, that is an `escalation`.
