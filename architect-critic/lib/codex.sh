@@ -80,7 +80,7 @@ _ac_codex_schema_path() {
 # string (async path: the fenced block extracted from Codex output). Valid when
 # it is an object with a challenges:[] array whose items each carry
 # text/severity/rationale strings; an optional gaps key, if present, must be an
-# array of objects so the consolidator can source-tag each item. Returns 0 if
+# array of objects so consolidation can source-tag each item. Returns 0 if
 # valid, 1 otherwise.
 _ac_codex_validate_json() {
   local input="$1" json

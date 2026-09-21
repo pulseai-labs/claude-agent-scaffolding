@@ -84,9 +84,11 @@ if jq -e '.. | objects | select(.cost_usd)' "$DATA_DIR/state.json" >/dev/null 2>
   fail_msg "fresh state.json contains cost_usd somewhere"
 fi
 
-# 9. auto_promote_suppressions present (schema v2 addition)
-jq -e '.auto_promote_suppressions' "$DATA_DIR/state.json" >/dev/null 2>&1 || \
-  fail_msg "fresh state.json missing auto_promote_suppressions"
+# 9. withdrawn candidate/suppression fields are NOT seeded on a fresh file
+for dropped in candidate_promotions declined_candidates auto_promote_suppressions; do
+  jq -e "has(\"$dropped\") | not" "$DATA_DIR/state.json" >/dev/null 2>&1 || \
+    fail_msg "fresh state.json seeds dropped field $dropped"
+done
 
 if [[ $fail -eq 0 ]]; then
   echo "Migration smoke: all assertions passed"

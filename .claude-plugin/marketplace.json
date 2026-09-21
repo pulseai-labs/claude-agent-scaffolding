@@ -38,7 +38,7 @@
     },
     {
       "name": "architect-critic",
-      "description": "Anti-sycophancy reviewer (v0.2 skill-first). 4 skills auto-invoke on natural-language triggers: critiquing-spec (audit + sequential rebuttal with T=4 concession scoring), reviewing-critique-history, listing-principles, promoting-principle. Ships ghost-notes (Wald survivor-bias) + CORE protocol (Curiosity/Objectivity/Reassurance/Empathy) as default principles. Full auto-promotion: vote-recurrence T=4 + instinct N=3 consecutive + 30/90-day suppression. Codex 0.125+ adversarial fresh-frame at close-depth. Standalone-invocable; consumer plugins (scaffold-onboard v0.2+, scaffold-dev v0.1+) invoke skills in-conversation (no file IPC).",
+      "description": "Anti-sycophancy reviewer (skill-first). 6 skills auto-invoke on natural-language triggers: critiquing-spec (audit + sequential rebuttal with T=4 concession scoring), managing-async-critique (background Codex audits: status/result/cancel/resume), checking-adversary-readiness (doctor), reviewing-critique-history, listing-principles, promoting-principle. Ships ghost-notes (Wald survivor-bias) + CORE protocol (Curiosity/Objectivity/Reassurance/Empathy) as default principles. Principle promotion is manual (/promote-principle). Codex 0.125+ adversarial fresh-frame at close-depth, synchronous OR async. Standalone-invocable; consumer plugins (scaffold-onboard v0.2+, scaffold-dev v0.1+) invoke skills in-conversation (no file IPC).",
       "category": "workflow",
       "source": "./architect-critic"
     },

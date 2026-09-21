@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/unit/test-state.sh — tests for lib/state.sh (schema v3, async external runs)
 # Covers: init at schema v3, recent_runs with concessions/skill_invoked (no cost_usd),
-# auto_promote_suppressions with 30/90-day windows, promotions, declined, locks.
+# manual promotions, locks.
 
 set -u
 
@@ -61,19 +61,16 @@ assert_eq "schema_version=3" "3" "$schema_ver"
 assert_eq "external_runs seeded empty on init" "0" "$(jq '.external_runs | length' "$state_file")"
 
 # ---------------------------------------------------------------------------
-# T3: init empty arrays for all required keys (incl. auto_promote_suppressions)
+# T3: init empty arrays for all seeded keys; withdrawn fields are absent
 # ---------------------------------------------------------------------------
 echo "T3: ac_state_init empty arrays"
 recent_runs_len="$(jq '.recent_runs | length' "$state_file")"
 promotions_len="$(jq '.principle_promotions | length' "$state_file")"
-candidates_len="$(jq '.candidate_promotions | length' "$state_file")"
-declined_len="$(jq '.declined_candidates | length' "$state_file")"
-suppressions_len="$(jq '.auto_promote_suppressions | length' "$state_file")"
 assert_eq "recent_runs starts empty" "0" "$recent_runs_len"
 assert_eq "principle_promotions starts empty" "0" "$promotions_len"
-assert_eq "candidate_promotions starts empty" "0" "$candidates_len"
-assert_eq "declined_candidates starts empty" "0" "$declined_len"
-assert_eq "auto_promote_suppressions starts empty" "0" "$suppressions_len"
+assert_eq "candidate_promotions absent from fresh seed" "false" "$(jq 'has("candidate_promotions")' "$state_file")"
+assert_eq "declined_candidates absent from fresh seed" "false" "$(jq 'has("declined_candidates")' "$state_file")"
+assert_eq "auto_promote_suppressions absent from fresh seed" "false" "$(jq 'has("auto_promote_suppressions")' "$state_file")"
 
 # ---------------------------------------------------------------------------
 # T4: test_no_in_flight_field — fresh state.json does not contain in_flight
@@ -92,13 +89,6 @@ ver_after="$(jq '.schema_version' "$state_file")"
 assert_eq "init does not overwrite existing state" "99" "$ver_after"
 # restore to v2 for remaining tests
 jq '.schema_version = 2' "$state_file" > "${state_file}.tmp" && mv "${state_file}.tmp" "$state_file"
-
-# ---------------------------------------------------------------------------
-# T6: ac_state_read outputs valid JSON
-# ---------------------------------------------------------------------------
-echo "T6: ac_state_read"
-read_output="$(ac_state_read | jq '.schema_version')"
-assert_eq "ac_state_read emits parseable JSON" "2" "$read_output"
 
 # ---------------------------------------------------------------------------
 # T7: ac_state_append_run — schema v3-compatible row with concessions + skill_invoked, no cost_usd
@@ -223,28 +213,15 @@ assert_eq "original entry was dropped after 20+1 appends" "null" "$has_first"
 # T9: ac_state_append_promotion adds a principle_promotion entry
 # ---------------------------------------------------------------------------
 echo "T9: ac_state_append_promotion"
-ac_state_append_promotion "auto" "Always document rollback paths" "user"
+ac_state_append_promotion "manual" "Always document rollback paths" "user"
 promo_len="$(jq '.principle_promotions | length' "$state_file")"
 assert_eq "principle_promotions has 1 entry" "1" "$promo_len"
 promo_text="$(jq -r '.principle_promotions[0].text' "$state_file")"
 assert_eq "principle_promotions[0].text" "Always document rollback paths" "$promo_text"
 promo_src="$(jq -r '.principle_promotions[0].source' "$state_file")"
-assert_eq "principle_promotions[0].source" "auto" "$promo_src"
+assert_eq "principle_promotions[0].source" "manual" "$promo_src"
 promo_scope="$(jq -r '.principle_promotions[0].scope' "$state_file")"
 assert_eq "principle_promotions[0].scope" "user" "$promo_scope"
-
-# ---------------------------------------------------------------------------
-# T10: ac_state_append_declined adds a declined_candidates entry
-# ---------------------------------------------------------------------------
-echo "T10: ac_state_append_declined"
-suppress_ts="2026-06-14T00:00:00Z"
-ac_state_append_declined "Prefer explicit config" "$suppress_ts"
-declined_len="$(jq '.declined_candidates | length' "$state_file")"
-assert_eq "declined_candidates has 1 entry" "1" "$declined_len"
-declined_text="$(jq -r '.declined_candidates[0].text' "$state_file")"
-assert_eq "declined_candidates[0].text" "Prefer explicit config" "$declined_text"
-declined_sup="$(jq -r '.declined_candidates[0].suppress_until' "$state_file")"
-assert_eq "declined_candidates[0].suppress_until" "$suppress_ts" "$declined_sup"
 
 # ---------------------------------------------------------------------------
 # T11: lock file is created and released
@@ -289,52 +266,6 @@ preserved_ver="$(jq '.schema_version' "$state_file")"
 assert_eq "future schema preserved" "99" "$preserved_ver"
 preserved_future="$(jq -r '.future_field' "$state_file")"
 assert_eq "future field preserved" "x" "$preserved_future"
-
-# ---------------------------------------------------------------------------
-# T15: test_auto_promote_suppressions_30day — reason_score=4 → 30-day window
-# ---------------------------------------------------------------------------
-echo "T15: auto_promote_suppressions 30-day window (reason_score=4)"
-setup_tmp_repo > /dev/null
-ac_state_init
-state_file="$(ac_state_path)"
-fp_30="abc123def456abc123def456abc123def456abc123def456abc123def4560030"
-ac_state_add_suppression "$fp_30" 4
-sup_len="$(jq '.auto_promote_suppressions | length' "$state_file")"
-assert_eq "auto_promote_suppressions has 1 entry" "1" "$sup_len"
-stored_fp="$(jq -r '.auto_promote_suppressions[0].fingerprint' "$state_file")"
-assert_eq "fingerprint stored" "$fp_30" "$stored_fp"
-stored_score="$(jq '.auto_promote_suppressions[0].reason_score' "$state_file")"
-assert_eq "reason_score=4 stored" "4" "$stored_score"
-suppressed_at="$(jq -r '.auto_promote_suppressions[0].suppressed_at' "$state_file")"
-expires_at="$(jq -r '.auto_promote_suppressions[0].expires_at' "$state_file")"
-# Independent (non-circular) guard: stored expires_at is a well-formed ISO-8601
-# UTC stamp that actually moved off suppressed_at — catches a date-helper that
-# silently returns empty/garbage (which a bare helper==stored equality would mask).
-if [[ "$expires_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ && "$expires_at" != "$suppressed_at" ]]; then
-  echo "  ✓ expires_at is well-formed ISO and advanced from suppressed_at"; PASS=$((PASS+1))
-else
-  echo "  ✗ expires_at malformed or unchanged: '$expires_at' (suppressed_at='$suppressed_at')"; FAIL=$((FAIL+1))
-fi
-# Verify expires_at is exactly suppressed_at + 30 days (portable date math).
-expected_expires="$(_ac_date_add_days "$suppressed_at" 30)"
-assert_eq "expires_at = suppressed_at + 30d for reason_score=4" "$expected_expires" "$expires_at"
-
-# ---------------------------------------------------------------------------
-# T16: test_auto_promote_suppressions_90day — reason_score=5 → 90-day window
-# ---------------------------------------------------------------------------
-echo "T16: auto_promote_suppressions 90-day window (reason_score=5)"
-fp_90="999888777666555444333222111000fedcba9876543210fedcba9876543210ff"
-ac_state_add_suppression "$fp_90" 5
-sup_len="$(jq '.auto_promote_suppressions | length' "$state_file")"
-assert_eq "auto_promote_suppressions has 2 entries" "2" "$sup_len"
-stored_fp_90="$(jq -r '.auto_promote_suppressions[1].fingerprint' "$state_file")"
-assert_eq "fingerprint 90d stored" "$fp_90" "$stored_fp_90"
-stored_score_90="$(jq '.auto_promote_suppressions[1].reason_score' "$state_file")"
-assert_eq "reason_score=5 stored" "5" "$stored_score_90"
-sup_at_90="$(jq -r '.auto_promote_suppressions[1].suppressed_at' "$state_file")"
-exp_at_90="$(jq -r '.auto_promote_suppressions[1].expires_at' "$state_file")"
-expected_expires_90="$(_ac_date_add_days "$sup_at_90" 90)"
-assert_eq "expires_at = suppressed_at + 90d for reason_score=5" "$expected_expires_90" "$exp_at_90"
 
 # ---------------------------------------------------------------------------
 # T17: ac_state_init re-seeds a 0-byte state.json (#451)
@@ -395,7 +326,7 @@ assert_eq "unparseable file byte-identical after refusal" "$before_sha" "$after_
 # exercised through real locked callers:
 #   (a) shape refusal — state_write_field with a jq path that emits two
 #       documents
-#   (b) jq failure — state_add_suppression with an unparseable --argjson
+#   (b) jq failure — state_write_field with an unparseable --argjson value
 # In both cases: rc != 0, state.json byte-identical, no state.lock left, and
 # the next write succeeds immediately (not after the 5s acquire timeout).
 # ---------------------------------------------------------------------------
@@ -420,7 +351,7 @@ assert_eq "next write succeeds after shape refusal" "0" "$?"
 [[ $SECONDS -lt 4 ]]
 assert_eq "no 5s lock stall after shape refusal" "0" "$?"
 
-"$TESTS_DIR/../bin/arc" state_add_suppression "deadbeef1234" "notanint" 2>/dev/null
+"$TESTS_DIR/../bin/arc" state_write_field ".x" "notanint{" 2>/dev/null
 T20_RC=$?
 [[ "$T20_RC" -ne 0 ]]
 assert_eq "jq-fail funnel refusal exits non-zero" "0" "$?"

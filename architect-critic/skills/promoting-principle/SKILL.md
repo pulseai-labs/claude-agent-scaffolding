@@ -1,11 +1,11 @@
 ---
 name: promoting-principle
-description: Promote a principle to user-global or project-scoped principles.md. Triggers on "promote this principle", "record this as a principle", "add to principles.md", "make this a principle", "save this principle". Validates uniqueness, tags with source + timestamp, auto-links to active challenge fingerprint if invoked during critiquing-spec rebuttal.
+description: Promote a principle to user-global or project-scoped principles.md. Triggers on "promote this principle", "record this as a principle", "add to principles.md", "make this a principle", "save this principle". Validates uniqueness, tags with source + timestamp, records the promotion in state.json.
 ---
 
 # promoting-principle
 
-You have been invoked because the user wants to record a principle permanently — either in their user-global principles file or in the current project's scoped file. Your job is to parse the principle text and scope, validate that the text is non-empty and non-duplicate, append the formatted entry to the correct file, and record the promotion in `state.json`. If a challenge fingerprint is active in the environment, link the promotion to it for future auto-promotion dedup.
+You have been invoked because the user wants to record a principle permanently — either in their user-global principles file or in the current project's scoped file. Your job is to parse the principle text and scope, validate that the text is non-empty and non-duplicate, append the formatted entry to the correct file, and record the promotion in `state.json`.
 
 You may be invoked two ways:
 - **Slash command:** `/promote-principle "<text>" [--scope user|project]`. The wrapper at `commands/promote-principle.md` exports the raw arg string as `$ARCHITECT_CRITIC_ARGS`.
@@ -194,9 +194,9 @@ write is the exact path this verb exists to keep closed.
 
 ---
 
-## Step 7: Auto-link to active challenge — not shipped
+## Step 7: Challenge provenance — prose only
 
-The design sketched a challenge link: `critiquing-spec` would export `ARCHITECT_CRITIC_CURRENT_CHALLENGE_FINGERPRINT` during a rebuttal cycle, and the promotion record would carry `linked_challenge` for auto-promotion dedup. **None of that machinery ships** — nothing in the plugin sets that env var, no lib code reads a `linked_challenge` field, and the record `"$arc_bin" state_append_promotion` writes (`{timestamp, source, text, scope}`) carries no id to link on. Do not hand-roll a `jq` amend to force one — an unlocked raw write is exactly the path Step 6's verb exists to keep closed. If the user wants the provenance, name the originating challenge in your confirmation message as prose.
+The promotion record `"$arc_bin" state_append_promotion` writes (`{timestamp, source, text, scope}`) carries no challenge id to link on. Do not hand-roll a `jq` amend to force one — an unlocked raw write is exactly the path Step 6's verb exists to keep closed. If the promotion was prompted by a challenge in a `critiquing-spec` run and the user wants the provenance, name the originating challenge in your confirmation message as prose.
 
 ---
 
@@ -210,12 +210,6 @@ Promoted: '<principle text>'
   Scope:       <user|project>
   Principle ID: <principle_id>
   Promoted at: <ISO8601 timestamp>
-```
-
-If `linked_challenge` was set, append:
-
-```
-  Linked challenge: <fingerprint> (will dedup future auto-promotions for this pattern)
 ```
 
 ---
@@ -232,7 +226,7 @@ User types: `/promote-principle "Avoid implicit coupling between modules that sh
 4. Uniqueness check: no existing principle normalizes to a Jaccard ≥ 0.85 match.
 5. Entry appended under `## Your principles (user-promoted)`.
 6. `state.json` updated: one entry added to `principle_promotions[]`.
-7. No challenge link written — the link machinery is not shipped (Step 7).
+7. Nothing to record beyond the promotion (Step 7).
 8. Output:
 
 ```
@@ -283,7 +277,7 @@ User types: `/promote-principle "All schema migrations must be reversible." --sc
 4. Uniqueness check passes (new file, zero existing principles after headers).
 5. Entry appended under `## Project principles (scope=project)`.
 6. `state.json` updated with `"scope": "project"`.
-7. No challenge fingerprint in env.
+7. Nothing to record beyond the promotion.
 8. Output:
 
 ```
@@ -300,7 +294,7 @@ Promoted: 'All schema migrations must be reversible.'
 
 The user accepts a challenge from a `critiquing-spec` run and types: *"Record this as a principle: always include a rollback path in migration specs."*
 
-Steps 1–6 run normally; Step 7 adds nothing to state (the challenge link is not shipped). The originating challenge can be named in the confirmation as prose — the only provenance the shipped machinery carries:
+Steps 1–6 run normally; Step 7 adds nothing to state — the promotion record carries no challenge id. The originating challenge can be named in the confirmation as prose — the only provenance the shipped machinery carries:
 
 ```
 Promoted: 'always include a rollback path in migration specs'
@@ -308,7 +302,7 @@ Promoted: 'always include a rollback path in migration specs'
   Scope:        user
   Principle ID: pp-2b8e00f3c4a91d67
   Promoted at:  2026-05-24T14:40:00Z
-  From challenge: the rollback-path challenge of this audit (prose provenance — no linked_challenge field exists in state)
+  From challenge: the rollback-path challenge of this audit (prose provenance — the state record has no challenge field)
 ```
 
 ---

@@ -6,8 +6,8 @@ argument-hint: "\"<text>\" [--scope user|project]"
 # /promote-principle
 
 Invoke the **promoting-principle** skill. The skill body validates uniqueness, appends to
-the target principles.md with source tag + timestamp, auto-links to active challenge
-fingerprint if invoked during a critiquing-spec rebuttal. This slash command is a thin wrapper.
+the target principles.md with source tag + timestamp, and records the promotion in
+state.json. This slash command is a thin wrapper.
 
 ## Arguments
 

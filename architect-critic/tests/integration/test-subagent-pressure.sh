@@ -42,7 +42,7 @@ done
 # --- 2. Lib helpers sourcing under fresh subshell ---
 echo ""
 echo "=== Subshell check: lib helpers source cleanly ==="
-for lib in state.sh principles.sh promotion.sh codex.sh consolidator.sh migration.sh; do
+for lib in state.sh principles.sh codex.sh migration.sh; do
   if bash -c "source '$PLUGIN_DIR/lib/$lib' 2>/dev/null"; then
     assert_pass "lib/$lib sources cleanly in fresh subshell"
   else

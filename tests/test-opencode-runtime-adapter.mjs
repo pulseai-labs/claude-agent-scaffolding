@@ -1620,7 +1620,7 @@ test("Task 6 lifecycle tolerates missing state, missing users, and malformed tra
   await hooks["experimental.chat.messages.transform"]({}, missingState);
   assert.match(
     missingState.messages[0].parts[0].text,
-    /^architect-critic v0\.3 installed; principles loaded from \(shipped defaults only\)\nRequest$/,
+    /^architect-critic installed; principles loaded from \(shipped defaults only\)\nRequest$/,
   );
 
   const malformed = [

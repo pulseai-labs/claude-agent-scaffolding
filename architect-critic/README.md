@@ -1,6 +1,6 @@
 # architect-critic
 
-Anti-sycophancy reviewer plugin for Claude Code and Codex (v0.2 — skill-first). Four gerund-named skills auto-invoke on natural-language triggers: `critiquing-spec` runs a host-agent self-audit followed by sequential adversarial rebuttal with T=4 concession scoring, `reviewing-critique-history` surfaces recent run summaries, `listing-principles` renders the merged principle set, and `promoting-principle` adds a principle manually. Ships two shipped-default principles — ghost notes (Wald survivor-bias: look for what is *absent*) and CORE protocol (Curiosity / Objectivity / Reassurance / Empathy rebuttal tone) — that are prepended to your `principles.md` on first run. Full auto-promotion machinery: vote-recurrence threshold T=4, supplementary instinct-style N=3 consecutive signal, 30/90-day suppression windows. At `--close` depth, the plugin dispatches the other agent as the adversarial fresh-frame reviewer: Codex when hosted in Claude Code, Claude Code when hosted in Codex. Standalone-invocable; consumer plugins (`scaffold-onboard v0.2+`, `scaffold-dev v0.1+`) invoke `critiquing-spec` in-conversation with no file IPC.
+Anti-sycophancy reviewer plugin for Claude Code and Codex (skill-first). Six gerund-named skills auto-invoke on natural-language triggers: `critiquing-spec` runs a host-agent self-audit followed by sequential adversarial rebuttal with T=4 concession scoring, `managing-async-critique` tracks background async audits (status / result / cancel / resume), `checking-adversary-readiness` verifies the external adversary before a deep critique, `reviewing-critique-history` surfaces recent run summaries, `listing-principles` renders the merged principle set, and `promoting-principle` adds a principle manually. Ships two shipped-default principles — ghost notes (Wald survivor-bias: look for what is *absent*) and CORE protocol (Curiosity / Objectivity / Reassurance / Empathy rebuttal tone) — read from `templates/principles.md` at audit time. Principle promotion is manual, via `/promote-principle`. At `--close` depth, the plugin dispatches the other agent as the adversarial fresh-frame reviewer: Codex when hosted in Claude Code, Claude Code when hosted in Codex. Standalone-invocable; consumer plugins (`scaffold-onboard v0.2+`, `scaffold-dev v0.1+`) invoke `critiquing-spec` in-conversation with no file IPC.
 
 ## Install
 
@@ -32,56 +32,58 @@ Audit a specific spec file:
 /critique --spec docs/SPEC-payments.md
 ```
 
-All four skills also auto-invoke on natural-language triggers — no slash command required:
+All six skills also auto-invoke on natural-language triggers — no slash command required:
 
 ```
 "critique my spec"                   # → critiquing-spec
+"critique jobs" / "resume critique"  # → managing-async-critique
+"check adversary readiness"          # → checking-adversary-readiness
 "show my recent critiques"           # → reviewing-critique-history
 "what principles are in use?"        # → listing-principles
 "add a principle about rollbacks"    # → promoting-principle
 ```
 
-## Skills (4)
+## Skills (6)
 
 | Skill | Trigger phrases (examples) | What it does |
 |---|---|---|
-| `critiquing-spec` | "critique my spec", "audit this plan", "review this design", "run a critique" | Discovers spec file, runs claude-self-audit, optional Codex fresh-frame, sequential rebuttal per challenge, auto-promotion offer |
+| `critiquing-spec` | "critique my spec", "audit this plan", "review this design", "run a critique" | Discovers spec file, runs claude-self-audit, optional Codex fresh-frame, sequential rebuttal per challenge, appends run to state.json |
+| `managing-async-critique` | "critique jobs", "resume critique", "cancel critique audit", "check critique job" | Background async audits: status, result, cancel, resume (resume consolidates the finished Codex result with the persisted host self-audit and runs one unified rebuttal) |
+| `checking-adversary-readiness` | "check adversary readiness", "is codex ready", "critique doctor" | Verifies the external adversary is installed, authenticated, and schema-capable; advisory, never blocks |
 | `reviewing-critique-history` | "show recent critiques", "critique list", "what did the last audit find", "history of critiques" | Renders recent runs from state.json with challenge counts, concession tallies, skills invoked |
-| `listing-principles` | "what principles are in use", "show my principles", "list my principles", "principles-list" | Composes and renders user-global + project-scoped + pattern-derived + governance principles |
-| `promoting-principle` | "add a principle", "promote this principle", "record a principle about X", "add to principles.md" | Validates text, routes to user-global or project scope, appends with `[promoted YYYY-MM-DD source:manual]` annotation |
+| `listing-principles` | "what principles are in use", "show my principles", "list my principles", "principles-list" | Renders shipped + user-global + project-scoped + memory-bank principles, merged last-wins |
+| `promoting-principle` | "add a principle", "promote this principle", "record a principle about X", "add to principles.md" | Validates text, routes to user-global or project scope, appends a `<!-- source: user-promoted, promoted_at: …, principle_id: … -->`-annotated entry, records the promotion in state.json |
 
-## Slash commands (4)
+## Slash commands (6)
 
 | Command | Args | Delegates to |
 |---|---|---|
 | `/critique` | `[--close] [--spec PATH]` | `critiquing-spec` skill |
+| `/critique-jobs` | `<status\|result\|cancel\|resume> [run-id]` | `managing-async-critique` skill |
+| `/critique-doctor` | _(none)_ | `checking-adversary-readiness` skill |
 | `/critique-list` | `[--limit N]` | `reviewing-critique-history` skill |
 | `/promote-principle` | `"<text>" [--scope user\|project]` | `promoting-principle` skill |
-| `/principles-list` | _(none)_ | `listing-principles` skill |
+| `/principles-list` | `[--source all\|shipped\|user\|project]` | `listing-principles` skill |
 
 All commands use `$ARGUMENTS` env-var bridge exclusively — no `$1`/`$2` bare positionals.
 
 ## Shipped principles
 
-Two principles ship as defaults in `templates/principles.md` and are auto-prepended to your `~/.claude/architect-critic/principles.md` on first run (preserving any existing content below them):
+Two principles ship as defaults in `templates/principles.md`. Audits read them from the plugin's own template file — nothing is copied into your principles file at install or first run:
 
 **Ghost notes** — drawn from Abraham Wald's WWII survivor-bias insight: when auditing a spec, look not just at what is present but for what is *absent*. The missing cases, the unspecified failure modes, the undocumented assumptions — these are the ghost notes. A design that only addresses the visible is incomplete.
 
 **CORE protocol** — sets the rebuttal-cycle tone: Curiosity (ask before assuming), Objectivity (score the argument, not the author), Reassurance (challenge the design, not the person), Empathy (acknowledge when the concern was legitimate even if conceded). Applied by Claude during the sequential rebuttal phase.
 
-## Auto-promotion
+## Principle promotion
 
-When a pattern recurs across critique runs, the skill offers to promote it to your `principles.md`. Two signals combine:
+Promotion is manual. When an audit surfaces a pattern worth keeping, add it yourself:
 
-- **Vote-recurrence (T=4):** a topic cluster that appears in ≥4 distinct runs triggers a promotion offer.
-- **Instinct signal (N=3):** a topic cluster appearing in 3 consecutive runs (regardless of total count) also triggers — catches fast-forming patterns before T=4 is reached.
+```
+/promote-principle "Always specify cancellation propagation in retry policies"
+```
 
-**Suppression windows** prevent re-prompting after a decline:
-
-- Score-4 decline (user said no to a promotion): suppressed for **30 days**.
-- Score-5 decline (user rejected a premise-invalidated challenge): suppressed for **90 days**.
-
-Promotion records live in `~/.claude/architect-critic/state.json` under `auto_promote_suppressions[]`.
+`/promote-principle "<text>"` writes to `~/.claude/architect-critic/principles.md` (user-global) by default, or `.claude/architect-critic/principles.md` (project-scoped) with `--scope project`. Each promotion is recorded in `state.json` under `principle_promotions[]` for dedup.
 
 ## Standalone use
 
@@ -96,8 +98,8 @@ Promotion records live in `~/.claude/architect-critic/state.json` under `auto_pr
 
 **Storage locations:**
 
-- `~/.claude/architect-critic/state.json` — run history, concession records, suppression windows.
-- `~/.claude/architect-critic/principles.md` — user-global principles (shipped defaults + your additions).
+- `~/.claude/architect-critic/state.json` — run history, concession records, promotion records, async job records. (Under `$CLAUDE_PLUGIN_DATA` when that env var is set.)
+- `~/.claude/architect-critic/principles.md` — user-global principles (your additions; shipped defaults stay in the plugin's `templates/principles.md`).
 - `.claude/architect-critic/principles.md` — project-scoped principles (optional; created by `/promote-principle --scope project`).
 
 **Invoking with an explicit path:**
@@ -129,12 +131,12 @@ The `project_class=unknown` state is logged in the skill output ("Project class:
 |---|---|---|
 | `ARCHITECT_CRITIC_CODEX_TIMEOUT_S` | `180` | Seconds before codex fresh-frame is killed and claude-only fallback is used |
 
-Principles file resolution order (highest priority first):
+Principles merge order (later sources win on a normalized duplicate):
 
-1. `$CLAUDE_PLUGIN_DATA/architect-critic/principles.md` (user-global)
-2. `.claude/architect-critic/principles.md` (project-scoped)
-3. Memory-bank pattern files (if scaffold-onboard v0.2+ is installed)
-4. Governance docs (if workspace-init manifest is present)
+1. `templates/principles.md` inside the plugin (shipped defaults — always present)
+2. `~/.claude/architect-critic/principles.md` (user-global)
+3. `.claude/architect-critic/principles.md` (project-scoped)
+4. The file `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` points at (memory-bank patterns, opt-in)
 
 ## Migrating from v0.1.x
 
@@ -156,20 +158,10 @@ No manual steps required. If anything looks wrong after migration, restore from 
 
 ## Development
 
-Run unit tests (~197 assertions):
+Run the suite (all unit + integration tests under `tests/`):
 
 ```bash
-bash tests/unit/test-state.sh
-bash tests/unit/test-principles.sh
-bash tests/unit/test-promotion.sh
-bash tests/unit/test-migration.sh
-```
-
-Run integration tests (bug repros, migration smoke, subagent pressure):
-
-```bash
-bash tests/integration/test-bug-repros.sh
-bash tests/integration/test-migration-smoke.sh
+bash run-tests.sh
 ```
 
 Run LLM-as-judge evals (requires an active Claude Code session):

@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.7.0 — 2026-09-22
+
+**Breaking:** auto-promotion and deterministic consolidation are withdrawn. Manual `/promote-principle` is unchanged.
+
+### Removed
+- **Auto-promotion machinery (`lib/promotion.sh`).** The vote-recurrence (T=4), instinct-signal (N=3), and 30/90-day suppression engine is deleted. It was never wired into a shipped path — no skill step ever called the vote writer — so no candidate could ever surface; the advertised feature could not have worked. `critiquing-spec` no longer runs a candidate check after the rebuttal cycle, and `listing-principles` no longer renders a suppressed-candidates footer.
+- **Deterministic consolidator (`lib/consolidator.sh`).** `ac_consolidator_merge` matched challenge text by exact similarity only; consolidation is judgment work and now happens in `critiquing-spec` Step 7 prose (same issue → one challenge, both rationales kept, highest severity wins, cross-confirmed first).
+- **Deterministic principle reads (`lib/principles.sh` helpers).** The merge/parse/seed/compose/load functions are gone; `critiquing-spec` Step 2 and `listing-principles` read the source files directly. `lib/principles.sh` now carries only the three path resolvers (`principles_shipped_path`, `principles_user_path`, `principles_project_path`).
+- **Dead state writers.** `ac_state_read`, `ac_state_append_declined`, `ac_state_add_suppression`, and `_ac_date_add_days` served only the withdrawn paths.
+- **Fresh-state fields.** A new `state.json` no longer seeds `candidate_promotions`, `declined_candidates`, or `auto_promote_suppressions` (the machinery that wrote them is gone).
+
+### Changed
+- **User-global principles have one home:** `~/.claude/architect-critic/principles.md` — under `$HOME`, surviving reinstalls. The plugin-data `principles.md` (`$CLAUDE_PLUGIN_DATA/architect-critic/principles.md`) was never actually read by audits; if you edited that file, move its principle lines into the `$HOME` file.
+- **Reads no longer write.** `arc state_external_run_list` and `arc state_external_run_get` no longer initialize state: on a missing `state.json` they return `[]` / not-found and create nothing, and a v2 file is read without migrating it. The session-start hook no longer creates `state.json` as a side effect.
+- **Session-start hook output drops the stale `v0.3` token.**
+
+### Preserved
+- Existing `state.json` files load unchanged: fields earlier versions wrote (including `candidate_promotions`, `declined_candidates`, `auto_promote_suppressions`) survive every write byte-for-byte — writers update only their own keys.
+- Manual promotion end-to-end: `promoting-principle`, `arc state_append_promotion`, `principle_promotions[]` dedup.
+- Async critique lifecycle: dispatch / status / result / cancel / resume, the shared Steps 7–9 procedure, `external_runs[]`, locking, and `ac_guarded_jq_write`.
+- `/critique --principles PATH` remains accepted (currently unused by the skill).
+
+### Tests
+- New `tests/integration/test-withdrawn-residue.sh` scans every shipped file for references to the withdrawn machinery (20 fixed + 2 regex needles), pins scope discipline with three fixture trees, and pins the kept dispatcher surface + Step 10 labels.
+- New `tests/unit/test-state-upgrade.sh` pins legacy `state.json` preservation (dropped fields survive `jq -S`-canonically through every kept verb), read-verbs-create-nothing with an adjacent writer control, no migration-on-read for v2 files, and the reduced fresh seed.
+- `test-principles.sh` rewritten to pin the three path resolvers (including that the user-global path is under `$HOME`, not plugin data). `test-state.sh` drops the deleted-function assertions; T20's jq-failure branch now exercises `state_write_field` with an unparseable `--argjson`. `test-promotion.sh` and `test-consolidator.sh` deleted with their libs.
+- `test-migration-smoke.sh` now asserts fresh state does not seed the dropped fields; `test-subagent-pressure.sh` drops the deleted libs from its sourcing check; the OpenCode adapter test matches the versionless session-start output.
+- Eval: the `listing-principles` rubric drops its suppressed-candidate criterion (renumbered); fixture `listing-principles/03-with-suppressed-candidate` and its result are removed together. All other committed eval results predate the rubric edit and are unchanged.
+
 ## v0.6.1 — 2026-09-19
 
 **Fix:** a state write can never empty state.json (#451).
