@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # context-ceiling.sh — herdr-crew's context-ceiling notice (#456).
 #
-# Tells a session its own context figure once that figure reaches the ceiling,
-# at the two moments a coordinator decides to start new work: a prompt or a
-# herdr wake (UserPromptSubmit) and a herdr new-work command (PreToolUse on
-# Bash). It never allows, denies or asks, and it always exits 0: a hook
-# failure must not stop a seat. What a unit is, and when to rotate, is prose —
-# lifecycle.md, "Rotation past the context ceiling".
+# Tells a session its own context figure once that figure reaches the ceiling, at the
+# two moments new work starts: a prompt or a herdr wake (UserPromptSubmit) and a herdr
+# new-work command (PreToolUse on Bash). It never allows, denies or asks, and it always
+# exits 0: a hook failure must not stop a seat. Every seat in a herdr pane is told, since
+# a session does not declare what it is; only a coordinator seat rotates on it, and what
+# a unit is — for that, and for a leaf's finish-and-report — is prose: lifecycle.md,
+# "Rotation past the context ceiling".
 #
 # The figure is input + cache_creation + cache_read tokens of the latest
 # non-sidechain assistant record in the transcript Claude Code names in the
@@ -103,5 +104,5 @@ case "$figure" in
 esac
 
 [ "$figure" -ge "$ceiling" ] || exit 0
-say "$event" "herdr-crew: context $figure >= ceiling $ceiling tokens. Finish the unit in hand, start no new one, and rotate at your next boundary (herdr-crew lifecycle.md, Rotation past the context ceiling)."
+say "$event" "herdr-crew: context $figure >= ceiling $ceiling tokens. Finish the unit in hand and start no new one; a coordinator seat rotates at its next boundary (herdr-crew lifecycle.md, Rotation past the context ceiling)."
 exit 0

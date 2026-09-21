@@ -40,9 +40,10 @@ nothing here reads the old ones.
   every field, every role key and every precedence rule is as it was, and both are
   still read as prose.
 - **One fail-open hook, and no runtime library.** `hooks-handlers/context-ceiling.sh`,
-  gated on `HERDR_PANE_ID` and inert outside a herdr pane, tells a coordinator seat
-  its own context figure once it passes the `context_ceiling` setting (default
-  500000 tokens). A run executes no `lib/`, no state directory and no parser; that
+  gated on `HERDR_PANE_ID` and inert outside a herdr pane, tells a seat its own context
+  figure once it passes the `context_ceiling` setting (default 500000 tokens): finish the
+  unit in hand and start no new one, and a coordinator seat rotates at its next boundary.
+  A run executes no `lib/`, no state directory and no parser; that
   hook is the only deterministic code on a user's path. The suites and the eval
   harness under `tests/` are build-and-test tooling, never run by the plugin.
 - **The ossify seam ports unchanged.** The spine execution-assignment phase, the

@@ -135,11 +135,11 @@ traffic out of the top's.
 
 ## Context ceiling
 
-One fail-open hook, gated on `HERDR_PANE_ID`, tells a coordinator seat its own context
+One fail-open hook, gated on `HERDR_PANE_ID`, tells a seat in a herdr pane its own context
 figure once it reaches the `context_ceiling` setting (default 500000 tokens): finish the
-unit in hand, start no new one, rotate at the next boundary. It never allows, denies or
-asks, it is inert outside a herdr pane, and it reports the figure as unavailable rather
-than guessing when it cannot read it. The rotation itself is prose, in
+unit in hand and start no new one, and a coordinator seat rotates at the next boundary. It
+never allows, denies or asks, it is inert outside a herdr pane, and it reports the figure as
+unavailable rather than guessing when it cannot read it. The rotation itself is prose, in
 `references/lifecycle.md`. That hook is the only deterministic code a run executes: a run
 has **no `lib/`, no state directory, no parser** — `agents.md` and `roles.md` are read as
 prose and nothing parses them. The suites and the eval harness under `tests/` are
