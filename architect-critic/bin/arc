@@ -19,7 +19,7 @@
 #     → resolves to ac_<function-suffix>, dispatches with remaining args.
 #       Examples:
 #         arc state_append_run                  → ac_state_append_run
-#         arc principles_merge                  → ac_principles_merge
+#         arc principles_user_path              → ac_principles_user_path
 #   arc --list
 #     → prints all ac_-prefixed functions, one per line, sorted.
 #
@@ -66,7 +66,7 @@ Usage: $(basename "$0") <function-suffix> [args...]
 
 Function suffix resolves to ${_DISPATCHER_PREFIX}_<suffix>.
 Examples:
-  $(basename "$0") principles_merge
+  $(basename "$0") principles_user_path
   $(basename "$0") state_append_run
 USAGE
   exit 2

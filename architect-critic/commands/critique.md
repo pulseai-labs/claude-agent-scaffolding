@@ -1,6 +1,6 @@
 ---
 description: Run an architect-critic audit on a spec or plan
-argument-hint: "[path] [--close] [--neutral] [--walk] [--model NAME] [--principles PATH] [--scope project|user]"
+argument-hint: "[path] [--close] [--neutral] [--walk] [--model NAME] [--principles PATH]"
 ---
 
 # /critique
@@ -20,7 +20,6 @@ command is a thin wrapper — the work happens in the skill.
 - `--walk` — walk every challenge sequentially; disables disposition triage (no auto-applied dispositions) for this invocation.
 - `--model NAME` — override codex model (respects user's `~/.codex/config.toml` by default).
 - `--principles PATH` — override principles.md path.
-- `--scope project|user` — for principle promotion during the audit run.
 
 ## Bridge
 
