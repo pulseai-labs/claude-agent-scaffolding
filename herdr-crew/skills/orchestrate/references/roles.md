@@ -30,7 +30,7 @@ herdr tab create --workspace <id> --cwd <path> --label "seat: <role> (<agent>)"
 herdr pane run <pane> "<command:>"
 herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>
 herdr pane read <pane>                      # confirm expected_model: before dispatch
-herdr agent prompt <pane> "<brief>"         # or brief_delivery: file
+herdr agent prompt <pane> "<brief>" --wait --until working --until blocked --timeout <ms>
 ```
 
 `references/herdr-mechanics.md` holds the full sequence and the flags this block leaves
@@ -39,11 +39,11 @@ needs a new worktree opens it with `herdr worktree create`, whose options are in
 `--help`; and a seat herdr does not detect waits on its screen and is sent its brief
 through the pane, never with an `agent` command. This file states only the role table
 and retention.
-Acceptance of input is not the start of a turn: after a dispatch to a detected seat,
-confirm the turn actually started, by `herdr-mechanics.md`'s turn-start check and its
-`agent_prompt_stalled` bullet, before the next wait. Every brief also asks
+Acceptance of input is not the start of a turn: that send's `--wait` confirms the turn
+started in the same call, and `herdr-mechanics.md`'s `agent_prompt_stalled` bullet says
+what to do when it did not. Every brief also asks
 the worker to state its model in its first reply — a second check, not the only one. A
-wrong model is a failed launch: release the pane and report it.
+wrong model is a failed launch: release the seat and report it.
 
 ## Retention follows artifacts
 
@@ -59,9 +59,9 @@ retained implementer finishes the PR's fix rounds unless the harness auto-compac
 The reviewer owns nothing durable and is released the moment its report file is
 processed; the verifier seat is retained across a fail-and-fix cycle on the same item
 — the re-check attaches its task to the same verifier — and is released only when the
-item passes or goes to the operator. When a seat is released, close its pane with
-`herdr pane close <pane>`; the run's own workspace closes at teardown, with `herdr
-workspace close <id>`. Read the close receipt rather than assuming it succeeded.
+item passes or goes to the operator. A seat is released as `herdr-mechanics.md`'s
+Teardown says (a worktree seat by removing its worktree, never by closing its pane), and
+the run's own workspace closes last. Read each receipt rather than assuming it succeeded.
 
 ## The activated-ossify-spine exception
 

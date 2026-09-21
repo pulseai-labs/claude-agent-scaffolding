@@ -12,10 +12,11 @@ for decisions, briefs, dispositions, and the operator's questions. Every other k
 work goes to a herdr worker session launched by seat name.
 
 Your first herdr command is `herdr --skill`; take every command's syntax from that guide,
-not from this skill. What that guide cannot express — the seat launch, the readiness and
-completion waits, how a seat is sent a message, and teardown — is stated once, in
-`references/herdr-mechanics.md`. Everything else here says what to do, and the guide says
-how to type it.
+not from this skill. `references/herdr-mechanics.md` states once what that guide cannot
+express or sets a default for that herdr-crew overrides: the seat launch and placement
+(one tab per seat, never the guide's default split), the readiness and completion waits,
+how a seat is sent a message, teardown, and machines. Where the two differ, that file
+wins. Everything else here says what to do, and the guide says how to type it.
 
 If you were invoked with an objective, bind or create the run's `run.json` for it, then follow
 `references/lifecycle.md` from step 1. If you were invoked without one, ask the operator
@@ -35,8 +36,8 @@ Your own turns take these kinds of action, and no others:
 4. Decide.
 5. Converse: operator questions, and answers to what workers write in their report files.
 6. Execute single authorized mutations: worktree, tab and pane creation, dispatch,
-   the PR comment, the merge — and, after it, the teardown: releasing workers,
-   closing panes and the run, and the verified branch delete.
+   the PR comment, the merge — and, after it, the teardown: releasing workers (a pane
+   closed, or a worktree removed), closing the run, and the verified branch delete.
 
 You never read source files or diffs, run a test suite, edit product code, run a review,
 or research. **The test: if the answer needs more than one command's output, dispatch it** to
@@ -58,12 +59,12 @@ Three consequences:
   progress. A single bounded `herdr agent wait`, on the state set
   `references/herdr-mechanics.md` states and always with a `--timeout`, is the wait
   primitive, over a typed state (`idle｜working｜blocked｜done｜unknown`); a seat herdr does
-  not detect waits on its report file instead, as that file states — one shell call,
-  no keepalive, no re-entry. A timeout is a checkpoint, not a failure. A loop of waits, and
-  restarting a wait after an empty timeout, stays forbidden. Beyond those `herdr pane read`
-  cases, the only bounded reads are the launch-banner `pane read` in `roles.md`, the
-  readiness `pane wait-output` of a seat herdr does not detect, and the one `/context`
-  reply at each task boundary.
+  not detect waits on its report file instead, as that file states — one background shell
+  call, no keepalive, no re-entry. A timeout is a checkpoint, not a failure. A loop of
+  waits, and restarting a wait after an empty timeout, stays forbidden. Beyond those
+  `herdr pane read` cases, the only bounded reads are the launch-banner `pane read` in
+  `roles.md`, the readiness `pane wait-output` of a seat herdr does not detect, and the
+  one `/context` reply at each task boundary.
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
   and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
 - **Verifying a worker's claim is a verifier dispatch**, not an orchestrator read. "Tests

@@ -51,20 +51,20 @@ Every command's syntax comes from `herdr --skill`.
    confirms the model, then the brief delivered as `brief_delivery` says (inject or
    file) — is `roles.md`'s "The launch," with the undetected-seat path in
    `herdr-mechanics.md`. The "state your model" line in the worker's first reply is
-   the second check. Wrong model: release the pane and report it.
+   the second check. Wrong model: release the seat and report it.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes, the same
    doorbell as completion (`herdr-mechanics.md`), and approves or amends it by sending
    the seat its next message. The final report later overwrites the plan in the same
    file. Fast briefs skip this.
-5. **Wait.** One bounded wait per dispatch, as `herdr-mechanics.md` states it: for a
-   detected seat
+5. **Wait.** One bounded wait per dispatch, run in the background as `herdr-mechanics.md`
+   states it: for a detected seat
    `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>`,
    over a typed state (`idle｜working｜blocked｜done｜unknown`); for a seat herdr does not
    detect, the report-file wait. Either is one shell call that returns once: whatever
-   polling it does happens inside that call, never as a loop of the orchestrator's own
-   waits. On a `done` or `idle` wake, read the report file its brief named, when
+   polling it does happens inside that call, never a rolling poll by the orchestrator.
+   On a `done` or `idle` wake, read the report file its brief named, when
    it is new since dispatch (`herdr-mechanics.md`) — the wake is only the doorbell, the
    file is the contract. A `blocked` wake is a dialog, and a blocked seat rejects
    `herdr agent prompt`: `herdr pane read <pane>` for it, answer it as
@@ -72,17 +72,16 @@ Every command's syntax comes from `herdr --skill`.
    A timeout is a checkpoint, not a failure: a loop of waits, and restarting a wait
    after an empty timeout, both stay forbidden. `herdr pane read` only on a `blocked`
    wake or a missing or malformed report, never to watch progress. A round's N
-   parallel items are N sequential bounded waits, one per pane in dispatch order —
-   not the forbidden loop, since each targets a different pane rather than
-   re-entering the one that just timed out. What persists is the report file, not
-   the state a finished pane has since moved to, so parking on one pane while
-   another keeps working loses nothing; the round's barrier closes when every
-   item's report file is in hand. On an empty timeout, the orchestrator does not
-   re-wait that pane: it moves on to the round's remaining panes, then returns
-   idle. That item's report file is not yet in hand, so the barrier closes on a
-   later turn, once it is on disk. At each task boundary for a retained implementer,
-   send `/context` and read the one reply before attaching the next task (the
-   threshold is in `roles.md`).
+   parallel items are N bounded background waits, one per pane, each waking the
+   session when it exits — not the forbidden loop, since each targets a different
+   pane rather than re-entering the one that just timed out. What persists is the
+   report file, not the state a finished pane has since moved to, so a pane that
+   finishes while another item still works loses nothing; the round's barrier
+   closes when every item's report file is in hand. On an empty timeout, the
+   orchestrator does not re-wait that pane: that item's report file is not yet in
+   hand, so the barrier closes on a later turn, once it is on disk. At each task
+   boundary for a retained implementer, send `/context` and read the one reply
+   before attaching the next task (the threshold is in `roles.md`).
 6. **Implementer finishes.** Its report file carries the completion body its
    brief defined — the commit SHAs and file count, each test command's pass and
    fail counts with the full output, the PR it opened with
