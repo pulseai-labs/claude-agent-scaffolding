@@ -24,12 +24,17 @@
 #     again the entry legitimately returns - not this gate's call.
 #
 # Needles are LITERAL substrings matched with awk index(), never regex - the
-# same counting discipline as test-external-executor-contract.sh. `workflows`
-# is a bare word on purpose: it catches `workflows/`, `ossify/workflows` and
-# regex-alternative forms alike, and the singular English word "workflow" never
-# matches it. A `.github/workflows` mention inside ossify/ would hit it; none
-# exists, and one appearing would be pointing at exactly the surface this gate
-# watches anyway - re-derive before assuming a hit is legitimate.
+# same counting discipline as test-external-executor-contract.sh. And index()
+# is exactly why every needle is anchored to THIS mechanism's shape - a path,
+# an env var, a schema field, a print string, a backticked tool name or a
+# hyphenated compound - and why no bare English word is a needle: a substring
+# cannot tell "the `.github/workflows/tests.yml` pointer" or a sentence-initial
+# "Workflow" or "the release workflows" from the deleted engine, and a gate
+# that flags legitimate prose trains its reader to dismiss the red. What a
+# substring cannot say is carried structurally instead: the directory is gone,
+# and no `allowed-tools:` line grants the tool. §4's false-positive control
+# proves the needle set is clean on legitimate prose as a class, not only on
+# today's tree.
 #
 # POSITIVE PINS ride beside the absences: the deletion must not eat the inline
 # path - the handoff.md halt, the verify.md overwrite rule, the three section
@@ -61,7 +66,10 @@ for needle in '- `fidelity` —' '- `pattern` —' '- `absence` —' 'declared_i
 done
 
 # ---------------------------------------------------------------------------
-# 1. Structural residue: the directory and the dedicated suite are gone.
+# 1. Structural residue: the directory and the dedicated suite are gone, and
+#    no allowed-tools grant names the tool. The grant check is structural
+#    because the substring test cannot be: the frontmatter key is anchored at
+#    column 0, and "Workflow" on that line is a grant, never prose.
 # ---------------------------------------------------------------------------
 [ ! -d "$OSSIFY/workflows" ] && T_PASS=$((T_PASS+1)) \
   || { T_FAIL=$((T_FAIL+1)); echo "FAIL: ossify/workflows/ still exists"; }
@@ -81,16 +89,13 @@ fidelity_truncated
 agents_run
 pre_fp
 post_fp
-workflows
-refuter
+ossify/workflows
 test-workflows
-Workflow
+`Workflow`
 layer 4: workflow
 workflow unavailable
-6 agents
-six agents
+(6 agents
 six-agent
-the delegated call
 NEEDLES
 
 NEEDLES_OUTER="$TMPDIR_WORK/needles-outer"
@@ -100,8 +105,7 @@ OSSIFY_NO_WORKFLOWS
 fidelity_truncated
 agents_run
 layer 4: workflow
-6 agents
-six agents
+(6 agents
 six-agent
 NEEDLES
 
@@ -121,6 +125,18 @@ control="$(awk 'index($0, "ossify") { print FILENAME ":" FNR; exit }' $(cat "$FL
 if [ -n "$control" ]; then T_PASS=$((T_PASS+1))
 else T_FAIL=$((T_FAIL+1)); echo "FAIL: no file under ossify/ contains the string 'ossify' - the scan is dead, not clean"; fi
 
+# The tool grant, structurally: a column-0 `allowed-tools:` line containing
+# "Workflow" is the mechanism being re-granted. Same-line only - the shipped
+# grants are single-line, and a hypothetical wrapped form is covered by the
+# backticked needle the moment prose names the tool.
+grant_hits="$(awk '/^allowed-tools:/ && index($0, "Workflow") { print FILENAME ":" FNR }' $(cat "$FLIST"))"
+if [ -z "$grant_hits" ]; then T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1))
+  echo "FAIL: an allowed-tools grant re-admits the Workflow tool:"
+  printf '      %s\n' $grant_hits
+fi
+
 # ---------------------------------------------------------------------------
 # 3. The scan itself. Each needle is one assertion; every hit is printed so the
 #    RED names exactly what was found.
@@ -137,8 +153,9 @@ while IFS= read -r needle; do
 done < "$NEEDLES_INNER"
 
 # The repo-root files that named the mechanism, under the mechanism-unique
-# subset only (see the header for why `Workflow`/`workflows`/`refuter` are not
-# scanned here).
+# subset only (see the header for why path-form and tool-name needles are not
+# scanned here: README's own structure carries `.github/workflows` references
+# for CI that have nothing to do with this mechanism).
 for f in "$REPO/README.md" "$REPO/tests/test-opencode-runtime-adapter.mjs"; do
   while IFS= read -r needle; do
     [ -n "$needle" ] || continue
@@ -151,5 +168,30 @@ for f in "$REPO/README.md" "$REPO/tests/test-opencode-runtime-adapter.mjs"; do
     fi
   done < "$NEEDLES_OUTER"
 done
+
+# ---------------------------------------------------------------------------
+# 4. The false-positive control: the same needle set over legitimate prose must
+#    hit NOTHING. Without this, only today's tree is proven clean - not the
+#    rule, and the next "`.github/workflows`" pointer or sentence-initial
+#    "Workflow" silently re-opens the class this gate just closed.
+# ---------------------------------------------------------------------------
+LEGIT="$TMPDIR_WORK/legitimate-prose.md"
+cat > "$LEGIT" <<'EOF'
+The CI workflow list lives at `.github/workflows/tests.yml`; consult it before
+changing a gate. Workflow ordering matters in that file, and the release
+workflows run serially. A critic that refutes a claim has refuted it; the
+reviewer is the claim's refuter, and six agents of chaos are not a mechanism.
+EOF
+
+legit_hits="$(while IFS= read -r needle; do
+  [ -n "$needle" ] || continue
+  awk -v needle="$needle" 'index($0, needle) { print FILENAME ":" FNR ": " needle }' "$LEGIT"
+done < "$NEEDLES_INNER")"
+if [ -z "$legit_hits" ]; then T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1))
+  echo "FAIL: a needle matches legitimate prose - the needle is wrong, not the prose:"
+  printf '      %s\n' $legit_hits
+fi
 
 t_summary

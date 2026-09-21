@@ -254,7 +254,7 @@ contract, not a summary of one:
 
 ### The finding schema
 
-Every finding, from either execution path, is exactly:
+Every finding is exactly:
 
 ```text
 {id, lens, claim, evidence: {file, line?}, declared_in_report_s7}
