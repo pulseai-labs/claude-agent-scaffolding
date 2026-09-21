@@ -22,7 +22,7 @@ running in your first reply, then continue.
 PLACEMENT: <abs path of the repo or worktree the lane runs from>.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
 MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
 SPINE_ID=<spine id>
@@ -115,7 +115,7 @@ running in your first reply, then continue.
 
 PLACEMENT: worktree <abs path>, branch <branch>, base <base-branch>. Use git -C
 for every git command; cd does not persist.
-REPORT_PATH=<the absolute path this seat writes its report to>
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 Everything you say upward (plan, question, escalation, report) goes in that file.
 
 BEFORE ANY EDIT, in this order:
@@ -160,7 +160,7 @@ ROLE: verifier for <work-item-id>, read-only. State the model you are running in
 your first reply, then continue.
 
 PLACEMENT: worktree <abs path>, at <head sha>, staged tree <tree oid>.
-REPORT_PATH=<the absolute path this seat writes its report to>
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 
 CLAIMS: <the numbered all-claims list from briefs.md's verifier template, filled
 from this item's spec>.

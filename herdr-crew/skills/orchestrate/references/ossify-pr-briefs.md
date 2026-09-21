@@ -20,7 +20,7 @@ CLOSE_EXPECTED_MODEL is a failed launch to report, not to work around.
 PLACEMENT: <abs path of the worktree the spine's lane ran from>.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 SPINE_ID=<spine id>
 CLOSE_COMMAND=<the command this seat was launched with, from its machine entry>
 CLOSE_EXPECTED_MODEL=<the model the banner or screen must show>
@@ -81,7 +81,7 @@ report, not to work around.
 PLACEMENT: REPO_ROOT — the worktree holding this PR's branch.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
 MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
 PR_REPO=<owner/repo>
@@ -183,7 +183,9 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 DONE: write your report file, returning PR_REPO, PR_NUMBER and every ledger
 comment id, plus one of two outcomes: the merge SHA; or
 `open: <PR url> at <head sha>` when the word you were relayed was wait or leave
-open, or at a fix-round boundary once the context-ceiling notice has fired. On the open shape, persist its review record —
+open, or at a fix-round boundary once the context-ceiling notice has fired — then stand
+down your own armed waits before you return, as the top and a spine session do: one
+report must wake one session (`lifecycle.md`, "Your own rotation"). On the open shape, persist its review record —
 whether the delegated review ran, its reviewed head, its clean/findings state and
 summary, the fix rounds run, and the durable ledger/comment references — the next
 fresh work-PR dispatch receives it as PRIOR_REVIEW in a fresh brief, the review

@@ -8,7 +8,7 @@ Every brief carries, in this order:
 1. Role, and "state your model in your first reply".
 2. Placement: absolute worktree path, branch, base branch.
 3. The task, plus any project rule the worker's location will not load, pasted verbatim.
-4. The report file's shape, and the forbidden actions for the role.
+4. The report file's shape — replaced whole, never in pieces — and the forbidden actions for the role.
 5. Where the worker speaks: a blocking question is written to the report file, then it
    waits; an escalation is written there, then it stops. A policy refusal is reported,
    never retried around.
@@ -35,7 +35,7 @@ verbatim rather than restating it.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 ROLE: implementer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path>, branch <branch>, base <base-branch>. Use git -C for every
@@ -70,7 +70,7 @@ If a tool or policy refuses you, report it verbatim and stop that step.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 ROLE: implementer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path>, branch <branch>, base <base-branch>. Use git -C for every
@@ -95,7 +95,7 @@ write an escalation there and stop; report refusals verbatim.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 ROLE: reviewer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path> checked out at PR <number>'s head <sha>.
@@ -125,7 +125,7 @@ escalation goes there too, then stop.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 ROLE: verifier, read-only. State the model you are running in your first reply, then
 continue.
 
@@ -160,7 +160,7 @@ lines and TASK replaced by:
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 TASK: work PR <number> to zero unresolved review threads. Inputs, in priority order:
   1. Disposition: <list>. Fix every item on it as dispositioned; defer or reject
      nothing on it yourself.
