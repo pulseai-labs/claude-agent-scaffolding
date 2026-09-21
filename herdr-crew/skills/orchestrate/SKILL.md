@@ -125,6 +125,11 @@ Two cases are named because they look like clashes and are not:
   to this session only. You
   wait on one spine report, through its report file: a lane driver whose subagents run
   in the background is a coordinator seat (`references/herdr-mechanics.md`, Completion).
+  Its brief is `references/briefs.md`'s fast-implementer template with its TASK replaced
+  by the dispatch and its report body replaced by the one `references/ossify-briefs.md`'s
+  spine-session DONE block defines — ids, SHAs and counts; a lane driver on this path owns
+  no run file of its own — because it is launched by no template of its own, and without
+  that `REPORT_PATH` the wait for it has nothing to wake on.
 - **`run-spine`, when this session just planned the spine.** Then the items deserve
   their own models, and inherited-runtime subagents cannot give them that.
   **Read `references/ossify-execution.md` and follow it**: the seats for the spine are
