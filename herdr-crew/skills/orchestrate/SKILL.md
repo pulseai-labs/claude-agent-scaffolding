@@ -61,9 +61,9 @@ Three consequences:
   the wait primitive for a detected seat that is not a coordinator, over a typed state
   (`idle｜working｜blocked｜done｜unknown`); a seat herdr does not detect, and a coordinator
   seat, wait on their report files instead, with no keepalive and no re-entry. The two dead
-  ends — a timeout, and a wake whose report is empty while the seat still works — are that
-  file's, and it names the next action for each. A loop of waits, and restarting a wait
-  after an empty timeout, stays forbidden. Beyond those `herdr pane read` cases, the only
+  ends — a timeout, and a wake with nothing new in the report while the seat still works —
+  are that file's, and it names the next action for each. A loop of waits, and restarting a
+  wait after an empty timeout, stays forbidden. Beyond those `herdr pane read` cases, the only
   bounded reads are the launch-banner `pane read` in `roles.md`, the readiness
   `pane wait-output` of a seat herdr does not detect, and the one `/context` reply at
   each task boundary.

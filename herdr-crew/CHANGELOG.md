@@ -69,7 +69,7 @@ nothing here reads the old ones.
 | `orca orchestration run-use` | naming the run's `run.json` path |
 | `worker-start` | the seat launch (row 1) |
 | `worker-done` | the seat's **report file**; the doorbell is the typed wait for a detected seat that is not a coordinator, and the report-file wait for an undetected or coordinator seat |
-| `worker-read` | `herdr pane read`, only on a `blocked` wake or a missing or malformed report |
+| `worker-read` | `herdr pane read`, only on a `blocked` wake, a missing or malformed report, or a timeout's checkpoint |
 | `worker-release` | as `orca terminal close` above |
 | `orca skills get orchestration` | `herdr --skill` |
 | `ORCA_TERMINAL_HANDLE` | `HERDR_PANE_ID` — the hook gate only |

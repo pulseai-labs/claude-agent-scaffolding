@@ -76,12 +76,14 @@ Every command's syntax comes from `herdr --skill`.
    file is the contract. A `blocked` wake is a dialog, and a blocked seat rejects
    `herdr agent prompt`: `herdr pane read <pane>` for it, answer it as
    `herdr-mechanics.md` says, then one fresh bounded wait on the answer.
-   A timeout is that file's checkpoint, and a wake whose report is empty while the seat
-   still works is its false wake: take the one `herdr pane read` each licenses, report what
-   it shows to the operator, and follow the doorbell rule that file states — neither is a
-   failure, and neither is re-entered here. A loop of waits, and restarting a wait after an
-   empty timeout, both stay forbidden. `herdr pane read` only on a `blocked` wake, a
-   missing or malformed report, or a timeout's checkpoint, never to watch progress.
+   A timeout is that file's checkpoint, and a wake with nothing new in the report while the
+   seat still works is its false wake. Each licenses one `herdr pane read`: the timeout's
+   observed state — stopped, at a dialog, or still at work — is reported to the operator,
+   and the false wake follows the doorbell rule that file states for the rest of that
+   dispatch, paging no one. Neither is a failure, and neither is re-entered here. A loop of
+   waits, and restarting a wait after an empty timeout, both stay forbidden. `herdr pane read`
+   only on a `blocked` wake, a missing or malformed report, or a timeout's checkpoint, never
+   to watch progress.
    A round's N parallel items are N bounded background waits, one per pane, each waking the
    session when it exits — not the forbidden loop, since each targets a different
    pane rather than re-entering the one that just timed out. What persists is the
@@ -181,8 +183,8 @@ Every command's syntax comes from `herdr --skill`.
     so its teardown validates the close's own result instead — the local landing it
     recorded in each hosting repo — and waits for no record pass.
 13. **Handoff.** If the run outlives the session, write a handoff naming the run's
-    `run.json` path, task ids, head SHA, and the next step — and, per live dispatch, its
-    pane id, `REPORT_PATH` and the hash last noted; on an activated
+    `run.json` path, task ids, head SHA, and the next step — every seat's pane id, and,
+    per live dispatch, its `REPORT_PATH` and the hash last noted; on an activated
     ossify spine, also the spine's approved `SEATS` block, the resolved coordinator
     profiles and the accumulated close-review ledger (oldest first). With ossify
     installed, that is `/ossify:handoff`.
@@ -224,10 +226,10 @@ never guessed. Both sessions' boundaries and returns are in their briefs
 **Your own rotation.** Your boundary is a fully acknowledged delivery with no
 operator question in flight. Live child dispatches keep running, but nothing
 inherits their waits: they are this session's background calls, and rebinding a
-`run.json` re-arms nothing. Write the handoff, recording, per live dispatch, its pane
-id, `REPORT_PATH` and the hash last noted, and your own resolved profile — `/ossify:handoff`
-with ossify installed, the same file by hand without it. Open a new tab and pane
-with the launch command the handoff recorded — ask the operator once when none
+`run.json` re-arms nothing. Write the handoff, recording every seat's pane id and, per
+live dispatch, its `REPORT_PATH` and the hash last noted, and your own resolved profile
+— `/ossify:handoff` with ossify installed, the same file by hand without it. Open a new tab
+and pane with the launch command the handoff recorded — ask the operator once when none
 did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`,
 the top's own workspace, never the run's, which closes last. Send the new top its
 resume — `/ossify:handoff-resume <path>` with ossify, or the path as its first
