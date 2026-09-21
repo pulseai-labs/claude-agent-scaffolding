@@ -200,11 +200,16 @@ rm -f "$tmp_ctl"
 tmp_unreadable="$(mktemp)"; printf 'claude-glm\n' > "$tmp_unreadable"
 chmod 000 "$tmp_unreadable"
 if [ -r "$tmp_unreadable" ]; then
-  # Running as root, or a filesystem that ignores 0000: this host cannot
-  # construct an unreadable file, so the control cannot exercise the guard.
-  fail "control: an unreadable file fails the sweep, not passes it" \
-    "could not make $tmp_unreadable unreadable on this host (root?) — control could not run"
-elif out="$(sweep_file "$tmp_unreadable" "control fixture")"; then
+  # Running as root, or a filesystem that ignores 0000: no mode makes a file
+  # unreadable for this uid, so swap in one no uid can read — a symlink whose
+  # target does not exist. The control still runs, which is what the documented
+  # `bash herdr-crew/run-tests.sh` needs on a root container; failing here
+  # instead turned the whole suite red with every product assertion green
+  # (Codex, 2026-09-21). The guard asserted below is the same guard either way.
+  rm -f "$tmp_unreadable"
+  ln -s "$tmp_unreadable.absent" "$tmp_unreadable"
+fi
+if out="$(sweep_file "$tmp_unreadable" "control fixture")"; then
   fail "control: an unreadable file fails the sweep, not passes it" \
     "the sweep certified a file it could not open: $out"
 elif printf '%s' "$out" | grep -F 'missing or unreadable' >/dev/null; then
