@@ -13,10 +13,11 @@ No single herdr call creates a seat, starts its command and delivers its brief, 
 is this sequence, in which `<seat label>` is `seat: <role> (<agent>)`:
 
 1. **The run's workspace, once per run, whatever the first seat needs.**
-   `herdr workspace create --cwd <first seat's tree> --label "run: <objective>" --no-focus`.
-   Its tab and shell pane (`.result.tab`, `.result.root_pane`) are the first seat's:
-   `herdr tab rename <tab> "<seat label>"`, not a second tab beside an empty one. Later
-   seats are tabbed in here, and a worktree links to it rather than replacing it.
+   `herdr workspace create --cwd <a path that already exists> --label "run: <objective>"
+   --no-focus` — the first seat's tree, or a neutral path when that seat's worktree is still
+   to be created (step 2), since a `--cwd` that does not exist yet fails the launch. Its tab
+   and shell pane (`.result.tab`, `.result.root_pane`) are the first seat's when its tree is
+   that path: `herdr tab rename <tab> "<seat label>"`, not a second tab beside an empty one.
 2. **One tab per further seat.**
    `herdr tab create --workspace <id> --cwd <the seat's tree> --label "<seat label>" --no-focus`.
    Its pane is `.result.root_pane`. A seat that needs a new worktree uses
@@ -128,8 +129,7 @@ For a detected seat that is not a coordinator (below), the wake is the typed wai
   it. A plan, a question or a late finding is answered with the seat's next message and
   one fresh bounded wait; an escalation goes to the operator.
 - `idle` or `done`, and nothing new: the false wake below, one `herdr pane read`.
-- `blocked`: a dialog, handled as above.
-- A timeout: the checkpoint below.
+- `blocked`: a dialog, handled as above. A timeout: the checkpoint below.
 
 **The two dead ends.** *A timeout is a checkpoint*: one `herdr pane read`, on any wait. The
 turn ends with the seat's observed state — stopped, at a dialog, or still at work —
@@ -194,7 +194,7 @@ machine that list does not show halts the run, never a guess. Every command for 
 then carries `herdr --machine <label>`, with its ids discovered there: ids and agent names
 are scoped to one server, and `--current` reaches no remote pane. Never consume a path from
 a `--machine` reply; resolve the seat's paths on its own machine. Place a seat only on a
-machine that stays up for its life and whose filesystem the orchestrator can read — its
-report file is read where it is written, so an unopenable `REPORT_PATH` is a seat that can
-never report. A connection failure does not prove a mutation was not applied, so inspect
-the remote state before retrying.
+machine that stays up for its life and whose filesystem the orchestrator can read: its
+report file is read where it is written, so an unopenable `REPORT_PATH` never reports. A
+connection failure does not prove a mutation was not applied, so inspect the remote state
+before retrying.

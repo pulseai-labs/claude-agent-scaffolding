@@ -59,7 +59,8 @@ open the PR from the worktree with `gh pr create --repo <owner/repo> --base
   Files: <paths touched, plus any separate file holding longer narrative>
 
 NEVER: merge, delete a branch, force-push, edit files outside the worktree, or run any
-subagent. When blocked, write the question to your report file and wait; when stuck,
+subagent — your report file at REPORT_PATH is the one exception outside it, as the ossify
+briefs say. When blocked, write the question to your report file and wait; when stuck,
 write an escalation there and stop.
 If a tool or policy refuses you, report it verbatim and stop that step.
 ```
@@ -85,8 +86,9 @@ from the worktree with `gh pr create --repo <owner/repo> --base <base-branch> --
   Changed / Evidence / PR / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: merge, delete a branch, force-push, edit files outside the worktree, or run any
-subagent. When blocked, write the question to your report file and wait; when stuck,
-write an escalation there and stop; report refusals verbatim.
+subagent — your report file at REPORT_PATH is the one exception outside it. When blocked,
+write the question to your report file and wait; when stuck, write an escalation there and
+stop; report refusals verbatim.
 ```
 
 ## Reviewer
@@ -113,7 +115,8 @@ then, in either case:
 The head line is not optional on a clean review: nothing ties a verdict to a SHA
 without it.
 
-NEVER: edit any file, post anything to GitHub, or run a second review. Your findings
+NEVER: edit any file other than your report file, post anything to GitHub, or run a second
+review. Your findings
 travel only in your report file. If `/code-review` refuses or errors, report its output
 verbatim and stop. A blocking question goes in your report file, then wait; an
 escalation goes there too, then stop.
