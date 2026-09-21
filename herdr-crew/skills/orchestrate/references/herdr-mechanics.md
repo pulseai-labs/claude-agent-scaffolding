@@ -118,8 +118,9 @@ This surface has no turn-start check, and its doorbell is the report file (see C
 A seat's result is its report file, at the `REPORT_PATH=` its brief names. herdr's `done`
 carries no body, so the file is the contract and the typed state is only the doorbell.
 
-Before each dispatch, note the file's hash (`git hash-object <path>`), empty if absent.
-For a detected seat the wake is the typed wait above. After it:
+Before each dispatch, note the file's hash (`git hash-object <path>`), empty if absent;
+the plan gate uses the same file and doorbell, so the hash is noted again before the reply
+that approves a plan. For a detected seat the wake is the typed wait above. After it:
 
 - `idle` or `done`, and the file is new (absent at dispatch, or a different hash): read it.
 - `idle` or `done`, and nothing new: the worker stopped without a report, either with a

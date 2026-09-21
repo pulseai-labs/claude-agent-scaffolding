@@ -39,9 +39,9 @@ TASK: <objective in two or three sentences, with the acceptance criteria and the
 command that proves them>.
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
-PLAN GATE: before your first edit, post your plan (files to touch, order, tests first)
-in your reply, then wait — the orchestrator answers with `herdr agent prompt` once its
-`herdr agent wait` wakes on this pane. Implement only what the reply approves.
+PLAN GATE: before your first edit, write your plan (files to touch, order, tests first)
+to your report file at REPORT_PATH, then wait. Implement only what the orchestrator's
+reply approves.
 
 DONE: commit on <branch> with messages written to a file and `git commit -F`; push;
 open the PR from the worktree with `gh pr create --repo <owner/repo> --base

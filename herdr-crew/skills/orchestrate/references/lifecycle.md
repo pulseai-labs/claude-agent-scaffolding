@@ -52,10 +52,12 @@ Every command's syntax comes from `herdr --skill`.
    file) — is `roles.md`'s "The launch," with the undetected-seat path in
    `herdr-mechanics.md`. The "state your model" line in the worker's first reply is
    the second check. Wrong model: release the pane and report it.
-4. **Plan gate, planned work only.** The planned implementer's brief says: post your
-   plan, then wait for a reply before implementing. The orchestrator waits on that
-   pane, reads the plan, and approves or amends it by prompting the pane again. Fast
-   briefs skip this.
+4. **Plan gate, planned work only.** The planned implementer's brief says: write your
+   plan to your report file, then wait for a reply before implementing. The
+   orchestrator reads the plan from that file when its bounded wait wakes, the same
+   doorbell as completion (`herdr-mechanics.md`), and approves or amends it by sending
+   the seat its next message. The final report later overwrites the plan in the same
+   file. Fast briefs skip this.
 5. **Wait.** One bounded wait per dispatch, as `herdr-mechanics.md` states it: for a
    detected seat
    `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>`,
