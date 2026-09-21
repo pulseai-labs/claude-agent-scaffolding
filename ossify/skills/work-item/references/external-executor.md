@@ -214,16 +214,14 @@ finishes, it comes back as a §4 record and goes through §5a.
 ## 6. Layer 4 under this mode
 
 External mode **runs Layer 4 inline** — the lenses applied by the close itself,
-per `close/references/impl-check.md` §4b's inline path — even where the
-delegated path's own conditions would otherwise be satisfied. The reason is
-arithmetic, not doctrine: the caller has already put a reviewer of its own on
-this item, and following it with a fan-out of hidden delegated agents spends a
-second review nobody asked for on a diff that has just been read.
+per `close/references/impl-check.md` §4b — which is no distinction at all:
+Layer 4 runs inline on every harness, and this mode changes nothing about it.
+The caller's own reviewer already covered the item, and the close's pass adds
+exactly what it adds on the no-flag path — one read, one findings set, the same
+verdict rule.
 
 The lenses, the finding schema and the verdict rule are `impl-check.md`'s and do
-not change. Nothing about the default no-flag path changes either — it keeps
-choosing the delegated path under exactly the conditions it chose it under
-before.
+not change.
 
 ---
 

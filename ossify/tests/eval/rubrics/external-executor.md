@@ -77,7 +77,7 @@ that fact and decides on it is.
    this mode the lane dispatches nothing itself**, and it does not say which
    executor the caller reuses — an answer that has ossify re-dispatching "the
    same live implementer" is describing the default nested path, not this one.
-5. **Correction is same-executor, and Layer 4 goes inline under this mode.** A
+5. **Correction is same-executor, and Layer 4 runs inline.** A
    rejected item is repaired by a continuation sent to the **same** executor
    that produced it, because the ordinary command's clean-tree pre-flight would
    correctly refuse the staged output; the continuation re-reads
@@ -87,12 +87,11 @@ that fact and decides on it is.
    `complete` shape — no third return mode and no commit — and the repaired item
    comes back to the lane as a fresh §4 record that passes the whole of criterion
    3 again, identity included, rather than being accepted on the continuation's
-   inner shape. Separately, external
-   mode runs Layer 4 **inline** even where the delegated path's own conditions
-   are otherwise satisfied, while the no-flag path's choice of the delegated
-   path is unchanged. Inventing a new return mode, sending the correction to a
-   fresh executor, or spending the delegated six-agent pass under external mode
-   is a wrong answer.
+   inner shape. Layer 4 runs
+   **inline** under this mode as under every mode — the close applies the
+   lenses itself and there is no second engine to route to. Inventing a new
+   return mode, sending the correction to a fresh executor, or routing Layer 4
+   to a multi-agent pass of any kind is a wrong answer.
 
 ## Output format
 `{"scores":{"mode_split":N,"round_sequencing":N,"result_validation":N,"gaps_routing":N,"correction_and_layer4":N},"pass":true|false,"notes":"<one sentence; where any criterion scores below 5, name the cause>"}`. Pass = all ≥4. JSON only.
