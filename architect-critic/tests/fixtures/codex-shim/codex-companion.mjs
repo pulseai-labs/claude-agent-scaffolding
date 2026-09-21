@@ -64,7 +64,7 @@ switch (sub) {
   }
   case "result": {
     // #39: the default return is ADVERSARY-shaped ({challenges, gaps}), the
-    // exact shape consolidator.sh + _ac_codex_validate_json consume.
+    // exact shape _ac_codex_validate_json accepts and Step 7 consolidates.
     const raw =
       process.env.CODEX_SHIM_RESULT_RAWOUTPUT ??
       'Adversarial audit complete.\n\n```json\n{"challenges":[{"text":"Codex challenge A","severity":"premise","rationale":"why it matters"}],"gaps":[]}\n```\n';

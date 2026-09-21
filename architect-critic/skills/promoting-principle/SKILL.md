@@ -99,7 +99,7 @@ If the file does not exist, create it the same way (copy from shipped template).
 
 ## Step 4: Uniqueness check
 
-Read all existing principles from both the target file and the other scope's file. Normalize each for comparison: lowercase, strip punctuation, collapse whitespace to single spaces.
+Read all existing principles from both the target file and the other scope's file — an existing principle is an entry under a `## …` principle section, one per top-level `- ` bullet or plain line (indented text under a bullet is that entry's elaboration, not a separate principle). Normalize each for comparison: lowercase, strip punctuation, collapse whitespace to single spaces.
 
 ```bash
 # Normalize helper (inline)

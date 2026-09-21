@@ -107,6 +107,89 @@ else
   FAIL=$((FAIL+1))
 fi
 
+echo "-- (b) 0-byte state.json: list prints [], get is not-found, nothing written --"
+rm -f "$STATE_FILE"
+: > "$STATE_FILE"
+cp "$STATE_FILE" "$TMP_DIR/zero-before.json"
+out="$(bash "$ARC" state_external_run_list)"; rc=$?
+assert_eq "external_run_list on 0-byte file: rc0" "0" "$rc"
+assert_eq "external_run_list on 0-byte file: prints []" "[]" "$out"
+if cmp -s "$TMP_DIR/zero-before.json" "$STATE_FILE"; then
+  echo "  ✓ 0-byte file byte-identical after list (no re-seed on read)"
+  PASS=$((PASS+1))
+else
+  echo "  ✗ 0-byte file changed by external_run_list"
+  FAIL=$((FAIL+1))
+fi
+set +e
+out="$(bash "$ARC" state_external_run_get r-anything 2>/dev/null)"; rc=$?
+set -e 2>/dev/null || true
+assert_eq "external_run_get on 0-byte file: rc1 (not found)" "1" "$rc"
+assert_eq "external_run_get on 0-byte file: empty stdout" "" "$out"
+if cmp -s "$TMP_DIR/zero-before.json" "$STATE_FILE"; then
+  echo "  ✓ 0-byte file byte-identical after get (no re-seed on read)"
+  PASS=$((PASS+1))
+else
+  echo "  ✗ 0-byte file changed by external_run_get"
+  FAIL=$((FAIL+1))
+fi
+
+echo "-- (b) malformed state.json: both read verbs refuse, file byte-identical --"
+printf 'this is not json{\n' > "$STATE_FILE"
+cp "$STATE_FILE" "$TMP_DIR/bad-before.json"
+set +e
+out="$(bash "$ARC" state_external_run_list 2>"$TMP_DIR/err-list.txt")"; rc=$?
+set -e 2>/dev/null || true
+if [[ "$rc" -ne 0 ]]; then
+  echo "  ✓ external_run_list on malformed file: non-zero rc ($rc)"
+  PASS=$((PASS+1))
+else
+  echo "  ✗ external_run_list on malformed file: rc0 (corruption swallowed)"
+  FAIL=$((FAIL+1))
+fi
+assert_eq "external_run_list on malformed file: empty stdout" "" "$out"
+if /usr/bin/grep -q 'not a single parseable JSON object' "$TMP_DIR/err-list.txt" && /usr/bin/grep -qF "$STATE_FILE" "$TMP_DIR/err-list.txt"; then
+  echo "  ✓ list refusal names the file on stderr"
+  PASS=$((PASS+1))
+else
+  echo "  ✗ list refusal missing wording/file name on stderr:"
+  cat "$TMP_DIR/err-list.txt"
+  FAIL=$((FAIL+1))
+fi
+if cmp -s "$TMP_DIR/bad-before.json" "$STATE_FILE"; then
+  echo "  ✓ malformed file byte-identical after list refusal"
+  PASS=$((PASS+1))
+else
+  echo "  ✗ malformed file changed by external_run_list"
+  FAIL=$((FAIL+1))
+fi
+set +e
+out="$(bash "$ARC" state_external_run_get r-anything 2>"$TMP_DIR/err-get.txt")"; rc=$?
+set -e 2>/dev/null || true
+if [[ "$rc" -ne 0 ]]; then
+  echo "  ✓ external_run_get on malformed file: non-zero rc ($rc)"
+  PASS=$((PASS+1))
+else
+  echo "  ✗ external_run_get on malformed file: rc0 (corruption swallowed)"
+  FAIL=$((FAIL+1))
+fi
+assert_eq "external_run_get on malformed file: empty stdout" "" "$out"
+if /usr/bin/grep -q 'not a single parseable JSON object' "$TMP_DIR/err-get.txt" && /usr/bin/grep -qF "$STATE_FILE" "$TMP_DIR/err-get.txt"; then
+  echo "  ✓ get refusal names the file on stderr"
+  PASS=$((PASS+1))
+else
+  echo "  ✗ get refusal missing wording/file name on stderr:"
+  cat "$TMP_DIR/err-get.txt"
+  FAIL=$((FAIL+1))
+fi
+if cmp -s "$TMP_DIR/bad-before.json" "$STATE_FILE"; then
+  echo "  ✓ malformed file byte-identical after get refusal"
+  PASS=$((PASS+1))
+else
+  echo "  ✗ malformed file changed by external_run_get"
+  FAIL=$((FAIL+1))
+fi
+
 # ---------------------------------------------------------------------------
 echo "-- (c) fresh seed carries the reduced schema --"
 rm -f "$STATE_FILE"

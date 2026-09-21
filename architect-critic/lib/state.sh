@@ -61,6 +61,22 @@ ac_state_init() {
   fi
 }
 
+# _ac_state_check_parseable <state_file> — read-side guard for verbs that must never
+# create, migrate or re-seed state. rc0 = proceed: an absent or 0-byte file is
+# the caller's "no records" case, and a parseable file is read as-is (including
+# v2). rc1 = the file exists, is non-empty, and is not a single parseable JSON
+# object — the refusal is logged with the same wording ac_state_init uses, and
+# the file is left byte-identical.
+_ac_state_check_parseable() {
+  local state_file="$1"
+  [[ -s "$state_file" ]] || return 0
+  if ! jq -e -s 'length == 1 and (.[0] | type == "object")' "$state_file" >/dev/null 2>&1; then
+    ac_log_error "state.json exists but is not a single parseable JSON object; refusing to touch it: $state_file"
+    return 1
+  fi
+  return 0
+}
+
 # ac_state_migrate — upgrade an existing state.json to the current schema (v3),
 # idempotently. v2 → add external_runs[] (if absent) + set schema_version=3,
 # preserving every existing field. Files already >=3 are left untouched; files
@@ -240,8 +256,10 @@ ac_state_append_promotion() {
 # Writer functions call ac_state_init first (creates a v3 file / lazily
 # migrates a v2 file), so external_runs[] always exists before a write. The two
 # read functions (get/list) do NOT init — a read must not create or migrate
-# state: a missing file is an empty list / not-found, and a v2 file is read
-# as-is (external_runs defaults to [] in the jq expression).
+# state. They go through _ac_state_check_parseable instead: a missing or 0-byte file
+# is an empty list / not-found, a non-empty unparseable file is refused
+# untouched with ac_state_init's wording, and a v2 file is read as-is
+# (external_runs defaults to [] in the jq expression).
 # ═════════════════════════════════════════════════════════════════════════════
 
 # ac_state_external_run_add --run-id R --host H --adversary A --artifact P --depth D
@@ -373,6 +391,7 @@ ac_state_external_run_set_status() {
 }
 
 # ac_state_external_run_get <run-id> — echo the record (compact JSON); rc1 absent.
+# Never writes: absent/0-byte file → not-found; unparseable file → refusal.
 ac_state_external_run_get() {
   local run_id="${1:-}"
   if [[ -z "$run_id" ]]; then
@@ -380,6 +399,10 @@ ac_state_external_run_get() {
   fi
   local state_file rec
   state_file="$(ac_state_path)"
+  _ac_state_check_parseable "$state_file" || return 1
+  if [[ ! -s "$state_file" ]]; then
+    return 1
+  fi
   rec="$(jq -c --arg rid "$run_id" '(.external_runs // []) | map(select(.run_id == $rid)) | .[0] // empty' "$state_file" 2>/dev/null || echo "")"
   if [[ -z "$rec" ]]; then
     return 1
@@ -399,6 +422,11 @@ ac_state_external_run_list() {
   done
   local state_file
   state_file="$(ac_state_path)"
+  _ac_state_check_parseable "$state_file" || return 1
+  if [[ ! -s "$state_file" ]]; then
+    echo "[]"
+    return 0
+  fi
   if [[ -n "$filter" ]]; then
     jq -c --arg st "$filter" '(.external_runs // []) | map(select(.status == $st))' "$state_file" 2>/dev/null || echo "[]"
   else

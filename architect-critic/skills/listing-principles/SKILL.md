@@ -65,7 +65,7 @@ Opt-in via environment variable, not install-probed: this source is included onl
 
 Read each resolved source directly with the Read tool — including the user-global file at `USER_PATH`. Reading must not write: if a file is absent, skip it silently rather than creating it.
 
-For every file, lines starting with `# ` are headers and `<!-- ... -->` comment lines are metadata — skip them. Each remaining non-empty line is an active principle; strip a trailing `[promoted ...]` annotation (the v0.1.x format) if present. For memory-bank patterns, read the file at `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` if the variable is set and the file exists.
+What counts as a principle: the entries under a file's principle sections — `## Shipped defaults`, `## Your principles (user-promoted)`, `## Project principles (scope=project)`. Each entry is one top-level `- ` bullet, or one plain non-empty line where a user wrote a principle without a bullet. Indented text under a bullet is that principle's elaboration, not a separate principle. A file's introductory prose, its `#`/`##` headers, its `<!-- ... -->` comments, and the commented-out `## Examples` lines are not principles. Strip a trailing `[promoted ...]` annotation (the v0.1.x format) if present. The memory-bank source has no sections — every `- ` bullet in it is a principle. For memory-bank patterns, read the file at `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` if the variable is set and the file exists.
 
 Hold all of it in your working context — the merge is yours, not a helper's.
 
@@ -92,7 +92,7 @@ Render as markdown in your turn message. Group by source heading. Omit any secti
 
 ### `<!-- source: ... -->` HTML comment contract
 
-The shipped `templates/principles.md` and any project/user principles files annotate entries with a block comment on the line **before** the bullet — the format `promoting-principle` Step 5 writes. It matches the comment line, then reads forward to the next `- ` line:
+The shipped `templates/principles.md` and entries written by `promoting-principle` Step 5 carry a block comment on the line **before** the bullet. An entry can also carry no comment — a bare bullet or plain line a user wrote by hand is still a principle under Step 3's rule; it just has no metadata, so the file it was read from decides its section. When the comment is present it matches the comment line, then reads forward to the next `- ` line:
 
 ```
 <!-- source: shipped-default, principle_id: pp-ghost-notes -->
@@ -104,6 +104,7 @@ The shipped `templates/principles.md` and any project/user principles files anno
 Route each entry by its `source` key and the file it was read from:
 - `shipped-default` → place under `## Shipped defaults`
 - `user-promoted` → the file decides: read from the user-global file → `## Your principles (user-promoted)`; read from the project file → `## Project principles`. Append `— promoted <date>` from `promoted_at` either way. **No shipped writer emits a `source: project` tag** — `promoting-principle` Step 5 tags every promotion `user-promoted`, including project-scope appends.
+- no `source:` comment → the file decides alone: user-global file → `## Your principles (user-promoted)`; project file → `## Project principles`.
 
 Strip the HTML comment from display text — it is file metadata, not content. `[promoted ...]` bracket annotations (the v0.1.x format) are stripped the same way — preserved in raw files, stripped at display time.
 

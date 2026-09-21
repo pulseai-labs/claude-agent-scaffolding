@@ -69,7 +69,7 @@ Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` 
 3. **Project-scoped** — `<repo>/.claude/architect-critic/principles.md` if it exists (`"$arc_bin" principles_project_path` resolves it; empty when cwd is outside a git repo). Project-specific principles override user-global on conflict.
 4. **Memory-bank patterns** — included only when `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` points at a readable file; every `- ` bullet in it becomes a principle.
 
-Lines beginning with `#` or `<!--` are headers and metadata, not principles — skip them. Each remaining non-empty line is a principle; strip a trailing `[promoted ...]` annotation (the v0.1 format) if present. Hold the merged set in context for Step 5; you will apply each principle when generating challenges.
+What counts as a principle: the entries under a file's principle sections — `## Shipped defaults`, `## Your principles (user-promoted)`, `## Project principles (scope=project)`. Each entry is one top-level `- ` bullet, or one plain non-empty line where a user wrote a principle without a bullet. Indented text under a bullet is that principle's elaboration, not a separate principle. A file's introductory prose, its `#`/`##` headers, its `<!-- ... -->` comments, and the commented-out `## Examples` lines are not principles. Strip a trailing `[promoted ...]` annotation (the v0.1.x format) if present. The memory-bank source has no sections — every `- ` bullet in it is a principle. Hold the merged set in context for Step 5; you will apply each principle when generating challenges.
 
 If no principles file exists anywhere, fall back to shipped defaults only — the audit still runs, just with the universal ghost-notes + CORE lens.
 
