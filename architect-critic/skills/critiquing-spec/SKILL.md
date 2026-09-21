@@ -314,12 +314,12 @@ You now have one or two challenge lists (claude-only, claude + codex, or the sin
 - **Same issue, one challenge.** When two challenges — within one list or across both — raise the same underlying issue, merge them into a single challenge. Keep every rationale that differs.
 - **Adversary attribution.** Each surviving challenge gets a `source` field: `["claude"]`, `["codex"]`, or `["claude", "codex"]` for cross-confirmed challenges — `["devin"]` under a Devin host-only run. **Cross-confirmed challenges are the strongest signal** — both an adversary that read your spec and a fresh-frame adversary that did not landed on the same issue. Surface those first in the rebuttal cycle.
 - **Severity reconciliation.** If both adversaries flagged the same challenge with different severities, preserve the **highest** severity (`premise` > `gap` > `alternative`).
-- **Gaps are findings too.** Each audit result may also carry `gaps` — elements the adversary found absent rather than wrong. Collect them source-tagged alongside the challenges, with no dedup — two adversaries noting the same absence is itself signal, so keep both. A gap is not a challenge: it does not enter the Step 8 rebuttal walk, but it must never silently vanish — Step 10 reports the adversary-gap count, and an adversary that returned only gaps still counts as used (next bullet).
+- **Gaps are findings too.** Each audit result may also carry `gaps` — elements the adversary found absent rather than wrong. Fold them into the merged list as findings of their own — source-tagged like any challenge, at `gap` severity, with no dedup (two adversaries noting the same absence is itself signal, so keep both). A `{challenges: [], gaps: [...]}` result is therefore not clean: its entries are walked in Step 8 and counted in Step 10's `Challenges`/`Candidates piled` like every other finding.
 - **Adversaries used.** An adversary counts as used when it contributed challenges OR gaps. A `{challenges: [], gaps: [...]}` result means the adversary ran and reported observations — `Adversaries used`, Step 9's `ADVERSARIES_JSON`, and the `adversaries_used` state field all include it; the audit never reads as if that adversary found nothing.
 
 On `HOST_AGENT=devin` a lone self-audit has nothing to merge — the self-audit list plays the merged-list role directly.
 
-The merged list is what you walk in Step 8; the collected gaps are reported in Step 10.
+The merged list — challenges and folded-in gaps alike — is what you walk in Step 8.
 
 **Worked example.** Suppose claude-self-audit returned:
 
@@ -346,9 +346,9 @@ After consolidation:
 - Challenge 1 (claude's "retry policy" + codex's "no retry/backoff") merges — same underlying issue (what happens on retry/timeout), both adversaries → `source: ["claude", "codex"]`, severity upgraded to `premise` (codex's higher rating wins).
 - Challenge 2 (claude's "rate-limit propagation") → `source: ["claude"]`, severity `gap`.
 - Challenge 3 (codex's "schema migration ordering") → `source: ["codex"]`, severity `gap`.
-- Codex's `gaps` entry → one adversary gap tagged `codex`: not walked in Step 8, reported in Step 10 as `Adversary gaps : 1 reported (not rebuttal-walked)`.
+- Codex's `gaps` entry folds in as a fourth finding → `source: ["codex"]`, severity `gap` — walked in Step 8 and counted in Step 10 like any challenge.
 
-Final list: 3 challenges, one cross-confirmed at premise level (surface first in Step 8), two single-adversary at gap level, plus 1 adversary gap.
+Final list: 4 findings, one cross-confirmed at premise level (surface first in Step 8), three single-adversary at gap level.
 
 ---
 
@@ -470,7 +470,6 @@ Audit complete for <target>.
 
   Adversaries used : <claude | claude + codex | devin>
   Challenges       : <N> total (<X> premise, <Y> gap, <Z> alternative)
-  Adversary gaps   : <G> reported (not rebuttal-walked; omit line when G=0)
   Concessions      : <C> of <N>
   Auto-applied     : <A> of <N> (disposition triage)
   Escalated        : <M> walked after triage
@@ -492,7 +491,7 @@ This is the structured handoff. Consumer plugins (scaffold-onboard, scaffold-dev
 **Stability contract for downstream consumers.** The following tokens MUST appear verbatim (case-sensitive) — the parsing consumers read them and the composing consumers must embed them:
 - The literal string `Audit complete for ` followed by the target (or the artifact path when no target was passed) — opening the summary and closing it.
 - The closing line `Audit complete for <target>[ phase_id=<N>]. <K> challenges stood:` followed immediately by one `- ` bullet per standing challenge — or `Audit complete for <target>. 0 challenges stood — recap is solid.` when none stood. scaffold-onboard parses this line for the standing-challenges list (`critic-moments.md` §5); its ` phase_id=<N>` segment appears only when the invocation passed one.
-- Field labels `Adversaries used`, `Challenges`, `Concessions`, `Auto-applied`, `Escalated`, `Deferred`, `Candidates piled`, `Principles`, `Elapsed` with `:` separator and exactly two spaces of indentation. `Adversary gaps` is a conditional label in the same format, present only when an adversary returned gap entries (`<G>` is their count, and a gaps-only adversary is why `Adversaries used` can exceed the challenge sources); it is omitted entirely when there are none, so consumers must treat it as optional.
+- Field labels `Adversaries used`, `Challenges`, `Concessions`, `Auto-applied`, `Escalated`, `Deferred`, `Candidates piled`, `Principles`, `Elapsed` with `:` separator and exactly two spaces of indentation.
 - The integer counts must be bare (no commas, no units inline — the unit goes outside the number, e.g. `seconds` after `Elapsed`).
 
 If you change this format, bump architect-critic minor version and coordinate with scaffold-onboard / scaffold-dev / ossify maintainers — their parsers and composers will break otherwise. Per [[feedback_v01_full_over_minimal]], this contract is design-locked and ships as-is; consumers parse against it.
