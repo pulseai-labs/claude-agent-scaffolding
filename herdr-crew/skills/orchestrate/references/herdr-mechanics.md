@@ -12,18 +12,17 @@ Where it overrides the guide's default, it says so. Read each id from the JSON t
 No single herdr call creates a seat, starts its command and delivers its brief, so a seat
 is this sequence, in which `<seat label>` is `seat: <role> (<agent>)`:
 
-1. **The run's workspace, once per run.**
+1. **The run's workspace, once per run, whatever the first seat needs.**
    `herdr workspace create --cwd <first seat's tree> --label "run: <objective>" --no-focus`.
    Its tab and shell pane (`.result.tab`, `.result.root_pane`) are the first seat's:
-   `herdr tab rename <tab> "<seat label>"`, not a second tab beside an empty one.
+   `herdr tab rename <tab> "<seat label>"`, not a second tab beside an empty one. Later
+   seats are tabbed in here, and a worktree links to it rather than replacing it.
 2. **One tab per further seat.**
    `herdr tab create --workspace <id> --cwd <the seat's tree> --label "<seat label>" --no-focus`.
    Its pane is `.result.root_pane`. A seat that needs a new worktree uses
-   `herdr worktree create` in place of this step or step 1. herdr opens the worktree as a
-   workspace of its own (`herdr worktree` manages Git worktree-backed workspaces). Read its
-   ids from the response; `herdr pane list --workspace <id>` names its pane.
-3. **The seat's command.** `herdr pane run <pane> "<command:>"`, the entry's `command:`
-   verbatim. It sends the text and Enter in one call.
+   `herdr worktree create` in place of this step, never step 1: herdr opens the worktree as
+   a workspace of its own. Read its ids from the response; `herdr pane list` names its pane.
+3. **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry.
 4. **Readiness**, on whichever of the two paths below the pane takes.
 5. **The model.** `herdr pane read <pane>`, with `--source visible` (the rendered viewport)
    when `model_shows: screen`, must show `expected_model:`;
@@ -54,17 +53,15 @@ a seat whose own command line contains its model string matches at once, proving
 
 ## The typed wait
 
-Every `herdr agent wait` herdr-crew issues, for readiness and for completion alike, names
-the same three settled states:
+Every `herdr agent wait` herdr-crew issues names the same three settled states:
 
     herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>
 
 The set is stated here; `roles.md` and `lifecycle.md` step 5 carry the same command.
-It is herdr's default set (no `--until` matches idle, done or blocked), written out, not
-inherited, and `--until` narrows: a wait without `blocked` sleeps through a dialog to its
-timeout, and only `idle`, `done` and `blocked` are proved settled — `done` does fire for a
-Claude Code pane, as `idle` does, and the hash tells a new report from an old one at that
-path. `--timeout` bounds the wait; a timeout is the checkpoint Completion states.
+It is herdr's default set (no `--until` matches any of them), written out, not inherited;
+`--until` narrows: without `blocked`, a wait sleeps through a dialog to its timeout, and
+only `idle`, `done` and `blocked` are proved settled — `done` does fire for a Claude Code
+pane, as `idle` does. `--timeout` bounds it; a timeout is the checkpoint Completion states.
 
 **Every readiness and completion wait runs in the background:** one shell call the host
 wakes the session on when it exits (Claude Code: the Bash tool's `run_in_background`), so
@@ -121,8 +118,9 @@ A seat's result is its report file, at the `REPORT_PATH=` its brief names. Every
 run keeps is placed outside every seat's worktree, so removing a worktree never takes one.
 `done` carries no body, so the file is the contract and the typed state is only the
 doorbell. The worker writes everything it says to the orchestrator there (a plan, a
-question, an escalation, a late finding, its report), so before every message that sends a
-seat to work, note its hash (`git hash-object <path>`), empty if absent.
+question, an escalation, a late finding, its report) and replaces the file whole
+(`briefs.md`); before every message that sends a seat to work, note its hash
+(`git hash-object <path>`), empty if absent.
 
 For a detected seat that is not a coordinator (below), the wake is the typed wait above:
 
@@ -152,10 +150,10 @@ one `pane read`, and a dialog it finds is reported with the rest of the state.
 
 ## Placement
 
-    workspace "run: <objective>"            one per run, closed last
-      tab "seat: verifier (<agent>)"        one full-size pane
-    workspace "<its label>"                 one per worktree a seat needs (step 2)
-      tab "seat: implementer (<agent>)"     one full-size pane
+    workspace "run: <objective>"          one per run, closed last
+      tab "seat: verifier (<agent>)"      one full-size pane
+      workspace "<its label>"             one per worktree a seat needs (step 2)
+        tab "seat: implementer (<agent>)" one full-size pane
 
 One tab per seat and one full-size pane per tab: **herdr-crew places a seat with
 `tab create`, never `pane split`**, because panes sharing a tab make a multi-agent screen
@@ -191,10 +189,12 @@ workspace too, and a close that finds its target already gone is information, no
 ## Machines
 
 A seat runs on the orchestrator's own machine. The config contract declares no machine: a
-seat goes elsewhere only when the operator names one, enabled in `herdr machine list`. A
-machine that list does not show halts the run, never a guess, as an undefined seat name
-does. Every command for that seat then carries `herdr --machine <label>`, with its ids
-discovered there: ids and agent names are scoped to one server, and `--current` reaches no
-remote pane. Never consume a path from a `--machine` reply; resolve the seat's paths on
-its own machine. A connection failure does not prove a mutation was not applied, so inspect
-the remote state before retrying. Place a seat only on a machine that stays up for its life.
+seat goes elsewhere only when the operator names one, enabled in `herdr machine list`; a
+machine that list does not show halts the run, never a guess. Every command for that seat
+then carries `herdr --machine <label>`, with its ids discovered there: ids and agent names
+are scoped to one server, and `--current` reaches no remote pane. Never consume a path from
+a `--machine` reply; resolve the seat's paths on its own machine. Place a seat only on a
+machine that stays up for its life and whose filesystem the orchestrator can read — its
+report file is read where it is written, so an unopenable `REPORT_PATH` is a seat that can
+never report. A connection failure does not prove a mutation was not applied, so inspect
+the remote state before retrying.

@@ -18,6 +18,11 @@ Angle brackets are slots. Fill every slot; delete nothing else. The `SEAT_` line
 the operator's approved seat, copied into the brief at launch; a worker that finds its
 model is not `SEAT_EXPECTED_MODEL` reports a failed launch and stops.
 
+The report file is replaced whole — one write, or a temp file beside it renamed over it —
+never appended to in pieces: the orchestrator's doorbell is that file's hash
+(`herdr-mechanics.md`), and it reads a change as a finished report. A plan, a question and
+a final report all replace the file the same way.
+
 **An activated ossify spine has four briefs of its own** — spine session, item
 implementer, item verifier, and the correction message — in
 `references/ossify-briefs.md`. They do not replace the five below, which still govern
