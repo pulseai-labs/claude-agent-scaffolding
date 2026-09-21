@@ -108,9 +108,9 @@ text, so the brief is the whole contract. That confound is genuinely gone.
 Three live channels remain, and they are why replacing only the source files
 with a pre-change snapshot still does not isolate the product version:
 
-- **the guide the seat reads.** Every coordinator brief makes `herdr --skill` the
-  seat's first herdr command (`ossify-briefs.md`, `ossify-pr-briefs.md`), and that
-  guide belongs to the installed binary, not the snapshot. It states dispatch and
+- **the guide the seat reads.** The spine-session and work-PR briefs each make
+  `herdr --skill` the seat's first herdr command (`ossify-briefs.md`, `ossify-pr-briefs.md`),
+  and that guide belongs to the installed binary, not the snapshot. It states dispatch and
   authority rules of its own, and this plugin deliberately overrides some of them:
   the guide starts an agent as a sibling pane in the current tab, where
   `herdr-mechanics.md` places each seat in its own tab; the guide says not to
@@ -122,9 +122,10 @@ with a pre-change snapshot still does not isolate the product version:
   orchestrate skill's `references/herdr-mechanics.md`, not a substituted copy, so
   the seat-launch, readiness, wait, send and teardown mechanics a seat reads come
   from the live file.
-- **the installed plugin.** A seat launched from a seat row runs an installed
-  command and resolves this plugin's own slash commands against the installation,
-  not against the snapshot.
+- **the installed plugin's hook.** No seat runs this plugin's own slash commands, so that
+  command surface is not a channel. What does reach a seat from the installation rather
+  than from the snapshot is the `context-ceiling` hook's `additionalContext` notice —
+  the notice the ROTATE rule in `ossify-briefs.md` depends on.
 
 Do not treat such a prompt-substituted run as old-contract discrimination or a
 causal old/new comparison, even when its judge reads the same snapshot. A

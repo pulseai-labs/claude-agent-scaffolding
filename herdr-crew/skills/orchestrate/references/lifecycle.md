@@ -7,8 +7,13 @@ Every command's syntax comes from `herdr --skill`.
    command's syntax comes from that guide. Single-command probes only: branch,
    `git status`, open PRs, the run's `run.json` (and its `dagr check --strict`
    lint), `herdr status`. Then bind or create the run's `run.json` for the
-   objective — naming its path is the whole operation, with no CLI call — or
-   continue from the one the operator names when resuming.
+   objective — **binding** an existing one is naming its path, with no CLI call,
+   and you continue from the one the operator names when resuming. **Creating**
+   one is dagr's producer contract, never a bare write: resolve the `dagr`
+   validator first (`dagr --skill`) and, with none available, do not start
+   writing run files at all; write the complete document to a temp file beside
+   the target, `dagr check --strict` it, and rename it over `run.json` only once
+   that check is clean.
 1b. **Ossify spine planned here?** If this session just completed `/ossify:plan-spine`
    against a concrete spine directory with a run bound, step 2 is replaced by
    `references/ossify-execution.md`: agree one implementer/verifier seat per work
@@ -49,7 +54,8 @@ Every command's syntax comes from `herdr --skill`.
    within a round may run in parallel; their merges are serial.
 3. **Launch.** The seat launch — pane creation, the readiness wait, the banner read that
    confirms the model, then the brief delivered as `brief_delivery` says (inject or
-   file) — is `roles.md`'s "The launch," with the undetected-seat path in
+   file) on the route `herdr-mechanics.md` fixes from its second detection ask after
+   that read — is `roles.md`'s "The launch," with the undetected-seat path in
    `herdr-mechanics.md`. The "state your model" line in the worker's first reply is
    the second check. Wrong model: release the seat and report it.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
@@ -59,27 +65,33 @@ Every command's syntax comes from `herdr --skill`.
    the seat its next message. The final report later overwrites the plan in the same
    file. Fast briefs skip this.
 5. **Wait.** One bounded wait per dispatch, run in the background as `herdr-mechanics.md`
-   states it: for a detected seat
+   states it: for a detected seat that is not a coordinator
    `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>`,
    over a typed state (`idle｜working｜blocked｜done｜unknown`); for a seat herdr does not
-   detect, the report-file wait. Either is one shell call that returns once: whatever
-   polling it does happens inside that call, never a rolling poll by the orchestrator.
+   detect, and for a coordinator seat, the report-file wait. Either is one call that
+   returns once: whatever polling it does happens inside that call, never a rolling poll
+   by the orchestrator.
    On a `done` or `idle` wake, read the report file its brief named, when
    it is new since dispatch (`herdr-mechanics.md`) — the wake is only the doorbell, the
    file is the contract. A `blocked` wake is a dialog, and a blocked seat rejects
    `herdr agent prompt`: `herdr pane read <pane>` for it, answer it as
    `herdr-mechanics.md` says, then one fresh bounded wait on the answer.
-   A timeout is a checkpoint, not a failure: a loop of waits, and restarting a wait
-   after an empty timeout, both stay forbidden. `herdr pane read` only on a `blocked`
-   wake or a missing or malformed report, never to watch progress. A round's N
-   parallel items are N bounded background waits, one per pane, each waking the
+   A timeout is that file's checkpoint, and a wake whose report is empty while the seat
+   still works is its false wake: take the one `herdr pane read` each licenses, report what
+   it shows to the operator, and follow the doorbell rule that file states — neither is a
+   failure, and neither is re-entered here. A loop of waits, and restarting a wait after an
+   empty timeout, both stay forbidden. `herdr pane read` only on a `blocked` wake, a
+   missing or malformed report, or a timeout's checkpoint, never to watch progress.
+   A round's N parallel items are N bounded background waits, one per pane, each waking the
    session when it exits — not the forbidden loop, since each targets a different
    pane rather than re-entering the one that just timed out. What persists is the
    report file, not the state a finished pane has since moved to, so a pane that
    finishes while another item still works loses nothing; the round's barrier
-   closes when every item's report file is in hand. On an empty timeout, the
-   orchestrator does not re-wait that pane: that item's report file is not yet in
-   hand, so the barrier closes on a later turn, once it is on disk. At each task
+   closes when every item's report file is in hand. A timed-out pane does not hold the
+   round: that item's report file is not yet in hand, so the barrier closes on a later
+   turn, once it is on disk — woken by another item's still-running wait, or by the
+   operator's word to wait on that pane again — never by the orchestrator's own re-entry.
+   At each task
    boundary for a retained implementer, send `/context` and read the one reply
    before attaching the next task (the threshold is in `roles.md`).
 6. **Implementer finishes.** Its report file carries the completion body its
@@ -169,7 +181,8 @@ Every command's syntax comes from `herdr --skill`.
     so its teardown validates the close's own result instead — the local landing it
     recorded in each hosting repo — and waits for no record pass.
 13. **Handoff.** If the run outlives the session, write a handoff naming the run's
-    `run.json` path, task ids, pane ids, head SHA, and the next step — on an activated
+    `run.json` path, task ids, head SHA, and the next step — and, per live dispatch, its
+    pane id, `REPORT_PATH` and the hash last noted; on an activated
     ossify spine, also the spine's approved `SEATS` block, the resolved coordinator
     profiles and the accumulated close-review ledger (oldest first). With ossify
     installed, that is `/ossify:handoff`.
@@ -209,14 +222,18 @@ never guessed. Both sessions' boundaries and returns are in their briefs
 `ossify-nested-run.md` §4.
 
 **Your own rotation.** Your boundary is a fully acknowledged delivery with no
-operator question in flight — live child dispatches keep running throughout and
-your successor inherits them by rebinding to the parent run's `run.json`. Write the
-handoff, recording your own resolved profile — `/ossify:handoff`
+operator question in flight. Live child dispatches keep running, but nothing
+inherits their waits: they are this session's background calls, and rebinding a
+`run.json` re-arms nothing. Write the handoff, recording, per live dispatch, its pane
+id, `REPORT_PATH` and the hash last noted, and your own resolved profile — `/ossify:handoff`
 with ossify installed, the same file by hand without it. Open a new tab and pane
 with the launch command the handoff recorded — ask the operator once when none
-did; an alias carries provider settings `ps` does not show. Send the new top its
+did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`,
+the top's own workspace, never the run's, which closes last. Send the new top its
 resume — `/ossify:handoff-resume <path>` with ossify, or the path as its first
 instruction without — confirm its turn started, then tell the operator
 which tab to use and that this one can close.
 The new top resumes by naming the parent's `run.json` path — there is no CLI call —
-then continues at the step the handoff named.
+and then, before the step the handoff named, issues one fresh bounded background
+wait per live pane the handoff listed: a new session's first wait, not a re-entry,
+which re-arms what the `run.json` cannot.

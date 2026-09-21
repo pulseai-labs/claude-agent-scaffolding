@@ -114,7 +114,7 @@ the typed path with no edit anywhere.
 `REPORT_PATH=` the brief names is the contract and the state is only the doorbell. A
 coordinator seat — a spine session, a work-PR session, or a `run-spine` lane driver, each
 running work of its own in the background — reads ready before its report exists, so it is
-waited on through its report file directly. The top is not one of them: it is the one that
+waited on through its report file directly. The top is not waited on: it is the one that
 waits, and it has no report file of its own. Every file a run keeps is placed outside every
 seat's worktree, so removing a worktree never takes one.
 
@@ -127,7 +127,9 @@ item's report file is in hand.
 ## The run's state
 
 A run's state lives in a dagr `run.json` the plugin's prose owns and no binary writes.
-Naming its path is the whole operation, and one run is one file per objective. The top
+**Binding** an existing one is naming its path, and one run
+is one file per objective. **Creating** one is dagr's producer contract — a temp-file
+write, `dagr check --strict`, then the rename (`references/lifecycle.md`, step 1). The top
 binds the run's file; a spine session creates a nested one of its own, which keeps item
 traffic out of the top's.
 
@@ -162,7 +164,12 @@ unmodified by this release and stays installed until the fleet has moved.
 
 ## Requirements
 
-- herdr 0.9.1 or later, running.
+- herdr 0.9.1 or later, running — **and the orchestrator session itself running inside one
+  of its panes**: the context-ceiling hook is gated on `HERDR_PANE_ID`, and every seat is
+  placed relative to the pane the operator launched this session in.
+- The **`herdr-dagr`** plugin's `dagr` binary on PATH, to create and lint the run's
+  `run.json`: dagr's producer contract resolves that validator *before* anything is
+  written, and with none available the run starts no run file — not an unvalidated one.
 - `jq` on PATH for the context-ceiling hook; without it the hook reports the figure as
   unavailable.
 - The agents named in `~/.claude/herdr-crew/agents.md` resolvable where their pane

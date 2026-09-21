@@ -36,8 +36,8 @@ herdr agent prompt <pane> "<brief>" --wait --until working --until blocked --tim
 `references/herdr-mechanics.md` holds the full sequence and the flags this block leaves
 out. The first seat takes the workspace's own tab rather than a new one; a seat that
 needs a new worktree opens it with `herdr worktree create`, whose options are in its
-`--help`; and a seat herdr does not detect waits on its screen and is sent its brief
-through the pane, never with an `agent` command. This file states only the role table
+`--help`; a seat herdr does not detect has its readiness read from its screen and is sent
+its brief through the pane, never with an `agent` command. This file states only the role table
 and retention.
 Acceptance of input is not the start of a turn: that send's `--wait` confirms the turn
 started in the same call, and `herdr-mechanics.md`'s `agent_prompt_stalled` bullet says

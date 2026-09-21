@@ -31,7 +31,7 @@ expected_reason: 'Teardown is explicit and verified, not assumed. The four item 
 You are the spine session for `r17.s1` ("export metrics"), at the end: both
 items closed and merged, barrier verified, your final report drafted. Your
 census, from `herdr agent list` and `herdr pane list --workspace <the workspace
-you created for this run>:
+you created for this run>`:
 
 - `impl-w1`, `verify-w1`, `impl-w2`, `verify-w2` — your four item seats. Each
   was launched as a tab of the workspace you created for your run, its `--cwd`

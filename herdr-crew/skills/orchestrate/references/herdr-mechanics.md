@@ -35,7 +35,10 @@ is this sequence, in which `<seat label>` is `seat: <role> (<agent>)`:
 herdr answers, live, which path a seat takes: does `herdr agent list` return a record for
 the pane? That answer, never a config field, is the discriminator, so a detection manifest
 landing later moves a seat to the typed path with no edit anywhere. Detection takes seconds
-after `pane run` (four, measured): ask once they pass, and a pane still absent is undetected.
+after `pane run` (four, measured): the first ask, once they pass, chooses only the
+**readiness wait** below; the **send's route** below is decided by a second ask of that
+same list, made once step 5's model read has shown `expected_model:` on the pane, since
+the TUI is demonstrably up by then. A pane absent to that ask is undetected for the send.
 
 **Detected** (a `claude-*` lane, `devin-*`, `pi`): the typed wait below. Detection is not
 readiness: a fresh agent's first detected state may be `blocked` on a folder-trust dialog,
@@ -56,13 +59,12 @@ the same three settled states:
 
     herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>
 
-The set is stated here; `roles.md`'s launch and `lifecycle.md` step 5 carry the same
-command. It is herdr's default set (no `--until` matches idle, done or blocked), written out
-so it is not inherited. `--until` narrows: a wait without `blocked` sleeps through a dialog
-to its timeout. `idle` and `done` both mean ready for input, told apart by whether the
-completion was seen, and a CLI read does not mark it seen, so an unfocused seat can settle
-in either. `unknown` is left out: herdr says it does not prove completion. `--timeout`
-bounds the wait, and a timeout is a checkpoint (`lifecycle.md` step 5).
+The set is stated here; `roles.md` and `lifecycle.md` step 5 carry the same command.
+It is herdr's default set (no `--until` matches idle, done or blocked), written out, not
+inherited, and `--until` narrows: a wait without `blocked` sleeps through a dialog to its
+timeout, and only `idle`, `done` and `blocked` are proved settled — `done` does fire for a
+Claude Code pane, as `idle` does, and the hash tells a new report from an old one at that
+path. `--timeout` bounds the wait; a timeout is the checkpoint Completion states.
 
 **Every readiness and completion wait runs in the background:** one shell call the host
 wakes the session on when it exits (Claude Code: the Bash tool's `run_in_background`), so
@@ -72,11 +74,10 @@ waits in the foreground, `<ms>` inside its cap on one call (Claude Code: 120000 
 600000 max), the call's own timeout covering it: a cut-off wait is neither wake nor timeout.
 
 **A `blocked` wake** means herdr recognised an approval or question dialog. A blocked
-agent rejects `herdr agent prompt` with `agent_blocked` before sending any input, so read
-the dialog with `herdr pane read <pane>`, put it to the operator (herdr's guide says to ask
-first), give the answer with `herdr agent send-keys <pane> <keys>`, and issue one fresh
-bounded wait. A question the worker writes to its report file is not a dialog: it rings
-the doorbell a report does (Completion).
+agent rejects `herdr agent prompt` with `agent_blocked`, sending nothing, so read the dialog
+with `herdr pane read <pane>`, put it to the operator (herdr's guide says to ask first),
+give the answer with `herdr agent send-keys <pane> <keys>`, then one fresh bounded wait. A
+question written to the report file is not a dialog; it rings that doorbell (Completion).
 
 ## Sending a seat a message
 
@@ -117,36 +118,37 @@ timeout counts from before submission, so it is a few seconds above the five-sec
 ## Completion
 
 A seat's result is its report file, at the `REPORT_PATH=` its brief names. Every file the
-run keeps (a report, a `run.json`, a brief file) is placed outside every seat's worktree,
-so removing a worktree never takes one. herdr's `done` carries no body, so
-the file is the contract and the typed state is only the doorbell. The worker writes
-everything it says to the orchestrator there (its plan, a question, an escalation, a late
-finding, its report), so before every message that sends a seat to work, note the file's
-hash (`git hash-object <path>`), empty if absent.
+run keeps is placed outside every seat's worktree, so removing a worktree never takes one.
+`done` carries no body, so the file is the contract and the typed state is only the
+doorbell. The worker writes everything it says to the orchestrator there (a plan, a
+question, an escalation, a late finding, its report), so before every message that sends a
+seat to work, note its hash (`git hash-object <path>`), empty if absent.
 
 For a detected seat that is not a coordinator (below), the wake is the typed wait above:
 
 - `idle` or `done`, and the file is new (absent at dispatch, or a different hash): read
   it. A plan, a question or a late finding is answered with the seat's next message and
   one fresh bounded wait; an escalation goes to the operator.
-- `idle` or `done`, and nothing new: the missing-report case, one `herdr pane read`.
+- `idle` or `done`, and nothing new: the false wake below, one `herdr pane read`.
 - `blocked`: a dialog, handled as above.
-- A timeout: a checkpoint, and that pane is never re-waited (`lifecycle.md`, step 5).
+- A timeout: the checkpoint below.
 
-Whether `done` ever fires for a Claude Code pane is unsettled, so nothing here depends on
-it. `idle` is in the set, and the hash tells a new report from an old one at the same path.
+**The two dead ends.** *A timeout is a checkpoint*: one `herdr pane read`, on any wait. The
+turn ends with the seat's observed state — stopped, at a dialog, or still at work —
+reported to the operator (a coordinator: to the top, in its report file); a further wait on
+that pane is the operator's decision, never the orchestrator's own re-entry. *A false wake*
+— that read showing a seat still at work (the backgrounded-shell case, measured live) — is
+not a timeout: its doorbell becomes the report file for the rest of that dispatch, one
+bounded background wait, as a coordinator is waited on — never a second typed wait.
 
 **An undetected seat's doorbell is the report file itself**, and so is a coordinator's: a
 seat running work of its own in the background (a spine or work-PR session's waits, a lane
 driver's subagents) reads `idle` or `done` before its report exists, so a typed wait on it
 wakes too soon. The doorbell is one bounded background wait that returns when
-`REPORT_PATH`'s hash differs from the one last noted, or at its timeout.
-It polls inside itself as `pane wait-output` does, so it is not the loop of waits
-`lifecycle.md` forbids. A changed file is read as above. A timeout with no new file is the
-missing-report case, whose one `herdr pane read` shows a stop, a dialog or a seat still at
-work. With no typed `blocked` here, a dialog goes to the operator, is answered with
-`herdr pane send-keys` and gets one fresh bounded wait; a seat still at work is a
-checkpoint, never re-waited.
+`REPORT_PATH`'s hash differs from the one last noted, or at its timeout, polling inside
+itself as `pane wait-output` does — not the loop of waits `lifecycle.md` forbids. A changed
+file is read as above; a timeout with no new file is the checkpoint above, read the same
+one `pane read`, and a dialog it finds is reported with the rest of the state.
 
 ## Placement
 
@@ -163,12 +165,11 @@ to a sibling pane split in the current tab; a seat reading that guide does not s
 The orchestrator is not in that workspace: it stays in the pane the operator launched it
 in, and herdr-crew does not move it, because a moved pane takes a new id.
 
-A seat's tree is whatever `--cwd` names, so a seat may sit in a different repository from
-the orchestrator: in the dual-repo case, an orchestrator in the AI workspace repo places
-an implementer in the canonical tree. `--env` (on `tab create` and `workspace create`)
-carries nothing but a seat's own scratch, such as `OSSIFY_SEAT`. A lane's provider
-variables are invoked by name through `command:`, never replayed with `--env`: a replayed
-environment is the silent-reroute defect.
+A seat's tree is whatever `--cwd` names, so a seat may sit in another repository: in the
+dual-repo case an orchestrator in the AI workspace places an implementer in the canonical
+tree. `--env` (on `tab create` and `workspace create`) carries only a seat's own scratch,
+such as `OSSIFY_SEAT`. A lane's provider variables are invoked by name through `command:`,
+never replayed with `--env`: a replayed environment is the silent-reroute defect.
 
 `--trust-repository` on `herdr worktree` grants herdr's per-request Git trust, not Claude
 Code's folder-trust dialog; only for a repository the operator verified, never as a retry.
@@ -189,12 +190,11 @@ workspace too, and a close that finds its target already gone is information, no
 
 ## Machines
 
-A seat runs on the orchestrator's own machine. The config contract declares no machine,
-so a seat goes elsewhere only when the operator names one for it, enabled in
-`herdr machine list`. A machine that list does not show halts the run, never a guess, as
-an undefined seat name does. Every command for that seat then carries
-`herdr --machine <label>`, with its ids discovered on that machine: ids and agent names
-are scoped to one server, and a local `--current` reaches no remote pane. Never consume a
-path from a `--machine` reply; resolve the seat's paths on its own machine. A connection
-failure does not prove a mutation was not applied, so inspect the remote state before
-retrying. Place a seat only on a machine that stays up for the seat's whole life.
+A seat runs on the orchestrator's own machine. The config contract declares no machine: a
+seat goes elsewhere only when the operator names one, enabled in `herdr machine list`. A
+machine that list does not show halts the run, never a guess, as an undefined seat name
+does. Every command for that seat then carries `herdr --machine <label>`, with its ids
+discovered there: ids and agent names are scoped to one server, and `--current` reaches no
+remote pane. Never consume a path from a `--machine` reply; resolve the seat's paths on
+its own machine. A connection failure does not prove a mutation was not applied, so inspect
+the remote state before retrying. Place a seat only on a machine that stays up for its life.

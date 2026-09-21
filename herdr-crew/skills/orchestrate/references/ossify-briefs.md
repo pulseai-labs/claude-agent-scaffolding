@@ -24,7 +24,7 @@ PLACEMENT: <abs path of the repo or worktree the lane runs from>.
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 REPORT_PATH=<the absolute path this seat writes its report to>
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
-MECHANICS=<the orchestrate skill's base directory, as Claude Code prints it>/references/herdr-mechanics.md
+MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
 SPINE_ID=<spine id>
 SPINE_COMMAND=<the command this seat was launched with, from its machine entry>
 SPINE_EXPECTED_MODEL=<model id the banner must show>

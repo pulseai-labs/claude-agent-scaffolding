@@ -55,8 +55,8 @@ nothing here reads the old ones.
 
 | orca-crew 0.7.0 | herdr-crew |
 |---|---|
-| `orca terminal create --worktree <sel> --command "<cmd>"` | `herdr worktree create` / `herdr workspace create --cwd`, then `herdr tab create --workspace <id> --cwd <path> --label <text>`, then `herdr pane run <pane> "<command:>"` |
-| `orca terminal wait --for tui-idle` | `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>` as a single background call — a detected seat that is not a coordinator. The three settled states are written out rather than inherited, and `blocked` is in the set so a dialog wakes instead of sleeping to the timeout |
+| `orca terminal create --worktree <sel> --command "<cmd>"` | the run's `herdr workspace create --cwd <path> --label "run: <objective>"` once — its own tab, relabelled with `herdr tab rename`, is the first seat's; each later seat `herdr tab create --workspace <id> --cwd <path> --label "seat: <role> (<agent>)"`; a worktree seat's `herdr worktree create` replaces the tab step (a workspace of its own); then `herdr pane run <pane> "<command:>"`. One tab per seat, never `pane split` |
+| `orca terminal wait --for tui-idle` | `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>` — every detected seat's readiness, and completion for a detected seat that is not a coordinator. One call that returns once, run in the background where the host has one and in the foreground inside that host's cap where it does not; the three settled states are written out rather than inherited, and `blocked` is in the set so a dialog wakes instead of sleeping to the timeout |
 | (no equivalent) | `herdr pane wait-output <pane> --match '<expected_model:>' --timeout <ms>` — an undetected seat's readiness, read from the screen when `model_shows: screen`; its completion doorbell is its report file |
 | `orca terminal read` | `herdr pane read <pane>` — serves both `model_shows: banner` and `screen` |
 | `orca terminal send` | detected: `herdr agent prompt <pane> "<text>"`, the `/context` send at a task boundary plain and with no `--wait`, because a local slash command settles without a turn; undetected: the message written to a file the seat can read, then a one-line pointer via `herdr pane run <pane> "<line>"` |
@@ -75,3 +75,6 @@ nothing here reads the old ones.
 | `ORCA_TERMINAL_HANDLE` | `HERDR_PANE_ID` — the hook gate only |
 | `~/.claude/orca-crew/agents.md` | `~/.claude/herdr-crew/agents.md` |
 | `.orca-crew/roles.md` | `.herdr-crew/roles.md` |
+
+`skills/orchestrate/references/herdr-mechanics.md` is the authority for every mechanic
+above and wins on any disagreement with this table.

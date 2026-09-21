@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: The orchestrator/worker session model over herdr — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through herdr, the seats defined in the operator's own files (~/.claude/herdr-crew/agents.md, .herdr-crew/roles.md). One /code-review per PR, findings returned in the seat's report file, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that runs the items in a fresh tab and pane per item. Use when the user says orchestrator session, spawn a worker, dispatch to a session, the seat, review this PR in a session, execution assignments for a spine, or runs /herdr-crew:orchestrate. Not herdr's command reference (`herdr --skill` owns that), and not a PR loop of its own where ossify's work-pr is installed.
+description: The orchestrator/worker session model over herdr — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through herdr, the seats defined in the operator's own files (~/.claude/herdr-crew/agents.md, .herdr-crew/roles.md). One /code-review per PR, findings returned in the seat's report file, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that gives each item seat a fresh tab and pane. Use when the user says orchestrator session, spawn a worker, dispatch to a session, the seat, review this PR in a session, execution assignments for a spine, or runs /herdr-crew:orchestrate. Not herdr's command reference (`herdr --skill` owns that), and not a PR loop of its own where ossify's work-pr is installed.
 ---
 
 # Orchestrate — the orchestrator/worker session model
@@ -55,16 +55,18 @@ Three consequences:
 
 - **No `Agent` tool from the orchestrator.** Subagents spend orchestrator-tier tokens and
   leave no herdr provenance. Every helper is a herdr session.
-- **`herdr pane read` only on a `blocked` wake or a missing or malformed report**, never to watch
-  progress. A single bounded `herdr agent wait`, on the state set
-  `references/herdr-mechanics.md` states and always with a `--timeout`, is the wait
-  primitive, over a typed state (`idle｜working｜blocked｜done｜unknown`); a seat herdr does
-  not detect waits on its report file instead, as that file states — one background shell
-  call, no keepalive, no re-entry. A timeout is a checkpoint, not a failure. A loop of
-  waits, and restarting a wait after an empty timeout, stays forbidden. Beyond those
-  `herdr pane read` cases, the only bounded reads are the launch-banner `pane read` in
-  `roles.md`, the readiness `pane wait-output` of a seat herdr does not detect, and the
-  one `/context` reply at each task boundary.
+- **`herdr pane read` only on a `blocked` wake, a missing or malformed report, or a
+  timeout's checkpoint**, never to watch progress. A single bounded `herdr agent wait`, on
+  the state set `references/herdr-mechanics.md` states and always with a `--timeout`, is
+  the wait primitive for a detected seat that is not a coordinator, over a typed state
+  (`idle｜working｜blocked｜done｜unknown`); a seat herdr does not detect, and a coordinator
+  seat, wait on their report files instead, with no keepalive and no re-entry. The two dead
+  ends — a timeout, and a wake whose report is empty while the seat still works — are that
+  file's, and it names the next action for each. A loop of waits, and restarting a wait
+  after an empty timeout, stays forbidden. Beyond those `herdr pane read` cases, the only
+  bounded reads are the launch-banner `pane read` in `roles.md`, the readiness
+  `pane wait-output` of a seat herdr does not detect, and the one `/context` reply at
+  each task boundary.
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
   and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
 - **Verifying a worker's claim is a verifier dispatch**, not an orchestrator read. "Tests
@@ -126,7 +128,7 @@ Two cases are named because they look like clashes and are not:
   **Read `references/ossify-execution.md` and follow it**: the seats for the spine are
   written into the project file and approved by the operator, and you inject them into
   one spine session's brief — that session creates a nested `run.json` it owns and
-  drives a fresh tab and pane per item, no subagent anywhere in that path.
+  drives a fresh tab and pane per item seat, no subagent anywhere in that path.
   Its four briefs are in `references/ossify-briefs.md`. Activation needs all four facts
   that file lists; installation alone is not one of them, so an ossify spine you did
   not plan here stays on the bullet above. The nested `run.json`'s mechanics — depth,

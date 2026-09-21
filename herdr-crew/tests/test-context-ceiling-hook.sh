@@ -106,7 +106,7 @@ run "$(input UserPromptSubmit "$T_BELOW")"
 expect_silent "one token below the ceiling: silent"
 run "$(input UserPromptSubmit "$T_AT")"
 expect_notice "at the ceiling: notice on a prompt" UserPromptSubmit \
-  "context 500000" "ceiling 500000" "Rotation past the context ceiling"
+  "herdr-crew:" "context 500000" "ceiling 500000" "Rotation past the context ceiling"
 run "$(input PreToolUse "$T_PAST" 'herdr agent prompt w7:p2 "implement item 3"')"
 expect_notice "past the ceiling: notice before 'agent prompt'" PreToolUse "context 523114" "ceiling 500000"
 

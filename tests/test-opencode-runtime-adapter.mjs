@@ -35,6 +35,7 @@ const ossifyReadmeUrl = new URL("ossify/README.md", root);
 const ossifyManifestUrl = new URL("ossify/.claude-plugin/plugin.json", root);
 const codeJudoManifestUrl = new URL("code-judo/.claude-plugin/plugin.json", root);
 const orcaCrewManifestUrl = new URL("orca-crew/.claude-plugin/plugin.json", root);
+const herdrCrewManifestUrl = new URL("herdr-crew/.claude-plugin/plugin.json", root);
 const gitignoreUrl = new URL(".gitignore", root);
 const wrapperDirectory = fileURLToPath(new URL(".opencode/bin", root));
 const selectedPluginsEnvironment = "OPENCODE_SCAFFOLDING_PLUGINS";
@@ -139,6 +140,9 @@ const excludedPlugins = [
   // Not in the OpenCode bundle in 0.1.0: it ships on Claude Code and Codex only.
   // Listed so the exclusion is a checked decision, not an oversight.
   "orca-crew",
+  // The Orca port's herdr twin, same status: ships on Claude Code and Codex only,
+  // and listed here for the same reason — a checked decision, not an absence.
+  "herdr-crew",
 ];
 
 const expectedAliases = {
@@ -410,6 +414,7 @@ test("Task 9 keeps root README versions aligned with parsed plugin manifests", a
     ossifyManifestSource,
     codeJudoManifestSource,
     orcaCrewManifestSource,
+    herdrCrewManifestSource,
   ] = await Promise.all([
     readFile(readmeUrl, "utf8"),
     readFile(aiMentorManifestUrl, "utf8"),
@@ -417,6 +422,7 @@ test("Task 9 keeps root README versions aligned with parsed plugin manifests", a
     readFile(ossifyManifestUrl, "utf8"),
     readFile(codeJudoManifestUrl, "utf8"),
     readFile(orcaCrewManifestUrl, "utf8"),
+    readFile(herdrCrewManifestUrl, "utf8"),
   ]);
   const manifests = [
     JSON.parse(aiMentorManifestSource),
@@ -424,6 +430,7 @@ test("Task 9 keeps root README versions aligned with parsed plugin manifests", a
     JSON.parse(ossifyManifestSource),
     JSON.parse(codeJudoManifestSource),
     JSON.parse(orcaCrewManifestSource),
+    JSON.parse(herdrCrewManifestSource),
   ];
   const pluginRows = parseMarkdownTable(markdownSection(rootReadme, "Plugins"));
   const layout = markdownSection(rootReadme, "Layout");

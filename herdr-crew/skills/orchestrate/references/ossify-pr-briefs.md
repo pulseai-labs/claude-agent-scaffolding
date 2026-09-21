@@ -83,7 +83,7 @@ PLACEMENT: REPO_ROOT — the worktree holding this PR's branch.
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 REPORT_PATH=<the absolute path this seat writes its report to>
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
-MECHANICS=<the orchestrate skill's base directory, as Claude Code prints it>/references/herdr-mechanics.md
+MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
 PR_REPO=<owner/repo>
 PR_NUMBER=<number>
 REPO_ROOT=<abs path of this seat's worktree>
