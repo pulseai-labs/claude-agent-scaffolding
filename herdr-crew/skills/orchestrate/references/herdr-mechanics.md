@@ -117,7 +117,8 @@ timeout counts from before submission, so it is a few seconds above the five-sec
 
 ## Completion
 
-A seat's result is its report file, at the `REPORT_PATH=` its brief names. herdr's `done`
+A seat's result is its report file, at the `REPORT_PATH=` its brief names, placed outside
+every seat's worktree so that removing a worktree never takes a report. herdr's `done`
 carries no body, so the file is the contract and the typed state is only the doorbell.
 The worker writes everything it says to the orchestrator there (its plan, a question, an
 escalation, a late finding, its report), so before every message that sends a seat to

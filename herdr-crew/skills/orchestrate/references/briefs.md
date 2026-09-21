@@ -184,7 +184,7 @@ A malformed, incomplete, or wrongly-shaped report from a live session is correct
 place, never by a new session: one send to that session, nothing else.
 
 ```text
-Your report file for <task-id> is malformed or incomplete: <the missing or wrong
+Your report file for <task id> is malformed or incomplete: <the missing or wrong
 field, and what is wrong with it>. The exact shape wanted: <the field, restated
 from your brief>. No other work; rewrite your report file at <REPORT_PATH>, then stop
 — the orchestrator waits and rereads it.

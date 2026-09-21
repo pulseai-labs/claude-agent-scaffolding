@@ -24,6 +24,7 @@
 #   - the nested run's own mechanical values: the file item bookkeeping lives
 #     in, the round barrier's gate node, and the required worker depth
 #   - no worker-to-orchestrator message type herdr does not have
+#   - the line budget these references are held to
 #
 # Counting is one awk index() pass: `grep -c` counts LINES, and `… | grep -q`
 # can fail on a true match under pipefail. Every zero-count has a non-empty
@@ -63,6 +64,8 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
+REF_BUDGET=200          # A3: each ossify reference stays under about 200 lines
+
 # landed <path> -> 0 when the path exists; otherwise prints a note (not a
 # pass) and returns 1, so the caller skips checks that have nothing to read.
 landed() {
@@ -97,6 +100,13 @@ absent() {
 nonempty() {
   if [ -s "$1" ]; then pass "$2"
   else fail "$2" "$1 is missing or empty — every zero-count against it would be vacuous"; fi
+}
+
+budget() {
+  if [ ! -f "$1" ]; then fail "$2" "no such file: $1"; return 0; fi
+  n="$(wc -l < "$1" | tr -d ' ')"
+  if [ "$n" -le "$REF_BUDGET" ]; then pass "$2 ($n lines)"
+  else fail "$2" "$n lines, over the $REF_BUDGET-line reference budget by $((n - REF_BUDGET))"; fi
 }
 
 # keys <file> <from-literal> <to-literal-or-empty> -> sorted `key:` names of
@@ -760,7 +770,12 @@ pin "$SKILL_MD" 'A single bounded `herdr agent wait`' \
 n_eq "$GENERIC_BRIEFS_MD" 'REPORT_PATH=<the absolute path this seat writes its report to>' 5 \
   "every dispatched brief names its report path"
 
-# No line budget binds these five references: the reference budget is enforced
-# on config.md and herdr-mechanics.md only, each by its own suite.
+section "reference line budgets"
+
+budget "$EXEC_MD" "ossify-execution.md is within the reference budget"
+budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
+budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget"
+budget "$BRIEFS_MD" "ossify-briefs.md is within the reference budget"
+budget "$WRITER_MD" "ossify-close-writer.md is within the reference budget"
 
 report

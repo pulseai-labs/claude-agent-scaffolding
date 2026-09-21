@@ -13,8 +13,7 @@ every slot and delete nothing else.
 ## Spine session (one per spine, dispatched by the top orchestrator)
 
 The lane driver, launched **from the `spine session` seat the project file names** —
-the top copies its approved profile into the brief.
-It is also a coordinator, which is why its brief carries scope identities.
+the top copies its approved profile in. A coordinator too, so it carries scope identities.
 
 ```text
 ROLE: ossify spine session and nested coordinator. State the model you are
@@ -35,10 +34,9 @@ SEATS — the operator-approved seats for this spine. Use them verbatim.
 <item id> verifier:    <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
 A seat this block does not list halts the item and asks.
 HANDOFF_PATH=<a prior spine session's handoff path, or "none">
-Everything you tell the top — the plan relay, a question, a halt, a rotation, your
-report — goes in your report file at REPORT_PATH; then wait for the top's next
-message, or stop where this brief says so. Your first herdr command is
-`herdr --skill`. MECHANICS addresses the orchestrator of a run, which for your own
+Everything you tell the top — plan relay, question, halt, rotation, report — goes in your
+report file at REPORT_PATH; then wait, or stop where this brief says so. Your first herdr
+command is `herdr --skill`. MECHANICS addresses a run's orchestrator, which for your own
 seats is you: every seat you launch, send to, wait on or release follows it.
 
 TASK: drive spine SPINE_ID to its final round barrier. With HANDOFF_PATH set, read that
@@ -47,11 +45,10 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
   1. Check the SEATS block against SPINE.md before anything else: every planned
      item has exactly one implementer row and one verifier row, and no row names
      an item the plan does not. A failure halts — ask, never substitute.
-  2. Create RUN_JSON for your item tasks, or continue it when it already exists,
-     and stay its single writer, as dagr's producer contract (`dagr --skill`)
-     says: one task per item, and each round's barrier a gate node whose fan-in
-     is that round's items. Lint every write with `dagr check --strict` before it
-     replaces the file. No item task goes in the top's run.json.
+  2. Create RUN_JSON for your item tasks, or continue it if it exists, as its single
+     writer per dagr's producer contract (`dagr --skill`): one task per item, and each
+     round's barrier a gate node whose fan-in is that round's items. Lint every write
+     with `dagr check --strict` before it replaces the file.
   3. Invoke `/ossify:run-spine $SPINE_ID --external-executor`. On the round's
      execution requests, launch a fresh IMPLEMENTER seat per item from its SEATS row, verbatim —
      never a substitute value — as a tab of the workspace you create for your run,
@@ -88,23 +85,20 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
 DONE: release every item pair and close the workspace you created for them,
-as MECHANICS's Teardown says, with `herdr workspace list` showing none of them —
-closing only what you can prove you created, never an active, reused, unrelated
-or unprovable identity — and report teardown you cannot complete rather than
-claiming it. Then write your report file:
+as MECHANICS's Teardown says, with `herdr workspace list` showing none of them — close
+only what you can prove you created, never an active, reused, unrelated or unprovable
+identity; report teardown you cannot complete, never claim it. Then write your report file:
   Changed / Evidence / Open / Files as ids, SHAs, counts and a report path, and the path of RUN_JSON.
-ROTATE instead once the context-ceiling notice has fired: stop at the next round
-barrier, do the same teardown, write `/ossify:handoff`, and write
-`rotate: <handoff path>` to your report file with the path of RUN_JSON. Never
-stop mid-round.
+ROTATE instead once the context-ceiling notice has fired: stop at the next round barrier,
+do the same teardown, write `/ossify:handoff`, and write `rotate: <handoff path>` to your
+report file with the path of RUN_JSON. Never stop mid-round.
 The spine is at its final round barrier when you finish; the close ceremony is
 the top's, in a fresh close session that is never this session.
 
-NEVER: record an item task in the top's run.json; run a Claude subagent for a
-work item; fall back to the default lane when an item launch fails; restart
-the lane; select the reviewer; run `/ossify:close` at all — the top dispatches
-it to a fresh close session. If you cannot launch an item session at all, stay
-alive, write that to your report file, and wait for the operator's decision.
+NEVER: record an item task in the top's run.json; run a Claude subagent for a work item;
+fall back to the default lane when an item launch fails; restart the lane; select the
+reviewer; run `/ossify:close` at all — the top dispatches it to a fresh close session.
+If no item session will launch, stay alive, report that, and wait for the operator's decision.
 ```
 
 ---
@@ -119,9 +113,8 @@ running in your first reply, then continue.
 
 PLACEMENT: worktree <abs path>, branch <branch>, base <base-branch>. Use git -C
 for every git command; cd does not persist.
-REPORT_PATH=<an absolute path outside this worktree that this seat writes its report to>
-Everything you say upward — your plan, a question, an escalation, your report —
-goes in your report file at REPORT_PATH.
+REPORT_PATH=<the absolute path this seat writes its report to>
+Everything you say upward (plan, question, escalation, report) goes in that file.
 
 BEFORE ANY EDIT, in this order:
   1. Confirm the model you are running is <expected model>. If it is not, stop
@@ -165,7 +158,7 @@ ROLE: verifier for <work-item-id>, read-only. State the model you are running in
 your first reply, then continue.
 
 PLACEMENT: worktree <abs path>, at <head sha>, staged tree <tree oid>.
-REPORT_PATH=<an absolute path outside this worktree that this seat writes its report to>
+REPORT_PATH=<the absolute path this seat writes its report to>
 
 CLAIMS: <the numbered all-claims list from briefs.md's verifier template, filled
 from this item's spec>.
@@ -174,12 +167,10 @@ DONE: write your report file with one line per claim — pass | fail | cannot
 determine, with commands and output verbatim — then the caveats. `Cannot
 determine` counts as fail.
 
-NEVER: commit, push, or edit a tracked file outside the mutation check. Leave
-`HEAD`, the staged tree and `git status --porcelain`
-exactly as found before you write your report file; scratch goes under the session
-scratchpad, never the worktree. Do
-not verify a second work item; you are retained for this one until it passes or
-escalates.
+NEVER: commit, push, or edit a tracked file outside the mutation check. Leave `HEAD`, the
+staged tree and `git status --porcelain` exactly as found before you write your report file;
+scratch goes under the session scratchpad, never the worktree. Do not verify a second
+work item; you are retained for this one until it passes or escalates.
 ```
 
 ---

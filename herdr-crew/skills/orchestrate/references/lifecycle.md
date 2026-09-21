@@ -40,13 +40,13 @@ Every command's syntax comes from `herdr --skill`.
    fixes take a new PR and fresh seats. **But a closed return skips the record pass**
    and goes straight to teardown: the pass exists to record PRs, and that return named
    none. Absent any of those four facts, continue at step 2.
-2. **Decompose.** One `task-create` per brief, `--deps` for the DAG, each carrying
-   the complexity class the orchestrator derives from the work item's spec and its
-   spine's bone/flesh class: `contract` if it touches an interface, schema, or
-   contract, or belongs to a bone spine; `bounded` only when the item is one-file,
-   mechanical, or read-only; everything else — including an item that classifies
-   nowhere — is `contract`. One implementer per worktree. Items within a round may
-   run in parallel; their merges are serial.
+2. **Decompose.** One task per brief in the run's `run.json`, its `deps` the task ids it
+   waits on (the run is a DAG), each carrying the complexity class the orchestrator
+   derives from the work item's spec and its spine's bone/flesh class: `contract` if it
+   touches an interface, schema, or contract, or belongs to a bone spine; `bounded` only
+   when the item is one-file, mechanical, or read-only; everything else — including an
+   item that classifies nowhere — is `contract`. One implementer per worktree. Items
+   within a round may run in parallel; their merges are serial.
 3. **Launch.** The seat launch — pane creation, the readiness wait, the banner read that
    confirms the model, then the brief delivered as `brief_delivery` says (inject or
    file) — is `roles.md`'s "The launch," with the undetected-seat path in

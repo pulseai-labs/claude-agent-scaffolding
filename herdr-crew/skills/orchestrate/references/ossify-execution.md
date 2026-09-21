@@ -4,7 +4,8 @@ A spine's work items each deserve their own model and effort; one dispatched lan
 cannot give them that, because whatever it spawns inherits its runtime.
 
 > **Editing note.** This file, `ossify-nested-run.md` and `ossify-briefs.md` are asserted
-> to hold no subagent invocation form. Never paste the call shape.
+> to hold no subagent invocation form and to stay under 200 lines. Never paste the
+> call shape.
 
 ## 1. Activation
 
