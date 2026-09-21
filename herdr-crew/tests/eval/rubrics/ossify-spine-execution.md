@@ -87,7 +87,7 @@ aligned.
 3. **Profiles are bound by the SEATS block and never substituted.** Each item's
    implementer and verifier are launched from that item's SEATS row, verbatim —
    the full resolved profile — with the model confirmed as its `model_shows`
-   says and from the first reply and the effort carried by the
+   says and by the worker's own check, and the effort carried by the
    launch argument. The spine session's own seat is approved the same way, as a
    `spine session` seat **beside** the item rows — named in the project file,
    its resolved profile resolved from the machine file into
@@ -140,7 +140,7 @@ aligned.
    nor the SEATS block: the reviewer's resolved profile and review
    level, and one PR-fix implementer, since no item pair survives to the PR. All
    of them reach the **work-PR session's** brief, which creates both seats and
-   confirms each model as its `model_shows` says and from the first reply, as an item row's is; the
+   confirms each model as its `model_shows` says and by the worker's own check, as an item row's is; the
    fix task waits for the disposition ledger and rides the fix-round brief.
    The work-PR session branches **initial versus resumed before any reviewer
    exists**, on the top-supplied `PRIOR_REVIEW`: `none` is an initial run;
