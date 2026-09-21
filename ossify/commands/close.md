@@ -1,7 +1,7 @@
 ---
 description: Run the ossify close ceremony on an id — context-routed to work item, spine, or release by the id's shape
 argument-hint: "<id>"
-allowed-tools: Bash(bash:*), Read, Write, Edit, Glob, Grep, Skill, Workflow
+allowed-tools: Bash(bash:*), Read, Write, Edit, Glob, Grep, Skill
 ---
 
 Parse args from `$ARGUMENTS` via the env-var bridge (no positional `$1`/`$2`/`$N`),

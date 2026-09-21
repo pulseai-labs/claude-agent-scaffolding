@@ -1,4 +1,4 @@
-# ossify (v1.9.0)
+# ossify (v1.10.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Nine entry skills (`start`, `adopt`,
@@ -10,10 +10,10 @@ loop (`/ossify:work-pr`) — which work in any repository, ossify-initialised
 or not. Since 1.5.0 (#339) `work-pr` is also the spine-close merge lane: a
 spine's hosting repos land on their base branches by PR where a remote exists
 (merged locally only where none does), and a release is a tag on the merged
-line. Since 1.6.0 (#139) `close`'s impl-check gate gains Layer 4: a delegated
-semantic review over three lenses (fidelity, pattern, absence) at work-item
-close, applied inline on every harness or by a dedicated Workflow-tool pass
-on Claude Code on Anthropic.
+line. Since 1.6.0 (#139) `close`'s impl-check gate gains Layer 4: a semantic
+review over three lenses (fidelity, pattern, absence) at work-item close,
+applied inline on every harness. Since 1.10.0 (#507) Layer 4 always runs
+inline — the delegated multi-agent engine behind it is removed.
 
 Since 1.8.0, `/ossify:run-spine <spine-id> --external-executor` is an optional,
 provider-neutral execution seam: instead of dispatching its own nested
@@ -24,8 +24,8 @@ supplies the procedure. Everything on either side of that one step is unchanged
 — worktrees, handoffs, the return contract, declared-order closes, serial
 merges, the round barrier, the 3-dispatch cap. The mode adds no return mode: a
 rejected item is repaired through a correction continuation that returns the
-same `complete` shape, and Layer 4 runs inline there because the caller has
-already reviewed the item. **`/ossify:run-spine <spine-id>` with no flag is
+same `complete` shape, and Layer 4 runs inline there as it does everywhere.
+**`/ossify:run-spine <spine-id>` with no flag is
 completely unchanged** and still dispatches `ossify:implementer-agent`.
 
 Since 1.9.0, the deterministic gates close the vacuous-green family: the

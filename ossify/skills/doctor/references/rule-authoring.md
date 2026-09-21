@@ -61,7 +61,7 @@ Two different things, and conflating them oversells what authoring buys:
 - **Mechanical evaluation is WONTFIX in ossify — settled 2026-08-15.** Ossify
   ships nothing that parses `mcrule` blocks and runs them against a codebase,
   and never will: the planned evaluator was retired by decision, its residue
-  folding into the planned Layer 4 agent pass (#139). (This file speaks for
+  folding into the planned Layer 4 pass (#139). (This file speaks for
   ossify only. Whether another stack consuming the shared artifact evaluates
   it mechanically is that stack's own contract — a mid-migration project
   should read the legacy stack's docs rather than be promised anything here,

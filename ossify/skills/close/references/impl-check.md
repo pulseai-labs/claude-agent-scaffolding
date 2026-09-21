@@ -150,8 +150,8 @@ is read.
 separate v0.3 item"*. Neither is true any longer: no ossify evaluator will
 ship, by decision rather than delay. An authored rule is documented, validated
 at authoring (`doctor` §6), and read **here, by you**, on every work-item
-close — this layer IS ossify's evaluation mechanism, and the planned Layer 4
-agent pass (#139) is its deepening, not its replacement. Nothing in this stack
+close — this layer IS ossify's evaluation mechanism, and the Layer 4 pass
+(#139) is its deepening, not its replacement. Nothing in this stack
 parses those blocks and runs them against a codebase, and nothing is waiting
 to. (The predecessor stack's own claims are covered two paragraphs up: its
 documented evaluator is a phantom entry point, which is exactly why this
@@ -210,9 +210,8 @@ by interpretation at a close gate is how a rule set stops meaning anything.
 Layer 3 asked whether the diff violates a pattern the project *wrote down*. Layer 4
 is the semantic pass nothing else in the gate can do: **does the diff implement the
 spec, follow the repo's patterns, and omit nothing the spec requires.** It runs
-after Layer 3, on the same staged diff, and its findings are judged by the same
-verdict rule no matter which execution path produced them (`work-item-close.md` §2
-chooses the path; this section owns the lenses).
+after Layer 3, on the same staged diff, and the close applies the lenses itself
+(`work-item-close.md` §2 drives; this section owns the lenses).
 
 ### The lenses
 
@@ -238,8 +237,8 @@ contract, not a summary of one:
   explained `partial` stage, `work-item-close.md` §3, can leave uncommitted
   edits sitting there that were never meant to inform this judgment) to
   establish what the repo actually does before judging against it. (This is the
-  one lens the inline path and the delegated path both need read access
-  beyond the diff for — the input list below is a floor, not a ceiling, here.)
+  one lens that needs read access beyond the diff for — the input list below
+  is a floor, not a ceiling, here.)
   The written half is `03-code-patterns.md`, and that half is Layer 3's — do not
   re-run it. What is left is the defect classes a documented rule never captures:
   guards that cannot fire (or fire always), ordering that inverts the contract,
@@ -261,9 +260,8 @@ Every finding, from either execution path, is exactly:
 {id, lens, claim, evidence: {file, line?}, declared_in_report_s7}
 ```
 
-`id` is a stable identifier the reader assigns (delegated path only — see the
-refuter note below; the inline path has no separate refuter pass to key
-against, so `id` is not load-bearing there). `lens` is one of the three ids
+`id` is a stable identifier assigned to the finding.
+`lens` is one of the three ids
 above; `claim` is one sentence naming the deviation and what it costs;
 `evidence.file` points into the staged diff, always, for `fidelity` and
 `pattern` findings. For `absence`, it names the path where the missing
@@ -275,7 +273,7 @@ file (real or prospective) where it should exist. Never invent a line number,
 or a diff-anchored file, to satisfy the shape. `declared_in_report_s7` is answered from report
 §7's own text.
 
-### The verdict rule — identical on both paths
+### The verdict rule
 
 A `fidelity` finding with `declared_in_report_s7: false` **halts** with the
 `[fidelity]` tag and §6's recovery menu — the report is wrong about the one thing
@@ -287,21 +285,10 @@ Advisory means advisory: no pattern or absence finding halts, delays, or re-runs
 this close (D5).
 
 **If a `fidelity` and an `absence` finding land on the same underlying gap**
-(independent readers can both notice it despite the lenses' partition above) —
-normalize before applying the halt: an absence-shaped gap is `absence`, never
-`fidelity`, regardless of which lens's reader produced it. Re-tag rather than
-drop; the claim and evidence carry over.
-
-**Truncation itself halts, independent of any individual finding's content.**
-The delegated fidelity reader is capped at 5 findings (a cost bound, not a
-completeness claim); on a diff with more genuine deviations than that, an
-omitted one being undeclared would defeat this gate's one hard guarantee
-silently. `fidelity_truncated: true` on the delegated return means the reader
-could not certify it reported every genuine fidelity deviation — treat that
-as a `[fidelity]` halt on its own, naming truncation as the reason, even when
-every finding actually returned is declared. The inline path has no schema
-cap to hit — a free-form judgment reports what it finds, so this halt class
-does not arise there.
+(the lenses can both notice it despite the partition above) — normalize before
+applying the halt: an absence-shaped gap is `absence`, never `fidelity`,
+regardless of which lens's pass produced it. Re-tag rather than drop; the
+claim and evidence carry over.
 
 ### The relationship to its neighbours, so no axis ships twice
 
@@ -316,7 +303,7 @@ Layer 4 catches a defect while the item is still open that code review would onl
 see once the spine's diff is one thing; code review still owns craft and
 spine-level intent. Neither re-runs the other.
 
-### Inline path — every harness
+### The pass — every harness, inline
 
 After Layer 3, read the staged diff, `spec.md`, `handoff.md`, report §7 and the
 patterns file, apply the three lenses yourself, and emit findings in the schema.
@@ -324,38 +311,8 @@ patterns file, apply the three lenses yourself, and emit findings in the schema.
 only (`git show HEAD:<path>`), never the raw worktree filesystem — an
 explained `partial` stage (`work-item-close.md` §3) can leave uncommitted
 edits sitting there that were never meant to inform this judgment, in either
-direction. This is not a degraded mode — it is the same judgment with the
-host's own context, and it is the universal fallback (`work-item-close.md`
-§2).
-
-### Delegated path — Claude Code on Anthropic only
-
-`ossify/workflows/verify-work-item.js`: one reader and one refuter per lens, six
-Sonnet agents, models pinned in the script (readers medium, refuters low). The
-script carries no lens text — the close passes the three lenses and the input
-paths in `args`. Every reader and refuter has ordinary tool access to the
-worktree beyond the fixed input list — the `pattern` reader specifically is
-told to use it, reading relevant neighbouring files before judging, the same
-requirement as the inline path above. It returns
-`{findings, agents_run, fidelity_truncated}`; it writes nothing, calls no
-`oss` verb, touches no git. Apply the verdict rule
-above to what returns exactly as if you had read the diff yourself: a
-delegated run changes who read the diff, never what the close asserts.
-
-**Refuter output is never trusted as free text.** The reader assigns each
-finding a stable `id`; the refuter is given the same findings back and returns
-exactly one verdict per `id` — `{id, retain, declared_in_report_s7}` — never a
-re-serialized finding, and never fewer or more verdicts than there are
-findings. The script accepts a survivor only if coverage is exact (every
-reader `id` gets one verdict, no extra ids, no duplicates) and its `id` is
-actually a member of what that lens's reader produced; a fabricated id, a
-truncated response, or a duplicate nulls the whole lens rather than being
-silently absorbed. `claim` and `evidence` always come from the reader's own
-object — the refuter's only write access is `declared_in_report_s7`, so it can
-correct a reader's mistagging of that one field without having to discard an
-otherwise-real finding to do it, and it can never touch anything else. This is
-deterministic verdict-checking, not judgment, and it is enforced in the script
-— see `tests/test-workflows.sh` T3.
+direction. This pass is the judgment with the host's own context — the same
+pass on every close that reaches it (`work-item-close.md` §2).
 
 ---
 
@@ -370,13 +327,10 @@ criterion:
 [report cross-check] report does not account for: AC-2
 [rule]               <file>:<line> - <the documented pattern it violates>
 [fidelity]           <file>:<line> - the diff deviates from spec.md: <claim>; report §7 does not declare it
-[fidelity]           the delegated reader hit its 5-finding cap and could not certify every genuine deviation is reported (truncated:true)
 ```
 
 Do not invent a fifth tag, do not translate one into prose, and do not merge two
-layers' findings under one tag. Four tags, spelled exactly as above — the two
-`[fidelity]` lines are the same tag on two distinct triggers (an undeclared
-finding, or unresolvable truncation), not a fifth.
+layers' findings under one tag. Four tags, spelled exactly as above.
 
 ---
 
@@ -431,8 +385,7 @@ reach it (`work-item-close.md` §5).
 - **Re-authoring an AC because the code failed it** (§6).
 - **Running `user:` rows here** (§2).
 - **Halting on a pattern or absence finding.** Advisory by decision (§4b); the
-  only Layer 4 halts are an undeclared fidelity deviation and the delegated
-  fidelity reader's own truncation (`fidelity_truncated: true`) — both under
-  the same `[fidelity]` tag.
+  only Layer 4 halt is an undeclared fidelity deviation, under the `[fidelity]`
+  tag.
 - **Letting `verify.md` advisories evaporate.** They are spine-close code
   review's input; advisory does not mean disposable.

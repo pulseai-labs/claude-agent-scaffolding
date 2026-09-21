@@ -127,128 +127,23 @@ gate invoked on `<spec path>` runs against a file called `<spec path>`.
 
 **Layer 4 needs one input Layers 1–3 never touch: `handoff.md`.** `$spec`,
 `$report` and `$wt` are already proven to exist by step 1 and Layer 1/2's own
-reads; `handoff.md` (`$(dirname "$spec")/handoff.md`) is not, and neither path
-below validates it before use. Check it exists and is readable **before**
-choosing a path — a missing or unreadable handoff is a halt, named
+reads; `handoff.md` (`$(dirname "$spec")/handoff.md`) is not, and nothing below
+validates it before use. Check it exists and is readable **before** running the
+lenses — a missing or unreadable handoff is a halt, named
 (`close: no handoff.md for $wi at <path> - halt`), not a silent empty-findings
-result from an agent that could not read what it was told to. Skipping this
-check does not fail loudly: a reader or refuter can still return a
-schema-valid empty `findings` object having never read the file, `agents_run`
-still reaches 6, and the gate reports green having verified nothing.
+result from a pass that never opened the file. Skipping this check does not
+fail loudly: a read that never happened still produces a clean-looking
+findings list, and the gate reports green having verified nothing.
 
-**Layer 4 runs delegated where it can, inline where it cannot — and inline,
-by choice, under external-executor mode.** If `OSSIFY_NO_WORKFLOWS` is unset, a
-tool named `Workflow` is available, **the lane is not in external-executor mode**
-(`work-item/references/external-executor.md` §6 — the caller has already put its
-own reviewer on this item, so six delegated agents behind it buy a second review
-nobody asked for; take the inline path, which is the same judgment with the
-host's own context), **and
-the staged diff is nonempty** (`git -C "$wt" diff --cached --name-only` —
-step 3 below halts unconditionally on an empty index regardless of what
-Layer 4 finds, so dispatching six agents first is pure waste; take the
-inline path instead, which costs nothing extra here), first fingerprint the
-three components whose mutation could turn a real halt into a silent pass —
-the worktree's identity (the staged index and `HEAD`), `report.md`, and
-`spec.md` (together they decide the halt: `spec.md` is the fidelity lens's
-own comparison target, §4b's `fidelity` — diff vs `spec.md` — decides
-whether a deviation exists at all, and `report.md`'s §7 decides
-`declared_in_report_s7`) — the six delegated agents
-get ordinary worktree and filesystem tool access, and the read-only
-instruction in their prompts is prose, not enforcement (the accepted spec
-residual R4); an injected instruction in the staged diff, `report.md`, or
-`spec.md` could get one of them to mutate the staged index, move `HEAD`
-without touching the index (`git reset --soft`, which `write-tree` alone
-would not detect), edit `report.md` mid-review — turning a real
-undeclared-fidelity finding into a silently advisory one by forging a §7
-declaration — or edit `spec.md` mid-review to erase or manufacture a
-fidelity deviation outright, and nothing downstream would notice.
-`handoff.md` and `03-code-patterns.md` stay unfingerprinted: they feed only
-`pattern`/`absence` findings, which are advisory by design (§4b) — the worst
-a mutated copy costs is noise in `verify.md`, never a wrong or missed halt,
-so they are an accepted residual (R4-style), not a gap in this guard:
+**Layer 4 runs inline — the close applies the three §4b lenses itself**
+(`references/impl-check.md`), on every harness. Read the staged diff,
+`spec.md`, `handoff.md`, report §7 and the patterns file
+(`03-code-patterns.md`, resolved as Layer 3 resolved it), and emit findings in
+the §4b schema. There is no selection step and no second engine: this pass is
+Layer 4, on every close that reaches it.
 
-```bash
-handoff="$(dirname "$spec")/handoff.md"
-tree_id="$(git -C "$wt" write-tree)" || { echo "close: could not capture the staged index's identity in $wt before the delegated call - halt"; exit 1; }
-head_id="$(git -C "$wt" rev-parse HEAD)" || { echo "close: could not capture HEAD's identity in $wt before the delegated call - halt"; exit 1; }
-report_id="$(git -C "$wt" hash-object "$report")" || { echo "close: could not fingerprint $report before the delegated call - halt"; exit 1; }
-spec_id="$(git -C "$wt" hash-object "$spec")" || { echo "close: could not fingerprint $spec before the delegated call - halt"; exit 1; }
-printf '%s:%s:%s:%s\n' "$tree_id" "$head_id" "$report_id" "$spec_id"
-```
-
-**The invariant this states in one sentence: the staged index (`write-tree`),
-`HEAD` (closing the `git reset --soft` gap `write-tree` alone leaves),
-`report.md` and `spec.md` (together they decide the halt — see above) are
-fingerprinted across the run; `handoff.md` and `03-code-patterns.md` are
-not, because they feed only advisory findings whose damage ceiling is
-wasted reviewer attention, never a wrong or missed halt.**
-
-**Hold this command's output as `pre_fp` and carry it forward as a literal
-value, exactly as `$spec`/`$report`/`$wt` are carried (§1).** The Workflow call
-below is a separate tool invocation, not more of this shell — nothing assigned
-in a bash block survives into the block after it on its own, and there is no
-shell between here and there to survive in anyway.
-
-Then call it with `workflows/verify-work-item.js` resolved to an **absolute
-path under the plugin root** — **not** a CWD-relative `ossify/workflows/…`: an
-installed close runs in the consumer
-project's own directory, not the plugin's, so a bare relative path resolves
-against whatever `ossify/` the consumer happens to have (usually none) and the
-call errors on every normal install, silently taking the fallback every time
-(the same reason `commands/close.md` reads its own SKILL.md through
-the plugin root, not a relative path) — passing in `args` the three §4b
-lenses — `fidelity`, `pattern`, `absence` — each as `{id, text}` taken verbatim
-from `impl-check.md` §4b, plus the input paths: `spec`, `report`, `handoff`
-(the work item's, beside `spec`), `patterns` (the memory-bank
-`03-code-patterns.md`, resolved as Layer 3 resolved it), and `wt`. On any error,
-a null lens result, a `findings: null` return, or `agents_run` below 6: run the
-inline path and print `layer 4: inline (workflow unavailable: <reason>)`. No
-retry, no resume. A clean delegated run prints `layer 4: workflow (6 agents)`.
-The close summary states which path ran.
-
-**Whatever the outcome — clean, errored, or fallen back — immediately
-re-derive the same fingerprint and compare, substituting the literal value you
-are carrying for `pre_fp` below:**
-
-```bash
-pre_fp="<the fingerprint the capture above printed>"
-tree_id="$(git -C "$wt" write-tree)" || { echo "close: could not re-derive the staged index's identity in $wt after the delegated call - halt"; exit 1; }
-head_id="$(git -C "$wt" rev-parse HEAD)" || { echo "close: could not re-derive HEAD's identity in $wt after the delegated call - halt"; exit 1; }
-report_id="$(git -C "$wt" hash-object "$report")" || { echo "close: could not re-fingerprint $report after the delegated call - halt"; exit 1; }
-spec_id="$(git -C "$wt" hash-object "$spec")" || { echo "close: could not re-fingerprint $spec after the delegated call - halt"; exit 1; }
-post_fp="$(printf '%s:%s:%s:%s\n' "$tree_id" "$head_id" "$report_id" "$spec_id")"
-[ "$pre_fp" = "$post_fp" ] || { echo "close: a fingerprinted Layer 4 input (the staged index, HEAD, report.md, or spec.md) changed during the delegated call in $wt - possible injection; inspect 'git -C $wt status'/'diff --cached', 'git -C $wt log -1 HEAD', and diff report.md/spec.md against their pre-call state, revert or unstage whatever the review added, and re-run - halt"; exit 1; }
-```
-
-A mismatch means one of the six agents wrote to something this pass never
-asked it to touch — the staged index, `HEAD`, `report.md`, or `spec.md`,
-the last two of which would otherwise let an injected agent forge a §7
-declaration (turning a real undeclared-fidelity finding into a silently
-advisory one) or rewrite the spec itself (erasing or manufacturing a
-fidelity deviation outright). This closes the mutation path across the
-components whose damage ceiling is a wrong or missed halt — not
-`handoff.md`/`03-code-patterns.md` (advisory-only inputs, the accepted
-residual) or the working tree files a delegated agent can still touch
-outside this list (an unfingerprinted neighbour file the `pattern` lens
-inspects, say); that read-path exposure is R4's accepted remainder, not
-this gate's job.
-
-**What this guard claims, stated as a boundary, not left implicit: it
-catches persistent mutation — an alteration still present when the
-delegated call returns. It does not claim to police what an agent reads
-mid-review or whether its returned judgment is honest; an agent that lies
-in its return value, or that mutates a fingerprinted file and restores the
-original bytes before returning, corrupts nothing this guard can see and
-needed no file access to begin with — the judgment itself is the trust
-boundary (R4), which is exactly why a halt lands on the operator's recovery
-menu rather than auto-applying, and why `verify.md` is advisory input to a
-human review, not a verdict.**
-
-Apply the §4b verdict rule to the findings from whichever path ran: an undeclared
-`fidelity` finding fires the `[fidelity]` halt; on the delegated path, so does
-`fidelity_truncated: true` on its own, naming truncation as the reason, even
-if every finding actually returned is declared — the reader could not certify
-it saw every genuine deviation. The advisory findings are written
+Apply the §4b verdict rule to the findings: an undeclared `fidelity` finding
+fires the `[fidelity]` halt. The advisory findings are written
 to `<work-item-dir>/verify.md` — `$(dirname "$report")` on Route A, `$wi_dir` on
 Route B — and echoed in the close summary.
 
@@ -260,8 +155,8 @@ retry is clean, an old `verify.md` from the halted attempt is still sitting
 there — code-review.md treats an existing file as current evidence and does
 not re-judge it (its own text says so), so a stale file would carry forward
 findings the retry already resolved. There is no "no run happened" state to
-distinguish from "this run found nothing": every completed Layer 4 run,
-delegated or inline, writes the current truth.
+distinguish from "this run found nothing": every completed Layer 4 run writes
+the current truth.
 
 Green → step 3. Anything else → step 5.
 

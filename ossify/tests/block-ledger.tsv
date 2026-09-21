@@ -45,10 +45,10 @@
 #   block unfindable and the failure read as "vacuous" rather than as wrong
 #   behaviour. Pick the anchor from the block's SCAFFOLDING, never from its FIX.
 #
-# Totals: 180 blocks - 70 operative (11 covered, 59 deferred), 110 illustrative.
+# Totals: 182 blocks - 72 operative (15 covered, 57 deferred), 110 illustrative.
 # DERIVED, never hand-counted: check 2's report line gives the total from a walk
-# of the TREE ("179 blocks accounted for"); one awk pass over the rows below
-# gives the split. Two independent routes, agreeing at 179 - that agreement IS
+# of the TREE ("182 blocks accounted for"); one awk pass over the rows below
+# gives the split. Two independent routes, agreeing at 182 - that agreement IS
 # the check. The previous headline (172 = 11/48/113) was ALREADY STALE BEFORE
 # the wayfinder branch: the retirements narrated in the parentheticals below
 # were never subtracted from it. So "172 + 8 new D rows = 180" corrects a figure
@@ -120,8 +120,6 @@ O	skills/close/references/patch-lane.md	touch_check	tests/test-close.sh	a patch 
 D	skills/close/references/patch-lane.md	1	#138	the patch commit's branch placement block - CL-1 says the target branch is unspecified, so executing it needs the design decision first. #272/#310 Task 9 keyed the block to a `repo_key` (any declared repo, not only canonical); the underlying CL-1 gap is unchanged
 I	skills/close/references/patch-lane.md	1	single patch_add call with <placeholder> args
 O	skills/close/references/work-item-close.md	abbrev-ref	tests/test-close.sh	W1: the merge guard fires when the item's own repo (target_repo, not always canonical since #272/#310 Task 9) is parked on the wrong branch
-O	skills/close/references/work-item-close.md	before the delegated call	tests/test-close.sh	W3: the Layer 4 staged-index identity guard prints the pre-call tree before the delegated Workflow call
-O	skills/close/references/work-item-close.md	post_fp=	tests/test-close.sh	W3: ...and halts naming possible injection if any fingerprinted input changed during that call (round 9 PR #380; redesigned round 10 for the tool-call boundary; extended round 12 to fingerprint report.md/spec.md/handoff.md/03-code-patterns.md; narrowed round 16 to write-tree + HEAD + report.md via git hash-object, ratified policy #3; corrected round 17 (policy #3 rev 2) to put spec.md back - handoff.md/03-code-patterns.md are the documented unfingerprinted residual; round 18 removed the dead, injection-shaped `patterns` placeholder assignment from the pre-block (H3) and added the guard's claim-boundary prose (persistent mutation only, not in-flight reads or agent honesty - H1, documented residual))
 D	skills/close/references/work-item-close.md	4	#138	path resolution, the spec-exists halt, the staged-changes read, and the Route A/B close sequence
 I	skills/close/references/work-item-close.md	1	a single <placeholder> assignment showing the report path's origin
 O	skills/close/references/cumulative-demo.md	elapsed=	tests/test-close.sh	D1-D4: the demo measurement block preserves the runner's rc instead of flattening it
@@ -216,7 +214,7 @@ H	skills/close/references/release-close.md	3309222637-11278
 H	skills/close/references/retrospective.md	1694933006-117
 H	skills/close/references/routing.md	2344377646-253
 H	skills/close/references/spine-close.md	587905026-21568
-H	skills/close/references/work-item-close.md	3930620246-5352
+H	skills/close/references/work-item-close.md	3790544145-3515
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	1897652786-133
 H	skills/doctor/references/budget-check.md	3813294467-2669
