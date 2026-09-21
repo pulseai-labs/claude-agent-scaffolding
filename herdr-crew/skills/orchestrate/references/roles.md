@@ -25,7 +25,7 @@ its brief, so the launch is this sequence (take exact flag syntax from `herdr
 --skill`):
 
 ```bash
-herdr worktree create <selector>            # or: herdr workspace create --cwd <path>
+herdr workspace create --cwd <path> --label "run: <objective>"   # once per run, not per seat
 herdr tab create --workspace <id> --cwd <path> --label "seat: <role> (<agent>)"
 herdr pane run <pane> "<command:>"
 herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>
@@ -33,8 +33,12 @@ herdr pane read <pane>                      # confirm expected_model: before dis
 herdr agent prompt <pane> "<brief>"         # or brief_delivery: file
 ```
 
-The full sequence, including the undetected-seat path, lives in
-`references/herdr-mechanics.md`; this file states only the role table and retention.
+`references/herdr-mechanics.md` holds the full sequence and the flags this block leaves
+out. The first seat takes the workspace's own tab rather than a new one; a seat that
+needs a new worktree opens it with `herdr worktree create`, whose options are in its
+`--help`; and a seat herdr does not detect waits on its screen and is prompted through
+the pane, never with the block's two `agent` lines. This file states only the role table
+and retention.
 Acceptance of input is not the start of a turn: after dispatch, confirm the turn
 actually started before the next `herdr agent wait`; if it did not, `herdr pane
 send-keys <pane> enter` submits what is sitting in the composer. Every brief also asks

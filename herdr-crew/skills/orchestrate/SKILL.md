@@ -56,7 +56,8 @@ Three consequences:
 - **`herdr pane read` only on a `blocked` wake or a missing or malformed report**, never to watch
   progress. A single bounded `herdr agent wait`, on the state set and with the `--timeout`
   that `references/herdr-mechanics.md` states, is the wait primitive, over a typed state
-  (`idle｜working｜blocked｜done｜unknown`) — one shell call,
+  (`idle｜working｜blocked｜done｜unknown`); a seat herdr does not detect waits on its report
+  file instead, as that file states — one shell call,
   no keepalive, no re-entry. A timeout is a checkpoint, not a failure. A loop of waits, and
   restarting a wait after an empty timeout, stays forbidden. Beyond those `herdr pane read`
   cases, the only bounded reads are the launch-banner `pane read` in `roles.md` and the one

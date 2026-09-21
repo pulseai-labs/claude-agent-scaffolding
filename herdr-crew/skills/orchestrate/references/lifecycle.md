@@ -56,10 +56,11 @@ Every command's syntax comes from `herdr --skill`.
    plan, then wait for a reply before implementing. The orchestrator waits on that
    pane, reads the plan, and approves or amends it by prompting the pane again. Fast
    briefs skip this.
-5. **Wait.** One
-   `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>`
-   per dispatch, the state set `herdr-mechanics.md` states: one shell call that
-   returns once, over a typed state (`idle｜working｜blocked｜done｜unknown`), never a
+5. **Wait.** One bounded wait per dispatch, as `herdr-mechanics.md` states it: for a
+   detected seat
+   `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>`,
+   over a typed state (`idle｜working｜blocked｜done｜unknown`); for a seat herdr does not
+   detect, the report-file wait. Either is one shell call that returns once, never a
    rolling poll. On a `done` or `idle` wake, read the report file its brief named, when
    it is new since dispatch (`herdr-mechanics.md`) — the wake is only the doorbell, the
    file is the contract. A `blocked` wake is a dialog, and a blocked seat rejects
