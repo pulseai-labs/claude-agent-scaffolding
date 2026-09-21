@@ -23,7 +23,7 @@ INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 REPORT_PATH=<the absolute path this seat writes its report to>
 SPINE_ID=<spine id>
 CLOSE_COMMAND=<the command this seat was launched with, from its machine entry>
-CLOSE_EXPECTED_MODEL=<model id the banner must show>
+CLOSE_EXPECTED_MODEL=<the model the banner or screen must show>
 CLOSE_EFFORT=<the effort this seat was launched at>
 CLOSE_REVIEW_LEDGER=<every close review's ledger for this spine, oldest first,
 verbatim — or "none">
@@ -88,7 +88,7 @@ PR_REPO=<owner/repo>
 PR_NUMBER=<number>
 REPO_ROOT=<abs path of this seat's worktree>
 WORKPR_COMMAND=<the command this seat was launched with, from its machine entry>
-WORKPR_EXPECTED_MODEL=<model id the banner must show>
+WORKPR_EXPECTED_MODEL=<the model the banner or screen must show>
 WORKPR_EFFORT=<the effort this seat was launched at>
 REVIEWER=<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
 REVIEW_LEVEL=<the /code-review level the top decided>

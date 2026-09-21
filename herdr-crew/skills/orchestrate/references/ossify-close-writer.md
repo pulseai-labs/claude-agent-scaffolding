@@ -31,7 +31,7 @@ REPO=<the declared `target_repo` identifier for this writer's repo — it exists
 for remote and remote-less repos alike>
 REPO_ROOT=<abs path of this repo's spine worktree>
 WRITER_COMMAND=<the command this seat was launched with, as the operator named it>
-WRITER_EXPECTED_MODEL=<model id the banner must show>
+WRITER_EXPECTED_MODEL=<the model the banner or screen must show>
 WRITER_EFFORT=<the effort this seat was launched at>
 ACCEPTED_LEDGER=<the accepted fix-now findings whose `target_repo` is this
 repo, verbatim from the close review's ledger>

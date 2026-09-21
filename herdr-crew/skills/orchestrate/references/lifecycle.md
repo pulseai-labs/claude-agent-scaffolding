@@ -83,8 +83,8 @@ Every command's syntax comes from `herdr --skill`.
    and the false wake follows the doorbell rule that file states for the rest of that
    dispatch, paging no one. Neither is a failure, and neither is re-entered here. A loop of
    waits, and restarting a wait after an empty timeout, both stay forbidden. `herdr pane read`
-   only on a `blocked` wake, a missing or malformed report, or a timeout's checkpoint, never
-   to watch progress.
+   only on a `blocked` wake, a missing or malformed report, a timeout's checkpoint, or the
+   false wake's own read, never to watch progress.
    A round's N parallel items are N bounded background waits, one per pane, each waking the
    session when it exits — not the forbidden loop, since each targets a different
    pane rather than re-entering the one that just timed out. What persists is the
@@ -111,10 +111,11 @@ Every command's syntax comes from `herdr --skill`.
    listing every claim: each acceptance criterion of the work item's spec, the
    mutation of any new test, and the diff against the requirement. The suite result
    on the head is not a claim — the orchestrator reads that SHA's check-runs before
-   dispatching the verifier. The verifier seat carries the effort its project-file
+   dispatching the verifier. The verifier seat runs at the effort its machine
    entry names — the claims include judgment, and `cannot determine` counts as fail.
-   On a fail, attach a fix task to the retained implementer by sending it the fix
-   task's brief (`herdr-mechanics.md` says how), wait for its report file
+   On a fail, attach a fix task to the retained implementer by sending it the
+   fast-implementer brief with the verifier's claims for a TASK (`briefs.md`;
+   `herdr-mechanics.md` says how), wait for its report file
    naming the new head SHA, read that SHA's check-runs, then re-check on the retained
    verifier; a second fail on the same item goes to the operator. The verifier is
    released only at pass or escalation.

@@ -55,8 +55,8 @@ Three consequences:
 
 - **No `Agent` tool from the orchestrator.** Subagents spend orchestrator-tier tokens and
   leave no herdr provenance. Every helper is a herdr session.
-- **`herdr pane read` only on a `blocked` wake, a missing or malformed report, or a
-  timeout's checkpoint**, never to watch progress. A single bounded `herdr agent wait`, on
+- **`herdr pane read` only on a `blocked` wake, a missing or malformed report, a
+  timeout's checkpoint, or the false wake's own read**, never to watch progress. A single bounded `herdr agent wait`, on
   the state set `references/herdr-mechanics.md` states and always with a `--timeout`, is
   the wait primitive for a detected seat that is not a coordinator, over a typed state
   (`idle｜working｜blocked｜done｜unknown`); a seat herdr does not detect, and a coordinator

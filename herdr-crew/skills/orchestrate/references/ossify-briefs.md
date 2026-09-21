@@ -27,7 +27,7 @@ RUN_JSON=<abs path of the run.json you write and own — never the top's>
 MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
 SPINE_ID=<spine id>
 SPINE_COMMAND=<the command this seat was launched with, from its machine entry>
-SPINE_EXPECTED_MODEL=<model id the banner must show>
+SPINE_EXPECTED_MODEL=<the model the banner or screen must show>
 SPINE_EFFORT=<the effort this seat was launched at>
 SEATS — the operator-approved seats for this spine. Use them verbatim.
 <item id> implementer: <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>

@@ -68,7 +68,8 @@ releases every item pair and closes the workspace it created, as
    report file, then waits. Gather the round's plans into **one** ordered ask to you;
    return an independent approve-or-amend per item; the spine session sends each
    implementer its item's decision, before which no edit starts.
-5. On each complete return, capture the item's four-part fingerprint, then create and
+5. On each complete return, capture the item's four-part fingerprint (`tree_id:head_id:report_id:spec_id`, ossify's
+   close guard), then create and
    dispatch that item's **fresh verifier seat** from its SEATS row's exact
    command, in the same worktree, against the fixed all-claims procedure.
    `cannot determine` = fail.
@@ -98,7 +99,7 @@ releases every item pair and closes the workspace it created, as
    dispatched off a halt.
 7. Initial gaps are handled inside the spine session: it asks you for the operator's
    answers, remains the handoff writer, appends clarifications, and re-requests the item
-   within ossify's three-attempt cap.
+   within ossify's three-iteration cap.
 8. Feed accepted results into the lane in declared decomposition order, **closing each
    item before the next feeds**: the lane gates the result, commits it in the worktree
    and merges `work/<wi>` into the spine branch — the per-item close, driven from here
