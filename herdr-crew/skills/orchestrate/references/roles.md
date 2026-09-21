@@ -104,7 +104,7 @@ PR — each launched from its own seat in the project file (`spine session`,
 hosting repo at a `halted: close-review`, launched from the profile the operator
 names at that halt (`ossify-close-writer.md`), never a seat the file pre-defines.** The
 work-PR session owns the reviewer and the
-PR-fix seat inside a child run of
+PR-fix seat inside a `run.json` of
 its own, so those two are budgeted there rather than here — the top decides both
 profiles at the PR transition and injects them, and neither survives the merge. No
 implementer is retained into a spine PR: every item pair was released at its item's

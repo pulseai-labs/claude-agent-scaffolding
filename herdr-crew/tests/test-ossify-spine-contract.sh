@@ -324,7 +324,7 @@ absent "$BRIEFS_MD" 'injected parent ids' \
 absent "$NESTED_MD" 'injected parent ids' \
   "the nested run's halt path names no 'injected parent ids'"
 absent "$NESTED_MD" 'the **injected parent**' \
-  "the nested run's completion bullet names the report file"
+  "the nested run's completion bullet no longer names the injected parent"
 pin "$GENERIC_BRIEFS_MD" 'Reviewed head: <sha>' \
   "the reviewer DONE carries its reviewed-head line exactly once"
 
@@ -352,6 +352,18 @@ section "no worker-to-orchestrator message type herdr lacks"
 for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD"; do
   for t in '`ask`' '`escalation`' '`send`' '`reply`'; do
     absent "$f" "$t" "${f##*/} names no $t message type"
+  done
+done
+
+section "one mechanic, one statement"
+
+# Every launch, send, wait, read and release is stated in herdr-mechanics.md
+# and deferred to. Two names are sanctioned in these files: `herdr --skill`,
+# the entry point, and `herdr workspace list`, the teardown check. A command
+# from any of these groups is a restatement waiting to drift.
+for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD"; do
+  for g in 'herdr agent ' 'herdr pane ' 'herdr tab ' 'herdr worktree '; do
+    absent "$f" "$g" "${f##*/} restates no '$g' command"
   done
 done
 

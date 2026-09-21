@@ -64,6 +64,12 @@ section "the rules that must survive a rewording"
 pin 'never `pane split`' "the no-split rule survives"
 pin 'invoked by name' "the lane-by-name rule survives"
 pin 'the file is the contract' "the report-file contract survives"
+pin 'placed outside every seat'"'"'s worktree' \
+  "every file the run keeps lives outside every seat's worktree (R39)"
+pin 'and so is a coordinator'"'"'s' \
+  "a coordinator seat is waited on through its report file (R41)"
+pin 'A local slash command (`/context`, `/clear`) settles without a turn' \
+  "a local slash command is sent without the turn-start check (R42)"
 
 section "placement"
 present '--cwd' "a seat's tree is set with --cwd"

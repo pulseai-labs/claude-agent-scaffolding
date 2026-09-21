@@ -66,11 +66,11 @@ Report a refusal verbatim.
 
 ## Work-PR session (one fresh seat per returned PR)
 
-Created by the top **in that PR's hosting-repo worktree**, so REPO_ROOT is
-the path this seat already sits in, never a fixed canonical path.
-Launched from the `work-PR session` seat the project file names, with the top's
-merge-executor assignment and PRIOR_REVIEW, it owns both PR seats inside a
-`run.json` of its own.
+Created by the top **in that PR's hosting-repo worktree**, so REPO_ROOT is the path this
+seat already sits in, never a fixed canonical path. Launched from the `work-PR session`
+seat the project file names, with the top's merge-executor assignment and PRIOR_REVIEW, it
+owns both PR seats inside a `run.json` of its own. The top waits on it as a coordinator
+seat (`herdr-mechanics.md`, Completion).
 
 ```text
 ROLE: work-PR session for PR PR_NUMBER in PR_REPO, and coordinator of its two
@@ -83,7 +83,7 @@ PLACEMENT: REPO_ROOT — the worktree holding this PR's branch.
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 REPORT_PATH=<the absolute path this seat writes its report to>
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
-MECHANICS=<abs path of herdr-crew's references/herdr-mechanics.md>
+MECHANICS=<the orchestrate skill's base directory, as Claude Code prints it>/references/herdr-mechanics.md
 PR_REPO=<owner/repo>
 PR_NUMBER=<number>
 REPO_ROOT=<abs path of this seat's worktree>
@@ -97,11 +97,11 @@ PRIOR_REVIEW=<the prior dispatch's durable review record — ran, reviewed head,
 clean/findings state, summary, fix rounds run, ledger/comment refs — "none", or "covered">
 MERGE_EXECUTOR=<session|operator — the top's explicit assignment>
 STOPPING_RULE=<the rule agreed before the PR opened>
-Everything you tell the top — a question, the round summary, the merge ask, your
-report — goes in your report file at REPORT_PATH; then wait for the top's next
-message, or stop where this brief says so. Your first herdr command is
-`herdr --skill`. MECHANICS addresses the orchestrator of a run, which for your own
-seats is you: every seat you launch, send to, wait on or release follows it.
+Everything you tell the top — a question, the round summary, the merge ask, your report —
+goes in your report file at REPORT_PATH; then wait, or stop where this brief says so. Your
+first herdr command is `herdr --skill`. MECHANICS addresses a run's orchestrator, which for
+your own seats is you: every seat you launch, send to, wait on or release follows it,
+except that where it says the operator, you mean the top, through your report file.
 
 TASK: drive PR_NUMBER to a merge on the top's word.
   1. Create RUN_JSON for your two seats and stay its single writer, as dagr's

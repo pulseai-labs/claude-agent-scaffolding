@@ -15,7 +15,7 @@ Every command's syntax comes from `herdr --skill`.
    item and the three coordinator seats with the operator into the project file,
    inject them as the spine session's SEATS block, ask the
    operator to confirm nested worker depth is 2, and
-   start **one** spine session that creates its own child `run.json` and launches every
+   start **one** spine session that creates a nested `run.json` of its own and launches every
    item pair. You approve relayed worker plans and wait on that one completion; you
    launch no item pane. **That completion is the final round barrier, not a PR.** When
    it lands you **dispatch** `/ossify:close <spine-id>` to a **fresh** close session —
@@ -36,7 +36,7 @@ Every command's syntax comes from `herdr --skill`.
    pass — a second close — and only then tear down: **step 12's worker release and
    branch deletion wait for that pass** — the work-PR session's own reviewer and PR-fix
    seats are exempt: it releases them when their work finishes, and the hold covers the
-   top's spine-level teardown, not seats inside a work-PR child run; post-merge product
+   top's spine-level teardown, not seats in a work-PR session's `run.json`; post-merge product
    fixes take a new PR and fresh seats. **But a closed return skips the record pass**
    and goes straight to teardown: the pass exists to record PRs, and that return named
    none. Absent any of those four facts, continue at step 2.

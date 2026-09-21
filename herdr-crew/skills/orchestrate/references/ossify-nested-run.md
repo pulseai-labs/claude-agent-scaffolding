@@ -37,7 +37,8 @@ file, as dagr's producer contract requires.
 - an item seat's question reaches the spine session the same way, in that seat's
   report file;
 - its final report goes in its report file like everything else, naming `RUN_JSON`;
-- the spine session is the only waiter on its item seats; you wait on the spine session.
+- the spine session is the only waiter on its item seats; you wait on the spine session
+  as on a coordinator seat (`herdr-mechanics.md`, Completion).
 
 The nested run keeps item plans and item reports away from you: you read a batched
 plan relay, genuine spine-level decisions, and one final report.
@@ -122,8 +123,8 @@ initiative.
 **A `rotate: <handoff path>` completion is not the final barrier.** The spine session
 stopped at an earlier round barrier past the context ceiling (`lifecycle.md`). Confirm the
 handoff path resolves, then dispatch a fresh spine session on the same spine-session
-seat — the same approved SEATS block injected again — with `HANDOFF_PATH` set. The close
-waits for a completion at the final barrier.
+seat — the same approved SEATS block injected again — with `HANDOFF_PATH` set and the
+same `RUN_JSON`, which it continues. The close waits for a completion at the final barrier.
 
 When its final report lands, **you dispatch** `/ossify:close <spine-id>` to a close
 session that is **always a fresh seat** you create, never the spine driver's: it

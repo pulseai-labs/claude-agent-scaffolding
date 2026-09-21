@@ -24,7 +24,7 @@ PLACEMENT: <abs path of the repo or worktree the lane runs from>.
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 REPORT_PATH=<the absolute path this seat writes its report to>
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
-MECHANICS=<abs path of herdr-crew's references/herdr-mechanics.md>
+MECHANICS=<the orchestrate skill's base directory, as Claude Code prints it>/references/herdr-mechanics.md
 SPINE_ID=<spine id>
 SPINE_COMMAND=<the command this seat was launched with, from its machine entry>
 SPINE_EXPECTED_MODEL=<model id the banner must show>
@@ -37,7 +37,8 @@ HANDOFF_PATH=<a prior spine session's handoff path, or "none">
 Everything you tell the top — plan relay, question, halt, rotation, report — goes in your
 report file at REPORT_PATH; then wait, or stop where this brief says so. Your first herdr
 command is `herdr --skill`. MECHANICS addresses a run's orchestrator, which for your own
-seats is you: every seat you launch, send to, wait on or release follows it.
+seats is you: every seat you launch, send to, wait on or release follows it, except that
+where it says the operator, you mean the top, through your report file.
 
 TASK: drive spine SPINE_ID to its final round barrier. With HANDOFF_PATH set, read that
 handoff first; ossify's own state says which round runs next. A first reply whose model
@@ -51,12 +52,12 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      with `dagr check --strict` before it replaces the file.
   3. Invoke `/ossify:run-spine $SPINE_ID --external-executor`. On the round's
      execution requests, launch a fresh IMPLEMENTER seat per item from its SEATS row, verbatim —
-     never a substitute value — as a tab of the workspace you create for your run,
-     its `--cwd` the worktree ossify prepared. The
-     verifier is created at step 5, once a complete return exists. Confirm each
-     model as its row's `model_shows` says and from the first reply; the effort is the given launch
-     argument. A row that is missing or ambiguous halts that launch and asks;
-     only a top reply carrying replacement rows moves the block.
+     never a substitute value — as a tab of the workspace you create for your run (created
+     again first if `herdr workspace list` no longer shows it: closing its last pane may take
+     it), its `--cwd` the worktree ossify prepared. The verifier is created at step 5, once
+     a complete return exists. Confirm each model as its row's `model_shows` says and from
+     the first reply; the effort is the given launch argument. A row that is missing or
+     ambiguous halts that launch and asks; only a top reply carrying replacement rows moves the block.
   4. Gather the round's implementation plans, each read from its implementer's
      report file, into ONE ordered relay to the top, and wait. Send each
      implementer the top's decision for its item before any edit starts.
@@ -72,9 +73,9 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      work-item entry from clean; a second failure asks again. Every execution of
      an item — the initial run, each correction, each replacement — counts against
      ossify's three-iteration cap, and once it is spent the ask offers halt only.
-     On halt, release that item's pair, mark the item halted, and if no other item
-     can proceed write a halt-shaped report to your report file, with the item and
-     reason; the spine stays at its barrier.
+     On halt, release that item's pair, mark it halted in your own state, and if no
+     other item can proceed write a halt-shaped report to your report file, with the
+     item and reason; the spine stays at its barrier.
   6. Return accepted results in declared decomposition order, closing each item
      before the next feeds: the lane gates, commits and merges `work/<wi>` into
      the spine branch — the per-item close, not the spine-close ceremony the top

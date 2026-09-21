@@ -119,7 +119,8 @@ Two cases are named because they look like clashes and are not:
   session is its orchestrator: it holds the state lock, commits at each close,
   merges at the barrier. The `Agent`-tool ban in §2 applies
   to this session only. You
-  wait on one spine report.
+  wait on one spine report, through its report file: a lane driver whose subagents run
+  in the background is a coordinator seat (`references/herdr-mechanics.md`, Completion).
 - **`run-spine`, when this session just planned the spine.** Then the items deserve
   their own models, and inherited-runtime subagents cannot give them that.
   **Read `references/ossify-execution.md` and follow it**: the seats for the spine are
