@@ -1,8 +1,9 @@
 # Briefs
 
 A brief is the whole contract the worker will ever see. The worker has no orchestration
-context, may be launched where the project's rules do not load, and receives herdr's
-injected preamble plus this text and nothing else. Every brief carries, in this order:
+context, may be launched where the project's rules do not load, and `herdr agent
+prompt` delivers this text verbatim — no preamble, nothing prepended, nothing else.
+Every brief carries, in this order:
 
 1. Role, and "state your model in your first reply".
 2. Placement: absolute worktree path, branch, base branch.
@@ -182,8 +183,8 @@ place, never by a new session: one `send` to that session, nothing else.
 ```text
 Your report file for <task-id> is malformed or incomplete: <the missing or wrong
 field, and what is wrong with it>. Send the exact shape wanted: <the field, restated
-from your brief>. No other work; rewrite your report file at REPORT_PATH, then stop —
-the orchestrator waits and rereads it.
+from your brief>. No other work; rewrite your report file at <REPORT_PATH>, then stop
+— the orchestrator waits and rereads it.
 ```
 
 If one `send` does not fix the report, that is an `escalation`.
