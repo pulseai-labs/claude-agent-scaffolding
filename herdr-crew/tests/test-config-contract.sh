@@ -145,6 +145,11 @@ if [ -f "$PLUGIN_ROOT/../.claude-plugin/marketplace.json" ]; then
 $PLUGIN_ROOT/../.claude-plugin/marketplace.json"
 fi
 for f in $SWEEP_FILES "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
+  rel="${f#"$PLUGIN_ROOT"/}"
+  if [ ! -r "$f" ]; then
+    fail "no personal name in $rel" "missing or unreadable — the sweep cannot certify a file it cannot open"
+    continue
+  fi
   hits=0
   for needle in $PERSONAL; do
     c="$(awk -v needle="$needle" '
@@ -153,7 +158,6 @@ for f in $SWEEP_FILES "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
       END { print n+0 }' "$f")"
     hits=$((hits + c))
   done
-  rel="${f#"$PLUGIN_ROOT"/}"
   if [ "$hits" -eq 0 ]; then pass "no personal name in $rel"
   else fail "no personal name in $rel" "$hits occurrence(s)"; fi
 done
@@ -166,5 +170,24 @@ ctl="$(awk -v needle='claude-glm' '
 rm -f "$tmp_ctl"
 if [ "$ctl" -eq 1 ]; then pass "control: the sweep detects a personal name"
 else fail "control: the sweep detects a personal name" "control counted $ctl"; fi
+
+# Control: a missing or unreadable file must fail the sweep, not pass it — a
+# name-only counting check has no way to distinguish "clean" from "unread",
+# and 2026-09-21 fix round 2 found the gate doing exactly that against
+# README.md (not yet created; see Task 9). This control plants a file with no
+# read permission and asserts the guard's own predicate (`[ ! -r "$f" ]`,
+# the same test the sweep loop above uses) catches it.
+tmp_unreadable="$(mktemp)"; printf 'claude-glm\n' > "$tmp_unreadable"
+chmod 000 "$tmp_unreadable"
+if [ -r "$tmp_unreadable" ]; then
+  # Running as root, or a filesystem that ignores 0000: this host cannot
+  # construct an unreadable file, so the control cannot exercise the guard.
+  fail "control: an unreadable file fails the sweep, not passes it" \
+    "could not make $tmp_unreadable unreadable on this host (root?) — control could not run"
+else
+  pass "control: an unreadable file fails the sweep, not passes it"
+fi
+chmod 644 "$tmp_unreadable" 2>/dev/null
+rm -f "$tmp_unreadable"
 
 report
