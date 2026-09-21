@@ -70,7 +70,10 @@ Every command's syntax comes from `herdr --skill`.
    re-entering the one that just timed out. What persists is the report file, not
    the state a finished pane has since moved to, so parking on one pane while
    another keeps working loses nothing; the round's barrier closes when every
-   item's report file is in hand. At each task boundary for a retained implementer,
+   item's report file is in hand. On an empty timeout, the orchestrator does not
+   re-wait that pane: it moves on to the round's remaining panes, then returns
+   idle. That item's report file is not yet in hand, so the barrier closes on a
+   later turn, once it is on disk. At each task boundary for a retained implementer,
    send `/context` and read the one reply before attaching the next task (the
    threshold is in `roles.md`).
 6. **Implementer finishes.** Its report file carries the completion body its
