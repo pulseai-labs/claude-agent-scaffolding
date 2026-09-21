@@ -28,7 +28,7 @@ its brief, so the launch is this sequence (take exact flag syntax from `herdr
 herdr worktree create <selector>            # or: herdr workspace create --cwd <path>
 herdr tab create --workspace <id> --cwd <path> --label "seat: <role> (<agent>)"
 herdr pane run <pane> "<command:>"
-herdr agent wait <pane> --until idle --timeout <ms>
+herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>
 herdr pane read <pane>                      # confirm expected_model: before dispatch
 herdr agent prompt <pane> "<brief>"         # or brief_delivery: file
 ```

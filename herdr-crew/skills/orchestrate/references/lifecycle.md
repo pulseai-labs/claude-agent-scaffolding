@@ -47,7 +47,7 @@ Every command's syntax comes from `herdr --skill`.
    mechanical, or read-only; everything else — including an item that classifies
    nowhere — is `contract`. One implementer per worktree. Items within a round may
    run in parallel; their merges are serial.
-3. **Launch.** The seat launch — pane creation, the idle wait, the banner read that
+3. **Launch.** The seat launch — pane creation, the readiness wait, the banner read that
    confirms the model, then the brief delivered as `brief_delivery` says (inject or
    file) — is `roles.md`'s "The launch," with the undetected-seat path in
    `herdr-mechanics.md`. The "state your model" line in the worker's first reply is
@@ -56,12 +56,15 @@ Every command's syntax comes from `herdr --skill`.
    plan, then wait for a reply before implementing. The orchestrator waits on that
    pane, reads the plan, and approves or amends it by prompting the pane again. Fast
    briefs skip this.
-5. **Wait.** One `herdr agent wait <pane> --until done --until idle --timeout <ms>`
-   per dispatch: one shell call that returns once, over a typed state
-   (`idle｜working｜blocked｜done｜unknown`), never a rolling poll. On a `done` wake,
-   read the report file it names — the wake is only the doorbell, the file is the
-   contract. A `blocked` wake means a question: `herdr pane read <pane>` for it,
-   answer with `herdr agent prompt <pane>`, then one fresh bounded wait on the answer.
+5. **Wait.** One
+   `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>`
+   per dispatch, the state set `herdr-mechanics.md` states: one shell call that
+   returns once, over a typed state (`idle｜working｜blocked｜done｜unknown`), never a
+   rolling poll. On a `done` or `idle` wake, read the report file its brief named, when
+   it is new since dispatch (`herdr-mechanics.md`) — the wake is only the doorbell, the
+   file is the contract. A `blocked` wake is a dialog, and a blocked seat rejects
+   `herdr agent prompt`: `herdr pane read <pane>` for it, answer it as
+   `herdr-mechanics.md` says, then one fresh bounded wait on the answer.
    A timeout is a checkpoint, not a failure: a loop of waits, and restarting a wait
    after an empty timeout, both stay forbidden. `herdr pane read` only on a `blocked`
    wake or a missing or malformed report, never to watch progress. A round's N
