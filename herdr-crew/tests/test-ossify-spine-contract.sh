@@ -30,9 +30,11 @@
 # can fail on a true match under pipefail. Every zero-count has a non-empty
 # control beside it.
 #
-# README.md, CHANGELOG.md and tests/eval/ land after this suite does. Until one
-# exists its checks print a note, never a pass, and they run in full once it
-# does; a file that exists but cannot be read fails.
+# Every file this suite reads ships with the plugin: README.md, CHANGELOG.md and
+# tests/eval/ included. A missing one FAILS rather than skipping. Until Task 9 the
+# three that landed last were guarded by `landed`, which printed a note and
+# returned 1 — a wrong path would then read as "not present yet" forever, and a
+# zero-count against a file nobody opened is not a clean file.
 #
 # Usage:   bash herdr-crew/tests/test-ossify-spine-contract.sh
 # Exit:    0 if every mechanical fact holds; 1 otherwise.
@@ -65,14 +67,6 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 . "$SCRIPT_DIR/_helpers.sh"
 
 REF_BUDGET=200          # A3: each ossify reference stays under about 200 lines
-
-# landed <path> -> 0 when the path exists; otherwise prints a note (not a
-# pass) and returns 1, so the caller skips checks that have nothing to read.
-landed() {
-  if [ -e "$1" ]; then return 0; fi
-  printf '  %s·%s %s not present yet — its checks run once it lands\n' "$DIM" "$RST" "${1#"$PLUGIN_ROOT"/}"
-  return 1
-}
 
 occurrences() {
   if [ -z "${2:-}" ]; then printf 'empty needle\n' >&2; return 1; fi
@@ -147,8 +141,9 @@ for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" \
          "$ROLES_MD" "$LIFECYCLE_MD" "$GENERIC_BRIEFS_MD" "$SKILL_MD" \
          "$PLUGIN_README_MD" "$COMMAND_MD"; do
   rel="${f#"$PLUGIN_ROOT"/}"
-  if [ "$f" = "$PLUGIN_README_MD" ]; then landed "$f" || continue; fi
-  # A count of zero from a file nobody read is not a clean file.
+  # A count of zero from a file nobody read is not a clean file. README.md is
+  # swept here like every other carrier — no skip, so a moved or renamed README
+  # fails rather than reporting itself absent.
   if [ ! -r "$f" ]; then
     fail "no sidecar reference survives in $rel" "missing or unreadable — the sweep cannot certify a file it cannot open"
     continue
@@ -391,13 +386,11 @@ n_eq "$PRBRIEFS_MD" "$ROW" 2 "the work-PR launched profiles carry the full resol
 # Any profile carrier anywhere is complete — no partial rows, and no partial
 # enumerations either: prose listing "command, expected model …" without the
 # delivery fields is the same defect in a sentence. The sweep runs over every
-# shipped surface and the evals, so a seventh site cannot land. An unmatched
-# fixture glob stays literal and fails the readability guard below.
-CARRIERS=("$REF"/*.md "$SKILL_MD" "$COMMAND_MD")
-if landed "$PLUGIN_README_MD"; then CARRIERS+=("$PLUGIN_README_MD"); fi
-if landed "$EVAL_DIR"; then
-  CARRIERS+=("$EVAL_DIR"/fixtures/ossify-spine-execution/*.md "$EVAL_RUBRIC_MD")
-fi
+# shipped surface and the evals, so a seventh site cannot land. The list is
+# unconditional: an unmatched fixture glob stays literal and fails the readability
+# guard below, rather than being skipped for a directory that has not arrived.
+CARRIERS=("$REF"/*.md "$SKILL_MD" "$COMMAND_MD" "$PLUGIN_README_MD"
+          "$EVAL_DIR"/fixtures/ossify-spine-execution/*.md "$EVAL_RUBRIC_MD")
 for f in "${CARRIERS[@]}"; do
   if [ ! -r "$f" ]; then fail "no partial profile carrier in ${f##*/}" "missing or unreadable: $f"; continue; fi
   n=$(awk 'index($0, "| model:") > 0 && index($0, "brief_delivery") == 0' "$f" | wc -l | tr -d ' ')
@@ -658,20 +651,17 @@ absent "$NESTED_MD" 'record branch' \
 # PR #470 row 1: the eval oracle tracks the same #466 contract — records are
 # written where ossify resolves ai_workspace, never a "record branch" no step
 # establishes. The rubric wraps the old claim across a line, so its pin is the
-# contiguous tail of the old wording. Once tests/eval/ exists, a missing
-# fixture or rubric fails here rather than being skipped.
-if landed "$EVAL_DIR"; then
-  nonempty "$EVAL_FIXTURE14" "eval fixture 14 exists"
-  pin "$EVAL_FIXTURE14" 'where ossify resolves ai_workspace' \
-    "fixture 14's oracle lands records where ossify resolves ai_workspace"
-  absent "$EVAL_FIXTURE14" 'record branch' \
-    "fixture 14's record-branch claim is gone"
-  nonempty "$EVAL_RUBRIC_MD" "the spine-execution rubric exists"
-  pin "$EVAL_RUBRIC_MD" 'where ossify resolves `ai_workspace`' \
-    "rubric criterion 1 lands records where ossify resolves ai_workspace"
-  absent "$EVAL_RUBRIC_MD" 'branch under its own policy' \
-    "rubric criterion 1's record-branch wording is gone"
-fi
+# contiguous tail of the old wording. A missing fixture or rubric fails here.
+nonempty "$EVAL_FIXTURE14" "eval fixture 14 exists"
+pin "$EVAL_FIXTURE14" 'where ossify resolves ai_workspace' \
+  "fixture 14's oracle lands records where ossify resolves ai_workspace"
+absent "$EVAL_FIXTURE14" 'record branch' \
+  "fixture 14's record-branch claim is gone"
+nonempty "$EVAL_RUBRIC_MD" "the spine-execution rubric exists"
+pin "$EVAL_RUBRIC_MD" 'where ossify resolves `ai_workspace`' \
+  "rubric criterion 1 lands records where ossify resolves ai_workspace"
+absent "$EVAL_RUBRIC_MD" 'branch under its own policy' \
+  "rubric criterion 1's record-branch wording is gone"
 
 section "four seats, one voice"
 
@@ -748,16 +738,15 @@ section "the release is declared once and agreed everywhere"
 # checked AGAINST it rather than against a literal repeated here, so a bump edits
 # one file. The literal below is what stops that from being a round trip. The
 # per-issue pins of the plugin this one was ported from record that plugin's
-# history, not this one's, so none of them carries over.
-if landed "$CHANGELOG_MD"; then
-  pin "$CHANGELOG_MD" '## 0.1.0' "the CHANGELOG opens a 0.1.0 section"
-  head_ver="$(awk '/^## /{sub(/^## /, ""); print; exit}' "$CHANGELOG_MD")"
-  for m in "$PLUGIN_ROOT/.claude-plugin/plugin.json" "$PLUGIN_ROOT/.codex-plugin/plugin.json"; do
-    mv_="$(awk -F'"' '/"version"/{print $4; exit}' "$m")"
-    if [ -n "$mv_" ] && [ "$mv_" = "$head_ver" ]; then pass "${m%/*.json} manifest version matches the CHANGELOG head ($mv_)"
-    else fail "${m%/*.json} manifest version matches the CHANGELOG head" "manifest '$mv_' vs CHANGELOG '$head_ver'"; fi
-  done
-fi
+# history, not this one's, so none of them carries over. A missing CHANGELOG
+# fails the pin outright rather than reporting itself not present yet.
+pin "$CHANGELOG_MD" '## 0.1.0' "the CHANGELOG opens a 0.1.0 section"
+head_ver="$(awk '/^## /{sub(/^## /, ""); print; exit}' "$CHANGELOG_MD")"
+for m in "$PLUGIN_ROOT/.claude-plugin/plugin.json" "$PLUGIN_ROOT/.codex-plugin/plugin.json"; do
+  mv_="$(awk -F'"' '/"version"/{print $4; exit}' "$m")"
+  if [ -n "$mv_" ] && [ "$mv_" = "$head_ver" ]; then pass "${m%/*.json} manifest version matches the CHANGELOG head ($mv_)"
+  else fail "${m%/*.json} manifest version matches the CHANGELOG head" "manifest '$mv_' vs CHANGELOG '$head_ver'"; fi
+done
 
 section "rotation past the context ceiling"
 

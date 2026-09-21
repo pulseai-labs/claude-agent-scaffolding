@@ -144,11 +144,17 @@ if [ -f "$PLUGIN_ROOT/../.claude-plugin/marketplace.json" ]; then
   SWEEP_FILES="$SWEEP_FILES
 $PLUGIN_ROOT/../.claude-plugin/marketplace.json"
 fi
-for f in $SWEEP_FILES "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
-  rel="${f#"$PLUGIN_ROOT"/}"
+# The sweep body, one file, as a function so the controls below exercise it
+# rather than restating it. The loop calls it once per swept file; the
+# unreadable-file control calls the same function, so what that control proves
+# is the guard's wiring — not, as it did until Task 9, that the OS honours
+# chmod 000. Returns 1 when the file cannot be certified: unreadable, or a
+# name counted in it.
+sweep_file() {
+  f="$1"; rel="$2"
   if [ ! -r "$f" ]; then
     fail "no personal name in $rel" "missing or unreadable — the sweep cannot certify a file it cannot open"
-    continue
+    return 1
   fi
   hits=0
   for needle in $PERSONAL; do
@@ -158,9 +164,15 @@ for f in $SWEEP_FILES "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
       END { print n+0 }' "$f")"
     hits=$((hits + c))
   done
-  if [ "$hits" -eq 0 ]; then pass "no personal name in $rel"
-  else fail "no personal name in $rel" "$hits occurrence(s)"; fi
+  if [ "$hits" -eq 0 ]; then pass "no personal name in $rel"; return 0; fi
+  fail "no personal name in $rel" "$hits occurrence(s)"
+  return 1
+}
+
+for f in $SWEEP_FILES "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
+  sweep_file "$f" "${f#"$PLUGIN_ROOT"/}"
 done
+
 # Control: the check can see a name when one is there.
 tmp_ctl="$(mktemp)"; printf 'claude-glm\n' > "$tmp_ctl"
 ctl="$(awk -v needle='claude-glm' '
@@ -174,9 +186,10 @@ else fail "control: the sweep detects a personal name" "control counted $ctl"; f
 # Control: a missing or unreadable file must fail the sweep, not pass it — a
 # name-only counting check has no way to distinguish "clean" from "unread",
 # and 2026-09-21 fix round 2 found the gate doing exactly that against
-# README.md (not yet created; see Task 9). This control plants a file with no
-# read permission and asserts the guard's own predicate (`[ ! -r "$f" ]`,
-# the same test the sweep loop above uses) catches it.
+# README.md (see Task 9). The planted file goes THROUGH `sweep_file`, so the
+# loop's own guard is what is asserted; the command substitution isolates the
+# planted failure from this suite's own count. The message is checked too:
+# a failure for any other reason means the guard is not what fired.
 tmp_unreadable="$(mktemp)"; printf 'claude-glm\n' > "$tmp_unreadable"
 chmod 000 "$tmp_unreadable"
 if [ -r "$tmp_unreadable" ]; then
@@ -184,10 +197,27 @@ if [ -r "$tmp_unreadable" ]; then
   # construct an unreadable file, so the control cannot exercise the guard.
   fail "control: an unreadable file fails the sweep, not passes it" \
     "could not make $tmp_unreadable unreadable on this host (root?) — control could not run"
-else
+elif out="$(sweep_file "$tmp_unreadable" "control fixture")"; then
+  fail "control: an unreadable file fails the sweep, not passes it" \
+    "the sweep certified a file it could not open: $out"
+elif printf '%s' "$out" | grep -F 'missing or unreadable' >/dev/null; then
   pass "control: an unreadable file fails the sweep, not passes it"
+else
+  fail "control: an unreadable file fails the sweep, not passes it" \
+    "the sweep failed it, but for another reason — the guard is not what fired: $out"
 fi
 chmod 644 "$tmp_unreadable" 2>/dev/null
 rm -f "$tmp_unreadable"
+
+# Adjacent control: the same function must PASS a readable, clean file.
+# Without it a sweep that failed every file would satisfy the control above.
+tmp_clean="$(mktemp)"; printf 'swept, and nothing personal in it\n' > "$tmp_clean"
+if out="$(sweep_file "$tmp_clean" "control fixture")" && [ -n "$out" ]; then
+  pass "control: the same sweep passes a readable, clean file"
+else
+  fail "control: the same sweep passes a readable, clean file" \
+    "a clean readable file did not pass the sweep: $out"
+fi
+rm -f "$tmp_clean"
 
 report
