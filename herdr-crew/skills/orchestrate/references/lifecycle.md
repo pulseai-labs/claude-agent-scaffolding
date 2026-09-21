@@ -233,7 +233,8 @@ live dispatch, its `REPORT_PATH` and the hash last noted, and your own resolved 
 — `/ossify:handoff` with ossify installed, the same file by hand without it. Open a new tab
 and pane with the launch command the handoff recorded — ask the operator once when none
 did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`,
-the top's own workspace, never the run's, which closes last. Send the new top its
+which herdr sets in every pane it hosts (as it does `HERDR_PANE_ID`), the top's own
+workspace, never the run's, which closes last. Send the new top its
 resume — `/ossify:handoff-resume <path>` with ossify, or the path as its first
 instruction without — confirm its turn started, then **stand down**: kill this session's
 armed background waits before the successor re-arms the same panes, and take no dispatch

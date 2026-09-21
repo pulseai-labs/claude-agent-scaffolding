@@ -24,6 +24,7 @@ TAIL_BYTES=4000000    # the latest assistant record sits in the transcript's tai
 
 ceiling="${CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING:-}"
 case "$ceiling" in ''|*[!0-9]*) ceiling=$DEFAULT_CEILING ;; esac
+[ "$ceiling" -ge 1 ] || ceiling=$DEFAULT_CEILING    # the manifest's min is 1; 0 fires on every prompt
 
 input="$(cat)"
 
@@ -56,9 +57,12 @@ case "$event" in
     command="$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null)"
     case "$command" in
       # herdr's new-work commands: tab/workspace/worktree creation, the seat
-      # launch (pane run) and the send (agent prompt). Everything else the
-      # coordinator runs — agent wait, pane read, pane list, agent list — is
-      # not new work and stays silent.
+      # launch (pane run) and the send (agent prompt). Matched by substring, so
+      # a command that merely mentions one of those verbs also fires; that is
+      # deliberate — the notice is advisory and never a block, and narrowing the
+      # pattern risks missing the real forms (`herdr --machine x pane run`,
+      # `"$HERDR_BIN_PATH" pane run`). `agent wait`, `pane read`, `pane list`
+      # and `agent list` carry none of the five and stay silent.
       *'tab create'*|*'workspace create'*|*'worktree create'*|*'pane run'*|*'agent prompt'*) ;;
       *) exit 0 ;;
     esac ;;

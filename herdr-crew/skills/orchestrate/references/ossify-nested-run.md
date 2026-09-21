@@ -68,8 +68,9 @@ releases every item pair and closes the workspace it created, as
    report file, then waits. Gather the round's plans into **one** ordered ask to you;
    return an independent approve-or-amend per item; the spine session sends each
    implementer its item's decision, before which no edit starts.
-5. On each complete return, capture the item's four-part fingerprint (`tree_id:head_id:report_id:spec_id`, ossify's
-   close guard), then create and
+5. On each complete return, capture the item's four-part fingerprint — work-item id, branch,
+   head oid, tree oid: the identity the correction packet's `expected_*` fields carry
+   (`ossify-briefs.md`) — then create and
    dispatch that item's **fresh verifier seat** from its SEATS row's exact
    command, in the same worktree, against the fixed all-claims procedure.
    `cannot determine` = fail.

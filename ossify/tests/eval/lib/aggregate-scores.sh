@@ -59,7 +59,7 @@ for skill_dir in "$RESULTS_DIR"/*/; do
     else
       skill_fail=$((skill_fail + 1))
       total_fail=$((total_fail + 1))
-      notes=$(jq -r '.notes // ""' "$result" 2>/dev/null)
+      notes=$(jq -r '.notes // ""' "$result" 2>/dev/null || echo "")
       echo "  FAIL: ${skill}/$(basename "$result" .json) — ${notes}"
     fi
   done

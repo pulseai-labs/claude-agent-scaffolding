@@ -110,7 +110,7 @@ expect_notice "at the ceiling: notice on a prompt" UserPromptSubmit \
 run "$(input PreToolUse "$T_PAST" 'herdr agent prompt w7:p2 "implement item 3"')"
 expect_notice "past the ceiling: notice before 'agent prompt'" PreToolUse "context 523114" "ceiling 500000"
 
-section "only herdr new-work commands, only inside a herdr pane"
+section "only commands carrying a new-work verb, only inside a herdr pane"
 # <verb>|<command>: the verb is the substring the matcher keys on, and it is
 # also the case's label, so deleting that substring from the handler names the
 # case it turns RED.
@@ -226,6 +226,8 @@ run "$(input UserPromptSubmit "$T600")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=abc
 expect_notice "a non-numeric setting falls back to 500000" UserPromptSubmit "ceiling 500000"
 run "$(input UserPromptSubmit "$T_BELOW")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=
 expect_silent "an empty setting falls back to 500000"
+run "$(input UserPromptSubmit "$T_BELOW")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=0
+expect_silent "a zero setting falls back to 500000"
 
 section "registration"
 HJ="$PLUGIN_ROOT/hooks/hooks.json"
