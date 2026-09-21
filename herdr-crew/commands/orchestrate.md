@@ -25,4 +25,4 @@ context is for decisions; every other kind of work is dispatched.
 If this session has just planned an ossify spine, the skill routes you to its
 execution-assignment phase: you agree per-item implementer and verifier seats with
 the operator into the project file and start one spine session. You do not launch
-item terminals yourself.
+item tabs and panes yourself.

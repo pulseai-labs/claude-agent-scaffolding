@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: The orchestrator/worker session model over herdr — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through herdr, the seats defined in the operator's own files (~/.claude/herdr-crew/agents.md, .herdr-crew/roles.md). One /code-review per PR, findings returned in the seat's report file, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that runs the items in fresh external terminals. Use when the user says orchestrator session, spawn a worker, dispatch to a session, the seat, review this PR in a session, execution assignments for a spine, or runs /herdr-crew:orchestrate. Not herdr's command reference (`herdr --skill` owns that), and not a PR loop of its own where ossify's work-pr is installed.
+description: The orchestrator/worker session model over herdr — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through herdr, the seats defined in the operator's own files (~/.claude/herdr-crew/agents.md, .herdr-crew/roles.md). One /code-review per PR, findings returned in the seat's report file, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that runs the items in a fresh tab and pane per item. Use when the user says orchestrator session, spawn a worker, dispatch to a session, the seat, review this PR in a session, execution assignments for a spine, or runs /herdr-crew:orchestrate. Not herdr's command reference (`herdr --skill` owns that), and not a PR loop of its own where ossify's work-pr is installed.
 ---
 
 # Orchestrate — the orchestrator/worker session model
@@ -33,7 +33,7 @@ Your own turns take these kinds of action, and no others:
 3. Read the seats' report files.
 4. Decide.
 5. Converse: operator questions, `reply`/`ask` with workers.
-6. Execute single authorized mutations: worktree and terminal creation, dispatch,
+6. Execute single authorized mutations: worktree, tab and pane creation, dispatch,
    the PR comment, the merge — and, after it, the teardown: releasing workers,
    closing panes and the run, and the verified branch delete.
 
@@ -120,7 +120,7 @@ Two cases are named because they look like clashes and are not:
   **Read `references/ossify-execution.md` and follow it**: the seats for the spine are
   written into the project file and approved by the operator, and you inject them into
   one spine session's brief — that session creates a nested `run.json` it owns and
-  drives fresh external terminals per item, no subagent anywhere in that path.
+  drives a fresh tab and pane per item, no subagent anywhere in that path.
   Its four briefs are in `references/ossify-briefs.md`. Activation needs all four facts
   that file lists; installation alone is not one of them, so an ossify spine you did
   not plan here stays on the bullet above. The nested `run.json`'s mechanics — depth,
@@ -139,7 +139,7 @@ Two cases are named because they look like clashes and are not:
 - **herdr is not running** (`herdr status` fails): say so and stop. Do not fall back
   to the `Agent` tool or to doing the work inline.
 - **A seat is undefined or its agent is missing** (the seat name is in neither file, the
-  terminal shows `command not found`, or the first reply names the wrong model): report
+  pane shows `command not found`, or the first reply names the wrong model): report
   it to the operator and stop that dispatch. Never substitute `claude --model`.
 - **A worker refuses on policy:** report the refusal verbatim. Do not retry it around, and
   do not rephrase the brief to slip past it.
