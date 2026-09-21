@@ -41,9 +41,10 @@ its brief through the pane, never with an `agent` command. This file states only
 and retention.
 Acceptance of input is not the start of a turn: that send's `--wait` confirms the turn
 started in the same call, and `herdr-mechanics.md`'s `agent_prompt_stalled` bullet says
-what to do when it did not. Every brief also asks
-the worker to state its model in its first reply — a second check, not the only one. A
-wrong model is a failed launch: release the seat and report it.
+what to do when it did not. A wrong model is a failed launch: release the seat and report
+it. Every brief also asks the worker to state its model in its first reply — the second
+check, and the worker's own: one that finds its model is not `SEAT_EXPECTED_MODEL` reports
+a failed launch in its report file and stops, rather than working around it.
 
 ## Retention follows artifacts
 
@@ -69,8 +70,8 @@ On a spine this session planned (`ossify-execution.md`), two rows above are
 superseded **for that spine's work items only**: the implementer and the verifier
 are launched from the spine's operator-approved SEATS rows, whose values may name
 a native `claude --model <id> --effort <level>` command rather than an alias; the
-model is confirmed as the row's `model_shows` says and from the first reply, exactly as *The launch*
-requires; and each item gets a
+model is confirmed as the row's `model_shows` says and by the worker's own check, exactly
+as *The launch* requires; and each item gets a
 **fresh** pair, retained across that item's corrections and released when it closes or
 escalates. A pair never crosses work items there.
 
@@ -100,8 +101,8 @@ the spine session, one per spine; a close
 session, a fresh tab and pane per close dispatch; a work-PR session, one per returned
 PR — each launched from its own seat in the project file (`spine session`,
 `close session`, `work-PR session`), the model confirmed as its profile's
-`model_shows` says and from the first reply, as an item row's is — and a close-review writer, one per affected
-hosting repo at a `halted: close-review`, launched from the profile the operator
+`model_shows` says and by the worker's own check, as an item row's is — and a close-review writer,
+one per affected hosting repo at a `halted: close-review`, launched from the profile the operator
 names at that halt (`ossify-close-writer.md`), never a seat the file pre-defines.** The
 work-PR session owns the reviewer and the
 PR-fix seat inside a `run.json` of

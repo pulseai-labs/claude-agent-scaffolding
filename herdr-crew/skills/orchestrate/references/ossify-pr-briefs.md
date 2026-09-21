@@ -150,7 +150,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      second merge loop inside this one; it works the fix list you give it,
      pushes, and returns `fixed in <sha>` per finding, never running work-pr or
      asking a merge — created from its PRFIX row —
-     confirm its model as the row's `model_shows` says and from the first reply before the
+     confirm its model as the row's `model_shows` says and by the worker's own check before the
      first fix task; a mismatch is a failed launch to ask about, never to work
      around. The delegated review ran once, on the head it was briefed with, and
      that seat is released after its report file validates. Each push moves the

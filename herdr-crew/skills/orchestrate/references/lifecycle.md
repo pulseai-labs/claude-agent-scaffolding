@@ -56,8 +56,9 @@ Every command's syntax comes from `herdr --skill`.
    confirms the model, then the brief delivered as `brief_delivery` says (inject or
    file) on the route `herdr-mechanics.md` fixes from its second detection ask after
    that read — is `roles.md`'s "The launch," with the undetected-seat path in
-   `herdr-mechanics.md`. The "state your model" line in the worker's first reply is
-   the second check. Wrong model: release the seat and report it.
+   `herdr-mechanics.md`. The "state your model" line is the worker's own second check: a
+   model that is not `SEAT_EXPECTED_MODEL` is a failed launch it writes to its report file
+   and stops on. Wrong model at the banner read: release the seat and report it.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes, the same

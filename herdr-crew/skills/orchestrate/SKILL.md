@@ -99,8 +99,10 @@ implementer, fix round, reviewer, verifier — plus the correction-request messa
 template, which is a send, not a session. A brief is the whole contract the worker
 will ever see, because a worker session has no orchestration context and may be
 launched somewhere its project rules do not load. Every brief asks the worker to
-state its model in its first reply, and you read that line before sending anything
-else.
+state its model in its first reply: a model that is not `SEAT_EXPECTED_MODEL` is a
+failed launch the worker reports and stops on rather than works around, and that
+report reaches you in its report file, like everything else it says. This session's
+own check is the launch's banner read (`references/roles.md`), made before dispatch.
 
 ## 6. With ossify
 
@@ -147,8 +149,9 @@ Two cases are named because they look like clashes and are not:
 - **herdr is not running** (`herdr status` fails): say so and stop. Do not fall back
   to the `Agent` tool or to doing the work inline.
 - **A seat is undefined or its agent is missing** (the seat name is in neither file, the
-  pane shows `command not found`, or the first reply names the wrong model): report
-  it to the operator and stop that dispatch. Never substitute `claude --model`.
+  pane shows `command not found`, or the banner read shows a model other than its
+  `expected_model:`): report it to the operator and stop that dispatch. Never substitute
+  `claude --model`.
 - **A worker refuses on policy:** report the refusal verbatim. Do not retry it around, and
   do not rephrase the brief to slip past it.
 - **`/code-review` is unavailable in the reviewer session:** the reviewer reports that in

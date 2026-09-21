@@ -55,8 +55,8 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      never a substitute value — as a tab of the workspace you create for your run (created
      again first if `herdr workspace list` no longer shows it: closing its last pane may take
      it), its `--cwd` the worktree ossify prepared. The verifier is created at step 5, once
-     a complete return exists. Confirm each model as its row's `model_shows` says and from
-     the first reply; the effort is the given launch argument. A row that is missing or
+     a complete return exists. Confirm each model as its row's `model_shows` says and by
+     the worker's own check; the effort is the given launch argument. A row that is missing or
      ambiguous halts that launch and asks; only a top reply carrying replacement rows moves the block.
   4. Gather the round's implementation plans, each read from its implementer's
      report file, into ONE ordered relay to the top, and wait. Send each

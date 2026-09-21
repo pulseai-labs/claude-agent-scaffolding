@@ -91,7 +91,7 @@ carrying a profile conforms rather than restating a field list.
 | field | set by | consumed at | travels |
 |---|---|---|---|
 | `command:` | the machine entry | `pane run` | every resolved profile |
-| `expected_model:` | the machine entry | the model read and the first reply | every resolved profile |
+| `expected_model:` | the machine entry | the model read, and the worker's own check | every resolved profile |
 | `effort:` | the machine entry | the launch | every resolved profile |
 | `model_shows:` | the machine entry | the model read | every resolved profile — the launching session never opens this file |
 | `brief_delivery:` | the machine entry | the brief's delivery | every resolved profile |

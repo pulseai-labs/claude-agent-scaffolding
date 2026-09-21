@@ -550,7 +550,7 @@ section "the PR lane runs the review before the command that consumes it"
 # result shape, and the full signal set a disposition covers.
 pin "$PRBRIEFS_MD" 'carrying those findings in as its disposition inputs' \
   "the reviewer runs before work-pr, whose disposition takes its findings"
-pin "$PRBRIEFS_MD" 'its model as the row'"'"'s `model_shows` says and from the first reply' \
+pin "$PRBRIEFS_MD" 'its model as the row'"'"'s `model_shows` says and by the worker'"'"'s own check' \
   "the PR-fix seat's ratified model is spent, not merely injected"
 pin "$PRBRIEFS_MD" 'halted: <step>' \
   "the close brief has a third result shape for a halt before any PR opens"
