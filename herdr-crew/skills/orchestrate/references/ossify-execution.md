@@ -1,0 +1,132 @@
+# ossify spine execution — assignments, seats, and who owns what
+
+A spine's work items each deserve their own model and effort; one dispatched lane driver
+cannot give them that, because whatever it spawns inherits its runtime.
+
+> **Editing note.** This file, `ossify-nested-run.md` and `ossify-briefs.md` are asserted
+> to hold no subagent invocation form. Never paste the call shape.
+
+## 1. Activation
+
+Four facts, **all** of them, and each about the session you are in right now:
+
+1. herdr-crew is the current top orchestrator;
+2. the run's `run.json` is bound;
+3. this session has just completed `/ossify:plan-spine`;
+4. a concrete spine directory exists on disk.
+
+Absent any one, this file does not apply and ossify runs as `SKILL.md` §6 says.
+**None of these activates it**: mere installation, an environment variable, a
+spine section in the project file, a `/plan-spine` in a session that is not the
+top. Discovery is not authority — the phase begins because *this* session
+planned *this* spine.
+
+## 2. Four seats, one voice
+
+| Layer | Owns | Never |
+|---|---|---|
+| **Top orchestrator** (you) | agreeing one implementer/verifier seat per item and the three coordinator seats — spine, close, work-PR — with the operator into the project file, injecting them into the spine session's brief as its SEATS block, launching the spine session from that seat's resolved profile, verbatim — a model mismatch is a failed launch, exactly as for an item row — approving or amending each relayed worker plan, deciding the reviewer and PR-fix seats at the PR transition, dispatching the close and one work-PR session per returned PR, each launched from its project-file seat with the model confirmed as an item row's, assigning each work-PR dispatch's merge executor (`MERGE_EXECUTOR`) and supplying its `PRIOR_REVIEW` — `none` only for a PR no earlier work-PR dispatch has covered, `covered` when one has and left durable evidence its review ran but persisted no record, otherwise the durable record that PR's last `open:` result persisted — asking for a writer profile and dispatching one fresh close-review writer per affected hosting repo when a close returns `halted: close-review`, relaying the merge word, dispatching the record pass, and the teardown | launching or supervising an item seat; reading an item seat's report file; reviewing, fixing or merging a spine PR itself |
+| **Spine session** | the ossify lane, a nested `run.json` of its own, launching and supervising both item seats per item, relaying plans up, item-local corrections | changing any ossify contract; writing item tasks into the top's `run.json` |
+| **Item seats** | one item each: implement, verify | crossing into another item |
+| **Close session** | one dispatch of `/ossify:close`, returning every PR it opened | creating any seat; driving a PR it opened |
+| **Work-PR session** | one returned PR: the reviewer seat, the PR-fix seat, dispositions, ledgers, and the merge on the top's relayed word under its `MERGE_EXECUTOR` assignment — always a merge commit on the named SHA, whoever executes | talking to the operator; merging without that word |
+
+ossify owns worktrees, handoffs, closes, merges and the round barrier, and knows
+nothing about the above.
+
+**Only the top talks to the operator; every other seat asks upward, one hop per
+layer, in its report file.** And every dispatched session returns a checkable
+artifact — a PR list, a ledger comment id, a merge SHA — never narrative.
+
+**Depth is confirmed with the operator, twice over.** Before the spine session
+launches, ask the operator to confirm nested worker depth is `2`: the spine
+session launches item sessions of its own. herdr has no depth setting to read, so
+a brief asserting the depth is not confirmation, and no CLI read substitutes. A
+spine session that reports it cannot launch an item session is relayed to the
+operator as an ask — you never answer it yourself or record your own choice as an
+operator decision.
+
+The nested `run.json`'s mechanics — depth, routing, the round procedure and the
+close — are in `references/ossify-nested-run.md`.
+
+## 3. The seats
+
+A spine's seats live in the project file, operator-approved — never in a file of
+this plugin's own.
+
+**Recommending.** After `/plan-spine`, recommend one implementer and one verifier seat per item
+from the project file's seats and conditions — scope, risk and cost,
+item by item — and the three coordinator seats beside them. Present **every** seat
+to the operator in one approval phase and write nothing until all of it is decided
+— a half-approved set looks binding and is not. Record the recommendation and any
+override.
+
+**Writing.** On approval, record the set in the project file's section for this
+spine — each item's implementer and verifier agent name, keyed by item, and the
+three coordinator seats' beside them. The project file
+names agents, never commands, so no machine detail reaches the repo. The profile resolves at
+injection: build the spine session's SEATS block by looking each approved name
+up in the machine file for its resolved profile, then inject
+the block into the spine session's brief (`ossify-briefs.md`) — the approved seats travel in the brief,
+so an edit made for another spine cannot reach a
+spine already running. A seat that needs to change mid-spine is a new operator
+decision you relay down through the reply; no session re-reads the file for it.
+
+A handoff the top writes **carries the approved seats verbatim** — the item rows
+and the three resolved coordinator profiles beside them; a resumed top
+launches from those, never a fresh read. A resumed top whose handoff lacks them asks the operator before any launch that spends an approved seat.
+
+## Fixed procedures
+
+implementation_plan_gate: worker-authored/top-orchestrator-approved
+implementer_entrypoint: /ossify:work-item <handoff path>
+verifier_procedure: all-claims-work-item-verify/v1
+
+**Only the resolved profiles vary.** The three procedures above
+are fixed for every item on every spine, recorded so the spine session checks
+rather than chooses. No reviewer row — §5 says why; the coordinator seats sit
+beside the item rows, never among them.
+
+## 4. Scope of the fresh-pair rule
+
+Fresh-per-item pairs are scoped to **activated ossify spines**. Outside them
+`roles.md`'s class routing and retention remain authoritative — a retained implementer
+across ordinary consecutive work items is still correct.
+
+The single exception inside a spine is a *replace* decision at the first-failure ask
+(`ossify-nested-run.md` §3): the old pair is released before its replacement exists, so
+one-pair-per-item is preserved by that ordering rather than broken by the exception. The
+replacement starts from a worktree reset to the request's `base_sha`, so it is an
+ordinary first run of the item, not an inheritance of the rejected work.
+
+## 5. Two profiles are chosen at the PR, not before
+
+Reviewer profile is absent from spine planning and from the SEATS block on purpose: the PR
+does not exist yet, and a profile chosen before there is a diff to read is a guess
+recorded as a decision. At the PR transition ask for the reviewer's resolved profile
+and `/code-review` level, and put **both** into the **work-PR
+session's** brief (`ossify-pr-briefs.md`) — that session creates the reviewer from the
+decided row and confirms its model as `model_shows` says and from the first reply exactly as an
+item row is; step 8's reviewer seat is the default only outside such a spine.
+
+**Decide the PR-fix implementer in the same breath.** Every item pair was released at
+its item's close and the spine session was a coordinator, not a writer — so step 10's
+*retained implementer* does not exist here. Ask for one PR-fix resolved profile
+alongside the reviewer's, and inject it into the same work-PR
+brief. The seat is **decided** by you and **created and dispatched by the work-PR
+session**, only once its disposition ledger exists, on `briefs.md`'s **fix-round
+brief** rather than the planned-implementer brief, whose DONE opens a new PR: it works
+the PR that already exists. One seat per PR, released at merge.
+
+**A close-review writer is not this seat.** When a close halts on its own review
+(`ossify-nested-run.md` §4), ask the operator for that writer's profile at the
+halt and dispatch one writer per affected hosting repo, each from
+`references/ossify-close-writer.md`, bounded to its own repo's worktree — not
+the PR-fix seat, chosen at the transition or early.
+
+## 6. Briefs
+
+The spine and item briefs are in `references/ossify-briefs.md`, the close and
+work-PR briefs in `references/ossify-pr-briefs.md`, the close-review writer's
+in `references/ossify-close-writer.md`; `references/briefs.md`'s templates still
+apply elsewhere, its fix-round brief included (§5).

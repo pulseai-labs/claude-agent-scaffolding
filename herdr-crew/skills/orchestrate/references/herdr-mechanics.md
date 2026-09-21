@@ -26,8 +26,8 @@ is this sequence, in which `<seat label>` is `seat: <role> (<agent>)`:
    verbatim. It sends the text and Enter in one call.
 4. **Readiness**, on whichever of the two paths below the pane takes.
 5. **The model.** `herdr pane read <pane>`, with `--source visible` (the rendered viewport)
-   when `model_shows: screen`, must show `expected_model:`; `command not found` or another
-   model is a failed launch (`roles.md`).
+   when `model_shows: screen`, must show `expected_model:`;
+   `command not found` or another model is a failed launch (`roles.md`).
 6. **Dispatch**, sent as below.
 
 ## The two readiness paths
