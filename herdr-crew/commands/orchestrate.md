@@ -1,5 +1,5 @@
 ---
-description: Start or resume an orchestrator Run over herdr — bind the objective, then drive worker sessions by seat (planned and bounded implementers, one reviewer per PR, one retained verifier per work item) while this session keeps its context for decisions. Seats come from the operator's own files.
+description: Start or resume an orchestrator run over herdr — bind the objective, then drive worker sessions by seat (planned and bounded implementers, one reviewer per PR, one retained verifier per work item) while this session keeps its context for decisions. Seats come from the operator's own files.
 argument-hint: "[objective]"
 allowed-tools: Bash(bash:*), Bash(herdr:*), Bash(git:*), Bash(gh:*), Read, Write
 ---
