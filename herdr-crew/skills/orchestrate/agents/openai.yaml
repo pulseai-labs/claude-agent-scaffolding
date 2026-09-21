@@ -1,0 +1,3 @@
+interface:
+  display_name: "Orchestrate"
+  short_description: "Orchestrator/worker session model over Orca"

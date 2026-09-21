@@ -1,0 +1,6 @@
+{
+  "name": "herdr-crew",
+  "version": "0.1.0",
+  "description": "The orchestrator/worker session model over herdr. An orchestrator session keeps its context for decisions and dispatches everything else to worker sessions launched by seat name: the operator's own files name each seat (~/.claude/herdr-crew/agents.md on the machine, .herdr-crew/roles.md in the project), implementers route by complexity class, one reviewer session runs /code-review once per PR, the retained implementer works GitHub threads to zero, merge only on the operator's word. A session budget caps each work item at one implementer and one verifier. Each seat gets its own labelled tab holding one full-size pane, in the tree its --cwd names, so a run of five seats is five readable tabs. Readiness is derived, not declared: a seat herdr detects waits on a typed agent state, a seat it does not waits on a screen pattern, so an undetected agent CLI is a first-class seat and a detection manifest later upgrades it with no edit. Run state lives in a dagr run.json the plugin owns and no binary writes. One fail-open hook tells a coordinator seat its own context figure past a configurable ceiling (default 500000 tokens). Defers every other herdr command to the binary's own guide. No lib, no state.",
+  "author": { "name": "Pras" }
+}
