@@ -64,13 +64,17 @@ the authority. The skill never substitutes `claude --model`.
 
 One implementer seat and one verifier seat per work item; one reviewer per PR. A fix
 round may re-use the verifier seat, and a context-rotation replacement occupies the seat
-it replaces; any session outside those seats is a planning defect, and the orchestrator
-stops to re-plan the item. The authority is the skill's `references/roles.md`. The
-implementer is retained across consecutive work items until it passes half its context
-window (checked by `/context` at each task boundary) or the harness auto-compacts; the
-next item starts fresh with the handoff the orchestrator writes from the inputs in its
-report file. An activated spine adds four seats outside that budget — the spine session,
-a close session, one work-PR session per returned PR, and a close-review writer.
+it replaces. Beyond those, the budget admits three kinds of seat: a role the operator
+declares in the project file, for that role's dispatch only and against the allowance the
+file declares; a `doctor session`, one per `/ossify:doctor` dispatch, released on return;
+and, on an activated spine, the four seats below. Any other session is a planning defect,
+and the orchestrator stops to re-plan the item. The authority is the skill's
+`references/roles.md`. The implementer is retained across consecutive work items until it
+passes half its context window (checked by `/context` at each task boundary) or the
+harness auto-compacts; the next item starts fresh with the handoff the orchestrator writes
+from the inputs in its report file. An activated spine adds four seats outside that budget
+— the spine session, a close session, one work-PR session per returned PR, and a
+close-review writer.
 
 ## With ossify
 
@@ -84,10 +88,10 @@ spine — and only then; installation, an environment variable, or a project fil
 disk activate nothing — the phase in `references/ossify-execution.md` applies instead:
 the operator approves one implementer and one verifier seat per work item plus the
 coordinator seats, the set is injected into one spine session's brief, and that session
-launches a fresh tab and pane per item. Only the top talks to the operator; every
-other seat asks upward, one hop per layer, in its report file, and every dispatched
-session returns a checkable artifact — a PR list, a ledger comment id, a merge SHA —
-never narrative.
+launches a fresh tab and pane per item seat — the implementer and the verifier each in
+its own tab. Only the top talks to the operator; every other seat asks upward, one hop
+per layer, in its report file, and every dispatched session returns a checkable artifact
+— a PR list, a ledger comment id, a merge SHA — never narrative.
 
 ## Placement
 
@@ -108,14 +112,16 @@ the typed path with no edit anywhere.
 
 **Completion is a report file.** herdr's typed state carries no body, so the file at the
 `REPORT_PATH=` the brief names is the contract and the state is only the doorbell. A
-coordinator seat — the top, a spine session, a work-PR session — runs work of its own in
-the background and reads ready before its report exists, so it is waited on through its
-report file directly. Every file a run keeps is placed outside every seat's worktree, so
-removing a worktree never takes one.
+coordinator seat — a spine session, a work-PR session, or a `run-spine` lane driver, each
+running work of its own in the background — reads ready before its report exists, so it is
+waited on through its report file directly. The top is not one of them: it is the one that
+waits, and it has no report file of its own. Every file a run keeps is placed outside every
+seat's worktree, so removing a worktree never takes one.
 
-**Every wait is one background call that returns once** — never a loop, and never a
-re-entry after an empty timeout. A round of N parallel items is N such waits, one per
-pane, each waking the session when it exits; the round's barrier closes when every
+**Every wait is one call that returns once** — a background call where the host has one,
+the wait in the foreground inside that host's cap where it does not — never a loop, and
+never a re-entry after an empty timeout. A round of N parallel items is N such waits, one
+per pane, each waking the session when it exits; the round's barrier closes when every
 item's report file is in hand.
 
 ## The run's state
@@ -132,9 +138,10 @@ figure once it reaches the `context_ceiling` setting (default 500000 tokens): fi
 unit in hand, start no new one, rotate at the next boundary. It never allows, denies or
 asks, it is inert outside a herdr pane, and it reports the figure as unavailable rather
 than guessing when it cannot read it. The rotation itself is prose, in
-`references/lifecycle.md`. This is the plugin's only deterministic code: **no `lib/`, no
-state directory, no parser** — `agents.md` and `roles.md` are read as prose and nothing
-parses them.
+`references/lifecycle.md`. That hook is the only deterministic code a run executes: a run
+has **no `lib/`, no state directory, no parser** — `agents.md` and `roles.md` are read as
+prose and nothing parses them. The suites and the eval harness under `tests/` are
+build-and-test tooling; the plugin never runs them on a user's path.
 
 ## Configuration
 

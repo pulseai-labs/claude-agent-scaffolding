@@ -23,50 +23,54 @@ nothing here reads the old ones.
 - **Completion is a report file**, at the `REPORT_PATH=` the seat's brief names; the
   typed state is only the doorbell, because herdr's `done` carries no body and a
   hash tells a new report from an old one at the same path. A coordinator seat — a
-  spine or work-PR session running work of its own in the background — is waited on
-  through its report file, not a typed state it would read as ready too soon.
+  spine session, a work-PR session, or a `run-spine` lane driver whose subagents run
+  in the background — is waited on through its report file, not a typed state it
+  would read as ready too soon.
 - **The bounded-wait narrowing.** `orca terminal wait --for tui-idle` becomes one
   `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>`
-  run in the background: a single call that returns once, with `blocked` in the set
-  so a dialog wakes rather than sleeping to the timeout. A round of N parallel items
-  is N such waits, one per pane — never a loop of waits, and never a re-entry after
-  an empty timeout.
+  — run in the background where the host has a background call, in the foreground
+  inside that host's cap where it does not: a single call that returns once, with
+  `blocked` in the set so a dialog wakes rather than sleeping to the timeout. A round
+  of N parallel items is N such waits, one per pane — never a loop of waits, and
+  never a re-entry after an empty timeout.
 - **The run's state lives in a dagr `run.json`** that the plugin's prose owns and no
   binary writes.
 - **The configuration paths move and the format does not.** The machine file is
   `~/.claude/herdr-crew/agents.md` and the project file is `.herdr-crew/roles.md`;
   every field, every role key and every precedence rule is as it was, and both are
   still read as prose.
-- **One fail-open hook, and no library.** `hooks-handlers/context-ceiling.sh`, gated
-  on `HERDR_PANE_ID` and inert outside a herdr pane, tells a coordinator seat its own
-  context figure once it passes the `context_ceiling` setting (default 500000
-  tokens). There is no `lib/`, no state directory and no parser; that hook is the
-  plugin's only deterministic code.
+- **One fail-open hook, and no runtime library.** `hooks-handlers/context-ceiling.sh`,
+  gated on `HERDR_PANE_ID` and inert outside a herdr pane, tells a coordinator seat
+  its own context figure once it passes the `context_ceiling` setting (default
+  500000 tokens). A run executes no `lib/`, no state directory and no parser; that
+  hook is the only deterministic code on a user's path. The suites and the eval
+  harness under `tests/` are build-and-test tooling, never run by the plugin.
 - **The ossify seam ports unchanged.** The spine execution-assignment phase, the
   approved SEATS block injected into one spine session's brief, the nested
-  `run.json`, the four coordinator seats outside the per-item budget, and the fixed
-  procedures are the contract they were; the lane's item panes are herdr tabs.
+  `run.json`, the three coordinator seats and the close-review writer outside the
+  per-item budget, and the fixed procedures are the contract they were; the lane's
+  item panes are herdr tabs.
 
 ### The verb map
 
 | orca-crew 0.7.0 | herdr-crew |
 |---|---|
 | `orca terminal create --worktree <sel> --command "<cmd>"` | `herdr worktree create` / `herdr workspace create --cwd`, then `herdr tab create --workspace <id> --cwd <path> --label <text>`, then `herdr pane run <pane> "<command:>"` |
-| `orca terminal wait --for tui-idle` | `herdr agent wait <pane> --until idle --timeout <ms>` — detected seats |
-| (no equivalent) | `herdr pane wait-output <pane> <pattern>` — undetected seats |
-| `orca terminal read` | `herdr pane read <pane>` |
-| `orca terminal send` | `herdr agent prompt <pane> "<text>"` |
-| `orca terminal close` | `herdr pane close <pane>` / `herdr workspace close <id>` |
+| `orca terminal wait --for tui-idle` | `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>` as a single background call — a detected seat that is not a coordinator. The three settled states are written out rather than inherited, and `blocked` is in the set so a dialog wakes instead of sleeping to the timeout |
+| (no equivalent) | `herdr pane wait-output <pane> --match '<expected_model:>' --timeout <ms>` — an undetected seat's readiness, read from the screen when `model_shows: screen`; its completion doorbell is its report file |
+| `orca terminal read` | `herdr pane read <pane>` — serves both `model_shows: banner` and `screen` |
+| `orca terminal send` | detected: `herdr agent prompt <pane> "<text>"`, the `/context` send at a task boundary plain and with no `--wait`, because a local slash command settles without a turn; undetected: the message written to a file the seat can read, then a one-line pointer via `herdr pane run <pane> "<line>"` |
+| `orca terminal close` | a tab seat: `herdr pane close <pane>`; a worktree seat: `herdr worktree remove --workspace <id>`, never a pane close; the run's own workspace closes last with `herdr workspace close <id>` |
 | `orca terminal list` | `herdr pane list` / `herdr agent list`, which is also the readiness discriminator |
 | `orca status --json` | `herdr status` |
-| `orca orchestration dispatch --inject` | `herdr agent prompt`; `brief_delivery: file` writes the brief and prompts one line pointing at it |
-| `orca orchestration ask` / `reply` | `herdr agent prompt` + `herdr agent wait` + `herdr pane read` — no mailbox; the orchestrator is the only asker |
-| `orca orchestration task-list` | the run's dagr `run.json` |
+| `orca orchestration dispatch --inject` | detected: `herdr agent prompt <pane> "<brief>" --wait --until working --until blocked --timeout <ms>`, that `--wait` being the turn-start check; undetected: the brief as a file, then a one-line pointer via `herdr pane run`; `brief_delivery: file` writes the brief and prompts one line pointing at it |
+| `orca orchestration ask` / `reply` | a worker writes its question into its report file and waits; the orchestrator answers with the seat's next message — herdr has no worker-to-orchestrator channel |
+| `orca orchestration task-list` | the run's dagr `run.json`; `dagr check --strict` lints it |
 | `orca orchestration run-use` | naming the run's `run.json` path |
-| `worker-start` | the seat launch |
-| `worker-done` | the seat's report file, woken by a typed wait |
-| `worker-read` | `herdr pane read`, the same narrow cases |
-| `worker-release` | `herdr pane close` / `herdr workspace close` |
+| `worker-start` | the seat launch (row 1) |
+| `worker-done` | the seat's **report file**; the doorbell is the typed wait for a detected seat that is not a coordinator, and the report-file wait for an undetected or coordinator seat |
+| `worker-read` | `herdr pane read`, only on a `blocked` wake or a missing or malformed report |
+| `worker-release` | as `orca terminal close` above |
 | `orca skills get orchestration` | `herdr --skill` |
 | `ORCA_TERMINAL_HANDLE` | `HERDR_PANE_ID` — the hook gate only |
 | `~/.claude/orca-crew/agents.md` | `~/.claude/herdr-crew/agents.md` |

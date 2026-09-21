@@ -145,11 +145,12 @@ if [ -f "$PLUGIN_ROOT/../.claude-plugin/marketplace.json" ]; then
 $PLUGIN_ROOT/../.claude-plugin/marketplace.json"
 fi
 # The sweep body, one file, as a function so the controls below exercise it
-# rather than restating it. The loop calls it once per swept file; the
-# unreadable-file control calls the same function, so what that control proves
-# is the guard's wiring — not, as it did until Task 9, that the OS honours
-# chmod 000. Returns 1 when the file cannot be certified: unreadable, or a
-# name counted in it.
+# rather than restating it. The loop calls it once per swept file; every control
+# calls the same function, so what a control proves is the sweep's own wiring —
+# not, as the unreadable-file control did until Task 9, that the OS honours
+# chmod 000, and not, as the name-detection control did, that an awk one-liner
+# can count. Returns 1 when the file cannot be certified: unreadable, or a name
+# counted in it.
 sweep_file() {
   f="$1"; rel="$2"
   if [ ! -r "$f" ]; then
@@ -173,15 +174,21 @@ for f in $SWEEP_FILES "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
   sweep_file "$f" "${f#"$PLUGIN_ROOT"/}"
 done
 
-# Control: the check can see a name when one is there.
+# Control: the check can see a name when one is there. Routed through
+# `sweep_file`, so it is the accumulating count that is asserted rather than a
+# standalone awk — until fix round 1 this control re-ran its own count, and
+# disabling the accumulation inside `sweep_file` left it green.
 tmp_ctl="$(mktemp)"; printf 'claude-glm\n' > "$tmp_ctl"
-ctl="$(awk -v needle='claude-glm' '
-  { line = $0
-    while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
-  END { print n+0 }' "$tmp_ctl")"
+if out="$(sweep_file "$tmp_ctl" "control fixture")"; then
+  fail "control: the sweep detects a personal name" \
+    "a planted name did not fail the sweep: $out"
+elif printf '%s' "$out" | grep -F 'occurrence(s)' >/dev/null; then
+  pass "control: the sweep detects a personal name"
+else
+  fail "control: the sweep detects a personal name" \
+    "the sweep failed it, but not on a counted name: $out"
+fi
 rm -f "$tmp_ctl"
-if [ "$ctl" -eq 1 ]; then pass "control: the sweep detects a personal name"
-else fail "control: the sweep detects a personal name" "control counted $ctl"; fi
 
 # Control: a missing or unreadable file must fail the sweep, not pass it — a
 # name-only counting check has no way to distinguish "clean" from "unread",
