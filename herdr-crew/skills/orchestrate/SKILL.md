@@ -125,11 +125,15 @@ Two cases are named because they look like clashes and are not:
   to this session only. You
   wait on one spine report, through its report file: a lane driver whose subagents run
   in the background is a coordinator seat (`references/herdr-mechanics.md`, Completion).
-  Its brief is `references/briefs.md`'s fast-implementer template with its TASK replaced
-  by the dispatch and its report body replaced by the one `references/ossify-briefs.md`'s
-  spine-session DONE block defines — ids, SHAs and counts; a lane driver on this path owns
-  no run file of its own — because it is launched by no template of its own, and without
-  that `REPORT_PATH` the wait for it has nothing to wake on.
+  Its brief is composed from `references/briefs.md`'s fast-implementer template: that
+  template's four `SEAT_` lines and its RULES slot stand, and its ROLE, PLACEMENT, TASK,
+  DONE body and NEVER line are all replaced — the TASK by the dispatch; the DONE body by the
+  one `references/ossify-briefs.md`'s spine-session DONE block defines (ids, SHAs and counts;
+  a lane driver on this path owns no run file of its own); the ROLE by the lane driver's, who
+  is ossify's orchestrator for that spine rather than an implementer; the PLACEMENT by the
+  tree the lane runs from; and the NEVER line, because it forbids running subagents and
+  merging, which are this seat's job. No template ships for it, and without that `REPORT_PATH`
+  the wait for it has nothing to wake on.
 - **`run-spine`, when this session just planned the spine.** Then the items deserve
   their own models, and inherited-runtime subagents cannot give them that.
   **Read `references/ossify-execution.md` and follow it**: the seats for the spine are
@@ -140,6 +144,12 @@ Two cases are named because they look like clashes and are not:
   that file lists; installation alone is not one of them, so an ossify spine you did
   not plan here stays on the bullet above. The nested `run.json`'s mechanics — depth,
   routing, the round procedure and the close — are in `references/ossify-nested-run.md`.
+- **`doctor`.** One fresh tab and pane per dispatch, launched from the project-file
+  `doctor session` seat and released on return (`references/roles.md`). Its brief is the
+  fast-implementer template with its TASK replaced by the dispatch and its report body
+  replaced by the doctor's own findings — the same composition the default lane above uses,
+  and for the same reason: a seat whose brief names no `REPORT_PATH` gives the wait for it
+  nothing to wake on.
 - **`work-pr`.** After the single reviewer dispatch and your disposition, the fix dispatch
   to the retained implementer is `/ossify:work-pr <PR> --repo-root <worktree holding the
   PR branch>` with the disposition list embedded as a third finding signal — work-pr

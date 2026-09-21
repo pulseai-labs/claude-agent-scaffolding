@@ -109,8 +109,8 @@ timeout counts from before submission, so it is a few seconds above the five-sec
   wake. `idle` or `done`: `herdr pane send-keys <pane> enter` submits what sits in the
   composer. `unknown`: report it to the operator. Never send the prompt again, because a
   stall does not prove the text was not delivered; read a `timeout` the same way.
-- `agent_blocked` (the seat was already at a dialog, and nothing was sent) and `blocked`
-  (the turn opened on one) are both handled as a `blocked` wake.
+- `agent_blocked` (nothing was sent) and `blocked` (the turn opened on one) are both a
+  `blocked` wake; a cleared `agent_blocked` re-sends the brief with the turn-start check.
 
 ## Completion
 
