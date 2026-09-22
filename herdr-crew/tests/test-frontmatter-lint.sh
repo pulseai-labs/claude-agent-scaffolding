@@ -336,4 +336,93 @@ for name in $names; do
   check_codex_policy "$name" "$SKILL_POSTURE"
 done
 
+section "the eval fixtures' frontmatter"
+
+# The eval harness parses every fixture's YAML frontmatter; nothing in CI did.
+# During PR #513 a bare apostrophe inside a single-quoted scalar broke fixture
+# 03's frontmatter, and only a manual Psych.parse re-check found it. Same parser
+# as above and for the same reason: a check that reads YAML another way is not
+# checking what will actually load the file.
+#
+# A missing directory or an empty set FAILS rather than noting. The "not present
+# yet" skip branch was deliberately removed in 0.1.0 — a wrong path would read as
+# "not arrived" forever, and a zero-count over a file nobody opened is not a
+# clean file — so no branch here may reintroduce one.
+#
+# The file set is a glob, not a list: a fixture nobody thought to enumerate is
+# still parsed, which is the whole failure this closes.
+fixture_check() { # <file> <rel>; callers use the captured output, not the counters
+  _f="$1"; _rel="$2"
+  if [ ! -r "$_f" ]; then
+    fail "$_rel: frontmatter parses" "missing or unreadable — the gate cannot certify a file it cannot open"
+    return 1
+  fi
+  _facts="$(fm_facts "$_f")"
+  _err="$(facts_error "$_facts")"
+  if [ -n "$_err" ]; then
+    fail "$_rel: frontmatter parses" "$_err"
+    return 1
+  fi
+  pass "$_rel: frontmatter parses"
+  return 0
+}
+
+FIXTURES_DIR="$PLUGIN_ROOT/tests/eval/fixtures"
+if [ ! -d "$FIXTURES_DIR" ]; then
+  fail "the eval fixture directory exists" \
+    "no $FIXTURES_DIR — every fixture's frontmatter would go unchecked"
+else
+  fixtures=0
+  for fixture in "$FIXTURES_DIR"/*/*.md; do
+    [ -e "$fixture" ] || continue
+    fixtures=$((fixtures + 1))
+    fixture_check "$fixture" "${fixture#"$PLUGIN_ROOT"/}"
+  done
+  if [ "$fixtures" -eq 0 ]; then
+    fail "the eval fixture set is non-empty" \
+      "no *.md under $FIXTURES_DIR/*/ — a glob that matched nothing certifies nothing"
+  fi
+fi
+
+# Control: the gate can see a broken scalar when one is there. This is PR #513's
+# exact shape — a bare apostrophe inside a single-quoted scalar ends the scalar
+# early, and the rest of the line is left as an unparseable fragment. Routed
+# through `fixture_check`, so what is asserted is the gate's own wiring rather
+# than a standalone Psych call; the message is checked too, so a failure for any
+# other reason does not read as this control passing.
+ctl_bad="$(mktemp)"
+cat > "$ctl_bad" <<'CTL_EOF'
+---
+scenario_id: control
+expected_reason: 'a bare apostrophe here's ends the scalar early'
+---
+CTL_EOF
+if out="$(fixture_check "$ctl_bad" "control fixture")"; then
+  fail "control: the gate fails a fixture with a broken scalar" \
+    "the planted apostrophe parsed: $out"
+elif printf '%s' "$out" | grep -F 'does not parse' >/dev/null; then
+  pass "control: the gate fails a fixture with a broken scalar"
+else
+  fail "control: the gate fails a fixture with a broken scalar" \
+    "the gate failed it, but not on a parse error: $out"
+fi
+rm -f "$ctl_bad"
+
+# Adjacent control: the same function must PASS a well-formed fixture. Without
+# it a gate that failed every file would satisfy the control above just as well.
+ctl_ok="$(mktemp)"
+cat > "$ctl_ok" <<'CTL_EOF'
+---
+scenario_id: control
+expected_reason: 'a quoted scalar, correctly closed'
+---
+CTL_EOF
+if out="$(fixture_check "$ctl_ok" "control fixture")" && [ -n "$out" ]; then
+  pass "control: the same gate passes a well-formed fixture"
+else
+  fail "control: the same gate passes a well-formed fixture" \
+    "a well-formed fixture did not pass: $out"
+fi
+rm -f "$ctl_ok"
+
 report

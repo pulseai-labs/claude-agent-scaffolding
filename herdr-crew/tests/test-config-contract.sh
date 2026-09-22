@@ -160,10 +160,20 @@ sweep_file() {
   fi
   hits=0
   for needle in $PERSONAL; do
-    c="$(awk -v needle="$needle" '
+    # The file is read as ONE line, joined by DELETING newlines — never by
+    # replacing them with a space. A markdown hard wrap splits a name at its
+    # hyphen: `claude-` ends one line and `glm` opens the next. A space-join
+    # rebuilds that as `claude- glm` and misses it; deleting rebuilds the name.
+    # Deleting cannot manufacture one either — every member of PERSONAL is
+    # space-less, so the join is what a split name already is. Until T7 the
+    # count was per line, and a wrap-split name was structurally invisible to
+    # it: the whole milestone leans on this gate. The unreadable-file guard
+    # above stays ahead of this pass, which is what keeps the three controls
+    # that call this function exercising the join rather than the read.
+    c="$(tr -d '\n' < "$f" | awk -v needle="$needle" '
       { line = $0
         while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
-      END { print n+0 }' "$f")"
+      END { print n+0 }')"
     hits=$((hits + c))
   done
   if [ "$hits" -eq 0 ]; then pass "no personal name in $rel"; return 0; fi
@@ -190,6 +200,24 @@ else
     "the sweep failed it, but not on a counted name: $out"
 fi
 rm -f "$tmp_ctl"
+
+# Control: the same check must still see a name SPLIT BY A MARKDOWN LINE WRAP.
+# This is the hole the per-line count had, and the plain plant above cannot see
+# it: `claude-` and `glm` on separate lines are each invisible to it, so the
+# wrap-aware join is what this control pins. It goes through `sweep_file` like
+# the others, and the message is checked, so a failure for any other reason does
+# not read as this control passing.
+tmp_wrap="$(mktemp)"; printf 'claude-\nglm\n' > "$tmp_wrap"
+if out="$(sweep_file "$tmp_wrap" "control fixture")"; then
+  fail "control: the sweep detects a name split by a line wrap" \
+    "a wrap-split name did not fail the sweep: $out"
+elif printf '%s' "$out" | grep -F 'occurrence(s)' >/dev/null; then
+  pass "control: the sweep detects a name split by a line wrap"
+else
+  fail "control: the sweep detects a name split by a line wrap" \
+    "the sweep failed it, but not on a counted name: $out"
+fi
+rm -f "$tmp_wrap"
 
 # Control: a missing or unreadable file must fail the sweep, not pass it — a
 # name-only counting check has no way to distinguish "clean" from "unread",

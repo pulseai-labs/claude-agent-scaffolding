@@ -77,8 +77,39 @@ occurrences() {
     END { print n+0 }' "$1"
 }
 
+# Occurrences of a literal substring in a file read as ONE logical line: every
+# whitespace run is squeezed to a single space first, which reassembles the space
+# a markdown wrap broke at (the newline plus the next line's indentation).
+# A per-line count is the default and stays the default: it is stricter, and a
+# needle that unexpectedly spans a wrap fails loudly rather than silently
+# matching. This counter exists for the clauses whose own text — the text a pin
+# must assert, not a prefix of it — is split by such a wrap today: there is no
+# contiguous needle that names them, so a per-line pin could only assert a
+# fragment and would report the clause absent. Two consequences worth stating:
+# an absence pin over a squeezed line also catches a reintroduction that wraps
+# differently, and a FALSE positive needs the surrounding prose to spell the
+# phrase across a line boundary, which none of the three sites here does.
+# Note the join is by SQUEEZING, not by the config suite's newline DELETION:
+# those clauses are personal names, which are space-less, while these are prose
+# whose words are separated by the very space the wrap consumed.
+occurrences_flat() {
+  if [ -z "${2:-}" ]; then printf 'empty needle\n' >&2; return 1; fi
+  [ -f "$1" ] || { printf 'no such file\n' >&2; return 1; }
+  awk -v needle="$2" '
+    { buf = buf " " $0 }
+    END {
+      gsub(/[[:space:]]+/, " ", buf)
+      while ((i = index(buf, needle)) > 0) { n++; buf = substr(buf, i + length(needle)) }
+      print n+0
+    }' "$1"
+}
+
+count_of() { # <file> <needle> [line|flat]
+  if [ "${3:-line}" = flat ]; then occurrences_flat "$1" "$2"; else occurrences "$1" "$2"; fi
+}
+
 pin() {
-  c="$(occurrences "$1" "$2")" || { fail "$3" "unreadable file or empty needle: $1"; return 0; }
+  c="$(count_of "$1" "$2" "${4:-line}")" || { fail "$3" "unreadable file or empty needle: $1"; return 0; }
   if [ "$c" -eq 1 ]; then pass "$3"
   elif [ "$c" -eq 0 ]; then fail "$3" "not found in ${1##*/} — reworded away, or the pin now spans a line wrap. pin: $2"
   else fail "$3" "found $c times in ${1##*/}; a pin must be unique. pin: $2"
@@ -86,7 +117,7 @@ pin() {
 }
 
 absent() {
-  c="$(occurrences "$1" "$2")" || { fail "$3" "unreadable file: $1"; return 0; }
+  c="$(count_of "$1" "$2" "${4:-line}")" || { fail "$3" "unreadable file: $1"; return 0; }
   if [ "$c" -eq 0 ]; then pass "$3"
   else fail "$3" "'$2' occurs $c time(s) in ${1##*/}"; fi
 }
@@ -760,17 +791,89 @@ pin "$PRBRIEFS_MD" "context-ceiling notice" "the work-PR brief returns open: pas
 
 section "waits and completion bodies"
 
-# The typed wait is stated once, in herdr-mechanics.md; lifecycle step 5
-# carries it byte-identical, and SKILL.md names it as the wait primitive.
+# The typed wait is stated once, in herdr-mechanics.md; lifecycle step 5 and
+# roles.md's launch block carry it byte-identical. Three copies or none: T4's
+# reviewer measured that roles.md's was unpinned where the brief said all three
+# were, so a revert of only that copy left the suite green.
 TYPED_WAIT='herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>'
 pin "$MECHANICS_MD" "$TYPED_WAIT" "herdr-mechanics.md states the typed wait once"
 pin "$LIFECYCLE_MD" "$TYPED_WAIT" "lifecycle step 5's wait is the typed wait, byte-identical"
+pin "$ROLES_MD" "$TYPED_WAIT" "roles.md's launch block carries the same typed wait, byte-identical"
 pin "$SKILL_MD" 'A single bounded `herdr agent wait`' \
   "SKILL.md's wait primitive is one bounded agent wait"
 # Each dispatched brief names the file its report is written to. Nine templates:
 # the generic five, plus the four dedicated dispatch templates in the same file.
 n_eq "$GENERIC_BRIEFS_MD" 'REPORT_PATH=<the absolute path this seat writes its report to>' 9 \
   "every dispatched brief names its report path"
+
+section "the clauses the milestone proved revertible"
+
+# T2's and T4's reviewers measured these by mutation: each revert left ALL SIX
+# SUITES GREEN. One pin per clause, and the label names the clause rather than
+# the count, so a RED reads as a fact. `flat` (the fourth argument) is used only
+# where the clause's own text is split by a markdown wrap in the file as it
+# stands — the three sites that qualify are named in their comments. A pin whose
+# needle has no reachable mutation is noise and none is written here: every pin
+# below reverts to a real one-clause edit.
+
+# T2 M-A. The spine dispatch's supply list names the correction body beside the
+# two item templates; deleting `and correction templates` left the suite green.
+pin "$EXEC_MD" 'item verifier and correction templates' \
+  "the spine dispatch's supply list names the correction body"
+
+# T2 M-B. The five atomic-rename REPORT_PATH slots — three spine-layer, two
+# PR-layer. The `REPORT_PATH=` count pins above count the PREFIX, which a revert
+# to a non-atomic mechanism leaves untouched; this is the mechanism itself.
+ATOMIC='replaced whole — a temp file in the same directory renamed over the path, never in pieces'
+n_eq "$BRIEFS_MD" "$ATOMIC" 3 "all three spine-layer report slots rename atomically"
+n_eq "$PRBRIEFS_MD" "$ATOMIC" 2 "both PR-layer report slots rename atomically"
+
+# T2 M-E. The identity anchor: reverting it to a four-part "fingerprint" left the
+# suite green. The four ids straddle a wrap, so this is two contiguous halves —
+# the capture, then the ids and the contract that declares them.
+pin "$NESTED_MD" 'capture the item'"'"'s identity as the result declares it — `head_oid`,' \
+  "the nested run's step 5 captures the item identity the result declares"
+pin "$NESTED_MD" '`tree_oid`, `report_oid` and `spec_oid`, the four ids the external-executor result envelope' \
+  "the identity anchor names all four ids and the contract that declares them"
+# #552, and the half that must NOT walk back in: the anchor once claimed these
+# four are "the same four the close guard fingerprints", which is false of
+# `close/references/work-item-close.md` — it compares no oid. `flat`: the removed
+# sentence wrapped between "four the" and "close", so only the squeezed count
+# catches a reintroduction that breaks the line somewhere else.
+absent "$NESTED_MD" 'close guard fingerprints' \
+  "the identity anchor carries no close-guard fingerprint claim" flat
+
+# T4 G1. Reverting roles.md wholesale dropped all of these: the #516c probe
+# conditioning — pinned in both of its halves, the profile's and the route's —
+# the pilot's F2 precondition, and the teardown pointer.
+pin "$ROLES_MD" 'Both files must exist before this sequence is run' \
+  "roles.md's launch states the both-files precondition (pilot F2)"
+pin "$ROLES_MD" 'a seat is sent one only when' \
+  "the context probe is conditioned, not sent to every retained seat"
+pin "$ROLES_MD" 'the send route that reaches it' \
+  "the probe's second condition is the route, not the profile's can: alone"
+pin "$ROLES_MD" 'A seat is released as `herdr-mechanics.md`'"'"'s' \
+  "roles.md points teardown at herdr-mechanics.md instead of restating it"
+
+# T4 G2. Deleting these from lifecycle.md left the suite green. The last is
+# `flat` because the file breaks its line inside the clause today.
+pin "$LIFECYCLE_MD" 'creates it again first and binds the id that call returns' \
+  "a launch whose run workspace is gone recreates it and rebinds the returned id"
+pin "$LIFECYCLE_MD" 'its machine label where the seat is not on this machine, and,' \
+  "step 13's handoff records each live seat's machine label"
+pin "$LIFECYCLE_MD" 'Write the handoff, recording every seat'"'"'s pane id, with its' \
+  "the rotation's own handoff records each live seat's machine label"
+pin "$LIFECYCLE_MD" 'through the machine the handoff names for a remote one' \
+  "a resumed top re-arms each remote pane through the machine it names" flat
+
+# T4 G3 and the P3 it drew. "`mv`, which this command allows" is a CROSS-FILE
+# truth: the dagr write's own sentence and the top's command allowlist are two
+# halves of one claim, so both are pinned and they sit together. `flat`: the
+# sentence is split at its comma by a wrap in the file as it stands.
+pin "$LIFECYCLE_MD" '`mv`, which this command allows' \
+  "lifecycle's dagr write names the mv the top's own command allows" flat
+pin "$COMMAND_MD" 'Bash(mv:*)' \
+  "commands/orchestrate.md's allowlist is what permits that mv"
 
 section "reference line budgets"
 
