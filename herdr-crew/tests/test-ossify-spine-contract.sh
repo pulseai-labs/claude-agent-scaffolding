@@ -898,6 +898,22 @@ pin "$ROLES_MD" 'the send route that reaches it' \
 pin "$ROLES_MD" 'A seat is released as `herdr-mechanics.md`'"'"'s' \
   "roles.md points teardown at herdr-mechanics.md instead of restating it"
 
+# T8b. The two shipped summaries of that conditioning, pinned next door to the rule
+# they summarise. T8 rewrote both to carry the condition and the fallback — the
+# README's parenthetical had asserted a check the excluded class never gets — and
+# then MEASURED that reverting both left all six suites green (527/0): the rule is
+# pinned above, its summaries were pinned by nothing, so a later edit could restore
+# the false reading in silence. `flat` on both, measured rather than assumed: each
+# clause's own text is split by a markdown wrap in the file as it stands (per-line
+# count 0, squeezed count 1), and the shorter fragment that DOES sit whole on one
+# line is a prefix of the clause — what this suite's header says a pin must not
+# assert on its own. The needle carries the `roles.md` pointer too, because the
+# pointer is half of what the fix is: the summary points, it does not restate.
+pin "$PLUGIN_README_MD" 'checked by `/context` at each task boundary for a seat that can answer the probe — one that cannot rotates at its item boundary instead, `references/roles.md`)' \
+  "README's retained-implementer summary carries the conditioned probe and its fallback" flat
+pin "$SKILL_MD" 'the one `/context` reply at each task boundary for a seat that can answer the probe — one that cannot rotates at its item boundary instead (`references/roles.md`)' \
+  "SKILL.md's bounded-reads list conditions the probe and gives the fallback" flat
+
 # T4 G2. Deleting these from lifecycle.md left the suite green. The last is
 # `flat` because the file breaks its line inside the clause today.
 pin "$LIFECYCLE_MD" 'creates it again first and binds the id that call returns' \

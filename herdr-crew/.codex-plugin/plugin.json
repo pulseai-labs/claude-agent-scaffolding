@@ -27,9 +27,9 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Start an orchestrator run for this objective.",
-      "Spawn a worker session for this task.",
-      "Review PR 123 in a fresh session."
+      "Start a herdr orchestrator session for this objective.",
+      "Dispatch a herdr worker seat for this task.",
+      "Review PR 123 in a fresh herdr seat."
     ],
     "websiteURL": "https://github.com/pulseai-labs/claude-agent-scaffolding/tree/main/herdr-crew",
     "brandColor": "#1D4ED8"
