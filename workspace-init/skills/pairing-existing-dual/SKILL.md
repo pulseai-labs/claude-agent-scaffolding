@@ -7,7 +7,7 @@ description: Pair an already-populated AI workspace with an already-populated ca
 
 ## 1. Overview
 
-This skill handles **Scenario C** (per **SPEC §9** — the third pairing scenario, alongside Scenario A `pairing-canonical-repo` and the deferred Scenario B): **both repos already exist and are populated.** A project that pre-dates the plugins often grew a memory-bank, specs, and handoffs in a sibling AI-workspace directory before the user discovered scaffold-* / workspace-init. The canonical holds production code. Neither was created by workspace-init, and there is no pairing manifest tying them together yet.
+This skill handles **Scenario C** (per **SPEC §9** — the third pairing scenario, alongside Scenario A `pairing-canonical-repo` and the deferred Scenario B): **both repos already exist and are populated.** A project that pre-dates the plugins often grew a memory-bank, specs, and handoffs in a sibling AI-workspace directory before the user installed workspace-init and ossify. The canonical holds production code. Neither was created by workspace-init, and there is no pairing manifest tying them together yet.
 
 This skill does the minimum to wire them up: it **writes the `.workspace/pairing.json` manifest** into the existing AI workspace and **installs the trace-filter `commit-msg` hook** (always in canonical; also in the AI workspace when it is itself a git repo). It does NOT create the AI workspace, seed its subdirectories, write CLAUDE.md / AGENTS.md / README.md stubs, or seed a memory bank — that content already exists and is the user's. **Nothing under the existing AI workspace is overwritten.**
 
@@ -161,7 +161,8 @@ Trace filter active in: <canonical>  [AND <ai-workspace> if it is a git repo]
 
 Next steps:
   1. cd /abs/path/<ai-workspace> && git status   (if it is a git repo)
-  2. Open the workspace in Claude/Codex; scaffold-* skills now resolve via the manifest.
+  2. Open the workspace in Claude/Codex; ossify resolves pairing.json as topology.
+  3. Run `/ossify:adopt` for existing source or history (or `/ossify:start` if the canonical is empty).
 ```
 
 ## 10. Discipline rules

@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "workspace-init",
-      "description": "Bootstrap a dual-repo workspace (AI workspace + canonical) with pairing manifest and AI-trace commit-msg filter. Run-once plugin; first in the scaffolding chain. 2 skills (initializing-dual-repo-workspace, pairing-canonical-repo), 2 slash commands (/init-workspace, /pair-workspace via $ARGUMENTS bridge). Pairing manifest schema v1.0 at <ai-workspace>/.workspace/pairing.json. commit-msg hook filters AI-trace lines with baked AI workspace path. Scenario A migration (--pair-with). 145 tests across 10 suites.",
+      "description": "Bootstrap or pair a dual-repo workspace (AI workspace + canonical), write pairing topology, install AI-trace commit-msg filters, and hand lifecycle work to ossify. Supports fresh bootstrap, a new AI workspace beside an existing canonical, and pairing two existing repositories.",
       "category": "workflow",
       "source": "./workspace-init"
     },

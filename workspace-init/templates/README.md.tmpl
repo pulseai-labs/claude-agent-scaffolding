@@ -4,8 +4,9 @@ The AI workspace half of a dual-repo project. Paired with canonical at `${CANONI
 
 ## What this repo holds
 
-- Memory bank, MASTER-SPEC, sprint specs, brainstorm artifacts, process ADRs — everything an agentic IDE needs to understand the project.
-- `.workspace/pairing.json` — the pairing manifest (workspace-init wrote this; downstream plugins read it).
+- Repository topology and bootstrap records for the project.
+- `.workspace/pairing.json` — the pairing manifest; ossify reads it as a topology fallback.
+- Temporary `CLAUDE.md` and `AGENTS.md` routers until ossify authors project-specific guidance.
 
 ## What this repo does NOT hold
 
@@ -19,8 +20,7 @@ Production code, product docs (PRD/SRS/BACKLOG), product ADRs, test code. Those 
 ## Plugins involved
 
 - `workspace-init` (this plugin) — bootstrapped both repos.
-- `scaffold-onboard` — runs next; authors MASTER-SPEC, memory-bank, PRD/SRS in canonical.
-- `scaffold-dev` — authors sprint specs after onboarding.
+- `ossify` — authors the lean spec and lifecycle guidance; use `/ossify:start` for an empty canonical or `/ossify:adopt` for existing source or history.
 - `architect-critic` — fresh-frame adversarial review of specs.
 - `ai-mentor` — decision-making aids.
 

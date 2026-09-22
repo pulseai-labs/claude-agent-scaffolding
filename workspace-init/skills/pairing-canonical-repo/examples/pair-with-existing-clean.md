@@ -195,32 +195,17 @@ Three sub-steps:
 
 ### AI workspace
 
-Newly created at `/Users/example/projects/foo-ai/` with full skeleton:
+Newly created at `/Users/example/projects/foo-ai/` — it contains exactly:
 
-```
-/Users/example/projects/foo-ai/
-├── .workspace/
-│   ├── pairing.json             # manifest with detected canonical metadata
-│   ├── init-log                 # records all 8 tasks
-│   └── handoffs/
-├── .claude/
-│   ├── memory-bank/
-│   └── .gitkeep
-├── docs/
-│   ├── MASTER-SPEC.md           # stub
-│   ├── specs/
-│   └── .gitkeep
-├── .superpowers/brainstorm/     # empty
-├── .archive/                    # empty
-├── .git/
-│   ├── hooks/commit-msg         # trace filter (executable)
-│   └── (new git repo internals)
-├── CLAUDE.md                    # stub
-├── AGENTS.md                    # stub
-├── README.md                    # with project name
-├── .gitignore                   # rendered from template
-└── (all files staged, not committed)
-```
+- `.workspace/` — `.gitkeep`, `pairing.json` (manifest with detected canonical metadata), `init-log` (records all 8 tasks)
+- `.claude/.gitkeep`
+- `docs/.gitkeep`, `docs/specs/.gitkeep`
+- `.superpowers/.gitkeep`
+- `.archive/.gitkeep`
+- `CLAUDE.md`, `AGENTS.md`, `README.md` — stubs
+- `.gitignore` — rendered from template
+- `.git/hooks/commit-msg` — trace filter (executable; not tracked by git)
+- (all files staged, not committed)
 
 Verify with `cd /Users/example/projects/foo-ai && git status`:
 
@@ -229,7 +214,7 @@ On branch main (new repo, no commits yet)
 
 Changes to be committed:
   new file:   .claude/.gitkeep
-  new file:   .superpowers/brainstorm/.gitkeep
+  new file:   .superpowers/.gitkeep
   new file:   ...
   new file:   CLAUDE.md
   new file:   AGENTS.md
@@ -293,14 +278,15 @@ Canonical's working tree NOT modified.
 
 Next steps:
   1. cd /Users/example/projects/foo-ai && git status
-  2. git commit -m "workspace-init: initial bootstrap (pair-with, workspace-init v0.1.0)"
+  2. git commit -m "workspace-init: initial bootstrap (pair-with)"
   3. cd /Users/example/projects/foo-ai && claude
-  4. /onboard
+  4. /ossify:adopt                         # canonical has source or history
+     (If the canonical is empty, use /ossify:start.)
 
 Manifest at: /Users/example/projects/foo-ai/.workspace/pairing.json
 Trace filter active in: /Users/example/projects/foo-ai  AND  /Users/example/projects/foo
 To override trace filter for a specific commit: git commit --no-verify
 ```
 
-The user commits the AI workspace skeleton, launches Claude Code in the AI workspace, and runs `/onboard`.
+The user commits the AI workspace skeleton, launches Claude Code in the AI workspace, and runs `/ossify:adopt`.
 The canonical repo's workflow is unaffected; the trace filter hook silently guards against AI-trace patterns in commits.

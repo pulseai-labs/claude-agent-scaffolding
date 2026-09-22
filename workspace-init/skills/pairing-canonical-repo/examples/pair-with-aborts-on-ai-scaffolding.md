@@ -3,7 +3,7 @@
 ## Scenario
 
 The user has an existing canonical repository at `/Users/example/projects/foo` that was previously
-onboarded as a single-repo project via scaffold-onboard. It contains AI scaffolding markers:
+onboarded as a single-repo project. It contains AI scaffolding markers:
 
 - `.claude/memory-bank/` (directory with memory state)
 - `docs/MASTER-SPEC.md` (project spec)
@@ -47,8 +47,8 @@ Found markers in /Users/example/projects/foo:
 Refusing to pair: this repo was already onboarded as a single-repo project.
 Pairing now would create an inconsistent dual-repo state.
 
-This is Scenario B (split existing single-repo into dual-repo) and is
-deferred to workspace-init v0.2. For now, the manual workaround is:
+This is Scenario B (split existing single-repo into dual-repo), which
+workspace-init does not yet automate. For now, the manual workaround is:
 
   1. Move .claude/memory-bank/, MASTER-SPEC.md (or docs/MASTER-SPEC.md),
      and any other scaffolding artifacts into a NEW sibling AI workspace
@@ -91,12 +91,12 @@ an ambiguous state:
 - Which memory-bank is current — the one in canonical/.claude/memory-bank/, or a new one in the AI workspace?
 - The trace filter hook in canonical would point to the new AI workspace, orphaning the old scaffolding.
 
-This is Scenario B (split existing single-repo) — deliberately deferred to v0.2 when workspace-init
-will include migration tooling to safely move AI artifacts and repoint references.
+This is Scenario B (split existing single-repo) — deliberately deferred until workspace-init
+includes migration tooling to safely move AI artifacts and repoint references.
 
 ## Manual workaround
 
-For v0.1, if the user needs to convert a single-repo to a dual-repo, the steps are:
+For now, if the user needs to convert a single-repo to a dual-repo, the steps are:
 
 1. **Move AI artifacts into a new AI workspace directory manually:**
 
@@ -118,5 +118,5 @@ For v0.1, if the user needs to convert a single-repo to a dual-repo, the steps a
    to have workspace-init install the commit-msg hook and validate the setup.
 
 This workaround is tedious but safe — it avoids the risk of ambiguous dual-repo state.
-v0.2 will automate this entire flow via a dedicated migration command; today
-the path is re-running the pairing recipe after the canonical is clean.
+A future workspace-init release is expected to automate this entire flow via a dedicated
+migration command; today the path is re-running the pairing recipe after the canonical is clean.

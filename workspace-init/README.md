@@ -1,6 +1,6 @@
 # workspace-init
 
-**Bootstrap a dual-repo workspace (AI workspace + canonical repo) with pairing manifest and AI-trace commit-msg filter.** Run-once plugin; first in the scaffolding chain (`workspace-init` → `scaffold-onboard` → `scaffold-dev`).
+**Bootstrap a dual-repo workspace (AI workspace + canonical repo) with pairing manifest and AI-trace commit-msg filter.** Run-once topology bootstrap; after pairing, continue with ossify (`/ossify:start` for an empty canonical, `/ossify:adopt` for existing source or history).
 
 ## What it does
 
@@ -76,7 +76,7 @@ The two skills (`initializing-dual-repo-workspace`, `pairing-canonical-repo`) au
 
 ## The pairing manifest
 
-Lives at `<ai-workspace>/.workspace/pairing.json`. Schema version **1.0**. Single source of truth for downstream plugins (`scaffold-onboard`, `scaffold-dev`) to discover which repo owns which artifact.
+Lives at `<ai-workspace>/.workspace/pairing.json`. Schema version **1.0**. Ossify can read `pairing.json` as a topology fallback. Legacy routing fields remain in schema v1.0 pending the separate manifest-schema diet.
 
 Top-level shape:
 
@@ -145,14 +145,14 @@ git commit --no-verify -m "..."
 
 Use sparingly — the whole point of the filter is to keep AI traces out of the canonical history. If you find yourself bypassing routinely, edit `blocked_patterns` in the manifest to relax the rule rather than disabling per-commit.
 
-The hook itself lives in `.git/hooks/commit-msg`, which is **not tracked by git** — clones won't carry it. A `core.hooksPath`-based tracked variant is deferred to v0.2.
+The hook itself lives in `.git/hooks/commit-msg`, which is **not tracked by git** — clones won't carry it. A `core.hooksPath`-based tracked variant is deferred to a future release.
 
 ## Pointers
 
 - Spec: [`docs/SPEC-workspace-init.md`](../docs/SPEC-workspace-init.md) — manifest schema (§6.2), resolver semantics (§6.3), bootstrap procedure (§8.1), Scenario A migration (§9.4), trace filter contract (§7.3).
 - Plan: [`docs/PLAN-workspace-init.md`](../docs/PLAN-workspace-init.md) — 9-phase implementation plan.
 - Changelog: [`CHANGELOG.md`](./CHANGELOG.md).
-- Sibling plugins in the chain: [`scaffold-onboard`](../scaffold-onboard/) (run-once project onboarding), [`scaffold-dev`](../scaffold-dev/) (slice-driven implementation; future).
+- Lifecycle continuation: [`ossify`](../ossify/) — `/ossify:start` for an empty canonical and `/ossify:adopt` for existing source or history.
 
 ## License
 

@@ -327,7 +327,6 @@ wi_manifest_write() {
            master_spec:            "${ai_workspace.root}/docs/MASTER-SPEC.md",
            memory_bank:            "${ai_workspace.root}/.claude/memory-bank",
            roadmap_state:          "${ai_workspace.root}/.workspace/project-roadmap.json",
-           principles_user_global: "${PLUGIN_DATA:architect-critic}/principles.md",
            superpowers_brainstorm: "${ai_workspace.root}/.superpowers/brainstorm"
          },
          git_policy: {

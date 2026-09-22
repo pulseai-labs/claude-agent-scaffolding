@@ -1,5 +1,21 @@
 # workspace-init changelog
 
+## 0.6.0 (2026-09-22)
+
+Lifecycle handoff to ossify: workspace-init stays the topology bootstrap — it creates or pairs the dual-repo layout, writes `pairing.json`, installs the AI-trace commit-msg filters, and prints next steps — but every generated stub, printed block, and example now routes the user to `/ossify:start` (empty canonical) or `/ossify:adopt` (existing source or history) instead of the retired scaffold-onboard/scaffold-dev chain (#308).
+
+### Changed
+- **Generated `CLAUDE.md` stub** declares what workspace-init wrote and hands off to ossify; the `## Next steps` block names both `/ossify:start` and `/ossify:adopt` with the canonical-content rule, and the generated-file footer no longer stamps a hardcoded plugin version.
+- **Generated `AGENTS.md` stub** routes lifecycle work through ossify, so the generated file satisfies ossify doctor's `agents_md` check.
+- **Generated `README.md` stub** describes the topology and bootstrap records the workspace actually holds, and lists ossify as the lifecycle continuation.
+- **Printed next-steps** in `initializing-dual-repo-workspace` and `pairing-canonical-repo` (and the `pairing-existing-dual` summary) route to `/ossify:start` / `/ossify:adopt`; suggested commit messages no longer embed plugin version strings, and the remaining deferral notes are version-neutral.
+- **Examples** for fresh bootstrap and pair-with show the same ossify next steps, version-neutral `created_by` values, and a created-paths inventory listing exactly what bootstrap writes — the decorative trees claiming pre-seeded `memory-bank/`, `process-adrs/`, and brainstorm directories are gone.
+- **Marketplace and root catalog** describe the plugin by capability and name ossify as the continuation.
+
+### Removed
+- **`well_known_paths.principles_user_global`** deleted from the manifest writer, the reference `pairing.json.tmpl`, and the fresh-bootstrap example — a duplicate pointer with zero consumers after architect-critic moved its principles to `$HOME/.claude/architect-critic/`. The generic `${PLUGIN_DATA:<name>}` resolver is unchanged.
+- **`.claude/.onboarding-state.json` gitignore entry** deleted from the template and the inline fallback (now byte-identical to the template again); `.workspace/handoffs/` stays ignored as a compatibility entry for the still-shipped handoff flow.
+
 ## 0.5.1 (2026-09-19)
 
 Trace-filter hardening: the hook installs safely, renders any path, and fails closed instead of silently going dark (#457, #458, #481), plus a Scenario A manifest-write flag fix (#173).

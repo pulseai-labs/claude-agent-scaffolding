@@ -39,7 +39,7 @@ The skill verifies (per SPEC §8.1):
 ✓ Neither /Users/example/projects/foo-ai nor /Users/example/projects/foo exist yet
 ```
 
-## What workspace-init does (8 pre-onboard tasks)
+## What workspace-init does (8 bootstrap tasks)
 
 1. **Task 8.1: Input collection** — user provides project name, parent dir, and project type
 2. **Task 8.2: Create root dir pair** — `wi_skeleton_create_root_pair` creates both `/Users/example/projects/foo-ai` and `/Users/example/projects/foo` (empty directories)
@@ -53,47 +53,24 @@ The skill verifies (per SPEC §8.1):
    - `wi_trace_filter_install_pair` installs `commit-msg` hook in both `.git/hooks/` directories
    - `wi_git_stage_ai_workspace` stages all files in the AI workspace (canonical stays empty)
 
-## Final directory tree
+## Created paths
 
-After bootstrap completes, the user's project directory looks like:
+After bootstrap completes, the AI workspace at `/Users/example/projects/foo-ai` contains exactly:
 
-```
-/Users/example/projects/
-├── foo-ai/                          # AI workspace (new, git-tracked)
-│   ├── .workspace/
-│   │   ├── pairing.json             # the manifest (schema v1.0)
-│   │   ├── init-log                 # transactional log of operations
-│   │   └── handoffs/                # (empty; for scaffold-dev later)
-│   ├── .claude/
-│   │   ├── memory-bank/             # (empty; scaffold-onboard writes here)
-│   │   └── .gitkeep
-│   ├── docs/
-│   │   ├── MASTER-SPEC.md           # (stub; scaffold-onboard overwrites)
-│   │   ├── specs/                   # (empty; for sprint specs)
-│   │   ├── process-adrs/            # (empty)
-│   │   └── .gitkeep
-│   ├── .superpowers/
-│   │   ├── brainstorm/              # (empty)
-│   │   └── .gitkeep
-│   ├── .archive/
-│   │   └── .gitkeep
-│   ├── .git/
-│   │   ├── hooks/
-│   │   │   └── commit-msg           # trace filter (executable)
-│   │   └── (standard git internals)
-│   ├── CLAUDE.md                    # router stub
-│   ├── AGENTS.md                    # cross-tool agents reference
-│   ├── README.md                    # AI workspace guide
-│   ├── .gitignore                   # (rendered from template)
-│   └── (staged for commit, not yet committed)
-│
-└── foo/                             # canonical (new, git-tracked)
-    ├── .git/
-    │   ├── hooks/
-    │   │   └── commit-msg           # trace filter (executable)
-    │   └── (standard git internals)
-    └── (working tree empty)
-```
+- `.workspace/` — `.gitkeep`, `pairing.json` (the manifest, schema v1.0), `init-log` (transactional log of operations)
+- `.claude/.gitkeep`
+- `docs/.gitkeep`, `docs/specs/.gitkeep`
+- `.superpowers/.gitkeep`
+- `.archive/.gitkeep`
+- `CLAUDE.md` — topology stub
+- `AGENTS.md` — cross-tool agents reference
+- `README.md` — AI workspace guide
+- `.gitignore` — rendered from template
+- `.git/hooks/commit-msg` — trace filter (executable; not tracked by git)
+- (all files staged for commit, not yet committed)
+
+The canonical at `/Users/example/projects/foo` has an empty working tree; its only
+addition is `.git/hooks/commit-msg` (trace filter, executable; not tracked by git).
 
 ## Final manifest
 
@@ -147,7 +124,6 @@ The pairing manifest at `/Users/example/projects/foo-ai/.workspace/pairing.json`
   "well_known_paths": {
     "master_spec":            "${ai_workspace.root}/docs/MASTER-SPEC.md",
     "memory_bank":            "${ai_workspace.root}/.claude/memory-bank",
-    "principles_user_global": "${PLUGIN_DATA:architect-critic}/principles.md",
     "superpowers_brainstorm": "${ai_workspace.root}/.superpowers/brainstorm"
   },
 
@@ -171,9 +147,11 @@ The pairing manifest at `/Users/example/projects/foo-ai/.workspace/pairing.json`
   },
 
   "created_at":      "2026-05-25T14:30:00Z",
-  "created_by":      "workspace-init@0.1.0"
+  "created_by":      "workspace-init@<running-plugin-version>"
 }
 ```
+
+The real writer stamps the installed plugin version at write time.
 
 ## Final next-steps message
 
@@ -190,9 +168,9 @@ AI workspace has skeleton + manifest + stubs staged (not yet committed — revie
 
 Next steps:
   1. cd /Users/example/projects/foo-ai && git status
-  2. git commit -m "workspace-init: initial bootstrap (workspace-init v0.1.0)"
+  2. git commit -m "workspace-init: initial bootstrap"
   3. cd /Users/example/projects/foo-ai && claude
-  4. /onboard                              # begin scaffold-onboard's 10-phase conversation
+  4. /ossify:start                         # bare canonical; routes to /ossify:adopt if source or history is present
 
 Manifest at: /Users/example/projects/foo-ai/.workspace/pairing.json
 Init log at: /Users/example/projects/foo-ai/.workspace/init-log (rollback record)
@@ -200,4 +178,4 @@ Init log at: /Users/example/projects/foo-ai/.workspace/init-log (rollback record
 To override trace filter for a specific commit: git commit --no-verify
 ```
 
-The user then commits the staged AI workspace skeleton manually, launches Claude Code in the AI workspace directory, and invokes `/onboard` to begin the scaffold-onboard process.
+The user then commits the staged AI workspace skeleton manually, launches Claude Code in the AI workspace directory, and invokes `/ossify:start`.

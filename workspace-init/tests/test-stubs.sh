@@ -54,6 +54,14 @@ test_C1_claude_md_writes_file_with_substitution() {
   assert_contains "$canonical_root" "$content" || return 1
   assert_not_contains '${PROJECT_NAME}' "$content" || return 1
   assert_not_contains '${CANONICAL_ROOT}' "$content" || return 1
+
+  # S8: the rendered stub hands lifecycle work to ossify and carries no
+  # retired-stack continuation or ornamental version claim.
+  assert_contains '/ossify:start' "$content" || return 1
+  assert_contains '/ossify:adopt' "$content" || return 1
+  assert_not_contains '/onboard' "$content" || return 1
+  assert_not_contains 'scaffold-onboard' "$content" || return 1
+  [[ ! "$content" =~ workspace-init\ v[0-9] ]] || return 1
 }
 
 test_C2_claude_md_logs_write_file() {
@@ -113,6 +121,12 @@ test_A1_agents_md_writes_file_with_project_name() {
   content="$(cat "${ai_root}/AGENTS.md")"
   assert_contains "my-agents-proj" "$content" || return 1
   assert_not_contains '${PROJECT_NAME}' "$content" || return 1
+
+  # S8: ossify doctor's agents_md check is exactly `grep -qi ossify` on the
+  # rendered file — run the owning predicate, not an approximation.
+  grep -qi 'ossify' "${ai_root}/AGENTS.md" || {
+    echo '    rendered AGENTS.md never mentions ossify'; return 1; }
+  assert_not_contains 'scaffold-onboard' "$content" || return 1
 }
 
 test_A2_agents_md_fallback_to_manifest_name() {
@@ -174,6 +188,15 @@ test_R1_readme_writes_file_with_substitution() {
   assert_contains "$canonical_root" "$content" || return 1
   assert_not_contains '${PROJECT_NAME}' "$content" || return 1
   assert_not_contains '${CANONICAL_ROOT}' "$content" || return 1
+
+  # S8: the rendered README routes lifecycle to ossify and does not claim
+  # bootstrap already authored a memory bank or sprint specs.
+  assert_contains 'ossify' "$content" || return 1
+  assert_contains '/ossify:start' "$content" || return 1
+  assert_contains '/ossify:adopt' "$content" || return 1
+  assert_not_contains 'scaffold-onboard' "$content" || return 1
+  assert_not_contains 'scaffold-dev' "$content" || return 1
+  assert_not_contains 'emory bank' "$content" || return 1
 }
 
 test_R2_readme_logs_write_file() {

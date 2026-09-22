@@ -18,6 +18,18 @@ skill_description_matches() { # $1=skill_path $2=user_phrase
 
 INIT_SKILL="$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md"
 PAIR_SKILL="$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md"
+DUAL_SKILL="$WI_PLUGIN_ROOT/skills/pairing-existing-dual/SKILL.md"
+FRESH_EX="$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/examples/fresh-bootstrap.md"
+PAIR_CLEAN_EX="$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/examples/pair-with-existing-clean.md"
+PAIR_ABORT_EX="$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/examples/pair-with-aborts-on-ai-scaffolding.md"
+REPO_ROOT="$(cd "$WI_PLUGIN_ROOT/.." && pwd)"
+CLAUDE_MARKETPLACE="$REPO_ROOT/.claude-plugin/marketplace.json"
+ROOT_README="$REPO_ROOT/README.md"
+
+# Patterns that name the retired stack's continuation routes or ornamental
+# version claims. `scaffold-\*` is a literal asterisk; `workspace-init v[0-9]`
+# and `workspace-init@[0-9]` catch hardcoded version strings.
+_retired_route_patterns='(/onboard|/scaffold-project|scaffold-onboard|scaffold-dev|scaffold-\*|workspace-init v[0-9]|workspace-init@[0-9])'
 
 # 1. Skill exists at expected path
 test_init_skill_file_exists() { assert_file_exists "$INIT_SKILL"; }
@@ -109,6 +121,142 @@ test_no_site_references_dead_repair_flag() {
     echo "    a site still names the non-existent --repair flag"; return 1; }
 }
 
+# --- S8: printed next-steps route to ossify, never to the retired stack ---
+
+test_printed_skill_routes_point_to_ossify() {
+  local init_sec pair_sec dual_sec
+  init_sec="$(awk '/^## 6\. Print next-steps/,/^## 7\./' "$INIT_SKILL")"
+  pair_sec="$(awk '/^## 8\. Print next-steps/,/^## 9\./' "$PAIR_SKILL")"
+  dual_sec="$(awk '/^## 9\. Surface summary/,/^## 10\./' "$DUAL_SKILL")"
+
+  [[ -n "$init_sec" && -n "$pair_sec" && -n "$dual_sec" ]] \
+    || { echo "    a scoped next-steps section is empty — headings drifted"; return 1; }
+
+  # Fresh bootstrap: a bare canonical starts at /ossify:start.
+  assert_contains '/ossify:start' "$init_sec" || return 1
+  # Scenario A + C: existing source or history routes directly to /ossify:adopt;
+  # /ossify:start appears only as the empty-canonical exception.
+  assert_contains '/ossify:adopt' "$pair_sec" || return 1
+  assert_contains '/ossify:start' "$pair_sec" || return 1
+  assert_contains '/ossify:adopt' "$dual_sec" || return 1
+  assert_contains '/ossify:start' "$dual_sec" || return 1
+
+  local sec
+  for sec in "$init_sec" "$pair_sec" "$dual_sec"; do
+    if grep -Eq "$_retired_route_patterns" <<<"$sec"; then
+      echo "    retired route survives in a printed next-steps block:"
+      grep -En "$_retired_route_patterns" <<<"$sec"
+      return 1
+    fi
+  done
+}
+
+test_examples_routes_and_created_paths_match_reality() {
+  local init_ex_sec pair_ex_sec
+  init_ex_sec="$(awk '/^## Final next-steps message/,0' "$FRESH_EX")"
+  pair_ex_sec="$(awk '/^## Final next-steps message/,0' "$PAIR_CLEAN_EX")"
+
+  # The changed lines (commit text + route lines) must be byte-consistent
+  # between each skill's printed block and its example's copy.
+  local l
+  while IFS= read -r l; do
+    [[ -z "$l" ]] && continue
+    assert_contains "$l" "$init_ex_sec" || return 1
+  done < <(awk '/^## 6\. Print next-steps/,/^## 7\./' "$INIT_SKILL" \
+             | grep -E 'git commit -m|/ossify')
+  while IFS= read -r l; do
+    [[ -z "$l" ]] && continue
+    assert_contains "$l" "$pair_ex_sec" || return 1
+  done < <(awk '/^## 8\. Print next-steps/,/^## 9\./' "$PAIR_SKILL" \
+             | grep -E 'git commit -m|/ossify')
+
+  # Closing sentences name the ossify route, not the retired one.
+  assert_contains '/ossify:start' "$init_ex_sec" || return 1
+  assert_contains '/ossify:adopt' "$pair_ex_sec" || return 1
+  if grep -Eq "$_retired_route_patterns" <<<"$init_ex_sec"; then
+    echo "    retired route survives in fresh-bootstrap next-steps"; return 1
+  fi
+  if grep -Eq "$_retired_route_patterns" <<<"$pair_ex_sec"; then
+    echo "    retired route survives in pair-with-existing-clean next-steps"; return 1
+  fi
+
+  # Generated-path claims must match what the tasks actually create.
+  local fresh_tree pair_tree
+  fresh_tree="$(awk '/^## Created paths/,/^## Final manifest/' "$FRESH_EX")"
+  pair_tree="$(awk '/^### AI workspace/,/^### Canonical/' "$PAIR_CLEAN_EX")"
+  [[ -n "$fresh_tree" && -n "$pair_tree" ]] \
+    || { echo "    a scoped created-paths section is empty — headings drifted"; return 1; }
+
+  local bad need
+  for bad in 'handoffs/' 'memory-bank/' 'MASTER-SPEC.md' 'process-adrs/' '.superpowers/brainstorm/'; do
+    assert_not_contains "$bad" "$fresh_tree" || return 1
+    assert_not_contains "$bad" "$pair_tree" || return 1
+  done
+  for need in '.workspace/' '.claude/.gitkeep' 'docs/specs/.gitkeep' '.superpowers/.gitkeep' '.archive/.gitkeep'; do
+    assert_contains "$need" "$fresh_tree" || return 1
+    assert_contains "$need" "$pair_tree" || return 1
+  done
+}
+
+test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
+  # The scoped file set: every generated-file source, acting-prose surface and
+  # consumer-facing catalog line a fresh workspace's user can read. Sibling
+  # plugin entries in the shared catalogs are accurate hosted-but-deprecated
+  # documentation and are deliberately out of scope.
+  local files=(
+    "$WI_PLUGIN_ROOT/templates/CLAUDE.md.stub.tmpl"
+    "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl"
+    "$WI_PLUGIN_ROOT/templates/README.md.tmpl"
+    "$WI_PLUGIN_ROOT/templates/gitignore.tmpl"
+    "$WI_PLUGIN_ROOT/templates/pairing.json.tmpl"
+    "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md"
+    "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md"
+    "$WI_PLUGIN_ROOT/skills/pairing-existing-dual/SKILL.md"
+    "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/examples/fresh-bootstrap.md"
+    "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/examples/pair-with-existing-clean.md"
+    "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/examples/pair-with-aborts-on-ai-scaffolding.md"
+    "$WI_PLUGIN_ROOT/README.md"
+    "$WI_PLUGIN_ROOT/lib/skeleton.sh"
+  )
+  local f
+  for f in "${files[@]}"; do
+    [[ -f "$f" ]] || { echo "    scoped file missing: $f"; return 1; }
+    if grep -En "$_retired_route_patterns" "$f"; then
+      echo "    retired guidance still present in $f"
+      return 1
+    fi
+  done
+
+  # Claude marketplace listing — only the workspace-init member is scoped.
+  local desc
+  desc="$(jq -r '.plugins[] | select(.name == "workspace-init") | .description' "$CLAUDE_MARKETPLACE")"
+  [[ -n "$desc" ]] || { echo "    workspace-init description missing from marketplace.json"; return 1; }
+  assert_contains 'ossify' "$desc" || return 1
+  assert_not_contains 'first in the scaffolding chain' "$desc" || return 1
+  if grep -Eq '[0-9]+ (skills|slash commands|tests)' <<<"$desc"; then
+    echo "    hand-maintained counts in marketplace description"; return 1
+  fi
+  if grep -En "$_retired_route_patterns" <<<"$desc"; then
+    echo "    retired route in marketplace description"; return 1
+  fi
+
+  # Root catalog — only the workspace-init row is scoped.
+  local row
+  row="$(grep -F '| [`workspace-init`](./workspace-init/)' "$ROOT_README")"
+  [[ -n "$row" ]] || { echo "    workspace-init row not found in root README"; return 1; }
+  assert_contains 'v0.6.0' "$row" || return 1
+  assert_not_contains 'scaffold-onboard' "$row" || return 1
+  assert_not_contains 'scaffold-dev' "$row" || return 1
+  assert_not_contains 'scaffolding chain' "$row" || return 1
+
+  # Illustrative created_by values must be version-neutral, so substituting the
+  # current release number for 0.1.0 cannot satisfy them.
+  grep -qF 'workspace-init@<running plugin version>' "$WI_PLUGIN_ROOT/templates/pairing.json.tmpl" \
+    || { echo "    pairing.json.tmpl created_by comment is not version-neutral"; return 1; }
+  grep -qF 'workspace-init@<running-plugin-version>' "$FRESH_EX" \
+    || { echo "    fresh example created_by is not version-neutral"; return 1; }
+}
+
 # --- run all ---
 wi_test_run test_init_skill_file_exists
 wi_test_run test_pair_skill_file_exists
@@ -127,5 +275,8 @@ wi_test_run test_readme_uses_canonical_ai_suffix_in_both_fresh_modes
 wi_test_run test_pair_skill_manifest_write_uses_canonical_git_remote_flag
 wi_test_run test_pair_example_uses_canonical_git_remote_flag
 wi_test_run test_no_site_references_dead_repair_flag
+wi_test_run test_printed_skill_routes_point_to_ossify
+wi_test_run test_examples_routes_and_created_paths_match_reality
+wi_test_run test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces
 
 wi_test_summary
