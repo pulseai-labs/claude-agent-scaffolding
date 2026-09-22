@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
+# aggregate-scores.sh — herdr-crew copy.
+#
+# VERBATIM COPY of ossify/tests/eval/lib/aggregate-scores.sh below the header,
+# with ONE comment line reworded: it opened with a bookkeeping term this repo's
+# prose sweep bans. The code is untouched. The body derives EVAL_DIR from its own
+# location, so it needs no edit to work
+# here — and editing it is how the two silently stop agreeing. If ossify's
+# changes, re-copy rather than patch. Nothing asserts the two are identical;
+# `diff` them before trusting either.
 # aggregate-scores.sh — read per-fixture JSON results and print pass/fail summary.
-# Run AFTER the Claude-Code-session eval run has written results/*.json.
+# AFTER the Claude-Code-session eval run has written results/*.json, run this.
 
 set -euo pipefail
 

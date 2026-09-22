@@ -75,8 +75,8 @@ marketplaces as of v1.0.0; in this bundle it stays an explicit opt-in.
 ## Plugins This Bundle Does Not Carry
 
 **The allowlist accepts only the names in the inventory below, and neither
-`code-judo` nor `orca-crew` is one of them.** They ship to the Claude and Codex
-marketplaces but are deliberately not in the OpenCode bundle yet.
+`code-judo`, `orca-crew` nor `herdr-crew` is one of them.** They ship to the Claude
+and Codex marketplaces but are deliberately not in the OpenCode bundle yet.
 
 Adding a name the bundle does not carry does not produce a helpful error. The adapter
 throws `Unknown OpenCode plugin: <name>` from its config hook, OpenCode catches

@@ -34,8 +34,8 @@ Installing the meta-plugin installs exactly these five, and nothing else:
 | `ossify` | 6 skills (`start`, `plan-release`, `plan-spine`, `work-item`, `close`, `doctor`) plus the `work-item-worker` subagent. `adopt`, `challenge`, and `wayfinder` are deliberately not advertised on this surface. |
 | `code-judo` | All 4 skills |
 
-`scaffold`, `scaffold-onboard`, `scaffold-dev`, `claude-security-audit`, and
-`orca-crew` are not published to Devin.
+`scaffold`, `scaffold-onboard`, `scaffold-dev`, `claude-security-audit`,
+`orca-crew`, and `herdr-crew` are not published to Devin.
 
 ## Installation
 
