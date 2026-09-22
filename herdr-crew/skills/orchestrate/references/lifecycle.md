@@ -11,9 +11,10 @@ Every command's syntax comes from `herdr --skill`.
    and you continue from the one the operator names when resuming. **Creating**
    one is dagr's producer contract, never a bare write: resolve the `dagr`
    validator first (`dagr --skill`) and, with none available, do not start
-   writing run files at all; write the complete document to a temp file beside
-   the target, `dagr check --strict` it, and rename it over `run.json` only once
-   that check is clean.
+   writing run files at all. That contract is the rule for every write of the
+   file, not only its first: the complete document goes to a temp file beside
+   the target, `dagr check --strict` it, and the rename over `run.json` — `mv`,
+   which this command allows — lands only once that check is clean.
 1b. **Ossify spine planned here?** If this session just completed `/ossify:plan-spine`
    against a concrete spine directory with a run bound, step 2 is replaced by
    `references/ossify-execution.md`: agree one implementer/verifier seat per work
@@ -56,7 +57,10 @@ Every command's syntax comes from `herdr --skill`.
    confirms the model, then the brief delivered as `brief_delivery` says (inject or
    file) on the route `herdr-mechanics.md` fixes from its second detection ask after
    that read — is `roles.md`'s "The launch," with the undetected-seat path in
-   `herdr-mechanics.md`. The "state your model" line is the worker's own second check: a
+   `herdr-mechanics.md`. The run's workspace can go before the run does — a first seat's
+   release may take it — so a later launch whose `herdr workspace list` no longer shows it
+   creates it again first and binds the id that call returns, the clause the spine
+   session's brief already carries. The "state your model" line is the worker's own second check: a
    model that is not `SEAT_EXPECTED_MODEL` is a failed launch it writes to its report file
    and stops on. Wrong model at the banner read: release the seat and report it.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
@@ -95,8 +99,9 @@ Every command's syntax comes from `herdr --skill`.
    turn, once it is on disk — woken by another item's still-running wait, or by the
    operator's word to wait on that pane again — never by the orchestrator's own re-entry.
    At each task
-   boundary for a retained implementer, send `/context` and read the one reply
-   before attaching the next task (the threshold is in `roles.md`).
+   boundary for a retained implementer whose profile can run a local slash command,
+   send `/context` and read the one reply before attaching the next task; the
+   threshold, and the seat this probe does not reach, are in `roles.md`.
 6. **Implementer finishes.** Its report file carries the completion body its
    brief defined — the commit SHAs and file count, each test command's pass and
    fail counts with the full output, the PR it opened with
@@ -189,7 +194,8 @@ Every command's syntax comes from `herdr --skill`.
     so its teardown validates the close's own result instead — the local landing it
     recorded in each hosting repo — and waits for no record pass.
 13. **Handoff.** If the run outlives the session, write a handoff naming the run's
-    `run.json` path, task ids, head SHA, and the next step — every seat's pane id, and,
+    `run.json` path, task ids, head SHA, and the next step — every seat's pane id, with
+    its machine label where the seat is not on this machine, and,
     per live dispatch, its `REPORT_PATH` and the hash last noted; on an activated
     ossify spine, also the spine's approved `SEATS` block, the resolved coordinator
     profiles and the accumulated close-review ledger (oldest first). With ossify
@@ -232,13 +238,20 @@ never guessed. Both sessions' boundaries and returns are in their briefs
 **Your own rotation.** Your boundary is a fully acknowledged delivery with no
 operator question in flight. Live child dispatches keep running, but nothing
 inherits their waits: they are this session's background calls, and rebinding a
-`run.json` re-arms nothing. Write the handoff, recording every seat's pane id and, per
+`run.json` re-arms nothing. Write the handoff, recording every seat's pane id, with its
+machine label where the seat is not on this machine, and, per
 live dispatch, its `REPORT_PATH` and the hash last noted, and your own resolved profile
 — `/ossify:handoff` with ossify installed, the same file by hand without it. Open a new tab
 and pane with the launch command the handoff recorded — ask the operator once when none
 did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`,
 which herdr sets in every pane it hosts (as it does `HERDR_PANE_ID`), the top's own
-workspace, never the run's, which closes last. Send the new top its
+workspace, never the run's, which closes last. **Launch it as the seat launch
+`herdr-mechanics.md` states** — the readiness path, the model read against the profile the
+handoff recorded, then the second detection ask — and send its resume on the route that
+ask fixes: a successor is a seat like any other, and one sent its resume before its TUI
+accepts input never binds the run. The run file's `run.orchestrator` block still names
+this session's pane after the handover — the field dagr routes the operator's messages
+to — and the successor does not rebind it: issue #556 holds that gap. Send the new top its
 resume — `/ossify:handoff-resume <path>` with ossify, or the path as its first
 instruction without — confirm its turn started, then **stand down**: kill this session's
 armed background waits before the successor re-arms the same panes, and take no dispatch
@@ -248,6 +261,8 @@ wait that fires anyway is read and handed to the successor, never acted on. Then
 operator which tab to use and that this one can close.
 The new top resumes by naming the parent's `run.json` path — there is no CLI call —
 and then, before the step the handoff named, issues one fresh bounded background
-wait per live pane the handoff listed: a new session's first wait, not a re-entry,
+wait per live pane the handoff listed, through the machine the handoff names for a
+remote one, which every later operation on that pane carries too (`herdr-mechanics.md`,
+Machines): a new session's first wait, not a re-entry,
 which re-arms what the `run.json` cannot — and it can re-arm them because the
 predecessor stood down, so each pane has exactly one waiter.
