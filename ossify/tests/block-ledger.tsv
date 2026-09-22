@@ -45,13 +45,16 @@
 #   block unfindable and the failure read as "vacuous" rather than as wrong
 #   behaviour. Pick the anchor from the block's SCAFFOLDING, never from its FIX.
 #
-# Totals: 184 blocks - 72 operative (15 covered, 57 deferred), 112 illustrative.
+# Totals: 185 blocks - 73 operative (16 covered, 57 deferred), 112 illustrative.
 # DERIVED, never hand-counted: check 2's report line gives the total from a walk
-# of the TREE ("184 blocks accounted for"); one awk pass over the rows below
+# of the TREE ("185 blocks accounted for"); one awk pass over the rows below
 # gives the split (O rows counted, D and I summed). Two independent routes,
-# agreeing at 184 - that agreement IS the check. 1.11.0 added two illustrative
+# agreeing at 185 - that agreement IS the check. 1.11.0 added two illustrative
 # blocks (a bone_set_touch and a risk_gate_set_touch call) and no operative one,
-# which is the whole of the 182 -> 184 move; the 15/57 split is unchanged.
+# the whole of the 182 -> 184 move. 1.11.2 added one - the doctor touch-surface
+# sweep - and then reclassified it from illustrative to COVERED once the #555
+# review found two defects in logic no execution could see, which is the whole of
+# the 184 -> 185 and 15 -> 16 covered moves; the 57 deferred split is unchanged.
 # The previous headline (172 = 11/48/113) was ALREADY STALE BEFORE
 # the wayfinder branch: the retirements narrated in the parentheticals below
 # were never subtracted from it. So "172 + 8 new D rows = 180" corrects a figure
@@ -107,7 +110,7 @@
 #
 I	skills/adopt/SKILL.md	1	single-verb calls with <placeholder> args: release_add, release_status (the C4 retroactive baseline pair)
 D	skills/challenge/references/adversaries.md	3	#138	the plugin-root resolution (oss-dispatcher shape, the budget-check workaround), and the codex and claude adversary invocation recipes - schema-backed exec forms the close-depth audit runs; documented shell the agent runs, never executed by the suite, and a wrong shape fails loudly into host-only
-O	skills/close/references/spine-close.md	work items that are not complete	tests/test-close.sh	the open-work-item gate refuses to close a spine with incomplete items
+O	skills/close/references/spine-close.md	work items that are not complete	tests/test-close.sh	the open-work-item gate refuses to close a spine with incomplete items, and its two EMPTY arms refuse a spine with no work items and one whose items were all withdrawn (#533 half B, #531), and the withdrawn arm's route out names the ledger remedy's by-spine argument - keyed to a spine that closes, since the amendment is applied by that spine's close (F15) - and the SPINE.md record a halt cannot write, and the zero-item arm's work_item_add names the target repo the verb requires once more than one is declared
 O	skills/close/references/spine-close.md	merge --no-ff	tests/test-close.sh	the landing pass: the local arm's merge guard (the spine tip must actually reach the base branch) and the PR arm's push/create with the gh-inoperable third-leg halt. #339 re-anchored this row from 'is-ancestor' - the record pass added its own --is-ancestor lineage guard and the harness refuses a duplicated anchor
 O	skills/close/references/spine-close.md	mergeCommit	tests/test-close.sh	the record pass (#339): a MERGED PR is proven locally - head identity (mergeCommit^2 == headRefOid, a rebase/squash landing halts), lineage (the pushed tip from the PR body is an ANCESTOR of the merged head, so fix rounds pass and rewrites halt), the stranded-merge guard (local base ahead of origin halts, repair named, never run), then repo:mergeCommit lands in $merge_shas
 O	skills/close/references/spine-close.md	touch_check	tests/test-close.sh	bone-touch at close re-classifies the spine rather than trusting the plan
@@ -117,13 +120,13 @@ O	skills/close/references/release-close.md	spines that are not closed	tests/test
 O	skills/close/references/release-close.md	expired_fakes	tests/test-close.sh	the fake-expiry gate blocks on fakes past their expiry release
 O	skills/close/references/release-close.md	expired_quarantines	tests/test-close.sh	the quarantine gate blocks on quarantines that have come due
 D	skills/close/references/release-close.md	1	#138	the ai_workspace path composition for the release retro is unexecuted
-O	skills/close/references/release-close.md	git tag	tests/test-close.sh	the #339 release-tag block, round 2 (T1/T2/T8): per hosting repo via oss repo_root + the recovered base branch, remote resolved never assumed origin, annotated always, resumable only when an existing tag matches the base tip locally AND on the remote (R1-R3 in test-close.sh)
+O	skills/close/references/release-close.md	git tag	tests/test-close.sh	the #339 release-tag block, round 2 (T1/T2/T8): per hosting repo via oss repo_root + the recovered base branch, remote resolved never assumed origin, annotated always, resumable only when an existing tag matches the base tip locally AND on the remote (R1-R3 in test-close.sh), and an EMPTY tag set halts rather than tagging nothing (F18/R8), with a route out that reopens the item's closed parent spine instead of re-tagging a repo whose work never landed
 I	skills/close/references/release-close.md	6	single-verb calls: demo_user_lines, ledger_retire, release goal read, feature_list, release_status, release_dir (the retro destination became a release_dir call - the verb is test-worktree.sh's)
 O	skills/close/references/patch-lane.md	touch_check	tests/test-close.sh	a patch touching a bone surface must escalate out of the patch lane
 D	skills/close/references/patch-lane.md	1	#138	the patch commit's branch placement block - CL-1 says the target branch is unspecified, so executing it needs the design decision first. #272/#310 Task 9 keyed the block to a `repo_key` (any declared repo, not only canonical); the underlying CL-1 gap is unchanged
 I	skills/close/references/patch-lane.md	1	single patch_add call with <placeholder> args
 O	skills/close/references/work-item-close.md	abbrev-ref	tests/test-close.sh	W1: the merge guard fires when the item's own repo (target_repo, not always canonical since #272/#310 Task 9) is parked on the wrong branch
-D	skills/close/references/work-item-close.md	4	#138	path resolution, the spec-exists halt, the staged-changes read, and the Route A/B close sequence
+D	skills/close/references/work-item-close.md	4	#138	path resolution (which now reads .status and refuses an `abandoned` item BEFORE diagnosing a missing worktree, #531) - and that arm's route out reopens an already-closed parent spine, since un-withdrawing alone leaves a planned item inside a closed spine that release close's tag selector then accepts, the spec-exists halt, the staged-changes read, and the Route A/B close sequence
 I	skills/close/references/work-item-close.md	1	a single <placeholder> assignment showing the report path's origin
 O	skills/close/references/cumulative-demo.md	elapsed=	tests/test-close.sh	D1-D4: the demo measurement block preserves the runner's rc instead of flattening it
 O	skills/close/references/cumulative-demo.md	evd=	tests/test-close.sh	F3a-g: the quarantine-comparison block disposes of its evidence dir on green, differing, halt, failing-command, lookup-failure, and signal-during-diff paths
@@ -142,6 +145,7 @@ D	commands/run-spine.md	1	#138	the $ARGUMENTS env-var bridge
 D	commands/start.md	1	#138	the $ARGUMENTS env-var bridge
 D	commands/work-item.md	1	#138	the $ARGUMENTS env-var bridge
 I	skills/doctor/SKILL.md	2	a single doctor call (interop_check's block went with its verb - §7 is performed by reading; rules_types' block went the same way - §6's type table is the reference's §3 prose now) and the surface-token placeholder assignment (the broken $ARGS parse became the family's prose-placeholder form - there is no parse logic left to cover; §12 owns $ARGUMENTS)
+O	skills/doctor/references/state-inspection.md	ls-files -z	tests/test-prose-contracts.sh	the §5 touch-surface sweep (#523): each declared repo's tracked-path corpus is fed to touch_check, whose OUTPUT is the finding - a surface that matches no tracked file is an ABSENCE from the accumulated hits, and every failure that would FAKE that absence (an unreadable repo, an unreadable registry, an empty corpus) is reported as itself instead
 I	skills/doctor/references/state-inspection.md	3	the reads the agent-performed half works from, now that doctor emits only its four gate lines: the four advisory counts, the `| type` guard that must precede them (jq's length answers on strings too, so a corrupt field returns a plausible number at rc 0), and the worktree_orphans call shapes one per repo key (#156). Each is a single read whose OUTPUT the prose interprets - the judgement is the prose
 I	skills/doctor/references/spec-validation.md	2	a spec_path resolve and a bones-count get bound to an explicit state path
 I	skills/doctor/references/interop-check.md	3	the resolution calls the agent-performed check reads FROM, now that the verb is gone: the ai_workspace + declared-repo root reads, the declared-repo git work-tree probe (#272/#310 Task 10: was canonical-only), and state_path vs $OSS_STATE_FILE. Each is a single call whose OUTPUT the prose interprets - the judgement is the prose, so executing these would test the fixture rather than the check
@@ -213,17 +217,17 @@ H	skills/close/references/fake-expiry.md	3491573094-743
 H	skills/close/references/harvest.md	1931122618-713
 H	skills/close/references/impl-check.md	3998988429-864
 H	skills/close/references/patch-lane.md	1122131773-2611
-H	skills/close/references/release-close.md	1100043058-11313
+H	skills/close/references/release-close.md	1444363264-13073
 H	skills/close/references/retrospective.md	1694933006-117
 H	skills/close/references/routing.md	2855300955-280
-H	skills/close/references/spine-close.md	3280402613-22395
-H	skills/close/references/work-item-close.md	3790544145-3515
+H	skills/close/references/spine-close.md	2348298578-24971
+H	skills/close/references/work-item-close.md	3939495863-5012
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	1897652786-133
 H	skills/doctor/references/budget-check.md	3813294467-2669
 H	skills/doctor/references/interop-check.md	3316355601-827
 H	skills/doctor/references/spec-validation.md	906553258-123
-H	skills/doctor/references/state-inspection.md	1463118705-1262
+H	skills/doctor/references/state-inspection.md	4093638061-4242
 H	skills/plan-release/SKILL.md	1172871519-2561
 H	skills/plan-release/references/bone-touch-judge.md	3422967488-1278
 H	skills/plan-release/references/class-declaration.md	2145716635-323

@@ -87,8 +87,21 @@ a line whose replacement never landed, which is the silent-coverage loss
 `demo-amendments.md` §6 exists to prevent. Clear it with
 `"$oss_bin" ledger_unplan <line-id> <spine-id>` in the same pass, exactly as the
 whole-spine arm above already does. Any demo line the withdrawn item alone was
-going to add goes the same way: it was planned, never built, and a line that can
-never pass is a demo blocker rather than coverage.
+going to add is a **different case, and `ledger_unplan` is not the tool for it**:
+that verb clears a pending amendment and answers **rc 7 for an ordinary active
+line**, which this one still is. Retire or replace it instead —
+`"$oss_bin" ledger_retire <line-id> <spine-id> <reason>` or
+`"$oss_bin" ledger_supersede <line-id> <spine-id> <reason>` — and confirm
+afterwards that the spine still contributes valid coverage. Both take the spine as
+the **second** argument (a two-argument form exits 2 and plans nothing), and both
+are *planning* verbs: the amendment they record is applied by the close of the
+spine named there, so `<spine-id>` must be a spine that will actually close — the
+one that carries the replacement. Name the spine you are about to retire and the
+line stays active with the amendment pending, silently and forever
+(`demo-amendments.md` §3); where nothing carries the replacement, the coverage
+question goes back to `plan-release` rather than being papered over. It was
+planned, never built, and a line that can never pass is a demo blocker rather
+than coverage.
 
 ---
 

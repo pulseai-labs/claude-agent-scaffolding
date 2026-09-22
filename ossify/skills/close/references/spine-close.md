@@ -54,8 +54,16 @@ open="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .statu
   || { echo "close: $spine_id has work items that are not complete: $open - halt"; exit 1; }
 withdrawn="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status == \"abandoned\") | .id] | join(\", \")")"
 live="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .id] | join(\", \")")"
-[ -n "$live" ] || [ -z "$withdrawn" ] \
-  || { echo "close: $spine_id records only withdrawn work items ($withdrawn) - there is nothing to land, review, demo or harvest. This is not a close: retire the spine with \"$oss_bin\" spine_status $spine_id abandoned, or un-withdraw an item with \"$oss_bin\" work_item_status <wi-id> planned - halt"; exit 1; }
+# A spine with NO work items ran nothing, exactly like a fully-withdrawn one: it
+# was never decomposed into rounds, so there is nothing to land, review, demo or
+# harvest: a spine whose branch changed nothing halts at step 5's changed-path
+# guard ("the touch check is INCONCLUSIVE, not clean") or fails step 4's demo on
+# a zero-line ledger, and the harvest is step 9 - eight steps on, not five. Its own message, because its cause and its next action differ: the
+# plan was never filled, rather than filled and then emptied.
+[ -n "$live" ] || [ -n "$withdrawn" ] \
+  || { echo "close: $spine_id has no work items - there is nothing to land, review, demo or harvest, and a spine that ran nothing is retired rather than closed. Decompose it with \"$oss_bin\" work_item_add $spine_id <title> <target-repo> - the repo is required once more than one is declared, because the verb refuses to guess a default, or retire it with \"$oss_bin\" spine_status $spine_id abandoned - halt"; exit 1; }
+[ -n "$live" ] \
+  || { echo "close: $spine_id records only withdrawn work items ($withdrawn) - there is nothing to land, review, demo or harvest, and a spine that ran nothing is retired rather than closed. Retire it with \"$oss_bin\" spine_status $spine_id abandoned, AFTER the two obligations the retirement carries: (1) the demo ledger - an amendment this spine planned is still pending, so clear it with \"$oss_bin\" ledger_unplan <line-id> $spine_id, and an ordinary ACTIVE line whose only implementation was withdrawn is retired or replaced with \"$oss_bin\" ledger_retire <line-id> <spine-id> <reason> or \"$oss_bin\" ledger_supersede <line-id> <spine-id> <reason> - keyed to a spine that will CLOSE, never $spine_id, which is the spine being retired here: both are planning verbs whose amendment is applied by the close of the spine named there, so naming the retiring spine leaves the line active and the amendment pending forever, silently (demo-amendments.md §3) (ledger_unplan answers rc 7 for an active line, so it is not the tool for that case either); (2) any repo ARMED for this spine - restore its checkout, or record it as parked in SPINE.md, where the base-branch table and the withdrawal's own reason both already live: this halt writes no close record, because it exits before §9's state writes. To reverse the withdrawal instead: \"$oss_bin\" work_item_status <wi-id> planned - which restores the STATUS, and the item can run only where the lane can still cut its branch: work-item/references/round-orchestration.md §2 halts on an existing spine branch, which close leaves behind in every hosting repo (issue #133 is the open reconciliation). Where it cannot, carry the item into a NEW spine (decomposition.md §1's whole-spine arm). The account is split: plan-spine/references/decomposition.md §1 owns the demo-ledger half, and §3 below owns the armed-repo half this halt exits before reaching - halt"; exit 1; }
 [ -z "$withdrawn" ] \
   || echo "close: $spine_id withdrew work items before dispatch: $withdrawn - SPINE.md records why; they contribute nothing to this close"
 ```
@@ -87,6 +95,16 @@ already names.
 The withdrawn line is `[ -z … ] || echo` for the same strict-mode
 reason `release-close.md` §2 gives for its abandoned-spine line: it is the
 block's last command, and an `&&` form returns 1 on the clean case.
+
+**The retirement's two obligations are properties of the repos and the ledger,
+not of the steps that follow, so they survive the halt.** A halt exits the
+ceremony, and the later sections — where the demo-ledger and parked-repo work is
+described — never run; both are stated in the halt message itself for that
+reason, and the parked-repo account in §3 still owns the detail for a close that
+proceeds. The parked repo's RECORD goes to `SPINE.md`, because §3 names the close
+record and §9 is what writes it — which a halt never reaches, so naming only the
+close record would leave the obligation with nowhere to land. Nothing in this
+gate touches either: it refuses, names what is owed, and stops.
 
 ---
 
