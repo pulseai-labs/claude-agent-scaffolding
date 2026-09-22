@@ -65,30 +65,61 @@ _oss_reg_require_single() { # $1=state-file $2=jq-selector(uses $v) $3=singular 
   fi
 }
 
-# The per-entry refusal, ONCE. A REAL entry carrying surrounding whitespace is
-# not blank - it passes the emptiness arm above - and its glob can never match a
-# real path once the CR (or tab, or NBSP) is part of it. Measured on 602565f: a
+# The per-entry refusal, ONCE. A REAL entry carrying a surrounding invisible
+# character is not blank - it passes the emptiness arm - and its glob can never
+# match a real path once that character is part of it. Measured on 602565f: a
 # CR-terminated glob was journaled at rc 0 and touch_check went CLEAN on the very
 # path the re-point was meant to cover, which is the defect these verbs exist to
-# repair entered through their own argument handling. LEADING/TRAILING only,
-# deliberately: an interior space is legal (a path can contain one), so this is
-# narrower than "any whitespace". The offending entry is named with @json,
-# because a CR on a terminal is invisible and "trailing whitespace" alone does
-# not say which entry to fix.
+# repair entered through their own argument handling.
+#
+# The edge class is `[\s\p{Cf}]`, not `\s` alone. `\s` is Unicode White_Space and
+# covers the CR, tab, VT, NBSP and ideographic-space vectors - but NOT the format
+# characters, and a UTF-8 BOM (U+FEFF) or a zero-width space (U+200B) sits on
+# line 1 of exactly the composed-from-a-Windows-file input this rail exists for.
+# Measured before this extension: a BOM-prefixed and a ZWSP-suffixed glob were
+# BOTH journaled at rc 0 and touch_check answered CLEAN on the covered path - the
+# #530 harm one invisible character wide of the guard. `\p{Cf}` closes the family
+# (BOM, ZWSP, ZWNJ, ZWJ, soft hyphen, bidi marks).
+#
+# LEADING/TRAILING only, deliberately: an interior space is legal (a path can
+# contain one), so this is narrower than "any whitespace". The offending entry is
+# named with @json, because a CR on a terminal is invisible and "trailing
+# whitespace" alone does not say which entry to fix. @json renders `\r`, `\t` and
+# `\v` in escaped form but passes NBSP, U+3000, BOM and ZWSP through as raw
+# UTF-8, so for those vectors the named entry reads like a clean glob; that
+# fidelity gap is tracked on #551, and the refusal itself is unaffected.
 #
 # It is shared with the two ADD verbs because the same entry can be journaled at
 # MINT, where nothing refused it and there is no re-point to repair it with: a
 # bone minted on a CRLF-composed csv declared a surface that touch_check then
 # answered CLEAN on, from mint day, with rc 0 and nothing to review. The mint
-# takes this arm alone - it does NOT take the re-point's emptiness arm, because a
-# bone may legitimately be minted before its surface exists (pinned below).
+# takes this arm and the one-list arm - it does NOT take the emptiness arm,
+# because a bone may legitimately be minted before its surface exists (pinned).
 _oss_reg_refuse_contaminated() { # $1=json-list $2=noun-phrase $3=why
   local list="$1" noun="$2" ws_why="$3" bad
-  bad="$(jq -rn --argjson t "$list" 'first($t[] | select(. != (sub("^\\s+";"") | sub("\\s+$";"")))) // empty | @json')" || {
+  # `2>/dev/null`: the one-list arm above normally rejects a non-parsing list
+  # first, so this jq only ever sees a list that parses - but the arm is shared,
+  # and a caller that reaches it directly must not leak jq's raw
+  # "--argjson" error into a refusal that is OURS (see _oss_reg_require_one_list).
+  bad="$(jq -rn --argjson t "$list" 'first($t[] | select(. != (sub("^[\\s\\p{Cf}]+";"") | sub("[\\s\\p{Cf}]+$";"")))) // empty | @json' 2>/dev/null)" || {
     echo "oss: cannot read the $noun" >&2; return 2; }
   if [ -n "$bad" ]; then
     echo "oss: the $noun has an entry with leading or trailing whitespace: $bad - trim it; $ws_why" >&2; return 2
   fi
+}
+
+# The one-list arm, ONCE (#541 round 2). The splitter is line-oriented (`jq -R`
+# processes each line alone), so a csv wrapped over two lines emits TWO JSON
+# values and `--argjson` cannot parse them. Both the corrective appends AND the
+# two mint verbs take this arm: at the mint it is what makes a wrapped csv answer
+# "not one list" instead of letting the contaminated arm's jq fail - which leaked
+# `jq: invalid JSON text passed to --argjson` onto stderr and then mislabelled the
+# failure "cannot read the touch list", the raw-error leak and the false cause the
+# re-point path has been pinned against since 1.11.0, reproduced one verb over by
+# extracting the arms apart.
+_oss_reg_require_one_list() { # $1=json-list $2=noun-phrase $3=csv-name
+  jq -en --argjson t "$1" 'true' >/dev/null 2>&1 || {
+    echo "oss: the $2 is not one list - a $3 is a single comma-separated line, and a newline splits it into several" >&2; return 2; }
 }
 
 # The payload half of a corrective append, ONCE (#525). The two touch re-points
@@ -103,8 +134,7 @@ _oss_reg_refuse_contaminated() { # $1=json-list $2=noun-phrase $3=why
 # real path and reproduces the silent-clean defect these verbs exist to repair.
 _oss_repoint_guard() { # $1=json-list $2=noun $3=csv-name $4=needle $5=blank-why $6=whitespace-why
   local list="$1" noun="$2" csv="$3" needle="$4" blank_why="$5" ws_why="$6"
-  jq -en --argjson t "$list" 'true' >/dev/null 2>&1 || {
-    echo "oss: the new $noun is not one list - a $csv is a single comma-separated line, and a newline splits it into several" >&2; return 2; }
+  _oss_reg_require_one_list "$list" "new $noun" "$csv" || return $?
   jq -en --argjson t "$list" 'any($t[]; test("[^\\s]"))' >/dev/null 2>&1 || {
     echo "oss: the new $noun needs at least one $needle - every entry is blank, and $blank_why" >&2; return 2; }
   _oss_reg_refuse_contaminated "$list" "new $noun" "$ws_why"
@@ -151,8 +181,9 @@ _oss_reg_uniq_gate() { # $1=state-file $2=payload about to be minted -> 0, or 7 
 oss_reg_add_bone() { # $1=state $2=adr-ref $3=title $4=touch-csv $5=revisit(optional)
   local sf="$1" touch
   touch="$(_oss_csv_to_json "$4")" || return $?
+  _oss_reg_require_one_list "$touch" "touch list" "touch-csv" || return $?
   _oss_reg_refuse_contaminated "$touch" "touch list" \
-    "a glob minted with surrounding whitespace matches no real path, and touch_check then answers CLEAN on the code the bone was declared to cover" || return $?
+    "a glob minted with surrounding whitespace or an invisible format character matches no real path, and touch_check then answers CLEAN on the code the bone was declared to cover" || return $?
   oss_state_mutate "$sf" add_bone \
     "$(jq -n --arg adr "$2" --arg t "$3" --argjson touch "$touch" \
         --arg rv "${5:-}" --arg ts "$(_oss_now)" \
@@ -164,10 +195,12 @@ oss_reg_add_risk_gate() { # $1=state $2=name $3=touch-csv $4=controls-csv
   local sf="$1" touch c
   touch="$(_oss_csv_to_json "$3")" || return $?
   c="$(_oss_csv_to_json "$4")" || return $?
+  _oss_reg_require_one_list "$touch" "touch list" "touch-csv" || return $?
   _oss_reg_refuse_contaminated "$touch" "touch list" \
-    "a glob minted with surrounding whitespace matches no real path, and touch_check then answers CLEAN on the code the gate was declared to cover" || return $?
+    "a glob minted with surrounding whitespace or an invisible format character matches no real path, and touch_check then answers CLEAN on the code the gate was declared to cover" || return $?
+  _oss_reg_require_one_list "$c" "controls list" "controls-csv" || return $?
   _oss_reg_refuse_contaminated "$c" "controls list" \
-    "a control phrase with surrounding whitespace is not the phrase the caller wrote" || return $?
+    "a control phrase with surrounding whitespace or an invisible format character is not the phrase the caller wrote" || return $?
   oss_state_mutate "$sf" add_risk_gate \
     "$(jq -n --arg n "$2" --argjson touch "$touch" \
         --argjson c "$c" --arg ts "$(_oss_now)" \

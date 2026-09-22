@@ -113,6 +113,54 @@ t_assert_rc 0 "an empty controls list is still admitted at mint"
 t_capture jq -c '.risk_gates[] | select(.name=="ctrl-gate") | .controls' "$S"
 t_assert_eq '[]' "$T_OUT" "...and recorded as empty, not refused"
 
+# --- the edge class is `[\s\p{Cf}]`, not `\s` alone (round 2) ----------------
+# `\s` is Unicode White_Space, which covers the CR/tab/VT/NBSP/U+3000 rows above
+# - but NOT the format characters, and a UTF-8 BOM (U+FEFF) or a zero-width space
+# (U+200B) sits on line 1 of exactly the composed-from-a-Windows-file input this
+# rail exists for. Measured before the extension: a BOM-prefixed and a
+# ZWSP-suffixed glob were journaled at rc 0 at the MINT and on the re-point
+# alike, and touch_check answered CLEAN on the covered path - the #530 harm one
+# invisible character wide of the guard.
+for csv in "$(printf '\xef\xbb\xbfsrc/bom/**')" "$(printf 'src/zwsp/**\xe2\x80\x8b')" \
+           "$(printf 'src/zwnj/**\xe2\x80\x8c')" "$(printf 'src/softhyphen/**\xc2\xad')"; do
+  _hex="$(printf '%s' "$csv" | od -An -tx1 | tr -d ' ')"
+  t_capture oss_reg_add_bone "$S" ADR-F "format char" "$csv" ""
+  t_assert_rc 2 "bone_add refuses an invisible format character at the edge ($_hex)"
+  t_capture oss_reg_set_bone_touch "$S" ADR-0002 "$csv"
+  t_assert_rc 2 "...and the re-point verb refuses it too ($_hex)"
+done
+t_capture jq '[.bones[] | select(.adr=="ADR-F")] | length' "$S"
+t_assert_eq "0" "$T_OUT" "...and no bone was minted by any refused call"
+# ADJACENT CONTROL, the same rule the interior-space row states: the guard is
+# EDGES only. An interior zero-width space stays legal, so this row goes RED if
+# the predicate is ever widened to "contains a format character anywhere".
+t_capture oss_reg_add_bone "$S" ADR-F2 "interior format char" "$(printf 'src/a\xe2\x80\x8bb.py')" ""
+t_assert_rc 0 "an entry with an INTERIOR zero-width space is still accepted"
+t_capture jq -c '.bones[] | select(.adr=="ADR-F2") | .touch' "$S"
+t_assert_eq '["src/a​b.py"]' "$T_OUT" "...and it survives into the journaled surface"
+
+# --- the mint takes the ONE-LIST arm too (round 2) --------------------------
+# A csv wrapped over two lines emits two JSON values, so --argjson cannot parse
+# it. The re-point path has answered that with "not one list" since 1.11.0, and
+# its own comment calls the arms' separation deliberate. Calling the contaminated
+# arm directly at the mint put it back in front of an unparseable list: measured,
+# `bone_add` printed jq's raw `invalid JSON text passed to --argjson` on stderr
+# and then mislabelled the failure "cannot read the touch list" - the retry-loop
+# false cause this file's corrupt-state rows exist to prevent, one verb over.
+t_capture oss_reg_add_bone "$S" ADR-NL "wrapped csv" "$(printf 'src/a/**\nsrc/b/**')" ""
+t_assert_rc 2 "bone_add refuses a two-line touch-csv"
+t_assert_contains "$T_OUT" "not one list" "...and reports two lists, not an unreadable one"
+case "$T_OUT" in
+  *"parse error"*|*"jq: error"*|*"invalid JSON"*)
+    T_FAIL=$((T_FAIL+1)); echo "FAIL: bone_add leaks jq's raw error into its refusal - the one-list arm is not running first" ;;
+  *) T_PASS=$((T_PASS+1)) ;;
+esac
+t_capture oss_reg_add_risk_gate "$S" nl-gate "src/a/**" "$(printf 'ctl-a\nctl-b')"
+t_assert_rc 2 "...and risk_gate_add refuses a two-line controls-csv the same way"
+t_assert_contains "$T_OUT" "not one list" "...with the same diagnosis, not a jq error"
+t_capture jq '[.risk_gates[] | select(.name=="nl-gate")] | length' "$S"
+t_assert_eq "0" "$T_OUT" "...and no gate was minted by either refused call"
+
 # --- D1 fake lifecycle (Task 2, named risk 7): oss_reg_set_fake_status must
 # leave expiry_release ALONE when the 5th arg (new expiry) is omitted.
 # test-ledger.sh only exercises the WITH-a-new-expiry (renew) path, so that
