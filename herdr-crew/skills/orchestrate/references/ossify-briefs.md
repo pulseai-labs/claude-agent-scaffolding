@@ -22,7 +22,7 @@ running in your first reply, then continue.
 PLACEMENT: <abs path of the repo or worktree the lane runs from>.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
 MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
 SPINE_ID=<spine id>
@@ -114,7 +114,7 @@ running in your first reply, then continue.
 
 PLACEMENT: worktree <abs path>, branch <branch>, base <base-branch>. Use git -C
 for every git command; cd does not persist.
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 Everything you say upward (plan, question, escalation, report) goes in that file.
 
 BEFORE ANY EDIT, in this order:
@@ -150,15 +150,15 @@ verbatim.
 
 ## Item verifier (one fresh seat per work item, retained through corrections)
 
-Launched from its SEATS row's verifier command, verbatim. The
-procedure is this skill's existing all-claims work-item verification — the
-`briefs.md` verifier body, with these placements and this retention.
+Launched from its SEATS row's verifier command, verbatim. Its procedure is the
+fixed `all-claims-work-item-verify/v1`; its CLAIMS is `briefs.md`'s verifier CLAIMS
+body, supplied verbatim with the dispatch; its placements and retention are its own.
 
 ```text
-ROLE: verifier for <work-item-id>, read-only, in worktree <abs path>, at <head sha>, staged
-tree <tree oid>. State the model you are running; EXPECTED_MODEL below is the value to match —
-a mismatch is a failed launch to report and stop.
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
+ROLE: verifier for <work-item-id>, read-only, in worktree <abs path>, at the accepted result's
+`head_oid`, staged tree `tree_oid`. State the model you are running; EXPECTED_MODEL below is the
+value to match — a mismatch is a failed launch to report and stop.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 EXPECTED_MODEL=<this item's SEATS row names it — fill this line; a coordinator never sends it blank>
 
 CLAIMS: <the numbered list the coordinator fills from this item's spec, from the verifier body
@@ -186,9 +186,9 @@ seat, once, with every finding consolidated:
 OSSIFY CORRECTION CONTINUATION v1
 handoff_path: <abs path>
 work_item_id: <work-item-id>
-expected_branch: <branch from the item's execution request>
-expected_head_sha: <head oid from the accepted result>
-expected_tree_oid: <tree oid from the accepted result>
+expected_branch: <the `branch` of the item's execution request>
+expected_head_sha: <the `head_oid` of the accepted result>
+expected_tree_oid: <the `tree_oid` of the accepted result>
 failures:
 - <one finding per line>
 ```

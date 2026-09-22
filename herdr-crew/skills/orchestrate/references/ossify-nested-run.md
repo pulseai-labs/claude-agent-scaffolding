@@ -68,10 +68,10 @@ releases every item pair and closes the workspace it created, as
    report file, then waits. Gather the round's plans into **one** ordered ask to you;
    return an independent approve-or-amend per item; the spine session sends each
    implementer its item's decision, before which no edit starts.
-5. On each complete return, capture the item's four-part fingerprint — `head_oid`, `tree_oid`,
-   `report_oid` and `spec_oid`, the four ids the external-executor result envelope declares
-   (`ossify/skills/work-item/references/external-executor.md` §4) and the same four the close
-   guard fingerprints — then create and
+5. On each complete return, capture the item's identity as the result declares it — `head_oid`,
+   `tree_oid`, `report_oid` and `spec_oid`, the four ids the external-executor result envelope
+   declares (`ossify/skills/work-item/references/external-executor.md` §4) and the same four the
+   close guard fingerprints — then create and
    dispatch that item's **fresh verifier seat** from its SEATS row's exact
    command, in the same worktree, against the fixed all-claims procedure.
    `cannot determine` = fail.

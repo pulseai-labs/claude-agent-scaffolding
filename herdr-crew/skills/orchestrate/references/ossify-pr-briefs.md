@@ -20,7 +20,7 @@ CLOSE_EXPECTED_MODEL is a failed launch to report, not to work around.
 PLACEMENT: <abs path of the worktree the spine's lane ran from>.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 SPINE_ID=<spine id>
 CLOSE_COMMAND=<the command this seat was launched with, from its machine entry>
 CLOSE_EXPECTED_MODEL=<the model the banner or screen must show>
@@ -81,7 +81,7 @@ report, not to work around.
 PLACEMENT: REPO_ROOT — the worktree holding this PR's branch.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
 MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
 PR_REPO=<owner/repo>
