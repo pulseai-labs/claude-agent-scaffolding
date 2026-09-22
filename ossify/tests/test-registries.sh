@@ -256,6 +256,28 @@ t_capture oss_reg_set_bone_touch "$TMP/touch-corrupt.json" ADR-0003 "src/**"
 t_assert_rc 2 "bone_set_touch: an unreadable state is rc 2, not a raw jq error"
 t_capture oss_reg_set_risk_gate_touch "$TMP/touch-corrupt.json" gold-correctness "src/**"
 t_assert_rc 2 "risk_gate_set_touch: an unreadable state is rc 2, not a raw jq error"
+# #525: the ladder's `2>/dev/null` is a LEARNED fix, not cosmetic noise
+# suppression - it is what keeps a corrupt state's refusal OURS. Without it jq's
+# raw parse error lands in the same captured output as the "cannot read" line,
+# and the operator (or an agent) reading the first line sees a jq failure
+# instead of the remedy. The arm had no assertion before this extraction, which
+# is exactly the "line a fourth hand-copy drops" the issue names - so it is
+# pinned here, on all three verbs that share the ladder now.
+for _v in oss_reg_set_bone_touch oss_reg_set_risk_gate_touch oss_reg_set_risk_gate_controls; do
+  case "$_v" in
+    oss_reg_set_bone_touch)         _a="ADR-0003";         _msg="cannot read bones" ;;
+    oss_reg_set_risk_gate_touch)    _a="gold-correctness"; _msg="cannot read risk gates" ;;
+    oss_reg_set_risk_gate_controls) _a="phrase-gate";      _msg="cannot read risk gates" ;;
+  esac
+  t_capture "$_v" "$TMP/touch-corrupt.json" "$_a" "src/**"
+  t_assert_rc 2 "$_v: a corrupt state refuses at rc 2"
+  t_assert_contains "$T_OUT" "$_msg" "$_v: the refusal is the verb's own message"
+  case "$T_OUT" in
+    *"parse error"*|*"jq: error"*)
+      T_FAIL=$((T_FAIL+1)); echo "FAIL: $_v leaks jq's raw error into the refusal - the ladder's 2>/dev/null routing is gone" ;;
+    *) T_PASS=$((T_PASS+1)) ;;
+  esac
+done
 t_capture jq '.mutations | length' "$ST"
 t_assert_eq "$N1" "$T_OUT" "every refusal above left the journal unchanged"
 # Duplicates (#305 shape) refuse rather than guess which entry to re-point.
