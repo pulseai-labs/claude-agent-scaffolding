@@ -195,6 +195,6 @@ the record pass — a later merge is a new work-PR dispatch, not a resumption of
 one. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: talk to the operator — every question goes up to the top; squash; merge
-without the top's relayed word; delete a branch; or dispatch a second review —
-one delegated review per PR, exactly as `roles.md` and step 8 have it.
+without the top's relayed word; delete a branch; or dispatch a second full review — one
+delegated review per PR (`roles.md`, step 8); a fixed head takes one scoped delta re-review.
 ```
