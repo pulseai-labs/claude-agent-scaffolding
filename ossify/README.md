@@ -1,4 +1,4 @@
-# ossify (v1.11.0)
+# ossify (v1.11.1)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Nine entry skills (`start`, `adopt`,
@@ -55,9 +55,26 @@ journaled corrective appends. The op names `set_bone_touch` and
 `set_risk_gate_touch`, their payloads `{adr,touch}` and `{name,touch}`, and the
 status value `abandoned` are a compatibility contract: live journals written by
 an earlier local build already carry them, and renaming an op is what replay
-catches (`unknown op`, rc 4). A payload reshape does **not** fail replay — it
-applies as a silent no-op — so the payload keys are held by this contract and
-by the verbs' own tests, not by replay alone.
+catches (`unknown op`, rc 4). A payload reshape does **not** fail replay, and it
+fails in two different ways, so neither mode is a safe default to describe: a
+renamed **identifier** key (`adr` → `adr_ref`) applies as a silent no-op and
+leaves the surface as it was, while a renamed **value** key (`touch` → `surface`)
+is destructive — it writes `touch: null` at rc 0 and the next `touch_check` on
+that surface answers `INCONCLUSIVE, not clean` (rc 2) on every call, forever.
+The payload keys are held by this contract and by the verbs' own tests, not by
+replay alone.
+
+Since 1.11.1, the registries' corrective-append verbs refuse input they would
+otherwise silently misinterpret. A re-point or a controls rewrite whose list
+carries an entry with leading or trailing whitespace — a CR kept from a CRLF file
+is the usual source — is refused at rc 2 and the entry is named with its
+whitespace escaped, instead of being journaled as a glob that can never match the
+path it was meant to cover; a list with no entry in it at all is refused for the
+same reason, on all three verbs rather than the two that had the guard. A caller
+who space-splits a list gets a usage refusal naming the CSV grammar instead of a
+silently shrunk surface. And `bone_add` / `risk_gate_add` refuse a ref that
+already exists rather than minting a second row for one key, which had left the
+operator holding a surface the re-point verb then refused to repair.
 
 Since 1.7.0 (#368), every bare `doctor` sweep includes plugin provenance and
 `doctor provenance` runs it alone. It reports the answering `oss` binary, the

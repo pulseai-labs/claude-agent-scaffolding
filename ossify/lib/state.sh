@@ -73,12 +73,22 @@ _oss_apply_op() { # $1=op $2=payload-json
     # set_risk_gate_touch, and their payload keys {adr,touch} and {name,touch},
     # are already in live journals, so neither may be renamed or reshaped.
     # Replay is only HALF that enforcement, and claiming otherwise overclaims
-    # it: an op-NAME rename fails loudly here ("unknown op", rc 4), but a
-    # payload reshape does NOT - `$p.adr` reads null, `first()` matches nothing,
-    # and jq assigns to an empty path at rc 0, identically on live apply and on
-    # replay. The payload keys are held by this contract and by the verbs' own
-    # tests (test-registries.sh pins the journaled [op, payload] exactly), not
-    # by replay. first()-targeted for the same check-to-append race reason as
+    # it. An op-NAME rename fails loudly here ("unknown op", rc 4). A payload
+    # reshape does NOT fail, and it fails in TWO different ways, so neither mode
+    # is a safe default to describe (#532):
+    #   - an IDENTIFIER key renamed (`adr` -> `adr_ref`) is a silent no-op:
+    #     `$p.adr` reads null, `first(.bones[] | select(.adr == null))` matches
+    #     nothing, and jq assigns to an empty path at rc 0 - the surface is left
+    #     exactly as it was, identically on live apply and on replay.
+    #   - a VALUE key renamed (`touch` -> `surface`) is DESTRUCTIVE: `$p.touch`
+    #     reads null, `first()` DOES match on the identifier, and the assignment
+    #     writes `.touch = null` at rc 0. Replay stays clean (it re-applies the
+    #     same transform), and the damage surfaces only at the next reader:
+    #     touch_check answers rc 2 "cannot read bones ... INCONCLUSIVE, not
+    #     clean" on every call for that surface, forever.
+    # The payload keys are held by this contract and by the verbs' own tests
+    # (test-registries.sh pins the journaled [op, payload] exactly), not by
+    # replay. first()-targeted for the same check-to-append race reason as
     # set_risk_gate_controls.
     set_bone_touch)
       jq --argjson p "$payload" '(first(.bones[] | select(.adr == $p.adr)) | .touch) = $p.touch' ;;
