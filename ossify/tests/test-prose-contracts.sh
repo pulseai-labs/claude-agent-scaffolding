@@ -288,4 +288,214 @@ for f in "$OSSSK/.claude-plugin/plugin.json" \
   fi
 done
 
+# --- phase 2: the abandoned carve-out's own claims, held mechanically --------
+#
+# Three sites, each with the same failure shape this file exists for: the words
+# are the whole guard, and nothing else in the suite can see them drift.
+#
+# (a) work-item close must READ the status before it diagnoses a missing
+# worktree (#531 site 1). A direct `/close <abandoned-id>` routes into this
+# document, its §1 block halts on the absent worktree, and the prose then asserts
+# the CAUSE - "the lane skipped work_item_exec" - which is wrong for a withdrawn
+# item (never dispatched) and sends the operator to the wrong remedy. The block
+# is one of this file's D rows (deferred, never executed by the suite), so this
+# assertion is its only hold.
+WIC="$OSSSK/skills/close/references/work-item-close.md"
+# This file grepped text until now; site (a) needs the SHARED block extractor
+# (tests/lib/blocks.sh), the same one test-close.sh and test-block-ledger.sh use,
+# because the claim is about a block's internals rather than a line's presence.
+. "$HERE/lib/blocks.sh"
+_PC_TMP="$(mktemp -d)"; _F="$_PC_TMP/wic-block.sh"
+if oss_block_extract "$WIC" 'no recorded worktree for' "$_F" 2>/dev/null && [ -s "$_F" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's block no longer extracts - the checks below are vacuous"
+fi
+# The status read and the abandoned arm must both be there, and the arm must come
+# BEFORE the worktree halt: an arm placed after it is unreachable, because the
+# halt exits first.
+_ab_line="$(grep -n 'abandoned' "$_F" | head -1 | cut -d: -f1)"
+_halt_line="$(grep -n 'no recorded worktree' "$_F" | head -1 | cut -d: -f1)"
+if [ -n "$_ab_line" ] && [ -n "$_halt_line" ] && [ "$_ab_line" -lt "$_halt_line" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1 does not test for 'abandoned' BEFORE the missing-worktree halt (ab=${_ab_line:-none} halt=${_halt_line:-none}) - an abandoned item is told the lane skipped work_item_exec"
+fi
+if grep -Fq 'status' "$_F" ; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's block never reads .status - it cannot tell a withdrawn item from a skipped dispatch"
+fi
+# The TEST, not just the word: the block must COMPARE the status against
+# 'abandoned'. Asserting merely that "abandoned" appears in the block passes on
+# the message text alone, so a block that reads the status and then ignores it
+# (or tests something else) would satisfy the weaker form - measured by mutation.
+if grep -Fq '= "abandoned"' "$_F" || grep -Fq "= 'abandoned'" "$_F"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1 does not COMPARE the status against 'abandoned' - naming it in a message is not testing it"
+fi
+# The route out must not leave the SAME trap the release-close halt did: if this
+# item's spine is already closed, un-withdrawing it puts a planned item inside a
+# closed spine, which release close's tag selector then accepts. And the arm may
+# not prescribe reopening it either: close leaves the spine's integration branch
+# in place, the lane halts on an existing branch (round-orchestration.md section
+# 2), so the arm has to name THAT obstruction and the route that can run - a new
+# spine. The first form of this assertion pinned `spine_status`, i.e. the reopen
+# that does not work; it was replaced when the round-3 review proved it out.
+for _lit in 'work_item_status' 'spine_add' 'round-orchestration.md' 'decomposition.md'; do
+  if grep -Fq "$_lit" "$_F"; then
+    T_PASS=$((T_PASS+1))
+  else
+    T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's abandoned arm does not name '$_lit'"
+  fi
+done
+
+# (b) the withdrawal arm's demo-ledger remedy must WORK (#531 site 3 / F15). The
+# sentence shipped in 1.11.0 said a demo line the withdrawn item alone was going
+# to add "goes the same way" as a pending amendment - pointing at ledger_unplan,
+# which answers rc 7 for an ordinary active line. The line stays active, its
+# implementation was withdrawn, and it then blocks this spine and every later
+# cumulative demo. The remedy for that case is retire/replace.
+DECOMP="$OSSSK/skills/plan-spine/references/decomposition.md"
+if grep -Fq 'goes the same way' "$DECOMP"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1 still says a demo line 'goes the same way' - that points at ledger_unplan, which cannot clear an active line"
+else
+  T_PASS=$((T_PASS+1))
+fi
+_wd_para="$(grep -A 14 'Any demo line the withdrawn item alone' "$DECOMP")"
+case "$_wd_para" in
+  *ledger_retire*|*ledger_supersede*) T_PASS=$((T_PASS+1));;
+  *) T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1's withdrawal arm names neither ledger_retire nor ledger_supersede for the active-line case - the remedy is unreachable from the text";;
+esac
+case "$_wd_para" in
+  *"rc 7"*) T_PASS=$((T_PASS+1));;
+  *) T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1's withdrawal arm does not say why ledger_unplan fails there (rc 7) - the operator retries it";;
+esac
+# The INVOCATION, not the verb name: `ledger_retire`/`ledger_supersede` take
+# <line-id> <spine-id> <reason> (lib/commands.sh declares _oss_need 3 for both),
+# so the two-argument forms this paragraph shipped exit 2 and plan nothing. The
+# OLD form is the search term - it is what a regression here would be phrased in.
+case "$_wd_para" in
+  *"ledger_retire <line-id> <spine-id>"*|*"ledger_supersede <line-id> <spine-id>"*) T_PASS=$((T_PASS+1));;
+  *) T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1's remedy does not name the by-spine argument - a two-argument ledger_retire/ledger_supersede exits 2";;
+esac
+case "$_wd_para" in
+  *"ledger_retire <line-id> <reason>"*|*"ledger_supersede <line-id> <new-line-id>"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1's remedy still shows a two-argument form (it exits 2) - or supersede's second argument as a replacement line id, which it is not";;
+  *) T_PASS=$((T_PASS+1));;
+esac
+case "$_wd_para" in
+  *"demo-amendments.md"*) T_PASS=$((T_PASS+1));;
+  *) T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1's remedy does not cite demo-amendments.md - the document that owns the keying rule the amendment depends on";;
+esac
+
+# (c) doctor's zero-match touch-surface sweep (#523). This is the DETECTOR the
+# 1.11.0 re-point verbs never had, and it is agent-performed prose, so the facts
+# without which it is unexecutable must be present IN THE RECIPE: the semantics
+# oracle (touch_check - never a hand-rolled glob match, because a shell `*`
+# crosses `/`, so a matcher written there would disagree with the verb that
+# decides reclassification) and the corpus (git ls-files, per declared repo). The
+# exclusion must be present too, or every deliberately-matching-nothing surface
+# becomes a false finding. Asserting the block's own content rather than a
+# mention somewhere in the file: measured by mutation, a file-level grep passes
+# while the recipe no longer calls the oracle.
+SKILLS="$HERE/../skills"
+SI="$SKILLS/doctor/references/state-inspection.md"
+_SW="$_PC_TMP/sweep-block.sh"
+if oss_block_extract "$SI" 'ls-files -z' "$_SW" 2>/dev/null && [ -s "$_SW" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: state-inspection.md §5's touch-surface sweep block no longer extracts - the checks below are vacuous"
+fi
+# The INVOCATION form, not the word: the block's own comment explains what the
+# oracle is, so a word-grep passes on the comment while the recipe no longer
+# calls it - measured by mutation.
+if grep -Fq '"$oss_bin" touch_check' "$_SW" && grep -Fq 'ls-files' "$_SW"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep recipe does not INVOKE both the oracle (\"\$oss_bin\" touch_check) and the corpus (git ls-files)"
+fi
+if grep -Fq 'not-applicable' "$SI"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: state-inspection.md's surface sweep does not name 'not-applicable' - every deliberate placeholder becomes a false finding"
+fi
+
+
+# (d) the §5 sweep must RUN, and must not read a failure as an absence (#523).
+# It shipped classified ILLUSTRATIVE, and the review of #555 found two defects
+# in its logic that no execution could see: `$repos` was never assigned anywhere
+# in the doctor skill, and an unreadable repo read as a zero-match. Either one
+# turns EVERY bone and gate into a finding - the false-positive cascade the
+# check exists to prevent, inverted. The block is OPERATIVE by the ledger's own
+# rule (control flow, rc handling, and a variable one step assigns and a later
+# step consumes), so it is extracted AND executed here against a real repo.
+# That is what moves its ledger row from I to O.
+#
+# Run with NOTHING injected that the caller does not genuinely supply
+# (tests/lib/blocks.sh): `oss_bin` and `repos` ARE the caller's, so they are
+# passed; everything else the block must establish itself.
+OSS="$HERE/../bin/oss"
+SWWS="$_PC_TMP/sweepws"; mkdir -p "$SWWS/.ossify" "$SWWS/canon"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"},"gone":{"root":"%s"}},"well_known_paths":{}}\n' \
+  "$SWWS/canon" "$SWWS/absent" > "$SWWS/.ossify/topology.json"
+( cd "$SWWS/canon" && git init -q . && : > tracked.txt && git add tracked.txt \
+  && git -c user.email=t@t -c user.name=t commit -qm fixture ) >/dev/null 2>&1
+SWS="$SWWS/state.json"
+( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" init "sweep" ) >/dev/null 2>&1
+( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" bone_add ADR-9091 "on a tracked file" "tracked.txt" ) >/dev/null 2>&1
+( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" bone_add ADR-9092 "on nothing" "nowhere/at/all/**" ) >/dev/null 2>&1
+# cd in the MAIN shell, not a subshell: t_capture/t_assert mutate the T_PASS/
+# T_FAIL globals, and a subshell's mutations never propagate (test-manifest.sh
+# documents the vacuous-green trap this avoids).
+cd "$SWWS"
+t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" repos="$(printf 'canonical\ngone')" bash -c \
+  "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'SKIPPED[%s]\n' \"\$skipped\"; printf 'ROSTER%s\n' \"\$roster\"; printf 'INHITS%s\n' \"\$(grep -c ADR-9092 \"\$hits\" 2>/dev/null || true)\""
+cd "$HERE"
+t_assert_rc 0 "(d) the sweep COMPLETES with a declared repo unreadable - it reports the skip rather than exiting the whole run"
+t_assert_contains "$T_OUT" "skip: touch(gone)" "(d) ... naming the unreadable repo by key, in the §1 grammar"
+t_assert_contains "$T_OUT" "bone ADR-9091" "(d) ... recording the surface that matched a tracked file"
+t_assert_contains "$T_OUT" "INHITS0" "(d) ... and the zero-match surface is NOT among the hits - counted from the file itself, so the roster naming the same id cannot mask it"
+t_assert_contains "$T_OUT" "SKIPPED[ gone]" "(d) ... and feeding \$skipped, which the prose's partial-corpus rule reads"
+# The ROSTER: touch_check answers "<kind> <id>" per match and never the glob,
+# so a warn line naming "the id and the glob list" has no other source. Without
+# this read the report's second half is unfillable and the `not-applicable`
+# exclusion is unreadable - the same unassigned-variable class as $repos.
+t_assert_contains "$T_OUT" "ADR-9092" "(d) ... and $roster carrying a surface that matched NOTHING, which is exactly the one a warn line names"
+t_assert_contains "$T_OUT" "nowhere/at/all/**" "(d) ... with its glob list, which touch_check's own output cannot supply"
+# G4: with EVERY declared repo unreadable the read set is EMPTY, and the sweep
+# must report that rather than one absence per surface.
+t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" repos="gone" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_assert_rc 0 "(d) a read set that came back EMPTY does not abort the sweep"
+t_assert_contains "$T_OUT" "no declared repo could be read" "(d) ... it reports that the sweep inspected nothing, rather than reporting every healthy surface as unmatched"
+# The corpus arm: `repos` UNSET under strict mode. This is the shipped defect
+# (an unassigned variable), so it is run with NOTHING injected.
+t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_assert_rc 0 "(d) an unset \$repos does not abort the sweep under strict mode"
+t_assert_contains "$T_OUT" "skip: touch - the declared repo keys could not be read" "(d) ... it says the sweep did not run, instead of sweeping an empty corpus and reporting every surface"
+# The registry arm: a batch that is INCONCLUSIVE leaves no hits either, so an
+# unreadable registry must not read as a whole-corpus absence.
+SWSB="$_PC_TMP/broken-state.json"; printf '%s\n' '{"schema_version":2}' > "$SWSB"
+t_capture env OSS_STATE_FILE="$SWSB" oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_assert_rc 0 "(d) an unreadable registry does not abort the sweep"
+t_assert_contains "$T_OUT" "registry could not be read" "(d) ... it reports the registry failure, so an empty \$hits is not read as every surface matching nothing"
+# The resolver arm: touch_check returns its RESOLVER's rc 1 before it ever looks
+# at the registry - measured, so rc 1 there is indistinguishable from "clean" and
+# the rc alone cannot catch it. Only a second probe can, which is why one exists.
+SWBR="$_PC_TMP/badroute"; mkdir -p "$SWBR/.ossify"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"}},"well_known_paths":{"project_state":"${repos.nosuch.root}/ps.json"}}\n' \
+  "$SWBR/canon" > "$SWBR/.ossify/topology.json"
+cd "$SWBR"
+t_capture env oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+cd "$HERE"
+t_assert_rc 0 "(d) an unresolvable state route does not abort the sweep"
+t_assert_contains "$T_OUT" "state could not be resolved or read" "(d) ... it reports that instead of an absence, even though touch_check's rc 1 there looks exactly like clean"
+# R2-2: the legacy key set must exclude ai_workspace, or a planning file under it
+# can satisfy a stale product glob and suppress a real warning.
+if grep -Fq 'OTHER than `ai_workspace`' "$_SW"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: the sweep's corpus comment does not exclude ai_workspace from the legacy pairing-manifest key set - a planning file then satisfies a stale product glob and the zero-match warning is suppressed"
+fi
+rm -rf "$_PC_TMP"
 t_summary

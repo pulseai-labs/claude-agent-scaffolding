@@ -24,6 +24,11 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 
 ```bash
 wi="<work-item id>"
+st="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .status")"
+if [ "$st" = "abandoned" ]; then
+  echo "close: $wi is abandoned - it was minted and withdrawn BEFORE any dispatch, so it has no worktree by construction and nothing to close. This is NOT the skipped-work_item_exec case below, and nothing should be reconstructed for it: spine close skips an abandoned item, and the withdrawal's own two obligations live in DIFFERENT owners: the demo-ledger amendment it owes is plan-spine/references/decomposition.md §1, and the repo armed for its spine - restore its checkout, or record it as parked - is spine-close.md §3, which this standalone route never reaches. To reverse the withdrawal: \"$oss_bin\" work_item_status $wi planned - but if this item's spine is ALREADY closed, that alone is not the recovery: un-withdrawing leaves a planned item inside a closed spine, and release close's tag selector takes any non-abandoned item whose spine is closed, so a later release close would tag a repo whose work was never dispatched or landed. Reopening the spine does NOT re-enable it: work-item/references/round-orchestration.md §2 halts on an existing spine branch, which close leaves behind in every hosting repo (issue #133 is the open reconciliation). Carry the work into a NEW spine instead - \"$oss_bin\" spine_add <release> <name> <class> <target-repo>, then \"$oss_bin\" work_item_add it there (plan-spine/references/decomposition.md §1's whole-spine arm) - halt"
+  exit 1
+fi
 wt="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .worktree_path")"
 [ -n "$wt" ] && [ "$wt" != "null" ] && [ -d "$wt" ] \
   || { echo "close: no recorded worktree for $wi - halt"; exit 1; }
@@ -38,7 +43,12 @@ resolves nothing and the guard that was supposed to catch it already passed.
 A missing `worktree_path` means the lane skipped `"$oss_bin" work_item_exec`. That is a
 halt, not something to reconstruct: `"$oss_bin" worktree_resolve <target_repo> <wi>`
 will happily echo a conventional path whether or not it is the one this item was
-built in.
+built in. **The block tests one other cause first**: an item withdrawn before any
+dispatch is `abandoned`, and *that* is why it has no worktree — it was never
+dispatched, so there is nothing to reconstruct and nothing to close. The two
+cases want opposite actions (one is a broken lane, the other is a plan that
+deliberately dropped the item), which is why the status is read before the
+diagnosis rather than after it.
 
 ### Route A — in the round flow
 
