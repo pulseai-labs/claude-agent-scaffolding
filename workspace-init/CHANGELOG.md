@@ -11,10 +11,17 @@ Lifecycle handoff to ossify: workspace-init stays the topology bootstrap — it 
 - **Printed next-steps** in `initializing-dual-repo-workspace` and `pairing-canonical-repo` (and the `pairing-existing-dual` summary) route to `/ossify:start` / `/ossify:adopt`; suggested commit messages no longer embed plugin version strings, and the remaining deferral notes are version-neutral.
 - **Examples** for fresh bootstrap and pair-with show the same ossify next steps, version-neutral `created_by` values, and a created-paths inventory listing exactly what bootstrap writes — the decorative trees claiming pre-seeded `memory-bank/`, `process-adrs/`, and brainstorm directories are gone.
 - **Marketplace and root catalog** describe the plugin by capability and name ossify as the continuation.
+- **Scenario C** continues to ossify with its pairing manifest as the topology: ossify resolves the `.workspace/pairing.json` the pair writes, so no second declaration is authored — and the printed next steps now prepare the workspace for adoption's clean-tree gate (commit the pairing changes, `git init`-ing the workspace first where it is not a repo yet).
 
 ### Removed
 - **`well_known_paths.principles_user_global`** deleted from the manifest writer, the reference `pairing.json.tmpl`, and the fresh-bootstrap example — a duplicate pointer with zero consumers after architect-critic moved its principles to `$HOME/.claude/architect-critic/`. The generic `${PLUGIN_DATA:<name>}` resolver is unchanged.
 - **`.claude/.onboarding-state.json` gitignore entry** deleted from the template and the inline fallback (now byte-identical to the template again); `.workspace/handoffs/` stays ignored as a compatibility entry for the still-shipped handoff flow.
+
+### Compatibility
+- **Deliberate residual:** the pairing schema stays v1.0 and retains the Shape-D routing, `during_dev`, and `roadmap` fields until the schema diet lands; generic `${PLUGIN_DATA:<name>}` token resolution is unchanged, and this release makes no repair/unpair or #272 change.
+
+### Verification
+- Release gates run locally under both jq 1.8.1 and 1.7: `workspace-init/run-tests.sh` plus the repo-root `test-codex-dual-publish.sh`, `test-devin-publish.sh`, `test-recommendation-policy-parity.sh`, and the OpenCode adapter unit suite. The OpenCode 1.18.13 live-loader gate is left to CI, which installs that exact version.
 
 ## 0.5.1 (2026-09-19)
 

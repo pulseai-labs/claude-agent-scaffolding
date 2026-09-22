@@ -141,6 +141,19 @@ test_printed_skill_routes_point_to_ossify() {
   assert_contains '/ossify:adopt' "$dual_sec" || return 1
   assert_contains '/ossify:start' "$dual_sec" || return 1
 
+  # S8 round 1 (F1): the Scenario-C block must prepare the workspace for adopt's
+  # clean-tree gate (A3) — the skill writes pairing.json + the init-log but never
+  # stages or commits, so a git-backed workspace is left dirty and a non-git one
+  # cannot pass the tracked-tree sweep at all.
+  assert_contains 'commit the pairing changes' "$dual_sec" || return 1
+  assert_contains '`git init` it first' "$dual_sec" || return 1
+  assert_contains 'must all be clean' "$dual_sec" || return 1
+
+  # S8 round 1 (F2): the step opens the workspace in Claude *or* Codex, so the route
+  # must name the Codex surface's form too — ossify's Codex manifest publishes
+  # skills, not slash commands.
+  assert_contains 'on Codex, invoke the corresponding ossify skill' "$dual_sec" || return 1
+
   local sec
   for sec in "$init_sec" "$pair_sec" "$dual_sec"; do
     if grep -Eq "$_retired_route_patterns" <<<"$sec"; then
@@ -248,6 +261,16 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   assert_not_contains 'scaffold-onboard' "$row" || return 1
   assert_not_contains 'scaffold-dev' "$row" || return 1
   assert_not_contains 'scaffolding chain' "$row" || return 1
+
+  # S8 round 1 (F3): the lifecycle overview above the table must not leave
+  # workspace-init at the head of the chain this release retires for new
+  # workspaces — it names ossify as the continuation and the old chain as legacy.
+  local overview
+  overview="$(awk '/^Most of the marketplace is designed to/,/^## Install/' "$ROOT_README")"
+  [[ -n "$overview" ]] || { echo "    root lifecycle overview not found"; return 1; }
+  assert_not_contains '(chain head)' "$overview" || return 1
+  assert_contains 'its continuation for new workspaces is `ossify`' "$overview" || return 1
+  assert_contains 'not the legacy `scaffold-onboard` + `scaffold-dev` chain' "$overview" || return 1
 
   # Illustrative created_by values must be version-neutral, so substituting the
   # current release number for 0.1.0 cannot satisfy them.

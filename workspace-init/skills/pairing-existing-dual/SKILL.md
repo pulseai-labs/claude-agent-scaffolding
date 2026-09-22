@@ -160,9 +160,17 @@ Manifest written at: /abs/path/<ai-workspace>/.workspace/pairing.json
 Trace filter active in: <canonical>  [AND <ai-workspace> if it is a git repo]
 
 Next steps:
-  1. cd /abs/path/<ai-workspace> && git status   (if it is a git repo)
+  1. Prepare the AI workspace for adoption: `cd /abs/path/<ai-workspace> && git status`, then
+     commit the pairing changes — `.workspace/pairing.json` and the init-log beside it — so
+     neither is left uncommitted or untracked. If it is not a git repo yet, `git init` it first
+     (your call, not this skill's) and commit the result.
   2. Open the workspace in Claude/Codex; ossify resolves pairing.json as topology.
-  3. Run `/ossify:adopt` for existing source or history (or `/ossify:start` if the canonical is empty).
+  3. Run `/ossify:adopt` for existing source or history (or `/ossify:start` if the canonical is
+     empty); on Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
+  4. Adoption refuses while any tree it will edit is dirty: the AI workspace, the canonical, and
+     every repo the topology declares must all be clean — tracked and untracked — with each
+     declared repo on the default branch the manifest declares (otherwise adoption names the
+     checked-out branch and asks for confirmation before proceeding).
 ```
 
 ## 10. Discipline rules
