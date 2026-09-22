@@ -70,11 +70,12 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 # what "one resolver, one halt, one source of truth" below is protecting.
 #
 # EVERY hosting repo, never canonical alone: the distinct target_repo values
-# across the spine's work items, the same set spine-close.md §3's merge loop
-# iterates. A cross-repo spine's diff spans every one of them, and reading
+# across the spine's non-abandoned work items, the same set spine-close.md §3's
+# merge loop iterates (an abandoned item wrote nothing and recorded no base).
+# A cross-repo spine's diff spans every one of them, and reading
 # only one repo's diff reviews PART of the spine dressed up as the whole of
 # it — which is worse than skipping the review, because it reads as done.
-hosting_repos="$("$oss_bin" get ".work_items[] | select(.spine==\"$spine_id\") | .target_repo" | sort -u)"
+hosting_repos="$("$oss_bin" get ".work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .target_repo" | sort -u)"
 [ -n "$hosting_repos" ] \
   || { echo "code-review: no work items found for $spine_id - halt, cannot scope the diff"; exit 1; }
 while IFS= read -r repo; do
@@ -115,6 +116,13 @@ reconstruction is always the one in scope here, never Route A's return
 payload. Absent is a clean signal, not a gap — not every close writes one
 (impl-check.md §4b: `pattern`, `absence`, and a declared `fidelity` finding,
 never a halt).
+
+**Walk the non-`abandoned` items only — the same set `hosting_repos` read
+above.** A withdrawn item was never dispatched: it has no `work-<wi>/` directory
+and no `verify.md`, and while a `spec.md` may survive from planning, its ACs were
+deliberately never implemented. Folding either one in reports a planning decision
+back as a gap in the work, and the disposition loop then churns on work the plan
+withdrew. Axis B reads the same set (§4).
 
 **Before Axis A:** read only each file's `pattern`-tagged findings and fold
 them into your Axis A findings. Leave the rest of the file unread.
@@ -189,7 +197,8 @@ can weigh it.
 
 ## 4. Axis B — Spec
 
-Now read the spine's `SPINE.md` and each work item's `spec.md`, and ask **three**
+Now read the spine's `SPINE.md` and each **non-`abandoned`** work item's
+`spec.md`, and ask **three**
 questions of the diff:
 
 1. **Does it do what was asked?** Every AC passed mechanically — that is the

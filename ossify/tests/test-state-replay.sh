@@ -257,5 +257,64 @@ t_capture oss_state_read "$S6" '.mutations | length'
 t_assert_eq "2" "$T_OUT" "the journal kept BOTH mutations - append, not edit"
 rm -rf "$T6"
 
+# --- 1.11.0: the touch re-point ops and `abandoned`, on REAL journal records -
+# set_bone_touch {adr,touch}, set_risk_gate_touch {name,touch} and the
+# work-item status `abandoned` are a compatibility contract: live estate
+# journals already carry them, from a local-only build that shipped them before
+# this release. The payloads below are VERBATIM .payload values from those
+# journals (seqs noted), written through oss_state_mutate - the path the verbs
+# take - so this is the migration-path input, not a fresh derivation. Without
+# the two _oss_apply_op cases the first touch record fails on "unknown op"
+# (rc 4), which is exactly what 1.10.0 does to those estates' doctor replay.
+T7="$(mktemp -d)"; S7="$T7/state.json"
+oss_state_init "$S7" touch-replay >/dev/null
+oss_state_mutate "$S7" add_bone '{"adr":"ADR-0003","title":"silver + ingestion layer","touch":["src/silver/**","src/ingestion/**"],"revisit_trigger":null,"at":"2026-08-30T00:00:00Z"}' >/dev/null
+for g in project-identity pii-disclosure gold-correctness; do
+  oss_state_mutate "$S7" add_risk_gate "{\"name\":\"$g\",\"touch\":[\"src/$g/**\"],\"controls\":[\"control-$g\"],\"at\":\"2026-08-30T00:00:00Z\"}" >/dev/null
+done
+oss_state_mutate "$S7" add_work_item '{"id":"r0.s1.w5","spine":"r0.s1","title":"minted then withdrawn","target_repo":"canonical","status":"planned","created_at":"2026-09-01T00:00:00Z"}' >/dev/null
+t_capture oss_state_replay "$S7"
+t_assert_rc 0 "setup: the add-only journal replays clean before any re-point"
+
+# marketplace-analytics seq 64, then seqs 83 and 107 (the same bone, twice), then 138.
+t_capture oss_state_mutate "$S7" set_work_item_status '{"work_item":"r0.s1.w5","status":"abandoned","at":"2026-09-08T18:27:23Z"}'
+t_assert_rc 0 "seq 64 (set_work_item_status abandoned) applies"
+t_capture oss_state_mutate "$S7" set_bone_touch '{"adr":"ADR-0003","touch":["src/silver/**","src/ingestion/**","packages/marketplace-analytics/src/marketplace_analytics/silver/**","packages/marketplace-analytics/src/marketplace_analytics/ingestion/**"]}'
+t_assert_rc 0 "seq 83 (set_bone_touch) applies"
+t_capture oss_state_mutate "$S7" set_bone_touch '{"adr":"ADR-0003","touch":["src/silver/**","src/ingestion/**","packages/marketplace-analytics/src/marketplace_analytics/silver/**","packages/marketplace-analytics/src/marketplace_analytics/ingestion/**","packages/google-analytics/src/google_analytics/silver/**","packages/google-analytics/src/google_analytics/ingestion/**"]}'
+t_assert_rc 0 "seq 107 (set_bone_touch, same bone again) applies"
+t_capture oss_state_mutate "$S7" set_risk_gate_touch '{"name":"gold-correctness","touch":["packages/wabash-ga-lakehouse/src/wabash_ga_lakehouse/gold/**","notebooks/gold_build.py"]}'
+t_assert_rc 0 "seq 138 (set_risk_gate_touch) applies"
+# agent-framework seqs 354 and 355.
+t_capture oss_state_mutate "$S7" set_risk_gate_touch '{"name":"project-identity","touch":["packages/waf-tools/src/waf_tools/server/**","packages/waf-core/src/waf_core/shapes/chat/auth*","packages/waf-tools/src/waf_tools/client/**","packages/waf-core/src/waf_core/composition/host/**"]}'
+t_assert_rc 0 "seq 354 (set_risk_gate_touch) applies"
+t_capture oss_state_mutate "$S7" set_risk_gate_touch '{"name":"pii-disclosure","touch":["packages/waf-compute/src/waf_compute/redaction/**","packages/waf-core/src/waf_core/hooks/**","packages/waf-log/src/waf_log/writer/**","packages/waf-compute/src/waf_compute/templates/batch.py"]}'
+t_assert_rc 0 "seq 355 (set_risk_gate_touch) applies"
+
+t_capture oss_state_replay "$S7"
+t_assert_rc 0 "a journal carrying the estates' real records replays to the exact live state"
+# Replay equality alone is a round trip through one transform; these pin the
+# VALUES the records must produce, independently of that transform.
+t_capture oss_state_read "$S7" '.bones[0].touch | length'
+t_assert_eq "6" "$T_OUT" "ADR-0003 carries seq 107's six globs - the later re-point wins"
+t_capture oss_state_read "$S7" '.bones[0].touch[5]'
+t_assert_eq "packages/google-analytics/src/google_analytics/ingestion/**" "$T_OUT" "...and holds seq 107's text, not seq 83's"
+t_capture oss_state_read "$S7" '[.risk_gates[] | "\(.name)=\(.touch | length):\(.touch[0])"] | join(" ")'
+t_assert_eq "project-identity=4:packages/waf-tools/src/waf_tools/server/** pii-disclosure=4:packages/waf-compute/src/waf_compute/redaction/** gold-correctness=2:packages/wabash-ga-lakehouse/src/wabash_ga_lakehouse/gold/**" "$T_OUT" "each gate's touch surface is its own record's, and no other gate moved"
+t_capture oss_state_read "$S7" '[.risk_gates[].controls[0]] | join(",")'
+t_assert_eq "control-project-identity,control-pii-disclosure,control-gold-correctness" "$T_OUT" "a touch re-point leaves every gate's controls alone"
+t_capture oss_state_read "$S7" '.work_items[] | select(.id=="r0.s1.w5") | .status'
+t_assert_eq "abandoned" "$T_OUT" "r0.s1.w5 reads abandoned after replay"
+t_capture oss_state_read "$S7" '.mutations | length'
+t_assert_eq "11" "$T_OUT" "the journal holds all eleven mutations - append, never edit"
+# The doctor path the estates run: its replay line must be ok, not fail.
+t_capture env OSS_STATE_FILE="$S7" bash "$OSS" doctor
+t_assert_contains "$T_OUT" "ok: replay" "oss doctor reports replay ok on the estates' records"
+case "$T_OUT" in
+  *"fail: replay"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: oss doctor reports 'fail: replay' on the estates' records" ;;
+  *) T_PASS=$((T_PASS+1)) ;;
+esac
+rm -rf "$T7"
+
 rm -rf "$TMP"
 t_summary

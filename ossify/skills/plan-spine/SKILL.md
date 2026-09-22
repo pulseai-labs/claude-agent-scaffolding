@@ -52,8 +52,12 @@ implementer dispatch, verification, and merge belong to the execution engine
 - The user wants to close a spine or run the cumulative demo — that is `close`.
 - The named spine already has work items and the user did not explicitly ask for
   a replan. Ask: *"Author a later round's specs (§6), fix up a failed round (§7),
-  or replan from scratch?"* A replan **adds** items (`w4`, …); retire the old
-  spine `abandoned` (`references/decomposition.md`).
+  or replan from scratch?"* A replan **adds** items (`w4`, …). `references/decomposition.md`
+  §1 keeps two **mutually exclusive** arms apart, and which one you are in is the
+  whole question: a **partial** replan withdraws each never-dispatched item it
+  replaces (`work_item_status <wi-id> abandoned`) and leaves the spine running; a
+  **whole-spine split** retires the old spine (`spine_status <spine-id>
+  abandoned`) and re-declares the halves at plan-release. Never both on one spine.
 
 ---
 

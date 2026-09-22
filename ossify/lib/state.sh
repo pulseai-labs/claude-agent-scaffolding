@@ -69,6 +69,21 @@ _oss_apply_op() { # $1=op $2=payload-json
       # duplicates pre-lock (#305) and this bounds the race to one target,
       # identically on live apply and replay.
       jq --argjson p "$payload" '(first(.risk_gates[] | select(.name == $p.name)) | .controls) = $p.controls' ;;
+    # COMPATIBILITY CONTRACT (1.11.0): the op names set_bone_touch and
+    # set_risk_gate_touch, and their payload keys {adr,touch} and {name,touch},
+    # are already in live journals, so neither may be renamed or reshaped.
+    # Replay is only HALF that enforcement, and claiming otherwise overclaims
+    # it: an op-NAME rename fails loudly here ("unknown op", rc 4), but a
+    # payload reshape does NOT - `$p.adr` reads null, `first()` matches nothing,
+    # and jq assigns to an empty path at rc 0, identically on live apply and on
+    # replay. The payload keys are held by this contract and by the verbs' own
+    # tests (test-registries.sh pins the journaled [op, payload] exactly), not
+    # by replay. first()-targeted for the same check-to-append race reason as
+    # set_risk_gate_controls.
+    set_bone_touch)
+      jq --argjson p "$payload" '(first(.bones[] | select(.adr == $p.adr)) | .touch) = $p.touch' ;;
+    set_risk_gate_touch)
+      jq --argjson p "$payload" '(first(.risk_gates[] | select(.name == $p.name)) | .touch) = $p.touch' ;;
     add_fake)      jq --argjson p "$payload" '.fakes += [$p]' ;;
     add_feature)   jq --argjson p "$payload" '.feature_map += [$p]' ;;
     add_demo_line)

@@ -44,12 +44,17 @@ harvest". Resolve the paths deliberately.
 **The work items come from state:**
 
 ```bash
-items="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\") | .id] | join(\" \")")"
+items="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .id] | join(\" \")")"
 [ -n "$items" ] || { echo "close: no work items recorded for $spine_id - halt"; exit 1; }
 ```
 
 **Test the output, never the rc.** `"$oss_bin" get` is `jq -r` without `-e`: a `select`
 matching nothing exits **0** with an empty string (`routing.md` §4).
+
+**`abandoned` items are left out.** Withdrawn before dispatch, they have no
+`report.md` and no per-item handoff, so enumerating them would name a missing
+report for each — a gap in the record that is not one. `spine-close.md` §2
+already named them in the close.
 
 **The directory comes from a glob, and it is hoisted once per spine.** Nothing in
 state holds a spine slug, so the spine directory is recovered exactly as

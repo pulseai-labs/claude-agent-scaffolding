@@ -15,7 +15,8 @@ contract uses, for two reasons that are both about **readers**:
   section sets is six documents; six with the same set is a record.
 
 **The memory-bank harvest does NOT read this file.** It enumerates exactly two
-inputs — each work item's `report.md` §9 and its `handoff.md` `## Clarifications`
+inputs — each **non-`abandoned`** work item's `report.md` §9 and its `handoff.md`
+`## Clarifications`
 (`harvest.md` §2) — and the apply validates the *whole* accepted set before
 touching the filesystem, refusing on the first item whose `source` is outside
 the two-value enum (`harvest.md` §7). So a candidate harvested out of a retro
@@ -53,6 +54,12 @@ not a restatement of the work items.
 The work items, by id and title, with what each actually delivered. Where the
 delivery differs from the plan, say so here rather than quietly matching the plan
 back to the code.
+
+**An `abandoned` item shipped nothing and belongs here by name.** List it with
+the others and say it was withdrawn before dispatch: omitting it silently
+narrows the record, and giving it a delivery invents one. `SPINE.md` carries the
+reason (`plan-spine/references/decomposition.md` §1); this section carries the
+fact, the same way §3 names a quarantined line.
 
 ### `## 3. Demo outcome`
 

@@ -225,8 +225,9 @@ recommendation.
 The middle scope, and the one the ceremony is named for (spec §6.1). Eleven
 steps, in **binding order**:
 
-1. **Every work item `complete`**, else refuse and **name the offender**. Test
-   the *output* of the `"$oss_bin" get` — a `select` matching nothing exits 0.
+1. **Every work item `complete`** — or `abandoned`, withdrawn before dispatch —
+   else refuse and **name the offender**. Test the *output* of the
+   `"$oss_bin" get` — a `select` matching nothing exits 0.
 2. **Land each hosting repo on its own `base_branch` — by PR where a remote
    exists, locally where none does (#339)**. The PR arm pushes the spine branch,
    opens the PR, and hands it to `/ossify:work-pr` — not published on
@@ -273,7 +274,8 @@ budget — is in **`references/cumulative-demo.md`**.
 The two retrospective section sets, full for bone and lean for flesh, are pinned
 verbatim in **`references/retrospective.md`**. It is the only copy.
 
-The harvest (step 9) — how the candidates are enumerated from each work item's
+The harvest (step 9) — how the candidates are enumerated from each
+**non-`abandoned`** work item's
 `report.md` and `handoff.md`, the `[report]`/`[handoff]` trust tag, the two-file
 allowlist, and the append rules (no `oss` verb: whole-set validation, then you
 write, in one pass) — is in **`references/harvest.md`**. Also the only copy.
