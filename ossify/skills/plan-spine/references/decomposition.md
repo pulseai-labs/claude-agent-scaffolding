@@ -62,6 +62,34 @@ The signal is reliable in practice: a six-item decomposition almost always has a
 seam in the middle where the first *n* items deliver one outcome and the rest
 deliver another. That seam is the spine boundary you are looking for.
 
+### Withdrawing a minted item
+
+A work item already in state that the decomposition no longer wants — folded
+into a sibling, found unnecessary, moved to another spine — is **withdrawn**:
+`"$oss_bin" work_item_status <wi-id> abandoned`. It is **never deleted** (the
+journal is append-only, so there is no delete) and **never marked `complete`**
+(`complete` records a merge onto the spine branch, which for a withdrawn item
+never happened). Left `planned`, it blocks spine close forever
+(`close/references/spine-close.md` §2). Record why in `SPINE.md` beside the
+decomposition — state carries the status, not the reason.
+
+**Only an item that was never dispatched is withdrawn.** Once `/run-spine` has
+dispatched an item, its round lands or halts; a dispatched item that turns out
+wrong is a replan, not a withdrawal. The round walk, spine close and release
+close all skip an `abandoned` item, so withdrawing a dispatched one would strand
+its work. A withdrawal made by mistake is reversed with
+`"$oss_bin" work_item_status <wi-id> planned`.
+
+**A withdrawal owes the demo ledger too.** If the withdrawn item was the reason
+this spine planned a `ledger_supersede` or `ledger_retire`, that amendment is
+still pending and keyed to this spine — `close` would consume it and deactivate
+a line whose replacement never landed, which is the silent-coverage loss
+`demo-amendments.md` §6 exists to prevent. Clear it with
+`"$oss_bin" ledger_unplan <line-id> <spine-id>` in the same pass, exactly as the
+whole-spine arm above already does. Any demo line the withdrawn item alone was
+going to add goes the same way: it was planned, never built, and a line that can
+never pass is a demo blocker rather than coverage.
+
 ---
 
 ## 2. What each work item declares

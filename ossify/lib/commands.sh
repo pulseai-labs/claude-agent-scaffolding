@@ -70,6 +70,14 @@ oss_cmd_risk_gate_set_controls() { # $1=name $2=controls-csv — corrective appe
   _oss_need 2 risk_gate_set_controls "<name> <controls-csv>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_risk_gate_controls "$sf" "$1" "$2"
 }
+oss_cmd_bone_set_touch() { # $1=adr $2=touch-csv — corrective append (1.11.0)
+  _oss_need 2 bone_set_touch "<adr> <touch-csv>" "$@" || return 2;
+  local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_bone_touch "$sf" "$1" "$2"
+}
+oss_cmd_risk_gate_set_touch() { # $1=name $2=touch-csv — corrective append (1.11.0)
+  _oss_need 2 risk_gate_set_touch "<name> <touch-csv>" "$@" || return 2;
+  local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_risk_gate_touch "$sf" "$1" "$2"
+}
 oss_cmd_fake_add() { # $1=boundary $2=channel $3=reason $4=trigger $5=expiry-release
   _oss_need 5 fake_add "<boundary> <channel> <reason> <trigger> <expiry-release>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_add_fake "$sf" "$1" "$2" "$3" "$4" "$5"

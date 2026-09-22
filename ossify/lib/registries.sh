@@ -70,6 +70,86 @@ oss_reg_set_risk_gate_controls() { # $1=state $2=name $3=controls-csv
       '{name:$n,controls:$c}')"
 }
 
+# Corrective append for a touch surface (1.11.0, #469/#369/#411): replaces one
+# bone's or gate's touch globs with a fresh journaled mutation, the same shape
+# as set_controls above. When code moves, the registered globs match nothing
+# and touch_check goes silently clean; this is the repair, run on a surface the
+# caller has already established is stale. **Nothing here DETECTS a surface that
+# matches no files** - the start-side references say so, and no verb, doctor
+# sweep or README claims otherwise.
+# A re-point to nothing is not a repair, so the list needs at least one
+# non-blank glob: `[]` would make touch_check clean on every path forever - the
+# defect being repaired - and so would a lone blank entry, which the splitter
+# turns "", "  ", " , " and a bare tab into. bone_add still admits an empty
+# surface; the refusal belongs to the re-point, not to the registry.
+oss_reg_set_bone_touch() { # $1=state $2=adr $3=touch-csv
+  local sf="$1" adr="$2" n touch
+  if [ ! -f "$sf" ]; then
+    echo "oss: no state at $sf - run 'oss init <name>' first" >&2; return 1
+  fi
+  n="$(jq --arg a "$adr" '[.bones[] | select(.adr == $a)] | length' "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read bones from $sf" >&2; return 2; }
+  case "$n" in ''|*[!0-9]*)
+    echo "oss: cannot read bones from $sf" >&2; return 2 ;;
+  esac
+  if [ "$n" -eq 0 ]; then
+    echo "oss: unknown bone '$adr'" >&2; return 7
+  fi
+  if [ "$n" -gt 1 ]; then
+    echo "oss: bone '$adr' matches $n bones - duplicate ADR refs have no supported repair yet (#305); refusing rather than guessing" >&2; return 7
+  fi
+  touch="$(_oss_csv_to_json "$3")" || return $?
+  # TWO refusals, deliberately separate. The splitter is line-oriented (`jq -R`
+  # processes each line alone), so a touch-csv wrapped over two lines emits TWO
+  # JSON values and `--argjson` cannot parse them — folding that into the
+  # emptiness test reported "the list is empty" for a list that was merely
+  # wrapped, and an agent following that message retries and stays stuck.
+  jq -en --argjson t "$touch" 'true' >/dev/null 2>&1 || {
+    echo "oss: the new touch list is not one list - a touch-csv is a single comma-separated line, and a newline splits it into several" >&2; return 2; }
+  # Non-empty is not enough. The splitter trims literal SPACES only, so a tab-,
+  # CR- or VT-only entry survives as an "glob" that can never match a real path
+  # and reproduces the silent-clean defect this verb exists to repair — the
+  # array-length test accepted it. `\s` catches the lookalikes `length` missed.
+  jq -en --argjson t "$touch" 'any($t[]; test("[^\\s]"))' >/dev/null 2>&1 || {
+    echo "oss: the new touch list needs at least one glob - every entry is blank, and a blank surface makes touch_check clean on every path" >&2; return 2; }
+  oss_state_mutate "$sf" set_bone_touch \
+    "$(jq -n --arg a "$adr" --argjson t "$touch" '{adr:$a,touch:$t}')"
+}
+
+oss_reg_set_risk_gate_touch() { # $1=state $2=name $3=touch-csv
+  local sf="$1" name="$2" n touch
+  if [ ! -f "$sf" ]; then
+    echo "oss: no state at $sf - run 'oss init <name>' first" >&2; return 1
+  fi
+  n="$(jq --arg n "$name" '[.risk_gates[] | select(.name == $n)] | length' "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read risk gates from $sf" >&2; return 2; }
+  case "$n" in ''|*[!0-9]*)
+    echo "oss: cannot read risk gates from $sf" >&2; return 2 ;;
+  esac
+  if [ "$n" -eq 0 ]; then
+    echo "oss: unknown risk gate '$name'" >&2; return 7
+  fi
+  if [ "$n" -gt 1 ]; then
+    echo "oss: risk gate '$name' matches $n gates - duplicate names have no supported repair yet (#305); refusing rather than guessing" >&2; return 7
+  fi
+  touch="$(_oss_csv_to_json "$3")" || return $?
+  # TWO refusals, deliberately separate. The splitter is line-oriented (`jq -R`
+  # processes each line alone), so a touch-csv wrapped over two lines emits TWO
+  # JSON values and `--argjson` cannot parse them — folding that into the
+  # emptiness test reported "the list is empty" for a list that was merely
+  # wrapped, and an agent following that message retries and stays stuck.
+  jq -en --argjson t "$touch" 'true' >/dev/null 2>&1 || {
+    echo "oss: the new touch list is not one list - a touch-csv is a single comma-separated line, and a newline splits it into several" >&2; return 2; }
+  # Non-empty is not enough. The splitter trims literal SPACES only, so a tab-,
+  # CR- or VT-only entry survives as an "glob" that can never match a real path
+  # and reproduces the silent-clean defect this verb exists to repair — the
+  # array-length test accepted it. `\s` catches the lookalikes `length` missed.
+  jq -en --argjson t "$touch" 'any($t[]; test("[^\\s]"))' >/dev/null 2>&1 || {
+    echo "oss: the new touch list needs at least one glob - every entry is blank, and a blank surface makes touch_check clean on every path" >&2; return 2; }
+  oss_state_mutate "$sf" set_risk_gate_touch \
+    "$(jq -n --arg n "$name" --argjson t "$touch" '{name:$n,touch:$t}')"
+}
+
 oss_reg_add_fake() { # $1=state $2=boundary $3=channel $4=reason $5=trigger $6=expiry-release
   case "$3" in real|fake|deferred) ;; *) echo "oss: channel must be real|fake|deferred" >&2; return 2;; esac
   oss_state_mutate "$1" add_fake \

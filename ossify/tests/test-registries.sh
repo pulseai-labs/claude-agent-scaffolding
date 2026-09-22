@@ -2,6 +2,7 @@
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/harness.sh"
 . "$HERE/../lib/id.sh"; . "$HERE/../lib/state.sh"; . "$HERE/../lib/registries.sh"
+OSS="$HERE/../bin/oss"
 TMP="$(mktemp -d)"; S="$TMP/state.json"
 oss_state_init "$S" reg-demo >/dev/null
 
@@ -145,6 +146,145 @@ t_capture oss_reg_add_bone "$S" ADR-77 "brace touch" "src/{exec\,api}/**" ""
 t_assert_rc 0 "bone with brace-glob touch added"
 t_capture jq -c '.bones[] | select(.adr=="ADR-77") | .touch' "$S"
 t_assert_eq '["src/{exec,api}/**"]' "$T_OUT" "bone touch holds the literal brace glob"
+
+# --- 1.11.0: re-pointing a touch surface (#469/#369/#411/#305) -------------
+# bone_add and risk_gate_add set a touch surface once. When code moves (into a
+# packages/ tree, say) the registered globs match nothing and touch_check goes
+# silently CLEAN on every affected bone and gate - reclassification and the
+# release-close docs trigger stop firing with no error. The repair is a
+# corrective append, like set_controls (#340): replay stays authoritative.
+# The op names and payload keys are a compatibility contract - live journals
+# already carry set_bone_touch {adr,touch} and set_risk_gate_touch {name,touch}.
+ST="$TMP/touch.json"
+oss_state_init "$ST" touch-demo >/dev/null
+oss_reg_add_bone "$ST" ADR-0003 "silver layer" "src/silver/**,src/ingestion/**" "" >/dev/null
+oss_reg_add_risk_gate "$ST" gold-correctness "src/gold/**" "golden-set" >/dev/null
+t_capture oss_reg_touch_check "$ST" packages/ma/silver/load.py packages/ma/gold/build.py
+t_assert_rc 1 "setup: code moved under packages/ matches no registered glob - the silent-clean defect"
+
+N0="$(jq '.mutations | length' "$ST")"
+t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "packages/ma/silver/**,packages/ma/ingestion/**"
+t_assert_rc 0 "bone_set_touch appends the correction"
+t_capture jq -c '.bones[] | select(.adr=="ADR-0003") | .touch' "$ST"
+t_assert_eq '["packages/ma/silver/**","packages/ma/ingestion/**"]' "$T_OUT" "the bone's touch surface is replaced, not extended"
+t_capture jq -c '.mutations[-1] | [.op, .payload]' "$ST"
+t_assert_eq '["set_bone_touch",{"adr":"ADR-0003","touch":["packages/ma/silver/**","packages/ma/ingestion/**"]}]' "$T_OUT" "journaled as set_bone_touch with payload exactly {adr,touch}"
+t_capture oss_reg_touch_check "$ST" packages/ma/silver/load.py
+t_assert_rc 0 "touch_check hits the new glob"
+t_assert_contains "$T_OUT" "bone ADR-0003" "...and names the re-pointed bone"
+t_capture oss_reg_touch_check "$ST" src/silver/load.py
+t_assert_rc 1 "touch_check is clean on the old glob - it was replaced"
+
+t_capture oss_reg_set_risk_gate_touch "$ST" gold-correctness "packages/ma/gold/**,notebooks/gold_build.py"
+t_assert_rc 0 "risk_gate_set_touch appends the correction"
+t_capture jq -c '.risk_gates[] | select(.name=="gold-correctness") | .touch' "$ST"
+t_assert_eq '["packages/ma/gold/**","notebooks/gold_build.py"]' "$T_OUT" "the gate's touch surface is replaced"
+t_capture jq -c '.risk_gates[] | select(.name=="gold-correctness") | .controls' "$ST"
+t_assert_eq '["golden-set"]' "$T_OUT" "the gate's controls are untouched by a touch re-point"
+t_capture jq -c '.mutations[-1] | [.op, .payload]' "$ST"
+t_assert_eq '["set_risk_gate_touch",{"name":"gold-correctness","touch":["packages/ma/gold/**","notebooks/gold_build.py"]}]' "$T_OUT" "journaled as set_risk_gate_touch with payload exactly {name,touch}"
+t_capture oss_reg_touch_check "$ST" packages/ma/gold/build.py
+t_assert_rc 0 "touch_check hits the gate's new glob"
+t_assert_contains "$T_OUT" "risk_gate gold-correctness" "...and names the re-pointed gate"
+t_capture oss_reg_touch_check "$ST" src/gold/build.py
+t_assert_rc 1 "touch_check is clean on the gate's old glob"
+
+t_capture jq '.mutations | length' "$ST"
+t_assert_eq "$((N0 + 2))" "$T_OUT" "one journaled mutation per accepted call"
+t_capture oss_state_replay "$ST"
+t_assert_rc 0 "replay reproduces the re-pointed state - the journal is authoritative"
+
+# Refusals. None may journal: rc 2 after a silent append reads identical from
+# the pass count, so the journal length is re-checked after all of them.
+N1="$(jq '.mutations | length' "$ST")"
+for v in oss_reg_set_bone_touch oss_reg_set_risk_gate_touch; do
+  t_capture "$v" "$TMP/nonexistent-state.json" x "src/**"
+  t_assert_rc 1 "$v: a stateless project answers the init message"
+  t_assert_contains "$T_OUT" "oss init" "$v: the message names the remedy verb"
+done
+t_capture oss_reg_set_bone_touch "$ST" ADR-0404 "src/**"
+t_assert_rc 7 "bone_set_touch: an unknown ADR refuses"
+t_assert_contains "$T_OUT" "unknown bone 'ADR-0404'" "...and names the bone"
+t_capture oss_reg_set_risk_gate_touch "$ST" no-such-gate "src/**"
+t_assert_rc 7 "risk_gate_set_touch: an unknown gate refuses"
+t_assert_contains "$T_OUT" "unknown risk gate 'no-such-gate'" "...and names the gate"
+# An empty touch list is refused: [] makes touch_check clean on every path,
+# forever - the very defect this verb exists to repair. bone_add still admits
+# an empty surface (a bone with none is legitimate); a RE-POINT to nothing is
+# not a repair. Whitespace-only and comma-only lists collapse to [] in the
+# splitter, so they are the same case.
+for csv in "" "   " " , ,"; do
+  t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "$csv"
+  t_assert_rc 2 "bone_set_touch refuses an empty touch list ('$csv')"
+  t_assert_contains "$T_OUT" "at least one glob" "...and says what it needs ('$csv')"
+  t_capture oss_reg_set_risk_gate_touch "$ST" gold-correctness "$csv"
+  t_assert_rc 2 "risk_gate_set_touch refuses an empty touch list ('$csv')"
+  t_assert_contains "$T_OUT" "at least one glob" "...and says what it needs ('$csv')"
+done
+# ADJACENT CONTROL for that guard (Codex P2 and the GLM seat, round 1 on
+# PR #520). The loop above pins SPACE-only emptiness - which the old
+# `length > 0` form already caught, so it proves nothing about the loosening.
+# The splitter trims literal spaces only, so a tab-, CR-, VT- or NBSP-only
+# entry SURVIVES as a "glob" that can never match a real path, reproducing the
+# exact silent-clean defect the verb exists to repair (measured: it journaled
+# `["\t"]` at rc 0 and touch_check went clean). These rows are what goes RED
+# under the array-length form.
+for csv in "$(printf '\t')" "$(printf '\r')" "$(printf '\v')" "$(printf '\xc2\xa0')" "$(printf '　')"; do
+  t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "$csv"
+  t_assert_rc 2 "bone_set_touch refuses a blank-lookalike list (non-space whitespace, $(printf '%s' "$csv" | od -An -tx1 | tr -d ' '))"
+  t_assert_contains "$T_OUT" "at least one glob" "...and says what it needs"
+  t_capture oss_reg_set_risk_gate_touch "$ST" gold-correctness "$csv"
+  t_assert_rc 2 "risk_gate_set_touch refuses a blank-lookalike list (non-space whitespace, $(printf '%s' "$csv" | od -An -tx1 | tr -d ' '))"
+  t_assert_contains "$T_OUT" "at least one glob" "...and says what it needs"
+done
+# The OTHER input the splitter mishandles: jq -R is LINE-oriented, so a csv
+# wrapped over two lines emits TWO JSON values and --argjson cannot parse them.
+# Fail-closed either way, but the diagnostic must not say "empty" - that is a
+# false cause, and an agent following its remedy retries and stays stuck.
+t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "$(printf 'src/a/**\nsrc/b/**')"
+t_assert_rc 2 "bone_set_touch refuses a two-line touch-csv"
+t_assert_contains "$T_OUT" "not one list" "...and reports two lists, not an empty one"
+t_capture oss_reg_set_risk_gate_touch "$ST" gold-correctness "$(printf 'src/a/**\nsrc/b/**')"
+t_assert_rc 2 "risk_gate_set_touch refuses a two-line touch-csv"
+t_assert_contains "$T_OUT" "not one list" "...and reports two lists, not an empty one"
+t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "$(printf 'src/\357\200\200**')"
+t_assert_rc 2 "bone_set_touch propagates the private-use refusal"
+t_capture oss_reg_set_risk_gate_touch "$ST" gold-correctness "$(printf 'src/\357\200\200**')"
+t_assert_rc 2 "risk_gate_set_touch propagates the private-use refusal"
+printf '{not json' > "$TMP/touch-corrupt.json"
+t_capture oss_reg_set_bone_touch "$TMP/touch-corrupt.json" ADR-0003 "src/**"
+t_assert_rc 2 "bone_set_touch: an unreadable state is rc 2, not a raw jq error"
+t_capture oss_reg_set_risk_gate_touch "$TMP/touch-corrupt.json" gold-correctness "src/**"
+t_assert_rc 2 "risk_gate_set_touch: an unreadable state is rc 2, not a raw jq error"
+t_capture jq '.mutations | length' "$ST"
+t_assert_eq "$N1" "$T_OUT" "every refusal above left the journal unchanged"
+# Duplicates (#305 shape) refuse rather than guess which entry to re-point.
+oss_reg_add_bone "$ST" ADR-0003 "silver layer, minted twice" "src/x/**" "" >/dev/null
+oss_reg_add_risk_gate "$ST" gold-correctness "src/y/**" "dup" >/dev/null
+t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "src/**"
+t_assert_rc 7 "bone_set_touch: a duplicate ADR refuses"
+t_assert_contains "$T_OUT" "#305" "...and names the issue"
+t_capture oss_reg_set_risk_gate_touch "$ST" gold-correctness "src/**"
+t_assert_rc 7 "risk_gate_set_touch: a duplicate gate name refuses"
+t_assert_contains "$T_OUT" "#305" "...and names the issue"
+
+# The dispatcher path: bin/oss runs `set -euo pipefail`, which the sourced
+# calls above do not. A verb that works sourced can still die there.
+SD="$TMP/touch-dispatch.json"
+oss_state_init "$SD" touch-dispatch >/dev/null
+oss_reg_add_bone "$SD" ADR-0003 "silver layer" "src/silver/**" "" >/dev/null
+oss_reg_add_risk_gate "$SD" gold-correctness "src/gold/**" "golden-set" >/dev/null
+t_capture env OSS_STATE_FILE="$SD" bash "$OSS" bone_set_touch ADR-0003 "packages/ma/silver/**"
+t_assert_rc 0 "oss bone_set_touch works through the strict dispatcher"
+t_capture env OSS_STATE_FILE="$SD" bash "$OSS" risk_gate_set_touch gold-correctness "packages/ma/gold/**"
+t_assert_rc 0 "oss risk_gate_set_touch works through the strict dispatcher"
+t_capture jq -c '[.bones[0].touch, .risk_gates[0].touch]' "$SD"
+t_assert_eq '[["packages/ma/silver/**"],["packages/ma/gold/**"]]' "$T_OUT" "both re-points landed through the dispatcher"
+t_capture env OSS_STATE_FILE="$SD" bash "$OSS" bone_set_touch ADR-0003 ""
+t_assert_rc 2 "the dispatcher returns the lib's rc 2 on an empty list, not an errexit abort"
+t_assert_contains "$T_OUT" "at least one glob" "...and it is the lib's refusal, not an unknown-verb usage error"
+t_capture env OSS_STATE_FILE="$SD" bash "$OSS" risk_gate_set_touch no-such-gate "src/**"
+t_assert_rc 7 "the dispatcher returns the lib's rc 7 on an unknown gate"
 
 rm -rf "$TMP"
 t_summary
