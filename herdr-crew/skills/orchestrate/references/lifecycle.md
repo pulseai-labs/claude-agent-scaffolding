@@ -120,7 +120,11 @@ Every command's syntax comes from `herdr --skill`.
    verifier; a second fail on the same item goes to the operator. The verifier is
    released only at pass or escalation.
 8. **Review.** A review runs exactly once per PR: the reviewer seat in a fresh worktree
-   at the PR head, brief `/code-review <PR>`, every finding returned in the report file
+   at the PR head, brief `/code-review <PR>`, every finding returned in the report file.
+   **A fixed head is revalidated, never re-reviewed whole**: the reviewer is re-dispatched from
+   its seat over the fix range alone — one scoped delta re-review — and its findings enter the
+   disposition baseline like any other, so a repository whose bot does not review a push still
+   reaches a complete signal on the head it asks about. Every finding returned in the report file
    as file, line, severity, claim. The reviewer posts nothing to GitHub and edits
    nothing, so that file is the sole copy of the review. Release the reviewer only
    after its report file validates — findings lines present in the stated schema, or

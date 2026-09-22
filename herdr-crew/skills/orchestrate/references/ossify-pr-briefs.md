@@ -156,8 +156,8 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      that seat is released after its report file validates. Each push moves the
      head under that verdict: before the next disposition round,
      re-fetch the GitHub review signals and the thread state on the new head —
-     the bots review every push, so the current-head verdict is read there, not
-     re-commissioned. A post-disposition finding returns
+     the bots review every push where they are installed, so the current-head verdict is read
+     there; where none is, the reviewer seat is re-dispatched over the fix range. A post-disposition finding returns
      through a blocking question to the top before any seat acts on it, never
      fixed by you or silently deferred. Relay ONE batched summary per round;
      STOPPING_RULE decides when fixing stops, counting the fix rounds

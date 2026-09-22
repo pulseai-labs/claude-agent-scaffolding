@@ -148,6 +148,12 @@ Two cases are named because they look like clashes and are not:
   that file lists; installation alone is not one of them, so an ossify spine you did
   not plan here stays on the bullet above. The nested `run.json`'s mechanics — depth,
   routing, the round procedure and the close — are in `references/ossify-nested-run.md`.
+- **A directly requested `work-item` or a non-spine `close`.** No shipped template fits either: the
+  item brief is the activated spine's (a SEATS row, an injected request) and the close brief names
+  `SPINE_ID`. Dispatch them the way the doctor dispatch is composed — the fast-implementer template
+  with its TASK the operator's command verbatim and its DONE body that command's own result — so the
+  seat has a `REPORT_PATH` and a body, and never the implementer's commit/push line where the unit is
+  read-only.
 - **`doctor`.** One fresh tab and pane per dispatch, launched from the project-file
   `doctor session` seat and released on return (`references/roles.md`). Its brief is composed
   from the fast-implementer template exactly as the default lane above composes its own — the
