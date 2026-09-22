@@ -1,8 +1,7 @@
 # Configuration
 
 Every seat a run uses, and every value in its profile, is a value the operator
-edits, not a fact the plugin hard-codes. herdr-crew ships no agents of its own: a coordinator reads
-two markdown files the way it reads any other file, and nothing anywhere parses them.
+edits, not a fact the plugin hard-codes: nothing parses the two files that follow.
 
 ## The two files
 
@@ -30,14 +29,6 @@ the whole contract a worker sees.
 The machine file is one block per agent, named by a `###` heading:
 
 ```markdown
-### fast-coder
-command: <the launch command on this machine — an alias, a binary, flags and all>
-expected_model: <the model id its banner or screen must show>
-effort: <the effort it runs at — the embedded flag's value, or (agent default)>
-model_shows: banner
-brief_delivery: inject
-can: slash-commands
-
 ### devin-impl
 command: devin-implementer --effort max
 expected_model: <the model id its banner or screen must show>
@@ -64,23 +55,19 @@ Each field exists because a measured case needs it:
   of `command:`. A `--model` flag in the command must agree; a disagreement is a
   config defect named at approval, never reconciled at launch.
 - `effort:` — the effort the seat runs at, and the only source for a brief's
-  `SEAT_EFFORT` — the embedded flag's value, or the operator's declaration
-  (`(agent default)` when the seat just runs its own).
+  `SEAT_EFFORT`: the embedded flag's value, or `(agent default)`.
 - `model_shows:` — where the launched model is verified, both read with `herdr
   pane read`: `banner` the emitted stream; `screen` the rendered screen — a
   status-bar agent returns nothing on the default read.
 - `brief_delivery:` — `inject` is the ordinary dispatch; `file` writes the brief to
   a file and sends one line pointing at it, for an agent whose composer fragments injects.
 - `can:` — what the agent is able to run, comma-separated: `slash-commands`,
-  `subagents` (the lane's `Agent`-tool workers), or `—`. The per-role requirement
-  is in the resolved-profile table below, checked at approval, never at dispatch.
+  `subagents` (the lane's `Agent`-tool workers), or `—`.
 - `note:` — free prose the coordinator reads when it uses that agent.
 
-A seat's readiness path is never a field here: it is derived by asking `herdr
-agent list` whether the pane is detected — detected waits on a typed state
-(`herdr agent wait`), undetected waits on a screen pattern (`herdr pane
-wait-output`). So a detection manifest landing later upgrades a seat from the
-screen path to the typed path with no edit anywhere.
+A seat's readiness path is never a field here: it follows from herdr's own answer
+to whether the pane is detected (`herdr-mechanics.md`) — so a detection manifest
+landing later moves a seat onto the typed path with no edit anywhere.
 
 ## What a resolved profile carries
 
@@ -170,7 +157,9 @@ brief: ./briefs/security-audit.md
 - `agent:` — the seat name the role launches on.
 - `blocks:` — `yes` holds the run at its point until the role passes or the operator
   overrules it; anything else it returns is advice the orchestrator records.
-- `brief:` — the file the coordinator sends as that role's brief.
+- `brief:` — the file the coordinator sends as that role's brief. It must carry a
+  report envelope — a `REPORT_PATH` and a completion shape — checked at approval
+  with `can:` and the block's other fields; without one the role cannot return.
 - `replaces:` — hands the role a step the plugin owns; the valid targets are
   `implementer`, `verifier`, `reviewer` only. The named seat is not launched for
   that run — the operator's role runs at the step's point in its place, and the
@@ -186,11 +175,23 @@ default is one, and anything beyond the declared number is a planning defect.
 What the session does itself — reading, planning, the ceremonies it runs in its
 own context — needs no setup in any state: every role falls back to the agent this session is already running, and herdr-crew works on install. Delegation meets each state's missing half — a session cannot recover its own launch command, so the first delegated dispatch halts; which file it names depends on what exists:
 
-- Neither file — the machine file and the one entry to add, in the shape above.
+- Neither file — the machine file and the one entry to add, in the shape below.
 - Machine file only — agent names have launch details but no role mapping; it
   names the project file and the `## Seats` section to add.
 - Project file only — roles name agents nothing resolves; it names the
   machine file and the entry to add.
+
+The operator writes the machine file once per machine; this is the shape to copy:
+
+```markdown
+### my-coder
+command: my-coder
+expected_model: my-model-1
+effort: (agent default)
+model_shows: banner
+brief_delivery: inject
+can: slash-commands
+```
 
 A run never writes machine-level configuration itself. A name the files do not
 define is never guessed — a seat name that neither file defines halts the run
