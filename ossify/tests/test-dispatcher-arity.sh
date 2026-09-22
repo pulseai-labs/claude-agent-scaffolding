@@ -86,6 +86,58 @@ t_assert_rc 0 "the happy path is untouched by the guard"
 t_capture bash "$OSS" bone_add ADR-2 title2 src/b "revisit when X"
 t_assert_rc 0 "the optional 4th argument is still accepted"
 
+# --- #530: a SPLIT glob list is refused, not silently shrunk ---------------
+# `_oss_need` counts with `-ge`, so a caller who space-splits a glob list
+# instead of using the documented CSV grammar got rc 0 and a ONE-glob surface -
+# and because a re-point REPLACES the list, the coverage the caller believed they
+# re-stated was gone, silently. These verbs take exactly two arguments and the
+# refusal names the grammar, not just the count.
+t_capture bash "$OSS" bone_set_touch ADR-1 "src/a/**" "src/b/**"
+t_assert_rc 2 "bone_set_touch refuses a third argument at rc 2"
+t_assert_contains "$T_OUT" "comma-separated" "...and names the CSV grammar the caller missed"
+t_capture bash "$OSS" risk_gate_set_touch g1 "src/a/**" "src/b/**"
+t_assert_rc 2 "risk_gate_set_touch refuses a third argument at rc 2"
+t_assert_contains "$T_OUT" "comma-separated" "...and names the CSV grammar too"
+# #524: the third corrective append, same defect - a space-split controls list
+# shrinks the checklist silently, and this verb REPLACES the list as well.
+t_capture bash "$OSS" risk_gate_set_controls g1 "ctl-a" "ctl-b"
+t_assert_rc 2 "risk_gate_set_controls refuses a third argument at rc 2"
+t_assert_contains "$T_OUT" "comma-separated" "...and names the CSV grammar"
+# #530 arm 2 at the MINT, where the verb is FIXED arity (no optional trailing
+# parameter), so exact arity is a drop-in: without it a space-split controls list
+# minted a gate whose checklist was silently one entry short.
+t_capture bash "$OSS" risk_gate_add g-split "src/a/**" "ctl-a" "ctl-b"
+t_assert_rc 2 "risk_gate_add refuses a fourth argument at rc 2"
+t_assert_contains "$T_OUT" "comma-separated" "...and names the CSV grammar the caller missed"
+# ADJACENT CONTROL: the two-argument form reaches the VERB, so the guard above is
+# the extra argument and not the verb. Two rows, because this fixture already
+# minted ADR-1 above: the KNOWN ref must still succeed (rc 0 - the re-point runs),
+# and an UNKNOWN one must answer the verb's own rc 7. An assertion of "rc != 0"
+# would not separate the arity guard from either.
+t_capture bash "$OSS" bone_set_touch ADR-1 "src/a/**,src/b/**"
+t_assert_rc 0 "the two-argument form on a known ref still re-points"
+t_capture bash "$OSS" bone_set_touch ADR-9 "src/a/**"
+t_assert_rc 7 "the two-argument form on an unknown ref answers the verb's rc 7, not the arity guard"
+t_capture bash "$OSS" risk_gate_set_touch g1 "src/a/**"
+t_assert_rc 7 "the gate verb's two-argument form does too"
+
+# --- #305 item 1: the uniqueness rail through the REAL dispatcher ------------
+# The rail runs INSIDE oss_state_mutate's critical section, and that body is
+# invoked in `|| rc=$?` context with errexit suspended - while every other suite
+# sources the libs and is non-strict anyway. So the guard's own error handling is
+# exercised nowhere except here, under `set -euo pipefail`, where one unguarded
+# failing assignment hard-exits the whole dispatcher instead of answering rc 7.
+t_capture bash "$OSS" bone_add ADR-1 "a second row for one ref" "src/other/**"
+t_assert_rc 7 "bone_add refuses an existing ADR ref at rc 7 through the dispatcher"
+t_assert_contains "$T_OUT" "already exists" "...and it is the rail's own message, not a shell abort"
+t_capture jq '[.bones[] | select(.adr=="ADR-1")] | length' "$TMP/ws/.ossify/project-state.json"
+t_assert_eq "1" "$T_OUT" "...and the refused call minted no second row"
+t_capture bash "$OSS" risk_gate_add g1 "src/a/**" "ctl-one"
+t_assert_rc 0 "...and a fresh gate name still mints"
+t_capture bash "$OSS" risk_gate_add g1 "src/other/**" "ctl-two"
+t_assert_rc 7 "...and re-adding that gate name refuses at rc 7"
+t_assert_contains "$T_OUT" "already exists" "...with the rail's own message, not a shell abort"
+
 # --- an uninitialised project is told to init, not to retry a lock ---------
 # Lock-acquire conflated "lock held" with "state file missing", so a project
 # that had never run `oss init` was told to "retry or run 'oss doctor'" at rc 3.
