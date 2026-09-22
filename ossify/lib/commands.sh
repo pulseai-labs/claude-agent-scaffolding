@@ -4,7 +4,8 @@
 # the tested lib functions. NO judgment logic here - that lives in the skills.
 #
 # Repo rc taxonomy (the cross-verb contract): 1 generic, 2 usage, 3 lock,
-# 4 apply-failure, 5 drift, 6 schema, 7 unknown-ref, 8 git/worktree.
+# 4 apply-failure, 5 drift, 6 schema, 7 unknown-ref OR an ambiguous one (a
+# duplicate key: two rows for one ADR ref or gate name), 8 git/worktree.
 
 # Arity guard. `bin/oss` runs `set -euo pipefail`, so a wrapper that expands
 # `"$1"` when the caller passed nothing dies with bash's raw `unbound variable`
@@ -22,6 +23,22 @@ _oss_need() { # $1=count $2=verb $3=usage ; then "$@" from the caller
   local want="$1" verb="$2" usage="$3"; shift 3
   [ "$#" -ge "$want" ] || {
     echo "oss: $verb needs $want argument(s) - usage: oss $verb $usage" >&2; return 2; }
+}
+
+# Exact-arity guard (#530). `_oss_need` counts with `-ge`, which is right for the
+# verbs whose last parameter is optional - and wrong for a verb whose arguments
+# are a target plus ONE csv: a caller who space-splits a list instead of using the
+# documented CSV grammar got rc 0 and a SHRUNK list, silently, and because a
+# corrective append REPLACES the list, the coverage the caller believed they
+# re-stated was gone. Too few answers with `_oss_need`'s own message, so the sweep
+# above keeps covering it; too many names the grammar the caller missed.
+_oss_need_exact() { # $1=count $2=verb $3=usage ; then "$@" from the caller
+  local want="$1" verb="$2" usage="$3"; shift 3
+  if [ "$#" -lt "$want" ]; then
+    echo "oss: $verb needs $want argument(s) - usage: oss $verb $usage" >&2; return 2
+  fi
+  [ "$#" -eq "$want" ] || {
+    echo "oss: $verb takes exactly $want argument(s) - usage: oss $verb $usage; a list is ONE comma-separated argument, and spaces split it into several" >&2; return 2; }
 }
 
 oss_cmd_init() { # $1=project-name
@@ -63,19 +80,30 @@ oss_cmd_bone_add() { # $1=adr $2=title $3=touch-csv [$4=revisit]
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_add_bone "$sf" "$1" "$2" "$3" "${4:-}"
 }
 oss_cmd_risk_gate_add() { # $1=name $2=touch-csv $3=controls-csv
-  _oss_need 3 risk_gate_add "<name> <touch-csv> <controls-csv>" "$@" || return 2;
+  # #530 arm 2, on the mint: this verb is FIXED arity (no optional trailing
+  # parameter), so exact arity is a drop-in - and without it a caller who
+  # space-split the controls list got rc 0 with the extra word silently dropped:
+  # the same shrunken-list defect #524 fixed one verb over. `bone_add` cannot
+  # take this guard - its 4th argument is optional - so its split-list case is
+  # documented instead (start/references/bones-registry.md).
+  _oss_need_exact 3 risk_gate_add "<name> <touch-csv> <controls-csv>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_add_risk_gate "$sf" "$1" "$2" "$3"
 }
 oss_cmd_risk_gate_set_controls() { # $1=name $2=controls-csv — corrective append (#340)
-  _oss_need 2 risk_gate_set_controls "<name> <controls-csv>" "$@" || return 2;
+  # #524: the same silent-misinterpretation defect the two re-point verbs carry -
+  # a space-split list shrinks the checklist just as silently, and this verb
+  # REPLACES the list exactly as they do. Fixed here rather than tracked
+  # separately, because leaving two of three siblings guarded is the unstated
+  # asymmetry #524 was filed about in the first place.
+  _oss_need_exact 2 risk_gate_set_controls "<name> <controls-csv>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_risk_gate_controls "$sf" "$1" "$2"
 }
 oss_cmd_bone_set_touch() { # $1=adr $2=touch-csv — corrective append (1.11.0)
-  _oss_need 2 bone_set_touch "<adr> <touch-csv>" "$@" || return 2;
+  _oss_need_exact 2 bone_set_touch "<adr> <touch-csv>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_bone_touch "$sf" "$1" "$2"
 }
 oss_cmd_risk_gate_set_touch() { # $1=name $2=touch-csv — corrective append (1.11.0)
-  _oss_need 2 risk_gate_set_touch "<name> <touch-csv>" "$@" || return 2;
+  _oss_need_exact 2 risk_gate_set_touch "<name> <touch-csv>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_risk_gate_touch "$sf" "$1" "$2"
 }
 oss_cmd_fake_add() { # $1=boundary $2=channel $3=reason $4=trigger $5=expiry-release

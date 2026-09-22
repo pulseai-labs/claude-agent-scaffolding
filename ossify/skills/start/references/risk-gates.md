@@ -57,8 +57,16 @@ the column is ceremony inflation.
 _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
 
 ```bash
-"$oss_bin" risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"
+"$oss_bin" risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"   # refuses a duplicate name (#305); refuses a contaminated or multi-line list at rc 2
 ```
+
+Both lists are **one** argument each: quote them. This verb is fixed arity, so a
+space-split list is refused at rc 2 with the CSV grammar named — but note the
+`bones-registry.md` §"Recording it" caveat does not apply here: `bone_add` is the
+one list-taking verb that cannot refuse a split. An entry carrying leading or
+trailing whitespace or an invisible format character (CR, tab, NBSP, BOM,
+zero-width space) is refused too: it would be journaled as a glob or control
+phrase that matches nothing real, leaving the gate silently blind.
 
 Worked example:
 
@@ -88,7 +96,7 @@ gate would never fire. A gate minted before you knew the grammar is
 repaired NOT by editing state but by a corrective append:
 
 ```bash
-"$oss_bin" risk_gate_set_controls "<name>" "<controls-csv>"   # refuses unknown names; refuses duplicate names (#305)
+"$oss_bin" risk_gate_set_controls "<name>" "<controls-csv>"   # refuses unknown names; refuses duplicate names (#305); refuses an empty, contaminated or multi-line list at rc 2 (risk-gates §6)
 ```
 
 **Repointing a gate's touch surface.** When the code a gate covers moves, its
@@ -98,7 +106,7 @@ never fires. Re-point it the same way — a corrective append that **replaces**
 the whole touch list and leaves the controls alone:
 
 ```bash
-"$oss_bin" risk_gate_set_touch "<name>" "<touch-csv>"   # refuses unknown and duplicate names (#305), and a list with no glob in it
+"$oss_bin" risk_gate_set_touch "<name>" "<touch-csv>"   # refuses unknown and duplicate names (#305), a list with no glob in it, and a contaminated or multi-line list at rc 2
 ```
 
 Same caveat as a bone's (`bones-registry.md`): the verb applies the correction
