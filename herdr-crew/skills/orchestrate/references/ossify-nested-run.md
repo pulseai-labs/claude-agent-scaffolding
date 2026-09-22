@@ -70,8 +70,7 @@ releases every item pair and closes the workspace it created, as
    implementer its item's decision, before which no edit starts.
 5. On each complete return, capture the item's identity as the result declares it — `head_oid`,
    `tree_oid`, `report_oid` and `spec_oid`, the four ids the external-executor result envelope
-   declares (`ossify/skills/work-item/references/external-executor.md` §4) and the same four the
-   close guard fingerprints — then create and
+   declares (`ossify/skills/work-item/references/external-executor.md` §4) — then create and
    dispatch that item's **fresh verifier seat** from its SEATS row's exact
    command, in the same worktree, against the fixed all-claims procedure.
    `cannot determine` = fail.
