@@ -333,11 +333,17 @@ belong in the read-out when the sweep gives you reason to look:
   the *state* half of the comparison lives here.
 - **A `complete` work item whose `report.md` is absent.** The harvest sweeps
   reports; a missing one silently narrows the next harvest.
-- **An `abandoned` work item with a recorded `worktree_path` or `branch`.**
-  `abandoned` means withdrawn *before any dispatch*
-  (`plan-spine/references/decomposition.md` §1); a recorded worktree says it was
-  dispatched, so either the status or the dispatch is wrong. Close skips an
-  abandoned item entirely, so work in that worktree never reaches the spine.
+- **An `abandoned` work item with a recorded dispatch field — `branch`,
+  `worktree_path` or **`base_sha`**.** `abandoned` means withdrawn *before any
+  dispatch* (`plan-spine/references/decomposition.md` §1); any of the three says
+  it was dispatched, so either the status or the dispatch is wrong. The third
+  field is the one a two-field read missed, and it is not hypothetical:
+  `"$oss_bin" work_item_exec <wi> "" "" <sha>` records `base_sha` alone at rc 0
+  (a hand-recovered dispatch), which a `branch`-or-`worktree_path` read called
+  undispatched — so the item abandoned successfully and its work was stranded.
+  The rails now read all three; this bullet must name all three, or the report
+  and the rail disagree about what "dispatched" means. Close skips an abandoned
+  item entirely, so work in that worktree never reaches the spine.
 - **A bone's or gate's touch surface matching NO tracked file in any declared repo.**
   Per SURFACE, not per glob: `touch_check` answers per match, so a list that is
   only PARTLY dead still records a hit and is not reported here.

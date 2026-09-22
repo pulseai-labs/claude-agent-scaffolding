@@ -497,5 +497,49 @@ if grep -Fq 'OTHER than `ai_workspace`' "$_SW"; then
 else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: the sweep's corpus comment does not exclude ai_workspace from the legacy pairing-manifest key set - a planning file then satisfies a stale product glob and the zero-match warning is suppressed"
 fi
+# --- phase 3: the never-strand invariant's two surfaces must agree -----------
+#
+# The dispatch predicate is one definition used at four sites, and one of them is
+# PROSE: doctor's §5 drift bullet reports the very pair the rails refuse to
+# create. If the bullet names fewer fields than the shell predicate reads, the
+# report and the rail disagree about what "dispatched" means - and the
+# disagreement is invisible in both directions (the bullet under-reports, the
+# rail over-refuses, and each looks correct read alone). Measured: the shipped
+# bullet named two fields while the guard read two, and the third (base_sha) was
+# how a half-write dispatch became an abandonment.
+ENT="$OSSSK/lib/entities.sh"
+SI3="$OSSSK/skills/doctor/references/state-inspection.md"
+# The PREDICATE's own definition, not a mention anywhere in the file: the three
+# field names also appear in the dispatch payload builder, so a file-level grep
+# passes while the predicate reads fewer (measured - the same trap as phase 2's
+# sweep row, where a word-grep passed on a comment).
+_pred="$(grep -F '_OSS_DISPATCHED_JQ=' "$ENT" | head -1)"
+if [ -n "$_pred" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: entities.sh no longer defines the shared dispatch predicate (_OSS_DISPATCHED_JQ=) - the parity checks below are vacuous"
+fi
+for _f in branch worktree_path base_sha; do
+  case "$_pred" in
+    *"$_f"*) T_PASS=$((T_PASS+1));;
+    *) T_FAIL=$((T_FAIL+1)); echo "FAIL: the dispatch predicate's definition does not read '$_f'";;
+  esac
+done
+_bullet="$(grep -A 8 'An `abandoned` work item with a recorded' "$SI3")"
+for _f in branch worktree_path base_sha; do
+  case "$_bullet" in
+    *"$_f"*) T_PASS=$((T_PASS+1));;
+    *) T_FAIL=$((T_FAIL+1)); echo "FAIL: state-inspection.md §5's abandoned-drift bullet does not name '$_f' - the report and the rail disagree about what dispatched means";;
+  esac
+done
+# The spine-level half is prose as well: plan-spine/SKILL.md states the two
+# mutually exclusive arms, and the rail now enforces the retirement precondition
+# they imply. Losing the word here is how the rule went unenforced for a release.
+if grep -Fq 'never-dispatched' "$OSSSK/skills/plan-spine/SKILL.md"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: plan-spine/SKILL.md no longer states the never-dispatched precondition"
+fi
+
 rm -rf "$_PC_TMP"
 t_summary

@@ -231,6 +231,112 @@ t_assert_rc 0 "the way back the refusal names works"
 t_capture oss_entity_set_work_item_exec "$S" "$WID3" "work/$WID3" "$TMP/.worktrees/$WID3" "abc123"
 t_assert_rc 0 "...and the un-withdrawn item can then be dispatched"
 
+# ---------------------------------------------------------------------------
+# Phase 3 (1.12.0, #529 with #528 and #533 half A): the never-strand invariant -
+# one predicate, one place, evaluated INSIDE the mutation lock.
+# ---------------------------------------------------------------------------
+# (1) THE PREDICATE READS ALL THREE FIELDS the dispatch writer journals. The
+# abandonment guard read `branch` and `worktree_path` only, and the writer
+# accepts a half-write: `work_item_exec <wi> "" "" <sha>` records base_sha alone
+# at rc 0 (a hand-recovered dispatch), which a two-field read called
+# undispatched - so the item abandoned successfully and its work was stranded,
+# which is the harm the guard exists to prevent.
+WID4="$(oss_entity_add_work_item "$S" r0.s1 "sha-only dispatch")"
+t_capture oss_entity_set_work_item_exec "$S" "$WID4" "" "" "sha-only-abc"
+t_assert_rc 0 "setup: the verb accepts a base_sha-only dispatch (the half-write shape)"
+N3="$(oss_state_read "$S" '.mutations | length')"
+t_capture oss_entity_set_work_item_status "$S" "$WID4" abandoned
+t_assert_rc 7 "a base_sha-only dispatch REFUSES the abandonment"
+t_assert_contains "$T_OUT" "base_sha" "...naming the field that made it dispatched"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID4\") | .status"
+t_assert_eq "planned" "$T_OUT" "...leaving the status alone"
+t_capture oss_state_read "$S" '.mutations | length'
+t_assert_eq "$N3" "$T_OUT" "...and journaling nothing"
+
+# (1b) The `complete` clause of the same guard, which the dispatch clause does NOT
+# cover. An item can be complete with no dispatch record - a hand-edited state, or
+# a journal from a build that recorded the merge without the dispatch - and its
+# merge is on the spine branch either way, so abandoning it takes a landed line
+# out of every close-path reader and out of release close's tag set. The raw op is
+# the only path that can now produce that shape, which is what makes this the
+# clause's own row rather than a duplicate of the dispatched one above.
+WID4B="$(oss_entity_add_work_item "$S" r0.s1 "landed, no dispatch record")"
+oss_state_mutate "$S" set_work_item_status \
+  "$(jq -n --arg w "$WID4B" --arg st complete --arg ts "$(_oss_now)" '{work_item:$w,status:$st,at:$ts}')" >/dev/null
+t_assert_eq "complete" "$(oss_state_read "$S" ".work_items[] | select(.id==\"$WID4B\") | .status")" \
+  "setup: an item is complete with NO dispatch record (the raw op, as an older journal would hold it)"
+t_capture oss_entity_set_work_item_status "$S" "$WID4B" abandoned
+t_assert_rc 7 "a COMPLETE item with no dispatch record still refuses the abandonment"
+t_assert_contains "$T_OUT" "complete" "...naming the status that blocks it, not a dispatch"
+
+# (2) THE SPINE LEVEL. A mid-round replan that retires a spine whose items are
+# active with recorded dispatches returns rc 0, and every close-path reader then
+# skips those items - the same strand, one level up. Retirement is for a spine
+# that ran NOTHING: any item dispatched, active or complete refuses it.
+SP2="$(oss_entity_add_spine "$S" r0 "second spine" flesh canonical)"
+WID5="$(oss_entity_add_work_item "$S" "$SP2" "dispatched item")"
+t_capture oss_entity_set_work_item_exec "$S" "$WID5" "work/$WID5" "$TMP/.worktrees/$WID5" "abc123"
+t_assert_rc 0 "setup: an item of the second spine is dispatched"
+t_capture oss_entity_set_spine_status "$S" "$SP2" abandoned
+t_assert_rc 7 "retiring a spine with a DISPATCHED item refuses"
+t_assert_contains "$T_OUT" "$WID5" "...naming the item that blocks it"
+t_capture oss_state_read "$S" ".spines[] | select(.id==\"$SP2\") | .status"
+t_assert_eq "planned" "$T_OUT" "...leaving the spine's status alone"
+# ADJACENT CONTROLS: both legitimate retirements still work, so the refusal is
+# "ran something" and not "has items".
+SP3="$(oss_entity_add_spine "$S" r0 "third spine" flesh canonical)"
+t_capture oss_entity_set_spine_status "$S" "$SP3" abandoned
+t_assert_rc 0 "a spine with NO items still retires (nothing ran)"
+SP4="$(oss_entity_add_spine "$S" r0 "fourth spine" flesh canonical)"
+WID6="$(oss_entity_add_work_item "$S" "$SP4" "withdrawn before dispatch")"
+t_capture oss_entity_set_work_item_status "$S" "$WID6" abandoned
+t_assert_rc 0 "setup: its only item is withdrawn before any dispatch"
+t_capture oss_entity_set_spine_status "$S" "$SP4" abandoned
+t_assert_rc 0 "...and that spine still retires (it ran nothing)"
+# A COMPLETE item blocks it too: its merge is on the spine branch, so retiring
+# the spine takes the landed line down with it.
+SP5="$(oss_entity_add_spine "$S" r0 "fifth spine" flesh canonical)"
+WID7="$(oss_entity_add_work_item "$S" "$SP5" "landed item")"
+t_capture oss_entity_set_work_item_exec "$S" "$WID7" "work/$WID7" "$TMP/.worktrees/$WID7" "abc123"
+t_assert_rc 0 "setup: its item is dispatched"
+t_capture oss_entity_set_work_item_status "$S" "$WID7" complete
+t_assert_rc 0 "setup: ...and goes complete"
+t_capture oss_entity_set_spine_status "$S" "$SP5" abandoned
+t_assert_rc 7 "retiring a spine with a COMPLETE item refuses"
+
+# (3) DUPLICATE IDS (#533 half A). The existence probe read one line per matching
+# record, so a duplicate id made the count string multi-line, the numeric case arm
+# fired, and the verb answered rc 2 "cannot read work item" - while
+# planned/active/complete, which skipped that read, proceeded on the SAME state at
+# rc 0. One verb, one state, two answers. The in-lock resolver counts records once
+# and names the condition the sibling registry verbs name (#305).
+DUP="r0.s1.w9"
+for _t in "duplicate id" "duplicate id, second row"; do
+  oss_state_mutate "$S" add_work_item \
+    "$(jq -n --arg s r0.s1 --arg t "$_t" --arg r canonical --arg ts "$(_oss_now)" \
+      '{spine:$s,title:$t,target_repo:$r,status:"planned",created_at:$ts,id:"r0.s1.w9"}')" >/dev/null
+done
+t_assert_eq "2" "$(oss_state_read "$S" '[.work_items[] | select(.id=="r0.s1.w9")] | length')" \
+  "setup: two records share one id (a duplicate no shipped verb can mint)"
+t_capture oss_entity_set_work_item_status "$S" "$DUP" abandoned
+t_assert_rc 7 "a duplicate id refuses the abandonment"
+t_assert_contains "$T_OUT" "#305" "...naming the duplicate-id condition, not a state-read failure"
+case "$T_OUT" in *"cannot read"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: the duplicate-id refusal still reads as a state-read failure";; *) T_PASS=$((T_PASS+1));; esac
+t_capture oss_entity_set_work_item_status "$S" "$DUP" planned
+t_assert_rc 7 "...and the same state refuses that id for a status that skips the abandonment read"
+t_capture oss_entity_set_work_item_exec "$S" "$DUP" "work/$DUP" "$TMP/.worktrees/$DUP" "abc"
+t_assert_rc 7 "...and for a dispatch"
+
+# (4) REPLAY IS UNTOUCHED, which is the whole reason the guards are verb-side. A
+# live estate may already hold the inconsistent pair; journaling one through the
+# raw op (the only path that can now produce one) must still replay clean.
+oss_state_mutate "$S" set_work_item_status \
+  "$(jq -n --arg w "$WID4" --arg st abandoned --arg ts "$(_oss_now)" '{work_item:$w,status:$st,at:$ts}')" >/dev/null
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID4\") | [(.status // \"\"), (.base_sha // \"\")] | join(\",\")"
+t_assert_eq "abandoned,sha-only-abc" "$T_OUT" "setup: the raw op CAN still journal the inconsistent pair (an older build's journal)"
+t_capture oss_state_replay "$S"
+t_assert_rc 0 "replay of that journal stays CLEAN - the rails are verb-side and _oss_apply_op is untouched"
+
 t_capture oss_entity_set_release_status "$S" "r0" "closed"
 t_assert_rc 0 "release status accepts a valid transition"
 t_capture oss_state_read "$S" '.releases[] | select(.id=="r0") | .status'

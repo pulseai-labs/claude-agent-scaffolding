@@ -1,6 +1,124 @@
 #!/usr/bin/env bash
 # Entity write paths: thin payload builders over oss_state_mutate.
 
+# THE dispatch predicate, one definition for every site that asks "was this item
+# dispatched?" (#529). All THREE fields, because set_work_item_exec journals
+# branch, worktree_path and base_sha in one payload and accepts a half-write:
+# `work_item_exec <wi> "" "" <sha>` records base_sha alone at rc 0, and a
+# two-field read called that undispatched - which is how a dispatched item
+# abandoned successfully and its work was stranded. Read by the abandonment
+# refusal, the dispatch refusal, the spine-level retirement refusal, and (in
+# words, the same three names) doctor's §5 drift bullet, which
+# test-prose-contracts.sh holds to this line.
+_OSS_DISPATCHED_JQ='((.branch // "") != "") or ((.worktree_path // "") != "") or ((.base_sha // "") != "")'
+
+# The shared resolve-exactly-one read (#529, #533 half A) - the same ladder the
+# registry verbs use (#525). ONE jq pass counts the records, so a duplicate id
+# can no longer turn a numeric test's input into a multi-line string: the
+# pre-lock probe read one line per matching record, the numeric `case` arm then
+# fired, and the verb answered rc 2 "cannot read work item" - while the statuses
+# that skipped that read proceeded on the SAME state at rc 0. rc 1 no state, 2
+# unreadable, 7 unknown or duplicate.
+_oss_entity_require_single() { # $1=state-file $2=collection-selector(uses $v) $3=what $4=value
+  local sf="$1" sel="$2" what="$3" val="$4" n
+  if [ ! -f "$sf" ]; then
+    echo "oss: no state at $sf - run 'oss init <name>' first" >&2; return 1
+  fi
+  n="$(jq --arg v "$val" "[$sel] | length" "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read $what '$val' from $sf" >&2; return 2; }
+  case "$n" in ''|*[!0-9]*)
+    echo "oss: cannot read $what '$val' from $sf" >&2; return 2 ;;
+  esac
+  if [ "$n" -eq 0 ]; then
+    echo "oss: unknown $what '$val'" >&2; return 7
+  fi
+  if [ "$n" -gt 1 ]; then
+    echo "oss: $what '$val' matches $n records - duplicate ids have no supported repair yet (#305); refusing rather than guessing" >&2; return 7
+  fi
+}
+
+# The three never-strand guards (#529). Each is handed to oss_state_mutate as
+# its `$5`, so it is evaluated INSIDE that function's lock, immediately before
+# the append: the pre-lock spelling was a check-to-append race - a concurrent
+# work_item_exec commits its dispatch between the read and the append, and the
+# item ends up abandoned while dispatched, which is the state every close-path
+# reader then skips. #528 is that race, with data loss as its outcome.
+#
+# rc contract, inherited from the merged hook: 0 lets the append through, 7
+# refuses it having printed its own message, and ANY other rc fails closed at 4 -
+# so a guard that could not answer never mints.
+
+_oss_entity_guard_wi_status() { # $1=state-file $2=payload about to be minted
+  local sf="$1" wi st d st2
+  wi="$(printf '%s' "$2" | jq -r '.work_item // ""')" || return 4
+  st="$(printf '%s' "$2" | jq -r '.status // ""')" || return 4
+  _oss_entity_require_single "$sf" '.work_items[] | select(.id == $v)' "work item" "$wi" || return $?
+  # Only an abandonment is guarded; every other status is a plain write.
+  [ "$st" = "abandoned" ] || return 0
+  # `abandoned` is refused on an item that records a dispatch - ANY of the three
+  # fields the writer journals - or that is `complete`, whose merge is already on
+  # the spine branch. Every close-path reader skips an abandoned item, so either
+  # pair strands work that never reaches the spine branch and, post-close,
+  # silently shrinks release close's tag set instead of failing it. Prose alone
+  # did not hold this (decomposition.md §1 says "only a never-dispatched item is
+  # withdrawn"); doctor reports the pair as drift (§5), which is the report, not
+  # the guard - this is the guard.
+  d="$(jq -r --arg w "$wi" "[.work_items[] | select(.id == \$w)] | first | (${_OSS_DISPATCHED_JQ})" "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
+  if [ "$d" = "true" ]; then
+    echo "oss: work item '$wi' records a dispatch (branch, worktree_path or base_sha) - it was dispatched, and 'abandoned' means withdrawn BEFORE any dispatch; a dispatched item's round lands or halts, and a plan that drops it is a replan, not a withdrawal (plan-spine/references/decomposition.md §1)" >&2
+    return 7
+  fi
+  st2="$(jq -r --arg w "$wi" "[.work_items[] | select(.id == \$w)] | first | .status // \"\"" "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
+  if [ "$st2" = "complete" ]; then
+    echo "oss: work item '$wi' is complete - its merge is on the spine branch, so 'abandoned' would take a landed line out of every close-path reader and out of release close's tag set; a plan that drops a landed item is a replan, not a withdrawal (plan-spine/references/decomposition.md §1)" >&2
+    return 7
+  fi
+}
+
+_oss_entity_guard_wi_exec() { # $1=state-file $2=payload about to be minted
+  local sf="$1" wi st
+  wi="$(printf '%s' "$2" | jq -r '.work_item // ""')" || return 4
+  _oss_entity_require_single "$sf" '.work_items[] | select(.id == $v)' "work item" "$wi" || return $?
+  # The MIRROR of the abandonment guard, and the same harm entered through the
+  # companion verb: an `abandoned` item was withdrawn BEFORE any dispatch, so
+  # journaling a branch or worktree onto it re-creates the exact stranded state
+  # the other guard refuses to create in the other order. Measured: with this arm
+  # absent, `work_item_status <wi> abandoned` then `work_item_exec` both returned
+  # rc 0 and left {status:abandoned, branch, worktree_path} - the pair doctor
+  # reports as drift. decomposition.md §1 gives the way back, so the refusal
+  # names it.
+  st="$(jq -r --arg w "$wi" "[.work_items[] | select(.id == \$w)] | first | .status // \"\"" "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
+  if [ "$st" = "abandoned" ]; then
+    echo "oss: work item '$wi' is abandoned - it was withdrawn before any dispatch, so it has no round to run and no worktree to hold. Un-withdraw it first: \"oss work_item_status $wi planned\" (plan-spine/references/decomposition.md §1)" >&2
+    return 7
+  fi
+}
+
+_oss_entity_guard_spine_status() { # $1=state-file $2=payload about to be minted
+  local sf="$1" sp st blockers
+  sp="$(printf '%s' "$2" | jq -r '.spine // ""')" || return 4
+  st="$(printf '%s' "$2" | jq -r '.status // ""')" || return 4
+  _oss_entity_require_single "$sf" '.spines[] | select(.id == $v)' "spine" "$sp" || return $?
+  [ "$st" = "abandoned" ] || return 0
+  # The SPINE LEVEL of the same invariant. A retirement is for a spine that ran
+  # nothing; every close-path reader skips an abandoned item, so retiring a spine
+  # whose items were dispatched, are active, or have landed strands that work -
+  # the same harm one level up, and it returned rc 0 before this guard.
+  blockers="$(jq -r --arg s "$sp" "
+    [.work_items[] | select(.spine == \$s)
+     | select((${_OSS_DISPATCHED_JQ}) or (.status == \"active\") or (.status == \"complete\"))
+     | \"\(.id)(\(.status))\"]
+    | join(\", \")" "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read the work items of spine '$sp' from $sf" >&2; return 2; }
+  if [ -n "$blockers" ]; then
+    echo "oss: spine '$sp' records dispatched or landed work ($blockers) - a spine that ran anything is closed, not retired, and every close-path reader skips the items a retirement would abandon, so that work would never reach the spine branch. Close it, or return an item first: \"oss work_item_status <wi-id> planned\" (plan-spine/references/decomposition.md §1)" >&2
+    return 7
+  fi
+}
+
 oss_entity_add_release() { # $1=state $2=name $3=goal
   local sf="$1" ts; ts="$(_oss_now)"
   oss_state_mutate "$sf" add_release \
@@ -70,10 +188,13 @@ oss_entity_set_spine_status() { # $1=state $2=spine-id $3=status
   local sf="$1" spine="$2" st="$3"
   case "$st" in planned|active|closed|abandoned) ;; *)
     echo "oss: spine status must be planned|active|closed|abandoned" >&2; return 2;; esac
-  jq -e --arg s "$spine" '.spines[] | select(.id == $s)' "$sf" >/dev/null 2>&1 \
-    || { echo "oss: unknown spine '$spine'" >&2; return 7; }
+  # The existence read AND the retirement precondition are one guard, handed to
+  # oss_state_mutate as `$5` so both are evaluated inside its lock (#528/#529):
+  # a pre-lock read is a check-to-append race, and the append here is the one
+  # that decides whether a spine's dispatched work is abandoned.
   oss_state_mutate "$sf" set_spine_status \
-    "$(jq -n --arg s "$spine" --arg st "$st" --arg ts "$(_oss_now)" '{spine:$s,status:$st,at:$ts}')"
+    "$(jq -n --arg s "$spine" --arg st "$st" --arg ts "$(_oss_now)" '{spine:$s,status:$st,at:$ts}')" \
+    "" _oss_entity_guard_spine_status
 }
 
 oss_entity_set_work_item_status() { # $1=state $2=work-item-id $3=status
@@ -82,34 +203,13 @@ oss_entity_set_work_item_status() { # $1=state $2=work-item-id $3=status
   # value is a compatibility contract: live journals already carry it.
   case "$st" in planned|active|complete|abandoned) ;; *)
     echo "oss: work item status must be planned|active|complete|abandoned" >&2; return 2;; esac
-  jq -e --arg w "$wi" '.work_items[] | select(.id == $w)' "$sf" >/dev/null 2>&1 \
-    || { echo "oss: unknown work item '$wi'" >&2; return 7; }
-  # `abandoned` is REFUSED on a dispatched item, and the recorded dispatch is
-  # `branch` or `worktree_path` - the round walk journals both before the
-  # implementer runs (work-item/references/round-orchestration.md §3). Every
-  # close-path reader skips an abandoned item, so withdrawing a dispatched one
-  # strands work that never reaches the spine branch and, post-close, silently
-  # shrinks release close's tag set instead of failing it. Prose alone did not
-  # hold this (decomposition.md §1 says "only a never-dispatched item is
-  # withdrawn"); doctor reports the pair as drift (state-inspection.md §5),
-  # which is the report, not the guard - this is the guard.
-  if [ "$st" = "abandoned" ]; then
-    local n
-    # Explicit failure routing: under bin/oss errexit an unguarded failing
-    # assignment hard-exits with jq's raw error before the case below labels it.
-    n="$(jq -r --arg w "$wi" '.work_items[] | select(.id == $w)
-          | [(.branch // ""), (.worktree_path // "")] | map(select(length > 0)) | length' "$sf" 2>/dev/null)" || {
-      echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
-    case "$n" in ''|*[!0-9]*)
-      echo "oss: cannot read work item '$wi' from $sf" >&2; return 2 ;;
-    esac
-    if [ "$n" -gt 0 ]; then
-      echo "oss: work item '$wi' records a branch or a worktree - it was dispatched, and 'abandoned' means withdrawn BEFORE any dispatch; a dispatched item's round lands or halts, and a plan that drops it is a replan, not a withdrawal (plan-spine/references/decomposition.md §1)" >&2
-      return 7
-    fi
-  fi
+  # The existence read, the duplicate-id read and the abandonment precondition
+  # are ONE guard, evaluated inside oss_state_mutate's lock (#528/#529). The
+  # payload shape is unchanged - live journals already carry
+  # {work_item,status,at} - so this is a precondition, not a contract edit.
   oss_state_mutate "$sf" set_work_item_status \
-    "$(jq -n --arg w "$wi" --arg st "$st" --arg ts "$(_oss_now)" '{work_item:$w,status:$st,at:$ts}')"
+    "$(jq -n --arg w "$wi" --arg st "$st" --arg ts "$(_oss_now)" '{work_item:$w,status:$st,at:$ts}')" \
+    "" _oss_entity_guard_wi_status
 }
 
 oss_entity_set_release_status() { # $1=state $2=release-id $3=status
@@ -123,27 +223,14 @@ oss_entity_set_release_status() { # $1=state $2=release-id $3=status
 }
 
 oss_entity_set_work_item_exec() { # $1=state $2=wi-id $3=branch $4=worktree-path $5=base-sha
-  local sf="$1" wi="$2" st
-  jq -e --arg w "$wi" '.work_items[] | select(.id == $w)' "$sf" >/dev/null 2>&1 \
-    || { echo "oss: unknown work item '$wi'" >&2; return 7; }
-  # The MIRROR of the abandonment guard above, and the same harm entered
-  # through the companion verb: an `abandoned` item was withdrawn BEFORE any
-  # dispatch, so journaling a branch or worktree onto it re-creates the exact
-  # stranded state that guard refuses to create in the other order - every
-  # close-path reader skips an abandoned item, so the work never reaches the
-  # spine branch and release close's tag set silently shrinks. Measured: with
-  # this arm absent, `work_item_status <wi> abandoned` then `work_item_exec`
-  # both returned rc 0 and left {status:abandoned, branch, worktree_path} -
-  # the pair `doctor` reports as drift (doctor/references/state-inspection.md
-  # §5). decomposition.md §1 gives the way back, so the refusal names it.
-  # The read is pre-lock, the same shape as the abandonment guard's own check.
-  st="$(jq -r --arg w "$wi" '.work_items[] | select(.id == $w) | .status // ""' "$sf" 2>/dev/null)" || {
-    echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
-  if [ "$st" = "abandoned" ]; then
-    echo "oss: work item '$wi' is abandoned - it was withdrawn before any dispatch, so it has no round to run and no worktree to hold. Un-withdraw it first: \"oss work_item_status $wi planned\" (plan-spine/references/decomposition.md §1)" >&2
-    return 7
-  fi
+  local sf="$1" wi="$2"
+  # The existence read and the mirror precondition are one guard, evaluated
+  # inside oss_state_mutate's lock (#528/#529) - the same `$5` slot the
+  # abandonment guard uses, so the two directions of the invariant cannot drift
+  # apart. set_work_item_exec's op and payload are untouched: this is a
+  # precondition, and it names the way back (work_item_status <id> planned).
   oss_state_mutate "$sf" set_work_item_exec \
     "$(jq -n --arg w "$wi" --arg b "$3" --arg p "$4" --arg s "$5" \
-      '{work_item:$w,branch:$b,worktree_path:$p,base_sha:$s}')"
+      '{work_item:$w,branch:$b,worktree_path:$p,base_sha:$s}')" \
+    "" _oss_entity_guard_wi_exec
 }

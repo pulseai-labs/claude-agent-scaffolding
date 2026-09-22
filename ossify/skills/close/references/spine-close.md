@@ -90,7 +90,11 @@ items are on record and merely withdrawn. Refusing at the gate keeps that from
 reading as a gap in the record, and it is the honest verdict anyway: a spine that
 ran nothing is **retired**, not closed — `"$oss_bin" spine_status <spine-id>
 abandoned`, the whole-spine arm `plan-spine/references/decomposition.md` §1
-already names.
+already names. That retirement is itself refused (rc 7) if any of the spine's
+items records a dispatch, is `active`, or is `complete` — this gate is reached
+only when every item is complete or withdrawn, so the refusal can only fire for
+an item someone dispatched **after** this halt, and the message names the item
+and the way back.
 
 The withdrawn line is `[ -z … ] || echo` for the same strict-mode
 reason `release-close.md` §2 gives for its abandoned-spine line: it is the

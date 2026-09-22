@@ -1,4 +1,4 @@
-# ossify (v1.11.2)
+# ossify (v1.12.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Nine entry skills (`start`, `adopt`,
@@ -104,6 +104,21 @@ file in any declared repo — per SURFACE, so a list that is only partly dead st
 reads clean: a surface re-pointed at a tree that does not exist reads `clean` on
 every path and the spine is never reclassified. The repair has existed since
 1.11.0, and now the detection does too.
+
+Since 1.12.0, the never-strand invariant has **one predicate and one place**. A
+work item counts as dispatched when it records any of the three fields the
+dispatch writer journals — `branch`, `worktree_path`, `base_sha` — and that one
+definition now answers in both directions and at the spine level: an item that
+records a dispatch, or that has landed, is never `abandoned`; an `abandoned` item
+is never dispatched; and a spine any of whose items records a dispatch, is
+`active`, or has landed is never retired. Each refusal is evaluated **inside the
+state lock**, so a concurrent writer's commit is visible to it — the previous
+reads happened before the lock, which is a check-to-append race with data loss as
+its outcome. A duplicate work-item id is named as a duplicate (rc 7, pointing at
+#305) instead of being misreported as a state-read failure, and it is refused for
+every status rather than for `abandoned` alone. No journal op, payload key or
+status value changes: the rails are verb-side, so a journal that already holds an
+inconsistent pair still replays clean and `doctor` reports it as drift.
 
 Since 1.7.0 (#368), every bare `doctor` sweep includes plugin provenance and
 `doctor provenance` runs it alone. It reports the answering `oss` binary, the
