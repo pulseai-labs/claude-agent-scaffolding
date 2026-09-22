@@ -1,6 +1,6 @@
 {
   "name": "architect-critic",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Anti-sycophancy reviewer for specs and plans, with optional cross-agent fresh-frame critique (synchronous or async background Codex audits).",
   "author": {
     "name": "Pras"

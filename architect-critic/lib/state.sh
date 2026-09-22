@@ -10,15 +10,15 @@
 #     "external_runs": [ {run_id, host_agent, adversary, artifact_path, depth, status,
 #                         started_at, completed_at, result_path, codex_session_id,
 #                         resolved_run_request_id} ],
-#     "principle_promotions": [...],
-#     "candidate_promotions": [...],
-#     "declined_candidates": [...],
-#     "auto_promote_suppressions": [ {fingerprint, suppressed_at, expires_at, reason_score} ]
+#     "principle_promotions": [...]
 #   }
+# Fields seeded by earlier schema versions that existing files still carry
+# are preserved untouched on every write — the guarded jq writer rewrites the
+# whole object and never drops unknown keys.
 # v3 changes vs v2 (#39): adds external_runs[] — durable async external-adversary job
 #   memory (status/result/resume + re-resume idempotency via resolved_run_request_id).
 # v2 changes vs v1: dropped the per-request in-flight tracker and per-run USD field;
-#   added concessions + skill_invoked to recent_runs; added auto_promote_suppressions[].
+#   added concessions + skill_invoked to recent_runs.
 
 # Returns the absolute path to state.json.
 ac_state_path() {
@@ -39,7 +39,7 @@ ac_state_init() {
   state_file="$(ac_state_path)"
   local data_dir
   data_dir="$(ac_data_dir)"
-  local seed='{"schema_version":3,"recent_runs":[],"external_runs":[],"principle_promotions":[],"candidate_promotions":[],"declined_candidates":[],"auto_promote_suppressions":[]}'
+  local seed='{"schema_version":3,"recent_runs":[],"external_runs":[],"principle_promotions":[]}'
   if [[ ! -f "$state_file" ]]; then
     mkdir -p "$data_dir"
     printf '%s\n' "$seed" > "$state_file"
@@ -59,6 +59,22 @@ ac_state_init() {
       ac_state_migrate
     fi
   fi
+}
+
+# _ac_state_check_parseable <state_file> — read-side guard for verbs that must never
+# create, migrate or re-seed state. rc0 = proceed: an absent or 0-byte file is
+# the caller's "no records" case, and a parseable file is read as-is (including
+# v2). rc1 = the file exists, is non-empty, and is not a single parseable JSON
+# object — the refusal is logged with the same wording ac_state_init uses, and
+# the file is left byte-identical.
+_ac_state_check_parseable() {
+  local state_file="$1"
+  [[ -s "$state_file" ]] || return 0
+  if ! jq -e -s 'length == 1 and (.[0] | type == "object")' "$state_file" >/dev/null 2>&1; then
+    ac_log_error "state.json exists but is not a single parseable JSON object; refusing to touch it: $state_file"
+    return 1
+  fi
+  return 0
 }
 
 # ac_state_migrate — upgrade an existing state.json to the current schema (v3),
@@ -86,12 +102,6 @@ ac_state_migrate() {
   fi
   ac_lock_release "$lock_path"
   return $rc
-}
-
-# Emit the raw contents of state.json to stdout.
-# Caller is responsible for piping to jq.
-ac_state_read() {
-  cat "$(ac_state_path)"
 }
 
 # Atomically update a single field in state.json.
@@ -241,101 +251,15 @@ ac_state_append_promotion() {
   return $rc
 }
 
-# Append a declined candidate to declined_candidates.
-# Args: <text> <suppress_until>
-# suppress_until: ISO-8601 timestamp string (e.g. "2026-06-14T00:00:00Z")
-ac_state_append_declined() {
-  local text="$1"
-  local suppress_until="$2"
-  local state_file lock_path declined_at
-  state_file="$(ac_state_path)"
-  lock_path="$(ac_data_dir)/state.lock"
-  declined_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-
-  ac_lock_acquire "$lock_path" || return 1
-  ac_guarded_jq_write "$state_file" \
-    --arg txt "$text" \
-    --arg da "$declined_at" \
-    --arg su "$suppress_until" \
-    '.declined_candidates += [{"text":$txt,"declined_at":$da,"suppress_until":$su}]' \
-    "$state_file"
-  local rc=$?
-  ac_lock_release "$lock_path"
-  return $rc
-}
-
-# _ac_date_add_days <iso-8601-utc> <days> — echo the timestamp + N days, UTC.
-# Portable across macOS/BSD (`date -j -f -v`) and Linux (GNU coreutils `date -d`).
-# BSD is tried FIRST: its `-j` fails cleanly on GNU date, whereas GNU's `-d`
-# syntax makes BSD date emit non-empty GARBAGE (its `-d` means daylight-saving),
-# so "first non-empty wins" would silently return the wrong value on macOS. Each
-# branch is therefore also validated against a strict ISO-8601 regex so no
-# non-conforming output can slip through. Echoes empty + rc1 if neither parses.
-_ac_date_add_days() {
-  local ts="$1" days="$2" out
-  local re='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'
-  # BSD: -v MUST precede -f — BSD getopt stops at the first positional, so a -v
-  # placed after the input date is silently ignored (returns the input unchanged).
-  if out="$(date -u -j "-v+${days}d" -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null)" && [[ "$out" =~ $re ]]; then
-    echo "$out"; return 0
-  fi
-  if out="$(date -u -d "$ts +$days days" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null)" && [[ "$out" =~ $re ]]; then
-    echo "$out"; return 0
-  fi
-  echo ""; return 1
-}
-
-# Append an auto-promote suppression entry by fingerprint.
-# Args: <fingerprint> <reason_score>
-#   fingerprint: opaque string identifying the candidate (caller computes SHA-256)
-#   reason_score: integer 4 → 30-day window; 5 → 90-day window
-# Window arithmetic is portable (GNU date -d OR BSD date -v) via _ac_date_add_days.
-ac_state_add_suppression() {
-  local fingerprint="$1"
-  local reason_score="$2"
-  local state_file lock_path suppressed_at expires_at days
-  state_file="$(ac_state_path)"
-  lock_path="$(ac_data_dir)/state.lock"
-  suppressed_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-
-  case "$reason_score" in
-    5) days=90 ;;
-    4) days=30 ;;
-    *)
-      ac_log_warn "ac_state_add_suppression: reason_score=$reason_score not in {4,5}; defaulting to 30-day window"
-      days=30
-      ;;
-  esac
-
-  # Portable date arithmetic (GNU date -d on Linux, BSD date -v on macOS).
-  expires_at="$(_ac_date_add_days "$suppressed_at" "$days")"
-  if [[ -z "$expires_at" ]]; then
-    ac_log_error "ac_state_add_suppression: failed to compute expires_at from $suppressed_at (+${days}d)"
-    return 1
-  fi
-
-  ac_lock_acquire "$lock_path" || return 1
-  ac_guarded_jq_write "$state_file" \
-    --arg fp "$fingerprint" \
-    --arg sa "$suppressed_at" \
-    --arg ea "$expires_at" \
-    --argjson rs "$reason_score" \
-    '.auto_promote_suppressions += [{
-       "fingerprint": $fp,
-       "suppressed_at": $sa,
-       "expires_at": $ea,
-       "reason_score": $rs
-     }]' \
-    "$state_file"
-  local rc=$?
-  ac_lock_release "$lock_path"
-  return $rc
-}
-
 # ═════════════════════════════════════════════════════════════════════════════
 # external_runs[] — durable async external-adversary job memory (schema v3, #39).
-# Each function calls ac_state_init first (creates a v3 file / lazily migrates a
-# v2 file), so external_runs[] always exists before read/write.
+# Writer functions call ac_state_init first (creates a v3 file / lazily
+# migrates a v2 file), so external_runs[] always exists before a write. The two
+# read functions (get/list) do NOT init — a read must not create or migrate
+# state. They go through _ac_state_check_parseable instead: a missing or 0-byte file
+# is an empty list / not-found, a non-empty unparseable file is refused
+# untouched with ac_state_init's wording, and a v2 file is read as-is
+# (external_runs defaults to [] in the jq expression).
 # ═════════════════════════════════════════════════════════════════════════════
 
 # ac_state_external_run_add --run-id R --host H --adversary A --artifact P --depth D
@@ -467,14 +391,18 @@ ac_state_external_run_set_status() {
 }
 
 # ac_state_external_run_get <run-id> — echo the record (compact JSON); rc1 absent.
+# Never writes: absent/0-byte file → not-found; unparseable file → refusal.
 ac_state_external_run_get() {
   local run_id="${1:-}"
   if [[ -z "$run_id" ]]; then
     ac_log_error "ac_state_external_run_get: run-id required"; return 1
   fi
-  ac_state_init
   local state_file rec
   state_file="$(ac_state_path)"
+  _ac_state_check_parseable "$state_file" || return 1
+  if [[ ! -s "$state_file" ]]; then
+    return 1
+  fi
   rec="$(jq -c --arg rid "$run_id" '(.external_runs // []) | map(select(.run_id == $rid)) | .[0] // empty' "$state_file" 2>/dev/null || echo "")"
   if [[ -z "$rec" ]]; then
     return 1
@@ -492,9 +420,13 @@ ac_state_external_run_list() {
       *) ac_log_error "ac_state_external_run_list: unknown flag: $1"; return 2 ;;
     esac
   done
-  ac_state_init
   local state_file
   state_file="$(ac_state_path)"
+  _ac_state_check_parseable "$state_file" || return 1
+  if [[ ! -s "$state_file" ]]; then
+    echo "[]"
+    return 0
+  fi
   if [[ -n "$filter" ]]; then
     jq -c --arg st "$filter" '(.external_runs // []) | map(select(.status == $st))' "$state_file" 2>/dev/null || echo "[]"
   else

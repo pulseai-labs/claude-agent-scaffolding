@@ -1218,7 +1218,7 @@ test("prompt translation absolutizes existing plugin-relative refs", async () =>
   const translated = translatePrompt(
     "Read `skills/work-item/SKILL.md` first.\n" +
       "Then `skills/work-item/references/report-contract.md`.\n" +
-      "Run `workflows/verify-work-item.js` via node.\n" +
+      "Dispatch `agents/implementer-agent.md` for the item.\n" +
       "The wrapper at `commands/close.md` reads its own SKILL.md.\n" +
       "A missing ref `skills/no-such-dir/SKILL.md` stays relative.\n" +
       "So does a descriptive glob `agents/*.md`.\n" +
@@ -1236,10 +1236,10 @@ test("prompt translation absolutizes existing plugin-relative refs", async () =>
     ),
   );
   // Every shipped plugin-root dir is in scope — not just the original six —
-  // so `workflows/` (verify-work-item.js), `commands/` (command wrappers),
+  // so `agents/` (implementer-agent.md), `commands/` (command wrappers),
   // `rules/`, `tests/`, and hooks dirs absolutize the same way.
   assert.ok(
-    translated.includes(`\`${ossifyRoot}/workflows/verify-work-item.js\``),
+    translated.includes(`\`${ossifyRoot}/agents/implementer-agent.md\``),
   );
   assert.ok(translated.includes(`\`${ossifyRoot}/commands/close.md\``));
   // Existence gate: refs that do not resolve under the plugin root must not
@@ -1627,7 +1627,7 @@ test("Task 6 lifecycle tolerates missing state, missing users, and malformed tra
   await hooks["experimental.chat.messages.transform"]({}, missingState);
   assert.match(
     missingState.messages[0].parts[0].text,
-    /^architect-critic v0\.3 installed; principles loaded from \(shipped defaults only\)\nRequest$/,
+    /^architect-critic installed; principles loaded from \(shipped defaults only\)\nRequest$/,
   );
 
   const malformed = [

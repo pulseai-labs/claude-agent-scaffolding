@@ -5,7 +5,7 @@ description: Show all principles in effect (shipped defaults + user-promoted + p
 
 # listing-principles
 
-You have been invoked because the user wants to see all principles currently in effect for the architect-critic. Your job is to read up to four principle sources, merge them, apply any `--source` filter, and render the result grouped by source — each principle annotated with its origin and any suppression status. This skill is intentionally read-only: no mutation, no promotion, no state writes.
+You have been invoked because the user wants to see all principles currently in effect for the architect-critic. Your job is to read up to four principle sources, merge them, apply any `--source` filter, and render the result grouped by source — each principle annotated with its origin. This skill is intentionally read-only: no mutation, no promotion, no state writes.
 
 ---
 
@@ -57,23 +57,21 @@ If `git rev-parse` fails (not in a git repo), try `$PWD/.claude/architect-critic
 
 **Source 4 — Memory-bank patterns** (`project` filter includes these; `all` includes these)
 
-Opt-in via environment variable, not install-probed: this source is included only when `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` is set and names a readable file — every `- ` bullet in it becomes a synthetic principle (`source=memory-bank`, no `principle_id`). Point it at whatever bank file holds patterns worth auditing through (for a scaffold-onboard-derived bank, e.g. `02-system-patterns.md` or `03-code-patterns.md`). These entries render under `## Memory-bank patterns` and count as project-source for filter purposes. `ac_principles_merge` (`lib/principles.sh`) implements this same source-4 rule — the env var's target file is the only memory-bank input it reads.
+Opt-in via environment variable, not install-probed: this source is included only when `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` is set and names a readable file — every `- ` bullet in it becomes a synthetic principle (`source=memory-bank`, no `principle_id`). Point it at whatever bank file holds patterns worth auditing through (for a scaffold-onboard-derived bank, e.g. `02-system-patterns.md` or `03-code-patterns.md`). These entries render under `## Memory-bank patterns` and count as project-source for filter purposes.
 
 ---
 
-## Step 3: Merge via the `arc` dispatcher
+## Step 3: Read the source files
 
-Call the bash helper to load user-global principles via the resolved `"$arc_bin"` (Step 2 resolves it; on Claude Code `arc` is on `$PATH` because Claude Code adds each plugin's `bin/` automatically — on Devin it is not, hence the resolution). The dispatcher's bash shebang forces a bash runtime under it regardless of the calling Bash tool's shell (zsh by default on macOS), so the lib's `${BASH_SOURCE[0]}` and `${BASH_REMATCH[…]}` work as written. Never `source` the lib directly from skill body — under zsh it crashes:
+Read each resolved source directly with the Read tool — including the user-global file at `USER_PATH`. Reading must not write: if a file is absent, skip it silently rather than creating it.
 
-```bash
-"$arc_bin" principles_load_user_global
-```
+What counts as a principle: the entries under a file's principle sections — `## Shipped defaults`, `## Your principles` (with or without the `(user-promoted)` parenthetical — the bare form is the legacy heading and is still a user section), `## Project principles` (with or without `(scope=project)`). Each entry is one top-level `- ` bullet, or one plain non-empty line where a user wrote a principle without a bullet. Indented text under a bullet is that principle's elaboration, not a separate principle. A file's introductory prose, its `#`/`##` headers, its `<!-- ... -->` comments, and the commented-out `#`-prefixed lines under `## Examples` are not principles — `#`-prefixed lines are never principles anywhere. In a file carrying a `<!-- migrated from v0.1.x -->` marker, everything from that marker onward is the user's own content, and its entries under its own principle sections count by this same rule. A trailing `[promoted ...]` annotation (the v0.1.x format) is metadata, not part of the principle text — strip it for comparison, keep it for display. The memory-bank source has no sections — every `- ` bullet in it is a principle.
 
-This strips header lines (lines starting with `# `), strips trailing `[promoted ...]` annotations, and emits one active principle per line. Hold the output in your working context.
+Duplicates: two entries carrying the same `principle_id` in their `<!-- source: ... -->` comments are one principle, whatever their text — the later source wins and the survivor is annotated with the displaced source, with one exception: a `source: shipped-default` entry read outside the canonical shipped file is a copy, and the canonical shipped entry always wins over it, so a plugin update actually lands. Entries with no `principle_id` dedup on normalized text — trim, lowercase, collapse whitespace. For memory-bank patterns, read the file at `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` if the variable is set and the file exists.
 
-For the shipped defaults and project-scoped file, read them directly with the Read tool (they use `<!-- source: ... -->` HTML comments that you parse — see Step 6 below). For memory-bank patterns, read the file at `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` if the variable is set and the file exists.
+Hold all of it in your working context — the merge is yours, not a helper's.
 
-**Duplicate handling.** Normalize for comparison: trim, lowercase, collapse spaces. Project-scoped wins over user-global on conflict; annotate the winner `(overrides user-global)`. Drop the duplicate silently. Display order: shipped → user → project → memory-bank.
+**Duplicate handling.** The winner displaces the loser silently; annotate the winner `(overrides <source>)` naming the displaced source (`overrides user-global`, `overrides shipped-default` for a stale copied default, and so on). Display order: shipped → user → project → memory-bank.
 
 ---
 
@@ -90,29 +88,13 @@ Apply the filter after the merge. Do not re-read files; just drop sections not m
 
 ---
 
-## Step 5: Read suppressions
-
-Read `auto_promote_suppressions[]` from `state.json`:
-
-```bash
-STATE_FILE="$("$arc_bin" state_path)"
-SUPPRESSIONS="$(jq -c '.auto_promote_suppressions // []' "$STATE_FILE" 2>/dev/null || echo '[]')"
-NOW_ISO="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-```
-
-A suppression is **active** if its `expires_at` field is greater than `NOW_ISO` (lexicographic ISO8601 comparison is correct). Collect all active suppressions into a working list.
-
-These are declined auto-promotion candidates; surfacing them lets the user know why a recurring theme isn't appearing as a candidate. Display in a `## Suppressed candidates` footer. If the field is absent or empty, skip the footer silently.
-
----
-
-## Step 6: Render output
+## Step 5: Render output
 
 Render as markdown in your turn message. Group by source heading. Omit any section whose source produced zero entries after filtering — do not render empty headers.
 
 ### `<!-- source: ... -->` HTML comment contract
 
-The shipped `templates/principles.md` and any project/user principles files annotate entries with a block comment on the line **before** the bullet — the format `promoting-principle` Step 5 writes and `ac_principles_parse_meta` (`lib/principles.sh`, the parsing authority) reads. It matches the comment line, then reads forward to the next `- ` line:
+The shipped `templates/principles.md` and entries written by `promoting-principle` Step 5 carry a block comment on the line **before** the bullet. An entry can also carry no comment — a bare bullet or plain line a user wrote by hand is still a principle under Step 3's rule; it just has no metadata, so the file it was read from decides its section. When the comment is present it matches the comment line, then reads forward to the next `- ` line:
 
 ```
 <!-- source: shipped-default, principle_id: pp-ghost-notes -->
@@ -124,8 +106,9 @@ The shipped `templates/principles.md` and any project/user principles files anno
 Route each entry by its `source` key and the file it was read from:
 - `shipped-default` → place under `## Shipped defaults`
 - `user-promoted` → the file decides: read from the user-global file → `## Your principles (user-promoted)`; read from the project file → `## Project principles`. Append `— promoted <date>` from `promoted_at` either way. **No shipped writer emits a `source: project` tag** — `promoting-principle` Step 5 tags every promotion `user-promoted`, including project-scope appends.
+- no `source:` comment → the file decides alone: user-global file → `## Your principles (user-promoted)`; project file → `## Project principles`.
 
-Strip the HTML comment from display text — it is file metadata, not content. This is the contract Phase 3.2 (auto-promotion write path) relies on. `ac_principles_load_user_global` strips `[promoted ...]` bracket annotations for the merge step; HTML comments are preserved in raw files and stripped here at display time.
+Strip the HTML comment from display text — it is file metadata, not content. `[promoted ...]` bracket annotations (the v0.1.x format) are stripped the same way — preserved in raw files, stripped at display time.
 
 ### Rendered format
 
@@ -142,18 +125,15 @@ Strip the HTML comment from display text — it is file metadata, not content. T
 
 ## Memory-bank patterns
 - **Avoid mutable shared state across async boundaries** (from the memory-bank source)
-
-## Suppressed candidates (won't auto-promote until expiry)
-- "Use camelCase for variables" — suppressed 2026-05-01, expires 2026-05-31 (reason_score 4)
 ```
 
 ---
 
-## Step 7: Empty-state handling
+## Step 6: Empty-state handling
 
 | Condition | Output |
 |---|---|
-| Only shipped defaults exist | Render shipped section; omit user/project/memory-bank/suppressed sections |
+| Only shipped defaults exist | Render shipped section; omit user/project/memory-bank sections |
 | `--source user` with no user principles | "No user-promoted principles yet. Run `/promote-principle` to add one." |
 | `--source project` with no project file | "No project-scoped principles file found at `.claude/architect-critic/principles.md`." |
 | `--source shipped` | Always renders (shipped file always present) |
@@ -170,7 +150,6 @@ Suppose:
 - `~/.claude/architect-critic/principles.md` has one user-promoted principle: *"Prefer explicit over implicit configuration"* (promoted 2026-05-22).
 - `.claude/architect-critic/principles.md` has one project principle: *"Use 2-space indent for all YAML/JSON config"* (promoted 2026-05-20).
 - `ARCHITECT_CRITIC_MEMORY_BANK_PATH` is unset (no memory-bank source).
-- `state.json` has one active suppression: *"Use camelCase for variables"* (suppressed 2026-05-01, expires 2026-05-31, reason_score 4).
 
 With `--source all` (default), the rendered output is:
 
@@ -186,19 +165,16 @@ With `--source all` (default), the rendered output is:
 ## Project principles
 - **Use 2-space indent for all YAML/JSON config** — promoted 2026-05-20
 
-## Suppressed candidates (won't auto-promote until expiry)
-- "Use camelCase for variables" — suppressed 2026-05-01, expires 2026-05-31 (reason_score 4)
+---
+
+With `--source shipped`, only the shipped section renders.
 
 ---
 
-With `--source shipped`, only the shipped section renders. With `--source user` and one principle present, the suppressed footer is omitted (suppressions are cross-source metadata, shown only under `all`).
+## Tool boundary and promotion-write contract
 
----
+All file I/O (principles files, the memory-bank env-var file) runs through your Read tool; `arc` is used only to resolve paths. Merge logic and display assembly run in your working context. The render is your turn message as plain markdown — not bash stdout, not a tool-call trace. Do not mutate any file. This skill is read-only.
 
-## Tool boundary and Phase 3.2 contract
-
-All file I/O (principles files, state.json, the memory-bank env-var file) runs in Bash. Merge logic and display assembly run in your working context. The render is your turn message as plain markdown — not bash stdout, not a tool-call trace. Do not mutate any file. This skill is read-only.
-
-The comment format so Phase 3.2 (auto-promotion write path in `critiquing-spec` + `promoting-principle`) can round-trip correctly is the block format §6 documents: a `<!-- source: ..., promoted_at: ..., principle_id: ... -->` comment line, then the `- ` bullet. The writer of record is `promoting-principle` Step 5 — do not re-specify its output here; when `listing-principles` reads a file back, §6's routing rules apply unchanged, and the stripped text goes to `ac_principles_load_user_global` for the merge step (that function strips `[promoted ...]` bracket annotations; HTML comments were already stripped at display time).
+The comment format so the promotion write path (`promoting-principle`) can round-trip correctly is the block format above: a `<!-- source: ..., promoted_at: ..., principle_id: ... -->` comment line, then the `- ` bullet. The writer of record is `promoting-principle` Step 5 — do not re-specify its output here; when `listing-principles` reads a file back, the routing rules above apply unchanged.
 
 **Backward compatibility.** v0.1.x files use bracket annotations `[promoted DATE source:SCOPE]` instead of HTML comments. Recognize both forms and render both as `— promoted DATE`. Block HTML comments are the canonical form; brackets are accepted for graceful migration.

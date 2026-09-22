@@ -13,8 +13,8 @@
 #   - zero subagent-invocation forms in the external branch
 #   - the two-value return enum, unchanged by the correction continuation
 #   - zero `orca` in ossify's shipped product surfaces
-#   - the inline-Layer-4 route under external mode, with the pre-existing
-#     delegated-path conditions pinned beside it as the loosening's control
+#   - the universal inline Layer 4 route (the deletion's absence side is
+#     test-layer4-residue.sh's, not duplicated here)
 #
 # COUNTING is one awk index() pass per needle. `grep -c` counts matching LINES
 # and cannot see two hits on one line; `… | grep -q` can fail on a TRUE match
@@ -200,22 +200,19 @@ for form in 'Task(' 'Agent(' 'subagent_type'; do
 done
 
 # ---------------------------------------------------------------------------
-# 7. Layer 4 route under external mode — and the control on the loosening
+# 7. Layer 4 route — inline everywhere, including under external mode
 # ---------------------------------------------------------------------------
-pin "$WIC" 'the lane is not in external-executor mode' \
-  "work-item-close.md conditions the delegated Layer 4 path on non-external mode"
+nonempty "$WIC" "work-item-close.md exists"
+pin "$WIC" 'Layer 4 runs inline' \
+  "work-item-close.md states the universal inline Layer 4 pass"
 pin "$EXT" 'runs Layer 4 inline' \
-  "external-executor.md requires the inline Layer 4 path"
+  "external-executor.md still names the inline Layer 4 route under its mode"
 
-# A change that makes a check take a different branch fails by taking that
-# branch ALWAYS. These three are the pre-existing conditions that must still
-# gate the delegated path beside the new one.
-pin "$WIC" 'OSSIFY_NO_WORKFLOWS' \
-  "control: the OSSIFY_NO_WORKFLOWS condition still gates the delegated path"
-pin "$WIC" 'the staged diff is nonempty' \
-  "control: the nonempty-staged-diff condition still gates the delegated path"
-pin "$WIC" 'layer 4: workflow (6 agents)' \
-  "control: the delegated path still exists and still reports itself"
+# There is no route to choose any more: the contract is that no second engine
+# exists. The absence half of that contract is test-layer4-residue.sh's —
+# pinning the deleted tokens' absence HERE would store them in a file the
+# residue gate scans, and a zero-count next to the literal needle is the
+# self-match this suite's counting discipline exists to avoid.
 
 # ---------------------------------------------------------------------------
 # 8. Product-surface neutrality — no Orca inside shipped ossify

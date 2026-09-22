@@ -1,16 +1,16 @@
 ---
 name: critiquing-spec
-description: "Adversarial audit of a written spec or plan. Triggers on phrases like \"audit this spec\", \"critique X\", \"adversarial review\", \"challenge the spec\", \"deep audit\", \"fresh-frame review\". Runs host-agent self-audit in conversation; optionally invokes the other agent as a fresh-frame adversary at close-depth (--close flag or NL trigger): Codex when hosted in Claude Code, Claude Code when hosted in Codex. Produces challenges/gaps/alternatives, runs sequential rebuttal cycle with 1-5 concession scoring, appends run to state.json, checks auto-promotion candidates."
+description: "Adversarial audit of a written spec or plan. Triggers on phrases like \"audit this spec\", \"critique X\", \"adversarial review\", \"challenge the spec\", \"deep audit\", \"fresh-frame review\". Runs host-agent self-audit in conversation; optionally invokes the other agent as a fresh-frame adversary at close-depth (--close flag or NL trigger): Codex when hosted in Claude Code, Claude Code when hosted in Codex. Produces challenges/gaps/alternatives, runs sequential rebuttal cycle with 1-5 concession scoring, appends run to state.json."
 ---
 
 # critiquing-spec
 
 You are the architect-critic. You have been invoked because the user wants an adversarial audit of a written artifact (spec, plan, design doc, RFC). Your job is to surface unstated assumptions, missing failure modes, and viable alternatives the author has not considered — and then run a structured rebuttal cycle so the author either concedes (and the spec strengthens) or rebuts (and you record what stood).
 
-This skill body is the centerpiece of the architect-critic plugin. Everything that requires judgment lives here — you read these instructions, then act. Bash helpers under `lib/` do the bookkeeping (state file appends, similarity dedup, principle file merges); they never do the thinking.
+This skill body is the centerpiece of the architect-critic plugin. Everything that requires judgment lives here — you read these instructions, then act. Bash helpers under `lib/` do the bookkeeping (state file appends, async job records); they never do the thinking.
 
 You may be invoked through any of these channels:
-- **Slash command:** `/critique [path] [--close] [--neutral] [--model NAME] [--principles PATH] [--scope project|user]`. The wrapper at `commands/critique.md` exports the raw arg string as `$ARCHITECT_CRITIC_ARGS` (env-var bridge per [[feedback_slash_command_dollar_n_bug]] — `$1`/`$2` get template-substituted by Claude Code at render time and silently corrupt bash locals, so never reference bare positionals).
+- **Slash command:** `/critique [path] [--close] [--neutral] [--model NAME] [--principles PATH]`. The wrapper at `commands/critique.md` exports the raw arg string as `$ARCHITECT_CRITIC_ARGS` (env-var bridge per [[feedback_slash_command_dollar_n_bug]] — `$1`/`$2` get template-substituted by Claude Code at render time and silently corrupt bash locals, so never reference bare positionals).
 - **Skill() call from a peer skill:** `Skill(architect-critic:critiquing-spec, target=…, [phase_id=…,] depth=…, artifact_path=…)` — the channel scaffold-onboard's critic moments use (`scaffold-onboard/skills/onboarding-project/references/critic-moments.md` §1). These arrive as invocation arguments, not `$ARCHITECT_CRITIC_ARGS`: `artifact_path` is this channel's Step-1 path source, and `target`/`phase_id` feed the Step-10 closing line. `depth` names the caller's intent (`premise-audit`/`close`); no shipped step parses it — close-depth comes only from `--close` in `$ARCHITECT_CRITIC_ARGS`.
 - **Devin and other shim-less channels:** no `commands/critique.md` wrapper runs on Devin, so nothing exports `$ARCHITECT_CRITIC_ARGS`. Flags and the artifact path arrive as literal tokens in the invocation/request text itself — parse them from there exactly as if the env var had carried them. The same applies to `Skill()` and natural-language invocations.
 - **Natural language:** *"audit this spec"*, *"critique the X plan"*, *"adversarial review of Y"*, *"challenge the spec"*, *"deep audit"*, *"fresh-frame review"*, *"close review"*.
@@ -60,22 +60,18 @@ Once you have a path: `Read` the artifact end-to-end. Hold its contents in your 
 
 ## Step 2: Resolve principles
 
-Principles are the lens you audit through. Merge sources in this exact order, last-wins on duplicates (normalized text comparison — trim, lowercase, collapse whitespace).
+Principles are the lens you audit through. You read each source file yourself with your file-reading tool and merge them in working context, in this exact order, last-wins on duplicates. An absent file is skipped, never created — reading principles must not write anything.
 
 Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
-1. **Shipped defaults** — `templates/principles.md` (relative to the plugin root). Always loaded. Contains the **Ghost Notes principle** (what is absent from the spec is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy as the tone for every challenge raised).
-2. **User-global** — the user's promoted principles across all projects, at the path `"$arc_bin" principles_user_path` resolves (`~/.claude/architect-critic/principles.md`, under `$HOME` — unlike `"$arc_bin" state_path`, this one does not consult `CLAUDE_PLUGIN_DATA`).
-3. **Project-scoped** — `<repo>/.claude/architect-critic/principles.md` if it exists. Project-specific principles override user-global on conflict.
-4. **Memory-bank patterns** — included only when `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` points at a readable file; every `- ` bullet in it becomes a principle. `"$arc_bin" principles_merge` handles all four sources; it is authoritative for resolution order.
+1. **Shipped defaults** — `templates/principles.md` (relative to the plugin root; `"$arc_bin" principles_shipped_path` resolves it). Always loaded. Contains the **Ghost Notes principle** (what is absent from the spec is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy as the tone for every challenge raised).
+2. **User-global** — the user's promoted principles across all projects, at the path `"$arc_bin" principles_user_path` resolves (`~/.claude/architect-critic/principles.md`, under `$HOME` — unlike `"$arc_bin" state_path`, this one does not consult `CLAUDE_PLUGIN_DATA`). If the file does not exist, skip it — do not create it.
+3. **Project-scoped** — `<repo>/.claude/architect-critic/principles.md` if it exists (`"$arc_bin" principles_project_path` resolves it; empty when cwd is outside a git repo). Project-specific principles override user-global on conflict.
+4. **Memory-bank patterns** — included only when `$ARCHITECT_CRITIC_MEMORY_BANK_PATH` points at a readable file; every `- ` bullet in it becomes a principle.
 
-Run the `arc` dispatcher to do the file merge (on Claude Code, `arc` is on `$PATH` automatically; on Devin, `arc_bin` is resolved per `rules/dispatcher-path.md`; its bash shebang forces a bash runtime for the lib regardless of the calling shell — required because bare `source` of these libs crashes with `BASH_SOURCE[0]: parameter not set` under zsh):
+What counts as a principle: the entries under a file's principle sections — `## Shipped defaults`, `## Your principles` (with or without the `(user-promoted)` parenthetical — the bare form is the legacy heading and is still a user section), `## Project principles` (with or without `(scope=project)`). Each entry is one top-level `- ` bullet, or one plain non-empty line where a user wrote a principle without a bullet. Indented text under a bullet is that principle's elaboration, not a separate principle. A file's introductory prose, its `#`/`##` headers, its `<!-- ... -->` comments, and the commented-out `#`-prefixed lines under `## Examples` are not principles — `#`-prefixed lines are never principles anywhere. In a file carrying a `<!-- migrated from v0.1.x -->` marker, everything from that marker onward is the user's own content, and its entries under its own principle sections count by this same rule. A trailing `[promoted ...]` annotation (the v0.1.x format) is metadata, not part of the principle text — strip it for comparison, keep it for display. The memory-bank source has no sections — every `- ` bullet in it is a principle.
 
-```bash
-"$arc_bin" principles_merge
-```
-
-That returns the merged principles block to stdout. Hold it in context for Step 5; you will apply each principle when generating challenges.
+Duplicates: two entries carrying the same `principle_id` in their `<!-- source: ... -->` comments are one principle, whatever their text — the later source wins and the survivor is annotated with the displaced source, with one exception: a `source: shipped-default` entry read outside the canonical shipped file is a copy, and the canonical shipped entry always wins over it, so a plugin update actually lands. Entries with no `principle_id` dedup on normalized text — trim, lowercase, collapse whitespace. Hold the merged set in context for Step 5; you will apply each principle when generating challenges.
 
 If no principles file exists anywhere, fall back to shipped defaults only — the audit still runs, just with the universal ghost-notes + CORE lens.
 
@@ -313,18 +309,17 @@ Steps 7 (consolidate), 8 (rebuttal cycle), and 9 (append run) form one reusable 
 
 ## Step 7: Consolidate challenges
 
-You now have one or two challenge lists (claude-only, claude + codex, or the single devin self-audit). Merge them via the bash helper — **except on `HOST_AGENT=devin`**: a lone self-audit has nothing to merge, and the helper's `source`/`adversaries_used` vocabulary only knows claude/codex, so it would mislabel a devin run. On Devin the self-audit list plays the merged-list role directly:
+You now have one or two challenge lists (claude-only, claude + codex, or the single devin self-audit). Consolidate them yourself — this is judgment work, not a helper call:
 
-```bash
-"$arc_bin" consolidator_merge "$CLAUDE_AUDIT_JSON" "$CODEX_AUDIT_JSON"
-```
-
-The consolidator's algorithm:
-- **Similarity dedup.** Text overlap >70% between two challenges means they are the same challenge. Use shingle/Jaccard similarity (the helper handles this).
+- **Same issue, one challenge.** When two challenges — within one list or across both — raise the same underlying issue, merge them into a single challenge. Keep every rationale that differs.
 - **Adversary attribution.** Each surviving challenge gets a `source` field: `["claude"]`, `["codex"]`, or `["claude", "codex"]` for cross-confirmed challenges — `["devin"]` under a Devin host-only run. **Cross-confirmed challenges are the strongest signal** — both an adversary that read your spec and a fresh-frame adversary that did not landed on the same issue. Surface those first in the rebuttal cycle.
 - **Severity reconciliation.** If both adversaries flagged the same challenge with different severities, preserve the **highest** severity (`premise` > `gap` > `alternative`).
+- **Gaps are findings too.** Each audit result may also carry `gaps` — elements the adversary found absent rather than wrong. Fold them into the merged list as findings of their own — source-tagged like any challenge, at `gap` severity, with no dedup (two adversaries noting the same absence is itself signal, so keep both). A `{challenges: [], gaps: [...]}` result is therefore not clean: its entries are walked in Step 8 and counted in Step 10's `Challenges`/`Candidates piled` like every other finding.
+- **Adversaries used.** An adversary counts as used when it contributed challenges OR gaps. A `{challenges: [], gaps: [...]}` result means the adversary ran and reported observations — `Adversaries used`, Step 9's `ADVERSARIES_JSON`, and the `adversaries_used` state field all include it; the audit never reads as if that adversary found nothing.
 
-The merged list is what you walk in Step 8.
+On `HOST_AGENT=devin` a lone self-audit has nothing to merge — the self-audit list plays the merged-list role directly.
+
+The merged list — challenges and folded-in gaps alike — is what you walk in Step 8.
 
 **Worked example.** Suppose claude-self-audit returned:
 
@@ -341,15 +336,19 @@ And codex returned:
 { "challenges": [
   { "text": "No retry/backoff strategy defined for upstream timeouts", "severity": "premise", "rationale": "..." },
   { "text": "Schema migration ordering ambiguous", "severity": "gap", "rationale": "..." }
+],
+  "gaps": [
+  { "text": "No load-shedding strategy under worker overload" }
 ]}
 ```
 
 After consolidation:
-- Challenge 1 (claude's "retry policy" + codex's "no retry/backoff") merges — text overlap >70%, both adversaries → `source: ["claude", "codex"]`, severity upgraded to `premise` (codex's higher rating wins).
+- Challenge 1 (claude's "retry policy" + codex's "no retry/backoff") merges — same underlying issue (what happens on retry/timeout), both adversaries → `source: ["claude", "codex"]`, severity upgraded to `premise` (codex's higher rating wins).
 - Challenge 2 (claude's "rate-limit propagation") → `source: ["claude"]`, severity `gap`.
 - Challenge 3 (codex's "schema migration ordering") → `source: ["codex"]`, severity `gap`.
+- Codex's `gaps` entry folds in as a fourth finding → `source: ["codex"]`, severity `gap` — walked in Step 8 and counted in Step 10 like any challenge.
 
-Final list: 3 challenges, one cross-confirmed at premise level (surface first in Step 8), two single-adversary at gap level.
+Final list: 4 findings, one cross-confirmed at premise level (surface first in Step 8), three single-adversary at gap level.
 
 ---
 
@@ -402,7 +401,7 @@ Track deferred items while the cycle runs: `DEFERRED_CHALLENGES_JSON` and `DEFER
 - If they say *"defer"* → append the challenge to `DEFERRED_CHALLENGES_JSON`, increment `DEFERRED_COUNT`, and advance. Defer means valid/unresolved but later: tracked, e.g. filed as an issue, never silently dropped.
 - If they rebut → **score the rebuttal 1–5 yourself** against the rubric below. This is a semantic judgment — you make every judgment call in this cycle, so there is no deterministic helper to call; read the rebuttal, weigh it against the challenge and the spec, and pick the score.
   - Score ≥4 → concede. The rebuttal materially addresses the challenge. Mark concession.
-  - Score ≤3 → challenge stands. Surface to the candidates pile for Step 9's auto-promotion check. Tell the user gently: *"That doesn't quite address the concern — the challenge stands, but I've noted your reasoning."*
+  - Score ≤3 → challenge stands. It joins the pile of challenges that stood — the count Step 10 reports as `Candidates piled`. Tell the user gently: *"That doesn't quite address the concern — the challenge stands, but I've noted your reasoning."*
 
 Advance to the next challenge.
 
@@ -426,7 +425,7 @@ When you land on a 3 (the borderline case), default to "stands" but soften the f
 
 ---
 
-## Step 9: Bash bookkeeping — append run + check auto-promotion
+## Step 9: Bash bookkeeping — append run
 
 State updates happen in bash because they are pure I/O. Initialize state first — `state_init` is idempotent and a no-op when `state.json` already exists, but without it the append below cannot take `state.lock` on a fresh install (the lock's parent directory is created only here). Then append the run record with the **flag form** — it is the only form that carries the deferred-challenge fields (`--deferred-count` / `--deferred-challenges`), so use it whenever any challenge was deferred (they default to `0`/`[]` when omitted):
 
@@ -460,30 +459,6 @@ The schema v3 `recent_runs[]` entry includes:
 - `skill_invoked` — `"critiquing-spec"`
 - `elapsed_ms` — wall-clock from Step 1 start to Step 10 emit
 
-Then run the auto-promotion candidate check:
-
-```bash
-"$arc_bin" promotion_check_candidates
-```
-
-The helper inspects `recent_runs[]` for patterns (same challenge fingerprint surfacing across ≥3 runs) and emits any candidates. If candidates exist, surface them to the user as a separate turn message asking whether to promote — but only when the rebuttal cycle in Step 8 is fully complete (don't interrupt mid-cycle).
-
-**Auto-promotion candidate surfacing format:**
-
-```
-Auto-promotion candidates from this audit:
-
-  1. "Every retry policy must specify cancellation propagation behavior"
-     — surfaced in 4 of last 7 audits, conceded in 3 of them
-     Promote to: [user-global | project-scoped | dismiss for 30d]
-
-  2. "..."
-```
-
-Wait for the user's pick per candidate. Pass their decision to the real verbs: promote → `"$arc_bin" promotion_promote <fingerprint> <basis>` (`lib/promotion.sh` records the promotion in state; the chosen scope's `principles.md` write is `promoting-principle` Step 5's); dismiss → `"$arc_bin" promotion_apply_suppression <fingerprint> <reason_score>` (suppression window is 30/90 days, selected from `reason_score`). There is no single `ac_promotion_apply` — the promote and suppress paths are separate functions.
-
-**On the "candidates pile" from Step 8.** Challenges that stood after rebuttal (score ≤3) get fingerprinted and added to the candidates pile for *future* cross-run analysis — they don't auto-promote on this run, but they raise the recurrence count for next time. This is the FULL auto-promotion model per [[project_architect_critic_v01_settlements]] — three recurrences across runs trigger the promotion offer.
-
 ---
 
 ## Step 10: Emit the structured summary
@@ -502,8 +477,6 @@ Audit complete for <target>.
   Candidates piled : <K> (challenges that stood after rebuttal)
   Principles       : <P> applied (shipped + user + project)
   Elapsed          : <S> seconds
-
-<If promotion candidates surfaced: prompt for promote decision here>
 
 Audit complete for <target>[ phase_id=<N>]. <K> challenges stood:
 - <one bullet per challenge that stood, verbatim>
@@ -539,9 +512,10 @@ This fallback is intentional — `unknown` is a valid project class, not an erro
 
 A few invariants to keep clear, since this skill straddles a markdown/bash boundary:
 
-- **You** (Claude reading this skill body) make every judgment call: which path to audit when multiple candidates exist, what challenges to surface, how to score a rebuttal, when to escape-hatch out of sequential mode.
-- **Bash helpers** (`lib/*.sh`) handle pure I/O: reading state files, computing similarity scores, appending JSON, file merges. They never decide what is or isn't a challenge.
-- **Codex** is a fresh-frame adversary, not a judge. Its output is one of two input streams to the consolidator. You still mediate the rebuttal cycle.
-- **The user** is the final authority — exercised directly on every escalated challenge, and by standing delegation (the policy's *Disposition triage* section) on challenges that clear the escalation predicate; the `⚡` digest keeps every delegated disposition auditable, and `reopen` / `--walk` revoke it. You never auto-promote without consent, and escalated classes never auto-apply.
+- **You** (Claude reading this skill body) make every judgment call: which path to audit when multiple candidates exist, what challenges to surface, which challenges are the same issue, how to score a rebuttal, when to escape-hatch out of sequential mode.
+- **Bash helpers** (`lib/*.sh`) handle pure I/O: reading state files, appending JSON, managing async job records. They never decide what is or isn't a challenge.
+- **Codex** is a fresh-frame adversary, not a judge. Its output is one of two input streams you consolidate. You still mediate the rebuttal cycle.
+- **The user** is the final authority — exercised directly on every escalated challenge, and by standing delegation (the policy's *Disposition triage* section) on challenges that clear the escalation predicate; the `⚡` digest keeps every delegated disposition auditable, and `reopen` / `--walk` revoke it. Escalated classes never auto-apply.
 
 When in doubt, prefer doing the work in conversation over delegating to bash. An earlier architecture got this wrong; this one corrects it. If you find yourself reaching for `bash -c` to wrap a reasoning step, stop — that work belongs here.
+
