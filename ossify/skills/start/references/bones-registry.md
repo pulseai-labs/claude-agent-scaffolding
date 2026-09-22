@@ -67,7 +67,7 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 "$oss_bin" bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
 ```
 
-Touch CSV entries follow risk-gates.md §3's grammar — a bare `,` separates entries, `\,` is a literal comma inside one; multiple directories are multiple entries (case-globs do not brace-expand). The whole list is **one** argument: quote it. Space-splitting it does not mint a shorter list and warn — the second word lands in the `[revisit trigger]` slot, so the surface silently shrinks and a glob becomes the bone's durable revisit trigger. The verb cannot tell the two apart for you: its 4th argument is optional, so it will not refuse the call.
+Touch CSV entries follow risk-gates.md §3's grammar — a bare `,` separates entries, `\,` is a literal comma inside one; multiple directories are multiple entries (case-globs do not brace-expand). The whole list is **one** argument: quote it. Space-splitting it does not mint a shorter list and warn — the second word lands in the `[revisit trigger]` slot, so the surface silently shrinks and a glob becomes the bone's durable revisit trigger. The verb cannot tell the two apart for you: its 4th argument is optional, so it will not refuse the call. It does refuse, at rc 2, a list of more than one line, and any entry carrying leading or trailing whitespace or an invisible format character (CR, tab, NBSP, BOM, zero-width space) — which would be journaled as a glob matching no real path, leaving `touch_check` clean on the very code the bone claims to cover.
 
 Worked example:
 
@@ -101,7 +101,14 @@ It **replaces** the whole touch list — name every glob the bone should cover,
 old ones included where they still apply. The CSV grammar is the same as
 `bone_add`'s. It refuses an unknown ADR ref, a duplicate one (#305), and a list
 carrying no glob at all — a blank surface would make the check clean on every
-path, the defect being repaired. Update the ADR file's own statement of scope in
+path, the defect being repaired. It also refuses, at rc 2, a list of more than
+one line (a newline splits the csv into two) and any entry carrying leading or
+trailing whitespace or an invisible format character — a CR, tab, NBSP, BOM or
+zero-width space kept from a file composed elsewhere. Such an entry would
+otherwise be journaled as a glob that matches no real path, leaving the check
+clean on exactly the code you were re-pointing to cover. `bone_add` refuses the
+same entries; the one thing it cannot refuse is the split list above, because its
+4th argument is optional. Update the ADR file's own statement of scope in
 the same change, so the index and the decision still agree.
 
 **Nothing verifies that the new globs match live code.** The verb is a

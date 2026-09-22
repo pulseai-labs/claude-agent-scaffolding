@@ -76,7 +76,10 @@ path it was meant to cover; a list with no entry in it at all is refused for the
 same reason, on all three verbs rather than the two that had the guard. The two
 mint verbs refuse such an entry too, so a bone or gate cannot be *created* with a
 surface that silently covers nothing, and a caller who space-splits a list gets a
-usage refusal naming the CSV grammar instead of a silently shrunk surface. And
+usage refusal naming the CSV grammar instead of a silently shrunk surface — on
+every list-taking verb except `bone_add`: its 4th argument is optional, so no
+arity guard can tell a glob from a revisit trigger, and `bones-registry.md`
+states where the second word lands instead. And
 `bone_add` / `risk_gate_add` refuse a ref that already exists rather than minting
 a second row for one key, which had left the operator holding a surface the
 re-point verb then refused to repair — that rail runs inside the state lock, so

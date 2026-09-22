@@ -4,7 +4,8 @@
 # the tested lib functions. NO judgment logic here - that lives in the skills.
 #
 # Repo rc taxonomy (the cross-verb contract): 1 generic, 2 usage, 3 lock,
-# 4 apply-failure, 5 drift, 6 schema, 7 unknown-ref, 8 git/worktree.
+# 4 apply-failure, 5 drift, 6 schema, 7 unknown-ref OR an ambiguous one (a
+# duplicate key: two rows for one ADR ref or gate name), 8 git/worktree.
 
 # Arity guard. `bin/oss` runs `set -euo pipefail`, so a wrapper that expands
 # `"$1"` when the caller passed nothing dies with bash's raw `unbound variable`
