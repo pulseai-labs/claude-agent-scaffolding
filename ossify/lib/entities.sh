@@ -123,9 +123,26 @@ oss_entity_set_release_status() { # $1=state $2=release-id $3=status
 }
 
 oss_entity_set_work_item_exec() { # $1=state $2=wi-id $3=branch $4=worktree-path $5=base-sha
-  local sf="$1" wi="$2"
+  local sf="$1" wi="$2" st
   jq -e --arg w "$wi" '.work_items[] | select(.id == $w)' "$sf" >/dev/null 2>&1 \
     || { echo "oss: unknown work item '$wi'" >&2; return 7; }
+  # The MIRROR of the abandonment guard above, and the same harm entered
+  # through the companion verb: an `abandoned` item was withdrawn BEFORE any
+  # dispatch, so journaling a branch or worktree onto it re-creates the exact
+  # stranded state that guard refuses to create in the other order - every
+  # close-path reader skips an abandoned item, so the work never reaches the
+  # spine branch and release close's tag set silently shrinks. Measured: with
+  # this arm absent, `work_item_status <wi> abandoned` then `work_item_exec`
+  # both returned rc 0 and left {status:abandoned, branch, worktree_path} -
+  # the pair `doctor` reports as drift (doctor/references/state-inspection.md
+  # §5). decomposition.md §1 gives the way back, so the refusal names it.
+  # The read is pre-lock, the same shape as the abandonment guard's own check.
+  st="$(jq -r --arg w "$wi" '.work_items[] | select(.id == $w) | .status // ""' "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
+  if [ "$st" = "abandoned" ]; then
+    echo "oss: work item '$wi' is abandoned - it was withdrawn before any dispatch, so it has no round to run and no worktree to hold. Un-withdraw it first: \"oss work_item_status $wi planned\" (plan-spine/references/decomposition.md §1)" >&2
+    return 7
+  fi
   oss_state_mutate "$sf" set_work_item_exec \
     "$(jq -n --arg w "$wi" --arg b "$3" --arg p "$4" --arg s "$5" \
       '{work_item:$w,branch:$b,worktree_path:$p,base_sha:$s}')"

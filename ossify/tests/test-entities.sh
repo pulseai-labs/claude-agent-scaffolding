@@ -203,6 +203,34 @@ t_assert_rc 0 "setup: the dispatched item can still go complete"
 t_capture oss_entity_set_work_item_status "$S" "$WID" abandoned
 t_assert_rc 7 "a COMPLETE item cannot be abandoned after its merge landed"
 
+# The MIRROR guard on the same pair (GLM seat, round 2 on PR #520; reported
+# measured twice and re-measured here). `work_item_exec` refuses to dispatch an
+# already-`abandoned` item: without it the companion verb re-creates at rc 0
+# exactly the stranded record the abandonment guard above refuses to create in
+# the other order - {status:abandoned, branch, worktree_path}, the pair doctor
+# reports as drift.
+WID3="$(oss_entity_add_work_item "$S" r0.s1 "withdrawn, then dispatched?")"
+t_capture oss_entity_set_work_item_status "$S" "$WID3" abandoned
+t_assert_rc 0 "setup: a third item is withdrawn before any dispatch"
+N2="$(oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_exec")] | length')"
+t_capture oss_entity_set_work_item_exec "$S" "$WID3" "work/$WID3" "$TMP/.worktrees/$WID3" "abc123"
+t_assert_rc 7 "dispatching an ABANDONED item refuses"
+t_assert_contains "$T_OUT" "is abandoned" "...and names the status as the reason"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID3\") | [(.branch // \"\"), (.worktree_path // \"\")] | join(\",\")"
+t_assert_eq "," "$T_OUT" "...leaving branch and worktree_path unset"
+t_capture oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_exec")] | length'
+t_assert_eq "$N2" "$T_OUT" "...and journaling nothing"
+# ADJACENT CONTROL: the same call on a live item still journals, so the refusal
+# above is the abandoned STATUS and not the verb - without this, a guard that
+# refused every dispatch would satisfy the assertions above.
+t_capture oss_entity_set_work_item_exec "$S" "$WID" "work/$WID" "$TMP/.worktrees/$WID" "abc123"
+t_assert_rc 0 "the same call on a live item still dispatches"
+# ...and un-withdrawing re-opens the path, which is exactly what the refusal names.
+t_capture oss_entity_set_work_item_status "$S" "$WID3" planned
+t_assert_rc 0 "the way back the refusal names works"
+t_capture oss_entity_set_work_item_exec "$S" "$WID3" "work/$WID3" "$TMP/.worktrees/$WID3" "abc123"
+t_assert_rc 0 "...and the un-withdrawn item can then be dispatched"
+
 t_capture oss_entity_set_release_status "$S" "r0" "closed"
 t_assert_rc 0 "release status accepts a valid transition"
 t_capture oss_state_read "$S" '.releases[] | select(.id=="r0") | .status'
