@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: The orchestrator/worker session model over herdr — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through herdr, the seats defined in the operator's own files (~/.claude/herdr-crew/agents.md, .herdr-crew/roles.md). One /code-review per PR, findings returned in the seat's report file, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that gives each item seat a fresh tab and pane. Use when the user says orchestrator session, spawn a worker, dispatch to a session, the seat, review this PR in a session, execution assignments for a spine, or runs /herdr-crew:orchestrate. Not herdr's command reference (`herdr --skill` owns that), and not a PR loop of its own where ossify's work-pr is installed.
+description: The orchestrator/worker session model over herdr — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through herdr, the seats defined in the operator's own files (~/.claude/herdr-crew/agents.md, .herdr-crew/roles.md). One /code-review per PR, findings returned in the seat's report file, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that gives each item seat a fresh tab and pane. Use when the user says the herdr orchestrator session, a herdr worker seat, the herdr crew, dispatch to a herdr session, execution assignments for a spine in herdr, or runs /herdr-crew:orchestrate. Not herdr's command reference (`herdr --skill` owns that), and not a PR loop of its own where ossify's work-pr is installed.
 ---
 
 # Orchestrate — the orchestrator/worker session model
@@ -66,7 +66,8 @@ Three consequences:
   wait after an empty timeout, stays forbidden. Beyond those `herdr pane read` cases, the only
   bounded reads are the launch-banner `pane read` in `roles.md`, the readiness
   `pane wait-output` of a seat herdr does not detect, and the one `/context` reply at
-  each task boundary.
+  each task boundary for a seat that can answer the probe — one that cannot rotates at
+  its item boundary instead (`references/roles.md`).
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
   and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
 - **Verifying a worker's claim is a verifier dispatch**, not an orchestrator read. "Tests

@@ -70,9 +70,11 @@ file declares; a `doctor session`, one per `/ossify:doctor` dispatch, released o
 and, on an activated spine, the four seats below. Any other session is a planning defect,
 and the orchestrator stops to re-plan the item. The authority is the skill's
 `references/roles.md`. The implementer is retained across consecutive work items until it
-passes half its context window (checked by `/context` at each task boundary) or the
-harness auto-compacts; the next item starts fresh with the handoff the orchestrator writes
-from the inputs in its report file. An activated spine adds four seats outside that budget
+passes half its context window (checked by `/context` at each task boundary for a seat
+that can answer the probe — one that cannot rotates at its item boundary instead,
+`references/roles.md`) or the harness auto-compacts; the next item starts fresh with the
+handoff the orchestrator writes from the inputs in its report file. An activated spine adds
+four seats outside that budget
 — the spine session, a close session, one work-PR session per returned PR, and a
 close-review writer.
 
