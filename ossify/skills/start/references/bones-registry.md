@@ -67,7 +67,7 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 "$oss_bin" bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
 ```
 
-Touch CSV entries follow risk-gates.md §3's grammar — a bare `,` separates entries, `\,` is a literal comma inside one; multiple directories are multiple entries (case-globs do not brace-expand).
+Touch CSV entries follow risk-gates.md §3's grammar — a bare `,` separates entries, `\,` is a literal comma inside one; multiple directories are multiple entries (case-globs do not brace-expand). The whole list is **one** argument: quote it. Space-splitting it does not mint a shorter list and warn — the second word lands in the `[revisit trigger]` slot, so the surface silently shrinks and a glob becomes the bone's durable revisit trigger. The verb cannot tell the two apart for you: its 4th argument is optional, so it will not refuse the call.
 
 Worked example:
 

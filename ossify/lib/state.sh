@@ -78,16 +78,23 @@ _oss_apply_op() { # $1=op $2=payload-json
     # it. An op-NAME rename fails loudly here ("unknown op", rc 4). A payload
     # reshape does NOT fail, and it fails in TWO different ways, so neither mode
     # is a safe default to describe (#532):
-    #   - an IDENTIFIER key renamed (`adr` -> `adr_ref`) is a silent no-op:
-    #     `$p.adr` reads null, `first(.bones[] | select(.adr == null))` matches
-    #     nothing, and jq assigns to an empty path at rc 0 - the surface is left
-    #     exactly as it was, identically on live apply and on replay.
+    #   - an IDENTIFIER key renamed (`adr` -> `adr_ref`) is a silent no-op WHILE
+    #     every bone carries its `adr`: `$p.adr` reads null, `first(.bones[] |
+    #     select(.adr == null))` matches nothing, and jq assigns to an empty path
+    #     at rc 0, identically on live apply and on replay. It is NOT a no-op for
+    #     a row whose `adr` is null or absent: `select(.adr == null)` matches
+    #     THAT row, and the assignment then overwrites its touch. Measured on a
+    #     hand-built adr-less row, replaced at rc 0.
     #   - a VALUE key renamed (`touch` -> `surface`) is DESTRUCTIVE: `$p.touch`
     #     reads null, `first()` DOES match on the identifier, and the assignment
     #     writes `.touch = null` at rc 0. Replay stays clean (it re-applies the
-    #     same transform), and the damage surfaces only at the next reader:
-    #     touch_check answers rc 2 "cannot read bones ... INCONCLUSIVE, not
-    #     clean" on every call for that surface, forever.
+    #     same transform), and the damage surfaces at the next reader: ONE nulled
+    #     row makes EVERY touch_check answer rc 2 "cannot read bones ...
+    #     INCONCLUSIVE, not clean", not only the damaged surface's - the read is
+    #     a single pass over `.bones` and the first null aborts it. Measured on a
+    #     two-bone fixture with one row nulled: rc 2 for the healthy bone's path
+    #     as well, so reclassification and the release-close docs triggers are
+    #     disabled project-wide, not for one surface.
     # The payload keys are held by this contract and by the verbs' own tests
     # (test-registries.sh pins the journaled [op, payload] exactly), not by
     # replay. first()-targeted for the same check-to-append race reason as

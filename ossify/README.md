@@ -57,10 +57,13 @@ status value `abandoned` are a compatibility contract: live journals written by
 an earlier local build already carry them, and renaming an op is what replay
 catches (`unknown op`, rc 4). A payload reshape does **not** fail replay, and it
 fails in two different ways, so neither mode is a safe default to describe: a
-renamed **identifier** key (`adr` → `adr_ref`) applies as a silent no-op and
-leaves the surface as it was, while a renamed **value** key (`touch` → `surface`)
-is destructive — it writes `touch: null` at rc 0 and the next `touch_check` on
-that surface answers `INCONCLUSIVE, not clean` (rc 2) on every call, forever.
+renamed **identifier** key (`adr` → `adr_ref`) applies as a silent no-op — the
+surface is left as it was — for a registry whose rows carry their key, where a
+row whose key is null or absent is instead matched by the null comparison and
+gets its surface overwritten; and a renamed **value** key (`touch` → `surface`)
+is destructive — it writes `touch: null` at rc 0, and **one** such row makes
+**every** `touch_check` answer `INCONCLUSIVE, not clean` (rc 2), not only the
+damaged surface's, because the read is a single pass that the first null aborts.
 The payload keys are held by this contract and by the verbs' own tests, not by
 replay alone.
 
@@ -70,11 +73,14 @@ carries an entry with leading or trailing whitespace — a CR kept from a CRLF f
 is the usual source — is refused at rc 2 and the entry is named with its
 whitespace escaped, instead of being journaled as a glob that can never match the
 path it was meant to cover; a list with no entry in it at all is refused for the
-same reason, on all three verbs rather than the two that had the guard. A caller
-who space-splits a list gets a usage refusal naming the CSV grammar instead of a
-silently shrunk surface. And `bone_add` / `risk_gate_add` refuse a ref that
-already exists rather than minting a second row for one key, which had left the
-operator holding a surface the re-point verb then refused to repair.
+same reason, on all three verbs rather than the two that had the guard. The two
+mint verbs refuse such an entry too, so a bone or gate cannot be *created* with a
+surface that silently covers nothing, and a caller who space-splits a list gets a
+usage refusal naming the CSV grammar instead of a silently shrunk surface. And
+`bone_add` / `risk_gate_add` refuse a ref that already exists rather than minting
+a second row for one key, which had left the operator holding a surface the
+re-point verb then refused to repair — that rail runs inside the state lock, so
+two ceremonies racing to mint the same key cannot produce the duplicate either.
 
 Since 1.7.0 (#368), every bare `doctor` sweep includes plugin provenance and
 `doctor provenance` runs it alone. It reports the answering `oss` binary, the
