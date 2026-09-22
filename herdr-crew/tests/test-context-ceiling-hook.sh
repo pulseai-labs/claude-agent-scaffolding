@@ -168,6 +168,37 @@ expect_notice "no transcript_path in the hook input: unavailable notice" UserPro
   "figure unavailable (hook input has no transcript_path)" "ceiling of 500000"
 run "$(input UserPromptSubmit "$TMP/never-written.jsonl")"
 expect_silent "transcript not written yet: silent"
+# #527 — the adjacent case: a transcript path that names something the handler
+# cannot read. Before the fix the tail reads nothing, its empty output
+# classifies as "none", the wc redirection fails and the integer test raises
+# before the handler exits 0 having said nothing at all — a silent pass over a
+# figure it could not read, which the handler's header forbids.
+T_UNREADABLE="$TMP/unreadable.jsonl"
+{ user_line; assistant_line msg_unreadable 10 90 523014; } > "$T_UNREADABLE"
+chmod 000 "$T_UNREADABLE"
+if [ -r "$T_UNREADABLE" ]; then
+  # Running as root, or a filesystem that ignores 0000: no mode makes a file
+  # unreadable for this uid, so swap in a broken link — the one entry no uid can
+  # read. test-config-contract.sh's unreadable-file control uses the same
+  # convention; the guard asserted below is the handler's readable-file guard
+  # either way.
+  rm -f "$T_UNREADABLE"
+  ln -s "$T_UNREADABLE.absent" "$T_UNREADABLE"
+fi
+run "$(input UserPromptSubmit "$T_UNREADABLE")"
+expect_notice "an existing transcript the handler cannot read: unavailable notice" \
+  UserPromptSubmit "figure unavailable (transcript is not a readable file)"
+chmod 644 "$T_UNREADABLE" 2>/dev/null
+rm -f "$T_UNREADABLE"
+# The other half of the same guard, and the one a non-root run would otherwise
+# leave untested: an entry that is readable but not a regular file. `tail` on a
+# directory fails; on a fifo it would block, which is why `-f` is part of the
+# guard and not only `-r`.
+mkdir "$TMP/dir-transcript.jsonl"
+run "$(input UserPromptSubmit "$TMP/dir-transcript.jsonl")"
+expect_notice "a transcript path that is not a regular file: unavailable notice" \
+  UserPromptSubmit "figure unavailable (transcript is not a readable file)"
+rmdir "$TMP/dir-transcript.jsonl"
 user_line > "$TMP/fresh.jsonl"
 run "$(input UserPromptSubmit "$TMP/fresh.jsonl")"
 expect_silent "no assistant turn yet: silent"
@@ -182,6 +213,47 @@ expect_notice "assistant records without usage (format drift): unavailable notic
 run "$(input UserPromptSubmit "$TMP/drift-latest.jsonl")"
 expect_notice "the latest record has no usage but an older one does: unavailable notice" \
   UserPromptSubmit "figure unavailable (no readable usage"
+# #519b — a usage object that carries none of the three counters the handler
+# reads. Summing them with `// 0` produced a figure of 0, which is a real figure
+# to the check below: no notice, the ceiling passed in silence, and a
+# coordinator already past it started more work.
+{ user_line; jq -cn '{type: "assistant", isSidechain: false,
+    message: {id: "m_nocounters", role: "assistant", content: [],
+              usage: {input_tokens_total: 523114, output_tokens: 10,
+                      cache_creation: {ephemeral_5m_input_tokens: 900}}}}'; } \
+  > "$TMP/nocounters.jsonl"
+run "$(input UserPromptSubmit "$TMP/nocounters.jsonl")"
+expect_notice "a usage object with none of the three counters: unavailable notice" \
+  UserPromptSubmit "figure unavailable (no readable usage"
+# The adjacent control for that tightening: the three counters read beside keys
+# the handler does not know must still produce a figure. Without it, a handler
+# that refused every usage object carrying anything extra would pass the case
+# above — and a format that adds a field would be refused as drift.
+{ user_line; jq -cn '{type: "assistant", isSidechain: false,
+    message: {id: "m_extras", role: "assistant", content: [],
+              usage: {input_tokens: 10, cache_creation_input_tokens: 90,
+                      cache_read_input_tokens: 523014, output_tokens: 10,
+                      service_tier: "standard",
+                      cache_creation: {ephemeral_5m_input_tokens: 90}}}}'; } \
+  > "$TMP/extras.jsonl"
+run "$(input UserPromptSubmit "$TMP/extras.jsonl")"
+expect_notice "control: the three counters beside unrecognised keys still read a figure" \
+  UserPromptSubmit "context 523114"
+# One counter of the three missing is the same defect at a smaller scale, and
+# the header settles it: the figure IS input + cache_creation + cache_read, so a
+# usage object that cannot supply all three cannot supply the figure. One case
+# per field, so each clause of the handler's check has its own failing mutation.
+for missing in input_tokens cache_creation_input_tokens cache_read_input_tokens; do
+  f="$TMP/missing-$missing.jsonl"
+  { user_line; jq -cn --arg m "$missing" '{
+      type: "assistant", isSidechain: false,
+      message: {id: "m_missing", role: "assistant", content: [],
+                usage: ({input_tokens: 10, cache_creation_input_tokens: 90,
+                         cache_read_input_tokens: 523014} | del(.[$m]))}}'; } > "$f"
+  run "$(input UserPromptSubmit "$f")"
+  expect_notice "a usage object missing $missing: unavailable notice" \
+    UserPromptSubmit "figure unavailable (no readable usage"
+done
 printf '%s\n' '{not json' '}}}' 'still not json' > "$TMP/malformed.jsonl"
 run "$(input UserPromptSubmit "$TMP/malformed.jsonl")"
 expect_notice "every tail line malformed: unavailable notice" UserPromptSubmit \
@@ -214,6 +286,37 @@ for b in cat tail; do ln -s "$(command -v "$b")" "$NOJQ/$b"; done
 OUT="$(printf '%s' "$(input UserPromptSubmit "$T_PAST")" | env -u CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING \
   HERDR_PANE_ID=w1:p1 PATH="$NOJQ" "$BASH_BIN" "$HOOK" 2>/dev/null)"; RC=$?
 expect_notice "no jq on PATH: unavailable notice on a prompt" UserPromptSubmit "figure unavailable (jq not found)"
+# #516b — the same jq-less path on the wake. A coordinator woken by a
+# background wait runs its new-work command here rather than on a prompt, and
+# this plugin's doorbell IS a background wait, so this is its ordinary path.
+# Before the fix the raw check recognised only UserPromptSubmit: the figure went
+# unchecked and nothing said so.
+run "$(input PreToolUse "$T_PAST" 'herdr agent prompt w7:p2 "implement item 3"')" PATH="$NOJQ"
+expect_notice "no jq on PATH: unavailable notice before a new-work command" \
+  PreToolUse "figure unavailable (jq not found)"
+# The adjacent control: with jq absent the notice must still belong to the
+# new-work matcher, not to every Bash call — the coordinator's ordinary commands
+# learn nothing under no jq any more than they do with jq present.
+run "$(input PreToolUse "$T_PAST" 'git status --short')" PATH="$NOJQ"
+expect_silent "no jq on PATH: silent before a non-new-work command"
+# The walk's fourth path: an input jq cannot parse — a truncated hook input, or
+# a jq on PATH that fails on a well-formed one. Either way the figure was not
+# read and nothing said so: the event was empty, so the handler fell out of its
+# own case in silence. The raw spelling the no-jq path reads says which event
+# the notice belongs to.
+printf '%s' '{"session_id":"s","transcript_path":"'"$T_PAST"'","cwd":"/tmp","hook_event_name":"UserPromptSubmit","prompt":"unterminated' \
+  > "$TMP/malformed-input.json"
+run "$(cat "$TMP/malformed-input.json")"
+expect_notice "an input jq cannot parse: unavailable notice" UserPromptSubmit \
+  "figure unavailable (jq could not read the hook input)"
+# Its adjacent control: an unparseable input that carries no new-work command is
+# not the handler's business, and the fast path stops it before any of this — so
+# the case above is the event's notice, not a handler that speaks on any input
+# it cannot parse.
+printf '%s' '{"hook_event_name":"PreToolUse","tool_input":{"command":"git status --short"' \
+  > "$TMP/malformed-nonwork.json"
+run "$(cat "$TMP/malformed-nonwork.json")"
+expect_silent "control: an unparseable input carrying no new-work command stays silent"
 
 section "the setting"
 T150="$(transcript s150 150000)"
