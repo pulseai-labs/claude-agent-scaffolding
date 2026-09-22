@@ -83,7 +83,12 @@ oss_cmd_risk_gate_add() { # $1=name $2=touch-csv $3=controls-csv
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_add_risk_gate "$sf" "$1" "$2" "$3"
 }
 oss_cmd_risk_gate_set_controls() { # $1=name $2=controls-csv — corrective append (#340)
-  _oss_need 2 risk_gate_set_controls "<name> <controls-csv>" "$@" || return 2;
+  # #524: the same silent-misinterpretation defect the two re-point verbs carry -
+  # a space-split list shrinks the checklist just as silently, and this verb
+  # REPLACES the list exactly as they do. Fixed here rather than tracked
+  # separately, because leaving two of three siblings guarded is the unstated
+  # asymmetry #524 was filed about in the first place.
+  _oss_need_exact 2 risk_gate_set_controls "<name> <controls-csv>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_risk_gate_controls "$sf" "$1" "$2"
 }
 oss_cmd_bone_set_touch() { # $1=adr $2=touch-csv — corrective append (1.11.0)

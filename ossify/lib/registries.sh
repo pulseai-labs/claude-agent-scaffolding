@@ -111,6 +111,9 @@ oss_reg_set_risk_gate_controls() { # $1=state $2=name $3=controls-csv
   _oss_reg_require_single "$sf" '.risk_gates[] | select(.name == $v)' \
     "risk gate" "risk gates" "duplicate names" "$name" || return $?
   c="$(_oss_csv_to_json "$3")" || return $?
+  _oss_repoint_guard "$c" "controls list" "controls-csv" "control" \
+    "a gate with no controls is a worry, not a gate (start/references/risk-gates.md §6)" \
+    "a control phrase with surrounding whitespace is not the phrase the caller wrote" || return $?
   oss_state_mutate "$sf" set_risk_gate_controls \
     "$(jq -n --arg n "$name" --argjson c "$c" \
       '{name:$n,controls:$c}')"

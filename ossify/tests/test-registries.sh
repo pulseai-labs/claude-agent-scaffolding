@@ -315,6 +315,36 @@ t_capture jq -c '.bones[] | select(.adr=="ADR-0003") | .touch' "$ST"
 t_assert_eq '["src/my file.py","src/ok/**"]' "$T_OUT" "...and the interior space survives into the journaled surface"
 t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "packages/ma/silver/**,packages/ma/ingestion/**"
 t_assert_rc 0 "...and the surface is re-pointable again afterwards"
+# #524: set_controls took an empty list at rc 0 and journaled controls: [] - the
+# gate's downstream checklist silently emptied for every later spine that touches
+# its surface. The 1.11.0 touch verbs refuse a list with no glob in it; the guard
+# sat one function away and did not cover its sibling. risk-gates.md §6: a gate
+# with no controls "is a worry, not a gate".
+N2="$(jq '.mutations | length' "$ST")"
+t_capture oss_reg_set_risk_gate_controls "$ST" gold-correctness ""
+t_assert_rc 2 "set_controls refuses an empty list at rc 2"
+t_assert_contains "$T_OUT" "at least one control" "...and says what a gate needs"
+t_assert_contains "$T_OUT" "risk-gates.md" "...and cites the rule it protects"
+for csv in "   " " , ," "$(printf '\t')" "$(printf '\xc2\xa0')"; do
+  t_capture oss_reg_set_risk_gate_controls "$ST" gold-correctness "$csv"
+  t_assert_rc 2 "set_controls refuses a blank-lookalike list ($(printf '%s' "$csv" | od -An -tx1 | tr -d ' '))"
+  t_assert_contains "$T_OUT" "at least one control" "...and names controls, not globs"
+done
+# The shared guard gives set_controls the per-entry refusal too (#530's arm, same
+# helper): a control phrase carrying a trailing CR is not the phrase the caller
+# wrote, and the CSV grammar exists to make that unambiguous.
+t_capture oss_reg_set_risk_gate_controls "$ST" gold-correctness "$(printf 'ctl-one\r')"
+t_assert_rc 2 "set_controls refuses an entry with surrounding whitespace"
+t_assert_contains "$T_OUT" "leading or trailing whitespace" "...and diagnoses the entry"
+t_capture jq '.mutations | length' "$ST"
+t_assert_eq "$N2" "$T_OUT" "every set_controls refusal above left the journal unchanged"
+# ADJACENT CONTROL: replace semantics are untouched - a non-empty list still
+# replaces wholesale - and the noun in the message is what tells the two verbs'
+# refusals apart (a controls refusal must not say "at least one glob").
+t_capture oss_reg_set_risk_gate_controls "$ST" gold-correctness "ctl-a,ctl-b"
+t_assert_rc 0 "a non-empty controls list still replaces wholesale"
+t_capture jq -c '.risk_gates[] | select(.name=="gold-correctness") | .controls' "$ST"
+t_assert_eq '["ctl-a","ctl-b"]' "$T_OUT" "...and lands in the journal"
 # Duplicates (#305 shape) refuse rather than guess which entry to re-point.
 oss_reg_add_bone "$ST" ADR-0003 "silver layer, minted twice" "src/x/**" "" >/dev/null
 oss_reg_add_risk_gate "$ST" gold-correctness "src/y/**" "dup" >/dev/null

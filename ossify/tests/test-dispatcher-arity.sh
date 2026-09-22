@@ -98,6 +98,11 @@ t_assert_contains "$T_OUT" "comma-separated" "...and names the CSV grammar the c
 t_capture bash "$OSS" risk_gate_set_touch g1 "src/a/**" "src/b/**"
 t_assert_rc 2 "risk_gate_set_touch refuses a third argument at rc 2"
 t_assert_contains "$T_OUT" "comma-separated" "...and names the CSV grammar too"
+# #524: the third corrective append, same defect - a space-split controls list
+# shrinks the checklist silently, and this verb REPLACES the list as well.
+t_capture bash "$OSS" risk_gate_set_controls g1 "ctl-a" "ctl-b"
+t_assert_rc 2 "risk_gate_set_controls refuses a third argument at rc 2"
+t_assert_contains "$T_OUT" "comma-separated" "...and names the CSV grammar"
 # ADJACENT CONTROL: the two-argument form reaches the VERB, so the guard above is
 # the extra argument and not the verb. Two rows, because this fixture already
 # minted ADR-1 above: the KNOWN ref must still succeed (rc 0 - the re-point runs),
