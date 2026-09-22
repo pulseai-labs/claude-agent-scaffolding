@@ -348,10 +348,11 @@ belong in the read-out when the sweep gives you reason to look:
 
   ```bash
   # The corpus is every tracked path in every declared repo. `$repos` is the
-  # declared repo-key list, one per line, from the same manifest read the
-  # `manifest` check above performs (a native topology's `.repos` object; a
-  # legacy pairing manifest's top-level `.root` objects) - no verb lists the
-  # keys, so this is an agent-performed read. The SEMANTICS ORACLE is touch_check,
+  # declared repo-key list, one per line, from the manifest read doctor's interop
+  # check already performs (`interop-check.md`, "`ai_workspace` and every declared
+  # repo": a native topology's `.repos` object; a legacy pairing manifest's
+  # top-level `.root` objects, translated as `_oss_topology_shape` does) - no verb
+  # lists the keys, so this is an agent-performed read. The SEMANTICS ORACLE is touch_check,
   # never a hand-rolled glob match: a shell `*` crosses `/`, so a matcher written
   # here would disagree with the verb that decides reclassification.
   #
