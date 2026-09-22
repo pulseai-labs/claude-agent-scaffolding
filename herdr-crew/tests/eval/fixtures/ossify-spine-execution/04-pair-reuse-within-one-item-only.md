@@ -29,7 +29,7 @@ expected_reason: 'Retention is item-local, has an end, and its first failure is 
 ---
 
 You are the spine session for `r5.s2`, with the `run.json` you own. Round 1's
-`r5.s2.w1` came back complete; you captured its four-part fingerprint and its
+`r5.s2.w1` came back complete; you captured the identity its result declares and its
 verifier ran the all-claims check. The verifier reported two failures: claim 3
 (the mutation check — the new test still passes when the implementation edits
 are reverted) and claim 5 (`cannot determine` — it could not see whether the
