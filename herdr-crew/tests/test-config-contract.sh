@@ -106,12 +106,13 @@ brief_pin() {
   if [ "$count" -eq "$want" ]; then pass "$label ($count)"
   else fail "$label" "found $count, expected $want: $needle"; fi
 }
-# Five dispatched templates: planned implementer, fast implementer, reviewer,
-# verifier, fix round. The correction-request template is a send, not a launch,
-# so it carries no seat.
-brief_pin 'SEAT_COMMAND=' "every dispatched template names its seat's command" 5
-brief_pin 'SEAT_EXPECTED_MODEL=' "every dispatched template names its expected model" 5
-brief_pin 'SEAT_EFFORT=' "every dispatched template names its effort" 5
+# Nine dispatched templates: planned implementer, fast implementer, reviewer,
+# verifier, fix round, and the four dedicated dispatch templates — lane driver,
+# doctor dispatch, direct work-item, non-spine close. The correction-request
+# template is a send, not a launch, so it carries no seat.
+brief_pin 'SEAT_COMMAND=' "every dispatched template names its seat's command" 9
+brief_pin 'SEAT_EXPECTED_MODEL=' "every dispatched template names its expected model" 9
+brief_pin 'SEAT_EFFORT=' "every dispatched template names its effort" 9
 brief_pin 'claude-glm' "no alias name survives in briefs.md" 0
 
 section "the named points exist in the run"

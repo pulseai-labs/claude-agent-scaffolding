@@ -767,8 +767,9 @@ pin "$MECHANICS_MD" "$TYPED_WAIT" "herdr-mechanics.md states the typed wait once
 pin "$LIFECYCLE_MD" "$TYPED_WAIT" "lifecycle step 5's wait is the typed wait, byte-identical"
 pin "$SKILL_MD" 'A single bounded `herdr agent wait`' \
   "SKILL.md's wait primitive is one bounded agent wait"
-# Each dispatched brief names the file its report is written to.
-n_eq "$GENERIC_BRIEFS_MD" 'REPORT_PATH=<the absolute path this seat writes its report to>' 5 \
+# Each dispatched brief names the file its report is written to. Nine templates:
+# the generic five, plus the four dedicated dispatch templates in the same file.
+n_eq "$GENERIC_BRIEFS_MD" 'REPORT_PATH=<the absolute path this seat writes its report to>' 9 \
   "every dispatched brief names its report path"
 
 section "reference line budgets"
