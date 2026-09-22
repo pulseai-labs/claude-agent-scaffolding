@@ -49,7 +49,9 @@ default.
 ## 2. Round sequencing
 
 Do all of §3 and §4 for **every item in the round, in declared decomposition
-order, before building any request.** Worktrees created and journaled, handoffs
+order, before building any request.** An `abandoned` item is skipped at the top
+of `round-orchestration.md` §3 and gets no request. Worktrees created and
+journaled, handoffs
 authored, specs confirmed to parse — the whole round's preparation lands first.
 
 Then build one request per item, still in declared order, and invoke the

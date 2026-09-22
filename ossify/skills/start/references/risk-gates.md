@@ -91,6 +91,16 @@ repaired NOT by editing state but by a corrective append:
 "$oss_bin" risk_gate_set_controls "<name>" "<controls-csv>"   # refuses unknown names; refuses duplicate names (#305)
 ```
 
+**Repointing a gate's touch surface.** When the code a gate covers moves, its
+globs match nothing and `"$oss_bin" touch_check` goes silently clean on it: no
+spine near the moved code reclassifies, and the release-close docs trigger
+never fires. Re-point it the same way — a corrective append that **replaces**
+the whole touch list and leaves the controls alone:
+
+```bash
+"$oss_bin" risk_gate_set_touch "<name>" "<touch-csv>"   # refuses unknown and duplicate names (#305), and an empty list
+```
+
 ---
 
 ## 4. What a gate does downstream

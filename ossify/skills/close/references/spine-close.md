@@ -42,16 +42,19 @@ known gap rather than papered over.
 
 ---
 
-## 2. Step 1 — every work item `complete`, or refuse and name the offender
+## 2. Step 1 — every work item `complete` or `abandoned`, or refuse and name the offender
 
 `$spine_id` is the id `/close` was invoked with, carried from §2's routing.
 
 _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
 
 ```bash
-open="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"complete\") | .id] | join(\", \")")"
+open="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"complete\" and .status != \"abandoned\") | .id] | join(\", \")")"
 [ -z "$open" ] \
   || { echo "close: $spine_id has work items that are not complete: $open - halt"; exit 1; }
+withdrawn="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status == \"abandoned\") | .id] | join(\", \")")"
+[ -z "$withdrawn" ] \
+  || echo "close: $spine_id withdrew work items before dispatch: $withdrawn - SPINE.md records why; they contribute nothing to this close"
 ```
 
 **Test the output, never the rc.** `"$oss_bin" get` is `jq -r` without `-e`: a `select`
@@ -60,6 +63,15 @@ fires and a spine with three unfinished items closes clean (`routing.md` §4).
 
 `complete` means "this item's work is on the spine branch" — §4 sets it *last*,
 after its merge is verified landed, precisely so this step can read it that way.
+
+**`abandoned` means the item was minted and then withdrawn before any dispatch**
+(`plan-spine/references/decomposition.md` §1). It contributes nothing to the
+spine branch — no worktree, no handoff, no commits — so it neither blocks this
+gate nor counts toward any later step: §3 lands no repo for it, and step 10
+removes no worktree for it. A **dispatched** item is never abandoned; its round
+lands or halts. The withdrawn line is `[ -z … ] || echo` for the same strict-mode
+reason `release-close.md` §2 gives for its abandoned-spine line: it is the
+block's last command, and an `&&` form returns 1 on the clean case.
 
 ---
 
@@ -75,8 +87,12 @@ produces findings and a decision per finding, not a halt. Its findings are fixed
 before the PR opens, which shrinks the review loop the PR then runs.
 
 **This step repeats once per hosting repo** — the distinct `target_repo` values
-across the spine's work items, the same set `round-orchestration.md` §2 looped to
-cut the branch in before round 1. A spine confined to one repo loops once; a
+across the spine's work items **other than `abandoned` ones**, the same set
+`round-orchestration.md` §2 looped to cut the branch in before round 1. An
+abandoned item wrote nothing and authored no handoff, so a repo that only it
+named has no work to land and no recorded base to land it on — including it
+halts the close on an unresolvable base. A spine confined to one repo loops
+once; a
 cross-repo spine lands into every repo it touched, and none of them is optional
 — a hosting repo left unlanded is work the spine did that never reached its base
 branch, however green the repos that DID land make the close look.
@@ -144,7 +160,7 @@ spine_branch="$("$oss_bin" branch_name "$spine_id" "$spine_slug")"
 # THE REPO SET IS READ AS AN ASSIGNMENT, never from a process substitution
 # (round 5 sweep): a selector failure inside `< <(...)` is invisible - the
 # loop receives zero repos and the pass succeeds having landed nothing.
-landing_repos="$("$oss_bin" get ".work_items[] | select(.spine==\"$spine_id\") | .target_repo" | sort -u)" \
+landing_repos="$("$oss_bin" get ".work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .target_repo" | sort -u)" \
   || { echo "close: the hosting-repo set could not be read from state - halt"; exit 1; }
 
 merge_shas=""
@@ -769,6 +785,10 @@ honest, not a failure to re-run) and where the outcomes are recorded — is in
 ```bash
 "$oss_bin" worktree_remove "$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .target_repo")" "$wi"
 ```
+
+**Skip `abandoned` items.** Withdrawn before dispatch, an abandoned item never
+had a worktree or a branch, and `worktree_remove` on one fails the close at its
+last step. Every other work item in the spine gets the call.
 
 **Already per repo, because the target is per item.** Walking every work item
 in the spine and reading each one's own `target_repo` runs this in whichever

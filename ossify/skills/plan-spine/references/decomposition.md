@@ -62,6 +62,24 @@ The signal is reliable in practice: a six-item decomposition almost always has a
 seam in the middle where the first *n* items deliver one outcome and the rest
 deliver another. That seam is the spine boundary you are looking for.
 
+### Withdrawing a minted item
+
+A work item already in state that the decomposition no longer wants — folded
+into a sibling, found unnecessary, moved to another spine — is **withdrawn**:
+`"$oss_bin" work_item_status <wi-id> abandoned`. It is **never deleted** (the
+journal is append-only, so there is no delete) and **never marked `complete`**
+(`complete` records a merge onto the spine branch, which for a withdrawn item
+never happened). Left `planned`, it blocks spine close forever
+(`close/references/spine-close.md` §2). Record why in `SPINE.md` beside the
+decomposition — state carries the status, not the reason.
+
+**Only an item that was never dispatched is withdrawn.** Once `/run-spine` has
+dispatched an item, its round lands or halts; a dispatched item that turns out
+wrong is a replan, not a withdrawal. The round walk, spine close and release
+close all skip an `abandoned` item, so withdrawing a dispatched one would strand
+its work. A withdrawal made by mistake is reversed with
+`"$oss_bin" work_item_status <wi-id> planned`.
+
 ---
 
 ## 2. What each work item declares

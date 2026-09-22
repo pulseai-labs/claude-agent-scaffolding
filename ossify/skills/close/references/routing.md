@@ -96,7 +96,7 @@ bare assignment from a command that is *expected* to fail on bad input; under
 
 ```bash
 "$oss_bin" spine_list
-"$oss_bin" get '[.work_items[] | select(.status != "complete") | {id, title, status}]'
+"$oss_bin" get '[.work_items[] | select(.status != "complete" and .status != "abandoned") | {id, title, status}]'
 ```
 
 Then ask for the id explicitly. The reason to refuse rather than guess: a close
@@ -135,5 +135,5 @@ against state — `"$oss_bin" get … || …` never fires on a typo.
 - **Accepting a `VS-` id by stripping the prefix.** It is a different grammar
   from a different stack; the ids do not correspond.
 - **Closing a scope whose children are not closed.** Each layer refuses upward:
-  work items must be `complete` before a spine closes, spines must be closed
-  before a release does.
+  work items must be `complete` (or `abandoned`) before a spine closes, spines
+  must be closed before a release does.

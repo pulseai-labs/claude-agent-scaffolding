@@ -225,8 +225,9 @@ recommendation.
 The middle scope, and the one the ceremony is named for (spec §6.1). Eleven
 steps, in **binding order**:
 
-1. **Every work item `complete`**, else refuse and **name the offender**. Test
-   the *output* of the `"$oss_bin" get` — a `select` matching nothing exits 0.
+1. **Every work item `complete`** — or `abandoned`, withdrawn before dispatch —
+   else refuse and **name the offender**. Test the *output* of the
+   `"$oss_bin" get` — a `select` matching nothing exits 0.
 2. **Land each hosting repo on its own `base_branch` — by PR where a remote
    exists, locally where none does (#339)**. The PR arm pushes the spine branch,
    opens the PR, and hands it to `/ossify:work-pr` — not published on

@@ -85,6 +85,25 @@ The registry entry is the *index*; the ADR file carries the full context /
 decision / consequences prose. Keep them consistent — the index is what the
 mechanical checks read.
 
+### Repointing a bone's touch surface
+
+When the code a bone governs moves — into a `packages/` tree, a renamed module
+— its registered globs match nothing, and `"$oss_bin" touch_check` goes silently
+**clean** for every spine that touches the moved code: the spine is never
+reclassified to `bone`, and nothing reports why. Re-point the surface with a
+corrective append, never by editing state:
+
+```bash
+"$oss_bin" bone_set_touch "ADR-0002" "packages/core/src/domain/**,packages/core/src/port.rs"
+```
+
+It **replaces** the whole touch list — name every glob the bone should cover,
+old ones included where they still apply. The CSV grammar is the same as
+`bone_add`'s. It refuses an unknown ADR ref, a duplicate one (#305), and an
+empty list — an empty surface would make the check clean on every path, the
+defect being repaired. Update the ADR file's own statement of scope in the same
+change, so the index and the decision still agree.
+
 ### Authoring the ADR file
 
 `"$oss_bin" bone_add` writes **the index row only**. Nothing writes the ADR file, and

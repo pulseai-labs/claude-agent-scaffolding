@@ -70,11 +70,12 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 # what "one resolver, one halt, one source of truth" below is protecting.
 #
 # EVERY hosting repo, never canonical alone: the distinct target_repo values
-# across the spine's work items, the same set spine-close.md §3's merge loop
-# iterates. A cross-repo spine's diff spans every one of them, and reading
+# across the spine's non-abandoned work items, the same set spine-close.md §3's
+# merge loop iterates (an abandoned item wrote nothing and recorded no base).
+# A cross-repo spine's diff spans every one of them, and reading
 # only one repo's diff reviews PART of the spine dressed up as the whole of
 # it — which is worse than skipping the review, because it reads as done.
-hosting_repos="$("$oss_bin" get ".work_items[] | select(.spine==\"$spine_id\") | .target_repo" | sort -u)"
+hosting_repos="$("$oss_bin" get ".work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .target_repo" | sort -u)"
 [ -n "$hosting_repos" ] \
   || { echo "code-review: no work items found for $spine_id - halt, cannot scope the diff"; exit 1; }
 while IFS= read -r repo; do

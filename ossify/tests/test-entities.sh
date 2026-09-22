@@ -109,12 +109,13 @@ t_assert_rc 7 "release status on an unknown id is rc 7"
 # The block comment above claims "bad enum -> rc 2" for status transitions, but
 # only the SPINE setter was ever asserted for it — the work-item and release
 # setters had their unknown-id arm covered and their enum arm not, so a header
-# promising all three was describing one. Each enum is DIFFERENT (spine adds
-# `abandoned`, work item uses `complete`, release has neither), which is exactly
-# the shape where a copy-paste guard goes unnoticed.
+# promising all three was describing one. Each enum is DIFFERENT (spine uses
+# `closed`, work item uses `complete`, both carry `abandoned`, release has
+# neither of the last two), which is exactly the shape where a copy-paste guard
+# goes unnoticed.
 t_capture oss_entity_set_work_item_status "$S" "$WI" "shipped"
 t_assert_rc 2 "work item status rejects an unknown enum value"
-t_assert_contains "$T_OUT" "planned|active|complete" "...and names the work-item enum, not another entity's"
+t_assert_contains "$T_OUT" "planned|active|complete|abandoned" "...and names the work-item enum, not another entity's"
 # `closed` is valid for a spine and a release, and NOT for a work item. A guard
 # copied from a sibling would accept it here; this is the assertion that sees it.
 t_capture oss_entity_set_work_item_status "$S" "$WI" "closed"
@@ -136,6 +137,31 @@ t_capture oss_entity_set_work_item_status "$S" "$WI" "complete"
 t_assert_rc 0 "work item status accepts a valid transition"
 t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WI\") | .status"
 t_assert_eq "complete" "$T_OUT" "work item status actually changed"
+
+# 1.11.0: `abandoned` is a work-item status - minted, then withdrawn before any
+# dispatch. Without it such an item stayed `planned` (blocking spine close) or
+# was marked `complete` (recording a merge that never happened). The refusals
+# above stay the adjacent control: `closed` and `shipped` still refuse, and the
+# release enum still refuses `abandoned`, so the widening is this one value.
+t_capture oss_entity_add_work_item "$S" r0.s1 "withdrawn before dispatch"
+WI2="$T_OUT"
+t_assert_eq "r0.s1.w2" "$WI2" "setup: a second work item to withdraw"
+N0="$(oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_status")] | length')"
+t_capture oss_entity_set_work_item_status "$S" "$WI2" "abandoned"
+t_assert_rc 0 "work item status accepts 'abandoned'"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WI2\") | .status"
+t_assert_eq "abandoned" "$T_OUT" "work item status actually changed to abandoned"
+t_capture oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_status")] | length'
+t_assert_eq "$((N0 + 1))" "$T_OUT" "the abandonment journals exactly one set_work_item_status"
+t_capture oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_status")] | last | .payload | keys | join(",")'
+t_assert_eq "at,status,work_item" "$T_OUT" "the payload shape is unchanged - live journals already carry {work_item,status,at}"
+# A withdrawal made by mistake is reversible through the same verb.
+t_capture oss_entity_set_work_item_status "$S" "$WI2" "planned"
+t_assert_rc 0 "an abandoned work item can return to planned"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WI2\") | .status"
+t_assert_eq "planned" "$T_OUT" "...and the state reads planned again"
+t_capture oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_status")] | length'
+t_assert_eq "$((N0 + 2))" "$T_OUT" "one journaled mutation per accepted call"
 t_capture oss_entity_set_release_status "$S" "r0" "closed"
 t_assert_rc 0 "release status accepts a valid transition"
 t_capture oss_state_read "$S" '.releases[] | select(.id=="r0") | .status'

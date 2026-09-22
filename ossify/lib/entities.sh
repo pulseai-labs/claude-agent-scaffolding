@@ -78,8 +78,10 @@ oss_entity_set_spine_status() { # $1=state $2=spine-id $3=status
 
 oss_entity_set_work_item_status() { # $1=state $2=work-item-id $3=status
   local sf="$1" wi="$2" st="$3"
-  case "$st" in planned|active|complete) ;; *)
-    echo "oss: work item status must be planned|active|complete" >&2; return 2;; esac
+  # `abandoned` = minted, then withdrawn before any dispatch (1.11.0). The
+  # value is a compatibility contract: live journals already carry it.
+  case "$st" in planned|active|complete|abandoned) ;; *)
+    echo "oss: work item status must be planned|active|complete|abandoned" >&2; return 2;; esac
   jq -e --arg w "$wi" '.work_items[] | select(.id == $w)' "$sf" >/dev/null 2>&1 \
     || { echo "oss: unknown work item '$wi'" >&2; return 7; }
   oss_state_mutate "$sf" set_work_item_status \

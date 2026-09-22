@@ -70,6 +70,59 @@ oss_reg_set_risk_gate_controls() { # $1=state $2=name $3=controls-csv
       '{name:$n,controls:$c}')"
 }
 
+# Corrective append for a touch surface (1.11.0, #469/#369/#411): replaces one
+# bone's or gate's touch globs with a fresh journaled mutation, the same shape
+# as set_controls above. When code moves, the registered globs match nothing
+# and touch_check goes silently clean; this is the repair. An EMPTY list is
+# refused (rc 2): `[]` would make touch_check clean on every path forever - the
+# defect being repaired - and the splitter turns "", "  " and " , " into `[]`.
+# bone_add still admits an empty surface; a re-point to nothing is not a repair.
+oss_reg_set_bone_touch() { # $1=state $2=adr $3=touch-csv
+  local sf="$1" adr="$2" n touch
+  if [ ! -f "$sf" ]; then
+    echo "oss: no state at $sf - run 'oss init <name>' first" >&2; return 1
+  fi
+  n="$(jq --arg a "$adr" '[.bones[] | select(.adr == $a)] | length' "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read bones from $sf" >&2; return 2; }
+  case "$n" in ''|*[!0-9]*)
+    echo "oss: cannot read bones from $sf" >&2; return 2 ;;
+  esac
+  if [ "$n" -eq 0 ]; then
+    echo "oss: unknown bone '$adr'" >&2; return 7
+  fi
+  if [ "$n" -gt 1 ]; then
+    echo "oss: bone '$adr' matches $n bones - duplicate ADR refs have no supported repair yet (#305); refusing rather than guessing" >&2; return 7
+  fi
+  touch="$(_oss_csv_to_json "$3")" || return $?
+  jq -en --argjson t "$touch" '$t | length > 0' >/dev/null 2>&1 || {
+    echo "oss: the new touch list is empty - a re-point needs at least one glob (an empty surface makes touch_check clean on every path)" >&2; return 2; }
+  oss_state_mutate "$sf" set_bone_touch \
+    "$(jq -n --arg a "$adr" --argjson t "$touch" '{adr:$a,touch:$t}')"
+}
+
+oss_reg_set_risk_gate_touch() { # $1=state $2=name $3=touch-csv
+  local sf="$1" name="$2" n touch
+  if [ ! -f "$sf" ]; then
+    echo "oss: no state at $sf - run 'oss init <name>' first" >&2; return 1
+  fi
+  n="$(jq --arg n "$name" '[.risk_gates[] | select(.name == $n)] | length' "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read risk gates from $sf" >&2; return 2; }
+  case "$n" in ''|*[!0-9]*)
+    echo "oss: cannot read risk gates from $sf" >&2; return 2 ;;
+  esac
+  if [ "$n" -eq 0 ]; then
+    echo "oss: unknown risk gate '$name'" >&2; return 7
+  fi
+  if [ "$n" -gt 1 ]; then
+    echo "oss: risk gate '$name' matches $n gates - duplicate names have no supported repair yet (#305); refusing rather than guessing" >&2; return 7
+  fi
+  touch="$(_oss_csv_to_json "$3")" || return $?
+  jq -en --argjson t "$touch" '$t | length > 0' >/dev/null 2>&1 || {
+    echo "oss: the new touch list is empty - a re-point needs at least one glob (an empty surface makes touch_check clean on every path)" >&2; return 2; }
+  oss_state_mutate "$sf" set_risk_gate_touch \
+    "$(jq -n --arg n "$name" --argjson t "$touch" '{name:$n,touch:$t}')"
+}
+
 oss_reg_add_fake() { # $1=state $2=boundary $3=channel $4=reason $5=trigger $6=expiry-release
   case "$3" in real|fake|deferred) ;; *) echo "oss: channel must be real|fake|deferred" >&2; return 2;; esac
   oss_state_mutate "$1" add_fake \

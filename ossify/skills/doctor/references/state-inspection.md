@@ -303,8 +303,8 @@ and nothing on this surface is a gate.
 **The remedy is a judgment call, which is why it is not automated.** An orphan
 may be:
 
-- a leftover from an abandoned work item — safe to remove, *after* checking it
-  has no uncommitted work: `git -C "<orphan>" status --porcelain`;
+- a leftover from a work item given up mid-flight — safe to remove, *after*
+  checking it has no uncommitted work: `git -C "<orphan>" status --porcelain`;
 - a worktree whose state record was lost — the directory is the *survivor*, and
   deleting it destroys the only copy;
 - someone's hand-made scratch directory that happens to live there.
@@ -333,8 +333,17 @@ belong in the read-out when the sweep gives you reason to look:
   the *state* half of the comparison lives here.
 - **A `complete` work item whose `report.md` is absent.** The harvest sweeps
   reports; a missing one silently narrows the next harvest.
+- **An `abandoned` work item with a recorded `worktree_path` or `branch`.**
+  `abandoned` means withdrawn *before any dispatch*
+  (`plan-spine/references/decomposition.md` §1); a recorded worktree says it was
+  dispatched, so either the status or the dispatch is wrong. Close skips an
+  abandoned item entirely, so work in that worktree never reaches the spine.
 
 Report these as findings with their evidence. Do not repair them.
+
+**List the `abandoned` work items by id in the read-out** even when nothing is
+wrong with them — a line, not a finding: each is work the plan withdrew, and
+its spine's `SPINE.md` should say why.
 
 ---
 
