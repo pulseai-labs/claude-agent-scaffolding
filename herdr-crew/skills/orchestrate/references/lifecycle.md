@@ -33,17 +33,19 @@ Every command's syntax comes from `herdr --skill`.
    not one you run here. Then **dispatch a work-PR session** per returned PR, in that
    PR's own hosting-repo worktree, launched from the project file's work-PR
    seat, carrying the reviewer **and** PR-fix profiles you
-   decide now, the merge-executor assignment, and `PRIOR_REVIEW` (`none` for a PR no
+   decide now, the merge-executor assignment, `PRIOR_REVIEW` (`none` for a PR no
    earlier work-PR dispatch has covered, `covered` when one has and left durable
    evidence its review ran but no record,
    otherwise the record its last `open:` result
-   persisted): steps 8-12 are that session's loop, and you relay the merge word to it
-   rather than merging yourself. Once every returned PR has merged, dispatch the record
-   pass — a second close — and only then tear down: **step 12's worker release and
-   branch deletion wait for that pass** — the work-PR session's own reviewer and PR-fix
-   seats are exempt: it releases them when their work finishes, and the hold covers the
-   top's spine-level teardown, not seats in a work-PR session's `run.json`; post-merge product
-   fixes take a new PR and fresh seats. **But a closed return skips the record pass**
+   persisted), and the child templates it will construct, verbatim as `briefs.md`'s
+   dispatch matrix lists them for a work-PR session: steps 8-12 are that session's loop,
+   and you relay the merge word to it rather than merging yourself. Once every returned
+   PR has merged, dispatch the record pass — a second close — and only then tear down:
+   **step 12's worker release and branch deletion wait for that pass** — the work-PR
+   session's own reviewer and PR-fix seats are exempt: it releases them when their work
+   finishes, and the hold covers the top's spine-level teardown, not seats in a work-PR
+   session's `run.json`; post-merge product fixes take a new PR and fresh seats.
+   **But a closed return skips the record pass**
    and goes straight to teardown: the pass exists to record PRs, and that return named
    none. Absent any of those four facts, continue at step 2.
 2. **Decompose.** One task per brief in the run's `run.json`, its `deps` the task ids it
@@ -99,9 +101,9 @@ Every command's syntax comes from `herdr --skill`.
    turn, once it is on disk — woken by another item's still-running wait, or by the
    operator's word to wait on that pane again — never by the orchestrator's own re-entry.
    At each task
-   boundary for a retained implementer whose profile can run a local slash command,
-   send `/context` and read the one reply before attaching the next task; the
-   threshold, and the seat this probe does not reach, are in `roles.md`.
+   boundary for a retained implementer whose profile can run a local slash command and
+   whose send route carries one, send `/context` and read the one reply before attaching
+   the next task; the threshold, and the seat this probe does not reach, are in `roles.md`.
 6. **Implementer finishes.** Its report file carries the completion body its
    brief defined — the commit SHAs and file count, each test command's pass and
    fail counts with the full output, the PR it opened with

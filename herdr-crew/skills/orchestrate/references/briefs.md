@@ -361,6 +361,11 @@ Questions go up in your report file: when blocked, write the question there and 
 stuck, write an escalation there and stop; report refusals verbatim.
 ```
 
+Nothing dispatches a PR loop for this close: it is the operator's own dispatch, so its
+returned list is relayed to the operator, who decides what runs next. The spine chain in
+`lifecycle.md` step 1b — a work-PR session per returned PR, then the record pass — is
+that step's and stays scoped to it.
+
 ## Correction request (one send, no new session)
 
 A malformed, incomplete, or wrongly-shaped report from a live session is corrected in

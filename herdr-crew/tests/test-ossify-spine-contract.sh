@@ -914,6 +914,19 @@ pin "$PLUGIN_README_MD" 'checked by `/context` at each task boundary for a seat 
 pin "$SKILL_MD" 'the one `/context` reply at each task boundary for a seat that can answer the probe — one that cannot rotates at its item boundary instead (`references/roles.md`)' \
   "SKILL.md's bounded-reads list conditions the probe and gives the fallback" flat
 
+# The whole-branch review's finding 1: README's What-ships row for `briefs.md` counted
+# five dispatched templates where the file ships nine — the four ossify dispatch
+# templates absent from the listing surface a reader opens first. Measured on a scratch
+# copy before this pin existed: with the row reverted to "Five dispatched brief
+# templates …", the whole suite stayed green (528/0 — 55 in config, the one assertion a
+# standalone clone skips being the repo-root marketplace sweep), so the row was
+# revertible in silence, exactly as the reviewer reported. The needle is the clause and
+# not the count alone: it names the four templates, because their absence was half the
+# finding. Per-line, and it sits whole on the row's one line; a later reword of the row
+# fails it loudly rather than silently, which is the direction this suite accepts.
+pin "$PLUGIN_README_MD" 'Nine dispatched brief templates — the generic five (planned implementer, fast implementer, reviewer, verifier, fix round) and the four dedicated dispatch templates the ossify dispatches use (lane driver, doctor dispatch, direct work-item, non-spine close)' \
+  "README's What-ships row counts the nine dispatched templates and names the four dedicated ones"
+
 # T4 G2. Deleting these from lifecycle.md left the suite green. The last is
 # `flat` because the file breaks its line inside the clause today.
 pin "$LIFECYCLE_MD" 'creates it again first and binds the id that call returns' \

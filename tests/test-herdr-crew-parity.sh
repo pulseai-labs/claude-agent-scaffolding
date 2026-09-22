@@ -123,5 +123,53 @@ else
   fi
 fi
 
+# herdr-crew's Codex prompts, and the collision they exist to avoid (#535). The
+# `interface.defaultPrompt` array is a user-facing surface — the suggested actions on
+# the Codex plugin page, where the string is actually clickable — and it carried
+# orca-crew's three generic prompts verbatim while both plugins are installed. The
+# whole-branch review then measured that the herdr-specific replacement can be
+# reverted with every suite and this file still green, so it was silently revertible
+# on the very surface the fix was for. The pin has two halves and they sit together,
+# the shape herdr-crew's own suite uses for the `mv` cross-file truth: herdr-crew's
+# own text, and the two-tree fact that makes it a fix — no prompt she offers is one
+# orca-crew offers, which is exactly the claim a plugin suite cannot see. (This file
+# reads the Claude manifest above; the Codex one is read here for the first time.)
+# `cmp` over the jq streams rather than `[[ == ]]` on command substitution, for the
+# reason the description pin above states: `$( )` strips trailing newlines from both
+# sides.
+CODEX_HERDR="$ROOT/herdr-crew/.codex-plugin/plugin.json"
+CODEX_ORCA="$ROOT/orca-crew/.codex-plugin/plugin.json"
+if [[ ! -f "$CODEX_HERDR" || ! -f "$CODEX_ORCA" ]]; then
+  fail "both plugins' Codex manifests exist — a missing one makes the prompt counts vacuous"
+else
+  expected_prompts='Start a herdr orchestrator session for this objective.
+Dispatch a herdr worker seat for this task.
+Review PR 123 in a fresh herdr seat.'
+  if cmp -s <(jq -r '.interface.defaultPrompt[]' "$CODEX_HERDR") <(printf '%s\n' "$expected_prompts"); then
+    pass "herdr-crew's Codex prompts are the herdr-specific three"
+  else
+    fail "herdr-crew's Codex prompts are the herdr-specific three — read: $(jq -r '.interface.defaultPrompt[]' "$CODEX_HERDR" | tr '\n' '|')"
+  fi
+
+  # Half two, whole-line matches: a substring test would call a prompt shared whenever
+  # one merely CONTAINS another, and a count over an empty read certifies nothing, so
+  # the read is asserted non-empty before the comparison is believed.
+  shared=0
+  checked=0
+  while IFS= read -r prompt; do
+    [[ -n "$prompt" ]] || continue
+    checked=$((checked + 1))
+    n="$(jq -r '.interface.defaultPrompt[]' "$CODEX_ORCA" | awk -v p="$prompt" '$0 == p { n++ } END { print n+0 }')"
+    shared=$((shared + n))
+  done < <(jq -r '.interface.defaultPrompt[]' "$CODEX_HERDR")
+  if [[ "$checked" -eq 0 ]]; then
+    fail "no prompt herdr-crew offers is one orca-crew offers — read no prompts at all"
+  elif [[ "$shared" -eq 0 ]]; then
+    pass "no prompt herdr-crew offers is one orca-crew offers (checked $checked)"
+  else
+    fail "no prompt herdr-crew offers is one orca-crew offers — $shared shared with orca-crew"
+  fi
+fi
+
 printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

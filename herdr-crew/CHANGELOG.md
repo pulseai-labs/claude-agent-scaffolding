@@ -77,9 +77,10 @@ any ossify contract; `orca-crew` is unmodified by this release too.
   and an input `jq` cannot parse attributes its notice to the event the raw input
   names. A `tail` that cannot run is the same class and takes the same path: its
   status is read under `pipefail`, so it reports that the transcript's tail could
-  not be read rather than "none". The three separator spellings a JSON writer
-  produces are read on the raw paths, and what stays outside them is stated where
-  the boundary is drawn.
+  not be read rather than "none". The two separator spellings a JSON writer produces
+  — compact, and one space after the colon — are read on the raw paths, with a third,
+  space-on-both-sides form kept as a belt alternative; what stays outside them is
+  stated where the boundary is drawn.
 - **The first-run halt shows an entry to copy** (#518). Neither seat file exists on
   a fresh machine, so the halt is right — but the section named the file to add and
   never showed one complete, with the model id the seat must show a slot in all
