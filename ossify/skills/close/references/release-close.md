@@ -427,7 +427,7 @@ whichever repo that happens to be:
 # failure in a process substitution is invisible, the loop tags NOTHING and
 # the pass still returns 0. jq variables crossing a shell double-quoted
 # string need the backslash (\$root, \$s); $rel is shell-expanded on purpose.
-tag_repos="$("$oss_bin" get ". as \$root | .work_items[] | select(.spine as \$s | any(\$root.spines[]; .id == \$s and .status == \"closed\" and .release == \"$rel\")) | .target_repo" | sort -u)" \
+tag_repos="$("$oss_bin" get ". as \$root | .work_items[] | select(.status != \"abandoned\") | select(.spine as \$s | any(\$root.spines[]; .id == \$s and .status == \"closed\" and .release == \"$rel\")) | .target_repo" | sort -u)" \
   || { echo "close: the release-tag repo set could not be read from state - halt"; exit 1; }
 
 while IFS= read -r repo; do

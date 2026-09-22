@@ -246,9 +246,12 @@ notices is a cumulative demo measuring a tree assembled by accident.
 
 **Status is set last, after the merge is verified landed.** Spine close reads
 `complete` as "this item's work is on the spine branch" — it is the only signal
-the status enum can carry (`planned|active|complete`). Setting it before the
-merge means a conflict halt leaves state asserting a merge that never happened,
-and the next spine close believes it.
+of that the status enum can carry (`planned|active|complete|abandoned`). Setting
+it before the merge means a conflict halt leaves state asserting a merge that
+never happened, and the next spine close believes it. **Work-item close never
+sets `abandoned`.** That status belongs to an item withdrawn before any dispatch
+(`plan-spine/references/decomposition.md` §1); an item that reached this
+ceremony was dispatched, and its close lands or halts.
 
 **A merge conflict halts.** Surface the conflicted paths verbatim and stop. Never
 auto-resolve, never `--abort` on the user's behalf, and never `-X` a strategy

@@ -1515,10 +1515,14 @@ t_assert_eq "ghe.example.com/owner/repo" "$(cat "$PR_STATE/gh_repo")" "P12: the 
 # cannot tell a scoped selector from an unscoped one when every spine targets
 # the same repo, so this fixture declares three - the CURRENT release's
 # closed spine lands in "current", an earlier closed release's in "earlier",
-# an abandoned spine's in "abandon" - and the assertion is EQUALITY.
-mkdir -p "$TMP/r8ws/.ossify" "$TMP/r8cur" "$TMP/r8earl" "$TMP/r8aband"
+# an abandoned spine's in "abandon" - and the assertion is EQUALITY. Since
+# 1.11.0 a fourth repo, "withdrawn", is named ONLY by an `abandoned` work item
+# inside the current release's closed spine: minted, withdrawn before dispatch,
+# so nothing landed there and no base was recorded - a selector that forgets
+# the work-item status names it too.
+mkdir -p "$TMP/r8ws/.ossify" "$TMP/r8cur" "$TMP/r8earl" "$TMP/r8aband" "$TMP/r8wd"
 cat > "$TMP/r8ws/.ossify/topology.json" <<R8TOPO
-{"schema_version":1,"repos":{"current":{"root":"$TMP/r8cur"},"earlier":{"root":"$TMP/r8earl"},"abandon":{"root":"$TMP/r8aband"}},"well_known_paths":{}}
+{"schema_version":1,"repos":{"current":{"root":"$TMP/r8cur"},"earlier":{"root":"$TMP/r8earl"},"abandon":{"root":"$TMP/r8aband"},"withdrawn":{"root":"$TMP/r8wd"}},"well_known_paths":{}}
 R8TOPO
 ( cd "$TMP/r8ws"
   bash "$OSS" init r8f >/dev/null
@@ -1531,11 +1535,15 @@ R8TOPO
   bash "$OSS" work_item_add "$R8ABANDON_SP" ai abandon >/dev/null
   bash "$OSS" spine_status "$R8ABANDON_SP" abandoned >/dev/null
   R8CLOSED_SP="$(bash "$OSS" spine_add "$R8REL" cs flesh current)"
-  bash "$OSS" work_item_add "$R8CLOSED_SP" ci current >/dev/null
+  R8CI="$(bash "$OSS" work_item_add "$R8CLOSED_SP" ci current)"
+  R8WD="$(bash "$OSS" work_item_add "$R8CLOSED_SP" wd withdrawn)"
+  bash "$OSS" work_item_status "$R8WD" abandoned >/dev/null
   bash "$OSS" spine_status "$R8CLOSED_SP" closed >/dev/null
   printf '%s\n' "$R8REL" > "$TMP/r8ws/.rel"
+  printf '%s %s %s\n' "$R8CLOSED_SP" "$R8CI" "$R8WD" > "$TMP/r8ws/.ids"
 )
 R8REL="$(cat "$TMP/r8ws/.rel")"
+read -r R8CLOSED_SP R8CI R8WD < "$TMP/r8ws/.ids"
 # Run the assignment line AS BASH SOURCE (eval), so the shell processes the
 # jq escapes exactly as the shipped script does - passing the extracted text
 # through quotes leaves the backslashes as data and jq fails on \$root.
@@ -1544,7 +1552,107 @@ sel_rc=0; SEL_OUT="$(cd "$TMP/r8ws" && rel="$R8REL" PATH="$(dirname "$OSS"):$PAT
 # Assert on $sel_rc directly - there is no t_capture here, so T_RC would hold
 # the PREVIOUS capture's status and read green or red for the wrong scenario.
 t_assert_eq 0 "$sel_rc" "R8: the tag-set selector executes against real state (a jq failure would abort)"
-t_assert_eq "current" "$SEL_OUT" "R8: the selector yields EXACTLY the current release's closed-spine repo (an unscoped selector would name earlier/abandon too)"
+t_assert_eq "current" "$SEL_OUT" "R8: the selector yields EXACTLY the current release's closed-spine repo (an unscoped selector would name earlier/abandon too, a status-blind one withdrawn)"
+
+# R9. EVERY SPINE-SCOPED SELECTOR SKIPS AN `abandoned` WORK ITEM (1.11.0). The
+# same fixture's closed spine holds one live item in "current" and one
+# withdrawn item alone in "withdrawn". Each assignment below is read out of the
+# SHIPPED file and evaluated as bash source, R8's way; each must name the live
+# item's repo (or id) and never the withdrawn one. A selector that still names
+# it halts the close on an unresolvable base (landing, review), cuts a branch
+# nothing will use (round walk), or reports a missing report that is not one
+# (harvest).
+# The extraction refuses BOTH ways `oss_block_extract` does, for the same
+# reason (tests/lib/blocks.sh): "not found" and "found twice" are different
+# failures, and folding them together reports an ambiguous anchor as a missing
+# one. `grep -F | head -1` did exactly the folding - silently binding to
+# whichever occurrence came first - and an EMPTY extraction fed to `eval`
+# returns 0, so an rc assertion could pass having executed nothing. (GLM seat,
+# round 1 on PR #520.)
+_r9_pick() { # $1=file $2=literal-anchor ; echoes the one line, rc 1=absent 2=ambiguous
+  local n
+  n="$(grep -cF -- "$2" "$1" 2>/dev/null)" || n=0
+  if [ "$n" -eq 0 ]; then return 1; fi
+  if [ "$n" -gt 1 ]; then return 2; fi
+  grep -F -- "$2" "$1" | sed 's/ *\\$//'
+}
+_r9_extract() { # $1=file $2=anchor $3=label ; echoes the line, rc 9=absent 8=ambiguous
+  local line rc
+  line="$(_r9_pick "$1" "$2")"; rc=$?
+  if [ "$rc" -eq 1 ]; then echo "$3-NO-LINE"; return 9; fi
+  if [ "$rc" -eq 2 ]; then echo "$3-AMBIGUOUS"; return 8; fi
+  printf '%s' "$line"
+}
+_r9_eval() { # $1=file $2=anchor $3=var-to-print ; echoes the value, rc from the eval
+  local line rc
+  line="$(_r9_extract "$1" "$2" R9)"; rc=$?
+  if [ "$rc" -ne 0 ]; then printf '%s\n' "$line"; return "$rc"; fi
+  ( cd "$TMP/r8ws" && spine_id="$R8CLOSED_SP" repo_list="$TMP/r9-list" \
+      PATH="$(dirname "$OSS"):$PATH" eval "$line" && eval "printf '%s' \"\$$3\"" )
+}
+for _r9 in \
+  "$SKILLS/close/references/spine-close.md|landing_repos=\"\$(|landing_repos|current" \
+  "$SKILLS/close/references/code-review.md|hosting_repos=\"\$(|hosting_repos|current" \
+  "$SKILLS/close/references/harvest.md|items=\"\$(|items|$R8CI"; do
+  _f="${_r9%%|*}"; _rest="${_r9#*|}"; _anchor="${_rest%%|*}"; _rest="${_rest#*|}"; _var="${_rest%%|*}"; _want="${_rest#*|}"
+  r9_rc=0; R9_OUT="$(_r9_eval "$_f" "$_anchor" "$_var")" || r9_rc=$?
+  t_assert_eq 0 "$r9_rc" "R9: ${_f##*/} \$$_var executes against real state"
+  t_assert_eq "$_want" "$R9_OUT" "R9: ${_f##*/} \$$_var names exactly the live item's $( [ "$_var" = items ] && echo id || echo repo ), not the withdrawn one"
+done
+# round-orchestration.md §2 writes its set to "$repo_list" and names the spine
+# by placeholder; substitute the id, run it, read the file. The extraction is
+# asserted FIRST and separately: an empty one would make `eval ""` return 0 and
+# the rc assertion below pass without executing anything, pointing the failure
+# at the selector instead of at the anchor.
+R9CUT_LINE="$(_r9_extract "$SKILLS/work-item/references/round-orchestration.md" '> "$repo_list"' R9CUT)"; r9_cut_rc=$?
+t_assert_eq 0 "$r9_cut_rc" "R9CUT: the round walk's hosting-repo line is extracted at all"
+R9_CUT="$(printf '%s' "$R9CUT_LINE" | sed "s/<spine-id>/$R8CLOSED_SP/")"
+r9_rc=0; ( cd "$TMP/r8ws" && repo_list="$TMP/r9-list" PATH="$(dirname "$OSS"):$PATH" eval "$R9_CUT" ) || r9_rc=$?
+t_assert_eq 0 "$r9_rc" "R9: round-orchestration.md's hosting-repo read executes against real state"
+t_assert_eq "current" "$(cat "$TMP/r9-list" 2>/dev/null)" "R9: the spine branch is cut only where a live item runs - never in a repo only a withdrawn item names"
+
+# R10. THE CLASS FORM OF R9, and its limit, stated here where it can be read.
+# R9 pins four files BY NAME, so a fifth spine-scoped SELECTOR written without
+# the abandoned conjunct passes CI - and that is not hypothetical: the round-1
+# review found readers that the named list had missed. This asserts the
+# invariant over the shipped tree instead: every `work_items[]` read that
+# mentions `.spine` must also mention `abandoned` (either conjunct; the
+# `withdrawn=` line selects the abandoned set on purpose).
+#
+# WHAT IT CANNOT SEE, and why it is not a substitute for reading the readers:
+# PROSE readers with no selector at all. code-review.md's Layer 4 `verify.md`
+# walk and Axis B's `spec.md` read are that shape, and the same sweep missed
+# both. This test closes the selector half of the class only.
+R10_EXEMPT='plan-spine/references/cross-repo.md'   # a plan-time read-back: showing a withdrawn item there is the point
+r10_checked=0
+while IFS= read -r _hit; do
+  _rf="${_hit%%:*}"; _rl="${_hit#*:}"; _rf="${_rf#./}"
+  if [ "$_rf" = "$R10_EXEMPT" ]; then T_PASS=$((T_PASS+1)); continue; fi
+  r10_checked=$((r10_checked+1))
+  case "$_rl" in
+    *abandoned*) T_PASS=$((T_PASS+1)) ;;
+    *) T_FAIL=$((T_FAIL+1)); echo "FAIL: R10: $_rf has a spine-scoped work-item read with no abandoned conjunct: $(printf '%s' "$_rl" | cut -c1-110)" ;;
+  esac
+done < <(cd "$SKILLS" && grep -rn 'work_items\[\]' . 2>/dev/null | grep '\.spine')
+# A floor, not a total: if the grep itself broke, every assertion above would be
+# vacuously true. Nine sites ship today; the floor guards the walk, it does not
+# pin the count.
+if [ "$r10_checked" -ge 5 ]; then T_PASS=$((T_PASS+1)); else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: R10: only $r10_checked spine-scoped selectors enumerated - the sweep is broken and its assertions are vacuous"
+fi
+
+# The open-item gate itself (spine-close.md §2), on the same spine: the planned
+# live item still HALTS it (the adjacent control - the loosening is abandoned
+# only), the withdrawn one is never named as an offender, and once the live
+# item is complete the gate passes and names the withdrawal instead.
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$TMP/r8ws' && set -euo pipefail; spine_id='$R8CLOSED_SP'; . '$OPEN_BLOCK'"
+t_assert_rc 1 "R9: a planned item still halts the gate beside an abandoned one"
+t_assert_contains "$T_OUT" "not complete: $R8CI - halt" "R9: ...naming only the live item"
+case "$T_OUT" in *"$R8WD"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: R9: the gate named the withdrawn item $R8WD as an offender" ;; *) T_PASS=$((T_PASS+1)) ;; esac
+( cd "$TMP/r8ws" && bash "$OSS" work_item_status "$R8CI" complete >/dev/null )
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$TMP/r8ws' && set -euo pipefail; spine_id='$R8CLOSED_SP'; . '$OPEN_BLOCK'"
+t_assert_rc 0 "R9: complete + abandoned passes the gate - under set -e, so the withdrawn line's form is proven too"
+t_assert_contains "$T_OUT" "withdrew work items before dispatch: $R8WD" "R9: ...and the close names the withdrawal"
 
 # P13. THE CLASS SWEEP, instance 1 (T16's class, landing + record passes):
 # a per-repo base mapping with TWO entries for one repo is a halt everywhere

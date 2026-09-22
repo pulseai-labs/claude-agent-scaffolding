@@ -176,7 +176,7 @@ t_assert_eq "superseded" "$T_OUT" "station 5: the planned status is superseded"
 # assertion below cannot be vacuous.
 # ---------------------------------------------------------------------------
 spine_id="r0.s1"
-OPEN_WI="$("$OSS" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"complete\") | .id] | join(\", \")")"
+OPEN_WI="$("$OSS" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"complete\" and .status != \"abandoned\") | .id] | join(\", \")")"
 t_assert_eq "r0.s1.w1, r0.s1.w2" "$OPEN_WI" "station 6: spine-close §2's selector NAMES the incomplete items"
 
 t_capture "$OSS" work_item_status r0.s1.w1 complete
@@ -187,7 +187,7 @@ t_assert_rc 0 "station 6: r0.s1.w2 complete"
 # rc captured alongside the value: this is the EMPTY assertion, and an `oss get`
 # that failed outright would also produce an empty string. Without the rc the
 # gate-satisfied claim could be made by a broken selector.
-OPEN_WI="$("$OSS" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"complete\") | .id] | join(\", \")")"; SEL_RC=$?
+OPEN_WI="$("$OSS" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"complete\" and .status != \"abandoned\") | .id] | join(\", \")")"; SEL_RC=$?
 t_assert_eq "0" "$SEL_RC" "station 6: the selector itself ran"
 t_assert_eq "" "$OPEN_WI" "station 6: the spine-close gate is satisfied - no item left open"
 t_capture "$OSS" get '.close_records | length'

@@ -45,11 +45,14 @@
 #   block unfindable and the failure read as "vacuous" rather than as wrong
 #   behaviour. Pick the anchor from the block's SCAFFOLDING, never from its FIX.
 #
-# Totals: 182 blocks - 72 operative (15 covered, 57 deferred), 110 illustrative.
+# Totals: 184 blocks - 72 operative (15 covered, 57 deferred), 112 illustrative.
 # DERIVED, never hand-counted: check 2's report line gives the total from a walk
-# of the TREE ("182 blocks accounted for"); one awk pass over the rows below
-# gives the split. Two independent routes, agreeing at 182 - that agreement IS
-# the check. The previous headline (172 = 11/48/113) was ALREADY STALE BEFORE
+# of the TREE ("184 blocks accounted for"); one awk pass over the rows below
+# gives the split (O rows counted, D and I summed). Two independent routes,
+# agreeing at 184 - that agreement IS the check. 1.11.0 added two illustrative
+# blocks (a bone_set_touch and a risk_gate_set_touch call) and no operative one,
+# which is the whole of the 182 -> 184 move; the 15/57 split is unchanged.
+# The previous headline (172 = 11/48/113) was ALREADY STALE BEFORE
 # the wayfinder branch: the retirements narrated in the parentheticals below
 # were never subtracted from it. So "172 + 8 new D rows = 180" corrects a figure
 # that was never true; do not re-derive 180 from that arithmetic. Nothing
@@ -177,10 +180,10 @@ I	skills/plan-spine/references/citation-foldin.md	2	two ADR reads used to check 
 D	skills/start/SKILL.md	1	#138	the topology-absent refusal, printed verbatim (the author/re-probe/halt remedy is prose outside this block)
 I	skills/start/SKILL.md	6	single-verb calls with <placeholder> args: feature_add, bone_add, risk_gate_add, posture_set, overlay_set, doctor
 D	skills/start/references/bones-registry.md	1	#138	the ADR-number minting block - two sed forms, a sort -n tail, and 10# base-10 forcing, all silently wrong on an empty or odd-named dir
-I	skills/start/references/bones-registry.md	2	a bone_add shape and a worked bone_add example
+I	skills/start/references/bones-registry.md	3	a bone_add shape, a worked bone_add example, and the bone_set_touch corrective append (1.11.0)
 I	skills/start/references/journey-map.md	1	a single feature_add call
 I	skills/start/references/posture-block.md	4	single-verb calls: posture_set, overlay_set, bone_add, composition_set
-I	skills/start/references/risk-gates.md	3	a risk_gate_add shape, a worked example (one control escapes its commas, #340), and the risk_gate_set_controls corrective append
+I	skills/start/references/risk-gates.md	4	a risk_gate_add shape, a worked example (one control escapes its commas, #340), and the risk_gate_set_controls corrective append, and the risk_gate_set_touch corrective append (1.11.0)
 D	skills/work-item/references/pre-flight.md	1	#138	the verify_acs read loop that Gate 2 uses to detect a malformed AC table
 I	skills/work-item/references/pre-flight.md	2	a verify_acs call and a porcelain cleanliness read
 I	skills/work-item/SKILL.md	5	single-verb calls with <placeholder> args: verify_acs, porcelain read, redgate, verify_step, git add
@@ -204,16 +207,16 @@ H	commands/work-item.md	2378584622-144
 H	skills/adopt/SKILL.md	1739936869-205
 H	skills/challenge/references/adversaries.md	755500974-2123
 H	skills/close/SKILL.md	505737925-398
-H	skills/close/references/code-review.md	3723747542-1702
+H	skills/close/references/code-review.md	460889698-1802
 H	skills/close/references/cumulative-demo.md	398889074-7685
 H	skills/close/references/fake-expiry.md	3491573094-743
-H	skills/close/references/harvest.md	1956608162-684
+H	skills/close/references/harvest.md	1931122618-713
 H	skills/close/references/impl-check.md	3998988429-864
 H	skills/close/references/patch-lane.md	1122131773-2611
-H	skills/close/references/release-close.md	3309222637-11278
+H	skills/close/references/release-close.md	1100043058-11313
 H	skills/close/references/retrospective.md	1694933006-117
-H	skills/close/references/routing.md	2344377646-253
-H	skills/close/references/spine-close.md	587905026-21568
+H	skills/close/references/routing.md	2855300955-280
+H	skills/close/references/spine-close.md	3280402613-22395
 H	skills/close/references/work-item-close.md	3790544145-3515
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	1897652786-133
@@ -232,22 +235,22 @@ H	skills/plan-release/references/rolling-wave.md	1157652703-218
 H	skills/plan-release/references/spine-sequencing-dag.md	1267392964-148
 H	skills/plan-spine/SKILL.md	2172740796-2802
 H	skills/plan-spine/references/citation-foldin.md	2955820270-361
-H	skills/plan-spine/references/cross-repo.md	1426504098-912
+H	skills/plan-spine/references/cross-repo.md	1560286378-920
 H	skills/plan-spine/references/decomposition.md	1735798245-670
 H	skills/plan-spine/references/demo-amendments.md	1701789836-357
 H	skills/plan-spine/references/demo-authoring.md	1062611185-1621
 H	skills/plan-spine/references/fake-ledger-discipline.md	95797153-393
 H	skills/start/SKILL.md	713231529-1195
-H	skills/start/references/bones-registry.md	3634089714-1063
+H	skills/start/references/bones-registry.md	3219690395-1177
 H	skills/start/references/journey-map.md	2970283972-104
 H	skills/start/references/posture-block.md	663882063-607
-H	skills/start/references/risk-gates.md	1883369797-591
+H	skills/start/references/risk-gates.md	2159350347-744
 H	skills/work-item/SKILL.md	1649129982-549
 H	skills/work-item/references/debugging.md	3357513431-594
 H	skills/work-item/references/handoff-contract.md	1777633753-89
 H	skills/work-item/references/pre-flight.md	998874162-623
 H	skills/work-item/references/report-contract.md	3145313531-89
-H	skills/work-item/references/round-orchestration.md	124199088-3610
+H	skills/work-item/references/round-orchestration.md	464434423-3637
 H	skills/work-item/references/tdd-loop.md	3319628973-863
 H	skills/wayfinder/references/tracker.md	2651208881-10057
 H	skills/wayfinder/references/charting.md	3417135513-1905

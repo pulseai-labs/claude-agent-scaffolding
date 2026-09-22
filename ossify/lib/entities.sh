@@ -78,10 +78,36 @@ oss_entity_set_spine_status() { # $1=state $2=spine-id $3=status
 
 oss_entity_set_work_item_status() { # $1=state $2=work-item-id $3=status
   local sf="$1" wi="$2" st="$3"
-  case "$st" in planned|active|complete) ;; *)
-    echo "oss: work item status must be planned|active|complete" >&2; return 2;; esac
+  # `abandoned` = minted, then withdrawn before any dispatch (1.11.0). The
+  # value is a compatibility contract: live journals already carry it.
+  case "$st" in planned|active|complete|abandoned) ;; *)
+    echo "oss: work item status must be planned|active|complete|abandoned" >&2; return 2;; esac
   jq -e --arg w "$wi" '.work_items[] | select(.id == $w)' "$sf" >/dev/null 2>&1 \
     || { echo "oss: unknown work item '$wi'" >&2; return 7; }
+  # `abandoned` is REFUSED on a dispatched item, and the recorded dispatch is
+  # `branch` or `worktree_path` - the round walk journals both before the
+  # implementer runs (work-item/references/round-orchestration.md §3). Every
+  # close-path reader skips an abandoned item, so withdrawing a dispatched one
+  # strands work that never reaches the spine branch and, post-close, silently
+  # shrinks release close's tag set instead of failing it. Prose alone did not
+  # hold this (decomposition.md §1 says "only a never-dispatched item is
+  # withdrawn"); doctor reports the pair as drift (state-inspection.md §5),
+  # which is the report, not the guard - this is the guard.
+  if [ "$st" = "abandoned" ]; then
+    local n
+    # Explicit failure routing: under bin/oss errexit an unguarded failing
+    # assignment hard-exits with jq's raw error before the case below labels it.
+    n="$(jq -r --arg w "$wi" '.work_items[] | select(.id == $w)
+          | [(.branch // ""), (.worktree_path // "")] | map(select(length > 0)) | length' "$sf" 2>/dev/null)" || {
+      echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
+    case "$n" in ''|*[!0-9]*)
+      echo "oss: cannot read work item '$wi' from $sf" >&2; return 2 ;;
+    esac
+    if [ "$n" -gt 0 ]; then
+      echo "oss: work item '$wi' records a branch or a worktree - it was dispatched, and 'abandoned' means withdrawn BEFORE any dispatch; a dispatched item's round lands or halts, and a plan that drops it is a replan, not a withdrawal (plan-spine/references/decomposition.md §1)" >&2
+      return 7
+    fi
+  fi
   oss_state_mutate "$sf" set_work_item_status \
     "$(jq -n --arg w "$wi" --arg st "$st" --arg ts "$(_oss_now)" '{work_item:$w,status:$st,at:$ts}')"
 }

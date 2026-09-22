@@ -72,14 +72,16 @@ rounds are stored; do not imply the read is machine-backed.
 ## 2. Before round 1 — cut **and check out** the spine integration branch in every hosting repo
 
 Once per spine, per hosting repo — the distinct `target_repo` values across the
-spine's work items, read from state. This block runs on **every** `/run-spine`,
+spine's work items **other than `abandoned` ones**, read from state. An item
+withdrawn before dispatch runs nowhere, so a repo only it names gets no branch.
+This block runs on **every** `/run-spine`,
 so an already-existing spine branch in any hosting repo means an earlier
 invocation got here first — halt rather than re-cutting it or half-reusing it:
 
 ```bash
 spine_branch="$("$oss_bin" branch_name "<spine-id>" "<spine-slug>")"
 repo_list="$(mktemp)"; repo_bases="$(mktemp)"
-"$oss_bin" get '.work_items[] | select(.spine=="<spine-id>") | .target_repo' | sort -u > "$repo_list"
+"$oss_bin" get '.work_items[] | select(.spine=="<spine-id>" and .status != "abandoned") | .target_repo' | sort -u > "$repo_list"
 
 # PASS 1 - CHECK every hosting repo. Mutate nothing. A halt here leaves every
 # repo exactly as it was found.
@@ -190,6 +192,17 @@ writes the branch it actually created into state.
 ---
 
 ## 3. Per work item in the round
+
+**First, skip an `abandoned` item.** Read its status —
+`"$oss_bin" get '.work_items[] | select(.id=="<wi-id>") | .status'` — and if it is
+`abandoned`, the item was withdrawn before dispatch
+(`plan-spine/references/decomposition.md` §1) and the plan still lists it: no
+spec check, no worktree, no handoff, no dispatch, and the §7 barrier does not
+wait for it. This holds in both dispatch modes — `external-executor.md` §2 runs
+this section for every item in the round, so an abandoned item gets no request
+either. Never dispatch it to "see whether it still applies": un-withdrawing is a
+planning decision (`"$oss_bin" work_item_status <wi-id> planned`), made in
+`plan-spine`, not here.
 
 **Before spawning anything: confirm the round's specs exist and parse.**
 `plan-spine` may legitimately defer a later round's specs until that round starts
@@ -404,7 +417,8 @@ state is the evidence for diagnosing what happened.
 ## 7. The round barrier
 
 **Every work item in a round reaches `complete` before the next round starts** —
-strict-order verification, spec §6. A work item still `active` at the barrier
+strict-order verification, spec §6. An `abandoned` item was never dispatched and
+is not waited for (§3). A work item still `active` at the barrier
 **halts the round**; name it and stop.
 
 The barrier is what the DAG's edges bought. Round *K+1*'s items were declared to

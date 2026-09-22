@@ -85,6 +85,34 @@ The registry entry is the *index*; the ADR file carries the full context /
 decision / consequences prose. Keep them consistent — the index is what the
 mechanical checks read.
 
+### Repointing a bone's touch surface
+
+When the code a bone governs moves — into a `packages/` tree, a renamed module
+— its registered globs match nothing, and `"$oss_bin" touch_check` goes silently
+**clean** for every spine that touches the moved code: the spine is never
+reclassified to `bone`, and nothing reports why. Re-point the surface with a
+corrective append, never by editing state:
+
+```bash
+"$oss_bin" bone_set_touch "ADR-0002" "packages/core/src/domain/**,packages/core/src/port.rs"
+```
+
+It **replaces** the whole touch list — name every glob the bone should cover,
+old ones included where they still apply. The CSV grammar is the same as
+`bone_add`'s. It refuses an unknown ADR ref, a duplicate one (#305), and a list
+carrying no glob at all — a blank surface would make the check clean on every
+path, the defect being repaired. Update the ADR file's own statement of scope in
+the same change, so the index and the decision still agree.
+
+**Nothing verifies that the new globs match live code.** The verb is a
+correction you apply, not a detector: a re-point at a path that does not exist
+is accepted and stays silent, exactly like the stale glob it replaced. Check the
+new list yourself before relying on the repair — feed the moved code's real
+paths (list them with `git ls-files`) to `"$oss_bin" touch_check`, whose rc 0/1
+is the hit/clean verdict and is read per
+`plan-release/references/bone-touch-judge.md` §2. A re-point that still reads
+clean on the code it was meant to cover has repaired nothing.
+
 ### Authoring the ADR file
 
 `"$oss_bin" bone_add` writes **the index row only**. Nothing writes the ADR file, and
