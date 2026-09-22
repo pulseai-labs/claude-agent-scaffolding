@@ -145,11 +145,12 @@ Two cases are named because they look like clashes and are not:
   not plan here stays on the bullet above. The nested `run.json`'s mechanics — depth,
   routing, the round procedure and the close — are in `references/ossify-nested-run.md`.
 - **`doctor`.** One fresh tab and pane per dispatch, launched from the project-file
-  `doctor session` seat and released on return (`references/roles.md`). Its brief is the
-  fast-implementer template with its TASK replaced by the dispatch and its report body
-  replaced by the doctor's own findings — the same composition the default lane above uses,
-  and for the same reason: a seat whose brief names no `REPORT_PATH` gives the wait for it
-  nothing to wake on.
+  `doctor session` seat and released on return (`references/roles.md`). Its brief is composed
+  from the fast-implementer template exactly as the default lane above composes its own — the
+  same five lines replaced, for the same reason — with two differences the dispatch dictates:
+  the TASK is the `/ossify:doctor` dispatch, and the DONE line carries the diagnostic report
+  rather than `commit …; push; open the PR`, which a read-only sweep never runs. A seat whose
+  brief names no `REPORT_PATH` gives the wait for it nothing to wake on.
 - **`work-pr`.** After the single reviewer dispatch and your disposition, the fix dispatch
   to the retained implementer is `/ossify:work-pr <PR> --repo-root <worktree holding the
   PR branch>` with the disposition list embedded as a third finding signal — work-pr
