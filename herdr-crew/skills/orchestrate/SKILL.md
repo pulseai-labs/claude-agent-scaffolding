@@ -156,7 +156,11 @@ Two cases are named because they look like clashes and are not:
   line carries that dispatch's own result rather than `commit …; push; open the PR`. What that
   dispatch may write is ossify's contract, not this file's. A seat whose brief names no
   `REPORT_PATH` gives the wait for it nothing to wake on.
-- **`work-pr`.** After the single reviewer dispatch and your disposition, the fix dispatch
+- **`work-pr`.** Its brief carries the child templates it will construct, appended with the
+  dispatch as the spine coordinator's are: `references/briefs.md`'s reviewer template for the
+  review, and that file's fix-round and correction bodies for what follows — a work-PR session
+  builds those child briefs, and a dispatched brief is the whole contract its worker ever sees.
+  After the single reviewer dispatch and your disposition, the fix dispatch
   to the retained implementer is `/ossify:work-pr <PR> --repo-root <worktree holding the
   PR branch>` with the disposition list embedded as a third finding signal — work-pr
   targets the invoking repository unless told otherwise, and the retained implementer
