@@ -286,6 +286,11 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   assert_not_contains 'scaffold-dev' "$row" || return 1
   assert_not_contains 'scaffolding chain' "$row" || return 1
 
+  # S8 closing edit (item 3): the row's continuation clause states adoption's
+  # qualifier — the claim it replaced ("for existing source or history" alone)
+  # is what the row must not carry back.
+  assert_contains 'only for a project previously onboarded with the legacy scaffold stack' "$row" || return 1
+
   # S8 round 1 (F3): the lifecycle overview above the table must not leave
   # workspace-init at the head of the chain this release retires for new
   # workspaces — it names ossify as the continuation and the old chain as legacy.

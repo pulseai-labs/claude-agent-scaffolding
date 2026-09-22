@@ -170,9 +170,11 @@ Next steps:
   3. Make the workspace legible to Codex before you continue: ossify's interop check fails while
      `AGENTS.md` is missing or never names ossify, and it reports rather than repairs. Author that
      file, or merge an ossify section into the one you already have — keep whatever is already in
-     it. This skill writes no project guidance, so the file is yours.
-  4. Run `/ossify:adopt` for existing source or history (or `/ossify:start` if the canonical is
-     empty); on Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
+     it. This skill writes no project guidance, so the file is yours to author and commit before
+     step 4.
+  4. Run `/ossify:adopt` only for a project previously onboarded with the legacy scaffold stack —
+     without that stack there is no supported ossify continuation yet (or `/ossify:start` if the
+     canonical is empty); on Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
   5. Adoption refuses while any tree it will edit is dirty: the AI workspace, the canonical, and
      every repo the topology declares must all be clean — tracked and untracked — with each
      declared repo on the default branch the manifest declares (otherwise adoption names the
