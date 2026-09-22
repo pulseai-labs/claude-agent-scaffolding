@@ -18,10 +18,10 @@
 // BOTH this reference AND the `jq -n` payload in `wi_manifest_write`.
 //
 // Substitution points used by `wi_manifest_write` (NOT done via wi_render_template):
-//   ${SCHEMA_VERSION}            — always "1.0" for workspace-init v0.1.0
+//   ${SCHEMA_VERSION}            — always "1.0"
 //   ${AI_WORKSPACE_ROOT}         — absolute path
 //   ${AI_WORKSPACE_NAME}         — basename of AI workspace root
-//   ${AI_WORKSPACE_GIT_TRACKED}  — always true for v0.1.0
+//   ${AI_WORKSPACE_GIT_TRACKED}  — true by default; false when the AI workspace is not a git repo
 //   ${AI_WORKSPACE_GIT_REMOTE}   — null or "<url>"
 //   ${CANONICAL_ROOT}            — absolute path
 //   ${CANONICAL_NAME}            — basename
@@ -39,7 +39,7 @@
 //                                  Routes `/defer --tooling` to a tooling repo.
 //   ${PROJECT_TYPE}              — "personal" or "work"
 //   ${CREATED_AT}                — ISO 8601 (e.g. 2026-05-25T14:30:00Z)
-//   ${CREATED_BY}                — "workspace-init@0.1.0"
+//   ${CREATED_BY}                — "workspace-init@<running plugin version>"
 //
 // See: workspace-init/docs/SPEC §6.2 for the canonical schema and §6.3 for the
 // ${ai_workspace.root} / ${canonical.root} / ${PLUGIN_DATA:<name>} / ${HOME} /
@@ -101,7 +101,6 @@
   "well_known_paths": {
     "master_spec":            "${ai_workspace.root}/docs/MASTER-SPEC.md",
     "memory_bank":            "${ai_workspace.root}/.claude/memory-bank",
-    "principles_user_global": "${PLUGIN_DATA:architect-critic}/principles.md",
     "superpowers_brainstorm": "${ai_workspace.root}/.superpowers/brainstorm"
   },
 

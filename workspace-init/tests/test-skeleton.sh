@@ -290,17 +290,35 @@ test_S1_seed_subdirs_creates_all_with_gitkeep_and_gitignore() {
   }
 }
 
-test_S2_gitignore_content_matches_spec() {
+test_S2_gitignore_preserves_compat_entries_drops_dead_onboarding_state() {
   local parent="$_WI_TMP/s2"
   mkdir -p "$parent"
   wi_skeleton_create_root_ai_only "$parent" "foo" >/dev/null 2>&1
   local ai="$parent/foo-ai"
   wi_skeleton_seed_subdirs "$ai" >/dev/null 2>&1
   local body; body="$(cat "$ai/.gitignore")"
-  assert_contains ".workspace/handoffs/"              "$body" || return 1
-  assert_contains ".claude/.onboarding-state.json"    "$body" || return 1
+  # The dead onboarding-state entry is gone; the scaffold-dev handoff escape
+  # valve stays as a compatibility entry, and the OS entries are kept.
+  assert_not_contains ".claude/.onboarding-state.json" "$body" || return 1
+  assert_contains ".workspace/handoffs/"               "$body" || return 1
   assert_contains ".DS_Store"                          "$body" || return 1
   assert_contains "*.swp"                              "$body" || return 1
+}
+
+# The inline .gitignore fallback (used only when the template file is absent)
+# must produce a file byte-identical to the template it mirrors.
+test_S5_gitignore_inline_fallback_matches_template() {
+  local parent="$_WI_TMP/s5"
+  mkdir -p "$parent"
+  wi_skeleton_create_root_ai_only "$parent" "foo" >/dev/null 2>&1
+  local ai="$parent/foo-ai"
+  ( export WI_TEMPLATES_DIR="$_WI_TMP/no-templates"
+    wi_skeleton_seed_subdirs "$ai" >/dev/null 2>&1 ) || return 1
+  cmp -s "$ai/.gitignore" "$WI_PLUGIN_ROOT/templates/gitignore.tmpl" || {
+    echo '    inline fallback differs from gitignore.tmpl'; return 1; }
+  local body; body="$(cat "$ai/.gitignore")"
+  assert_contains ".workspace/handoffs/"               "$body" || return 1
+  assert_not_contains ".claude/.onboarding-state.json" "$body" || return 1
 }
 
 test_S3_seed_subdirs_idempotent_no_double_log() {
@@ -371,7 +389,8 @@ wi_test_run test_R2_create_root_pair_preserves_wrapper_contents
 wi_test_run test_A1_create_root_ai_only_creates_only_ai
 
 wi_test_run test_S1_seed_subdirs_creates_all_with_gitkeep_and_gitignore
-wi_test_run test_S2_gitignore_content_matches_spec
+wi_test_run test_S2_gitignore_preserves_compat_entries_drops_dead_onboarding_state
+wi_test_run test_S5_gitignore_inline_fallback_matches_template
 wi_test_run test_S3_seed_subdirs_idempotent_no_double_log
 wi_test_run test_S4_seed_subdirs_logs_each_gitkeep
 
