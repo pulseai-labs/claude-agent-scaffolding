@@ -821,12 +821,23 @@ section "the clauses the milestone proved revertible"
 pin "$EXEC_MD" 'item verifier and correction templates' \
   "the spine dispatch's supply list names the correction body"
 
-# T2 M-B. The five atomic-rename REPORT_PATH slots — three spine-layer, two
-# PR-layer. The `REPORT_PATH=` count pins above count the PREFIX, which a revert
-# to a non-atomic mechanism leaves untouched; this is the mechanism itself.
+# T2 M-B. The six atomic-rename REPORT_PATH slots — three spine-layer, two
+# PR-layer, one close-review-writer. The `REPORT_PATH=` count pins above count the
+# PREFIX, which a revert to a non-atomic mechanism leaves untouched; this is the
+# mechanism itself. The writer's slot was the sixth and escaped T2 entirely: its
+# finding named five, so "5/5 identical" was measured over the five it knew, and
+# this file's slot kept the pre-fix wording for a whole milestone (T7b).
 ATOMIC='replaced whole — a temp file in the same directory renamed over the path, never in pieces'
 n_eq "$BRIEFS_MD" "$ATOMIC" 3 "all three spine-layer report slots rename atomically"
 n_eq "$PRBRIEFS_MD" "$ATOMIC" 2 "both PR-layer report slots rename atomically"
+n_eq "$WRITER_MD" "$ATOMIC" 1 "the close-review writer's report slot renames atomically"
+# The generic layer's nine, added with the writer's slot in T7b. Not part of the
+# six T2's finding named, but the same class and the same file set: measured, a
+# revert of ONE of these nine left every suite green, exactly the hole the writer's
+# slot was. The set is now 9+3+2+1 = all fifteen slot lines in shipped prose, so a
+# revert of any one of them goes RED. The counter is the plain one — measured, this
+# needle sits whole on one line in all fifteen, so no `flat` is needed here.
+n_eq "$GENERIC_BRIEFS_MD" "$ATOMIC" 9 "all nine generic brief slots rename atomically"
 
 # T2 M-E. The identity anchor: reverting it to a four-part "fingerprint" left the
 # suite green. The four ids straddle a wrap, so this is two contiguous halves —
