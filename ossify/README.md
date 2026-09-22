@@ -1,4 +1,4 @@
-# ossify (v1.10.0)
+# ossify (v1.11.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Nine entry skills (`start`, `adopt`,
@@ -38,6 +38,18 @@ zero lines - empty, user-only, or all-quarantined - instead of printing
 `PASS 0 lines`, and the close ceremony's quarantine check writes its
 head/parent evidence into a per-invocation tempdir rather than fixed `/tmp`
 paths that collided across concurrent closes.
+
+Since 1.11.0, two states the lifecycle could not express have a verb. A work
+item minted and then withdrawn before any dispatch is marked `abandoned`
+(`oss work_item_status <id> abandoned`): the round walk, spine close, harvest
+and release close all skip it, where before it either blocked spine close as
+`planned` or recorded a merge that never happened as `complete`. And a bone's
+or risk gate's touch surface can be re-pointed after the code it covers moves
+(`oss bone_set_touch`, `oss risk_gate_set_touch`), so `touch_check` no longer
+goes silently clean on globs that match nothing. Both are journaled corrective
+appends. The op names `set_bone_touch` and `set_risk_gate_touch`, their
+payloads `{adr,touch}` and `{name,touch}`, and the status value `abandoned` are
+a compatibility contract: replay depends on them staying exactly as spelled.
 
 Since 1.7.0 (#368), every bare `doctor` sweep includes plugin provenance and
 `doctor provenance` runs it alone. It reports the answering `oss` binary, the
