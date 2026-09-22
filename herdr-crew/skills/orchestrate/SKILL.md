@@ -148,9 +148,10 @@ Two cases are named because they look like clashes and are not:
   `doctor session` seat and released on return (`references/roles.md`). Its brief is composed
   from the fast-implementer template exactly as the default lane above composes its own — the
   same five lines replaced, for the same reason — with two differences the dispatch dictates:
-  the TASK is the `/ossify:doctor` dispatch, and the DONE line carries the diagnostic report
-  rather than `commit …; push; open the PR`, which a read-only sweep never runs. A seat whose
-  brief names no `REPORT_PATH` gives the wait for it nothing to wake on.
+  the TASK is the operator's dispatch verbatim, its surface arguments included, and the DONE
+  line carries that dispatch's own result rather than `commit …; push; open the PR`. What that
+  dispatch may write is ossify's contract, not this file's. A seat whose brief names no
+  `REPORT_PATH` gives the wait for it nothing to wake on.
 - **`work-pr`.** After the single reviewer dispatch and your disposition, the fix dispatch
   to the retained implementer is `/ossify:work-pr <PR> --repo-root <worktree holding the
   PR branch>` with the disposition list embedded as a third finding signal — work-pr
