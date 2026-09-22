@@ -99,11 +99,24 @@ MANIFEST="$ROOT/herdr-crew/.claude-plugin/plugin.json"
 if [[ ! -f "$MARKETPLACE" || ! -f "$MANIFEST" ]]; then
   fail "the marketplace listing and the plugin manifest both exist"
 else
+  # The emptiness guard uses $( ) deliberately — stripping is what "empty" means
+  # here — while the EQUALITY test must not, which is why the jq expression runs
+  # twice per side and the two checks use different machinery. $( ) strips
+  # trailing newlines from both sides, so a description differing only in one
+  # reads equal; cmp over the streams sees it. Both are hardened the same way as
+  # the two copy pins above.
+  #
+  # Note where this pin's mutations live: on the STREAM, not the file. Appending
+  # a blank line to either JSON source leaves jq's output byte-identical —
+  # measured — because jq re-serializes the value and the file's own trailing
+  # newline never reaches it. The discriminating mutation is a `\n` INSIDE the
+  # description string, which is what cmp catches and $( ) does not.
   mkt="$(jq -r '.plugins[] | select(.name == "herdr-crew") | .description' "$MARKETPLACE")"
   man="$(jq -r '.description' "$MANIFEST")"
   if [[ -z "$mkt" || -z "$man" ]]; then
     fail "the marketplace entry and the manifest both carry a description" "empty on one side — an empty string equals no other claim"
-  elif [[ "$mkt" == "$man" ]]; then
+  elif cmp -s <(jq -r '.plugins[] | select(.name == "herdr-crew") | .description' "$MARKETPLACE") \
+              <(jq -r '.description' "$MANIFEST"); then
     pass "the marketplace entry's description matches the plugin manifest's"
   else
     fail "the marketplace entry's description matches the plugin manifest's — the plugin is described two ways"

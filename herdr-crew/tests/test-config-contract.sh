@@ -164,11 +164,15 @@ sweep_file() {
     # replacing them with a space. A markdown hard wrap splits a name at its
     # hyphen: `claude-` ends one line and `glm` opens the next. A space-join
     # rebuilds that as `claude- glm` and misses it; deleting rebuilds the name.
-    # Deleting cannot manufacture one either — every member of PERSONAL is
-    # space-less, so the join is what a split name already is. Until T7 the
-    # count was per line, and a wrap-split name was structurally invisible to
-    # it: the whole milestone leans on this gate. The unreadable-file guard
-    # above stays ahead of this pass, which is what keeps the three controls
+    # Deleting can also MANUFACTURE one: a line ending `claude` joined to a line
+    # opening `-glm` spells `claude-glm` — measured, per-line 0 and joined 1 on
+    # that fixture. The direction is what makes that acceptable, and it is
+    # fail-closed: the joined count is monotonically at or above the per-line
+    # count, so the join can only fail a file, never certify one, and a false RED
+    # is loud. Absent today — per-line and joined agree on all 16 swept files.
+    # Until T7 the count was per line, and a wrap-split name was structurally
+    # invisible to it: the whole milestone leans on this gate. The unreadable-file
+    # guard above stays ahead of this pass, which is what keeps the three controls
     # that call this function exercising the join rather than the read.
     c="$(tr -d '\n' < "$f" | awk -v needle="$needle" '
       { line = $0

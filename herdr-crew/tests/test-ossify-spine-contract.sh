@@ -122,6 +122,23 @@ absent() {
   else fail "$3" "'$2' occurs $c time(s) in ${1##*/}"; fi
 }
 
+# Every needle must count 0. For a claim whose SPELLING is not fixed, one needle
+# asserts less than its label promises: T7's absence pin below counted 0 for four
+# honest rewordings of the very claim it was written to keep out. The label here
+# describes the whole set, the failure message names the spelling that came back,
+# and an empty set is refused — a count over nothing is not a clean file.
+absent_any() { # <file> <label> <line|flat> <needle>...
+  _file="$1"; _label="$2"; _how="$3"; shift 3
+  if [ "$#" -eq 0 ]; then fail "$_label" "no needles — an empty set certifies nothing"; return 0; fi
+  _hits=""
+  for _needle in "$@"; do
+    _c="$(count_of "$_file" "$_needle" "$_how")" || { fail "$_label" "unreadable file: $_file"; return 0; }
+    [ "$_c" -eq 0 ] || _hits="$_hits [$_needle x$_c]"
+  done
+  if [ -z "$_hits" ]; then pass "$_label"
+  else fail "$_label" "the claim is back:$_hits"; fi
+}
+
 nonempty() {
   if [ -s "$1" ]; then pass "$2"
   else fail "$2" "$1 is missing or empty — every zero-count against it would be vacuous"; fi
@@ -851,8 +868,23 @@ pin "$NESTED_MD" '`tree_oid`, `report_oid` and `spec_oid`, the four ids the exte
 # `close/references/work-item-close.md` — it compares no oid. `flat`: the removed
 # sentence wrapped between "four the" and "close", so only the squeezed count
 # catches a reintroduction that breaks the line somewhere else.
-absent "$NESTED_MD" 'close guard fingerprints' \
-  "the identity anchor carries no close-guard fingerprint claim" flat
+#
+# THREE needles, not one, and the label is narrowed to what they assert. Review of
+# T7 measured the one-needle form counting 0 for `close-guard fingerprints` (the
+# hyphenated spelling that form's own label taught), `close guard's fingerprints`,
+# `close guard fingerprint covers` and `fingerprinted by the close guard` — four
+# honest rewordings of the claim the pin exists to exclude, each of which it would
+# have called absent. The set below catches all four, and both wrap-break positions
+# of the hyphenated form (`close-guard` broken at its hyphen squeezes to
+# `close- guard`). So the label says the guard is NAMED nowhere rather than that no
+# such claim exists. What that still leaves uncovered, and why it is accepted: a
+# spelling that makes the claim without naming the guard in any of these three
+# forms. Any realistic reintroduction names it, and the residual failure direction
+# is the loud one — a future TRUE sentence that merely mentions the close guard
+# false-REDs, which its author sees at once.
+absent_any "$NESTED_MD" \
+  "the identity anchor names no close guard, so it cannot carry the fingerprint claim" flat \
+  'close guard' 'close-guard' 'close- guard'
 
 # T4 G1. Reverting roles.md wholesale dropped all of these: the #516c probe
 # conditioning — pinned in both of its halves, the profile's and the route's —
