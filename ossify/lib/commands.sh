@@ -24,6 +24,22 @@ _oss_need() { # $1=count $2=verb $3=usage ; then "$@" from the caller
     echo "oss: $verb needs $want argument(s) - usage: oss $verb $usage" >&2; return 2; }
 }
 
+# Exact-arity guard (#530). `_oss_need` counts with `-ge`, which is right for the
+# verbs whose last parameter is optional - and wrong for a verb whose arguments
+# are a target plus ONE csv: a caller who space-splits a list instead of using the
+# documented CSV grammar got rc 0 and a SHRUNK list, silently, and because a
+# corrective append REPLACES the list, the coverage the caller believed they
+# re-stated was gone. Too few answers with `_oss_need`'s own message, so the sweep
+# above keeps covering it; too many names the grammar the caller missed.
+_oss_need_exact() { # $1=count $2=verb $3=usage ; then "$@" from the caller
+  local want="$1" verb="$2" usage="$3"; shift 3
+  if [ "$#" -lt "$want" ]; then
+    echo "oss: $verb needs $want argument(s) - usage: oss $verb $usage" >&2; return 2
+  fi
+  [ "$#" -eq "$want" ] || {
+    echo "oss: $verb takes exactly $want argument(s) - usage: oss $verb $usage; a list is ONE comma-separated argument, and spaces split it into several" >&2; return 2; }
+}
+
 oss_cmd_init() { # $1=project-name
   _oss_need 1 init "<project-name>" "$@" || return 2
   local sf; sf="$(_oss_resolve_state)" || return $?
@@ -71,11 +87,11 @@ oss_cmd_risk_gate_set_controls() { # $1=name $2=controls-csv — corrective appe
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_risk_gate_controls "$sf" "$1" "$2"
 }
 oss_cmd_bone_set_touch() { # $1=adr $2=touch-csv — corrective append (1.11.0)
-  _oss_need 2 bone_set_touch "<adr> <touch-csv>" "$@" || return 2;
+  _oss_need_exact 2 bone_set_touch "<adr> <touch-csv>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_bone_touch "$sf" "$1" "$2"
 }
 oss_cmd_risk_gate_set_touch() { # $1=name $2=touch-csv — corrective append (1.11.0)
-  _oss_need 2 risk_gate_set_touch "<name> <touch-csv>" "$@" || return 2;
+  _oss_need_exact 2 risk_gate_set_touch "<name> <touch-csv>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_risk_gate_touch "$sf" "$1" "$2"
 }
 oss_cmd_fake_add() { # $1=boundary $2=channel $3=reason $4=trigger $5=expiry-release

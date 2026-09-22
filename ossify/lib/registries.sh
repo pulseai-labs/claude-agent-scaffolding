@@ -67,6 +67,21 @@ _oss_repoint_guard() { # $1=json-list $2=noun $3=csv-name $4=needle $5=blank-why
     echo "oss: the new $noun is not one list - a $csv is a single comma-separated line, and a newline splits it into several" >&2; return 2; }
   jq -en --argjson t "$list" 'any($t[]; test("[^\\s]"))' >/dev/null 2>&1 || {
     echo "oss: the new $noun needs at least one $needle - every entry is blank, and $blank_why" >&2; return 2; }
+  # #530: a REAL entry carrying surrounding whitespace passes both arms above -
+  # it is not blank - and its glob can never match a real path once the CR (or
+  # tab, or NBSP) is part of it. Measured on 602565f: a CR-terminated glob was
+  # journaled at rc 0 and touch_check went CLEAN on the very path the re-point was
+  # meant to cover, which is the defect these verbs exist to repair entered
+  # through their own argument handling. LEADING/TRAILING only, deliberately: an
+  # interior space is legal (a path can contain one), so this is narrower than
+  # "any whitespace". The offending entry is named with @json, because a CR on a
+  # terminal is invisible and "trailing whitespace" alone does not say which
+  # entry to fix.
+  bad="$(jq -rn --argjson t "$list" 'first($t[] | select(. != (sub("^\\s+";"") | sub("\\s+$";"")))) // empty | @json')" || {
+    echo "oss: cannot read the new $noun" >&2; return 2; }
+  if [ -n "$bad" ]; then
+    echo "oss: the new $noun has an entry with leading or trailing whitespace: $bad - trim it; $ws_why" >&2; return 2
+  fi
 }
 
 oss_reg_add_bone() { # $1=state $2=adr-ref $3=title $4=touch-csv $5=revisit(optional)

@@ -237,6 +237,30 @@ for csv in "$(printf '\t')" "$(printf '\r')" "$(printf '\v')" "$(printf '\xc2\xa
   t_assert_rc 2 "risk_gate_set_touch refuses a blank-lookalike list (non-space whitespace, $(printf '%s' "$csv" | od -An -tx1 | tr -d ' '))"
   t_assert_contains "$T_OUT" "at least one glob" "...and says what it needs"
 done
+# #530: a REAL glob carrying one non-space whitespace character passes the blank
+# guard above - that guard only requires SOME entry with a non-whitespace
+# character, and the splitter trims literal spaces only. Measured on 602565f:
+# `bone_set_touch ADR-0003 "$(printf 'src/silver/**\r')"` returned rc 0,
+# journaled a CR-terminated glob, and touch_check went CLEAN on the very path the
+# re-point was meant to cover - the defect these verbs exist to repair, entered
+# through their own argument handling. The realistic vector is a csv composed
+# from a CRLF file through `while IFS= read -r` (strips \n, keeps \r).
+for csv in "$(printf 'src/silver/**\r')" "$(printf 'src/silver/**\v')" "$(printf '\tsrc/silver/**')" "$(printf 'src/silver/**\xc2\xa0')" "$(printf 'src/silver/**　')"; do
+  _hex="$(printf '%s' "$csv" | od -An -tx1 | tr -d ' ')"
+  t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "$csv"
+  t_assert_rc 2 "bone_set_touch refuses an entry with surrounding whitespace ($_hex)"
+  t_assert_contains "$T_OUT" "leading or trailing whitespace" "...and says what is wrong with the entry ($_hex)"
+  t_capture oss_reg_set_risk_gate_touch "$ST" gold-correctness "$csv"
+  t_assert_rc 2 "risk_gate_set_touch refuses it too ($_hex)"
+  t_assert_contains "$T_OUT" "leading or trailing whitespace" "...with the same diagnosis ($_hex)"
+done
+# The message NAMES the offending entry, and renders it escaped (@json), because
+# a CR on a terminal is invisible - an operator told only "trailing whitespace"
+# cannot find which entry to fix.
+t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "$(printf 'src/silver/**\r')"
+t_assert_contains "$T_OUT" 'src/silver/**\r' "...and names the entry with its whitespace escaped, not literally"
+t_capture jq -c '.bones[] | select(.adr=="ADR-0003") | .touch' "$ST"
+t_assert_eq '["packages/ma/silver/**","packages/ma/ingestion/**"]' "$T_OUT" "...and the refused call left the accepted surface in place"
 # The OTHER input the splitter mishandles: jq -R is LINE-oriented, so a csv
 # wrapped over two lines emits TWO JSON values and --argjson cannot parse them.
 # Fail-closed either way, but the diagnostic must not say "empty" - that is a
@@ -280,6 +304,17 @@ for _v in oss_reg_set_bone_touch oss_reg_set_risk_gate_touch oss_reg_set_risk_ga
 done
 t_capture jq '.mutations | length' "$ST"
 t_assert_eq "$N1" "$T_OUT" "every refusal above left the journal unchanged"
+# ADJACENT CONTROL for #530's per-entry guard: an INTERIOR space is not
+# surrounding whitespace - a path can contain one, so refusing it would be a
+# guard stricter than the operation it protects. This row is what goes RED if the
+# check is written as "any whitespace in the entry" instead of "leading or
+# trailing".
+t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "src/my file.py,src/ok/**"
+t_assert_rc 0 "an entry with an interior space is still accepted"
+t_capture jq -c '.bones[] | select(.adr=="ADR-0003") | .touch' "$ST"
+t_assert_eq '["src/my file.py","src/ok/**"]' "$T_OUT" "...and the interior space survives into the journaled surface"
+t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "packages/ma/silver/**,packages/ma/ingestion/**"
+t_assert_rc 0 "...and the surface is re-pointable again afterwards"
 # Duplicates (#305 shape) refuse rather than guess which entry to re-point.
 oss_reg_add_bone "$ST" ADR-0003 "silver layer, minted twice" "src/x/**" "" >/dev/null
 oss_reg_add_risk_gate "$ST" gold-correctness "src/y/**" "dup" >/dev/null
