@@ -16,7 +16,12 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
-REF_BUDGET=200
+# 204, raised from 200 during PR #513's review rounds: this file's budget is this
+# port's own invention (orca-crew has no mechanics reference), and the rounds' P1
+# fixes — the run workspace's per-server allocation, the first seat's cwd, the
+# agent_blocked re-send — needed room that eight content-neutral trades could not
+# keep finding. The gate still fails over the limit; the slack is two lines.
+REF_BUDGET=204
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

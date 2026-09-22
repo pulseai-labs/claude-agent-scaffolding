@@ -113,10 +113,10 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      asked upward and nothing is created. Then branch on PRIOR_REVIEW. `none` means
      the top dispatched you onto a PR no earlier work-PR dispatch has covered — an
      initial run, and step 3 creates the reviewer. `covered` means a dispatch worked
-     this PR and left durable evidence its delegated review ran
-     but persisted no record: a resumed run, no reviewer created,
-     the current head's signals as your baseline; evidence absent the value is not
-     spent — ask the top and create nothing. A record whose reviewed head equals
+     this PR and left durable evidence its delegated review ran but persisted no record:
+     a resumed run, no reviewer created, the current head's signals as your baseline,
+     and only where that review's findings survive it — proof of execution with none is
+     not `covered`: halt and ask the top. Evidence absent the value is not spent; ask. A record whose reviewed head equals
      the current PR head is a resumed run: skip only step 3's reviewer creation —
      the review already ran — and enter step 4 with the record and its unresolved
      findings as your disposition baseline. A record on a moved head is a resumed

@@ -133,7 +133,10 @@ Two cases are named because they look like clashes and are not:
   is ossify's orchestrator for that spine rather than an implementer; the PLACEMENT by the
   tree the lane runs from; and the NEVER line, because it forbids running subagents and
   merging, which are this seat's job. No template ships for it, and without that `REPORT_PATH`
-  the wait for it has nothing to wake on.
+  the wait for it has nothing to wake on. When its barrier lands, the close transition
+  `lifecycle.md` step 1b defines is this path's too: dispatch `/ossify:close <spine-id>` to a
+  fresh close session, then a work-PR session per returned PR, then the record pass — otherwise
+  a successful default lane has no defined next step and nothing records what it opened.
 - **`run-spine`, when this session just planned the spine.** Then the items deserve
   their own models, and inherited-runtime subagents cannot give them that.
   **Read `references/ossify-execution.md` and follow it**: the seats for the spine are

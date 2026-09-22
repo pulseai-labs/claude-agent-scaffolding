@@ -12,12 +12,14 @@ Where it overrides the guide's default, it says so. Read each id from the JSON t
 No single herdr call creates a seat, starts its command and delivers its brief, so a seat
 is this sequence, in which `<seat label>` is `seat: <role> (<agent>)`:
 
-1. **The run's workspace, once per run, whatever the first seat needs.**
+1. **The run's workspace, once per run per server that hosts a seat.**
    `herdr workspace create --cwd <a path that already exists> --label "run: <objective>"
-   --no-focus` — the first seat's tree, or a neutral path when that seat's worktree is still
-   to be created (step 2), since a `--cwd` that does not exist yet fails the launch. Its tab
-   and shell pane (`.result.tab`, `.result.root_pane`) are the first seat's when its tree is
-   that path: `herdr tab rename <tab> "<seat label>"`, not a second tab beside an empty one.
+   --no-focus` — the first seat's tree, or a neutral path when that seat's worktree is still to
+   be created (step 2), since a `--cwd` that does not exist yet fails the launch. Its tab and
+   shell pane (`.result.tab`, `.result.root_pane`) are the first seat's when its tree is that
+   path: `herdr tab rename <tab> "<seat label>"`, not a second tab beside an empty one. A
+   seat on another machine needs its own, created with `--machine <label>`: ids are
+   server-scoped.
 2. **One tab per further seat.**
    `herdr tab create --workspace <id> --cwd <the seat's tree> --label "<seat label>" --no-focus`.
    Its pane is `.result.root_pane`. A seat that needs a new worktree uses
@@ -194,7 +196,6 @@ machine that list does not show halts the run, never a guess. Every command for 
 then carries `herdr --machine <label>`, with its ids discovered there: ids and agent names
 are scoped to one server, and `--current` reaches no remote pane. Never consume a path from
 a `--machine` reply; resolve the seat's paths on its own machine. Place a seat only on a
-machine that stays up for its life and whose filesystem the orchestrator can read: its
-report file is read where it is written, so an unopenable `REPORT_PATH` never reports. A
-connection failure does not prove a mutation was not applied, so inspect the remote state
-before retrying.
+machine that stays up and whose filesystem the orchestrator can read: its report file is read
+where it is written, so an unopenable `REPORT_PATH` never reports. A connection failure does
+not prove a mutation was not applied, so inspect the remote state before retrying.

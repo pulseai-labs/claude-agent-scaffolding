@@ -33,7 +33,7 @@ verbatim rather than restating it.
 
 ```text
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
-SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
+SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 ROLE: implementer. State the model you are running in your first reply, then continue.
@@ -69,7 +69,7 @@ If a tool or policy refuses you, report it verbatim and stop that step.
 
 ```text
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
-SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
+SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 ROLE: implementer. State the model you are running in your first reply, then continue.
@@ -95,7 +95,7 @@ stop; report refusals verbatim.
 
 ```text
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
-SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
+SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 ROLE: reviewer. State the model you are running in your first reply, then continue.
@@ -126,7 +126,7 @@ escalation goes there too, then stop.
 
 ```text
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
-SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
+SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 ROLE: verifier, read-only. State the model you are running in your first reply, then
@@ -161,7 +161,7 @@ lines and TASK replaced by:
 
 ```text
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
-SEAT_EXPECTED_MODEL=<the model the banner or screen must show>
+SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
 TASK: work PR <number> to zero unresolved review threads. Inputs, in priority order:

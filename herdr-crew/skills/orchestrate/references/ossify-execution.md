@@ -13,7 +13,9 @@ Four facts, **all** of them, and each about the session you are in right now:
 
 1. herdr-crew is the current top orchestrator;
 2. the run's `run.json` is bound;
-3. this session has just completed `/ossify:plan-spine`;
+3. this session has just completed `/ossify:plan-spine` — **or it resumed a handoff whose
+   `SEATS` block and spine plan the handoff carries, which is how a rotated top inherits the
+   activation: the handoff is the marker, and a resumed top satisfies this fact by having it**;
 4. a concrete spine directory exists on disk.
 
 Absent any one, this file does not apply and ossify runs as `SKILL.md` §6 says.
