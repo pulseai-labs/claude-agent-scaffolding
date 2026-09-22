@@ -86,9 +86,8 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
 DONE: release every item pair and close the workspace you created for them,
-as MECHANICS's Teardown says, with `herdr workspace list` showing none of them — close
-only what you can prove you created, never an active, reused, unrelated or unprovable
-identity; report teardown you cannot complete, never claim it. Then write your report file:
+as MECHANICS's Teardown says, with `herdr workspace list` showing none of them; report
+teardown you cannot complete, never claim it. Then write your report file:
   Changed / Evidence / Open / Files as ids, SHAs, counts and a report path, and the path of RUN_JSON.
 ROTATE instead once the context-ceiling notice has fired: stop at the next round barrier,
 do the same teardown, write `/ossify:handoff`, and write `rotate: <handoff path>` to your
@@ -156,14 +155,14 @@ procedure is this skill's existing all-claims work-item verification — the
 `briefs.md` verifier body, with these placements and this retention.
 
 ```text
-ROLE: verifier for <work-item-id>, read-only. State the model you are running — if it is not
-your SEATS row's, that is a failed launch: report it and stop.
-
-PLACEMENT: worktree <abs path>, at <head sha>, staged tree <tree oid>.
+ROLE: verifier for <work-item-id>, read-only, in worktree <abs path>, at <head sha>, staged
+tree <tree oid>. State the model you are running; EXPECTED_MODEL below is the value to match —
+a mismatch is a failed launch to report and stop.
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
+EXPECTED_MODEL=<this item's SEATS row names it — fill this line; a coordinator never sends it blank>
 
-CLAIMS: <the numbered all-claims list from briefs.md's verifier template, filled
-from this item's spec>.
+CLAIMS: <the numbered list the coordinator fills from this item's spec, from the verifier body
+it supplied — every claim, so the verifier reads no other file for them>.
 
 DONE: write your report file with one line per claim — pass | fail | cannot
 determine, with commands and output verbatim — then the caveats. `Cannot
