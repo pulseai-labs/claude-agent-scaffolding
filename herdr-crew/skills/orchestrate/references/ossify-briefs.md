@@ -156,8 +156,8 @@ procedure is this skill's existing all-claims work-item verification — the
 `briefs.md` verifier body, with these placements and this retention.
 
 ```text
-ROLE: verifier for <work-item-id>, read-only. State the model you are running in
-your first reply, then continue.
+ROLE: verifier for <work-item-id>, read-only. State the model you are running — if it is not
+your SEATS row's, that is a failed launch: report it and stop.
 
 PLACEMENT: worktree <abs path>, at <head sha>, staged tree <tree oid>.
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces

@@ -72,7 +72,9 @@ injection: build the spine session's SEATS block by looking each approved name
 up in the machine file for its resolved profile, then inject
 the block into the spine session's brief (`ossify-briefs.md`) — the approved seats travel in the brief,
 so an edit made for another spine cannot reach a
-spine already running. A seat that needs to change mid-spine is a new operator
+spine already running. **The item briefs travel with it**: append that file's item implementer and
+item verifier templates to the same dispatch, because the spine session builds those child briefs
+from what it was given, and a dispatched brief is the whole contract its worker ever sees. A seat that needs to change mid-spine is a new operator
 decision you relay down through the reply; no session re-reads the file for it.
 
 A handoff the top writes **carries the approved seats verbatim** — the item rows

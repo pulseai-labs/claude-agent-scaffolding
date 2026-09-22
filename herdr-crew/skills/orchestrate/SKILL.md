@@ -127,9 +127,10 @@ Two cases are named because they look like clashes and are not:
   in the background is a coordinator seat (`references/herdr-mechanics.md`, Completion).
   Its brief is composed from `references/briefs.md`'s fast-implementer template: that
   template's three `SEAT_` lines, its `REPORT_PATH` line and its RULES slot stand; its ROLE,
-  PLACEMENT, TASK, DONE body and NEVER line are all replaced — the TASK by the dispatch; the DONE body by the
-  one `references/ossify-briefs.md`'s spine-session DONE block defines (ids, SHAs and counts;
-  a lane driver on this path owns no run file of its own); the ROLE by the lane driver's, who
+  PLACEMENT, TASK, DONE body and NEVER line are all replaced — the TASK by the dispatch; the
+  DONE body by its own completion body, not the activated spine brief's: the spine id, each
+  round's items and their state, the barrier's result, and the SHAs it merged; no run-file path
+  and no item-pair teardown, which belong to that other path. The ROLE by the lane driver's, who
   is ossify's orchestrator for that spine rather than an implementer; the PLACEMENT by the
   tree the lane runs from; and the NEVER line, because it forbids running subagents and
   merging, which are this seat's job. No template ships for it, and without that `REPORT_PATH`
