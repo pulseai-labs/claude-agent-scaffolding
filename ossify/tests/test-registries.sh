@@ -15,6 +15,35 @@ t_assert_rc 0 "fake added"
 t_capture oss_reg_add_feature "$S" "paper trading loop" "user places a paper trade and sees P&L move" flesh journey-map
 t_assert_rc 0 "feature added"
 
+# --- #305 item 1: the add verbs refuse a ref that already exists -----------
+# The ADR ref (and the gate name) is the key every reader uses - touch_check, the
+# doctor shape gate, the registry doc - and the writer did not enforce it: a
+# second bone_add for ADR-013 minted a second row for one ref (the PulseDB adopt
+# pilot, 2026-08-23), after which bone_set_touch refuses the ref at rc 7 and the
+# operator holds a surface they cannot repair. Nothing detects a duplicate, so the
+# writer is the only place the mint can be refused.
+t_capture oss_reg_add_bone "$S" ADR-0002 "a second row for one ref" "src/other/**" ""
+t_assert_rc 7 "bone_add refuses an ADR ref that already exists"
+t_assert_contains "$T_OUT" "already exists" "...and says the ref is already there"
+t_assert_contains "$T_OUT" "bone_set_touch" "...and names the repair for an existing surface"
+t_assert_contains "$T_OUT" "#305" "...and names the issue"
+t_capture jq '[.bones[] | select(.adr=="ADR-0002")] | length' "$S"
+t_assert_eq "1" "$T_OUT" "...and no second row was minted"
+t_capture oss_reg_add_risk_gate "$S" live-money "src/other/**" "ctl"
+t_assert_rc 7 "risk_gate_add refuses a name that already exists"
+t_assert_contains "$T_OUT" "already exists" "...and says so"
+t_assert_contains "$T_OUT" "risk_gate_set_touch" "...and names the repair"
+t_capture jq '[.risk_gates[] | select(.name=="live-money")] | length' "$S"
+t_assert_eq "1" "$T_OUT" "...and no second gate was minted"
+# ADJACENT CONTROL: a DISTINCT ref is still added, and bone_add still admits an
+# empty surface - the asymmetry with the re-point verbs is deliberate and pinned
+# below (a bone with no surface is legitimate at mint; a re-point to nothing is
+# not a repair).
+t_capture oss_reg_add_bone "$S" ADR-0011 "a different decision" "" ""
+t_assert_rc 0 "a distinct ADR ref is still added, with an empty surface"
+t_capture jq -c '.bones[] | select(.adr=="ADR-0011") | .touch' "$S"
+t_assert_eq '[]' "$T_OUT" "...and its empty surface is recorded as such"
+
 # --- D1 fake lifecycle (Task 2, named risk 7): oss_reg_set_fake_status must
 # leave expiry_release ALONE when the 5th arg (new expiry) is omitted.
 # test-ledger.sh only exercises the WITH-a-new-expiry (renew) path, so that
@@ -136,7 +165,13 @@ t_assert_contains "$T_OUT" "oss init" "the message names the remedy verb"
 t_capture oss_reg_set_risk_gate_controls "$S" no-such-gate "x"
 t_assert_rc 7 "unknown gate name refuses"
 t_assert_contains "$T_OUT" "unknown risk gate" "the unknown-name refusal names the gate"
-t_capture oss_reg_add_risk_gate "$S" phrase-gate "src/**" "dup"   # #305 shape
+# The duplicate row is built with the RAW op now, because the add rail refuses to
+# mint one - and that is a STRONGER fixture than the verb was: it proves the set
+# verbs refuse a duplicate that arrived through a path no shipped verb can create
+# any more (a journal written by an older build, or the check-to-append race the
+# state comment names).
+oss_state_mutate "$S" add_risk_gate \
+  "$(jq -n --arg ts "$(_oss_now)" '{name:"phrase-gate",touch:["src/**"],controls:["dup"],at:$ts}')" >/dev/null
 t_capture oss_reg_set_risk_gate_controls "$S" phrase-gate "x"
 t_assert_rc 7 "duplicate gate names refuse rather than guess"
 t_assert_contains "$T_OUT" "#305" "the duplicate refusal names the issue"
@@ -345,9 +380,15 @@ t_capture oss_reg_set_risk_gate_controls "$ST" gold-correctness "ctl-a,ctl-b"
 t_assert_rc 0 "a non-empty controls list still replaces wholesale"
 t_capture jq -c '.risk_gates[] | select(.name=="gold-correctness") | .controls' "$ST"
 t_assert_eq '["ctl-a","ctl-b"]' "$T_OUT" "...and lands in the journal"
-# Duplicates (#305 shape) refuse rather than guess which entry to re-point.
-oss_reg_add_bone "$ST" ADR-0003 "silver layer, minted twice" "src/x/**" "" >/dev/null
-oss_reg_add_risk_gate "$ST" gold-correctness "src/y/**" "dup" >/dev/null
+# Duplicates (#305 shape) refuse rather than guess which entry to re-point. Both
+# rows are minted with the RAW op: the add rails (added with #305 item 1) refuse
+# to create a duplicate, so a fixture built through the verb would be impossible -
+# and this way the set verbs are proven against a duplicate that only an older
+# journal or a check-to-append race can produce.
+oss_state_mutate "$ST" add_bone \
+  "$(jq -n --arg ts "$(_oss_now)" '{adr:"ADR-0003",title:"silver layer, minted twice",touch:["src/x/**"],revisit_trigger:null,at:$ts}')" >/dev/null
+oss_state_mutate "$ST" add_risk_gate \
+  "$(jq -n --arg ts "$(_oss_now)" '{name:"gold-correctness",touch:["src/y/**"],controls:["dup"],at:$ts}')" >/dev/null
 t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "src/**"
 t_assert_rc 7 "bone_set_touch: a duplicate ADR refuses"
 t_assert_contains "$T_OUT" "#305" "...and names the issue"

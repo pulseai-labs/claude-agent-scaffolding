@@ -23,6 +23,24 @@ _oss_csv_to_json() {
   | map(gsub("\uE000"; ",") | gsub("^ +| +$";""))
   | map(select(length>0))'; }
 
+# The read the ladder and the add-rails share: how many records match the key.
+# Echoes the count; rc 1 no state (with the init remedy), rc 2 unreadable or a
+# non-numeric count - the `case` arm is the belt to the `||`'s braces, because a
+# jq that exits 0 with something that is not a number would otherwise reach an
+# arithmetic test as a syntax error.
+_oss_reg_count() { # $1=state-file $2=jq-selector(uses $v) $3=plural $4=value
+  local sf="$1" sel="$2" many="$3" val="$4" n
+  if [ ! -f "$sf" ]; then
+    echo "oss: no state at $sf - run 'oss init <name>' first" >&2; return 1
+  fi
+  n="$(jq --arg v "$val" "[$sel] | length" "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read $many from $sf" >&2; return 2; }
+  case "$n" in ''|*[!0-9]*)
+    echo "oss: cannot read $many from $sf" >&2; return 2 ;;
+  esac
+  printf '%s\n' "$n"
+}
+
 # The resolve-and-refuse ladder, ONCE (#525). Three verbs carried it
 # line-for-line - set_risk_gate_controls (#340), set_bone_touch and
 # set_risk_gate_touch (1.11.0) - with only the collection, the field and the
@@ -35,14 +53,7 @@ _oss_csv_to_json() {
 # replaces. rc 1 no state, 2 unreadable, 7 unknown or duplicate.
 _oss_reg_require_single() { # $1=state-file $2=jq-selector(uses $v) $3=singular $4=plural $5=duplicate-noun $6=value
   local sf="$1" sel="$2" one="$3" many="$4" dup="$5" val="$6" n
-  if [ ! -f "$sf" ]; then
-    echo "oss: no state at $sf - run 'oss init <name>' first" >&2; return 1
-  fi
-  n="$(jq --arg v "$val" "[$sel] | length" "$sf" 2>/dev/null)" || {
-    echo "oss: cannot read $many from $sf" >&2; return 2; }
-  case "$n" in ''|*[!0-9]*)
-    echo "oss: cannot read $many from $sf" >&2; return 2 ;;
-  esac
+  n="$(_oss_reg_count "$sf" "$sel" "$many" "$val")" || return $?
   if [ "$n" -eq 0 ]; then
     echo "oss: unknown $one '$val'" >&2; return 7
   fi
@@ -84,19 +95,42 @@ _oss_repoint_guard() { # $1=json-list $2=noun $3=csv-name $4=needle $5=blank-why
   fi
 }
 
+# #305 item 1: the add verbs refuse a ref that already exists. The ADR ref (and
+# the gate name) is the key every reader uses - touch_check, the doctor shape
+# gate, the registry doc - and the writer did not enforce it: a second bone_add
+# for ADR-013 minted a second row for one ref (the PulseDB adopt pilot,
+# 2026-08-23), after which bone_set_touch refuses the ref at rc 7 and the
+# operator holds a surface they cannot repair. Nothing DETECTS a duplicate
+# (doctor's four checks are state/schema/replay/shape), so the writer is the only
+# place the mint can be refused. risk_gate_add carries the same rail: the two are
+# one defect class - the duplicate-row fixtures in test-registries.sh were already
+# labelled "#305 shape" for both - and a duplicate gate name is refused by
+# set_controls/set_touch with a message naming #305, so an open gate writer would
+# re-open the asymmetry #524 was filed about.
 oss_reg_add_bone() { # $1=state $2=adr-ref $3=title $4=touch-csv $5=revisit(optional)
-  local touch; touch="$(_oss_csv_to_json "$4")" || return $?
-  oss_state_mutate "$1" add_bone \
+  local sf="$1" n touch
+  n="$(_oss_reg_count "$sf" '.bones[] | select(.adr == $v)' "bones" "$2")" || return $?
+  if [ "$n" -gt 0 ]; then
+    echo "oss: bone '$2' already exists - one ADR ref keys one bone, and duplicate refs have no supported repair yet (#305); correct its surface with 'oss bone_set_touch <adr> <touch-csv>', or mint a new ref for a second decision" >&2
+    return 7
+  fi
+  touch="$(_oss_csv_to_json "$4")" || return $?
+  oss_state_mutate "$sf" add_bone \
     "$(jq -n --arg adr "$2" --arg t "$3" --argjson touch "$touch" \
         --arg rv "${5:-}" --arg ts "$(_oss_now)" \
       '{adr:$adr,title:$t,touch:$touch,revisit_trigger:(if $rv=="" then null else $rv end),at:$ts}')"
 }
 
 oss_reg_add_risk_gate() { # $1=state $2=name $3=touch-csv $4=controls-csv
-  local touch c
+  local sf="$1" n touch c
+  n="$(_oss_reg_count "$sf" '.risk_gates[] | select(.name == $v)' "risk gates" "$2")" || return $?
+  if [ "$n" -gt 0 ]; then
+    echo "oss: risk gate '$2' already exists - one name keys one gate, and duplicate names have no supported repair yet (#305); correct its surface with 'oss risk_gate_set_touch <name> <touch-csv>', or choose a new name" >&2
+    return 7
+  fi
   touch="$(_oss_csv_to_json "$3")" || return $?
   c="$(_oss_csv_to_json "$4")" || return $?
-  oss_state_mutate "$1" add_risk_gate \
+  oss_state_mutate "$sf" add_risk_gate \
     "$(jq -n --arg n "$2" --argjson touch "$touch" \
         --argjson c "$c" --arg ts "$(_oss_now)" \
       '{name:$n,touch:$touch,controls:$c,at:$ts}')"
