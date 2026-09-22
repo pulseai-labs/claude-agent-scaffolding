@@ -918,6 +918,26 @@ pin "$LIFECYCLE_MD" '`mv`, which this command allows' \
 pin "$COMMAND_MD" 'Bash(mv:*)' \
   "commands/orchestrate.md's allowlist is what permits that mv"
 
+# T9b. The item verifier is the seat `roles.md` places in a canonical worktree for
+# a fresh frame (#537) — the location whose project rules do not load, which is the
+# slot's whole purpose — and its template was the one session brief in this file
+# without the RULES slot. T1 added the slot to `briefs.md`'s generic reviewer and
+# verifier and left this file's item verifier to "a later task"; no later brief
+# carried it, and T9's walk found the gap. Measured, the absence was unguarded: at
+# that head, with this template's slot missing (199 lines), all six suites were
+# green. A count over the file's three session briefs, not a `pin`: the slot line
+# is byte-for-byte the same in all three, so there is no unique needle on the line
+# itself. The correction message is a send, not a session, and carries none.
+# Residual, stated: a slot MOVED between templates in this file would keep the
+# count — closing that needs a span helper this suite does not have, and a move is
+# not the one-line revert this pin exists to catch. The slot sits flush under
+# CLAIMS with the blank line before DONE because the file is at its 200-line gate
+# and only one net line fit: measured over the plugin's fifteen shipped slots, the
+# blank that FOLLOWS a slot is universal while the leading one is absent in eight,
+# so the trailing one is the one to keep.
+n_eq "$BRIEFS_MD" 'RULES THAT DO NOT LOAD HERE' 3 \
+  "all three session briefs carry the rules slot"
+
 section "reference line budgets"
 
 budget "$EXEC_MD" "ossify-execution.md is within the reference budget"

@@ -163,6 +163,7 @@ EXPECTED_MODEL=<this item's SEATS row names it — fill this line; a coordinator
 
 CLAIMS: <the numbered list the coordinator fills from this item's spec, from the verifier body
 it supplied — every claim, so the verifier reads no other file for them>.
+RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
 DONE: write your report file with one line per claim — pass | fail | cannot
 determine, with commands and output verbatim — then the caveats. `Cannot
