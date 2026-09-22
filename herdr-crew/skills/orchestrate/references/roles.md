@@ -58,10 +58,12 @@ boundary the context probe is `/context`, for a seat whose profile can run a loc
 command (`can: slash-commands`, `config.md`): send it and read the one reply with
 `herdr pane read <pane>` — the orchestrator's one context source: past half its window, as
 `/context` reports, or an auto-compact, the next item goes to a fresh implementer. That
-probe is the mechanism for those seats; a seat whose profile cannot run a local slash
-command is never sent one — it has no way to answer — and rotates at its item boundary
-instead, on the run's own record: the item it has just finished, not a probe it cannot
-answer. The
+probe is the mechanism for the seats that can answer it, and a seat is sent one only when
+both hold: its profile can run a local slash command, and the send route that reaches it —
+the second detection ask's answer (`herdr-mechanics.md`) — carries one. A seat failing
+either condition — a profile without the capability, or a pane that ask finds undetected —
+is never sent the probe, and rotates at its item boundary instead, on the run's own record:
+the item it has just finished, not a probe it cannot answer. The
 implementer returns its handoff inputs in its report file; the orchestrator writes the
 handoff into the next brief. Rotation happens between work items, never mid-PR: the
 retained implementer finishes the PR's fix rounds unless the harness auto-compacts.
