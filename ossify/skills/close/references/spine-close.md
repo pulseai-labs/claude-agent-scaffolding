@@ -54,8 +54,15 @@ open="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .statu
   || { echo "close: $spine_id has work items that are not complete: $open - halt"; exit 1; }
 withdrawn="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status == \"abandoned\") | .id] | join(\", \")")"
 live="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .id] | join(\", \")")"
-[ -n "$live" ] || [ -z "$withdrawn" ] \
-  || { echo "close: $spine_id records only withdrawn work items ($withdrawn) - there is nothing to land, review, demo or harvest. This is not a close: retire the spine with \"$oss_bin\" spine_status $spine_id abandoned, or un-withdraw an item with \"$oss_bin\" work_item_status <wi-id> planned - halt"; exit 1; }
+# A spine with NO work items ran nothing, exactly like a fully-withdrawn one: it
+# was never decomposed into rounds, so there is nothing to land, review, demo or
+# harvest, and passing here only moves the discovery to step 9's harvest, five
+# steps later. Its own message, because its cause and its next action differ: the
+# plan was never filled, rather than filled and then emptied.
+[ -n "$live" ] || [ -n "$withdrawn" ] \
+  || { echo "close: $spine_id has no work items - there is nothing to land, review, demo or harvest, and a spine that ran nothing is retired rather than closed. Decompose it with \"$oss_bin\" work_item_add $spine_id <title>, or retire it with \"$oss_bin\" spine_status $spine_id abandoned - halt"; exit 1; }
+[ -n "$live" ] \
+  || { echo "close: $spine_id records only withdrawn work items ($withdrawn) - there is nothing to land, review, demo or harvest, and a spine that ran nothing is retired rather than closed. Retire it with \"$oss_bin\" spine_status $spine_id abandoned, AFTER the two obligations the retirement carries: (1) the demo ledger - an amendment this spine planned is still pending, so clear it with \"$oss_bin\" ledger_unplan <line-id> $spine_id, and an ordinary ACTIVE line whose only implementation was withdrawn is retired or replaced with \"$oss_bin\" ledger_retire <line-id> <reason> or \"$oss_bin\" ledger_supersede <line-id> <new-line-id> (ledger_unplan answers rc 7 for an active line, so it is not the tool for that case); (2) any repo ARMED for this spine - restore its checkout, or name it parked in the close record (next-but-one section). To reverse the withdrawal instead: \"$oss_bin\" work_item_status <wi-id> planned. The whole-spine arm in plan-spine/references/decomposition.md §1 owns the full account - halt"; exit 1; }
 [ -z "$withdrawn" ] \
   || echo "close: $spine_id withdrew work items before dispatch: $withdrawn - SPINE.md records why; they contribute nothing to this close"
 ```
@@ -87,6 +94,14 @@ already names.
 The withdrawn line is `[ -z … ] || echo` for the same strict-mode
 reason `release-close.md` §2 gives for its abandoned-spine line: it is the
 block's last command, and an `&&` form returns 1 on the clean case.
+
+**The retirement's two obligations are properties of the repos and the ledger,
+not of the steps that follow, so they survive the halt.** A halt exits the
+ceremony, and the later sections — where the demo-ledger and parked-repo work is
+described — never run; both are stated in the halt message itself for that
+reason, and the parked-repo account in the next-but-one section still owns the
+detail. Nothing in this gate touches either: it refuses, names what is owed, and
+stops.
 
 ---
 

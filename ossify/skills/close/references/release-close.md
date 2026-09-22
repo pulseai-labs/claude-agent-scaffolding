@@ -429,6 +429,17 @@ whichever repo that happens to be:
 # string need the backslash (\$root, \$s); $rel is shell-expanded on purpose.
 tag_repos="$("$oss_bin" get ". as \$root | .work_items[] | select(.status != \"abandoned\") | select(.spine as \$s | any(\$root.spines[]; .id == \$s and .status == \"closed\" and .release == \"$rel\")) | .target_repo" | sort -u)" \
   || { echo "close: the release-tag repo set could not be read from state - halt"; exit 1; }
+# AN EMPTY SET IS NOT A CLEAN SET. The assignment above cannot fail and still
+# return nothing, but it can SUCCEED with nothing: every closed spine of this
+# release may hold only withdrawn items (an abandoned spine passes the release
+# gate deliberately, and a spine can be closed by hand), or none at all. The loop
+# below then iterates nothing, nothing is tagged, and the pass returns 0 - the
+# same outcome the comment above refuses to allow through a selector failure, so
+# it may not come in through this door either. The close record would say the
+# release published while no tag exists anywhere, which is the audit-trail break
+# this section exists to prevent.
+[ -n "$tag_repos" ] \
+  || { echo "close: $rel has no repo to tag - its closed spines hold no non-abandoned work item, so there is no landed line to publish. A withdrawal made by mistake returns with \"$oss_bin\" work_item_status <wi-id> planned; a release with nothing to publish is the operator's decision (there is no release-retirement status), so this ceremony stops here rather than deciding for them - halt"; exit 1; }
 
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue

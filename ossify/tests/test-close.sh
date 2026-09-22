@@ -362,6 +362,57 @@ t_capture env "PATH=$SHIM:$PATH" bash -c "set -euo pipefail; spine_id='$SP'; . '
 t_assert_rc 0 "...and passes once every item is complete (so the refusal above fired for the stated reason)"
 t_assert_eq "" "$T_OUT" "...silently - a passing gate says nothing"
 
+# E1b. The two EMPTY arms of the same gate (#533 half B), and the completeness of
+# the route out the all-withdrawn halt names (#531 site 2, F15). Both fixtures live
+# in their OWN workspace: a release minted in the E workspace would take the next
+# id and shift the r1/r2/r3 the expiry fixtures below assert by name, and their own
+# workspace also keeps the spine set of $REL untouched.
+#   - a spine with NO work items ran nothing, exactly like a fully-withdrawn one;
+#     before this the gate passed, the landing loop iterated an empty set, and the
+#     session learned there was nothing to close five steps later, at the harvest.
+#   - the withdrawn halt named only spine_status/work_item_status: it left out the
+#     demo-ledger obligation (ledger_unplan for a pending amendment, but
+#     ledger_retire/ledger_supersede for an ordinary active line whose only
+#     implementation was withdrawn - ledger_unplan answers rc 7 there, which is the
+#     wrong remedy this row pins) and the parked-repo restoration that the section
+#     after next makes a property of the armed repos.
+P2WS="$TMP/p2ws"; mkdir -p "$P2WS/.workspace"
+printf '{"schema_version":"1.0","ai_workspace":{"root":"%s"},"canonical":{"root":"%s"},"well_known_paths":{}}\n' \
+  "$P2WS" "$CANON" > "$P2WS/.workspace/pairing.json"
+( cd "$P2WS" && bash "$OSS" init "phase-2 fixtures" >/dev/null )
+P2REL="$(cd "$P2WS" && bash "$OSS" release_add "the empty arms" "fixtures")"
+SPZERO="$(cd "$P2WS" && bash "$OSS" spine_add "$P2REL" "never decomposed" flesh)"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$P2WS'; set -euo pipefail; spine_id='$SPZERO'; . '$OPEN_BLOCK'"
+t_assert_rc 1 "step 1 halts on a spine with NO work items"
+t_assert_contains "$T_OUT" "no work items" "...naming the zero-item case as its own cause, not the withdrawn one"
+t_assert_contains "$T_OUT" "work_item_add" "...and naming the way to give it items"
+t_assert_contains "$T_OUT" "spine_status" "...and the retirement route, as the withdrawn arm does"
+SPABAND="$(cd "$P2WS" && bash "$OSS" spine_add "$P2REL" "planned then emptied" flesh)"
+WIA="$(cd "$P2WS" && bash "$OSS" work_item_add "$SPABAND" "withdrawn before dispatch")"
+( cd "$P2WS" && bash "$OSS" work_item_status "$WIA" abandoned >/dev/null )
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$P2WS'; set -euo pipefail; spine_id='$SPABAND'; . '$OPEN_BLOCK'"
+t_assert_rc 1 "step 1 halts when every item was withdrawn"
+t_assert_contains "$T_OUT" "$WIA" "...naming the withdrawn item by id"
+t_assert_contains "$T_OUT" "ledger_unplan" "...and naming the demo-ledger obligation for a PENDING amendment"
+t_assert_contains "$T_OUT" "ledger_retire" "...and the retire/replace route for an ordinary active line (F15: ledger_unplan answers rc 7 there)"
+t_assert_contains "$T_OUT" "parked" "...and the parked-repo restoration the section after next owns"
+t_assert_contains "$T_OUT" "decomposition.md" "...and pointing at the whole-spine arm that owns the full account"
+# ADJACENT CONTROL: the SAME workspace's spine with one PLANNED item still halts
+# on the not-complete arm, so the two new arms did not swallow it, and a spine with
+# one live item plus one withdrawn item still passes the gate (the loosening is
+# EMPTY, not withdrawn - a partially withdrawn spine closes as before).
+SPMIX="$(cd "$P2WS" && bash "$OSS" spine_add "$P2REL" "mixed" flesh)"
+WIM1="$(cd "$P2WS" && bash "$OSS" work_item_add "$SPMIX" "live one")"
+WIM2="$(cd "$P2WS" && bash "$OSS" work_item_add "$SPMIX" "withdrawn one")"
+( cd "$P2WS" && bash "$OSS" work_item_status "$WIM2" abandoned >/dev/null )
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$P2WS'; set -euo pipefail; spine_id='$SPMIX'; . '$OPEN_BLOCK'"
+t_assert_rc 1 "...a spine with a PLANNED item still halts on the not-complete arm"
+t_assert_contains "$T_OUT" "$WIM1" "...naming the live offender"
+( cd "$P2WS" && bash "$OSS" work_item_status "$WIM1" complete >/dev/null )
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$P2WS'; set -euo pipefail; spine_id='$SPMIX'; . '$OPEN_BLOCK'"
+t_assert_rc 0 "...and a spine with one completed and one withdrawn item PASSES the gate - the refusal is empty, not partially withdrawn"
+t_assert_contains "$T_OUT" "withdrew work items before dispatch" "...with the note naming what it dropped, in the shipped wording"
+
 # Move the BASE branch forward, the way a sibling spine closing first would.
 # This is what makes the changed-path assertions in E5 non-vacuous: with the base
 # still at the fork point every candidate computation agrees.
@@ -1480,6 +1531,33 @@ t_capture env "PATH=$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
 canonical:release-line'; . '$TAG_BLOCK'"
 t_assert_rc 1 "R7: two recorded bases for one repo halt the tag pass"
 t_assert_contains "$T_OUT" "conflicting base" "R7: ...naming the conflict, not silently picking a line"
+
+# R8. THE EMPTY TAG SET (F18, deferred from #520 into #533). A release whose
+# closed spines hold only abandoned items - or no items at all - has no
+# non-abandoned work item to name a repo, so `tag_repos` is empty. The block's
+# own comment names the failure it was written for (a selector failure makes the
+# loop tag NOTHING and the pass still return 0); the empty set reaches the same
+# outcome through a door the comment does not cover. Measured on 3a4182b against
+# this shim: rc 0, no tag anywhere, no halt - the close record then says the
+# release published, which is the audit-trail break release-close.md §3 itself
+# refuses to allow. The cause is reachable without corruption: an abandoned spine
+# passes the release gate deliberately (spinegate, T1/T2) and a spine can be
+# closed by hand.
+F18SHIM="$TMP/f18-shim"; mkdir -p "$F18SHIM"
+{ printf '#!/usr/bin/env bash\ncase "$1 $2" in\n'
+  printf '  "get "*)            echo "" ;;\n'
+  printf '  "repo_root "*)      echo canonical ;;\n'
+  printf '  *)                  exit 0 ;;\nesac\n'
+} > "$F18SHIM/oss"; chmod +x "$F18SHIM/oss"
+t_capture env "PATH=$F18SHIM:$PATH" "oss_bin=$F18SHIM/oss" bash -c \
+  "set -euo pipefail; rel='r9'; repo_base_branches='canonical:main'; . '$TAG_BLOCK'"
+t_assert_rc 1 "R8: an EMPTY tag set halts the tag pass"
+t_assert_contains "$T_OUT" "no repo to tag" "R8: ...naming the empty set as the reason"
+t_assert_contains "$T_OUT" "abandoned" "R8: ...and the cause the operator has to judge"
+t_assert_contains "$T_OUT" "work_item_status" "R8: ...and the route out when a withdrawal was a mistake"
+# The ADJACENT CONTROL is R1-R7 above, on the live fixtures: the same block with
+# a NON-empty tag set still tags (`tagged r9`). It is not repeated here with a
+# second shim - a second canned fixture would assert the shim, not the block.
 
 # P11. A CLOSED-UNMERGED PR is not a resumable landing (round 5, T20):
 # --state all selects it, creation is suppressed, work-pr refuses it and the

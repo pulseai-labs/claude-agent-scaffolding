@@ -288,4 +288,114 @@ for f in "$OSSSK/.claude-plugin/plugin.json" \
   fi
 done
 
+# --- phase 2: the abandoned carve-out's own claims, held mechanically --------
+#
+# Three sites, each with the same failure shape this file exists for: the words
+# are the whole guard, and nothing else in the suite can see them drift.
+#
+# (a) work-item close must READ the status before it diagnoses a missing
+# worktree (#531 site 1). A direct `/close <abandoned-id>` routes into this
+# document, its §1 block halts on the absent worktree, and the prose then asserts
+# the CAUSE - "the lane skipped work_item_exec" - which is wrong for a withdrawn
+# item (never dispatched) and sends the operator to the wrong remedy. The block
+# is one of this file's D rows (deferred, never executed by the suite), so this
+# assertion is its only hold.
+WIC="$OSSSK/skills/close/references/work-item-close.md"
+# This file grepped text until now; site (a) needs the SHARED block extractor
+# (tests/lib/blocks.sh), the same one test-close.sh and test-block-ledger.sh use,
+# because the claim is about a block's internals rather than a line's presence.
+. "$HERE/lib/blocks.sh"
+_PC_TMP="$(mktemp -d)"; _F="$_PC_TMP/wic-block.sh"
+if oss_block_extract "$WIC" 'no recorded worktree for' "$_F" 2>/dev/null && [ -s "$_F" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's block no longer extracts - the checks below are vacuous"
+fi
+# The status read and the abandoned arm must both be there, and the arm must come
+# BEFORE the worktree halt: an arm placed after it is unreachable, because the
+# halt exits first.
+_ab_line="$(grep -n 'abandoned' "$_F" | head -1 | cut -d: -f1)"
+_halt_line="$(grep -n 'no recorded worktree' "$_F" | head -1 | cut -d: -f1)"
+if [ -n "$_ab_line" ] && [ -n "$_halt_line" ] && [ "$_ab_line" -lt "$_halt_line" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1 does not test for 'abandoned' BEFORE the missing-worktree halt (ab=${_ab_line:-none} halt=${_halt_line:-none}) - an abandoned item is told the lane skipped work_item_exec"
+fi
+if grep -Fq 'status' "$_F" ; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's block never reads .status - it cannot tell a withdrawn item from a skipped dispatch"
+fi
+# The TEST, not just the word: the block must COMPARE the status against
+# 'abandoned'. Asserting merely that "abandoned" appears in the block passes on
+# the message text alone, so a block that reads the status and then ignores it
+# (or tests something else) would satisfy the weaker form - measured by mutation.
+if grep -Fq '= "abandoned"' "$_F" || grep -Fq "= 'abandoned'" "$_F"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1 does not COMPARE the status against 'abandoned' - naming it in a message is not testing it"
+fi
+# The route out and the owner of the full account.
+for _lit in 'work_item_status' 'decomposition.md'; do
+  if grep -Fq "$_lit" "$_F"; then
+    T_PASS=$((T_PASS+1))
+  else
+    T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's abandoned arm does not name '$_lit'"
+  fi
+done
+
+# (b) the withdrawal arm's demo-ledger remedy must WORK (#531 site 3 / F15). The
+# sentence shipped in 1.11.0 said a demo line the withdrawn item alone was going
+# to add "goes the same way" as a pending amendment - pointing at ledger_unplan,
+# which answers rc 7 for an ordinary active line. The line stays active, its
+# implementation was withdrawn, and it then blocks this spine and every later
+# cumulative demo. The remedy for that case is retire/replace.
+DECOMP="$OSSSK/skills/plan-spine/references/decomposition.md"
+if grep -Fq 'goes the same way' "$DECOMP"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1 still says a demo line 'goes the same way' - that points at ledger_unplan, which cannot clear an active line"
+else
+  T_PASS=$((T_PASS+1))
+fi
+_wd_para="$(grep -A 14 'Any demo line the withdrawn item alone' "$DECOMP")"
+case "$_wd_para" in
+  *ledger_retire*|*ledger_supersede*) T_PASS=$((T_PASS+1));;
+  *) T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1's withdrawal arm names neither ledger_retire nor ledger_supersede for the active-line case - the remedy is unreachable from the text";;
+esac
+case "$_wd_para" in
+  *"rc 7"*) T_PASS=$((T_PASS+1));;
+  *) T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1's withdrawal arm does not say why ledger_unplan fails there (rc 7) - the operator retries it";;
+esac
+
+# (c) doctor's zero-match touch-surface sweep (#523). This is the DETECTOR the
+# 1.11.0 re-point verbs never had, and it is agent-performed prose, so the facts
+# without which it is unexecutable must be present IN THE RECIPE: the semantics
+# oracle (touch_check - never a hand-rolled glob match, because a shell `*`
+# crosses `/`, so a matcher written there would disagree with the verb that
+# decides reclassification) and the corpus (git ls-files, per declared repo). The
+# exclusion must be present too, or every deliberately-matching-nothing surface
+# becomes a false finding. Asserting the block's own content rather than a
+# mention somewhere in the file: measured by mutation, a file-level grep passes
+# while the recipe no longer calls the oracle.
+SI="$OSSSK/skills/doctor/references/state-inspection.md"
+_SW="$_PC_TMP/sweep-block.sh"
+if oss_block_extract "$SI" 'ls-files -z' "$_SW" 2>/dev/null && [ -s "$_SW" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: state-inspection.md §5's touch-surface sweep block no longer extracts - the checks below are vacuous"
+fi
+# The INVOCATION form, not the word: the block's own comment explains what the
+# oracle is, so a word-grep passes on the comment while the recipe no longer
+# calls it - measured by mutation.
+if grep -Fq '"$oss_bin" touch_check' "$_SW" && grep -Fq 'ls-files' "$_SW"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep recipe does not INVOKE both the oracle (\"\$oss_bin\" touch_check) and the corpus (git ls-files)"
+fi
+if grep -Fq 'not-applicable' "$SI"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: state-inspection.md's surface sweep does not name 'not-applicable' - every deliberate placeholder becomes a false finding"
+fi
+
+rm -rf "$_PC_TMP"
 t_summary

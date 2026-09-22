@@ -1,4 +1,4 @@
-# ossify (v1.11.1)
+# ossify (v1.11.2)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Nine entry skills (`start`, `adopt`,
@@ -84,6 +84,24 @@ states where the second word lands instead. And
 a second row for one key, which had left the operator holding a surface the
 re-point verb then refused to repair — that rail runs inside the state lock, so
 two ceremonies racing to mint the same key cannot produce the duplicate either.
+
+Since 1.11.2, the `abandoned` carve-out is complete on the close path, and the
+detector the re-point verbs never had ships as a doctor sweep. A work item
+withdrawn before dispatch is diagnosed as just that when `/ossify:close` is
+pointed at it, instead of being told the execution lane skipped
+`work_item_exec` — the two want opposite actions, which is why the status is read
+before the diagnosis. Spine close's all-withdrawn halt now names the whole route
+out, including the two obligations a retirement carries: the demo-ledger
+amendment the withdrawal owes (and for an ordinary active line whose only
+implementation was withdrawn, retire-or-replace rather than `ledger_unplan`,
+which answers rc 7 there), and any repo armed for that spine. The same gate
+refuses a spine with **no** work items — it was never decomposed, and passing
+used to move the discovery to the harvest, five steps later. Release close halts
+when its tag set is empty, instead of recording a release that published nothing.
+And `doctor` reports a bone's or gate's touch globs that match **no** tracked file
+in any declared repo: a surface re-pointed at a tree that does not exist reads
+`clean` on every path, so the spine is never reclassified and the docs trigger
+never fires — the repair has existed since 1.11.0, and now the detection does too.
 
 Since 1.7.0 (#368), every bare `doctor` sweep includes plugin provenance and
 `doctor provenance` runs it alone. It reports the answering `oss` binary, the

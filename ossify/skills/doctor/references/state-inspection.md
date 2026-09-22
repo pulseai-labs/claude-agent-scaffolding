@@ -338,6 +338,43 @@ belong in the read-out when the sweep gives you reason to look:
   (`plan-spine/references/decomposition.md` §1); a recorded worktree says it was
   dispatched, so either the status or the dispatch is wrong. Close skips an
   abandoned item entirely, so work in that worktree never reaches the spine.
+- **A bone's or gate's touch globs matching NO tracked file in any declared repo.**
+  `touch_check` goes silently **clean** on such a surface, so the spine is never
+  reclassified to `bone` and the release-close docs trigger never fires. The
+  1.11.0 re-point verbs *repair* such a surface and nothing *detects* one — a
+  re-point to a glob that matches nothing is accepted at rc 0, which is how a
+  mis-guessed correction leaves the surface exactly as broken as it was. Sweep
+  for it:
+
+  ```bash
+  # The corpus is every tracked path in every declared repo - the same $repos
+  # list bones-registry.md §3 walks. The SEMANTICS ORACLE is touch_check, never a
+  # hand-rolled glob match: a shell `*` crosses `/`, so a matcher written here
+  # would disagree with the verb that decides reclassification.
+  hits="$(mktemp)"
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    root="$("$oss_bin" repo_root "$name")" || exit 1
+    git -C "$root" ls-files -z | xargs -0 -n 200 "$oss_bin" touch_check >> "$hits" || :
+  done <<EOF
+  $repos
+  EOF
+  ```
+
+  **The finding is the ABSENCE of a line, not the rc.** Each batch answers 0 for
+  a hit, 1 for clean, 2 for inconclusive; `xargs` returns 123 when any batch
+  answers non-zero, which is the ordinary case here and is not an error. Read
+  `$hits`: every surface that appears there matched at least one tracked file.
+  Every bone and gate that does **not** appear is a `warn:` line naming the id and
+  the glob list —
+  `warn: touch - bone ADR-0003 matches no tracked file in any declared repo: packages/ma/silver/**, packages/ma/ingestion/**`.
+  A repo that could not be read is `skip: touch(<key>) - …`, in the §1 grammar.
+  Two exclusions, both deliberate: a surface whose list carries `not-applicable`
+  is left alone (it matches nothing *on purpose* — `bones-registry.md` §2/§6),
+  while a surface with an **empty** list is reported, as its own line: that is the
+  §6 anti-pattern, "a comment, not a bone". The remedy is a re-point
+  (`bone_set_touch` / `risk_gate_set_touch`) or a legitimate `not-applicable`, and
+  which one it is belongs to the operator, per the section's closing rule.
 
 Report these as findings with their evidence. Do not repair them.
 
