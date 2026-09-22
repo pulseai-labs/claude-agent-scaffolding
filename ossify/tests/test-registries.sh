@@ -77,6 +77,42 @@ t_assert_eq "1" "$T_OUT" "...with still one row for that ref"
 t_capture oss_reg_add_bone "$S" ADR-0004 "a fourth decision" "src/other/**" ""
 t_assert_rc 0 "...and the new ref mints at rc 0"
 
+# --- #530 at the MINT: a contaminated entry is refused before it lands -------
+# The re-point verbs refuse an entry with surrounding whitespace; the two ADD
+# verbs journaled one at rc 0. A bone minted from a CRLF-composed csv declared a
+# surface that touch_check then answered CLEAN on, from mint day, with nothing to
+# review and no refusal to notice. Measured before this rail:
+# `bone_add ADR-C "t" "$(printf 'src/c/**\r')"` -> rc 0, and touch_check on
+# src/c/load.py -> rc 1 (clean) - the #530 harm, at the boundary that creates the
+# registry rather than the one that repairs it.
+for csv in "$(printf 'src/c/**\r')" "$(printf '\tsrc/c/**')" "$(printf 'src/c/**\xc2\xa0')"; do
+  _hex="$(printf '%s' "$csv" | od -An -tx1 | tr -d ' ')"
+  t_capture oss_reg_add_bone "$S" ADR-C "contaminated mint" "$csv" ""
+  t_assert_rc 2 "bone_add refuses an entry with surrounding whitespace ($_hex)"
+  t_assert_contains "$T_OUT" "leading or trailing whitespace" "...and diagnoses the entry ($_hex)"
+done
+t_capture jq '[.bones[] | select(.adr=="ADR-C")] | length' "$S"
+t_assert_eq "0" "$T_OUT" "...and no bone was minted by any refused call"
+t_capture oss_reg_add_risk_gate "$S" ctrl-gate "$(printf 'src/c/**\r')" "ctl-one"
+t_assert_rc 2 "risk_gate_add refuses a contaminated touch glob"
+t_capture oss_reg_add_risk_gate "$S" ctrl-gate "src/c/**" "$(printf 'ctl-one\r')"
+t_assert_rc 2 "...and a contaminated control phrase"
+t_capture jq '[.risk_gates[] | select(.name=="ctrl-gate")] | length' "$S"
+t_assert_eq "0" "$T_OUT" "...and no gate was minted either"
+# ADJACENT CONTROLS. The mint keeps every tolerance it had: an interior space and
+# an escaped comma still pass, and an EMPTY surface is still admitted - the
+# registry declares a surface at spec time, before the code exists, and the
+# refusal belongs to the corrective append, which REPLACES a surface. Without
+# these rows the rails above could be over-refusing and nothing would say so.
+t_capture oss_reg_add_bone "$S" ADR-C2 "interior space" "src/my file.py,src/ok/**" ""
+t_assert_rc 0 "an entry with an interior space is still minted"
+t_capture jq -c '.bones[] | select(.adr=="ADR-C2") | .touch' "$S"
+t_assert_eq '["src/my file.py","src/ok/**"]' "$T_OUT" "...with the interior space intact"
+t_capture oss_reg_add_risk_gate "$S" ctrl-gate "src/c/**" ""
+t_assert_rc 0 "an empty controls list is still admitted at mint"
+t_capture jq -c '.risk_gates[] | select(.name=="ctrl-gate") | .controls' "$S"
+t_assert_eq '[]' "$T_OUT" "...and recorded as empty, not refused"
+
 # --- D1 fake lifecycle (Task 2, named risk 7): oss_reg_set_fake_status must
 # leave expiry_release ALONE when the 5th arg (new expiry) is omitted.
 # test-ledger.sh only exercises the WITH-a-new-expiry (renew) path, so that
@@ -209,6 +245,12 @@ oss_state_mutate "$S" add_risk_gate \
 t_capture oss_reg_set_risk_gate_controls "$S" phrase-gate "x"
 t_assert_rc 7 "duplicate gate names refuse rather than guess"
 t_assert_contains "$T_OUT" "#305" "the duplicate refusal names the issue"
+# #525's byte-identity claim, PINNED, because nothing pinned it and it drifted:
+# `read-plural` and `count-noun` are separate parameters for exactly this - the
+# read messages say "risk gates" while the duplicate message said "gates", so
+# collapsing the two labels silently reworded both gate verbs' duplicate refusal.
+# The whole clause is asserted, not just "#305", so a future reword goes RED.
+t_assert_contains "$T_OUT" "matches 2 gates - duplicate names" "...with the count-noun the extraction promised to keep byte-identical"
 
 # bone_add shares the splitter: a brace-glob touch entry stays one entry.
 t_capture oss_reg_add_bone "$S" ADR-77 "brace touch" "src/{exec\,api}/**" ""

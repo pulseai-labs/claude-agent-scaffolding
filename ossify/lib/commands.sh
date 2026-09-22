@@ -79,7 +79,13 @@ oss_cmd_bone_add() { # $1=adr $2=title $3=touch-csv [$4=revisit]
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_add_bone "$sf" "$1" "$2" "$3" "${4:-}"
 }
 oss_cmd_risk_gate_add() { # $1=name $2=touch-csv $3=controls-csv
-  _oss_need 3 risk_gate_add "<name> <touch-csv> <controls-csv>" "$@" || return 2;
+  # #530 arm 2, on the mint: this verb is FIXED arity (no optional trailing
+  # parameter), so exact arity is a drop-in - and without it a caller who
+  # space-split the controls list got rc 0 with the extra word silently dropped:
+  # the same shrunken-list defect #524 fixed one verb over. `bone_add` cannot
+  # take this guard - its 4th argument is optional - so its split-list case is
+  # documented instead (start/references/bones-registry.md).
+  _oss_need_exact 3 risk_gate_add "<name> <touch-csv> <controls-csv>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_add_risk_gate "$sf" "$1" "$2" "$3"
 }
 oss_cmd_risk_gate_set_controls() { # $1=name $2=controls-csv — corrective append (#340)

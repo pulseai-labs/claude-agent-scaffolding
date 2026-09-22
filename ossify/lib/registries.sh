@@ -50,15 +50,44 @@ _oss_reg_count() { # $1=state-file $2=jq-selector(uses $v) $3=plural $4=value
 # `case` below can label it (rc 5, not the intended rc 2), and that comment plus
 # the numeric arm beside it is exactly the line a fourth hand-copy drops. The
 # labels are arguments so every message stays byte-identical to the three it
-# replaces. rc 1 no state, 2 unreadable, 7 unknown or duplicate.
-_oss_reg_require_single() { # $1=state-file $2=jq-selector(uses $v) $3=singular $4=plural $5=duplicate-noun $6=value
-  local sf="$1" sel="$2" one="$3" many="$4" dup="$5" val="$6" n
+# replaces. `read-plural` and `count-noun` are SEPARATE on purpose: the read
+# messages say "risk gates" while the duplicate message said "gates", so giving
+# the two one label silently reworded the duplicate refusal for both gate verbs.
+# rc 1 no state, 2 unreadable, 7 unknown or duplicate.
+_oss_reg_require_single() { # $1=state-file $2=jq-selector(uses $v) $3=singular $4=read-plural $5=count-noun $6=duplicate-noun $7=value
+  local sf="$1" sel="$2" one="$3" many="$4" cnt="$5" dup="$6" val="$7" n
   n="$(_oss_reg_count "$sf" "$sel" "$many" "$val")" || return $?
   if [ "$n" -eq 0 ]; then
     echo "oss: unknown $one '$val'" >&2; return 7
   fi
   if [ "$n" -gt 1 ]; then
-    echo "oss: $one '$val' matches $n $many - $dup have no supported repair yet (#305); refusing rather than guessing" >&2; return 7
+    echo "oss: $one '$val' matches $n $cnt - $dup have no supported repair yet (#305); refusing rather than guessing" >&2; return 7
+  fi
+}
+
+# The per-entry refusal, ONCE. A REAL entry carrying surrounding whitespace is
+# not blank - it passes the emptiness arm above - and its glob can never match a
+# real path once the CR (or tab, or NBSP) is part of it. Measured on 602565f: a
+# CR-terminated glob was journaled at rc 0 and touch_check went CLEAN on the very
+# path the re-point was meant to cover, which is the defect these verbs exist to
+# repair entered through their own argument handling. LEADING/TRAILING only,
+# deliberately: an interior space is legal (a path can contain one), so this is
+# narrower than "any whitespace". The offending entry is named with @json,
+# because a CR on a terminal is invisible and "trailing whitespace" alone does
+# not say which entry to fix.
+#
+# It is shared with the two ADD verbs because the same entry can be journaled at
+# MINT, where nothing refused it and there is no re-point to repair it with: a
+# bone minted on a CRLF-composed csv declared a surface that touch_check then
+# answered CLEAN on, from mint day, with rc 0 and nothing to review. The mint
+# takes this arm alone - it does NOT take the re-point's emptiness arm, because a
+# bone may legitimately be minted before its surface exists (pinned below).
+_oss_reg_refuse_contaminated() { # $1=json-list $2=noun-phrase $3=why
+  local list="$1" noun="$2" ws_why="$3" bad
+  bad="$(jq -rn --argjson t "$list" 'first($t[] | select(. != (sub("^\\s+";"") | sub("\\s+$";"")))) // empty | @json')" || {
+    echo "oss: cannot read the $noun" >&2; return 2; }
+  if [ -n "$bad" ]; then
+    echo "oss: the $noun has an entry with leading or trailing whitespace: $bad - trim it; $ws_why" >&2; return 2
   fi
 }
 
@@ -73,26 +102,12 @@ _oss_reg_require_single() { # $1=state-file $2=jq-selector(uses $v) $3=singular 
 # so a tab-, CR- or VT-only entry survives as an "entry" that can never match a
 # real path and reproduces the silent-clean defect these verbs exist to repair.
 _oss_repoint_guard() { # $1=json-list $2=noun $3=csv-name $4=needle $5=blank-why $6=whitespace-why
-  local list="$1" noun="$2" csv="$3" needle="$4" blank_why="$5" ws_why="$6" bad
+  local list="$1" noun="$2" csv="$3" needle="$4" blank_why="$5" ws_why="$6"
   jq -en --argjson t "$list" 'true' >/dev/null 2>&1 || {
     echo "oss: the new $noun is not one list - a $csv is a single comma-separated line, and a newline splits it into several" >&2; return 2; }
   jq -en --argjson t "$list" 'any($t[]; test("[^\\s]"))' >/dev/null 2>&1 || {
     echo "oss: the new $noun needs at least one $needle - every entry is blank, and $blank_why" >&2; return 2; }
-  # #530: a REAL entry carrying surrounding whitespace passes both arms above -
-  # it is not blank - and its glob can never match a real path once the CR (or
-  # tab, or NBSP) is part of it. Measured on 602565f: a CR-terminated glob was
-  # journaled at rc 0 and touch_check went CLEAN on the very path the re-point was
-  # meant to cover, which is the defect these verbs exist to repair entered
-  # through their own argument handling. LEADING/TRAILING only, deliberately: an
-  # interior space is legal (a path can contain one), so this is narrower than
-  # "any whitespace". The offending entry is named with @json, because a CR on a
-  # terminal is invisible and "trailing whitespace" alone does not say which
-  # entry to fix.
-  bad="$(jq -rn --argjson t "$list" 'first($t[] | select(. != (sub("^\\s+";"") | sub("\\s+$";"")))) // empty | @json')" || {
-    echo "oss: cannot read the new $noun" >&2; return 2; }
-  if [ -n "$bad" ]; then
-    echo "oss: the new $noun has an entry with leading or trailing whitespace: $bad - trim it; $ws_why" >&2; return 2
-  fi
+  _oss_reg_refuse_contaminated "$list" "new $noun" "$ws_why"
 }
 
 # #305 item 1: the add verbs refuse a ref that already exists. The ADR ref (and
@@ -136,6 +151,8 @@ _oss_reg_uniq_gate() { # $1=state-file $2=payload about to be minted -> 0, or 7 
 oss_reg_add_bone() { # $1=state $2=adr-ref $3=title $4=touch-csv $5=revisit(optional)
   local sf="$1" touch
   touch="$(_oss_csv_to_json "$4")" || return $?
+  _oss_reg_refuse_contaminated "$touch" "touch list" \
+    "a glob minted with surrounding whitespace matches no real path, and touch_check then answers CLEAN on the code the bone was declared to cover" || return $?
   oss_state_mutate "$sf" add_bone \
     "$(jq -n --arg adr "$2" --arg t "$3" --argjson touch "$touch" \
         --arg rv "${5:-}" --arg ts "$(_oss_now)" \
@@ -147,6 +164,10 @@ oss_reg_add_risk_gate() { # $1=state $2=name $3=touch-csv $4=controls-csv
   local sf="$1" touch c
   touch="$(_oss_csv_to_json "$3")" || return $?
   c="$(_oss_csv_to_json "$4")" || return $?
+  _oss_reg_refuse_contaminated "$touch" "touch list" \
+    "a glob minted with surrounding whitespace matches no real path, and touch_check then answers CLEAN on the code the gate was declared to cover" || return $?
+  _oss_reg_refuse_contaminated "$c" "controls list" \
+    "a control phrase with surrounding whitespace is not the phrase the caller wrote" || return $?
   oss_state_mutate "$sf" add_risk_gate \
     "$(jq -n --arg n "$2" --argjson touch "$touch" \
         --argjson c "$c" --arg ts "$(_oss_now)" \
@@ -161,7 +182,7 @@ oss_reg_add_risk_gate() { # $1=state $2=name $3=touch-csv $4=controls-csv
 oss_reg_set_risk_gate_controls() { # $1=state $2=name $3=controls-csv
   local sf="$1" name="$2" c
   _oss_reg_require_single "$sf" '.risk_gates[] | select(.name == $v)' \
-    "risk gate" "risk gates" "duplicate names" "$name" || return $?
+    "risk gate" "risk gates" "gates" "duplicate names" "$name" || return $?
   c="$(_oss_csv_to_json "$3")" || return $?
   _oss_repoint_guard "$c" "controls list" "controls-csv" "control" \
     "a gate with no controls is a worry, not a gate (start/references/risk-gates.md §6)" \
@@ -187,7 +208,7 @@ oss_reg_set_risk_gate_controls() { # $1=state $2=name $3=controls-csv
 oss_reg_set_bone_touch() { # $1=state $2=adr $3=touch-csv
   local sf="$1" adr="$2" touch
   _oss_reg_require_single "$sf" '.bones[] | select(.adr == $v)' \
-    "bone" "bones" "duplicate ADR refs" "$adr" || return $?
+    "bone" "bones" "bones" "duplicate ADR refs" "$adr" || return $?
   touch="$(_oss_csv_to_json "$3")" || return $?
   _oss_repoint_guard "$touch" "touch list" "touch-csv" "glob" \
     "a blank surface makes touch_check clean on every path" \
@@ -199,7 +220,7 @@ oss_reg_set_bone_touch() { # $1=state $2=adr $3=touch-csv
 oss_reg_set_risk_gate_touch() { # $1=state $2=name $3=touch-csv
   local sf="$1" name="$2" touch
   _oss_reg_require_single "$sf" '.risk_gates[] | select(.name == $v)' \
-    "risk gate" "risk gates" "duplicate names" "$name" || return $?
+    "risk gate" "risk gates" "gates" "duplicate names" "$name" || return $?
   touch="$(_oss_csv_to_json "$3")" || return $?
   _oss_repoint_guard "$touch" "touch list" "touch-csv" "glob" \
     "a blank surface makes touch_check clean on every path" \

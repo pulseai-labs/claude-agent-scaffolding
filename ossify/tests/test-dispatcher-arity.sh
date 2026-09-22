@@ -103,6 +103,12 @@ t_assert_contains "$T_OUT" "comma-separated" "...and names the CSV grammar too"
 t_capture bash "$OSS" risk_gate_set_controls g1 "ctl-a" "ctl-b"
 t_assert_rc 2 "risk_gate_set_controls refuses a third argument at rc 2"
 t_assert_contains "$T_OUT" "comma-separated" "...and names the CSV grammar"
+# #530 arm 2 at the MINT, where the verb is FIXED arity (no optional trailing
+# parameter), so exact arity is a drop-in: without it a space-split controls list
+# minted a gate whose checklist was silently one entry short.
+t_capture bash "$OSS" risk_gate_add g-split "src/a/**" "ctl-a" "ctl-b"
+t_assert_rc 2 "risk_gate_add refuses a fourth argument at rc 2"
+t_assert_contains "$T_OUT" "comma-separated" "...and names the CSV grammar the caller missed"
 # ADJACENT CONTROL: the two-argument form reaches the VERB, so the guard above is
 # the extra argument and not the verb. Two rows, because this fixture already
 # minted ADR-1 above: the KNOWN ref must still succeed (rc 0 - the re-point runs),
