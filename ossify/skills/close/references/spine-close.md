@@ -112,6 +112,20 @@ cross-repo spine lands into every repo it touched, and none of them is optional
 — a hosting repo left unlanded is work the spine did that never reached its base
 branch, however green the repos that DID land make the close look.
 
+**A repo that was ARMED but hosts only withdrawn items still needs its checkout
+back.** `round-orchestration.md` §2 cuts **and checks out** the spine branch in
+every hosting repo it finds *before round 1*, so a repo can hold that branch
+with no live item left to land — a later-withdrawn item was its only one, and
+that withdrawal is valid precisely because the item itself was never dispatched.
+The landing set above excludes the repo, correctly (there is nothing to land),
+so nothing in this loop switches it back and no cleanup removes the branch. The
+tell is mechanical: **the spine branch still resolves in that repo**. Restore
+the checkout where a base is recorded for it (`SPINE.md`'s base-branch table, or
+a handoff's `base_branch:` line), and where none is, say so in the close record
+and name the repo as parked — never report a repo as landed on its base branch
+while it is sitting on the spine branch, which is the audit-trail failure this
+step exists to prevent.
+
 **Which landing arm a repo takes is decided by evidence, never by taste, and the
 rule is one line: a repo with a remote lands by PR; a repo without one merges
 locally (#339).** The base branch of a remote repo is a *published* line — every

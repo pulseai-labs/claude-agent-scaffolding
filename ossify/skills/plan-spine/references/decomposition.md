@@ -80,6 +80,16 @@ close all skip an `abandoned` item, so withdrawing a dispatched one would strand
 its work. A withdrawal made by mistake is reversed with
 `"$oss_bin" work_item_status <wi-id> planned`.
 
+**A withdrawal owes the demo ledger too.** If the withdrawn item was the reason
+this spine planned a `ledger_supersede` or `ledger_retire`, that amendment is
+still pending and keyed to this spine — `close` would consume it and deactivate
+a line whose replacement never landed, which is the silent-coverage loss
+`demo-amendments.md` §6 exists to prevent. Clear it with
+`"$oss_bin" ledger_unplan <line-id> <spine-id>` in the same pass, exactly as the
+whole-spine arm above already does. Any demo line the withdrawn item alone was
+going to add goes the same way: it was planned, never built, and a line that can
+never pass is a demo blocker rather than coverage.
+
 ---
 
 ## 2. What each work item declares
