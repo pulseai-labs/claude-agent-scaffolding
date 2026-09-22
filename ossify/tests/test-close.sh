@@ -369,7 +369,8 @@ t_assert_eq "" "$T_OUT" "...silently - a passing gate says nothing"
 # workspace also keeps the spine set of $REL untouched.
 #   - a spine with NO work items ran nothing, exactly like a fully-withdrawn one;
 #     before this the gate passed, the landing loop iterated an empty set, and the
-#     session learned there was nothing to close five steps later, at the harvest.
+#     session learned there was nothing to close only at step 5's changed-path
+#     guard (or step 4's demo), with the harvest eight steps on.
 #   - the withdrawn halt named only spine_status/work_item_status: it left out the
 #     demo-ledger obligation (ledger_unplan for a pending amendment, but
 #     ledger_retire/ledger_supersede for an ordinary active line whose only
@@ -407,7 +408,11 @@ t_assert_contains "$T_OUT" "ledger_retire <line-id> <spine-id> <reason>" "...wit
 t_assert_contains "$T_OUT" "demo-amendments.md" "...and citing the document that owns the keying rule, so the operator can read why"
 t_assert_contains "$T_OUT" "parked" "...and the parked-repo restoration §3 owns"
 t_assert_contains "$T_OUT" "SPINE.md" "...and the medium that record goes to, since this halt writes no close record"
-t_assert_contains "$T_OUT" "decomposition.md" "...and pointing at the whole-spine arm that owns the full account"
+t_assert_contains "$T_OUT" "decomposition.md" "...and pointing at the whole-spine arm that owns the demo-ledger half"
+# G2: the halted account has TWO owners and the message must name both - the
+# armed-repo half lives in §3, which this halt exits before reaching, so a
+# pointer to decomposition.md alone names a document that does not hold it.
+t_assert_contains "$T_OUT" "3 below owns the armed-repo half" "...and at §3 for the armed-repo half, which the halt exits before reaching"
 # ADJACENT CONTROL: the SAME workspace's spine with one PLANNED item still halts
 # on the not-complete arm, so the two new arms did not swallow it, and a spine with
 # one live item plus one withdrawn item still passes the gate (the loosening is
@@ -1569,7 +1574,7 @@ t_assert_contains "$T_OUT" "work_item_status" "R8: ...and the route out when a w
 # Un-withdrawing ALONE re-tags a repo whose work never landed: the selector above
 # takes any non-abandoned item in a closed spine, and this item's spine is closed
 # by construction here. So the route out must reopen the spine and land the work.
-t_assert_contains "$T_OUT" "spine_status <spine-id> active" "R8: ...with the reopening the item's closed parent spine needs before it can be run and landed"
+t_assert_contains "$T_OUT" "spine_add <release> <name> <class> <target-repo>" "R8: ...with the NEW spine the work must move to, since reopening cannot re-enable a spine whose branch close left in place (round-orchestration.md section 2, issue #133)"
 # The ADJACENT CONTROL is R1-R7 above, on the live fixtures: the same block with
 # a NON-empty tag set still tags (`tagged r9`). It is not repeated here with a
 # second shim - a second canned fixture would assert the shim, not the block.

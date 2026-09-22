@@ -45,13 +45,16 @@
 #   block unfindable and the failure read as "vacuous" rather than as wrong
 #   behaviour. Pick the anchor from the block's SCAFFOLDING, never from its FIX.
 #
-# Totals: 184 blocks - 72 operative (15 covered, 57 deferred), 112 illustrative.
+# Totals: 185 blocks - 73 operative (16 covered, 57 deferred), 112 illustrative.
 # DERIVED, never hand-counted: check 2's report line gives the total from a walk
-# of the TREE ("184 blocks accounted for"); one awk pass over the rows below
+# of the TREE ("185 blocks accounted for"); one awk pass over the rows below
 # gives the split (O rows counted, D and I summed). Two independent routes,
-# agreeing at 184 - that agreement IS the check. 1.11.0 added two illustrative
+# agreeing at 185 - that agreement IS the check. 1.11.0 added two illustrative
 # blocks (a bone_set_touch and a risk_gate_set_touch call) and no operative one,
-# which is the whole of the 182 -> 184 move; the 15/57 split is unchanged.
+# the whole of the 182 -> 184 move. 1.11.2 added one - the doctor touch-surface
+# sweep - and then reclassified it from illustrative to COVERED once the #555
+# review found two defects in logic no execution could see, which is the whole of
+# the 184 -> 185 and 15 -> 16 covered moves; the 57 deferred split is unchanged.
 # The previous headline (172 = 11/48/113) was ALREADY STALE BEFORE
 # the wayfinder branch: the retirements narrated in the parentheticals below
 # were never subtracted from it. So "172 + 8 new D rows = 180" corrects a figure
@@ -214,17 +217,17 @@ H	skills/close/references/fake-expiry.md	3491573094-743
 H	skills/close/references/harvest.md	1931122618-713
 H	skills/close/references/impl-check.md	3998988429-864
 H	skills/close/references/patch-lane.md	1122131773-2611
-H	skills/close/references/release-close.md	1809165907-12859
+H	skills/close/references/release-close.md	1444363264-13073
 H	skills/close/references/retrospective.md	1694933006-117
 H	skills/close/references/routing.md	2855300955-280
-H	skills/close/references/spine-close.md	2857548828-24390
-H	skills/close/references/work-item-close.md	2643425635-4557
+H	skills/close/references/spine-close.md	2348298578-24971
+H	skills/close/references/work-item-close.md	3939495863-5012
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	1897652786-133
 H	skills/doctor/references/budget-check.md	3813294467-2669
 H	skills/doctor/references/interop-check.md	3316355601-827
 H	skills/doctor/references/spec-validation.md	906553258-123
-H	skills/doctor/references/state-inspection.md	64687944-3592
+H	skills/doctor/references/state-inspection.md	4093638061-4242
 H	skills/plan-release/SKILL.md	1172871519-2561
 H	skills/plan-release/references/bone-touch-judge.md	3422967488-1278
 H	skills/plan-release/references/class-declaration.md	2145716635-323

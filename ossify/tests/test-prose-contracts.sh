@@ -337,9 +337,13 @@ else
 fi
 # The route out must not leave the SAME trap the release-close halt did: if this
 # item's spine is already closed, un-withdrawing it puts a planned item inside a
-# closed spine, which release close's tag selector then accepts - so the arm has
-# to name reopening it (`spine_status ... active`) before the item can be run.
-for _lit in 'work_item_status' 'spine_status' 'decomposition.md'; do
+# closed spine, which release close's tag selector then accepts. And the arm may
+# not prescribe reopening it either: close leaves the spine's integration branch
+# in place, the lane halts on an existing branch (round-orchestration.md section
+# 2), so the arm has to name THAT obstruction and the route that can run - a new
+# spine. The first form of this assertion pinned `spine_status`, i.e. the reopen
+# that does not work; it was replaced when the round-3 review proved it out.
+for _lit in 'work_item_status' 'spine_add' 'round-orchestration.md' 'decomposition.md'; do
   if grep -Fq "$_lit" "$_F"; then
     T_PASS=$((T_PASS+1))
   else
@@ -446,16 +450,24 @@ SWS="$SWWS/state.json"
 # documents the vacuous-green trap this avoids).
 cd "$SWWS"
 t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" repos="$(printf 'canonical\ngone')" bash -c \
-  "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'SKIPPED[%s]\n' \"\$skipped\""
+  "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'SKIPPED[%s]\n' \"\$skipped\"; printf 'ROSTER%s\n' \"\$roster\"; printf 'INHITS%s\n' \"\$(grep -c ADR-9092 \"\$hits\" 2>/dev/null || true)\""
 cd "$HERE"
 t_assert_rc 0 "(d) the sweep COMPLETES with a declared repo unreadable - it reports the skip rather than exiting the whole run"
 t_assert_contains "$T_OUT" "skip: touch(gone)" "(d) ... naming the unreadable repo by key, in the §1 grammar"
 t_assert_contains "$T_OUT" "bone ADR-9091" "(d) ... recording the surface that matched a tracked file"
-case "$T_OUT" in
-  *ADR-9092*) T_FAIL=$((T_FAIL+1)); echo "FAIL: the sweep recorded a hit for a surface matching NO tracked file - the absence is the finding, and it is what must NOT be in \$hits";;
-  *) T_PASS=$((T_PASS+1));;
-esac
+t_assert_contains "$T_OUT" "INHITS0" "(d) ... and the zero-match surface is NOT among the hits - counted from the file itself, so the roster naming the same id cannot mask it"
 t_assert_contains "$T_OUT" "SKIPPED[ gone]" "(d) ... and feeding \$skipped, which the prose's partial-corpus rule reads"
+# The ROSTER: touch_check answers "<kind> <id>" per match and never the glob,
+# so a warn line naming "the id and the glob list" has no other source. Without
+# this read the report's second half is unfillable and the `not-applicable`
+# exclusion is unreadable - the same unassigned-variable class as $repos.
+t_assert_contains "$T_OUT" "ADR-9092" "(d) ... and $roster carrying a surface that matched NOTHING, which is exactly the one a warn line names"
+t_assert_contains "$T_OUT" "nowhere/at/all/**" "(d) ... with its glob list, which touch_check's own output cannot supply"
+# G4: with EVERY declared repo unreadable the read set is EMPTY, and the sweep
+# must report that rather than one absence per surface.
+t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" repos="gone" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_assert_rc 0 "(d) a read set that came back EMPTY does not abort the sweep"
+t_assert_contains "$T_OUT" "no declared repo could be read" "(d) ... it reports that the sweep inspected nothing, rather than reporting every healthy surface as unmatched"
 # The corpus arm: `repos` UNSET under strict mode. This is the shipped defect
 # (an unassigned variable), so it is run with NOTHING injected.
 t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" bash -c "set -euo pipefail; . '$_SW'; echo DONE"

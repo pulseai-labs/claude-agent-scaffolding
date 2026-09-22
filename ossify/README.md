@@ -96,12 +96,14 @@ amendment the withdrawal owes (and for an ordinary active line whose only
 implementation was withdrawn, retire-or-replace rather than `ledger_unplan`,
 which answers rc 7 there), and any repo armed for that spine. The same gate
 refuses a spine with **no** work items — it was never decomposed, and passing
-used to move the discovery to the harvest, five steps later. Release close halts
+used to move the discovery to a later step — step 5's changed-path guard, or
+step 4's demo on a zero-line ledger. Release close halts
 when its tag set is empty, instead of recording a release that published nothing.
-And `doctor` reports a bone's or gate's touch globs that match **no** tracked file
-in any declared repo: a surface re-pointed at a tree that does not exist reads
-`clean` on every path, so the spine is never reclassified and the docs trigger
-never fires — the repair has existed since 1.11.0, and now the detection does too.
+And `doctor` reports a bone's or gate's touch surface that matches **no** tracked
+file in any declared repo — per SURFACE, so a list that is only partly dead still
+reads clean: a surface re-pointed at a tree that does not exist reads `clean` on
+every path and the spine is never reclassified. The repair has existed since
+1.11.0, and now the detection does too.
 
 Since 1.7.0 (#368), every bare `doctor` sweep includes plugin provenance and
 `doctor provenance` runs it alone. It reports the answering `oss` binary, the

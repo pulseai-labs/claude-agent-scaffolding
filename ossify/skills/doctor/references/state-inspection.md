@@ -338,9 +338,13 @@ belong in the read-out when the sweep gives you reason to look:
   (`plan-spine/references/decomposition.md` §1); a recorded worktree says it was
   dispatched, so either the status or the dispatch is wrong. Close skips an
   abandoned item entirely, so work in that worktree never reaches the spine.
-- **A bone's or gate's touch globs matching NO tracked file in any declared repo.**
+- **A bone's or gate's touch surface matching NO tracked file in any declared repo.**
+  Per SURFACE, not per glob: `touch_check` answers per match, so a list that is
+  only PARTLY dead still records a hit and is not reported here.
   `touch_check` goes silently **clean** on such a surface, so the spine is never
-  reclassified to `bone` and the release-close docs trigger never fires. The
+  reclassified to `bone` - the reclassification is the harm, and it is real on
+  its own (the release-close docs trigger that would also read it is not shipped;
+  `release-close.md`'s gate table says so). The
   1.11.0 re-point verbs *repair* such a surface and nothing *detects* one — a
   re-point to a glob that matches nothing is accepted at rc 0, which is how a
   mis-guessed correction leaves the surface exactly as broken as it was. Sweep
@@ -352,16 +356,20 @@ belong in the read-out when the sweep gives you reason to look:
   # check already performs (`interop-check.md`, "`ai_workspace` and every declared
   # repo": a native topology's `.repos` object; a legacy pairing manifest's
   # top-level `.root` objects OTHER than `ai_workspace`, which the normalized
-  # manifest excludes from `.repos` - a legacy key set that kept it would scan
-  # planning files and let a stale product glob match one, suppressing a real
-  # warning) - no verb
-  # lists the keys, so this is an agent-performed read. The SEMANTICS ORACLE is touch_check,
+  # manifest excludes from `.repos`, so a planning file can never satisfy a stale
+  # product glob) - no verb lists the keys, so this is an agent-performed read.
+  # The SEMANTICS ORACLE is touch_check,
   # never a hand-rolled glob match: a shell `*` crosses `/`, so a matcher written
   # here would disagree with the verb that decides reclassification.
   #
   # Every failure that would otherwise READ AS AN ABSENCE is reported instead: an
   # unreadable registry makes every batch inconclusive, an unreadable repo
   # contributes no hits, and either one would turn every surface into a finding.
+  # The roster: what each warn line NAMES. `touch_check` answers "<kind> <id>"
+  # per match and never the glob, so the id-and-glob-list half of the report has
+  # no other source - and the `not-applicable` exclusion below is read from it.
+  roster="$("$oss_bin" get '[.bones[], .risk_gates[] | {id: (.adr // .name), touch: (.touch | join(", "))}]')" \
+    || roster=""
   probe_rc=0; "$oss_bin" touch_check . >/dev/null 2>&1 || probe_rc=$?
   state_rc=0; "$oss_bin" get 'true' >/dev/null 2>&1 || state_rc=$?
   if [ -z "${repos:-}" ]; then
@@ -371,7 +379,7 @@ belong in the read-out when the sweep gives you reason to look:
   elif [ "$probe_rc" = 2 ]; then
     echo "skip: touch - the bones/risk-gate registry could not be read (touch_check answers rc 2), so no absence below would be sound"
   else
-    hits="$(mktemp)"; skipped=""
+    hits="$(mktemp)"; skipped=""; read_any=""
     while IFS= read -r name; do
       [ -n "$name" ] || continue
       listed="$(mktemp)"
@@ -379,11 +387,17 @@ belong in the read-out when the sweep gives you reason to look:
         && git -C "$root" ls-files -z > "$listed" \
         || { echo "skip: touch($name) - the repo could not be read: no usable root, or its tracked files could not be listed"
              skipped="$skipped $name"; rm -f "$listed"; continue; }
+      read_any=1
       if [ -s "$listed" ]; then
         xargs -0 -n 200 "$oss_bin" touch_check < "$listed" >> "$hits" || :
       fi
       rm -f "$listed"
     done < <(printf '%s\n' "$repos")
+    # With EVERY repo skipped, $hits is empty because nothing was READ, so the
+    # absence rule below must not run - every healthy surface would be reported
+    # from a sweep that inspected nothing.
+    [ -n "$read_any" ] \
+      || echo "skip: touch - no declared repo could be read, so the sweep inspected nothing"
   fi
   ```
 
@@ -399,9 +413,14 @@ belong in the read-out when the sweep gives you reason to look:
   `$skipped`; a surface missing from `$hits` may have matched a file in one of those
   repos, so with `$skipped` non-empty report the misses as *unmatched in the repos
   that were read*, naming the keys — never as matching no tracked file at all. The
-  empty corpus and the unreadable registry above are the same rule at their own
-  scale: each reports its own failure instead of an absence it cannot support, so
-  a sweep that did not run says that, rather than reporting every surface.
+  empty corpus, the unreadable registry above and a read set that came back
+  EMPTY - every declared repo skipped - are the same rule at their own scale:
+  each reports its own failure instead of an absence it cannot support, so a
+  sweep that did not run says that, rather than reporting every surface.
+
+  **The ids and the glob lists come from `$roster`**, never from memory: it pairs
+  every bone and gate with its touch list, which `touch_check`'s own output
+  cannot supply it prints `<kind> <id>` per match.
   Two exclusions, both deliberate: a surface whose list carries `not-applicable`
   is left alone (it matches nothing *on purpose* — `bones-registry.md` §2/§6),
   while a surface with an **empty** list is reported, as its own line: that is the
