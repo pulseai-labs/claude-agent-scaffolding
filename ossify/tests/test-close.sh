@@ -1562,9 +1562,31 @@ t_assert_eq "current" "$SEL_OUT" "R8: the selector yields EXACTLY the current re
 # it halts the close on an unresolvable base (landing, review), cuts a branch
 # nothing will use (round walk), or reports a missing report that is not one
 # (harvest).
-_r9_eval() { # $1=file $2=grep-anchor $3=var-to-print ; echoes the value, rc from the eval
-  local line; line="$(grep -F "$2" "$1" | head -1 | sed 's/ *\\$//')"
-  [ -n "$line" ] || { echo "R9-NO-LINE"; return 9; }
+# The extraction refuses BOTH ways `oss_block_extract` does, for the same
+# reason (tests/lib/blocks.sh): "not found" and "found twice" are different
+# failures, and folding them together reports an ambiguous anchor as a missing
+# one. `grep -F | head -1` did exactly the folding - silently binding to
+# whichever occurrence came first - and an EMPTY extraction fed to `eval`
+# returns 0, so an rc assertion could pass having executed nothing. (GLM seat,
+# round 1 on PR #520.)
+_r9_pick() { # $1=file $2=literal-anchor ; echoes the one line, rc 1=absent 2=ambiguous
+  local n
+  n="$(grep -cF -- "$2" "$1" 2>/dev/null)" || n=0
+  if [ "$n" -eq 0 ]; then return 1; fi
+  if [ "$n" -gt 1 ]; then return 2; fi
+  grep -F -- "$2" "$1" | sed 's/ *\\$//'
+}
+_r9_extract() { # $1=file $2=anchor $3=label ; echoes the line, rc 9=absent 8=ambiguous
+  local line rc
+  line="$(_r9_pick "$1" "$2")"; rc=$?
+  if [ "$rc" -eq 1 ]; then echo "$3-NO-LINE"; return 9; fi
+  if [ "$rc" -eq 2 ]; then echo "$3-AMBIGUOUS"; return 8; fi
+  printf '%s' "$line"
+}
+_r9_eval() { # $1=file $2=anchor $3=var-to-print ; echoes the value, rc from the eval
+  local line rc
+  line="$(_r9_extract "$1" "$2" R9)"; rc=$?
+  if [ "$rc" -ne 0 ]; then printf '%s\n' "$line"; return "$rc"; fi
   ( cd "$TMP/r8ws" && spine_id="$R8CLOSED_SP" repo_list="$TMP/r9-list" \
       PATH="$(dirname "$OSS"):$PATH" eval "$line" && eval "printf '%s' \"\$$3\"" )
 }
@@ -1578,11 +1600,46 @@ for _r9 in \
   t_assert_eq "$_want" "$R9_OUT" "R9: ${_f##*/} \$$_var names exactly the live item's $( [ "$_var" = items ] && echo id || echo repo ), not the withdrawn one"
 done
 # round-orchestration.md §2 writes its set to "$repo_list" and names the spine
-# by placeholder; substitute the id, run it, read the file.
-R9_CUT="$(grep -F '> "$repo_list"' "$SKILLS/work-item/references/round-orchestration.md" | head -1 | sed "s/<spine-id>/$R8CLOSED_SP/")"
+# by placeholder; substitute the id, run it, read the file. The extraction is
+# asserted FIRST and separately: an empty one would make `eval ""` return 0 and
+# the rc assertion below pass without executing anything, pointing the failure
+# at the selector instead of at the anchor.
+R9CUT_LINE="$(_r9_extract "$SKILLS/work-item/references/round-orchestration.md" '> "$repo_list"' R9CUT)"; r9_cut_rc=$?
+t_assert_eq 0 "$r9_cut_rc" "R9CUT: the round walk's hosting-repo line is extracted at all"
+R9_CUT="$(printf '%s' "$R9CUT_LINE" | sed "s/<spine-id>/$R8CLOSED_SP/")"
 r9_rc=0; ( cd "$TMP/r8ws" && repo_list="$TMP/r9-list" PATH="$(dirname "$OSS"):$PATH" eval "$R9_CUT" ) || r9_rc=$?
 t_assert_eq 0 "$r9_rc" "R9: round-orchestration.md's hosting-repo read executes against real state"
 t_assert_eq "current" "$(cat "$TMP/r9-list" 2>/dev/null)" "R9: the spine branch is cut only where a live item runs - never in a repo only a withdrawn item names"
+
+# R10. THE CLASS FORM OF R9, and its limit, stated here where it can be read.
+# R9 pins four files BY NAME, so a fifth spine-scoped SELECTOR written without
+# the abandoned conjunct passes CI - and that is not hypothetical: the round-1
+# review found readers that the named list had missed. This asserts the
+# invariant over the shipped tree instead: every `work_items[]` read that
+# mentions `.spine` must also mention `abandoned` (either conjunct; the
+# `withdrawn=` line selects the abandoned set on purpose).
+#
+# WHAT IT CANNOT SEE, and why it is not a substitute for reading the readers:
+# PROSE readers with no selector at all. code-review.md's Layer 4 `verify.md`
+# walk and Axis B's `spec.md` read are that shape, and the same sweep missed
+# both. This test closes the selector half of the class only.
+R10_EXEMPT='plan-spine/references/cross-repo.md'   # a plan-time read-back: showing a withdrawn item there is the point
+r10_checked=0
+while IFS= read -r _hit; do
+  _rf="${_hit%%:*}"; _rl="${_hit#*:}"; _rf="${_rf#./}"
+  if [ "$_rf" = "$R10_EXEMPT" ]; then T_PASS=$((T_PASS+1)); continue; fi
+  r10_checked=$((r10_checked+1))
+  case "$_rl" in
+    *abandoned*) T_PASS=$((T_PASS+1)) ;;
+    *) T_FAIL=$((T_FAIL+1)); echo "FAIL: R10: $_rf has a spine-scoped work-item read with no abandoned conjunct: $(printf '%s' "$_rl" | cut -c1-110)" ;;
+  esac
+done < <(cd "$SKILLS" && grep -rn 'work_items\[\]' . 2>/dev/null | grep '\.spine')
+# A floor, not a total: if the grep itself broke, every assertion above would be
+# vacuously true. Nine sites ship today; the floor guards the walk, it does not
+# pin the count.
+if [ "$r10_checked" -ge 5 ]; then T_PASS=$((T_PASS+1)); else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: R10: only $r10_checked spine-scoped selectors enumerated - the sweep is broken and its assertions are vacuous"
+fi
 
 # The open-item gate itself (spine-close.md §2), on the same spine: the planned
 # live item still HALTS it (the adjacent control - the loosening is abandoned

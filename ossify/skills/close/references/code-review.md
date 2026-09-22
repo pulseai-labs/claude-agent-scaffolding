@@ -117,6 +117,13 @@ payload. Absent is a clean signal, not a gap — not every close writes one
 (impl-check.md §4b: `pattern`, `absence`, and a declared `fidelity` finding,
 never a halt).
 
+**Walk the non-`abandoned` items only — the same set `hosting_repos` read
+above.** A withdrawn item was never dispatched: it has no `work-<wi>/` directory
+and no `verify.md`, and while a `spec.md` may survive from planning, its ACs were
+deliberately never implemented. Folding either one in reports a planning decision
+back as a gap in the work, and the disposition loop then churns on work the plan
+withdrew. Axis B reads the same set (§4).
+
 **Before Axis A:** read only each file's `pattern`-tagged findings and fold
 them into your Axis A findings. Leave the rest of the file unread.
 
@@ -190,7 +197,8 @@ can weigh it.
 
 ## 4. Axis B — Spec
 
-Now read the spine's `SPINE.md` and each work item's `spec.md`, and ask **three**
+Now read the spine's `SPINE.md` and each **non-`abandoned`** work item's
+`spec.md`, and ask **three**
 questions of the diff:
 
 1. **Does it do what was asked?** Every AC passed mechanically — that is the

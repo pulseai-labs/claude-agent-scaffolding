@@ -162,6 +162,47 @@ t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WI2\") | .status"
 t_assert_eq "planned" "$T_OUT" "...and the state reads planned again"
 t_capture oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_status")] | length'
 t_assert_eq "$((N0 + 2))" "$T_OUT" "one journaled mutation per accepted call"
+
+# The DISPATCH guard on the same value (GLM seat, round 1 on PR #520).
+# `abandoned` means withdrawn BEFORE any dispatch, and a recorded
+# branch or worktree_path IS the dispatch. Without the guard, an active or
+# complete item flips at rc 0; every close-path reader then skips it, its
+# committed work never reaches the spine branch, and post-close it silently
+# shrinks release close's tag set. Measured on the unguarded setter: it
+# journaled and stranded at rc 0.
+WID="$(oss_entity_add_work_item "$S" r0.s1 "dispatched, so not withdrawable")"
+t_capture oss_entity_set_work_item_status "$S" "$WID" active
+t_assert_rc 0 "setup: the dispatched item goes active"
+t_capture oss_entity_set_work_item_exec "$S" "$WID" "work/$WID" "$TMP/.worktrees/$WID" "abc123"
+t_assert_rc 0 "setup: the dispatch journals branch + worktree_path"
+N1="$(oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_status")] | length')"
+t_capture oss_entity_set_work_item_status "$S" "$WID" abandoned
+t_assert_rc 7 "abandoning a DISPATCHED item refuses"
+t_assert_contains "$T_OUT" "was dispatched" "...and names the dispatch as the reason"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID\") | .status"
+t_assert_eq "active" "$T_OUT" "...leaving the status untouched"
+t_capture oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_status")] | length'
+t_assert_eq "$N1" "$T_OUT" "...and journaling nothing"
+# ADJACENT CONTROL: the same value on a never-dispatched item still applies, so
+# the refusal above is the DISPATCH and not the value - without this, a guard
+# that refused every abandonment would pass the assertions above.
+t_capture oss_entity_set_work_item_status "$S" "$WI2" abandoned
+t_assert_rc 0 "the same value on a never-dispatched item still applies"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WI2\") | .status"
+t_assert_eq "abandoned" "$T_OUT" "...and lands"
+# A branch ALONE (no worktree_path) is enough: the round walk journals both, and
+# a guard reading only the worktree would let a half-journaled dispatch through.
+WID2="$(oss_entity_add_work_item "$S" r0.s1 "branch only")"
+oss_entity_set_work_item_exec "$S" "$WID2" "work/$WID2" "" "" >/dev/null 2>&1
+t_capture oss_entity_set_work_item_status "$S" "$WID2" abandoned
+t_assert_rc 7 "a recorded branch alone refuses the abandonment too"
+# And a COMPLETE item is refused as well: the merge already landed, so
+# abandoning it would take the tag set down with it.
+t_capture oss_entity_set_work_item_status "$S" "$WID" complete
+t_assert_rc 0 "setup: the dispatched item can still go complete"
+t_capture oss_entity_set_work_item_status "$S" "$WID" abandoned
+t_assert_rc 7 "a COMPLETE item cannot be abandoned after its merge landed"
+
 t_capture oss_entity_set_release_status "$S" "r0" "closed"
 t_assert_rc 0 "release status accepts a valid transition"
 t_capture oss_state_read "$S" '.releases[] | select(.id=="r0") | .status'

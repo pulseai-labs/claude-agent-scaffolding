@@ -53,6 +53,9 @@ open="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .statu
 [ -z "$open" ] \
   || { echo "close: $spine_id has work items that are not complete: $open - halt"; exit 1; }
 withdrawn="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status == \"abandoned\") | .id] | join(\", \")")"
+live="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .id] | join(\", \")")"
+[ -n "$live" ] || [ -z "$withdrawn" ] \
+  || { echo "close: $spine_id records only withdrawn work items ($withdrawn) - there is nothing to land, review, demo or harvest. This is not a close: retire the spine with \"$oss_bin\" spine_status $spine_id abandoned, or un-withdraw an item with \"$oss_bin\" work_item_status <wi-id> planned - halt"; exit 1; }
 [ -z "$withdrawn" ] \
   || echo "close: $spine_id withdrew work items before dispatch: $withdrawn - SPINE.md records why; they contribute nothing to this close"
 ```
@@ -69,7 +72,19 @@ after its merge is verified landed, precisely so this step can read it that way.
 spine branch — no worktree, no handoff, no commits — so it neither blocks this
 gate nor counts toward any later step: §3 lands no repo for it, and step 10
 removes no worktree for it. A **dispatched** item is never abandoned; its round
-lands or halts. The withdrawn line is `[ -z … ] || echo` for the same strict-mode
+lands or halts.
+
+**A spine whose work items are ALL withdrawn is refused here, with the route out
+named.** Every later step reads the non-abandoned set — §3's landing repos, §4's
+review scope, step 9's harvest — so a spine with nothing live would halt at
+whichever of them runs first, on a message saying *no work items found* when the
+items are on record and merely withdrawn. Refusing at the gate keeps that from
+reading as a gap in the record, and it is the honest verdict anyway: a spine that
+ran nothing is **retired**, not closed — `"$oss_bin" spine_status <spine-id>
+abandoned`, the whole-spine arm `plan-spine/references/decomposition.md` §1
+already names.
+
+The withdrawn line is `[ -z … ] || echo` for the same strict-mode
 reason `release-close.md` §2 gives for its abandoned-spine line: it is the
 block's last command, and an `&&` form returns 1 on the clean case.
 

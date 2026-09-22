@@ -1254,8 +1254,14 @@ Resolve it before §3, the way the ceremony already resolves it —
 audited ref differently.** No spine records a base branch for a repo it never
 hosted work on — `ai_workspace` always (it never executes), and any other
 declared repo (a `private_core`, a `tooling_repo`, or a second product repo)
-whenever no closing spine's work items targeted it: audit each such repo's
-checked-out branch and name it as such in its block. A repo that DID host one
+whenever no closing spine dispatched a work item into it: audit each such repo's
+checked-out branch and name it as such in its block. **The predicate is
+DISPATCHED, not targeted.** An `abandoned` item was withdrawn before any
+dispatch (`plan-spine/references/decomposition.md` §1), and `target_repo` is set
+at mint time — so a repo only an abandoned item names takes THIS arm, never the
+one below. Reading `target_repo` as a dispatch is what sends such a repo down
+the handoff-derived path, where no handoff exists and no base was ever recorded,
+and it halts the audit on that. A repo that DID host one
 of the closing spines' items resolves the same way `canonical` does above —
 from that spine's handoffs, never guessed, whatever the repo is named. A
 plain non-repo root (determined per §2, whatever the field

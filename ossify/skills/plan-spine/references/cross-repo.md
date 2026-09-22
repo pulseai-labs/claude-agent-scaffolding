@@ -30,8 +30,15 @@ the execution engine reads, because the item is what gets a worktree.
 Read them back:
 
 ```bash
-"$oss_bin" get '[.work_items[] | select(.spine == "r1.s2") | {id, title, target_repo}]'
+"$oss_bin" get '[.work_items[] | select(.spine == "r1.s2") | {id, title, status, target_repo}]'
 ```
+
+**`status` is in the projection on purpose.** An `abandoned` item was withdrawn
+before any dispatch (`decomposition.md` §1), so it names a repo this spine will
+never run in — read the set without the status and it looks live, in the very
+plan the rest of this file positions. This read is a plan-time read-back, not a
+close-path reader: it shows the withdrawn item rather than filtering it out,
+because during planning the withdrawal is what you want to see.
 
 **Why one repo per item, strictly:** the item is the unit that gets a worktree, a
 branch, and a merge. An item spanning two repos has two branches and two merges,

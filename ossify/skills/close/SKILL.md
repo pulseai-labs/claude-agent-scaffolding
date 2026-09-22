@@ -274,7 +274,8 @@ budget — is in **`references/cumulative-demo.md`**.
 The two retrospective section sets, full for bone and lean for flesh, are pinned
 verbatim in **`references/retrospective.md`**. It is the only copy.
 
-The harvest (step 9) — how the candidates are enumerated from each work item's
+The harvest (step 9) — how the candidates are enumerated from each
+**non-`abandoned`** work item's
 `report.md` and `handoff.md`, the `[report]`/`[handoff]` trust tag, the two-file
 allowlist, and the append rules (no `oss` verb: whole-set validation, then you
 write, in one pass) — is in **`references/harvest.md`**. Also the only copy.
