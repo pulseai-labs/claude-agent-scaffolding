@@ -91,10 +91,16 @@ reading as a gap in the record, and it is the honest verdict anyway: a spine tha
 ran nothing is **retired**, not closed — `"$oss_bin" spine_status <spine-id>
 abandoned`, the whole-spine arm `plan-spine/references/decomposition.md` §1
 already names. That retirement is itself refused (rc 7) if any of the spine's
-items records a dispatch, is `active`, or is `complete` — this gate is reached
-only when every item is complete or withdrawn, so the refusal can only fire for
-an item someone dispatched **after** this halt, and the message names the item
-and the way back.
+items records a dispatch, is `active`, or is `complete`. Two causes reach it: a
+journal written before 1.12.0 holding the `abandoned`-with-a-dispatch-field pair
+(`state-inspection.md` §5 reports that pair as drift), and a bare status write —
+`work_item_status <wi-id> active` or `complete` on a never-dispatched item, which
+the verb admits and this level counts as "ran something". A dispatch **after**
+this halt is not one of them: the mirror arm refuses dispatching a withdrawn item
+outright, so the cause the halt is reached with is never a new dispatch. The
+message names the item that blocks it, and the route out is to close the spine or
+to re-dispatch the item's round — returning it to `planned` does not clear the
+record.
 
 The withdrawn line is `[ -z … ] || echo` for the same strict-mode
 reason `release-close.md` §2 gives for its abandoned-spine line: it is the

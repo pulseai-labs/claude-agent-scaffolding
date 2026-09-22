@@ -53,9 +53,11 @@ never-dispatched precondition this arm has always implied: `spine_status <spine>
 abandoned` answers rc 7 if any of the spine's items records a dispatch (`branch`,
 `worktree_path` or `base_sha`), is `active`, or is `complete` — because every
 close-path reader skips an abandoned item, so retiring a spine whose work has
-started or landed strands it. Close that spine instead, or return an item with
-`"$oss_bin" work_item_status <wi-id> planned` if its round was abandoned without
-a landing. A spine whose items were all withdrawn **before** dispatch, or that has
+started or landed strands it. Close that spine instead: returning an item to
+`planned` re-opens it for a re-dispatch and does **not** clear the dispatch record
+that blocks the retirement — a re-dispatch REPLACES that record, and it is the
+only write that changes it. A spine whose items were all withdrawn **before**
+dispatch, or that has
 no items at all, retires normally — which is exactly what the close gate's two
 empty arms ask for.
 

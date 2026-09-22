@@ -40,7 +40,9 @@ passes `[ -n … ]`. Every state read in this layer is guarded that way, and the
 merge target in step 4 is the one where it matters most — `git merge null`
 resolves nothing and the guard that was supposed to catch it already passed.
 
-A missing `worktree_path` means the lane skipped `"$oss_bin" work_item_exec`. That is a
+A missing `worktree_path` means the lane skipped `"$oss_bin" work_item_exec` — or
+recorded a half-write, `work_item_exec <wi> "" "" <sha>`, which journals `base_sha`
+alone and names no worktree either. Both are a
 halt, not something to reconstruct: `"$oss_bin" worktree_resolve <target_repo> <wi>`
 will happily echo a conventional path whether or not it is the one this item was
 built in. **The block tests one other cause first**: an item withdrawn before any

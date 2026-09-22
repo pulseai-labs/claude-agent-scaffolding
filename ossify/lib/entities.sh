@@ -75,10 +75,21 @@ _oss_entity_guard_wi_status() { # $1=state-file $2=payload about to be minted
     echo "oss: work item '$wi' is complete - its merge is on the spine branch, so 'abandoned' would take a landed line out of every close-path reader and out of release close's tag set; a plan that drops a landed item is a replan, not a withdrawal (plan-spine/references/decomposition.md §1)" >&2
     return 7
   fi
+  # An `active` item is a round in flight, and the SPINE level already counts one
+  # as 'ran something' - so this level must too, or one status write turns a
+  # spine the rail has just refused into one it retires a call later. Measured on
+  # the unguarded setter: `work_item_status <wi> active` (no dispatch record) then
+  # `abandoned` returned rc 0, and the retirement that had answered rc 7 naming
+  # that item answered rc 0 immediately after. The route out is the documented
+  # one: land the round, or return the item to planned first.
+  if [ "$st2" = "active" ]; then
+    echo "oss: work item '$wi' is active - its round is in flight, and an active item is one this spine's retirement counts as 'ran something', so withdrawing it here would retire that spine a call later. Land the round, or return the item to planned first if the round was abandoned without a landing: \"oss work_item_status $wi planned\" (plan-spine/references/decomposition.md §1)" >&2
+    return 7
+  fi
 }
 
 _oss_entity_guard_wi_exec() { # $1=state-file $2=payload about to be minted
-  local sf="$1" wi st
+  local sf="$1" wi st rb rp rs nb np ns rec
   wi="$(printf '%s' "$2" | jq -r '.work_item // ""')" || return 4
   _oss_entity_require_single "$sf" '.work_items[] | select(.id == $v)' "work item" "$wi" || return $?
   # The MIRROR of the abandonment guard, and the same harm entered through the
@@ -89,10 +100,39 @@ _oss_entity_guard_wi_exec() { # $1=state-file $2=payload about to be minted
   # rc 0 and left {status:abandoned, branch, worktree_path} - the pair doctor
   # reports as drift. decomposition.md §1 gives the way back, so the refusal
   # names it.
-  st="$(jq -r --arg w "$wi" "[.work_items[] | select(.id == \$w)] | first | .status // \"\"" "$sf" 2>/dev/null)" || {
+  #
+  # THIS VERB MAINTAINS THE RECORD THAT EVERY OTHER GUARD READS, so it guards the
+  # record as well as the status. Three clauses follow: a write that records no
+  # dispatch at all, one that empties a field the record already holds (branch
+  # and worktree_path are how close finds the work), and one onto a landed item
+  # whose provenance its record IS. Measured on the unguarded write:
+  # `work_item_exec <wi> "" "" ""` returned rc 0 and wiped a recorded dispatch,
+  # after which the abandonment AND the retirement both returned rc 0 - the strand
+  # #529 exists to prevent, entered through the verbs that maintain the record.
+  rec="$(jq -r --arg w "$wi" --argjson p "$2" '
+    ([.work_items[] | select(.id == $w)] | first) as $r
+    | [($r.status // ""), ($r.branch // ""), ($r.worktree_path // ""), ($r.base_sha // ""),
+       ($p.branch // ""), ($p.worktree_path // ""), ($p.base_sha // "")] | join("\u0001")' "$sf" 2>/dev/null)" || {
     echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
+  # The separator is U+0001, NOT a tab: an IFS *whitespace* character makes `read`
+  # strip leading empties and collapse runs, so a record with no dispatch at all
+  # (four leading empty fields) would shift left and this guard would refuse every
+  # legitimate dispatch. A non-whitespace delimiter preserves empty fields exactly.
+  IFS=$'\x01' read -r st rb rp rs nb np ns <<<"$rec"
+  if [ -z "$nb" ] && [ -z "$np" ] && [ -z "$ns" ]; then
+    echo "oss: work_item_exec for '$wi' records no dispatch at all - all three fields are empty, so this is not a dispatch, and on an item that has one it would erase the record of it. A dispatch names the round's branch, worktree_path and base_sha (work-item/references/round-orchestration.md §3)" >&2
+    return 7
+  fi
+  if { [ -n "$rb" ] && [ -z "$nb" ]; } || { [ -n "$rp" ] && [ -z "$np" ]; } || { [ -n "$rs" ] && [ -z "$ns" ]; }; then
+    echo "oss: work_item_exec for '$wi' would drop a dispatch field the record already holds (branch, worktree_path, base_sha) - a re-dispatch REPLACES all three, and emptying one leaves an item the predicate still calls dispatched that close can no longer find (work-item/references/round-orchestration.md §3)" >&2
+    return 7
+  fi
   if [ "$st" = "abandoned" ]; then
     echo "oss: work item '$wi' is abandoned - it was withdrawn before any dispatch, so it has no round to run and no worktree to hold. Un-withdraw it first: \"oss work_item_status $wi planned\" (plan-spine/references/decomposition.md §1)" >&2
+    return 7
+  fi
+  if [ "$st" = "complete" ]; then
+    echo "oss: work item '$wi' is complete - its merge is on the spine branch, and its record names the branch and worktree that landed there; a re-dispatch would overwrite that provenance, and a later close re-run would gate against the redo. Landed work that must be redone is a new item, not a re-dispatch (plan-spine/references/decomposition.md §1)" >&2
     return 7
   fi
 }
@@ -114,7 +154,7 @@ _oss_entity_guard_spine_status() { # $1=state-file $2=payload about to be minted
     | join(\", \")" "$sf" 2>/dev/null)" || {
     echo "oss: cannot read the work items of spine '$sp' from $sf" >&2; return 2; }
   if [ -n "$blockers" ]; then
-    echo "oss: spine '$sp' records dispatched or landed work ($blockers) - a spine that ran anything is closed, not retired, and every close-path reader skips the items a retirement would abandon, so that work would never reach the spine branch. Close it, or return an item first: \"oss work_item_status <wi-id> planned\" (plan-spine/references/decomposition.md §1)" >&2
+    echo "oss: spine '$sp' records dispatched or landed work ($blockers) - a spine that ran anything is closed, not retired, and every close-path reader skips the items a retirement would abandon, so that work would never reach the spine branch. Close it instead: returning an item to 'planned' re-opens it for a re-dispatch and does NOT clear the dispatch record that blocks this retirement - a re-dispatch REPLACES that record (plan-spine/references/decomposition.md §1)" >&2
     return 7
   fi
 }

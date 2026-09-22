@@ -512,13 +512,17 @@ SI3="$OSSSK/skills/doctor/references/state-inspection.md"
 # The PREDICATE's own definition, not a mention anywhere in the file: the three
 # field names also appear in the dispatch payload builder, so a file-level grep
 # passes while the predicate reads fewer (measured - the same trap as phase 2's
-# sweep row, where a word-grep passed on a comment).
-_pred="$(grep -F '_OSS_DISPATCHED_JQ=' "$ENT" | head -1)"
-if [ -n "$_pred" ]; then
+# sweep row, where a word-grep passed on a comment). Anchored to COLUMN 0 and
+# required to be UNIQUE: `grep -F '…='` would take the first match, so a future
+# comment carrying the literal above the definition would satisfy the field
+# checks while the real predicate drifted under it (round 1, GLM seat).
+_pred_n="$(grep -cE '^_OSS_DISPATCHED_JQ=' "$ENT" || true)"
+if [ "$_pred_n" = "1" ]; then
   T_PASS=$((T_PASS+1))
 else
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: entities.sh no longer defines the shared dispatch predicate (_OSS_DISPATCHED_JQ=) - the parity checks below are vacuous"
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: entities.sh must define the shared dispatch predicate (_OSS_DISPATCHED_JQ=) exactly once at column 0, found $_pred_n - the parity checks below are vacuous otherwise"
 fi
+_pred="$(grep -E '^_OSS_DISPATCHED_JQ=' "$ENT" || true)"
 for _f in branch worktree_path base_sha; do
   case "$_pred" in
     *"$_f"*) T_PASS=$((T_PASS+1));;
@@ -534,11 +538,30 @@ for _f in branch worktree_path base_sha; do
 done
 # The spine-level half is prose as well: plan-spine/SKILL.md states the two
 # mutually exclusive arms, and the rail now enforces the retirement precondition
-# they imply. Losing the word here is how the rule went unenforced for a release.
-if grep -Fq 'never-dispatched' "$OSSSK/skills/plan-spine/SKILL.md"; then
+# they imply. Anchored to the ENFORCEMENT sentence this phase added, not to the
+# pre-existing "never-dispatched" phrase at line 57: a pin on the old wording
+# stays green when the added sentence is deleted, so it cannot detect the loss
+# its own failure message describes (round 1, GLM seat - measured by deleting
+# the sentence and watching this row stay green).
+if grep -Fq 'Both are now enforced rather than declared' "$OSSSK/skills/plan-spine/SKILL.md"; then
   T_PASS=$((T_PASS+1))
 else
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: plan-spine/SKILL.md no longer states the never-dispatched precondition"
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: plan-spine/SKILL.md no longer states that the withdrawal and the retirement are ENFORCED (the phase-3 sentence), so the rail and the prose it moves with have drifted"
+fi
+# The third reader of the dispatch record is a close-path diagnosis, and it is
+# one field wide if nobody holds it: work-item-close.md's halt gloss explains a
+# missing worktree_path as "the lane skipped work_item_exec", which is FALSE for
+# the base_sha-only half-write this phase documents - the lane dispatched and
+# recorded no worktree. The halt is right either way; the diagnosis the operator
+# recovers from must name both causes.
+_wc="$(grep -A 3 'A missing .worktree_path. means' "$OSSSK/skills/close/references/work-item-close.md" || true)"
+if [ -n "$_wc" ]; then
+  case "$_wc" in
+    *base_sha*) T_PASS=$((T_PASS+1));;
+    *) T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md's missing-worktree_path gloss does not name the base_sha-only half-write - it tells the operator a lane broke when a dispatch is on record";;
+  esac
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md no longer states the missing-worktree_path diagnosis at all - re-anchor this row or drop it"
 fi
 
 rm -rf "$_PC_TMP"
