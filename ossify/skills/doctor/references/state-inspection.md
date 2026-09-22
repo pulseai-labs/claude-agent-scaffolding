@@ -351,7 +351,10 @@ belong in the read-out when the sweep gives you reason to look:
   # declared repo-key list, one per line, from the manifest read doctor's interop
   # check already performs (`interop-check.md`, "`ai_workspace` and every declared
   # repo": a native topology's `.repos` object; a legacy pairing manifest's
-  # top-level `.root` objects, translated as `_oss_topology_shape` does) - no verb
+  # top-level `.root` objects OTHER than `ai_workspace`, which the normalized
+  # manifest excludes from `.repos` - a legacy key set that kept it would scan
+  # planning files and let a stale product glob match one, suppressing a real
+  # warning) - no verb
   # lists the keys, so this is an agent-performed read. The SEMANTICS ORACLE is touch_check,
   # never a hand-rolled glob match: a shell `*` crosses `/`, so a matcher written
   # here would disagree with the verb that decides reclassification.
@@ -360,8 +363,11 @@ belong in the read-out when the sweep gives you reason to look:
   # unreadable registry makes every batch inconclusive, an unreadable repo
   # contributes no hits, and either one would turn every surface into a finding.
   probe_rc=0; "$oss_bin" touch_check . >/dev/null 2>&1 || probe_rc=$?
+  state_rc=0; "$oss_bin" get 'true' >/dev/null 2>&1 || state_rc=$?
   if [ -z "${repos:-}" ]; then
     echo "skip: touch - the declared repo keys could not be read, so the sweep did not run"
+  elif [ "$state_rc" != 0 ]; then
+    echo "skip: touch - the state could not be resolved or read, and touch_check returns its resolver's rc 1 WITHOUT checking anything, so an empty hit file would not be an absence"
   elif [ "$probe_rc" = 2 ]; then
     echo "skip: touch - the bones/risk-gate registry could not be read (touch_check answers rc 2), so no absence below would be sound"
   else

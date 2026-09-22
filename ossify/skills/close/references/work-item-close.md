@@ -26,7 +26,7 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 wi="<work-item id>"
 st="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .status")"
 if [ "$st" = "abandoned" ]; then
-  echo "close: $wi is abandoned - it was minted and withdrawn BEFORE any dispatch, so it has no worktree by construction and nothing to close. This is NOT the skipped-work_item_exec case below, and nothing should be reconstructed for it: spine close skips an abandoned item, and the withdrawal's own obligations live in plan-spine/references/decomposition.md §1 (the demo-ledger amendment it owes, and any repo armed for its spine). To reverse the withdrawal: \"$oss_bin\" work_item_status $wi planned - halt"
+  echo "close: $wi is abandoned - it was minted and withdrawn BEFORE any dispatch, so it has no worktree by construction and nothing to close. This is NOT the skipped-work_item_exec case below, and nothing should be reconstructed for it: spine close skips an abandoned item, and the withdrawal's own obligations live in plan-spine/references/decomposition.md §1 (the demo-ledger amendment it owes, and any repo armed for its spine). To reverse the withdrawal: \"$oss_bin\" work_item_status $wi planned - but if this item's spine is ALREADY closed, that alone is not the recovery: un-withdrawing leaves a planned item inside a closed spine, and release close's tag selector takes any non-abandoned item whose spine is closed, so a later release close would tag a repo whose work was never dispatched or landed. Reopen the spine first (\"$oss_bin\" spine_status <spine-id> active), run the item, close the spine again - halt"
   exit 1
 fi
 wt="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .worktree_path")"

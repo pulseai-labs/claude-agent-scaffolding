@@ -386,6 +386,10 @@ t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$P2WS'; set -euo pipefail; spine_i
 t_assert_rc 1 "step 1 halts on a spine with NO work items"
 t_assert_contains "$T_OUT" "no work items" "...naming the zero-item case as its own cause, not the withdrawn one"
 t_assert_contains "$T_OUT" "work_item_add" "...and naming the way to give it items"
+# With the repo argument NAMED: work_item_add's target_repo is optional only where
+# the workspace declares a single repo (`_oss_default_repo_key` refuses to guess
+# among several), so the bare two-argument form fails on any multi-repo project.
+t_assert_contains "$T_OUT" "work_item_add $SPZERO <title> <target-repo>" "...with the target repo the verb requires once more than one is declared"
 t_assert_contains "$T_OUT" "spine_status" "...and the retirement route, as the withdrawn arm does"
 SPABAND="$(cd "$P2WS" && bash "$OSS" spine_add "$P2REL" "planned then emptied" flesh)"
 WIA="$(cd "$P2WS" && bash "$OSS" work_item_add "$SPABAND" "withdrawn before dispatch")"

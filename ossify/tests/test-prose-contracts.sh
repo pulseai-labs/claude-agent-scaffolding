@@ -335,8 +335,11 @@ if grep -Fq '= "abandoned"' "$_F" || grep -Fq "= 'abandoned'" "$_F"; then
 else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1 does not COMPARE the status against 'abandoned' - naming it in a message is not testing it"
 fi
-# The route out and the owner of the full account.
-for _lit in 'work_item_status' 'decomposition.md'; do
+# The route out must not leave the SAME trap the release-close halt did: if this
+# item's spine is already closed, un-withdrawing it puts a planned item inside a
+# closed spine, which release close's tag selector then accepts - so the arm has
+# to name reopening it (`spine_status ... active`) before the item can be run.
+for _lit in 'work_item_status' 'spine_status' 'decomposition.md'; do
   if grep -Fq "$_lit" "$_F"; then
     T_PASS=$((T_PASS+1))
   else
@@ -464,5 +467,23 @@ SWSB="$_PC_TMP/broken-state.json"; printf '%s\n' '{"schema_version":2}' > "$SWSB
 t_capture env OSS_STATE_FILE="$SWSB" oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 t_assert_rc 0 "(d) an unreadable registry does not abort the sweep"
 t_assert_contains "$T_OUT" "registry could not be read" "(d) ... it reports the registry failure, so an empty \$hits is not read as every surface matching nothing"
+# The resolver arm: touch_check returns its RESOLVER's rc 1 before it ever looks
+# at the registry - measured, so rc 1 there is indistinguishable from "clean" and
+# the rc alone cannot catch it. Only a second probe can, which is why one exists.
+SWBR="$_PC_TMP/badroute"; mkdir -p "$SWBR/.ossify"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"}},"well_known_paths":{"project_state":"${repos.nosuch.root}/ps.json"}}\n' \
+  "$SWBR/canon" > "$SWBR/.ossify/topology.json"
+cd "$SWBR"
+t_capture env oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+cd "$HERE"
+t_assert_rc 0 "(d) an unresolvable state route does not abort the sweep"
+t_assert_contains "$T_OUT" "state could not be resolved or read" "(d) ... it reports that instead of an absence, even though touch_check's rc 1 there looks exactly like clean"
+# R2-2: the legacy key set must exclude ai_workspace, or a planning file under it
+# can satisfy a stale product glob and suppress a real warning.
+if grep -Fq 'OTHER than `ai_workspace`' "$_SW"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: the sweep's corpus comment does not exclude ai_workspace from the legacy pairing-manifest key set - a planning file then satisfies a stale product glob and the zero-match warning is suppressed"
+fi
 rm -rf "$_PC_TMP"
 t_summary
