@@ -115,6 +115,23 @@ t_assert_rc 7 "the two-argument form on an unknown ref answers the verb's rc 7, 
 t_capture bash "$OSS" risk_gate_set_touch g1 "src/a/**"
 t_assert_rc 7 "the gate verb's two-argument form does too"
 
+# --- #305 item 1: the uniqueness rail through the REAL dispatcher ------------
+# The rail runs INSIDE oss_state_mutate's critical section, and that body is
+# invoked in `|| rc=$?` context with errexit suspended - while every other suite
+# sources the libs and is non-strict anyway. So the guard's own error handling is
+# exercised nowhere except here, under `set -euo pipefail`, where one unguarded
+# failing assignment hard-exits the whole dispatcher instead of answering rc 7.
+t_capture bash "$OSS" bone_add ADR-1 "a second row for one ref" "src/other/**"
+t_assert_rc 7 "bone_add refuses an existing ADR ref at rc 7 through the dispatcher"
+t_assert_contains "$T_OUT" "already exists" "...and it is the rail's own message, not a shell abort"
+t_capture jq '[.bones[] | select(.adr=="ADR-1")] | length' "$TMP/ws/.ossify/project-state.json"
+t_assert_eq "1" "$T_OUT" "...and the refused call minted no second row"
+t_capture bash "$OSS" risk_gate_add g1 "src/a/**" "ctl-one"
+t_assert_rc 0 "...and a fresh gate name still mints"
+t_capture bash "$OSS" risk_gate_add g1 "src/other/**" "ctl-two"
+t_assert_rc 7 "...and re-adding that gate name refuses at rc 7"
+t_assert_contains "$T_OUT" "already exists" "...with the rail's own message, not a shell abort"
+
 # --- an uninitialised project is told to init, not to retry a lock ---------
 # Lock-acquire conflated "lock held" with "state file missing", so a project
 # that had never run `oss init` was told to "retry or run 'oss doctor'" at rc 3.

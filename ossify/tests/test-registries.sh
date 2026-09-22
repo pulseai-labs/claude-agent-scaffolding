@@ -44,6 +44,39 @@ t_assert_rc 0 "a distinct ADR ref is still added, with an empty surface"
 t_capture jq -c '.bones[] | select(.adr=="ADR-0011") | .touch' "$S"
 t_assert_eq '[]' "$T_OUT" "...and its empty surface is recorded as such"
 
+# --- #305 item 1, the atomic half: the rail runs INSIDE the mutation lock ----
+# The refusals above are only half the rail. The count they refuse on was a read
+# in the VERB, before oss_state_mutate acquires its lock - so two ceremonies could
+# both read "no such ref", serialize on the lock, and the second would append a
+# second row for one key: the unrepairable state this rail exists to prevent,
+# entered by two conforming callers. Measured against that version: two concurrent
+# `oss bone_add ADR-Rn` each exited 0 and left two rows for ADR-Rn.
+#
+# A concurrency test would be a TIMING test - green on a lucky schedule, so it
+# cannot pin this. The structural property is what the rail needs and what is
+# decidable: the guard must be unable to answer before the lock is held, so with
+# the lock HELD a duplicate add answers the LOCK (rc 3), never the duplicate
+# (rc 7). A verb-side count answers 7 while the lock is held, which is what makes
+# these rows RED against that spelling.
+mkdir "$S.lock"
+t_capture oss_reg_add_bone "$S" ADR-0002 "a third row for one ref" "src/other/**" ""
+t_assert_rc 3 "a duplicate add while the lock is held answers rc 3, not rc 7 - the rail is inside the lock"
+t_capture oss_reg_add_risk_gate "$S" live-money "src/other/**" "ctl"
+t_assert_rc 3 "...and the gate rail is too"
+# ADJACENT CONTROL, same held lock, a ref that does NOT exist: also rc 3. Without
+# it, a rc 3 arriving for any other reason would read as proof of atomicity.
+t_capture oss_reg_add_bone "$S" ADR-0004 "a fourth decision" "src/other/**" ""
+t_assert_rc 3 "...and an add for a NEW ref answers rc 3 under the same lock"
+rmdir "$S.lock"
+# Released again, and both verdicts are the ones the rows above already pinned:
+# the duplicate still refuses at rc 7, the new ref still mints.
+t_capture oss_reg_add_bone "$S" ADR-0002 "a third row for one ref" "src/other/**" ""
+t_assert_rc 7 "...and once the lock is released the duplicate refuses at rc 7 as before"
+t_capture jq '[.bones[] | select(.adr=="ADR-0002")] | length' "$S"
+t_assert_eq "1" "$T_OUT" "...with still one row for that ref"
+t_capture oss_reg_add_bone "$S" ADR-0004 "a fourth decision" "src/other/**" ""
+t_assert_rc 0 "...and the new ref mints at rc 0"
+
 # --- D1 fake lifecycle (Task 2, named risk 7): oss_reg_set_fake_status must
 # leave expiry_release ALONE when the 5th arg (new expiry) is omitted.
 # test-ledger.sh only exercises the WITH-a-new-expiry (renew) path, so that
@@ -168,8 +201,9 @@ t_assert_contains "$T_OUT" "unknown risk gate" "the unknown-name refusal names t
 # The duplicate row is built with the RAW op now, because the add rail refuses to
 # mint one - and that is a STRONGER fixture than the verb was: it proves the set
 # verbs refuse a duplicate that arrived through a path no shipped verb can create
-# any more (a journal written by an older build, or the check-to-append race the
-# state comment names).
+# any more (a journal written by an older build). The check-to-append race is no
+# longer such a path either: the add rails run INSIDE the mutation lock, which
+# the "#305 item 1, the atomic half" rows above pin.
 oss_state_mutate "$S" add_risk_gate \
   "$(jq -n --arg ts "$(_oss_now)" '{name:"phrase-gate",touch:["src/**"],controls:["dup"],at:$ts}')" >/dev/null
 t_capture oss_reg_set_risk_gate_controls "$S" phrase-gate "x"
@@ -384,7 +418,8 @@ t_assert_eq '["ctl-a","ctl-b"]' "$T_OUT" "...and lands in the journal"
 # rows are minted with the RAW op: the add rails (added with #305 item 1) refuse
 # to create a duplicate, so a fixture built through the verb would be impossible -
 # and this way the set verbs are proven against a duplicate that only an older
-# journal or a check-to-append race can produce.
+# journal can produce (the add rails are now in-lock, so not even a
+# check-to-append race mints one).
 oss_state_mutate "$ST" add_bone \
   "$(jq -n --arg ts "$(_oss_now)" '{adr:"ADR-0003",title:"silver layer, minted twice",touch:["src/x/**"],revisit_trigger:null,at:$ts}')" >/dev/null
 oss_state_mutate "$ST" add_risk_gate \

@@ -107,33 +107,51 @@ _oss_repoint_guard() { # $1=json-list $2=noun $3=csv-name $4=needle $5=blank-why
 # labelled "#305 shape" for both - and a duplicate gate name is refused by
 # set_controls/set_touch with a message naming #305, so an open gate writer would
 # re-open the asymmetry #524 was filed about.
+#
+# The rail is handed to oss_state_mutate as its uniqueness guard, so it is
+# evaluated INSIDE that function's lock. It was a count in the verb first, and
+# that spelling is a check-to-append race: both ceremonies read "no such ref",
+# then serialize on the lock, and the second appends a second row for one key -
+# the unrepairable state this rail exists to prevent, entered by two conforming
+# callers. Measured against that version: two concurrent `oss bone_add ADR-Rn`
+# each returned rc 0 and left two rows for ADR-Rn (the window is the caller's own
+# jq spawn between the count and the lock, and it is not narrow). The refusal is
+# unchanged - same rc 7, same message byte for byte - only the moment moves.
+_oss_reg_uniq_bone() { # $1=state-file $2=payload about to be minted -> 0, or 7 if the ref exists
+  local adr n
+  adr="$(printf '%s' "$2" | jq -r '.adr')" || return 4
+  n="$(_oss_reg_count "$1" '.bones[] | select(.adr == $v)' "bones" "$adr")" || return $?
+  [ "$n" -eq 0 ] || {
+    echo "oss: bone '$adr' already exists - one ADR ref keys one bone, and duplicate refs have no supported repair yet (#305); correct its surface with 'oss bone_set_touch <adr> <touch-csv>', or mint a new ref for a second decision" >&2; return 7; }
+}
+
+_oss_reg_uniq_gate() { # $1=state-file $2=payload about to be minted -> 0, or 7 if the name exists
+  local name n
+  name="$(printf '%s' "$2" | jq -r '.name')" || return 4
+  n="$(_oss_reg_count "$1" '.risk_gates[] | select(.name == $v)' "risk gates" "$name")" || return $?
+  [ "$n" -eq 0 ] || {
+    echo "oss: risk gate '$name' already exists - one name keys one gate, and duplicate names have no supported repair yet (#305); correct its surface with 'oss risk_gate_set_touch <name> <touch-csv>', or choose a new name" >&2; return 7; }
+}
+
 oss_reg_add_bone() { # $1=state $2=adr-ref $3=title $4=touch-csv $5=revisit(optional)
-  local sf="$1" n touch
-  n="$(_oss_reg_count "$sf" '.bones[] | select(.adr == $v)' "bones" "$2")" || return $?
-  if [ "$n" -gt 0 ]; then
-    echo "oss: bone '$2' already exists - one ADR ref keys one bone, and duplicate refs have no supported repair yet (#305); correct its surface with 'oss bone_set_touch <adr> <touch-csv>', or mint a new ref for a second decision" >&2
-    return 7
-  fi
+  local sf="$1" touch
   touch="$(_oss_csv_to_json "$4")" || return $?
   oss_state_mutate "$sf" add_bone \
     "$(jq -n --arg adr "$2" --arg t "$3" --argjson touch "$touch" \
         --arg rv "${5:-}" --arg ts "$(_oss_now)" \
-      '{adr:$adr,title:$t,touch:$touch,revisit_trigger:(if $rv=="" then null else $rv end),at:$ts}')"
+      '{adr:$adr,title:$t,touch:$touch,revisit_trigger:(if $rv=="" then null else $rv end),at:$ts}')" \
+    "" _oss_reg_uniq_bone
 }
 
 oss_reg_add_risk_gate() { # $1=state $2=name $3=touch-csv $4=controls-csv
-  local sf="$1" n touch c
-  n="$(_oss_reg_count "$sf" '.risk_gates[] | select(.name == $v)' "risk gates" "$2")" || return $?
-  if [ "$n" -gt 0 ]; then
-    echo "oss: risk gate '$2' already exists - one name keys one gate, and duplicate names have no supported repair yet (#305); correct its surface with 'oss risk_gate_set_touch <name> <touch-csv>', or choose a new name" >&2
-    return 7
-  fi
+  local sf="$1" touch c
   touch="$(_oss_csv_to_json "$3")" || return $?
   c="$(_oss_csv_to_json "$4")" || return $?
   oss_state_mutate "$sf" add_risk_gate \
     "$(jq -n --arg n "$2" --argjson touch "$touch" \
         --argjson c "$c" --arg ts "$(_oss_now)" \
-      '{name:$n,touch:$touch,controls:$c,at:$ts}')"
+      '{name:$n,touch:$touch,controls:$c,at:$ts}')" \
+    "" _oss_reg_uniq_gate
 }
 
 # Corrective append (#340): replaces a named gate's controls with a fresh
