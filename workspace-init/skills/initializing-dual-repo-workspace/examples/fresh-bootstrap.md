@@ -172,6 +172,7 @@ Next steps:
   3. cd /Users/example/projects/foo-ai && claude
   4. /ossify:start                         # bare canonical; routes to /ossify:adopt if source or history is present
                                            # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
+                                           # on Devin, invoke the ossify skill `start`; the adopt paths are not published on that surface, so reopen the checkout in Claude Code or Codex
                                            # a recorded tooling repo that already carries history refuses it too, with no supported ossify continuation yet
 
 Manifest at: /Users/example/projects/foo-ai/.workspace/pairing.json
