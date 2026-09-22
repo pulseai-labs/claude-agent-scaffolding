@@ -178,6 +178,13 @@ test_printed_skill_routes_point_to_ossify() {
   assert_contains 'never names ossify' "$dual_sec" || return 1
   assert_contains 'writes no project guidance' "$dual_sec" || return 1
 
+  # S8 final edit: the Scenario-C route states adoption's scope (an unpinned truth
+  # is how this class returns — every other surface carries the qualifier), and the
+  # AGENTS.md work is committed before the route, or A3 refuses on the dirt that
+  # step itself created.
+  assert_contains 'only for a project previously onboarded with the legacy scaffold stack' "$dual_sec" || return 1
+  assert_contains 'author and commit before' "$dual_sec" || return 1
+
   local sec
   for sec in "$init_sec" "$pair_sec" "$dual_sec"; do
     if grep -Eq "$_retired_route_patterns" <<<"$sec"; then
