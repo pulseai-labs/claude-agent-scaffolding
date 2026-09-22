@@ -221,6 +221,32 @@ for csv in "" "   " " , ,"; do
   t_assert_rc 2 "risk_gate_set_touch refuses an empty touch list ('$csv')"
   t_assert_contains "$T_OUT" "at least one glob" "...and says what it needs ('$csv')"
 done
+# ADJACENT CONTROL for that guard (Codex P2 and the GLM seat, round 1 on
+# PR #520). The loop above pins SPACE-only emptiness - which the old
+# `length > 0` form already caught, so it proves nothing about the loosening.
+# The splitter trims literal spaces only, so a tab-, CR-, VT- or NBSP-only
+# entry SURVIVES as a "glob" that can never match a real path, reproducing the
+# exact silent-clean defect the verb exists to repair (measured: it journaled
+# `["\t"]` at rc 0 and touch_check went clean). These rows are what goes RED
+# under the array-length form.
+for csv in "$(printf '\t')" "$(printf '\r')" "$(printf '\v')" "$(printf '\xc2\xa0')" "$(printf '　')"; do
+  t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "$csv"
+  t_assert_rc 2 "bone_set_touch refuses a blank-lookalike list (non-space whitespace, $(printf '%s' "$csv" | od -An -tx1 | tr -d ' '))"
+  t_assert_contains "$T_OUT" "at least one glob" "...and says what it needs"
+  t_capture oss_reg_set_risk_gate_touch "$ST" gold-correctness "$csv"
+  t_assert_rc 2 "risk_gate_set_touch refuses a blank-lookalike list (non-space whitespace, $(printf '%s' "$csv" | od -An -tx1 | tr -d ' '))"
+  t_assert_contains "$T_OUT" "at least one glob" "...and says what it needs"
+done
+# The OTHER input the splitter mishandles: jq -R is LINE-oriented, so a csv
+# wrapped over two lines emits TWO JSON values and --argjson cannot parse them.
+# Fail-closed either way, but the diagnostic must not say "empty" - that is a
+# false cause, and an agent following its remedy retries and stays stuck.
+t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "$(printf 'src/a/**\nsrc/b/**')"
+t_assert_rc 2 "bone_set_touch refuses a two-line touch-csv"
+t_assert_contains "$T_OUT" "not one list" "...and reports two lists, not an empty one"
+t_capture oss_reg_set_risk_gate_touch "$ST" gold-correctness "$(printf 'src/a/**\nsrc/b/**')"
+t_assert_rc 2 "risk_gate_set_touch refuses a two-line touch-csv"
+t_assert_contains "$T_OUT" "not one list" "...and reports two lists, not an empty one"
 t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "$(printf 'src/\357\200\200**')"
 t_assert_rc 2 "bone_set_touch propagates the private-use refusal"
 t_capture oss_reg_set_risk_gate_touch "$ST" gold-correctness "$(printf 'src/\357\200\200**')"

@@ -45,11 +45,14 @@
 #   block unfindable and the failure read as "vacuous" rather than as wrong
 #   behaviour. Pick the anchor from the block's SCAFFOLDING, never from its FIX.
 #
-# Totals: 182 blocks - 72 operative (15 covered, 57 deferred), 110 illustrative.
+# Totals: 184 blocks - 72 operative (15 covered, 57 deferred), 112 illustrative.
 # DERIVED, never hand-counted: check 2's report line gives the total from a walk
-# of the TREE ("182 blocks accounted for"); one awk pass over the rows below
-# gives the split. Two independent routes, agreeing at 182 - that agreement IS
-# the check. The previous headline (172 = 11/48/113) was ALREADY STALE BEFORE
+# of the TREE ("184 blocks accounted for"); one awk pass over the rows below
+# gives the split (O rows counted, D and I summed). Two independent routes,
+# agreeing at 184 - that agreement IS the check. 1.11.0 added two illustrative
+# blocks (a bone_set_touch and a risk_gate_set_touch call) and no operative one,
+# which is the whole of the 182 -> 184 move; the 15/57 split is unchanged.
+# The previous headline (172 = 11/48/113) was ALREADY STALE BEFORE
 # the wayfinder branch: the retirements narrated in the parentheticals below
 # were never subtracted from it. So "172 + 8 new D rows = 180" corrects a figure
 # that was never true; do not re-derive 180 from that arithmetic. Nothing
@@ -213,7 +216,7 @@ H	skills/close/references/patch-lane.md	1122131773-2611
 H	skills/close/references/release-close.md	1100043058-11313
 H	skills/close/references/retrospective.md	1694933006-117
 H	skills/close/references/routing.md	2855300955-280
-H	skills/close/references/spine-close.md	2597559794-21917
+H	skills/close/references/spine-close.md	3280402613-22395
 H	skills/close/references/work-item-close.md	3790544145-3515
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	1897652786-133
@@ -232,7 +235,7 @@ H	skills/plan-release/references/rolling-wave.md	1157652703-218
 H	skills/plan-release/references/spine-sequencing-dag.md	1267392964-148
 H	skills/plan-spine/SKILL.md	2172740796-2802
 H	skills/plan-spine/references/citation-foldin.md	2955820270-361
-H	skills/plan-spine/references/cross-repo.md	1426504098-912
+H	skills/plan-spine/references/cross-repo.md	1560286378-920
 H	skills/plan-spine/references/decomposition.md	1735798245-670
 H	skills/plan-spine/references/demo-amendments.md	1701789836-357
 H	skills/plan-spine/references/demo-authoring.md	1062611185-1621
@@ -241,7 +244,7 @@ H	skills/start/SKILL.md	713231529-1195
 H	skills/start/references/bones-registry.md	3219690395-1177
 H	skills/start/references/journey-map.md	2970283972-104
 H	skills/start/references/posture-block.md	663882063-607
-H	skills/start/references/risk-gates.md	1326609253-732
+H	skills/start/references/risk-gates.md	2159350347-744
 H	skills/work-item/SKILL.md	1649129982-549
 H	skills/work-item/references/debugging.md	3357513431-594
 H	skills/work-item/references/handoff-contract.md	1777633753-89

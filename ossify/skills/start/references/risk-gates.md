@@ -98,8 +98,12 @@ never fires. Re-point it the same way — a corrective append that **replaces**
 the whole touch list and leaves the controls alone:
 
 ```bash
-"$oss_bin" risk_gate_set_touch "<name>" "<touch-csv>"   # refuses unknown and duplicate names (#305), and an empty list
+"$oss_bin" risk_gate_set_touch "<name>" "<touch-csv>"   # refuses unknown and duplicate names (#305), and a list with no glob in it
 ```
+
+Same caveat as a bone's (`bones-registry.md`): the verb applies the correction
+you give it and never checks that the new globs match live code, so verify the
+re-point yourself before relying on it.
 
 ---
 

@@ -99,10 +99,19 @@ corrective append, never by editing state:
 
 It **replaces** the whole touch list — name every glob the bone should cover,
 old ones included where they still apply. The CSV grammar is the same as
-`bone_add`'s. It refuses an unknown ADR ref, a duplicate one (#305), and an
-empty list — an empty surface would make the check clean on every path, the
-defect being repaired. Update the ADR file's own statement of scope in the same
-change, so the index and the decision still agree.
+`bone_add`'s. It refuses an unknown ADR ref, a duplicate one (#305), and a list
+carrying no glob at all — a blank surface would make the check clean on every
+path, the defect being repaired. Update the ADR file's own statement of scope in
+the same change, so the index and the decision still agree.
+
+**Nothing verifies that the new globs match live code.** The verb is a
+correction you apply, not a detector: a re-point at a path that does not exist
+is accepted and stays silent, exactly like the stale glob it replaced. Check the
+new list yourself before relying on the repair — feed the moved code's real
+paths (list them with `git ls-files`) to `"$oss_bin" touch_check`, whose rc 0/1
+is the hit/clean verdict and is read per
+`plan-release/references/bone-touch-judge.md` §2. A re-point that still reads
+clean on the code it was meant to cover has repaired nothing.
 
 ### Authoring the ADR file
 

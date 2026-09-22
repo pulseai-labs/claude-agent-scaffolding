@@ -43,13 +43,21 @@ Since 1.11.0, two states the lifecycle could not express have a verb. A work
 item minted and then withdrawn before any dispatch is marked `abandoned`
 (`oss work_item_status <id> abandoned`): the round walk, spine close, harvest
 and release close all skip it, where before it either blocked spine close as
-`planned` or recorded a merge that never happened as `complete`. And a bone's
-or risk gate's touch surface can be re-pointed after the code it covers moves
-(`oss bone_set_touch`, `oss risk_gate_set_touch`), so `touch_check` no longer
-goes silently clean on globs that match nothing. Both are journaled corrective
-appends. The op names `set_bone_touch` and `set_risk_gate_touch`, their
-payloads `{adr,touch}` and `{name,touch}`, and the status value `abandoned` are
-a compatibility contract: replay depends on them staying exactly as spelled.
+`planned` or recorded a merge that never happened as `complete`. The verb
+refuses it on an item that was already dispatched — a recorded branch or
+worktree is the dispatch, and withdrawing one would strand its work. And a
+bone's or risk gate's touch surface can be **re-pointed** after the code it
+covers moves (`oss bone_set_touch`, `oss risk_gate_set_touch`). That is a
+correction the caller applies, **not a detector**: nothing here notices that a
+surface has gone stale, and a re-point to a glob that matches nothing is
+accepted. What the verbs refuse is a list carrying no glob at all. Both are
+journaled corrective appends. The op names `set_bone_touch` and
+`set_risk_gate_touch`, their payloads `{adr,touch}` and `{name,touch}`, and the
+status value `abandoned` are a compatibility contract: live journals written by
+an earlier local build already carry them, and renaming an op is what replay
+catches (`unknown op`, rc 4). A payload reshape does **not** fail replay — it
+applies as a silent no-op — so the payload keys are held by this contract and
+by the verbs' own tests, not by replay alone.
 
 Since 1.7.0 (#368), every bare `doctor` sweep includes plugin provenance and
 `doctor provenance` runs it alone. It reports the answering `oss` binary, the
