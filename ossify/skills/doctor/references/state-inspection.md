@@ -347,18 +347,37 @@ belong in the read-out when the sweep gives you reason to look:
   for it:
 
   ```bash
-  # The corpus is every tracked path in every declared repo - the same $repos
-  # list bones-registry.md §3 walks. The SEMANTICS ORACLE is touch_check, never a
-  # hand-rolled glob match: a shell `*` crosses `/`, so a matcher written here
-  # would disagree with the verb that decides reclassification.
-  hits="$(mktemp)"
-  while IFS= read -r name; do
-    [ -n "$name" ] || continue
-    root="$("$oss_bin" repo_root "$name")" || exit 1
-    git -C "$root" ls-files -z | xargs -0 -n 200 "$oss_bin" touch_check >> "$hits" || :
-  done <<EOF
-  $repos
-  EOF
+  # The corpus is every tracked path in every declared repo. `$repos` is the
+  # declared repo-key list, one per line, from the same manifest read the
+  # `manifest` check above performs (a native topology's `.repos` object; a
+  # legacy pairing manifest's top-level `.root` objects) - no verb lists the
+  # keys, so this is an agent-performed read. The SEMANTICS ORACLE is touch_check,
+  # never a hand-rolled glob match: a shell `*` crosses `/`, so a matcher written
+  # here would disagree with the verb that decides reclassification.
+  #
+  # Every failure that would otherwise READ AS AN ABSENCE is reported instead: an
+  # unreadable registry makes every batch inconclusive, an unreadable repo
+  # contributes no hits, and either one would turn every surface into a finding.
+  probe_rc=0; "$oss_bin" touch_check . >/dev/null 2>&1 || probe_rc=$?
+  if [ -z "${repos:-}" ]; then
+    echo "skip: touch - the declared repo keys could not be read, so the sweep did not run"
+  elif [ "$probe_rc" = 2 ]; then
+    echo "skip: touch - the bones/risk-gate registry could not be read (touch_check answers rc 2), so no absence below would be sound"
+  else
+    hits="$(mktemp)"; skipped=""
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      listed="$(mktemp)"
+      root="$("$oss_bin" repo_root "$name")" \
+        && git -C "$root" ls-files -z > "$listed" \
+        || { echo "skip: touch($name) - the repo could not be read: no usable root, or its tracked files could not be listed"
+             skipped="$skipped $name"; rm -f "$listed"; continue; }
+      if [ -s "$listed" ]; then
+        xargs -0 -n 200 "$oss_bin" touch_check < "$listed" >> "$hits" || :
+      fi
+      rm -f "$listed"
+    done < <(printf '%s\n' "$repos")
+  fi
   ```
 
   **The finding is the ABSENCE of a line, not the rc.** Each batch answers 0 for
@@ -368,7 +387,14 @@ belong in the read-out when the sweep gives you reason to look:
   Every bone and gate that does **not** appear is a `warn:` line naming the id and
   the glob list —
   `warn: touch - bone ADR-0003 matches no tracked file in any declared repo: packages/ma/silver/**, packages/ma/ingestion/**`.
-  A repo that could not be read is `skip: touch(<key>) - …`, in the §1 grammar.
+  **That absence is only whole-corpus when the whole corpus was read.** A repo that
+  could not be read is `skip: touch(<key>) - …` in the §1 grammar and is named in
+  `$skipped`; a surface missing from `$hits` may have matched a file in one of those
+  repos, so with `$skipped` non-empty report the misses as *unmatched in the repos
+  that were read*, naming the keys — never as matching no tracked file at all. The
+  empty corpus and the unreadable registry above are the same rule at their own
+  scale: each reports its own failure instead of an absence it cannot support, so
+  a sweep that did not run says that, rather than reporting every surface.
   Two exclusions, both deliberate: a surface whose list carries `not-applicable`
   is left alone (it matches nothing *on purpose* — `bones-registry.md` §2/§6),
   while a surface with an **empty** list is reported, as its own line: that is the

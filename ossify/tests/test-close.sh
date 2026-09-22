@@ -395,7 +395,14 @@ t_assert_rc 1 "step 1 halts when every item was withdrawn"
 t_assert_contains "$T_OUT" "$WIA" "...naming the withdrawn item by id"
 t_assert_contains "$T_OUT" "ledger_unplan" "...and naming the demo-ledger obligation for a PENDING amendment"
 t_assert_contains "$T_OUT" "ledger_retire" "...and the retire/replace route for an ordinary active line (F15: ledger_unplan answers rc 7 there)"
-t_assert_contains "$T_OUT" "parked" "...and the parked-repo restoration the section after next owns"
+# The ARITY and the KEY, both of which the shipped message got wrong: the verbs
+# take <line> <by-spine> <reason> (lib/commands.sh declares _oss_need 3), and the
+# amendment they record is applied by the CLOSE of the spine named there - so
+# naming the retiring spine, as the first form did, leaves it pending forever.
+t_assert_contains "$T_OUT" "ledger_retire <line-id> <spine-id> <reason>" "...with the by-spine argument the dispatcher requires, not the two-argument form that exits 2"
+t_assert_contains "$T_OUT" "demo-amendments.md" "...and citing the document that owns the keying rule, so the operator can read why"
+t_assert_contains "$T_OUT" "parked" "...and the parked-repo restoration §3 owns"
+t_assert_contains "$T_OUT" "SPINE.md" "...and the medium that record goes to, since this halt writes no close record"
 t_assert_contains "$T_OUT" "decomposition.md" "...and pointing at the whole-spine arm that owns the full account"
 # ADJACENT CONTROL: the SAME workspace's spine with one PLANNED item still halts
 # on the not-complete arm, so the two new arms did not swallow it, and a spine with
@@ -1555,6 +1562,10 @@ t_assert_rc 1 "R8: an EMPTY tag set halts the tag pass"
 t_assert_contains "$T_OUT" "no repo to tag" "R8: ...naming the empty set as the reason"
 t_assert_contains "$T_OUT" "abandoned" "R8: ...and the cause the operator has to judge"
 t_assert_contains "$T_OUT" "work_item_status" "R8: ...and the route out when a withdrawal was a mistake"
+# Un-withdrawing ALONE re-tags a repo whose work never landed: the selector above
+# takes any non-abandoned item in a closed spine, and this item's spine is closed
+# by construction here. So the route out must reopen the spine and land the work.
+t_assert_contains "$T_OUT" "spine_status <spine-id> active" "R8: ...with the reopening the item's closed parent spine needs before it can be run and landed"
 # The ADJACENT CONTROL is R1-R7 above, on the live fixtures: the same block with
 # a NON-empty tag set still tags (`tagged r9`). It is not repeated here with a
 # second shim - a second canned fixture would assert the shim, not the block.

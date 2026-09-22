@@ -365,6 +365,22 @@ case "$_wd_para" in
   *"rc 7"*) T_PASS=$((T_PASS+1));;
   *) T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1's withdrawal arm does not say why ledger_unplan fails there (rc 7) - the operator retries it";;
 esac
+# The INVOCATION, not the verb name: `ledger_retire`/`ledger_supersede` take
+# <line-id> <spine-id> <reason> (lib/commands.sh declares _oss_need 3 for both),
+# so the two-argument forms this paragraph shipped exit 2 and plan nothing. The
+# OLD form is the search term - it is what a regression here would be phrased in.
+case "$_wd_para" in
+  *"ledger_retire <line-id> <spine-id>"*|*"ledger_supersede <line-id> <spine-id>"*) T_PASS=$((T_PASS+1));;
+  *) T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1's remedy does not name the by-spine argument - a two-argument ledger_retire/ledger_supersede exits 2";;
+esac
+case "$_wd_para" in
+  *"ledger_retire <line-id> <reason>"*|*"ledger_supersede <line-id> <new-line-id>"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1's remedy still shows a two-argument form (it exits 2) - or supersede's second argument as a replacement line id, which it is not";;
+  *) T_PASS=$((T_PASS+1));;
+esac
+case "$_wd_para" in
+  *"demo-amendments.md"*) T_PASS=$((T_PASS+1));;
+  *) T_FAIL=$((T_FAIL+1)); echo "FAIL: decomposition.md §1's remedy does not cite demo-amendments.md - the document that owns the keying rule the amendment depends on";;
+esac
 
 # (c) doctor's zero-match touch-surface sweep (#523). This is the DETECTOR the
 # 1.11.0 re-point verbs never had, and it is agent-performed prose, so the facts
@@ -376,7 +392,8 @@ esac
 # becomes a false finding. Asserting the block's own content rather than a
 # mention somewhere in the file: measured by mutation, a file-level grep passes
 # while the recipe no longer calls the oracle.
-SI="$OSSSK/skills/doctor/references/state-inspection.md"
+SKILLS="$HERE/../skills"
+SI="$SKILLS/doctor/references/state-inspection.md"
 _SW="$_PC_TMP/sweep-block.sh"
 if oss_block_extract "$SI" 'ls-files -z' "$_SW" 2>/dev/null && [ -s "$_SW" ]; then
   T_PASS=$((T_PASS+1))
@@ -397,5 +414,55 @@ else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: state-inspection.md's surface sweep does not name 'not-applicable' - every deliberate placeholder becomes a false finding"
 fi
 
+
+# (d) the §5 sweep must RUN, and must not read a failure as an absence (#523).
+# It shipped classified ILLUSTRATIVE, and the review of #555 found two defects
+# in its logic that no execution could see: `$repos` was never assigned anywhere
+# in the doctor skill, and an unreadable repo read as a zero-match. Either one
+# turns EVERY bone and gate into a finding - the false-positive cascade the
+# check exists to prevent, inverted. The block is OPERATIVE by the ledger's own
+# rule (control flow, rc handling, and a variable one step assigns and a later
+# step consumes), so it is extracted AND executed here against a real repo.
+# That is what moves its ledger row from I to O.
+#
+# Run with NOTHING injected that the caller does not genuinely supply
+# (tests/lib/blocks.sh): `oss_bin` and `repos` ARE the caller's, so they are
+# passed; everything else the block must establish itself.
+OSS="$HERE/../bin/oss"
+SWWS="$_PC_TMP/sweepws"; mkdir -p "$SWWS/.ossify" "$SWWS/canon"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"},"gone":{"root":"%s"}},"well_known_paths":{}}\n' \
+  "$SWWS/canon" "$SWWS/absent" > "$SWWS/.ossify/topology.json"
+( cd "$SWWS/canon" && git init -q . && : > tracked.txt && git add tracked.txt \
+  && git -c user.email=t@t -c user.name=t commit -qm fixture ) >/dev/null 2>&1
+SWS="$SWWS/state.json"
+( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" init "sweep" ) >/dev/null 2>&1
+( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" bone_add ADR-9091 "on a tracked file" "tracked.txt" ) >/dev/null 2>&1
+( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" bone_add ADR-9092 "on nothing" "nowhere/at/all/**" ) >/dev/null 2>&1
+# cd in the MAIN shell, not a subshell: t_capture/t_assert mutate the T_PASS/
+# T_FAIL globals, and a subshell's mutations never propagate (test-manifest.sh
+# documents the vacuous-green trap this avoids).
+cd "$SWWS"
+t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" repos="$(printf 'canonical\ngone')" bash -c \
+  "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'SKIPPED[%s]\n' \"\$skipped\""
+cd "$HERE"
+t_assert_rc 0 "(d) the sweep COMPLETES with a declared repo unreadable - it reports the skip rather than exiting the whole run"
+t_assert_contains "$T_OUT" "skip: touch(gone)" "(d) ... naming the unreadable repo by key, in the §1 grammar"
+t_assert_contains "$T_OUT" "bone ADR-9091" "(d) ... recording the surface that matched a tracked file"
+case "$T_OUT" in
+  *ADR-9092*) T_FAIL=$((T_FAIL+1)); echo "FAIL: the sweep recorded a hit for a surface matching NO tracked file - the absence is the finding, and it is what must NOT be in \$hits";;
+  *) T_PASS=$((T_PASS+1));;
+esac
+t_assert_contains "$T_OUT" "SKIPPED[ gone]" "(d) ... and feeding \$skipped, which the prose's partial-corpus rule reads"
+# The corpus arm: `repos` UNSET under strict mode. This is the shipped defect
+# (an unassigned variable), so it is run with NOTHING injected.
+t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_assert_rc 0 "(d) an unset \$repos does not abort the sweep under strict mode"
+t_assert_contains "$T_OUT" "skip: touch - the declared repo keys could not be read" "(d) ... it says the sweep did not run, instead of sweeping an empty corpus and reporting every surface"
+# The registry arm: a batch that is INCONCLUSIVE leaves no hits either, so an
+# unreadable registry must not read as a whole-corpus absence.
+SWSB="$_PC_TMP/broken-state.json"; printf '%s\n' '{"schema_version":2}' > "$SWSB"
+t_capture env OSS_STATE_FILE="$SWSB" oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_assert_rc 0 "(d) an unreadable registry does not abort the sweep"
+t_assert_contains "$T_OUT" "registry could not be read" "(d) ... it reports the registry failure, so an empty \$hits is not read as every surface matching nothing"
 rm -rf "$_PC_TMP"
 t_summary
