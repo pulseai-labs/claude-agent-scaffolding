@@ -16,9 +16,7 @@ Production source, tests, product documentation, and product ADRs belong in the 
 ## Continue with ossify
 
 - Empty canonical: run `/ossify:start`.
-- Existing source or history: run `/ossify:adopt`.
-
-`/ossify:start` checks canonical content and routes to `/ossify:adopt` without authoring when it finds either.
+- `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack — a canonical that already carries source or history without that stack has no supported ossify continuation yet.
 
 ## AI-trace filter
 

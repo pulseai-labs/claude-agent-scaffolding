@@ -296,6 +296,14 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   assert_contains 'its continuation for new workspaces is `ossify`' "$overview" || return 1
   assert_contains 'not the legacy `scaffold-onboard` + `scaffold-dev` chain' "$overview" || return 1
 
+  # S8 round 3 (H1): this plugin's own README states the continuation twice, and
+  # both must state adoption's scope rather than imply that "existing source or
+  # history" alone qualifies for it.
+  local wi_readme
+  wi_readme="$(cat "$WI_PLUGIN_ROOT/README.md")"
+  assert_contains 'legacy scaffold stack' "$wi_readme" || return 1
+  assert_not_contains 'for existing source or history' "$wi_readme" || return 1
+
   # Illustrative created_by values must be version-neutral, so substituting the
   # current release number for 0.1.0 cannot satisfy them.
   grep -qF 'workspace-init@<running plugin version>' "$WI_PLUGIN_ROOT/templates/pairing.json.tmpl" \

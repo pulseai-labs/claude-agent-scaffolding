@@ -20,7 +20,7 @@ Production code, product docs (PRD/SRS/BACKLOG), product ADRs, test code. Those 
 ## Plugins involved
 
 - `workspace-init` (this plugin) — bootstrapped both repos.
-- `ossify` — authors the lean spec and lifecycle guidance; use `/ossify:start` for an empty canonical or `/ossify:adopt` for existing source or history.
+- `ossify` — authors the lean spec and lifecycle guidance; `/ossify:start` for an empty canonical. `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack; without it, an existing-source canonical has no supported ossify continuation yet.
 - `architect-critic` — fresh-frame adversarial review of specs.
 - `ai-mentor` — decision-making aids.
 

@@ -62,6 +62,11 @@ test_C1_claude_md_writes_file_with_substitution() {
   assert_not_contains '/onboard' "$content" || return 1
   assert_not_contains 'scaffold-onboard' "$content" || return 1
   [[ ! "$content" =~ workspace-init\ v[0-9] ]] || return 1
+
+  # S8 round 3: the continuation must state adoption's scope rather than imply
+  # that "existing source or history" alone qualifies for it.
+  assert_contains 'legacy scaffold stack' "$content" || return 1
+  assert_not_contains 'Existing source or history: run' "$content" || return 1
 }
 
 test_C2_claude_md_logs_write_file() {
@@ -127,6 +132,11 @@ test_A1_agents_md_writes_file_with_project_name() {
   grep -qi 'ossify' "${ai_root}/AGENTS.md" || {
     echo '    rendered AGENTS.md never mentions ossify'; return 1; }
   assert_not_contains 'scaffold-onboard' "$content" || return 1
+
+  # S8 round 3: the router must state adoption's scope, not imply that
+  # "existing source or history" alone qualifies for it.
+  assert_contains 'legacy scaffold stack' "$content" || return 1
+  assert_not_contains 'for existing source or history' "$content" || return 1
 }
 
 test_A2_agents_md_fallback_to_manifest_name() {
@@ -197,6 +207,11 @@ test_R1_readme_writes_file_with_substitution() {
   assert_not_contains 'scaffold-onboard' "$content" || return 1
   assert_not_contains 'scaffold-dev' "$content" || return 1
   assert_not_contains 'emory bank' "$content" || return 1
+
+  # S8 round 3: the plugin list must state adoption's scope, not imply that
+  # "existing source or history" alone qualifies for it.
+  assert_contains 'legacy scaffold stack' "$content" || return 1
+  assert_not_contains 'for existing source or history' "$content" || return 1
 }
 
 test_R2_readme_logs_write_file() {

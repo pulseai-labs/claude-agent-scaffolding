@@ -1,6 +1,6 @@
 # workspace-init
 
-**Bootstrap a dual-repo workspace (AI workspace + canonical repo) with pairing manifest and AI-trace commit-msg filter.** Run-once topology bootstrap; after pairing, continue with ossify (`/ossify:start` for an empty canonical, `/ossify:adopt` for existing source or history).
+**Bootstrap a dual-repo workspace (AI workspace + canonical repo) with pairing manifest and AI-trace commit-msg filter.** Run-once topology bootstrap; after pairing, continue with ossify (`/ossify:start` for an empty canonical). `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack — a canonical that already carries source or history without that stack has no supported ossify continuation yet.
 
 ## What it does
 
@@ -152,7 +152,7 @@ The hook itself lives in `.git/hooks/commit-msg`, which is **not tracked by git*
 - Spec: [`docs/SPEC-workspace-init.md`](../docs/SPEC-workspace-init.md) — manifest schema (§6.2), resolver semantics (§6.3), bootstrap procedure (§8.1), Scenario A migration (§9.4), trace filter contract (§7.3).
 - Plan: [`docs/PLAN-workspace-init.md`](../docs/PLAN-workspace-init.md) — 9-phase implementation plan.
 - Changelog: [`CHANGELOG.md`](./CHANGELOG.md).
-- Lifecycle continuation: [`ossify`](../ossify/) — `/ossify:start` for an empty canonical and `/ossify:adopt` for existing source or history.
+- Lifecycle continuation: [`ossify`](../ossify/) — `/ossify:start` for an empty canonical; `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack, so a canonical that already carries source or history without that stack has no supported ossify continuation yet.
 
 ## License
 
