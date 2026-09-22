@@ -1,6 +1,6 @@
 # workspace-init
 
-**Bootstrap a dual-repo workspace (AI workspace + canonical repo) with pairing manifest and AI-trace commit-msg filter.** Run-once topology bootstrap; after pairing, continue with ossify (`/ossify:start` for an empty canonical). `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack — a canonical that already carries source or history without that stack has no supported ossify continuation yet.
+**Bootstrap a dual-repo workspace (AI workspace + canonical repo) with pairing manifest and AI-trace commit-msg filter.** Run-once topology bootstrap; after pairing, continue with ossify — install it alongside first (**Install** below) — starting with `/ossify:start` for an empty canonical. `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack — a canonical that already carries source or history without that stack has no supported ossify continuation yet.
 
 ## What it does
 
@@ -12,7 +12,11 @@ Scenario A (`/pair-workspace`) lets you adopt an **existing** canonical repo —
 
 ```
 /plugin install workspace-init@claude-agent-scaffolding
+/plugin install ossify@claude-agent-scaffolding
 ```
+
+`ossify` is the lifecycle continuation this plugin hands off to, and a separate
+plugin: install it alongside, before the first `/ossify:*` command.
 
 ## Quickstart
 

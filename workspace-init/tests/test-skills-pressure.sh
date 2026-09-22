@@ -134,6 +134,12 @@ test_printed_skill_routes_point_to_ossify() {
 
   # Fresh bootstrap: a bare canonical starts at /ossify:start.
   assert_contains '/ossify:start' "$init_sec" || return 1
+
+  # S8 round 4 (F2): the fresh block opens no tool, so half its readers are on Codex —
+  # it must name the skill form the way the Scenario-C block does. And (F3) a recorded
+  # tooling repo that already carries history refuses the route outright.
+  assert_contains 'on Codex, invoke the corresponding ossify skill — `start`, or `adopt`' "$init_sec" || return 1
+  assert_contains 'a recorded tooling repo that already carries history refuses it too' "$init_sec" || return 1
   # Scenario A + C: existing source or history routes directly to /ossify:adopt;
   # /ossify:start appears only as the empty-canonical exception.
   assert_contains '/ossify:adopt' "$pair_sec" || return 1
@@ -201,22 +207,25 @@ test_examples_routes_and_created_paths_match_reality() {
   pair_ex_sec="$(awk '/^## Final next-steps message/,0' "$PAIR_CLEAN_EX")"
 
   # The changed lines (commit text + route lines) must be byte-consistent
-  # between each skill's printed block and its example's copy.
+  # between each skill's printed block and its example's copy. `ossify skill`
+  # covers the Codex-form lines, which name the skill and not a slash command.
   local l
   while IFS= read -r l; do
     [[ -z "$l" ]] && continue
     assert_contains "$l" "$init_ex_sec" || return 1
   done < <(awk '/^## 6\. Print next-steps/,/^## 7\./' "$INIT_SKILL" \
-             | grep -E 'git commit -m|/ossify')
+             | grep -E 'git commit -m|/ossify|ossify skill')
   while IFS= read -r l; do
     [[ -z "$l" ]] && continue
     assert_contains "$l" "$pair_ex_sec" || return 1
   done < <(awk '/^## 8\. Print next-steps/,/^## 9\./' "$PAIR_SKILL" \
-             | grep -E 'git commit -m|/ossify')
+             | grep -E 'git commit -m|/ossify|ossify skill')
 
   # Closing sentences name the ossify route, not the retired one.
   assert_contains '/ossify:start' "$init_ex_sec" || return 1
   assert_contains '/ossify:adopt' "$pair_ex_sec" || return 1
+  # F3's clause rides the same mirror: the example must state it too.
+  assert_contains 'a recorded tooling repo that already carries history refuses it too' "$init_ex_sec" || return 1
   if grep -Eq "$_retired_route_patterns" <<<"$init_ex_sec"; then
     echo "    retired route survives in fresh-bootstrap next-steps"; return 1
   fi
@@ -315,6 +324,11 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   wi_readme="$(cat "$WI_PLUGIN_ROOT/README.md")"
   assert_contains 'legacy scaffold stack' "$wi_readme" || return 1
   assert_not_contains 'for existing source or history' "$wi_readme" || return 1
+
+  # S8 round 4 (F1): the README hands off to ossify, so its own install path must
+  # install it — a standalone reader must not reach an unregistered command.
+  assert_contains '/plugin install ossify@claude-agent-scaffolding' "$wi_readme" || return 1
+  assert_contains 'install it alongside first' "$wi_readme" || return 1
 
   # Illustrative created_by values must be version-neutral, so substituting the
   # current release number for 0.1.0 cannot satisfy them.

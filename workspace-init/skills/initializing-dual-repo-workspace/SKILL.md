@@ -261,6 +261,8 @@ Next steps:
   2. git commit -m "workspace-init: initial bootstrap"
   3. cd /abs/path/{name}-ai && claude
   4. /ossify:start                         # bare canonical; routes to /ossify:adopt if source or history is present
+                                           # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
+                                           # a recorded tooling repo that already carries history refuses it too, with no supported ossify continuation yet
 
 Manifest at: /abs/path/{name}-ai/.workspace/pairing.json
 Init log at: /abs/path/{name}-ai/.workspace/init-log (rollback record)
