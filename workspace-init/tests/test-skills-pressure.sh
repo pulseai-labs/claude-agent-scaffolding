@@ -154,6 +154,30 @@ test_printed_skill_routes_point_to_ossify() {
   # skills, not slash commands.
   assert_contains 'on Codex, invoke the corresponding ossify skill' "$dual_sec" || return 1
 
+  # S8 round 2 (G1): the Scenario A route must state today's truth — adoption targets
+  # projects that came from the legacy scaffold stack, and a plain existing-source
+  # repository has no supported continuation — instead of advertising the refusal.
+  assert_contains 'legacy scaffold stack' "$pair_sec" || return 1
+  assert_contains 'no supported ossify continuation yet' "$pair_sec" || return 1
+  assert_not_contains '# canonical has source or history' "$pair_sec" || return 1
+
+  # S8 round 2 (G2): adoption's clean-tree gate sweeps every declared repo, so this
+  # block must say the canonical is swept too — the pairing never cleans it.
+  assert_contains 'every participating tree must be clean' "$pair_sec" || return 1
+  assert_contains 'the AI workspace, the canonical,' "$pair_sec" || return 1
+
+  # S8 round 2 (G3): after `git init` the manifest's tracked flag and the AI-side hook
+  # are stale, so the block must send the user back through this skill before committing.
+  assert_contains 're-run this skill' "$dual_sec" || return 1
+  assert_contains 'the AI-side trace filter is installed' "$dual_sec" || return 1
+
+  # S8 round 2 (G4): adoption lands on a workspace Codex can drive, and Scenario C never
+  # writes AGENTS.md — the user must make it name ossify, and the block must say the
+  # skill itself writes no project guidance.
+  assert_contains '`AGENTS.md`' "$dual_sec" || return 1
+  assert_contains 'never names ossify' "$dual_sec" || return 1
+  assert_contains 'writes no project guidance' "$dual_sec" || return 1
+
   local sec
   for sec in "$init_sec" "$pair_sec" "$dual_sec"; do
     if grep -Eq "$_retired_route_patterns" <<<"$sec"; then
