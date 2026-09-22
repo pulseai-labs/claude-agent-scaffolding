@@ -212,12 +212,12 @@ safe: the implementer's after `lifecycle.md` step 12's merged-branch check, the 
 (it edits nothing) once its report file validates (step 8). A refused remove goes to the
 operator, never past it with `--force` — and it releases only the worktree's own workspace:
 `herdr workspace list` still shows the **source repository's** checkout that step 2's
-`worktree create` opened, which the run did not create and the operator's to close, in the
-dual-repo case the canonical checkout left open on every worktree seat for the rest of the
-run. The run's own workspace closes last, `herdr workspace close <id>`, after every workspace
-linked to it. Close only what the run created, read every receipt (a failed call is JSON on
-stderr, exit status 1), and confirm with `herdr workspace list`, never assume: a last pane's
-close may take its tab and workspace too, and a close that finds its target already gone is
+`worktree create` opened, which the run did not create and the operator's to close — in the
+dual-repo case the canonical checkout, the repo step 2's `--cwd` names. The run's own
+workspace closes last, `herdr workspace close <id>`, after every workspace linked to it.
+Close only what the run created, read every receipt (a failed call is JSON on stderr, exit
+status 1), and confirm with `herdr workspace list`, never assume: a last pane's close may
+take its tab and workspace too, and a close that finds its target already gone is
 information, not failure.
 
 ## Machines

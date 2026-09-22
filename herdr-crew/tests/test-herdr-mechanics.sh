@@ -21,9 +21,9 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # `result.root_pane.pane_id` and its source-repo `--cwd`, the source-repo workspace that
 # `worktree remove` leaves open, the undetected caveat's remedy, the doorbell's generation
 # rule and a detected coordinator's `--until blocked` wait beside it, `enter` as the submit
-# key, and which ask governs the completion wait. Every addition is a clause, and the 29
-# lines are the smallest form the eight requirements take. The gate still fails over the
-# limit; the slack is two lines.
+# key, and which ask governs the completion wait. Every addition is a clause: the file went
+# 201 -> 233 lines (+32: numstat 56 insertions, 24 deletions) and the gate rose 204 -> 235
+# (+31). The gate still fails over the limit; the slack is two lines.
 #
 # 204, raised from 200 during PR #513's review rounds: this file's budget is this
 # port's own invention (orca-crew has no mechanics reference), and the rounds' P1
