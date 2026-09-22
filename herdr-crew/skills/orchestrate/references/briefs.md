@@ -6,7 +6,9 @@ text verbatim (`herdr-mechanics.md`) — no preamble, nothing prepended, nothing
 Every brief carries, in this order:
 
 1. Role, and "state your model in your first reply".
-2. Placement: absolute worktree path, branch, base branch.
+2. Placement: the absolute path the seat sits in — a worktree or a repo path — and, where
+   relevant, the ref or SHA it sits at; the worktree templates carry branch and base
+   besides.
 3. The task, plus any project rule the worker's location will not load, pasted verbatim.
 4. The report file's shape — a temp file in the same directory renamed over the path,
    never in pieces — and the forbidden actions for the role.
@@ -346,9 +348,13 @@ TASK: run `/ossify:close <id>` — the operator's command, verbatim — and let 
 halt. Whatever it hands off, you do not drive.
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
-DONE: write your report file carrying the close's own result, close-shaped: every PR it
-returned, one line per PR as `<repo> #<number> <url>`; or the single word `closed` when it
-recorded with no PR open. Never a `commit …; push; open the PR` line of your own.
+DONE: write your report file carrying exactly one of three results: every PR the close
+returned — one line per PR, `<repo> #<number> <url>`; the single word `closed` when it
+recorded with no PR open; or `halted: <step> — <evidence>` when it stopped, naming the
+failing step and repo and, on its own line, what it had already opened:
+`opened: <repo> #<n> <url> …` or `opened: none` — a close can halt after opening in one
+repo, and hiding those PRs strands them. Never a `commit …; push; open the PR` line of your
+own.
 NEVER: create a seat, merge, re-invoke `/ossify:close`, or open a PR of your own — a halt
 settles this dispatch, and a remediated one is a fresh session the orchestrator dispatches.
 Questions go up in your report file: when blocked, write the question there and wait; when
