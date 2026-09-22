@@ -48,13 +48,19 @@ unavailable() { # <event> <reason>
 # the input is read as text because jq cannot read it: jq is not on PATH, or it
 # failed on the input. The fast path above has already matched, so the spelling
 # settles only which event a notice belongs to: a prompt, or a new-work command
-# on the wake path this plugin's own doorbell makes ordinary. The spellings are
-# the two a JSON writer produces — compact, and with a single space — and an
-# input written any other way stays silent, as it does with jq.
+# on the wake path this plugin's own doorbell makes ordinary.
+#
+# The separators are the three a JSON writer produces — compact, one space after
+# the colon, and one space on either side of it (an indented or tab-indented
+# writer still emits one of the three between the key and its colon). What stays
+# outside is other spacing between the key and its colon: two spaces, a tab, a
+# newline. No standard writer emits those, and the key/value adjacency is kept
+# deliberately — a pattern loose enough to match any whitespace would also let a
+# mention inside a command's own text attribute a notice to the wrong event.
 event_in_raw() {
   case "$1" in
-    *'"hook_event_name":"UserPromptSubmit"'*|*'"hook_event_name": "UserPromptSubmit"'*) printf '%s' UserPromptSubmit ;;
-    *'"hook_event_name":"PreToolUse"'*|*'"hook_event_name": "PreToolUse"'*) printf '%s' PreToolUse ;;
+    *'"hook_event_name":"UserPromptSubmit"'*|*'"hook_event_name": "UserPromptSubmit"'*|*'"hook_event_name" : "UserPromptSubmit"'*) printf '%s' UserPromptSubmit ;;
+    *'"hook_event_name":"PreToolUse"'*|*'"hook_event_name": "PreToolUse"'*|*'"hook_event_name" : "PreToolUse"'*) printf '%s' PreToolUse ;;
   esac
 }
 
@@ -112,6 +118,15 @@ fi
 # substituted), "none" (no assistant record and every line parses) or "partial"
 # (no assistant record readable — a malformed or truncated tail cannot be told
 # from a lost record).
+#
+# The tail's own status is the verdict's business, and the pipeline is the only
+# place it can be read: without pipefail the substitution reports jq's status, so
+# a tail that cannot be run at all — a PATH without one — exits 0 here and its
+# empty output classifies as "none": a silence with a figure unread, which is the
+# class this hook exists to remove. A read that fails where `-r` passed, and a jq
+# that fails on the tail, land here too; in all three the tail's content could
+# not be read, which is what the notice says.
+set -o pipefail
 verdict="$(tail -c "$TAIL_BYTES" "$transcript" 2>/dev/null | jq -Rrn '
   [inputs] as $lines
   | ([$lines[] | fromjson?]) as $parsed
@@ -131,6 +146,11 @@ verdict="$(tail -c "$TAIL_BYTES" "$transcript" 2>/dev/null | jq -Rrn '
         else "nousage" end
     elif ($parsed | length) < ($lines | length) then "partial"
     else "none" end' 2>/dev/null)"
+tail_status=$?
+set +o pipefail
+if [ "$tail_status" -ne 0 ]; then
+  unavailable "$event" "the transcript's tail could not be read"; exit 0
+fi
 
 case "$verdict" in
   figure\ *) figure="${verdict#figure }" ;;

@@ -5,7 +5,9 @@
 # Feeds hook-input JSON on stdin to hooks-handlers/context-ceiling.sh the way
 # Claude Code does, against a transcript written per case, and checks stdout
 # and the exit code. Silent cases sit beside firing controls built by the same
-# fixture writers, so a handler that prints nothing cannot pass.
+# fixture writers, so a handler that prints nothing cannot pass. A few cases run
+# the handler against a PATH stripped of one binary, or with a jq stub that
+# fails, because three of its notices are about a read it could not make at all.
 #
 # Usage:    bash herdr-crew/tests/test-context-ceiling-hook.sh
 # Exit:     0 if every case holds; 1 otherwise.
@@ -281,42 +283,113 @@ expect_notice "the latest assistant record predates the whole tail: unavailable 
   > "$TMP/garbled.jsonl"
 run "$(input UserPromptSubmit "$TMP/garbled.jsonl")"
 expect_notice "unparseable lines around a valid record: the figure is still read" UserPromptSubmit "context 523114"
+# The PATH-stripped fixtures: each removes exactly the binary its case is about,
+# and nothing else. NOJQ keeps cat and tail (#516b's path — with jq absent the
+# input is read as text); NOTAIL keeps jq, wc and tr (fix round 1: the tail
+# cannot be run at all); NOWC keeps jq, tail and tr (fix round 1: the size read
+# cannot be run).
 NOJQ="$TMP/nojq-bin"; mkdir -p "$NOJQ"
 for b in cat tail; do ln -s "$(command -v "$b")" "$NOJQ/$b"; done
-OUT="$(printf '%s' "$(input UserPromptSubmit "$T_PAST")" | env -u CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING \
-  HERDR_PANE_ID=w1:p1 PATH="$NOJQ" "$BASH_BIN" "$HOOK" 2>/dev/null)"; RC=$?
-expect_notice "no jq on PATH: unavailable notice on a prompt" UserPromptSubmit "figure unavailable (jq not found)"
-# #516b — the same jq-less path on the wake. A coordinator woken by a
-# background wait runs its new-work command here rather than on a prompt, and
-# this plugin's doorbell IS a background wait, so this is its ordinary path.
-# Before the fix the raw check recognised only UserPromptSubmit: the figure went
-# unchecked and nothing said so.
-run "$(input PreToolUse "$T_PAST" 'herdr agent prompt w7:p2 "implement item 3"')" PATH="$NOJQ"
-expect_notice "no jq on PATH: unavailable notice before a new-work command" \
-  PreToolUse "figure unavailable (jq not found)"
+NOTAIL="$TMP/notail-bin"; mkdir -p "$NOTAIL"
+for b in cat jq wc tr; do ln -s "$(command -v "$b")" "$NOTAIL/$b"; done
+NOWC="$TMP/nowc-bin"; mkdir -p "$NOWC"
+for b in cat jq tail tr; do ln -s "$(command -v "$b")" "$NOWC/$b"; done
+
+# raw_input <shape> <event> <separator> <complete|truncated>
+# The raw path reads the hook input as text, so its reach is a spelling list, and
+# the separator is the whitespace a writer put between the event key and its
+# colon. `truncated` cuts the JSON off inside a value, which is the branch where
+# the jq-present path reads text too (the fourth path). For the compact
+# separator these fixtures are byte-equal to `input()`'s, plus the cut.
+raw_input() {
+  case "$1:$4" in
+    prompt:complete)  end='"prompt":"next"}' ;;
+    prompt:truncated) end='"prompt":"unterminated' ;;
+    wake:complete)    end='"tool_name":"Bash","tool_input":{"command":"herdr agent prompt w7:p2 \"implement item 3\"","description":"d"}}' ;;
+    wake:truncated)   end='"tool_name":"Bash","tool_input":{"command":"herdr agent prompt w7:p2 \"implement item 3\""' ;;
+  esac
+  printf '{"session_id":"s","transcript_path":"%s","cwd":"/tmp","hook_event_name"%s"%s",%s' \
+    "$T_PAST" "$3" "$2" "$end"
+}
+
+# #516b's path, its fourth-path sibling, and fix round 1's Finding 2: the raw
+# path's spelling list, pinned on BOTH raw branches (jq absent, and jq present
+# with an input it cannot parse) and on BOTH events — the boundary was silent on
+# all four until the enumeration was widened to the separators a writer emits.
+# branch|shape|separator; the separator is in the label, so dropping that
+# alternative from the handler names the two cases it turns RED.
+for entry in 'nojq|prompt|:' 'nojq|prompt|: ' 'nojq|prompt| : ' \
+             'nojq|wake|:' 'nojq|wake|: ' 'nojq|wake| : ' \
+             'unparsed|prompt|:' 'unparsed|prompt|: ' 'unparsed|prompt| : ' \
+             'unparsed|wake|:' 'unparsed|wake|: ' 'unparsed|wake| : '; do
+  branch="${entry%%|*}"; rest="${entry#*|}"
+  shape="${rest%%|*}"; sep="${rest#*|}"
+  case "$shape" in
+    prompt) event=UserPromptSubmit; shape_label=prompt ;;
+    wake)   event=PreToolUse; shape_label=wake ;;
+  esac
+  if [ "$branch" = nojq ]; then
+    branch_label='no jq'; reason='jq not found'; cut=complete
+    input_text="$(raw_input "$shape" "$event" "$sep" "$cut")"
+    run "$input_text" PATH="$NOJQ"
+  else
+    branch_label='unparseable input'; reason='jq could not read the hook input'; cut=truncated
+    input_text="$(raw_input "$shape" "$event" "$sep" "$cut")"
+    run "$input_text"
+  fi
+  expect_notice "raw path, $branch_label, $shape_label, separator '$sep': unavailable notice" \
+    "$event" "figure unavailable ($reason)"
+done
 # The adjacent control: with jq absent the notice must still belong to the
 # new-work matcher, not to every Bash call — the coordinator's ordinary commands
 # learn nothing under no jq any more than they do with jq present.
 run "$(input PreToolUse "$T_PAST" 'git status --short')" PATH="$NOJQ"
 expect_silent "no jq on PATH: silent before a non-new-work command"
-# The walk's fourth path: an input jq cannot parse — a truncated hook input, or
-# a jq on PATH that fails on a well-formed one. Either way the figure was not
-# read and nothing said so: the event was empty, so the handler fell out of its
-# own case in silence. The raw spelling the no-jq path reads says which event
-# the notice belongs to.
-printf '%s' '{"session_id":"s","transcript_path":"'"$T_PAST"'","cwd":"/tmp","hook_event_name":"UserPromptSubmit","prompt":"unterminated' \
-  > "$TMP/malformed-input.json"
-run "$(cat "$TMP/malformed-input.json")"
-expect_notice "an input jq cannot parse: unavailable notice" UserPromptSubmit \
-  "figure unavailable (jq could not read the hook input)"
 # Its adjacent control: an unparseable input that carries no new-work command is
 # not the handler's business, and the fast path stops it before any of this — so
-# the case above is the event's notice, not a handler that speaks on any input
+# the cases above are the event's notice, not a handler that speaks on any input
 # it cannot parse.
 printf '%s' '{"hook_event_name":"PreToolUse","tool_input":{"command":"git status --short"' \
   > "$TMP/malformed-nonwork.json"
 run "$(cat "$TMP/malformed-nonwork.json")"
 expect_silent "control: an unparseable input carrying no new-work command stays silent"
+# The fourth path's other named trigger, pinned rather than asserted in a
+# comment: a jq that is present and fails. The input is well-formed here, so the
+# raw spelling is the only thing left that can attribute the notice — the class
+# the malformed-input case does not cover.
+BROKENJQ="$TMP/brokenjq-bin"; mkdir -p "$BROKENJQ"
+printf '#!/bin/sh\nexit 1\n' > "$BROKENJQ/jq"; chmod +x "$BROKENJQ/jq"
+run "$(input UserPromptSubmit "$T_PAST")" PATH="$BROKENJQ:$PATH"
+expect_notice "a jq on PATH that fails on a well-formed input: unavailable notice" \
+  UserPromptSubmit "figure unavailable (jq could not read the hook input)"
+# Fix round 1, Finding 1: the tail could not be read at all. With `tail` off PATH
+# its status was invisible (the pipeline reported jq's), the empty tail fell
+# through to "none", the size check passed, and the handler exited having said
+# nothing — on a past-ceiling prompt and on the wake command both. The status
+# guard speaks, and the guard's file-side half (a read that fails where `-r`
+# passed) has no portable fixture: this is the case that exercises the guard.
+run "$(input UserPromptSubmit "$T_PAST")" PATH="$NOTAIL"
+expect_notice "a PATH without tail, on a prompt: unavailable notice" UserPromptSubmit \
+  "figure unavailable (the transcript's tail could not be read)"
+run "$(input PreToolUse "$T_PAST" 'herdr agent prompt w7:p2 "implement item 3"')" PATH="$NOTAIL"
+expect_notice "a PATH without tail, before a new-work command: unavailable notice" PreToolUse \
+  "figure unavailable (the transcript's tail could not be read)"
+# The adjacent control: the same transcript and the same command with `tail`
+# present reaches its figure — so the notice above is the missing read, not a
+# handler that cannot see the ceiling.
+run "$(input UserPromptSubmit "$T_PAST")"
+expect_notice "control: the same fixture with tail present reaches its figure" \
+  UserPromptSubmit "context 523114"
+# Fix round 1, Finding 3: the size read's own failure. With `wc` off PATH the
+# guard speaks; this is the fixture that turns the size guard's mutation RED on
+# its own, which the T6 report wrongly called impossible.
+run "$(input UserPromptSubmit "$TMP/fresh.jsonl")" PATH="$NOWC"
+expect_notice "a PATH without wc, on a fresh transcript: unavailable notice" UserPromptSubmit \
+  "figure unavailable (the transcript's size could not be read)"
+# The adjacent control: the same fixture with `wc` present is the ordinary silent
+# case, so the notice above belongs to the missing read.
+run "$(input UserPromptSubmit "$TMP/fresh.jsonl")"
+expect_silent "control: the same fresh transcript with wc present is silent"
 
 section "the setting"
 T150="$(transcript s150 150000)"
