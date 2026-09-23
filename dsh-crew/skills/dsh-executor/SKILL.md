@@ -58,30 +58,38 @@ Foreground, one item at a time, in declared order:
 
 1. Fingerprint the item: `head_oid` (`git -C <worktree_path> rev-parse HEAD`), `tree_oid`
    (`git -C <worktree_path> write-tree`), `git -C <worktree_path> status --porcelain`, and the
-   blob ids of the report and the spec (`git hash-object`).
-2. Fill the verifier prompt (`dsh-brief` §3): CLAIMS from the item's spec (one per
-   acceptance criterion), the two fixed claims, the four paths.
+   blob ids of the report, the spec and the handoff (`git hash-object`) — the handoff sits
+   outside the worktree, so nothing else in this procedure covers it.
+2. Fill the verifier prompt (`dsh-brief` §3): CLAIMS from the item's spec (`dsh-brief` §3 —
+   one per `auto:` AC, none for a `user:` row), the two fixed claims, the four paths.
 3. Call `subagent_verifier` with `description: "verify <work_item_id>"` and that prompt.
 4. Fingerprint again. Any difference means the verifier changed the item: the stop rule (§3).
-5. Read the reply. PASS only when every claim you issued has exactly one line and each says
+5. Gate the worktree, whatever the verdict turns out to be: the branch, `HEAD` against the
+   request's `base_sha`, the staged-only status and the report's placement (§5's block), each
+   against the request. Any disagreement is the stop rule (§3) — never a correction, never a
+   record, and never a packet built from the state that failed the gate.
+6. Read the reply. PASS only when every claim you issued has exactly one line and each says
    `pass`, followed by `VERDICT: PASS` → §5. A well-formed reply naming a `fail` or
    `cannot determine`, with `VERDICT: FAIL` → §4a. A reply missing a claim, repeating one, or
    whose verdict contradicts its lines is not a verification: the stop rule (§3).
 
 ### 4a. One correction, then the operator
 
-1. The fingerprint from §4 step 1 is the rejected result's identity: `head_oid` and
-   `tree_oid` go into the packet. A correction is a dispatch of the item and counts against
-   ossify's cap of three dispatches (`correction-continuation.md` §4,
-   `round-orchestration.md` §6) — the original, every gaps replacement, every correction.
+1. The fingerprint from §4 step 1 is the rejected result's identity, and §4 step 5 has
+   already confirmed it against the request — so the packet can never encode a state that
+   gate would have refused: `head_oid` and `tree_oid` go into the packet. A correction is a
+   dispatch of the item and counts against ossify's cap of three dispatches
+   (`correction-continuation.md` §4, `round-orchestration.md` §6) — the original, every gaps
+   replacement, every correction.
    If this correction would be the fourth, it is not sent: the stop rule (§3).
 2. Fill the correction prompt (`dsh-brief` §4) with the packet: `handoff_path`,
    `work_item_id`, `expected_branch` = the request's `branch`, `expected_head_sha`,
    `expected_tree_oid`, `failures` = the verifier's FAILURES lines.
 3. Call `subagent_implementer` with `description: "correct <work_item_id>"`, foreground.
-4. On a `complete` return, verify again (§4, once); PASS → §5. A second FAIL (report both
-   verifier outputs), a refusal (`correction-continuation.md` §3 step 2) or any other
-   return → the stop rule (§3).
+4. On a return that passes §3's usability test and is `complete`, verify again (§4, once);
+   PASS → §5. A second FAIL (report both verifier outputs), a refusal
+   (`correction-continuation.md` §3 step 2), a return that fails §3's usability test, or any
+   other return → the stop rule (§3).
    Never a third attempt.
 
 A corrected item's result record is computed afresh in §5 and must pass the whole identity
@@ -96,10 +104,11 @@ not this skill's.
 
 ## 5. Compute the result record
 
-All values are read from the worktree and the documents, never from the child's words:
+All values are read from the worktree and the documents, never from the child's words — the
+same rows §4 step 5 gated on, read again here to build the record:
 
 ```bash
-WT=<worktree_path>; REPORT=<report_path from the return>; SPEC=<spec_path>
+WT="<worktree_path>"; REPORT="<report_path from the return>"; SPEC="<spec_path>"
 git -C "$WT" rev-parse --abbrev-ref HEAD      # must equal the request's branch
 git -C "$WT" rev-parse HEAD                   # head_oid; must equal the request's base_sha
 git -C "$WT" write-tree                       # tree_oid

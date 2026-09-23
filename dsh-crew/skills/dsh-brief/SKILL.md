@@ -56,8 +56,12 @@ and stop that step.
 ## 3. Verifier prompt
 
 Send as the `prompt` of `subagent_verifier`, foreground. The `description` is `verify
-<work_item_id>`. CLAIMS are filled from the item's spec: one per acceptance criterion,
-then the two fixed claims.
+<work_item_id>`. CLAIMS are filled from the item's spec: one per acceptance criterion
+carrying an `auto:` row, and **none** for a `user:` row — ossify's authoring grammar makes
+those documentation for the human demo, "not parsed, not gated"
+(`plan-spine/references/spec-authoring.md`), so a claim built from one has no valid check
+and the mandated fail on `cannot determine` would consume a correct item's correction and
+halt it. Then the two fixed claims.
 
 ```text
 ROLE: verifier, read-only.
@@ -67,8 +71,8 @@ PLACEMENT: <worktree_path>, branch <branch>. Read <spec_path>, <handoff_path> an
 not persist.
 
 CLAIMS:
-  1. <acceptance criterion>: <how to check>
-  2. <acceptance criterion>: <how to check>
+  1. <auto: acceptance criterion>: <how to check>
+  2. <auto: acceptance criterion>: <how to check>
   N-1. The staged diff matches the requirement: read the requirement, then
        `git -C <worktree_path> diff --cached`.
   N. When the item adds or changes a test: that test fails when the item's implementation
@@ -86,13 +90,15 @@ DONE: return, as your final message and nothing after it:
 
 NEVER: commit, push, stage, or edit a tracked file in <worktree_path>. The mutation
 check in claim N works on a copy and never touches <worktree_path>. The change is staged,
-not committed, so a copy cut at HEAD must be given it: remove a stale copy, if any, from an
-earlier run (`git -C <worktree_path> worktree remove --force /tmp/verify-<work_item_id>`,
-then `worktree prune`), `worktree add /tmp/verify-<work_item_id> --detach`, write the
-staged diff with `git -C <worktree_path> diff --cached --binary >
-/tmp/verify-<work_item_id>.patch` and `git -C /tmp/verify-<work_item_id> apply --index`
-it there. Then revert the implementation edits in the copy, keep the test, run it, and
-remove the copy. Any other write: stop and say so.
+not committed, so a copy cut at HEAD must be given it — in a private scratch dir, never at a
+predictable path: `git -C <worktree_path> worktree prune` first, then `D=$(mktemp -d)`, `git
+-C <worktree_path> worktree add "$D/copy" --detach`, write the staged diff with `git -C
+<worktree_path> diff --cached --binary > "$D/staged.patch"` and `git -C "$D/copy" apply
+--index` it there. Then revert the implementation edits in the copy, keep the test, run it,
+and — whatever the outcome — remove the copy and then the scratch dir: `git -C
+<worktree_path> worktree remove --force "$D/copy"`, `worktree prune`, `rm -rf "$D"`. That
+patch holds the item's whole staged diff and must not outlive the check. Any other write:
+stop and say so.
 ```
 
 ## 4. Correction prompt
