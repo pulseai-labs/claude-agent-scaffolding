@@ -18,15 +18,19 @@ state and no commands.
 
 ## Presets
 
-`references/presets.md` is the copy source for the operator's dsh home: profile rows
-(provider, custom skills root, permission preset, the two child tools) and the three
-presets `crew-spine`, `crew-implementer`, `crew-verifier`. Installing them is machine
+`references/presets.md` is the copy source for the operator's dsh home, measured against
+dsh 0.1.5-rc.3: the web profile rows (provider route, default model, permission preset, bash
+timeout), the three presets `crew-spine`, `crew-implementer`, `crew-verifier`, and a headless
+`crew` profile that runs a spine from a shell with no browser. Installing them is machine
 configuration, not this plugin's job.
 
 ## Requirements
 
-- DeepSeek Harness (`@deepseek-ai/dsh`) with the web profile; the skills root includes
-  this plugin's and ossify's skills (`skill-filesystem` `customSkillDirs`).
+- DeepSeek Harness `@deepseek-ai/dsh` **0.1.5-rc.3** (the `latest` tag, 0.1.5-rc.2, does
+  not boot on a fresh install; `references/presets.md` §0 says why), started with
+  `DSH_PERMISSION_MODE=danger-full-access` and the provider key in its environment.
+- One flat skills root holding every skill directory of this plugin and of ossify
+  (`skill-filesystem` `customSkillDirs` in the presets); symlinks into the plugin cache work.
 - ossify ≥ 1.8.0 on the same skills root; `oss` on the bash tool's PATH. ossify's
   `run-spine` is a command, not a skill: the `crew-spine` persona accepts
   `<spine-id> --external-executor` and follows the command's lane, the `work-item` skill's

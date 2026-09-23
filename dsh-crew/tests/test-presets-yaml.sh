@@ -44,4 +44,40 @@ for needle in "crew-spine" "crew-implementer" "crew-verifier" \
   grep -qF -- "$needle" "$DOC" && pass "$needle" || fail "$needle"
 done
 
+section "child personas equal dsh-brief §5"
+# Every `persona` configured on a subagent_implementer / subagent_verifier row in these
+# blocks must be, whitespace-normalised, the §5 text for that tool in dsh-brief — the
+# presets are copied onto machines, so a drifted copy is a child running another brief.
+BRIEF="$PLUGIN_ROOT/skills/dsh-brief/SKILL.md"
+awk '/^## 5\./{f=1} f && /^```text/{g=1; n++; next} g && /^```/{g=0; next} g{print > (dir "/persona-" n ".txt")}' dir="$tmp" "$BRIEF"
+[ -f "$tmp/persona-1.txt" ] && [ -f "$tmp/persona-2.txt" ] && pass "dsh-brief §5 carries two persona blocks" || fail "dsh-brief §5 carries two persona blocks"
+persona_out="$("$RUBY_BIN" -ryaml -e '
+  norm = ->(s) { s.to_s.split.join(" ") }
+  want = { "subagent_implementer" => norm.(File.read(ARGV[0])), "subagent_verifier" => norm.(File.read(ARGV[1])) }
+  seen = Hash.new(0); bad = []
+  walk = ->(n) {
+    case n
+    when Array then n.each { |x| walk.(x) }
+    when Hash
+      c = n["config"]
+      if c.is_a?(Hash) && want.key?(c["toolName"]) && c.key?("persona")
+        seen[c["toolName"]] += 1
+        bad << c["toolName"] unless norm.(c["persona"]) == want[c["toolName"]]
+      end
+      n.each_value { |x| walk.(x) }
+    end
+  }
+  ARGV[2..].each { |f| walk.(YAML.safe_load(File.read(f), aliases: true)) }
+  puts "seen #{want.keys.map { |k| "#{k}=#{seen[k]}" }.join(" ")}"
+  puts(bad.empty? ? "ok" : "drift #{bad.uniq.join(" ")}")
+' "$tmp/persona-1.txt" "$tmp/persona-2.txt" "$tmp"/block-*.yml 2>&1)"
+case "$persona_out" in
+  *"subagent_implementer=0"*|*"subagent_verifier=0"*) fail "each child tool's persona appears in the blocks" "$persona_out" ;;
+  *) pass "each child tool's persona appears in the blocks" ;;
+esac
+case "$persona_out" in
+  *$'\n'ok) pass "every child persona equals dsh-brief §5" ;;
+  *) fail "every child persona equals dsh-brief §5" "$persona_out" ;;
+esac
+
 report

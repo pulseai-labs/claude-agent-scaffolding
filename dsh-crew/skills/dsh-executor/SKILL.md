@@ -7,12 +7,13 @@ description: The caller-supplied execution procedure for ossify's run-spine --ex
 
 ## 1. You are here
 
-You are the spine session, on the `crew-spine` preset, cwd inside the AI workspace, `oss`
-on the PATH of the bash tool. `run-spine <spine-id> --external-executor` (ossify) has
-prepared every item in the round (the spine-branch cut, the per-item worktrees and the
-handoffs: `work-item/references/round-orchestration.md` §2–§4), built one request per item
-(`work-item/references/external-executor.md` §2–§3), and now hands you the round's request
-records, one per item, in declared decomposition order.
+You are the spine session, on the `crew-spine` preset or the headless `crew` profile, cwd
+inside the AI workspace, `oss` on the PATH of the bash tool. `run-spine <spine-id>
+--external-executor` (ossify) has prepared every item in the round (the spine-branch cut,
+the per-item worktrees and the handoffs: `work-item/references/round-orchestration.md`
+§2–§4), built one request per item (`work-item/references/external-executor.md` §2–§3),
+and now hands you the round's request records, one per item, in declared decomposition
+order.
 Your tools for this: `subagent_implementer`, `subagent_verifier`, `job_output`,
 `job_list`, `job_kill`, `bash`, `skill`. Prompts come from the `dsh-brief` skill (§2 the
 implementer prompt, §3 the verifier prompt, §4 the correction prompt).
@@ -35,7 +36,10 @@ Items within a round are parallel by construction; dispatch them all, then wait.
 
 Loop: `job_list()`; for each item's job not yet settled, `job_output(job_id, wait: true,
 timeout_ms: 600000)`. When a job settles, the child's return is the LAST JSON object in
-its final text (text before it is allowed, `returns.md` §5):
+its final text (text before it is allowed, `returns.md` §5). It is usable only if it is
+exactly one of `returns.md` §1's two shapes — every key present, no extra key, each enum
+value one of ossify's, a non-empty `gaps` whose every element carries exactly `section`,
+`question` and `severity`:
 
 - `mode: complete` → go to §4 for this item.
 - `mode: gaps-surfaced` → go to §6 for this item.
@@ -52,15 +56,25 @@ recovery. `job_kill` only on the operator's word.
 
 Foreground, one item at a time, in declared order:
 
-1. Fill the verifier prompt (`dsh-brief` §3): CLAIMS from the item's spec (one per
+1. Fingerprint the item: `head_oid` (`git -C <worktree_path> rev-parse HEAD`), `tree_oid`
+   (`git -C <worktree_path> write-tree`), `git -C <worktree_path> status --porcelain`, and the
+   blob ids of the report and the spec (`git hash-object`).
+2. Fill the verifier prompt (`dsh-brief` §3): CLAIMS from the item's spec (one per
    acceptance criterion), the two fixed claims, the four paths.
-2. Call `subagent_verifier` with `description: "verify <work_item_id>"` and that prompt.
-3. Read the last lines. `VERDICT: PASS` → §5. `VERDICT: FAIL` → §4a.
+3. Call `subagent_verifier` with `description: "verify <work_item_id>"` and that prompt.
+4. Fingerprint again. Any difference means the verifier changed the item: the stop rule (§3).
+5. Read the reply. PASS only when every claim you issued has exactly one line and each says
+   `pass`, followed by `VERDICT: PASS` → §5. A well-formed reply naming a `fail` or
+   `cannot determine`, with `VERDICT: FAIL` → §4a. A reply missing a claim, repeating one, or
+   whose verdict contradicts its lines is not a verification: the stop rule (§3).
 
 ### 4a. One correction, then the operator
 
-1. Compute `head_oid` (`git -C <worktree_path> rev-parse HEAD`) and `tree_oid`
-   (`git -C <worktree_path> write-tree`) now; they are the rejected result's identity.
+1. The fingerprint from §4 step 1 is the rejected result's identity: `head_oid` and
+   `tree_oid` go into the packet. A correction is a dispatch of the item and counts against
+   ossify's cap of three dispatches (`correction-continuation.md` §4,
+   `round-orchestration.md` §6) — the original, every gaps replacement, every correction.
+   If this correction would be the fourth, it is not sent: the stop rule (§3).
 2. Fill the correction prompt (`dsh-brief` §4) with the packet: `handoff_path`,
    `work_item_id`, `expected_branch` = the request's `branch`, `expected_head_sha`,
    `expected_tree_oid`, `failures` = the verifier's FAILURES lines.
@@ -74,9 +88,11 @@ A corrected item's result record is computed afresh in §5 and must pass the who
 table again (`external-executor.md` §7); the continuation's own return is never carried over.
 A correction packet ossify's close sends back after rejecting an item (`external-executor.md`
 §7, "to the same executor") is a new invocation of this procedure, run as a round of one:
-`dsh-brief` §4 with that packet, then §4 verify, then §5 afresh, then §7. The cap above
-counts attempts within one invocation; how many close rejections an item gets is ossify's
-(`close/references/impl-check.md` §6), not this skill's.
+`dsh-brief` §4 with that packet, then §4 verify, then §5 afresh, then §7. The
+one-correction limit above counts attempts within one invocation; ossify's three-dispatch
+cap (step 1) counts across them and applies to a close-sent packet as to any correction.
+How many close rejections an item gets is ossify's (`close/references/impl-check.md` §6),
+not this skill's.
 
 ## 5. Compute the result record
 
