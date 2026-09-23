@@ -324,9 +324,11 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 DONE: write your report file carrying that work item's own result, verbatim — its
 structured return. Never a commit, push or PR line.
 NEVER: commit, push, open a PR, or merge; edit files outside this worktree; or run any
-subagent — your report file at REPORT_PATH is the one exception outside it. When blocked,
-write the question to your report file and wait; when stuck, write an escalation there and
-stop; report refusals verbatim.
+subagent. The two exceptions to that scope are this item's own report.md, which the
+work-item contract has you author beside the handoff and spec, and your report file at
+REPORT_PATH; nothing else outside the worktree. When blocked, write the question to your
+report file and wait; when stuck, write an escalation there and stop; report refusals
+verbatim.
 ```
 
 ## Non-spine close
@@ -355,8 +357,9 @@ failing step and repo and, on its own line, what it had already opened:
 `opened: <repo> #<n> <url> …` or `opened: none` — a close can halt after opening in one
 repo, and hiding those PRs strands them. Never a `commit …; push; open the PR` line of your
 own.
-NEVER: create a seat, merge, re-invoke `/ossify:close`, or open a PR of your own — a halt
-settles this dispatch, and a remediated one is a fresh session the orchestrator dispatches.
+NEVER: create a seat, merge on your own authority, re-invoke `/ossify:close`, or open a PR
+of your own — a halt settles this dispatch, and a remediated one is a fresh session the
+orchestrator dispatches.
 Questions go up in your report file: when blocked, write the question there and wait; when
 stuck, write an escalation there and stop; report refusals verbatim.
 ```

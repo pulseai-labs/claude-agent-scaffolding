@@ -56,7 +56,7 @@ PRs strands them. Whenever the close review ran, carry its ledger verbatim too,
 naming each finding, its `target_repo`, its decision and the reason: the record pass
 cannot reconstruct it. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
-NEVER: create a seat, merge, ask the operator anything
+NEVER: create a seat, merge on your own authority, ask the operator anything
 (questions go up to the top in your report file), or re-invoke `/ossify:close` — a halt
 settles this dispatch; remediated, the top dispatches a fresh close session.
 Report a refusal verbatim.
