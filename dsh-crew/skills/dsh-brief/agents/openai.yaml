@@ -1,0 +1,3 @@
+interface:
+  display_name: "dsh brief"
+  short_description: "Child prompts and personas for a dsh spine session"

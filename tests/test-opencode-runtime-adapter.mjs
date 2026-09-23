@@ -143,6 +143,8 @@ const excludedPlugins = [
   // The Orca port's herdr twin, same status: ships on Claude Code and Codex only,
   // and listed here for the same reason — a checked decision, not an absence.
   "herdr-crew",
+  // The DeepSeek Harness crew, same status: ships on Claude Code and Codex only.
+  "dsh-crew",
 ];
 
 const expectedAliases = {
