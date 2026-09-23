@@ -93,8 +93,8 @@ Found markers in /abs/path/{name}:
 Refusing to pair: this repo was already onboarded as a single-repo project.
 Pairing now would create an inconsistent dual-repo state.
 
-This is Scenario B (split existing single-repo into dual-repo) and is
-deferred to workspace-init v0.2. For now, the manual workaround is:
+This is Scenario B (split existing single-repo into dual-repo), which
+workspace-init does not yet automate. For now, the manual workaround is:
   1. Move .claude/memory-bank/, MASTER-SPEC.md (or docs/MASTER-SPEC.md),
      and any other scaffolding artifacts into a NEW sibling AI workspace
      directory of your choosing (e.g., <canonical>-ai/).
@@ -296,9 +296,19 @@ Canonical's working tree NOT modified.
 
 Next steps:
   1. cd /abs/path/{name}-ai && git status
-  2. git commit -m "workspace-init: initial bootstrap (pair-with, workspace-init v0.1.0)"
+  2. git commit -m "workspace-init: initial bootstrap (pair-with)"
   3. cd /abs/path/{name}-ai && claude
-  4. /onboard
+  4. Continue into ossify only where it currently continues: `/ossify:adopt` targets projects
+     previously onboarded with the legacy scaffold stack — it reads that stack's roadmap state,
+     active-context cursor and legacy spec. A repository that already carries source or history
+     but never used that stack has no supported ossify continuation yet; `/ossify:start` sends
+     such a repository here rather than onboarding it. (For an empty canonical, `/ossify:start`
+     does onboard it.)
+  5. Before `/ossify:adopt`, every participating tree must be clean: adoption refuses while any
+     tree it will edit carries an uncommitted or untracked line — the AI workspace, the canonical,
+     and every other repo the topology declares — with each declared repo on the default branch
+     the manifest declares. This skill never touches the canonical's working tree, so uncommitted
+     work there is still there when the route runs.
 
 Manifest at: /abs/path/{name}-ai/.workspace/pairing.json
 Trace filter active in: /abs/path/{name}-ai  AND  /abs/path/{name}
@@ -325,7 +335,7 @@ To override trace filter for a specific commit: git commit --no-verify
   nothing created; no rollback needed.
 - **Canonical path doesn't exist or isn't absolute** → preflight aborts.
 - **Canonical isn't a git repo** → preflight aborts (per **SPEC §13.3**:
-  fail, or — future enhancement — offer to `git init` it; v0.1 just
+  fail, or — future enhancement — offer to `git init` it; today it just
   fails).
 - **Canonical has AI scaffolding markers** → section 4 abort with
   Scenario B guidance. No rollback needed; nothing created.

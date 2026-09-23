@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/test-init-fresh.sh — end-to-end integration test for FRESH-mode bootstrap.
 #
-# Drives the 8-task pre-onboard pipeline (SPEC §8) directly by calling the
+# Drives the 8-task bootstrap pipeline (SPEC §8) directly by calling the
 # wi_* library functions in the order a SKILL.md body would orchestrate.
 # Each test creates its own tempdir and asserts a slice of the resulting
 # filesystem + git + manifest state.
@@ -11,7 +11,7 @@
 #   Manifest body (6)  : routing entries, project_type personal + work, declared + actual default_branch
 #   Hooks         (2)  : both repos have baked hook; hook is functional (blocks Co-Authored-By)
 #   Staging       (2)  : ai staged but canonical not; no auto-commit anywhere
-#   Gitignore     (1)  : .workspace/handoffs/ literal in .gitignore
+#   Gitignore     (1)  : handoffs entry kept; dead onboarding-state entry dropped
 #   Failure modes (2)  : non-writable parent, invalid name — preflight aborts, no dirs
 
 source "$(dirname "$0")/_helpers.sh"
@@ -273,12 +273,16 @@ test_T2_no_auto_commit_in_either_repo() {
 # .gitignore content — 1 test
 # ---------------------------------------------------------------------------
 
-test_G1_gitignore_contains_handoffs_literal() {
+test_G1_gitignore_preserves_handoffs_drops_dead_onboarding_state() {
   local parent="$_WI_TMP/g1"; mkdir -p "$parent"
   _run_bootstrap "$parent" "alpha" personal >/dev/null 2>&1
   local body
   body="$(cat "$parent/alpha-ai/.gitignore")"
+  # Compatibility control: the scaffold-dev handoff escape valve stays ignored,
+  # while the dead onboarding-state entry is gone and an OS entry remains.
   assert_contains ".workspace/handoffs/" "$body" || return 1
+  assert_not_contains ".claude/.onboarding-state.json" "$body" || return 1
+  assert_contains ".DS_Store" "$body" || return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -334,7 +338,7 @@ wi_test_run test_K2_hook_blocks_co_authored_by_returns_one
 wi_test_run test_T1_ai_staged_canonical_not_staged
 wi_test_run test_T2_no_auto_commit_in_either_repo
 
-wi_test_run test_G1_gitignore_contains_handoffs_literal
+wi_test_run test_G1_gitignore_preserves_handoffs_drops_dead_onboarding_state
 
 wi_test_run test_F1_parent_not_writable_aborts_no_dirs
 wi_test_run test_F2_invalid_name_aborts_no_dirs

@@ -572,4 +572,28 @@ wi_test_run test_J2_ai_git_tracked_false_recorded
 wi_test_run test_J3_ai_git_tracked_rejects_non_boolean
 wi_test_run test_J4_canonical_git_tracked_unaffected_by_flag
 
+# ---------------------------------------------------------------------------
+# K. principles_user_global removal — the pointer had zero consumers after the
+#    architect-critic owned path moved to $HOME/.claude/architect-critic/.
+#    The generic ${PLUGIN_DATA:<name>} resolver (group C) is untouched; this
+#    deletes one data key, not the mechanism.
+# ---------------------------------------------------------------------------
+
+test_K1_principles_user_global_absent_from_all_three_sites() {
+  local ai; ai="$(_setup_pair k1)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  jq -e '.well_known_paths | has("principles_user_global") | not' "$m" >/dev/null \
+    || { echo "    generated manifest still carries principles_user_global"; return 1; }
+  local f
+  for f in "$WI_PLUGIN_ROOT/templates/pairing.json.tmpl" \
+           "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/examples/fresh-bootstrap.md"; do
+    if grep -qF 'principles_user_global' "$f"; then
+      echo "    principles_user_global still present in $f"
+      return 1
+    fi
+  done
+}
+
+wi_test_run test_K1_principles_user_global_absent_from_all_three_sites
+
 wi_test_summary
