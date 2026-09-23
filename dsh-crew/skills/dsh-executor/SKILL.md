@@ -26,8 +26,12 @@ ossify state is the single authority. You write nothing into `.ossify/` except t
 
 For every request, in declared order:
 
-1. Fill the implementer prompt (`dsh-brief` §2) with the seven request fields, verbatim.
-2. Call `subagent_implementer` with `description: "work item <work_item_id>"`, that
+1. Baseline the two documents no child may touch: the blob ids of the request's `spec_path`
+   and `handoff_path` (`git hash-object`), recorded before anything is dispatched. This is
+   the only comparison that can see a child editing its own contract: ossify recomputes the
+   spec's oid from the same file at §5a, so a weakened spec agrees with itself and passes.
+2. Fill the implementer prompt (`dsh-brief` §2) with the seven request fields, verbatim.
+3. Call `subagent_implementer` with `description: "work item <work_item_id>"`, that
    prompt, and `run_in_background: true`. Note the job id it returns against the item.
 
 Items within a round are parallel by construction; dispatch them all, then wait.
@@ -56,26 +60,31 @@ recovery. `job_kill` only on the operator's word.
 
 Foreground, one item at a time, in declared order:
 
-1. Fingerprint the item: `head_oid` (`git -C <worktree_path> rev-parse HEAD`), `tree_oid`
+1. Resolve the return's `report_path` first: it must be `report.md` beside the request's
+   `spec_path` and `handoff_path`. The request's documents are ossify's; that one path is the
+   child's, and nothing downstream — the fingerprint below, or the verifier's read — may
+   touch a path the request did not name. Any other path is the stop rule (§3).
+2. Fingerprint the item: `head_oid` (`git -C <worktree_path> rev-parse HEAD`), `tree_oid`
    (`git -C <worktree_path> write-tree`), `git -C <worktree_path> status --porcelain`, and the
    blob ids of the report, the spec and the handoff (`git hash-object`) — the handoff sits
-   outside the worktree, so nothing else in this procedure covers it.
-2. Fill the verifier prompt (`dsh-brief` §3): CLAIMS from the item's spec (`dsh-brief` §3 —
+   outside the worktree, so nothing else in this procedure covers it, and the spec's and the
+   handoff's must still equal §2 step 1's baseline.
+3. Fill the verifier prompt (`dsh-brief` §3): CLAIMS from the item's spec (`dsh-brief` §3 —
    one per `auto:` AC, none for a `user:` row), the two fixed claims, the four paths.
-3. Call `subagent_verifier` with `description: "verify <work_item_id>"` and that prompt.
-4. Fingerprint again. Any difference means the verifier changed the item: the stop rule (§3).
-5. Gate the worktree, whatever the verdict turns out to be: the branch, `HEAD` against the
-   request's `base_sha`, the staged-only status and the report's placement (§5's block), each
+4. Call `subagent_verifier` with `description: "verify <work_item_id>"` and that prompt.
+5. Fingerprint again. Any difference means the verifier changed the item: the stop rule (§3).
+6. Gate the worktree, whatever the verdict turns out to be: the three rows §5's block reads —
+   the branch, `HEAD` against the request's `base_sha`, and the staged-only status — each
    against the request. Any disagreement is the stop rule (§3) — never a correction, never a
    record, and never a packet built from the state that failed the gate.
-6. Read the reply. PASS only when every claim you issued has exactly one line and each says
+7. Read the reply. PASS only when every claim you issued has exactly one line and each says
    `pass`, followed by `VERDICT: PASS` → §5. A well-formed reply naming a `fail` or
    `cannot determine`, with `VERDICT: FAIL` → §4a. A reply missing a claim, repeating one, or
    whose verdict contradicts its lines is not a verification: the stop rule (§3).
 
 ### 4a. One correction, then the operator
 
-1. The fingerprint from §4 step 1 is the rejected result's identity, and §4 step 5 has
+1. The fingerprint from §4 step 2 is the rejected result's identity, and §4 step 6 has
    already confirmed it against the request — so the packet can never encode a state that
    gate would have refused: `head_oid` and `tree_oid` go into the packet. A correction is a
    dispatch of the item and counts against ossify's cap of three dispatches
@@ -105,7 +114,7 @@ not this skill's.
 ## 5. Compute the result record
 
 All values are read from the worktree and the documents, never from the child's words — the
-same rows §4 step 5 gated on, read again here to build the record:
+same rows §4 step 6 gated on, read again here to build the record:
 
 ```bash
 WT="<worktree_path>"; REPORT="<report_path from the return>"; SPEC="<spec_path>"
@@ -131,7 +140,9 @@ it.
 
 Before anything else, check the worktree is untouched: `git -C <worktree_path> status
 --porcelain` is empty, `rev-parse HEAD` equals the request's `base_sha`, `rev-parse
---abbrev-ref HEAD` equals the request's `branch`. Anything else means something else ran:
+--abbrev-ref HEAD` equals the request's `branch`, and the spec's and the handoff's blob ids
+still equal §2 step 1's baseline — a child that edited its own contract is the same defect
+here as anywhere else. Anything else means something else ran:
 the stop rule (§3). Otherwise write the gaps record (`references/records.md`, "The gaps
 record") with the child's `gaps` copied unextended; it goes back through §7 with the
 round's other records. It routes; it never reaches close. After §7, ossify's lane surfaces

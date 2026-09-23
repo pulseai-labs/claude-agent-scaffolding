@@ -91,12 +91,15 @@ DONE: return, as your final message and nothing after it:
 NEVER: commit, push, stage, or edit a tracked file in <worktree_path>. The mutation
 check in claim N works on a copy and never touches <worktree_path>. The change is staged,
 not committed, so a copy cut at HEAD must be given it — in a private scratch dir, never at a
-predictable path: `git -C <worktree_path> worktree prune` first, then `D=$(mktemp -d)`, `git
--C <worktree_path> worktree add "$D/copy" --detach`, write the staged diff with `git -C
-<worktree_path> diff --cached --binary > "$D/staged.patch"` and `git -C "$D/copy" apply
+predictable path: `git -C <worktree_path> worktree prune` first, then `mktemp -d`, which
+prints the scratch dir — `<D>` below stands for that printed absolute path, written
+literally into each call, because every bash call is a fresh shell (the tool's own contract:
+no cwd, variable or function persists between calls, so `$D` is empty in the next one). Then
+`git -C <worktree_path> worktree add <D>/copy --detach`, write the staged diff with `git -C
+<worktree_path> diff --cached --binary > <D>/staged.patch` and `git -C <D>/copy apply
 --index` it there. Then revert the implementation edits in the copy, keep the test, run it,
 and — whatever the outcome — remove the copy and then the scratch dir: `git -C
-<worktree_path> worktree remove --force "$D/copy"`, `worktree prune`, `rm -rf "$D"`. That
+<worktree_path> worktree remove --force <D>/copy`, `worktree prune`, `rm -rf <D>`. That
 patch holds the item's whole staged diff and must not outlive the check. Any other write:
 stop and say so.
 ```
