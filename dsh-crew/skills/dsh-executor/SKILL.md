@@ -43,7 +43,7 @@ as the one JSON object it must be:
   killed) → the stop rule, below. Nothing is retried in v0.
 
 **The stop rule.** Every child return that is not a usable result ends the same way: write
-no record for that item; let the round's other jobs settle and take them through §4–§5, so
+no record for that item; let the round's other jobs settle and take them through §4–§6, so
 no child is left running; then stop before §7 and report to the operator the item, its job
 id, the stop reason and the last output. The round is not handed back; the operator owns
 recovery. `job_kill` only on the operator's word.
@@ -73,8 +73,10 @@ Foreground, one item at a time, in declared order:
 A corrected item's result record is computed afresh in §5 and must pass the whole identity
 table again (`external-executor.md` §7); the continuation's own return is never carried over.
 A correction packet ossify's close sends back after rejecting an item (`external-executor.md`
-§7, "to the same executor") takes this same path: `dsh-brief` §4 with that packet, then §4
-verify, then §5 afresh.
+§7, "to the same executor") is a new invocation of this procedure, run as a round of one:
+`dsh-brief` §4 with that packet, then §4 verify, then §5 afresh, then §7. The cap above
+counts attempts within one invocation; how many close rejections an item gets is ossify's
+(`close/references/impl-check.md` §6), not this skill's.
 
 ## 5. Compute the result record
 
@@ -121,13 +123,15 @@ Write every record — results and gaps, one per request, no missing, extra or d
 in declared decomposition order, never arrival order; closes and merges stay serial; the
 round barrier is untouched.
 
-A follow-up invocation (a gaps replacement, §6) never overwrites an earlier records file:
-it writes `<spine spec dir>/round-<n>-<work_item_id>-gaps-<k>-external-records.yaml`,
-where `k` is that item's gap iteration.
+A follow-up invocation never overwrites an earlier records file: a gaps replacement (§6)
+writes `<spine spec dir>/round-<n>-<work_item_id>-gaps-<k>-external-records.yaml` and a
+close-sent correction (§4a) writes
+`<spine spec dir>/round-<n>-<work_item_id>-correction-<k>-external-records.yaml`, where `k`
+is that item's gap or correction iteration.
 
 ## 8. What you never do
 
 You never commit, never push, never edit a worktree yourself, never write `.ossify/`
-except through `oss`, never start a third attempt on an item, never soften
+except through `oss`, never start a third attempt on an item within one invocation, never soften
 `coordinator_verdict`, and never invent a field. If a tool refuses you, report it verbatim
 and stop that step. Recovery beyond one correction is the operator's.
