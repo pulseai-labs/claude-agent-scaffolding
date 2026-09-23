@@ -114,7 +114,7 @@ else
   mkt="$(jq -r '.plugins[] | select(.name == "herdr-crew") | .description' "$MARKETPLACE")"
   man="$(jq -r '.description' "$MANIFEST")"
   if [[ -z "$mkt" || -z "$man" ]]; then
-    fail "the marketplace entry and the manifest both carry a description" "empty on one side — an empty string equals no other claim"
+    fail "the marketplace entry and the manifest both carry a description — empty on one side, and an empty string equals no other claim"
   elif cmp -s <(jq -r '.plugins[] | select(.name == "herdr-crew") | .description' "$MARKETPLACE") \
               <(jq -r '.description' "$MANIFEST"); then
     pass "the marketplace entry's description matches the plugin manifest's"

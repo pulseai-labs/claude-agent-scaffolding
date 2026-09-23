@@ -668,7 +668,7 @@ pin "$PRBRIEFS_MD" 'ossify keeps that review advisory' \
 pin "$PRBRIEFS_MD" 'oldest first' \
   "the ledger slot accumulates every close review's ledger, oldest first"
 absent "$PRBRIEFS_MD" 'the most recent close' \
-  "the 0.5.0 newest-only ledger choice is gone"
+  "the newest-only ledger choice is gone"
 # N4/#467: a close-review ledger row names the repo its finding lands in, so a
 # multi-repo close splits fix-now findings into per-writer ledgers cleanly.
 pin "$PRBRIEFS_MD" 'carrying each finding, its `target_repo`' \

@@ -23,9 +23,9 @@ is this sequence, in which `<seat label>` is `seat: <role> (<agent>)`:
 2. **One tab per further seat.**
    `herdr tab create --workspace <id> --cwd <the seat's tree> --label "<seat label>" --no-focus`.
    Its pane is `.result.root_pane`. A seat that needs a new worktree uses `herdr worktree create`
-   — `--cwd <the source repo> --path <the new tree> --branch <b> --base main --label "<seat
-   label>" --no-focus` — in place of this step, never step 1: it opens **two** workspaces, the
-   worktree's own and the **source repository's** checkout (`is_linked_worktree: false`). Its
+   — `--cwd <the source repo> --path <the new tree> --branch <b> --base <base-branch> --label
+   "<seat label>" --no-focus` — in place of this step, never step 1: it opens **two** workspaces,
+   the worktree's own and the **source repository's** checkout (`is_linked_worktree: false`). Its
    `--label` names the worktree's **workspace**, so the seat's tab needs the `herdr tab rename`
    step 1 prescribes. `--cwd` is the lever that retargets the **source** repo: without it the
    call resolves its source from the *calling workspace's* repo. Read every id from the

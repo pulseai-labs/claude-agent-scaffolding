@@ -62,7 +62,8 @@ Each field exists because a measured case needs it:
 - `brief_delivery:` — `inject` is the ordinary dispatch; `file` writes the brief to
   a file and sends one line pointing at it, for an agent whose composer fragments injects.
 - `can:` — what the agent is able to run, comma-separated: `slash-commands`,
-  `subagents` (the lane's `Agent`-tool workers), or `—`.
+  `subagents` (the lane's `Agent`-tool workers), or `—`. The per-role
+  requirement, and where it is checked, are stated below.
 - `note:` — free prose the coordinator reads when it uses that agent.
 
 A seat's readiness path is never a field here: it follows from herdr's own answer

@@ -88,6 +88,7 @@ pin 'A local slash command (`/context`, `/clear`) settles without a turn' \
 section "placement"
 present '--cwd' "a seat's tree is set with --cwd"
 present '--label' "a seat's tab is labelled"
+present '--base <base-branch>' "a worktree seat's base is a slot, not a literal"
 
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"

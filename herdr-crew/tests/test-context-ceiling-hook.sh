@@ -340,6 +340,34 @@ for entry in 'nojq|prompt|:' 'nojq|prompt|: ' 'nojq|prompt| : ' \
   expect_notice "raw path, $branch_label, $shape_label, separator '$sep': unavailable notice" \
     "$event" "figure unavailable ($reason)"
 done
+# The adjacent control the widening needs (CLAUDE.md's testing discipline): the
+# spacing outside the three a writer emits stays silent — two spaces before the
+# colon, and a tab there, which is the boundary the handler's own comment names
+# and the closest neighbour of the accepted ` : `. Same machinery, same branches
+# and events, opposite expectation: a widening to any whitespace would leave
+# every case above green and enforce the boundary only by a comment.
+TAB_SEP="$(printf '\t')"
+for entry in "nojq|two spaces before the colon|  : " "unparsed|two spaces before the colon|  : " \
+             "nojq|a tab before the colon|${TAB_SEP}: " "unparsed|a tab before the colon|${TAB_SEP}: "; do
+  branch="${entry%%|*}"; rest="${entry#*|}"
+  sep_label="${rest%%|*}"; sep="${rest#*|}"
+  for shape in prompt wake; do
+    case "$shape" in
+      prompt) event=UserPromptSubmit ;;
+      wake)   event=PreToolUse ;;
+    esac
+    if [ "$branch" = nojq ]; then
+      branch_label='no jq'; cut=complete
+      input_text="$(raw_input "$shape" "$event" "$sep" "$cut")"
+      run "$input_text" PATH="$NOJQ"
+    else
+      branch_label='unparseable input'; cut=truncated
+      input_text="$(raw_input "$shape" "$event" "$sep" "$cut")"
+      run "$input_text"
+    fi
+    expect_silent "control: raw path, $branch_label, $shape, $sep_label stays silent"
+  done
+done
 # The adjacent control: with jq absent the notice must still belong to the
 # new-work matcher, not to every Bash call — the coordinator's ordinary commands
 # learn nothing under no jq any more than they do with jq present.
