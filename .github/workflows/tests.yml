@@ -84,6 +84,9 @@ jobs:
       - name: herdr-crew suite
         run: bash herdr-crew/run-tests.sh
 
+      - name: dsh-crew suite
+        run: bash dsh-crew/run-tests.sh
+
       - name: dual-publish parity (repo-root)
         run: bash tests/test-codex-dual-publish.sh
 

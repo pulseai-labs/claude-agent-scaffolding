@@ -350,6 +350,47 @@ for _lit in 'work_item_status' 'spine_add' 'round-orchestration.md' 'decompositi
     T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's abandoned arm does not name '$_lit'"
   fi
 done
+# (c) THE ARM MAY NOT ASSUME THE ITEM HAS NO DISPATCH ANY MORE (P1-B, the operator's
+# ruling of 2026-09-23; round-3 finding at work-item-close.md:43). The arm used to
+# assert "it has no worktree by construction" and "nothing should be reconstructed
+# for it" - impossible for the state the narrowing ships, because an `abandoned`
+# item that records a dispatch field is exactly what the dropped mirror arm used to
+# prevent and doctor's §5 exists to report. It is this file's D row (never executed
+# by the suite), so this is its only hold, and the checks pull in opposite
+# directions ON PURPOSE: the recorded fields must be READ and NAMED, and the
+# impossibility must be GONE. Either one alone is satisfiable by a mutation.
+#
+# Both positive checks are scoped to the DRIFT BRANCH's own message line, not to
+# the whole block: an unscoped `grep -Fq 'work_item_status $wi planned'` is
+# satisfied by the CLEAN branch's identical route further down, so deleting the
+# route from the branch that needs it would stay green - the substring-satisfied-
+# by-another-line trap this file has now been bitten by twice (the -A 8 window in
+# §5, and the field list whose explanation carried the field name).
+_drift="$(grep -F 'records a dispatch field' "$_F" || true)"
+_case="$(grep -A 1 'is abandoned AND records a dispatch field' "$_F" || true)"
+_rec_read="$(grep -F 'select(.id==' "$_F" | grep -F 'base_sha' || true)"
+if [ -n "$_case" ] && case "$_case" in *'work_item_status $wi planned'*) true;; *) false;; esac; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's drift branch does not name the record repair (work_item_status \$wi planned) in its OWN message - the operator is left with a halt and no route for the one pair that needs it"
+fi
+# The fields must be READ, not just mentioned: the arm's state read is the line that
+# selects the item and names the three fields. The read and the message are two
+# different lines in the block, so each half is checked where it actually lives.
+_read_ok=1
+for _f3 in '.branch' '.worktree_path' '.base_sha'; do
+  case "$_rec_read" in *"$_f3"*) ;; *) _read_ok=0;; esac
+done
+if [ "$_read_ok" = 1 ] && case "$_drift" in *'drift'*) true;; *) false;; esac; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's abandoned arm does not read all three dispatch fields and name the drift pair they form - it still tells the operator to skip an item the record says was dispatched"
+fi
+if grep -Fq 'by construction' "$_F"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's abandoned arm re-asserts 'by construction' - an abandoned item CAN record a dispatch field (the drift pair), so the impossibility claim is exactly the trap this row exists to catch"
+else
+  T_PASS=$((T_PASS+1))
+fi
 
 # (b) the withdrawal arm's demo-ledger remedy must WORK (#531 site 3 / F15). The
 # sentence shipped in 1.11.0 said a demo line the withdrawn item alone was going
@@ -497,5 +538,100 @@ if grep -Fq 'OTHER than `ai_workspace`' "$_SW"; then
 else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: the sweep's corpus comment does not exclude ai_workspace from the legacy pairing-manifest key set - a planning file then satisfies a stale product glob and the zero-match warning is suppressed"
 fi
+# --- phase 3: the never-strand invariant's two surfaces must agree -----------
+#
+# The dispatch predicate is one definition used at four sites, and one of them is
+# PROSE: doctor's §5 drift bullet reports the very pair the rails refuse to
+# create. If the bullet names fewer fields than the shell predicate reads, the
+# report and the rail disagree about what "dispatched" means - and the
+# disagreement is invisible in both directions (the bullet under-reports, the
+# rail over-refuses, and each looks correct read alone). Measured: the shipped
+# bullet named two fields while the guard read two, and the third (base_sha) was
+# how a half-write dispatch became an abandonment.
+ENT="$OSSSK/lib/entities.sh"
+SI3="$OSSSK/skills/doctor/references/state-inspection.md"
+# The PREDICATE's own definition, not a mention anywhere in the file: the three
+# field names also appear in the dispatch payload builder, so a file-level grep
+# passes while the predicate reads fewer (measured - the same trap as phase 2's
+# sweep row, where a word-grep passed on a comment). Anchored to COLUMN 0 and
+# required to be UNIQUE: `grep -F '…='` would take the first match, so a future
+# comment carrying the literal above the definition would satisfy the field
+# checks while the real predicate drifted under it (round 1, GLM seat).
+_pred_n="$(grep -cE '^_OSS_DISPATCHED_JQ=' "$ENT" || true)"
+if [ "$_pred_n" = "1" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: entities.sh must define the shared dispatch predicate (_OSS_DISPATCHED_JQ=) exactly once at column 0, found $_pred_n - the parity checks below are vacuous otherwise"
+fi
+_pred="$(grep -E '^_OSS_DISPATCHED_JQ=' "$ENT" || true)"
+for _f in branch worktree_path base_sha; do
+  case "$_pred" in
+    *"$_f"*) T_PASS=$((T_PASS+1));;
+    *) T_FAIL=$((T_FAIL+1)); echo "FAIL: the dispatch predicate's definition does not read '$_f'";;
+  esac
+done
+# The bullet's field list, and the window is its OWN two lines. It was `-A 8`
+# until this narrowing pass, and the mutation battery found why that was too wide:
+# the bullet's EXPLANATION below it names `base_sha` as well (`work_item_exec <wi>
+# "" "" <sha>` records it), so deleting `base_sha` from the field list itself left
+# this row GREEN - the check was satisfied by the prose that explains the field,
+# which is the round-1 #2 trap one level down (a check that passes on surrounding
+# commentary instead of on its subject). Measured: with `-A 2` the same deletion is
+# RED. The anchor below it is the bullet's own bolded heading, so this window is
+# the list, not the explanation.
+_bullet="$(grep -A 2 'An `abandoned` work item with a recorded' "$SI3")"
+for _f in branch worktree_path base_sha; do
+  case "$_bullet" in
+    *"$_f"*) T_PASS=$((T_PASS+1));;
+    *) T_FAIL=$((T_FAIL+1)); echo "FAIL: state-inspection.md §5's abandoned-drift bullet does not name '$_f' - the report and the rail disagree about what dispatched means";;
+  esac
+done
+# The item-level rail keeps three clauses (a recorded dispatch / `complete` /
+# `active`) and it is PROSE that tells the model to walk them, so the prose must
+# name all three. Round 2 (#21) is exactly this row's failure mode: the sentence
+# named a dispatched or landed item and said nothing about `active`, which the same
+# rail refuses - a never-dispatched item a lane had already marked in flight.
+# Re-anchored by the 1.12.0 narrowing (operator ruling, 2026-09-23): the old anchor
+# was the sentence that ALSO claimed the retirement was enforced, and that rail does
+# not ship (#563), so the anchor is the claim that remains true.
+_SK3="$OSSSK/skills/plan-spine/SKILL.md"
+_sk="$(grep -A 1 'The withdrawal is enforced rather than declared' "$_SK3" || true)"
+if [ -n "$_sk" ]; then
+  T_PASS=$((T_PASS+1))
+  for _f in dispatched complete active 'rc 7'; do
+    case "$_sk" in
+      *"$_f"*) T_PASS=$((T_PASS+1));;
+      *) T_FAIL=$((T_FAIL+1)); echo "FAIL: plan-spine/SKILL.md's withdrawal sentence does not name '$_f' - the rail refuses on it and the prose the model follows is narrower than the rail";;
+    esac
+  done
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: plan-spine/SKILL.md no longer states what the withdrawal refusal is enforced ON - re-anchor this row or drop it"
+fi
+# ADJACENT CONTROL, and it is the loosening's own: this row went from pinning one
+# exact sentence to pinning field names, so it accepts more - and what it must still
+# REJECT is the claim that went with the dropped rails. A prose sentence asserting
+# the retirement is enforced would be a rule the release does not keep, which is the
+# same report/rail disagreement one level up.
+if grep -Fq 'Both are now enforced rather than declared' "$_SK3"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: plan-spine/SKILL.md claims the retirement is enforced - that rail does not ship in 1.12.0 (#563)"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# The third reader of the dispatch record is a close-path diagnosis, and it is
+# one field wide if nobody holds it: work-item-close.md's halt gloss explains a
+# missing worktree_path as "the lane skipped work_item_exec", which is FALSE for
+# the base_sha-only half-write this phase documents - the lane dispatched and
+# recorded no worktree. The halt is right either way; the diagnosis the operator
+# recovers from must name both causes.
+_wc="$(grep -A 3 'A missing .worktree_path. means' "$OSSSK/skills/close/references/work-item-close.md" || true)"
+if [ -n "$_wc" ]; then
+  case "$_wc" in
+    *base_sha*) T_PASS=$((T_PASS+1));;
+    *) T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md's missing-worktree_path gloss does not name the base_sha-only half-write - it tells the operator a lane broke when a dispatch is on record";;
+  esac
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md no longer states the missing-worktree_path diagnosis at all - re-anchor this row or drop it"
+fi
+
 rm -rf "$_PC_TMP"
 t_summary

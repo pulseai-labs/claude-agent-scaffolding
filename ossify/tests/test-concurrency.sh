@@ -73,5 +73,70 @@ t_assert_eq "4" "$m2" "unknown-mint-spec mutate aborts rc 4"
 [ ! -d "$S.lock" ] && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: lock leaked after unknown-mint-spec mutate"; }
 if ls "$S".tmp.* >/dev/null 2>&1; then T_FAIL=$((T_FAIL+1)); echo "FAIL: temp orphan after unknown-mint-spec mutate"; else T_PASS=$((T_PASS+1)); fi
 
+# ---------------------------------------------------------------------------
+# M3 (#528, #529): the never-strand rail runs INSIDE the lock, and a guard that
+# cannot answer fails CLOSED. The guard is handed to oss_state_mutate as its `$5`
+# argument - the slot the 1.11.1 review built for the registries' duplicate rail -
+# so these rows exercise that same mechanism through the work-item verbs. The
+# 1.12.0 narrowing leaves two of them guarded (status, exec) and one not (spine
+# status, whose guard rode #563); the third row below is the control for that.
+# ---------------------------------------------------------------------------
+REL3="$(oss_entity_add_release "$S" "guard fixture" "for M3")"
+SP3="$(oss_entity_add_spine "$S" "$REL3" "guard spine" flesh canonical)"
+WI3="$(oss_entity_add_work_item "$S" "$SP3" "dispatched item" canonical)"
+oss_entity_set_work_item_exec "$S" "$WI3" "work/$WI3" "$TMP/.worktree/$WI3" "abc123" >/dev/null
+t_assert_eq "work/$WI3" "$(oss_state_read "$S" ".work_items[] | select(.id==\"$WI3\") | .branch")" \
+  "M3 setup: the fixture item records a dispatch, so the abandonment guard will refuse it"
+
+# (a) THE TOCTOU HOLD, and the reason it is an rc and not a timing test. With the
+# lock held, the verb must answer rc 3 - the lock-held refusal - and NOT the
+# guard's rc 7, even for a payload the guard refuses. A read that happens BEFORE
+# the lock refuses first and answers 7; a read that happens inside the lock never
+# runs. That is the mechanical proof, and it cannot go flaky.
+mkdir "$S.lock"
+t_capture oss_entity_set_work_item_status "$S" "$WI3" abandoned
+t_assert_rc 3 "(a) with the lock held, the abandonment answers rc 3, not the guard's rc 7"
+t_capture oss_entity_set_work_item_exec "$S" "$WI3" "work/$WI3" "$TMP/.worktree/$WI3" "abc123"
+t_assert_rc 3 "(a) ...and the dispatch guard does too"
+# The spine verb keeps its pre-lock resolver and no longer carries a guard at all,
+# so rc 3 here is the LOCK, not a rail: the same call answers 0 the moment it is
+# released (asserted below) - which is what "the spine rail was dropped" means.
+t_capture oss_entity_set_spine_status "$S" "$SP3" abandoned
+t_assert_rc 3 "(a) ...and the retirement, which no longer carries a guard, still takes the lock"
+rmdir "$S.lock"
+t_capture oss_entity_set_spine_status "$S" "$SP3" abandoned
+t_assert_rc 0 "(a) ...and lands at rc 0 once released - no spine rail remains (#563)"
+
+# (b) A GUARD REFUSAL UNDER REAL STRICT MODE leaves the lock, the temp file and
+# the journal exactly as they were. By the time a guard runs, the body has
+# already created $tmp (and, for a minting op, minted an id) - so the failure
+# path's `rm -f` is load-bearing rather than incidental.
+N3="$(oss_state_read "$S" '.mutations | length')"
+(
+  set -euo pipefail
+  oss_entity_set_work_item_status "$S" "$WI3" abandoned
+)
+m3=$?
+t_assert_eq "7" "$m3" "(b) a guard refusal under set -euo pipefail answers rc 7"
+[ ! -d "$S.lock" ] && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: lock leaked after a guard refusal"; }
+if ls "$S".tmp.* >/dev/null 2>&1; then T_FAIL=$((T_FAIL+1)); echo "FAIL: temp orphan after a guard refusal"; else T_PASS=$((T_PASS+1)); fi
+t_assert_eq "$N3" "$(oss_state_read "$S" '.mutations | length')" "(b) ...and the journal is unchanged"
+
+# (c) A MIS-SHIFTED GUARD NAME IS LOUD. #550 tracks the positional escape hatch;
+# what makes keeping it safe is that neither shift is silent: a guard name in the
+# MINT slot reaches _oss_mint_id as an unknown spec (rc 4), and a bogus name in
+# the GUARD slot answers the "could not answer" rc 4. Neither can pass as a
+# successful mint.
+t_capture oss_state_mutate "$S" set_work_item_status \
+  "$(jq -n --arg w "$WI3" --arg st abandoned --arg ts "$(_oss_now)" '{work_item:$w,status:$st,at:$ts}')" \
+  _oss_entity_guard_wi_status
+t_assert_rc 4 "(c) a guard name in the MINT slot aborts rc 4 (unknown mint spec), not silently"
+t_capture oss_state_mutate "$S" set_work_item_status \
+  "$(jq -n --arg w "$WI3" --arg st abandoned --arg ts "$(_oss_now)" '{work_item:$w,status:$st,at:$ts}')" \
+  "" no_such_guard_fn
+t_assert_rc 4 "(c) a bogus guard name aborts rc 4 (could not answer), fail-closed"
+t_assert_contains "$T_OUT" "could not answer" "(c) ...saying so, rather than minting on a rail that could not answer"
+t_assert_eq "$N3" "$(oss_state_read "$S" '.mutations | length')" "(c) ...and neither mis-shift journaled anything"
+
 rm -rf "$TMP"
 t_summary
