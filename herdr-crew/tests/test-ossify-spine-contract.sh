@@ -898,13 +898,13 @@ pin "$ROLES_MD" 'the send route that reaches it' \
 pin "$ROLES_MD" 'A seat is released as `herdr-mechanics.md`'"'"'s' \
   "roles.md points teardown at herdr-mechanics.md instead of restating it"
 
-# T8b. The two shipped summaries of that conditioning, pinned next door to the rule
-# they summarise. T8 rewrote both to carry the condition and the fallback — the
-# README's parenthetical had asserted a check the excluded class never gets — and
-# then MEASURED that reverting both left all six suites green (527/0): the rule is
-# pinned above, its summaries were pinned by nothing, so a later edit could restore
-# the false reading in silence. `flat` on both, measured rather than assumed: each
-# clause's own text is split by a markdown wrap in the file as it stands (per-line
+# T8b. The shipped summaries of that conditioning, pinned next door to the rule
+# they summarise. T8 rewrote the two it could reach to carry the condition and the
+# fallback — the README's parenthetical had asserted a check the excluded class never
+# gets — and then MEASURED that reverting both left all six suites green (527/0): the
+# rule is pinned above, its summaries were pinned by nothing, so a later edit could
+# restore the false reading in silence. `flat` on both, measured rather than assumed:
+# each clause's own text is split by a markdown wrap in the file as it stands (per-line
 # count 0, squeezed count 1), and the shorter fragment that DOES sit whole on one
 # line is a prefix of the clause — what this suite's header says a pin must not
 # assert on its own. The needle carries the `roles.md` pointer too, because the
@@ -913,6 +913,22 @@ pin "$PLUGIN_README_MD" 'checked by `/context` at each task boundary for a seat 
   "README's retained-implementer summary carries the conditioned probe and its fallback" flat
 pin "$SKILL_MD" 'the one `/context` reply at each task boundary for a seat that can answer the probe — one that cannot rotates at its item boundary instead (`references/roles.md`)' \
   "SKILL.md's bounded-reads list conditions the probe and gives the fallback" flat
+
+# Fix round 2, on the whole-branch review's finding 3 and the controller's ruling: the
+# third site of the same three, `lifecycle.md` step 5 — the only one that still carried
+# one condition until the round above two-conditioned it, and the Open item that round
+# flagged rather than pinned, because its brief named two. The ruling: the asymmetry is
+# worse than the extra assertion, and a revert of this one would leave the suite green,
+# which is the class this milestone spent its last four tasks closing. Same shape, same
+# counter, measured the same way: this clause is wrap-split in the file as it stands
+# (per-line count 0, squeezed count 1), so `flat`. The needle is the conditioned subject
+# and not the sentence's action: `send /context … before attaching the next task` is text
+# this fix did not touch, and asserting it would buy false REDs on an honest rewording of
+# the action for no extra claim. Not the shorter fragment either (`whose profile can run a
+# local slash command and whose send route carries one` measures 1 too) — that is a prefix
+# of the clause, which this suite's header says a pin must not assert on its own.
+pin "$LIFECYCLE_MD" 'for a retained implementer whose profile can run a local slash command and whose send route carries one' \
+  "lifecycle step 5's probe sentence names both conditions the rule turns on" flat
 
 # The whole-branch review's finding 1: README's What-ships row for `briefs.md` counted
 # five dispatched templates where the file ships nine — the four ossify dispatch
