@@ -355,8 +355,10 @@ returned — one line per PR, `<repo> #<number> <url>`; the single word `closed`
 recorded with no PR open; or `halted: <step> — <evidence>` when it stopped, naming the
 failing step and repo and, on its own line, what it had already opened:
 `opened: <repo> #<n> <url> …` or `opened: none` — a close can halt after opening in one
-repo, and hiding those PRs strands them. Never a `commit …; push; open the PR` line of your
-own.
+repo, and hiding those PRs strands them. After the result, carry the close's own summary,
+verbatim — the message the ceremony ends with — because the result alone is a protocol
+token, and the report file is all the parent's contract reads. Never a `commit …; push;
+open the PR` line of your own.
 NEVER: create a seat, merge on your own authority, re-invoke `/ossify:close`, or open a PR
 of your own — a halt settles this dispatch, and a remediated one is a fresh session the
 orchestrator dispatches.
