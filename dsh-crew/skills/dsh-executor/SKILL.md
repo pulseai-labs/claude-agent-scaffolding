@@ -24,15 +24,18 @@ ossify state is the single authority. You write nothing into `.ossify/` except t
 
 ## 2. Dispatch the round
 
-For every request, in declared order:
+Take the round in this order — every baseline first, then the dispatches:
 
-1. Baseline the two documents no child may touch: the blob ids of the request's `spec_path`
-   and `handoff_path` (`git hash-object`), recorded before anything is dispatched. This is
-   the only comparison that can see a child editing its own contract: ossify recomputes the
-   spec's oid from the same file at §5a, so a weakened spec agrees with itself and passes.
-2. Fill the implementer prompt (`dsh-brief` §2) with the seven request fields, verbatim.
-3. Call `subagent_implementer` with `description: "work item <work_item_id>"`, that
-   prompt, and `run_in_background: true`. Note the job id it returns against the item.
+1. Baseline the two documents no child may touch — the blob ids of **every** request's
+   `spec_path` and `handoff_path` (`git hash-object`) — all of them, before the first
+   dispatch. The round is parallel, so a child already running can edit a sibling's spec, and
+   a baseline taken after that dispatch cannot see it. This is the only comparison that can
+   see a child editing its own contract at all: ossify recomputes the spec's oid from the
+   same file at §5a, so a weakened spec agrees with itself and passes.
+2. Then, for every request in declared order: fill the implementer prompt (`dsh-brief` §2)
+   with the seven request fields, verbatim, and call `subagent_implementer` with
+   `description: "work item <work_item_id>"`, that prompt, and `run_in_background: true`.
+   Note the job id it returns against the item.
 
 Items within a round are parallel by construction; dispatch them all, then wait.
 
@@ -105,7 +108,9 @@ A corrected item's result record is computed afresh in §5 and must pass the who
 table again (`external-executor.md` §7); the continuation's own return is never carried over.
 A correction packet ossify's close sends back after rejecting an item (`external-executor.md`
 §7, "to the same executor") is a new invocation of this procedure, run as a round of one:
-`dsh-brief` §4 with that packet, then §4 verify, then §5 afresh, then §7. The
+`dsh-brief` §4 with that packet, then §4 verify, then §5 afresh, then §7 — baselining that
+item's spec and handoff (§2 step 1) immediately before the correction is dispatched, since
+this path enters at §4 and never runs §2. The
 one-correction limit above counts attempts within one invocation; ossify's three-dispatch
 cap (step 1) counts across them and applies to a close-sent packet as to any correction.
 How many close rejections an item gets is ossify's (`close/references/impl-check.md` §6),
@@ -155,7 +160,10 @@ request); run that through §2–§7 as a round of one.
 Write every record — results and gaps, one per request, no missing, extra or duplicate
 `work_item_id` — as YAML blocks into
 `<spine spec dir>/round-<n>-external-records.yaml`, then continue `run-spine`'s lane at
-`external-executor.md` §5a with that file as the caller's return. Records are fed to close
+`external-executor.md` §5a with that file as the caller's return. Every scalar copied from a
+child — `summary`, and a gap's `question` and `section` — is model-written text and must be
+written as a quoted YAML string, so a `: `, a leading indicator or an embedded newline
+cannot change the file's parse or a value's type. Records are fed to close
 in declared decomposition order, never arrival order; closes and merges stay serial; the
 round barrier is untouched.
 
