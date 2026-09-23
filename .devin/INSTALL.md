@@ -35,7 +35,7 @@ Installing the meta-plugin installs exactly these five, and nothing else:
 | `code-judo` | All 4 skills |
 
 `scaffold`, `scaffold-onboard`, `scaffold-dev`, `claude-security-audit`,
-`orca-crew`, and `herdr-crew` are not published to Devin.
+`orca-crew`, `herdr-crew`, and `dsh-crew` are not published to Devin.
 
 ## Installation
 
