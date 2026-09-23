@@ -58,6 +58,8 @@ implementer dispatch, verification, and merge belong to the execution engine
   replaces (`work_item_status <wi-id> abandoned`) and leaves the spine running; a
   **whole-spine split** retires the old spine (`spine_status <spine-id>
   abandoned`) and re-declares the halves at plan-release. Never both on one spine.
+  The withdrawal is enforced rather than declared: `work_item_status <wi-id>
+  abandoned` is refused (rc 7) on a dispatched, `complete` or `active` item (§1).
 
 ---
 
