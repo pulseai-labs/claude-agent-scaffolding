@@ -25,7 +25,7 @@ WRITER_EXPECTED_MODEL is a failed launch to report, not to work around.
 PLACEMENT: REPO_ROOT — the worktree holding this repo's spine branch.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — never in pieces
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 SPINE_ID=<spine id>
 REPO=<the declared `target_repo` identifier for this writer's repo — it exists
 for remote and remote-less repos alike>

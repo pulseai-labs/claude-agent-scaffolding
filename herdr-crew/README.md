@@ -25,7 +25,7 @@ placement, teardown, and machines — and it wins where the two differ.
 | `references/roles.md` | The role table and the seats that fill it, the launch sequence, retention, the session budget, placement for the dual-repo case, and the writers rules. |
 | `references/lifecycle.md` | The thirteen-step run, the operator's own roles and the named points they run at, and rotation past the context ceiling. |
 | `references/config.md` | The operator's two files, the agent entries and their fields, the resolved profile and where each value travels, the project file's three sections, and what happens when a file is missing. |
-| `references/briefs.md` | Five dispatched brief templates — planned implementer, fast implementer, reviewer, verifier, fix round — plus the correction-request message template, which is a send and not a session. |
+| `references/briefs.md` | Nine dispatched brief templates — the generic five (planned implementer, fast implementer, reviewer, verifier, fix round) and the four dedicated dispatch templates the ossify dispatches use (lane driver, doctor dispatch, direct work-item, non-spine close) — plus the correction-request message template, which is a send and not a session; the file's header states the whole-contract rule and the dispatch matrix. |
 | `references/ossify-execution.md` | The spine execution-assignment contract: the four activation facts, the seats and the layers that own them, the approved block injected into the spine session's brief, and the three fixed procedures. |
 | `references/ossify-nested-run.md` | The activated spine's nested run: the required worker depth, the nested `run.json`, the round procedure and its gate, the close, and rotation. |
 | `references/ossify-pr-briefs.md` | The two PR-lane briefs: the close session's, and the work-PR session's with the merge bind and its return shapes. |
@@ -70,9 +70,11 @@ file declares; a `doctor session`, one per `/ossify:doctor` dispatch, released o
 and, on an activated spine, the four seats below. Any other session is a planning defect,
 and the orchestrator stops to re-plan the item. The authority is the skill's
 `references/roles.md`. The implementer is retained across consecutive work items until it
-passes half its context window (checked by `/context` at each task boundary) or the
-harness auto-compacts; the next item starts fresh with the handoff the orchestrator writes
-from the inputs in its report file. An activated spine adds four seats outside that budget
+passes half its context window (checked by `/context` at each task boundary for a seat
+that can answer the probe — one that cannot rotates at its item boundary instead,
+`references/roles.md`) or the harness auto-compacts; the next item starts fresh with the
+handoff the orchestrator writes from the inputs in its report file. An activated spine adds
+four seats outside that budget
 — the spine session, a close session, one work-PR session per returned PR, and a
 close-review writer.
 

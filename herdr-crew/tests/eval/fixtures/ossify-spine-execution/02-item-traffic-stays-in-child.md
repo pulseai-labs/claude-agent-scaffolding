@@ -28,7 +28,7 @@ herdr prepends nothing to a brief, so the brief is the whole contract, and
 nothing arrived alongside it — and you created the `run.json` you own,
 `run_child77`, for item tasks:
 
-    REPORT_PATH=/runs/r6.s1/spine-report.md
+    REPORT_PATH=/runs/r6.s1/spine-report.md, replaced whole — a temp file in the same directory renamed over the path, never in pieces
     RUN_JSON=/runs/r6.s1/run_child77.json
     SEATS — the operator-approved seats for this spine. Use them verbatim.
     r6.s1.w1 implementer: strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
@@ -39,7 +39,7 @@ nothing arrived alongside it — and you created the `run.json` you own,
     r6.s1.w3 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
 
 Round 1 holds three items. `r6.s1.w1` has already come back complete; you
-captured its four-part fingerprint and created its verifier pane at that
+captured the identity its result declares and created its verifier pane at that
 point, and that verifier has just written its all-claims report to its report
 file, naming the item's completion.
 

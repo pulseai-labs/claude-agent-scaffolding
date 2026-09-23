@@ -16,12 +16,21 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
+# 235, raised from 204 during T3 (2026-09-22): the pilot measured eight mechanics the file
+# had wrong or missing — the two detection events, the worktree path's workspace label and
+# `result.root_pane.pane_id` and its source-repo `--cwd`, the source-repo workspace that
+# `worktree remove` leaves open, the undetected caveat's remedy, the doorbell's generation
+# rule and a detected coordinator's `--until blocked` wait beside it, `enter` as the submit
+# key, and which ask governs the completion wait. Every addition is a clause: the file went
+# 201 -> 233 lines (+32: numstat 56 insertions, 24 deletions) and the gate rose 204 -> 235
+# (+31). The gate still fails over the limit; the slack is two lines.
+#
 # 204, raised from 200 during PR #513's review rounds: this file's budget is this
 # port's own invention (orca-crew has no mechanics reference), and the rounds' P1
 # fixes — the run workspace's per-server allocation, the first seat's cwd, the
 # agent_blocked re-send — needed room that eight content-neutral trades could not
-# keep finding. The gate still fails over the limit; the slack is two lines.
-REF_BUDGET=204
+# keep finding.
+REF_BUDGET=235
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -79,6 +88,7 @@ pin 'A local slash command (`/context`, `/clear`) settles without a turn' \
 section "placement"
 present '--cwd' "a seat's tree is set with --cwd"
 present '--label' "a seat's tab is labelled"
+present '--base <base-branch>' "a worktree seat's base is a slot, not a literal"
 
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"

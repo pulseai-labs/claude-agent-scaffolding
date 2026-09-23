@@ -21,7 +21,7 @@ expected_reason: 'Retention is item-local, has an end, and its first failure is 
   from its own SEATS row, even though w1''s implementer is alive, idle, well-warmed
   on this spine and cheaper to reuse. A second failure asks again with the same three
   options rather than escalating silently. The wrong answers this fixture falsifies
-  are: correcting on the first failure without asking, which is the pre-0.4.0 behaviour;
+  are: correcting on the first failure without asking;
   carrying w1''s implementer into w3 because the generic retention rule retains implementers
   across consecutive work items (that rule is unchanged OUTSIDE an activated spine,
   and this is inside one); sending two separate corrections; and creating a new writer
@@ -29,7 +29,7 @@ expected_reason: 'Retention is item-local, has an end, and its first failure is 
 ---
 
 You are the spine session for `r5.s2`, with the `run.json` you own. Round 1's
-`r5.s2.w1` came back complete; you captured its four-part fingerprint and its
+`r5.s2.w1` came back complete; you captured the identity its result declares and its
 verifier ran the all-claims check. The verifier reported two failures: claim 3
 (the mutation check — the new test still passes when the implementation edits
 are reverted) and claim 5 (`cannot determine` — it could not see whether the

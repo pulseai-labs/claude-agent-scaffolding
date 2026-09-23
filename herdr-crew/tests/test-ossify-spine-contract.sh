@@ -77,8 +77,39 @@ occurrences() {
     END { print n+0 }' "$1"
 }
 
+# Occurrences of a literal substring in a file read as ONE logical line: every
+# whitespace run is squeezed to a single space first, which reassembles the space
+# a markdown wrap broke at (the newline plus the next line's indentation).
+# A per-line count is the default and stays the default: it is stricter, and a
+# needle that unexpectedly spans a wrap fails loudly rather than silently
+# matching. This counter exists for the clauses whose own text — the text a pin
+# must assert, not a prefix of it — is split by such a wrap today: there is no
+# contiguous needle that names them, so a per-line pin could only assert a
+# fragment and would report the clause absent. Two consequences worth stating:
+# an absence pin over a squeezed line also catches a reintroduction that wraps
+# differently, and a FALSE positive needs the surrounding prose to spell the
+# phrase across a line boundary, which none of the three sites here does.
+# Note the join is by SQUEEZING, not by the config suite's newline DELETION:
+# those clauses are personal names, which are space-less, while these are prose
+# whose words are separated by the very space the wrap consumed.
+occurrences_flat() {
+  if [ -z "${2:-}" ]; then printf 'empty needle\n' >&2; return 1; fi
+  [ -f "$1" ] || { printf 'no such file\n' >&2; return 1; }
+  awk -v needle="$2" '
+    { buf = buf " " $0 }
+    END {
+      gsub(/[[:space:]]+/, " ", buf)
+      while ((i = index(buf, needle)) > 0) { n++; buf = substr(buf, i + length(needle)) }
+      print n+0
+    }' "$1"
+}
+
+count_of() { # <file> <needle> [line|flat]
+  if [ "${3:-line}" = flat ]; then occurrences_flat "$1" "$2"; else occurrences "$1" "$2"; fi
+}
+
 pin() {
-  c="$(occurrences "$1" "$2")" || { fail "$3" "unreadable file or empty needle: $1"; return 0; }
+  c="$(count_of "$1" "$2" "${4:-line}")" || { fail "$3" "unreadable file or empty needle: $1"; return 0; }
   if [ "$c" -eq 1 ]; then pass "$3"
   elif [ "$c" -eq 0 ]; then fail "$3" "not found in ${1##*/} — reworded away, or the pin now spans a line wrap. pin: $2"
   else fail "$3" "found $c times in ${1##*/}; a pin must be unique. pin: $2"
@@ -86,9 +117,26 @@ pin() {
 }
 
 absent() {
-  c="$(occurrences "$1" "$2")" || { fail "$3" "unreadable file: $1"; return 0; }
+  c="$(count_of "$1" "$2" "${4:-line}")" || { fail "$3" "unreadable file: $1"; return 0; }
   if [ "$c" -eq 0 ]; then pass "$3"
   else fail "$3" "'$2' occurs $c time(s) in ${1##*/}"; fi
+}
+
+# Every needle must count 0. For a claim whose SPELLING is not fixed, one needle
+# asserts less than its label promises: T7's absence pin below counted 0 for four
+# honest rewordings of the very claim it was written to keep out. The label here
+# describes the whole set, the failure message names the spelling that came back,
+# and an empty set is refused — a count over nothing is not a clean file.
+absent_any() { # <file> <label> <line|flat> <needle>...
+  _file="$1"; _label="$2"; _how="$3"; shift 3
+  if [ "$#" -eq 0 ]; then fail "$_label" "no needles — an empty set certifies nothing"; return 0; fi
+  _hits=""
+  for _needle in "$@"; do
+    _c="$(count_of "$_file" "$_needle" "$_how")" || { fail "$_label" "unreadable file: $_file"; return 0; }
+    [ "$_c" -eq 0 ] || _hits="$_hits [$_needle x$_c]"
+  done
+  if [ -z "$_hits" ]; then pass "$_label"
+  else fail "$_label" "the claim is back:$_hits"; fi
 }
 
 nonempty() {
@@ -620,7 +668,7 @@ pin "$PRBRIEFS_MD" 'ossify keeps that review advisory' \
 pin "$PRBRIEFS_MD" 'oldest first' \
   "the ledger slot accumulates every close review's ledger, oldest first"
 absent "$PRBRIEFS_MD" 'the most recent close' \
-  "the 0.5.0 newest-only ledger choice is gone"
+  "the newest-only ledger choice is gone"
 # N4/#467: a close-review ledger row names the repo its finding lands in, so a
 # multi-repo close splits fix-now findings into per-writer ledgers cleanly.
 pin "$PRBRIEFS_MD" 'carrying each finding, its `target_repo`' \
@@ -760,16 +808,180 @@ pin "$PRBRIEFS_MD" "context-ceiling notice" "the work-PR brief returns open: pas
 
 section "waits and completion bodies"
 
-# The typed wait is stated once, in herdr-mechanics.md; lifecycle step 5
-# carries it byte-identical, and SKILL.md names it as the wait primitive.
+# The typed wait is stated once, in herdr-mechanics.md; lifecycle step 5 and
+# roles.md's launch block carry it byte-identical. Three copies or none: T4's
+# reviewer measured that roles.md's was unpinned where the brief said all three
+# were, so a revert of only that copy left the suite green.
 TYPED_WAIT='herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>'
 pin "$MECHANICS_MD" "$TYPED_WAIT" "herdr-mechanics.md states the typed wait once"
 pin "$LIFECYCLE_MD" "$TYPED_WAIT" "lifecycle step 5's wait is the typed wait, byte-identical"
+pin "$ROLES_MD" "$TYPED_WAIT" "roles.md's launch block carries the same typed wait, byte-identical"
 pin "$SKILL_MD" 'A single bounded `herdr agent wait`' \
   "SKILL.md's wait primitive is one bounded agent wait"
-# Each dispatched brief names the file its report is written to.
-n_eq "$GENERIC_BRIEFS_MD" 'REPORT_PATH=<the absolute path this seat writes its report to>' 5 \
+# Each dispatched brief names the file its report is written to. Nine templates:
+# the generic five, plus the four dedicated dispatch templates in the same file.
+n_eq "$GENERIC_BRIEFS_MD" 'REPORT_PATH=<the absolute path this seat writes its report to>' 9 \
   "every dispatched brief names its report path"
+
+section "the clauses the milestone proved revertible"
+
+# T2's and T4's reviewers measured these by mutation: each revert left ALL SIX
+# SUITES GREEN. One pin per clause, and the label names the clause rather than
+# the count, so a RED reads as a fact. `flat` (the fourth argument) is used only
+# where the clause's own text is split by a markdown wrap in the file as it
+# stands — the three sites that qualify are named in their comments. A pin whose
+# needle has no reachable mutation is noise and none is written here: every pin
+# below reverts to a real one-clause edit.
+
+# T2 M-A. The spine dispatch's supply list names the correction body beside the
+# two item templates; deleting `and correction templates` left the suite green.
+pin "$EXEC_MD" 'item verifier and correction templates' \
+  "the spine dispatch's supply list names the correction body"
+
+# T2 M-B. The six atomic-rename REPORT_PATH slots — three spine-layer, two
+# PR-layer, one close-review-writer. The `REPORT_PATH=` count pins above count the
+# PREFIX, which a revert to a non-atomic mechanism leaves untouched; this is the
+# mechanism itself. The writer's slot was the sixth and escaped T2 entirely: its
+# finding named five, so "5/5 identical" was measured over the five it knew, and
+# this file's slot kept the pre-fix wording for a whole milestone (T7b).
+ATOMIC='replaced whole — a temp file in the same directory renamed over the path, never in pieces'
+n_eq "$BRIEFS_MD" "$ATOMIC" 3 "all three spine-layer report slots rename atomically"
+n_eq "$PRBRIEFS_MD" "$ATOMIC" 2 "both PR-layer report slots rename atomically"
+n_eq "$WRITER_MD" "$ATOMIC" 1 "the close-review writer's report slot renames atomically"
+# The generic layer's nine, added with the writer's slot in T7b. Not part of the
+# six T2's finding named, but the same class and the same file set: measured, a
+# revert of ONE of these nine left every suite green, exactly the hole the writer's
+# slot was. The set is now 9+3+2+1 = all fifteen slot lines in shipped prose, so a
+# revert of any one of them goes RED. The counter is the plain one — measured, this
+# needle sits whole on one line in all fifteen, so no `flat` is needed here.
+n_eq "$GENERIC_BRIEFS_MD" "$ATOMIC" 9 "all nine generic brief slots rename atomically"
+
+# T2 M-E. The identity anchor: reverting it to a four-part "fingerprint" left the
+# suite green. The four ids straddle a wrap, so this is two contiguous halves —
+# the capture, then the ids and the contract that declares them.
+pin "$NESTED_MD" 'capture the item'"'"'s identity as the result declares it — `head_oid`,' \
+  "the nested run's step 5 captures the item identity the result declares"
+pin "$NESTED_MD" '`tree_oid`, `report_oid` and `spec_oid`, the four ids the external-executor result envelope' \
+  "the identity anchor names all four ids and the contract that declares them"
+# #552, and the half that must NOT walk back in: the anchor once claimed these
+# four are "the same four the close guard fingerprints", which is false of
+# `close/references/work-item-close.md` — it compares no oid. `flat`: the removed
+# sentence wrapped between "four the" and "close", so only the squeezed count
+# catches a reintroduction that breaks the line somewhere else.
+#
+# THREE needles, not one, and the label is narrowed to what they assert. Review of
+# T7 measured the one-needle form counting 0 for `close-guard fingerprints` (the
+# hyphenated spelling that form's own label taught), `close guard's fingerprints`,
+# `close guard fingerprint covers` and `fingerprinted by the close guard` — four
+# honest rewordings of the claim the pin exists to exclude, each of which it would
+# have called absent. The set below catches all four, and both wrap-break positions
+# of the hyphenated form (`close-guard` broken at its hyphen squeezes to
+# `close- guard`). So the label says the guard is NAMED nowhere rather than that no
+# such claim exists. What that still leaves uncovered, and why it is accepted: a
+# spelling that makes the claim without naming the guard in any of these three
+# forms. Any realistic reintroduction names it, and the residual failure direction
+# is the loud one — a future TRUE sentence that merely mentions the close guard
+# false-REDs, which its author sees at once.
+absent_any "$NESTED_MD" \
+  "the identity anchor names no close guard, so it cannot carry the fingerprint claim" flat \
+  'close guard' 'close-guard' 'close- guard'
+
+# T4 G1. Reverting roles.md wholesale dropped all of these: the #516c probe
+# conditioning — pinned in both of its halves, the profile's and the route's —
+# the pilot's F2 precondition, and the teardown pointer.
+pin "$ROLES_MD" 'Both files must exist before this sequence is run' \
+  "roles.md's launch states the both-files precondition (pilot F2)"
+pin "$ROLES_MD" 'a seat is sent one only when' \
+  "the context probe is conditioned, not sent to every retained seat"
+pin "$ROLES_MD" 'the send route that reaches it' \
+  "the probe's second condition is the route, not the profile's can: alone"
+pin "$ROLES_MD" 'A seat is released as `herdr-mechanics.md`'"'"'s' \
+  "roles.md points teardown at herdr-mechanics.md instead of restating it"
+
+# T8b. The shipped summaries of that conditioning, pinned next door to the rule
+# they summarise. T8 rewrote the two it could reach to carry the condition and the
+# fallback — the README's parenthetical had asserted a check the excluded class never
+# gets — and then MEASURED that reverting both left all six suites green (527/0): the
+# rule is pinned above, its summaries were pinned by nothing, so a later edit could
+# restore the false reading in silence. `flat` on both, measured rather than assumed:
+# each clause's own text is split by a markdown wrap in the file as it stands (per-line
+# count 0, squeezed count 1), and the shorter fragment that DOES sit whole on one
+# line is a prefix of the clause — what this suite's header says a pin must not
+# assert on its own. The needle carries the `roles.md` pointer too, because the
+# pointer is half of what the fix is: the summary points, it does not restate.
+pin "$PLUGIN_README_MD" 'checked by `/context` at each task boundary for a seat that can answer the probe — one that cannot rotates at its item boundary instead, `references/roles.md`)' \
+  "README's retained-implementer summary carries the conditioned probe and its fallback" flat
+pin "$SKILL_MD" 'the one `/context` reply at each task boundary for a seat that can answer the probe — one that cannot rotates at its item boundary instead (`references/roles.md`)' \
+  "SKILL.md's bounded-reads list conditions the probe and gives the fallback" flat
+
+# Fix round 2, on the whole-branch review's finding 3 and the controller's ruling: the
+# third site of the same three, `lifecycle.md` step 5 — the only one that still carried
+# one condition until the round above two-conditioned it, and the Open item that round
+# flagged rather than pinned, because its brief named two. The ruling: the asymmetry is
+# worse than the extra assertion, and a revert of this one would leave the suite green,
+# which is the class this milestone spent its last four tasks closing. Same shape, same
+# counter, measured the same way: this clause is wrap-split in the file as it stands
+# (per-line count 0, squeezed count 1), so `flat`. The needle is the conditioned subject
+# and not the sentence's action: `send /context … before attaching the next task` is text
+# this fix did not touch, and asserting it would buy false REDs on an honest rewording of
+# the action for no extra claim. Not the shorter fragment either (`whose profile can run a
+# local slash command and whose send route carries one` measures 1 too) — that is a prefix
+# of the clause, which this suite's header says a pin must not assert on its own.
+pin "$LIFECYCLE_MD" 'for a retained implementer whose profile can run a local slash command and whose send route carries one' \
+  "lifecycle step 5's probe sentence names both conditions the rule turns on" flat
+
+# The whole-branch review's finding 1: README's What-ships row for `briefs.md` counted
+# five dispatched templates where the file ships nine — the four ossify dispatch
+# templates absent from the listing surface a reader opens first. Measured on a scratch
+# copy before this pin existed: with the row reverted to "Five dispatched brief
+# templates …", the whole suite stayed green (528/0 — 55 in config, the one assertion a
+# standalone clone skips being the repo-root marketplace sweep), so the row was
+# revertible in silence, exactly as the reviewer reported. The needle is the clause and
+# not the count alone: it names the four templates, because their absence was half the
+# finding. Per-line, and it sits whole on the row's one line; a later reword of the row
+# fails it loudly rather than silently, which is the direction this suite accepts.
+pin "$PLUGIN_README_MD" 'Nine dispatched brief templates — the generic five (planned implementer, fast implementer, reviewer, verifier, fix round) and the four dedicated dispatch templates the ossify dispatches use (lane driver, doctor dispatch, direct work-item, non-spine close)' \
+  "README's What-ships row counts the nine dispatched templates and names the four dedicated ones"
+
+# T4 G2. Deleting these from lifecycle.md left the suite green. The last is
+# `flat` because the file breaks its line inside the clause today.
+pin "$LIFECYCLE_MD" 'creates it again first and binds the id that call returns' \
+  "a launch whose run workspace is gone recreates it and rebinds the returned id"
+pin "$LIFECYCLE_MD" 'its machine label where the seat is not on this machine, and,' \
+  "step 13's handoff records each live seat's machine label"
+pin "$LIFECYCLE_MD" 'Write the handoff, recording every seat'"'"'s pane id, with its' \
+  "the rotation's own handoff records each live seat's machine label"
+pin "$LIFECYCLE_MD" 'through the machine the handoff names for a remote one' \
+  "a resumed top re-arms each remote pane through the machine it names" flat
+
+# T4 G3 and the P3 it drew. "`mv`, which this command allows" is a CROSS-FILE
+# truth: the dagr write's own sentence and the top's command allowlist are two
+# halves of one claim, so both are pinned and they sit together. `flat`: the
+# sentence is split at its comma by a wrap in the file as it stands.
+pin "$LIFECYCLE_MD" '`mv`, which this command allows' \
+  "lifecycle's dagr write names the mv the top's own command allows" flat
+pin "$COMMAND_MD" 'Bash(mv:*)' \
+  "commands/orchestrate.md's allowlist is what permits that mv"
+
+# T9b. The item verifier is the seat `roles.md` places in a canonical worktree for
+# a fresh frame (#537) — the location whose project rules do not load, which is the
+# slot's whole purpose — and its template was the one session brief in this file
+# without the RULES slot. T1 added the slot to `briefs.md`'s generic reviewer and
+# verifier and left this file's item verifier to "a later task"; no later brief
+# carried it, and T9's walk found the gap. Measured, the absence was unguarded: at
+# that head, with this template's slot missing (199 lines), all six suites were
+# green. A count over the file's three session briefs, not a `pin`: the slot line
+# is byte-for-byte the same in all three, so there is no unique needle on the line
+# itself. The correction message is a send, not a session, and carries none.
+# Residual, stated: a slot MOVED between templates in this file would keep the
+# count — closing that needs a span helper this suite does not have, and a move is
+# not the one-line revert this pin exists to catch. The slot sits flush under
+# CLAIMS with the blank line before DONE because the file is at its 200-line gate
+# and only one net line fit: measured over the plugin's fifteen shipped slots, the
+# blank that FOLLOWS a slot is universal while the leading one is absent in eight,
+# so the trailing one is the one to keep.
+n_eq "$BRIEFS_MD" 'RULES THAT DO NOT LOAD HERE' 3 \
+  "all three session briefs carry the rules slot"
 
 section "reference line budgets"
 

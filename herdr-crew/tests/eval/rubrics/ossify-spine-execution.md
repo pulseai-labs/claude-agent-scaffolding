@@ -43,7 +43,17 @@ aligned.
    agrees the seats with the operator and records them in the project file,
    then starts **exactly one** spine session and launches **no** item
    pane; the spine session owns both item panes for each item; each item
-   pane works one item. A top orchestrator that launches or supervises an
+   pane works one item. **The dispatch carries what its coordinator will
+   construct**: the top's dispatch to the spine session carries the child brief
+   bodies that session builds from — the item implementer, the item verifier and
+   the correction bodies, and the body the item verifier's CLAIMS instantiates —
+   beside its identities and its SEATS block, because a coordinator builds a
+   child brief from what its dispatch supplies and a dispatched brief is the
+   whole contract its worker sees. A dispatch that tells the spine session to
+   rebuild a child body from another template's lines, or to assemble one from a
+   source the dispatch did not carry, is a wrong answer; the work-PR session's
+   reviewer, fix-round and correction bodies travel with its dispatch the same
+   way. A top orchestrator that launches or supervises an
    item pane is a wrong answer, as is a spine session that hands item
    supervision back up. The spine session **closes each item through the lane
    before the barrier** — gate, commit, merge into the spine branch, in declared
@@ -109,11 +119,11 @@ aligned.
    substitute — is a wrong answer.
 4. **Pairs are fresh per item and item-local.** Every activated item gets a
    fresh implementer pane at round launch and a fresh verifier pane
-   later, when its complete return and fingerprint exist — creating the verifier
-   alongside the implementer is a wrong answer, since it would have nothing to
-   verify. **The first verifier failure is surfaced, not handled**: one blocking
-   question written to the spine session's own report file, carrying the
-   verifier's summary and exactly three
+   later, when its complete return and the identity that result declares
+   exist — creating the verifier alongside the implementer is a wrong answer,
+   since it would have nothing to verify. **The first verifier failure is
+   surfaced, not handled**: one blocking question written to the spine session's
+   own report file, carrying the verifier's summary and exactly three
    options — correct with the same pair, replace the pair, halt — with the pair
    idling until the reply, and a second failure asking again rather than
    escalating silently. *Correct* is one consolidated correction to the same
@@ -122,8 +132,16 @@ aligned.
    item's worktree reset to the request's `base_sha` with a clean porcelain —
    the rejected staged work is discarded, which is what replacing means — so two
    pairs never live on one item, and a replacement at a different seat is a new
-   operator decision whose reply carries the replacement rows. The pair is released when the item
-   closes or escalates. Correcting on the first failure without asking is a wrong
+   operator decision whose reply carries the replacement rows. **A correction
+   packet's fields are the contract's, not a paraphrase**: the accepted result
+   declares `head_oid`, `tree_oid`, `report_oid` and `spec_oid`, and the item's
+   execution request declares its `branch`, so the packet's `expected_branch`,
+   `expected_head_sha` and `expected_tree_oid` carry that request's `branch` and
+   that result's `head_oid` and `tree_oid` under those field names — the same
+   ids the verifier's placement spends — and a packet whose fields are
+   re-derived, paraphrased or witnessed from another artifact is a wrong
+   answer. The pair is released when the item closes or escalates.
+   Correcting on the first failure without asking is a wrong
    answer; so is carrying a pair into another item, and so is a silent
    replacement writer. Outside an activated spine the generic class routing and
    cross-item retention are unchanged; generalising fresh-per-item into a

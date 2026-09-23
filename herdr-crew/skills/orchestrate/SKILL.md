@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: The orchestrator/worker session model over herdr — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through herdr, the seats defined in the operator's own files (~/.claude/herdr-crew/agents.md, .herdr-crew/roles.md). One /code-review per PR, findings returned in the seat's report file, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that gives each item seat a fresh tab and pane. Use when the user says orchestrator session, spawn a worker, dispatch to a session, the seat, review this PR in a session, execution assignments for a spine, or runs /herdr-crew:orchestrate. Not herdr's command reference (`herdr --skill` owns that), and not a PR loop of its own where ossify's work-pr is installed.
+description: The orchestrator/worker session model over herdr — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through herdr, the seats defined in the operator's own files (~/.claude/herdr-crew/agents.md, .herdr-crew/roles.md). One /code-review per PR, findings returned in the seat's report file, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that gives each item seat a fresh tab and pane. Use when the user says the herdr orchestrator session, a herdr worker seat, the herdr crew, dispatch to a herdr session, execution assignments for a spine in herdr, or runs /herdr-crew:orchestrate. Not herdr's command reference (`herdr --skill` owns that), and not a PR loop of its own where ossify's work-pr is installed.
 ---
 
 # Orchestrate — the orchestrator/worker session model
@@ -66,7 +66,8 @@ Three consequences:
   wait after an empty timeout, stays forbidden. Beyond those `herdr pane read` cases, the only
   bounded reads are the launch-banner `pane read` in `roles.md`, the readiness
   `pane wait-output` of a seat herdr does not detect, and the one `/context` reply at
-  each task boundary.
+  each task boundary for a seat that can answer the probe — one that cannot rotates at
+  its item boundary instead (`references/roles.md`).
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
   and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
 - **Verifying a worker's claim is a verifier dispatch**, not an orchestrator read. "Tests
@@ -94,15 +95,20 @@ merge gate, handoff. One run per objective. You drive the steps and nothing else
 
 ## 5. Briefs
 
-`references/briefs.md` ships five dispatched briefs — planned implementer, fast
-implementer, fix round, reviewer, verifier — plus the correction-request message
-template, which is a send, not a session. A brief is the whole contract the worker
+`references/briefs.md` ships nine dispatched briefs: the generic five — planned
+implementer, fast implementer, fix round, reviewer, verifier — and the four ossify
+dispatch templates — lane driver, doctor dispatch, direct work-item, non-spine close —
+plus the correction-request message template, which is a send, not a session. Each
+template is a whole contract, complete on its own; the rule and the dispatch matrix that
+makes it checkable are that file's header. A brief is the whole contract the worker
 will ever see, because a worker session has no orchestration context and may be
 launched somewhere its project rules do not load. Every brief asks the worker to
 state its model in its first reply: a model that is not `SEAT_EXPECTED_MODEL` is a
 failed launch the worker reports and stops on rather than works around, and that
-report reaches you in its report file, like everything else it says. This session's
-own check is the launch's banner read (`references/roles.md`), made before dispatch.
+report reaches you in its report file, like everything else it says — and that file is
+the wait's own wake, so a brief naming no `REPORT_PATH` gives the wait for it nothing.
+This session's own check is the launch's banner read (`references/roles.md`), made
+before dispatch.
 
 ## 6. With ossify
 
@@ -114,7 +120,7 @@ command by the delegation floor: does it need the operator turn by turn?
 - **Dispatched to a herdr session:** `run-spine`, `work-item`, `close`, `work-pr`,
   `doctor`.
 
-Two cases are named because they look like clashes and are not:
+These cases are named because they look like clashes and are not:
 
 - **`run-spine`, by default.** Dispatch `/ossify:run-spine <id>` to one lane-driver
   session — the seat the project file names for it, `can: subagents` on its machine
@@ -125,16 +131,9 @@ Two cases are named because they look like clashes and are not:
   to this session only. You
   wait on one spine report, through its report file: a lane driver whose subagents run
   in the background is a coordinator seat (`references/herdr-mechanics.md`, Completion).
-  Its brief is composed from `references/briefs.md`'s fast-implementer template: that
-  template's three `SEAT_` lines, its `REPORT_PATH` line and its RULES slot stand; its ROLE,
-  PLACEMENT, TASK, DONE body and NEVER line are all replaced — the TASK by the dispatch; the
-  DONE body by its own completion body, not the activated spine brief's: the spine id, each
-  round's items and their state, the barrier's result, and the SHAs it merged; no run-file path
-  and no item-pair teardown, which belong to that other path. The ROLE by the lane driver's, who
-  is ossify's orchestrator for that spine rather than an implementer; the PLACEMENT by the
-  tree the lane runs from; and the NEVER line, because it forbids running subagents and
-  merging, which are this seat's job. No template ships for it, and without that `REPORT_PATH`
-  the wait for it has nothing to wake on. When its barrier lands, the close transition
+  Its brief is `references/briefs.md`'s lane-driver template, filled: that template carries
+  its own ROLE, PLACEMENT, TASK, completion body and NEVER line, so none of them is
+  assembled from another template's. When its barrier lands, the close transition
   `lifecycle.md` step 1b defines is this path's too: dispatch `/ossify:close <spine-id>` to a
   fresh close session, then a work-PR session per returned PR, then the record pass — otherwise
   a successful default lane has no defined next step and nothing records what it opened.
@@ -148,22 +147,20 @@ Two cases are named because they look like clashes and are not:
   that file lists; installation alone is not one of them, so an ossify spine you did
   not plan here stays on the bullet above. The nested `run.json`'s mechanics — depth,
   routing, the round procedure and the close — are in `references/ossify-nested-run.md`.
-- **A directly requested `work-item` or a non-spine `close`.** No shipped template fits either: the
-  item brief is the activated spine's (a SEATS row, an injected request) and the close brief names
-  `SPINE_ID`. Dispatch them the way the doctor dispatch is composed — the fast-implementer template
-  with its TASK the operator's command verbatim and its DONE body that command's own result — so the
-  seat has a `REPORT_PATH` and a body, and never the implementer's commit/push line where the unit is
-  read-only.
+- **A directly requested `work-item` or a non-spine `close`.** No template for the
+  activated path fits either: that item brief is the spine's (a SEATS row, an injected request)
+  and the spine close brief names `SPINE_ID`. Dispatch them from `references/briefs.md`'s own —
+  the direct work-item template, or the non-spine close one — filled: the TASK is the operator's
+  command verbatim and the DONE body that command's own result, so the seat has a `REPORT_PATH` and
+  a body, and never the implementer's commit/push line where the unit is read-only.
 - **`doctor`.** One fresh tab and pane per dispatch, launched from the project-file
-  `doctor session` seat and released on return (`references/roles.md`). Its brief is composed
-  from the fast-implementer template exactly as the default lane above composes its own — the
-  same five lines replaced, for the same reason — with two differences the dispatch dictates:
-  the TASK is the operator's dispatch verbatim, its surface arguments included, and the DONE
-  line carries that dispatch's own result rather than `commit …; push; open the PR`. What that
-  dispatch may write is ossify's contract, not this file's. A seat whose brief names no
-  `REPORT_PATH` gives the wait for it nothing to wake on.
-- **`work-pr`.** Its brief carries the child templates it will construct, appended with the
-  dispatch as the spine coordinator's are: `references/briefs.md`'s reviewer template for the
+  `doctor session` seat and released on return (`references/roles.md`). Its brief is
+  `references/briefs.md`'s doctor-dispatch template, filled: the TASK is the operator's dispatch
+  verbatim, its surface arguments included, and the DONE line carries that dispatch's own result
+  rather than `commit …; push; open the PR`. What that dispatch may write is ossify's contract,
+  not this file's, and that template does not adjudicate it.
+- **`work-pr`.** Its brief carries the child templates it will construct, verbatim:
+  `references/briefs.md`'s reviewer template for the
   review, and that file's fix-round and correction bodies for what follows — a work-PR session
   builds those child briefs, and a dispatched brief is the whole contract its worker ever sees.
   After the single reviewer dispatch and your disposition, the fix dispatch
@@ -179,6 +176,12 @@ Two cases are named because they look like clashes and are not:
 
 - **herdr is not running** (`herdr status` fails): say so and stop. Do not fall back
   to the `Agent` tool or to doing the work inline.
+- **This session is not inside a herdr pane** (`HERDR_PANE_ID` is absent, and with it the
+  `HERDR_WORKSPACE_ID` a rotation later needs): say so and stop. The daemon check above is
+  not enough — a healthy daemon with this session started from an ordinary terminal is a run
+  it cannot finish: the context-ceiling hook is gated on `HERDR_PANE_ID` and goes inert, and
+  every seat is placed relative to the pane the operator launched this session in
+  (`README.md`, Requirements).
 - **A seat is undefined or its agent is missing** (the seat name is in neither file, the
   pane shows `command not found`, or the banner read shows a model other than its
   `expected_model:`): report it to the operator and stop that dispatch. Never substitute

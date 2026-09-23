@@ -100,6 +100,12 @@ jobs:
       - name: recommendation-policy parity (repo-root)
         run: bash tests/test-recommendation-policy-parity.sh
 
+      - name: herdr-crew parity pins (repo-root)
+        # herdr-crew's two verbatim copies (orca-crew's fidelity pins, ossify's
+        # eval aggregator) and the manifest/marketplace description. A plugin
+        # suite cannot see its sibling tree, so this one is repo-root.
+        run: bash tests/test-herdr-crew-parity.sh
+
       - name: OpenCode runtime adapter unit suite
         run: node --test tests/test-opencode-runtime-adapter.mjs
 

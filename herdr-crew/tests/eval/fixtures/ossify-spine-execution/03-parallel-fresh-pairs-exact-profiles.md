@@ -7,11 +7,11 @@ expected_reason: 'THE DISCRIMINATING FIXTURE for this surface. Each item gets it
   command, which is a legitimate row value here even though the generic role table
   launches by seat name. TWO panes for two items at this point, not four: the verifier
   is NOT created at round launch, because it has nothing to verify until that items
-  complete return and fingerprint exist; it is created and dispatched later, from
-  its own row command. Both panes are tabs of the workspace the spine session
-  created for its run, and their two item tasks live in the run.json it owns;
-  the two items may run concurrently. The model is confirmed as each row''s
-  `model_shows` says — the banner here — and by the worker''s own check;
+  complete return and the identity that result declares exist; it is created and
+  dispatched later, from its own row command. Both panes are tabs of the workspace
+  the spine session created for its run, and their two item tasks live in the
+  run.json it owns; the two items may run concurrently. The model is confirmed as
+  each row''s `model_shows` says — the banner here — and by the worker''s own check;
   the effort is the launch argument, with no runtime attestation. The wrong answers
   this fixture falsifies are: dispatching one lane-driver session that spawns per-item
   subagents through the Agent tool (which is what the pre-change contract prescribed);

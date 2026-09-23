@@ -22,10 +22,18 @@ is this sequence, in which `<seat label>` is `seat: <role> (<agent>)`:
    server-scoped.
 2. **One tab per further seat.**
    `herdr tab create --workspace <id> --cwd <the seat's tree> --label "<seat label>" --no-focus`.
-   Its pane is `.result.root_pane`. A seat that needs a new worktree uses
-   `herdr worktree create` in place of this step, never step 1: herdr opens the worktree as
-   a workspace of its own. Read its ids from the response; `herdr pane list` names its pane.
-3. **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry.
+   Its pane is `.result.root_pane`. A seat that needs a new worktree uses `herdr worktree create`
+   — `--cwd <the source repo> --path <the new tree> --branch <b> --base <base-branch> --label
+   "<seat label>" --no-focus` — in place of this step, never step 1: it opens **two** workspaces,
+   the worktree's own and the **source repository's** checkout (`is_linked_worktree: false`). Its
+   `--label` names the worktree's **workspace**, so the seat's tab needs the `herdr tab rename`
+   step 1 prescribes. `--cwd` is the lever that retargets the **source** repo: without it the
+   call resolves its source from the *calling workspace's* repo. Read every id from the
+   response, `result.root_pane.pane_id` included.
+3. **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry —
+   re-running a **launch** command into a pane whose foreground process is already that
+   agent's TUI delivers its line to the agent as a prompt, the mechanism the undetected
+   seat's one-line pointer relies on, so a stray re-run costs a live seat a turn.
 4. **Readiness**, on whichever of the two paths below the pane takes.
 5. **The model.** `herdr pane read <pane>`, with `--source visible` (the rendered viewport)
    when `model_shows: screen`, must show `expected_model:`;
@@ -36,11 +44,15 @@ is this sequence, in which `<seat label>` is `seat: <role> (<agent>)`:
 
 herdr answers, live, which path a seat takes: does `herdr agent list` return a record for
 the pane? That answer, never a config field, is the discriminator, so a detection manifest
-landing later moves a seat to the typed path with no edit anywhere. Detection takes seconds
-after `pane run` (four, measured): the first ask, once they pass, chooses only the
-**readiness wait** below; the **send's route** below is decided by a second ask of that
-same list, made once step 5's model read has shown `expected_model:` on the pane, since
-the TUI is demonstrably up by then. A pane absent to that ask is undetected for the send.
+landing later moves a seat to the typed path with no edit anywhere. Detection after `pane
+run` is two events, measured: a record appears within about a second (0.6 s, still
+`agent_status: unknown`, no session identity, the shell's pane title) and the seat reaches a
+settled state (`idle`) at about four seconds (3.8–4.0 s). The first ask, once the record is
+there, chooses only the **readiness wait** below; the **send's route** is decided by a second
+ask of that same list, made once step 5's model read has shown `expected_model:` on the pane,
+since the TUI is demonstrably up by then — and the **completion wait** follows that second
+ask too, so the route that delivered the message is the one that can wake it. A pane absent
+to that ask is undetected for the send.
 
 **Detected** (a `claude-*` lane, `devin-*`, `pi`): the typed wait below. Detection is not
 readiness: a fresh agent's first detected state may be `blocked` on a folder-trust dialog,
@@ -52,11 +64,14 @@ which `--dangerously-skip-permissions` does not skip, and it is handled as a `bl
 `expected_model:` and `model_shows` says where on the pane it appears, so the string that
 confirms the model also shows the TUI is up, and existing entries need no edit. Without
 `--timeout` the wait has no bound. Caveat: it searches existing output before it polls, so
-a seat whose own command line contains its model string matches at once, proving nothing.
+a seat whose own command line contains its model string matches at once, proving nothing —
+wait on output the launch command cannot produce, or exclude the echoed command before
+declaring readiness.
 
 ## The typed wait
 
-Every `herdr agent wait` herdr-crew issues names the same three settled states:
+Every `herdr agent wait` herdr-crew issues names the same three settled states, except one
+companion wait a detected coordinator needs, which selects `blocked` alone (Completion):
 
     herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>
 
@@ -110,7 +125,8 @@ timeout counts from before submission, so it is a few seconds above the five-sec
 - `agent_prompt_stalled`: no activity was observed within five seconds of submission.
   `herdr agent get <pane>` gives the state. `working`: it started. `blocked`: a `blocked`
   wake. `idle` or `done`: `herdr pane send-keys <pane> enter` submits what sits in the
-  composer. `unknown`: report it to the operator. Never send the prompt again, because a
+  composer (`enter` is the submitting key; herdr's help names only `esc`). `unknown`:
+  report it to the operator. Never send the prompt again, because a
   stall does not prove the text was not delivered; read a `timeout` the same way.
 - `agent_blocked` (nothing was sent) and `blocked` (the turn opened on one) are both a
   `blocked` wake; a cleared `agent_blocked` re-sends the brief with the turn-start check.
@@ -146,15 +162,26 @@ seat running work of its own in the background (a spine or work-PR session's wai
 driver's subagents) reads `idle` or `done` before its report exists, so a typed wait on it
 wakes too soon. The doorbell is one bounded background wait that returns when
 `REPORT_PATH`'s hash differs from the one last noted, or at its timeout, polling inside
-itself as `pane wait-output` does — not the loop of waits `lifecycle.md` forbids. A changed
-file is read as above; a timeout with no new file is the checkpoint above, read the same
-one `pane read`, and a dialog it finds is reported with the rest of the state.
+itself as `pane wait-output` does — not the loop of waits `lifecycle.md` forbids. A **hash
+difference** is what wakes it, so a byte-identical replacement (a retained verifier
+repeating the same failure, a blocker restated after a clarification) never does: note the
+file's identity — inode or mtime — beside the hash, or clear or move the acknowledged
+report before a dispatch. A changed file is read as above; a timeout with no new file is
+the checkpoint above, read the same one `pane read`, and a dialog it finds is reported with
+the rest of the state.
+
+A **detected** coordinator adds one wait the non-coordinator path does not need: a dialog
+takes it to `blocked` and it writes no report while the dialog stands, so the doorbell
+above would sleep to its timeout. Add one bounded wait beside it,
+`herdr agent wait <pane> --until blocked --timeout <ms>`; that `blocked` wake is the dialog
+above, handled as any `blocked` wake is.
 
 ## Placement
 
     workspace "run: <objective>"          one per run, closed last
       tab "seat: verifier (<agent>)"      one full-size pane
-      workspace "<its label>"             one per worktree a seat needs (step 2)
+      workspace "seat: implementer (<agent>)" one per worktree a seat needs, named by
+                                              step 2's `--label`; its tab is renamed
         tab "seat: implementer (<agent>)" one full-size pane
 
 One tab per seat and one full-size pane per tab: **herdr-crew places a seat with
@@ -167,9 +194,10 @@ in, and herdr-crew does not move it, because a moved pane takes a new id.
 
 A seat's tree is whatever `--cwd` names, so a seat may sit in another repository: in the
 dual-repo case an orchestrator in the AI workspace places an implementer in the canonical
-tree. `--env` (on `tab create` and `workspace create`) carries only a seat's own scratch,
-such as `OSSIFY_SEAT`. A lane's provider variables are invoked by name through `command:`,
-never replayed with `--env`: a replayed environment is the silent-reroute defect.
+tree — for a worktree seat, step 2's `--cwd` is what makes that true. `--env` (on
+`tab create` and `workspace create`) carries only a seat's own scratch, such as
+`OSSIFY_SEAT`. A lane's provider variables are invoked by name through `command:`, never
+replayed with `--env`: a replayed environment is the silent-reroute defect.
 
 `--trust-repository` on `herdr worktree` grants herdr's per-request Git trust, not Claude
 Code's folder-trust dialog; only for a repository the operator verified, never as a retry.
@@ -182,11 +210,15 @@ take the workspace with it or be refused, and that workspace's id is the only se
 `herdr worktree remove --workspace <id>`, which is its release once its branch's work is
 safe: the implementer's after `lifecycle.md` step 12's merged-branch check, the reviewer's
 (it edits nothing) once its report file validates (step 8). A refused remove goes to the
-operator, never past it with `--force`. The run's own workspace closes last,
-`herdr workspace close <id>`, after every workspace linked to it. Close only what the run
-created, read every receipt (a failed call is JSON on stderr, exit status 1), and confirm
-with `herdr workspace list`, never assume: a last pane's close may take its tab and
-workspace too, and a close that finds its target already gone is information, not failure.
+operator, never past it with `--force` — and it releases only the worktree's own workspace:
+`herdr workspace list` still shows the **source repository's** checkout that step 2's
+`worktree create` opened, which the run did not create and the operator's to close — in the
+dual-repo case the canonical checkout, the repo step 2's `--cwd` names. The run's own
+workspace closes last, `herdr workspace close <id>`, after every workspace linked to it.
+Close only what the run created, read every receipt (a failed call is JSON on stderr, exit
+status 1), and confirm with `herdr workspace list`, never assume: a last pane's close may
+take its tab and workspace too, and a close that finds its target already gone is
+information, not failure.
 
 ## Machines
 

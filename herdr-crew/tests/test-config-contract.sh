@@ -106,12 +106,13 @@ brief_pin() {
   if [ "$count" -eq "$want" ]; then pass "$label ($count)"
   else fail "$label" "found $count, expected $want: $needle"; fi
 }
-# Five dispatched templates: planned implementer, fast implementer, reviewer,
-# verifier, fix round. The correction-request template is a send, not a launch,
-# so it carries no seat.
-brief_pin 'SEAT_COMMAND=' "every dispatched template names its seat's command" 5
-brief_pin 'SEAT_EXPECTED_MODEL=' "every dispatched template names its expected model" 5
-brief_pin 'SEAT_EFFORT=' "every dispatched template names its effort" 5
+# Nine dispatched templates: planned implementer, fast implementer, reviewer,
+# verifier, fix round, and the four dedicated dispatch templates — lane driver,
+# doctor dispatch, direct work-item, non-spine close. The correction-request
+# template is a send, not a launch, so it carries no seat.
+brief_pin 'SEAT_COMMAND=' "every dispatched template names its seat's command" 9
+brief_pin 'SEAT_EXPECTED_MODEL=' "every dispatched template names its expected model" 9
+brief_pin 'SEAT_EFFORT=' "every dispatched template names its effort" 9
 brief_pin 'claude-glm' "no alias name survives in briefs.md" 0
 
 section "the named points exist in the run"
@@ -135,11 +136,11 @@ $PLUGIN_ROOT/.claude-plugin/plugin.json
 $PLUGIN_ROOT/.codex-plugin/plugin.json"
 # The marketplace listing is shipped prose too — same sweep, when the checkout
 # carries it (a standalone plugin clone has no repo root).
-# CHANGELOG.md is deliberately absent: its historical entries record what
-# 0.2.0-0.6.0 actually shipped, names included, and rewriting them would falsify
-# the record. The cost of that exclusion is a forward hole — a future entry that
-# names a personal alias in its head entry passes this gate. Accepted: head-entry
-# sweeping is machinery this release does not need.
+# CHANGELOG.md is deliberately absent: its historical entries are a record of
+# what shipped, and rewriting one to satisfy a sweep would falsify it. The cost
+# of that exclusion is a forward hole — a future entry that names a personal
+# alias in its head entry passes this gate. Accepted: head-entry sweeping is
+# machinery this release does not need.
 if [ -f "$PLUGIN_ROOT/../.claude-plugin/marketplace.json" ]; then
   SWEEP_FILES="$SWEEP_FILES
 $PLUGIN_ROOT/../.claude-plugin/marketplace.json"
@@ -159,10 +160,24 @@ sweep_file() {
   fi
   hits=0
   for needle in $PERSONAL; do
-    c="$(awk -v needle="$needle" '
+    # The file is read as ONE line, joined by DELETING newlines — never by
+    # replacing them with a space. A markdown hard wrap splits a name at its
+    # hyphen: `claude-` ends one line and `glm` opens the next. A space-join
+    # rebuilds that as `claude- glm` and misses it; deleting rebuilds the name.
+    # Deleting can also MANUFACTURE one: a line ending `claude` joined to a line
+    # opening `-glm` spells `claude-glm` — measured, per-line 0 and joined 1 on
+    # that fixture. The direction is what makes that acceptable, and it is
+    # fail-closed: the joined count is monotonically at or above the per-line
+    # count, so the join can only fail a file, never certify one, and a false RED
+    # is loud. Absent today — per-line and joined agree on all 16 swept files.
+    # Until T7 the count was per line, and a wrap-split name was structurally
+    # invisible to it: the whole milestone leans on this gate. The unreadable-file
+    # guard above stays ahead of this pass, which is what keeps the three controls
+    # that call this function exercising the join rather than the read.
+    c="$(tr -d '\n' < "$f" | awk -v needle="$needle" '
       { line = $0
         while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
-      END { print n+0 }' "$f")"
+      END { print n+0 }')"
     hits=$((hits + c))
   done
   if [ "$hits" -eq 0 ]; then pass "no personal name in $rel"; return 0; fi
@@ -189,6 +204,24 @@ else
     "the sweep failed it, but not on a counted name: $out"
 fi
 rm -f "$tmp_ctl"
+
+# Control: the same check must still see a name SPLIT BY A MARKDOWN LINE WRAP.
+# This is the hole the per-line count had, and the plain plant above cannot see
+# it: `claude-` and `glm` on separate lines are each invisible to it, so the
+# wrap-aware join is what this control pins. It goes through `sweep_file` like
+# the others, and the message is checked, so a failure for any other reason does
+# not read as this control passing.
+tmp_wrap="$(mktemp)"; printf 'claude-\nglm\n' > "$tmp_wrap"
+if out="$(sweep_file "$tmp_wrap" "control fixture")"; then
+  fail "control: the sweep detects a name split by a line wrap" \
+    "a wrap-split name did not fail the sweep: $out"
+elif printf '%s' "$out" | grep -F 'occurrence(s)' >/dev/null; then
+  pass "control: the sweep detects a name split by a line wrap"
+else
+  fail "control: the sweep detects a name split by a line wrap" \
+    "the sweep failed it, but not on a counted name: $out"
+fi
+rm -f "$tmp_wrap"
 
 # Control: a missing or unreadable file must fail the sweep, not pass it — a
 # name-only counting check has no way to distinguish "clean" from "unread",

@@ -20,9 +20,12 @@ The seat names below are examples: the project file (`.herdr-crew/roles.md`,
 
 A seat is a name, never `--model`. The command it resolves to lives in the operator's
 machine file; run-time surfaces carry the name only, and a name neither file defines
-halts the run. No single herdr call creates a seat, launches its command and delivers
-its brief, so the launch is this sequence (take exact flag syntax from `herdr
---skill`):
+halts the run. **Both files must exist before this sequence is run**: a seat's role
+resolves through the project file and its launch command through the machine file, so
+with either absent there is nothing to resolve — that state is `config.md`'s, its
+"When a file is missing", not a decision this sequence makes. No single herdr
+call creates a seat, launches its command and delivers its brief, so the launch is this
+sequence (take exact flag syntax from `herdr --skill`):
 
 ```bash
 herdr workspace create --cwd <path> --label "run: <objective>"   # once per run, not per seat
@@ -51,9 +54,16 @@ a failed launch in its report file and stops, rather than working around it.
 The session that built the PR fixes the PR, and an implementer is retained across
 consecutive work items. herdr has no ownership transfer: retain a seat by keeping its
 pane and sending it the next task's brief (`herdr-mechanics.md` says how). At each task
-boundary send `/context` and read the one reply with `herdr pane read <pane>` — the
-orchestrator's one context source: past half its window, as `/context`
-reports, or an auto-compact, the next item goes to a fresh implementer. The
+boundary the context probe is `/context`, for a seat whose profile can run a local slash
+command (`can: slash-commands`, `config.md`): send it and read the one reply with
+`herdr pane read <pane>` — the orchestrator's one context source: past half its window, as
+`/context` reports, or an auto-compact, the next item goes to a fresh implementer. That
+probe is the mechanism for the seats that can answer it, and a seat is sent one only when
+both hold: its profile can run a local slash command, and the send route that reaches it —
+the second detection ask's answer (`herdr-mechanics.md`) — carries one. A seat failing
+either condition — a profile without the capability, or a pane that ask finds undetected —
+is never sent the probe, and rotates at its item boundary instead, on the run's own record:
+the item it has just finished, not a probe it cannot answer. The
 implementer returns its handoff inputs in its report file; the orchestrator writes the
 handoff into the next brief. Rotation happens between work items, never mid-PR: the
 retained implementer finishes the PR's fix rounds unless the harness auto-compacts.
@@ -61,7 +71,8 @@ The reviewer owns nothing durable and is released the moment its report file is
 processed; the verifier seat is retained across a fail-and-fix cycle on the same item
 — the re-check attaches its task to the same verifier — and is released only when the
 item passes or goes to the operator. A seat is released as `herdr-mechanics.md`'s
-Teardown says (a worktree seat by removing its worktree, never by closing its pane), and
+Teardown says — the same place that states the source repository's workspace a worktree
+seat leaves open, which the run did not create and does not close — and
 the run's own workspace closes last. Read each receipt rather than assuming it succeeded.
 
 ## The activated-ossify-spine exception
