@@ -3,8 +3,9 @@
 The crew for DeepSeek Harness (dsh). A spine session on the `crew-spine` preset runs
 ossify's `run-spine <spine-id> --external-executor`: each work item goes to a configured
 `subagent_implementer` child, is verified by a `subagent_verifier` child, gets one
-correction on FAIL, and comes back as ossify's result record computed from git. ossify
-state is the single authority; this plugin adds nothing to its contract, ships no lib, no
+correction on FAIL, and comes back as ossify's result record computed from git. A round
+can also stop for the operator: a second verifier FAIL or an unusable child return writes
+no record, and the round is not handed back. ossify state is the single authority; this plugin adds nothing to its contract, ships no lib, no
 state and no commands.
 
 ## Skills
@@ -26,8 +27,10 @@ configuration, not this plugin's job.
 
 - DeepSeek Harness (`@deepseek-ai/dsh`) with the web profile; the skills root includes
   this plugin's and ossify's skills (`skill-filesystem` `customSkillDirs`).
-- ossify ≥ 1.8.0 (`run-spine --external-executor`) on the same skills root; `oss` on the
-  bash tool's PATH.
+- ossify ≥ 1.8.0 on the same skills root; `oss` on the bash tool's PATH. ossify's
+  `run-spine` is a command, not a skill: the `crew-spine` persona accepts
+  `<spine-id> --external-executor` and follows the command's lane, the `work-item` skill's
+  `references/round-orchestration.md`.
 - A provider the session can reach; the reference uses the local Ollama daemon route with
   `deepseek-v4.1-flash:cloud`.
 

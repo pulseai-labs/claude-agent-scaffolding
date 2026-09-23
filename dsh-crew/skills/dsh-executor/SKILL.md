@@ -34,8 +34,8 @@ Items within a round are parallel by construction; dispatch them all, then wait.
 ## 3. Collect the returns
 
 Loop: `job_list()`; for each item's job not yet settled, `job_output(job_id, wait: true,
-timeout_ms: 600000)`. When a job settles, its final text is the child's return. Parse it
-as the one JSON object it must be:
+timeout_ms: 600000)`. When a job settles, the child's return is the LAST JSON object in
+its final text (text before it is allowed, `returns.md` §5):
 
 - `mode: complete` → go to §4 for this item.
 - `mode: gaps-surfaced` → go to §6 for this item.
@@ -87,7 +87,7 @@ WT=<worktree_path>; REPORT=<report_path from the return>; SPEC=<spec_path>
 git -C "$WT" rev-parse --abbrev-ref HEAD      # must equal the request's branch
 git -C "$WT" rev-parse HEAD                   # head_oid; must equal the request's base_sha
 git -C "$WT" write-tree                       # tree_oid
-git -C "$WT" status --porcelain               # every line must start with a staged code (M, A, D, R, C in column 1) and have a space in column 2; no '??'
+git -C "$WT" status --porcelain               # every line must start with a staged code (M, A, D, R, C, T in column 1) and have a space in column 2; no '??'
 git hash-object "$REPORT"                     # report_oid
 git hash-object "$SPEC"                       # spec_oid
 ```

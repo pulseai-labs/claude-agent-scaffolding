@@ -119,8 +119,20 @@ expected_tree_oid: <tree_oid from the rejected result>
 failures:
 <one line per failure, from the verifier's FAILURES list>
 
-DONE and NEVER: as in the implementer prompt — one JSON object as the final message,
-never commit, never push, never a subagent.
+PLACEMENT: work only inside <worktree_path>, on branch <branch>. Use the bash tool's
+workdir field or git -C for every command; cd does not persist.
+
+DONE: update the SAME report.md, stage as the work-item skill's §8 says, and return
+exactly ONE JSON object as your final message and nothing after it — the complete shape
+from the work-item skill's returns contract (references/returns.md §2), verbatim,
+unextended:
+{"mode": "complete", "report_path": "<abs path to report.md>", "summary": "<one-line>", "stage_status": "all_staged | partial | none"}
+On an identity mismatch, refuse as its §3 step 2 says: name which of the four disagreed,
+and stop.
+
+NEVER: commit, push, edit a file outside <worktree_path> other than report.md, write
+ossify state, or start a subagent. If a tool refuses you, report it verbatim in summary
+and stop that step.
 ```
 
 ## 5. Configured personas

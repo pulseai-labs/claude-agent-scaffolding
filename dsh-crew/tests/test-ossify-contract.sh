@@ -58,6 +58,34 @@ done <<< "$ossify_req_keys"
 mirror_req_keys="$(awk '/^external_execution_request:/{f=1; next} f && /^$/{exit} f && /^  [a-z_]+:/{sub(/:.*/,""); sub(/^  /,""); print}' "$MIRROR")"
 [ "$(printf '%s' "$ossify_req_keys" | sort)" = "$(printf '%s' "$mirror_req_keys" | sort)" ] && pass "request field set identical" || fail "request field set identical" "ossify: $(echo $ossify_req_keys) | mirror: $(echo $mirror_req_keys)"
 
+section "records.md blocks are ossify's, verbatim"
+# Each fenced yaml/text block in records.md must equal, whole, a fenced block in
+# ossify's external-executor.md or correction-continuation.md. Whole-block equality,
+# not substring: a field ossify appends to a record, or one the mirror adds, turns red.
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+split_blocks() { # file outdir prefix
+  awk -v d="$2" -v p="$3" '
+    !f && /^```(yaml|text)$/ { f=1; n++; out=sprintf("%s/%s.%02d", d, p, n); print > out; next }
+    f { print > out; if ($0 == "```") { f=0; close(out) } }
+  ' "$1"
+}
+mkdir -p "$TMP/m" "$TMP/o"
+split_blocks "$MIRROR" "$TMP/m" mirror
+split_blocks "$REF/external-executor.md" "$TMP/o" ee
+split_blocks "$REF/correction-continuation.md" "$TMP/o" cc
+nblocks=$(find "$TMP/m" -type f | wc -l | tr -d ' ')
+[ "$nblocks" -gt 0 ] && pass "fenced blocks extracted from records.md ($nblocks)" || fail "fenced blocks extracted from records.md"
+for mb in "$TMP"/m/*; do
+  [ -f "$mb" ] || continue
+  hit=""
+  for ob in "$TMP"/o/*; do
+    [ -f "$ob" ] || continue
+    cmp -s "$mb" "$ob" && { hit=1; break; }
+  done
+  label="$(sed -n 2p "$mb")"
+  [ -n "$hit" ] && pass "block '$label' is verbatim in ossify" || fail "block '$label' is verbatim in ossify" "no identical fenced block in external-executor.md or correction-continuation.md"
+done
+
 section "identity table: the six git reads the skill prescribes"
 for row in "rev-parse --abbrev-ref HEAD" "rev-parse HEAD" "write-tree" "status --porcelain" "hash-object" "report.md"; do
   has "$SKILL" "$row" && pass "row: $row" || fail "row: $row"
