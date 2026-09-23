@@ -341,7 +341,7 @@ belong in the read-out when the sweep gives you reason to look:
   `"$oss_bin" work_item_exec <wi> "" "" <sha>` records `base_sha` alone at rc 0
   (a hand-recovered dispatch), which a `branch`-or-`worktree_path` read called
   undispatched — so the item abandoned successfully and its work was stranded.
-  The rails now read all three; this bullet must name all three, or the report
+  The rail now reads all three; this bullet must name all three, or the report
   and the rail disagree about what "dispatched" means. Close skips an abandoned
   item entirely, so work in that worktree never reaches the spine.
 - **A bone's or gate's touch surface matching NO tracked file in any declared repo.**

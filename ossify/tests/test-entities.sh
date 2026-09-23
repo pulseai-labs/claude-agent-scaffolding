@@ -203,39 +203,44 @@ t_assert_rc 0 "setup: the dispatched item can still go complete"
 t_capture oss_entity_set_work_item_status "$S" "$WID" abandoned
 t_assert_rc 7 "a COMPLETE item cannot be abandoned after its merge landed"
 
-# The MIRROR guard on the same pair (GLM seat, round 2 on PR #520; reported
-# measured twice and re-measured here). `work_item_exec` refuses to dispatch an
-# already-`abandoned` item: without it the companion verb re-creates at rc 0
-# exactly the stranded record the abandonment guard above refuses to create in
-# the other order - {status:abandoned, branch, worktree_path}, the pair doctor
-# reports as drift.
+# The MIRROR arm does NOT ship in 1.12.0 - the operator's ruling of 2026-09-23
+# narrowed the set to the abandonment transition, and a refusal on the dispatch
+# WRITE is a condition on the record, not on that transition (#563). So
+# dispatching an already-`abandoned` item is accepted again, and the pair it
+# leaves - {status:abandoned, branch, worktree_path} - is doctor's §5 report, not
+# the verb's refusal: the report half is what still carries it (state-inspection.md
+# §5, pinned by test-prose-contracts.sh).
 WID3="$(oss_entity_add_work_item "$S" r0.s1 "withdrawn, then dispatched?")"
 t_capture oss_entity_set_work_item_status "$S" "$WID3" abandoned
 t_assert_rc 0 "setup: a third item is withdrawn before any dispatch"
 N2="$(oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_exec")] | length')"
 t_capture oss_entity_set_work_item_exec "$S" "$WID3" "work/$WID3" "$TMP/.worktrees/$WID3" "abc123"
-t_assert_rc 7 "dispatching an ABANDONED item refuses"
-t_assert_contains "$T_OUT" "is abandoned" "...and names the status as the reason"
-t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID3\") | [(.branch // \"\"), (.worktree_path // \"\")] | join(\",\")"
-t_assert_eq "," "$T_OUT" "...leaving branch and worktree_path unset"
+t_assert_rc 0 "dispatching an ABANDONED item is accepted - the mirror arm is dropped"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID3\") | [(.status // \"\"), (.branch // \"\")] | join(\",\")"
+t_assert_eq "abandoned,work/$WID3" "$T_OUT" "...and the drift pair is the record it lands (the report, not the rail)"
 t_capture oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_exec")] | length'
-t_assert_eq "$N2" "$T_OUT" "...and journaling nothing"
-# ADJACENT CONTROL: the same call on a live item still journals, so the refusal
-# above is the abandoned STATUS and not the verb - without this, a guard that
-# refused every dispatch would satisfy the assertions above. The control carries
-# its own item: $WID is COMPLETE by this point (the row above it asserts exactly
-# that), and re-dispatching a landed item is refused too (round 1 on #562), so the
-# old spelling of this control would have measured the new clause, not this one.
+t_assert_eq "$((N2 + 1))" "$T_OUT" "...journaling exactly one mutation"
+# ADJACENT CONTROL: the SAME pair is still refused in the guarded direction, and
+# this is what makes the drop a narrowing rather than a hole - the item now
+# records a dispatch, so the rail that DID ship refuses the withdrawal right next
+# to the call that was let through.
+t_capture oss_entity_set_work_item_status "$S" "$WID3" abandoned
+t_assert_rc 7 "...and withdrawing that same item is still refused (the kept rail)"
+t_assert_contains "$T_OUT" "records a dispatch" "...naming the dispatch it recorded"
+# The live-item control this row has always carried: the same dispatch call on an
+# item that is neither withdrawn nor landed still journals, so the accepted row
+# above is not "this verb says yes to everything now".
 WIDLIVE="$(oss_entity_add_work_item "$S" r0.s1 "live control item")"
 t_capture oss_entity_set_work_item_status "$S" "$WIDLIVE" active
 t_assert_rc 0 "setup: the control item is active"
 t_capture oss_entity_set_work_item_exec "$S" "$WIDLIVE" "work/$WIDLIVE" "$TMP/.worktrees/$WIDLIVE" "abc123"
 t_assert_rc 0 "the same call on a live item still dispatches"
-# ...and un-withdrawing re-opens the path, which is exactly what the refusal names.
+# ...and un-withdrawing still re-opens the path on the drift pair too: the way back
+# the dropped remedy used to name is a plain status write, in the guarded direction.
 t_capture oss_entity_set_work_item_status "$S" "$WID3" planned
-t_assert_rc 0 "the way back the refusal names works"
+t_assert_rc 0 "the way back works: the withdrawn-then-dispatched item returns to planned"
 t_capture oss_entity_set_work_item_exec "$S" "$WID3" "work/$WID3" "$TMP/.worktrees/$WID3" "abc123"
-t_assert_rc 0 "...and the un-withdrawn item can then be dispatched"
+t_assert_rc 0 "...and it can then be re-dispatched (a payload that records a dispatch)"
 
 # ---------------------------------------------------------------------------
 # Phase 3 (1.12.0, #529 with #528 and #533 half A): the never-strand invariant -
@@ -277,21 +282,31 @@ t_capture oss_entity_set_work_item_status "$S" "$WID4B" abandoned
 t_assert_rc 7 "a COMPLETE item with no dispatch record still refuses the abandonment"
 t_assert_contains "$T_OUT" "complete" "...naming the status that blocks it, not a dispatch"
 
-# (2) THE SPINE LEVEL. A mid-round replan that retires a spine whose items are
-# active with recorded dispatches returns rc 0, and every close-path reader then
-# skips those items - the same strand, one level up. Retirement is for a spine
-# that ran NOTHING: any item dispatched, active or complete refuses it.
+# (2) THE SPINE LEVEL does NOT SHIP - the operator's ruling of 2026-09-23 dropped
+# the retirement refusal (round-1 #9, round-2 #17/#19/#20/#22/#27: the two levels
+# disagreed, the printed remedy was false for one of its own causes, and the
+# remedies circled on the pre-1.12 drift pair). It is the same class as the other
+# dropped arms - a condition on a record the same verb family can rewrite - and it
+# rides #563. The consequence is stated rather than hidden: a spine whose items
+# have started or landed retires at rc 0 again, and every close-path reader then
+# skips them.
+#
+# ADJACENT CONTROL, and the reason this is a narrowing and not a hole: the
+# item-level rail still refuses the withdrawal of exactly these items, in the
+# guarded ORDER. What the ruling dropped is the second door, not the lock.
 SP2="$(oss_entity_add_spine "$S" r0 "second spine" flesh canonical)"
 WID5="$(oss_entity_add_work_item "$S" "$SP2" "dispatched item")"
 t_capture oss_entity_set_work_item_exec "$S" "$WID5" "work/$WID5" "$TMP/.worktrees/$WID5" "abc123"
 t_assert_rc 0 "setup: an item of the second spine is dispatched"
 t_capture oss_entity_set_spine_status "$S" "$SP2" abandoned
-t_assert_rc 7 "retiring a spine with a DISPATCHED item refuses"
-t_assert_contains "$T_OUT" "$WID5" "...naming the item that blocks it"
+t_assert_rc 0 "retiring a spine with a DISPATCHED item is accepted - the spine rail is dropped"
 t_capture oss_state_read "$S" ".spines[] | select(.id==\"$SP2\") | .status"
-t_assert_eq "planned" "$T_OUT" "...leaving the spine's status alone"
-# ADJACENT CONTROLS: both legitimate retirements still work, so the refusal is
-# "ran something" and not "has items".
+t_assert_eq "abandoned" "$T_OUT" "...and the retirement really lands (not a silent no-op)"
+t_capture oss_entity_set_work_item_status "$S" "$WID5" abandoned
+t_assert_rc 7 "...and the ITEM-level rail still refuses that item's withdrawal"
+t_assert_contains "$T_OUT" "records a dispatch" "...naming the dispatch, one level down from the dropped refusal"
+# Controls that were never about the dropped term: a spine with no items retires,
+# and one whose only item was withdrawn before dispatch retires.
 SP3="$(oss_entity_add_spine "$S" r0 "third spine" flesh canonical)"
 t_capture oss_entity_set_spine_status "$S" "$SP3" abandoned
 t_assert_rc 0 "a spine with NO items still retires (nothing ran)"
@@ -301,8 +316,9 @@ t_capture oss_entity_set_work_item_status "$S" "$WID6" abandoned
 t_assert_rc 0 "setup: its only item is withdrawn before any dispatch"
 t_capture oss_entity_set_spine_status "$S" "$SP4" abandoned
 t_assert_rc 0 "...and that spine still retires (it ran nothing)"
-# A COMPLETE item blocks it too: its merge is on the spine branch, so retiring
-# the spine takes the landed line down with it.
+# The second cause the dropped refusal used to name, kept as a row because the
+# ITEM-level `complete` clause is the control for it now: a spine whose item is
+# dispatched AND complete still retires, and the item still cannot be withdrawn.
 SP5="$(oss_entity_add_spine "$S" r0 "fifth spine" flesh canonical)"
 WID7="$(oss_entity_add_work_item "$S" "$SP5" "landed item")"
 t_capture oss_entity_set_work_item_exec "$S" "$WID7" "work/$WID7" "$TMP/.worktrees/$WID7" "abc123"
@@ -310,7 +326,9 @@ t_assert_rc 0 "setup: its item is dispatched"
 t_capture oss_entity_set_work_item_status "$S" "$WID7" complete
 t_assert_rc 0 "setup: ...and goes complete"
 t_capture oss_entity_set_spine_status "$S" "$SP5" abandoned
-t_assert_rc 7 "retiring a spine with a COMPLETE item refuses"
+t_assert_rc 0 "retiring a spine with a COMPLETE item is accepted too - no spine read remains"
+t_capture oss_entity_set_work_item_status "$S" "$WID7" abandoned
+t_assert_rc 7 "...and the item-level rail still refuses the landed item's withdrawal"
 
 # (3) DUPLICATE IDS (#533 half A). The existence probe read one line per matching
 # record, so a duplicate id made the count string multi-line, the numeric case arm
@@ -346,50 +364,57 @@ t_capture oss_state_replay "$S"
 t_assert_rc 0 "replay of that journal stays CLEAN - the rails are verb-side and _oss_apply_op is untouched"
 
 # ---------------------------------------------------------------------------
-# Phase 3, round 1 (PR #562 review, GLM seat): the write path may not ERASE or
-# NARROW the record the rails read; the item level counts `active` as the spine
-# level already does; and the dispatch write may not overwrite a landed item's
-# provenance. Each refusal below is measured RED on the unguarded head first -
-# an all-empty exec returned rc 0 and wiped a recorded dispatch, after which the
-# abandonment and the retirement both passed rc 0, which is the strand #529
-# exists to prevent, entered through the verbs that maintain the record.
+# Phase 3, round 1 (PR #562 review, GLM seat), NARROWED by the operator's ruling
+# of 2026-09-23: ONE clause survives on the dispatch write - a payload that
+# records NO dispatch at all, on an item that already records one - because the
+# abandonment rail above stands on it (erase the record and that rail sees an
+# undispatched item and lets the strand through). The narrowing clause, the
+# landed-provenance clause and the mirror arm do not ship (#563); each row below
+# states which side of that line it is on, and every accepted row is paired with
+# the refusal that must still fire next to it.
 # ---------------------------------------------------------------------------
 SP6="$(oss_entity_add_spine "$S" r0 "sixth spine" flesh canonical)"
 WID9="$(oss_entity_add_work_item "$S" "$SP6" "erase me")"
 t_capture oss_entity_set_work_item_exec "$S" "$WID9" "work/$WID9" "$TMP/.worktrees/$WID9" "sha-9"
 t_assert_rc 0 "setup: the item records a full dispatch"
 
-# (5a) ALL-EMPTY: records no dispatch at all, and would erase one.
+# (5a) ALL-EMPTY ON A RECORDED ITEM: the kept clause. It records no dispatch at
+# all and would erase the one on record.
 N9="$(oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_exec")] | length')"
 t_capture oss_entity_set_work_item_exec "$S" "$WID9" "" "" ""
-t_assert_rc 7 "an all-empty exec is REFUSED"
+t_assert_rc 7 "an all-empty exec on a RECORDED item is REFUSED (the kept clause)"
 t_assert_contains "$T_OUT" "no dispatch" "...naming emptiness as the reason"
 t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID9\") | .branch"
 t_assert_eq "work/$WID9" "$T_OUT" "...leaving the recorded dispatch intact"
 t_capture oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_exec")] | length'
 t_assert_eq "$N9" "$T_OUT" "...and journaling nothing"
-# ...and on an item with NO record at all, where the narrowing clause below
-# cannot fire - this is the row that ISOLATES the all-empty clause. Proved by
-# mutation: neutering the all-empty condition leaves every other row green,
-# because a record with fields is caught by narrowing one clause later.
+# ADJACENT CONTROL for the loosening that follows: the SAME call on an item with
+# NO record at all is accepted, because there is nothing to erase. The pair is
+# adjacent on purpose - the refusal above is the WIPE, not emptiness, and the
+# clause was dropped exactly where it was not load-bearing. Then the recorded item
+# refuses again AFTER the accepted one, so a mutation that neuters the clause
+# cannot pass by row order either.
 WID14="$(oss_entity_add_work_item "$S" "$SP6" "nothing to record")"
 t_capture oss_entity_set_work_item_exec "$S" "$WID14" "" "" ""
-t_assert_rc 7 "an all-empty exec on an item with NO record is refused too"
-t_assert_contains "$T_OUT" "no dispatch" "...naming emptiness, not narrowing"
+t_assert_rc 0 "the same all-empty exec on an item with NO record is accepted now"
 t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID14\") | [(.branch // \"\"), (.worktree_path // \"\"), (.base_sha // \"\")] | join(\"|\")"
-t_assert_eq "||" "$T_OUT" "...and leaving the item with no dispatch record"
+t_assert_eq "||" "$T_OUT" "...and the item holds no dispatch record"
+t_capture oss_entity_set_work_item_exec "$S" "$WID9" "" "" ""
+t_assert_rc 7 "...and a RECORDED item still refuses the same call, after it"
 
-# (5b) NARROWING: emptying a field the record ALREADY holds is the same harm one
-# field at a time - branch and worktree_path are how close finds the work, so
-# removing them leaves an item the predicate still calls dispatched and close
-# can no longer reconstruct.
+# (5b) NARROWING a recorded field: ACCEPTED now (the clause rode the same drop).
+# What must not change is the rail's soundness - no accepted write may leave a
+# recorded item reading UNDISPATCHED, and this one does not: the predicate still
+# reads the base_sha it records, so the withdrawal is refused immediately after.
 t_capture oss_entity_set_work_item_exec "$S" "$WID9" "" "" "sha-9b"
-t_assert_rc 7 "an exec that empties a RECORDED field is refused"
-t_assert_contains "$T_OUT" "would drop" "...naming the narrowing it refuses"
+t_assert_rc 0 "an exec that empties a RECORDED field is accepted now (dropped clause)"
 t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID9\") | [(.branch // \"\"), (.worktree_path // \"\"), (.base_sha // \"\")] | join(\"|\")"
-t_assert_eq "work/$WID9|$TMP/.worktrees/$WID9|sha-9" "$T_OUT" "...leaving all three fields as they were"
-# ADJACENT CONTROL: replacing all three values (a re-dispatch) still journals, so
-# the refusal above is narrowing and not the verb.
+t_assert_eq "||sha-9b" "$T_OUT" "...and the record is what the payload wrote"
+t_capture oss_entity_set_work_item_status "$S" "$WID9" abandoned
+t_assert_rc 7 "...and the item still reads DISPATCHED, so the rail refuses it"
+t_assert_contains "$T_OUT" "base_sha" "...naming the field the emptied write left behind"
+# ADJACENT CONTROL: a FULL re-dispatch (all three fields) still journals, so the
+# refusal above is not "this verb now refuses everything".
 t_capture oss_entity_set_work_item_exec "$S" "$WID9" "work/$WID9-redo" "$TMP/.worktrees/$WID9-redo" "sha-9c"
 t_assert_rc 0 "a full re-dispatch (all three fields) still journals"
 # ...and the half-write is still accepted where there is NO record to narrow: that
@@ -398,19 +423,21 @@ WID10="$(oss_entity_add_work_item "$S" "$SP6" "half-write")"
 t_capture oss_entity_set_work_item_exec "$S" "$WID10" "" "" "sha-only-10"
 t_assert_rc 0 "a base_sha-only dispatch on a fresh item is still accepted"
 
-# (5c) LANDED PROVENANCE: a complete item's record is the branch its merge landed
-# from; re-dispatching overwrites it, and a later close re-run then gates against
-# the redo worktree under an item that already landed.
+# (5c) LANDED PROVENANCE is no longer protected by this verb: re-dispatching a
+# COMPLETE item overwrites the branch the merge landed from (round-1 #13's clause,
+# dropped with the rest - #563). ADJACENT CONTROL: the landing itself still keeps
+# the item out of a withdrawal, which is the rail that DID ship.
 WID11="$(oss_entity_add_work_item "$S" "$SP6" "landed")"
 t_capture oss_entity_set_work_item_exec "$S" "$WID11" "work/$WID11" "$TMP/.worktrees/$WID11" "sha-11"
 t_assert_rc 0 "setup: the landed item is dispatched"
 t_capture oss_entity_set_work_item_status "$S" "$WID11" complete
 t_assert_rc 0 "setup: ...and goes complete"
 t_capture oss_entity_set_work_item_exec "$S" "$WID11" "work/REDO" "$TMP/.worktrees/REDO" "sha-11b"
-t_assert_rc 7 "re-dispatching a COMPLETE item is refused"
-t_assert_contains "$T_OUT" "complete" "...naming the status as the reason"
+t_assert_rc 0 "re-dispatching a COMPLETE item is accepted now (dropped clause)"
 t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID11\") | .branch"
-t_assert_eq "work/$WID11" "$T_OUT" "...leaving the landed record intact"
+t_assert_eq "work/REDO" "$T_OUT" "...and the record is the redo's - the overwrite is the finding's harm, now #563"
+t_capture oss_entity_set_work_item_status "$S" "$WID11" abandoned
+t_assert_rc 7 "...and the landed item still cannot be withdrawn (the kept rail, item level)"
 # ADJACENT CONTROL: the same call on an ACTIVE item still journals - the
 # legitimate re-dispatch, a round that returned gaps-surfaced and runs again.
 WID12="$(oss_entity_add_work_item "$S" "$SP6" "re-dispatchable")"
@@ -419,10 +446,13 @@ t_assert_rc 0 "setup: an item goes active before its dispatch"
 t_capture oss_entity_set_work_item_exec "$S" "$WID12" "work/$WID12" "$TMP/.worktrees/$WID12" "sha-12"
 t_assert_rc 0 "the same call on an active item still dispatches"
 
-# (6) THE ITEM LEVEL COUNTS `active`, as the spine level already does. Abandoning
-# an active item returned rc 0, and the spine's own refusal - which counts an
-# active item as 'ran something' - was then passed at rc 0 one call later, so a
-# spine whose round was in flight could be retired by a single write.
+# (6) THE `active` CLAUSE IS KEPT - it is a condition on the abandonment
+# transition itself (the operator's ruling names it explicitly, round-2 #21), and
+# the prose had to be narrowed to state it: decomposition.md §1 now says an
+# `active` item is not withdrawable either, even with no dispatch record. Its
+# whole justification is item-level now - the status is admitted on its own, and
+# the round walk creates the worktree before it journals the dispatch - because
+# the spine level that used to count it as 'ran something' does not ship (#563).
 WID13="$(oss_entity_add_work_item "$S" "$SP6" "active, then withdrawn?")"
 t_capture oss_entity_set_work_item_status "$S" "$WID13" active
 t_assert_rc 0 "setup: the item is active with no dispatch record"
@@ -434,8 +464,10 @@ t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID13\") | .status
 t_assert_eq "active" "$T_OUT" "...leaving the status untouched"
 t_capture oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_status")] | length'
 t_assert_eq "$N13" "$T_OUT" "...and journaling nothing"
-t_capture oss_entity_set_spine_status "$S" "$SP6" abandoned
-t_assert_rc 7 "...and the spine still refuses retirement (the dodge is closed)"
+# ADJACENT CONTROL: the clause reads the STATUS, not a predicate term - the item
+# has no dispatch record, and the item it is written on is otherwise ordinary.
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID13\") | [(.branch // \"\"), (.base_sha // \"\")] | join(\"|\")"
+t_assert_eq "|" "$T_OUT" "...and it carries no dispatch record at all (the clause is the status)"
 # ADJACENT CONTROLS, both documented routes, so the refusal is `active` and not
 # every abandonment: the item returns to planned, and THEN withdraws.
 t_capture oss_entity_set_work_item_status "$S" "$WID13" planned
@@ -448,9 +480,70 @@ t_assert_rc 0 "release status accepts a valid transition"
 t_capture oss_state_read "$S" '.releases[] | select(.id=="r0") | .status'
 t_assert_eq "closed" "$T_OUT" "release status actually changed"
 
-# The smoke row carries its own item: $WI is COMPLETE by line 136 of this file,
-# and a re-dispatch onto a landed item is refused (round 1 on #562) - the row's
-# subject is the exec payload, not the status it is written onto.
+# ---------------------------------------------------------------------------
+# (7) THE ROUND-2 P1 MECHANISM IS GONE, exercised through bin/oss - the real
+# dispatcher under `set -euo pipefail`, not the sourced lib. The pre-narrowing
+# guard joined the record and the payload with U+0001 and parsed both with ONE
+# line-oriented `read`, so a newline anywhere in a value truncated the parse: a
+# full, valid re-dispatch was refused rc 7, and once the RECORD held a newline the
+# item could never be re-dispatched at all - a permanent lockout (round-2 #18).
+# Nothing positional is parsed now, so these rows are the repro.
+# ---------------------------------------------------------------------------
+WIDNL="$(oss_entity_add_work_item "$S" r0.s1 "newline repro")"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDNL" "work/$WIDNL" "$TMP/.worktrees/$WIDNL" "sha-nl"
+t_assert_rc 0 "setup: the item records a dispatch through the dispatcher"
+WIDNL_WT=$'/tmp/wt\nsub'
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDNL" "work/redo" "$WIDNL_WT" "sha-nl2"
+t_assert_rc 0 "a re-dispatch whose worktree_path holds a NEWLINE is accepted (was rc 7)"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WIDNL\") | .worktree_path"
+t_assert_eq "$WIDNL_WT" "$T_OUT" "...and the newline is stored verbatim, not truncated"
+# ...and the RECORD side, which is the half of #18 that was permanent: an item whose
+# recorded field holds a newline accepts a further re-dispatch, and then a clean one.
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDNL" "work/redo2" $'/tmp/wt2\nsub2' "sha-nl3"
+t_assert_rc 0 "an item whose RECORD already holds a newline still accepts a re-dispatch"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDNL" "work/redo3" "$TMP/.worktrees/redo3" "sha-nl4"
+t_assert_rc 0 "...and again with a clean path - the lockout is gone"
+# CONTROL: the kept clause still fires through the dispatcher on that same
+# newline-bearing record - the mechanism changed, the clause did not.
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDNL" "" "" ""
+t_assert_rc 7 "...and the kept clause still refuses the wipe on that item"
+
+# ---------------------------------------------------------------------------
+# (8) THE MALFORMED-FIELD ARM FAILS CLOSED (operator's ruling, item 3; round-2
+# #16). `_OSS_DISPATCHED_JQ` reads each field with `//`, and jq's `//` takes the
+# right side for a JSON `false` - so an item whose record held `"branch": false`
+# read as UNDISPATCHED, and the rail journaled the stranded pair it exists to
+# prevent. A guard that cannot answer now answers rc 4, on BOTH paths, and both are
+# exercised through bin/oss: the abandonment (where the fail-open stranded the
+# item) and the one kept exec clause (which cannot tell whether the write is a wipe).
+# ---------------------------------------------------------------------------
+WIDBAD="r0.s1.w98"
+oss_state_mutate "$S" add_work_item \
+  "$(jq -n --arg s r0.s1 --arg t "malformed dispatch field" --arg r canonical --arg ts "$(_oss_now)" \
+    '{spine:$s,title:$t,target_repo:$r,status:"planned",created_at:$ts,id:"r0.s1.w98",branch:false}')" >/dev/null
+t_assert_eq "false" "$(oss_state_read "$S" ".work_items[] | select(.id==\"$WIDBAD\") | .branch")" \
+  "setup: an item records \"branch\": false (the raw-op write this release tolerates)"
+N_BAD="$(oss_state_read "$S" '.mutations | length')"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_status "$WIDBAD" abandoned
+t_assert_rc 4 "a malformed dispatch field makes the abandonment fail CLOSED at rc 4"
+t_assert_contains "$T_OUT" "not a string" "...saying the guard could not answer, not reading it as undispatched"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDBAD" "" "" ""
+t_assert_rc 4 "...and the kept exec clause fails closed on the same record"
+t_capture oss_state_read "$S" '.mutations | length'
+t_assert_eq "$N_BAD" "$T_OUT" "...and neither attempt journaled anything"
+# CONTROLS, both directions on the same state: the guard DOES answer when it can
+# (a well-formed dispatch is rc 7, not 4), and the repair it names stays reachable -
+# a full re-dispatch replaces all three fields, so failing closed here cannot lock
+# the item out of repair.
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDBAD" "work/repair" "/tmp/wt-repair" "sha-repair"
+t_assert_rc 0 "a full re-dispatch on the malformed item is accepted (the repair is not locked out)"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WIDBAD\") | [(.branch|tostring), (.base_sha|tostring)] | join(\",\")"
+t_assert_eq "work/repair,sha-repair" "$T_OUT" "...and it replaced the malformed field"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_status "$WIDBAD" abandoned
+t_assert_rc 7 "...and the same call now answers rc 7 (dispatched), not 4 - it answers when it can"
+
+# The smoke row carries its own item: its subject is the exec PAYLOAD and the record
+# it lands, not whatever status an item reached earlier in this file.
 WIEXEC="$(oss_entity_add_work_item "$S" r0.s1 "exec smoke")"
 t_capture oss_entity_set_work_item_exec "$S" "$WIEXEC" "work/$WIEXEC" "/tmp/wt" "abc123"
 t_assert_rc 0 "work item exec fields recorded"

@@ -105,20 +105,27 @@ reads clean: a surface re-pointed at a tree that does not exist reads `clean` on
 every path and the spine is never reclassified. The repair has existed since
 1.11.0, and now the detection does too.
 
-Since 1.12.0, the never-strand invariant has **one predicate and one place**. A
-work item counts as dispatched when it records any of the three fields the
-dispatch writer journals — `branch`, `worktree_path`, `base_sha` — and that one
-definition now answers in both directions and at the spine level: an item that
-records a dispatch, or that has landed, is never `abandoned`; an `abandoned` item
-is never dispatched; and a spine any of whose items records a dispatch, is
-`active`, or has landed is never retired. Each refusal is evaluated **inside the
-state lock**, so a concurrent writer's commit is visible to it — the previous
-reads happened before the lock, which is a check-to-append race with data loss as
-its outcome. A duplicate work-item id is named as a duplicate (rc 7, pointing at
-#305) instead of being misreported as a state-read failure, and it is refused for
-every status rather than for `abandoned` alone. No journal op, payload key or
-status value changes: the rails are verb-side, so a journal that already holds an
-inconsistent pair still replays clean and `doctor` reports it as drift.
+Since 1.12.0 (#529, #528, #533 half A), the never-strand **rail** guards one
+transition — the withdrawal. A work item counts as dispatched when it records any
+of the three fields the dispatch writer journals — `branch`, `worktree_path`,
+`base_sha` — and an item that records one, or that has landed, or whose round is
+`active`, is never `abandoned`. That refusal is evaluated **inside the state
+lock**, so a concurrent writer's commit is visible to it (the previous read
+happened before the lock, which is a check-to-append race with data loss as its
+outcome), and it fails **closed** at rc 4 on a dispatch field recorded as
+something other than a string rather than reading that as undispatched. One
+clause survives on the dispatch write, and it is the clause the withdrawal rail
+stands on: a `work_item_exec` whose payload records no dispatch at all is refused
+on an item that records one, because erasing the record is how the strand is
+entered. The mirror refusal, the landed-item refusal and the spine-level
+retirement refusal do **not** ship in this release (#563) — they are point checks
+over a record this same verb family can rewrite, and two review rounds found
+another disagreement each time; what the release claims is what it enforces. A
+duplicate work-item id is named as a duplicate (rc 7, pointing at #305) instead
+of being misreported as a state-read failure, and it is refused for every status
+rather than for `abandoned` alone. No journal op, payload key or status value
+changes: the rail is verb-side, so a journal that already holds an inconsistent
+pair still replays clean and `doctor` reports it as drift.
 
 Since 1.7.0 (#368), every bare `doctor` sweep includes plugin provenance and
 `doctor provenance` runs it alone. It reports the answering `oss` binary, the

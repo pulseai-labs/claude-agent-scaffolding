@@ -48,19 +48,6 @@ position; carry any ledger line already planned against the old spine with
 state, abandoned, so the release close can report it
 (`close/references/release-close.md` §2 names abandoned spines explicitly).
 
-**The retirement is refused while the spine has run anything**, and that is the
-never-dispatched precondition this arm has always implied: `spine_status <spine>
-abandoned` answers rc 7 if any of the spine's items records a dispatch (`branch`,
-`worktree_path` or `base_sha`), is `active`, or is `complete` — because every
-close-path reader skips an abandoned item, so retiring a spine whose work has
-started or landed strands it. Close that spine instead: returning an item to
-`planned` re-opens it for a re-dispatch and does **not** clear the dispatch record
-that blocks the retirement — a re-dispatch REPLACES that record, and it is the
-only write that changes it. A spine whose items were all withdrawn **before**
-dispatch, or that has
-no items at all, retires normally — which is exactly what the close gate's two
-empty arms ask for.
-
 What **not** to do, in order of how tempting each is:
 
 - **Do not merge two items to reach five.** The count is now legal and the plan
@@ -86,12 +73,17 @@ never happened). Left `planned`, it blocks spine close forever
 (`close/references/spine-close.md` §2). Record why in `SPINE.md` beside the
 decomposition — state carries the status, not the reason.
 
-**Only an item that was never dispatched is withdrawn.** Once `/run-spine` has
-dispatched an item, its round lands or halts; a dispatched item that turns out
-wrong is a replan, not a withdrawal. The round walk, spine close and release
-close all skip an `abandoned` item, so withdrawing a dispatched one would strand
-its work. A withdrawal made by mistake is reversed with
-`"$oss_bin" work_item_status <wi-id> planned`.
+**Only an item that was never dispatched is withdrawn — and not an `active` one
+either.** Once `/run-spine` has dispatched an item, its round lands or halts; a
+dispatched item that turns out wrong is a replan, not a withdrawal. The verb
+refuses `abandoned` (rc 7) on an item that records a dispatch, is `complete`, or
+is `active` — the last of those even with no dispatch record, since `active` is
+admitted on its own and the round walk creates the worktree before it journals
+the dispatch (`work-item/references/round-orchestration.md` §3). The round walk,
+spine close and release close all skip an `abandoned` item, so withdrawing any of
+those would strand its work. A withdrawal made by mistake is reversed with
+`"$oss_bin" work_item_status <wi-id> planned`; an `active` item takes that route
+too, once its round was abandoned without a landing.
 
 **A withdrawal owes the demo ledger too.** If the withdrawn item was the reason
 this spine planned a `ledger_supersede` or `ledger_retire`, that amendment is

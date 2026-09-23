@@ -529,24 +529,52 @@ for _f in branch worktree_path base_sha; do
     *) T_FAIL=$((T_FAIL+1)); echo "FAIL: the dispatch predicate's definition does not read '$_f'";;
   esac
 done
-_bullet="$(grep -A 8 'An `abandoned` work item with a recorded' "$SI3")"
+# The bullet's field list, and the window is its OWN two lines. It was `-A 8`
+# until this narrowing pass, and the mutation battery found why that was too wide:
+# the bullet's EXPLANATION below it names `base_sha` as well (`work_item_exec <wi>
+# "" "" <sha>` records it), so deleting `base_sha` from the field list itself left
+# this row GREEN - the check was satisfied by the prose that explains the field,
+# which is the round-1 #2 trap one level down (a check that passes on surrounding
+# commentary instead of on its subject). Measured: with `-A 2` the same deletion is
+# RED. The anchor below it is the bullet's own bolded heading, so this window is
+# the list, not the explanation.
+_bullet="$(grep -A 2 'An `abandoned` work item with a recorded' "$SI3")"
 for _f in branch worktree_path base_sha; do
   case "$_bullet" in
     *"$_f"*) T_PASS=$((T_PASS+1));;
     *) T_FAIL=$((T_FAIL+1)); echo "FAIL: state-inspection.md §5's abandoned-drift bullet does not name '$_f' - the report and the rail disagree about what dispatched means";;
   esac
 done
-# The spine-level half is prose as well: plan-spine/SKILL.md states the two
-# mutually exclusive arms, and the rail now enforces the retirement precondition
-# they imply. Anchored to the ENFORCEMENT sentence this phase added, not to the
-# pre-existing "never-dispatched" phrase at line 57: a pin on the old wording
-# stays green when the added sentence is deleted, so it cannot detect the loss
-# its own failure message describes (round 1, GLM seat - measured by deleting
-# the sentence and watching this row stay green).
-if grep -Fq 'Both are now enforced rather than declared' "$OSSSK/skills/plan-spine/SKILL.md"; then
+# The item-level rail keeps three clauses (a recorded dispatch / `complete` /
+# `active`) and it is PROSE that tells the model to walk them, so the prose must
+# name all three. Round 2 (#21) is exactly this row's failure mode: the sentence
+# named a dispatched or landed item and said nothing about `active`, which the same
+# rail refuses - a never-dispatched item a lane had already marked in flight.
+# Re-anchored by the 1.12.0 narrowing (operator ruling, 2026-09-23): the old anchor
+# was the sentence that ALSO claimed the retirement was enforced, and that rail does
+# not ship (#563), so the anchor is the claim that remains true.
+_SK3="$OSSSK/skills/plan-spine/SKILL.md"
+_sk="$(grep -A 1 'The withdrawal is enforced rather than declared' "$_SK3" || true)"
+if [ -n "$_sk" ]; then
   T_PASS=$((T_PASS+1))
+  for _f in dispatched complete active 'rc 7'; do
+    case "$_sk" in
+      *"$_f"*) T_PASS=$((T_PASS+1));;
+      *) T_FAIL=$((T_FAIL+1)); echo "FAIL: plan-spine/SKILL.md's withdrawal sentence does not name '$_f' - the rail refuses on it and the prose the model follows is narrower than the rail";;
+    esac
+  done
 else
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: plan-spine/SKILL.md no longer states that the withdrawal and the retirement are ENFORCED (the phase-3 sentence), so the rail and the prose it moves with have drifted"
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: plan-spine/SKILL.md no longer states what the withdrawal refusal is enforced ON - re-anchor this row or drop it"
+fi
+# ADJACENT CONTROL, and it is the loosening's own: this row went from pinning one
+# exact sentence to pinning field names, so it accepts more - and what it must still
+# REJECT is the claim that went with the dropped rails. A prose sentence asserting
+# the retirement is enforced would be a rule the release does not keep, which is the
+# same report/rail disagreement one level up.
+if grep -Fq 'Both are now enforced rather than declared' "$_SK3"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: plan-spine/SKILL.md claims the retirement is enforced - that rail does not ship in 1.12.0 (#563)"
+else
+  T_PASS=$((T_PASS+1))
 fi
 # The third reader of the dispatch record is a close-path diagnosis, and it is
 # one field wide if nobody holds it: work-item-close.md's halt gloss explains a

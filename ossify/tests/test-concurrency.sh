@@ -74,10 +74,12 @@ t_assert_eq "4" "$m2" "unknown-mint-spec mutate aborts rc 4"
 if ls "$S".tmp.* >/dev/null 2>&1; then T_FAIL=$((T_FAIL+1)); echo "FAIL: temp orphan after unknown-mint-spec mutate"; else T_PASS=$((T_PASS+1)); fi
 
 # ---------------------------------------------------------------------------
-# M3 (#528, #529): the never-strand guards run INSIDE the lock, and a guard that
-# cannot answer fails CLOSED. The guards are handed to oss_state_mutate as its
-# `$5` argument - the slot the 1.11.1 review built for the registries' duplicate
-# rail - so these rows exercise that same mechanism through the work-item verbs.
+# M3 (#528, #529): the never-strand rail runs INSIDE the lock, and a guard that
+# cannot answer fails CLOSED. The guard is handed to oss_state_mutate as its `$5`
+# argument - the slot the 1.11.1 review built for the registries' duplicate rail -
+# so these rows exercise that same mechanism through the work-item verbs. The
+# 1.12.0 narrowing leaves two of them guarded (status, exec) and one not (spine
+# status, whose guard rode #563); the third row below is the control for that.
 # ---------------------------------------------------------------------------
 REL3="$(oss_entity_add_release "$S" "guard fixture" "for M3")"
 SP3="$(oss_entity_add_spine "$S" "$REL3" "guard spine" flesh canonical)"
@@ -96,9 +98,14 @@ t_capture oss_entity_set_work_item_status "$S" "$WI3" abandoned
 t_assert_rc 3 "(a) with the lock held, the abandonment answers rc 3, not the guard's rc 7"
 t_capture oss_entity_set_work_item_exec "$S" "$WI3" "work/$WI3" "$TMP/.worktree/$WI3" "abc123"
 t_assert_rc 3 "(a) ...and the dispatch guard does too"
+# The spine verb keeps its pre-lock resolver and no longer carries a guard at all,
+# so rc 3 here is the LOCK, not a rail: the same call answers 0 the moment it is
+# released (asserted below) - which is what "the spine rail was dropped" means.
 t_capture oss_entity_set_spine_status "$S" "$SP3" abandoned
-t_assert_rc 3 "(a) ...and the spine-level guard"
+t_assert_rc 3 "(a) ...and the retirement, which no longer carries a guard, still takes the lock"
 rmdir "$S.lock"
+t_capture oss_entity_set_spine_status "$S" "$SP3" abandoned
+t_assert_rc 0 "(a) ...and lands at rc 0 once released - no spine rail remains (#563)"
 
 # (b) A GUARD REFUSAL UNDER REAL STRICT MODE leaves the lock, the temp file and
 # the journal exactly as they were. By the time a guard runs, the body has
