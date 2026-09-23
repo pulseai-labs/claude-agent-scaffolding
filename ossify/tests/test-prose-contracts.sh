@@ -350,6 +350,47 @@ for _lit in 'work_item_status' 'spine_add' 'round-orchestration.md' 'decompositi
     T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's abandoned arm does not name '$_lit'"
   fi
 done
+# (c) THE ARM MAY NOT ASSUME THE ITEM HAS NO DISPATCH ANY MORE (P1-B, the operator's
+# ruling of 2026-09-23; round-3 finding at work-item-close.md:43). The arm used to
+# assert "it has no worktree by construction" and "nothing should be reconstructed
+# for it" - impossible for the state the narrowing ships, because an `abandoned`
+# item that records a dispatch field is exactly what the dropped mirror arm used to
+# prevent and doctor's §5 exists to report. It is this file's D row (never executed
+# by the suite), so this is its only hold, and the checks pull in opposite
+# directions ON PURPOSE: the recorded fields must be READ and NAMED, and the
+# impossibility must be GONE. Either one alone is satisfiable by a mutation.
+#
+# Both positive checks are scoped to the DRIFT BRANCH's own message line, not to
+# the whole block: an unscoped `grep -Fq 'work_item_status $wi planned'` is
+# satisfied by the CLEAN branch's identical route further down, so deleting the
+# route from the branch that needs it would stay green - the substring-satisfied-
+# by-another-line trap this file has now been bitten by twice (the -A 8 window in
+# §5, and the field list whose explanation carried the field name).
+_drift="$(grep -F 'records a dispatch field' "$_F" || true)"
+_case="$(grep -A 1 'is abandoned AND records a dispatch field' "$_F" || true)"
+_rec_read="$(grep -F 'select(.id==' "$_F" | grep -F 'base_sha' || true)"
+if [ -n "$_case" ] && case "$_case" in *'work_item_status $wi planned'*) true;; *) false;; esac; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's drift branch does not name the record repair (work_item_status \$wi planned) in its OWN message - the operator is left with a halt and no route for the one pair that needs it"
+fi
+# The fields must be READ, not just mentioned: the arm's state read is the line that
+# selects the item and names the three fields. The read and the message are two
+# different lines in the block, so each half is checked where it actually lives.
+_read_ok=1
+for _f3 in '.branch' '.worktree_path' '.base_sha'; do
+  case "$_rec_read" in *"$_f3"*) ;; *) _read_ok=0;; esac
+done
+if [ "$_read_ok" = 1 ] && case "$_drift" in *'drift'*) true;; *) false;; esac; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's abandoned arm does not read all three dispatch fields and name the drift pair they form - it still tells the operator to skip an item the record says was dispatched"
+fi
+if grep -Fq 'by construction' "$_F"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md §1's abandoned arm re-asserts 'by construction' - an abandoned item CAN record a dispatch field (the drift pair), so the impossibility claim is exactly the trap this row exists to catch"
+else
+  T_PASS=$((T_PASS+1))
+fi
 
 # (b) the withdrawal arm's demo-ledger remedy must WORK (#531 site 3 / F15). The
 # sentence shipped in 1.11.0 said a demo line the withdrawn item alone was going

@@ -509,13 +509,15 @@ t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDNL" "" "" ""
 t_assert_rc 7 "...and the kept clause still refuses the wipe on that item"
 
 # ---------------------------------------------------------------------------
-# (8) THE MALFORMED-FIELD ARM FAILS CLOSED (operator's ruling, item 3; round-2
-# #16). `_OSS_DISPATCHED_JQ` reads each field with `//`, and jq's `//` takes the
-# right side for a JSON `false` - so an item whose record held `"branch": false`
-# read as UNDISPATCHED, and the rail journaled the stranded pair it exists to
-# prevent. A guard that cannot answer now answers rc 4, on BOTH paths, and both are
-# exercised through bin/oss: the abandonment (where the fail-open stranded the
-# item) and the one kept exec clause (which cannot tell whether the write is a wipe).
+# (8) THE MALFORMED-FIELD ARM FAILS CLOSED, AND ITS REMEDY IS NOW A ROUTE THAT
+# RUNS (P1-A, the operator's ruling of 2026-09-23). `_OSS_DISPATCHED_JQ` reads each
+# field with `//`, and jq's `//` takes the right side for a JSON `false` - so an
+# item whose record held `"branch": false` read as UNDISPATCHED, and the rail
+# journaled the stranded pair it exists to prevent (round-2 #16). A guard that
+# cannot answer answers rc 4 on BOTH paths, through bin/oss - and the route it
+# names has to be one this state can actually walk, which is what the first half of
+# this section measures: on a record with NOTHING well-formed, the wipe the message
+# prescribes is accepted, and the withdrawal it chains to then succeeds.
 # ---------------------------------------------------------------------------
 WIDBAD="r0.s1.w98"
 oss_state_mutate "$S" add_work_item \
@@ -524,22 +526,68 @@ oss_state_mutate "$S" add_work_item \
 t_assert_eq "false" "$(oss_state_read "$S" ".work_items[] | select(.id==\"$WIDBAD\") | .branch")" \
   "setup: an item records \"branch\": false (the raw-op write this release tolerates)"
 N_BAD="$(oss_state_read "$S" '.mutations | length')"
+N_BAD_EXEC="$(oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_exec")] | length')"
 t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_status "$WIDBAD" abandoned
 t_assert_rc 4 "a malformed dispatch field makes the abandonment fail CLOSED at rc 4"
 t_assert_contains "$T_OUT" "not a string" "...saying the guard could not answer, not reading it as undispatched"
-t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDBAD" "" "" ""
-t_assert_rc 4 "...and the kept exec clause fails closed on the same record"
 t_capture oss_state_read "$S" '.mutations | length'
-t_assert_eq "$N_BAD" "$T_OUT" "...and neither attempt journaled anything"
-# CONTROLS, both directions on the same state: the guard DOES answer when it can
-# (a well-formed dispatch is rc 7, not 4), and the repair it names stays reachable -
-# a full re-dispatch replaces all three fields, so failing closed here cannot lock
-# the item out of repair.
-t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDBAD" "work/repair" "/tmp/wt-repair" "sha-repair"
-t_assert_rc 0 "a full re-dispatch on the malformed item is accepted (the repair is not locked out)"
-t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WIDBAD\") | [(.branch|tostring), (.base_sha|tostring)] | join(\",\")"
-t_assert_eq "work/repair,sha-repair" "$T_OUT" "...and it replaced the malformed field"
+t_assert_eq "$N_BAD" "$T_OUT" "...and journaling nothing"
+# THE ROUTE THE MESSAGE NAMES, both halves, on the record the message was printed
+# for. Before P1-A the first half was refused (rc 4 on this record, rc 7 once any
+# field survived) and the second half therefore never ran: the remedy named a
+# repair that makes the item MORE dispatched, and a planned never-dispatched item
+# could not be withdrawn at all.
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDBAD" "" "" ""
+t_assert_rc 0 "the wipe the remedy names is ACCEPTED on a record with nothing well-formed"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WIDBAD\") | [(.branch|tostring), (.worktree_path|tostring), (.base_sha|tostring)] | join(\"|\")"
+t_assert_eq "||" "$T_OUT" "...and it clears the malformed field (the item now reads undispatched)"
 t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_status "$WIDBAD" abandoned
+t_assert_rc 0 "...and the withdrawal the remedy chains to then RUNS"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WIDBAD\") | .status"
+t_assert_eq "abandoned" "$T_OUT" "...leaving the item withdrawn, not stranded"
+t_capture oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_exec")] | length'
+t_assert_eq "$((N_BAD_EXEC + 1))" "$T_OUT" "...with exactly the one exec mutation the repair writes"
+# ADJACENT CONTROL (i): the MIXED record keeps the wipe REFUSED - one well-formed
+# field survives the malformed one, so erasing the record would still hide a real
+# dispatch. Its repair is the full re-dispatch, which the message names instead.
+WIDMIX="r0.s1.w97"
+oss_state_mutate "$S" add_work_item \
+  "$(jq -n --arg s r0.s1 --arg t "mixed dispatch record" --arg r canonical --arg ts "$(_oss_now)" \
+    '{spine:$s,title:$t,target_repo:$r,status:"planned",created_at:$ts,id:"r0.s1.w97",branch:"work/mix",worktree_path:false}')" >/dev/null
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_status "$WIDMIX" abandoned
+t_assert_rc 4 "the MIXED record fails the withdrawal closed too"
+t_assert_contains "$T_OUT" "full re-dispatch" "...naming the repair that works for a record with a surviving field"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDMIX" "" "" ""
+t_assert_rc 7 "...and its wipe is REFUSED, unlike the record with nothing well-formed"
+t_assert_contains "$T_OUT" "would erase the record" "...naming the surviving dispatch as the reason"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WIDMIX\") | [(.branch|tostring), (.worktree_path|tostring)] | join(\"|\")"
+t_assert_eq "work/mix|false" "$T_OUT" "...leaving the mixed record exactly as it was"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDMIX" "work/y" "/tmp/wty" "shaY"
+t_assert_rc 0 "...and the full re-dispatch the message named replaces all three"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WIDMIX\") | [(.branch|tostring), (.worktree_path|tostring), (.base_sha|tostring)] | join(\"|\")"
+t_assert_eq "work/y|/tmp/wty|shaY" "$T_OUT" "...repairing the malformed field on the way"
+# ADJACENT CONTROL (ii): a GENUINE well-formed record still refuses the wipe, so
+# the acceptance above is the `bad`-and-nothing-else class and not a general
+# loosening of the clause.
+WIDGEN="$(oss_entity_add_work_item "$S" r0.s1 "genuine record control")"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDGEN" "work/gen" "/tmp/wtgen" "shaGen"
+t_assert_rc 0 "setup: a well-formed dispatch lands"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDGEN" "" "" ""
+t_assert_rc 7 "a well-formed recorded item still refuses the wipe"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WIDGEN\") | .branch"
+t_assert_eq "work/gen" "$T_OUT" "...leaving its dispatch intact"
+# The repair path is still a repair, and the item still reads dispatched after it:
+# a full re-dispatch on a malformed record is accepted, and the withdrawal is then
+# refused on the dispatch it recorded (rc 7, not 4) - the guard answers when it can.
+WIDBAD2="r0.s1.w95"
+oss_state_mutate "$S" add_work_item \
+  "$(jq -n --arg s r0.s1 --arg t "malformed, repaired by a re-dispatch" --arg r canonical --arg ts "$(_oss_now)" \
+    '{spine:$s,title:$t,target_repo:$r,status:"planned",created_at:$ts,id:"r0.s1.w95",worktree_path:false}')" >/dev/null
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WIDBAD2" "work/repair" "/tmp/wt-repair" "sha-repair"
+t_assert_rc 0 "a full re-dispatch on a malformed record is accepted (the other repair)"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WIDBAD2\") | [(.branch|tostring), (.worktree_path|tostring), (.base_sha|tostring)] | join(\",\")"
+t_assert_eq "work/repair,/tmp/wt-repair,sha-repair" "$T_OUT" "...and it replaced the malformed field"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_status "$WIDBAD2" abandoned
 t_assert_rc 7 "...and the same call now answers rc 7 (dispatched), not 4 - it answers when it can"
 
 # The smoke row carries its own item: its subject is the exec PAYLOAD and the record

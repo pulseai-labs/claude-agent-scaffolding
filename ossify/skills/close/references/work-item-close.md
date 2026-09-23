@@ -26,7 +26,12 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 wi="<work-item id>"
 st="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .status")"
 if [ "$st" = "abandoned" ]; then
-  echo "close: $wi is abandoned - it was minted and withdrawn BEFORE any dispatch, so it has no worktree by construction and nothing to close. This is NOT the skipped-work_item_exec case below, and nothing should be reconstructed for it: spine close skips an abandoned item, and the withdrawal's own two obligations live in DIFFERENT owners: the demo-ledger amendment it owes is plan-spine/references/decomposition.md §1, and the repo armed for its spine - restore its checkout, or record it as parked - is spine-close.md §3, which this standalone route never reaches. To reverse the withdrawal: \"$oss_bin\" work_item_status $wi planned - but if this item's spine is ALREADY closed, that alone is not the recovery: un-withdrawing leaves a planned item inside a closed spine, and release close's tag selector takes any non-abandoned item whose spine is closed, so a later release close would tag a repo whose work was never dispatched or landed. Reopening the spine does NOT re-enable it: work-item/references/round-orchestration.md §2 halts on an existing spine branch, which close leaves behind in every hosting repo (issue #133 is the open reconciliation). Carry the work into a NEW spine instead - \"$oss_bin\" spine_add <release> <name> <class> <target-repo>, then \"$oss_bin\" work_item_add it there (plan-spine/references/decomposition.md §1's whole-spine arm) - halt"
+  rec="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | [.branch, .worktree_path, .base_sha] | map(select(. != null) | tostring) | join(\", \")")"
+  if [ -n "$rec" ]; then
+    echo "close: $wi is abandoned AND records a dispatch field ($rec) - that pair is the drift doctor's §5 bullet reports, not a clean withdrawal, and it is NOT the skipped-work_item_exec case below: the worktree the record names may hold real work, so nothing here may skip the item as 'nothing to close'. The withdrawal is the half that is wrong, so repair the RECORD and let the work land: \"$oss_bin\" work_item_status $wi planned, then resume the round the record describes (work-item/references/round-orchestration.md §2/§3) so it lands or reports its own halt - and where it cannot run, carry the work into a NEW spine: \"$oss_bin\" spine_add <release> <name> <class> <target-repo>, then \"$oss_bin\" work_item_add it there (plan-spine/references/decomposition.md §1's whole-spine arm) - halt"
+    exit 1
+  fi
+  echo "close: $wi is abandoned and records no dispatch field at all, which is what 'withdrawn before any dispatch' means in state - there is nothing to close. This is NOT the skipped-work_item_exec case below, and nothing should be reconstructed for it: spine close skips an abandoned item, and the withdrawal's own two obligations live in DIFFERENT owners: the demo-ledger amendment it owes is plan-spine/references/decomposition.md §1, and the repo armed for its spine - restore its checkout, or record it as parked - is spine-close.md §3, which this standalone route never reaches. To reverse the withdrawal: \"$oss_bin\" work_item_status $wi planned - but if this item's spine is ALREADY closed, that alone is not the recovery: un-withdrawing leaves a planned item inside a closed spine, and release close's tag selector takes any non-abandoned item whose spine is closed, so a later release close would tag a repo whose work was never dispatched or landed. Reopening the spine does NOT re-enable it: work-item/references/round-orchestration.md §2 halts on an existing spine branch, which close leaves behind in every hosting repo (issue #133 is the open reconciliation). Carry the work into a NEW spine instead - \"$oss_bin\" spine_add <release> <name> <class> <target-repo>, then \"$oss_bin\" work_item_add it there (plan-spine/references/decomposition.md §1's whole-spine arm) - halt"
   exit 1
 fi
 wt="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .worktree_path")"
@@ -47,10 +52,18 @@ halt, not something to reconstruct: `"$oss_bin" worktree_resolve <target_repo> <
 will happily echo a conventional path whether or not it is the one this item was
 built in. **The block tests one other cause first**: an item withdrawn before any
 dispatch is `abandoned`, and *that* is why it has no worktree — it was never
-dispatched, so there is nothing to reconstruct and nothing to close. The two
-cases want opposite actions (one is a broken lane, the other is a plan that
-deliberately dropped the item), which is why the status is read before the
-diagnosis rather than after it.
+dispatched, so there is nothing to reconstruct and nothing to close. That is
+three cases, not two: **an `abandoned` item that still records a dispatch field** —
+`branch`, `worktree_path` or `base_sha` — was dispatched and *then* withdrawn (the
+pair `references/state-inspection.md` §5 reports as drift, and the state a
+pre-1.12 journal can hold), so its worktree may be real work that no close path
+skips for it: the block reads those fields and names them, sends the operator to
+repair the record and resume the round, and keeps the new-spine route for where
+the round cannot run. An `abandoned` item with **no** recorded field is the plan
+that deliberately dropped the item — the case this layer must not reconstruct.
+The three want different actions (a broken lane, a dropped item, a dispatch that
+has to land), which is why the record is read before the diagnosis rather than
+after it.
 
 ### Route A — in the round flow
 

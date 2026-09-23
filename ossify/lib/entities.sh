@@ -111,7 +111,20 @@ _oss_entity_guard_wi_status() { # $1=state-file $2=payload about to be minted
   d="${ans%% *}"; cls="${ans#* }"
   case "$cls" in
     *bad*)
-      echo "oss: work item '$wi' records a dispatch field (branch, worktree_path or base_sha) that is not a string, so this guard cannot tell whether the item was dispatched - and a malformed field must not read as undispatched (jq's // takes the right side for a JSON false). Repair the field before withdrawing the item" >&2
+      # The route out must be one that WORKS for this record class (P1-A, operator
+      # ruling of 2026-09-23): the repair named here is the one the exec guard
+      # accepts, and for a record with nothing well-formed that is the wipe -
+      # which clears the malformed field and leaves an item that reads
+      # undispatched, so the withdrawal below then runs. A mixed record keeps the
+      # genuine dispatch that survives the malformed field, so its repair is the
+      # full re-dispatch, and the withdrawal is still refused afterwards - which is
+      # the one thing this message may not promise away.
+      case "$cls" in
+        *set*)
+          echo "oss: work item '$wi' records a dispatch field (branch, worktree_path or base_sha) that is not a string, and at least one well-formed field as well, so this guard cannot tell whether the item was dispatched - and a malformed field must not read as undispatched (jq's // takes the right side for a JSON false). Repair the record with a full re-dispatch, which replaces all three: \"oss work_item_exec $wi <branch> <worktree_path> <base_sha>\" (work-item/references/round-orchestration.md §3); the withdrawal is then refused on the dispatch that survives" >&2 ;;
+        *)
+          echo "oss: work item '$wi' records a dispatch field (branch, worktree_path or base_sha) that is not a string, so this guard cannot tell whether the item was dispatched - and a malformed field must not read as undispatched (jq's // takes the right side for a JSON false). Nothing well-formed is recorded, so the repair is to clear the record and then withdraw: \"oss work_item_exec $wi \"\" \"\" \"\"\" (a wipe is accepted on a record with no well-formed dispatch field to lose), then \"oss work_item_status $wi abandoned\"" >&2 ;;
+      esac
       return 4 ;;
   esac
   if [ "$d" = "true" ]; then
@@ -160,7 +173,11 @@ _oss_entity_guard_wi_status() { # $1=state-file $2=payload about to be minted
 # never a silent "no dispatch" (#562 round 2; a JSON false reads as empty under
 # jq's `//`). A payload that DOES record a dispatch is let through before the
 # record is even classified - replacing a malformed field is the repair, so
-# failing closed on the record must not also lock the repair out.
+# failing closed on the record must not also lock the repair out. On the RECORD
+# side the malformed arm no longer refuses on its own: whether this write is a
+# wipe is decided by whether a well-formed dispatch survives it (P1-A), so a
+# record with a malformed field and no well-formed one accepts the same write the
+# abandonment guard's rc-4 message prescribes.
 _oss_entity_guard_wi_exec() { # $1=state-file $2=payload about to be minted
   local sf="$1" wi pcls rcls
   wi="$(printf '%s' "$2" | jq -r '.work_item // ""')" || return 4
@@ -175,12 +192,21 @@ _oss_entity_guard_wi_exec() { # $1=state-file $2=payload about to be minted
   esac
   rcls="$(jq -r --arg w "$wi" "([.work_items[] | select(.id == \$w)] | first // {}) | ${_OSS_DISPATCH_CLS_JQ}" "$sf" 2>/dev/null)" || {
     echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
+  # THE WIPE REFUSAL FIRES ON A GENUINE RECORD AND NOWHERE ELSE (P1-A, operator
+  # ruling of 2026-09-23). A `set` field - a non-empty string - is a real recorded
+  # dispatch and erasing it is the strand. A record whose fields are all absent,
+  # empty or `bad` holds nothing worth protecting, and there this identical write
+  # IS the repair: it clears a malformed field, the item then reads undispatched,
+  # and the withdrawal the abandonment guard's rc-4 arm sent the operator here for
+  # succeeds. Refusing it was a dead-end - the arm refused the wipe (rc 4 or rc 7),
+  # named a repair that makes the item MORE dispatched, and so foreclosed the
+  # withdrawal on a `planned` item that had never been dispatched at all.
+  #
+  # The mixed record keeps the refusal: `bad` + `set` means a genuine dispatch
+  # survives the malformed field, so erasing the record would still hide it.
   case "$rcls" in
-    *bad*)
-      echo "oss: work item '$wi' records a dispatch field (branch, worktree_path or base_sha) that is not a string, so this guard cannot tell whether the write below would erase a recorded dispatch. Repair the field first - a full re-dispatch replaces all three" >&2
-      return 4 ;;
     *set*)
-      echo "oss: work_item_exec for '$wi' records no dispatch at all - all three fields are empty, so this is not a dispatch, and the item already records one: this write would erase the record of it. A dispatch names the round's branch, worktree_path and base_sha (work-item/references/round-orchestration.md §3)" >&2
+      echo "oss: work_item_exec for '$wi' records no dispatch at all - all three fields are empty, so this is not a dispatch, and the item already records one: this write would erase the record of it. A dispatch names the round's branch, worktree_path and base_sha (work-item/references/round-orchestration.md §3), and replacing a record rather than erasing it means giving all three" >&2
       return 7 ;;
   esac
 }
