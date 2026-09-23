@@ -40,12 +40,13 @@ The handoff is the contract. Read it end to end before anything else.
 PLACEMENT: work only inside <worktree_path>, on branch <branch>, base <base_sha>. Use the
 bash tool's workdir field or git -C for every command; cd does not persist.
 
-DONE: stage everything, write report.md beside the spec, and return exactly ONE JSON
-object as your final message and nothing after it — the complete shape or the
-gaps-surfaced shape from the work-item skill's returns contract, unextended:
-{"mode": "complete", "report_path": "<abs>/report.md", "summary": "<one line>", "stage_status": "all_staged"}
+DONE: write report.md beside the spec, stage as the work-item skill's §8 says, and return
+exactly ONE JSON object as your final message and nothing after it — one of the two
+shapes from the work-item skill's returns contract (references/returns.md §1), verbatim,
+unextended:
+{"mode": "complete", "report_path": "<abs path to report.md>", "summary": "<one-line>", "stage_status": "all_staged | partial | none"}
 or
-{"mode": "gaps-surfaced", "gaps": [{"section": "<where>", "question": "<concrete>", "severity": "blocking"}]}
+{"mode": "gaps-surfaced", "gaps": [{"section": "<ref>", "question": "<concrete question>", "severity": "blocking | nice-to-have"}, ...]}
 
 NEVER: commit, push, edit a file outside <worktree_path> other than report.md, write
 ossify state, or start a subagent. If a tool refuses you, report it verbatim in summary
@@ -71,8 +72,9 @@ CLAIMS:
   N-1. The staged diff matches the requirement: read the requirement, then
        `git -C <worktree_path> diff --cached`.
   N. When the item adds or changes a test: that test fails when the item's implementation
-     edits, not the test, are reverted in a disposable copy; when no test is added or
-     changed, delete this claim (never `cannot determine`).
+     edits, not the test, are reverted in a disposable copy that carries the staged
+     change (see NEVER); when no test is added or changed, delete this claim (never
+     `cannot determine`).
 
 DONE: return, as your final message and nothing after it:
   one line per claim — `<n>. <claim>: pass | fail | cannot determine — <evidence, commands
@@ -82,10 +84,15 @@ DONE: return, as your final message and nothing after it:
   `- <AC id or claim>: <what was observed>`.
 `cannot determine` counts as fail.
 
-NEVER: commit, push, stage, or edit a tracked file. The mutation check in claim N works
-on a copy: `git -C <worktree_path> worktree add /tmp/verify-<work_item_id> --detach`,
-revert there, run there, then `git -C <worktree_path> worktree remove --force
-/tmp/verify-<work_item_id>`. Any other write: stop and say so.
+NEVER: commit, push, stage, or edit a tracked file in <worktree_path>. The mutation
+check in claim N works on a copy and never touches <worktree_path>. The change is staged,
+not committed, so a copy cut at HEAD must be given it: remove a stale copy, if any, from an
+earlier run (`git -C <worktree_path> worktree remove --force /tmp/verify-<work_item_id>`,
+then `worktree prune`), `worktree add /tmp/verify-<work_item_id> --detach`, write the
+staged diff with `git -C <worktree_path> diff --cached --binary >
+/tmp/verify-<work_item_id>.patch` and `git -C /tmp/verify-<work_item_id> apply --index`
+it there. Then revert the implementation edits in the copy, keep the test, run it, and
+remove the copy. Any other write: stop and say so.
 ```
 
 ## 4. Correction prompt
