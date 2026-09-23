@@ -40,8 +40,13 @@ as the one JSON object it must be:
 - `mode: complete` → go to §4 for this item.
 - `mode: gaps-surfaced` → go to §6 for this item.
 - anything else, or a stop reason other than completed (error, refusal, max-tokens,
-  killed) → this item failed. Write no record for it: stop the round here and report the
-  item, its job id, the stop reason and the last output to the operator. Nothing is retried in v0.
+  killed) → the stop rule, below. Nothing is retried in v0.
+
+**The stop rule.** Every child return that is not a usable result ends the same way: write
+no record for that item; let the round's other jobs settle and take them through §4–§5, so
+no child is left running; then stop before §7 and report to the operator the item, its job
+id, the stop reason and the last output. The round is not handed back; the operator owns
+recovery. `job_kill` only on the operator's word.
 
 ## 4. Verify a complete return
 
@@ -60,13 +65,16 @@ Foreground, one item at a time, in declared order:
    `work_item_id`, `expected_branch` = the request's `branch`, `expected_head_sha`,
    `expected_tree_oid`, `failures` = the verifier's FAILURES lines.
 3. Call `subagent_implementer` with `description: "correct <work_item_id>"`, foreground.
-4. On its complete return, verify again (§4, once). PASS → §5. A second FAIL stops this
-   item: report both verifier outputs to the operator, settle the round's other items,
-   then stop before §7. The round is not handed back; the operator owns recovery.
+4. On a `complete` return, verify again (§4, once); PASS → §5. A second FAIL (report both
+   verifier outputs), a refusal (`correction-continuation.md` §3 step 2) or any other
+   return → the stop rule (§3).
    Never a third attempt.
 
 A corrected item's result record is computed afresh in §5 and must pass the whole identity
 table again (`external-executor.md` §7); the continuation's own return is never carried over.
+A correction packet ossify's close sends back after rejecting an item (`external-executor.md`
+§7, "to the same executor") takes this same path: `dsh-brief` §4 with that packet, then §4
+verify, then §5 afresh.
 
 ## 5. Compute the result record
 
@@ -84,8 +92,8 @@ git hash-object "$SPEC"                       # spec_oid
 
 Also check `REPORT` is `report.md` in the same directory as `spec_path` and
 `handoff_path`. If the branch, `HEAD` or the status check disagree with the request, do not
-build a record: stop, name the row that disagreed, and report to the operator — ossify's
-§5a would halt on it anyway, and a record that hides it is worse than none.
+build a record: name the row that disagreed and apply the stop rule (§3) — ossify's §5a
+would halt on it anyway, and a record that hides it is worse than none.
 
 Write the record in ossify's shape (`references/records.md`, "The result record"):
 `coordinator_verdict: accepted`, `implementer_return` copied unextended from the return,
@@ -97,11 +105,12 @@ it.
 Before anything else, check the worktree is untouched: `git -C <worktree_path> status
 --porcelain` is empty, `rev-parse HEAD` equals the request's `base_sha`, `rev-parse
 --abbrev-ref HEAD` equals the request's `branch`. Anything else means something else ran:
-stop and report. Then write the gaps record (`references/records.md`, "The gaps record")
-with the child's `gaps` copied unextended. It routes; it never reaches close. ossify's lane
-surfaces the gaps, appends clarifications to the handoff, and hands you one new
-single-item request (same `branch` and `worktree_path`, read off the original request);
-run it through §2–§5 as a round of one.
+the stop rule (§3). Otherwise write the gaps record (`references/records.md`, "The gaps
+record") with the child's `gaps` copied unextended; it goes back through §7 with the
+round's other records. It routes; it never reaches close. After §7, ossify's lane surfaces
+the gaps, appends clarifications to the handoff, and invokes this procedure again with one
+new single-item request (same `branch` and `worktree_path`, read off the original
+request); run that through §2–§7 as a round of one.
 
 ## 7. Hand the round back
 
@@ -111,6 +120,10 @@ Write every record — results and gaps, one per request, no missing, extra or d
 `external-executor.md` §5a with that file as the caller's return. Records are fed to close
 in declared decomposition order, never arrival order; closes and merges stay serial; the
 round barrier is untouched.
+
+A follow-up invocation (a gaps replacement, §6) never overwrites an earlier records file:
+it writes `<spine spec dir>/round-<n>-<work_item_id>-gaps-<k>-external-records.yaml`,
+where `k` is that item's gap iteration.
 
 ## 8. What you never do
 
