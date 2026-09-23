@@ -1,6 +1,6 @@
 ---
 name: initializing-dual-repo-workspace
-description: Bootstrap a fresh dual-repo workspace — creates a new AI workspace repo (memory bank, specs, agent scaffolding) and a clean canonical repo (production code, zero AI traces) with a pairing manifest. Use when the user wants to start a new project with the dual-repo topology, mentions "create workspace", "bootstrap project", "new AI workspace", "set up dual repo", "init project workspace".
+description: Bootstrap a fresh dual-repo workspace — creates a new AI workspace and clean canonical repository, declares their topology in a pairing manifest, writes temporary agent stubs, and installs AI-trace commit-message filters. Use when the user wants to start a new project with the dual-repo topology, mentions "create workspace", "bootstrap project", "new AI workspace", "set up dual repo", "init project workspace".
 ---
 
 # Skill — initializing-dual-repo-workspace
@@ -129,7 +129,7 @@ valid: only those two inner targets are collision-sensitive. If any check fails,
 cleanly — no rollback needed because nothing has been created. Print the
 preflight error to stderr and exit non-zero.
 
-## 5. The 8 pre-onboard tasks
+## 5. The 8 bootstrap tasks
 
 Execute the tasks in the order below. After each task, append an entry to
 `<ai-workspace>/.workspace/init-log` via `"$wi_bin" log_op …` so rollback can undo
@@ -194,8 +194,8 @@ Expected init-log entry: `file <ai_root>/.workspace/pairing.json`.
 
 ### 5.5 — Task 8.5: Write CLAUDE.md stub
 
-Renders the CLAUDE.md router stub. scaffold-onboard's `/scaffold-project`
-will overwrite this later.
+Renders the topology-only CLAUDE.md stub. Ossify onboarding owns the
+project-specific router that follows.
 
 ```
 "$wi_bin" stub_claude_md "$ai_root" "$name"
@@ -258,9 +258,12 @@ AI workspace has skeleton + manifest + stubs staged (not yet committed — revie
 
 Next steps:
   1. cd /abs/path/{name}-ai && git status
-  2. git commit -m "workspace-init: initial bootstrap (workspace-init v0.1.0)"
+  2. git commit -m "workspace-init: initial bootstrap"
   3. cd /abs/path/{name}-ai && claude
-  4. /onboard                              # begin scaffold-onboard's 10-phase conversation
+  4. /ossify:start                         # bare canonical; routes to /ossify:adopt if source or history is present
+                                           # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
+                                           # on Devin, invoke the ossify skill `start`; the adopt paths are not published on that surface, so reopen the checkout in Claude Code or Codex
+                                           # a recorded tooling repo that already carries history refuses it too, with no supported ossify continuation yet
 
 Manifest at: /abs/path/{name}-ai/.workspace/pairing.json
 Init log at: /abs/path/{name}-ai/.workspace/init-log (rollback record)
@@ -277,7 +280,7 @@ These are non-negotiable invariants for this skill:
   `[[feedback_strict_honor_no_unsolicited_commits]]` and the Wabash
   strict-honor convention.
 - **DO stage-only** in the AI workspace (canonical stays empty in fresh mode).
-- **DO NOT push.** workspace-init never pushes; remote setup is v0.2 work.
+- **DO NOT push.** workspace-init never pushes; remote setup is future work.
 - **DO NOT infer wrapper mode.** It is enabled only by an explicit
   `--wrapper <existing-dir>` argument or an equivalent unambiguous natural-
   language request naming the wrapper.
@@ -286,9 +289,9 @@ These are non-negotiable invariants for this skill:
 - **DO NOT pull or fetch.** Network ops are off (`allow_ai_pull=false`,
   `allow_ai_fetch=false`); this is a fresh project, there's nothing to pull.
 - **DO NOT add a `Co-Authored-By:` trailer or any AI-marker** anywhere —
-  not in commit messages (you're not committing anyway), not in the
-  rendered stubs, not in the manifest's `created_by` field beyond
-  `workspace-init@0.1.0`.
+  not in commit messages (you're not committing anyway), not in rendered
+  guidance. The manifest's `created_by` value is runtime provenance
+  written by `wi_manifest_write`; do not alter it.
 - **DO NOT modify any pre-existing `.git/hooks/`** — fresh mode just
   created the repos, so this isn't a real risk, but stay disciplined: the
   hook install always overwrites only `commit-msg` and only via the

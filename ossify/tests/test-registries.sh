@@ -15,6 +15,152 @@ t_assert_rc 0 "fake added"
 t_capture oss_reg_add_feature "$S" "paper trading loop" "user places a paper trade and sees P&L move" flesh journey-map
 t_assert_rc 0 "feature added"
 
+# --- #305 item 1: the add verbs refuse a ref that already exists -----------
+# The ADR ref (and the gate name) is the key every reader uses - touch_check, the
+# doctor shape gate, the registry doc - and the writer did not enforce it: a
+# second bone_add for ADR-013 minted a second row for one ref (the PulseDB adopt
+# pilot, 2026-08-23), after which bone_set_touch refuses the ref at rc 7 and the
+# operator holds a surface they cannot repair. Nothing detects a duplicate, so the
+# writer is the only place the mint can be refused.
+t_capture oss_reg_add_bone "$S" ADR-0002 "a second row for one ref" "src/other/**" ""
+t_assert_rc 7 "bone_add refuses an ADR ref that already exists"
+t_assert_contains "$T_OUT" "already exists" "...and says the ref is already there"
+t_assert_contains "$T_OUT" "bone_set_touch" "...and names the repair for an existing surface"
+t_assert_contains "$T_OUT" "#305" "...and names the issue"
+t_capture jq '[.bones[] | select(.adr=="ADR-0002")] | length' "$S"
+t_assert_eq "1" "$T_OUT" "...and no second row was minted"
+t_capture oss_reg_add_risk_gate "$S" live-money "src/other/**" "ctl"
+t_assert_rc 7 "risk_gate_add refuses a name that already exists"
+t_assert_contains "$T_OUT" "already exists" "...and says so"
+t_assert_contains "$T_OUT" "risk_gate_set_touch" "...and names the repair"
+t_capture jq '[.risk_gates[] | select(.name=="live-money")] | length' "$S"
+t_assert_eq "1" "$T_OUT" "...and no second gate was minted"
+# ADJACENT CONTROL: a DISTINCT ref is still added, and bone_add still admits an
+# empty surface - the asymmetry with the re-point verbs is deliberate and pinned
+# below (a bone with no surface is legitimate at mint; a re-point to nothing is
+# not a repair).
+t_capture oss_reg_add_bone "$S" ADR-0011 "a different decision" "" ""
+t_assert_rc 0 "a distinct ADR ref is still added, with an empty surface"
+t_capture jq -c '.bones[] | select(.adr=="ADR-0011") | .touch' "$S"
+t_assert_eq '[]' "$T_OUT" "...and its empty surface is recorded as such"
+
+# --- #305 item 1, the atomic half: the rail runs INSIDE the mutation lock ----
+# The refusals above are only half the rail. The count they refuse on was a read
+# in the VERB, before oss_state_mutate acquires its lock - so two ceremonies could
+# both read "no such ref", serialize on the lock, and the second would append a
+# second row for one key: the unrepairable state this rail exists to prevent,
+# entered by two conforming callers. Measured against that version: two concurrent
+# `oss bone_add ADR-Rn` each exited 0 and left two rows for ADR-Rn.
+#
+# A concurrency test would be a TIMING test - green on a lucky schedule, so it
+# cannot pin this. The structural property is what the rail needs and what is
+# decidable: the guard must be unable to answer before the lock is held, so with
+# the lock HELD a duplicate add answers the LOCK (rc 3), never the duplicate
+# (rc 7). A verb-side count answers 7 while the lock is held, which is what makes
+# these rows RED against that spelling.
+mkdir "$S.lock"
+t_capture oss_reg_add_bone "$S" ADR-0002 "a third row for one ref" "src/other/**" ""
+t_assert_rc 3 "a duplicate add while the lock is held answers rc 3, not rc 7 - the rail is inside the lock"
+t_capture oss_reg_add_risk_gate "$S" live-money "src/other/**" "ctl"
+t_assert_rc 3 "...and the gate rail is too"
+# ADJACENT CONTROL, same held lock, a ref that does NOT exist: also rc 3. Without
+# it, a rc 3 arriving for any other reason would read as proof of atomicity.
+t_capture oss_reg_add_bone "$S" ADR-0004 "a fourth decision" "src/other/**" ""
+t_assert_rc 3 "...and an add for a NEW ref answers rc 3 under the same lock"
+rmdir "$S.lock"
+# Released again, and both verdicts are the ones the rows above already pinned:
+# the duplicate still refuses at rc 7, the new ref still mints.
+t_capture oss_reg_add_bone "$S" ADR-0002 "a third row for one ref" "src/other/**" ""
+t_assert_rc 7 "...and once the lock is released the duplicate refuses at rc 7 as before"
+t_capture jq '[.bones[] | select(.adr=="ADR-0002")] | length' "$S"
+t_assert_eq "1" "$T_OUT" "...with still one row for that ref"
+t_capture oss_reg_add_bone "$S" ADR-0004 "a fourth decision" "src/other/**" ""
+t_assert_rc 0 "...and the new ref mints at rc 0"
+
+# --- #530 at the MINT: a contaminated entry is refused before it lands -------
+# The re-point verbs refuse an entry with surrounding whitespace; the two ADD
+# verbs journaled one at rc 0. A bone minted from a CRLF-composed csv declared a
+# surface that touch_check then answered CLEAN on, from mint day, with nothing to
+# review and no refusal to notice. Measured before this rail:
+# `bone_add ADR-C "t" "$(printf 'src/c/**\r')"` -> rc 0, and touch_check on
+# src/c/load.py -> rc 1 (clean) - the #530 harm, at the boundary that creates the
+# registry rather than the one that repairs it.
+for csv in "$(printf 'src/c/**\r')" "$(printf '\tsrc/c/**')" "$(printf 'src/c/**\xc2\xa0')"; do
+  _hex="$(printf '%s' "$csv" | od -An -tx1 | tr -d ' ')"
+  t_capture oss_reg_add_bone "$S" ADR-C "contaminated mint" "$csv" ""
+  t_assert_rc 2 "bone_add refuses an entry with surrounding whitespace ($_hex)"
+  t_assert_contains "$T_OUT" "leading or trailing whitespace" "...and diagnoses the entry ($_hex)"
+done
+t_capture jq '[.bones[] | select(.adr=="ADR-C")] | length' "$S"
+t_assert_eq "0" "$T_OUT" "...and no bone was minted by any refused call"
+t_capture oss_reg_add_risk_gate "$S" ctrl-gate "$(printf 'src/c/**\r')" "ctl-one"
+t_assert_rc 2 "risk_gate_add refuses a contaminated touch glob"
+t_capture oss_reg_add_risk_gate "$S" ctrl-gate "src/c/**" "$(printf 'ctl-one\r')"
+t_assert_rc 2 "...and a contaminated control phrase"
+t_capture jq '[.risk_gates[] | select(.name=="ctrl-gate")] | length' "$S"
+t_assert_eq "0" "$T_OUT" "...and no gate was minted either"
+# ADJACENT CONTROLS. The mint keeps every tolerance it had: an interior space and
+# an escaped comma still pass, and an EMPTY surface is still admitted - the
+# registry declares a surface at spec time, before the code exists, and the
+# refusal belongs to the corrective append, which REPLACES a surface. Without
+# these rows the rails above could be over-refusing and nothing would say so.
+t_capture oss_reg_add_bone "$S" ADR-C2 "interior space" "src/my file.py,src/ok/**" ""
+t_assert_rc 0 "an entry with an interior space is still minted"
+t_capture jq -c '.bones[] | select(.adr=="ADR-C2") | .touch' "$S"
+t_assert_eq '["src/my file.py","src/ok/**"]' "$T_OUT" "...with the interior space intact"
+t_capture oss_reg_add_risk_gate "$S" ctrl-gate "src/c/**" ""
+t_assert_rc 0 "an empty controls list is still admitted at mint"
+t_capture jq -c '.risk_gates[] | select(.name=="ctrl-gate") | .controls' "$S"
+t_assert_eq '[]' "$T_OUT" "...and recorded as empty, not refused"
+
+# --- the edge class is `[\s\p{Cf}]`, not `\s` alone (round 2) ----------------
+# `\s` is Unicode White_Space, which covers the CR/tab/VT/NBSP/U+3000 rows above
+# - but NOT the format characters, and a UTF-8 BOM (U+FEFF) or a zero-width space
+# (U+200B) sits on line 1 of exactly the composed-from-a-Windows-file input this
+# rail exists for. Measured before the extension: a BOM-prefixed and a
+# ZWSP-suffixed glob were journaled at rc 0 at the MINT and on the re-point
+# alike, and touch_check answered CLEAN on the covered path - the #530 harm one
+# invisible character wide of the guard.
+for csv in "$(printf '\xef\xbb\xbfsrc/bom/**')" "$(printf 'src/zwsp/**\xe2\x80\x8b')" \
+           "$(printf 'src/zwnj/**\xe2\x80\x8c')" "$(printf 'src/softhyphen/**\xc2\xad')"; do
+  _hex="$(printf '%s' "$csv" | od -An -tx1 | tr -d ' ')"
+  t_capture oss_reg_add_bone "$S" ADR-F "format char" "$csv" ""
+  t_assert_rc 2 "bone_add refuses an invisible format character at the edge ($_hex)"
+  t_capture oss_reg_set_bone_touch "$S" ADR-0002 "$csv"
+  t_assert_rc 2 "...and the re-point verb refuses it too ($_hex)"
+done
+t_capture jq '[.bones[] | select(.adr=="ADR-F")] | length' "$S"
+t_assert_eq "0" "$T_OUT" "...and no bone was minted by any refused call"
+# ADJACENT CONTROL, the same rule the interior-space row states: the guard is
+# EDGES only. An interior zero-width space stays legal, so this row goes RED if
+# the predicate is ever widened to "contains a format character anywhere".
+t_capture oss_reg_add_bone "$S" ADR-F2 "interior format char" "$(printf 'src/a\xe2\x80\x8bb.py')" ""
+t_assert_rc 0 "an entry with an INTERIOR zero-width space is still accepted"
+t_capture jq -c '.bones[] | select(.adr=="ADR-F2") | .touch' "$S"
+t_assert_eq '["src/a​b.py"]' "$T_OUT" "...and it survives into the journaled surface"
+
+# --- the mint takes the ONE-LIST arm too (round 2) --------------------------
+# A csv wrapped over two lines emits two JSON values, so --argjson cannot parse
+# it. The re-point path has answered that with "not one list" since 1.11.0, and
+# its own comment calls the arms' separation deliberate. Calling the contaminated
+# arm directly at the mint put it back in front of an unparseable list: measured,
+# `bone_add` printed jq's raw `invalid JSON text passed to --argjson` on stderr
+# and then mislabelled the failure "cannot read the touch list" - the retry-loop
+# false cause this file's corrupt-state rows exist to prevent, one verb over.
+t_capture oss_reg_add_bone "$S" ADR-NL "wrapped csv" "$(printf 'src/a/**\nsrc/b/**')" ""
+t_assert_rc 2 "bone_add refuses a two-line touch-csv"
+t_assert_contains "$T_OUT" "not one list" "...and reports two lists, not an unreadable one"
+case "$T_OUT" in
+  *"parse error"*|*"jq: error"*|*"invalid JSON"*)
+    T_FAIL=$((T_FAIL+1)); echo "FAIL: bone_add leaks jq's raw error into its refusal - the one-list arm is not running first" ;;
+  *) T_PASS=$((T_PASS+1)) ;;
+esac
+t_capture oss_reg_add_risk_gate "$S" nl-gate "src/a/**" "$(printf 'ctl-a\nctl-b')"
+t_assert_rc 2 "...and risk_gate_add refuses a two-line controls-csv the same way"
+t_assert_contains "$T_OUT" "not one list" "...with the same diagnosis, not a jq error"
+t_capture jq '[.risk_gates[] | select(.name=="nl-gate")] | length' "$S"
+t_assert_eq "0" "$T_OUT" "...and no gate was minted by either refused call"
+
 # --- D1 fake lifecycle (Task 2, named risk 7): oss_reg_set_fake_status must
 # leave expiry_release ALONE when the 5th arg (new expiry) is omitted.
 # test-ledger.sh only exercises the WITH-a-new-expiry (renew) path, so that
@@ -136,10 +282,23 @@ t_assert_contains "$T_OUT" "oss init" "the message names the remedy verb"
 t_capture oss_reg_set_risk_gate_controls "$S" no-such-gate "x"
 t_assert_rc 7 "unknown gate name refuses"
 t_assert_contains "$T_OUT" "unknown risk gate" "the unknown-name refusal names the gate"
-t_capture oss_reg_add_risk_gate "$S" phrase-gate "src/**" "dup"   # #305 shape
+# The duplicate row is built with the RAW op now, because the add rail refuses to
+# mint one - and that is a STRONGER fixture than the verb was: it proves the set
+# verbs refuse a duplicate that arrived through a path no shipped verb can create
+# any more (a journal written by an older build). The check-to-append race is no
+# longer such a path either: the add rails run INSIDE the mutation lock, which
+# the "#305 item 1, the atomic half" rows above pin.
+oss_state_mutate "$S" add_risk_gate \
+  "$(jq -n --arg ts "$(_oss_now)" '{name:"phrase-gate",touch:["src/**"],controls:["dup"],at:$ts}')" >/dev/null
 t_capture oss_reg_set_risk_gate_controls "$S" phrase-gate "x"
 t_assert_rc 7 "duplicate gate names refuse rather than guess"
 t_assert_contains "$T_OUT" "#305" "the duplicate refusal names the issue"
+# #525's byte-identity claim, PINNED, because nothing pinned it and it drifted:
+# `read-plural` and `count-noun` are separate parameters for exactly this - the
+# read messages say "risk gates" while the duplicate message said "gates", so
+# collapsing the two labels silently reworded both gate verbs' duplicate refusal.
+# The whole clause is asserted, not just "#305", so a future reword goes RED.
+t_assert_contains "$T_OUT" "matches 2 gates - duplicate names" "...with the count-noun the extraction promised to keep byte-identical"
 
 # bone_add shares the splitter: a brace-glob touch entry stays one entry.
 t_capture oss_reg_add_bone "$S" ADR-77 "brace touch" "src/{exec\,api}/**" ""
@@ -237,6 +396,30 @@ for csv in "$(printf '\t')" "$(printf '\r')" "$(printf '\v')" "$(printf '\xc2\xa
   t_assert_rc 2 "risk_gate_set_touch refuses a blank-lookalike list (non-space whitespace, $(printf '%s' "$csv" | od -An -tx1 | tr -d ' '))"
   t_assert_contains "$T_OUT" "at least one glob" "...and says what it needs"
 done
+# #530: a REAL glob carrying one non-space whitespace character passes the blank
+# guard above - that guard only requires SOME entry with a non-whitespace
+# character, and the splitter trims literal spaces only. Measured on 602565f:
+# `bone_set_touch ADR-0003 "$(printf 'src/silver/**\r')"` returned rc 0,
+# journaled a CR-terminated glob, and touch_check went CLEAN on the very path the
+# re-point was meant to cover - the defect these verbs exist to repair, entered
+# through their own argument handling. The realistic vector is a csv composed
+# from a CRLF file through `while IFS= read -r` (strips \n, keeps \r).
+for csv in "$(printf 'src/silver/**\r')" "$(printf 'src/silver/**\v')" "$(printf '\tsrc/silver/**')" "$(printf 'src/silver/**\xc2\xa0')" "$(printf 'src/silver/**　')"; do
+  _hex="$(printf '%s' "$csv" | od -An -tx1 | tr -d ' ')"
+  t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "$csv"
+  t_assert_rc 2 "bone_set_touch refuses an entry with surrounding whitespace ($_hex)"
+  t_assert_contains "$T_OUT" "leading or trailing whitespace" "...and says what is wrong with the entry ($_hex)"
+  t_capture oss_reg_set_risk_gate_touch "$ST" gold-correctness "$csv"
+  t_assert_rc 2 "risk_gate_set_touch refuses it too ($_hex)"
+  t_assert_contains "$T_OUT" "leading or trailing whitespace" "...with the same diagnosis ($_hex)"
+done
+# The message NAMES the offending entry, and renders it escaped (@json), because
+# a CR on a terminal is invisible - an operator told only "trailing whitespace"
+# cannot find which entry to fix.
+t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "$(printf 'src/silver/**\r')"
+t_assert_contains "$T_OUT" 'src/silver/**\r' "...and names the entry with its whitespace escaped, not literally"
+t_capture jq -c '.bones[] | select(.adr=="ADR-0003") | .touch' "$ST"
+t_assert_eq '["packages/ma/silver/**","packages/ma/ingestion/**"]' "$T_OUT" "...and the refused call left the accepted surface in place"
 # The OTHER input the splitter mishandles: jq -R is LINE-oriented, so a csv
 # wrapped over two lines emits TWO JSON values and --argjson cannot parse them.
 # Fail-closed either way, but the diagnostic must not say "empty" - that is a
@@ -256,11 +439,81 @@ t_capture oss_reg_set_bone_touch "$TMP/touch-corrupt.json" ADR-0003 "src/**"
 t_assert_rc 2 "bone_set_touch: an unreadable state is rc 2, not a raw jq error"
 t_capture oss_reg_set_risk_gate_touch "$TMP/touch-corrupt.json" gold-correctness "src/**"
 t_assert_rc 2 "risk_gate_set_touch: an unreadable state is rc 2, not a raw jq error"
+# #525: the ladder's `2>/dev/null` is a LEARNED fix, not cosmetic noise
+# suppression - it is what keeps a corrupt state's refusal OURS. Without it jq's
+# raw parse error lands in the same captured output as the "cannot read" line,
+# and the operator (or an agent) reading the first line sees a jq failure
+# instead of the remedy. The arm had no assertion before this extraction, which
+# is exactly the "line a fourth hand-copy drops" the issue names - so it is
+# pinned here, on all three verbs that share the ladder now.
+for _v in oss_reg_set_bone_touch oss_reg_set_risk_gate_touch oss_reg_set_risk_gate_controls; do
+  case "$_v" in
+    oss_reg_set_bone_touch)         _a="ADR-0003";         _msg="cannot read bones" ;;
+    oss_reg_set_risk_gate_touch)    _a="gold-correctness"; _msg="cannot read risk gates" ;;
+    oss_reg_set_risk_gate_controls) _a="phrase-gate";      _msg="cannot read risk gates" ;;
+  esac
+  t_capture "$_v" "$TMP/touch-corrupt.json" "$_a" "src/**"
+  t_assert_rc 2 "$_v: a corrupt state refuses at rc 2"
+  t_assert_contains "$T_OUT" "$_msg" "$_v: the refusal is the verb's own message"
+  case "$T_OUT" in
+    *"parse error"*|*"jq: error"*)
+      T_FAIL=$((T_FAIL+1)); echo "FAIL: $_v leaks jq's raw error into the refusal - the ladder's 2>/dev/null routing is gone" ;;
+    *) T_PASS=$((T_PASS+1)) ;;
+  esac
+done
 t_capture jq '.mutations | length' "$ST"
 t_assert_eq "$N1" "$T_OUT" "every refusal above left the journal unchanged"
-# Duplicates (#305 shape) refuse rather than guess which entry to re-point.
-oss_reg_add_bone "$ST" ADR-0003 "silver layer, minted twice" "src/x/**" "" >/dev/null
-oss_reg_add_risk_gate "$ST" gold-correctness "src/y/**" "dup" >/dev/null
+# ADJACENT CONTROL for #530's per-entry guard: an INTERIOR space is not
+# surrounding whitespace - a path can contain one, so refusing it would be a
+# guard stricter than the operation it protects. This row is what goes RED if the
+# check is written as "any whitespace in the entry" instead of "leading or
+# trailing".
+t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "src/my file.py,src/ok/**"
+t_assert_rc 0 "an entry with an interior space is still accepted"
+t_capture jq -c '.bones[] | select(.adr=="ADR-0003") | .touch' "$ST"
+t_assert_eq '["src/my file.py","src/ok/**"]' "$T_OUT" "...and the interior space survives into the journaled surface"
+t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "packages/ma/silver/**,packages/ma/ingestion/**"
+t_assert_rc 0 "...and the surface is re-pointable again afterwards"
+# #524: set_controls took an empty list at rc 0 and journaled controls: [] - the
+# gate's downstream checklist silently emptied for every later spine that touches
+# its surface. The 1.11.0 touch verbs refuse a list with no glob in it; the guard
+# sat one function away and did not cover its sibling. risk-gates.md §6: a gate
+# with no controls "is a worry, not a gate".
+N2="$(jq '.mutations | length' "$ST")"
+t_capture oss_reg_set_risk_gate_controls "$ST" gold-correctness ""
+t_assert_rc 2 "set_controls refuses an empty list at rc 2"
+t_assert_contains "$T_OUT" "at least one control" "...and says what a gate needs"
+t_assert_contains "$T_OUT" "risk-gates.md" "...and cites the rule it protects"
+for csv in "   " " , ," "$(printf '\t')" "$(printf '\xc2\xa0')"; do
+  t_capture oss_reg_set_risk_gate_controls "$ST" gold-correctness "$csv"
+  t_assert_rc 2 "set_controls refuses a blank-lookalike list ($(printf '%s' "$csv" | od -An -tx1 | tr -d ' '))"
+  t_assert_contains "$T_OUT" "at least one control" "...and names controls, not globs"
+done
+# The shared guard gives set_controls the per-entry refusal too (#530's arm, same
+# helper): a control phrase carrying a trailing CR is not the phrase the caller
+# wrote, and the CSV grammar exists to make that unambiguous.
+t_capture oss_reg_set_risk_gate_controls "$ST" gold-correctness "$(printf 'ctl-one\r')"
+t_assert_rc 2 "set_controls refuses an entry with surrounding whitespace"
+t_assert_contains "$T_OUT" "leading or trailing whitespace" "...and diagnoses the entry"
+t_capture jq '.mutations | length' "$ST"
+t_assert_eq "$N2" "$T_OUT" "every set_controls refusal above left the journal unchanged"
+# ADJACENT CONTROL: replace semantics are untouched - a non-empty list still
+# replaces wholesale - and the noun in the message is what tells the two verbs'
+# refusals apart (a controls refusal must not say "at least one glob").
+t_capture oss_reg_set_risk_gate_controls "$ST" gold-correctness "ctl-a,ctl-b"
+t_assert_rc 0 "a non-empty controls list still replaces wholesale"
+t_capture jq -c '.risk_gates[] | select(.name=="gold-correctness") | .controls' "$ST"
+t_assert_eq '["ctl-a","ctl-b"]' "$T_OUT" "...and lands in the journal"
+# Duplicates (#305 shape) refuse rather than guess which entry to re-point. Both
+# rows are minted with the RAW op: the add rails (added with #305 item 1) refuse
+# to create a duplicate, so a fixture built through the verb would be impossible -
+# and this way the set verbs are proven against a duplicate that only an older
+# journal can produce (the add rails are now in-lock, so not even a
+# check-to-append race mints one).
+oss_state_mutate "$ST" add_bone \
+  "$(jq -n --arg ts "$(_oss_now)" '{adr:"ADR-0003",title:"silver layer, minted twice",touch:["src/x/**"],revisit_trigger:null,at:$ts}')" >/dev/null
+oss_state_mutate "$ST" add_risk_gate \
+  "$(jq -n --arg ts "$(_oss_now)" '{name:"gold-correctness",touch:["src/y/**"],controls:["dup"],at:$ts}')" >/dev/null
 t_capture oss_reg_set_bone_touch "$ST" ADR-0003 "src/**"
 t_assert_rc 7 "bone_set_touch: a duplicate ADR refuses"
 t_assert_contains "$T_OUT" "#305" "...and names the issue"

@@ -7,7 +7,7 @@ description: Pair an already-populated AI workspace with an already-populated ca
 
 ## 1. Overview
 
-This skill handles **Scenario C** (per **SPEC §9** — the third pairing scenario, alongside Scenario A `pairing-canonical-repo` and the deferred Scenario B): **both repos already exist and are populated.** A project that pre-dates the plugins often grew a memory-bank, specs, and handoffs in a sibling AI-workspace directory before the user discovered scaffold-* / workspace-init. The canonical holds production code. Neither was created by workspace-init, and there is no pairing manifest tying them together yet.
+This skill handles **Scenario C** (per **SPEC §9** — the third pairing scenario, alongside Scenario A `pairing-canonical-repo` and the deferred Scenario B): **both repos already exist and are populated.** A project that pre-dates the plugins often grew a memory-bank, specs, and handoffs in a sibling AI-workspace directory before the user installed workspace-init and ossify. The canonical holds production code. Neither was created by workspace-init, and there is no pairing manifest tying them together yet.
 
 This skill does the minimum to wire them up: it **writes the `.workspace/pairing.json` manifest** into the existing AI workspace and **installs the trace-filter `commit-msg` hook** (always in canonical; also in the AI workspace when it is itself a git repo). It does NOT create the AI workspace, seed its subdirectories, write CLAUDE.md / AGENTS.md / README.md stubs, or seed a memory bank — that content already exists and is the user's. **Nothing under the existing AI workspace is overwritten.**
 
@@ -160,8 +160,25 @@ Manifest written at: /abs/path/<ai-workspace>/.workspace/pairing.json
 Trace filter active in: <canonical>  [AND <ai-workspace> if it is a git repo]
 
 Next steps:
-  1. cd /abs/path/<ai-workspace> && git status   (if it is a git repo)
-  2. Open the workspace in Claude/Codex; scaffold-* skills now resolve via the manifest.
+  1. Prepare the AI workspace for adoption: `cd /abs/path/<ai-workspace> && git status`, then
+     commit the pairing changes — `.workspace/pairing.json` and the init-log beside it — so
+     neither is left uncommitted or untracked. If it is not a git repo yet, `git init` it first
+     (your call, not this skill's), re-run this skill so the manifest records the real
+     `ai_workspace.git_tracked` value and the AI-side trace filter is installed (§6.2), then
+     commit.
+  2. Open the workspace in Claude/Codex; ossify resolves pairing.json as topology.
+  3. Make the workspace legible to Codex before you continue: ossify's interop check fails while
+     `AGENTS.md` is missing or never names ossify, and it reports rather than repairs. Author that
+     file, or merge an ossify section into the one you already have — keep whatever is already in
+     it. This skill writes no project guidance, so the file is yours to author and commit before
+     step 4.
+  4. Run `/ossify:adopt` only for a project previously onboarded with the legacy scaffold stack —
+     without that stack there is no supported ossify continuation yet (or `/ossify:start` if the
+     canonical is empty); on Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
+  5. Adoption refuses while any tree it will edit is dirty: the AI workspace, the canonical, and
+     every repo the topology declares must all be clean — tracked and untracked — with each
+     declared repo on the default branch the manifest declares (otherwise adoption names the
+     checked-out branch and asks for confirmation before proceeding).
 ```
 
 ## 10. Discipline rules

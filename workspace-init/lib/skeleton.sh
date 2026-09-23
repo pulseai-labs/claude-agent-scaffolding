@@ -297,10 +297,7 @@ wi_skeleton_seed_subdirs() {
       fi
     else
       cat > "$gi" <<'EOF'
-# Onboarding session state (scaffold-onboard)
-.claude/.onboarding-state.json
-
-# Handoff escape valve files — per scaffold-dev §6b (durable per-machine; not synced)
+# Per-machine handoff files (legacy compatibility; not synced)
 .workspace/handoffs/
 
 # OS-level cruft

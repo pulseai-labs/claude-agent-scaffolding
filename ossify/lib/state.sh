@@ -64,21 +64,40 @@ _oss_apply_op() { # $1=op $2=payload-json
     add_bone)      jq --argjson p "$payload" '.bones += [$p]' ;;
     add_risk_gate) jq --argjson p "$payload" '.risk_gates += [$p]' ;;
     set_risk_gate_controls)
-      # first()-targeted: a duplicate name minted in the check-to-append race
-      # would otherwise take the correction on BOTH entries; the verb refuses
-      # duplicates pre-lock (#305) and this bounds the race to one target,
-      # identically on live apply and replay.
+      # first()-targeted: a duplicate name would otherwise take the correction on
+      # BOTH entries. This verb's own duplicate refusal is pre-lock (#305), so two
+      # of ITS calls can interleave, and this bounds that to one target,
+      # identically on live apply and replay. A duplicate MINTED by an add verb is
+      # no longer a source: add_bone and add_risk_gate pass their uniqueness rail
+      # into oss_state_mutate as its $5 guard, which runs inside that lock.
       jq --argjson p "$payload" '(first(.risk_gates[] | select(.name == $p.name)) | .controls) = $p.controls' ;;
     # COMPATIBILITY CONTRACT (1.11.0): the op names set_bone_touch and
     # set_risk_gate_touch, and their payload keys {adr,touch} and {name,touch},
     # are already in live journals, so neither may be renamed or reshaped.
     # Replay is only HALF that enforcement, and claiming otherwise overclaims
-    # it: an op-NAME rename fails loudly here ("unknown op", rc 4), but a
-    # payload reshape does NOT - `$p.adr` reads null, `first()` matches nothing,
-    # and jq assigns to an empty path at rc 0, identically on live apply and on
-    # replay. The payload keys are held by this contract and by the verbs' own
-    # tests (test-registries.sh pins the journaled [op, payload] exactly), not
-    # by replay. first()-targeted for the same check-to-append race reason as
+    # it. An op-NAME rename fails loudly here ("unknown op", rc 4). A payload
+    # reshape does NOT fail, and it fails in TWO different ways, so neither mode
+    # is a safe default to describe (#532):
+    #   - an IDENTIFIER key renamed (`adr` -> `adr_ref`) is a silent no-op WHILE
+    #     every bone carries its `adr`: `$p.adr` reads null, `first(.bones[] |
+    #     select(.adr == null))` matches nothing, and jq assigns to an empty path
+    #     at rc 0, identically on live apply and on replay. It is NOT a no-op for
+    #     a row whose `adr` is null or absent: `select(.adr == null)` matches
+    #     THAT row, and the assignment then overwrites its touch. Measured on a
+    #     hand-built adr-less row, replaced at rc 0.
+    #   - a VALUE key renamed (`touch` -> `surface`) is DESTRUCTIVE: `$p.touch`
+    #     reads null, `first()` DOES match on the identifier, and the assignment
+    #     writes `.touch = null` at rc 0. Replay stays clean (it re-applies the
+    #     same transform), and the damage surfaces at the next reader: ONE nulled
+    #     row makes EVERY touch_check answer rc 2 "cannot read bones ...
+    #     INCONCLUSIVE, not clean", not only the damaged surface's - the read is
+    #     a single pass over `.bones` and the first null aborts it. Measured on a
+    #     two-bone fixture with one row nulled: rc 2 for the healthy bone's path
+    #     as well, so reclassification and the release-close docs triggers are
+    #     disabled project-wide, not for one surface.
+    # The payload keys are held by this contract and by the verbs' own tests
+    # (test-registries.sh pins the journaled [op, payload] exactly), not by
+    # replay. first()-targeted for the same check-to-append race reason as
     # set_risk_gate_controls.
     set_bone_touch)
       jq --argjson p "$payload" '(first(.bones[] | select(.adr == $p.adr)) | .touch) = $p.touch' ;;
@@ -252,8 +271,8 @@ _oss_mint_id() { # $1=state-file $2=mint-spec (release | spine:<rel> | work_item
   esac
 }
 
-oss_state_mutate() { # $1=state-file $2=op $3=payload-json [$4=mint-spec]
-  local sf="$1" op="$2" payload="$3" mint="${4:-}" lock="$1.lock" rc=0
+oss_state_mutate() { # $1=state-file $2=op $3=payload-json [$4=mint-spec] [$5=uniqueness-guard-fn]
+  local sf="$1" op="$2" payload="$3" mint="${4:-}" uniq="${5:-}" lock="$1.lock" rc=0
   # A project that was never initialised is not a project whose lock is held.
   # `mkdir "$lock"` below fails for BOTH reasons - the lock directory already
   # exists, or its parent `.ossify/` does not exist at all - and the single
@@ -299,17 +318,18 @@ oss_state_mutate() { # $1=state-file $2=op $3=payload-json [$4=mint-spec]
   # errexit is SUSPENDED for the whole body, so no bare command-substitution
   # inside it can hard-exit and leak the lock. The body echoes the minted id
   # (if any) to stdout on success; that stdout flows through this function.
-  _oss_state_mutate_body "$sf" "$op" "$payload" "$mint" || rc=$?
+  _oss_state_mutate_body "$sf" "$op" "$payload" "$mint" "$uniq" || rc=$?
   rmdir "$lock" 2>/dev/null || true
   return "$rc"
 }
 
-# Critical-section body. rc 0 ok, 4 on any failure. NO lock logic here - the
-# wrapper owns lock acquire/release. Minting happens here (inside the lock);
-# the minted id is injected into the payload BEFORE journaling so the journal
-# format and _oss_apply_op are unchanged (replay stays byte-identical).
-_oss_state_mutate_body() { # $1=state-file $2=op $3=payload $4=mint-spec
-  local sf="$1" op="$2" payload="$3" mint="${4:-}" tmp seq ts minted_id=""
+# Critical-section body. rc 0 ok, 4 on any failure, or the uniqueness guard's own
+# 7 when it refuses the mint. NO lock logic here - the wrapper owns lock
+# acquire/release. Minting happens here (inside the lock); the minted id is
+# injected into the payload BEFORE journaling so the journal format and
+# _oss_apply_op are unchanged (replay stays byte-identical).
+_oss_state_mutate_body() { # $1=state-file $2=op $3=payload $4=mint-spec $5=uniqueness-guard-fn
+  local sf="$1" op="$2" payload="$3" mint="${4:-}" uniq="${5:-}" tmp seq ts minted_id="" urc=0
   tmp="$(mktemp "${sf}.tmp.XXXXXX")" || return 4
   if [ -n "$mint" ]; then
     minted_id="$(_oss_mint_id "$sf" "$mint")" || { rm -f "$tmp"; return 4; }
@@ -321,6 +341,30 @@ _oss_state_mutate_body() { # $1=state-file $2=op $3=payload $4=mint-spec
   fi
   seq="$(jq '.mutations | length' "$sf" 2>/dev/null)" || { rm -f "$tmp"; return 4; }
   ts="$(_oss_now)" || { rm -f "$tmp"; return 4; }
+  # $5 = an OPTIONAL uniqueness guard (#305): the NAME of a function called with
+  # ($1=state-file, $2=the payload about to be minted) HERE, inside the critical
+  # section and immediately before the append. It returns 0 to let the mint
+  # through, or 7 to refuse it having printed its own message; any other rc is a
+  # guard failure and fails CLOSED at 4 - never mint on a rail that could not
+  # answer.
+  #
+  # WHY IT LIVES IN HERE RATHER THAN IN THE CALLER'S VERB: a verb-side check runs
+  # BEFORE this lock is acquired, so it is a check-to-append race - two ceremonies
+  # both read "no such ref", then serialize on the lock, and the second one
+  # appends a second row for one key, which is the unrepairable state #305 is
+  # about, entered by two conforming callers. Measured on the verb-side version:
+  # two concurrent `oss bone_add ADR-Rn` each exited 0 and left two rows for
+  # ADR-Rn, with the window being the caller's own jq spawn between its count and
+  # this lock. Deliberately AFTER the `seq` read above: a corrupt state keeps its
+  # established rc 4 there rather than being re-labelled by the guard's read.
+  if [ -n "$uniq" ]; then
+    urc=0; "$uniq" "$sf" "$payload" || urc=$?
+    if [ "$urc" -ne 0 ]; then
+      rm -f "$tmp"
+      [ "$urc" -eq 7 ] || { echo "oss: the uniqueness guard could not answer (rc $urc); refusing to mint" >&2; return 4; }
+      return 7
+    fi
+  fi
   # journal append + effect in ONE jq pipeline into ONE $tmp, committed by a
   # single mv - mutation and journal entry commit atomically.
   if ! jq --arg op "$op" --arg ts "$ts" --argjson seq "$seq" --argjson payload "$payload" \
