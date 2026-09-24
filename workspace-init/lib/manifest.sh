@@ -454,7 +454,7 @@ wi_manifest_relocate() {
   fi
 
   local old_root
-  old_root="$(jq -r '.ai_workspace.root // "(unset)"' "$manifest" 2>/dev/null)"
+  old_root="$(jq -r '.ai_workspace.root // "(unset)"' "$manifest" 2>/dev/null)" || old_root="(unreadable)"
 
   local ai_name cn_name=""
   ai_name="$(basename "$ai_root")"
@@ -637,10 +637,17 @@ wi_manifest_validate() {
     wi_log_error "wi_manifest_validate: $manifest is not valid JSON"
     return 1
   fi
+  # ...and a JSON object: every field check below indexes into it, and jq
+  # errors (rather than reporting a missing field) when indexing an array or
+  # scalar.
+  if ! jq -e 'type == "object"' "$manifest" >/dev/null 2>&1; then
+    wi_log_error "wi_manifest_validate: $manifest is not a JSON object"
+    return 1
+  fi
 
   # schema_version.
   local v
-  v="$(jq -r '.schema_version // empty' "$manifest" 2>/dev/null)"
+  v="$(jq -r '.schema_version // empty' "$manifest" 2>/dev/null)" || v=""
   if [[ -z "$v" ]]; then
     wi_log_error "wi_manifest_validate: schema_version missing in $manifest"
     return 1
@@ -662,8 +669,12 @@ wi_manifest_validate() {
   #
   # We use a single jq program for all presence checks; jq returns the
   # comma-separated names of any missing fields (or empty when all present).
+  # The jq program's own exit status is checked: a required block of the wrong
+  # type (e.g. "git_policy": "bad") makes an index inside it error, and an
+  # unchecked capture would read that as "nothing missing" — a pass — or,
+  # under the dispatcher's errexit, abort with no message.
   local missing
-  missing="$(jq -r '
+  if ! missing="$(jq -r '
     [
       (if has("schema_version")    then empty else "schema_version"    end),
       (if has("topology")          then empty else "topology"          end),
@@ -719,7 +730,10 @@ wi_manifest_validate() {
       (if .created_at != null then empty else "created_at" end),
       (if .created_by != null then empty else "created_by" end)
     ] | join(", ")
-  ' "$manifest" 2>/dev/null)"
+  ' "$manifest" 2>/dev/null)"; then
+    wi_log_error "wi_manifest_validate: $manifest has a required block of the wrong type; its required fields could not be checked"
+    return 1
+  fi
 
   if [[ -n "$missing" ]]; then
     wi_log_error "wi_manifest_validate: $manifest missing required fields: $missing"

@@ -9,6 +9,7 @@
 #   F. Reader/writer version-skew (3) — SPEC §6.5
 #   G. Round-trip (2)
 #   L. wi_manifest_relocate — the moved-workspace manifest repair (#491)
+#   V. wi_manifest_validate fails loudly when its field check cannot run
 
 source "$(dirname "$0")/_helpers.sh"
 source "$WI_LIB_DIR/_helpers.sh"
@@ -679,6 +680,15 @@ test_L3_relocate_refuses_bad_manifest_unchanged() {
   cmp -s "$_WI_TMP/l3/nopolicy.orig" "$rm_" || { echo "    schema-invalid manifest was modified"; return 1; }
   grep -qF 'git_policy' "$_WI_TMP/l3/err" || {
     echo "    refusal does not name the missing field"; cat "$_WI_TMP/l3/err"; return 1; }
+  # A required block of the wrong type (Codex round 2 on #581): the full
+  # validator's jq errored, the capture read empty, and it passed. Refused now.
+  local bad; bad="$(_setup_pair l3-typed)" || return 1
+  local bm="$bad/.workspace/pairing.json"
+  jq '.git_policy = "bad"' "$bm" > "$bm.t" && mv "$bm.t" "$bm"
+  cp "$bm" "$_WI_TMP/l3/typed.orig"
+  if "$WI_BIN" manifest_relocate "$bad" 2>/dev/null; then
+    echo "    relocate accepted a wrong-typed git_policy"; return 1; fi
+  cmp -s "$_WI_TMP/l3/typed.orig" "$bm" || { echo "    wrong-typed manifest was modified"; return 1; }
   # Missing manifest → refused, nothing created.
   rm -f "$m"
   if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
@@ -719,10 +729,51 @@ test_L5_relocate_relative_root_recorded_absolute() {
     "relative argument recorded as an absolute path"
 }
 
+# ---------------------------------------------------------------------------
+# V. wi_manifest_validate must fail — with a message — when its own field
+#    check cannot run (a wrong-typed block, a non-object document), on both
+#    the sourced and the dispatched path.
+# ---------------------------------------------------------------------------
+test_V1_validate_rejects_wrong_typed_blocks() {
+  local ai; ai="$(_setup_pair v1)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v1/good"
+  # Control: the untouched manifest validates on both paths.
+  wi_manifest_validate "$ai" 2>/dev/null || { echo "    control: valid manifest rejected (sourced)"; return 1; }
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || { echo "    control: valid manifest rejected (dispatched)"; return 1; }
+  local edit
+  for edit in '.git_policy = "bad"' '.canonical = "x"' '.routing = [1]' \
+              '.git_policy.trace_filter = 7' '.during_dev = true'; do
+    jq "$edit" "$_WI_TMP/v1/good" > "$m"
+    if wi_manifest_validate "$ai" 2>"$_WI_TMP/v1/err"; then
+      echo "    sourced validate accepted: $edit"; return 1; fi
+    grep -qF 'wrong type' "$_WI_TMP/v1/err" || {
+      echo "    sourced refusal does not explain ($edit):"; cat "$_WI_TMP/v1/err"; return 1; }
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v1/err"; then
+      echo "    dispatched validate accepted: $edit"; return 1; fi
+    grep -qF 'wrong type' "$_WI_TMP/v1/err" || {
+      echo "    dispatched refusal is silent ($edit):"; cat "$_WI_TMP/v1/err"; return 1; }
+  done
+}
+
+test_V2_validate_rejects_non_object_document() {
+  local ai="$_WI_TMP/v2/proj-ai"; mkdir -p "$ai/.workspace"
+  local body
+  for body in '[1,2]' '"text"' '42'; do
+    printf '%s' "$body" > "$ai/.workspace/pairing.json"
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v2/err"; then
+      echo "    validate accepted a non-object document: $body"; return 1; fi
+    grep -qF 'not a JSON object' "$_WI_TMP/v2/err" || {
+      echo "    refusal does not name the problem ($body):"; cat "$_WI_TMP/v2/err"; return 1; }
+  done
+}
+
 wi_test_run test_L1_relocate_rewrites_ai_root_preserves_everything_else
 wi_test_run test_L2_relocate_canonical_root_only_with_flag
 wi_test_run test_L3_relocate_refuses_bad_manifest_unchanged
 wi_test_run test_L4_relocate_refuses_bad_roots_unchanged
 wi_test_run test_L5_relocate_relative_root_recorded_absolute
+wi_test_run test_V1_validate_rejects_wrong_typed_blocks
+wi_test_run test_V2_validate_rejects_non_object_document
 
 wi_test_summary
