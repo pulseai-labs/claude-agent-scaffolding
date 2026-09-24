@@ -167,4 +167,80 @@ rm -f "$tmp_ctl"
 if [ "$ctl" -eq 1 ]; then pass "control: the sweep detects a personal name"
 else fail "control: the sweep detects a personal name" "control counted $ctl"; fi
 
+section "the dsh spine driver kind"
+DSH_MD="$PLUGIN_ROOT/skills/orchestrate/references/dsh-driver.md"
+EXEC_MD="$PLUGIN_ROOT/skills/orchestrate/references/ossify-execution.md"
+# Named at least twice since the agent-entries exception (PR review round 1); the
+# exact-once pin on that exception, in the section below, is the adjacent control.
+present 'kind: dsh-spine-driver' "config.md names the dsh spine driver kind"
+present '`dsh-driver.md`' "config.md points at dsh-driver.md"
+if [ -f "$DSH_MD" ]; then
+  n="$(wc -l < "$DSH_MD" | tr -d ' ')"
+  if [ "$n" -le "$REF_BUDGET" ]; then pass "dsh-driver.md within the reference budget ($n lines)"
+  else fail "dsh-driver.md within the reference budget" "$n lines, over by $((n - REF_BUDGET))"; fi
+  for needle in 'kind: dsh-spine-driver' 'preset: crew-spine' 'model_shows: transcript' \
+    'brief_delivery: api' '`.dsh-crew/roles.md`' '`dsh-session`' 'a fresh session'; do
+    c="$(occurrences "$DSH_MD" "$needle")"
+    if [ "$c" -ge 1 ]; then pass "dsh-driver.md: $needle"; else fail "dsh-driver.md: $needle" "not found"; fi
+  done
+  # The entry block is the kind's contract: a dsh seat is created through the web API, so
+  # its entry has no command: line. The block is the lines after the first `### `, up to
+  # the closing fence.
+  blk="$(awk '/^### /{f=1; next} f && /^```/{exit} f' "$DSH_MD")"
+  kinds="$(printf '%s\n' "$blk" | awk '/^kind: dsh-spine-driver$/{n++} END{print n+0}')"
+  cmds="$(printf '%s\n' "$blk" | awk '/^command:/{n++} END{print n+0}')"
+  if [ "$kinds" -eq 1 ] && [ "$cmds" -eq 0 ]; then pass "the dsh entry block has a kind and no command:"
+  else fail "the dsh entry block has a kind and no command:" "kind=$kinds command=$cmds"; fi
+  # Pointers to dsh-session, never its call shape.
+  api="$(awk 'index($0, "rpcId") + index($0, "/api/session") > 0 {n++} END{print n+0}' "$DSH_MD")"
+  if [ "$api" -eq 0 ]; then pass "dsh-driver.md restates no dsh /api call shape"
+  else fail "dsh-driver.md restates no dsh /api call shape" "$api line(s)"; fi
+else
+  fail "dsh-driver.md exists" "no such file"
+fi
+c="$(occurrences "$EXEC_MD" 'references/dsh-driver.md')"
+if [ "$c" -ge 1 ]; then pass "ossify-execution.md routes a dsh spine seat to dsh-driver.md"
+else fail "ossify-execution.md routes a dsh spine seat to dsh-driver.md" "not found"; fi
+
+section "the dsh driver's requirement sentences"
+# Each is a rule the top's path depends on and no deterministic test can exercise;
+# pinned so a rewording cannot drop it (the whole-branch review's six findings).
+if [ -f "$DSH_MD" ]; then
+  for needle in 'continue <spine-id> from its recorded state' \
+    'together or not at all' \
+    'the pre-brief gate' \
+    '`ASK_CANCELLED` counts' \
+    'the turn end only' \
+    'nothing downstream is dispatched'; do
+    c="$(occurrences "$DSH_MD" "$needle")"
+    if [ "$c" -ge 1 ]; then pass "dsh-driver.md keeps: $needle"; else fail "dsh-driver.md keeps: $needle" "not found"; fi
+  done
+fi
+c="$(occurrences "$EXEC_MD" 'before recommending item rows')"
+if [ "$c" -ge 1 ]; then pass "ossify-execution.md routes a dsh spine seat before item rows are recommended"
+else fail "ossify-execution.md routes a dsh spine seat before item rows are recommended" "not found"; fi
+
+section "the dsh path reaches every surface the top reads first"
+# PR review round 1: a top reads config.md, lifecycle 1b, the delegation floor,
+# ossify-nested-run.md §4 and the command before dsh-driver.md, so each must admit the
+# kind rather than contradict it.
+LIFE_MD="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
+NEST_MD="$PLUGIN_ROOT/skills/orchestrate/references/ossify-nested-run.md"
+SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
+CMD_MD="$PLUGIN_ROOT/commands/orchestrate.md"
+pin 'a `kind: dsh-spine-driver` entry has no `command:`' "config.md's agent entries admit the dsh kind"
+while IFS='|' read -r f needle label; do
+  c="$(occurrences "$f" "$needle")" || c=0
+  if [ "$c" -ge 1 ]; then pass "$label"; else fail "$label" "not found: $needle"; fi
+done <<LIST
+$LIFE_MD|A \`kind: dsh-spine-driver\` spine seat|lifecycle 1b hands a dsh spine seat to dsh-driver.md
+$SKILL_MD|\`dsh-session\` spawn, steer and cancel calls|the delegation floor admits the dsh calls
+$SKILL_MD|a dsh spine driver's transcript reads|the delegation floor admits the transcript reads
+$NEST_MD|replaces this section's completion signals|ossify-nested-run.md §4 yields to dsh-driver.md
+$CMD_MD|\`.dsh-crew/roles.md\`|the command names the dsh roles file
+$DSH_MD|A close session is never rotated|a dsh close finishes past the ceiling
+$DSH_MD|never to a successor|a mid-round stop is recovered in the same session
+$DSH_MD|\`data.usage.totalTokens\` against|the ceiling is compared in tokens
+LIST
+
 report

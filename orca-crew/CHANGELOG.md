@@ -2,6 +2,33 @@
 
 All notable changes to the `orca-crew` plugin.
 
+## 0.8.0
+
+**The dsh spine driver.** A spine's spine and close seats can be a DeepSeek Harness (dsh)
+session instead of a launched command. `references/dsh-driver.md` is the whole contract,
+and dsh-crew 0.3.0 supplies the session, its skills and the presets.
+
+- **The `kind: dsh-spine-driver` agent entry** has no `command:`: `preset: crew-spine`,
+  a `route:` and `effort:` from `~/.dsh/settings.yaml`, the model read from the session's
+  transcript, and the brief sent as one steered message through dsh-crew's `dsh-session`
+  skill. Every surface the top reads before that file admits the kind: `config.md`'s
+  agent entries and capability table, `lifecycle.md` step 1b, the delegation floor's
+  actions and reads, `ossify-nested-run.md` §4, `ossify-execution.md` §3 and §7, and the
+  command.
+- **`.dsh-crew/roles.md` in place of item rows.** At spine planning the top recommends
+  that file's implementer, verifier and reviewer rows in the one approval phase and
+  writes it; the items get no per-item seats from this plugin.
+- **dsh-crew's item procedure.** A dsh-driven spine runs its items through
+  `dsh-executor`: no worker-authored plan gate, one automatic correction and then a stop
+  for the operator, and no nested-depth ask.
+- **Every close in a fresh dsh session**, never the spine driver's, so dsh-crew's
+  reviewer pass runs at close review and a close-sent correction has its executor.
+- **The top watches the transcript**: the driver's `ask_user_question` goes to the
+  operator in the browser and the top relays its text; a token-free wait ends on a turn
+  end, a pending question or `context_ceiling`; only a `completed` turn is a completion;
+  rotation is a steered hand-off.
+- No eval fixture is added; the dsh lane is verified by a real spine run.
+
 ## 0.7.0
 
 The **config-driven crew** — seats, agent commands, roles and conditions move out

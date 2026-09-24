@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# herdr-crew's two verbatim copies, and one manifest restatement (#513).
+# herdr-crew's three verbatim copies, and one manifest restatement (#513).
 #
-# herdr-crew was ported from orca-crew, and two of its files are copies of a
+# herdr-crew was ported from orca-crew, and three of its files are copies of a
 # sibling plugin's rather than code of its own:
 #
 #   tests/test-fidelity-pins.sh          ← orca-crew's, plugin name only
 #   tests/eval/lib/aggregate-scores.sh   ← ossify's, below its header
+#   skills/orchestrate/references/dsh-driver.md ← orca-crew's, plugin name only
 #
 # Each copy's own header states "keep them identical" as a manual ritual, and
 # nothing enforced it. orca-crew stays installed for the migration, so a fix to
@@ -13,7 +14,7 @@
 # which is the drift the ritual exists to prevent and exactly the shape a
 # ritual does not catch.
 #
-# WHY THESE TWO AND NOT MORE. Both pairs are pinned here rather than in either
+# WHY THESE AND NOT MORE. Every pair is pinned here rather than in either
 # plugin's suite because a plugin suite cannot see its sibling: herdr-crew's
 # run-tests.sh reads only herdr-crew/, and orca-crew's only orca-crew/. A
 # repo-root script sees both trees, which is why this one runs from CI's
@@ -63,6 +64,22 @@ if [[ -s "$ORCA_PINS" && -s "$HERDR_PINS" ]]; then
     pass "herdr-crew/tests/test-fidelity-pins.sh is orca-crew's apart from the plugin name"
   else
     fail "tests/test-fidelity-pins.sh drifted from orca-crew's copy — re-copy it, or land the same edit in both; only the plugin name may differ"
+  fi
+fi
+
+ORCA_DSH="$ROOT/orca-crew/skills/orchestrate/references/dsh-driver.md"
+HERDR_DSH="$ROOT/herdr-crew/skills/orchestrate/references/dsh-driver.md"
+for f in "$ORCA_DSH" "$HERDR_DSH"; do
+  rel="${f#"$ROOT"/}"
+  if [[ ! -f "$f" ]]; then fail "$rel exists"
+  elif [[ ! -s "$f" ]]; then fail "$rel is non-empty"
+  else pass "$rel exists and is non-empty"; fi
+done
+if [[ -s "$ORCA_DSH" && -s "$HERDR_DSH" ]]; then
+  if cmp -s <(sed 's/orca-crew/herdr-crew/g' "$ORCA_DSH") "$HERDR_DSH"; then
+    pass "herdr-crew's dsh-driver.md is orca-crew's apart from the plugin name"
+  else
+    fail "dsh-driver.md drifted between orca-crew and herdr-crew — land the same edit in both; only the plugin name may differ"
   fi
 fi
 

@@ -27,7 +27,9 @@ the whole contract a worker sees.
 
 ## Agent entries
 
-The machine file is one block per agent, named by a `###` heading:
+The machine file is one block per agent, named by a `###` heading. One kind differs:
+a `kind: dsh-spine-driver` entry has no `command:` or `expected_model:`; its fields,
+values and profile row are `dsh-driver.md`'s. Every other entry has this shape:
 
 ```markdown
 ### fast-coder
@@ -112,6 +114,7 @@ dispatch. The requirement is per role: a role whose shipped or declared brief in
 | item verifier | no command | — |
 | spine session, default lane | `/ossify:run-spine`; spawns `ossify:implementer-agent` subagents through the `Agent` tool | `slash-commands, subagents` |
 | spine session, external-executor lane | `/ossify:run-spine` | `slash-commands` |
+| spine or close session on a `kind: dsh-spine-driver` agent | its persona, no command (`dsh-driver.md`) | — |
 | close session | `/ossify:close` | `slash-commands` |
 | work-PR session | `/ossify:work-pr` | `slash-commands` |
 | doctor session | `/ossify:doctor` | `slash-commands` |

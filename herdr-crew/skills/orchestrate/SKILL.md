@@ -31,11 +31,13 @@ Your own turns take these kinds of action, and no others:
 2. Write briefs from the templates in `references/briefs.md`, `references/ossify-briefs.md`,
    `references/ossify-pr-briefs.md` and `references/ossify-close-writer.md`, dispositions,
    the handoff, and — on an activated
-   ossify spine — the spine's seats in `.herdr-crew/roles.md`.
-3. Read the seats' report files.
+   ossify spine — the spine's seats in `.herdr-crew/roles.md`, and `.dsh-crew/roles.md`
+   when a dsh spine driver runs it (`references/dsh-driver.md`).
+3. Read the seats' report files, and a dsh session's final message (`references/dsh-driver.md` §5).
 4. Decide.
 5. Converse: operator questions, and answers to what workers write in their report files.
-6. Execute single authorized mutations: worktree, tab and pane creation, dispatch,
+6. Execute single authorized mutations: worktree, tab and pane creation, dispatch —
+   for a dsh spine driver, its `dsh-session` spawn, steer and cancel calls —
    the PR comment, the merge — and, after it, the teardown: releasing workers (a pane
    closed, or a worktree removed), closing the run, and the verified branch delete.
 
@@ -67,7 +69,8 @@ Three consequences:
   bounded reads are the launch-banner `pane read` in `roles.md`, the readiness
   `pane wait-output` of a seat herdr does not detect, and the one `/context` reply at
   each task boundary for a seat that can answer the probe — one that cannot rotates at
-  its item boundary instead (`references/roles.md`).
+  its item boundary instead (`references/roles.md`) — and a dsh spine driver's transcript reads,
+  with the one shell wait that bounds them (`references/dsh-driver.md` §5).
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
   and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
 - **Verifying a worker's claim is a verifier dispatch**, not an orchestrator read. "Tests

@@ -30,11 +30,13 @@ Your own turns take these kinds of action, and no others:
 2. Write briefs from the templates in `references/briefs.md`, `references/ossify-briefs.md`,
    `references/ossify-pr-briefs.md` and `references/ossify-close-writer.md`, dispositions,
    the handoff, and — on an activated
-   ossify spine — the spine's seats in `.orca-crew/roles.md`.
-3. Read `worker_done` bodies.
+   ossify spine — the spine's seats in `.orca-crew/roles.md`, and `.dsh-crew/roles.md`
+   when a dsh spine driver runs it (`references/dsh-driver.md`).
+3. Read `worker_done` bodies, and a dsh session's final message (`references/dsh-driver.md` §5).
 4. Decide.
 5. Converse: operator questions, `reply`/`ask` with workers.
-6. Execute single authorized mutations: worktree and terminal creation, dispatch,
+6. Execute single authorized mutations: worktree and terminal creation, dispatch —
+   for a dsh spine driver, its `dsh-session` spawn, steer and cancel calls —
    the PR comment, the merge — and, after it, the teardown: releasing workers,
    closing terminals and the Run, and the verified branch delete.
 
@@ -59,8 +61,9 @@ Three consequences:
   failure. A heartbeat means alive, not done; a wake carrying only heartbeats gets one command,
   `check --ack <delivery> --wait --types worker_done,escalation,question --timeout-ms 900000`,
   and no probe or narrative. Beyond those `worker-read` cases, the only
-  bounded reads are the launch-banner `terminal read` in `roles.md` and the one
-  `/context` reply at each task boundary.
+  bounded reads are the launch-banner `terminal read` in `roles.md`, the one
+  `/context` reply at each task boundary, and a dsh spine driver's transcript reads,
+  with the one shell wait that bounds them (`references/dsh-driver.md` §5).
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
   and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
 - **Verifying a worker's claim is a verifier dispatch**, not an orchestrator read. "Tests

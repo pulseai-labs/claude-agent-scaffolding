@@ -57,7 +57,8 @@ close — are in `references/ossify-nested-run.md`.
 A spine's seats live in the project file, operator-approved — never in a file of
 this plugin's own.
 
-**Recommending.** After `/plan-spine`, recommend one implementer and one verifier seat per item
+**Recommending.** A spine seat of `kind: dsh-spine-driver` changes what is recommended
+here: read §7 first. Otherwise, after `/plan-spine`, recommend one implementer and one verifier seat per item
 from the project file's seats and conditions — scope, risk and cost,
 item by item — and the three coordinator seats beside them. Present **every** seat
 to the operator in one approval phase and write nothing until all of it is decided
@@ -136,3 +137,12 @@ The spine and item briefs are in `references/ossify-briefs.md`, the close and
 work-PR briefs in `references/ossify-pr-briefs.md`, the close-review writer's
 in `references/ossify-close-writer.md`; `references/briefs.md`'s templates still
 apply elsewhere, its fix-round brief included (§5).
+
+## 7. A spine seat inside DeepSeek Harness
+
+When the `spine session` seat you recommend, or the operator chooses, names a
+`kind: dsh-spine-driver` agent, read `references/dsh-driver.md`
+before recommending item rows, and follow it in place of §3's item rows, the fixed
+procedures, the round procedure in `ossify-nested-run.md` §3, and the spine and close
+briefs of §6 (its §5–§6 messages are theirs): the spine and its closes run as dsh
+sessions, and the items take their routes from `.dsh-crew/roles.md`.
