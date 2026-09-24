@@ -155,6 +155,8 @@ the run, so a spine with any chance of a gap belongs in the web UI.
       ask_user_question short: a one-line question and short option labels. Post any
       detail the operator needs as a chat message first, then ask, because a long
       question card hides its options and its Submit button.
+      Child routes come from `.dsh-crew/roles.md`, as the `dsh-executor` skill's §2 step 0
+      says; at close, its §9 adds the reviewer's pass.
 - id: skill-filesystem
   config:
     customSkillDirs:

@@ -14,9 +14,10 @@ the per-item worktrees and the handoffs: `work-item/references/round-orchestrati
 §2–§4), built one request per item (`work-item/references/external-executor.md` §2–§3),
 and now hands you the round's request records, one per item, in declared decomposition
 order.
-Your tools for this: `subagent_implementer`, `subagent_verifier`, `job_output`,
-`job_list`, `job_kill`, `bash`, `skill`. Prompts come from the `dsh-brief` skill (§2 the
-implementer prompt, §3 the verifier prompt, §4 the correction prompt).
+Your tools for this: `subagent_implementer`, `subagent_verifier`, `list_subagent_models`,
+`subagent_reviewer` (optional, §9), `job_output`, `job_list`, `job_kill`, `bash`, `skill`.
+Prompts come from the `dsh-brief` skill (§2 the implementer prompt, §3 the verifier prompt,
+§4 the correction prompt, §6 the reviewer prompt).
 
 ossify state is the single authority. You write nothing into `.ossify/` except through
 `oss`, and you never commit, never push. The records you produce are ossify's, unextended,
@@ -27,6 +28,25 @@ SKILL.md, in the `dsh-executor` skill directory, not under ossify's `work-item/`
 
 Take the round in this order — every baseline first, then the dispatches:
 
+0. Resolve the roles, once per round, before anything else. Read `.dsh-crew/roles.md` at the
+   AI workspace root (`references/presets.md` §9 in this plugin gives its shape).
+   - **No file:** there is no selection this round. Send no `provider`, `model` or
+     `reasoning_effort` on any child call; every child runs your route. Say so once in the
+     hand-back (§7).
+   - **A file:** it must hold exactly one `## Roles` table with one row each for
+     `implementer`, `verifier` and `reviewer`. A missing row means no selection for that role.
+     A duplicate row, or a role name outside those three, stops the round here: report the
+     file and the row to the operator, and never pick one of the rows.
+   - **Checking the routes:**
+     1. For each implementer or verifier route, call `list_subagent_models` with that
+        `provider` and `model`, and confirm the route is offered and the row's effort is among
+        its efforts. It answers `is not allowed for this Session` for a route outside the
+        allow-list, and otherwise lists the model's reasoning efforts.
+     2. For a reviewer row other than `driver`, confirm `subagent_reviewer` is among your
+        tools.
+     3. Any failure stops the round before the first dispatch. Report the file, the row and
+        what was missing to the operator. It is not a gap and not a record. dsh's allow-list
+        would refuse the call anyway; this fails early and names why.
 1. Baseline the two documents no child may touch — the blob ids of **every** request's
    `spec_path` and `handoff_path` (`git hash-object`) — all of them, before the first
    dispatch. The round is parallel, so a child already running can edit a sibling's spec, and
@@ -36,7 +56,9 @@ Take the round in this order — every baseline first, then the dispatches:
 2. Then, for every request in declared order: fill the implementer prompt (`dsh-brief` §2)
    with the seven request fields, verbatim, and call `subagent_implementer` with
    `description: "work item <work_item_id>"`, that prompt, and `run_in_background: true`.
-   Note the job id it returns against the item.
+   Note the job id it returns against the item. When step 0 resolved an implementer route,
+   the call also carries `provider`, `model` and `reasoning_effort` from that row, copied,
+   never chosen.
 
 Items within a round are parallel by construction; dispatch them all, then wait.
 
@@ -60,6 +82,22 @@ no child is left running; then stop before §7 and report to the operator the it
 id, the stop reason and the last output. The round is not handed back; the operator owns
 recovery. `job_kill` only on the operator's word.
 
+### 3a. The route check — every child, when it settles
+
+Before you use any child's return — implementer, correction or verifier — confirm the route it
+actually ran on, from its own transcript, never from its words:
+
+1. Your session's directory is the one under `~/.dsh/sessions/` holding your transcript;
+   children are the bare-UUID directories beside it. Take the newest whose
+   `session.v3.jsonl.zstd` (read with `zstd -dc`) opens with a `session` line carrying
+   `"origin":"subagent"`, and whose first `user/message` names this item's `handoff_path`.
+2. Its newest `request/header` gives `data.header.config`: `provider`, `model`,
+   `reasoningEffort`.
+3. Compare it with the role's row from §2 step 0. With no row, compare it with your own route
+   (your newest `request/header`).
+4. No such transcript, or a difference, is the stop rule (§3): no record for the item, and the
+   report names the expected route and the one the child ran.
+
 ## 4. Verify a complete return
 
 Foreground, one item at a time, in declared order:
@@ -76,6 +114,8 @@ Foreground, one item at a time, in declared order:
 3. Fill the verifier prompt (`dsh-brief` §3): CLAIMS from the item's spec (`dsh-brief` §3 —
    one per `auto:` AC, none for a `user:` row), the two fixed claims, the four paths.
 4. Call `subagent_verifier` with `description: "verify <work_item_id>"` and that prompt.
+   When §2 step 0 resolved a verifier route, the call also carries `provider`, `model` and
+   `reasoning_effort` from that row, copied, never chosen.
 5. Fingerprint again. Any difference means the verifier changed the item: the stop rule (§3).
 6. Gate the worktree, whatever the verdict turns out to be: the three rows §5's block reads —
    the branch, `HEAD` against the request's `base_sha`, and the staged-only status — each
@@ -98,7 +138,8 @@ Foreground, one item at a time, in declared order:
 2. Fill the correction prompt (`dsh-brief` §4) with the packet: `handoff_path`,
    `work_item_id`, `expected_branch` = the request's `branch`, `expected_head_sha`,
    `expected_tree_oid`, `failures` = the verifier's FAILURES lines.
-3. Call `subagent_implementer` with `description: "correct <work_item_id>"`, foreground.
+3. Call `subagent_implementer` with `description: "correct <work_item_id>"`, foreground,
+   with the implementer row's `provider`, `model` and `reasoning_effort`, as in §2.
 4. On a return that passes §3's usability test and is `complete`, verify again (§4, once);
    PASS → §5. A second FAIL (report both verifier outputs), a refusal
    (`correction-continuation.md` §3 step 2), a return that fails §3's usability test, or any
@@ -168,13 +209,35 @@ cannot change the file's parse or a value's type. Records are fed to close
 in declared decomposition order, never arrival order; closes and merges stay serial; the
 round barrier is untouched.
 
+Then tell the operator, in chat, each item's implementer and verifier route as §3a read it, or
+that no `roles.md` was in force. The records file carries no route: its fields are ossify's.
+
 A follow-up invocation never overwrites an earlier records file: a gaps replacement (§6)
 writes `<spine spec dir>/round-<n>-<work_item_id>-gaps-<k>-external-records.yaml` and a
 close-sent correction (§4a) writes
 `<spine spec dir>/round-<n>-<work_item_id>-correction-<k>-external-records.yaml`, where `k`
 is that item's gap or correction iteration.
 
-## 8. What you never do
+## 9. At close — the reviewer's second pass
+
+ossify's close runs its own code review, in your session, as `close/references/code-review.md`
+says. That review is never handed to another agent. At close, resolve the reviewer row as §2
+step 0 does, reading the file again: close may run in a session that dispatched no round. When
+it names a reviewer other than `driver`, add one independent pass at the same point:
+
+1. After close's Axis A and Axis B findings are written down, and before their dispositions,
+   call `subagent_reviewer` once, in the foreground, with the reviewer prompt (`dsh-brief` §6)
+   for each hosting repo's spine diff: the same `repo_root`, `base_branch` and `spine_branch`
+   close resolved for its own review.
+2. Take the **last JSON array** in its reply. A code fence around it is normal. Each element
+   must carry exactly `file`, `line`, `severity` and `claim`. Anything else is reported to the
+   operator verbatim, and close continues on its own findings.
+3. Add every finding to close's findings, marked as the reviewer's, and disposition them all
+   under close's rules. The reviewer's severity is advice, and close's rules decide.
+4. Record the reply's final `MODEL:` line in close's report. The claude-code provider keeps no
+   transcript, so §3a cannot check it; the profile's pinned row is the control.
+
+## 10. What you never do
 
 You never commit, never push, never edit a worktree yourself, never write `.ossify/`
 except through `oss`, never start a third attempt on an item within one invocation, never soften
