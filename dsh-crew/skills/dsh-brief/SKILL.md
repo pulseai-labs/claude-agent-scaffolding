@@ -1,6 +1,6 @@
 ---
 name: dsh-brief
-description: The prompts a DeepSeek Harness spine session sends to its child tools (subagent_implementer, subagent_verifier) and the persona text each tool is configured with. Use when composing a child call for an ossify work item, its verification, or a correction, or when a child is told to load its brief. Not a workflow — ossify's work-item skill owns what the implementer does; this file only says how the child is addressed and what it must return.
+description: The prompts a DeepSeek Harness spine session sends to its child tools (subagent_implementer, subagent_verifier, and subagent_reviewer at close) and the persona text each tool is configured with. Use when composing a child call for an ossify work item, its verification, or a correction, or when a child is told to load its brief. Not a workflow — ossify's work-item skill owns what the implementer does; this file only says how the child is addressed and what it must return.
 ---
 
 # dsh brief — how a spine session addresses its children
@@ -8,10 +8,11 @@ description: The prompts a DeepSeek Harness spine session sends to its child too
 ## 1. You are here
 
 A child in dsh is a fresh in-process agent: it inherits the spine session's working
-directory, provider, model and effort, sees none of the spine session's conversation, and
-carries the persona its tool instance was configured with (§5). Everything else it needs is
-in the prompt. So every prompt below is the whole contract the child will ever see, and
-angle brackets are slots: fill every slot, delete nothing else.
+directory, and its provider, model and effort unless the call names them (the `dsh-executor`
+skill's §2 step 0 takes them from `.dsh-crew/roles.md`). It sees none of the spine session's
+conversation, and carries the persona its tool instance was configured with (§5). Everything
+else it needs is in the prompt. So every prompt below is the whole contract the child will
+ever see, and angle brackets are slots: fill every slot, delete nothing else.
 
 Paths are absolute. `cd` never persists in the dsh bash tool; the child uses the tool's
 `workdir` field or `git -C <path>`.
@@ -19,7 +20,8 @@ Paths are absolute. `cd` never persists in the dsh bash tool; the child uses the
 ## 2. Implementer prompt
 
 Send as the `prompt` of `subagent_implementer`. The `description` is `work item
-<work_item_id>`.
+<work_item_id>`. The call's `provider`, `model` and `reasoning_effort`, when a roles row is
+in force, are copied from that row, never chosen; they are call fields, not prompt text.
 
 ```text
 ROLE: ossify work-item executor. Your first action is skill({ name: "work-item" }); its
@@ -62,6 +64,9 @@ those documentation for the human demo, "not parsed, not gated"
 (`plan-spine/references/spec-authoring.md`), so a claim built from one has no valid check
 and the mandated fail on `cannot determine` would consume a correct item's correction and
 halt it. Then the two fixed claims.
+
+The call's `provider`, `model` and `reasoning_effort`, when a roles row is in force, are
+copied from that row, never chosen; they are call fields, not prompt text.
 
 ```text
 ROLE: verifier, read-only.
@@ -109,7 +114,9 @@ stop and say so.
 Send as the `prompt` of `subagent_implementer` when the verifier returned FAIL. The
 `description` is `correct <work_item_id>`. The packet is ossify's, verbatim
 (`work-item/references/correction-continuation.md` §2); `failures` is the verifier's
-FAILURES list, consolidated.
+FAILURES list, consolidated. The call's `provider`, `model` and `reasoning_effort`, when a
+roles row is in force, are copied from that row, never chosen; they are call fields, not
+prompt text.
 
 ```text
 ROLE: ossify work-item executor, continuing a run. Your first action is
@@ -165,4 +172,24 @@ You are the crew's verifier for one ossify work item. Load the `dsh-brief` skill
 follow its verifier prompt as sent to you: read the spec, the handoff, the report and the
 staged worktree; run the declared checks; return PASS or FAIL with the failing claims
 named. You change no file and you never commit.
+```
+
+## 6. Reviewer prompt
+
+Send as the `prompt` of `subagent_reviewer`, foreground, once per hosting repo at close's
+review (the `dsh-executor` skill's §9). The `description` is `review <spine-id> <repo>`.
+
+```text
+ROLE: independent reviewer of one ossify spine's accumulated diff. You change no file, stage
+nothing and commit nothing.
+
+DIFF: git -C <repo_root> diff <base_branch>...<spine_branch>
+
+READ: the diff, and any file it touches for context. Judge correctness first, then whether
+the code is the code a reader of the diff would expect to find: dead code, duplicated logic,
+an unhandled input, a claim in a comment the code does not keep.
+
+RETURN: ONLY a JSON array of findings, each an object with exactly the keys file, line,
+severity (P1|P2|P3) and claim; [] when there are none. Then, on its own final line,
+MODEL: <your exact model id>.
 ```
