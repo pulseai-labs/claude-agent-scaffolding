@@ -23,7 +23,8 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # rule and a detected coordinator's `--until blocked` wait beside it, `enter` as the submit
 # key, and which ask governs the completion wait. Every addition is a clause: the file went
 # 201 -> 233 lines (+32: numstat 56 insertions, 24 deletions) and the gate rose 204 -> 235
-# (+31). The gate still fails over the limit; the slack is two lines.
+# (+31). The gate still fails over the limit; #574's widened doorbell predicate and #575's
+# mutually-cancelling companion wait spent the two-line slack (233 -> 235, 2026-09-24).
 #
 # 204, raised from 200 during PR #513's review rounds: this file's budget is this
 # port's own invention (orca-crew has no mechanics reference), and the rounds' P1
@@ -84,6 +85,21 @@ pin 'and so is a coordinator'"'"'s' \
   "a coordinator seat is waited on through its report file (R41)"
 pin 'A local slash command (`/context`, `/clear`) settles without a turn' \
   "a local slash command is sent without the turn-start check (R42)"
+
+# #574: the doorbell's predicate. Both halves are pinned — a revert to the hash alone kills
+# the first, and dropping the comparison leaves the identity remedy recorded but unread,
+# which is the half the issue exists for.
+pin 'the identity noted beside it differs' \
+  "the doorbell's wait compares the noted identity, not the hash alone (#574)"
+pin 'Both are compared, not merely recorded' \
+  "the noted identity is compared, not merely recorded (#574)"
+
+# #575: the detected coordinator's companion wait, made mutually cancelling — each wake
+# disarms the other, so a dispatch leaves at most one armed wait.
+pin 'and it ends the doorbell' \
+  "the companion's blocked wake ends the doorbell (#575)"
+pin "The doorbell's return — a new report or its timeout — ends the companion" \
+  "the doorbell's return ends the companion: one armed wait per dispatch (#575)"
 
 section "placement"
 present '--cwd' "a seat's tree is set with --cwd"
