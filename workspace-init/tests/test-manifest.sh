@@ -816,6 +816,62 @@ test_L6_relocate_refuses_symlinked_manifest() {
     echo "    refusal does not name the symlink"; cat "$_WI_TMP/l6/err"; return 1; }
 }
 
+test_V4_validate_rejects_invalid_regex_pattern() {
+  # Codex round 4 on #581: the hook fails closed on an invalid ERE, so the
+  # validator must too — the last hook rule it did not mirror.
+  local ai; ai="$(_setup_pair v4)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v4/good"
+  jq '.git_policy.trace_filter.blocked_patterns = ["^ok", "("]' "$_WI_TMP/v4/good" > "$m"
+  if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v4/err"; then
+    echo "    validate accepted an invalid ERE"; return 1; fi
+  grep -qF 'not a valid extended regex: (' "$_WI_TMP/v4/err" || {
+    echo "    refusal does not name the pattern"; cat "$_WI_TMP/v4/err"; return 1; }
+  # Adjacent control: valid EREs using groups, classes and anchors still pass.
+  jq '.git_policy.trace_filter.blocked_patterns = ["^(a|b)+$", "[[:space:]]x", "<noreply@x\\.com>"]' \
+    "$_WI_TMP/v4/good" > "$m"
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || { echo "    control: valid EREs rejected"; return 1; }
+}
+
+test_L7_relocate_refuses_self_pairing() {
+  # Codex round 4 on #581: the pair's two roots must differ, as the pairing
+  # preflight requires — via the flag or via the recorded canonical.root.
+  local ai; ai="$(_setup_pair l7)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/l7/orig"
+  if "$WI_BIN" manifest_relocate "$ai" --canonical-root "$ai/." 2>"$_WI_TMP/l7/err"; then
+    echo "    relocate accepted --canonical-root equal to the AI root"; return 1; fi
+  cmp -s "$_WI_TMP/l7/orig" "$m" || { echo "    manifest modified by a refused self-pair"; return 1; }
+  grep -qF 'same directory as both roots' "$_WI_TMP/l7/err" || {
+    echo "    refusal does not explain"; cat "$_WI_TMP/l7/err"; return 1; }
+  # Recorded canonical.root equal to the AI root, no flag → also refused.
+  jq --arg r "$(cd "$ai" && pwd -P)" '.canonical.root = $r' "$_WI_TMP/l7/orig" > "$m"
+  cp "$m" "$_WI_TMP/l7/orig2"
+  if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
+    echo "    relocate accepted a recorded canonical equal to the AI root"; return 1; fi
+  cmp -s "$_WI_TMP/l7/orig2" "$m" || { echo "    manifest modified by a refused call"; return 1; }
+  # Control: the flag naming a distinct directory still fixes it.
+  mkdir -p "$_WI_TMP/l7/real-canonical"
+  "$WI_BIN" manifest_relocate "$ai" --canonical-root "$_WI_TMP/l7/real-canonical" 2>/dev/null || {
+    echo "    control: relocate to a distinct canonical failed"; return 1; }
+}
+
+test_L8_relocate_preserves_manifest_mode() {
+  # Codex round 4 on #581: the rewrite must keep the manifest's mode, not
+  # take the caller's umask.
+  local ai; ai="$(_setup_pair l8)" || return 1
+  local m="$ai/.workspace/pairing.json" mode
+  for mode in 600 640; do
+    chmod "$mode" "$m"
+    ( umask 022; "$WI_BIN" manifest_relocate "$ai" 2>/dev/null ) || {
+      echo "    relocate failed at mode $mode"; return 1; }
+    local got; got="$(stat -c '%a' "$m" 2>/dev/null || stat -f '%Lp' "$m")"
+    assert_eq "$mode" "$got" "mode after relocate" || return 1
+  done
+  ls "$ai/.workspace" | grep -q '\.tmp\.' && { echo "    relocate left a tmp file behind"; return 1; }
+  return 0
+}
+
 wi_test_run test_L1_relocate_rewrites_ai_root_preserves_everything_else
 wi_test_run test_L2_relocate_canonical_root_only_with_flag
 wi_test_run test_L3_relocate_refuses_bad_manifest_unchanged
@@ -825,5 +881,8 @@ wi_test_run test_V1_validate_rejects_wrong_typed_blocks
 wi_test_run test_V2_validate_rejects_non_object_document
 wi_test_run test_V3_validate_rejects_invalid_policy_leaf_types
 wi_test_run test_L6_relocate_refuses_symlinked_manifest
+wi_test_run test_V4_validate_rejects_invalid_regex_pattern
+wi_test_run test_L7_relocate_refuses_self_pairing
+wi_test_run test_L8_relocate_preserves_manifest_mode
 
 wi_test_summary

@@ -385,7 +385,9 @@ wi_manifest_write() {
 #
 # Refuses, changing nothing, when: the root is not a directory, the manifest is
 # a symlink, missing, not a single JSON object, or fails wi_manifest_validate
-# (the full schema check), or --canonical-root is not a directory. Atomic
+# (the full schema check, including every trace-filter rule the hook applies),
+# --canonical-root is not a directory, or the result would record the same
+# directory as both roots. The rewrite keeps the manifest's file mode. Atomic
 # via tmp-then-mv. Does not touch the hooks and writes no init-log entry: it is
 # a repair, not a bootstrap step, so rollback has nothing to undo.
 wi_manifest_relocate() {
@@ -463,11 +465,33 @@ wi_manifest_relocate() {
   local old_root
   old_root="$(jq -r '.ai_workspace.root // "(unset)"' "$manifest" 2>/dev/null)" || old_root="(unreadable)"
 
+  # The pair must stay a pair: refuse a result whose two roots are the same
+  # directory — the self-pairing wi_skeleton_preflight_existing_dual rejects —
+  # whether it comes from --canonical-root or from the recorded canonical.root.
+  local final_cn
+  if [[ -n "$canonical_root" ]]; then
+    final_cn="$canonical_root"
+  else
+    final_cn="$(jq -r '.canonical.root' "$manifest" 2>/dev/null)" || final_cn=""
+  fi
+  if [[ -n "$final_cn" && "$(wi_realpath "$final_cn")" == "$(wi_realpath "$ai_root")" ]]; then
+    wi_log_error "wi_manifest_relocate: refusing to record the same directory as both roots: $ai_root; ai_root and canonical must be different paths (pass the canonical's real location with --canonical-root)"
+    return 1
+  fi
+
   local ai_name cn_name=""
   ai_name="$(basename "$ai_root")"
   [[ -z "$canonical_root" ]] || cn_name="$(basename "$canonical_root")"
 
+  # Build the replacement in a copy of the original (cp -p), so the rename
+  # keeps the manifest's mode rather than the caller's umask: a 0600 manifest
+  # stays 0600. The redirect below truncates the copy but keeps its mode.
   local tmp="${manifest}.tmp.$$"
+  if ! cp -p "$manifest" "$tmp" 2>/dev/null; then
+    rm -f "$tmp"
+    wi_log_error "wi_manifest_relocate: could not stage a copy of $manifest"
+    return 1
+  fi
   if ! jq \
       --arg ai_root   "$ai_root" \
       --arg ai_name   "$ai_name" \
@@ -770,6 +794,21 @@ wi_manifest_validate() {
     wi_log_error "wi_manifest_validate: $manifest has invalid values: $bad_policy"
     return 1
   fi
+  # The last rule the hook applies: every pattern must be a valid extended
+  # regex (grep -E exit 2 is an evaluation error, not "no match"). With this,
+  # every policy check the hook fails closed on is also checked here.
+  local pattern grc
+  while IFS= read -r pattern; do
+    [[ -n "$pattern" ]] || continue
+    # `|| grc=$?`, not a bare call: grep exits 1 on the valid "no match"
+    # path, which would abort the dispatcher's errexit.
+    grc=0
+    grep -E -e "$pattern" /dev/null >/dev/null 2>&1 || grc=$?
+    if (( grc > 1 )); then
+      wi_log_error "wi_manifest_validate: $manifest has invalid values: git_policy.trace_filter.blocked_patterns entry is not a valid extended regex: $pattern"
+      return 1
+    fi
+  done < <(jq -r '.git_policy.trace_filter.blocked_patterns[]' "$manifest" 2>/dev/null)
 
   return 0
 }
