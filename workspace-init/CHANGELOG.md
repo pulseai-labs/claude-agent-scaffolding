@@ -1,5 +1,23 @@
 # workspace-init changelog
 
+## 0.7.0 (2026-09-24)
+
+The six workspace-init issues deferred from the 0.5.1 cycle (#482, #488, #490, #491, #492, #493): the dispatched default-branch probe no longer aborts, both hook installers validate the AI root before writing, a symlinked hook is never replaced, the moved-workspace repair can rewrite the manifest's recorded roots, and an empty blocked pattern fails closed.
+
+### Added
+- **#491 — `wi manifest_relocate <ai-root> [--canonical-root PATH]`** completes the moved-workspace repair. Re-baking the hooks restored the filter but left `pairing.json` naming the old `ai_workspace.root`, so consumers resolving paths through `wi_manifest_resolve` read a stale location. The new verb rewrites `ai_workspace.root`/`name` (and, only with the flag, `canonical.root`/`name`) to absolute physical paths and carries every other field through unchanged — `project_type`, remotes, `default_branch`, a customised `git_policy`, `tooling_repo`, `created_at`. It refuses, changing nothing, on a missing or corrupt manifest or a root that is not a directory, writes atomically, and adds no init-log entry. The README's Repair section runs it after the hook re-bake.
+
+### Fixed
+- **#482 — `wi git_detect_default_branch` no longer exits 128 through the dispatcher.** On a canonical with an `origin` remote but no `origin/HEAD` (a plain `git init` + `git remote add`, which is where a Scenario A pairing starts), step 1's failing `git symbolic-ref` aborted the function under `set -euo pipefail` before the documented fallbacks ran. Every probe's expected failure is now absorbed and the chain moves on; dispatcher-path tests cover no-`origin/HEAD`, `origin/HEAD` set, and a non-repo.
+- **#492 — the single-target `wi trace_filter_install` validates the AI root before any write.** It now applies the pair installer's check (the directory exists and holds a `pairing.json` that is a single JSON object) through one shared validator, so a mistyped root fails instead of baking a dead path into the hook, creating `<typo>/.workspace`, and returning success.
+- **#490 — a symlinked `commit-msg` is never replaced.** A valid symlink whose target is a copy of our hook read as ours through the link, and the install moved a regular file over it, dropping the user's link. The install now refuses any symlink — dangling or valid — naming its target, and `wi_rollback`'s HOOK_INSTALL inverse leaves any symlink in place.
+- **#493 — an empty-string entry in `blocked_patterns` fails closed.** `[""]` used to read as allow-all. The hook now blocks and names the empty entry; an explicit `[]` or `enforce: false` remain the ways to allow everything. Hooks installed before 0.7.0 keep the old behaviour until re-baked with `wi trace_filter_install_pair`. The README Repair section's read-first probe now reads `project_type` from `git_policy.project_type`, where it lives, instead of printing `null`.
+- **#488 — the render-failure tests hold under any uid.** They forced a failure with a `chmod 000` template that root can still read. `WI_HOOKS_DIR` is now a strict override (a set override with no template fails the render instead of falling back to the shipped one), and the tests point it at a directory with no template.
+
+### Compatibility
+- `WI_HOOKS_DIR` is a test-only override; with it unset, template lookup is unchanged.
+- The pair installer's AI-root error now names the resolved absolute path rather than the argument as typed.
+
 ## 0.6.0 (2026-09-22)
 
 Lifecycle handoff to ossify: workspace-init stays the topology bootstrap — it creates or pairs the dual-repo layout, writes `pairing.json`, installs the AI-trace commit-msg filters, and prints next steps — but every generated stub, printed block, and example now routes the user to `/ossify:start` (empty canonical) or `/ossify:adopt` (projects previously onboarded with the legacy scaffold stack — a repository that arrives with source or history but no such stack has no supported ossify continuation yet) instead of the retired scaffold-onboard/scaffold-dev chain (#308).
