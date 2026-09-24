@@ -492,6 +492,13 @@ wi_manifest_relocate() {
     wi_log_error "wi_manifest_relocate: could not stage a copy of $manifest"
     return 1
   fi
+  # A read-only manifest (0444) gives the copy no owner-write bit, and the
+  # redirect would fail. Open the copy for the rewrite, and take the bit away
+  # again afterwards if the original did not have it. `find -perm` is the
+  # POSIX way to read one mode bit on both GNU and BSD.
+  local owner_ro=0
+  [[ -n "$(find "$manifest" -prune -perm -u=w 2>/dev/null)" ]] || owner_ro=1
+  chmod u+w "$tmp" 2>/dev/null
   if ! jq \
       --arg ai_root   "$ai_root" \
       --arg ai_name   "$ai_name" \
@@ -505,6 +512,11 @@ wi_manifest_relocate() {
       "$manifest" > "$tmp" 2>/dev/null; then
     rm -f "$tmp"
     wi_log_error "wi_manifest_relocate: jq failed rewriting $manifest"
+    return 1
+  fi
+  if (( owner_ro )) && ! chmod u-w "$tmp" 2>/dev/null; then
+    rm -f "$tmp"
+    wi_log_error "wi_manifest_relocate: could not restore the read-only mode of $manifest"
     return 1
   fi
   mv "$tmp" "$manifest" || {

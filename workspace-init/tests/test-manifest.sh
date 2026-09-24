@@ -861,7 +861,10 @@ test_L8_relocate_preserves_manifest_mode() {
   # take the caller's umask.
   local ai; ai="$(_setup_pair l8)" || return 1
   local m="$ai/.workspace/pairing.json" mode
-  for mode in 600 640; do
+  # 444 covers a read-only manifest (Codex round 5 on #581): the staged copy
+  # must be writable for the rewrite and read-only again afterwards. Only a
+  # non-root run can see the write failure; the mode assertion holds for both.
+  for mode in 600 640 444; do
     chmod "$mode" "$m"
     ( umask 022; "$WI_BIN" manifest_relocate "$ai" 2>/dev/null ) || {
       echo "    relocate failed at mode $mode"; return 1; }
