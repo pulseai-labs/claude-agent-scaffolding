@@ -147,8 +147,8 @@ and stop that step.
 ## 5. Configured personas
 
 These are the `persona` values of the two tool instances in the `crew-spine` preset
-(`references/presets.md` in this plugin). A persona shadows the deployment persona for
-that child alone; it is short because the prompt above carries the contract.
+(`presets/crew-spine/agent.cordis.yml` in this plugin). A persona shadows the deployment
+persona for that child alone; it is short because the prompt above carries the contract.
 
 `subagent_implementer`:
 
