@@ -168,9 +168,12 @@ sel_out="$("$RUBY_BIN" -ryaml -e '
       when Hash then (c = n["config"]; rows << c if c.is_a?(Hash) && c["toolName"]); n.each_value { |x| walk.(x) } end }
     walk.(YAML.safe_load(File.read(f), aliases: true))
     kids = rows.select { |c| %w[subagent_implementer subagent_verifier].include?(c["toolName"]) }
-    next if kids.empty?
     label = File.basename(f)
     sel = rows.select { |c| c["modelSelectionSettings"] == true }.map { |c| c["toolName"] }.uniq
+    # A profile-level child (the reviewer rows in §8) reaches crew-spine sessions too, so no row
+    # but the implementer row may be selectable in any block, crew-spine rows or not.
+    (sel - ["subagent_implementer"]).each { |t| bad << "#{label} #{t}: only subagent_implementer may be selectable" }
+    next if kids.empty?
     kids.each { |c| bad << "#{label} #{c["toolName"]}: child row without maxDepth 1" if c["maxDepth"] != 1 }
     rows.each do |c|
       named = Array(c.dig("toolFilter", "deny")) + Array(c.dig("toolFilter", "allow"))
