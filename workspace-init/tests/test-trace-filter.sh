@@ -293,6 +293,18 @@ test_E11_empty_string_pattern_blocks() {
   assert_eq "1" "$rc" "an empty entry beside a valid one must fail closed" || return 1
   grep -qF 'contains an empty-string entry' "$d/stderr" || {
     echo "    mixed list: block does not name the empty-string entry"; cat "$d/stderr"; return 1; }
+  # Codex round 7 on #581: an entry with a line break collapses into empty
+  # records the same way ("\n" became allow-all). Blocked and named — alone,
+  # and embedded in an otherwise real pattern.
+  local nl
+  for nl in '["\n"]' '["^a\nb"]'; do
+    tmp="$(mktemp)"
+    jq ".git_policy.trace_filter.blocked_patterns = $nl" "$manifest" > "$tmp" && mv "$tmp" "$manifest"
+    rc="$(_run_hook "$hook" "$msg" "$d")"
+    assert_eq "1" "$rc" "line-break pattern $nl must fail closed" || return 1
+    grep -qF 'an entry with a line break' "$d/stderr" || {
+      echo "    block does not name the line break ($nl)"; cat "$d/stderr"; return 1; }
+  done
   # Adjacent controls: the explicit empty array still allows (E3's contract),
   # and a whitespace pattern is a real regex, not an empty entry.
   tmp="$(mktemp)"

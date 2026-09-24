@@ -830,7 +830,7 @@ wi_manifest_validate() {
   # The trace-filter policy leaves must have the types the commit-msg hook
   # requires — otherwise the manifest validates here and the hook then fails
   # closed on it. Same rules as the hook: enforce is a boolean; blocked_patterns
-  # is an array of non-empty strings (#493).
+  # is an array of non-empty strings with no line break or NUL (#493).
   local bad_policy
   if ! bad_policy="$(jq -r '
     .git_policy.trace_filter as $tf
@@ -839,8 +839,10 @@ wi_manifest_validate() {
          else "git_policy.trace_filter.enforce (must be a boolean)" end),
         (if ($tf.blocked_patterns | type) != "array"
          then "git_policy.trace_filter.blocked_patterns (must be an array)"
-         elif ($tf.blocked_patterns | all(type == "string" and . != "")) then empty
-         else "git_policy.trace_filter.blocked_patterns (entries must be non-empty strings)" end)
+         elif ($tf.blocked_patterns
+               | all(type == "string" and . != "" and ((explode | any(. == 10 or . == 0)) | not)))
+         then empty
+         else "git_policy.trace_filter.blocked_patterns (entries must be non-empty single-line strings)" end)
       ] | join(", ")
   ' "$manifest" 2>/dev/null)"; then
     wi_log_error "wi_manifest_validate: $manifest has a required block of the wrong type; its required fields could not be checked"

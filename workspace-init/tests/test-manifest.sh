@@ -780,7 +780,9 @@ test_V3_validate_rejects_invalid_policy_leaf_types() {
               '.git_policy.trace_filter.blocked_patterns = {"a":1}' \
               '.git_policy.trace_filter.blocked_patterns = "x"' \
               '.git_policy.trace_filter.blocked_patterns = ["^a", 1]' \
-              '.git_policy.trace_filter.blocked_patterns = ["^a", ""]'; do
+              '.git_policy.trace_filter.blocked_patterns = ["^a", ""]' \
+              '.git_policy.trace_filter.blocked_patterns = ["\n"]' \
+              '.git_policy.trace_filter.blocked_patterns = ["^a\nb"]'; do
     jq "$edit" "$_WI_TMP/v3/good" > "$m"
     if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v3/err"; then
       echo "    validate accepted: $edit"; return 1; fi
