@@ -2,7 +2,7 @@
 #
 # dsh-crew — presets and profile rows
 #
-# The three shipped presets (presets/<name>/agent.cordis.yml + preset.yml) and every
+# The one shipped preset (presets/crew-spine/agent.cordis.yml + preset.yml) and every
 # fenced yaml block in references/presets.md parse under Psych (the parser the house
 # uses because it is what actually loads YAML elsewhere; it reads a `!!js` scalar as its
 # source string). Then the facts a copied file must not drift from: the child personas
@@ -22,7 +22,7 @@ require_ruby_psych || { report; exit 1; }
 DOC="$PLUGIN_ROOT/references/presets.md"
 PRESETS="$PLUGIN_ROOT/presets"
 BRIEF="$PLUGIN_ROOT/skills/dsh-brief/SKILL.md"
-NAMES="crew-spine crew-implementer crew-verifier"
+NAMES="crew-spine"
 [ -f "$DOC" ] && pass "references/presets.md exists" || { fail "references/presets.md exists"; report; exit 1; }
 
 parses() { "$RUBY_BIN" -ryaml -e 'YAML.safe_load(File.read(ARGV[0]), aliases: true)' "$1" 2>/dev/null; }
@@ -36,6 +36,8 @@ for n in $NAMES; do
   out="$("$RUBY_BIN" -ryaml -e 'y = YAML.safe_load(File.read(ARGV[0])); puts((y.is_a?(Hash) && y["name"].is_a?(String) && y["description"].is_a?(String)) ? "ok" : "bad")' "$PRESETS/$n/preset.yml" 2>&1)"
   [ "$out" = "ok" ] && pass "$n/preset.yml has name and description" || fail "$n/preset.yml has name and description" "$out"
 done
+shopt -s nullglob; shipped=("$PRESETS"/*/); shopt -u nullglob
+[ "${#shipped[@]}" -eq 1 ] && [ -d "$PRESETS/crew-spine" ] && pass "crew-spine is the only shipped preset" || fail "crew-spine is the only shipped preset" "${shipped[*]}"
 
 section "presets.md yaml blocks parse"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
@@ -68,7 +70,8 @@ for needle in "toolName: subagent_implementer" "toolName: subagent_verifier" \
   grep -qF -- "$needle" "$PRESETS/crew-spine/agent.cordis.yml" && pass "crew-spine: $needle" || fail "crew-spine: $needle"
 done
 for needle in "defaultPreset: danger-full-access" "api: anthropic-messages" "deepseek-v4.1-flash:cloud" \
-  "subagent-model-selection:" "busyEnter: steer" "x-opencode-session" "--trusted-host"; do
+  "subagent-model-selection:" "busyEnter: steer" "x-opencode-session" "--trusted-host" \
+  "toolName: subagent_reviewer"; do
   grep -qF -- "$needle" "$DOC" && pass "presets.md: $needle" || fail "presets.md: $needle"
 done
 for needle in "ossify-references" "resume.md" '`/close <spine-id>`' "chat message first"; do
@@ -149,5 +152,57 @@ case "$routes_out" in
   allowed=*[!0-9]*) fail "every allow-listed route, the default, and reasoning: max" "$routes_out" ;;
   allowed=*) pass "every allow-listed route and the default model are defined; every route sets reasoning: max" ;;
 esac
+
+section "selectable child rows: maxDepth guards them, no toolFilter names them"
+# Spike 5: with modelSelectionSettings on, the tool stops being a global tool, so any
+# toolFilter naming it fails at child start; maxDepth: 1 is the guard dsh enforces instead.
+sel_out="$("$RUBY_BIN" -ryaml -e '
+  rows = []
+  walk = ->(n) { case n when Array then n.each { |x| walk.(x) }
+    when Hash then (c = n["config"]; rows << c if c.is_a?(Hash) && c["toolName"]); n.each_value { |x| walk.(x) } end }
+  ARGV.each { |f| walk.(YAML.safe_load(File.read(f), aliases: true)) }
+  sel = rows.select { |c| c["modelSelectionSettings"] == true }.map { |c| c["toolName"] }.uniq
+  bad = []
+  rows.each do |c|
+    bad << "#{c["toolName"]}: selectable without maxDepth 1" if c["modelSelectionSettings"] == true && c["maxDepth"] != 1
+    named = Array(c.dig("toolFilter", "deny")) + Array(c.dig("toolFilter", "allow"))
+    (named & sel).each { |t| bad << "#{c["toolName"]}: toolFilter names selectable #{t}" }
+  end
+  %w[subagent_implementer subagent_verifier].each { |t| bad << "#{t} is not selectable" unless sel.include?(t) }
+  puts(bad.empty? ? "ok" : bad.uniq.join("; "))
+' "$PRESETS/crew-spine/agent.cordis.yml" "$tmp"/block-*.yml 2>&1)"
+[ "$sel_out" = "ok" ] && pass "both child rows selectable, maxDepth 1, never named by a toolFilter" || fail "both child rows selectable, maxDepth 1, never named by a toolFilter" "$sel_out"
+
+section "the headless profile's child rows are crew-spine's"
+rows_out="$("$RUBY_BIN" -ryaml -e '
+  pick = ->(f) { r = {}; walk = ->(n) { case n when Array then n.each { |x| walk.(x) }
+    when Hash then (c = n["config"]; r[c["toolName"]] = c.reject { |k, _| k == "persona" } if c.is_a?(Hash) && %w[subagent_implementer subagent_verifier].include?(c["toolName"])); n.each_value { |x| walk.(x) } end }
+    walk.(YAML.safe_load(File.read(f), aliases: true)); r }
+  want = pick.(ARGV[0]); got = {}
+  ARGV[1..].each { |f| got.merge!(pick.(f)) }
+  puts(want == got && want.size == 2 ? "ok" : "drift preset=#{want} headless=#{got}")
+' "$PRESETS/crew-spine/agent.cordis.yml" "$tmp"/block-*.yml 2>&1)"
+[ "$rows_out" = "ok" ] && pass "headless child rows equal crew-spine's (persona compared above)" || fail "headless child rows equal crew-spine's" "$rows_out"
+
+section "the example roles.md routes are allow-listed"
+# The example project file (a ```markdown fence opening '## Roles') must name only routes the
+# example settings.yaml allow-lists, one row per role; the reviewer names a tool kind.
+awk '/^```markdown$/{f=1; buf=""; next} f && /^```$/{f=0; if (buf ~ /^## Roles/) print buf; next} f{buf = buf $0 "\n"}' "$DOC" > "$tmp/roles.md"
+roles_out="$("$RUBY_BIN" -ryaml -e '
+  rows = File.read(ARGV[0]).lines.map(&:strip).select { |l| l.start_with?("|") && !l.start_with?("|---") }.drop(1)
+    .map { |l| l.split("|").map(&:strip).reject(&:empty?) }
+  allowed = []
+  ARGV[1..].each { |f| y = YAML.safe_load(File.read(f), aliases: true); allowed.concat(Array(y.dig("subagent-model-selection", "allowedModels"))) if y.is_a?(Hash) }
+  allowed = allowed.map { |a| "#{a["provider"]}/#{a["model"]}" }
+  bad = []
+  roles = rows.map(&:first)
+  bad << "roles #{roles}" unless roles.sort == %w[implementer reviewer verifier]
+  rows.each do |role, route, _|
+    if role == "reviewer" then bad << "reviewer #{route}" unless %w[claude-code codex driver].include?(route)
+    else bad << "#{role} #{route} not allow-listed" unless allowed.include?(route) end
+  end
+  puts(bad.empty? ? "ok" : bad.join("; "))
+' "$tmp/roles.md" "$tmp"/block-*.yml 2>&1)"
+[ "$roles_out" = "ok" ] && pass "example roles.md: one row per role, routes allow-listed" || fail "example roles.md: one row per role, routes allow-listed" "$roles_out"
 
 report

@@ -10,10 +10,11 @@ from the web UI on 2026-09-23 and 2026-09-24 (two rounds, a hand-off and a close
 |---|---|---|
 | Provider routes, the default model, the child-model allow-list, the composer | `~/.dsh/settings.yaml` | §6 |
 | Host settings for the web profile | `~/.dsh/profiles/web/cordis.patch.yml` | §1 |
-| The three presets | `presets/<name>/` in this plugin → `~/.dsh/.agent-presets/<name>/` | §2–§4 |
+| The spine preset | `presets/crew-spine/` in this plugin → `~/.dsh/.agent-presets/crew-spine/` | §2 |
 | A headless spine session | `~/.dsh/profiles/crew/cordis.patch.yml` | §5 |
 | Reaching the web UI from another machine | `tailscale serve` + the unit's flags | §7 |
-| An optional Claude Code review child | a profile plugin + two rows | §8 |
+| The optional reviewer child | a profile plugin + two rows in the web profile | §8 |
+| Which model fills each crew role, per project | `.dsh-crew/roles.md` in the AI workspace | §9 |
 
 ## 0. Before the rows
 
@@ -44,11 +45,12 @@ from the web UI on 2026-09-23 and 2026-09-24 (two rounds, a hand-off and a close
   root does not carry them. Re-link after an ossify update, as with the skills.
 - **How the rows compose.** The web profile disables the model-facing tools at host level and
   each preset turns them on for its own sessions; the subagent seam (`subagent`, the `spawn`
-  provider) is already mounted. So the web profile patch carries only host settings (§1),
-  routes live once in `settings.yaml` (§6), and everything a session sees (persona, tools,
-  skills root, the two child tools) lives in the preset (§2–§4). A child joins its parent's
+  provider) is already mounted. So the web profile patch carries only host settings (§1) and,
+  optionally, the reviewer's rows (§8); routes live once in `settings.yaml` (§6); and
+  everything a session sees (persona, tools, skills root, the two child tools) lives in the
+  preset (§2). A child joins its parent's
   composition minus its `toolFilter`, takes its persona from its tool row, and runs its
-  parent's route.
+  parent's route unless the call names one (both crew child tools are selectable; §6).
 
 ## 1. Web profile patch — `~/.dsh/profiles/web/cordis.patch.yml`
 
@@ -66,30 +68,37 @@ shipped default is 60 s). No provider rows: routes and the default model are in 
 
 The permission row's id is `permission`.
 
-## 2–4. The presets — `presets/` in this plugin
+## 2. The spine preset — `presets/crew-spine/` in this plugin
 
-Each is a directory with an `agent.cordis.yml` (the composition) and a `preset.yml` (the
-picker's name and description). Install one by copying its directory to
-`~/.dsh/.agent-presets/<name>/`; copy again after a plugin update. The files are complete as
-shipped: the skills root is the only machine path in them, and it is resolved from `HOME`.
+A directory with an `agent.cordis.yml` (the composition) and a `preset.yml` (the picker's name
+and description). Install it by copying the directory to `~/.dsh/.agent-presets/crew-spine/`,
+and copy it again after a plugin update. The file is complete as shipped: the skills root is
+the only machine path in it, and it is resolved from `HOME`.
 
-- **§2 `crew-spine`**: the spine session. The shipped `standard` preset with its persona
-  replaced, the skills root set, and its delegation group reduced to the two configured child
-  tools plus the subagent control tools (no generic `subagent`, `subagent_fork`, `workflow` or
-  `ralph`, so every child is one of the two). Its persona runs a spine, continues a halted
-  spine from its recorded state (ossify cannot resume one itself), runs `/close`, hands off and
-  resumes through ossify's handoff procedures, and keeps every `ask_user_question` short, with
-  the detail posted as a chat message first. The spine session runs ossify's close, which
-  commits and merges, so the persona forbids commits outside the lane rather than commits as
-  such; the children never commit.
-- **§3 `crew-implementer`** and **§4 `crew-verifier`**: for a human running one item by hand,
-  as `standard` with the implementer or verifier persona and the skills root, and no
-  delegation group. **The spine's children do not use them.** A child started through
-  `subagent_implementer` or `subagent_verifier` takes its persona from the `crew-spine` tool
-  row (the text in the `dsh-brief` skill's §5) and runs the parent's route. The verifier
-  preset is read-only by its prompt, not by its tool set: `bash` stays because the verifier's
-  claim N builds a disposable copy, and 0.1.5-rc.3's `tool-fs` has no read-only mode. The
-  `subagent_verifier` child is tighter, because its `toolFilter` removes `edit` and `write`.
+It is the shipped `standard` preset with its persona replaced, the skills root set, and its
+delegation group reduced to the two configured child tools plus the subagent control tools
+(no generic `subagent`, `subagent_fork`, `workflow` or `ralph`, so every child is one of the
+two). Its persona:
+- runs a spine;
+- continues a halted spine from its recorded state (ossify cannot resume one itself);
+- runs `/close`;
+- hands off and resumes through ossify's handoff procedures;
+- keeps every `ask_user_question` short, with the detail posted as a chat message first.
+
+It commits only where ossify's lane and close tell it to; its children never commit.
+
+**The two child rows are model-selectable** (`modelSelectionSettings: true`): each call may
+name a `provider`, `model` and `reasoning_effort` from the allow-list in §6, and the driver
+takes them from the project's `roles.md` (§9). Because a selectable tool is not a global tool,
+no `toolFilter` may name it: a filter that does fails the child at start. Recursion is stopped
+by `maxDepth: 1` on both rows instead, which dsh enforces on every start, whoever calls. The
+verifier's `toolFilter` still removes `edit` and `write`.
+
+## 3–4. Retired in 0.3.0
+
+0.2.0 shipped `crew-implementer` and `crew-verifier` for a human running one item by hand. A
+spine's children never used them. Run one item by hand in `crew-spine` ("execute work item
+<id>" reaches the `work-item` skill), or in `standard` with the skills root.
 
 ## 5. The headless `crew` profile — a spine run with no browser
 
@@ -147,6 +156,8 @@ the run, so a spine with any chance of a gap belongs in the web UI.
       ask_user_question short: a one-line question and short option labels. Post any
       detail the operator needs as a chat message first, then ask, because a long
       question card hides its options and its Submit button.
+      Child routes come from `.dsh-crew/roles.md`, as the `dsh-executor` skill's §2 step 0
+      says; at close, its §9 adds the reviewer's pass.
 - id: skill-filesystem
   config:
     customSkillDirs:
@@ -165,24 +176,26 @@ the run, so a spine with any chance of a gap belongs in the web UI.
       config:
         provider: spawn
         toolName: subagent_implementer
+        modelSelectionSettings: true
+        maxDepth: 1
         persona: |
           You are ossify's work-item executor. Load the `work-item` skill with the skill tool as
           your first action; it is your binding system prompt. One handoff in, one JSON return out.
           You never commit.
-        toolFilter:
-          deny: [subagent_implementer, subagent_verifier]
     - id: tool-subagent-verifier
       name: '@deepseek-ai/dsh-tool-subagent'
       config:
         provider: spawn
         toolName: subagent_verifier
+        modelSelectionSettings: true
+        maxDepth: 1
         persona: |
           You are the crew's verifier for one ossify work item. Load the `dsh-brief` skill and
           follow its verifier prompt as sent to you: read the spec, the handoff, the report and the
           staged worktree; run the declared checks; return PASS or FAIL with the failing claims
           named. You change no file and you never commit.
         toolFilter:
-          deny: [subagent_implementer, subagent_verifier, edit, write]
+          deny: [edit, write]
 ```
 
 The persona is the `crew-spine` preset's, word for word; the suite checks it.
@@ -312,8 +325,8 @@ What each part is for, and what breaks without it:
   child model has to resolve every allow-listed route, or it fails at boot with `NO_ADAPTER`.
   That is why routes live here and nowhere else. Never drop a route the allow-list still
   names. The allow-list does nothing for a tool row that does not set
-  `modelSelectionSettings: true`, and neither crew child tool sets it in this release, so
-  children run their parent's route.
+  `modelSelectionSettings: true`. Both crew child tools set it, so a child call may name any
+  allow-listed route; a call that names none runs its parent's route.
 - **`busyEnter: steer`.** Plain Enter while the agent is busy steers (lands at the next step
   boundary) instead of queueing for the end of the turn, and Cmd/Ctrl+Enter does the opposite.
   dsh's default is queue, and a spine is one long turn, so a queued message can wait hours.
@@ -343,21 +356,22 @@ reachable from wherever the operator is. On a tailnet:
   `dsh --profile crew` session does not: it is written to disk but never registered, so it is
   invisible there. Start spine sessions in the UI, or through `/api` (the `dsh-session` skill).
 
-## 8. Optional — a Claude Code review child
+## 8. Optional — the reviewer child (Claude Code)
 
-`@deepseek-ai/dsh-subagent-claude-code` runs Claude Code, through its SDK and under the host
-user's own Claude Code login, as a child tool of a dsh session. It is measured in a test
-profile only, and **not yet run from `crew-spine`**. There, a Sonnet child reviewed a closed
-spine's diff, and its top three findings matched ones the spine's PR review and close audit had
-found independently. The child keeps no transcript (`persistSession: false`). Its model was
-confirmed by calling the same SDK's `query()` and reading `result.modelUsage`
-(`claude-sonnet-5`).
+`@deepseek-ai/dsh-subagent-claude-code` runs Claude Code as a child, through its SDK and under
+the host user's own Claude Code login. It is the `subagent_reviewer` tool that `roles.md`'s
+reviewer row (§9) and the `dsh-executor` skill's §9 use. It is mounted at profile level, in the
+web profile's patch, **not in the preset**: a preset row naming a provider the profile lacks
+would break `crew-spine` on every machine without the plugin. A profile-level row does reach
+`crew-spine` web sessions (measured 2026-09-24).
 
 - **Install** into a profile: `dsh plugin --profile <name> add
   @deepseek-ai/dsh-subagent-claude-code@0.1.5-rc.3`. `dsh plugin` forwards to **pnpm**. Where
   pnpm is missing, a PATH shim works: a `pnpm` script containing `exec npx -y pnpm@10 "$@"`
-  (corepack 0.24 cannot run pnpm 12). Check that the profile's `package.json` lists the package
-  under `dsh.profile.bundles`.
+  (corepack 0.24 cannot run pnpm 12). `dsh plugin add` records the package in the profile's
+  `package.json` under `dsh.profile.bundles` itself; check that it is there. A fresh profile's
+  `cordis.patch.yml` ends in a literal `[]`, which must be replaced by the rows, not appended
+  after: rows after it fail to parse.
 - **Rows** in that profile's patch: the provider's settings, and one tool instance over it.
 
 ```yaml
@@ -366,14 +380,52 @@ confirmed by calling the same SDK's `query()` and reading `result.modelUsage`
     model: sonnet
     permissionMode: auto
 - insert:
-    - id: tool-subagent-claude
+    - id: tool-subagent-reviewer
       name: '@deepseek-ai/dsh-tool-subagent'
       config:
         provider: claude-code
-        toolName: subagent_claude_code
+        toolName: subagent_reviewer
         backgroundMode: one-shot
         maxDepth: provider-managed
 ```
 
 The model is pinned on the provider row: Claude Code takes no per-call dsh route, so a review
-child's model is fixed here, not chosen by the caller.
+child's model is fixed here, not chosen by the caller. The child keeps no transcript
+(`persistSession: false`), so its model is self-reported, in the reply's `MODEL:` line, and the
+pinned row is the control. A Sonnet reviewer on a planted diff returned the planted P1 and two
+real P2s in the required shape, inside a code fence. Codex (`dsh-subagent-codex`) as the
+reviewer is not yet measured.
+
+The headless `crew` profile has no reviewer unless its own patch adds the same rows. A
+`roles.md` naming one stops a headless round at step 0.
+
+## 9. Roles — `.dsh-crew/roles.md`
+
+The project's choice of model for each crew role. It lives at the root of the AI workspace.
+The orchestrator writes it at spine planning, and the operator approves it. The driver's own
+route is not here: whoever starts the driver chooses it (an orchestrator's agent entry, or the
+operator in the UI).
+
+```markdown
+## Roles
+
+| Role | Route | Effort |
+|---|---|---|
+| implementer | zai/glm-5.3-flashx | max |
+| verifier | ollama-local/deepseek-v4.1-flash:cloud | max |
+| reviewer | claude-code | (pinned) |
+```
+
+- **One row per role**: `implementer`, `verifier`, `reviewer`, and nothing else. There are no
+  conditions and no second row.
+- **Implementer and verifier** routes are `provider/model` exactly as §6 defines them, and each
+  must be in §6's allow-list. Effort is one of that model's `reasoningEfforts`.
+- **Reviewer** is `claude-code` or `codex` (the `subagent_reviewer` tool from §8, whose model
+  is pinned in the profile), or `driver` for no second pass. The driver can check only that the
+  tool exists. The operator checks, when approving the file, that the profile's pinned provider
+  matches the row.
+- **No file** means the 0.2.0 behaviour: children run the driver's route, and there is no
+  reviewer pass. **No row** means the same for that role.
+- A row the session cannot honour stops the round before its first dispatch (the
+  `dsh-executor` skill, §2 step 0). A successor re-reads the file, so routes survive a
+  hand-off.

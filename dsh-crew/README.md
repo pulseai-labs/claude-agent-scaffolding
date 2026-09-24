@@ -10,23 +10,29 @@ state and no commands.
 
 ## Skills
 
-- `dsh-executor` — the round as a dsh spine session runs it: dispatch, collect, verify,
-  one correction, compute the record, hand the round back. Mirrors ossify's
+- `dsh-executor` — the round as a dsh spine session runs it: resolve the roles, dispatch,
+  collect, check each child's route, verify, one correction, compute the record, hand the
+  round back; at close, the reviewer's second pass. Mirrors ossify's
   `work-item/references/external-executor.md`; `references/records.md` quotes the records.
-- `dsh-brief` — the implementer, verifier and correction prompts, and the two personas the
-  child tools are configured with.
+- `dsh-brief` — the implementer, verifier, correction and reviewer prompts, and the two
+  personas the child tools are configured with.
 - `dsh-session` — for an orchestrator outside dsh: spawn a session through the web `/api` so
   it shows in the operator's browser, select its model, steer it, read its transcript for
   delivery, pending questions, turn end and context fill, and hand a spine to a successor.
 
 ## Presets
 
-`presets/crew-spine`, `presets/crew-implementer` and `presets/crew-verifier` are the three
-presets as files; copy each directory into `~/.dsh/.agent-presets/`. `references/presets.md`
-is the rest of the operator's dsh home, measured against dsh 0.1.5-rc.3: `~/.dsh/settings.yaml`
-as the one home for provider routes, the web profile rows, a headless `crew` profile, browser
-access to the web UI, and an optional Claude Code review child. Installing them is machine
-configuration, not this plugin's job.
+`presets/crew-spine` is the spine preset as files; copy the directory into
+`~/.dsh/.agent-presets/`. `references/presets.md` is the rest of the operator's dsh home,
+measured against dsh 0.1.5-rc.3: `~/.dsh/settings.yaml` as the one home for provider routes,
+the web profile rows, a headless `crew` profile, browser access to the web UI, and the optional
+Claude Code reviewer child. Installing them is machine configuration, not this plugin's job.
+
+## Roles
+
+Each project names the model for each crew role (implementer, verifier, reviewer) in
+`.dsh-crew/roles.md` at its AI workspace root. `references/presets.md` §9 is the file's
+contract. With no file, children run the driver's route and there is no reviewer pass.
 
 ## Requirements
 
