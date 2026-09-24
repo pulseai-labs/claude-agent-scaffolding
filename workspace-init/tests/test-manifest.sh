@@ -768,6 +768,54 @@ test_V2_validate_rejects_non_object_document() {
   done
 }
 
+test_V3_validate_rejects_invalid_policy_leaf_types() {
+  # Codex round 3 on #581: the leaves the commit-msg hook enforces must carry
+  # the hook's types, or a manifest validates here and the hook then blocks.
+  local ai; ai="$(_setup_pair v3)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v3/good"
+  local edit
+  for edit in '.git_policy.trace_filter.enforce = "bad"' \
+              '.git_policy.trace_filter.enforce = null' \
+              '.git_policy.trace_filter.blocked_patterns = {"a":1}' \
+              '.git_policy.trace_filter.blocked_patterns = "x"' \
+              '.git_policy.trace_filter.blocked_patterns = ["^a", 1]' \
+              '.git_policy.trace_filter.blocked_patterns = ["^a", ""]'; do
+    jq "$edit" "$_WI_TMP/v3/good" > "$m"
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v3/err"; then
+      echo "    validate accepted: $edit"; return 1; fi
+    grep -qF 'git_policy.trace_filter' "$_WI_TMP/v3/err" || {
+      echo "    refusal does not name the policy leaf ($edit):"; cat "$_WI_TMP/v3/err"; return 1; }
+  done
+  # Adjacent controls: the two deliberate allow-everything policies stay valid.
+  for edit in '.git_policy.trace_filter.enforce = false' \
+              '.git_policy.trace_filter.blocked_patterns = []'; do
+    jq "$edit" "$_WI_TMP/v3/good" > "$m"
+    "$WI_BIN" manifest_validate "$ai" 2>/dev/null || {
+      echo "    control rejected: $edit"; return 1; }
+  done
+}
+
+test_L6_relocate_refuses_symlinked_manifest() {
+  # Codex round 3 on #581: tmp-then-mv would replace the link with a regular
+  # file and leave the shared target stale. Refused; link and target intact.
+  local ai; ai="$(_setup_pair l6)" || return 1
+  local shared="$_WI_TMP/l6/shared.json"
+  mv "$ai/.workspace/pairing.json" "$shared"
+  ln -s "$shared" "$ai/.workspace/pairing.json"
+  cp "$shared" "$_WI_TMP/l6/orig"
+  mv "$ai" "$_WI_TMP/l6/moved-ai"
+  local moved="$_WI_TMP/l6/moved-ai"
+  if "$WI_BIN" manifest_relocate "$moved" 2>"$_WI_TMP/l6/err"; then
+    echo "    relocate replaced a symlinked manifest"; return 1; fi
+  [[ -L "$moved/.workspace/pairing.json" ]] || { echo "    the link was replaced"; return 1; }
+  [[ "$(readlink "$moved/.workspace/pairing.json")" == "$shared" ]] || {
+    echo "    the link's target changed"; return 1; }
+  cmp -s "$_WI_TMP/l6/orig" "$shared" || { echo "    the shared target was modified"; return 1; }
+  grep -qF 'symlinked manifest' "$_WI_TMP/l6/err" || {
+    echo "    refusal does not name the symlink"; cat "$_WI_TMP/l6/err"; return 1; }
+}
+
 wi_test_run test_L1_relocate_rewrites_ai_root_preserves_everything_else
 wi_test_run test_L2_relocate_canonical_root_only_with_flag
 wi_test_run test_L3_relocate_refuses_bad_manifest_unchanged
@@ -775,5 +823,7 @@ wi_test_run test_L4_relocate_refuses_bad_roots_unchanged
 wi_test_run test_L5_relocate_relative_root_recorded_absolute
 wi_test_run test_V1_validate_rejects_wrong_typed_blocks
 wi_test_run test_V2_validate_rejects_non_object_document
+wi_test_run test_V3_validate_rejects_invalid_policy_leaf_types
+wi_test_run test_L6_relocate_refuses_symlinked_manifest
 
 wi_test_summary
