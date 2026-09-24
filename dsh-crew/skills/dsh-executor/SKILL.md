@@ -30,21 +30,29 @@ Take the round in this order — every baseline first, then the dispatches:
 
 0. Resolve the roles, once per round, before anything else. Read `.dsh-crew/roles.md` at the
    AI workspace root (`references/presets.md` §9 in this plugin gives its shape).
+   - **Your tools first.** Confirm `subagent_implementer` and `subagent_verifier` are both
+     among your tools, whatever the file says. A missing one means a stale `crew-spine` is
+     installed (a 0.3.0 preset has no `subagent_verifier`; `references/presets.md` §2). Stop
+     the round and tell the operator to copy the plugin's `crew-spine` again.
    - **No file:** there is no selection this round. Send no `provider`, `model` or
-     `reasoning_effort` on any child call; every child runs your route. Say so once in the
-     hand-back (§7).
+     `reasoning_effort` on any child call; every child runs your route and effort. Say so once
+     in the hand-back (§7).
    - **A file:** it must hold exactly one `## Roles` table with one row each for
      `implementer`, `verifier` and `reviewer`. A missing row means no selection for that role.
      A duplicate row, or a role name outside those three, stops the round here: report the
      file and the row to the operator, and never pick one of the rows.
-   - **Checking the routes:**
-     1. For each implementer or verifier route, call `list_subagent_models` with that
-        `provider` and `model`, and confirm the route is offered and the row's effort is among
-        its efforts. It answers `is not allowed for this Session` for a route outside the
-        allow-list, and otherwise lists the model's reasoning efforts.
-     2. For a reviewer row other than `driver`, confirm `subagent_reviewer` is among your
+   - **Checking the rows:**
+     1. For the implementer route, call `list_subagent_models` with that `provider` and
+        `model`. Confirm the route is offered and the row's effort is among its efforts. It
+        answers `is not allowed for this Session` for a route outside the allow-list, and
+        otherwise lists the model's reasoning efforts.
+     2. A verifier row must read route `driver` and effort `(driver)`. The verifier tool is not
+        selectable (`references/presets.md` §2), so a verifier always runs your route and
+        effort. A row naming anything else asks for a route dsh cannot give it. Name the row
+        and say that it must read `driver`.
+     3. For a reviewer row other than `driver`, confirm `subagent_reviewer` is among your
         tools.
-     3. Any failure stops the round before the first dispatch. Report the file, the row and
+     4. Any failure stops the round before the first dispatch. Report the file, the row and
         what was missing to the operator. It is not a gap and not a record. dsh's allow-list
         would refuse the call anyway; this fails early and names why.
 1. Baseline the two documents no child may touch — the blob ids of **every** request's
@@ -87,16 +95,29 @@ recovery. `job_kill` only on the operator's word.
 Before you use any child's return — implementer, correction or verifier — confirm the route it
 actually ran on, from its own transcript, never from its words:
 
-1. Your session's directory is the one under `~/.dsh/sessions/` holding your transcript;
-   children are the bare-UUID directories beside it. Take the newest whose
-   `session.v3.jsonl.zstd` (read with `zstd -dc`) opens with a `session` line carrying
-   `"origin":"subagent"`, and whose first `user/message` names this item's `handoff_path`.
-2. Its newest `request/header` gives `data.header.config`: `provider`, `model`,
-   `reasoningEffort`.
-3. Compare it with the role's row from §2 step 0. With no row, compare it with your own route
-   (your newest `request/header`).
-4. No such transcript, or a difference, is the stop rule (§3): no record for the item, and the
-   report names the expected route and the one the child ran.
+1. **Find your own session.** Your session id is `$DSH_SESSION_ID` in the bash tool, and your
+   directory is `ls -d ~/.dsh/sessions/*/"$DSH_SESSION_ID"`. Its `subagent/catalog` events
+   list every child you started: `data.childId`, and `data.label`, which is the `description`
+   you sent (`work item <id>`, `verify <id>`, `correct <id>`).
+2. **Find the child.** Take the newest child whose catalog label is this call's description.
+   Its transcript is `session.v3.jsonl.zstd` (read it with `zstd -dc`) in the `<childId>`
+   directory beside yours, and it must pass three checks:
+   - its first line, the `session` line, carries `"origin":"subagent"`;
+   - that line's `"parentSession"` equals your session id;
+   - its first `user/message` names this item's `handoff_path`.
+
+   A successor's directory sits beside its predecessor's and that predecessor's children, so
+   the `parentSession` match is what keeps a predecessor's child for the same item out.
+3. **Read its route.** Its newest `request/header` gives `data.header.config`: `provider`,
+   `model`, `reasoningEffort`.
+4. **Compare it with the expected route:**
+   - an implementer or a correction: the implementer row from §2 step 0, or your own route
+     when there is no row;
+   - a verifier: always your own route.
+
+   Your own route is your newest `request/header`, all three fields.
+5. **On a mismatch, stop.** No such transcript, or any difference, is the stop rule (§3): no
+   record for the item, and the report names the expected route and the one the child ran.
 
 ## 4. Verify a complete return
 
@@ -114,8 +135,9 @@ Foreground, one item at a time, in declared order:
 3. Fill the verifier prompt (`dsh-brief` §3): CLAIMS from the item's spec (`dsh-brief` §3 —
    one per `auto:` AC, none for a `user:` row), the two fixed claims, the four paths.
 4. Call `subagent_verifier` with `description: "verify <work_item_id>"` and that prompt.
-   When §2 step 0 resolved a verifier route, the call also carries `provider`, `model` and
-   `reasoning_effort` from that row, copied, never chosen.
+   The call names no `provider`, `model` or `reasoning_effort`: the verifier tool is not
+   selectable, so it runs your route and effort, and a call naming one is refused
+   (`child model selection is disabled for this tool instance`).
 5. Fingerprint again. Any difference means the verifier changed the item: the stop rule (§3).
 6. Gate the worktree, whatever the verdict turns out to be: the three rows §5's block reads —
    the branch, `HEAD` against the request's `base_sha`, and the staged-only status — each
@@ -209,8 +231,8 @@ cannot change the file's parse or a value's type. Records are fed to close
 in declared decomposition order, never arrival order; closes and merges stay serial; the
 round barrier is untouched.
 
-Then tell the operator, in chat, each item's implementer and verifier route as §3a read it, or
-that no `roles.md` was in force. The records file carries no route: its fields are ossify's.
+Then tell the operator, in chat, every child's route as §3a read it (each implementer,
+verifier and correction), or that no `roles.md` was in force. The records file carries no route: its fields are ossify's.
 
 A follow-up invocation never overwrites an earlier records file: a gaps replacement (§6)
 writes `<spine spec dir>/round-<n>-<work_item_id>-gaps-<k>-external-records.yaml` and a
@@ -222,8 +244,18 @@ is that item's gap or correction iteration.
 
 ossify's close runs its own code review, in your session, as `close/references/code-review.md`
 says. That review is never handed to another agent. At close, resolve the reviewer row as §2
-step 0 does, reading the file again: close may run in a session that dispatched no round. When
-it names a reviewer other than `driver`, add one independent pass at the same point:
+step 0 does, reading the file again: close may run in a session that dispatched no round.
+
+Anything that would stop a round at §2 step 0 cannot stop one here, because close has no
+round. It stops before the reviewer call instead:
+- post the file and the row, or what was missing, in chat;
+- ask the operator, with `ask_user_question`, whether close continues without the reviewer's
+  pass;
+- on yes, close continues on its own findings, and its report says the pass was skipped and
+  why;
+- on no, stop and wait for the operator.
+
+When the file names a reviewer other than `driver`, add one independent pass at the same point:
 
 1. After close's Axis A and Axis B findings are written down, and before their dispositions,
    call `subagent_reviewer` once, in the foreground, with the reviewer prompt (`dsh-brief` §6)
