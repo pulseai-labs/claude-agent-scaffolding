@@ -41,7 +41,7 @@ Its resolved profile, wherever one travels:
 | role | started by | needs |
 |---|---|---|
 | spine session, external-executor lane | a steered `<spine-id> --external-executor`, first spawn only | — |
-| spine session, after a stop or a hand-off | a steered `continue <spine-id> from its recorded state` | — |
+| spine session, after a stop (same session) or a hand-off (a successor) | a steered `continue <spine-id> from its recorded state` | — |
 | close session | a steered `/close <spine-id>`, in a fresh session | — |
 
 A spine's `spine session` and `close session` seats name a `kind: dsh-spine-driver` agent
@@ -102,8 +102,10 @@ contract is the same on both paths.
   than the top talks to the operator.
 - **Wait** token-free: one shell wait, bounded at 15 minutes, that ends on the first of
   the turn ending, a question pending that you have not yet relayed, or, for a spine
-  session, the context figure first reaching the plugin setting `context_ceiling`
-  (default 500000 tokens). A
+  session, its context first reaching the plugin setting `context_ceiling` (default
+  500000 tokens), read as the newest `assistant/message`'s
+  `data.usage.totalTokens` against that token count, never as `dsh-session` §7's ratio
+  to `contextWindow`. A
   timeout is a checkpoint, never a failure. Never spend a turn per poll. Re-arm it so a
   condition you have already handled cannot end it again: after relaying a question, the
   next wait ends on that question's `tool/result`, by its `callId` (and
@@ -114,9 +116,11 @@ contract is the same on both paths.
   - the final round barrier, every item closed: `ossify-nested-run.md` §4 applies from
     there, as it does to any spine session's completion;
   - a stop for the operator (`dsh-executor`'s stop rule, a refusal, or a resume's drift
-    report): a halt at its round barrier, and nothing downstream is dispatched. Once the
-    operator has remediated, steer `continue <spine-id> from its recorded state` to the
-    same session, where it starts a new turn, or to a successor;
+    report): a halt, and nothing downstream is dispatched. A stop-rule halt is
+    mid-round: no record was written and the round was not handed back, so only the
+    session that holds it can recover it. Once the operator has remediated, steer
+    `continue <spine-id> from its recorded state` to that same session, where it starts
+    a new turn, never to a successor, which can reconcile only persisted state;
   - the handoff path of a hand-off you steered: the rotation below;
   - anything you cannot place among these three is a stop.
 

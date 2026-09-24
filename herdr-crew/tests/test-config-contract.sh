@@ -337,6 +337,8 @@ $SKILL_MD|a dsh spine driver's transcript reads|the delegation floor admits the 
 $NEST_MD|replaces this section's completion signals|ossify-nested-run.md §4 yields to dsh-driver.md
 $CMD_MD|\`.dsh-crew/roles.md\`|the command names the dsh roles file
 $DSH_MD|A close session is never rotated|a dsh close finishes past the ceiling
+$DSH_MD|never to a successor|a mid-round stop is recovered in the same session
+$DSH_MD|\`data.usage.totalTokens\` against|the ceiling is compared in tokens
 LIST
 
 report
