@@ -40,12 +40,15 @@ Its resolved profile, wherever one travels:
 
 | role | started by | needs |
 |---|---|---|
-| spine session, external-executor lane | a steered `<spine-id> --external-executor` | — |
+| spine session, external-executor lane | a steered `<spine-id> --external-executor`, first spawn only | — |
+| spine session, after a stop or a hand-off | a steered `continue <spine-id> from its recorded state` | — |
 | close session | a steered `/close <spine-id>`, in a fresh session | — |
 
-Any other seat naming a `kind: dsh-spine-driver` agent is a configuration defect, named at
-approval. The spine and close seats may name the same agent; each close is still a fresh
-session.
+A spine's `spine session` and `close session` seats name a `kind: dsh-spine-driver` agent
+together or not at all: a correction the close sends back goes to the executor that ran
+the item, and the reviewer pass reads the spine's `.dsh-crew/roles.md`. A mixed pairing,
+or any other seat naming the kind, is a configuration defect named at approval. The two
+seats may name the same agent; each close is still a fresh session.
 
 ## 3. At spine planning — `.dsh-crew/roles.md` in place of item rows
 
@@ -83,25 +86,41 @@ contract is the same on both paths.
 
 - **Spawn** each session as `dsh-session` §4 says: on its `preset:`, with the AI
   workspace as its working directory, its model selected to `route:` and `effort:` before
-  the first message, and renamed so the operator can find it. Confirm the selection it
-  echoes, then the transcript's first `request/header`. A mismatch is a failed launch,
-  reported, exactly as a wrong model is on any seat.
-- **Brief** it with one steered message (`dsh-session` §5): `<spine-id>
-  --external-executor` for a spine session, with `Resume from <handoff path>, then
-  continue.` prepended on a rotation; for a close, the text in §6. Confirm delivery by
-  your request id.
+  the first message, and renamed so the operator can find it. The selection it echoes is
+  the pre-brief gate: a mismatch there is a failed launch, reported, and no brief is sent.
+  After the brief, confirm the transcript's first `request/header` as well. A mismatch
+  there means the session is already working on the wrong route: cancel its turn
+  (`dsh-session` §3, `session/cancel`), then report the failed launch.
+- **Brief** it with one steered message (`dsh-session` §5), and confirm delivery by your
+  request id. The first spine session gets `<spine-id> --external-executor`. A successor
+  gets `Resume from <handoff path>, then continue <spine-id> from its recorded state.
+  Decisions still go to the operator through ask_user_question.`, never the
+  `--external-executor` form, which would start the lane over. A close gets §6's text.
 - **The operator's questions.** The driver asks the operator in the browser itself, and
   nothing you send can answer those questions. When the transcript shows one pending, tell the
   operator its text (`dsh-session` §7, §8). This is the one place where a seat other
   than the top talks to the operator.
-- **Wait** token-free: one shell wait that ends when the transcript shows the turn has
-  ended, a question pending, or a context figure at or past the plugin setting
-  `context_ceiling` (default 500000 tokens), bounded at 15 minutes. A timeout is a
-  checkpoint, never a failure. Never spend a turn per poll.
+- **Wait** token-free: one shell wait, bounded at 15 minutes, that ends on the first of
+  the turn ending, a question pending that you have not yet relayed, or the context
+  figure first reaching the plugin setting `context_ceiling` (default 500000 tokens). A
+  timeout is a checkpoint, never a failure. Never spend a turn per poll. Re-arm it so a
+  condition you have already handled cannot end it again: after relaying a question, the
+  next wait ends on that question's `tool/result`, by its `callId` (and
+  `ASK_CANCELLED` counts), or on the turn ending; after steering a hand-off, it ends on
+  the turn end only; and the ceiling ends a wait once per session.
 - **The completion** is the session's final assistant message, when its turn ends with
-  `reason.kind` `completed`. Treat it exactly as `ossify-nested-run.md` §4 treats the
-  spine or close session's completion. A turn that ended any other way is a failed
-  dispatch: report it, and dispatch nothing downstream.
+  `reason.kind` `completed`. A spine session's is one of four, read from the message:
+  - the final round barrier, every item closed: `ossify-nested-run.md` §4 applies from
+    there, as it does to any spine session's completion;
+  - a stop for the operator (`dsh-executor`'s stop rule, a refusal, or a resume's drift
+    report): a halt at its round barrier, and nothing downstream is dispatched. Once the
+    operator has remediated, steer `continue <spine-id> from its recorded state` to the
+    same session, where it starts a new turn, or to a successor;
+  - the handoff path of a hand-off you steered: the rotation below;
+  - anything you cannot place among these three is a stop.
+
+  A close session's completion is one of §6's three shapes. A turn that ended any other
+  way is a failed dispatch: report it, and dispatch nothing downstream.
 - **Rotation.** dsh has no context hook, so the driver cannot see its own figure. At
   the ceiling, steer the hand-off and spawn the successor as `dsh-session` §9 says; the
   handoff path it reports is this lane's rotation completion.
