@@ -293,7 +293,7 @@ test_E11_empty_string_pattern_blocks() {
   assert_eq "1" "$rc" "an empty entry beside a valid one must fail closed" || return 1
   grep -qF 'contains an empty-string entry' "$d/stderr" || {
     echo "    mixed list: block does not name the empty-string entry"; cat "$d/stderr"; return 1; }
-  # Codex round 7 on #581: an entry with a line break collapses into empty
+  # An entry with a line break collapses into empty
   # records the same way ("\n" became allow-all). Blocked and named — alone,
   # and embedded in an otherwise real pattern.
   local nl

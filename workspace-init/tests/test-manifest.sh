@@ -680,7 +680,7 @@ test_L3_relocate_refuses_bad_manifest_unchanged() {
   cmp -s "$_WI_TMP/l3/nopolicy.orig" "$rm_" || { echo "    schema-invalid manifest was modified"; return 1; }
   grep -qF 'git_policy' "$_WI_TMP/l3/err" || {
     echo "    refusal does not name the missing field"; cat "$_WI_TMP/l3/err"; return 1; }
-  # A required block of the wrong type (Codex round 2 on #581): the full
+  # A required block of the wrong type: the full
   # validator's jq errored, the capture read empty, and it passed. Refused now.
   local bad; bad="$(_setup_pair l3-typed)" || return 1
   local bm="$bad/.workspace/pairing.json"
@@ -769,7 +769,7 @@ test_V2_validate_rejects_non_object_document() {
 }
 
 test_V3_validate_rejects_invalid_policy_leaf_types() {
-  # Codex round 3 on #581: the leaves the commit-msg hook enforces must carry
+  # The leaves the commit-msg hook enforces must carry
   # the hook's types, or a manifest validates here and the hook then blocks.
   local ai; ai="$(_setup_pair v3)" || return 1
   local m="$ai/.workspace/pairing.json"
@@ -799,7 +799,7 @@ test_V3_validate_rejects_invalid_policy_leaf_types() {
 }
 
 test_L6_relocate_refuses_symlinked_manifest() {
-  # Codex round 3 on #581: tmp-then-mv would replace the link with a regular
+  # Tmp-then-mv would replace the link with a regular
   # file and leave the shared target stale. Refused; link and target intact.
   local ai; ai="$(_setup_pair l6)" || return 1
   local shared="$_WI_TMP/l6/shared.json"
@@ -819,7 +819,7 @@ test_L6_relocate_refuses_symlinked_manifest() {
 }
 
 test_V4_validate_rejects_invalid_regex_pattern() {
-  # Codex round 4 on #581: the hook fails closed on an invalid ERE, so the
+  # The hook fails closed on an invalid ERE, so the
   # validator must too — the last hook rule it did not mirror.
   local ai; ai="$(_setup_pair v4)" || return 1
   local m="$ai/.workspace/pairing.json"
@@ -836,7 +836,7 @@ test_V4_validate_rejects_invalid_regex_pattern() {
 }
 
 test_L7_relocate_refuses_self_pairing() {
-  # Codex round 4 on #581: the pair's two roots must differ, as the pairing
+  # The pair's two roots must differ, as the pairing
   # preflight requires — via the flag or via the recorded canonical.root.
   local ai; ai="$(_setup_pair l7)" || return 1
   local m="$ai/.workspace/pairing.json"
@@ -859,11 +859,11 @@ test_L7_relocate_refuses_self_pairing() {
 }
 
 test_L8_relocate_preserves_manifest_mode() {
-  # Codex round 4 on #581: the rewrite must keep the manifest's mode, not
+  # The rewrite must keep the manifest's mode, not
   # take the caller's umask.
   local ai; ai="$(_setup_pair l8)" || return 1
   local m="$ai/.workspace/pairing.json" mode
-  # 444 covers a read-only manifest (Codex round 5 on #581): the staged copy
+  # 444 covers a read-only manifest: the staged copy
   # must be writable for the rewrite and read-only again afterwards. Only a
   # non-root run can see the write failure; the mode assertion holds for both.
   for mode in 600 640 444; do
@@ -878,7 +878,7 @@ test_L8_relocate_preserves_manifest_mode() {
 }
 
 test_V5_validate_rejects_wrong_typed_leaves() {
-  # Codex round 6 on #581: every required leaf carries its schema type, not
+  # Every required leaf carries its schema type, not
   # just presence. One edit per case so each refusal names that field.
   local ai; ai="$(_setup_custom_pair v5)" || return 1
   local m="$ai/.workspace/pairing.json"
@@ -916,7 +916,7 @@ CASES
 }
 
 test_L9_relocate_temp_file_is_not_predictable() {
-  # Codex round 8 on #581: a symlink planted at ${manifest}.tmp.<pid> was
+  # A symlink planted at ${manifest}.tmp.<pid> was
   # followed — its target overwritten — and then renamed over pairing.json.
   # `exec` keeps the planting shell's PID, so the dispatcher's $$ is known.
   local ai; ai="$(_setup_pair l9)" || return 1
