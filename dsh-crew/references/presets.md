@@ -10,7 +10,7 @@ from the web UI on 2026-09-23 and 2026-09-24 (two rounds, a hand-off and a close
 |---|---|---|
 | Provider routes, the default model, the child-model allow-list, the composer | `~/.dsh/settings.yaml` | §6 |
 | Host settings for the web profile | `~/.dsh/profiles/web/cordis.patch.yml` | §1 |
-| The three presets | `presets/<name>/` in this plugin → `~/.dsh/.agent-presets/<name>/` | §2–§4 |
+| The spine preset | `presets/crew-spine/` in this plugin → `~/.dsh/.agent-presets/crew-spine/` | §2 |
 | A headless spine session | `~/.dsh/profiles/crew/cordis.patch.yml` | §5 |
 | Reaching the web UI from another machine | `tailscale serve` + the unit's flags | §7 |
 | An optional Claude Code review child | a profile plugin + two rows | §8 |
@@ -46,7 +46,7 @@ from the web UI on 2026-09-23 and 2026-09-24 (two rounds, a hand-off and a close
   each preset turns them on for its own sessions; the subagent seam (`subagent`, the `spawn`
   provider) is already mounted. So the web profile patch carries only host settings (§1),
   routes live once in `settings.yaml` (§6), and everything a session sees (persona, tools,
-  skills root, the two child tools) lives in the preset (§2–§4). A child joins its parent's
+  skills root, the two child tools) lives in the preset (§2). A child joins its parent's
   composition minus its `toolFilter`, takes its persona from its tool row, and runs its
   parent's route unless the call names one (both crew child tools are selectable; §6).
 
@@ -66,30 +66,37 @@ shipped default is 60 s). No provider rows: routes and the default model are in 
 
 The permission row's id is `permission`.
 
-## 2–4. The presets — `presets/` in this plugin
+## 2. The spine preset — `presets/crew-spine/` in this plugin
 
-Each is a directory with an `agent.cordis.yml` (the composition) and a `preset.yml` (the
-picker's name and description). Install one by copying its directory to
-`~/.dsh/.agent-presets/<name>/`; copy again after a plugin update. The files are complete as
-shipped: the skills root is the only machine path in them, and it is resolved from `HOME`.
+A directory with an `agent.cordis.yml` (the composition) and a `preset.yml` (the picker's name
+and description). Install it by copying the directory to `~/.dsh/.agent-presets/crew-spine/`,
+and copy it again after a plugin update. The file is complete as shipped: the skills root is
+the only machine path in it, and it is resolved from `HOME`.
 
-- **§2 `crew-spine`**: the spine session. The shipped `standard` preset with its persona
-  replaced, the skills root set, and its delegation group reduced to the two configured child
-  tools plus the subagent control tools (no generic `subagent`, `subagent_fork`, `workflow` or
-  `ralph`, so every child is one of the two). Its persona runs a spine, continues a halted
-  spine from its recorded state (ossify cannot resume one itself), runs `/close`, hands off and
-  resumes through ossify's handoff procedures, and keeps every `ask_user_question` short, with
-  the detail posted as a chat message first. The spine session runs ossify's close, which
-  commits and merges, so the persona forbids commits outside the lane rather than commits as
-  such; the children never commit.
-- **§3 `crew-implementer`** and **§4 `crew-verifier`**: for a human running one item by hand,
-  as `standard` with the implementer or verifier persona and the skills root, and no
-  delegation group. **The spine's children do not use them.** A child started through
-  `subagent_implementer` or `subagent_verifier` takes its persona from the `crew-spine` tool
-  row (the text in the `dsh-brief` skill's §5) and runs the parent's route. The verifier
-  preset is read-only by its prompt, not by its tool set: `bash` stays because the verifier's
-  claim N builds a disposable copy, and 0.1.5-rc.3's `tool-fs` has no read-only mode. The
-  `subagent_verifier` child is tighter, because its `toolFilter` removes `edit` and `write`.
+It is the shipped `standard` preset with its persona replaced, the skills root set, and its
+delegation group reduced to the two configured child tools plus the subagent control tools
+(no generic `subagent`, `subagent_fork`, `workflow` or `ralph`, so every child is one of the
+two). Its persona:
+- runs a spine;
+- continues a halted spine from its recorded state (ossify cannot resume one itself);
+- runs `/close`;
+- hands off and resumes through ossify's handoff procedures;
+- keeps every `ask_user_question` short, with the detail posted as a chat message first.
+
+It commits only where ossify's lane and close tell it to; its children never commit.
+
+**The two child rows are model-selectable** (`modelSelectionSettings: true`): each call may
+name a `provider`, `model` and `reasoning_effort` from the allow-list in §6, and the driver
+takes them from the project's `roles.md` (§9). Because a selectable tool is not a global tool,
+no `toolFilter` may name it: a filter that does fails the child at start. Recursion is stopped
+by `maxDepth: 1` on both rows instead, which dsh enforces on every start, whoever calls. The
+verifier's `toolFilter` still removes `edit` and `write`.
+
+## 3–4. Retired in 0.3.0
+
+0.2.0 shipped `crew-implementer` and `crew-verifier` for a human running one item by hand. A
+spine's children never used them. Run one item by hand in `crew-spine` ("execute work item
+<id>" reaches the `work-item` skill), or in `standard` with the skills root.
 
 ## 5. The headless `crew` profile — a spine run with no browser
 

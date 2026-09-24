@@ -2,7 +2,7 @@
 #
 # dsh-crew — presets and profile rows
 #
-# The three shipped presets (presets/<name>/agent.cordis.yml + preset.yml) and every
+# The one shipped preset (presets/crew-spine/agent.cordis.yml + preset.yml) and every
 # fenced yaml block in references/presets.md parse under Psych (the parser the house
 # uses because it is what actually loads YAML elsewhere; it reads a `!!js` scalar as its
 # source string). Then the facts a copied file must not drift from: the child personas
@@ -22,7 +22,7 @@ require_ruby_psych || { report; exit 1; }
 DOC="$PLUGIN_ROOT/references/presets.md"
 PRESETS="$PLUGIN_ROOT/presets"
 BRIEF="$PLUGIN_ROOT/skills/dsh-brief/SKILL.md"
-NAMES="crew-spine crew-implementer crew-verifier"
+NAMES="crew-spine"
 [ -f "$DOC" ] && pass "references/presets.md exists" || { fail "references/presets.md exists"; report; exit 1; }
 
 parses() { "$RUBY_BIN" -ryaml -e 'YAML.safe_load(File.read(ARGV[0]), aliases: true)' "$1" 2>/dev/null; }
@@ -36,6 +36,8 @@ for n in $NAMES; do
   out="$("$RUBY_BIN" -ryaml -e 'y = YAML.safe_load(File.read(ARGV[0])); puts((y.is_a?(Hash) && y["name"].is_a?(String) && y["description"].is_a?(String)) ? "ok" : "bad")' "$PRESETS/$n/preset.yml" 2>&1)"
   [ "$out" = "ok" ] && pass "$n/preset.yml has name and description" || fail "$n/preset.yml has name and description" "$out"
 done
+shopt -s nullglob; shipped=("$PRESETS"/*/); shopt -u nullglob
+[ "${#shipped[@]}" -eq 1 ] && [ -d "$PRESETS/crew-spine" ] && pass "crew-spine is the only shipped preset" || fail "crew-spine is the only shipped preset" "${shipped[*]}"
 
 section "presets.md yaml blocks parse"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
