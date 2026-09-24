@@ -2,6 +2,12 @@
 
 All notable changes to the `orca-crew` plugin.
 
+## 0.8.1
+
+- **`references/dsh-driver.md` §3** recommends `.dsh-crew/roles.md`'s verifier as `driver`:
+  since dsh-crew 0.3.1 the verifier always runs the driver's own route and effort. The
+  implementer route and effort still come from the allow-list.
+
 ## 0.8.0
 
 **The dsh spine driver.** A spine's spine and close seats can be a DeepSeek Harness (dsh)

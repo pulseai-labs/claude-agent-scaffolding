@@ -2,6 +2,40 @@
 
 All notable changes to the `dsh-crew` plugin.
 
+## 0.3.1
+
+The verifier runs the driver's route, because 0.3.0's `crew-spine` could not run a spine.
+
+- **Only `subagent_implementer` is model-selectable.** dsh 0.1.5-rc.3 registers at most one
+  selectable child tool per composition, and 0.3.0 made both rows selectable, so its
+  sessions had **no `subagent_verifier`**, silently. The verifier row drops
+  `modelSelectionSettings` and runs the driver's own route and effort. `maxDepth: 1` and the
+  `edit`/`write` deny stay. The headless profile's rows match.
+- **`roles.md`'s verifier row is `| verifier | driver | (driver) |`, or it is absent.** Any
+  other value stops the round at `dsh-executor` §2 step 0, naming the row. A file written for
+  0.3.0 with a literal verifier route therefore stops until that row reads `driver`.
+- **`dsh-executor`:**
+  - §2 step 0 first checks both child tools exist;
+  - §3a finds each child exactly, by `$DSH_SESSION_ID`, the child's `parentSession` and the
+    catalog label, and compares a verifier with the driver's own route;
+  - §7 reports every child's route;
+  - §9 asks the operator when anything would stop a round at close, a malformed `roles.md`
+    included.
+- **`dsh-brief` §1 and §3:** the verifier call names no route.
+- **`dsh-session` §3:** `workspace/archiveSession`, the only way to remove a session from the
+  UI (the transcript stays on disk).
+- **Suite:**
+  - exactly one selectable child row per composition, and it is `subagent_implementer`;
+  - the example implementer effort is checked against the model's `reasoningEfforts`;
+  - the example verifier row is `driver`.
+
+**Upgrading.** Copy `presets/crew-spine/` into `~/.dsh/.agent-presets/` again. Coming from
+0.2.0, also delete `crew-implementer/` and `crew-verifier/` from `~/.dsh/.agent-presets/`. A
+stale preset fails like this:
+- a 0.2.0 `crew-spine` has no `list_subagent_models`, so a `roles.md` stops at §2 step 0;
+- a 0.3.0 `crew-spine` has no `subagent_verifier`, and 0.3.1's §2 step 0 now stops on that
+  with a message.
+
 ## 0.3.0
 
 A model per crew role, chosen per project; and a reviewer child at close.
@@ -13,8 +47,8 @@ A model per crew role, chosen per project; and a reviewer child at close.
   profile's rows match.
 - **The by-hand `crew-implementer` and `crew-verifier` presets are retired.** A spine's
   children never used them. Run one item by hand in `crew-spine` ("execute work item <id>"
-  reaches the `work-item` skill), or in `standard` with the skills root. `dsh-crew-sync`
-  removes them from managed installs.
+  reaches the `work-item` skill), or in `standard` with the skills root. Delete them from
+  `~/.dsh/.agent-presets/` by hand (see 0.3.1's upgrade note).
 - **`.dsh-crew/roles.md`** (`references/presets.md` §9): one row each for `implementer`,
   `verifier` and `reviewer`; child routes from the `settings.yaml` allow-list; the reviewer
   `claude-code`, `codex` or `driver`. No file keeps 0.2.0's behaviour.
