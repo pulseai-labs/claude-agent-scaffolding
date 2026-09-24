@@ -48,7 +48,7 @@ from the web UI on 2026-09-23 and 2026-09-24 (two rounds, a hand-off and a close
   routes live once in `settings.yaml` (§6), and everything a session sees (persona, tools,
   skills root, the two child tools) lives in the preset (§2–§4). A child joins its parent's
   composition minus its `toolFilter`, takes its persona from its tool row, and runs its
-  parent's route.
+  parent's route unless the call names one (both crew child tools are selectable; §6).
 
 ## 1. Web profile patch — `~/.dsh/profiles/web/cordis.patch.yml`
 
@@ -165,24 +165,26 @@ the run, so a spine with any chance of a gap belongs in the web UI.
       config:
         provider: spawn
         toolName: subagent_implementer
+        modelSelectionSettings: true
+        maxDepth: 1
         persona: |
           You are ossify's work-item executor. Load the `work-item` skill with the skill tool as
           your first action; it is your binding system prompt. One handoff in, one JSON return out.
           You never commit.
-        toolFilter:
-          deny: [subagent_implementer, subagent_verifier]
     - id: tool-subagent-verifier
       name: '@deepseek-ai/dsh-tool-subagent'
       config:
         provider: spawn
         toolName: subagent_verifier
+        modelSelectionSettings: true
+        maxDepth: 1
         persona: |
           You are the crew's verifier for one ossify work item. Load the `dsh-brief` skill and
           follow its verifier prompt as sent to you: read the spec, the handoff, the report and the
           staged worktree; run the declared checks; return PASS or FAIL with the failing claims
           named. You change no file and you never commit.
         toolFilter:
-          deny: [subagent_implementer, subagent_verifier, edit, write]
+          deny: [edit, write]
 ```
 
 The persona is the `crew-spine` preset's, word for word; the suite checks it.
@@ -312,8 +314,8 @@ What each part is for, and what breaks without it:
   child model has to resolve every allow-listed route, or it fails at boot with `NO_ADAPTER`.
   That is why routes live here and nowhere else. Never drop a route the allow-list still
   names. The allow-list does nothing for a tool row that does not set
-  `modelSelectionSettings: true`, and neither crew child tool sets it in this release, so
-  children run their parent's route.
+  `modelSelectionSettings: true`. Both crew child tools set it, so a child call may name any
+  allow-listed route; a call that names none runs its parent's route.
 - **`busyEnter: steer`.** Plain Enter while the agent is busy steers (lands at the next step
   boundary) instead of queueing for the end of the turn, and Cmd/Ctrl+Enter does the opposite.
   dsh's default is queue, and a spine is one long turn, so a queued message can wait hours.
