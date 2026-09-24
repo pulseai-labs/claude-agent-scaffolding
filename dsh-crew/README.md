@@ -15,13 +15,17 @@ state and no commands.
   `work-item/references/external-executor.md`; `references/records.md` quotes the records.
 - `dsh-brief` — the implementer, verifier and correction prompts, and the two personas the
   child tools are configured with.
+- `dsh-session` — for an orchestrator outside dsh: spawn a session through the web `/api` so
+  it shows in the operator's browser, select its model, steer it, read its transcript for
+  delivery, pending questions, turn end and context fill, and hand a spine to a successor.
 
 ## Presets
 
-`references/presets.md` is the copy source for the operator's dsh home, measured against
-dsh 0.1.5-rc.3: the web profile rows (provider route, default model, permission preset, bash
-timeout), the three presets `crew-spine`, `crew-implementer`, `crew-verifier`, and a headless
-`crew` profile that runs a spine from a shell with no browser. Installing them is machine
+`presets/crew-spine`, `presets/crew-implementer` and `presets/crew-verifier` are the three
+presets as files; copy each directory into `~/.dsh/.agent-presets/`. `references/presets.md`
+is the rest of the operator's dsh home, measured against dsh 0.1.5-rc.3: `~/.dsh/settings.yaml`
+as the one home for provider routes, the web profile rows, a headless `crew` profile, browser
+access to the web UI, and an optional Claude Code review child. Installing them is machine
 configuration, not this plugin's job.
 
 ## Requirements
@@ -29,16 +33,20 @@ configuration, not this plugin's job.
 - DeepSeek Harness `@deepseek-ai/dsh` **0.1.5-rc.3** (the `latest` tag, 0.1.5-rc.2, does
   not boot on a fresh install; `references/presets.md` §0 says why), started with
   `DSH_PERMISSION_MODE=danger-full-access` and the provider key in its environment.
-- One flat skills root holding every skill directory of this plugin and of ossify
-  (`skill-filesystem` `customSkillDirs` in the presets); symlinks into the plugin cache work.
+- One flat skills root, `~/.local/share/dsh-crew/skills`, holding every skill directory of
+  this plugin and of ossify (`skill-filesystem` `customSkillDirs` in the presets); symlinks
+  into the plugin cache work. Beside it, `~/.local/share/dsh-crew/ossify-references` links to
+  the installed ossify's `references/`, for the spine persona's hand-off and resume.
 - ossify ≥ 1.8.0 on the same skills root; `oss` on the bash tool's PATH. ossify's
   `run-spine` is a command, not a skill: the `crew-spine` persona accepts
   `<spine-id> --external-executor` and follows the command's lane, the `work-item` skill's
   `references/round-orchestration.md`.
-- A provider the session can reach; the reference uses the local Ollama daemon route with
-  `deepseek-v4.1-flash:cloud`.
+- A provider the session can reach, defined in `~/.dsh/settings.yaml`; the reference defines
+  the local Ollama daemon route (`deepseek-v4.1-flash:cloud`), Z.AI and OpenCode Go.
+- For `dsh-session`: a shell on the dsh host, `curl`, `zstd`, and `dsh web` running.
 
 ## Tests
 
 `bash dsh-crew/run-tests.sh` — frontmatter lint, fidelity pins, ossify contract parity
-(against the sibling `ossify/` or `OSSIFY_ROOT`), presets YAML.
+(against the sibling `ossify/` or `OSSIFY_ROOT`), and the presets: the files, the reference's
+YAML, and the facts a copy must not drift from.

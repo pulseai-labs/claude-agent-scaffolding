@@ -19,8 +19,9 @@ Your tools for this: `subagent_implementer`, `subagent_verifier`, `job_output`,
 implementer prompt, §3 the verifier prompt, §4 the correction prompt).
 
 ossify state is the single authority. You write nothing into `.ossify/` except through
-`oss`, and you never commit, never push. The records you produce are ossify's
-(`references/records.md`), unextended.
+`oss`, and you never commit, never push. The records you produce are ossify's, unextended,
+and this skill quotes them in its **own** `references/records.md`: the file beside this
+SKILL.md, in the `dsh-executor` skill directory, not under ossify's `work-item/`.
 
 ## 2. Dispatch the round
 
@@ -136,8 +137,8 @@ Also check `REPORT` is `report.md` in the same directory as `spec_path` and
 build a record: name the row that disagreed and apply the stop rule (§3) — ossify's §5a
 would halt on it anyway, and a record that hides it is worse than none.
 
-Write the record in ossify's shape (`references/records.md`, "The result record"):
-`coordinator_verdict: accepted`, `implementer_return` copied unextended from the return,
+Write the record in ossify's shape (this skill's `references/records.md`, "The result
+record"): `coordinator_verdict: accepted`, `implementer_return` copied unextended from the return,
 the four oids. `stage_status` is copied from the return; ossify recomputes it, never trusts
 it.
 
@@ -148,8 +149,8 @@ Before anything else, check the worktree is untouched: `git -C <worktree_path> s
 --abbrev-ref HEAD` equals the request's `branch`, and the spec's and the handoff's blob ids
 still equal §2 step 1's baseline — a child that edited its own contract is the same defect
 here as anywhere else. Anything else means something else ran:
-the stop rule (§3). Otherwise write the gaps record (`references/records.md`, "The gaps
-record") with the child's `gaps` copied unextended; it goes back through §7 with the
+the stop rule (§3). Otherwise write the gaps record (this skill's `references/records.md`,
+"The gaps record") with the child's `gaps` copied unextended; it goes back through §7 with the
 round's other records. It routes; it never reaches close. After §7, ossify's lane surfaces
 the gaps, appends clarifications to the handoff, and invokes this procedure again with one
 new single-item request (same `branch` and `worktree_path`, read off the original

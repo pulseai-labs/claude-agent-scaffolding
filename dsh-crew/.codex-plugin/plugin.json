@@ -1,7 +1,7 @@
 {
   "name": "dsh-crew",
-  "version": "0.1.0",
-  "description": "The crew for DeepSeek Harness (dsh): a spine session on the crew-spine preset runs ossify's run-spine --external-executor, dispatching each work item to a configured subagent_implementer child, verifying it with a subagent_verifier child, computing ossify's result record from git and handing the round back. ossify state is the single authority; this plugin adds nothing to its contract. Two prose skills (dsh-executor, dsh-brief) and a presets reference the operator copies into the dsh home. No lib, no state, no commands.",
+  "version": "0.2.0",
+  "description": "The crew for DeepSeek Harness (dsh): a spine session on the crew-spine preset runs ossify's run-spine --external-executor, dispatching each work item to a configured subagent_implementer child, verifying it with a subagent_verifier child, computing ossify's result record from git and handing the round back; an orchestrator outside dsh spawns, steers and hands off those sessions through the dsh web API. ossify state is the single authority; this plugin adds nothing to its contract. Three prose skills (dsh-executor, dsh-brief, dsh-session), the three presets as files, and a reference for the operator's dsh home. No lib, no state, no commands.",
   "author": {
     "name": "Pras"
   },
@@ -17,7 +17,7 @@
   "interface": {
     "displayName": "dsh-crew",
     "shortDescription": "Run ossify spines inside DeepSeek Harness",
-    "longDescription": "A spine session in DeepSeek Harness runs ossify's run-spine --external-executor, dispatching each work item to a configured implementer child tool and verifying it with a configured verifier child tool. ossify state stays the single authority; the plugin ships prose skills only and adds nothing to ossify's contract.",
+    "longDescription": "A spine session in DeepSeek Harness runs ossify's run-spine --external-executor, dispatching each work item to a configured implementer child tool and verifying it with a configured verifier child tool; an orchestrator outside dsh spawns and steers those sessions through the dsh web API. ossify state stays the single authority; the plugin ships prose skills and preset files only and adds nothing to ossify's contract.",
     "developerName": "Pras",
     "category": "Coding",
     "capabilities": [
