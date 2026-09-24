@@ -22,13 +22,13 @@ the operator's approved seat, copied into the brief at launch; a worker that fin
 model is not `SEAT_EXPECTED_MODEL` reports a failed launch and stops.
 
 The report file is replaced whole, never appended to in pieces: the orchestrator's
-doorbell is that file's hash (`herdr-mechanics.md`), and it reads a change as a finished
-report. Write the new content to a temp file in the same directory, then rename it over
-the path: the rename is the atomic step, and opening the path is not — it truncates the
-file before the content lands, and the doorbell can fire on that truncation and parse
-half a report. No tool here documents an atomic rename, so the requirement is the
-writer's, not the tool's. A plan, a question and a final report all replace the file the
-same way.
+doorbell compares that file's hash or its identity (`herdr-mechanics.md`), and it reads a
+change as a finished report. Write the new content to a temp file in the same directory,
+then rename it over the path: the rename is the atomic step, and opening the path is not —
+it truncates the file before the content lands, and the doorbell can fire on that
+truncation and parse half a report. No tool here documents an atomic rename, so the
+requirement is the writer's, not the tool's. A plan, a question and a final report all
+replace the file the same way.
 
 ## A template is a whole contract
 
