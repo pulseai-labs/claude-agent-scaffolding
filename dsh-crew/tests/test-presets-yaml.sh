@@ -70,7 +70,8 @@ for needle in "toolName: subagent_implementer" "toolName: subagent_verifier" \
   grep -qF -- "$needle" "$PRESETS/crew-spine/agent.cordis.yml" && pass "crew-spine: $needle" || fail "crew-spine: $needle"
 done
 for needle in "defaultPreset: danger-full-access" "api: anthropic-messages" "deepseek-v4.1-flash:cloud" \
-  "subagent-model-selection:" "busyEnter: steer" "x-opencode-session" "--trusted-host"; do
+  "subagent-model-selection:" "busyEnter: steer" "x-opencode-session" "--trusted-host" \
+  "toolName: subagent_reviewer"; do
   grep -qF -- "$needle" "$DOC" && pass "presets.md: $needle" || fail "presets.md: $needle"
 done
 for needle in "ossify-references" "resume.md" '`/close <spine-id>`' "chat message first"; do

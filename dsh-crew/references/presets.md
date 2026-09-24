@@ -13,7 +13,7 @@ from the web UI on 2026-09-23 and 2026-09-24 (two rounds, a hand-off and a close
 | The spine preset | `presets/crew-spine/` in this plugin → `~/.dsh/.agent-presets/crew-spine/` | §2 |
 | A headless spine session | `~/.dsh/profiles/crew/cordis.patch.yml` | §5 |
 | Reaching the web UI from another machine | `tailscale serve` + the unit's flags | §7 |
-| An optional Claude Code review child | a profile plugin + two rows | §8 |
+| The optional reviewer child | a profile plugin + two rows in the web profile | §8 |
 | Which model fills each crew role, per project | `.dsh-crew/roles.md` in the AI workspace | §9 |
 
 ## 0. Before the rows
@@ -45,9 +45,10 @@ from the web UI on 2026-09-23 and 2026-09-24 (two rounds, a hand-off and a close
   root does not carry them. Re-link after an ossify update, as with the skills.
 - **How the rows compose.** The web profile disables the model-facing tools at host level and
   each preset turns them on for its own sessions; the subagent seam (`subagent`, the `spawn`
-  provider) is already mounted. So the web profile patch carries only host settings (§1),
-  routes live once in `settings.yaml` (§6), and everything a session sees (persona, tools,
-  skills root, the two child tools) lives in the preset (§2). A child joins its parent's
+  provider) is already mounted. So the web profile patch carries only host settings (§1) and,
+  optionally, the reviewer's rows (§8); routes live once in `settings.yaml` (§6); and
+  everything a session sees (persona, tools, skills root, the two child tools) lives in the
+  preset (§2). A child joins its parent's
   composition minus its `toolFilter`, takes its persona from its tool row, and runs its
   parent's route unless the call names one (both crew child tools are selectable; §6).
 
@@ -355,21 +356,22 @@ reachable from wherever the operator is. On a tailnet:
   `dsh --profile crew` session does not: it is written to disk but never registered, so it is
   invisible there. Start spine sessions in the UI, or through `/api` (the `dsh-session` skill).
 
-## 8. Optional — a Claude Code review child
+## 8. Optional — the reviewer child (Claude Code)
 
-`@deepseek-ai/dsh-subagent-claude-code` runs Claude Code, through its SDK and under the host
-user's own Claude Code login, as a child tool of a dsh session. It is measured in a test
-profile only, and **not yet run from `crew-spine`**. There, a Sonnet child reviewed a closed
-spine's diff, and its top three findings matched ones the spine's PR review and close audit had
-found independently. The child keeps no transcript (`persistSession: false`). Its model was
-confirmed by calling the same SDK's `query()` and reading `result.modelUsage`
-(`claude-sonnet-5`).
+`@deepseek-ai/dsh-subagent-claude-code` runs Claude Code as a child, through its SDK and under
+the host user's own Claude Code login. It is the `subagent_reviewer` tool that `roles.md`'s
+reviewer row (§9) and the `dsh-executor` skill's §9 use. It is mounted at profile level, in the
+web profile's patch, **not in the preset**: a preset row naming a provider the profile lacks
+would break `crew-spine` on every machine without the plugin. A profile-level row does reach
+`crew-spine` web sessions (measured 2026-09-24).
 
 - **Install** into a profile: `dsh plugin --profile <name> add
   @deepseek-ai/dsh-subagent-claude-code@0.1.5-rc.3`. `dsh plugin` forwards to **pnpm**. Where
   pnpm is missing, a PATH shim works: a `pnpm` script containing `exec npx -y pnpm@10 "$@"`
-  (corepack 0.24 cannot run pnpm 12). Check that the profile's `package.json` lists the package
-  under `dsh.profile.bundles`.
+  (corepack 0.24 cannot run pnpm 12). `dsh plugin add` records the package in the profile's
+  `package.json` under `dsh.profile.bundles` itself; check that it is there. A fresh profile's
+  `cordis.patch.yml` ends in a literal `[]`, which must be replaced by the rows, not appended
+  after: rows after it fail to parse.
 - **Rows** in that profile's patch: the provider's settings, and one tool instance over it.
 
 ```yaml
@@ -378,17 +380,24 @@ confirmed by calling the same SDK's `query()` and reading `result.modelUsage`
     model: sonnet
     permissionMode: auto
 - insert:
-    - id: tool-subagent-claude
+    - id: tool-subagent-reviewer
       name: '@deepseek-ai/dsh-tool-subagent'
       config:
         provider: claude-code
-        toolName: subagent_claude_code
+        toolName: subagent_reviewer
         backgroundMode: one-shot
         maxDepth: provider-managed
 ```
 
 The model is pinned on the provider row: Claude Code takes no per-call dsh route, so a review
-child's model is fixed here, not chosen by the caller.
+child's model is fixed here, not chosen by the caller. The child keeps no transcript
+(`persistSession: false`), so its model is self-reported, in the reply's `MODEL:` line, and the
+pinned row is the control. A Sonnet reviewer on a planted diff returned the planted P1 and two
+real P2s in the required shape, inside a code fence. Codex (`dsh-subagent-codex`) as the
+reviewer is not yet measured.
+
+The headless `crew` profile has no reviewer unless its own patch adds the same rows. A
+`roles.md` naming one stops a headless round at step 0.
 
 ## 9. Roles — `.dsh-crew/roles.md`
 
