@@ -178,9 +178,10 @@ wi_rollback() {
         local hook="${target_path}/.git/hooks/commit-msg"
         # Never delete a hook we did not write: install refuses foreign hooks,
         # so a foreign commit-msg here means the user replaced ours (or the log
-        # line is stale). Leave it and warn (#457). The existence test sees a
-        # dangling symlink too — -e alone follows the link and misses it.
-        if [[ -e "$hook" || -L "$hook" ]] && ! _wi_trace_filter_is_our_hook "$hook"; then
+        # line is stale). Leave it and warn (#457). Install never writes a
+        # symlink and refuses to replace one (#490), so ANY symlink here —
+        # dangling, or pointing at a copy of our hook — is the user's.
+        if [[ -L "$hook" ]] || { [[ -e "$hook" ]] && ! _wi_trace_filter_is_our_hook "$hook"; }; then
           wi_log_warn "wi_rollback: commit-msg hook not installed by workspace-init; leaving in place: $hook"
           warnings=$((warnings + 1))
           continue

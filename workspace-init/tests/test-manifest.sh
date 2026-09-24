@@ -8,6 +8,8 @@
 #   E. Missing-field handling (3)
 #   F. Reader/writer version-skew (3) — SPEC §6.5
 #   G. Round-trip (2)
+#   L. wi_manifest_relocate — the moved-workspace manifest repair (#491)
+#   V. wi_manifest_validate fails loudly when its field check cannot run
 
 source "$(dirname "$0")/_helpers.sh"
 source "$WI_LIB_DIR/_helpers.sh"
@@ -595,5 +597,352 @@ test_K1_principles_user_global_absent_from_all_three_sites() {
 }
 
 wi_test_run test_K1_principles_user_global_absent_from_all_three_sites
+
+# ---------------------------------------------------------------------------
+# L. wi_manifest_relocate (#491) — rewrite the recorded roots after a move,
+#    carrying every other field through byte-for-byte (as JSON).
+# ---------------------------------------------------------------------------
+
+# A manifest with every non-default value a repair must not lose.
+_setup_custom_pair() {
+  local slot="$1"
+  local ai="$_WI_TMP/$slot/proj-ai" cn="$_WI_TMP/$slot/proj" tool="$_WI_TMP/$slot/tools"
+  mkdir -p "$ai/.workspace" "$cn" "$tool"
+  wi_manifest_write "$ai" "$cn" work --default-branch develop \
+      --git-remote git@example.com:o/proj-ai.git \
+      --canonical-git-remote git@example.com:o/proj.git \
+      --tooling-repo "$tool" --tooling-repo-remote git@example.com:o/tools.git \
+      >/dev/null 2>&1 || { echo "    setup_custom_pair: write failed" >&2; return 1; }
+  local m="$ai/.workspace/pairing.json" tmp="$ai/.workspace/t"
+  jq '.git_policy.trace_filter.blocked_patterns += ["^Signed-off-by: bot"]
+      | .git_policy.allow_ai_push = true' "$m" > "$tmp" && mv "$tmp" "$m"
+  echo "$ai"
+}
+
+test_L1_relocate_rewrites_ai_root_preserves_everything_else() {
+  local ai; ai="$(_setup_custom_pair l1)" || return 1
+  local moved="$_WI_TMP/l1/proj-ai-MOVED"
+  mv "$ai" "$moved"
+  local m="$moved/.workspace/pairing.json"
+  jq -S 'del(.ai_workspace.root, .ai_workspace.name)' "$m" > "$_WI_TMP/l1/before"
+  "$WI_BIN" manifest_relocate "$moved" 2>/dev/null || { echo "    relocate failed"; return 1; }
+  local want; want="$(cd "$moved" && pwd -P)"
+  assert_eq "$want" "$(jq -r '.ai_workspace.root' "$m")" "root rewritten" || return 1
+  assert_eq "proj-ai-MOVED" "$(jq -r '.ai_workspace.name' "$m")" "name rewritten" || return 1
+  jq -S 'del(.ai_workspace.root, .ai_workspace.name)' "$m" > "$_WI_TMP/l1/after"
+  cmp -s "$_WI_TMP/l1/before" "$_WI_TMP/l1/after" || {
+    echo "    a field other than ai_workspace.root/name changed:"
+    diff "$_WI_TMP/l1/before" "$_WI_TMP/l1/after"; return 1; }
+  # Resolution follows the new root.
+  assert_eq "$want/docs/MASTER-SPEC.md" \
+    "$(wi_manifest_resolve "$moved" '${ai_workspace.root}/docs/MASTER-SPEC.md')" \
+    "resolver reads the relocated root" || return 1
+  wi_manifest_validate "$moved" 2>/dev/null || { echo "    relocated manifest no longer validates"; return 1; }
+}
+
+test_L2_relocate_canonical_root_only_with_flag() {
+  local ai; ai="$(_setup_custom_pair l2)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  local old_cn; old_cn="$(jq -r '.canonical.root' "$m")"
+  # Without the flag, canonical is untouched even if it moved.
+  mv "$old_cn" "$_WI_TMP/l2/proj-NEW"
+  "$WI_BIN" manifest_relocate "$ai" 2>/dev/null || return 1
+  assert_eq "$old_cn" "$(jq -r '.canonical.root' "$m")" "canonical untouched without flag" || return 1
+  jq -S 'del(.ai_workspace.root, .ai_workspace.name, .canonical.root, .canonical.name)' "$m" > "$_WI_TMP/l2/before"
+  "$WI_BIN" manifest_relocate "$ai" --canonical-root "$_WI_TMP/l2/proj-NEW" 2>/dev/null || {
+    echo "    relocate with --canonical-root failed"; return 1; }
+  assert_eq "$(cd "$_WI_TMP/l2/proj-NEW" && pwd -P)" "$(jq -r '.canonical.root' "$m")" "canonical root" || return 1
+  assert_eq "proj-NEW" "$(jq -r '.canonical.name' "$m")" "canonical name" || return 1
+  jq -S 'del(.ai_workspace.root, .ai_workspace.name, .canonical.root, .canonical.name)' "$m" > "$_WI_TMP/l2/after"
+  cmp -s "$_WI_TMP/l2/before" "$_WI_TMP/l2/after" || {
+    echo "    --canonical-root changed another field:"; diff "$_WI_TMP/l2/before" "$_WI_TMP/l2/after"; return 1; }
+}
+
+test_L3_relocate_refuses_bad_manifest_unchanged() {
+  local ai="$_WI_TMP/l3/proj-ai"; mkdir -p "$ai/.workspace"
+  local m="$ai/.workspace/pairing.json" body
+  for body in '' '{"a":1}
+{"b":2}' '[1,2]' '{"ai_workspace":"not-an-object"}' '{ not json' \
+      '{"ai_workspace":{}}'; do
+    printf '%s' "$body" > "$m"
+    if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
+      echo "    relocate accepted a bad manifest: $body"; return 1; fi
+    [[ "$(cat "$m")" == "$body" ]] || { echo "    bad manifest was modified: $body"; return 1; }
+  done
+  # A real manifest missing one required field (valid JSON, right shape) is
+  # still corrupt: refused, bytes unchanged.
+  local real; real="$(_setup_pair l3-real)" || return 1
+  local rm_="$real/.workspace/pairing.json"
+  jq 'del(.git_policy)' "$rm_" > "$rm_.t" && mv "$rm_.t" "$rm_"
+  cp "$rm_" "$_WI_TMP/l3/nopolicy.orig"
+  if "$WI_BIN" manifest_relocate "$real" 2>"$_WI_TMP/l3/err"; then
+    echo "    relocate accepted a manifest with no git_policy"; return 1; fi
+  cmp -s "$_WI_TMP/l3/nopolicy.orig" "$rm_" || { echo "    schema-invalid manifest was modified"; return 1; }
+  grep -qF 'git_policy' "$_WI_TMP/l3/err" || {
+    echo "    refusal does not name the missing field"; cat "$_WI_TMP/l3/err"; return 1; }
+  # A required block of the wrong type: the full
+  # validator's jq errored, the capture read empty, and it passed. Refused now.
+  local bad; bad="$(_setup_pair l3-typed)" || return 1
+  local bm="$bad/.workspace/pairing.json"
+  jq '.git_policy = "bad"' "$bm" > "$bm.t" && mv "$bm.t" "$bm"
+  cp "$bm" "$_WI_TMP/l3/typed.orig"
+  if "$WI_BIN" manifest_relocate "$bad" 2>/dev/null; then
+    echo "    relocate accepted a wrong-typed git_policy"; return 1; fi
+  cmp -s "$_WI_TMP/l3/typed.orig" "$bm" || { echo "    wrong-typed manifest was modified"; return 1; }
+  # Missing manifest → refused, nothing created.
+  rm -f "$m"
+  if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
+    echo "    relocate accepted a missing manifest"; return 1; fi
+  assert_file_absent "$m" || return 1
+  ls "$ai/.workspace" | grep -q . && { echo "    relocate left files behind"; return 1; }
+  return 0
+}
+
+test_L4_relocate_refuses_bad_roots_unchanged() {
+  local ai; ai="$(_setup_pair l4)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/l4/orig"
+  if "$WI_BIN" manifest_relocate "$ai" --canonical-root "$_WI_TMP/l4/nope" 2>"$_WI_TMP/l4/err"; then
+    echo "    relocate accepted a nonexistent canonical root"; return 1; fi
+  cmp -s "$_WI_TMP/l4/orig" "$m" || { echo "    manifest modified by a refused relocate"; return 1; }
+  grep -qF 'canonical root is not a directory' "$_WI_TMP/l4/err" || {
+    echo "    refusal does not name the canonical root"; cat "$_WI_TMP/l4/err"; return 1; }
+  if "$WI_BIN" manifest_relocate "$_WI_TMP/l4/ai-TYPO" 2>/dev/null; then
+    echo "    relocate accepted a nonexistent AI root"; return 1; fi
+  [[ ! -e "$_WI_TMP/l4/ai-TYPO" ]] || { echo "    relocate created the mistyped root"; return 1; }
+  if "$WI_BIN" manifest_relocate "$ai" --canonical-root 2>/dev/null; then
+    echo "    relocate accepted --canonical-root without a value"; return 1; fi
+  if "$WI_BIN" manifest_relocate "$ai" --bogus 2>/dev/null; then
+    echo "    relocate accepted an unknown argument"; return 1; fi
+  if "$WI_BIN" manifest_relocate 2>/dev/null; then
+    echo "    relocate accepted no arguments"; return 1; fi
+  cmp -s "$_WI_TMP/l4/orig" "$m" || { echo "    manifest modified by a refused call"; return 1; }
+}
+
+test_L5_relocate_relative_root_recorded_absolute() {
+  local ai; ai="$(_setup_pair l5)" || return 1
+  mv "$ai" "$_WI_TMP/l5/renamed-ai"
+  ( cd "$_WI_TMP/l5" && "$WI_BIN" manifest_relocate renamed-ai ) 2>/dev/null || {
+    echo "    relative relocate failed"; return 1; }
+  assert_eq "$(cd "$_WI_TMP/l5/renamed-ai" && pwd -P)" \
+    "$(jq -r '.ai_workspace.root' "$_WI_TMP/l5/renamed-ai/.workspace/pairing.json")" \
+    "relative argument recorded as an absolute path"
+}
+
+# ---------------------------------------------------------------------------
+# V. wi_manifest_validate must fail — with a message — when its own field
+#    check cannot run (a wrong-typed block, a non-object document), on both
+#    the sourced and the dispatched path.
+# ---------------------------------------------------------------------------
+test_V1_validate_rejects_wrong_typed_blocks() {
+  local ai; ai="$(_setup_pair v1)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v1/good"
+  # Control: the untouched manifest validates on both paths.
+  wi_manifest_validate "$ai" 2>/dev/null || { echo "    control: valid manifest rejected (sourced)"; return 1; }
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || { echo "    control: valid manifest rejected (dispatched)"; return 1; }
+  local edit
+  for edit in '.git_policy = "bad"' '.canonical = "x"' '.routing = [1]' \
+              '.git_policy.trace_filter = 7' '.during_dev = true'; do
+    jq "$edit" "$_WI_TMP/v1/good" > "$m"
+    if wi_manifest_validate "$ai" 2>"$_WI_TMP/v1/err"; then
+      echo "    sourced validate accepted: $edit"; return 1; fi
+    grep -qF 'wrong type' "$_WI_TMP/v1/err" || {
+      echo "    sourced refusal does not explain ($edit):"; cat "$_WI_TMP/v1/err"; return 1; }
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v1/err"; then
+      echo "    dispatched validate accepted: $edit"; return 1; fi
+    grep -qF 'wrong type' "$_WI_TMP/v1/err" || {
+      echo "    dispatched refusal is silent ($edit):"; cat "$_WI_TMP/v1/err"; return 1; }
+  done
+}
+
+test_V2_validate_rejects_non_object_document() {
+  local ai="$_WI_TMP/v2/proj-ai"; mkdir -p "$ai/.workspace"
+  local body
+  for body in '[1,2]' '"text"' '42'; do
+    printf '%s' "$body" > "$ai/.workspace/pairing.json"
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v2/err"; then
+      echo "    validate accepted a non-object document: $body"; return 1; fi
+    grep -qF 'not a JSON object' "$_WI_TMP/v2/err" || {
+      echo "    refusal does not name the problem ($body):"; cat "$_WI_TMP/v2/err"; return 1; }
+  done
+}
+
+test_V3_validate_rejects_invalid_policy_leaf_types() {
+  # The leaves the commit-msg hook enforces must carry
+  # the hook's types, or a manifest validates here and the hook then blocks.
+  local ai; ai="$(_setup_pair v3)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v3/good"
+  local edit
+  for edit in '.git_policy.trace_filter.enforce = "bad"' \
+              '.git_policy.trace_filter.enforce = null' \
+              '.git_policy.trace_filter.blocked_patterns = {"a":1}' \
+              '.git_policy.trace_filter.blocked_patterns = "x"' \
+              '.git_policy.trace_filter.blocked_patterns = ["^a", 1]' \
+              '.git_policy.trace_filter.blocked_patterns = ["^a", ""]' \
+              '.git_policy.trace_filter.blocked_patterns = ["\n"]' \
+              '.git_policy.trace_filter.blocked_patterns = ["^a\nb"]'; do
+    jq "$edit" "$_WI_TMP/v3/good" > "$m"
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v3/err"; then
+      echo "    validate accepted: $edit"; return 1; fi
+    grep -qF 'git_policy.trace_filter' "$_WI_TMP/v3/err" || {
+      echo "    refusal does not name the policy leaf ($edit):"; cat "$_WI_TMP/v3/err"; return 1; }
+  done
+  # Adjacent controls: the two deliberate allow-everything policies stay valid.
+  for edit in '.git_policy.trace_filter.enforce = false' \
+              '.git_policy.trace_filter.blocked_patterns = []'; do
+    jq "$edit" "$_WI_TMP/v3/good" > "$m"
+    "$WI_BIN" manifest_validate "$ai" 2>/dev/null || {
+      echo "    control rejected: $edit"; return 1; }
+  done
+}
+
+test_L6_relocate_refuses_symlinked_manifest() {
+  # Tmp-then-mv would replace the link with a regular
+  # file and leave the shared target stale. Refused; link and target intact.
+  local ai; ai="$(_setup_pair l6)" || return 1
+  local shared="$_WI_TMP/l6/shared.json"
+  mv "$ai/.workspace/pairing.json" "$shared"
+  ln -s "$shared" "$ai/.workspace/pairing.json"
+  cp "$shared" "$_WI_TMP/l6/orig"
+  mv "$ai" "$_WI_TMP/l6/moved-ai"
+  local moved="$_WI_TMP/l6/moved-ai"
+  if "$WI_BIN" manifest_relocate "$moved" 2>"$_WI_TMP/l6/err"; then
+    echo "    relocate replaced a symlinked manifest"; return 1; fi
+  [[ -L "$moved/.workspace/pairing.json" ]] || { echo "    the link was replaced"; return 1; }
+  [[ "$(readlink "$moved/.workspace/pairing.json")" == "$shared" ]] || {
+    echo "    the link's target changed"; return 1; }
+  cmp -s "$_WI_TMP/l6/orig" "$shared" || { echo "    the shared target was modified"; return 1; }
+  grep -qF 'symlinked manifest' "$_WI_TMP/l6/err" || {
+    echo "    refusal does not name the symlink"; cat "$_WI_TMP/l6/err"; return 1; }
+}
+
+test_V4_validate_rejects_invalid_regex_pattern() {
+  # The hook fails closed on an invalid ERE, so the
+  # validator must too — the last hook rule it did not mirror.
+  local ai; ai="$(_setup_pair v4)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v4/good"
+  jq '.git_policy.trace_filter.blocked_patterns = ["^ok", "("]' "$_WI_TMP/v4/good" > "$m"
+  if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v4/err"; then
+    echo "    validate accepted an invalid ERE"; return 1; fi
+  grep -qF 'not a valid extended regex: (' "$_WI_TMP/v4/err" || {
+    echo "    refusal does not name the pattern"; cat "$_WI_TMP/v4/err"; return 1; }
+  # Adjacent control: valid EREs using groups, classes and anchors still pass.
+  jq '.git_policy.trace_filter.blocked_patterns = ["^(a|b)+$", "[[:space:]]x", "<noreply@x\\.com>"]' \
+    "$_WI_TMP/v4/good" > "$m"
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || { echo "    control: valid EREs rejected"; return 1; }
+}
+
+test_L7_relocate_refuses_self_pairing() {
+  # The pair's two roots must differ, as the pairing
+  # preflight requires — via the flag or via the recorded canonical.root.
+  local ai; ai="$(_setup_pair l7)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/l7/orig"
+  if "$WI_BIN" manifest_relocate "$ai" --canonical-root "$ai/." 2>"$_WI_TMP/l7/err"; then
+    echo "    relocate accepted --canonical-root equal to the AI root"; return 1; fi
+  cmp -s "$_WI_TMP/l7/orig" "$m" || { echo "    manifest modified by a refused self-pair"; return 1; }
+  grep -qF 'same directory as both roots' "$_WI_TMP/l7/err" || {
+    echo "    refusal does not explain"; cat "$_WI_TMP/l7/err"; return 1; }
+  # Recorded canonical.root equal to the AI root, no flag → also refused.
+  jq --arg r "$(cd "$ai" && pwd -P)" '.canonical.root = $r' "$_WI_TMP/l7/orig" > "$m"
+  cp "$m" "$_WI_TMP/l7/orig2"
+  if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
+    echo "    relocate accepted a recorded canonical equal to the AI root"; return 1; fi
+  cmp -s "$_WI_TMP/l7/orig2" "$m" || { echo "    manifest modified by a refused call"; return 1; }
+  # Control: the flag naming a distinct directory still fixes it.
+  mkdir -p "$_WI_TMP/l7/real-canonical"
+  "$WI_BIN" manifest_relocate "$ai" --canonical-root "$_WI_TMP/l7/real-canonical" 2>/dev/null || {
+    echo "    control: relocate to a distinct canonical failed"; return 1; }
+}
+
+test_L8_relocate_preserves_manifest_mode() {
+  # The rewrite must keep the manifest's mode, not
+  # take the caller's umask.
+  local ai; ai="$(_setup_pair l8)" || return 1
+  local m="$ai/.workspace/pairing.json" mode
+  # 444 covers a read-only manifest: the staged copy
+  # must be writable for the rewrite and read-only again afterwards. Only a
+  # non-root run can see the write failure; the mode assertion holds for both.
+  for mode in 600 640 444; do
+    chmod "$mode" "$m"
+    ( umask 022; "$WI_BIN" manifest_relocate "$ai" 2>/dev/null ) || {
+      echo "    relocate failed at mode $mode"; return 1; }
+    local got; got="$(stat -c '%a' "$m" 2>/dev/null || stat -f '%Lp' "$m")"
+    assert_eq "$mode" "$got" "mode after relocate" || return 1
+  done
+  ls "$ai/.workspace" | grep -q '\.tmp\.' && { echo "    relocate left a tmp file behind"; return 1; }
+  return 0
+}
+
+test_V5_validate_rejects_wrong_typed_leaves() {
+  # Every required leaf carries its schema type, not
+  # just presence. One edit per case so each refusal names that field.
+  local ai; ai="$(_setup_custom_pair v5)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v5/good"
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || {
+    echo "    control: rich manifest (remotes + tooling_repo) rejected"; return 1; }
+  local edit field
+  while IFS='|' read -r field edit; do
+    jq "$edit" "$_WI_TMP/v5/good" > "$m"
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v5/err"; then
+      echo "    validate accepted: $edit"; return 1; fi
+    grep -qF "$field" "$_WI_TMP/v5/err" || {
+      echo "    refusal does not name $field:"; cat "$_WI_TMP/v5/err"; return 1; }
+  done <<'CASES'
+canonical.root|.canonical.root = 42
+ai_workspace.name|.ai_workspace.name = true
+schema_version|.schema_version = 1
+routing.prd|.routing.prd = {}
+during_dev.branch_naming|.during_dev.branch_naming = []
+git_policy.project_type|.git_policy.project_type = 7
+git_policy.allow_ai_push|.git_policy.allow_ai_push = "no"
+canonical.git_tracked|.canonical.git_tracked = "yes"
+canonical.git_remote|.canonical.git_remote = 5
+tooling_repo.root|.tooling_repo.root = false
+CASES
+  # Adjacent controls: null remotes and a manifest with no tooling_repo stay valid.
+  jq '.ai_workspace.git_remote = null | .canonical.git_remote = null | del(.tooling_repo)' \
+    "$_WI_TMP/v5/good" > "$m"
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || { echo "    control: null remotes rejected"; return 1; }
+  # And relocate refuses a wrong-typed leaf without touching the file.
+  jq '.canonical.root = 42' "$_WI_TMP/v5/good" > "$m"; cp "$m" "$_WI_TMP/v5/typed"
+  if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
+    echo "    relocate accepted a wrong-typed canonical.root"; return 1; fi
+  cmp -s "$_WI_TMP/v5/typed" "$m" || { echo "    relocate modified the wrong-typed manifest"; return 1; }
+}
+
+test_L9_relocate_temp_file_is_not_predictable() {
+  # A symlink planted at ${manifest}.tmp.<pid> was
+  # followed — its target overwritten — and then renamed over pairing.json.
+  # `exec` keeps the planting shell's PID, so the dispatcher's $$ is known.
+  local ai; ai="$(_setup_pair l9)" || return 1
+  local m="$ai/.workspace/pairing.json" victim="$_WI_TMP/l9/victim"
+  printf 'VICTIM\n' > "$victim"
+  bash -c 'ln -s "$1" "$2.tmp.$$"; exec "$3" manifest_relocate "$4"' \
+    _ "$victim" "$m" "$WI_BIN" "$ai" 2>/dev/null || {
+    echo "    relocate failed with a planted temp symlink"; return 1; }
+  assert_eq "VICTIM" "$(cat "$victim")" "planted symlink's target untouched" || return 1
+  [[ -f "$m" && ! -L "$m" ]] || { echo "    pairing.json is not a regular file"; return 1; }
+  jq -e '.ai_workspace.root' "$m" >/dev/null 2>&1 || { echo "    pairing.json lost its content"; return 1; }
+}
+
+wi_test_run test_L1_relocate_rewrites_ai_root_preserves_everything_else
+wi_test_run test_L2_relocate_canonical_root_only_with_flag
+wi_test_run test_L3_relocate_refuses_bad_manifest_unchanged
+wi_test_run test_L4_relocate_refuses_bad_roots_unchanged
+wi_test_run test_L5_relocate_relative_root_recorded_absolute
+wi_test_run test_V1_validate_rejects_wrong_typed_blocks
+wi_test_run test_V2_validate_rejects_non_object_document
+wi_test_run test_V3_validate_rejects_invalid_policy_leaf_types
+wi_test_run test_L6_relocate_refuses_symlinked_manifest
+wi_test_run test_V4_validate_rejects_invalid_regex_pattern
+wi_test_run test_L7_relocate_refuses_self_pairing
+wi_test_run test_L8_relocate_preserves_manifest_mode
+wi_test_run test_V5_validate_rejects_wrong_typed_leaves
+wi_test_run test_L9_relocate_temp_file_is_not_predictable
 
 wi_test_summary

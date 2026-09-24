@@ -138,7 +138,7 @@ Because the AI workspace is already populated with the user's content, this skil
 - **Preflight fails** → nothing written; surface the specific failure (missing/empty AI workspace, canonical not a git repo, self-pairing) and stop.
 - **Manifest write fails** → atomic write leaves no partial file; surface the error and stop. Re-running is safe.
 - **Hook install fails** (permissions, symlink loop, `chmod +x`) → the manifest is already valid and stays in place; surface which hook failed and the manual remediation (`"$wi_bin" trace_filter_install` can be re-run, or the user can inspect `.git/hooks/`). Do NOT delete the manifest or any AI-workspace content.
-- **Hook install refuses a foreign `commit-msg`** → the trace-filter install refuses rather than overwriting a hook it did not install; the foreign hook (even a dangling symlink) is preserved. The manifest stays valid and in place; surface the refusal and let the user decide whether to remove or chain their hook — after they move it aside, `"$wi_bin" trace_filter_install "$ai_root" <repo>` retries that repo only.
+- **Hook install refuses a foreign `commit-msg`** → the trace-filter install refuses rather than overwriting a hook it did not install; the foreign hook (even a dangling symlink) is preserved, and a symlinked `commit-msg` is never replaced whatever it points to. The manifest stays valid and in place; surface the refusal and let the user decide whether to remove or chain their hook — after they move it aside, `"$wi_bin" trace_filter_install "$ai_root" <repo>` retries that repo only.
 - **`pairing.json` already present** → §4 surfaced it and got confirmation; the atomic write overwrites only that one file.
 
 ## 9. Surface summary + next steps

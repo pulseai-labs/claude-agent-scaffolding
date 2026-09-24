@@ -67,6 +67,16 @@ if ! patterns="$(jq -r '.git_policy.trace_filter.blocked_patterns | if type == "
   echo "ERROR: workspace-init trace filter fails closed: cannot read git_policy.trace_filter.blocked_patterns in $MANIFEST_PATH; commit blocked." >&2
   _wi_block
 fi
+# An empty-string entry has no coherent meaning: as an extended regex it
+# matches every message, yet the scan below cannot apply it, so it used to be
+# skipped and read as allow-all (#493). An entry containing a line break (or a
+# NUL) collapses the same way: the patterns travel one per line, so "\n" turns
+# into empty records the scan skips. Both are broken policy, and a broken
+# policy fails closed. To allow everything, use an empty array or enforce:false.
+if jq -e '.git_policy.trace_filter.blocked_patterns | any(. == "" or (explode | any(. == 10 or . == 0)))' "$MANIFEST_PATH" >/dev/null 2>&1; then
+  echo "ERROR: workspace-init trace filter fails closed: git_policy.trace_filter.blocked_patterns contains an empty-string entry or an entry with a line break in $MANIFEST_PATH; commit blocked." >&2
+  _wi_block
+fi
 if [[ -z "$patterns" ]]; then exit 0; fi
 
 # Scan commit message against each pattern. grep exit status 2 is an ERE
