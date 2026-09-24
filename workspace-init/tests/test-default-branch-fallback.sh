@@ -15,6 +15,9 @@
 #   I3. Idempotent init preserves an existing repo's branch
 #   I4. Gitfile-backed existing AI repo remains idempotent and stageable
 #   I5. Git 2.27-compatible fallback still initializes fresh repos on main
+#   D1. Dispatcher path: origin remote without origin/HEAD falls through (#482)
+#   D2. Dispatcher path: origin/HEAD set still wins at step 1
+#   D3. Dispatcher path: a non-repo reaches the prompt and defaults to main
 
 source "$(dirname "$0")/_helpers.sh"
 source "$WI_LIB_DIR/_helpers.sh"
@@ -281,6 +284,51 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# D1-D3. The DISPATCHED path (#482). The skills call `wi
+# git_detect_default_branch`, which runs under `set -euo pipefail`; the F-tests
+# above source the lib under `set -u` only and cannot see an abort there.
+# ---------------------------------------------------------------------------
+test_D1_dispatcher_origin_without_head_falls_through() {
+  local repo="$_WI_TMP/d1-canon"
+  mkdir -p "$repo"
+  git -C "$repo" init -q
+  git -C "$repo" symbolic-ref HEAD refs/heads/trunk
+  git -C "$repo" remote add origin https://example.invalid/x.git
+
+  local out rc
+  out="$("$WI_BIN" git_detect_default_branch "$repo" </dev/null 2>/dev/null)"
+  rc=$?
+  assert_eq 0 "$rc" "D1: dispatcher exit status" || return 1
+  assert_eq "trunk" "$out" "D1: falls through to local HEAD" || return 1
+}
+
+test_D2_dispatcher_origin_head_still_wins() {
+  local seed="$_WI_TMP/d2-seed" upstream="$_WI_TMP/d2-upstream.git"
+  local repo="$_WI_TMP/d2-clone"
+  _make_repo_with_branch "$seed" "develop"
+  git clone -q --bare "$seed" "$upstream"
+  git clone -q "$upstream" "$repo"
+  git -C "$repo" checkout -q -b feature
+
+  local out rc
+  out="$("$WI_BIN" git_detect_default_branch "$repo" </dev/null 2>/dev/null)"
+  rc=$?
+  assert_eq 0 "$rc" "D2: dispatcher exit status" || return 1
+  assert_eq "develop" "$out" "D2: origin/HEAD beats the current branch" || return 1
+}
+
+test_D3_dispatcher_non_repo_defaults_to_main() {
+  local dir="$_WI_TMP/d3-not-a-repo"
+  mkdir -p "$dir"
+
+  local out rc
+  out="$(GIT_CEILING_DIRECTORIES="$_WI_TMP" "$WI_BIN" git_detect_default_branch "$dir" </dev/null 2>/dev/null)"
+  rc=$?
+  assert_eq 0 "$rc" "D3: dispatcher exit status" || return 1
+  assert_eq "main" "$out" "D3: EOF at the prompt defaults to main" || return 1
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -298,6 +346,9 @@ wi_test_run test_I2_fresh_pair_initializes_both_on_main
 wi_test_run test_I3_existing_repo_branch_is_preserved
 wi_test_run test_I4_gitfile_repo_is_preserved_and_stageable
 wi_test_run test_I5_old_git_fallback_initializes_main
+wi_test_run test_D1_dispatcher_origin_without_head_falls_through
+wi_test_run test_D2_dispatcher_origin_head_still_wins
+wi_test_run test_D3_dispatcher_non_repo_defaults_to_main
 
 echo ""
 wi_test_summary
