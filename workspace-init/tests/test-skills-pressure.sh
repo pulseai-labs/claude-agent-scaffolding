@@ -304,7 +304,7 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   local row
   row="$(grep -F '| [`workspace-init`](./workspace-init/)' "$ROOT_README")"
   [[ -n "$row" ]] || { echo "    workspace-init row not found in root README"; return 1; }
-  assert_contains 'v0.6.0' "$row" || return 1
+  assert_contains 'v0.7.0' "$row" || return 1
   assert_not_contains 'scaffold-onboard' "$row" || return 1
   assert_not_contains 'scaffold-dev' "$row" || return 1
   assert_not_contains 'scaffolding chain' "$row" || return 1

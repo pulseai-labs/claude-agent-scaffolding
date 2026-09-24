@@ -100,9 +100,15 @@ wi_git_detect_default_branch() {
   local repo="$1"
   local branch=""
 
+  # Each probe below is EXPECTED to fail on some repos (no origin/HEAD, a
+  # detached HEAD, not a repo at all). Under the dispatcher's
+  # `set -euo pipefail` a failing probe would abort the whole function before
+  # the next fallback runs (#482), so every probe's failure is absorbed with
+  # `|| branch=""` and the chain moves on.
+
   # Step 1: origin/HEAD symbolic-ref.
   branch="$(git -C "$repo" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null \
-    | sed 's@^refs/remotes/origin/@@')"
+    | sed 's@^refs/remotes/origin/@@')" || branch=""
   if [[ -n "$branch" ]]; then
     printf '%s\n' "$branch"
     return 0
@@ -110,14 +116,14 @@ wi_git_detect_default_branch() {
 
   # Step 2: local HEAD symbolic-ref.
   branch="$(git -C "$repo" symbolic-ref HEAD 2>/dev/null \
-    | sed 's@^refs/heads/@@')"
+    | sed 's@^refs/heads/@@')" || branch=""
   if [[ -n "$branch" ]]; then
     printf '%s\n' "$branch"
     return 0
   fi
 
   # Step 3: branch --show-current.
-  branch="$(git -C "$repo" branch --show-current 2>/dev/null)"
+  branch="$(git -C "$repo" branch --show-current 2>/dev/null)" || branch=""
   if [[ -n "$branch" ]]; then
     printf '%s\n' "$branch"
     return 0

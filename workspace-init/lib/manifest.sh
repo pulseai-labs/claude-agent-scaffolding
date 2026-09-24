@@ -19,6 +19,7 @@
 #   wi_plugin_data_dir <plugin-name>
 #   wi_manifest_write  <ai-root> <canonical-root> <project-type> [--git-remote URL]
 #                      [--canonical-git-remote URL] [--default-branch NAME]
+#   wi_manifest_relocate <ai-root> [--canonical-root PATH]
 #   wi_manifest_read   <ai-root> [<field-jq-path>]
 #   wi_manifest_resolve <ai-root> <string-with-vars>
 #   wi_manifest_validate <ai-root>
@@ -365,6 +366,181 @@ wi_manifest_write() {
 }
 
 # ---------------------------------------------------------------------------
+# wi_manifest_relocate
+# ---------------------------------------------------------------------------
+# Usage:
+#   wi_manifest_relocate <ai-root> [--canonical-root PATH]
+#
+# The manifest half of repairing a MOVED workspace (#491). Re-baking the hooks
+# (wi_trace_filter_install_pair) restores the filter, but pairing.json still
+# records the old ai_workspace.root, and consumers resolving paths through
+# wi_manifest_resolve would read the stale location.
+#
+# <ai-root> is the workspace's CURRENT location; its manifest moved with it.
+# Rewrites ai_workspace.root and ai_workspace.name to that location, and — only
+# with --canonical-root — canonical.root and canonical.name too. Every other
+# field (project_type, git remotes, default_branch, git_policy, tooling_repo,
+# created_at, ...) is carried through untouched. Both roots are recorded as
+# absolute physical paths, matching what the hooks bake.
+#
+# Refuses, changing nothing, when: the root is not a directory, the manifest is
+# a symlink, missing, not a single JSON object, or fails wi_manifest_validate
+# (the full schema check, including every trace-filter rule the hook applies),
+# --canonical-root is not a directory, or the result would record the same
+# directory as both roots. The rewrite keeps the manifest's file mode. Atomic
+# via tmp-then-mv. Does not touch the hooks and writes no init-log entry: it is
+# a repair, not a bootstrap step, so rollback has nothing to undo.
+wi_manifest_relocate() {
+  if [[ $# -lt 1 || -z "${1:-}" ]]; then
+    wi_log_error "wi_manifest_relocate: usage: wi_manifest_relocate <ai-root> [--canonical-root PATH]"
+    return 1
+  fi
+  local ai_root="$1"; shift
+  local canonical_root=""
+
+  while (( $# > 0 )); do
+    case "$1" in
+      --canonical-root)
+        if [[ -z "${2:-}" ]]; then
+          wi_log_error "wi_manifest_relocate: --canonical-root requires PATH"
+          return 1
+        fi
+        canonical_root="$2"
+        shift 2
+        ;;
+      *)
+        wi_log_error "wi_manifest_relocate: unknown argument: $1"
+        return 1
+        ;;
+    esac
+  done
+
+  ai_root="$(wi_resolve_root "$ai_root")"
+  if [[ ! -d "$ai_root" ]]; then
+    wi_log_error "wi_manifest_relocate: AI workspace root is not a directory: $ai_root"
+    return 1
+  fi
+  if [[ -n "$canonical_root" ]]; then
+    canonical_root="$(wi_resolve_root "$canonical_root")"
+    if [[ ! -d "$canonical_root" ]]; then
+      wi_log_error "wi_manifest_relocate: canonical root is not a directory: $canonical_root"
+      return 1
+    fi
+  fi
+
+  local manifest
+  manifest="$(_wi_manifest_path "$ai_root")"
+  # A symlinked manifest (a shared or dotfile-managed file) would be replaced
+  # by the tmp-then-mv below, leaving its real target stale while reporting
+  # success. Refuse, as the hook installer refuses a symlinked hook (#490).
+  if [[ -L "$manifest" ]]; then
+    wi_log_error "wi_manifest_relocate: refusing to replace a symlinked manifest: $manifest -> $(readlink "$manifest" 2>/dev/null); relocate its target by hand, or replace the link with a copy and re-run"
+    return 1
+  fi
+  if [[ ! -f "$manifest" ]]; then
+    wi_log_error "wi_manifest_relocate: manifest not found at $manifest"
+    return 1
+  fi
+  # Exactly one JSON object whose root blocks are objects — the same
+  # single-document test the hook applies, plus the shape this edit needs.
+  if ! jq -ne --arg cn "$canonical_root" '
+        input as $doc
+        | ([inputs] | length == 0)
+          and ($doc | type == "object")
+          and ($doc.ai_workspace | type == "object")
+          and ($cn == "" or ($doc.canonical | type == "object"))' \
+      "$manifest" >/dev/null 2>&1; then
+    wi_log_error "wi_manifest_relocate: $manifest is not a single JSON object with the blocks to update; repair it first (README: Repair)"
+    return 1
+  fi
+  # A parseable object can still be corrupt (missing schema_version, routing,
+  # git_policy, ...). Relocating it would report success on a file the hook
+  # and every consumer still reject, so the full schema check runs too. It
+  # names the missing fields itself.
+  if ! wi_manifest_validate "$ai_root"; then
+    wi_log_error "wi_manifest_relocate: refusing to relocate an invalid manifest; repair it first (README: Repair)"
+    return 1
+  fi
+
+  local old_root
+  old_root="$(jq -r '.ai_workspace.root // "(unset)"' "$manifest" 2>/dev/null)" || old_root="(unreadable)"
+
+  # The pair must stay a pair: refuse a result whose two roots are the same
+  # directory — the self-pairing wi_skeleton_preflight_existing_dual rejects —
+  # whether it comes from --canonical-root or from the recorded canonical.root.
+  local final_cn
+  if [[ -n "$canonical_root" ]]; then
+    final_cn="$canonical_root"
+  else
+    final_cn="$(jq -r '.canonical.root' "$manifest" 2>/dev/null)" || final_cn=""
+  fi
+  if [[ -n "$final_cn" && "$(wi_realpath "$final_cn")" == "$(wi_realpath "$ai_root")" ]]; then
+    wi_log_error "wi_manifest_relocate: refusing to record the same directory as both roots: $ai_root; ai_root and canonical must be different paths (pass the canonical's real location with --canonical-root)"
+    return 1
+  fi
+
+  local ai_name cn_name=""
+  ai_name="$(basename "$ai_root")"
+  [[ -z "$canonical_root" ]] || cn_name="$(basename "$canonical_root")"
+
+  # Build the replacement in a copy of the original (cp -p), so the rename
+  # keeps the manifest's mode rather than the caller's umask: a 0600 manifest
+  # stays 0600. The redirect below truncates the copy but keeps its mode.
+  # The temp name must not be predictable: a ${manifest}.tmp.$$ name lets
+  # anyone who can write the directory plant a symlink there first, which cp
+  # and the redirect would follow (overwriting its target) and the rename
+  # would then install as pairing.json. mktemp creates the file exclusively
+  # under a random name; cp -p then copies the mode onto that regular file.
+  local tmp
+  if ! tmp="$(mktemp "${manifest}.tmp.XXXXXX" 2>/dev/null)"; then
+    wi_log_error "wi_manifest_relocate: could not create a temp file beside $manifest"
+    return 1
+  fi
+  if ! cp -p "$manifest" "$tmp" 2>/dev/null; then
+    rm -f "$tmp"
+    wi_log_error "wi_manifest_relocate: could not stage a copy of $manifest"
+    return 1
+  fi
+  # A read-only manifest (0444) gives the copy no owner-write bit, and the
+  # redirect would fail. Open the copy for the rewrite, and take the bit away
+  # again afterwards if the original did not have it. `find -perm` is the
+  # POSIX way to read one mode bit on both GNU and BSD.
+  local owner_ro=0
+  [[ -n "$(find "$manifest" -prune -perm -u=w 2>/dev/null)" ]] || owner_ro=1
+  chmod u+w "$tmp" 2>/dev/null
+  if ! jq \
+      --arg ai_root   "$ai_root" \
+      --arg ai_name   "$ai_name" \
+      --arg cn_root   "$canonical_root" \
+      --arg cn_name   "$cn_name" \
+      '.ai_workspace.root = $ai_root
+       | .ai_workspace.name = $ai_name
+       | if $cn_root != "" then
+           .canonical.root = $cn_root | .canonical.name = $cn_name
+         else . end' \
+      "$manifest" > "$tmp" 2>/dev/null; then
+    rm -f "$tmp"
+    wi_log_error "wi_manifest_relocate: jq failed rewriting $manifest"
+    return 1
+  fi
+  if (( owner_ro )) && ! chmod u-w "$tmp" 2>/dev/null; then
+    rm -f "$tmp"
+    wi_log_error "wi_manifest_relocate: could not restore the read-only mode of $manifest"
+    return 1
+  fi
+  mv "$tmp" "$manifest" || {
+    rm -f "$tmp"
+    wi_log_error "wi_manifest_relocate: failed to mv tmp to $manifest"
+    return 1
+  }
+  wi_log_info "wi_manifest_relocate: ai_workspace.root ${old_root} -> ${ai_root}"
+  if [[ -n "$canonical_root" ]]; then
+    wi_log_info "wi_manifest_relocate: canonical.root -> ${canonical_root}"
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
 # wi_manifest_read
 # ---------------------------------------------------------------------------
 # Usage:
@@ -513,10 +689,17 @@ wi_manifest_validate() {
     wi_log_error "wi_manifest_validate: $manifest is not valid JSON"
     return 1
   fi
+  # ...and a JSON object: every field check below indexes into it, and jq
+  # errors (rather than reporting a missing field) when indexing an array or
+  # scalar.
+  if ! jq -e 'type == "object"' "$manifest" >/dev/null 2>&1; then
+    wi_log_error "wi_manifest_validate: $manifest is not a JSON object"
+    return 1
+  fi
 
   # schema_version.
   local v
-  v="$(jq -r '.schema_version // empty' "$manifest" 2>/dev/null)"
+  v="$(jq -r '.schema_version // empty' "$manifest" 2>/dev/null)" || v=""
   if [[ -z "$v" ]]; then
     wi_log_error "wi_manifest_validate: schema_version missing in $manifest"
     return 1
@@ -538,8 +721,12 @@ wi_manifest_validate() {
   #
   # We use a single jq program for all presence checks; jq returns the
   # comma-separated names of any missing fields (or empty when all present).
+  # The jq program's own exit status is checked: a required block of the wrong
+  # type (e.g. "git_policy": "bad") makes an index inside it error, and an
+  # unchecked capture would read that as "nothing missing" — a pass — or,
+  # under the dispatcher's errexit, abort with no message.
   local missing
-  missing="$(jq -r '
+  if ! missing="$(jq -r '
     [
       (if has("schema_version")    then empty else "schema_version"    end),
       (if has("topology")          then empty else "topology"          end),
@@ -595,12 +782,100 @@ wi_manifest_validate() {
       (if .created_at != null then empty else "created_at" end),
       (if .created_by != null then empty else "created_by" end)
     ] | join(", ")
-  ' "$manifest" 2>/dev/null)"
+  ' "$manifest" 2>/dev/null)"; then
+    wi_log_error "wi_manifest_validate: $manifest has a required block of the wrong type; its required fields could not be checked"
+    return 1
+  fi
 
   if [[ -n "$missing" ]]; then
     wi_log_error "wi_manifest_validate: $manifest missing required fields: $missing"
     return 1
   fi
+
+  # Every required leaf must also have its schema type — a present but
+  # wrong-typed value ("canonical.root": 42) would otherwise validate and then
+  # resolve as "42/..." downstream. One table covers the whole required set, so
+  # the check is by type class, not by the field someone last tripped over.
+  # Optional keys (the remotes, tooling_repo) are typed only when present.
+  local bad_types
+  if ! bad_types="$(jq -r '
+    def want($path; $types):
+      (getpath($path) | type) as $t
+      | if ($types | index($t)) then empty
+        else "\($path | join(".")) (must be \($types | join(" or ")), is \($t))" end;
+    def opt($path; $types):
+      if (getpath($path[0:-1]) | type) == "object" and (getpath($path[0:-1]) | has($path[-1]))
+      then want($path; $types) else empty end;
+    [
+      ((["schema_version"], ["topology"], ["ai_workspace","root"], ["ai_workspace","name"],
+        ["canonical","root"], ["canonical","name"], ["canonical","default_branch"],
+        ["git_policy","project_type"], ["created_at"], ["created_by"])
+         as $p | want($p; ["string"])),
+      ((.routing | keys[] | ["routing", .]) as $p | want($p; ["string"])),
+      ((["during_dev","worktrees_dir"], ["during_dev","branch_naming"],
+        ["during_dev","sprint_dir_template"], ["during_dev","slice_spec_format"])
+         as $p | want($p; ["string"])),
+      ((["ai_workspace","git_tracked"], ["canonical","git_tracked"],
+        ["git_policy","allow_ai_local_commits"], ["git_policy","allow_ai_local_merge"],
+        ["git_policy","allow_ai_local_rebase"], ["git_policy","allow_ai_fetch"],
+        ["git_policy","allow_ai_push"], ["git_policy","allow_ai_pull"])
+         as $p | want($p; ["boolean"])),
+      ((["ai_workspace","git_remote"], ["canonical","git_remote"])
+         as $p | opt($p; ["string","null"])),
+      (if has("tooling_repo") then
+         ((["tooling_repo","root"], ["tooling_repo","name"]) as $p | want($p; ["string"])),
+         (["tooling_repo","git_remote"] as $p | opt($p; ["string","null"]))
+       else empty end)
+    ] | join(", ")
+  ' "$manifest" 2>/dev/null)"; then
+    wi_log_error "wi_manifest_validate: $manifest has a required block of the wrong type; its required fields could not be checked"
+    return 1
+  fi
+  if [[ -n "$bad_types" ]]; then
+    wi_log_error "wi_manifest_validate: $manifest has wrongly typed fields: $bad_types"
+    return 1
+  fi
+
+  # The trace-filter policy leaves must have the types the commit-msg hook
+  # requires — otherwise the manifest validates here and the hook then fails
+  # closed on it. Same rules as the hook: enforce is a boolean; blocked_patterns
+  # is an array of non-empty strings with no line break or NUL (#493).
+  local bad_policy
+  if ! bad_policy="$(jq -r '
+    .git_policy.trace_filter as $tf
+    | [
+        (if ($tf.enforce | type) == "boolean" then empty
+         else "git_policy.trace_filter.enforce (must be a boolean)" end),
+        (if ($tf.blocked_patterns | type) != "array"
+         then "git_policy.trace_filter.blocked_patterns (must be an array)"
+         elif ($tf.blocked_patterns
+               | all(type == "string" and . != "" and ((explode | any(. == 10 or . == 0)) | not)))
+         then empty
+         else "git_policy.trace_filter.blocked_patterns (entries must be non-empty single-line strings)" end)
+      ] | join(", ")
+  ' "$manifest" 2>/dev/null)"; then
+    wi_log_error "wi_manifest_validate: $manifest has a required block of the wrong type; its required fields could not be checked"
+    return 1
+  fi
+  if [[ -n "$bad_policy" ]]; then
+    wi_log_error "wi_manifest_validate: $manifest has invalid values: $bad_policy"
+    return 1
+  fi
+  # The last rule the hook applies: every pattern must be a valid extended
+  # regex (grep -E exit 2 is an evaluation error, not "no match"). With this,
+  # every policy check the hook fails closed on is also checked here.
+  local pattern grc
+  while IFS= read -r pattern; do
+    [[ -n "$pattern" ]] || continue
+    # `|| grc=$?`, not a bare call: grep exits 1 on the valid "no match"
+    # path, which would abort the dispatcher's errexit.
+    grc=0
+    grep -E -e "$pattern" /dev/null >/dev/null 2>&1 || grc=$?
+    if (( grc > 1 )); then
+      wi_log_error "wi_manifest_validate: $manifest has invalid values: git_policy.trace_filter.blocked_patterns entry is not a valid extended regex: $pattern"
+      return 1
+    fi
+  done < <(jq -r '.git_policy.trace_filter.blocked_patterns[]' "$manifest" 2>/dev/null)
 
   return 0
 }
