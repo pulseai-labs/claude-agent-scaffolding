@@ -27,9 +27,9 @@ disk.
   pipeline prints it into your transcript, so never run one on its own.
 - **Cookie.** `GET /?token=…` with a cookie jar answers 303 and sets the session cookie. Every
   `/api` call sends that jar. Keep the jar in a private temp directory and delete it when you
-  are done. For `dsh web` as a systemd user unit (from a non-login shell, set
-  `XDG_RUNTIME_DIR=/run/user/$(id -u)` first), capture and log in in one command, printing
-  only the status code:
+  are done. For `dsh web` as a systemd user unit, capture and log in in one command, printing
+  only the status code (`journalctl` reads the journal files, so a fresh non-login shell
+  needs no session variables for this):
 
   ```bash
   jar="$(mktemp -d)/jar"
