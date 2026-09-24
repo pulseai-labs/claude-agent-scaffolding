@@ -268,7 +268,9 @@ rm -f "$tmp_clean"
 section "the dsh spine driver kind"
 DSH_MD="$PLUGIN_ROOT/skills/orchestrate/references/dsh-driver.md"
 EXEC_MD="$PLUGIN_ROOT/skills/orchestrate/references/ossify-execution.md"
-pin 'kind: dsh-spine-driver' "config.md names the dsh spine driver kind once"
+# Named at least twice since the agent-entries exception (PR review round 1); the
+# exact-once pin on that exception, in the section below, is the adjacent control.
+present 'kind: dsh-spine-driver' "config.md names the dsh spine driver kind"
 present '`dsh-driver.md`' "config.md points at dsh-driver.md"
 if [ -f "$DSH_MD" ]; then
   n="$(wc -l < "$DSH_MD" | tr -d ' ')"
@@ -315,5 +317,26 @@ fi
 c="$(occurrences "$EXEC_MD" 'before recommending item rows')"
 if [ "$c" -ge 1 ]; then pass "ossify-execution.md routes a dsh spine seat before item rows are recommended"
 else fail "ossify-execution.md routes a dsh spine seat before item rows are recommended" "not found"; fi
+
+section "the dsh path reaches every surface the top reads first"
+# PR review round 1: a top reads config.md, lifecycle 1b, the delegation floor,
+# ossify-nested-run.md §4 and the command before dsh-driver.md, so each must admit the
+# kind rather than contradict it.
+LIFE_MD="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
+NEST_MD="$PLUGIN_ROOT/skills/orchestrate/references/ossify-nested-run.md"
+SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
+CMD_MD="$PLUGIN_ROOT/commands/orchestrate.md"
+pin 'a `kind: dsh-spine-driver` entry has no `command:`' "config.md's agent entries admit the dsh kind"
+while IFS='|' read -r f needle label; do
+  c="$(occurrences "$f" "$needle")" || c=0
+  if [ "$c" -ge 1 ]; then pass "$label"; else fail "$label" "not found: $needle"; fi
+done <<LIST
+$LIFE_MD|A \`kind: dsh-spine-driver\` spine seat|lifecycle 1b hands a dsh spine seat to dsh-driver.md
+$SKILL_MD|\`dsh-session\` spawn, steer and cancel calls|the delegation floor admits the dsh calls
+$SKILL_MD|a dsh spine driver's transcript reads|the delegation floor admits the transcript reads
+$NEST_MD|replaces this section's completion signals|ossify-nested-run.md §4 yields to dsh-driver.md
+$CMD_MD|\`.dsh-crew/roles.md\`|the command names the dsh roles file
+$DSH_MD|A close session is never rotated|a dsh close finishes past the ceiling
+LIST
 
 report

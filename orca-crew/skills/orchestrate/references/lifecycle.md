@@ -39,6 +39,9 @@ Every command's syntax comes from `orca skills get orchestration`.
    fixes take a new PR and fresh seats. **But a closed return skips the record pass**
    and goes straight to teardown: the pass exists to record PRs, and that return named
    none. Absent any of those four facts, continue at step 2.
+   **A `kind: dsh-spine-driver` spine seat** keeps this step's order, but
+   `references/dsh-driver.md` replaces its SEATS block, depth ask, spine and close
+   launches and completion signals: read it before agreeing any seat.
 2. **Decompose.** One `task-create` per brief, `--deps` for the DAG, each carrying
    the complexity class the orchestrator derives from the work item's spec and its
    spine's bone/flesh class: `contract` if it touches an interface, schema, or

@@ -143,5 +143,6 @@ apply elsewhere, its fix-round brief included (§5).
 When the `spine session` seat you recommend, or the operator chooses, names a
 `kind: dsh-spine-driver` agent, read `references/dsh-driver.md`
 before recommending item rows, and follow it in place of §3's item rows, the fixed
-procedures and the round procedure in `ossify-nested-run.md` §3: the spine and its closes
-run as dsh sessions, and the items take their routes from `.dsh-crew/roles.md`.
+procedures, the round procedure in `ossify-nested-run.md` §3, and the spine and close
+briefs of §6 (its §5–§6 messages are theirs): the spine and its closes run as dsh
+sessions, and the items take their routes from `.dsh-crew/roles.md`.

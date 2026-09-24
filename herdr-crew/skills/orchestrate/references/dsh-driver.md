@@ -101,8 +101,9 @@ contract is the same on both paths.
   operator its text (`dsh-session` §7, §8). This is the one place where a seat other
   than the top talks to the operator.
 - **Wait** token-free: one shell wait, bounded at 15 minutes, that ends on the first of
-  the turn ending, a question pending that you have not yet relayed, or the context
-  figure first reaching the plugin setting `context_ceiling` (default 500000 tokens). A
+  the turn ending, a question pending that you have not yet relayed, or, for a spine
+  session, the context figure first reaching the plugin setting `context_ceiling`
+  (default 500000 tokens). A
   timeout is a checkpoint, never a failure. Never spend a turn per poll. Re-arm it so a
   condition you have already handled cannot end it again: after relaying a question, the
   next wait ends on that question's `tool/result`, by its `callId` (and
@@ -121,9 +122,11 @@ contract is the same on both paths.
 
   A close session's completion is one of §6's three shapes. A turn that ended any other
   way is a failed dispatch: report it, and dispatch nothing downstream.
-- **Rotation.** dsh has no context hook, so the driver cannot see its own figure. At
-  the ceiling, steer the hand-off and spawn the successor as `dsh-session` §9 says; the
-  handoff path it reports is this lane's rotation completion.
+- **Rotation**, of a spine session only. dsh has no context hook, so the driver cannot
+  see its own figure. At the ceiling, steer the hand-off and spawn the successor as
+  `dsh-session` §9 says; the handoff path it reports is this lane's rotation completion.
+  A close session is never rotated: it has no round barrier to stop at, and it finishes
+  its unit past the ceiling, as `lifecycle.md` says of every close session.
 - **Never** send a queued message to a running driver, and never restart `dsh web` while
   any of its sessions has an open turn.
 

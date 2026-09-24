@@ -104,6 +104,8 @@ round barrier is ossify's, unchanged.
 
 ## 4. The spine close is dispatched, and it comes next
 
+On a `kind: dsh-spine-driver` spine, `dsh-driver.md` §5–§6 replaces this section's completion signals and its close launch; the rest of the section holds.
+
 The spine session stops at the final round barrier — where `/ossify:run-spine` hands
 the baton to `/ossify:close <spine-id>` — and never runs the close on its own
 initiative.

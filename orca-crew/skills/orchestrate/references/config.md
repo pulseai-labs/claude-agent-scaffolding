@@ -27,7 +27,9 @@ the whole contract a worker sees.
 
 ## Agent entries
 
-The machine file is one block per agent, named by a `###` heading:
+The machine file is one block per agent, named by a `###` heading. One kind differs:
+a `kind: dsh-spine-driver` entry has no `command:` or `expected_model:`; its fields,
+values and profile row are `dsh-driver.md`'s. Every other entry has this shape:
 
 ```markdown
 ### fast-coder
