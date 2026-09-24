@@ -138,8 +138,9 @@ run keeps is placed outside every seat's worktree, so removing a worktree never 
 `done` carries no body, so the file is the contract and the typed state is only the
 doorbell. The worker writes everything it says to the orchestrator there (a plan, a
 question, an escalation, a late finding, its report) and replaces the file whole
-(`briefs.md`); before every message that sends a seat to work, note its hash
-(`git hash-object <path>`), empty if absent.
+(`briefs.md`); before every message that sends a seat to work, note what the doorbell
+compares — its hash (`git hash-object <path>`), empty if absent, and the file's identity
+(inode or mtime).
 
 For a detected seat that is not a coordinator (below), the wake is the typed wait above:
 
@@ -165,9 +166,9 @@ wakes too soon. The doorbell is one bounded background wait that returns when
 or at its timeout, polling inside itself as `pane wait-output` does — not the loop of
 waits `lifecycle.md` forbids. Both are compared, not merely recorded, so a byte-identical
 replacement (a retained verifier repeating the same failure, a blocker restated after a
-clarification) — same hash, new inode — still wakes it: note the file's identity — inode
-or mtime — beside the hash, or clear or move the acknowledged report before a dispatch. A
-changed file is read as above; a timeout with no new file is the checkpoint above, read
+clarification) — same hash, new inode — still wakes it: the identity noted at dispatch
+above, or a cleared or moved acknowledged report before a dispatch.
+A changed file is read as above; a timeout with no new file is the checkpoint above, read
 the same one `pane read`, and a dialog it finds is reported with the rest of the state.
 
 A **detected** coordinator adds one wait the non-coordinator path does not need: a dialog
@@ -176,7 +177,8 @@ above would sleep to its timeout. Add one bounded wait beside it,
 `herdr agent wait <pane> --until blocked --timeout <ms>`; that `blocked` wake is the dialog
 above, handled as any `blocked` wake is, and it ends the doorbell.
 The doorbell's return — a new report or its timeout — ends the companion, so a dispatch
-leaves at most one armed wait.
+leaves at most one armed wait. An answered dialog re-arms the pair: the fresh bounded wait
+after the answer is the doorbell and its companion again, not one wait.
 
 ## Placement
 

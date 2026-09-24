@@ -409,6 +409,12 @@ for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD"; do
     absent "$f" "$g" "${f##*/} restates no '$g' command"
   done
 done
+# #574, the generic layer's half: briefs.md is where a brief-writer meets the doorbell, so
+# it must name what the doorbell compares — the hash or the file's identity — while still
+# deferring to herdr-mechanics.md for the rule. The mechanics file states it once (its own
+# suite pins that); this pin holds the deferral, not a second statement.
+pin "$GENERIC_BRIEFS_MD" 'doorbell compares that file'"'"'s hash or its identity (`herdr-mechanics.md`)' \
+  "briefs.md names what the doorbell compares and still defers to herdr-mechanics.md (#574)"
 
 section "the seats block is the freeze, not a file"
 
