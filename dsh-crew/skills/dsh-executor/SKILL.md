@@ -150,9 +150,9 @@ A corrected item's result record is computed afresh in §5 and must pass the who
 table again (`external-executor.md` §7); the continuation's own return is never carried over.
 A correction packet ossify's close sends back after rejecting an item (`external-executor.md`
 §7, "to the same executor") is a new invocation of this procedure, run as a round of one:
-`dsh-brief` §4 with that packet, then §4 verify, then §5 afresh, then §7 — baselining that
-item's spec and handoff (§2 step 1) immediately before the correction is dispatched, since
-this path enters at §4 and never runs §2. The
+`dsh-brief` §4 with that packet, then §4 verify, then §5 afresh, then §7 — resolving the roles
+(§2 step 0) and baselining that item's spec and handoff (§2 step 1) immediately before the
+correction is dispatched, since this path enters at §4 and never runs §2. The
 one-correction limit above counts attempts within one invocation; ossify's three-dispatch
 cap (step 1) counts across them and applies to a close-sent packet as to any correction.
 How many close rejections an item gets is ossify's (`close/references/impl-check.md` §6),
@@ -229,12 +229,17 @@ it names a reviewer other than `driver`, add one independent pass at the same po
    call `subagent_reviewer` once, in the foreground, with the reviewer prompt (`dsh-brief` §6)
    for each hosting repo's spine diff: the same `repo_root`, `base_branch` and `spine_branch`
    close resolved for its own review.
-2. Take the **last JSON array** in its reply. A code fence around it is normal. Each element
+2. Before and after each call, in that repo, take `git -C <repo_root> status --porcelain`,
+   `git -C <repo_root> rev-parse HEAD` and `git -C <repo_root> rev-parse <spine_branch>`. The
+   reviewer's tools are not restricted, so its read-only role is only its prompt. Any
+   difference means it changed the tree: report the difference to the operator, and close
+   does not continue on that tree without the operator's word.
+3. Take the **last JSON array** in its reply. A code fence around it is normal. Each element
    must carry exactly `file`, `line`, `severity` and `claim`. Anything else is reported to the
    operator verbatim, and close continues on its own findings.
-3. Add every finding to close's findings, marked as the reviewer's, and disposition them all
+4. Add every finding to close's findings, marked as the reviewer's, and disposition them all
    under close's rules. The reviewer's severity is advice, and close's rules decide.
-4. Record the reply's final `MODEL:` line in close's report. The claude-code provider keeps no
+5. Record the reply's final `MODEL:` line in close's report. The claude-code provider keeps no
    transcript, so §3a cannot check it; the profile's pinned row is the control.
 
 ## 10. What you never do
