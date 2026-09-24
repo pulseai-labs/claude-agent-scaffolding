@@ -136,3 +136,10 @@ The spine and item briefs are in `references/ossify-briefs.md`, the close and
 work-PR briefs in `references/ossify-pr-briefs.md`, the close-review writer's
 in `references/ossify-close-writer.md`; `references/briefs.md`'s templates still
 apply elsewhere, its fix-round brief included (§5).
+
+## 7. A spine seat inside DeepSeek Harness
+
+When the approved `spine session` seat names a `kind: dsh-spine-driver` agent, read
+`references/dsh-driver.md` and follow it in place of §3's item rows, the fixed procedures
+and the round procedure in `ossify-nested-run.md` §3: the spine and its closes run as dsh
+sessions, and the items take their routes from `.dsh-crew/roles.md`.
