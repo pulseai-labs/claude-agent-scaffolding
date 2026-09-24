@@ -783,6 +783,50 @@ wi_manifest_validate() {
     return 1
   fi
 
+  # Every required leaf must also have its schema type — a present but
+  # wrong-typed value ("canonical.root": 42) would otherwise validate and then
+  # resolve as "42/..." downstream. One table covers the whole required set, so
+  # the check is by type class, not by the field someone last tripped over.
+  # Optional keys (the remotes, tooling_repo) are typed only when present.
+  local bad_types
+  if ! bad_types="$(jq -r '
+    def want($path; $types):
+      (getpath($path) | type) as $t
+      | if ($types | index($t)) then empty
+        else "\($path | join(".")) (must be \($types | join(" or ")), is \($t))" end;
+    def opt($path; $types):
+      if (getpath($path[0:-1]) | type) == "object" and (getpath($path[0:-1]) | has($path[-1]))
+      then want($path; $types) else empty end;
+    [
+      ((["schema_version"], ["topology"], ["ai_workspace","root"], ["ai_workspace","name"],
+        ["canonical","root"], ["canonical","name"], ["canonical","default_branch"],
+        ["git_policy","project_type"], ["created_at"], ["created_by"])
+         as $p | want($p; ["string"])),
+      ((.routing | keys[] | ["routing", .]) as $p | want($p; ["string"])),
+      ((["during_dev","worktrees_dir"], ["during_dev","branch_naming"],
+        ["during_dev","sprint_dir_template"], ["during_dev","slice_spec_format"])
+         as $p | want($p; ["string"])),
+      ((["ai_workspace","git_tracked"], ["canonical","git_tracked"],
+        ["git_policy","allow_ai_local_commits"], ["git_policy","allow_ai_local_merge"],
+        ["git_policy","allow_ai_local_rebase"], ["git_policy","allow_ai_fetch"],
+        ["git_policy","allow_ai_push"], ["git_policy","allow_ai_pull"])
+         as $p | want($p; ["boolean"])),
+      ((["ai_workspace","git_remote"], ["canonical","git_remote"])
+         as $p | opt($p; ["string","null"])),
+      (if has("tooling_repo") then
+         ((["tooling_repo","root"], ["tooling_repo","name"]) as $p | want($p; ["string"])),
+         (["tooling_repo","git_remote"] as $p | opt($p; ["string","null"]))
+       else empty end)
+    ] | join(", ")
+  ' "$manifest" 2>/dev/null)"; then
+    wi_log_error "wi_manifest_validate: $manifest has a required block of the wrong type; its required fields could not be checked"
+    return 1
+  fi
+  if [[ -n "$bad_types" ]]; then
+    wi_log_error "wi_manifest_validate: $manifest has wrongly typed fields: $bad_types"
+    return 1
+  fi
+
   # The trace-filter policy leaves must have the types the commit-msg hook
   # requires — otherwise the manifest validates here and the hook then fails
   # closed on it. Same rules as the hook: enforce is a boolean; blocked_patterns

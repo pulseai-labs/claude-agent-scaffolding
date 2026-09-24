@@ -875,6 +875,44 @@ test_L8_relocate_preserves_manifest_mode() {
   return 0
 }
 
+test_V5_validate_rejects_wrong_typed_leaves() {
+  # Codex round 6 on #581: every required leaf carries its schema type, not
+  # just presence. One edit per case so each refusal names that field.
+  local ai; ai="$(_setup_custom_pair v5)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v5/good"
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || {
+    echo "    control: rich manifest (remotes + tooling_repo) rejected"; return 1; }
+  local edit field
+  while IFS='|' read -r field edit; do
+    jq "$edit" "$_WI_TMP/v5/good" > "$m"
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v5/err"; then
+      echo "    validate accepted: $edit"; return 1; fi
+    grep -qF "$field" "$_WI_TMP/v5/err" || {
+      echo "    refusal does not name $field:"; cat "$_WI_TMP/v5/err"; return 1; }
+  done <<'CASES'
+canonical.root|.canonical.root = 42
+ai_workspace.name|.ai_workspace.name = true
+schema_version|.schema_version = 1
+routing.prd|.routing.prd = {}
+during_dev.branch_naming|.during_dev.branch_naming = []
+git_policy.project_type|.git_policy.project_type = 7
+git_policy.allow_ai_push|.git_policy.allow_ai_push = "no"
+canonical.git_tracked|.canonical.git_tracked = "yes"
+canonical.git_remote|.canonical.git_remote = 5
+tooling_repo.root|.tooling_repo.root = false
+CASES
+  # Adjacent controls: null remotes and a manifest with no tooling_repo stay valid.
+  jq '.ai_workspace.git_remote = null | .canonical.git_remote = null | del(.tooling_repo)' \
+    "$_WI_TMP/v5/good" > "$m"
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || { echo "    control: null remotes rejected"; return 1; }
+  # And relocate refuses a wrong-typed leaf without touching the file.
+  jq '.canonical.root = 42' "$_WI_TMP/v5/good" > "$m"; cp "$m" "$_WI_TMP/v5/typed"
+  if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
+    echo "    relocate accepted a wrong-typed canonical.root"; return 1; fi
+  cmp -s "$_WI_TMP/v5/typed" "$m" || { echo "    relocate modified the wrong-typed manifest"; return 1; }
+}
+
 wi_test_run test_L1_relocate_rewrites_ai_root_preserves_everything_else
 wi_test_run test_L2_relocate_canonical_root_only_with_flag
 wi_test_run test_L3_relocate_refuses_bad_manifest_unchanged
@@ -887,5 +925,6 @@ wi_test_run test_L6_relocate_refuses_symlinked_manifest
 wi_test_run test_V4_validate_rejects_invalid_regex_pattern
 wi_test_run test_L7_relocate_refuses_self_pairing
 wi_test_run test_L8_relocate_preserves_manifest_mode
+wi_test_run test_V5_validate_rejects_wrong_typed_leaves
 
 wi_test_summary
