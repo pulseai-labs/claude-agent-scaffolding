@@ -74,7 +74,8 @@ for needle in "defaultPreset: danger-full-access" "api: anthropic-messages" "dee
   "toolName: subagent_reviewer"; do
   grep -qF -- "$needle" "$DOC" && pass "presets.md: $needle" || fail "presets.md: $needle"
 done
-for needle in "ossify-references" "resume.md" '`/close <spine-id>`' "chat message first"; do
+for needle in "ossify-references" "resume.md" '`/close <spine-id>`' "chat message first" \
+  "before any mutation, run the \`dsh-executor\` skill's §2 step 0 checks"; do
   grep -qF -- "$needle" "$PRESETS/crew-spine/agent.cordis.yml" && pass "crew-spine persona: $needle" || fail "crew-spine persona: $needle"
 done
 

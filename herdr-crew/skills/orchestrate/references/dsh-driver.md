@@ -117,7 +117,10 @@ contract is the same on both paths.
   - the final round barrier, every item closed: `ossify-nested-run.md` §4 applies from
     there, as it does to any spine session's completion;
   - a stop for the operator (`dsh-executor`'s stop rule, a refusal, or a resume's drift
-    report): a halt, and nothing downstream is dispatched. A stop-rule halt is
+    report): a halt, and nothing downstream is dispatched. A stop from the persona's
+    `dsh-executor` §2 step 0 checks (a stale preset, an unusable `.dsh-crew/roles.md`)
+    comes before any mutation: once the operator has fixed it, send the same first message
+    to a fresh session, since the stopped one keeps its tools. A stop-rule halt is
     mid-round: no record was written and the round was not handed back, so only the
     session that holds it can recover it. Once the operator has remediated, steer
     `continue <spine-id> from its recorded state` to that same session, where it starts

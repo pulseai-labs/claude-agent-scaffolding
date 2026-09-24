@@ -15,21 +15,27 @@ The verifier runs the driver's route, because 0.3.0's `crew-spine` could not run
   other value stops the round at `dsh-executor` §2 step 0, naming the row. A file written for
   0.3.0 with a literal verifier route therefore stops until that row reads `driver`.
 - **`dsh-executor`:**
-  - §2 step 0 first checks both child tools exist;
-  - §3a finds each child exactly, by `$DSH_SESSION_ID`, the child's `parentSession` and the
-    catalog label, and compares a verifier with the driver's own route;
+  - §2 step 0 first checks both child tools exist, and the `crew-spine` persona runs its
+    checks before run-spine's first mutation and before a continuation reconciles, so a
+    stale preset or an unusable file stops with nothing changed;
+  - §3a finds each child exactly, by `$DSH_SESSION_ID` (under `DSH_HOME`), the child's
+    `parentSession` and the catalog label, and compares a verifier with the driver's own
+    route;
   - §7 reports every child's route;
-  - §9 asks the operator when anything would stop a round at close, a malformed `roles.md`
-    included.
+  - §9 resolves `roles.md` before close's first step. A defect that bears on the reviewer
+    asks the operator whether close runs without the pass, and a no halts as
+    `halted: roles`, never `close-review`.
 - **`dsh-brief` §1 and §3:** the verifier call names no route.
 - **`dsh-session` §3:** `workspace/archiveSession`, the only way to remove a session from the
   UI (the transcript stays on disk).
 - **Suite:**
-  - exactly one selectable child row per composition, and it is `subagent_implementer`;
+  - exactly one selectable child row per composition, and it is `subagent_implementer`; no
+    other row in any block, the profile-level reviewer included, is selectable;
   - the example implementer effort is checked against the model's `reasoningEfforts`;
   - the example verifier row is `driver`.
 
-**Upgrading.** Copy `presets/crew-spine/` into `~/.dsh/.agent-presets/` again. Coming from
+**Upgrading.** Copy `presets/crew-spine/` into `~/.dsh/.agent-presets/` again, and re-apply
+`references/presets.md` §5's rows to a headless `crew` profile. Coming from
 0.2.0, also delete `crew-implementer/` and `crew-verifier/` from `~/.dsh/.agent-presets/`. A
 stale preset fails like this:
 - a 0.2.0 `crew-spine` has no `list_subagent_models`, so a `roles.md` stops at §2 step 0;

@@ -7,6 +7,9 @@ All notable changes to the `herdr-crew` plugin.
 - **`references/dsh-driver.md` §3** recommends `.dsh-crew/roles.md`'s verifier as `driver`:
   since dsh-crew 0.3.1 the verifier always runs the driver's own route and effort. The
   implementer route and effort still come from the allow-list.
+- **`references/dsh-driver.md` §5:** a stop from the driver's pre-mutation step 0 checks (a
+  stale preset, an unusable `.dsh-crew/roles.md`) is retried by sending the same first message
+  to a fresh session, never by `continue` to the stopped one.
 
 ## 0.2.0
 

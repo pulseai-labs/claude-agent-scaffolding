@@ -29,11 +29,17 @@ SKILL.md, in the `dsh-executor` skill directory, not under ossify's `work-item/`
 Take the round in this order — every baseline first, then the dispatches:
 
 0. Resolve the roles, once per round, before anything else. Read `.dsh-crew/roles.md` at the
-   AI workspace root (`references/presets.md` §9 in this plugin gives its shape).
+   AI workspace root (`references/presets.md` §9 in this plugin gives its shape). The
+   `crew-spine` persona also runs this step's checks once before run-spine's first mutation,
+   and before a continuation reconciles, so a stale preset or an unusable file stops the
+   session with nothing changed. The operator then fixes the cause and sends the same first
+   message to a fresh session.
    - **Your tools first.** Confirm `subagent_implementer` and `subagent_verifier` are both
      among your tools, whatever the file says. A missing one means a stale `crew-spine` is
-     installed (a 0.3.0 preset has no `subagent_verifier`; `references/presets.md` §2). Stop
-     the round and tell the operator to copy the plugin's `crew-spine` again.
+     installed (a 0.3.0 preset has no `subagent_verifier`; `references/presets.md` §2). Stop,
+     and tell the operator to copy the plugin's `crew-spine` again, or for the headless
+     `crew` profile to re-apply `references/presets.md` §5's rows, and to start a fresh
+     session.
    - **No file:** there is no selection this round. Send no `provider`, `model` or
      `reasoning_effort` on any child call; every child runs your route and effort. Say so once
      in the hand-back (§7).
@@ -96,7 +102,7 @@ Before you use any child's return — implementer, correction or verifier — co
 actually ran on, from its own transcript, never from its words:
 
 1. **Find your own session.** Your session id is `$DSH_SESSION_ID` in the bash tool, and your
-   directory is `ls -d ~/.dsh/sessions/*/"$DSH_SESSION_ID"`. Its `subagent/catalog` events
+   directory is `ls -d "${DSH_HOME:-$HOME/.dsh}"/sessions/*/"$DSH_SESSION_ID"`. Its `subagent/catalog` events
    list every child you started: `data.childId`, and `data.label`, which is the `description`
    you sent (`work item <id>`, `verify <id>`, `correct <id>`).
 2. **Find the child.** Take the newest child whose catalog label is this call's description.
@@ -243,19 +249,23 @@ is that item's gap or correction iteration.
 ## 9. At close — the reviewer's second pass
 
 ossify's close runs its own code review, in your session, as `close/references/code-review.md`
-says. That review is never handed to another agent. At close, resolve the reviewer row as §2
-step 0 does, reading the file again: close may run in a session that dispatched no round.
+says. That review is never handed to another agent. At close, resolve the file before
+close's first step, reading it again as §2 step 0 does: close may run in a session that
+dispatched no round.
 
-Anything that would stop a round at §2 step 0 cannot stop one here, because close has no
-round. It stops before the reviewer call instead:
-- post the file and the row, or what was missing, in chat;
+Only a defect that bears on the reviewer's pass gates it: a duplicate or unknown row, or a
+reviewer row other than `driver` whose `subagent_reviewer` tool you lack. Post any other
+step 0 failure in chat as a warning, since it will stop a correction the close sends back,
+and go on. On a gating defect, before close's first step:
+- post the file and the row in chat;
 - ask the operator, with `ask_user_question`, whether close continues without the reviewer's
   pass;
-- on yes, close continues on its own findings, and its report says the pass was skipped and
-  why;
-- on no, stop and wait for the operator.
+- on yes, close runs without it, and its report says the pass was skipped and why;
+- on no, stop with nothing done and reply `halted: roles — <file> <row>`. It is never
+  `halted: close-review`, because no review has run.
 
-When the file names a reviewer other than `driver`, add one independent pass at the same point:
+When the file names a reviewer other than `driver` and the pass is not skipped, add one
+independent pass during close review:
 
 1. After close's Axis A and Axis B findings are written down, and before their dispositions,
    call `subagent_reviewer` once, in the foreground, with the reviewer prompt (`dsh-brief` §6)
