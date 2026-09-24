@@ -150,6 +150,11 @@ first delegated dispatch halts naming the file to add; a seat name neither defin
 halts the run. The contract and field
 reference are `skills/orchestrate/references/config.md`.
 
+**DeepSeek Harness seats.** A spine's `spine session` and `close session` seats can name a
+`kind: dsh-spine-driver` agent: a dsh session the top spawns and watches through dsh-crew's
+`dsh-session` skill, whose items take their routes from `.dsh-crew/roles.md`.
+`references/dsh-driver.md` is the contract.
+
 ## Requirements
 
 - Orca running with the orchestration feature enabled.

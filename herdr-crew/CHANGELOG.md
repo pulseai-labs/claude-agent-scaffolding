@@ -2,6 +2,33 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.0
+
+**The dsh spine driver.** A spine's spine and close seats can be a DeepSeek Harness (dsh)
+session instead of a launched command. `references/dsh-driver.md` is the whole contract,
+and dsh-crew 0.3.0 supplies the session, its skills and the presets.
+
+- **The `kind: dsh-spine-driver` agent entry** has no `command:`: `preset: crew-spine`,
+  a `route:` and `effort:` from `~/.dsh/settings.yaml`, the model read from the session's
+  transcript, and the brief sent as one steered message through dsh-crew's `dsh-session`
+  skill. `config.md`'s capability table gains its row; `ossify-execution.md` §7 routes a
+  dsh spine seat to the new file.
+- **`.dsh-crew/roles.md` in place of item rows.** At spine planning the top recommends
+  that file's implementer, verifier and reviewer rows in the one approval phase and
+  writes it; the items get no per-item seats from this plugin.
+- **dsh-crew's item procedure.** A dsh-driven spine runs its items through
+  `dsh-executor`: no worker-authored plan gate, one automatic correction and then a stop
+  for the operator, and no nested-depth ask.
+- **Every close in a fresh dsh session**, never the spine driver's, so dsh-crew's
+  reviewer pass runs at close review and a close-sent correction has its executor.
+- **The top watches the transcript**: the driver's `ask_user_question` goes to the
+  operator in the browser and the top relays its text; a token-free wait ends on a turn
+  end, a pending question or `context_ceiling`; only a `completed` turn is a completion;
+  rotation is a steered hand-off.
+- **Parity pin.** `tests/test-herdr-crew-parity.sh` holds `references/dsh-driver.md`
+  byte-identical to orca-crew's apart from the plugin name.
+- No eval fixture is added; the dsh lane is verified by a real spine run.
+
 ## 0.1.1
 
 The **0.1.0 port, corrected against its own first pilot**. 0.1.0 was written from

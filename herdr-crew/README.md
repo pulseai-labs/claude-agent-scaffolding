@@ -164,6 +164,11 @@ looking for `.herdr-crew/roles.md`, and the machine file has one fixed path — 
 migrating is a copy of the two files to the paths above. orca-crew itself is
 unmodified by this release and stays installed until the fleet has moved.
 
+**DeepSeek Harness seats.** A spine's `spine session` and `close session` seats can name a
+`kind: dsh-spine-driver` agent: a dsh session the top spawns and watches through dsh-crew's
+`dsh-session` skill, whose items take their routes from `.dsh-crew/roles.md`.
+`references/dsh-driver.md` is the contract.
+
 ## Requirements
 
 - herdr 0.9.1 or later, running — **and the orchestrator session itself running inside one
