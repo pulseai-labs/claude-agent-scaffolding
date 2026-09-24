@@ -30,8 +30,8 @@ Claude Code reviewer child. Installing them is machine configuration, not this p
 
 ## Roles
 
-Each project names the model for each crew role (implementer, verifier, reviewer) in
-`.dsh-crew/roles.md` at its AI workspace root. `references/presets.md` §9 is the file's
+Each project names the implementer's model and the reviewer in `.dsh-crew/roles.md` at its
+AI workspace root; the verifier always runs the driver's route and effort. `references/presets.md` §9 is the file's
 contract. With no file, children run the driver's route and there is no reviewer pass.
 
 ## Requirements
