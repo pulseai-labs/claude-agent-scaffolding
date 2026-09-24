@@ -384,8 +384,8 @@ wi_manifest_write() {
 # absolute physical paths, matching what the hooks bake.
 #
 # Refuses, changing nothing, when: the root is not a directory, the manifest is
-# missing or not a single JSON object, its ai_workspace (or, with the flag,
-# canonical) is not an object, or --canonical-root is not a directory. Atomic
+# missing, not a single JSON object, or fails wi_manifest_validate (the full
+# schema check), or --canonical-root is not a directory. Atomic
 # via tmp-then-mv. Does not touch the hooks and writes no init-log entry: it is
 # a repair, not a bootstrap step, so rollback has nothing to undo.
 wi_manifest_relocate() {
@@ -442,6 +442,14 @@ wi_manifest_relocate() {
           and ($cn == "" or ($doc.canonical | type == "object"))' \
       "$manifest" >/dev/null 2>&1; then
     wi_log_error "wi_manifest_relocate: $manifest is not a single JSON object with the blocks to update; repair it first (README: Repair)"
+    return 1
+  fi
+  # A parseable object can still be corrupt (missing schema_version, routing,
+  # git_policy, ...). Relocating it would report success on a file the hook
+  # and every consumer still reject, so the full schema check runs too. It
+  # names the missing fields itself.
+  if ! wi_manifest_validate "$ai_root"; then
+    wi_log_error "wi_manifest_relocate: refusing to relocate an invalid manifest; repair it first (README: Repair)"
     return 1
   fi
 

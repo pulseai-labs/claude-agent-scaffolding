@@ -661,12 +661,24 @@ test_L3_relocate_refuses_bad_manifest_unchanged() {
   local ai="$_WI_TMP/l3/proj-ai"; mkdir -p "$ai/.workspace"
   local m="$ai/.workspace/pairing.json" body
   for body in '' '{"a":1}
-{"b":2}' '[1,2]' '{"ai_workspace":"not-an-object"}' '{ not json'; do
+{"b":2}' '[1,2]' '{"ai_workspace":"not-an-object"}' '{ not json' \
+      '{"ai_workspace":{}}'; do
     printf '%s' "$body" > "$m"
     if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
       echo "    relocate accepted a bad manifest: $body"; return 1; fi
     [[ "$(cat "$m")" == "$body" ]] || { echo "    bad manifest was modified: $body"; return 1; }
   done
+  # A real manifest missing one required field (valid JSON, right shape) is
+  # still corrupt: refused, bytes unchanged.
+  local real; real="$(_setup_pair l3-real)" || return 1
+  local rm_="$real/.workspace/pairing.json"
+  jq 'del(.git_policy)' "$rm_" > "$rm_.t" && mv "$rm_.t" "$rm_"
+  cp "$rm_" "$_WI_TMP/l3/nopolicy.orig"
+  if "$WI_BIN" manifest_relocate "$real" 2>"$_WI_TMP/l3/err"; then
+    echo "    relocate accepted a manifest with no git_policy"; return 1; fi
+  cmp -s "$_WI_TMP/l3/nopolicy.orig" "$rm_" || { echo "    schema-invalid manifest was modified"; return 1; }
+  grep -qF 'git_policy' "$_WI_TMP/l3/err" || {
+    echo "    refusal does not name the missing field"; cat "$_WI_TMP/l3/err"; return 1; }
   # Missing manifest → refused, nothing created.
   rm -f "$m"
   if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
