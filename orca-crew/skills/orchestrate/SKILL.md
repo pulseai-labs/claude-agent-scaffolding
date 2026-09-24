@@ -30,7 +30,8 @@ Your own turns take these kinds of action, and no others:
 2. Write briefs from the templates in `references/briefs.md`, `references/ossify-briefs.md`,
    `references/ossify-pr-briefs.md` and `references/ossify-close-writer.md`, dispositions,
    the handoff, and — on an activated
-   ossify spine — the spine's seats in `.orca-crew/roles.md`.
+   ossify spine — the spine's seats in `.orca-crew/roles.md`, and `.dsh-crew/roles.md`
+   when a dsh spine driver runs it (`references/dsh-driver.md`).
 3. Read `worker_done` bodies.
 4. Decide.
 5. Converse: operator questions, `reply`/`ask` with workers.
