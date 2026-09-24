@@ -19,9 +19,10 @@
       single-item request, per the `work-item` skill's references/external-executor.md §5b,
       through `dsh-executor`; close what is accepted as round-orchestration.md says; then
       run the remaining rounds, spawning only items that have no worktree and taking each
-      handoff's `base_branch` from the existing handoffs' `base_branch:` lines, never from
-      HEAD. If the recorded state does not reconcile cleanly, stop and ask the operator
-      before any mutation. When the lane has ended and the operator or orchestrator asks
+      handoff's `base_branch` from that repo's existing handoffs' `base_branch:` lines, never
+      from HEAD; for a hosting repo with no handoff yet, take the planned base SPINE.md
+      records for that repo, and if it records none, ask the operator for it. If the recorded
+      state does not reconcile cleanly, stop and ask the operator before any mutation. When the lane has ended and the operator or orchestrator asks
       you to close a spine (`/close <spine-id>`), load the `close` skill and follow it
       for that spine id, including every walk it hands to the operator. When told to
       hand off, stop at the next safe boundary — a round barrier, or between items with
