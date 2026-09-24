@@ -183,4 +183,25 @@ rows_out="$("$RUBY_BIN" -ryaml -e '
 ' "$PRESETS/crew-spine/agent.cordis.yml" "$tmp"/block-*.yml 2>&1)"
 [ "$rows_out" = "ok" ] && pass "headless child rows equal crew-spine's (persona compared above)" || fail "headless child rows equal crew-spine's" "$rows_out"
 
+section "the example roles.md routes are allow-listed"
+# The example project file (a ```markdown fence opening '## Roles') must name only routes the
+# example settings.yaml allow-lists, one row per role; the reviewer names a tool kind.
+awk '/^```markdown$/{f=1; buf=""; next} f && /^```$/{f=0; if (buf ~ /^## Roles/) print buf; next} f{buf = buf $0 "\n"}' "$DOC" > "$tmp/roles.md"
+roles_out="$("$RUBY_BIN" -ryaml -e '
+  rows = File.read(ARGV[0]).lines.map(&:strip).select { |l| l.start_with?("|") && !l.start_with?("|---") }.drop(1)
+    .map { |l| l.split("|").map(&:strip).reject(&:empty?) }
+  allowed = []
+  ARGV[1..].each { |f| y = YAML.safe_load(File.read(f), aliases: true); allowed.concat(Array(y.dig("subagent-model-selection", "allowedModels"))) if y.is_a?(Hash) }
+  allowed = allowed.map { |a| "#{a["provider"]}/#{a["model"]}" }
+  bad = []
+  roles = rows.map(&:first)
+  bad << "roles #{roles}" unless roles.sort == %w[implementer reviewer verifier]
+  rows.each do |role, route, _|
+    if role == "reviewer" then bad << "reviewer #{route}" unless %w[claude-code codex driver].include?(route)
+    else bad << "#{role} #{route} not allow-listed" unless allowed.include?(route) end
+  end
+  puts(bad.empty? ? "ok" : bad.join("; "))
+' "$tmp/roles.md" "$tmp"/block-*.yml 2>&1)"
+[ "$roles_out" = "ok" ] && pass "example roles.md: one row per role, routes allow-listed" || fail "example roles.md: one row per role, routes allow-listed" "$roles_out"
+
 report

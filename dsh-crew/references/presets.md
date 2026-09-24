@@ -14,6 +14,7 @@ from the web UI on 2026-09-23 and 2026-09-24 (two rounds, a hand-off and a close
 | A headless spine session | `~/.dsh/profiles/crew/cordis.patch.yml` | §5 |
 | Reaching the web UI from another machine | `tailscale serve` + the unit's flags | §7 |
 | An optional Claude Code review child | a profile plugin + two rows | §8 |
+| Which model fills each crew role, per project | `.dsh-crew/roles.md` in the AI workspace | §9 |
 
 ## 0. Before the rows
 
@@ -386,3 +387,34 @@ confirmed by calling the same SDK's `query()` and reading `result.modelUsage`
 
 The model is pinned on the provider row: Claude Code takes no per-call dsh route, so a review
 child's model is fixed here, not chosen by the caller.
+
+## 9. Roles — `.dsh-crew/roles.md`
+
+The project's choice of model for each crew role. It lives at the root of the AI workspace.
+The orchestrator writes it at spine planning, and the operator approves it. The driver's own
+route is not here: whoever starts the driver chooses it (an orchestrator's agent entry, or the
+operator in the UI).
+
+```markdown
+## Roles
+
+| Role | Route | Effort |
+|---|---|---|
+| implementer | zai/glm-5.3-flashx | max |
+| verifier | ollama-local/deepseek-v4.1-flash:cloud | max |
+| reviewer | claude-code | (pinned) |
+```
+
+- **One row per role**: `implementer`, `verifier`, `reviewer`, and nothing else. There are no
+  conditions and no second row.
+- **Implementer and verifier** routes are `provider/model` exactly as §6 defines them, and each
+  must be in §6's allow-list. Effort is one of that model's `reasoningEfforts`.
+- **Reviewer** is `claude-code` or `codex` (the `subagent_reviewer` tool from §8, whose model
+  is pinned in the profile), or `driver` for no second pass. The driver can check only that the
+  tool exists. The operator checks, when approving the file, that the profile's pinned provider
+  matches the row.
+- **No file** means the 0.2.0 behaviour: children run the driver's route, and there is no
+  reviewer pass. **No row** means the same for that role.
+- A row the session cannot honour stops the round before its first dispatch (the
+  `dsh-executor` skill, §2 step 0). A successor re-reads the file, so routes survive a
+  hand-off.
