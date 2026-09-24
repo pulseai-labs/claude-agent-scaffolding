@@ -170,7 +170,10 @@ sel_out="$("$RUBY_BIN" -ryaml -e '
     walk.(YAML.safe_load(File.read(f), aliases: true))
     kids = rows.select { |c| %w[subagent_implementer subagent_verifier].include?(c["toolName"]) }
     label = File.basename(f)
-    sel = rows.select { |c| c["modelSelectionSettings"] == true }.map { |c| c["toolName"] }.uniq
+    # Count instances, not names: dsh collides per selectable instance, so two rows with one
+    # toolName are two registrations of list_subagent_models.
+    sel_all = rows.select { |c| c["modelSelectionSettings"] == true }.map { |c| c["toolName"] }
+    sel = sel_all.uniq
     # A profile-level child (the reviewer rows in §8) reaches crew-spine sessions too, so no row
     # but the implementer row may be selectable in any block, crew-spine rows or not.
     (sel - ["subagent_implementer"]).each { |t| bad << "#{label} #{t}: only subagent_implementer may be selectable" }
@@ -180,7 +183,7 @@ sel_out="$("$RUBY_BIN" -ryaml -e '
       named = Array(c.dig("toolFilter", "deny")) + Array(c.dig("toolFilter", "allow"))
       (named & sel).each { |t| bad << "#{label} #{c["toolName"]}: toolFilter names selectable #{t}" }
     end
-    bad << "#{label}: selectable rows #{sel}, expected exactly [\"subagent_implementer\"]" unless sel == ["subagent_implementer"]
+    bad << "#{label}: selectable rows #{sel_all}, expected exactly [\"subagent_implementer\"]" unless sel_all == ["subagent_implementer"]
   end
   puts(bad.empty? ? "ok" : bad.uniq.join("; "))
 ' "$PRESETS/crew-spine/agent.cordis.yml" "$tmp"/block-*.yml 2>&1)"
