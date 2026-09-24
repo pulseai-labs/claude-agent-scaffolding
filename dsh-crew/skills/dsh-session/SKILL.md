@@ -144,8 +144,9 @@ A spine outlives one session's context. The `crew-spine` persona carries both ha
 
 1. **Steer the hand-off** to the running driver: name the spine, the state you know it is in,
    and what the successor will do next, and tell it to hand off following its hand-off rule.
-   It stops at the next safe boundary, writes an ossify handoff, commits only that file, and
-   reports the path. Confirm delivery, then wait for its turn to end (§7).
+   It stops at the next persisted round barrier (never mid-round, so this can take a whole
+   round: hand off before the ceiling, not at it), writes an ossify handoff, commits only that
+   file, and reports the path. Confirm delivery, then wait for its turn to end (§7).
 2. **Spawn the successor** (§4) on `crew-spine` in the same `cwd`, select its model, and
    prompt it to resume from that handoff path following its resume rule, then to carry on
    (continue the spine, or run `/close <spine-id>`). Decisions still go to the operator

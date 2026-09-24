@@ -12,7 +12,7 @@ a close), carried back into the plugin.
   skills root is a `!!js` expression over `process.env.HOME`, so the files carry no user name.
   `references/presets.md` §2–§4 now point at them.
 - **The `crew-spine` persona** gains the clauses that run's close depended on: continuing a
-  halted spine from its recorded state, `/close <spine-id>`, handing off at a safe boundary
+  halted spine from its recorded state, `/close <spine-id>`, handing off at a persisted round barrier
   through ossify's `handoff/compose.md`, and resuming through `resume.md`. It also keeps every
   `ask_user_question` short and posts the detail as a chat message first. A long card in the
   web UI hides its options and Submit button.

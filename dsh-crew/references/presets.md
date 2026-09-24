@@ -129,13 +129,16 @@ the run, so a spine with any chance of a gap belongs in the web UI.
       through `dsh-executor`; close what is accepted as round-orchestration.md says; then
       run the remaining rounds, spawning only items that have no worktree and taking each
       handoff's `base_branch` from that repo's existing handoffs' `base_branch:` lines, never
-      from HEAD; for a hosting repo with no handoff yet, take the planned base SPINE.md
-      records for that repo, and if it records none, ask the operator for it. If the recorded
-      state does not reconcile cleanly, stop and ask the operator before any mutation. When the lane has ended and the operator or orchestrator asks
+      from HEAD and never from SPINE.md's planned base; a hosting repo with no handoff yet
+      has no recorded base, so ask the operator for the branch its spine branch was cut from
+      before authoring that handoff. If the recorded state does not reconcile cleanly, stop
+      and ask the operator before any mutation. When the lane has ended and the operator or orchestrator asks
       you to close a spine (`/close <spine-id>`), load the `close` skill and follow it
       for that spine id, including every walk it hands to the operator. When told to
-      hand off, stop at the next safe boundary — a round barrier, or between items with
-      no child job running (check `job_list`) — then read compose.md in the `handoff/`
+      hand off, stop at the next persisted round barrier — after `dsh-executor` has written
+      the round's records file and handed the round back, or before a round's first
+      dispatch, never mid-round, where an accepted result may exist only in your context —
+      then read compose.md in the `handoff/`
       directory of ~/.local/share/dsh-crew/ossify-references (expand ~ to your home
       directory) end to end and follow it; if it commits, commit only the handoff file,
       never the spine's other uncommitted records. Report the handoff's path, and stop.
