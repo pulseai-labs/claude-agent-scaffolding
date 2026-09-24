@@ -50,7 +50,8 @@ from the web UI on 2026-09-23 and 2026-09-24 (two rounds, a hand-off and a close
   everything a session sees (persona, tools, skills root, the two child tools) lives in the
   preset (§2). A child joins its parent's
   composition minus its `toolFilter`, takes its persona from its tool row, and runs its
-  parent's route unless the call names one (both crew child tools are selectable; §6).
+  parent's route and effort unless the call names one, which only the implementer's tool
+  accepts (§2).
 
 ## 1. Web profile patch — `~/.dsh/profiles/web/cordis.patch.yml`
 
@@ -77,8 +78,9 @@ the only machine path in it, and it is resolved from `HOME`.
 
 It is the shipped `standard` preset with its persona replaced, the skills root set, and its
 delegation group reduced to the two configured child tools plus the subagent control tools
-(no generic `subagent`, `subagent_fork`, `workflow` or `ralph`, so every child is one of the
-two). Its persona:
+(no generic `subagent`, `subagent_fork`, `workflow` or `ralph`, so every child the preset
+itself starts is one of the two; a web profile carrying §8's rows adds the reviewer as a
+third). Its persona:
 - runs a spine;
 - continues a halted spine from its recorded state (ossify cannot resume one itself);
 - runs `/close`;
@@ -87,12 +89,21 @@ two). Its persona:
 
 It commits only where ossify's lane and close tell it to; its children never commit.
 
-**The two child rows are model-selectable** (`modelSelectionSettings: true`): each call may
-name a `provider`, `model` and `reasoning_effort` from the allow-list in §6, and the driver
-takes them from the project's `roles.md` (§9). Because a selectable tool is not a global tool,
-no `toolFilter` may name it: a filter that does fails the child at start. Recursion is stopped
-by `maxDepth: 1` on both rows instead, which dsh enforces on every start, whoever calls. The
-verifier's `toolFilter` still removes `edit` and `write`.
+**Only the implementer row is model-selectable** (`modelSelectionSettings: true`). Each
+`subagent_implementer` call may name a `provider`, `model` and `reasoning_effort` from the
+allow-list in §6, and the driver takes them from the project's `roles.md` (§9). The verifier
+row is not selectable, so every verifier runs the driver's own route and effort. dsh
+0.1.5-rc.3 allows at most one selectable child tool per composition:
+- each selectable instance registers `list_subagent_models` in the same scope;
+- the second registration throws;
+- that instance's tool is then silently absent from the session.
+
+So a second selectable row, including a future Codex child, removes a tool rather than adding
+a route (measured 2026-09-25).
+
+A selectable tool is not a global tool, so no `toolFilter` may name it: a filter that does
+fails the child at start. `maxDepth: 1` on both rows stops recursion instead, and dsh enforces
+it on every start, whoever calls. The verifier's `toolFilter` still removes `edit` and `write`.
 
 ## 3–4. Retired in 0.3.0
 
@@ -324,8 +335,10 @@ What each part is for, and what breaks without it:
   child model has to resolve every allow-listed route, or it fails at boot with `NO_ADAPTER`.
   That is why routes live here and nowhere else. Never drop a route the allow-list still
   names. The allow-list does nothing for a tool row that does not set
-  `modelSelectionSettings: true`. Both crew child tools set it, so a child call may name any
-  allow-listed route; a call that names none runs its parent's route.
+  `modelSelectionSettings: true`. Only `subagent_implementer` sets it (§2), so an implementer
+  call may name any allow-listed route, and one that names none runs its parent's route and
+  effort. A `subagent_verifier` call that names a route is refused:
+  `child model selection is disabled for this tool instance`.
 - **`busyEnter: steer`.** Plain Enter while the agent is busy steers (lands at the next step
   boundary) instead of queueing for the end of the turn, and Cmd/Ctrl+Enter does the opposite.
   dsh's default is queue, and a spine is one long turn, so a queued message can wait hours.
@@ -411,14 +424,17 @@ operator in the UI).
 | Role | Route | Effort |
 |---|---|---|
 | implementer | zai/glm-5.3-flashx | max |
-| verifier | ollama-local/deepseek-v4.1-flash:cloud | max |
+| verifier | driver | (driver) |
 | reviewer | claude-code | (pinned) |
 ```
 
 - **One row per role**: `implementer`, `verifier`, `reviewer`, and nothing else. There are no
   conditions and no second row.
-- **Implementer and verifier** routes are `provider/model` exactly as §6 defines them, and each
-  must be in §6's allow-list. Effort is one of that model's `reasoningEfforts`.
+- **Implementer**: the route is `provider/model` exactly as §6 defines it, and it must be in
+  §6's allow-list. Effort is one of that model's `reasoningEfforts`.
+- **Verifier**: `driver`, with effort `(driver)`. The verifier runs the driver's own route and
+  effort, because its tool is not selectable (§2). A row naming anything else stops the round,
+  because dsh cannot honour it. No row means the same as `driver`.
 - **Reviewer** is `claude-code` or `codex` (the `subagent_reviewer` tool from §8, whose model
   is pinned in the profile), or `driver` for no second pass. The driver can check only that the
   tool exists. The operator checks, when approving the file, that the profile's pinned provider
