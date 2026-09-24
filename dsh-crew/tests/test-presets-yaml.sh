@@ -153,25 +153,34 @@ case "$routes_out" in
   allowed=*) pass "every allow-listed route and the default model are defined; every route sets reasoning: max" ;;
 esac
 
-section "selectable child rows: maxDepth guards them, no toolFilter names them"
+section "exactly one selectable child row: the implementer"
 # Spike 5: with modelSelectionSettings on, the tool stops being a global tool, so any
 # toolFilter naming it fails at child start; maxDepth: 1 is the guard dsh enforces instead.
+# Spike 7: dsh 0.1.5-rc.3 registers at most one selectable child tool per composition; a
+# second selectable row is silently absent from the session. The verifier runs the driver's route.
 sel_out="$("$RUBY_BIN" -ryaml -e '
-  rows = []
-  walk = ->(n) { case n when Array then n.each { |x| walk.(x) }
-    when Hash then (c = n["config"]; rows << c if c.is_a?(Hash) && c["toolName"]); n.each_value { |x| walk.(x) } end }
-  ARGV.each { |f| walk.(YAML.safe_load(File.read(f), aliases: true)) }
-  sel = rows.select { |c| c["modelSelectionSettings"] == true }.map { |c| c["toolName"] }.uniq
+  # Per file: each composition (the preset, the headless profile) must hold the invariant on
+  # its own, so one copy cannot satisfy it for the other.
   bad = []
-  rows.each do |c|
-    bad << "#{c["toolName"]}: selectable without maxDepth 1" if c["modelSelectionSettings"] == true && c["maxDepth"] != 1
-    named = Array(c.dig("toolFilter", "deny")) + Array(c.dig("toolFilter", "allow"))
-    (named & sel).each { |t| bad << "#{c["toolName"]}: toolFilter names selectable #{t}" }
+  ARGV.each do |f|
+    rows = []
+    walk = ->(n) { case n when Array then n.each { |x| walk.(x) }
+      when Hash then (c = n["config"]; rows << c if c.is_a?(Hash) && c["toolName"]); n.each_value { |x| walk.(x) } end }
+    walk.(YAML.safe_load(File.read(f), aliases: true))
+    kids = rows.select { |c| %w[subagent_implementer subagent_verifier].include?(c["toolName"]) }
+    next if kids.empty?
+    label = File.basename(f)
+    sel = rows.select { |c| c["modelSelectionSettings"] == true }.map { |c| c["toolName"] }.uniq
+    kids.each { |c| bad << "#{label} #{c["toolName"]}: child row without maxDepth 1" if c["maxDepth"] != 1 }
+    rows.each do |c|
+      named = Array(c.dig("toolFilter", "deny")) + Array(c.dig("toolFilter", "allow"))
+      (named & sel).each { |t| bad << "#{label} #{c["toolName"]}: toolFilter names selectable #{t}" }
+    end
+    bad << "#{label}: selectable rows #{sel}, expected exactly [\"subagent_implementer\"]" unless sel == ["subagent_implementer"]
   end
-  %w[subagent_implementer subagent_verifier].each { |t| bad << "#{t} is not selectable" unless sel.include?(t) }
   puts(bad.empty? ? "ok" : bad.uniq.join("; "))
 ' "$PRESETS/crew-spine/agent.cordis.yml" "$tmp"/block-*.yml 2>&1)"
-[ "$sel_out" = "ok" ] && pass "both child rows selectable, maxDepth 1, never named by a toolFilter" || fail "both child rows selectable, maxDepth 1, never named by a toolFilter" "$sel_out"
+[ "$sel_out" = "ok" ] && pass "only subagent_implementer is selectable; both child rows maxDepth 1; no toolFilter names a selectable tool" || fail "only subagent_implementer is selectable; both child rows maxDepth 1; no toolFilter names a selectable tool" "$sel_out"
 
 section "the headless profile's child rows are crew-spine's"
 rows_out="$("$RUBY_BIN" -ryaml -e '

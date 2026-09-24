@@ -187,7 +187,6 @@ the run, so a spine with any chance of a gap belongs in the web UI.
       config:
         provider: spawn
         toolName: subagent_verifier
-        modelSelectionSettings: true
         maxDepth: 1
         persona: |
           You are the crew's verifier for one ossify work item. Load the `dsh-brief` skill and
