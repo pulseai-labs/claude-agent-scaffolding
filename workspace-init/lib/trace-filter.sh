@@ -19,10 +19,13 @@ if ! declare -F wi_git_is_linked_worktree >/dev/null 2>&1; then
   source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/skeleton.sh"
 fi
 
-# Locate the hooks/commit-msg.tmpl. Prefer WI_HOOKS_DIR (set by tests/_helpers.sh)
-# with a relative-to-script fallback for production.
+# Locate the hooks/commit-msg.tmpl. WI_HOOKS_DIR (set by tests/_helpers.sh) is
+# an explicit override and is honoured strictly — a set override whose
+# template is missing makes the render fail rather than silently falling back
+# to the shipped template, which is what lets the render-failure tests run
+# under any uid (#488). Unset, the path is relative to this script.
 _wi_trace_filter_template() {
-  if [[ -n "${WI_HOOKS_DIR:-}" && -f "${WI_HOOKS_DIR}/commit-msg.tmpl" ]]; then
+  if [[ -n "${WI_HOOKS_DIR:-}" ]]; then
     echo "${WI_HOOKS_DIR}/commit-msg.tmpl"
   else
     echo "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/commit-msg.tmpl"
@@ -45,6 +48,31 @@ _wi_trace_filter_is_our_hook() {
   [[ -f "$hook" ]] || return 1
   grep -qxF "$_WI_TRACE_FILTER_MARKER" "$hook" 2>/dev/null && return 0
   grep -qxF "$_WI_TRACE_FILTER_LEGACY" "$hook" 2>/dev/null
+}
+
+# _wi_trace_filter_check_ai_root <caller> <resolved-ai-root>
+# The AI root is baked into the hook and receives the init-log entry, so it is
+# validated BEFORE any write: the directory exists and holds a pairing.json
+# that is a single JSON object (the same test the hook applies). A mistyped or
+# moved root must fail here — not bake a dead path into a hook, create a stray
+# <typo>/.workspace via wi_log_op, and still report success (#492).
+_wi_trace_filter_check_ai_root() {
+  local caller="$1" ai_root="$2"
+  if [[ -z "$ai_root" || ! -d "$ai_root" ]]; then
+    wi_log_error "${caller}: AI workspace root is not a directory: ${ai_root}"
+    return 1
+  fi
+  local manifest="${ai_root%/}/.workspace/pairing.json"
+  if [[ ! -f "$manifest" ]]; then
+    wi_log_error "${caller}: pairing manifest not found: $manifest"
+    return 1
+  fi
+  if ! jq -ne 'input as $doc | ([inputs] | length == 0) and ($doc | type == "object")' \
+      "$manifest" >/dev/null 2>&1; then
+    wi_log_error "${caller}: pairing manifest is not a single JSON object: $manifest"
+    return 1
+  fi
+  return 0
 }
 
 # wi_trace_filter_render <ai-workspace-root>
@@ -119,6 +147,7 @@ wi_trace_filter_install() {
     resolved="$(wi_resolve_root "$target_repo")"
     [[ -n "$resolved" ]] && target_repo="$resolved"
   fi
+  _wi_trace_filter_check_ai_root wi_trace_filter_install "$ai_root" || return 1
   if ! wi_trace_filter_is_installable_repo_root "$target_repo"; then
     wi_log_error "wi_trace_filter_install: target is not an installable git repo root: $target_repo"
     return 1
@@ -141,13 +170,19 @@ wi_trace_filter_install() {
     return 1
   }
   local out="${hooks_dir}/commit-msg"
+  # A symlinked hook is the user's arrangement (a dotfile-managed hooks dir,
+  # say) whatever its target holds — even a copy of our own hook. Replacing it
+  # would `mv` a regular file over the link and silently drop that arrangement,
+  # so any symlink, dangling or valid, is refused before a byte is touched
+  # (#490). The user updates the link's target themselves.
+  if [[ -L "$out" ]]; then
+    wi_log_error "wi_trace_filter_install: refusing to replace a symlinked commit-msg hook: $out -> $(readlink "$out" 2>/dev/null); update the link's target yourself, or remove the link and re-run"
+    return 1
+  fi
   # Never displace a hook we did not install (#457). Our own hook (marker line,
   # or the pre-0.5.1 legacy header) stays replaceable so the moved-workspace
   # repair can re-bake it; anything else is refused before a byte is touched.
-  # The existence test must see every directory entry: -e alone misses a
-  # DANGLING symlink (-e follows the link), and a symlink is still the user's
-  # hook whether or not its target exists.
-  if [[ -e "$out" || -L "$out" ]] && ! _wi_trace_filter_is_our_hook "$out"; then
+  if [[ -e "$out" ]] && ! _wi_trace_filter_is_our_hook "$out"; then
     wi_log_error "wi_trace_filter_install: refusing to overwrite existing commit-msg hook not installed by workspace-init: $out"
     return 1
   fi
@@ -185,24 +220,12 @@ wi_trace_filter_install_pair() {
   local canonical_root="$2"
   # Validate the AI root BEFORE writing either hook: a mistyped or moved path
   # must fail here, not after canonical's hook has been re-baked to a dead
-  # path (and wi_log_op would even create <bad-root>/.workspace).
-  local resolved_ai manifest
+  # path. (Each wi_trace_filter_install call re-checks; this one names the
+  # pair verb in the error and fails before the canonical install starts.)
+  local resolved_ai
   resolved_ai="$(wi_resolve_root "$ai_root")"
   [[ -n "$resolved_ai" ]] || resolved_ai="$ai_root"
-  if [[ ! -d "$resolved_ai" ]]; then
-    wi_log_error "wi_trace_filter_install_pair: AI workspace root is not a directory: $ai_root"
-    return 1
-  fi
-  manifest="${resolved_ai%/}/.workspace/pairing.json"
-  if [[ ! -f "$manifest" ]]; then
-    wi_log_error "wi_trace_filter_install_pair: pairing manifest not found: $manifest"
-    return 1
-  fi
-  if ! jq -ne 'input as $doc | ([inputs] | length == 0) and ($doc | type == "object")' \
-      "$manifest" >/dev/null 2>&1; then
-    wi_log_error "wi_trace_filter_install_pair: pairing manifest is not a single JSON object: $manifest"
-    return 1
-  fi
+  _wi_trace_filter_check_ai_root wi_trace_filter_install_pair "$resolved_ai" || return 1
   wi_trace_filter_install "$resolved_ai" "$canonical_root" || return 1
   if ! wi_trace_filter_install "$resolved_ai" "$resolved_ai"; then
     wi_log_error "wi_trace_filter_install_pair: canonical hook updated; AI-side install refused or failed (see above)"

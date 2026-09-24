@@ -19,6 +19,7 @@
 #   wi_plugin_data_dir <plugin-name>
 #   wi_manifest_write  <ai-root> <canonical-root> <project-type> [--git-remote URL]
 #                      [--canonical-git-remote URL] [--default-branch NAME]
+#   wi_manifest_relocate <ai-root> [--canonical-root PATH]
 #   wi_manifest_read   <ai-root> [<field-jq-path>]
 #   wi_manifest_resolve <ai-root> <string-with-vars>
 #   wi_manifest_validate <ai-root>
@@ -361,6 +362,121 @@ wi_manifest_write() {
     rm -f "$tmp"
     return 1
   }
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# wi_manifest_relocate
+# ---------------------------------------------------------------------------
+# Usage:
+#   wi_manifest_relocate <ai-root> [--canonical-root PATH]
+#
+# The manifest half of repairing a MOVED workspace (#491). Re-baking the hooks
+# (wi_trace_filter_install_pair) restores the filter, but pairing.json still
+# records the old ai_workspace.root, and consumers resolving paths through
+# wi_manifest_resolve would read the stale location.
+#
+# <ai-root> is the workspace's CURRENT location; its manifest moved with it.
+# Rewrites ai_workspace.root and ai_workspace.name to that location, and — only
+# with --canonical-root — canonical.root and canonical.name too. Every other
+# field (project_type, git remotes, default_branch, git_policy, tooling_repo,
+# created_at, ...) is carried through untouched. Both roots are recorded as
+# absolute physical paths, matching what the hooks bake.
+#
+# Refuses, changing nothing, when: the root is not a directory, the manifest is
+# missing or not a single JSON object, its ai_workspace (or, with the flag,
+# canonical) is not an object, or --canonical-root is not a directory. Atomic
+# via tmp-then-mv. Does not touch the hooks and writes no init-log entry: it is
+# a repair, not a bootstrap step, so rollback has nothing to undo.
+wi_manifest_relocate() {
+  if [[ $# -lt 1 || -z "${1:-}" ]]; then
+    wi_log_error "wi_manifest_relocate: usage: wi_manifest_relocate <ai-root> [--canonical-root PATH]"
+    return 1
+  fi
+  local ai_root="$1"; shift
+  local canonical_root=""
+
+  while (( $# > 0 )); do
+    case "$1" in
+      --canonical-root)
+        if [[ -z "${2:-}" ]]; then
+          wi_log_error "wi_manifest_relocate: --canonical-root requires PATH"
+          return 1
+        fi
+        canonical_root="$2"
+        shift 2
+        ;;
+      *)
+        wi_log_error "wi_manifest_relocate: unknown argument: $1"
+        return 1
+        ;;
+    esac
+  done
+
+  ai_root="$(wi_resolve_root "$ai_root")"
+  if [[ ! -d "$ai_root" ]]; then
+    wi_log_error "wi_manifest_relocate: AI workspace root is not a directory: $ai_root"
+    return 1
+  fi
+  if [[ -n "$canonical_root" ]]; then
+    canonical_root="$(wi_resolve_root "$canonical_root")"
+    if [[ ! -d "$canonical_root" ]]; then
+      wi_log_error "wi_manifest_relocate: canonical root is not a directory: $canonical_root"
+      return 1
+    fi
+  fi
+
+  local manifest
+  manifest="$(_wi_manifest_path "$ai_root")"
+  if [[ ! -f "$manifest" ]]; then
+    wi_log_error "wi_manifest_relocate: manifest not found at $manifest"
+    return 1
+  fi
+  # Exactly one JSON object whose root blocks are objects — the same
+  # single-document test the hook applies, plus the shape this edit needs.
+  if ! jq -ne --arg cn "$canonical_root" '
+        input as $doc
+        | ([inputs] | length == 0)
+          and ($doc | type == "object")
+          and ($doc.ai_workspace | type == "object")
+          and ($cn == "" or ($doc.canonical | type == "object"))' \
+      "$manifest" >/dev/null 2>&1; then
+    wi_log_error "wi_manifest_relocate: $manifest is not a single JSON object with the blocks to update; repair it first (README: Repair)"
+    return 1
+  fi
+
+  local old_root
+  old_root="$(jq -r '.ai_workspace.root // "(unset)"' "$manifest" 2>/dev/null)"
+
+  local ai_name cn_name=""
+  ai_name="$(basename "$ai_root")"
+  [[ -z "$canonical_root" ]] || cn_name="$(basename "$canonical_root")"
+
+  local tmp="${manifest}.tmp.$$"
+  if ! jq \
+      --arg ai_root   "$ai_root" \
+      --arg ai_name   "$ai_name" \
+      --arg cn_root   "$canonical_root" \
+      --arg cn_name   "$cn_name" \
+      '.ai_workspace.root = $ai_root
+       | .ai_workspace.name = $ai_name
+       | if $cn_root != "" then
+           .canonical.root = $cn_root | .canonical.name = $cn_name
+         else . end' \
+      "$manifest" > "$tmp" 2>/dev/null; then
+    rm -f "$tmp"
+    wi_log_error "wi_manifest_relocate: jq failed rewriting $manifest"
+    return 1
+  fi
+  mv "$tmp" "$manifest" || {
+    rm -f "$tmp"
+    wi_log_error "wi_manifest_relocate: failed to mv tmp to $manifest"
+    return 1
+  }
+  wi_log_info "wi_manifest_relocate: ai_workspace.root ${old_root} -> ${ai_root}"
+  if [[ -n "$canonical_root" ]]; then
+    wi_log_info "wi_manifest_relocate: canonical.root -> ${canonical_root}"
+  fi
   return 0
 }
 

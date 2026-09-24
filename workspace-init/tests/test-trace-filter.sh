@@ -270,6 +270,41 @@ test_E10_unreadable_blocked_patterns_blocks() {
   _assert_fails_closed "$d/stderr"
 }
 
+test_E11_empty_string_pattern_blocks() {
+  # #493: [""] used to read as allow-all (the scan skipped the empty line and
+  # an all-empty pattern list exited 0). It is a broken policy: fail closed and
+  # name it — alone, and beside a valid pattern on a message that pattern
+  # would NOT block (so only the empty entry can be the reason).
+  local d; d="$(_make_fixture)"
+  local manifest="$d/foo-ai/.workspace/pairing.json"
+  local tmp; tmp="$(mktemp)"
+  jq '.git_policy.trace_filter.blocked_patterns = [""]' "$manifest" > "$tmp" && mv "$tmp" "$manifest"
+  local hook; hook="$(_render_hook "$d")"
+  local msg; msg="$(_write_msg "$d" $'fix: a plain message
+')"
+  local rc; rc="$(_run_hook "$hook" "$msg" "$d")"
+  assert_eq "1" "$rc" "[\"\"] must fail closed (exit 1)" || return 1
+  grep -qF 'contains an empty-string entry' "$d/stderr" || {
+    echo "    block does not name the empty-string entry"; cat "$d/stderr"; return 1; }
+  _assert_fails_closed "$d/stderr" || return 1
+  tmp="$(mktemp)"
+  jq '.git_policy.trace_filter.blocked_patterns = ["^Co-Authored-By:", ""]' "$manifest" > "$tmp" && mv "$tmp" "$manifest"
+  rc="$(_run_hook "$hook" "$msg" "$d")"
+  assert_eq "1" "$rc" "an empty entry beside a valid one must fail closed" || return 1
+  grep -qF 'contains an empty-string entry' "$d/stderr" || {
+    echo "    mixed list: block does not name the empty-string entry"; cat "$d/stderr"; return 1; }
+  # Adjacent controls: the explicit empty array still allows (E3's contract),
+  # and a whitespace pattern is a real regex, not an empty entry.
+  tmp="$(mktemp)"
+  jq '.git_policy.trace_filter.blocked_patterns = []' "$manifest" > "$tmp" && mv "$tmp" "$manifest"
+  rc="$(_run_hook "$hook" "$msg" "$d")"
+  assert_eq "0" "$rc" "[] must still allow" || return 1
+  tmp="$(mktemp)"
+  jq '.git_policy.trace_filter.blocked_patterns = ["^zzz-never "]' "$manifest" > "$tmp" && mv "$tmp" "$manifest"
+  rc="$(_run_hook "$hook" "$msg" "$d")"
+  assert_eq "0" "$rc" "a non-matching non-empty pattern must still allow"
+}
+
 test_E5_trailer_at_line_start_in_multiline_blocks() {
   local d; d="$(_make_fixture)"
   local hook; hook="$(_render_hook "$d")"
@@ -475,10 +510,11 @@ test_F1_install_refuses_foreign_hook_preserves_bytes() {
     echo "    refusal not explained to the user"; cat "$d/inst-err"; return 1; }
   # Adjacent: the refusal runs before render — a render failure cannot turn a
   # refusal into a deletion (today `> "$out"` truncates before render runs).
+  # The render is made to fail with a missing template, not an unreadable one:
+  # chmod 000 does not stop root from reading (#488).
   local bad="$d/badhooks"; mkdir -p "$bad"
-  : > "$bad/commit-msg.tmpl"; chmod 000 "$bad/commit-msg.tmpl"
   if WI_HOOKS_DIR="$bad" "$WI_BIN" trace_filter_install "$ai" "$cn" 2>/dev/null; then
-    echo "    install succeeded over foreign hook with unreadable template"; return 1
+    echo "    install succeeded over foreign hook with a missing template"; return 1
   fi
   cmp -s "$d/hook.orig" "$cn/.git/hooks/commit-msg" || {
     echo "    foreign hook changed on the render-failure path"; return 1; }
@@ -491,12 +527,15 @@ test_F2_render_failure_preserves_own_hook() {
   local parsed; parsed="$(_make_foreign_hook_fixture "$d" "$fh")"
   local ai="${parsed%%|*}" cn="${parsed##*|}"
   cp "$cn/.git/hooks/commit-msg" "$d/hook.orig"
-  # Force a render failure: an unreadable template.
+  # Force a render failure with a template that does not exist. This fails
+  # under any uid; the previous chmod-000 template was still readable by root,
+  # so the install succeeded and the test failed there (#488).
   local bad="$d/badhooks"; mkdir -p "$bad"
-  : > "$bad/commit-msg.tmpl"; chmod 000 "$bad/commit-msg.tmpl"
-  if WI_HOOKS_DIR="$bad" "$WI_BIN" trace_filter_install "$ai" "$cn" 2>/dev/null; then
-    echo "    install unexpectedly succeeded with unreadable template"; return 1
+  if WI_HOOKS_DIR="$bad" "$WI_BIN" trace_filter_install "$ai" "$cn" 2>"$d/render-err"; then
+    echo "    install unexpectedly succeeded with a missing template"; return 1
   fi
+  grep -qF 'render failed' "$d/render-err" || {
+    echo "    install failed for a reason other than the render"; cat "$d/render-err"; return 1; }
   cmp -s "$d/hook.orig" "$cn/.git/hooks/commit-msg" || {
     echo "    our own hook was destroyed by a failed render"; return 1; }
 }
@@ -629,6 +668,22 @@ test_R1_hook_repair_names_existing_wi_verb() {
   _assert_fails_closed "$d/stderr"
 }
 
+test_R2_readme_manifest_probe_reads_project_type() {
+  # #493: the Repair section's read-first probe printed project_type: null
+  # because the field lives at git_policy.project_type. Run the probe exactly
+  # as the README prints it against a real manifest.
+  local d; d="$(_make_fixture)"
+  local ai="$d/foo-ai"
+  local probe
+  probe="$(awk '/^jq .*<ai-workspace>\/\.workspace\/pairing\.json$/ { print; exit }' "$WI_PLUGIN_ROOT/README.md")"
+  [[ -n "$probe" ]] || { echo "    README Repair probe not found"; return 1; }
+  probe="${probe//<ai-workspace>/$(printf '%q' "$ai")}"
+  local out
+  out="$(bash -c "$probe" 2>&1)" || { echo "    probe failed: $out"; return 1; }
+  assert_eq "personal" "$(printf '%s' "$out" | jq -r '.project_type')" \
+    "README probe must print the manifest's project_type"
+}
+
 test_M1_moved_workspace_repair_restores_filter() {
   # The #481 trigger end to end: pair, MOVE the workspace, verify the hook now
   # fails closed, run the repair the message names, verify the filter is back.
@@ -668,6 +723,35 @@ test_M1_moved_workspace_repair_restores_filter() {
   # And the AI-workspace-side hook was re-baked too (pair form).
   grep -qF "$moved" "$cn/.git/hooks/commit-msg" || {
     echo "    canonical hook not re-baked to the moved path"; return 1; }
+}
+
+test_M2_moved_workspace_full_repair_updates_manifest_roots() {
+  # #491: the README's complete moved-workspace repair — re-bake the hooks,
+  # then relocate the manifest — leaves no stale root behind. Run as documented.
+  local d; d="$(wi_tmpdir)"; mkdir -p "$d"
+  local ai="$d/proj-ai" moved="$d/proj-ai-MOVED" cn="$d/proj"
+  mkdir -p "$ai" "$cn"
+  git -C "$ai" init -q 2>/dev/null; git -C "$cn" init -q 2>/dev/null
+  "$WI_BIN" manifest_write "$ai" "$cn" work --default-branch main >/dev/null 2>&1 || return 1
+  "$WI_BIN" trace_filter_install_pair "$ai" "$cn" 2>/dev/null || return 1
+  mv "$ai" "$moved"
+  "$WI_BIN" trace_filter_install_pair "$moved" "$cn" 2>/dev/null || {
+    echo "    hook re-bake failed"; return 1; }
+  # After the hook repair alone the manifest still names the old root.
+  assert_eq "$ai" "$(jq -r '.ai_workspace.root' "$moved/.workspace/pairing.json")" \
+    "precondition: re-bake leaves the recorded root stale" || return 1
+  "$WI_BIN" manifest_relocate "$moved" 2>/dev/null || { echo "    relocate failed"; return 1; }
+  local want; want="$(cd "$moved" && pwd -P)"
+  assert_eq "$want" "$("$WI_BIN" manifest_resolve "$moved" '${ai_workspace.root}')" \
+    "resolver follows the relocated root" || return 1
+  # The filter still evaluates its policy after the manifest edit.
+  git -C "$cn" -c user.email=t@t -c user.name=t commit -q --allow-empty \
+      -m $'y\n\nCo-Authored-By: Bot <bot@x>' 2>"$d/err"
+  [[ $? -ne 0 ]] || { echo "    trailer commit allowed after relocate"; return 1; }
+  grep -q 'blocked AI-trace pattern' "$d/err" || {
+    echo "    block after relocate is not the filter's"; cat "$d/err"; return 1; }
+  git -C "$cn" -c user.email=t@t -c user.name=t commit -q --allow-empty -m clean 2>/dev/null || {
+    echo "    clean commit blocked after relocate"; return 1; }
 }
 
 # ---------------------------------------------------------------------------
@@ -986,8 +1070,55 @@ test_Q5_pair_install_validates_ai_root_before_writes() {
     echo "    foreign AI hook was destroyed"; return 1; }
 }
 
+# Q6 — single-target install validates the AI root before any write (#492)
+test_Q6_single_install_validates_ai_root_before_writes() {
+  local d; d="$(wi_tmpdir)"; mkdir -p "$d"
+  local ai="$d/ai-side" cn="$d/canonical"
+  mkdir -p "$ai" "$cn"
+  git -C "$cn" init -q 2>/dev/null
+  "$WI_BIN" manifest_write "$ai" "$cn" work --default-branch main >/dev/null 2>&1 || return 1
+  "$WI_BIN" trace_filter_install "$ai" "$cn" 2>/dev/null || {
+    echo "    control: valid single-target install failed"; return 1; }
+  cp "$cn/.git/hooks/commit-msg" "$d/canon.orig"
+  # Leg 1: nonexistent AI root → nonzero, hook byte-identical, no stray dir.
+  if "$WI_BIN" trace_filter_install "$d/ai-TYPO" "$cn" 2>"$d/err1"; then
+    echo "    single install accepted a nonexistent AI root"; return 1; fi
+  cmp -s "$d/canon.orig" "$cn/.git/hooks/commit-msg" || {
+    echo "    hook rewritten despite a bad AI root"; return 1; }
+  [[ ! -e "$d/ai-TYPO" ]] || {
+    echo "    install created a directory at the mistyped path"; return 1; }
+  grep -qF 'wi_trace_filter_install: AI workspace root is not a directory' "$d/err1" || {
+    echo "    failure does not name the AI-root problem"; cat "$d/err1"; return 1; }
+  # Leg 2: existing root with NO manifest → refused, nothing logged there.
+  local ai2="$d/ai-nomanifest"; mkdir -p "$ai2"
+  if "$WI_BIN" trace_filter_install "$ai2" "$cn" 2>"$d/err2"; then
+    echo "    single install accepted a missing manifest"; return 1; fi
+  [[ ! -e "$ai2/.workspace" ]] || {
+    echo "    install logged into a root without a manifest"; return 1; }
+  cmp -s "$d/canon.orig" "$cn/.git/hooks/commit-msg" || {
+    echo "    hook rewritten despite a missing manifest"; return 1; }
+  grep -qF 'pairing manifest not found' "$d/err2" || {
+    echo "    failure does not name the missing manifest"; cat "$d/err2"; return 1; }
+  # Leg 3: corrupt manifest → refused.
+  local ai3="$d/ai-corrupt"; mkdir -p "$ai3/.workspace"
+  printf '{"a":1}\n{"b":2}\n' > "$ai3/.workspace/pairing.json"
+  if "$WI_BIN" trace_filter_install "$ai3" "$cn" 2>"$d/err3"; then
+    echo "    single install accepted a two-document manifest"; return 1; fi
+  cmp -s "$d/canon.orig" "$cn/.git/hooks/commit-msg" || {
+    echo "    hook rewritten despite a corrupt manifest"; return 1; }
+  [[ ! -e "$ai3/.workspace/init-log" ]] || {
+    echo "    install logged despite a corrupt manifest"; return 1; }
+  # Adjacent control: a RELATIVE but valid AI root still installs (the
+  # validator runs after canonicalisation, not on the raw argument).
+  rm -f "$cn/.git/hooks/commit-msg"
+  ( cd "$d" && "$WI_BIN" trace_filter_install ai-side canonical ) 2>/dev/null || {
+    echo "    relative valid AI root was refused"; return 1; }
+  grep -qF "$(cd "$ai" && pwd -P)" "$cn/.git/hooks/commit-msg" || {
+    echo "    relative install did not bake the absolute AI root"; return 1; }
+}
+
 # ---------------------------------------------------------------------------
-# Foreign-hook destruction edge cases (round-1 D class) — 2 tests
+# Foreign-hook destruction edge cases (round-1 D class, plus #490) — 3 tests
 # ---------------------------------------------------------------------------
 
 test_D1_dangling_symlink_hook_never_destroyed() {
@@ -1014,6 +1145,46 @@ test_D1_dangling_symlink_hook_never_destroyed() {
     echo "    rollback deleted the dangling symlink"; return 1; }
   [[ "$(readlink "$cn/.git/hooks/commit-msg")" == "$want" ]] || {
     echo "    rollback rewrote the dangling symlink"; return 1; }
+}
+
+test_D3_valid_symlink_to_our_hook_never_replaced() {
+  # #490: a VALID symlink whose target is a copy of our managed hook (a
+  # dotfile-managed hooks dir) reads as "ours" through the link. Install must
+  # still refuse — replacing it would mv a regular file over the link — and
+  # rollback must leave it. The target's bytes stay untouched too.
+  local d; d="$(wi_tmpdir)"; mkdir -p "$d"
+  local ai="$d/foo-ai" cn="$d/foo" dot="$d/dotfiles"
+  mkdir -p "$ai/.workspace" "$cn" "$dot"
+  git -C "$cn" init -q 2>/dev/null
+  "$WI_BIN" manifest_write "$ai" "$cn" personal >/dev/null 2>&1 || return 1
+  "$WI_BIN" trace_filter_install "$ai" "$cn" 2>/dev/null || return 1
+  mv "$cn/.git/hooks/commit-msg" "$dot/commit-msg"
+  ln -s "$dot/commit-msg" "$cn/.git/hooks/commit-msg"
+  _wi_trace_filter_is_our_hook "$cn/.git/hooks/commit-msg" || {
+    echo "    fixture invalid: the link's target is not recognised as ours"; return 1; }
+  cp "$dot/commit-msg" "$d/target.orig"
+  if "$WI_BIN" trace_filter_install "$ai" "$cn" 2>"$d/err"; then
+    echo "    install replaced a valid symlink to our hook"; return 1; fi
+  [[ -L "$cn/.git/hooks/commit-msg" ]] || {
+    echo "    the symlink was replaced by a regular file"; return 1; }
+  [[ "$(readlink "$cn/.git/hooks/commit-msg")" == "$dot/commit-msg" ]] || {
+    echo "    the symlink's target changed"; return 1; }
+  cmp -s "$d/target.orig" "$dot/commit-msg" || {
+    echo "    the link's target bytes changed"; return 1; }
+  grep -qF 'symlinked commit-msg hook' "$d/err" || {
+    echo "    refusal does not name the symlink"; cat "$d/err"; return 1; }
+  # The pair form refuses the same way (canonical is installed first).
+  if "$WI_BIN" trace_filter_install_pair "$ai" "$cn" 2>/dev/null; then
+    echo "    pair install replaced a valid symlink"; return 1; fi
+  [[ -L "$cn/.git/hooks/commit-msg" ]] || {
+    echo "    pair install replaced the symlink"; return 1; }
+  # Rollback of a logged HOOK_INSTALL leaves the link and its target alone.
+  local log="$ai/.workspace/init-log"
+  wi_rollback "$log" >/dev/null 2>&1
+  [[ -L "$cn/.git/hooks/commit-msg" ]] || {
+    echo "    rollback deleted the valid symlink"; return 1; }
+  cmp -s "$d/target.orig" "$dot/commit-msg" || {
+    echo "    rollback changed the link's target"; return 1; }
 }
 
 test_D2_scenario_c_skill_documents_foreign_hook_refusal() {
@@ -1051,6 +1222,7 @@ wi_test_run test_E3_empty_patterns_array_allows
 wi_test_run test_E4_malformed_json_manifest_fails_closed
 wi_test_run test_E9_missing_or_nonboolean_enforce_blocks
 wi_test_run test_E10_unreadable_blocked_patterns_blocks
+wi_test_run test_E11_empty_string_pattern_blocks
 wi_test_run test_E5_trailer_at_line_start_in_multiline_blocks
 wi_test_run test_E6_pattern_at_line_start_with_trailing_whitespace_blocks
 wi_test_run test_E7_unicode_robot_at_line_start_blocks
@@ -1087,7 +1259,9 @@ wi_test_run test_SC9_placeholder_text_in_path
 
 # Named-repair contract + moved-workspace repair (#481)
 wi_test_run test_R1_hook_repair_names_existing_wi_verb
+wi_test_run test_R2_readme_manifest_probe_reads_project_type
 wi_test_run test_M1_moved_workspace_repair_restores_filter
+wi_test_run test_M2_moved_workspace_full_repair_updates_manifest_roots
 
 # Single-JSON-object manifest policy (RB1, CB2)
 wi_test_run test_O1_empty_manifest_blocks
@@ -1110,7 +1284,9 @@ wi_test_run test_H6_workspace_init_mentions_resolve_to_real_commands
 
 # Foreign-hook destruction edges (CB3, RB4)
 wi_test_run test_Q5_pair_install_validates_ai_root_before_writes
+wi_test_run test_Q6_single_install_validates_ai_root_before_writes
 wi_test_run test_D1_dangling_symlink_hook_never_destroyed
+wi_test_run test_D3_valid_symlink_to_our_hook_never_replaced
 wi_test_run test_D2_scenario_c_skill_documents_foreign_hook_refusal
 
 wi_test_summary

@@ -8,6 +8,7 @@
 #   E. Missing-field handling (3)
 #   F. Reader/writer version-skew (3) — SPEC §6.5
 #   G. Round-trip (2)
+#   L. wi_manifest_relocate — the moved-workspace manifest repair (#491)
 
 source "$(dirname "$0")/_helpers.sh"
 source "$WI_LIB_DIR/_helpers.sh"
@@ -595,5 +596,121 @@ test_K1_principles_user_global_absent_from_all_three_sites() {
 }
 
 wi_test_run test_K1_principles_user_global_absent_from_all_three_sites
+
+# ---------------------------------------------------------------------------
+# L. wi_manifest_relocate (#491) — rewrite the recorded roots after a move,
+#    carrying every other field through byte-for-byte (as JSON).
+# ---------------------------------------------------------------------------
+
+# A manifest with every non-default value a repair must not lose.
+_setup_custom_pair() {
+  local slot="$1"
+  local ai="$_WI_TMP/$slot/proj-ai" cn="$_WI_TMP/$slot/proj" tool="$_WI_TMP/$slot/tools"
+  mkdir -p "$ai/.workspace" "$cn" "$tool"
+  wi_manifest_write "$ai" "$cn" work --default-branch develop \
+      --git-remote git@example.com:o/proj-ai.git \
+      --canonical-git-remote git@example.com:o/proj.git \
+      --tooling-repo "$tool" --tooling-repo-remote git@example.com:o/tools.git \
+      >/dev/null 2>&1 || { echo "    setup_custom_pair: write failed" >&2; return 1; }
+  local m="$ai/.workspace/pairing.json" tmp="$ai/.workspace/t"
+  jq '.git_policy.trace_filter.blocked_patterns += ["^Signed-off-by: bot"]
+      | .git_policy.allow_ai_push = true' "$m" > "$tmp" && mv "$tmp" "$m"
+  echo "$ai"
+}
+
+test_L1_relocate_rewrites_ai_root_preserves_everything_else() {
+  local ai; ai="$(_setup_custom_pair l1)" || return 1
+  local moved="$_WI_TMP/l1/proj-ai-MOVED"
+  mv "$ai" "$moved"
+  local m="$moved/.workspace/pairing.json"
+  jq -S 'del(.ai_workspace.root, .ai_workspace.name)' "$m" > "$_WI_TMP/l1/before"
+  "$WI_BIN" manifest_relocate "$moved" 2>/dev/null || { echo "    relocate failed"; return 1; }
+  local want; want="$(cd "$moved" && pwd -P)"
+  assert_eq "$want" "$(jq -r '.ai_workspace.root' "$m")" "root rewritten" || return 1
+  assert_eq "proj-ai-MOVED" "$(jq -r '.ai_workspace.name' "$m")" "name rewritten" || return 1
+  jq -S 'del(.ai_workspace.root, .ai_workspace.name)' "$m" > "$_WI_TMP/l1/after"
+  cmp -s "$_WI_TMP/l1/before" "$_WI_TMP/l1/after" || {
+    echo "    a field other than ai_workspace.root/name changed:"
+    diff "$_WI_TMP/l1/before" "$_WI_TMP/l1/after"; return 1; }
+  # Resolution follows the new root.
+  assert_eq "$want/docs/MASTER-SPEC.md" \
+    "$(wi_manifest_resolve "$moved" '${ai_workspace.root}/docs/MASTER-SPEC.md')" \
+    "resolver reads the relocated root" || return 1
+  wi_manifest_validate "$moved" 2>/dev/null || { echo "    relocated manifest no longer validates"; return 1; }
+}
+
+test_L2_relocate_canonical_root_only_with_flag() {
+  local ai; ai="$(_setup_custom_pair l2)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  local old_cn; old_cn="$(jq -r '.canonical.root' "$m")"
+  # Without the flag, canonical is untouched even if it moved.
+  mv "$old_cn" "$_WI_TMP/l2/proj-NEW"
+  "$WI_BIN" manifest_relocate "$ai" 2>/dev/null || return 1
+  assert_eq "$old_cn" "$(jq -r '.canonical.root' "$m")" "canonical untouched without flag" || return 1
+  jq -S 'del(.ai_workspace.root, .ai_workspace.name, .canonical.root, .canonical.name)' "$m" > "$_WI_TMP/l2/before"
+  "$WI_BIN" manifest_relocate "$ai" --canonical-root "$_WI_TMP/l2/proj-NEW" 2>/dev/null || {
+    echo "    relocate with --canonical-root failed"; return 1; }
+  assert_eq "$(cd "$_WI_TMP/l2/proj-NEW" && pwd -P)" "$(jq -r '.canonical.root' "$m")" "canonical root" || return 1
+  assert_eq "proj-NEW" "$(jq -r '.canonical.name' "$m")" "canonical name" || return 1
+  jq -S 'del(.ai_workspace.root, .ai_workspace.name, .canonical.root, .canonical.name)' "$m" > "$_WI_TMP/l2/after"
+  cmp -s "$_WI_TMP/l2/before" "$_WI_TMP/l2/after" || {
+    echo "    --canonical-root changed another field:"; diff "$_WI_TMP/l2/before" "$_WI_TMP/l2/after"; return 1; }
+}
+
+test_L3_relocate_refuses_bad_manifest_unchanged() {
+  local ai="$_WI_TMP/l3/proj-ai"; mkdir -p "$ai/.workspace"
+  local m="$ai/.workspace/pairing.json" body
+  for body in '' '{"a":1}
+{"b":2}' '[1,2]' '{"ai_workspace":"not-an-object"}' '{ not json'; do
+    printf '%s' "$body" > "$m"
+    if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
+      echo "    relocate accepted a bad manifest: $body"; return 1; fi
+    [[ "$(cat "$m")" == "$body" ]] || { echo "    bad manifest was modified: $body"; return 1; }
+  done
+  # Missing manifest → refused, nothing created.
+  rm -f "$m"
+  if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
+    echo "    relocate accepted a missing manifest"; return 1; fi
+  assert_file_absent "$m" || return 1
+  ls "$ai/.workspace" | grep -q . && { echo "    relocate left files behind"; return 1; }
+  return 0
+}
+
+test_L4_relocate_refuses_bad_roots_unchanged() {
+  local ai; ai="$(_setup_pair l4)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/l4/orig"
+  if "$WI_BIN" manifest_relocate "$ai" --canonical-root "$_WI_TMP/l4/nope" 2>"$_WI_TMP/l4/err"; then
+    echo "    relocate accepted a nonexistent canonical root"; return 1; fi
+  cmp -s "$_WI_TMP/l4/orig" "$m" || { echo "    manifest modified by a refused relocate"; return 1; }
+  grep -qF 'canonical root is not a directory' "$_WI_TMP/l4/err" || {
+    echo "    refusal does not name the canonical root"; cat "$_WI_TMP/l4/err"; return 1; }
+  if "$WI_BIN" manifest_relocate "$_WI_TMP/l4/ai-TYPO" 2>/dev/null; then
+    echo "    relocate accepted a nonexistent AI root"; return 1; fi
+  [[ ! -e "$_WI_TMP/l4/ai-TYPO" ]] || { echo "    relocate created the mistyped root"; return 1; }
+  if "$WI_BIN" manifest_relocate "$ai" --canonical-root 2>/dev/null; then
+    echo "    relocate accepted --canonical-root without a value"; return 1; fi
+  if "$WI_BIN" manifest_relocate "$ai" --bogus 2>/dev/null; then
+    echo "    relocate accepted an unknown argument"; return 1; fi
+  if "$WI_BIN" manifest_relocate 2>/dev/null; then
+    echo "    relocate accepted no arguments"; return 1; fi
+  cmp -s "$_WI_TMP/l4/orig" "$m" || { echo "    manifest modified by a refused call"; return 1; }
+}
+
+test_L5_relocate_relative_root_recorded_absolute() {
+  local ai; ai="$(_setup_pair l5)" || return 1
+  mv "$ai" "$_WI_TMP/l5/renamed-ai"
+  ( cd "$_WI_TMP/l5" && "$WI_BIN" manifest_relocate renamed-ai ) 2>/dev/null || {
+    echo "    relative relocate failed"; return 1; }
+  assert_eq "$(cd "$_WI_TMP/l5/renamed-ai" && pwd -P)" \
+    "$(jq -r '.ai_workspace.root' "$_WI_TMP/l5/renamed-ai/.workspace/pairing.json")" \
+    "relative argument recorded as an absolute path"
+}
+
+wi_test_run test_L1_relocate_rewrites_ai_root_preserves_everything_else
+wi_test_run test_L2_relocate_canonical_root_only_with_flag
+wi_test_run test_L3_relocate_refuses_bad_manifest_unchanged
+wi_test_run test_L4_relocate_refuses_bad_roots_unchanged
+wi_test_run test_L5_relocate_relative_root_recorded_absolute
 
 wi_test_summary

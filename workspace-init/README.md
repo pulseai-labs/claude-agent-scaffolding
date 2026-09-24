@@ -108,7 +108,7 @@ A `commit-msg` hook is installed into `<canonical>/.git/hooks/commit-msg` with t
    - `<noreply@openai\.com>`
 4. If any pattern matches, refuses the commit with a pointer error.
 
-The install only replaces hooks it wrote — recognised by a `# workspace-init:managed-hook` marker line (or the pre-0.5.1 `auto-installed` header). Any other existing `commit-msg` hook is preserved and the install refuses, so a user hook is never silently displaced.
+The install only replaces hooks it wrote — recognised by a `# workspace-init:managed-hook` marker line (or the pre-0.5.1 `auto-installed` header). Any other existing `commit-msg` hook is preserved and the install refuses, so a user hook is never silently displaced. A `commit-msg` that is a **symlink** is never replaced, whatever it points to — even a copy of this hook — because replacing it would drop the link; update the link's target yourself, or remove the link and re-run the install.
 
 ### Repair
 
@@ -122,12 +122,20 @@ The hook fails closed when it cannot evaluate its policy: the commit is blocked 
 <plugin dir>/bin/wi trace_filter_install_pair <ai-workspace> <canonical-repo>
 ```
 
-The pair form repairs the load-bearing canonical hook first; an AI-side refusal (a foreign hook, or the workspace not being a git repo) is reported and still leaves canonical protected. To repair only one repo's hook, use `wi trace_filter_install <ai-workspace> <repo>`. Re-running the pairing recipe (`/workspace-init:pair-existing-dual` or `/workspace-init:pair-workspace`) does the same through the guided flow. Note: re-baking updates the hooks only — the `ai_workspace.root` recorded inside `pairing.json` is not rewritten by this repair (tracked as #491); the pairing recipe rewrites it.
+The pair form repairs the load-bearing canonical hook first; an AI-side refusal (a foreign hook, or the workspace not being a git repo) is reported and still leaves canonical protected. To repair only one repo's hook, use `wi trace_filter_install <ai-workspace> <repo>`. Re-running the pairing recipe (`/workspace-init:pair-existing-dual` or `/workspace-init:pair-workspace`) does the same through the guided flow.
+
+Re-baking updates the hooks only. The roots recorded inside `pairing.json` — which other plugins resolve paths from — still name the old location, so update them too:
+
+```
+<plugin dir>/bin/wi manifest_relocate <ai-workspace> [--canonical-root <canonical-repo>]
+```
+
+It rewrites `ai_workspace.root` and `ai_workspace.name` to the workspace's current location — and, only with `--canonical-root`, `canonical.root` and `canonical.name` for a canonical that moved too. Every other field (`project_type`, the remotes, `default_branch`, any customised `git_policy`) is kept. It refuses without changing anything if the manifest is missing or corrupt; repair that first (below).
 
 **`manifest not found`, `not a single JSON object`, `enforce missing or not a boolean`, or `cannot read … blocked_patterns`.** The manifest at `<ai-workspace>/.workspace/pairing.json` is missing or corrupt. Repair it without losing canonical metadata — `project_type`, `canonical.git_remote`, `canonical.default_branch`, and any customised `git_policy` are the fields to keep. If the file still parses, read them first:
 
 ```
-jq '{project_type, canonical, git_policy}' <ai-workspace>/.workspace/pairing.json
+jq '{project_type: .git_policy.project_type, canonical, git_policy}' <ai-workspace>/.workspace/pairing.json
 ```
 
 then rewrite with those values passed through explicitly:
@@ -138,6 +146,8 @@ then rewrite with those values passed through explicitly:
 ```
 
 If the file does not parse, recover the values from the canonical repo itself: `git -C <canonical> remote get-url origin` for the remote and `git -C <canonical> symbolic-ref refs/remotes/origin/HEAD --short` (or the repo's actual default branch) for `--default-branch` — `manifest_write` defaults it to `main`, which may be wrong for this repo. A customised `git_policy` (e.g. extra `blocked_patterns`) is regenerated to defaults by `manifest_write`; re-apply customisations afterwards or hand-edit the file — it must remain a single JSON object. Re-running the pairing recipe is the guided alternative and performs the same metadata detection the original pairing used.
+
+**`blocked_patterns contains an empty-string entry`.** An empty pattern has no coherent meaning — as a regex it would match every message — so the filter refuses to guess. Edit the manifest and remove the `""` entry. To allow every commit deliberately, set `blocked_patterns` to `[]` or `enforce` to `false` instead. No hook reinstall is needed.
 
 **`<pattern> is not a valid extended regex`.** An entry in `git_policy.trace_filter.blocked_patterns` cannot be evaluated — the error names the offending pattern. Edit the manifest, fix or remove that entry, and keep the file a single JSON object; no hook reinstall is needed since the hook reads the manifest on every commit.
 
