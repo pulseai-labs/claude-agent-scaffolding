@@ -21,16 +21,24 @@ disk.
 
 - **Server.** `http://127.0.0.1:3080`, the loopback address `dsh web` listens on, from the dsh
   host itself. That address needs no `--trusted-host`; any other authority does.
-- **Token.** `dsh web` logs `dsh web: http://127.0.0.1:3080/?token=…` at every start. When it
-  runs as a systemd user unit, take the newest one:
-  `journalctl --user -u dsh-web | grep -oE 'token=[A-Za-z0-9_-]+' | tail -1` (from a
-  non-login shell, set `XDG_RUNTIME_DIR=/run/user/$(id -u)` first). **The token is a
-  credential.** Keep it in a shell variable. Never print it, and never put it in a message to
-  anyone, a file you keep, or a commit.
+- **Token.** `dsh web` logs `dsh web: http://127.0.0.1:3080/?token=…` at every start; take
+  the newest one. **The token is a credential**: capture it straight into a variable and
+  never let it reach stdout, a message, a file you keep, or a commit. A bare lookup
+  pipeline prints it into your transcript, so never run one on its own.
 - **Cookie.** `GET /?token=…` with a cookie jar answers 303 and sets the session cookie. Every
   `/api` call sends that jar. Keep the jar in a private temp directory and delete it when you
-  are done. The shell may not keep variables or files between your tool calls, so do login
-  and the calls in the same command when your shell is fresh per call.
+  are done. For `dsh web` as a systemd user unit (from a non-login shell, set
+  `XDG_RUNTIME_DIR=/run/user/$(id -u)` first), capture and log in in one command, printing
+  only the status code:
+
+  ```bash
+  jar="$(mktemp -d)/jar"
+  tok="$(journalctl --user -u dsh-web | grep -oE 'token=[A-Za-z0-9_-]+' | tail -1)"
+  curl -s -o /dev/null -w '%{http_code}\n' -c "$jar" "http://127.0.0.1:3080/?$tok"; unset tok
+  ```
+
+  The shell may not keep variables or files between your tool calls, so when it is fresh per
+  call, run the calls you need in that same command.
 - **Status codes.** 401 means not logged in. 403 means the authority is not trusted; it is
   checked before login.
 
