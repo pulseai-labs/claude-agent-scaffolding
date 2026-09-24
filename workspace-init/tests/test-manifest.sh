@@ -915,6 +915,21 @@ CASES
   cmp -s "$_WI_TMP/v5/typed" "$m" || { echo "    relocate modified the wrong-typed manifest"; return 1; }
 }
 
+test_L9_relocate_temp_file_is_not_predictable() {
+  # Codex round 8 on #581: a symlink planted at ${manifest}.tmp.<pid> was
+  # followed — its target overwritten — and then renamed over pairing.json.
+  # `exec` keeps the planting shell's PID, so the dispatcher's $$ is known.
+  local ai; ai="$(_setup_pair l9)" || return 1
+  local m="$ai/.workspace/pairing.json" victim="$_WI_TMP/l9/victim"
+  printf 'VICTIM\n' > "$victim"
+  bash -c 'ln -s "$1" "$2.tmp.$$"; exec "$3" manifest_relocate "$4"' \
+    _ "$victim" "$m" "$WI_BIN" "$ai" 2>/dev/null || {
+    echo "    relocate failed with a planted temp symlink"; return 1; }
+  assert_eq "VICTIM" "$(cat "$victim")" "planted symlink's target untouched" || return 1
+  [[ -f "$m" && ! -L "$m" ]] || { echo "    pairing.json is not a regular file"; return 1; }
+  jq -e '.ai_workspace.root' "$m" >/dev/null 2>&1 || { echo "    pairing.json lost its content"; return 1; }
+}
+
 wi_test_run test_L1_relocate_rewrites_ai_root_preserves_everything_else
 wi_test_run test_L2_relocate_canonical_root_only_with_flag
 wi_test_run test_L3_relocate_refuses_bad_manifest_unchanged
@@ -928,5 +943,6 @@ wi_test_run test_V4_validate_rejects_invalid_regex_pattern
 wi_test_run test_L7_relocate_refuses_self_pairing
 wi_test_run test_L8_relocate_preserves_manifest_mode
 wi_test_run test_V5_validate_rejects_wrong_typed_leaves
+wi_test_run test_L9_relocate_temp_file_is_not_predictable
 
 wi_test_summary

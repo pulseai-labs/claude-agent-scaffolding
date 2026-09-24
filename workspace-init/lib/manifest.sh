@@ -486,7 +486,16 @@ wi_manifest_relocate() {
   # Build the replacement in a copy of the original (cp -p), so the rename
   # keeps the manifest's mode rather than the caller's umask: a 0600 manifest
   # stays 0600. The redirect below truncates the copy but keeps its mode.
-  local tmp="${manifest}.tmp.$$"
+  # The temp name must not be predictable: a ${manifest}.tmp.$$ name lets
+  # anyone who can write the directory plant a symlink there first, which cp
+  # and the redirect would follow (overwriting its target) and the rename
+  # would then install as pairing.json. mktemp creates the file exclusively
+  # under a random name; cp -p then copies the mode onto that regular file.
+  local tmp
+  if ! tmp="$(mktemp "${manifest}.tmp.XXXXXX" 2>/dev/null)"; then
+    wi_log_error "wi_manifest_relocate: could not create a temp file beside $manifest"
+    return 1
+  fi
   if ! cp -p "$manifest" "$tmp" 2>/dev/null; then
     rm -f "$tmp"
     wi_log_error "wi_manifest_relocate: could not stage a copy of $manifest"
