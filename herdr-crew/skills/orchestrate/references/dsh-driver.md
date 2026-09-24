@@ -53,15 +53,16 @@ seats may name the same agent; each close is still a fresh session.
 ## 3. At spine planning — `.dsh-crew/roles.md` in place of item rows
 
 When the `spine session` seat names a `kind: dsh-spine-driver` agent, the items get no
-seats from this plugin. Their implementers and verifiers are dsh child tools, with one
-route per role for the whole project, from `.dsh-crew/roles.md` at the AI workspace root
-(dsh-crew's `references/presets.md` §9). In the one approval phase of
-`ossify-execution.md` §3:
+seats from this plugin. Their implementers and verifiers are dsh child tools. The
+implementer takes one route for the whole project from `.dsh-crew/roles.md` at the AI
+workspace root (dsh-crew's `references/presets.md` §9), and the verifier runs the driver's
+own. In the one approval phase of `ossify-execution.md` §3:
 
 - Recommend the three coordinator seats as usual. Where the per-item rows would go,
-  recommend that file's three rows: the implementer and verifier routes and efforts, from
-  the `subagent-model-selection` allow-list in `~/.dsh/settings.yaml`, and the reviewer
-  (`claude-code`, `codex`, or `driver` for none).
+  recommend that file's three rows: the implementer route and effort, from the
+  `subagent-model-selection` allow-list in `~/.dsh/settings.yaml`; the verifier as `driver`,
+  because it always runs the driver's own route and effort (dsh-crew's
+  `references/presets.md` §2); and the reviewer (`claude-code`, `codex`, or `driver` for none).
 - A reviewer other than `driver` is a tool the web profile must mount (dsh-crew's
   `references/presets.md` §8). Confirm with the operator, at approval, that the profile's
   pinned provider matches the row; the driver can check only that the tool exists.
