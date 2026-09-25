@@ -157,6 +157,12 @@ t_capture "$OSS" get '[.fakes[] | select(.boundary=="broker")][0].expiry_release
 t_assert_eq "r2" "$T_OUT" "dispatcher: fake_status renewal reaches state through the real binary"
 t_capture "$OSS" fake_status "broker" bogus "x"
 t_assert_rc 2 "dispatcher: fake_status rejects a bad enum through the real binary"
+# #125 through the real binary: the in-lock duplicate rail answers rc 7 under
+# set -euo pipefail, and the ledger keeps one record for the boundary.
+t_capture "$OSS" fake_add "broker" fake "a later spine keeps it" "first live order" r2
+t_assert_rc 7 "dispatcher: fake_add refuses a boundary already in the ledger (#125)"
+t_capture "$OSS" get '[.fakes[] | select(.boundary=="broker")] | length'
+t_assert_eq "1" "$T_OUT" "dispatcher: ...and the ledger still holds one broker record"
 
 cd "$HERE"
 unset OSS_STATE_FILE
