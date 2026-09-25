@@ -1,4 +1,4 @@
-# ossify (v1.12.0)
+# ossify (v1.12.1)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Nine entry skills (`start`, `adopt`,
@@ -126,6 +126,26 @@ of being misreported as a state-read failure, and it is refused for every status
 rather than for `abandoned` alone. No journal op, payload key or status value
 changes: the rail is verb-side, so a journal that already holds an inconsistent
 pair still replays clean and `doctor` reports it as drift.
+
+Since 1.12.1 (#120, #122, #125, #126), four mutation-side defects are fixed.
+The worktree verbs refuse any id that is not a work-item id (rc 2) before they
+build a path from it, so `worktree_remove canonical ../../x` can no longer remove
+a worktree outside `.worktrees` or delete its branch. A `worktree_add` that git
+fails after creating the worktree and branch — a failing `post-checkout` hook is
+enough — now rolls both back, so the retry is no longer refused forever; the
+rollback removes only what the call created, and keeps (and names) a branch that
+has moved off its base. Adds for one work item run one at a time (a lock in the
+git common dir; a second add refuses at rc 8), so a rollback never reaches a
+concurrent add's worktree. The id check matches the whole argument, so a
+multi-line value with a valid first line is refused too. `fake_add` refuses a boundary already in the ledger (rc
+7, inside the state lock, like `bone_add` and `risk_gate_add`), because
+`fake_status` rewrites every record carrying the boundary; a later spine records
+a retained fake as `fake_status … renewed` and a replaced one as
+`fake_status … replaced`. A journal that already holds a duplicate still replays.
+A malformed `auto:` AC — no backtick pair, or an empty command — now fails
+`verify_acs` at rc 3 wherever it sits in the spec, naming the AC, and
+`report_cross_check` says so. Before, a trailing one halted close as an
+"unreadable spec" and the same row anywhere else was dropped silently.
 
 Since 1.7.0 (#368), every bare `doctor` sweep includes plugin provenance and
 `doctor provenance` runs it alone. It reports the answering `oss` binary, the

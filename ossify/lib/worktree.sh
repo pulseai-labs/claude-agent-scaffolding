@@ -74,14 +74,52 @@ _oss_repo_root() { # $1=repo-key
 # the path composes it from `_oss_repo_root` inline, which is what the functions
 # below do.
 
+# The work-item id is the last component of every path this file builds
+# (`<root>/.worktrees/<wi>`), so it must be an id and nothing else (#120). An
+# unchecked `../../victim` resolved to a sibling worktree OUTSIDE .worktrees, and
+# worktree_remove then removed it and deleted its merged branch. The grammar has
+# no `/` and no `..`, so a valid id cannot leave the directory; lib/id.sh is the
+# one owner of that grammar.
+_oss_worktree_id_check() { # $1=work-item-id ; rc 0 valid, rc 2 refused
+  oss_id_valid_work_item "$1" && return 0
+  echo "oss: '$1' is not a work-item id (r<N>.s<N>.w<N>) - refusing to build a worktree path from it" >&2
+  return 2
+}
+
 oss_worktree_add() { # $1=repo-key $2=work-item-id $3=slug $4=base-ref ; echoes abs path
-  local key="$1" wi="$2" slug="$3" base="${4:-HEAD}" root dir path branch
+  local key="$1" wi="$2" root cd lock rc=0
+  _oss_worktree_id_check "$wi" || return $?
   root="$(_oss_repo_root "$key")" || return $?
+  # One add per work item at a time (PR #601 review). The rollback below removes
+  # what the failed call created, and "created" is only knowable if no other
+  # add for the same id runs between the existence checks and the rollback:
+  # otherwise the loser of two concurrent adds sees the WINNER's worktree and
+  # branch, and `--force` removes them with whatever the winner has written.
+  # `mkdir` is the atomic test-and-set; the lock lives in the git common dir, not
+  # under .worktrees, where worktree_orphans would report it.
+  cd="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
+    || { echo "oss: cannot resolve git common dir for $root" >&2; return 8; }
+  lock="$cd/ossify-worktree-add.$wi.lock"
+  mkdir "$lock" 2>/dev/null || {
+    echo "oss: another worktree_add for $wi is running (lock $lock) - if none is, remove the lock with: rmdir $(printf '%q' "$lock")" >&2
+    return 8; }
+  _oss_worktree_add_locked "$root" "$wi" "$3" "${4:-HEAD}" || rc=$?
+  rmdir "$lock" 2>/dev/null || true
+  return "$rc"
+}
+
+_oss_worktree_add_locked() { # $1=root $2=work-item-id $3=slug $4=base-ref ; echoes abs path
+  local root="$1" wi="$2" slug="$3" base="$4" dir path branch base_sha had_branch=0
   dir="$root/.worktrees"; path="$dir/$wi"
   branch="$(oss_id_work_item_branch "$wi" "$slug")"
   [ -e "$path" ] && { echo "oss: worktree already exists at $path" >&2; return 8; }
   mkdir -p "$dir" || return 8
   _oss_worktree_ignore "$root" || true
+  # Before-state for the rollback below (#122). The path was just checked absent;
+  # the branch and the base commit are recorded here so a rollback never removes
+  # anything this call did not create.
+  if git -C "$root" show-ref --verify --quiet "refs/heads/$branch"; then had_branch=1; fi
+  base_sha="$(git -C "$root" rev-parse --verify --quiet "$base^{commit}" 2>/dev/null)" || base_sha=""
   # NOT `2>&1`: this function's STDOUT IS ITS RETURN VALUE (the abs path), so
   # merging git's stderr into stdout makes any warning git decides to emit become
   # part of the path the caller captures. `-q` is silent on success today, which
@@ -90,9 +128,53 @@ oss_worktree_add() { # $1=repo-key $2=work-item-id $3=slug $4=base-ref ; echoes 
   # stderr.
   if ! git -C "$root" worktree add -q -b "$branch" "$path" "$base"; then
     echo "oss: git worktree add failed for $wi (branch $branch, base $base)" >&2
+    _oss_worktree_add_rollback "$root" "$path" "$branch" "$had_branch" "$base_sha" || true
     return 8
   fi
   printf '%s\n' "$path"
+}
+
+# #122: `git worktree add` can fail AFTER it has created the worktree and the
+# branch - a post-checkout hook that exits nonzero is enough - and the
+# already-exists guard above then refused every retry, so the work item could
+# not be spawned again without hand repair. Undo exactly what the call created:
+#   - the worktree at the path the guard proved absent before the call. `--force`
+#     because a failing checkout hook may have left files in it, and nothing in
+#     it predates the call. `git worktree remove` refuses a directory that is not
+#     a registered worktree, so this cannot delete anything else - and it is
+#     asked by path rather than matched against `worktree list`, which prints
+#     the symlink-resolved path (macOS /tmp) and would not match.
+#   - the branch, only if it did not exist before the call AND still points at
+#     the base commit, so no commit can be lost. `-D` because `-d` measures
+#     merged-ness against the root's HEAD, which a spine-branch base need not be
+#     merged into; the tip check is what makes the force safe.
+# Whatever cannot be undone safely is left in place and named, with the command
+# that finishes the repair. rc 0 rolled back (or nothing to undo), rc 8 not.
+_oss_worktree_add_rollback() { # $1=root $2=path $3=branch $4=had-branch(0|1) $5=base-sha
+  local root="$1" path="$2" branch="$3" had="$4" base_sha="$5" tip left="" undone="" qr qp qb
+  # Repair commands are printed for copying, so every interpolated value is
+  # shell-quoted: a path or a branch slug may hold a quote or a metacharacter.
+  qr="$(printf '%q' "$root")"; qp="$(printf '%q' "$path")"; qb="$(printf '%q' "$branch")"
+  if [ -e "$path" ]; then
+    git -C "$root" worktree remove --force "$path" >/dev/null 2>&1 && undone="$undone worktree" \
+      || left="$left $path (inspect it; if it is the new worktree: git -C $qr worktree remove --force $qp);"
+  fi
+  if [ "$had" = 0 ] && git -C "$root" show-ref --verify --quiet "refs/heads/$branch"; then
+    tip="$(git -C "$root" rev-parse --verify --quiet "refs/heads/$branch" 2>/dev/null)" || tip=""
+    if [ -n "$base_sha" ] && [ "$tip" = "$base_sha" ]; then
+      git -C "$root" branch -D "$branch" >/dev/null 2>&1 && undone="$undone branch" \
+        || left="$left branch $branch (git -C $qr branch -D $qb);"
+    else
+      left="$left branch $branch, which no longer points at the base - inspect it before deleting;"
+    fi
+  fi
+  if [ -n "$left" ]; then
+    echo "oss: the failed add left state behind that was not rolled back:$left the work item cannot be spawned again until it is gone" >&2
+    return 8
+  fi
+  # Say so only when something was undone: a failure before git created
+  # anything (an existing branch, a bad base) has nothing to roll back.
+  [ -z "$undone" ] || echo "oss: rolled back the partial add (removed:$undone) - fix the cause above and retry" >&2
 }
 
 # The worktree root lives INSIDE the repo, so without this every spawn leaves
@@ -127,7 +209,9 @@ _oss_worktree_ignore() { # $1=repo-root ; best-effort, never fatal
 }
 
 oss_worktree_resolve() { # $1=repo-key $2=work-item-id
-  local root path; root="$(_oss_repo_root "$1")" || return $?
+  local root path
+  _oss_worktree_id_check "$2" || return $?
+  root="$(_oss_repo_root "$1")" || return $?
   path="$root/.worktrees/$2"
   [ -d "$path" ] || { echo "oss: no worktree for '$2' under $root/.worktrees" >&2; return 1; }
   printf '%s\n' "$path"
