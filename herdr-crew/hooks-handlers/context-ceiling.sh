@@ -114,6 +114,16 @@ event="${fields%%$'\t'*}"
 rest="${fields#*$'\t'}"
 command="${rest%%$'\t'*}"
 transcript="${rest#*$'\t'}"
+# @tsv escaped a backslash inside a value as `\\`, where the per-field spawns
+# printed the value raw, so each field is put back. Without it a transcript path
+# with a backslash in it — legal on every host, the ordinary separator on some —
+# names nothing, and the handler exits silently over a figure it could have read,
+# which is the class it exists to remove. Only `\\` is put back: a tab or a
+# newline inside a value stays escaped, which no writer puts in a path, and
+# neither can reach the verb match, whose five verbs carry no escape at all.
+event="${event//'\\'/'\'}"
+command="${command//'\\'/'\'}"
+transcript="${transcript//'\\'/'\'}"
 if [ -z "$event" ]; then
   # jq read no event: the input is malformed, or the jq on PATH is broken.
   # Either way the figure was not read, and the same raw spellings say which

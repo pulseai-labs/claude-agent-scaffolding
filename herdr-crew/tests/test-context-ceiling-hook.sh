@@ -196,6 +196,17 @@ expect_notice "no transcript_path in the hook input: unavailable notice" UserPro
   "figure unavailable (hook input has no transcript_path)" "ceiling of 500000"
 run "$(input UserPromptSubmit "$TMP/never-written.jsonl")"
 expect_silent "transcript not written yet: silent"
+# The one-pass read escapes a backslash inside a value as `\\` before the fields
+# are split, and puts it back after. A transcript whose own name carries a
+# backslash is legal on every host and reads its figure; without the put-back
+# the handler looks for a two-backslash name, finds nothing and exits silently —
+# a figure unread passed over in silence, which is the class it exists to remove.
+# Measured both ways: with the put-back removed this case is the one that fails.
+f="$TMP/back\\slash.jsonl"
+{ user_line; assistant_line msg_backslash 10 90 523014; } > "$f"
+run "$(input UserPromptSubmit "$f")"
+expect_notice "a transcript path containing a backslash still reads its figure" \
+  UserPromptSubmit "context 523114"
 # #527 — the adjacent case: a transcript path that names something the handler
 # cannot read. Before the fix the tail reads nothing, its empty output
 # classifies as "none", the wc redirection fails and the integer test raises
