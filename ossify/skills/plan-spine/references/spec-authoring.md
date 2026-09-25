@@ -89,7 +89,9 @@ zero-ACs class of bugs.
 
 `"$oss_bin" verify_acs` parses these lines at the worker's pre-flight Gate 2. A line
 that does not match yields **no row**, and a spec whose ACs all miss the grammar
-reaches the worker as a spec with zero ACs:
+reaches the worker as a spec with zero ACs. An `auto:` line whose command is
+missing, has only one backtick, or is empty between its backticks is different:
+`verify_acs` names it and exits **3**, so the gate halts instead of dropping it:
 
 ```text
 - [ ] AC-<N> auto: `<command>` → expected: exit <n>

@@ -39,6 +39,9 @@ t_capture oss_verify_parse_acs "$MAL"
 # (lines starting with AC-, not warning lines).
 t_assert_eq "2" "$(printf '%s\n' "$T_OUT" | grep -c '^AC-')" "missing-backtick AC produces zero TSV rows (not garbage)"
 t_assert_contains "$T_OUT" "AC-2" "the skipped line is named in the warning"
+# PR #601: the malformed row now FAILS the parse (rc 3) instead of being dropped
+# quietly - a report that never mentions AC-2 used to pass the cross-check.
+t_assert_rc 3 "a malformed auto: row fails the parse at rc 3, though it sits mid-spec"
 
 t_capture oss_verify_auto_step "$TMP" "true" "exit 0";           t_assert_rc 0 "exit 0 expectation passes"
 t_capture oss_verify_auto_step "$TMP" "false" "exit 0";          t_assert_rc 1 "exit 0 expectation fails on rc 1"
@@ -185,21 +188,38 @@ t_capture oss_verify_report_cross_check "$XR" "$XS2"
 t_assert_rc 0 "X1 control: a spec whose every auto AC is accounted for is still CLEAN"
 
 # #126: parse_acs's rc was its loop's last command, so a spec whose LAST auto:
-# row has an empty command (a stub, `` ` ` `` with nothing between) returned 1
-# although the parse succeeded - and the cross-check above read that as "cannot
-# read the spec" and halted close at rc 2. Reordered, the same two rows passed.
-# The row itself is still skipped: one row out, either order.
+# row had an empty command returned 1 and a spec with the same rows reordered
+# returned 0 - close halted or passed on line order alone, and the halt said
+# "cannot read the spec". PR #601's review: returning 0 instead would drop the
+# row silently, so a report never mentioning AC-2 passed. An empty command is a
+# MALFORMED AC: rc 3 in either order, named on stderr, never a row.
 X126="$TMP/x-spec-stub-last.md"
 printf -- '- [ ] AC-1 auto: `true` → expected: exit 0\n- [ ] AC-2 auto: `` → expected: exit 0\n' > "$X126"
+X126F="$TMP/x-spec-stub-first.md"
+printf -- '- [ ] AC-2 auto: `` → expected: exit 0\n- [ ] AC-1 auto: `true` → expected: exit 0\n' > "$X126F"
 t_capture oss_verify_parse_acs "$X126"
-t_assert_rc 0 "#126: a spec ending on an empty-command auto: row parses at rc 0"
-t_assert_eq "$(printf 'AC-1\ttrue\texit 0')" "$T_OUT" "#126: ...and the empty-command row is still skipped (one row out)"
+t_assert_rc 3 "#126: a spec ending on an empty-command auto: row fails the parse at rc 3"
+t_assert_contains "$T_OUT" "AC-2' has an empty command" "#126: ...and names the empty AC"
+t_assert_eq "1" "$(printf '%s\n' "$T_OUT" | grep -c '^AC-')" "#126: ...and emits no row for it"
+t_capture oss_verify_parse_acs "$X126F"
+t_assert_rc 3 "#126: the same rows REORDERED fail the same way - no order dependence"
 t_capture oss_verify_report_cross_check "$XR" "$X126"
-t_assert_rc 0 "#126: the cross-check no longer halts on it as an unreadable spec"
+t_assert_rc 2 "#126: the cross-check refuses a report against a spec with an empty-command AC"
+t_assert_contains "$T_OUT" "malformed auto: AC" "#126: ...naming the malformed AC as the reason"
+case "$T_OUT" in *"cannot read the spec"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: #126: the refusal still blames an unreadable spec";; *) T_PASS=$((T_PASS+1));; esac
 t_capture bash "$HERE/../bin/oss" verify_acs "$X126"
-t_assert_rc 0 "#126: dispatcher verify_acs (set -euo pipefail) answers rc 0 too"
-# ADJACENT CONTROL: an unreadable spec still fails at rc 2 - the fix removes the
-# false rc, not the real one.
+t_assert_rc 3 "#126: dispatcher verify_acs (set -euo pipefail) answers rc 3 too"
+# The same class, third arm: ONE backtick defeats the pair-extracting sed, and
+# the whole tail used to pass through as the command.
+XLONE="$TMP/x-spec-lone-backtick.md"
+printf -- '- [ ] AC-1 auto: `true` → expected: exit 0\n- [ ] AC-3 auto: `pytest tests → expected: exit 0\n' > "$XLONE"
+t_capture oss_verify_parse_acs "$XLONE"
+t_assert_rc 3 "a lone backtick is a malformed AC too (rc 3)"
+t_assert_eq "1" "$(printf '%s\n' "$T_OUT" | grep -c '^AC-')" "...and its tail never becomes a command row"
+# ADJACENT CONTROLS: a well-formed spec still parses at rc 0, and an unreadable
+# spec is still rc 2 - distinct from the malformed rc 3.
+t_capture oss_verify_parse_acs "$XS2"
+t_assert_rc 0 "#126 control: a well-formed spec still parses at rc 0"
 t_capture oss_verify_parse_acs "$TMP/no-such-spec.md"
 t_assert_rc 2 "#126 control: a missing spec is still rc 2"
 

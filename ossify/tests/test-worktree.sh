@@ -204,6 +204,11 @@ t_assert_contains "$T_OUT" "not a work-item id" "#120: ...and says the id is not
 [ -d "$TMP/victim" ] && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: #120: the victim worktree outside .worktrees was removed"; }
 git -C "$TMP/canon" show-ref --verify --quiet refs/heads/victim-branch \
   && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: #120: the victim's branch was deleted"; }
+# ...and the same traversal carried on a SECOND LINE behind a valid first line
+# (PR #601 review): the grammar check matched per line until it matched whole.
+t_capture "$OSS" worktree_remove canonical $'r0.s1.w1\n/../../../victim'
+t_assert_rc 2 "#120: a multi-line id with a valid first line is refused at rc 2"
+[ -d "$TMP/victim" ] && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: #120: a multi-line id reached the victim worktree"; }
 t_capture oss_worktree_resolve canonical ../../victim
 t_assert_rc 2 "#120: worktree_resolve refuses a traversal id at rc 2 (not rc 0 with the victim's path)"
 # worktree_add was refused before only by accident - git rejects `work/../..`
@@ -265,6 +270,38 @@ git -C "$TMP/canon" show-ref --verify --quiet refs/heads/work/r0.s3.w3-hook-comm
 [ -e "$TMP/canon/.worktrees/r0.s3.w3" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: #122 control: the worktree this call created was left behind"; } || T_PASS=$((T_PASS+1))
 rm -f "$TMP/canon/.git/hooks/post-checkout"
 git -C "$TMP/canon" branch -D work/r0.s3.w3-hook-commits >/dev/null 2>&1
+
+# #122, the ownership half (PR #601 review): the rollback may only remove what ITS
+# call created, which holds only if no second add for the same id runs between
+# the existence checks and the rollback. One add per id at a time: with that
+# id's lock held, an add refuses at rc 8 and touches nothing - a loser of two
+# concurrent adds never reaches a rollback that could remove the winner's tree.
+WTLOCK="$TMP/canon/.git/ossify-worktree-add.r0.s3.w4.lock"
+mkdir "$WTLOCK"
+t_capture "$OSS" worktree_add canonical r0.s3.w4 "locked" HEAD
+t_assert_rc 8 "#122: an add for an id whose add lock is held refuses at rc 8"
+t_assert_contains "$T_OUT" "another worktree_add for r0.s3.w4" "#122: ...and says another add holds it"
+[ -e "$TMP/canon/.worktrees/r0.s3.w4" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: #122: an add created a worktree while another add held the lock"; } || T_PASS=$((T_PASS+1))
+# ADJACENT CONTROL: another id is not blocked by that lock.
+t_capture "$OSS" worktree_add canonical r0.s3.w5 "unlocked" HEAD
+t_assert_rc 0 "#122 control: an add for a DIFFERENT id proceeds while that lock is held"
+oss_worktree_remove canonical r0.s3.w5 >/dev/null 2>&1
+rmdir "$WTLOCK"
+t_capture "$OSS" worktree_add canonical r0.s3.w4 "locked" HEAD
+t_assert_rc 0 "#122 control: once released, the add proceeds"
+[ -d "$WTLOCK" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: #122: a finished add left its lock behind"; } || T_PASS=$((T_PASS+1))
+oss_worktree_remove canonical r0.s3.w4 >/dev/null 2>&1
+
+# The repair commands the rollback prints are for copying, so every value in
+# them is shell-quoted (PR #601 review): a path with an apostrophe must come out
+# as one quoted word, not break the quoting. A plain directory is not a
+# worktree, so `git worktree remove` refuses it and the repair line is printed.
+QDIR="$TMP/it's here/r0.s3.w6"; mkdir -p "$QDIR"
+t_capture _oss_worktree_add_rollback "$TMP/canon" "$QDIR" "work/r0.s3.w6-x" 1 ""
+t_assert_rc 8 "a rollback that cannot undo a path says so at rc 8"
+t_assert_contains "$T_OUT" "worktree remove --force $(printf '%q' "$QDIR")" "...and the repair command quotes the path as one shell word"
+[ -d "$QDIR" ] && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: the rollback removed a directory that is not a worktree"; }
+rm -rf "$TMP/it's here"
 
 # ---------------------------------------------------------------------------
 # The spine-branch lifecycle the execution lane owns: cut AND CHECK OUT the
