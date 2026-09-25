@@ -107,8 +107,10 @@ fi
 # need no guard: they raise only when the payload itself is not an object, and
 # then the hook's first field raises too, which is the raw path both hooks take.
 #
-# @tsv, never a literal tab join: it escapes a tab, a newline and a backslash
-# inside a value, so the record can split only at the two tabs jq emitted.
+# @tsv, never a literal tab join: it escapes the bytes that would break the row
+# — a tab, a newline, a carriage return and a backslash, as `\t`, `\n`, `\r`
+# and `\\`, and a NUL as `\0` beside them — so the record can split only at the
+# two tabs jq emitted. The decode below is the spec for those five.
 # `map(tostring)` keeps a field that is not a string the text the per-field
 # spawns printed — @tsv refuses a container outright ("object (...) is not valid
 # in a csv row"), and one such field would take the whole pass, event included,
@@ -123,20 +125,60 @@ event="${fields%%$'\t'*}"
 rest="${fields#*$'\t'}"
 command="${rest%%$'\t'*}"
 transcript="${rest#*$'\t'}"
-# @tsv escapes a tab, a newline, a carriage return and a backslash inside a
-# value as `\t`, `\n`, `\r` and `\\` — jq's own definition — where the spawns it
-# replaced printed the value itself, so each field is decoded here. Without it a
-# transcript path carrying any of the four names nothing the handler can open,
-# and the hook exits silently over a figure it could have read, which is the
-# class it exists to remove. printf's %b is one left-to-right pass, which is what
-# the order needs: a value's own backslash arrives as `\\`, so `a\\tb` is a
-# backslash, a `t` and a `b`, and decoding by replacing `\\` and then `\t` in
-# sequence turns that into a tab instead — and a `\\` at the very end is the
-# same story. jq emits nothing else backslashed (measured: a control byte, DEL,
-# VT and FF pass through raw), so %b has only those four to decode.
-printf -v event '%b' "$event"
-printf -v command '%b' "$command"
-printf -v transcript '%b' "$transcript"
+# The three fields are put back the way those spawns' captures had them: every
+# verdict below was built on that text, so none of them may read differently.
+# The capture is `$( )`, which did two things to each value, and the decode does
+# both: a NUL byte cannot live in a bash variable, so it dropped every one, and
+# it strips every trailing newline.
+#
+# The escapes are jq's own `@tsv` definition plus one it does not document.
+# Measured on jq-1.8.1, every `\u00XX` from 00 to ff written in a value and read
+# back with `jq -r '[.a] | @tsv'`: a tab, a newline, a carriage return and a
+# backslash arrive as `\t`, `\n`, `\r` and `\\`, and a NUL as `\0`. Nothing else
+# is backslashed — the rest of the control bytes, DEL, VT and FF included, pass
+# through raw — so a field is runs of text and those five two-character escapes,
+# and there is no sixth for a decoder to guess at.
+#
+# The order is the whole difficulty, and the first substitution is what makes
+# the rest safe. A value's own backslash arrives as `\\`, so `win\\temp` is the
+# characters `\`, `\`, `t`, `e`...: decode `\t` before that pair and a name with
+# a backslash-t in it becomes a name with a tab, which is the name that exists
+# nowhere. `\\` therefore becomes a sentinel first — a backslash and a tab, a
+# pair no field can hold, because @tsv escapes every tab a value carries and the
+# split above has already taken jq's two. After it, every backslash left
+# introduces exactly one of t, n, r or 0, so each later substitution matches the
+# escape it names and nothing else, and the sentinel is the only backslash-tab.
+#
+# printf's `%b` is not this decode either, and both halves of that are measured:
+# it reads `\0` as the head of a C octal escape — the field `a\0123b`, which is
+# what a NUL followed by `123` arrives as, comes back `aSb` where the capture
+# had `a123b` — and it cuts the field off at the NUL, where the capture dropped
+# the byte and kept the rest of the text.
+#
+# The capture's own reading is the one the verdicts are built on, and one row of
+# it is visible: a value ending in a newline is stripped to the name before it —
+# the name the spawns opened, and the name the guards below test — so a path
+# whose OWN name ends in a newline is not opened here, where the round trip's
+# exact name would have opened it. Measured against the base hook (`5973a7b`):
+# base silent, this head silent, the round trip's exact name reads a figure.
+# That is the capture's reading and not a new rule, taken because every row a
+# writer can produce keeps the base hook's verdict with it.
+decode_tsv() { # <name> — decode that variable's value in place
+  local field="${!1}" bs='\\' byte='\' tab=$'\t' nl=$'\n' cr=$'\r' sent
+  case "$field" in *\\*) ;; *) return 0 ;; esac    # nothing escaped: every path
+  sent="$byte$tab"
+  field="${field//$bs$bs/$sent}"      # a value's own backslash, out of the way first
+  field="${field//$bs'0'/}"           # a NUL byte: dropped, as the capture dropped it
+  field="${field//$bs't'/$tab}"       # a tab
+  field="${field//$bs'n'/$nl}"        # a newline
+  field="${field//$bs'r'/$cr}"        # a carriage return
+  field="${field//$bs$tab/$byte}"     # and the value's own backslashes back
+  while [ "${field%$nl}" != "$field" ]; do field="${field%$nl}"; done   # the capture's strip
+  printf -v "$1" '%s' "$field"
+}
+decode_tsv event
+decode_tsv command
+decode_tsv transcript
 if [ -z "$event" ]; then
   # jq read no event: the input is malformed, or the jq on PATH is broken.
   # Either way the figure was not read, and the same raw spellings say which

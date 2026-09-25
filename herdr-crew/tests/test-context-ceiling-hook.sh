@@ -230,6 +230,33 @@ f="$TMP/win\\temp.jsonl"
 run "$(input UserPromptSubmit "$f")"
 expect_notice "a transcript path whose name carries a backslash-t still reads its figure" \
   UserPromptSubmit "context 523114"
+# Fix round 2, findings 1 and 2: the two rows where the round trip itself, rather
+# than the escape set, moved the verdict against the base hook (`5973a7b`). Both
+# are measured on both hooks in that round's report; each was RED on the head the
+# finding was raised against (`db09360`) and is green here.
+#
+# A value whose JSON string ends in a newline. The spawns' `$( )` stripped it, so
+# the name the base hook opened — and read this figure from — is the fixture's
+# own path, and the decode strips it too. Keep the newline in the decoded name
+# and `[ -e ]` tests a path that exists only without it: silent, over a file the
+# base hook read.
+f="$TMP/escape-trailing-newline.jsonl"
+{ user_line; assistant_line msg_tnl 10 90 523014; } > "$f"
+run "$(input UserPromptSubmit "$f"$'\n')"
+expect_notice "a transcript path whose JSON string ends in a newline still reads its figure" \
+  UserPromptSubmit "context 523114"
+# A `\u0000` escape in the payload: the file sits at the name with the byte
+# dropped, which is what `$( )` captured — a shell variable cannot hold a NUL —
+# and where the base hook read this figure. `%b` read `\0` as the head of a C
+# octal escape and cut the field off there (`printf -v x '%b' 'a\0b'` leaves
+# `a`), so the decoded name was a prefix that names nothing: silent.
+f="$TMP/escape-nul.jsonl"
+{ user_line; assistant_line msg_nul 10 90 523014; } > "$f"
+run "$(jq -cn --arg t "$f" '{session_id: "s",
+  transcript_path: ($t | sub("\\.jsonl$"; "\u0000.jsonl")), cwd: "/tmp",
+  hook_event_name: "UserPromptSubmit", prompt: "next"}')"
+expect_notice "a transcript path carrying a \u0000 escape still reads its figure" \
+  UserPromptSubmit "context 523114"
 # The one-pass read reads .tool_input on BOTH events, where the per-field spawns
 # read it only on the wake path — so a shape problem in that one field must not
 # invalidate the event and the transcript beside it. `.tool_input.command` raises
