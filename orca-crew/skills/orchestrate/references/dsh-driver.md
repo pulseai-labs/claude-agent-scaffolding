@@ -97,7 +97,8 @@ contract is the same on both paths.
   `~/.dsh/.agent-presets/crew-spine`. Any difference is a failed launch: a stale preset
   carries an older persona and older child rows, so the driver's own checks cannot stop it
   before run-spine's first mutation. Report it, and spawn nothing until the operator
-  re-copies the preset.
+  re-copies the preset. The check covers the preset only: the operator re-links the skills
+  root with it (dsh-crew's `references/presets.md` §0).
 - **Brief** it with one steered message (`dsh-session` §5), and confirm delivery by your
   request id. The first spine session gets `<spine-id> --external-executor`. A successor
   gets `Resume from <handoff path>, then continue <spine-id> from its recorded state.

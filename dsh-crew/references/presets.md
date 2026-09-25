@@ -35,8 +35,9 @@ from the web UI on 2026-09-23 and 2026-09-24 (two rounds, a hand-off and a close
   implementer load ossify's `work-item`, and the executor loads `dsh-executor` and `dsh-brief`.
   dsh follows symlinks, so links into the installed plugins' versioned cache directories
   (`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/skills/<skill>`) are enough;
-  re-link after a plugin update. The presets name the root as
-  `~/.local/share/dsh-crew/skills`, through a `!!js` expression over `process.env.HOME`, so the
+  re-link after a plugin update, together with re-copying the preset (§2): a preset and skills
+  from different versions disagree on which child tools take a route. The presets name the
+  root as `~/.local/share/dsh-crew/skills`, through a `!!js` expression over `process.env.HOME`, so the
   files carry no user name.
 - **ossify's references, linked.** The spine persona's hand-off and resume clauses read
   `handoff/compose.md` and `handoff/resume.md` from `~/.local/share/dsh-crew/ossify-references`,

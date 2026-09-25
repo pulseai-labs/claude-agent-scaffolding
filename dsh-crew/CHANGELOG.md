@@ -36,8 +36,10 @@ The verifier runs the driver's route, because 0.3.0's `crew-spine` could not run
   - the example implementer effort is checked against the model's `reasoningEfforts`;
   - the example verifier row is `driver`.
 
-**Upgrading.** Copy `presets/crew-spine/` into `~/.dsh/.agent-presets/` again, and re-apply
-`references/presets.md` §5's rows to a headless `crew` profile. Coming from
+**Upgrading.** Re-link the skills root to the 0.3.1 skills (`references/presets.md` §0) and
+copy `presets/crew-spine/` into `~/.dsh/.agent-presets/` again, **together**: the 0.3.1 preset
+with the 0.3.0 `dsh-executor` still sends the verifier a route, which is refused at the first
+verification. Re-apply `references/presets.md` §5's rows to a headless `crew` profile too. Coming from
 0.2.0, also delete `crew-implementer/` and `crew-verifier/` from `~/.dsh/.agent-presets/`. A
 stale preset fails like this:
 - a 0.2.0 `crew-spine` has no `list_subagent_models`, so a `roles.md` stops at §2 step 0;
