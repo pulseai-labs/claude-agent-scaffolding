@@ -18,7 +18,7 @@ oss_verify_parse_acs() { # $1=spec-file ; TSV label \t command \t expectation
   { grep -E '^[[:space:]]*-[[:space:]]*\[[ xX]\][[:space:]]*AC-[0-9]+[[:space:]]+auto:' "$1" || true; } \
   | ( bad=0
     while IFS= read -r line; do
-      local label cmd exp rest
+      local label cmd exp rest head
       # Anchor the label extraction on the CHECKBOX, not on a case class. An
       # earlier form used `^[^A-Z]*(AC-[0-9]+)`, which silently breaks on the
       # `- [X]` checkbox this function's own grep accepts: [^A-Z]* halts at the
@@ -27,15 +27,22 @@ oss_verify_parse_acs() { # $1=spec-file ; TSV label \t command \t expectation
       # report and never finds, failing a correct report.
       label="$(printf '%s' "$line" | sed -E 's/^.*\[[ xX]\][[:space:]]*(AC-[0-9]+).*/\1/')"
       rest="${line#*auto:}"
-      cmd="$(printf '%s' "$rest" | sed -E 's/^[^`]*`([^`]*)`.*/\1/')"
-      # If the sed did not match (no backtick pair in $rest), it passes $rest
+      # The command lives BEFORE the separator. `head` drops the last
+      # `→ expected:` and everything after it - greedy, as the `exp` split below
+      # is, so a command that itself contains an arrow survives - and the
+      # command is looked for there alone: a backticked word in the EXPECTATION
+      # (`output contains `ok``) used to be taken as the command when the
+      # command had no backticks (PR #601 review).
+      head="$(printf '%s' "$rest" | sed -E 's/^(.*)→[[:space:]]*expected:.*$/\1/')"
+      cmd="$(printf '%s' "$head" | sed -E 's/^[^`]*`([^`]*)`.*/\1/')"
+      # If the sed did not match (no backtick pair in $head), it passes $head
       # through unchanged as cmd. That makes the whole tail of the line —
       # including `→ expected: exit 0` — the command, which the RED gate runs
       # as garbage and reads as RED = proceed. Detect the no-match instead:
-      # when $rest holds no backtick PAIR, the AC is malformed and yields no row.
+      # when $head holds no backtick PAIR, the AC is malformed and yields no row.
       # A pair, not one backtick: a lone backtick also defeats the sed, and the
       # tail passed through as the command. (Codex P2 finding #4; PR #601.)
-      case "$rest" in *\`*\`*) ;; *)
+      case "$head" in *\`*\`*) ;; *)
         echo "oss: AC line '$label' has no backticked command (malformed AC)" >&2; bad=1; continue ;; esac
       if [ -z "$cmd" ]; then
         echo "oss: AC line '$label' has an empty command between its backticks (malformed AC)" >&2; bad=1; continue

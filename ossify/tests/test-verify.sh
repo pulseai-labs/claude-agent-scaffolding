@@ -216,6 +216,21 @@ printf -- '- [ ] AC-1 auto: `true` → expected: exit 0\n- [ ] AC-3 auto: `pytes
 t_capture oss_verify_parse_acs "$XLONE"
 t_assert_rc 3 "a lone backtick is a malformed AC too (rc 3)"
 t_assert_eq "1" "$(printf '%s\n' "$T_OUT" | grep -c '^AC-')" "...and its tail never becomes a command row"
+# The command is taken from BEFORE the `→ expected:` separator only (PR #601
+# review, round 2): with no backticked command, a backticked word in the
+# EXPECTATION used to become the command - `ok` here would have been run.
+XEXP="$TMP/x-spec-backtick-in-expectation.md"
+printf -- '- [ ] AC-4 auto: run it → expected: output contains `ok`\n' > "$XEXP"
+t_capture oss_verify_parse_acs "$XEXP"
+t_assert_rc 3 "an AC whose only backticks are in the expectation is malformed (rc 3)"
+t_assert_eq "0" "$(printf '%s\n' "$T_OUT" | grep -c '^AC-')" "...and no row runs the expectation's word as a command"
+# CONTROL: a backticked word in the expectation of a WELL-FORMED AC leaves its
+# command alone.
+XEXP2="$TMP/x-spec-backtick-in-both.md"
+printf -- '- [ ] AC-5 auto: `true` → expected: output contains `x`\n' > "$XEXP2"
+t_capture oss_verify_parse_acs "$XEXP2"
+t_assert_rc 0 "control: a well-formed AC with a backtick in its expectation still parses"
+t_assert_eq "$(printf 'AC-5\ttrue\toutput contains `x`')" "$T_OUT" "control: ...with its own command, not the expectation's word"
 # ADJACENT CONTROLS: a well-formed spec still parses at rc 0, and an unreadable
 # spec is still rc 2 - distinct from the malformed rc 3.
 t_capture oss_verify_parse_acs "$XS2"

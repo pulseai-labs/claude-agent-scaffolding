@@ -106,7 +106,7 @@ Five parts, each load-bearing:
 | `- [ ] ` | A markdown checkbox, exactly this | `- AC-1` or `* [ ] AC-1` yields **no row at all** |
 | `AC-<N>` | The label, numbered | No row |
 | `auto:` | The marker | No row. **And no ossify gate runs a `user:` AC either** — the human-walked half lives in the demo ledger (SKILL.md §8), keyed by spine, never read out of a spec |
-| `` `<command>` `` | **Backticked** | The AC is skipped with a stderr warning |
+| `` `<command>` `` | **Backticked**, before the `→` | No pair of backticks there, a lone backtick, or an empty command: `verify_acs` names the AC and exits **3** — the gate halts. A backticked word in the expectation is never taken as the command |
 | `→ expected: ` | U+2192, then the literal word | An ASCII `->`, or a missing `expected:`, lands the whole tail in the expectation field: a row is emitted and it is **unusable** |
 
 **The expectation grammar is `exit <n>` or `output contains <str>` — space-form,
