@@ -77,11 +77,24 @@ occurrences() { # <file> <needle>
 # newline: the phrase's words are separated by the very space the wrap consumed.
 # (A name is space-less, so the config suite's personal-name sweep deletes
 # newlines instead — it funnels through count_literal for the loop, not this.)
+#
+# Two bounds come with that join, both accepted: an ABSENCE pin over a squeezed
+# line also catches a reintroduction that wraps differently, which a per-line pin
+# would miss; and a false POSITIVE needs the surrounding prose to spell the needle
+# across a line boundary, which a restatement does and arbitrary text does not.
+#
+# The join is CAPTURED, not piped. A pipeline's status is its LAST command's, and
+# count_literal succeeds on empty input — so an awk that could not open the file
+# (an existing but unreadable one, which the `[ -f ]` guard above lets through)
+# came back as `0` with rc=0, and a flat ABSENCE check certified a file nobody
+# read. Capturing makes awk's failure this function's failure.
 occurrences_flat() { # <file> <needle>
   if [ -z "${2:-}" ]; then printf 'empty needle\n' >&2; return 1; fi
   [ -f "${1:-}" ] || { printf 'no such file: %s\n' "${1:-}" >&2; return 1; }
-  awk '{ buf = buf " " $0 }
-    END { gsub(/[[:space:]]+/, " ", buf); print buf }' "$1" | count_literal "$2"
+  _flat="$(awk '{ buf = buf " " $0 }
+    END { gsub(/[[:space:]]+/, " ", buf); print buf }' "$1")" || {
+    printf 'cannot read: %s\n' "${1:-}" >&2; return 1; }
+  printf '%s\n' "$_flat" | count_literal "$2"
 }
 
 count_of() { # <file> <needle> [line|flat]
@@ -89,12 +102,19 @@ count_of() { # <file> <needle> [line|flat]
 }
 
 # pin <file> <needle> <label> [line|flat] — the needle must occur EXACTLY once.
-# A zero count names the wrap case, because that is the common way a pin that is
-# still true stops being counted: the clause was reworded across a line break.
+# The zero-count message is MODE-AWARE. Per line, a wrap is the common way a pin
+# that is still true stops being counted, so it names that. In flat mode the join
+# squeezes every whitespace run, so a wrap cannot be the cause of a zero — naming
+# one there would send the investigator after a phantom.
 pin() {
   c="$(count_of "$1" "$2" "${4:-line}")" || { fail "$3" "unreadable file or empty needle: $1"; return 0; }
   if [ "$c" -eq 1 ]; then pass "$3"
-  elif [ "$c" -eq 0 ]; then fail "$3" "not found in ${1##*/} — reworded away, or the pin now spans a line wrap. pin: $2"
+  elif [ "$c" -eq 0 ]; then
+    if [ "${4:-line}" = flat ]; then
+      fail "$3" "not found in ${1##*/}, however it wraps — the flat count squeezes every whitespace run, so this is a reworded-away clause, not a wrap. pin: $2"
+    else
+      fail "$3" "not found in ${1##*/} — reworded away, or the pin now spans a line wrap. pin: $2"
+    fi
   else fail "$3" "found $c times in ${1##*/}; a pin must be unique. pin: $2"
   fi
 }

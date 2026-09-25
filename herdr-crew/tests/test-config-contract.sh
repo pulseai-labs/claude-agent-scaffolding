@@ -269,6 +269,76 @@ else
   fail "control: the same counter still counts an existing file" \
     "an existing file holding one occurrence did not count once: ${c:-no output}"
 fi
+
+# Control: the FLAT counter refuses a file it cannot open, in both ways a file can
+# be unopenable (#514 fix round 1, finding 1). Its join used to run in a pipeline
+# whose status was count_literal's, and count_literal succeeds on empty input — so
+# an existing but UNREADABLE file came back as `0` with rc=0 and a flat absence
+# check would certify a file nobody read. No flat absence site exists in the suites
+# today; the trap did, and this is the control that keeps it shut.
+if out="$(occurrences_flat "$tmp_absent" 'anything' 2>&1)"; then
+  fail "control: the flat counter refuses a missing file" \
+    "it returned a count for a file that does not exist: $out"
+elif printf '%s' "$out" | grep -F 'no such file' >/dev/null; then
+  pass "control: the flat counter refuses a missing file"
+else
+  fail "control: the flat counter refuses a missing file" \
+    "it failed, but not on the guard: $out"
+fi
+
+# …and the case the pipeline hid: an EXISTING, unreadable file. On a root container
+# no mode makes a file unreadable for this uid — the sweep's own control above
+# documents the same constraint — so the fixture falls back to a dangling symlink.
+# Both are refused before awk ever reads, so the refusal below is the same either
+# way; the message is checked against the branch that actually fired.
+tmp_unreadable="$ctl_dir/unreadable.md"; printf 'nothing personal in here\n' > "$tmp_unreadable"
+chmod 000 "$tmp_unreadable"
+unreadable_branch='unreadable'
+if [ -r "$tmp_unreadable" ]; then
+  rm -f "$tmp_unreadable"; ln -s "$tmp_unreadable.absent" "$tmp_unreadable"; unreadable_branch='dangling'
+fi
+if out="$(occurrences_flat "$tmp_unreadable" 'nothing personal' 2>&1)"; then
+  fail "control: the flat counter refuses a file it cannot read" \
+    "it returned a count for a file it never opened: $out"
+elif [ "$unreadable_branch" = unreadable ] && printf '%s' "$out" | grep -F 'cannot read' >/dev/null; then
+  pass "control: the flat counter refuses a file it cannot read (unreadable)"
+elif [ "$unreadable_branch" = dangling ] && printf '%s' "$out" | grep -F 'no such file' >/dev/null; then
+  pass "control: the flat counter refuses a file it cannot read (dangling link)"
+else
+  fail "control: the flat counter refuses a file it cannot read" \
+    "it failed, but not on the guard the fixture should have hit ($unreadable_branch): $out"
+fi
+chmod 644 "$tmp_unreadable" 2>/dev/null
+
+# Adjacent control: flat mode still COUNTS an existing, clean file — without it, a
+# counter that refused everything would satisfy the two controls above.
+if c="$(occurrences_flat "$tmp_countable" 'nothing personal')" && [ "$c" -eq 1 ]; then
+  pass "control: the flat counter still counts an existing file"
+else
+  fail "control: the flat counter still counts an existing file" \
+    "an existing file holding one occurrence did not count once in flat mode: ${c:-no output}"
+fi
+
+# Control: a flat-mode zero count does not send the reader after a wrap, and the
+# per-line one still does. The two halves sit together, so a mode-aware branch that
+# dropped the wrap mention everywhere cannot pass this block.
+out="$(pin "$tmp_countable" 'zzz-planted-absent-needle' 'control: flat zero' flat 2>&1)"
+verdict="$(printf '%s' "$out" | awk '{ if (index($0, "however it wraps") > 0) g=1; if (index($0, "line wrap") > 0) b=1 } END { print g+0 "-" b+0 }')"
+if [ "$verdict" = "1-0" ]; then
+  pass "control: a flat-mode zero count names no wrap"
+else
+  fail "control: a flat-mode zero count names no wrap" \
+    "expected the flat wording and no wrap (1-0), got $verdict: $out"
+fi
+out="$(pin "$tmp_countable" 'zzz-planted-absent-needle' 'control: line zero' 2>&1)"
+verdict="$(printf '%s' "$out" | awk '{ if (index($0, "line wrap") > 0) b=1 } END { print b+0 }')"
+if [ "$verdict" = "1" ]; then
+  pass "control: a per-line zero count still names the wrap"
+else
+  fail "control: a per-line zero count still names the wrap" \
+    "the per-line wording lost its wrap mention: $out"
+fi
+
 rm -f "$tmp_countable"
 rmdir "$ctl_dir"
 
