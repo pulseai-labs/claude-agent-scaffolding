@@ -339,8 +339,18 @@ else
     "the per-line wording lost its wrap mention: $out"
 fi
 
-rm -f "$tmp_countable"
-rmdir "$ctl_dir"
+# Every fixture this block created goes before its directory: `tmp_countable` and
+# the unreadable one — a chmod-restored regular file here, a dangling symlink under
+# root. The `rmdir` is an ASSERTION, not a courtesy: a fixture left behind made it
+# fail with a message while the suite still reported success, leaking one temp
+# directory per run (fix round 2, class 1).
+rm -f "$tmp_countable" "$tmp_unreadable"
+if rmdir "$ctl_dir"; then
+  pass "control: the counter controls leave no fixture behind"
+else
+  fail "control: the counter controls leave no fixture behind" \
+    "$ctl_dir survived its cleanup — a fixture was not removed before the directory"
+fi
 
 section "the dsh spine driver kind"
 DSH_MD="$PLUGIN_ROOT/skills/orchestrate/references/dsh-driver.md"
@@ -447,7 +457,13 @@ done
 got="$(count_shadows "$ctl_sh/not-a-definition.sh" pin)"
 if [ "$got" = 0 ]; then pass "control: count_shadows counts neither a call nor a comment"
 else fail "control: count_shadows counts neither a call nor a comment" "got [$got], expected [0]"; fi
-rm -f "$ctl_sh"/*.sh; rmdir "$ctl_sh"
+rm -f "$ctl_sh"/*.sh
+if rmdir "$ctl_sh"; then
+  pass "control: the spelling controls leave no fixture behind"
+else
+  fail "control: the spelling controls leave no fixture behind" \
+    "$ctl_sh survived its cleanup — a fixture was not removed before the directory"
+fi
 
 # Controls: the shape scan reports a planted shadow, passes a tree with none, and
 # FAILS a suite it cannot read rather than skipping it. All three run the real scan
@@ -486,6 +502,12 @@ else
   fail "control: the shape scan fails a suite it cannot read" "$out"
 fi
 chmod 644 "$ctl_tree/test-locked.sh" 2>/dev/null
-rm -f "$ctl_tree/test-locked.sh" "$ctl_tree/$HOISTED_EXEMPT"; rmdir "$ctl_tree"
+rm -f "$ctl_tree/test-locked.sh" "$ctl_tree/$HOISTED_EXEMPT"
+if rmdir "$ctl_tree"; then
+  pass "control: the scan controls leave no fixture behind"
+else
+  fail "control: the scan controls leave no fixture behind" \
+    "$ctl_tree survived its cleanup — a fixture was not removed before the directory"
+fi
 
 report
