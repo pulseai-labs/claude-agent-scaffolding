@@ -161,38 +161,51 @@ HOISTED_EXEMPT="test-fidelity-pins.sh"
 # point: an unreadable file used to yield an empty count whose arithmetic error read
 # as "no copies here", skipping the file in silence.
 #
-# One awk pass covers every name and every spelling bash accepts, because a shadow
-# does not have to look like the copy it shadows:
+# One awk pass covers every name and every spelling BASH ACCEPTS, because a shadow
+# does not have to look like the copy it shadows. Measured with `bash -n`, all of
+# these define a real function and every one of them is matched:
 #
-#   pin() {     pin () {     function pin {     function pin() {
-#   pin()       (the brace opens on the next line)
-#   <indented>  (leading whitespace is stripped before matching)
+#   pin() {     pin () {     pin<TAB>()<TAB>{     function pin {     function pin() {
+#   function pin () {        <indented>           (any of the above)
+#   pin()       + `{` on the next line, with any run of blank and comment-only lines
+#               between the two
+#   pin () # copied locally   + `{` on the next line
 #
-# A CALL (`pin "$REF" ...`) and a COMMENT (`# pin() { ...`) are not definitions:
-# that is why the parens, the brace or the `function` keyword are required, and why
-# a bare `name()` is only counted when a `{` opens on the next line.
+# A CALL (`pin "$REF" ...`), a COMMENT (`# pin() { ...`) and a bare `name()` that no
+# `{` ever follows are not definitions: that is why the parens, the brace or the
+# `function` keyword are required, and why a bare `name()` only counts when the first
+# line of code after it opens the body. A trailing comment is stripped before the
+# tests, because `pin () # copied locally` is the spelling that defeated the first
+# version of this matcher.
 count_shadows() { # <file> <fn>...
   awk -v names="$*" '
     BEGIN { n = split(names, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1 }
     {
-      line = $0
-      sub(/^[[:space:]]+/, "", line)
+      code = $0
+      sub(/^[[:space:]]+/, "", code)          # an indented definition is a definition
+      sub(/[[:space:]]*#.*$/, "", code)       # a trailing comment is not code
+      sub(/[[:space:]]+$/, "", code)
+
       if (waiting != "") {
-        if (line ~ /^\{/ && (waiting in want)) hits[waiting]++
+        if (code == "") next                  # a blank or comment-only line: bash still waits for the brace
+        if (code ~ /^\{/) { if (waiting in want) hits[waiting]++ }
         waiting = ""
+        if (code ~ /^\{/) next
       }
-      if (line ~ /^function[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/) {
-        name = line; sub(/^function[[:space:]]+/, "", name); sub(/[^A-Za-z0-9_].*$/, "", name)
+      if (code == "") next
+
+      if (code ~ /^function[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/) {
+        name = code; sub(/^function[[:space:]]+/, "", name); sub(/[^A-Za-z0-9_].*$/, "", name)
         if (name in want) hits[name]++
         next
       }
-      if (line ~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*\{/) {
-        name = line; sub(/[[:space:]]*\(.*$/, "", name)
+      if (code ~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*\{/) {
+        name = code; sub(/[[:space:]]*\(.*$/, "", name)
         if (name in want) hits[name]++
         next
       }
-      if (line ~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*$/) {
-        name = line; sub(/[[:space:]]*\(\)[[:space:]]*$/, "", name)
+      if (code ~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*$/) {
+        name = code; sub(/[[:space:]]*\(\)[[:space:]]*$/, "", name)
         waiting = name
         next
       }
