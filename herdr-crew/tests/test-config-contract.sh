@@ -420,9 +420,72 @@ $DSH_MD|\`data.usage.totalTokens\` against|the ceiling is compared in tokens
 LIST
 
 # #514, L1: a counter re-copied into any suite shadows the hoisted one and keeps
-# passing, so the shape is asserted rather than assumed — here, in the suite the
-# fourth copy would most plausibly land beside.
+# passing, so the shape is asserted rather than assumed. The per-suite half is
+# called from each suite; the directory-wide half is called ONCE, here — its answer
+# cannot differ between callers, and running it from three suites repeated the same
+# violation three times for ~31 awk spawns each (fix round 1, finding 12).
 section "the hoisted counters are not re-copied"
 assert_hoisted_counters
+assert_hoist_shape
+
+# Controls: every spelling that defines a shadow is caught, and neither a call nor a
+# comment is. `pin` stands for the six names; each fixture below defines a real
+# `pin`, and the last one defines nothing at all.
+ctl_sh="$(mktemp -d)"
+printf 'pin() {\n  :\n}\n'          > "$ctl_sh/col0.sh"
+printf 'pin () {\n  :\n}\n'         > "$ctl_sh/spaced-parens.sh"
+printf 'function pin {\n  :\n}\n'   > "$ctl_sh/function-keyword.sh"
+printf 'function pin() {\n  :\n}\n' > "$ctl_sh/function-parens.sh"
+printf 'pin()\n{\n  :\n}\n'         > "$ctl_sh/brace-next-line.sh"
+printf '  pin() {\n    :\n  }\n'    > "$ctl_sh/indented.sh"
+printf '# pin() { a comment is not a definition\npin "$REF" "a call is not a definition"\n' > "$ctl_sh/not-a-definition.sh"
+for spelling in col0 spaced-parens function-keyword function-parens brace-next-line indented; do
+  got="$(count_shadows "$ctl_sh/$spelling.sh" pin)"
+  if [ "$got" = "1 pin 1" ]; then pass "control: count_shadows catches the $spelling spelling"
+  else fail "control: count_shadows catches the $spelling spelling" "got [$got], expected [1 pin 1]"; fi
+done
+got="$(count_shadows "$ctl_sh/not-a-definition.sh" pin)"
+if [ "$got" = 0 ]; then pass "control: count_shadows counts neither a call nor a comment"
+else fail "control: count_shadows counts neither a call nor a comment" "got [$got], expected [0]"; fi
+rm -f "$ctl_sh"/*.sh; rmdir "$ctl_sh"
+
+# Controls: the shape scan reports a planted shadow, passes a tree with none, and
+# FAILS a suite it cannot read rather than skipping it. All three run the real scan
+# through its optional directory argument, captured in a command substitution so the
+# counters it moves stay the subshell's.
+ctl_tree="$(mktemp -d)"
+printf 'occurrences() {\n  :\n}\npin() {\n  :\n}\n' > "$ctl_tree/$HOISTED_EXEMPT"
+printf 'pin() {\n  :\n}\n' > "$ctl_tree/test-with-shadow.sh"
+out="$(assert_hoist_shape "$ctl_tree")"
+if printf '%s' "$out" | grep -F 'no copy of a hoisted counter in test-with-shadow.sh' >/dev/null; then
+  pass "control: the shape scan reports a planted shadow"
+else
+  fail "control: the shape scan reports a planted shadow" "$out"
+fi
+rm -f "$ctl_tree/test-with-shadow.sh"
+printf 'nothing here defines anything\n' > "$ctl_tree/test-clean.sh"
+out="$(assert_hoist_shape "$ctl_tree")"
+if printf '%s' "$out" | grep -F 'no suite outside the exemption re-defines a hoisted counter' >/dev/null; then
+  pass "control: the shape scan passes a tree with no shadow"
+else
+  fail "control: the shape scan passes a tree with no shadow" "$out"
+fi
+rm -f "$ctl_tree/test-clean.sh"
+# The unreadable case: on a root container no mode makes a file unreadable for this
+# uid — the sweep's control above documents the same constraint — so the fixture
+# falls back to a dangling symlink. Both fail the same `-r` guard, and the message
+# names the file either way.
+printf 'pin() {\n  :\n}\n' > "$ctl_tree/test-locked.sh"; chmod 000 "$ctl_tree/test-locked.sh"
+if [ -r "$ctl_tree/test-locked.sh" ]; then
+  rm -f "$ctl_tree/test-locked.sh"; ln -s "$ctl_tree/test-locked.sh.absent" "$ctl_tree/test-locked.sh"
+fi
+out="$(assert_hoist_shape "$ctl_tree")"
+if printf '%s' "$out" | grep -F 'test-locked.sh cannot be read' >/dev/null; then
+  pass "control: the shape scan fails a suite it cannot read"
+else
+  fail "control: the shape scan fails a suite it cannot read" "$out"
+fi
+chmod 644 "$ctl_tree/test-locked.sh" 2>/dev/null
+rm -f "$ctl_tree/test-locked.sh" "$ctl_tree/$HOISTED_EXEMPT"; rmdir "$ctl_tree"
 
 report

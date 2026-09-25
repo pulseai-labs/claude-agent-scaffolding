@@ -129,47 +129,142 @@ present() {
 #
 # A suite-local definition SHADOWS the one above: every assertion that calls it
 # keeps passing, so a re-copied loop is invisible until the day it drifts — which
-# is how the fourth copy lost its guard. This asserts the hoist, and NAMES the one
-# exemption rather than implying it by its absence.
+# is how the fourth copy lost its guard. Two halves assert the shape, split by
+# whose answer can differ:
 #
-# test-fidelity-pins.sh keeps its own copies because they are byte-identical to
-# orca-crew's, and tests/test-herdr-crew-parity.sh pins exactly that with cmp: an
-# edit here — including adding the missing guard — lands in one copy only and
-# fails a CI step. The exemption is asserted to be LIVE, so it cannot outlive its
+#   assert_hoisted_counters  THIS suite's own file, so it stays with the caller —
+#                            one awk pass over one file
+#   assert_hoist_shape       the whole directory, whose answer cannot differ
+#                            between callers, so it is called ONCE per full run
+#                            rather than repeating the same violation three times
+#
+# test-fidelity-pins.sh is the one exemption, NAMED rather than implied by its
+# absence. It keeps its own copies because it is orca-crew's apart from the plugin
+# name — the two files differ first at byte 25, in that name — and
+# tests/test-herdr-crew-parity.sh pins them by comparing `cmp` over the two streams
+# AFTER substituting the plugin name, not the files themselves. An edit here —
+# including adding the missing guard — lands in one copy only and fails that CI
+# step. The exemption is asserted in both directions, so it cannot outlive its
 # reason: when orca-crew is retired, hoist that copy too and delete both this
 # paragraph and the exemption. A suite that legitimately wants one of these names
 # for something else must extend the list deliberately.
+HOISTED_FNS="count_literal occurrences occurrences_flat count_of pin present"
+HOISTED_EXEMPT="test-fidelity-pins.sh"
+
+# Definitions of any of <fn>... that OPEN a function in <file>, as
+# "<total> [<fn> <count>]..." on one line — never empty on a successful read, so an
+# empty result is a FAILED READ and not a clean file. That distinction is the whole
+# point: an unreadable file used to yield an empty count whose arithmetic error read
+# as "no copies here", skipping the file in silence.
+#
+# One awk pass covers every name and every spelling bash accepts, because a shadow
+# does not have to look like the copy it shadows:
+#
+#   pin() {     pin () {     function pin {     function pin() {
+#   pin()       (the brace opens on the next line)
+#   <indented>  (leading whitespace is stripped before matching)
+#
+# A CALL (`pin "$REF" ...`) and a COMMENT (`# pin() { ...`) are not definitions:
+# that is why the parens, the brace or the `function` keyword are required, and why
+# a bare `name()` is only counted when a `{` opens on the next line.
+count_shadows() { # <file> <fn>...
+  awk -v names="$*" '
+    BEGIN { n = split(names, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1 }
+    {
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+      if (waiting != "") {
+        if (line ~ /^\{/ && (waiting in want)) hits[waiting]++
+        waiting = ""
+      }
+      if (line ~ /^function[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/) {
+        name = line; sub(/^function[[:space:]]+/, "", name); sub(/[^A-Za-z0-9_].*$/, "", name)
+        if (name in want) hits[name]++
+        next
+      }
+      if (line ~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*\{/) {
+        name = line; sub(/[[:space:]]*\(.*$/, "", name)
+        if (name in want) hits[name]++
+        next
+      }
+      if (line ~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*$/) {
+        name = line; sub(/[[:space:]]*\(\)[[:space:]]*$/, "", name)
+        waiting = name
+        next
+      }
+    }
+    END {
+      total = 0; tail = ""
+      for (i = 1; i <= n; i++) if (a[i] in hits) { total += hits[a[i]]; tail = tail " " a[i] " " hits[a[i]] }
+      print total tail
+    }' "$1"
+}
+
+# This suite's own file, from the caller that is running it. Cheap by design.
 assert_hoisted_counters() {
-  _dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  _fns="count_literal occurrences occurrences_flat count_of pin present"
-  _exempt="test-fidelity-pins.sh"
-  _copies=0
-  for _suite in "$_dir"/test-*.sh; do
-    [ "${_suite##*/}" = "$_exempt" ] && continue
-    for _fn in $_fns; do
-      _n="$(count_definitions "$_suite" "$_fn")"
-      if [ "$_n" -ne 0 ]; then
-        _copies=$((_copies + 1))
-        fail "no copy of $_fn in ${_suite##*/}" \
-          "$_n local definition(s) shadow the hoisted one in _helpers.sh; the shared definition is the only one (exemption: $_exempt)"
-      fi
-    done
-  done
-  [ "$_copies" -ne 0 ] || \
-    pass "no suite re-defines a hoisted counter (exemption: $_exempt, pinned to orca-crew's copies)"
-  if [ "$(count_definitions "$_dir/$_exempt" occurrences)" -eq 1 ]; then
-    pass "the one exemption still needs exempting"
+  _self="${BASH_SOURCE[1]:-}"
+  _shadows="$(count_shadows "$_self" $HOISTED_FNS)"
+  if [ -z "$_shadows" ]; then
+    fail "the shape scan ran over ${_self##*/}" \
+      "it returned nothing — a read that failed would certify the file in silence"
+  elif [ "$_shadows" = 0 ]; then
+    pass "no copy of a hoisted counter in ${_self##*/}"
   else
-    fail "the one exemption still needs exempting" \
-      "$_exempt no longer defines its own occurrences — hoist it and delete the exemption"
+    fail "no copy of a hoisted counter in ${_self##*/}" \
+      "$_shadows — a local definition shadows the one in _helpers.sh, and every assertion that calls it keeps passing"
   fi
 }
 
-# How many lines OPEN a definition of <fn> in <file>. Anchored at the line start
-# and requiring the parentheses and the brace, so a mention in a comment or a
-# call site is not a definition.
-count_definitions() { # <file> <fn>
-  awk -v fn="$2" '$0 ~ "^" fn "\\(\\)[[:space:]]*\\{" { n++ } END { print n+0 }' "$1"
+# The whole directory, plus the exemption in both directions. Called once per full
+# run; the optional directory exists for the controls, which plant a fixture tree.
+assert_hoist_shape() { # [directory]
+  _dir="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+  _copies=0
+  for _suite in "$_dir"/test-*.sh; do
+    _rel="${_suite##*/}"
+    [ "$_rel" = "$HOISTED_EXEMPT" ] && continue
+    if [ ! -r "$_suite" ]; then
+      _copies=$((_copies + 1))
+      fail "every suite is readable" \
+        "$_rel cannot be read — its definitions cannot be checked, and skipping it would certify nothing about it"
+      continue
+    fi
+    _shadows="$(count_shadows "$_suite" $HOISTED_FNS)"
+    if [ -z "$_shadows" ]; then
+      _copies=$((_copies + 1))
+      fail "the shape scan ran over $_rel" \
+        "it returned nothing — a read that failed would be skipped in silence"
+    elif [ "$_shadows" != 0 ]; then
+      _copies=$((_copies + 1))
+      fail "no copy of a hoisted counter in $_rel" \
+        "$_shadows — the shared definition in _helpers.sh is the only one (exemption: $HOISTED_EXEMPT)"
+    fi
+  done
+  [ "$_copies" -ne 0 ] || pass "no suite outside the exemption re-defines a hoisted counter"
+
+  # The exemption in BOTH directions: the copies it was granted for are still there
+  # — exactly once each — so the exemption is still needed; and no OTHER hoisted
+  # name has appeared in that file, which would otherwise be exempted without
+  # anyone deciding to exempt it.
+  if [ ! -r "$_dir/$HOISTED_EXEMPT" ]; then
+    fail "the exemption is present to be checked" \
+      "$HOISTED_EXEMPT is not readable in $_dir — an exemption for a file that is not there is not an exemption"
+    return 0
+  fi
+  _own="$(count_shadows "$_dir/$HOISTED_EXEMPT" occurrences pin)"
+  _extra="$(count_shadows "$_dir/$HOISTED_EXEMPT" count_literal occurrences_flat count_of present)"
+  if [ "$_own" = "2 occurrences 1 pin 1" ]; then
+    pass "the exemption still defines its own occurrences and pin, exactly once each"
+  else
+    fail "the exemption still defines its own occurrences and pin, exactly once each" \
+      "expected [2 occurrences 1 pin 1], got [$_own] — hoist the copy and delete the exemption"
+  fi
+  if [ "$_extra" = 0 ]; then
+    pass "the exemption defines none of the other four hoisted names"
+  else
+    fail "the exemption defines none of the other four hoisted names" \
+      "found [$_extra] — widen the exemption deliberately, or hoist the copy"
+  fi
 }
 
 # Ruby + Psych is how this repo parses YAML — tests/test-codex-dual-publish.sh
