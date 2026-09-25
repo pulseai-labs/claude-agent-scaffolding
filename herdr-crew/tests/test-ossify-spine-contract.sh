@@ -487,21 +487,120 @@ pin "$ROLES_MD" 'doctor session' \
 # command with no role to fill is the same defect. An anchor that no longer
 # matches, or a list that parses to nothing, would pass with nothing checked,
 # so both are failures here.
+#
+# Three pieces, each with its own control below, because this extractor's failure
+# mode is a RED that names the wrong fault (#514, L5).
+span_of() { # <file> <start-line> — the bullet's own lines, up to the section break
+  awk -v s="$2" 'NR<s{next} NR>s && (/^[[:space:]]*$/ || /^- / || /^#/) {exit} {print}' "$1"
+}
+# One backticked command per line. The span is joined to ONE line first, so a
+# token the wrap splits is still one token, then each `…` pair is matched whole by
+# a single grep -o. The spelling this replaces converted newlines to spaces,
+# converted the backtick to newlines, kept only the EVEN-numbered fields and
+# stripped spaces and commas — an even-field assumption that one unpaired
+# backtick flips for every token after it. `tr -d '` ,'` reproduces the old token
+# shape: a token holding a space or a comma had them removed.
+commands_in_span() { # the span arrives on stdin
+  tr '\n' ' ' | grep -o '`[^`]*`' | tr -d '` ,'
+}
+# The span's backtick count must be EVEN, and an odd one is refused with the count
+# rather than parsed. Measured: the live span is even (10). An odd count is what
+# produces the misleading RED — every token after the stray backtick pairs
+# wrongly, so prose fragments reach the config.md check and the per-command
+# failures name a fault that is not there. `grep -o` alone does NOT remove that:
+# on a fixture with one unpaired backtick, measured, both spellings lose the real
+# tokens and both feed a prose fragment to the check. The balance gate is what
+# turns that into a RED naming the actual defect.
+span_balanced() { # the span arrives on stdin
+  _ticks="$(tr -cd '`' | wc -c | tr -d ' ')"
+  [ $((_ticks % 2)) -eq 0 ] || { printf '%s' "$_ticks"; return 1; }
+  return 0
+}
 start=$(awk '/Dispatched to a herdr session/{print NR; exit}' "$SKILL_MD")
 missing=0
 parsed=0
 if [ -z "$start" ]; then
   fail "SKILL.md's dispatched-command list is found" "no line reads 'Dispatched to a herdr session'"
 else
-  for cmd in $(awk -v s="$start" 'NR<s{next} NR>s && (/^[[:space:]]*$/ || /^- / || /^#/) {exit} {print}' "$SKILL_MD" | tr '\n' ' ' | tr '`' '\n' | awk 'NR%2==0' | tr -d ' ,'); do
-    [ -n "$cmd" ] || continue
-    parsed=$((parsed+1))
-    if [ "$(occurrences "$CONFIG_MD" "/ossify:$cmd")" -eq 0 ]; then
-      missing=$((missing+1)); fail "dispatched command '$cmd' resolves to a role" "no /ossify:$cmd in config.md"
-    fi
-  done
-  if [ "$parsed" -eq 0 ]; then fail "SKILL.md's dispatched-command list parses" "no backticked command after the anchor"
-  elif [ "$missing" -eq 0 ]; then pass "every dispatched command resolves to a role in config.md ($parsed)"; fi
+  span="$(span_of "$SKILL_MD" "$start")"
+  if ! ticks="$(printf '%s\n' "$span" | span_balanced)"; then
+    fail "SKILL.md's dispatched-command span is a balanced list" \
+      "$ticks backticks — an unpaired one flips every token after it, so the per-command failures below would name the wrong fault"
+  else
+    for cmd in $(printf '%s\n' "$span" | commands_in_span); do
+      [ -n "$cmd" ] || continue
+      parsed=$((parsed+1))
+      if [ "$(occurrences "$CONFIG_MD" "/ossify:$cmd")" -eq 0 ]; then
+        missing=$((missing+1)); fail "dispatched command '$cmd' resolves to a role" "no /ossify:$cmd in config.md"
+      fi
+    done
+    if [ "$parsed" -eq 0 ]; then fail "SKILL.md's dispatched-command list parses" "no backticked command after the anchor"
+    elif [ "$missing" -eq 0 ]; then pass "every dispatched command resolves to a role in config.md ($parsed)"; fi
+  fi
+fi
+
+# ── the extractor's controls ────────────────────────────────────────────────
+#
+# Synthetic spans, shaped like the shipped bullet — a bold lead-in, comma-separated
+# backticked commands, a trailing sentence — so each control decides the extractor
+# and never the shipped list's content (a literal freeze of that list would fail on
+# the next legitimate command). They are fed straight to the extractor as span text:
+# `span_of` above is what carves a span out, and it is not what this item changed.
+# Every expected value below is a literal, not something the code under test wrote.
+
+# C1 — the wrap. A token the line wrap splits is recovered WHOLE, and its halves
+# are not emitted as commands of their own. This pins the newline→space join, the
+# one part of the old spelling the replacement keeps: drop it and the token is
+# lost (M4 below).
+ctl_wrap='- **Dispatched to a herdr session:** `alpha-
+  one`, `beta-two`.'
+c1="$(printf '%s\n' "$ctl_wrap" | commands_in_span | tr '\n' '|')"
+if [ "$c1" = 'alpha-one|beta-two|' ]; then
+  pass "control: a command split by the line wrap is recovered whole"
+else
+  fail "control: a command split by the line wrap is recovered whole" \
+    "emitted [$c1], expected [alpha-one|beta-two|] — a lost or split token, not a wrap-joined one"
+fi
+
+# C2 — the even-field assumption. With ONE unpaired backtick in the span, no token
+# the extractor feeds the config.md check may come from OUTSIDE a backtick pair.
+# Measured, that is exactly what the old spelling does: it emits the sentence's
+# trailing `.` — the span's tail after the last backtick — and that prose fragment
+# is what the per-command RED then names. This is deliberately NOT a claim that the
+# real tokens survive an unpaired backtick: measured, they do not, and no
+# pairing-based extractor can recover them (the balance gate above is for that).
+ctl_unpaired='- **Dispatched to a herdr `session:**
+  `alpha-one`, `beta-two`.'
+ctl_joined="$(printf '%s\n' "$ctl_unpaired" | tr '\n' ' ')"
+ctl_tail="$(printf '%s' "$ctl_joined" | sed 's/.*`//')"
+c2_n="$(printf '%s\n' "$ctl_unpaired" | commands_in_span | awk '{ if ($0 == "") next; n++ } END { print n+0 }')"
+c2_outside="$(printf '%s\n' "$ctl_unpaired" | commands_in_span | awk -v tail="$ctl_tail" '
+  { if ($0 == "") next; if (index(tail, $0) > 0) bad++ }
+  END { print bad+0 }')"
+if [ "$c2_n" -eq 0 ]; then
+  fail "control: an unpaired backtick feeds no prose from outside a pair" \
+    "the fixture emitted nothing at all — a control over an empty list certifies nothing"
+elif [ "$c2_outside" -eq 0 ]; then
+  pass "control: an unpaired backtick feeds no prose from outside a pair ($c2_n emitted, 0 from the span's tail)"
+else
+  fail "control: an unpaired backtick feeds no prose from outside a pair" \
+    "$c2_outside of $c2_n emitted tokens are prose from the span's tail [$ctl_tail]"
+fi
+
+# C3 — the balance gate itself. The fixture half must FIRE; the live half is the
+# adjacent control, because a gate that refused every span would satisfy the first
+# half alone and would make the shipping check above vacuous.
+if ticks="$(printf '%s\n' "$ctl_unpaired" | span_balanced)"; then
+  fail "control: the balance gate refuses an unpaired backtick" \
+    "it passed a span whose backtick count is odd"
+else
+  pass "control: the balance gate refuses an unpaired backtick ($ticks backticks)"
+fi
+if printf '%s\n' "$span" | span_balanced; then
+  pass "control: the balance gate does not refuse the live span"
+else
+  fail "control: the balance gate does not refuse the live span" \
+    "the shipped span measures unbalanced — the gate is refusing a valid state, and the check above would be skipped"
 fi
 
 section "the handoff carries the approved seats"
