@@ -558,6 +558,23 @@ else
   fail "control: a comment that starts a word after ; is removed, so its << opens nothing" \
     "got [$got], expected [1 pin 1]"
 fi
+# Controls, #602 review round 1 finding 3: an EMPTY delimiter is still a delimiter, and bash
+# ends that body at the first empty line. Measured before the fix: both fixtures counted
+# `2 pin 2`, while a bash that sources them defines `pin` ONCE — the trailing definition — so
+# the body's copy was a shadow this scan invented. Each fixture keeps the trailing definition,
+# which is what makes the skip's END measured rather than assumed: a skip that ran to the end
+# of the file would count 0.
+printf "cat <<''\npin() {\n  :\n}\n\npin() {\n  :\n}\n" > "$ctl_sh/empty-delimiter-single.sh"
+printf 'cat <<""\npin() {\n  :\n}\n\npin() {\n  :\n}\n' > "$ctl_sh/empty-delimiter-double.sh"
+for ctl_empty in empty-delimiter-single empty-delimiter-double; do
+  got="$(count_shadows "$ctl_sh/$ctl_empty.sh" pin)"
+  if [ "$got" = "1 pin 1" ]; then
+    pass "control: an empty delimiter ends its body at the empty line ($ctl_empty)"
+  else
+    fail "control: an empty delimiter ends its body at the empty line ($ctl_empty)" \
+      "got [$got], expected [1 pin 1] — the body's definition is data and the trailing one is not"
+  fi
+done
 rm -f "$ctl_sh"/*.sh
 if rmdir "$ctl_sh"; then
   pass "control: the spelling controls leave no fixture behind"

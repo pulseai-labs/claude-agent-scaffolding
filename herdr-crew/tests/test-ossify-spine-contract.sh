@@ -499,17 +499,27 @@ pin "$ROLES_MD" 'doctor session' \
 #
 # A carve that stops while a backticked token still sits after the span, in a position the
 # carve cannot certify as outside this bullet, REFUSES: rc 1, with a message naming the carve,
-# the file and the line it refused on. What it cannot certify is the first non-blank line
-# after the span, and — when that line is a sibling bullet, so the list may simply continue —
-# the rest of that bullet run: a command in a later item of the same list is the same ambiguity
-# (#602 review round 1, finding 2). The run ends at the first column-0 line that is neither a
-# bullet nor a heading, which is the bound: a command in a bullet AFTER an intervening prose
-# line is outside the check's subject. That bound is not arbitrary and it is measured on the
-# shipped file — its span ends at a blank line, the next content is the prose "These cases are
-# named…", and the bullets below that prose name commands too (`run-spine`, `/ossify:close
-# <spine-id>`, `references/…`), so a carve that read past column-0 prose would refuse the
-# shipped file rather than certify it. A span whose END a heading caused is likewise exempt: a
-# heading is where the document says a section ends.
+# the file and the line it refused on. TWO concepts decide it, one rule each:
+#
+#   the BLOCK after the span — the first non-blank line after it, plus the lines that still
+#   belong to the same markdown block: a bullet run continues across a blank line (a loose
+#   list) and over indented continuations, and a paragraph continues over indented lines but
+#   ends at a blank one. A heading ends the block, and so does a column-0 line that is neither
+#   a bullet nor an indented continuation.
+#
+#   the PREDICATE — the block's lines JOINED to one text (the join commands_in_span performs)
+#   carrying a backticked PAIR. Joining is what makes a token the wrap splits still one token:
+#   a per-line test missed the second half of `- `gamma-` / `  three`, dispatched…` and let a
+#   command in a later item of the same list through (#602 review round 1, finding 3).
+#
+# The block is exempt when a heading ends the span, or when the block's first line IS a heading:
+# a heading is where the document says a section ends, whether or not a blank line came first
+# (#602 review round 1, finding 2). Two bounds are measured rather than implied. The BLOCK's
+# end: a bullet after an intervening column-0 prose line is outside it, because reading past
+# that prose is what would refuse the shipped file — its own later bullets name `run-spine`,
+# `/ossify:close <spine-id>`, `references/…` — and C11 pins that. The PREDICATE's: a lone
+# unpaired backtick in the block is not a token and does not refuse (C14); the balance gate is
+# where an unpaired backtick inside the SPAN is caught.
 span_of() { # <file> <start-line>
   awk -v s="$2" '
     { line[NR] = $0 }
@@ -531,24 +541,27 @@ span_of() { # <file> <start-line>
       }
       follow = 0
       for (i = end_at + 1; i <= NR; i++) if (line[i] !~ /^[[:space:]]*$/) { follow = i; break }
-      refuse_at = 0
+      region_end = 0
       if (follow > 0) {
-        if (line[follow] ~ /`[^`]*`/) refuse_at = follow
-        else if (line[follow] ~ /^- /) {
-          # The bullet we carved is followed by a sibling, so the list may continue: a command
-          # in ANY of the adjacent items is the same ambiguity, not just in the first one
-          # (#602 review round 1, finding 2). The run is bounded by the list: a blank line
-          # between items keeps it, an indented continuation is part of an item, and the first
-          # column-0 line that is neither a bullet nor a heading ends it.
-          for (i = follow + 1; i <= NR; i++) {
-            if (line[i] ~ /^[[:space:]]*$/) continue
-            if (line[i] !~ /^- / && line[i] !~ /^[[:space:]]/) break
-            if (line[i] ~ /`[^`]*`/) { refuse_at = i; break }
+        region_end = follow
+        in_run = (line[follow] ~ /^- /)
+        for (i = follow + 1; i <= NR; i++) {
+          if (line[i] ~ /^[[:space:]]*$/) {
+            if (!in_run) break                       # a paragraph ends at a blank line; a list does not
+            j = i
+            while (j < NR && line[j + 1] ~ /^[[:space:]]*$/) j++
+            if (j < NR && (line[j + 1] ~ /^- / || line[j + 1] ~ /^[[:space:]]/)) { i = j; region_end = j; continue }
+            break
           }
+          if (line[i] ~ /^#/) break                  # a heading ends the section
+          if (line[i] ~ /^- / || line[i] ~ /^[[:space:]]/) { region_end = i; continue }
+          break                                      # column-0 prose ends the block
         }
       }
-      if (!stopped_at_heading && refuse_at > 0) {
-        printf "span_of refuses: the bullet at %s:%d ends at line %d, and line %d after it carries a backticked token — the carve cannot tell whether that command belongs to this bullet, so it stops here rather than certify the commands before the break\n", FILENAME, s, end_at, refuse_at
+      text = ""
+      for (i = follow; i <= region_end; i++) text = text " " line[i]
+      if (!stopped_at_heading && region_end > 0 && line[follow] !~ /^#/ && text ~ /`[^`]*`/) {
+        printf "span_of refuses: the bullet at %s:%d ends at line %d, and the block after it (from line %d) carries a backticked token — the carve cannot tell whether that command belongs to this bullet, so it stops here rather than certify the commands before the break\n", FILENAME, s, end_at, follow
         exit 1
       }
       for (i = s; i <= end_at; i++) print line[i]
@@ -853,6 +866,67 @@ if [ ! -e "$ctl_run" ]; then
 else
   fail "control: the bullet-run controls leave no fixture behind" \
     "$ctl_run survived its cleanup — a fixture was not removed"
+fi
+
+# C12–C14 — review round 1's findings 2 and 3 on the refusal's reach, and the predicate's own
+# bound. C12: a heading exempts the block whether or not a blank line came first (its heading
+# line carries the backtick that would otherwise refuse it, and the control asserts that
+# fixture property itself). Measured before this change: rc 1, the heading refused — a FALSE
+# refusal, so C12 is a loosening, and C5 is its adjacent control: a command line after a blank
+# line, which is not a heading and must still refuse. C13: a token the WRAP splits, in a later
+# item of the run, is still a token — measured before this change, only a per-line pair was
+# seen, so the command came back rc 0 with the anchor alone. C14: a lone unpaired backtick in
+# the block is not a token (C9 is its adjacent control: a pair on one line still refuses).
+ctl_block="$(mktemp -d)"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+
+## `Refusals`
+- `herdr status` fails: say so and stop.
+' > "$ctl_block/blank-then-heading.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+- Runs in this session instead.
+- `gamma-
+  three`, dispatched to a herdr session.
+' > "$ctl_block/wrapped-in-run.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+- Runs in this session instead.
+- A stray ` backtick opens no pair.
+' > "$ctl_block/lone-backtick.md"
+if ! printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+
+## `Refusals`
+- `herdr status` fails: say so and stop.
+' | awk 'NR == 3 { exit !index($0, "`") }'; then
+  fail "control: a heading exempts the block across a blank line" \
+    "the fixture's heading line carries no backtick — this control would pass without deciding the rule"
+elif c12_span="$(span_of "$ctl_block/blank-then-heading.md" 1)" &&
+     [ "$(printf '%s\n' "$c12_span" | commands_in_span | tr '\n' '|')" = 'alpha-one|' ]; then
+  pass "control: a heading exempts the block across a blank line"
+else
+  fail "control: a heading exempts the block across a blank line" \
+    "got [$c12_span] — a heading is where the section ends, blank line or not"
+fi
+if c13_span="$(span_of "$ctl_block/wrapped-in-run.md" 1)"; then
+  fail "control: the carve refuses a token the wrap splits in a later item" \
+    "rc 0 with [$c13_span] — a per-line test sees half a token and certifies the list"
+elif printf '%s' "$c13_span" | grep -F 'span_of refuses' >/dev/null; then
+  pass "control: the carve refuses a token the wrap splits in a later item"
+else
+  fail "control: the carve refuses a token the wrap splits in a later item" "$c13_span"
+fi
+if c14_span="$(span_of "$ctl_block/lone-backtick.md" 1)" &&
+   [ "$(printf '%s\n' "$c14_span" | commands_in_span | tr '\n' '|')" = 'alpha-one|' ]; then
+  pass "control: a lone unpaired backtick in the block is not a token"
+else
+  fail "control: a lone unpaired backtick in the block is not a token" \
+    "got [$c14_span] — the predicate is a backticked PAIR; the span's balance gate owns unpaired ticks"
+fi
+rm -rf "$ctl_block"
+if [ ! -e "$ctl_block" ]; then
+  pass "control: the block controls leave no fixture behind"
+else
+  fail "control: the block controls leave no fixture behind" \
+    "$ctl_block survived its cleanup — a fixture was not removed"
 fi
 
 section "the handoff carries the approved seats"

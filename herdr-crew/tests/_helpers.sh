@@ -336,8 +336,11 @@ count_shadows() { # <file> <fn>...
     # the terminator line to the UNQUOTED word, so a quoted delimiter ends at a line
     # reading its own text.
     # A leading `-` sets hd_tabs: `<<-` is terminated by the delimiter with leading
-    # TABS stripped. An empty delimiter is not an operator at all (nothing to match),
-    # and hd stays empty, so no body is skipped.
+    # TABS stripped. An EMPTY delimiter — `<<''`, `<<""` — is a delimiter too: bash ends
+    # that body at the first empty line, and so does the skip (#602 review round 1
+    # finding 3). Measured: a fixture whose body holds a definition and whose trailing
+    # line holds another is defined ONCE by a bash that sources it, and this scan counted
+    # 2 before the empty case was tracked.
     function heredoc_delim(line, op,   i, c, n, out, q) {
       hd_tabs = 0
       n = length(line); i = op + 2
@@ -358,17 +361,17 @@ count_shadows() { # <file> <fn>...
       return out
     }
     { line = $0
-      if (hd != "") {                                    # a heredoc BODY: data, never code
+      if (hd_on) {                                       # a heredoc BODY: data, never code
         body = line
         if (hd_tabs) sub(/^\t+/, "", body)               # `<<-` strips leading tabs from the terminator
-        if (body == hd) hd = ""
+        if (body == hd) hd_on = 0
         next
       }
       if (cont != "") { line = cont $0; cont = "" }      # the join bash performs on an unquoted backslash-newline
       if (line ~ /\\$/) { sub(/\\$/, "", line); cont = line; next }
       code = code_only(line)                             # the operator is looked for in code, never in a comment
       op = heredoc_op(code)
-      if (op > 0) hd = heredoc_delim(code, op)           # the operator line itself is code; the body starts at the next one
+      if (op > 0) { hd = heredoc_delim(code, op); hd_on = 1 }
       see(line) }
     END {
       if (cont != "") see(cont)                # a file ending in a continuation: no next line to join, and nothing to lose
