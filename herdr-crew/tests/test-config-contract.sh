@@ -480,6 +480,56 @@ if [ "$got" = 0 ]; then
 else
   fail "control: count_shadows counts no call, comment, or brace-less signature" "got [$got], expected [0]"
 fi
+
+# Controls, #599: a definition inside a heredoc BODY is not a definition of the file that
+# carries the heredoc. Bash is the judge here and a bash that sources these three defines
+# nothing (`declare -F pin`: absent, measured) while the line scan counted the body before
+# this change. The quoted and the unquoted delimiter are both measured — the issue's probe
+# used both — and `<<-` is the third because its terminator line is tab-stripped first.
+printf "cat <<'SHELL_FIXTURE'\npin() {\n  :\n}\nSHELL_FIXTURE\n" > "$ctl_sh/heredoc-quoted.sh"
+printf 'cat <<UNQUOTED\npin() {\n  :\n}\nUNQUOTED\n'             > "$ctl_sh/heredoc-unquoted.sh"
+printf 'cat <<-TABBED\n\tpin() {\n\t:\n\t}\n\tTABBED\n'          > "$ctl_sh/heredoc-tabbed.sh"
+for spelling in heredoc-quoted heredoc-unquoted heredoc-tabbed; do
+  got="$(count_shadows "$ctl_sh/$spelling.sh" pin)"
+  if [ "$got" = 0 ]; then pass "control: no definition is read inside the $spelling body"
+  else fail "control: no definition is read inside the $spelling body" "got [$got], expected [0]"; fi
+done
+# Adjacent control: the skip must END at the delimiter line. Without this one, a skip that
+# ran to the end of the file would satisfy all three controls above and disable the gate —
+# and its own expected count is measured, not assumed: the trailing definition is the only
+# one this file has, and a bash that sources it defines `pin` (`declare -F`: present).
+printf "cat <<'SHELL_FIXTURE'\npin() {\n  :\n}\nSHELL_FIXTURE\npin() {\n  :\n}\n" \
+  > "$ctl_sh/heredoc-then-definition.sh"
+got="$(count_shadows "$ctl_sh/heredoc-then-definition.sh" pin)"
+if [ "$got" = "1 pin 1" ]; then
+  pass "control: the skip ends at the delimiter, so a definition after the body counts"
+else
+  fail "control: the skip ends at the delimiter, so a definition after the body counts" \
+    "got [$got], expected [1 pin 1]"
+fi
+# Adjacent control, the other direction: a `<<` inside a quoted string is text, not an
+# operator, so it opens no body to skip. A skip that started on any `<<` would run to the
+# end of this fixture and the definition under it would go uncounted.
+printf 'echo "a <<not-a-heredoc, inside a quoted string"\npin() {\n  :\n}\n' \
+  > "$ctl_sh/quoted-operator.sh"
+got="$(count_shadows "$ctl_sh/quoted-operator.sh" pin)"
+if [ "$got" = "1 pin 1" ]; then
+  pass "control: a << inside a quoted string opens no body to skip"
+else
+  fail "control: a << inside a quoted string opens no body to skip" "got [$got], expected [1 pin 1]"
+fi
+# Adjacent control, the same failure class in the one place this suite itself trips it: a
+# `<<` in a COMMENT is not an operator either. Measured under the mutation that drops the
+# code projection the operator scan shares with `see()`: the comment lines of this very
+# block start a skip whose delimiter is a backtick, the scan then reads nothing to the end
+# of the file, and a definition appended after those lines counts 0 — in silence.
+printf '# a <<comment-heredoc is text\npin() {\n  :\n}\n' > "$ctl_sh/comment-operator.sh"
+got="$(count_shadows "$ctl_sh/comment-operator.sh" pin)"
+if [ "$got" = "1 pin 1" ]; then
+  pass "control: a << in a comment opens no body to skip"
+else
+  fail "control: a << in a comment opens no body to skip" "got [$got], expected [1 pin 1]"
+fi
 rm -f "$ctl_sh"/*.sh
 if rmdir "$ctl_sh"; then
   pass "control: the spelling controls leave no fixture behind"
@@ -510,6 +560,19 @@ else
   fail "control: the shape scan passes a tree with no shadow" "$out"
 fi
 rm -f "$ctl_tree/test-clean.sh"
+# Control, #599's own reproduction at the level the issue measured it: a tree whose only
+# suite embeds a fixture in a heredoc defines nothing, so the directory scan must not
+# redden it. Measured before this change: it reported `1 pin 1` for that suite, which is
+# the RED this control exists to keep out. The planted-shadow control above is its
+# adjacent control — a scan that reported nothing at all would pass this one and fail that.
+printf "cat <<'SHELL_FIXTURE'\npin() {\n  :\n}\nSHELL_FIXTURE\n" > "$ctl_tree/test-embeds-fixture.sh"
+out="$(assert_hoist_shape "$ctl_tree")"
+if printf '%s' "$out" | grep -F 'no suite outside the exemption re-defines a hoisted counter' >/dev/null; then
+  pass "control: the shape scan reads no shadow from a suite that embeds a fixture in a heredoc"
+else
+  fail "control: the shape scan reads no shadow from a suite that embeds a fixture in a heredoc" "$out"
+fi
+rm -f "$ctl_tree/test-embeds-fixture.sh"
 # The unreadable case: on a root container no mode makes a file unreadable for this
 # uid — the sweep's control above documents the same constraint — so the fixture
 # falls back to a dangling symlink. Both fail the same `-r` guard, and the message

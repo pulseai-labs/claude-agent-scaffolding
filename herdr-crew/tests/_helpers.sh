@@ -174,6 +174,24 @@ HOISTED_EXEMPT="test-fidelity-pins.sh"
 # not establish the first, and `function "pin" {` is the proof — accepted by `bash -n`,
 # defines nothing.
 #
+# A line inside a HEREDOC BODY is data, not code, and is not scanned at all (#599). The
+# body is opened by the first `<<` on a line that is not inside a quoted string, and `<<<`
+# — a herestring, not an operator — opens none; it ends at the delimiter line, compared
+# UNQUOTED, so `<<'X'` ends at a line reading X, with leading tabs stripped for `<<-`. The
+# operator is looked for in the same code projection `see()` uses — the trailing comment
+# removed — so a `<<` in a comment opens nothing either. Three bounds come with the skip,
+# named rather than implied: a quote opened on an EARLIER line is not modelled; a `<<`
+# inside arithmetic (`$(( 1 << 2 ))`) is not distinguished from an operator; and a SECOND
+# operator on the same line is not tracked, so its body is scanned as code — an over-count,
+# which is the fail-closed direction for a gate.
+#
+# Measured, every `<<` in the files this scan reads is one of three shapes, and each shape
+# after the first is pinned by a control in test-config-contract.sh's block:
+#
+#   the three real operators — `done <<LIST` (test-config-contract.sh), `<<'CTL_EOF'` twice
+#   (test-frontmatter-lint.sh); a `<<` inside a quoted string, which is how those controls
+#   write their fixtures (`printf "cat <<'X'\n…"`); or a `<<` inside a comment.
+#
 #   pin() {     pin () {     pin<TAB>()<TAB>{     function pin {     function pin() {
 #   function pin () {        <indented>           (any of the above)
 #   pin()       + `{` on the next line, with any run of blank and comment-only lines
@@ -202,7 +220,9 @@ HOISTED_EXEMPT="test-fidelity-pins.sh"
 #
 # The join is the one bash performs on an UNQUOTED backslash-newline. This scan reads
 # text, not a parse tree, so it also joins one inside a single-quoted string, where bash
-# keeps it — there the join is text, exactly as a `pin() {` inside a heredoc is.
+# keeps it. The counting rule above stays quote-blind and this pass changed nothing about
+# that: measured, a `pin() {` starting a line inside a multi-line quoted string still
+# counts 1, exactly as it did before #599. Only heredoc BODIES are now unread.
 #
 # A CALL (`pin "$REF" ...`), a COMMENT (`# pin() { ...`) and a bare `name()` with no
 # body after it (`pin()` + `foo=1`, which bash rejects) are not definitions: that is why
@@ -241,9 +261,75 @@ count_shadows() { # <file> <fn>...
         return
       }
     }
+    # Is the character at position `upto` inside a quoted string ON THIS LINE? The
+    # test exists for one purpose — placing a `<<` operator (below) — and the rest of
+    # this matcher stays the quote-blind text scan it is: a `pin() {` at the start of
+    # a line inside a quoted string is still counted, exactly as before.
+    function inside_quote(s, upto,   i, c, st) {
+      st = ""
+      for (i = 1; i < upto; i++) {
+        c = substr(s, i, 1)
+        if (st == "") {
+          if (c == "\\") { i++; continue }
+          if (c == "\047" || c == "\042") st = c
+          continue
+        }
+        if (st == "\047") { if (c == "\047") st = ""; continue }
+        if (c == "\\") { i++; continue }
+        if (c == "\042") st = ""
+      }
+      return st != ""
+    }
+    # The index of the first heredoc operator on this line, or 0. `<<<` is a
+    # herestring and not an operator; a `<<` inside a quoted string is text.
+    function heredoc_op(line,   i, n) {
+      n = length(line)
+      for (i = 1; i < n; i++) {
+        if (substr(line, i, 2) != "<<") continue
+        if (substr(line, i + 2, 1) == "<") { i += 2; continue }
+        if (inside_quote(line, i)) continue
+        return i
+      }
+      return 0
+    }
+    # The delimiter word after the operator, with its quoting removed: bash compares
+    # the terminator line to the UNQUOTED word, so a quoted delimiter ends at a line
+    # reading its own text.
+    # A leading `-` sets hd_tabs: `<<-` is terminated by the delimiter with leading
+    # TABS stripped. An empty delimiter is not an operator at all (nothing to match),
+    # and hd stays empty, so no body is skipped.
+    function heredoc_delim(line, op,   i, c, n, out, q) {
+      hd_tabs = 0
+      n = length(line); i = op + 2
+      if (substr(line, i, 1) == "-") { hd_tabs = 1; i++ }
+      while (i <= n) { c = substr(line, i, 1); if (c == " " || c == "\t") i++; else break }
+      out = ""
+      while (i <= n) {
+        c = substr(line, i, 1)
+        if (c == " " || c == "\t" || c == ";" || c == "|" || c == "&" || c == "(" || c == ")" || c == "<" || c == ">") break
+        if (c == "\047" || c == "\042") {
+          q = c; i++
+          while (i <= n && substr(line, i, 1) != q) { out = out substr(line, i, 1); i++ }
+          i++; continue
+        }
+        if (c == "\\") { i++; if (i <= n) { out = out substr(line, i, 1); i++ }; continue }
+        out = out c; i++
+      }
+      return out
+    }
     { line = $0
+      if (hd != "") {                                    # a heredoc BODY: data, never code
+        body = line
+        if (hd_tabs) sub(/^\t+/, "", body)               # `<<-` strips leading tabs from the terminator
+        if (body == hd) hd = ""
+        next
+      }
       if (cont != "") { line = cont $0; cont = "" }      # the join bash performs on an unquoted backslash-newline
       if (line ~ /\\$/) { sub(/\\$/, "", line); cont = line; next }
+      code = line
+      sub(/[[:space:]]*#.*$/, "", code)                  # the same comment rule see() uses, so an operator in a comment opens nothing
+      op = heredoc_op(code)
+      if (op > 0) hd = heredoc_delim(code, op)           # the operator line itself is code; the body starts at the next one
       see(line) }
     END {
       if (cont != "") see(cont)                # a file ending in a continuation: no next line to join, and nothing to lose
