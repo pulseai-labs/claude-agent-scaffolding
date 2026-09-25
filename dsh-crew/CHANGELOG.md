@@ -2,6 +2,52 @@
 
 All notable changes to the `dsh-crew` plugin.
 
+## 0.3.1
+
+The verifier runs the driver's route, because 0.3.0's `crew-spine` could not run a spine.
+
+- **Only `subagent_implementer` is model-selectable.** dsh 0.1.5-rc.3 registers at most one
+  selectable child tool per composition, and 0.3.0 made both rows selectable, so its
+  sessions had **no `subagent_verifier`**, silently. The verifier row drops
+  `modelSelectionSettings` and runs the driver's own route and effort. `maxDepth: 1` and the
+  `edit`/`write` deny stay. The headless profile's rows match.
+- **`roles.md`'s verifier row is `| verifier | driver | (driver) |`, or it is absent.** Any
+  other value stops the round at `dsh-executor` §2 step 0, naming the row. A file written for
+  0.3.0 with a literal verifier route therefore stops until that row reads `driver`.
+- **`dsh-executor`:**
+  - §2 step 0 first checks both child tools exist, and the `crew-spine` persona runs its
+    checks before run-spine's first mutation and before a continuation reconciles, so an
+    unusable file stops with nothing changed. A stale preset's persona predates that
+    clause, so compare the installed preset with the plugin's before a spine; orca-crew
+    0.8.1 and herdr-crew 0.2.1 do it before every spawn;
+  - §3a finds each child exactly, by `$DSH_SESSION_ID` (under `DSH_HOME`), the child's
+    `parentSession` and the catalog label, and compares a verifier with the driver's own
+    route;
+  - §7 reports every child's route;
+  - §9 resolves `roles.md` before close's first step. A defect that bears on the reviewer
+    asks the operator whether close runs without the pass, and a no halts as
+    `halted: roles`, never `close-review`.
+- **`dsh-brief` §1 and §3:** the verifier call names no route.
+- **`dsh-session` §3:** `workspace/archiveSession`, the only way to remove a session from the
+  UI (the transcript stays on disk).
+- **Suite:**
+  - exactly one selectable child row per composition, and it is `subagent_implementer`; no
+    other row in any block, the profile-level reviewer included, is selectable;
+  - the example implementer effort is checked against the model's `reasoningEfforts`;
+  - the example verifier row is `driver`.
+
+**Upgrading.** Re-link the skills root to the 0.3.1 skills (`references/presets.md` §0) and
+copy `presets/crew-spine/` into `~/.dsh/.agent-presets/` again, **together**: the 0.3.1 preset
+with the 0.3.0 `dsh-executor` still sends the verifier a route, which is refused at the first
+verification. Re-apply `references/presets.md` §5's rows to a headless `crew` profile too. Coming from
+0.2.0, also delete `crew-implementer/` and `crew-verifier/` from `~/.dsh/.agent-presets/`. A
+stale preset fails like this:
+- a 0.2.0 `crew-spine` has no `list_subagent_models`, so a `roles.md` stops at §2 step 0;
+- a 0.3.0 `crew-spine` has no `subagent_verifier`, and 0.3.1's §2 step 0 stops on that, but
+  only after run-spine has prepared round 1, because the old persona has no pre-mutation
+  check. An orchestrator's pre-spawn preset diff (orca-crew 0.8.1, herdr-crew 0.2.1) catches
+  it before any spawn.
+
 ## 0.3.0
 
 A model per crew role, chosen per project; and a reviewer child at close.
@@ -13,8 +59,8 @@ A model per crew role, chosen per project; and a reviewer child at close.
   profile's rows match.
 - **The by-hand `crew-implementer` and `crew-verifier` presets are retired.** A spine's
   children never used them. Run one item by hand in `crew-spine` ("execute work item <id>"
-  reaches the `work-item` skill), or in `standard` with the skills root. `dsh-crew-sync`
-  removes them from managed installs.
+  reaches the `work-item` skill), or in `standard` with the skills root. Delete them from
+  `~/.dsh/.agent-presets/` by hand (see 0.3.1's upgrade note).
 - **`.dsh-crew/roles.md`** (`references/presets.md` §9): one row each for `implementer`,
   `verifier` and `reviewer`; child routes from the `settings.yaml` allow-list; the reviewer
   `claude-code`, `codex` or `driver`. No file keeps 0.2.0's behaviour.

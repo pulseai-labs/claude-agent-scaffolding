@@ -74,7 +74,8 @@ for needle in "defaultPreset: danger-full-access" "api: anthropic-messages" "dee
   "toolName: subagent_reviewer"; do
   grep -qF -- "$needle" "$DOC" && pass "presets.md: $needle" || fail "presets.md: $needle"
 done
-for needle in "ossify-references" "resume.md" '`/close <spine-id>`' "chat message first"; do
+for needle in "ossify-references" "resume.md" '`/close <spine-id>`' "chat message first" \
+  "before any mutation, run the \`dsh-executor\` skill's §2 step 0 checks"; do
   grep -qF -- "$needle" "$PRESETS/crew-spine/agent.cordis.yml" && pass "crew-spine persona: $needle" || fail "crew-spine persona: $needle"
 done
 
@@ -153,25 +154,40 @@ case "$routes_out" in
   allowed=*) pass "every allow-listed route and the default model are defined; every route sets reasoning: max" ;;
 esac
 
-section "selectable child rows: maxDepth guards them, no toolFilter names them"
+section "exactly one selectable child row: the implementer"
 # Spike 5: with modelSelectionSettings on, the tool stops being a global tool, so any
 # toolFilter naming it fails at child start; maxDepth: 1 is the guard dsh enforces instead.
+# Spike 7: dsh 0.1.5-rc.3 registers at most one selectable child tool per composition; a
+# second selectable row is silently absent from the session. The verifier runs the driver's route.
 sel_out="$("$RUBY_BIN" -ryaml -e '
-  rows = []
-  walk = ->(n) { case n when Array then n.each { |x| walk.(x) }
-    when Hash then (c = n["config"]; rows << c if c.is_a?(Hash) && c["toolName"]); n.each_value { |x| walk.(x) } end }
-  ARGV.each { |f| walk.(YAML.safe_load(File.read(f), aliases: true)) }
-  sel = rows.select { |c| c["modelSelectionSettings"] == true }.map { |c| c["toolName"] }.uniq
+  # Per file: each composition (the preset, the headless profile) must hold the invariant on
+  # its own, so one copy cannot satisfy it for the other.
   bad = []
-  rows.each do |c|
-    bad << "#{c["toolName"]}: selectable without maxDepth 1" if c["modelSelectionSettings"] == true && c["maxDepth"] != 1
-    named = Array(c.dig("toolFilter", "deny")) + Array(c.dig("toolFilter", "allow"))
-    (named & sel).each { |t| bad << "#{c["toolName"]}: toolFilter names selectable #{t}" }
+  ARGV.each do |f|
+    rows = []
+    walk = ->(n) { case n when Array then n.each { |x| walk.(x) }
+      when Hash then (c = n["config"]; rows << c if c.is_a?(Hash) && c["toolName"]); n.each_value { |x| walk.(x) } end }
+    walk.(YAML.safe_load(File.read(f), aliases: true))
+    kids = rows.select { |c| %w[subagent_implementer subagent_verifier].include?(c["toolName"]) }
+    label = File.basename(f)
+    # Count instances, not names: dsh collides per selectable instance, so two rows with one
+    # toolName are two registrations of list_subagent_models.
+    sel_all = rows.select { |c| c["modelSelectionSettings"] == true }.map { |c| c["toolName"] }
+    sel = sel_all.uniq
+    # A profile-level child (the reviewer rows in §8) reaches crew-spine sessions too, so no row
+    # but the implementer row may be selectable in any block, crew-spine rows or not.
+    (sel - ["subagent_implementer"]).each { |t| bad << "#{label} #{t}: only subagent_implementer may be selectable" }
+    next if kids.empty?
+    kids.each { |c| bad << "#{label} #{c["toolName"]}: child row without maxDepth 1" if c["maxDepth"] != 1 }
+    rows.each do |c|
+      named = Array(c.dig("toolFilter", "deny")) + Array(c.dig("toolFilter", "allow"))
+      (named & sel).each { |t| bad << "#{label} #{c["toolName"]}: toolFilter names selectable #{t}" }
+    end
+    bad << "#{label}: selectable rows #{sel_all}, expected exactly [\"subagent_implementer\"]" unless sel_all == ["subagent_implementer"]
   end
-  %w[subagent_implementer subagent_verifier].each { |t| bad << "#{t} is not selectable" unless sel.include?(t) }
   puts(bad.empty? ? "ok" : bad.uniq.join("; "))
 ' "$PRESETS/crew-spine/agent.cordis.yml" "$tmp"/block-*.yml 2>&1)"
-[ "$sel_out" = "ok" ] && pass "both child rows selectable, maxDepth 1, never named by a toolFilter" || fail "both child rows selectable, maxDepth 1, never named by a toolFilter" "$sel_out"
+[ "$sel_out" = "ok" ] && pass "only subagent_implementer is selectable; both child rows maxDepth 1; no toolFilter names a selectable tool" || fail "only subagent_implementer is selectable; both child rows maxDepth 1; no toolFilter names a selectable tool" "$sel_out"
 
 section "the headless profile's child rows are crew-spine's"
 rows_out="$("$RUBY_BIN" -ryaml -e '
@@ -184,25 +200,39 @@ rows_out="$("$RUBY_BIN" -ryaml -e '
 ' "$PRESETS/crew-spine/agent.cordis.yml" "$tmp"/block-*.yml 2>&1)"
 [ "$rows_out" = "ok" ] && pass "headless child rows equal crew-spine's (persona compared above)" || fail "headless child rows equal crew-spine's" "$rows_out"
 
-section "the example roles.md routes are allow-listed"
-# The example project file (a ```markdown fence opening '## Roles') must name only routes the
-# example settings.yaml allow-lists, one row per role; the reviewer names a tool kind.
+section "the example roles.md: implementer allow-listed with an offered effort; verifier is driver"
+# The example project file (a ```markdown fence opening '## Roles') has one row per role. The
+# implementer's route must be allow-listed in the example settings.yaml, and its effort must be
+# among that model's reasoningEfforts. The verifier must be `driver (driver)`, because its tool
+# is not selectable. The reviewer names a tool kind.
 awk '/^```markdown$/{f=1; buf=""; next} f && /^```$/{f=0; if (buf ~ /^## Roles/) print buf; next} f{buf = buf $0 "\n"}' "$DOC" > "$tmp/roles.md"
 roles_out="$("$RUBY_BIN" -ryaml -e '
   rows = File.read(ARGV[0]).lines.map(&:strip).select { |l| l.start_with?("|") && !l.start_with?("|---") }.drop(1)
     .map { |l| l.split("|").map(&:strip).reject(&:empty?) }
-  allowed = []
-  ARGV[1..].each { |f| y = YAML.safe_load(File.read(f), aliases: true); allowed.concat(Array(y.dig("subagent-model-selection", "allowedModels"))) if y.is_a?(Hash) }
+  allowed = []; efforts = {}
+  ARGV[1..].each do |f|
+    y = YAML.safe_load(File.read(f), aliases: true)
+    next unless y.is_a?(Hash)
+    allowed.concat(Array(y.dig("subagent-model-selection", "allowedModels")))
+    (y.dig("llm-pi-ai", "providers") || {}).each do |p, v|
+      Array(v["models"]).each { |m| efforts["#{p}/#{m["id"]}"] = m["reasoningEfforts"].keys if m["reasoningEfforts"].is_a?(Hash) }
+    end
+  end
   allowed = allowed.map { |a| "#{a["provider"]}/#{a["model"]}" }
   bad = []
   roles = rows.map(&:first)
   bad << "roles #{roles}" unless roles.sort == %w[implementer reviewer verifier]
-  rows.each do |role, route, _|
-    if role == "reviewer" then bad << "reviewer #{route}" unless %w[claude-code codex driver].include?(route)
-    else bad << "#{role} #{route} not allow-listed" unless allowed.include?(route) end
+  rows.each do |role, route, effort|
+    case role
+    when "reviewer" then bad << "reviewer #{route}" unless %w[claude-code codex driver].include?(route)
+    when "verifier" then bad << "verifier #{route} #{effort}: must be driver (driver)" unless route == "driver" && effort == "(driver)"
+    else
+      bad << "#{role} #{route} not allow-listed" unless allowed.include?(route)
+      bad << "#{role} effort #{effort} not among #{route} reasoningEfforts #{efforts[route].inspect}" unless Array(efforts[route]).include?(effort)
+    end
   end
   puts(bad.empty? ? "ok" : bad.join("; "))
 ' "$tmp/roles.md" "$tmp"/block-*.yml 2>&1)"
-[ "$roles_out" = "ok" ] && pass "example roles.md: one row per role, routes allow-listed" || fail "example roles.md: one row per role, routes allow-listed" "$roles_out"
+[ "$roles_out" = "ok" ] && pass "example roles.md: one row per role; implementer allow-listed with an offered effort; verifier is driver" || fail "example roles.md: one row per role; implementer allow-listed with an offered effort; verifier is driver" "$roles_out"
 
 report

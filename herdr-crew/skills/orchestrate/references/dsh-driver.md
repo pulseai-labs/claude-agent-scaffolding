@@ -53,15 +53,16 @@ seats may name the same agent; each close is still a fresh session.
 ## 3. At spine planning — `.dsh-crew/roles.md` in place of item rows
 
 When the `spine session` seat names a `kind: dsh-spine-driver` agent, the items get no
-seats from this plugin. Their implementers and verifiers are dsh child tools, with one
-route per role for the whole project, from `.dsh-crew/roles.md` at the AI workspace root
-(dsh-crew's `references/presets.md` §9). In the one approval phase of
-`ossify-execution.md` §3:
+seats from this plugin. Their implementers and verifiers are dsh child tools. The
+implementer takes one route for the whole project from `.dsh-crew/roles.md` at the AI
+workspace root (dsh-crew's `references/presets.md` §9), and the verifier runs the driver's
+own. In the one approval phase of `ossify-execution.md` §3:
 
 - Recommend the three coordinator seats as usual. Where the per-item rows would go,
-  recommend that file's three rows: the implementer and verifier routes and efforts, from
-  the `subagent-model-selection` allow-list in `~/.dsh/settings.yaml`, and the reviewer
-  (`claude-code`, `codex`, or `driver` for none).
+  recommend that file's three rows: the implementer route and effort, from the
+  `subagent-model-selection` allow-list in `~/.dsh/settings.yaml`; the verifier as `driver`,
+  because it always runs the driver's own route and effort (dsh-crew's
+  `references/presets.md` §2); and the reviewer (`claude-code`, `codex`, or `driver` for none).
 - A reviewer other than `driver` is a tool the web profile must mount (dsh-crew's
   `references/presets.md` §8). Confirm with the operator, at approval, that the profile's
   pinned provider matches the row; the driver can check only that the tool exists.
@@ -91,6 +92,13 @@ contract is the same on both paths.
   After the brief, confirm the transcript's first `request/header` as well. A mismatch
   there means the session is already working on the wrong route: cancel its turn
   (`dsh-session` §3, `session/cancel`), then report the failed launch.
+- **Before each spawn, check the preset.** `diff -rq` the installed dsh-crew's
+  `presets/crew-spine` (the highest version in the plugin cache) against
+  `~/.dsh/.agent-presets/crew-spine`. Any difference is a failed launch: a stale preset
+  carries an older persona and older child rows, so the driver's own checks cannot stop it
+  before run-spine's first mutation. Report it, and spawn nothing until the operator
+  re-copies the preset. The check covers the preset only: the operator re-links the skills
+  root with it (dsh-crew's `references/presets.md` §0).
 - **Brief** it with one steered message (`dsh-session` §5), and confirm delivery by your
   request id. The first spine session gets `<spine-id> --external-executor`. A successor
   gets `Resume from <handoff path>, then continue <spine-id> from its recorded state.
@@ -116,7 +124,10 @@ contract is the same on both paths.
   - the final round barrier, every item closed: `ossify-nested-run.md` §4 applies from
     there, as it does to any spine session's completion;
   - a stop for the operator (`dsh-executor`'s stop rule, a refusal, or a resume's drift
-    report): a halt, and nothing downstream is dispatched. A stop-rule halt is
+    report): a halt, and nothing downstream is dispatched. A stop from the persona's
+    `dsh-executor` §2 step 0 checks (an unusable `.dsh-crew/roles.md`, or tools missing from
+    a preset the check above passed) comes before any mutation: once the operator has fixed it, send the same first message
+    to a fresh session, since the stopped one keeps its tools. A stop-rule halt is
     mid-round: no record was written and the round was not handed back, so only the
     session that holds it can recover it. Once the operator has remediated, steer
     `continue <spine-id> from its recorded state` to that same session, where it starts

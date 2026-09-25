@@ -63,6 +63,7 @@ The request object always goes inside `payload.args.request`. The answer is
 | `session/updateQueue` | `{"sessionId", "itemId", "action": {"kind": "remove"} \| {"kind": "steer"} \| {"kind": "edit", "content": […]}}` | `{"accepted": true}` |
 | `session/rename` | `{"sessionId", "title"}` | `{"title", "seq"}` |
 | `session/cancel` | `{"sessionId"}`: ends the active turn and keeps pending messages | `{"accepted": true}` |
+| `workspace/archiveSession` | `{"sessionId"}`: hides the session from the workspace list; its transcript stays on disk, and there is no hard delete. Only with no open turn (§7). | `{"archivedSessionIds": [ … ]}`, the complete set |
 
 ## 4. Spawn a session
 

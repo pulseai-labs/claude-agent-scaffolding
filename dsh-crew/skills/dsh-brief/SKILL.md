@@ -8,8 +8,9 @@ description: The prompts a DeepSeek Harness spine session sends to its child too
 ## 1. You are here
 
 A child in dsh is a fresh in-process agent: it inherits the spine session's working
-directory, and its provider, model and effort unless the call names them (the `dsh-executor`
-skill's §2 step 0 takes them from `.dsh-crew/roles.md`). It sees none of the spine session's
+directory, and its provider, model and effort unless the call names them. Only
+`subagent_implementer` accepts named ones (the `dsh-executor` skill's §2 step 0 takes them from
+`.dsh-crew/roles.md`), and a verifier always inherits. It sees none of the spine session's
 conversation, and carries the persona its tool instance was configured with (§5). Everything
 else it needs is in the prompt. So every prompt below is the whole contract the child will
 ever see, and angle brackets are slots: fill every slot, delete nothing else.
@@ -65,8 +66,8 @@ those documentation for the human demo, "not parsed, not gated"
 and the mandated fail on `cannot determine` would consume a correct item's correction and
 halt it. Then the two fixed claims.
 
-The call's `provider`, `model` and `reasoning_effort`, when a roles row is in force, are
-copied from that row, never chosen; they are call fields, not prompt text.
+The call names no `provider`, `model` or `reasoning_effort`: the verifier tool is not
+selectable, so the verifier runs your route and effort, and a call naming one is refused.
 
 ```text
 ROLE: verifier, read-only.
