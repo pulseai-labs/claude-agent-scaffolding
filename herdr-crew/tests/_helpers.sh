@@ -161,9 +161,9 @@ HOISTED_EXEMPT="test-fidelity-pins.sh"
 # point: an unreadable file used to yield an empty count whose arithmetic error read
 # as "no copies here", skipping the file in silence.
 #
-# One awk pass covers every name and every spelling BASH ACCEPTS, because a shadow
-# does not have to look like the copy it shadows. Measured with `bash -n`, all of
-# these define a real function and every one of them is matched:
+# One awk pass covers every name and the SIGNATURE spellings bash accepts, because a
+# shadow does not have to look like the copy it shadows. Measured with `bash -n`, all
+# of these define a real function and every one of them is matched:
 #
 #   pin() {     pin () {     pin<TAB>()<TAB>{     function pin {     function pin() {
 #   function pin () {        <indented>           (any of the above)
@@ -171,12 +171,16 @@ HOISTED_EXEMPT="test-fidelity-pins.sh"
 #               between the two
 #   pin () # copied locally   + `{` on the next line
 #
+# NOT covered, and named here rather than left to be implied by the list above: bash
+# also takes ANY compound command as a body, so `pin() ( : )` and
+# `pin() if true; then :; fi` define real functions that this matcher does not count —
+# a suite using one of those would still report clean while shadowing it. Reported as
+# a P2 in this round's seat report and left unfixed under the round's stopping rule.
+#
 # A CALL (`pin "$REF" ...`), a COMMENT (`# pin() { ...`) and a bare `name()` that no
 # `{` ever follows are not definitions: that is why the parens, the brace or the
 # `function` keyword are required, and why a bare `name()` only counts when the first
-# line of code after it opens the body. A trailing comment is stripped before the
-# tests, because `pin () # copied locally` is the spelling that defeated the first
-# version of this matcher.
+# line of code after it opens a BRACE GROUP.
 count_shadows() { # <file> <fn>...
   awk -v names="$*" '
     BEGIN { n = split(names, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1 }
