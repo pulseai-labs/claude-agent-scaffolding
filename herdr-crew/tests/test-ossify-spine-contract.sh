@@ -492,8 +492,47 @@ pin "$ROLES_MD" 'doctor session' \
 #
 # Three pieces, each with its own control below, because this extractor's failure
 # mode is a RED that names the wrong fault (#514, L5).
-span_of() { # <file> <start-line> — the bullet's own lines, up to the section break
-  awk -v s="$2" 'NR<s{next} NR>s && (/^[[:space:]]*$/ || /^- / || /^#/) {exit} {print}' "$1"
+# The bullet's own lines, up to the ITEM's end — following markdown's rule rather than
+# stopping at the first line that looks like a break. A blank line ends the item only when
+# the next non-blank line is not indented (an indented continuation paragraph is the same
+# item), a heading ends the section, and a sibling bullet at column 0 ends the item.
+#
+# A carve that stops while the first non-blank line after the span still carries a
+# backticked token REFUSES: rc 1, with a message naming the carve, the file and the two
+# line numbers. It cannot tell whether that command was meant to be in this bullet, and
+# certifying the commands before the break is exactly the silent truncation #597 is about.
+# A span whose END a heading caused is exempt: a heading is where the document says a
+# section ends, and the shipped file's own later sections name commands of their own.
+# Measured there: the live span ends at the blank line before "These cases are named…",
+# whose next non-blank line carries no backtick, so it is not refused and the check below
+# still resolves its five commands.
+span_of() { # <file> <start-line>
+  awk -v s="$2" '
+    { line[NR] = $0 }
+    END {
+      if (s < 1 || s > NR) {
+        printf "span_of refuses: %s has no line %d to carve from — no span, and an empty span certifies nothing\n", FILENAME, s
+        exit 1
+      }
+      end_at = NR; stopped_at_heading = 0
+      for (i = s + 1; i <= NR; i++) {
+        if (line[i] ~ /^#/) { end_at = i - 1; stopped_at_heading = 1; break }
+        if (line[i] ~ /^[[:space:]]*$/) {
+          j = i
+          while (j < NR && line[j + 1] ~ /^[[:space:]]*$/) j++
+          if (j < NR && line[j + 1] ~ /^[[:space:]]/) { i = j; continue }
+          end_at = i - 1; break
+        }
+        if (line[i] ~ /^- /) { end_at = i - 1; break }
+      }
+      follow = 0
+      for (i = end_at + 1; i <= NR; i++) if (line[i] !~ /^[[:space:]]*$/) { follow = i; break }
+      if (!stopped_at_heading && follow > 0 && line[follow] ~ /`[^`]*`/) {
+        printf "span_of refuses: the bullet at %s:%d ends at line %d, and the first non-blank line after it (%d) carries a backticked token — the carve cannot tell whether that command belongs to this bullet, so it stops here rather than certify the commands before the break\n", FILENAME, s, end_at, follow
+        exit 1
+      }
+      for (i = s; i <= end_at; i++) print line[i]
+    }' "$1"
 }
 # One backticked command per line. The span is joined to ONE line first, so a
 # token the wrap splits is still one token, then each `…` pair is matched whole by
@@ -511,7 +550,8 @@ commands_in_span() { # the span arrives on stdin
 # so prose fragments reach the config.md check and the per-command failures name a
 # fault that is not there. It is the way this gate covers, not the only way a span
 # can mislead: `span_of`'s own carve can drop a command with the check still green,
-# which this gate cannot see and which is tracked as #597.
+# and that is decided by the carve's own controls below — C4 to C8 — where the carve
+# captures a continuation and refuses a break it cannot certify.
 # `grep -o` alone does NOT remove the odd case: on a fixture with one unpaired
 # backtick, measured, both spellings lose the real tokens and both feed a prose
 # fragment to the check. The balance gate is what turns that into a RED naming the
@@ -524,24 +564,31 @@ span_balanced() { # the span arrives on stdin
 start=$(awk '/Dispatched to a herdr session/{print NR; exit}' "$SKILL_MD")
 missing=0
 parsed=0
+span=""
 if [ -z "$start" ]; then
   fail "SKILL.md's dispatched-command list is found" "no line reads 'Dispatched to a herdr session'"
+elif ! span="$(span_of "$SKILL_MD" "$start")"; then
+  # The carve refused, and its message names the carve, the file and both line numbers.
+  # Nothing below runs: the per-command check would otherwise certify the commands before
+  # the break, which is the silent truncation the refusal exists to prevent.
+  fail "SKILL.md's dispatched-command bullet is carved whole" "$span"
+  span=""
+elif [ -z "$span" ]; then
+  fail "SKILL.md's dispatched-command bullet is carved whole" \
+    "span_of returned nothing for the anchor at line $start — an empty span certifies no command"
+elif ! ticks="$(printf '%s\n' "$span" | span_balanced)"; then
+  fail "SKILL.md's dispatched-command span is a balanced list" \
+    "$ticks backticks — an unpaired one flips every token after it, so the per-command failures below would name the wrong fault"
 else
-  span="$(span_of "$SKILL_MD" "$start")"
-  if ! ticks="$(printf '%s\n' "$span" | span_balanced)"; then
-    fail "SKILL.md's dispatched-command span is a balanced list" \
-      "$ticks backticks — an unpaired one flips every token after it, so the per-command failures below would name the wrong fault"
-  else
-    for cmd in $(printf '%s\n' "$span" | commands_in_span); do
-      [ -n "$cmd" ] || continue
-      parsed=$((parsed+1))
-      if [ "$(occurrences "$CONFIG_MD" "/ossify:$cmd")" -eq 0 ]; then
-        missing=$((missing+1)); fail "dispatched command '$cmd' resolves to a role" "no /ossify:$cmd in config.md"
-      fi
-    done
-    if [ "$parsed" -eq 0 ]; then fail "SKILL.md's dispatched-command list parses" "no backticked command after the anchor"
-    elif [ "$missing" -eq 0 ]; then pass "every dispatched command resolves to a role in config.md ($parsed)"; fi
-  fi
+  for cmd in $(printf '%s\n' "$span" | commands_in_span); do
+    [ -n "$cmd" ] || continue
+    parsed=$((parsed+1))
+    if [ "$(occurrences "$CONFIG_MD" "/ossify:$cmd")" -eq 0 ]; then
+      missing=$((missing+1)); fail "dispatched command '$cmd' resolves to a role" "no /ossify:$cmd in config.md"
+    fi
+  done
+  if [ "$parsed" -eq 0 ]; then fail "SKILL.md's dispatched-command list parses" "no backticked command after the anchor"
+  elif [ "$missing" -eq 0 ]; then pass "every dispatched command resolves to a role in config.md ($parsed)"; fi
 fi
 
 # ── the extractor's controls ────────────────────────────────────────────────
@@ -552,10 +599,13 @@ fi
 # the next legitimate command). They are fed straight to the extractor as span text,
 # so the controls below decide the token extraction and the balance gate.
 #
-# What they do NOT cover is `span_of`'s own carve: its bullet rule can drop a
-# dispatched command — a bullet it takes for the end of the list — with the check
-# still green. That coverage is tracked as #597; the carve is unchanged here, and
-# this paragraph exists so the gap is stated where the controls are read.
+# What they do NOT decide is `span_of`'s own carve — a command on a line the carve takes
+# for the break used to be dropped with the check still green — so the carve has controls
+# of its own below: C4 the continuation a blank line does not end, and C5/C6 the two ways a
+# command can sit after the carve's break, which the carve must REFUSE rather than certify
+# around. C7 and C8 are their adjacent controls: the two shapes that must NOT be refused,
+# because a carve that refused everything would satisfy C5 and C6 just as well. Those
+# controls are what #597 asked for; the carve was fixed with them.
 # Every expected value below is a literal, not something the code under test wrote.
 
 # C1 — the wrap. A token the line wrap splits is recovered WHOLE, and its halves
@@ -638,6 +688,96 @@ elif printf '%s\n' "$span" | span_balanced; then
 else
   fail "control: the balance gate does not refuse the live span" \
     "the shipped span measures unbalanced — the gate is refusing a valid state, and the check above would be skipped"
+fi
+
+# ── the carve's own controls (#597) ─────────────────────────────────────────
+#
+# `span_of` decides which lines the check above even looks at, so a carve that stops early
+# certifies the commands before the break and reports the list green. Each fixture below is
+# a synthetic bullet in the shipped shape, written to a file because the carve reads a file;
+# the expectations are literals, never something the carve wrote.
+ctl_carve="$(mktemp -d)"
+
+# C4 — a continuation paragraph after a blank line is the SAME bullet in markdown, so the
+# command in it is captured. Measured before this change: the carve stopped at the blank line
+# and emitted `alpha-one` and `beta-two` only, with rc 0 — the command below it was never
+# checked and the shipping check stayed green.
+printf -- '- **Dispatched to a herdr session:** `alpha-one`, `beta-two`.\n\n  `gamma-three` is also dispatched to a herdr session.\n' \
+  > "$ctl_carve/continuation.md"
+if c4_span="$(span_of "$ctl_carve/continuation.md" 1)"; then
+  c4="$(printf '%s\n' "$c4_span" | commands_in_span | tr '\n' '|')"
+  if [ "$c4" = 'alpha-one|beta-two|gamma-three|' ]; then
+    pass "control: a command in an indented continuation paragraph is captured"
+  else
+    fail "control: a command in an indented continuation paragraph is captured" \
+      "emitted [$c4], expected [alpha-one|beta-two|gamma-three|] — the carve truncated the bullet"
+  fi
+else
+  fail "control: a command in an indented continuation paragraph is captured" \
+    "the carve refused a continuation it has to capture: $c4_span"
+fi
+
+# C5 and C6 — the two ways a command can sit after the carve's break. Neither can be
+# captured: the first is a command in a new paragraph the bullet does not indent, the second
+# one in a SIBLING bullet, which is a different item — and folding the rest of the section
+# into the span would feed this file's own later prose and file paths to the per-command
+# check (measured: SKILL.md's section names `/ossify:close <spine-id>`, `references/…` and
+# `commit …; push; open the PR` after the span). So the carve REFUSES, and what the control
+# decides is that the refusal names the carve rather than returning a quiet rc 0.
+printf -- '- **Dispatched to a herdr session:** `alpha-one`, `beta-two`.\n\n`gamma-three` is also dispatched to a herdr session.\n' \
+  > "$ctl_carve/after-blank.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`, `beta-two`.\n- `gamma-three`, dispatched to a herdr session.\n' \
+  > "$ctl_carve/sibling-bullet.md"
+for c5_fixture in after-blank sibling-bullet; do
+  case "$c5_fixture" in
+    after-blank)      c5_label="a command after a blank line" ;;
+    sibling-bullet)   c5_label="a command in a sibling bullet" ;;
+  esac
+  if c5_out="$(span_of "$ctl_carve/$c5_fixture.md" 1)"; then
+    fail "control: the carve refuses $c5_label it cannot certify" \
+      "it returned [$c5_out] with rc 0 — the command after the break is dropped in silence"
+  elif printf '%s' "$c5_out" | grep -F 'span_of refuses' >/dev/null &&
+       printf '%s' "$c5_out" | grep -F 'the carve cannot tell' >/dev/null; then
+    pass "control: the carve refuses $c5_label it cannot certify"
+  else
+    fail "control: the carve refuses $c5_label it cannot certify" \
+      "it refused, but not with a message naming the carve and the line: [$c5_out]"
+  fi
+done
+
+# C7 and C8 — the adjacent controls, the two shapes that must NOT be refused. C5/C6 alone
+# would be satisfied by a carve that refused every span, so the same call has to come back
+# with a span here. C8 is the heading rule: this fixture's heading line carries the backtick
+# that would otherwise refuse it, and the control asserts that fixture property itself, so it
+# cannot pass by accident on a heading that carries none.
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n- Runs in this session instead.\n' \
+  > "$ctl_carve/sibling-plain.md"
+if c7_span="$(span_of "$ctl_carve/sibling-plain.md" 1)" &&
+   [ "$(printf '%s\n' "$c7_span" | commands_in_span | tr '\n' '|')" = 'alpha-one|' ]; then
+  pass "control: a sibling bullet that carries no command does not refuse the span"
+else
+  fail "control: a sibling bullet that carries no command does not refuse the span" \
+    "got [$c7_span] — a carve that refuses every bullet after the anchor cannot be told from one that refuses only the ones carrying a command"
+fi
+ctl_carve_heading='- **Dispatched to a herdr session:** `alpha-one`.
+## `Refusals`
+- `herdr status` fails: say so and stop.'
+printf '%s\n' "$ctl_carve_heading" > "$ctl_carve/heading-break.md"
+if ! printf '%s\n' "$ctl_carve_heading" | awk 'NR == 2 { exit !index($0, "`") }'; then
+  fail "control: a span whose end a heading caused is not refused" \
+    "the fixture's heading line carries no backtick — this control would pass without deciding the heading rule"
+elif c8_span="$(span_of "$ctl_carve/heading-break.md" 1)"; then
+  pass "control: a span whose end a heading caused is not refused"
+else
+  fail "control: a span whose end a heading caused is not refused" "$c8_span"
+fi
+
+rm -rf "$ctl_carve"
+if [ ! -e "$ctl_carve" ]; then
+  pass "control: the carve controls leave no fixture behind"
+else
+  fail "control: the carve controls leave no fixture behind" \
+    "$ctl_carve survived its cleanup — a fixture was not removed"
 fi
 
 section "the handoff carries the approved seats"
