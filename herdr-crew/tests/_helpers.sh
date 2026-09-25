@@ -42,8 +42,14 @@ report() {
   # by nothing else. Measured before it existed: a `pin() ( : )` inserted immediately before this
   # call left the suite reporting clean (#602 review round 2, finding 4). The exempted file
   # redefines these names on purpose, so it is skipped by NAME, not by inference.
-  if [ "${BASH_SOURCE[1]##*/}" != "$HOISTED_EXEMPT" ]; then
-    hoisted_definitions_intact "no hoisted counter was redefined while ${BASH_SOURCE[1]##*/} ran"
+  # The caller is read ONCE, guarded, and its basename is what both the exemption test and the
+  # label use: report is called from a suite's own top level in every real run, but a shell that
+  # calls it with no caller frame at all — `bash -c "set -u; . _helpers.sh; report"`, which a
+  # control does — has no BASH_SOURCE[1], and an unguarded read aborts under `set -u` instead of
+  # reporting (#602 F7).
+  _caller="${BASH_SOURCE[1]:-}"
+  if [ "${_caller##*/}" != "$HOISTED_EXEMPT" ]; then
+    hoisted_definitions_intact "no hoisted counter was redefined while ${_caller##*/} ran"
   fi
   printf '\n%s──%s %d passed, %d failed\n' "$DIM" "$RST" "$PASS" "$FAIL"
   [ "$FAIL" -eq 0 ] || return 1
@@ -190,13 +196,20 @@ HOISTED_EXEMPT="test-fidelity-pins.sh"
 # A line inside a HEREDOC BODY is data, not code, and is not scanned at all (#599). The
 # body is opened by the first `<<` on a line that is not inside a quoted string, and `<<<`
 # — a herestring, not an operator — opens none; it ends at the delimiter line, compared
-# UNQUOTED, so `<<'X'` ends at a line reading X, with leading tabs stripped for `<<-`. The
-# operator is looked for in the same code projection `see()` uses — the trailing comment
-# removed — so a `<<` in a comment opens nothing either. Three bounds come with the skip,
-# named rather than implied: a quote opened on an EARLIER line is not modelled; a `<<`
-# inside arithmetic (`$(( 1 << 2 ))`) is not distinguished from an operator; and a SECOND
-# operator on the same line is not tracked, so its body is scanned as code — an over-count,
-# which is the fail-closed direction for a gate.
+# UNQUOTED, so `<<'X'` ends at a line reading X, with leading tabs stripped for `<<-`, and an
+# EMPTY delimiter (`<<''`, `<<""`) ends at the first empty line, which is where bash ends it
+# too. The operator is looked for in the same code projection `see()` uses — the trailing
+# comment removed — so a `<<` in a comment opens nothing either; and a `<<` inside arithmetic
+# is a SHIFT, not an operator, because `heredoc_op` tracks `$(( … ))` and a command-position
+# `(( … ))` (#602 F3).
+#
+# TWO bounds come with the skip, named rather than implied. A `<<` inside a DOUBLE-QUOTED
+# COMMAND SUBSTITUTION — `x="$(cat <<EOF …)"` — is not seen at all: bash parses that operator,
+# and this quote test is per line and sees only the outer quote, so the body is read as code and
+# a fixture in it counts as a live definition (measured). A quote opened on an EARLIER line is
+# not modelled for the same reason. Both are #603; this scan does not claim them. And a SECOND
+# operator on the same line is not tracked, so its body is scanned as code — an over-count, which
+# is the fail-closed direction for a gate.
 #
 # Measured, every `<<` in the files this scan reads is one of three shapes, and each shape
 # after the first is pinned by a control in test-config-contract.sh's block:

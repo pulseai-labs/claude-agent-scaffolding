@@ -430,9 +430,10 @@ $DSH_MD|\`data.usage.totalTokens\` against|the ceiling is compared in tokens
 LIST
 
 # #514, L1: a counter re-copied into any suite shadows the hoisted one and keeps
-# passing, so the shape is asserted rather than assumed. The per-suite half runs from every
-# suite that sources _helpers.sh — five of the six; test-fidelity-pins.sh is the exemption
-# HOISTED_EXEMPT names, and it is the one file that defines these names deliberately. The
+# passing, so the shape is asserted rather than assumed. The per-suite half runs from every suite
+# that CALLS it — five of the six. All six SOURCE _helpers.sh, test-fidelity-pins.sh included;
+# what that sixth file does not do is call either half, because it is the exemption
+# HOISTED_EXEMPT names and it is the one file that defines these names deliberately. The
 # directory-wide half is called ONCE, here — its answer cannot differ between callers, and
 # running it from three suites repeated the same violation three times for ~31 awk spawns
 # each (fix round 1, finding 12).
@@ -595,7 +596,9 @@ done
 # The adjacent control for that class: when a body really has no end, the scan must REFUSE
 # rather than print a count, because everything after the operator is uncertified. This is the
 # fail-closed half — a misclassified operator can only cost a loud RED, never silence — and the
-# fixture is bash-invalid on purpose (`bash -n` rejects an unterminated heredoc too).
+# fixture is the one bash itself only warns about: measured, `bash -n` ACCEPTS an unterminated
+# heredoc (rc 0) and reports `here-document at line 1 delimited by end-of-file`, and a bash that
+# sources the fixture runs it with the same warning. The scan refuses it for that reason.
 printf 'cat <<NEVER_ENDED\npin() {\n  :\n}\n' > "$ctl_sh/unterminated-body.sh"
 got="$(count_shadows "$ctl_sh/unterminated-body.sh" pin)"
 case "$got" in
@@ -814,6 +817,17 @@ if out="$(bash "$ctl_late/test-pristine.sh" 2>&1)" && [ -n "$out" ]; then
 else
   fail "control: a suite that defines no shadow still reports clean at report" \
     "output: [$out]"
+fi
+# The adjacent control for that call, from #602 F7: `report` reads its caller's name to skip the
+# exempted file, and a shell with no caller frame at all — `bash -c` — has no BASH_SOURCE[1].
+# Measured on faa3dd3: `. _helpers.sh` then `report` under `set -u` aborted with
+# "BASH_SOURCE[1]: unbound variable" instead of reporting.
+if out="$(bash -c "set -u; . '$SCRIPT_DIR/_helpers.sh'; report" 2>&1)" &&
+   printf '%s' "$out" | grep -F 'passed, 0 failed' >/dev/null &&
+   ! printf '%s' "$out" | grep -F 'unbound variable' >/dev/null; then
+  pass "control: report survives set -u with no caller frame"
+else
+  fail "control: report survives set -u with no caller frame" "output: [$out]"
 fi
 rm -rf "$ctl_late"
 if [ ! -e "$ctl_late" ]; then

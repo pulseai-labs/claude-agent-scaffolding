@@ -1138,6 +1138,37 @@ else
     "$ctl_marker survived its cleanup — a fixture was not removed"
 fi
 
+# C23 — the behaviour half of the sentence #602 F8 corrected, pinned as behaviour rather than
+# left in prose: a list item DIRECTLY under a column-0 prose line is still part of the block, so
+# its command is refused. C11 is the adjacent control for the other side: with a BLANK line
+# between the prose and the item the block has ended and the span is certified, which is the
+# shape the shipped file has.
+ctl_prose="$(mktemp -d)"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\nProse line with no backticks.\n- `gamma-three`, dispatched to a herdr session.\n'   > "$ctl_prose/direct.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\nProse line with no backticks.\n\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_prose/blank-separated.md"
+if c23_out="$(span_of "$ctl_prose/direct.md" 1)"; then
+  fail "control: a list item directly under prose is still in the block" \
+    "rc 0 with [$c23_out] — reading it as outside the block would certify the list without it"
+elif printf '%s' "$c23_out" | grep -F 'span_of refuses' >/dev/null; then
+  pass "control: a list item directly under prose is still in the block"
+else
+  fail "control: a list item directly under prose is still in the block" "$c23_out"
+fi
+if c23b_span="$(span_of "$ctl_prose/blank-separated.md" 1)" &&
+   [ "$(printf '%s\n' "$c23b_span" | commands_in_span | tr '\n' '|')" = 'alpha-one|' ]; then
+  pass "control: a blank line between the prose and a list item ends the block"
+else
+  fail "control: a blank line between the prose and a list item ends the block" \
+    "got [$c23b_span] — a blank line is what the shipped file has, and it must not refuse"
+fi
+rm -rf "$ctl_prose"
+if [ ! -e "$ctl_prose" ]; then
+  pass "control: the prose controls leave no fixture behind"
+else
+  fail "control: the prose controls leave no fixture behind" \
+    "$ctl_prose survived its cleanup — a fixture was not removed"
+fi
+
 section "the handoff carries the approved seats"
 
 # R2-1/R2-3, re-expressed: the child is never the source of its own seats — the
