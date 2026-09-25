@@ -497,15 +497,19 @@ pin "$ROLES_MD" 'doctor session' \
 # the next non-blank line is not indented (an indented continuation paragraph is the same
 # item), a heading ends the section, and a sibling bullet at column 0 ends the item.
 #
-# A carve that stops while the first non-blank line after the span still carries a
-# backticked token REFUSES: rc 1, with a message naming the carve, the file and the two
-# line numbers. It cannot tell whether that command was meant to be in this bullet, and
-# certifying the commands before the break is exactly the silent truncation #597 is about.
-# A span whose END a heading caused is exempt: a heading is where the document says a
-# section ends, and the shipped file's own later sections name commands of their own.
-# Measured there: the live span ends at the blank line before "These cases are named…",
-# whose next non-blank line carries no backtick, so it is not refused and the check below
-# still resolves its five commands.
+# A carve that stops while a backticked token still sits after the span, in a position the
+# carve cannot certify as outside this bullet, REFUSES: rc 1, with a message naming the carve,
+# the file and the line it refused on. What it cannot certify is the first non-blank line
+# after the span, and — when that line is a sibling bullet, so the list may simply continue —
+# the rest of that bullet run: a command in a later item of the same list is the same ambiguity
+# (#602 review round 1, finding 2). The run ends at the first column-0 line that is neither a
+# bullet nor a heading, which is the bound: a command in a bullet AFTER an intervening prose
+# line is outside the check's subject. That bound is not arbitrary and it is measured on the
+# shipped file — its span ends at a blank line, the next content is the prose "These cases are
+# named…", and the bullets below that prose name commands too (`run-spine`, `/ossify:close
+# <spine-id>`, `references/…`), so a carve that read past column-0 prose would refuse the
+# shipped file rather than certify it. A span whose END a heading caused is likewise exempt: a
+# heading is where the document says a section ends.
 span_of() { # <file> <start-line>
   awk -v s="$2" '
     { line[NR] = $0 }
@@ -527,8 +531,24 @@ span_of() { # <file> <start-line>
       }
       follow = 0
       for (i = end_at + 1; i <= NR; i++) if (line[i] !~ /^[[:space:]]*$/) { follow = i; break }
-      if (!stopped_at_heading && follow > 0 && line[follow] ~ /`[^`]*`/) {
-        printf "span_of refuses: the bullet at %s:%d ends at line %d, and the first non-blank line after it (%d) carries a backticked token — the carve cannot tell whether that command belongs to this bullet, so it stops here rather than certify the commands before the break\n", FILENAME, s, end_at, follow
+      refuse_at = 0
+      if (follow > 0) {
+        if (line[follow] ~ /`[^`]*`/) refuse_at = follow
+        else if (line[follow] ~ /^- /) {
+          # The bullet we carved is followed by a sibling, so the list may continue: a command
+          # in ANY of the adjacent items is the same ambiguity, not just in the first one
+          # (#602 review round 1, finding 2). The run is bounded by the list: a blank line
+          # between items keeps it, an indented continuation is part of an item, and the first
+          # column-0 line that is neither a bullet nor a heading ends it.
+          for (i = follow + 1; i <= NR; i++) {
+            if (line[i] ~ /^[[:space:]]*$/) continue
+            if (line[i] !~ /^- / && line[i] !~ /^[[:space:]]/) break
+            if (line[i] ~ /`[^`]*`/) { refuse_at = i; break }
+          }
+        }
+      }
+      if (!stopped_at_heading && refuse_at > 0) {
+        printf "span_of refuses: the bullet at %s:%d ends at line %d, and line %d after it carries a backticked token — the carve cannot tell whether that command belongs to this bullet, so it stops here rather than certify the commands before the break\n", FILENAME, s, end_at, refuse_at
         exit 1
       }
       for (i = s; i <= end_at; i++) print line[i]
@@ -778,6 +798,61 @@ if [ ! -e "$ctl_carve" ]; then
 else
   fail "control: the carve controls leave no fixture behind" \
     "$ctl_carve survived its cleanup — a fixture was not removed"
+fi
+
+# C9 and C10 — the bullet RUN, from #602's review round 1 finding 2. C5/C6 decided the first
+# line after the break; measured before this change, a command in a LATER item of the same
+# list came back rc 0 with only the anchor, so it was never checked. C9 is that case and C10
+# is its adjacent control, because a carve that refused every bullet run would satisfy C9
+# alone and would refuse the shipped file the day its bullet grows a sibling.
+ctl_run="$(mktemp -d)"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+- Runs in this session instead.
+- `gamma-three`, dispatched to a herdr session.
+' > "$ctl_run/run-with-command.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+- Runs in this session instead.
+- Another item of this list, carrying no command.
+' > "$ctl_run/run-plain.md"
+if c9_span="$(span_of "$ctl_run/run-with-command.md" 1)"; then
+  fail "control: the carve refuses a command in a later item of the same bullet run" \
+    "rc 0 with [$c9_span] — the later item's command is dropped in silence"
+elif printf '%s' "$c9_span" | grep -F 'span_of refuses' >/dev/null; then
+  pass "control: the carve refuses a command in a later item of the same bullet run"
+else
+  fail "control: the carve refuses a command in a later item of the same bullet run" "$c9_span"
+fi
+if c10_span="$(span_of "$ctl_run/run-plain.md" 1)" &&
+   [ "$(printf '%s\n' "$c10_span" | commands_in_span | tr '\n' '|')" = 'alpha-one|' ]; then
+  pass "control: a bullet run that carries no command does not refuse the span"
+else
+  fail "control: a bullet run that carries no command does not refuse the span" \
+    "got [$c10_span] — refusing every run cannot be told from refusing the ones that carry a command"
+fi
+# C11 — the BOUND, pinned rather than implied: a command in a bullet after an intervening
+# column-0 prose line is NOT refused, because reading past that prose is what would refuse the
+# shipped file (measured: its own later bullets name `run-spine`, `/ossify:close <spine-id>`
+# and `references/…`). If a later change widens the carve past prose, this control goes RED
+# and the bound in span_of's comment has to move with it, deliberately.
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+
+These cases are named because they look like clashes and are not:
+
+- `gamma-four`, dispatched to a herdr session.
+' > "$ctl_run/prose-then-bullet.md"
+if c11_span="$(span_of "$ctl_run/prose-then-bullet.md" 1)" &&
+   [ "$(printf '%s\n' "$c11_span" | commands_in_span | tr '\n' '|')" = 'alpha-one|' ]; then
+  pass "control: the carve's bound holds — a bullet after column-0 prose is not read"
+else
+  fail "control: the carve's bound holds — a bullet after column-0 prose is not read" \
+    "got [$c11_span] — the shipped file's own section has this shape, so reading past it refuses the live span"
+fi
+rm -rf "$ctl_run"
+if [ ! -e "$ctl_run" ]; then
+  pass "control: the bullet-run controls leave no fixture behind"
+else
+  fail "control: the bullet-run controls leave no fixture behind" \
+    "$ctl_run survived its cleanup — a fixture was not removed"
 fi
 
 section "the handoff carries the approved seats"

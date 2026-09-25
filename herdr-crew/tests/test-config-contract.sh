@@ -532,6 +532,32 @@ if [ "$got" = "1 pin 1" ]; then
 else
   fail "control: a << in a comment opens no body to skip" "got [$got], expected [1 pin 1]"
 fi
+# Controls, #602 review round 1 finding 1: the comment a line carries must be removed by
+# BASH's rule, not by the first `#` on the line — a `#` that is part of a word is part of
+# that word. Measured before the fix: both fixtures below counted 0, because the strip took
+# the delimiter down to `EOF` / `A ` and the skip then read nothing to the end of the file.
+printf 'cat <<EOF#tag\npin() {\n  :\n}\nEOF#tag\npin() {\n  :\n}\n' > "$ctl_sh/hash-in-delimiter.sh"
+printf 'cat <<"A #B"\npin() {\n  :\n}\nA #B\npin() {\n  :\n}\n'  > "$ctl_sh/hash-in-quoted-delimiter.sh"
+for ctl_delim in hash-in-delimiter hash-in-quoted-delimiter; do
+  got="$(count_shadows "$ctl_sh/$ctl_delim.sh" pin)"
+  if [ "$got" = "1 pin 1" ]; then
+    pass "control: a delimiter holding a # is read whole, so the skip ends where bash ends it ($ctl_delim)"
+  else
+    fail "control: a delimiter holding a # is read whole, so the skip ends where bash ends it ($ctl_delim)" \
+      "got [$got], expected [1 pin 1] — a truncated delimiter makes the skip run past the body"
+  fi
+done
+# Adjacent control for the same rule, the other direction: a `#` that DOES begin a comment,
+# in the one word-start position that is not a blank — after `;`. A rule that kept it would
+# leave the `<<` in that comment as an operator and skip the rest of the fixture.
+printf 'x=1;# a <<comment, after a semicolon\npin() {\n  :\n}\n' > "$ctl_sh/comment-after-semicolon.sh"
+got="$(count_shadows "$ctl_sh/comment-after-semicolon.sh" pin)"
+if [ "$got" = "1 pin 1" ]; then
+  pass "control: a comment that starts a word after ; is removed, so its << opens nothing"
+else
+  fail "control: a comment that starts a word after ; is removed, so its << opens nothing" \
+    "got [$got], expected [1 pin 1]"
+fi
 rm -f "$ctl_sh"/*.sh
 if rmdir "$ctl_sh"; then
   pass "control: the spelling controls leave no fixture behind"
