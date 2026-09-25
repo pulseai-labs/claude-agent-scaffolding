@@ -495,17 +495,24 @@ pin "$ROLES_MD" 'doctor session' \
 # The bullet's own lines, up to the ITEM's end — following markdown's rule rather than
 # stopping at the first line that looks like a break. A blank line ends the item only when
 # the next non-blank line is not indented (an indented continuation paragraph is the same
-# item), a heading ends the section, and a sibling bullet at column 0 ends the item.
+# item), a heading ends the section, and a sibling LIST ITEM at column 0 ends the item.
+#
+# Two rules are CommonMark's and are not approximations of it, because each was a P1 on its own:
+# a heading is the ATX form (0-3 spaces, then 1-6 `#`, then a blank, a tab or the end of the
+# line) and never a line inside a fenced code block (#602 F1), and a list item is any bullet
+# (`-`, `*`, `+`) or any ordered marker (`N.`, `N)`, 1-9 digits, then a blank, a tab or the end
+# of the line), read the same way by the carve AND by the block below, because a marker this
+# missed let a dispatched command through in silence (#602 F2).
 #
 # A carve that stops while a backticked token still sits after the span, in a position the
 # carve cannot certify as outside this bullet, REFUSES: rc 1, with a message naming the carve,
 # the file and the line it refused on. TWO concepts decide it, one rule each:
 #
 #   the BLOCK after the span — the first non-blank line after it, plus the lines that still
-#   belong to the same markdown block: a bullet run continues across a blank line (a loose
+#   belong to the same markdown block: a list run continues across a blank line (a loose
 #   list) and over indented continuations, and a paragraph continues over indented lines but
 #   ends at a blank one. A heading ends the block, and so does a column-0 line that is neither
-#   a bullet nor an indented continuation.
+#   a list item nor an indented continuation.
 #
 #   the PREDICATE — the block's lines JOINED to one text (the join commands_in_span performs)
 #   carrying a backticked PAIR. Joining is what makes a token the wrap splits still one token:
@@ -515,23 +522,76 @@ pin "$ROLES_MD" 'doctor session' \
 # The block is exempt when a heading ends the span, or when the block's first line IS a heading:
 # a heading is where the document says a section ends, whether or not a blank line came first
 # (#602 review round 1, finding 2). Two bounds are measured rather than implied. The BLOCK's
-# end: a bullet after an intervening column-0 prose line is outside it, because reading past
-# that prose is what would refuse the shipped file — its own later bullets name `run-spine`,
-# `/ossify:close <spine-id>`, `references/…` — and C11 pins that. The PREDICATE's: a lone
-# unpaired backtick in the block is not a token and does not refuse (C14); the balance gate is
-# where an unpaired backtick inside the SPAN is caught.
+# end: a list item after an intervening column-0 prose line is outside it only when a BLANK line
+# separates them — a list item directly under prose is still part of the block and its command is
+# still refused, which is the conservative direction — and reading past column-0 prose would
+# refuse the shipped file, whose own later bullets name `run-spine`, `/ossify:close <spine-id>`
+# and `references/…`. C11 pins the blank-separated case. The PREDICATE's: a lone unpaired
+# backtick in the block is not a token and does not refuse (C14); the balance gate is where an
+# unpaired backtick inside the SPAN is caught.
 span_of() { # <file> <start-line>
   awk -v s="$2" '
-    # An ATX heading, which can carry up to three leading spaces — a blank line followed by an
-    # indented `## `Refusals`` is still the end of the section, and reading it as an indented
-    # continuation made the span swallow the next section and refuse on its first bullet
-    # (#602 review round 2, finding 4). Four or more spaces is not a heading.
-    function is_heading(s,   k) {
+    # An ATX heading by CommonMark: up to three leading spaces, then one to six `#`, then a
+    # blank, a tab or the end of the line. `#597 backlog note` and `####### seven` are neither
+    # of them headings, and treating them as ones ended the span and exempted what followed
+    # (#602 F1).
+    function is_heading(s,   k, h, c) {
       k = 0
       while (k < 3 && substr(s, k + 1, 1) == " ") k++
-      return substr(s, k + 1, 1) == "#"
+      h = 0
+      while (substr(s, k + h + 1, 1) == "#") h++
+      if (h < 1 || h > 6) return 0
+      c = substr(s, k + h + 1, 1)
+      return c == "" || c == " " || c == "\t"
     }
-    { line[NR] = $0 }
+    # The fence a line opens with — three or more backticks or tildes, up to three spaces in —
+    # or "" for a line that opens none.
+    function fence_marker(s,   k, c, n, r) {
+      k = 0
+      while (k < 3 && substr(s, k + 1, 1) == " ") k++
+      c = substr(s, k + 1, 1)
+      if (c != "`" && c != "~") return ""
+      n = 0
+      while (substr(s, k + n + 1, 1) == c) n++
+      if (n < 3) return ""
+      r = ""
+      while (n-- > 0) r = r c
+      return r
+    }
+    # A list item marker at column 0: `-`, `*` or `+`, or 1-9 digits then `.` or `)`, each
+    # followed by a blank, a tab or the end of the line. `2.NoSpace` is not a marker (#602 F2).
+    function is_list_item(s,   c, n, d) {
+      c = substr(s, 1, 1)
+      if (c == "-" || c == "*" || c == "+") {
+        d = substr(s, 2, 1)
+        return d == "" || d == " " || d == "\t"
+      }
+      n = 0
+      while (n < 9 && substr(s, n + 1, 1) ~ /[0-9]/) n++
+      if (n == 0) return 0
+      c = substr(s, n + 1, 1)
+      if (c != "." && c != ")") return 0
+      d = substr(s, n + 2, 1)
+      return d == "" || d == " " || d == "\t"
+    }
+    function heading_at(i) { return !fenced[i] && is_heading(line[i]) }
+    { line[NR] = $0
+      # Fenced code first, over the whole file: a line between a fence and its close is code,
+      # and code is never a heading. The close is a fence of the same character, at least as
+      # long as the opener, with nothing but blanks after it; an unclosed fence runs to the end
+      # of the file, which is what CommonMark does too.
+      if (in_fence == 0) {
+        f = fence_marker($0)
+        if (f != "") { in_fence = 1; fence_char = substr(f, 1, 1); fence_len = length(f); fenced[NR] = 1 }
+      } else {
+        k = 0
+        while (k < 3 && substr($0, k + 1, 1) == " ") k++
+        n = 0
+        while (substr($0, k + n + 1, 1) == fence_char) n++
+        if (n >= fence_len && substr($0, k + n + 1) ~ /^[[:space:]]*$/) in_fence = 0
+        fenced[NR] = 1
+      }
+    }
     END {
       if (s < 1 || s > NR) {
         printf "span_of refuses: %s has no line %d to carve from — no span, and an empty span certifies nothing\n", FILENAME, s
@@ -539,37 +599,37 @@ span_of() { # <file> <start-line>
       }
       end_at = NR; stopped_at_heading = 0
       for (i = s + 1; i <= NR; i++) {
-        if (is_heading(line[i])) { end_at = i - 1; stopped_at_heading = 1; break }
+        if (heading_at(i)) { end_at = i - 1; stopped_at_heading = 1; break }
         if (line[i] ~ /^[[:space:]]*$/) {
           j = i
           while (j < NR && line[j + 1] ~ /^[[:space:]]*$/) j++
-          if (j < NR && !is_heading(line[j + 1]) && line[j + 1] ~ /^[[:space:]]/) { i = j; continue }
+          if (j < NR && !heading_at(j + 1) && line[j + 1] ~ /^[[:space:]]/) { i = j; continue }
           end_at = i - 1; break
         }
-        if (line[i] ~ /^- /) { end_at = i - 1; break }
+        if (is_list_item(line[i])) { end_at = i - 1; break }
       }
       follow = 0
       for (i = end_at + 1; i <= NR; i++) if (line[i] !~ /^[[:space:]]*$/) { follow = i; break }
       region_end = 0
       if (follow > 0) {
         region_end = follow
-        in_run = (line[follow] ~ /^- /)
+        in_run = is_list_item(line[follow])
         for (i = follow + 1; i <= NR; i++) {
           if (line[i] ~ /^[[:space:]]*$/) {
             if (!in_run) break                       # a paragraph ends at a blank line; a list does not
             j = i
             while (j < NR && line[j + 1] ~ /^[[:space:]]*$/) j++
-            if (j < NR && (line[j + 1] ~ /^- / || line[j + 1] ~ /^[[:space:]]/)) { i = j; region_end = j; continue }
+            if (j < NR && (is_list_item(line[j + 1]) || line[j + 1] ~ /^[[:space:]]/)) { i = j; region_end = j; continue }
             break
           }
-          if (is_heading(line[i])) break             # a heading ends the section
-          if (line[i] ~ /^- / || line[i] ~ /^[[:space:]]/) { region_end = i; continue }
+          if (heading_at(i)) break                   # a heading ends the section
+          if (is_list_item(line[i]) || line[i] ~ /^[[:space:]]/) { region_end = i; continue }
           break                                      # column-0 prose ends the block
         }
       }
       text = ""
       for (i = follow; i <= region_end; i++) text = text " " line[i]
-      if (!stopped_at_heading && region_end > 0 && !is_heading(line[follow]) && text ~ /`[^`]*`/) {
+      if (!stopped_at_heading && region_end > 0 && !heading_at(follow) && text ~ /`[^`]*`/) {
         printf "span_of refuses: the bullet at %s:%d ends at line %d, and the block after it (from line %d) carries a backticked token — the carve cannot tell whether that command belongs to this bullet, so it stops here rather than certify the commands before the break\n", FILENAME, s, end_at, follow
         exit 1
       }
@@ -976,6 +1036,106 @@ if [ ! -e "$ctl_indent" ]; then
 else
   fail "control: the heading controls leave no fixture behind" \
     "$ctl_indent survived its cleanup — a fixture was not removed"
+fi
+
+# C17–C19 — #602 F1: the heading test is CommonMark's ATX rule and nothing looser. Measured on
+# faa3dd3, each of these pseudo-headings ended the span and EXEMPTED the block, so the command
+# under it was dropped with rc 0 — the silent direction the refusal exists to close. C8 and C12
+# are the adjacent controls: a real ATX heading still ends the span and is still exempt.
+ctl_atx="$(mktemp -d)"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+
+#597 backlog note, and `gamma-three` is dispatched to a herdr session.
+' > "$ctl_atx/hash-then-digit.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+
+####### seven hashes, and `gamma-three` is dispatched to a herdr session.
+' > "$ctl_atx/seven-hashes.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+
+  ```
+  # init is code here
+  ```
+  `gamma-three`, dispatched to a herdr session.
+' > "$ctl_atx/fenced-init.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+
+  ~~~
+  # init is code here
+  ~~~
+  `gamma-three`, dispatched to a herdr session.
+' > "$ctl_atx/fenced-init-tilde.md"
+for c17 in hash-then-digit seven-hashes; do
+  if c17_out="$(span_of "$ctl_atx/$c17.md" 1)"; then
+    fail "control: a pseudo-heading does not exempt the block ($c17)" \
+      "rc 0 with [$c17_out] — the command under it is dropped and never checked"
+  elif printf '%s' "$c17_out" | grep -F 'span_of refuses' >/dev/null; then
+    pass "control: a pseudo-heading does not exempt the block ($c17)"
+  else
+    fail "control: a pseudo-heading does not exempt the block ($c17)" "$c17_out"
+  fi
+done
+# The backtick fence is asserted by CONTAINMENT, not by tokens: the fence itself is three
+# backticks inside the span, and the tokenizer pairs them like any other pair, which is the
+# extractor's own property and not this carve's. The tilde fence has no backticks, so there the
+# token list is the whole assertion.
+if c18_span="$(span_of "$ctl_atx/fenced-init.md" 1)" &&
+   printf '%s\n' "$c18_span" | grep -F 'gamma-three' >/dev/null; then
+  pass "control: a # line inside a backtick-fenced block is not a heading, so the span keeps going"
+else
+  fail "control: a # line inside a backtick-fenced block is not a heading, so the span keeps going" \
+    "got [$c18_span] — a fenced line ended the span early and the command after the fence was lost"
+fi
+if c19_span="$(span_of "$ctl_atx/fenced-init-tilde.md" 1)" &&
+   [ "$(printf '%s\n' "$c19_span" | commands_in_span | tr '\n' '|')" = 'alpha-one|gamma-three|' ]; then
+  pass "control: the same fence rule holds for a tilde fence"
+else
+  fail "control: the same fence rule holds for a tilde fence" \
+    "got [$c19_span] — the fence character is not the deciding factor"
+fi
+rm -rf "$ctl_atx"
+if [ ! -e "$ctl_atx" ]; then
+  pass "control: the ATX controls leave no fixture behind"
+else
+  fail "control: the ATX controls leave no fixture behind" \
+    "$ctl_atx survived its cleanup — a fixture was not removed"
+fi
+
+# C20–C22 — #602 F2: every CommonMark list marker ends the carve and extends the block, in both
+# places `span_of` reads one. Measured on faa3dd3, each run below came back rc 0 with only the
+# anchor, so the command in the second item was never checked. C22 is the adjacent control: a
+# column-0 line that merely starts with digits and a dot is NOT a marker, so a rule that dropped
+# the blank/tab/end-of-line requirement would refuse a document that is not ambiguous.
+ctl_marker="$(mktemp -d)"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n1. ordinary item\n2. `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/ordered-dot.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n1) ordinary item\n2) `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/ordered-paren.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n* ordinary item\n* `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/star.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n+ ordinary item\n+ `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/plus.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n* `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/star-sibling.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n1. ordinary item\n2.NoSpace `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/no-space-after-dot.md"
+for c20 in ordered-dot ordered-paren star plus star-sibling; do
+  if c20_out="$(span_of "$ctl_marker/$c20.md" 1)"; then
+    fail "control: every list marker is read as one ($c20)" \
+      "rc 0 with [$c20_out] — the second item's command is dropped and never checked"
+  elif printf '%s' "$c20_out" | grep -F 'span_of refuses' >/dev/null; then
+    pass "control: every list marker is read as one ($c20)"
+  else
+    fail "control: every list marker is read as one ($c20)" "$c20_out"
+  fi
+done
+if c22_span="$(span_of "$ctl_marker/no-space-after-dot.md" 1)" &&
+   [ "$(printf '%s\n' "$c22_span" | commands_in_span | tr '\n' '|')" = 'alpha-one|' ]; then
+  pass "control: digits and a dot without a blank after it are not a list marker"
+else
+  fail "control: digits and a dot without a blank after it are not a list marker" \
+    "got [$c22_span] — the marker rule needs its blank, a tab or the end of the line"
+fi
+rm -rf "$ctl_marker"
+if [ ! -e "$ctl_marker" ]; then
+  pass "control: the marker controls leave no fixture behind"
+else
+  fail "control: the marker controls leave no fixture behind" \
+    "$ctl_marker survived its cleanup — a fixture was not removed"
 fi
 
 section "the handoff carries the approved seats"
