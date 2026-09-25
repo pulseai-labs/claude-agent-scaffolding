@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
 # herdr-crew test helpers — sourced by every suite in this directory.
 #
-# Every plugin in this marketplace that has more than one suite keeps the
-# counters, the colour setup and pass/fail here instead of one copy per suite, so
-# this follows the house shape rather than inventing a third one.
+# Four plugins in this marketplace — code-judo, dsh-crew, orca-crew and this one —
+# keep the colour setup, pass/fail and the report line in a `_helpers.sh` rather
+# than one copy per suite; the other five carry a different set of primitives
+# (`assert_*` and temp helpers). This follows the first shape rather than inventing
+# a third one.
 #
-# The literal counters and the pin/present wrappers live here for the same
-# reason (#514, L1). One awk loop had grown four definitions across the suites
-# plus three more inline in test-config-contract.sh, and one of the four had
-# already lost the `[ -f ]` guard the other three carry — which is what a copy
-# does when nothing asserts the shape. test-fidelity-pins.sh is the one
-# exception, named where it is exempted at the bottom of this file.
+# The literal counters and the pin/present wrappers live here for a different
+# reason (#514, L1): this plugin had grown four definitions of one awk loop across
+# the suites plus three more inline in test-config-contract.sh, and one of the four
+# had already lost the `[ -f ]` guard the other three carry — which is what a copy
+# does when nothing asserts the shape. Measured when this was written: no sibling
+# `_helpers.sh` in this marketplace defines them, so this is the first hoist of its
+# kind here rather than a house shape. test-fidelity-pins.sh is the one exception,
+# named where it is exempted at the bottom of this file.
 
 PASS=0
 FAIL=0
