@@ -68,11 +68,24 @@ input() {
   fi
 }
 
-# run <stdin json> [NAME=value ...] -> OUT, RC; inside a herdr pane, setting unset
+# run <stdin json> [NAME=value ...] -> OUT, RC
+#
+# The handler runs inside a herdr pane (HERDR_PANE_ID=w1:p1) with the ceiling
+# option unset. A case names what it varies as NAME=value assignments, of which
+# two are this suite's fixtures: PATH=<dir> — the missing-binary cases run the
+# handler against a stripped PATH — and HERDR_PANE_ID= (empty), the case outside
+# a pane. The pane id is resolved here rather than left to the default, so a
+# caller's empty value is the one the handler sees whether or not env(1) keeps
+# the last of a repeated name (POSIX leaves that unspecified); the caller's own
+# assignment still travels in "$@", so the two cannot disagree.
 run() {
   stdin="$1"; shift
+  pane=w1:p1
+  for arg in "$@"; do
+    case "$arg" in HERDR_PANE_ID=*) pane="${arg#HERDR_PANE_ID=}" ;; esac
+  done
   OUT="$(printf '%s' "$stdin" | env -u CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING \
-    HERDR_PANE_ID=w1:p1 "$@" "$BASH_BIN" "$HOOK" 2>/dev/null)"
+    HERDR_PANE_ID="$pane" "$@" "$BASH_BIN" "$HOOK" 2>/dev/null)"
   RC=$?
 }
 
@@ -124,6 +137,17 @@ for entry in 'tab create|herdr tab create --workspace ws1 --cwd /tmp --label sea
   run "$(input PreToolUse "$T_PAST" "${entry#*|}")"
   expect_notice "past the ceiling: notice before '${entry%%|*}'" PreToolUse "context 523114"
 done
+# A tool_input.command that is not a string is not a shape Claude Code writes,
+# but the one-pass read of the three fields must not give it a different verdict
+# either: the per-field spawn printed the container and the verb's substring
+# match continued. @tsv alone refuses a container — "object (...) is not valid in
+# a csv row" — and one such field would take the whole pass, event included,
+# down the raw path; the expression stringifies each field to prevent that.
+run "$(jq -cn --arg t "$T_PAST" '{session_id: "s", transcript_path: $t, cwd: "/tmp",
+  hook_event_name: "PreToolUse", tool_name: "Bash",
+  tool_input: {command: {note: "herdr tab create"}, description: "d"}}')"
+expect_notice "a non-string tool_input.command carrying a verb still reads a figure" \
+  PreToolUse "context 523114"
 # Everything else a coordinator runs is not new work and stays silent.
 for entry in 'agent wait|herdr agent wait w7:p2 --until idle --timeout 60000' \
              'pane read|herdr pane read w7:p2' \
@@ -142,8 +166,10 @@ expect_silent "control: an Orca new-work command no longer arms the matcher"
 # so the silence below belongs to the gate and not to a handler that is mute anyway.
 run "$(input UserPromptSubmit "$T_PAST")"
 expect_notice "control: the same prompt inside a herdr pane fires" UserPromptSubmit "context 523114"
-OUT="$(printf '%s' "$(input UserPromptSubmit "$T_PAST")" | env -u HERDR_PANE_ID \
-  -u CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING "$BASH_BIN" "$HOOK" 2>/dev/null)"; RC=$?
+# The outside-a-pane fixture is an empty HERDR_PANE_ID through the helper: the
+# gate reads `${HERDR_PANE_ID:-}`, which cannot tell an empty value from an
+# unset one, and the invocation shape now lives in one place.
+run "$(input UserPromptSubmit "$T_PAST")" HERDR_PANE_ID=
 expect_silent "past the ceiling but outside a herdr pane: silent"
 
 section "the figure is the latest record, never a sum"
@@ -170,6 +196,81 @@ expect_notice "no transcript_path in the hook input: unavailable notice" UserPro
   "figure unavailable (hook input has no transcript_path)" "ceiling of 500000"
 run "$(input UserPromptSubmit "$TMP/never-written.jsonl")"
 expect_silent "transcript not written yet: silent"
+# The one-pass read escapes a tab, a newline, a carriage return and a backslash
+# inside a value — jq's own @tsv definition — and decodes all four before the
+# fields are used. Each of these names a real transcript, so each reads its
+# figure; leave any one of the four escaped and the path names nothing the
+# handler can open, so it exits silently over a figure it could have read, which
+# is the class it exists to remove. One case per escape, because a single case
+# cannot see the other three: the backslash case was green over the whole
+# tab/CR/newline class (the verifier's rows), and a decoder that replaced `\\`
+# and then `\t` in sequence passes it while failing the tab case's neighbour.
+escape_case() { # <name> <the escape's name for the label> <the character itself>
+  f="$TMP/escape-$1-$3.jsonl"
+  { user_line; assistant_line "msg_esc_$1" 10 90 523014; } > "$f"
+  run "$(input UserPromptSubmit "$f")"
+  expect_notice "a transcript path containing a $2 still reads its figure" \
+    UserPromptSubmit "context 523114"
+}
+escape_case backslash backslash '\'
+escape_case tab tab "$(printf '\t')"
+# $'\n', not $(printf '\n'): a command substitution strips the trailing newline,
+# so the fixture would have carried no newline and the case would have passed
+# against a decoder that never decoded one — measured, it did exactly that
+# before this line was fixed.
+escape_case newline newline $'\n'
+escape_case cr "carriage return" "$(printf '\r')"
+# And the second spelling this decode must not be: replacing `\\` first and then
+# `\t` in sequence. A path whose own name carries a backslash followed by a `t`
+# arrives escaped as `\\t`, and a chained decode turns that into a tab — a name
+# that exists nowhere, so the hook goes silent. The tab case above cannot see
+# this one: there the tab's own `\t` was never preceded by an escaped backslash.
+f="$TMP/win\\temp.jsonl"
+{ user_line; assistant_line msg_win 10 90 523014; } > "$f"
+run "$(input UserPromptSubmit "$f")"
+expect_notice "a transcript path whose name carries a backslash-t still reads its figure" \
+  UserPromptSubmit "context 523114"
+# Fix round 2, findings 1 and 2: the two rows where the round trip itself, rather
+# than the escape set, moved the verdict against the base hook (`5973a7b`). Both
+# are measured on both hooks in that round's report; each was RED on the head the
+# finding was raised against (`db09360`) and is green here.
+#
+# A value whose JSON string ends in a newline. The spawns' `$( )` stripped it, so
+# the name the base hook opened — and read this figure from — is the fixture's
+# own path, and the decode strips it too. Keep the newline in the decoded name
+# and `[ -e ]` tests a path that exists only without it: silent, over a file the
+# base hook read.
+f="$TMP/escape-trailing-newline.jsonl"
+{ user_line; assistant_line msg_tnl 10 90 523014; } > "$f"
+run "$(input UserPromptSubmit "$f"$'\n')"
+expect_notice "a transcript path whose JSON string ends in a newline still reads its figure" \
+  UserPromptSubmit "context 523114"
+# A `\u0000` escape in the payload: the file sits at the name with the byte
+# dropped, which is what `$( )` captured — a shell variable cannot hold a NUL —
+# and where the base hook read this figure. `%b` read `\0` as the head of a C
+# octal escape and cut the field off there (`printf -v x '%b' 'a\0b'` leaves
+# `a`), so the decoded name was a prefix that names nothing: silent.
+f="$TMP/escape-nul.jsonl"
+{ user_line; assistant_line msg_nul 10 90 523014; } > "$f"
+run "$(jq -cn --arg t "$f" '{session_id: "s",
+  transcript_path: ($t | sub("\\.jsonl$"; "\u0000.jsonl")), cwd: "/tmp",
+  hook_event_name: "UserPromptSubmit", prompt: "next"}')"
+expect_notice "a transcript path carrying a \u0000 escape still reads its figure" \
+  UserPromptSubmit "context 523114"
+# The one-pass read reads .tool_input on BOTH events, where the per-field spawns
+# read it only on the wake path — so a shape problem in that one field must not
+# invalidate the event and the transcript beside it. `.tool_input.command` raises
+# on a scalar or an array and `// ""` cannot catch a raised error, which failed
+# the whole pass: on a prompt that lost the figure's own notice, and on a wake
+# path that invented a "could not read" one where the old handler, whose command
+# spawn failed the same way, stayed silent. Optional indexing keeps both.
+run "$(jq -cn --arg t "$T_PAST" '{session_id: "s", transcript_path: $t, cwd: "/tmp",
+  hook_event_name: "UserPromptSubmit", prompt: "next", tool_input: "scalar"}')"
+expect_notice "a scalar tool_input on a prompt does not lose the notice" \
+  UserPromptSubmit "context 523114"
+run "$(jq -cn --arg t "$T_PAST" '{session_id: "s", transcript_path: $t, cwd: "/tmp",
+  hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: ["herdr tab create"]}')"
+expect_silent "an array tool_input on a wake does not invent a notice"
 # #527 — the adjacent case: a transcript path that names something the handler
 # cannot read. Before the fix the tail reads nothing, its empty output
 # classifies as "none", the wc redirection fails and the integer test raises
