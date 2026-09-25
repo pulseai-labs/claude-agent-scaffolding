@@ -184,6 +184,25 @@ t_assert_contains "$T_OUT" "AC-1" "X1 control setup: the well-formed AC line par
 t_capture oss_verify_report_cross_check "$XR" "$XS2"
 t_assert_rc 0 "X1 control: a spec whose every auto AC is accounted for is still CLEAN"
 
+# #126: parse_acs's rc was its loop's last command, so a spec whose LAST auto:
+# row has an empty command (a stub, `` ` ` `` with nothing between) returned 1
+# although the parse succeeded - and the cross-check above read that as "cannot
+# read the spec" and halted close at rc 2. Reordered, the same two rows passed.
+# The row itself is still skipped: one row out, either order.
+X126="$TMP/x-spec-stub-last.md"
+printf -- '- [ ] AC-1 auto: `true` → expected: exit 0\n- [ ] AC-2 auto: `` → expected: exit 0\n' > "$X126"
+t_capture oss_verify_parse_acs "$X126"
+t_assert_rc 0 "#126: a spec ending on an empty-command auto: row parses at rc 0"
+t_assert_eq "$(printf 'AC-1\ttrue\texit 0')" "$T_OUT" "#126: ...and the empty-command row is still skipped (one row out)"
+t_capture oss_verify_report_cross_check "$XR" "$X126"
+t_assert_rc 0 "#126: the cross-check no longer halts on it as an unreadable spec"
+t_capture bash "$HERE/../bin/oss" verify_acs "$X126"
+t_assert_rc 0 "#126: dispatcher verify_acs (set -euo pipefail) answers rc 0 too"
+# ADJACENT CONTROL: an unreadable spec still fails at rc 2 - the fix removes the
+# false rc, not the real one.
+t_capture oss_verify_parse_acs "$TMP/no-such-spec.md"
+t_assert_rc 2 "#126 control: a missing spec is still rc 2"
+
 # ===========================================================================
 # #460 - `producer | grep -q` under `set -o pipefail` inverts a TRUE match.
 # `grep -q` exits 0 at the first match; if the producer still has bytes to

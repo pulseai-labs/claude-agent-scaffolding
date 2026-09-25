@@ -32,7 +32,12 @@ oss_verify_parse_acs() { # $1=spec-file ; TSV label \t command \t expectation
         echo "oss: AC line '$label' has no backticked command — skipping (malformed AC)" >&2; continue ;; esac
       exp="$(printf '%s' "$rest" | sed -E 's/.*→[[:space:]]*expected:[[:space:]]*//')"
       exp="${exp#"${exp%%[![:space:]]*}"}"; exp="${exp%"${exp##*[![:space:]]}"}"
-      [ -n "$cmd" ] && printf '%s\t%s\t%s\n' "$label" "$cmd" "$exp"
+      # An `if`, not `[ -n "$cmd" ] && printf`: the loop's last command is this
+      # function's rc, and the `&&` form returned 1 whenever the spec's LAST
+      # auto: row had an empty command - a parse that succeeded, which
+      # report_cross_check then read as "cannot read the spec" and halted close
+      # on (#126). The row is still skipped; only the false rc goes.
+      if [ -n "$cmd" ]; then printf '%s\t%s\t%s\n' "$label" "$cmd" "$exp"; fi
     done
 }
 
