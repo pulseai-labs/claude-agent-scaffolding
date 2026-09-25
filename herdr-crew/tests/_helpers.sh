@@ -427,7 +427,9 @@ count_shadows() { # <file> <fn>...
     END {
       if (cont != "") see(cont)                # a file ending in a continuation: no next line to join, and nothing to lose
       # A body that never ends is a read that did not finish, not a clean file: it is either an
-      # unterminated heredoc (which bash itself rejects) or an operator this scan misclassified
+      # unterminated heredoc — which bash only WARNS about (measured on this tree: `bash -n`
+      # accepts it, rc 0, printing `here-document at line 1 delimited by end-of-file`, and a bash
+      # that sources it runs it with the same warning) — or an operator this scan misclassified
       # — and a misclassified one would otherwise swallow every line after it IN SILENCE. Both
       # are refused here, so the gate names the file instead of certifying it
       # (#602 review round 2, finding 2; the same shape as the empty-read refusal above).

@@ -502,7 +502,10 @@ pin "$ROLES_MD" 'doctor session' \
 # line) and never a line inside a fenced code block (#602 F1), and a list item is any bullet
 # (`-`, `*`, `+`) or any ordered marker (`N.`, `N)`, 1-9 digits, then a blank, a tab or the end
 # of the line), read the same way by the carve AND by the block below, because a marker this
-# missed let a dispatched command through in silence (#602 F2).
+# missed let a dispatched command through in silence (#602 F2). The fence gate is on EVERY
+# predicate that classifies a line — a fenced line is not a heading, not a list item and not the
+# column-0 line that ends a block (#602 F9) — because a gate on one predicate and not its sibling
+# is the same defect one level down.
 #
 # A carve that stops while a backticked token still sits after the span, in a position the
 # carve cannot certify as outside this bullet, REFUSES: rc 1, with a message naming the carve,
@@ -529,6 +532,24 @@ pin "$ROLES_MD" 'doctor session' \
 # and `references/…`. C11 pins the blank-separated case. The PREDICATE's: a lone unpaired
 # backtick in the block is not a token and does not refuse (C14); the balance gate is where an
 # unpaired backtick inside the SPAN is caught.
+#
+# THE MARKDOWN SHAPES THIS CARVE CERTIFIES, each one pinned by a control in this file rather than
+# asserted here in prose alone:
+#
+#   a blank line ends the item unless the next non-blank line is indented       C4
+#   a sibling list item ends it, in every CommonMark marker (`- * +`, `N. N)`)  C20, C22
+#   an ATX heading ends the section, 0-3 spaces in, and is exempt there         C8, C12, C15, C16
+#   `#597 backlog note` and `####### seven` are not headings                    C17
+#   fenced code is no structure at all — not a heading, not a list item         C18, C19, C24
+#   a list item directly under prose is in the block; a blank line fixes that   C23, C11, C23b
+#   the block's JOINED text decides the refusal                                 C13, C14
+#
+# OUTSIDE THAT MODEL, named here rather than modelled, both deferred to #603: an HTML comment
+# (`<!--`, `# not a heading`, `-->`) stops the block scan at its `#`-shaped line, and a list item
+# directly under a MULTI-LINE prose paragraph is not read, because the scan breaks on the second
+# consecutive prose line. Measured on this tree, both come back rc 0 with the command in the list
+# under them never checked — the same silent shape, in constructs this carve does not model. They
+# are the class #603 exists for, and this round states them and changes neither.
 span_of() { # <file> <start-line>
   awk -v s="$2" '
     # An ATX heading by CommonMark: up to three leading spaces, then one to six `#`, then a
@@ -575,6 +596,11 @@ span_of() { # <file> <start-line>
       return d == "" || d == " " || d == "\t"
     }
     function heading_at(i) { return !fenced[i] && is_heading(line[i]) }
+    # A list item, by the same rule and with the same fence gate: a `- ` line INSIDE fenced code
+    # is code, not Markdown structure, so it neither ends the carve nor extends the block. The
+    # gate belongs on every predicate that classifies a line — the round-1 fix gated the heading
+    # test and left this one open, which is exactly the defect #602 F9 names.
+    function list_item_at(i) { return !fenced[i] && is_list_item(line[i]) }
     { line[NR] = $0
       # Fenced code first, over the whole file: a line between a fence and its close is code,
       # and code is never a heading. The close is a fence of the same character, at least as
@@ -606,29 +632,33 @@ span_of() { # <file> <start-line>
           if (j < NR && !heading_at(j + 1) && line[j + 1] ~ /^[[:space:]]/) { i = j; continue }
           end_at = i - 1; break
         }
-        if (is_list_item(line[i])) { end_at = i - 1; break }
+        if (list_item_at(i)) { end_at = i - 1; break }
       }
       follow = 0
       for (i = end_at + 1; i <= NR; i++) if (line[i] !~ /^[[:space:]]*$/) { follow = i; break }
       region_end = 0
       if (follow > 0) {
         region_end = follow
-        in_run = is_list_item(line[follow])
+        in_run = list_item_at(follow)
         for (i = follow + 1; i <= NR; i++) {
           if (line[i] ~ /^[[:space:]]*$/) {
             if (!in_run) break                       # a paragraph ends at a blank line; a list does not
             j = i
             while (j < NR && line[j + 1] ~ /^[[:space:]]*$/) j++
-            if (j < NR && (is_list_item(line[j + 1]) || line[j + 1] ~ /^[[:space:]]/)) { i = j; region_end = j; continue }
+            if (j < NR && (list_item_at(j + 1) || line[j + 1] ~ /^[[:space:]]/)) { i = j; region_end = j; continue }
             break
           }
+          if (fenced[i]) continue                    # fence content is not structure: it neither ends the block nor joins it
           if (heading_at(i)) break                   # a heading ends the section
-          if (is_list_item(line[i]) || line[i] ~ /^[[:space:]]/) { region_end = i; continue }
+          if (list_item_at(i) || line[i] ~ /^[[:space:]]/) { region_end = i; continue }
           break                                      # column-0 prose ends the block
         }
       }
       text = ""
-      for (i = follow; i <= region_end; i++) text = text " " line[i]
+      # Fenced lines contribute NO text either: the backticks a fence is made of are code, and
+      # letting them into the joined text would make the predicate fire on the fence instead of
+      # on a command (#602 F9, the second half of the gate).
+      for (i = follow; i <= region_end; i++) if (!fenced[i]) text = text " " line[i]
       if (!stopped_at_heading && region_end > 0 && !heading_at(follow) && text ~ /`[^`]*`/) {
         printf "span_of refuses: the bullet at %s:%d ends at line %d, and the block after it (from line %d) carries a backticked token — the carve cannot tell whether that command belongs to this bullet, so it stops here rather than certify the commands before the break\n", FILENAME, s, end_at, follow
         exit 1
@@ -1102,10 +1132,13 @@ else
 fi
 
 # C20–C22 — #602 F2: every CommonMark list marker ends the carve and extends the block, in both
-# places `span_of` reads one. Measured on faa3dd3, each run below came back rc 0 with only the
-# anchor, so the command in the second item was never checked. C22 is the adjacent control: a
-# column-0 line that merely starts with digits and a dot is NOT a marker, so a rule that dropped
-# the blank/tab/end-of-line requirement would refuse a document that is not ambiguous.
+# places `span_of` reads one. Measured on faa3dd3, and the two shapes differed: the four RUN
+# fixtures below (ordered `1.`, its `1)`, `*` and `+`) came back rc 0 with only the anchor, so the
+# command in the second item was never checked, while the `*` SIBLING fixture came back rc 0 with
+# the item swallowed INTO the span instead — two lines, over-capture rather than a drop, and still
+# not a refusal. C22 is the adjacent control: a column-0 line that merely starts with digits and a
+# dot is NOT a marker, so a rule that dropped the blank/tab/end-of-line requirement would refuse a
+# document that is not ambiguous.
 ctl_marker="$(mktemp -d)"
 printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n1. ordinary item\n2. `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/ordered-dot.md"
 printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n1) ordinary item\n2) `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/ordered-paren.md"
@@ -1167,6 +1200,68 @@ if [ ! -e "$ctl_prose" ]; then
 else
   fail "control: the prose controls leave no fixture behind" \
     "$ctl_prose survived its cleanup — a fixture was not removed"
+fi
+
+# C24 — #602 F9: a line inside fenced code is never Markdown structure, so it is not a heading,
+# not a list item and not the column-0 line that ends a block. Measured on 411997c, where only
+# the heading test carried the fence gate: the `- code bullet` INSIDE the fence ended the carve,
+# the span came back two lines long, and `gamma-three` under the fence was never checked against
+# config.md. C25 is the adjacent control, the same fixture with a code line that is not list
+# shaped, whose verdict must not move.
+ctl_fence="$(mktemp -d)"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n```\n- code bullet\n```\n`gamma-three`, dispatched to a herdr session.\n' > "$ctl_fence/fence-list-under-anchor.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n```\nx code bullet\n```\n`gamma-three`, dispatched to a herdr session.\n' > "$ctl_fence/fence-plain-under-anchor.md"
+c24_out="$(span_of "$ctl_fence/fence-list-under-anchor.md" 1)" && c24_rc=0 || c24_rc=$?
+if [ "$c24_rc" -ne 0 ] || printf '%s\n' "$c24_out" | grep -F 'gamma-three' >/dev/null; then
+  pass "control: a list-shaped line inside a fence does not end the carve, so the command after it is checked"
+else
+  fail "control: a list-shaped line inside a fence does not end the carve, so the command after it is checked" \
+    "rc 0 with [$c24_out] — the span ends inside the fence and gamma-three is never checked"
+fi
+c25_out="$(span_of "$ctl_fence/fence-plain-under-anchor.md" 1)" && c25_rc=0 || c25_rc=$?
+if [ "$c25_rc" -eq 0 ] && printf '%s\n' "$c25_out" | grep -F 'gamma-three' >/dev/null; then
+  pass "control: the same fixture with a non-list code line keeps its verdict"
+else
+  fail "control: the same fixture with a non-list code line keeps its verdict" \
+    "rc=$c25_rc, out=[$c25_out] — the fence gate must not change a verdict it was not aimed at"
+fi
+rm -rf "$ctl_fence"
+if [ ! -e "$ctl_fence" ]; then
+  pass "control: the fence-gate controls leave no fixture behind"
+else
+  fail "control: the fence-gate controls leave no fixture behind" \
+    "$ctl_fence survived its cleanup — a fixture was not removed"
+fi
+
+# C26 and C27 — the second half of F9, in the BLOCK scan. Fenced lines are skipped there rather
+# than ending the block, and they contribute no text to the predicate either: a fence is code, and
+# the backticks it is made of are not a command. Measured on 411997c and on the first cut of this
+# fix, both fixture below REFUSED for that wrong reason — the predicate paired the fence own
+# backticks — so C27 is the control for the exclusion and C26 is its adjacent pair: with the
+# exclusion, the item that carries a command still refuses and the one that carries none does not.
+ctl_fenceblock="$(mktemp -d)"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n```\nx code\n```\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_fenceblock/fence-then-bullet.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n```\nx code\n```\n- an item carrying no command\n' > "$ctl_fenceblock/fence-then-plain.md"
+if c26_out="$(span_of "$ctl_fenceblock/fence-then-bullet.md" 1)"; then
+  fail "control: a bullet after a fence is still read as the block's own" \
+    "rc 0 with [$c26_out] — the fence hid the item and its command went unchecked"
+elif printf '%s' "$c26_out" | grep -F 'span_of refuses' >/dev/null; then
+  pass "control: a bullet after a fence is still read as the block's own"
+else
+  fail "control: a bullet after a fence is still read as the block's own" "$c26_out"
+fi
+if c27_span="$(span_of "$ctl_fenceblock/fence-then-plain.md" 1)"; then
+  pass "control: a fence in the block contributes no text, so an item with no command does not refuse"
+else
+  fail "control: a fence in the block contributes no text, so an item with no command does not refuse" \
+    "refused: [$c27_span] — the backticks the fence is made of were read as a backticked token"
+fi
+rm -rf "$ctl_fenceblock"
+if [ ! -e "$ctl_fenceblock" ]; then
+  pass "control: the block-fence controls leave no fixture behind"
+else
+  fail "control: the block-fence controls leave no fixture behind" \
+    "$ctl_fenceblock survived its cleanup — a fixture was not removed"
 fi
 
 section "the handoff carries the approved seats"
