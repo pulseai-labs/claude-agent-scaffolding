@@ -131,15 +131,15 @@ oss_worktree_add() { # $1=repo-key $2=work-item-id $3=slug $4=base-ref ; echoes 
 # Whatever cannot be undone safely is left in place and named, with the command
 # that finishes the repair. rc 0 rolled back (or nothing to undo), rc 8 not.
 _oss_worktree_add_rollback() { # $1=root $2=path $3=branch $4=had-branch(0|1) $5=base-sha
-  local root="$1" path="$2" branch="$3" had="$4" base_sha="$5" tip left=""
+  local root="$1" path="$2" branch="$3" had="$4" base_sha="$5" tip left="" undone=""
   if [ -e "$path" ]; then
-    git -C "$root" worktree remove --force "$path" >/dev/null 2>&1 \
+    git -C "$root" worktree remove --force "$path" >/dev/null 2>&1 && undone="$undone worktree" \
       || left="$left $path (inspect it; if it is the new worktree: git -C '$root' worktree remove --force '$path');"
   fi
   if [ "$had" = 0 ] && git -C "$root" show-ref --verify --quiet "refs/heads/$branch"; then
     tip="$(git -C "$root" rev-parse --verify --quiet "refs/heads/$branch" 2>/dev/null)" || tip=""
     if [ -n "$base_sha" ] && [ "$tip" = "$base_sha" ]; then
-      git -C "$root" branch -D "$branch" >/dev/null 2>&1 \
+      git -C "$root" branch -D "$branch" >/dev/null 2>&1 && undone="$undone branch" \
         || left="$left branch $branch (git -C '$root' branch -D '$branch');"
     else
       left="$left branch $branch, which no longer points at the base - inspect it before deleting;"
@@ -149,7 +149,9 @@ _oss_worktree_add_rollback() { # $1=root $2=path $3=branch $4=had-branch(0|1) $5
     echo "oss: the failed add left state behind that was not rolled back:$left the work item cannot be spawned again until it is gone" >&2
     return 8
   fi
-  echo "oss: rolled back the partial worktree and branch - fix the cause above and retry" >&2
+  # Say so only when something was undone: a failure before git created
+  # anything (an existing branch, a bad base) has nothing to roll back.
+  [ -z "$undone" ] || echo "oss: rolled back the partial add (removed:$undone) - fix the cause above and retry" >&2
 }
 
 # The worktree root lives INSIDE the repo, so without this every spawn leaves

@@ -243,6 +243,7 @@ oss_worktree_remove canonical r0.s3.w1 >/dev/null 2>&1
 git -C "$TMP/canon" branch work/r0.s3.w2-taken HEAD
 t_capture "$OSS" worktree_add canonical r0.s3.w2 "taken" HEAD
 t_assert_rc 8 "#122 control: an add onto an existing branch fails at rc 8"
+case "$T_OUT" in *"rolled back"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: #122 control: claimed a rollback when git created nothing";; *) T_PASS=$((T_PASS+1));; esac
 git -C "$TMP/canon" show-ref --verify --quiet refs/heads/work/r0.s3.w2-taken \
   && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: #122 control: a branch that predates the call was deleted by the rollback"; }
 git -C "$TMP/canon" branch -D work/r0.s3.w2-taken >/dev/null 2>&1
