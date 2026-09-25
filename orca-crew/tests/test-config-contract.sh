@@ -179,7 +179,8 @@ if [ -f "$DSH_MD" ]; then
   if [ "$n" -le "$REF_BUDGET" ]; then pass "dsh-driver.md within the reference budget ($n lines)"
   else fail "dsh-driver.md within the reference budget" "$n lines, over by $((n - REF_BUDGET))"; fi
   for needle in 'kind: dsh-spine-driver' 'preset: crew-spine' 'model_shows: transcript' \
-    'brief_delivery: api' '`.dsh-crew/roles.md`' '`dsh-session`' 'a fresh session'; do
+    'brief_delivery: api' '`.dsh-crew/roles.md`' '`dsh-session`' 'a fresh session' \
+    'presets/crew-spine'; do
     c="$(occurrences "$DSH_MD" "$needle")"
     if [ "$c" -ge 1 ]; then pass "dsh-driver.md: $needle"; else fail "dsh-driver.md: $needle" "not found"; fi
   done

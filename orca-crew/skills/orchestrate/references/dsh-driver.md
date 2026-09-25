@@ -92,6 +92,12 @@ contract is the same on both paths.
   After the brief, confirm the transcript's first `request/header` as well. A mismatch
   there means the session is already working on the wrong route: cancel its turn
   (`dsh-session` §3, `session/cancel`), then report the failed launch.
+- **Before each spawn, check the preset.** `diff -rq` the installed dsh-crew's
+  `presets/crew-spine` (the highest version in the plugin cache) against
+  `~/.dsh/.agent-presets/crew-spine`. Any difference is a failed launch: a stale preset
+  carries an older persona and older child rows, so the driver's own checks cannot stop it
+  before run-spine's first mutation. Report it, and spawn nothing until the operator
+  re-copies the preset.
 - **Brief** it with one steered message (`dsh-session` §5), and confirm delivery by your
   request id. The first spine session gets `<spine-id> --external-executor`. A successor
   gets `Resume from <handoff path>, then continue <spine-id> from its recorded state.
@@ -118,8 +124,8 @@ contract is the same on both paths.
     there, as it does to any spine session's completion;
   - a stop for the operator (`dsh-executor`'s stop rule, a refusal, or a resume's drift
     report): a halt, and nothing downstream is dispatched. A stop from the persona's
-    `dsh-executor` §2 step 0 checks (a stale preset, an unusable `.dsh-crew/roles.md`)
-    comes before any mutation: once the operator has fixed it, send the same first message
+    `dsh-executor` §2 step 0 checks (an unusable `.dsh-crew/roles.md`, or tools missing from
+    a preset the check above passed) comes before any mutation: once the operator has fixed it, send the same first message
     to a fresh session, since the stopped one keeps its tools. A stop-rule halt is
     mid-round: no record was written and the round was not handed back, so only the
     session that holds it can recover it. Once the operator has remediated, steer

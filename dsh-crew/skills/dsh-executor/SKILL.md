@@ -31,15 +31,18 @@ Take the round in this order — every baseline first, then the dispatches:
 0. Resolve the roles, once per round, before anything else. Read `.dsh-crew/roles.md` at the
    AI workspace root (`references/presets.md` §9 in this plugin gives its shape). The
    `crew-spine` persona also runs this step's checks once before run-spine's first mutation,
-   and before a continuation reconciles, so a stale preset or an unusable file stops the
-   session with nothing changed. The operator then fixes the cause and sends the same first
-   message to a fresh session.
+   and before a continuation reconciles, so an unusable file stops the session with nothing
+   changed. The operator then fixes the cause and sends the same first message to a fresh
+   session. A stale preset carries an older persona without that clause, so it reaches this
+   step only after run-spine has prepared the round. Compare the installed preset with the
+   plugin's before starting a spine; an orchestrator does this before every spawn.
    - **Your tools first.** Confirm `subagent_implementer` and `subagent_verifier` are both
      among your tools, whatever the file says. A missing one means a stale `crew-spine` is
      installed (a 0.3.0 preset has no `subagent_verifier`; `references/presets.md` §2). Stop,
      and tell the operator to copy the plugin's `crew-spine` again, or for the headless
-     `crew` profile to re-apply `references/presets.md` §5's rows, and to start a fresh
-     session.
+     `crew` profile to re-apply `references/presets.md` §5's rows. If run-spine has already
+     prepared this round, name its prepared items: a fresh session's continuation skips an
+     item that has a worktree, so recovering them is the operator's.
    - **No file:** there is no selection this round. Send no `provider`, `model` or
      `reasoning_effort` on any child call; every child runs your route and effort. Say so once
      in the hand-back (§7).

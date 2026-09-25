@@ -16,8 +16,10 @@ The verifier runs the driver's route, because 0.3.0's `crew-spine` could not run
   0.3.0 with a literal verifier route therefore stops until that row reads `driver`.
 - **`dsh-executor`:**
   - §2 step 0 first checks both child tools exist, and the `crew-spine` persona runs its
-    checks before run-spine's first mutation and before a continuation reconciles, so a
-    stale preset or an unusable file stops with nothing changed;
+    checks before run-spine's first mutation and before a continuation reconciles, so an
+    unusable file stops with nothing changed. A stale preset's persona predates that
+    clause, so compare the installed preset with the plugin's before a spine; orca-crew
+    0.8.1 and herdr-crew 0.2.1 do it before every spawn;
   - §3a finds each child exactly, by `$DSH_SESSION_ID` (under `DSH_HOME`), the child's
     `parentSession` and the catalog label, and compares a verifier with the driver's own
     route;
@@ -39,8 +41,10 @@ The verifier runs the driver's route, because 0.3.0's `crew-spine` could not run
 0.2.0, also delete `crew-implementer/` and `crew-verifier/` from `~/.dsh/.agent-presets/`. A
 stale preset fails like this:
 - a 0.2.0 `crew-spine` has no `list_subagent_models`, so a `roles.md` stops at §2 step 0;
-- a 0.3.0 `crew-spine` has no `subagent_verifier`, and 0.3.1's §2 step 0 now stops on that
-  with a message.
+- a 0.3.0 `crew-spine` has no `subagent_verifier`, and 0.3.1's §2 step 0 stops on that, but
+  only after run-spine has prepared round 1, because the old persona has no pre-mutation
+  check. An orchestrator's pre-spawn preset diff (orca-crew 0.8.1, herdr-crew 0.2.1) catches
+  it before any spawn.
 
 ## 0.3.0
 

@@ -136,7 +136,7 @@ the run, so a spine with any chance of a gap belongs in the web UI.
       operator asks you to run a spine, accept exactly `<spine-id> --external-executor` and
       refuse anything else before any mutation, as ossify's run-spine command does; then, still
       before any mutation, run the `dsh-executor` skill's §2 step 0 checks and stop on any
-      failure, so a stale preset or an unusable roles file changes nothing; then
+      failure, so an unusable roles file changes nothing; then
       read the `work-item` skill's references/round-orchestration.md end to end and follow
       it with that spine id, executing each round through the `dsh-executor` skill. Never
       edit ossify state except through `oss`. Commit, merge and push only where ossify's
