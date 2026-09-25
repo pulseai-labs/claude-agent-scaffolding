@@ -10,8 +10,9 @@
 # section headings a project file must use, the fallback rule, the halt rule
 # for an undefined seat, the readers rule, and the reference budget.
 #
-# Counting is one awk index() pass: `grep -c` counts LINES, and `… | grep -q`
-# can fail on a true match under pipefail.
+# Counting is one awk index() pass, hoisted to _helpers.sh with the pin/present
+# wrappers (#514, L1): `grep -c` counts LINES, and `… | grep -q` can fail on a
+# true match under pipefail.
 #
 # Usage:   bash herdr-crew/tests/test-config-contract.sh
 # Exit:    0 if every mechanical fact holds; 1 otherwise.
@@ -27,63 +28,39 @@ REF_BUDGET=200
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-occurrences() {
-  if [ -z "${2:-}" ]; then printf 'empty needle\n' >&2; return 1; fi
-  [ -f "$1" ] || { printf 'no such file\n' >&2; return 1; }
-  awk -v needle="$2" '
-    { line = $0
-      while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
-    END { print n+0 }
-  ' "$1"
-}
-
-pin() {
-  needle="$1"; label="$2"
-  count="$(occurrences "$CONFIG_MD" "$needle")" || { fail "$label" "count failed"; return 0; }
-  if [ "$count" -eq 1 ]; then pass "$label"
-  elif [ "$count" -eq 0 ]; then fail "$label" "not found, or the line wrapped: $needle"
-  else fail "$label" "found $count times; a pin must be unique: $needle"; fi
-}
-
-present() {
-  needle="$1"; label="$2"
-  count="$(occurrences "$CONFIG_MD" "$needle")" || { fail "$label" "count failed"; return 0; }
-  if [ "$count" -ge 1 ]; then pass "$label"; else fail "$label" "not found: $needle"; fi
-}
-
 printf '%sherdr-crew configuration contract%s\n\n' "$DIM" "$RST"
 
 section "the two files"
-pin '~/.claude/herdr-crew/agents.md' "the machine file's path is stated once"
-pin '`.herdr-crew/roles.md`' "the project file's path is stated once"
+pin "$CONFIG_MD" '~/.claude/herdr-crew/agents.md' "the machine file's path is stated once"
+pin "$CONFIG_MD" '`.herdr-crew/roles.md`' "the project file's path is stated once"
 
 section "the agent entry"
 for field in 'command:' 'expected_model:' 'effort:' 'model_shows:' 'brief_delivery:' 'can:' 'note:'; do
-  present "$field" "agent field $field is documented"
+  present "$CONFIG_MD" "$field" "agent field $field is documented"
 done
-present 'model_shows: banner' "banner is a documented value"
-present 'model_shows: screen' "screen is a documented value"
-present 'brief_delivery: inject' "inject is a documented value"
-present 'brief_delivery: file' "file delivery is a documented value"
+present "$CONFIG_MD" 'model_shows: banner' "banner is a documented value"
+present "$CONFIG_MD" 'model_shows: screen' "screen is a documented value"
+present "$CONFIG_MD" 'brief_delivery: inject' "inject is a documented value"
+present "$CONFIG_MD" 'brief_delivery: file' "file delivery is a documented value"
 
 section "the project file"
 for heading in '## Seats' '## My roles' '## Conditions'; do
-  present "$heading" "project-file heading $heading is documented"
+  present "$CONFIG_MD" "$heading" "project-file heading $heading is documented"
 done
 for key in 'at:' 'agent:' 'blocks:' 'brief:' 'replaces:'; do
-  present "$key" "role key $key is documented"
+  present "$CONFIG_MD" "$key" "role key $key is documented"
 done
 
 section "the rules that must survive a rewording"
-pin 'falls back to the agent this session is already running' \
+pin "$CONFIG_MD" 'falls back to the agent this session is already running' \
   "the no-file fallback survives"
-pin 'a seat name that neither file defines halts the run' \
+pin "$CONFIG_MD" 'a seat name that neither file defines halts the run' \
   "the undefined-seat halt survives"
-pin 'Workers never read either file' \
+pin "$CONFIG_MD" 'Workers never read either file' \
   "the readers rule survives"
-pin 'The project file wins' \
+pin "$CONFIG_MD" 'The project file wins' \
   "precedence survives"
-pin 'the first delegated dispatch' \
+pin "$CONFIG_MD" 'the first delegated dispatch' \
   "the no-config halt lands at the first delegated dispatch"
 
 section "budget"
@@ -97,12 +74,13 @@ fi
 
 section "briefs carry their seat inline"
 BRIEFS_MD="$PLUGIN_ROOT/skills/orchestrate/references/briefs.md"
+# The count and its refusal belong to the shared counter: this is the one pin
+# whose wanted count is not 1, so it cannot be `pin` itself. Until #514's hoist it
+# carried the first of this file's three inline copies of the loop — and, being
+# inline, it was the copy that never had the missing-file guard.
 brief_pin() {
   needle="$1"; label="$2"; want="$3"
-  count="$(awk -v needle="$needle" '
-    { line = $0
-      while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
-    END { print n+0 }' "$BRIEFS_MD")"
+  count="$(occurrences "$BRIEFS_MD" "$needle")" || { fail "$label" "count failed"; return 0; }
   if [ "$count" -eq "$want" ]; then pass "$label ($count)"
   else fail "$label" "found $count, expected $want: $needle"; fi
 }
@@ -118,10 +96,7 @@ brief_pin 'claude-glm' "no alias name survives in briefs.md" 0
 section "the named points exist in the run"
 LIFECYCLE_MD="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 for point in after-implementer before-review after-disposition before-merge-ask at-teardown; do
-  c_life="$(awk -v needle="$point" '
-    { line = $0
-      while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
-    END { print n+0 }' "$LIFECYCLE_MD")"
+  c_life="$(occurrences "$LIFECYCLE_MD" "$point")"
   c_cfg="$(occurrences "$CONFIG_MD" "$point")"
   if [ "$c_life" -ge 1 ] && [ "$c_cfg" -ge 1 ]; then pass "point $point is in both the run and config.md"
   else fail "point $point is in both" "lifecycle=$c_life config=$c_cfg"; fi
@@ -174,10 +149,11 @@ sweep_file() {
     # invisible to it: the whole milestone leans on this gate. The unreadable-file
     # guard above stays ahead of this pass, which is what keeps the three controls
     # that call this function exercising the join rather than the read.
-    c="$(tr -d '\n' < "$f" | awk -v needle="$needle" '
-      { line = $0
-        while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
-      END { print n+0 }')"
+    #
+    # The DELETING join stays here and is this sweep's own; only the loop moved to
+    # `count_literal` in _helpers.sh (#514, L1). Routed through `occurrences` — the
+    # per-line counter — the wrap-split name would be invisible again.
+    c="$(tr -d '\n' < "$f" | count_literal "$needle")"
     hits=$((hits + c))
   done
   if [ "$hits" -eq 0 ]; then pass "no personal name in $rel"; return 0; fi
@@ -265,13 +241,124 @@ else
 fi
 rm -f "$tmp_clean"
 
+# Control: the hoisted counter refuses a file it cannot open INSTEAD of returning
+# a count (#514, L1). This is the guard the copy in test-fidelity-pins.sh does not
+# carry, and it is the same failure mode as the unreadable-file control above: a
+# count is what a clean file returns, so a counter answering 0 for a file nobody
+# opened would certify it. The message is checked too, so a failure for another
+# reason does not read as the guard firing.
+ctl_dir="$(mktemp -d)"
+tmp_absent="$ctl_dir/absent.md"   # never created: the path is the fixture
+if out="$(occurrences "$tmp_absent" 'anything' 2>&1)"; then
+  fail "control: the hoisted counter refuses a missing file" \
+    "it returned a count for a file that does not exist: $out"
+elif printf '%s' "$out" | grep -F 'no such file' >/dev/null; then
+  pass "control: the hoisted counter refuses a missing file"
+else
+  fail "control: the hoisted counter refuses a missing file" \
+    "it failed, but not on the guard: $out"
+fi
+
+# Adjacent control: the same counter must still COUNT an existing, clean file.
+# Without it, a counter that refused every file would satisfy the control above —
+# which is the mirror of the sweep's own two controls, next to theirs.
+tmp_countable="$ctl_dir/countable.md"; printf 'nothing personal in here\n' > "$tmp_countable"
+if c="$(occurrences "$tmp_countable" 'nothing personal')" && [ "$c" -eq 1 ]; then
+  pass "control: the same counter still counts an existing file"
+else
+  fail "control: the same counter still counts an existing file" \
+    "an existing file holding one occurrence did not count once: ${c:-no output}"
+fi
+
+# Control: the FLAT counter refuses a file it cannot open, in both ways a file can
+# be unopenable (#514 fix round 1, finding 1). Its join used to run in a pipeline
+# whose status was count_literal's, and count_literal succeeds on empty input — so
+# an existing but UNREADABLE file came back as `0` with rc=0 and a flat absence
+# check would certify a file nobody read. No flat absence site exists in the suites
+# today; the trap did, and this is the control that keeps it shut.
+if out="$(occurrences_flat "$tmp_absent" 'anything' 2>&1)"; then
+  fail "control: the flat counter refuses a missing file" \
+    "it returned a count for a file that does not exist: $out"
+elif printf '%s' "$out" | grep -F 'no such file' >/dev/null; then
+  pass "control: the flat counter refuses a missing file"
+else
+  fail "control: the flat counter refuses a missing file" \
+    "it failed, but not on the guard: $out"
+fi
+
+# …and the case the pipeline hid: an EXISTING, unreadable file. On a root container
+# no mode makes a file unreadable for this uid — the sweep's own control above
+# documents the same constraint — so the fixture falls back to a dangling symlink.
+# Both are refused before awk ever reads, so the refusal below is the same either
+# way; the message is checked against the branch that actually fired.
+tmp_unreadable="$ctl_dir/unreadable.md"; printf 'nothing personal in here\n' > "$tmp_unreadable"
+chmod 000 "$tmp_unreadable"
+unreadable_branch='unreadable'
+if [ -r "$tmp_unreadable" ]; then
+  rm -f "$tmp_unreadable"; ln -s "$tmp_unreadable.absent" "$tmp_unreadable"; unreadable_branch='dangling'
+fi
+if out="$(occurrences_flat "$tmp_unreadable" 'nothing personal' 2>&1)"; then
+  fail "control: the flat counter refuses a file it cannot read" \
+    "it returned a count for a file it never opened: $out"
+elif [ "$unreadable_branch" = unreadable ] && printf '%s' "$out" | grep -F 'cannot read' >/dev/null; then
+  pass "control: the flat counter refuses a file it cannot read (unreadable)"
+elif [ "$unreadable_branch" = dangling ] && printf '%s' "$out" | grep -F 'no such file' >/dev/null; then
+  pass "control: the flat counter refuses a file it cannot read (dangling link)"
+else
+  fail "control: the flat counter refuses a file it cannot read" \
+    "it failed, but not on the guard the fixture should have hit ($unreadable_branch): $out"
+fi
+chmod 644 "$tmp_unreadable" 2>/dev/null
+
+# Adjacent control: flat mode still COUNTS an existing, clean file — without it, a
+# counter that refused everything would satisfy the two controls above.
+if c="$(occurrences_flat "$tmp_countable" 'nothing personal')" && [ "$c" -eq 1 ]; then
+  pass "control: the flat counter still counts an existing file"
+else
+  fail "control: the flat counter still counts an existing file" \
+    "an existing file holding one occurrence did not count once in flat mode: ${c:-no output}"
+fi
+
+# Control: a flat-mode zero count does not send the reader after a wrap, and the
+# per-line one still does. The two halves sit together, so a mode-aware branch that
+# dropped the wrap mention everywhere cannot pass this block.
+out="$(pin "$tmp_countable" 'zzz-planted-absent-needle' 'control: flat zero' flat 2>&1)"
+verdict="$(printf '%s' "$out" | awk '{ if (index($0, "however it wraps") > 0) g=1; if (index($0, "line wrap") > 0) b=1 } END { print g+0 "-" b+0 }')"
+if [ "$verdict" = "1-0" ]; then
+  pass "control: a flat-mode zero count names no wrap"
+else
+  fail "control: a flat-mode zero count names no wrap" \
+    "expected the flat wording and no wrap (1-0), got $verdict: $out"
+fi
+out="$(pin "$tmp_countable" 'zzz-planted-absent-needle' 'control: line zero' 2>&1)"
+verdict="$(printf '%s' "$out" | awk '{ if (index($0, "line wrap") > 0) b=1 } END { print b+0 }')"
+if [ "$verdict" = "1" ]; then
+  pass "control: a per-line zero count still names the wrap"
+else
+  fail "control: a per-line zero count still names the wrap" \
+    "the per-line wording lost its wrap mention: $out"
+fi
+
+# Every fixture this block created goes before its directory: `tmp_countable` and
+# the unreadable one — a chmod-restored regular file here, a dangling symlink under
+# root. The `rmdir` is an ASSERTION, not a courtesy: a fixture left behind made it
+# fail with a message while the suite still reported success, leaking one temp
+# directory per run (fix round 2, class 1).
+rm -f "$tmp_countable" "$tmp_unreadable"
+if rmdir "$ctl_dir"; then
+  pass "control: the counter controls leave no fixture behind"
+else
+  fail "control: the counter controls leave no fixture behind" \
+    "$ctl_dir survived its cleanup — a fixture was not removed before the directory"
+fi
+
 section "the dsh spine driver kind"
 DSH_MD="$PLUGIN_ROOT/skills/orchestrate/references/dsh-driver.md"
 EXEC_MD="$PLUGIN_ROOT/skills/orchestrate/references/ossify-execution.md"
 # Named at least twice since the agent-entries exception (PR review round 1); the
 # exact-once pin on that exception, in the section below, is the adjacent control.
-present 'kind: dsh-spine-driver' "config.md names the dsh spine driver kind"
-present '`dsh-driver.md`' "config.md points at dsh-driver.md"
+present "$CONFIG_MD" 'kind: dsh-spine-driver' "config.md names the dsh spine driver kind"
+present "$CONFIG_MD" '`dsh-driver.md`' "config.md points at dsh-driver.md"
 if [ -f "$DSH_MD" ]; then
   n="$(wc -l < "$DSH_MD" | tr -d ' ')"
   if [ "$n" -le "$REF_BUDGET" ]; then pass "dsh-driver.md within the reference budget ($n lines)"
@@ -327,7 +414,7 @@ LIFE_MD="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 NEST_MD="$PLUGIN_ROOT/skills/orchestrate/references/ossify-nested-run.md"
 SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
 CMD_MD="$PLUGIN_ROOT/commands/orchestrate.md"
-pin 'a `kind: dsh-spine-driver` entry has no `command:`' "config.md's agent entries admit the dsh kind"
+pin "$CONFIG_MD" 'a `kind: dsh-spine-driver` entry has no `command:`' "config.md's agent entries admit the dsh kind"
 while IFS='|' read -r f needle label; do
   c="$(occurrences "$f" "$needle")" || c=0
   if [ "$c" -ge 1 ]; then pass "$label"; else fail "$label" "not found: $needle"; fi
@@ -341,5 +428,109 @@ $DSH_MD|A close session is never rotated|a dsh close finishes past the ceiling
 $DSH_MD|never to a successor|a mid-round stop is recovered in the same session
 $DSH_MD|\`data.usage.totalTokens\` against|the ceiling is compared in tokens
 LIST
+
+# #514, L1: a counter re-copied into any suite shadows the hoisted one and keeps
+# passing, so the shape is asserted rather than assumed. The per-suite half is
+# called from each suite; the directory-wide half is called ONCE, here — its answer
+# cannot differ between callers, and running it from three suites repeated the same
+# violation three times for ~31 awk spawns each (fix round 1, finding 12).
+section "the hoisted counters are not re-copied"
+assert_hoisted_counters
+assert_hoist_shape
+
+# Controls: the spelling half of the coverage claim _helpers.sh makes about
+# `count_shadows` — every spelling that comment names has its fixture here, so a
+# spelling named there without one is the same defect as a control that stops
+# matching. Neither a call nor a comment is a definition, and the last fixture is the
+# one that defines none at all. `pin` stands for the six names. Every fixture but the
+# last was measured twice: `bash -n` accepts it, and a bash that sources it defines the
+# function (`declare -F` finds it). The commented signature is the spelling that
+# defeated the first version of the matcher; space-inside-parens and continued-brace
+# are the two a delta re-review of the fix found still missing.
+ctl_sh="$(mktemp -d)"
+printf 'pin() {\n  :\n}\n'                      > "$ctl_sh/col0.sh"
+printf 'pin () {\n  :\n}\n'                     > "$ctl_sh/spaced-parens.sh"
+printf 'pin\t()\t{\n  :\n}\n'                   > "$ctl_sh/tab-separated.sh"
+printf '  pin() {\n    :\n  }\n'                > "$ctl_sh/indented.sh"
+printf 'function pin {\n  :\n}\n'               > "$ctl_sh/function-keyword.sh"
+printf 'function pin() {\n  :\n}\n'             > "$ctl_sh/function-parens.sh"
+printf 'function pin () {\n  :\n}\n'            > "$ctl_sh/function-spaced-parens.sh"
+printf 'pin()\n{\n  :\n}\n'                     > "$ctl_sh/brace-next-line.sh"
+printf 'pin () # copied locally\n{\n  :\n}\n'   > "$ctl_sh/commented-signature.sh"
+printf 'pin()\n# a comment between\n{\n  :\n}\n' > "$ctl_sh/comment-between.sh"
+printf 'pin()\n\n{\n  :\n}\n'                   > "$ctl_sh/blank-between.sh"
+printf 'pin ( ) {\n  :\n}\n'                    > "$ctl_sh/space-inside-parens.sh"
+printf 'pin\t(\t)\t{\n  :\n}\n'                 > "$ctl_sh/tab-inside-parens.sh"
+printf 'pin () \\\n{\n  :\n}\n'                 > "$ctl_sh/continued-brace.sh"
+printf 'pin \\\n() {\n  :\n}\n'                 > "$ctl_sh/continued-name.sh"
+printf 'pi\\\nn() {\n  :\n}\n'                  > "$ctl_sh/continued-in-name.sh"
+printf '# pin() { a comment is not a definition\npin "$REF" "a call is not a definition"\npin()\nfoo=1\n' \
+  > "$ctl_sh/not-a-definition.sh"
+for spelling in col0 spaced-parens tab-separated indented function-keyword \
+  function-parens function-spaced-parens brace-next-line commented-signature \
+  comment-between blank-between space-inside-parens tab-inside-parens \
+  continued-brace continued-name continued-in-name; do
+  got="$(count_shadows "$ctl_sh/$spelling.sh" pin)"
+  if [ "$got" = "1 pin 1" ]; then pass "control: count_shadows catches the $spelling spelling"
+  else fail "control: count_shadows catches the $spelling spelling" "got [$got], expected [1 pin 1]"; fi
+done
+got="$(count_shadows "$ctl_sh/not-a-definition.sh" pin)"
+if [ "$got" = 0 ]; then
+  pass "control: count_shadows counts no call, comment, or brace-less signature"
+else
+  fail "control: count_shadows counts no call, comment, or brace-less signature" "got [$got], expected [0]"
+fi
+rm -f "$ctl_sh"/*.sh
+if rmdir "$ctl_sh"; then
+  pass "control: the spelling controls leave no fixture behind"
+else
+  fail "control: the spelling controls leave no fixture behind" \
+    "$ctl_sh survived its cleanup — a fixture was not removed before the directory"
+fi
+
+# Controls: the shape scan reports a planted shadow, passes a tree with none, and
+# FAILS a suite it cannot read rather than skipping it. All three run the real scan
+# through its optional directory argument, captured in a command substitution so the
+# counters it moves stay the subshell's.
+ctl_tree="$(mktemp -d)"
+printf 'occurrences() {\n  :\n}\npin() {\n  :\n}\n' > "$ctl_tree/$HOISTED_EXEMPT"
+printf 'pin() {\n  :\n}\n' > "$ctl_tree/test-with-shadow.sh"
+out="$(assert_hoist_shape "$ctl_tree")"
+if printf '%s' "$out" | grep -F 'no copy of a hoisted counter in test-with-shadow.sh' >/dev/null; then
+  pass "control: the shape scan reports a planted shadow"
+else
+  fail "control: the shape scan reports a planted shadow" "$out"
+fi
+rm -f "$ctl_tree/test-with-shadow.sh"
+printf 'nothing here defines anything\n' > "$ctl_tree/test-clean.sh"
+out="$(assert_hoist_shape "$ctl_tree")"
+if printf '%s' "$out" | grep -F 'no suite outside the exemption re-defines a hoisted counter' >/dev/null; then
+  pass "control: the shape scan passes a tree with no shadow"
+else
+  fail "control: the shape scan passes a tree with no shadow" "$out"
+fi
+rm -f "$ctl_tree/test-clean.sh"
+# The unreadable case: on a root container no mode makes a file unreadable for this
+# uid — the sweep's control above documents the same constraint — so the fixture
+# falls back to a dangling symlink. Both fail the same `-r` guard, and the message
+# names the file either way.
+printf 'pin() {\n  :\n}\n' > "$ctl_tree/test-locked.sh"; chmod 000 "$ctl_tree/test-locked.sh"
+if [ -r "$ctl_tree/test-locked.sh" ]; then
+  rm -f "$ctl_tree/test-locked.sh"; ln -s "$ctl_tree/test-locked.sh.absent" "$ctl_tree/test-locked.sh"
+fi
+out="$(assert_hoist_shape "$ctl_tree")"
+if printf '%s' "$out" | grep -F 'test-locked.sh cannot be read' >/dev/null; then
+  pass "control: the shape scan fails a suite it cannot read"
+else
+  fail "control: the shape scan fails a suite it cannot read" "$out"
+fi
+chmod 644 "$ctl_tree/test-locked.sh" 2>/dev/null
+rm -f "$ctl_tree/test-locked.sh" "$ctl_tree/$HOISTED_EXEMPT"
+if rmdir "$ctl_tree"; then
+  pass "control: the scan controls leave no fixture behind"
+else
+  fail "control: the scan controls leave no fixture behind" \
+    "$ctl_tree survived its cleanup — a fixture was not removed before the directory"
+fi
 
 report
