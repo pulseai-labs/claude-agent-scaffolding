@@ -430,10 +430,12 @@ $DSH_MD|\`data.usage.totalTokens\` against|the ceiling is compared in tokens
 LIST
 
 # #514, L1: a counter re-copied into any suite shadows the hoisted one and keeps
-# passing, so the shape is asserted rather than assumed. The per-suite half is
-# called from each suite; the directory-wide half is called ONCE, here — its answer
-# cannot differ between callers, and running it from three suites repeated the same
-# violation three times for ~31 awk spawns each (fix round 1, finding 12).
+# passing, so the shape is asserted rather than assumed. The per-suite half runs from every
+# suite that sources _helpers.sh — five of the six; test-fidelity-pins.sh is the exemption
+# HOISTED_EXEMPT names, and it is the one file that defines these names deliberately. The
+# directory-wide half is called ONCE, here — its answer cannot differ between callers, and
+# running it from three suites repeated the same violation three times for ~31 awk spawns
+# each (fix round 1, finding 12).
 section "the hoisted counters are not re-copied"
 assert_hoisted_counters
 assert_hoist_shape
@@ -594,6 +596,90 @@ if rmdir "$ctl_tree"; then
 else
   fail "control: the scan controls leave no fixture behind" \
     "$ctl_tree survived its cleanup — a fixture was not removed before the directory"
+fi
+
+# ── controls: the axes the text pass does not own ───────────────────────────
+#
+# #598 and #600 are one defect: a definition is a definition whatever its body form and
+# wherever on its line it starts, and the text scan — line-anchored, and recognising one
+# body form — counts several of them 0. Measured on this tree, every spelling below is
+# accepted by `bash -n` and defines `pin` when a bash sources it (`declare -F`: present),
+# and every one of them is counted 0 by `count_shadows`. So none of these controls decides
+# the text pass; they decide the STRUCTURAL half, the definition bash resolved compared
+# against the one _helpers.sh loaded. Each runs in its own SUBSHELL — the local `pin` lands
+# there and the counters it moves stay there — and each asserts the failure that names the
+# structural half and `pin`, NOT the text half's (a control satisfied by either half's
+# failure would certify the wrong instrument).
+ctl_self="${BASH_SOURCE[0]##*/}"
+structural_red() { # <output of assert_hoisted_counters> — the structural failure, naming pin
+  case "$1" in *"different definition of:"*"pin"*) ;; *) return 1 ;; esac
+  case "$1" in *"line-anchored text scan cannot count"*) ;; *) return 1 ;; esac
+  case "$1" in *"every assertion that calls it keeps passing"*) return 1 ;; esac
+  return 0
+}
+structural_clean() { # <output> — both halves report the suite clean
+  case "$1" in
+    *"no copy of a hoisted counter in $ctl_self"*"the hoisted counters are the ones bash resolved in $ctl_self"*) return 0 ;;
+  esac
+  return 1
+}
+for ctl_spelling in \
+  'pin() ( : )' \
+  'pin() (( 1 ))' \
+  'pin() [[ x ]]' \
+  'pin() if true; then :; fi' \
+  'pin() for i in; do :; done' \
+  'pin() while false; do :; done' \
+  'pin() until true; do :; done' \
+  'pin() case x in x) ;; esac' \
+  'pin() select i in; do :; done' \
+  'x=1; pin() { :; }' \
+  'if true; then pin() { :; }; fi'; do
+  out="$( eval "$ctl_spelling"; assert_hoisted_counters )"
+  if structural_red "$out"; then
+    pass "control: the structural half catches 'pin' spelled as [$ctl_spelling]"
+  else
+    fail "control: the structural half catches 'pin' spelled as [$ctl_spelling]" \
+      "$out — the text pass counts this 0, so this spelling is caught nowhere"
+  fi
+done
+# The spelling no text scan can reach at all: the source carries `eval "pin() { :; }"`,
+# which is not a definition to any line scan, and bash resolves a real `pin` from it.
+out="$( eval 'pin() { :; }'; assert_hoisted_counters )"
+if structural_red "$out"; then
+  pass "control: the structural half catches a definition built by eval"
+else
+  fail "control: the structural half catches a definition built by eval" \
+    "$out — no text scan can see this one, so it is this half or nothing"
+fi
+
+# The BOUND the division of labour names in _helpers.sh, in both directions. The bound: a
+# copy that is byte-identical in bash's own rendering AND does not start its line is
+# invisible to both halves. Built from `declare -f`, so the copy cannot drift from the
+# definition it copies as this file is edited.
+ctl_copy="$(declare -f pin)"
+out="$( eval "x=1; $ctl_copy"; assert_hoisted_counters )"
+if structural_clean "$out"; then
+  pass "control: a byte-identical copy off the line start is invisible to both halves (the named bound)"
+else
+  fail "control: a byte-identical copy off the line start is invisible to both halves (the named bound)" \
+    "$out — if the text pass now counts it or bash resolves something else, the bound in _helpers.sh is wrong"
+fi
+# The adjacent control, the drift direction: the same copy with ONE body line dropped — the
+# shape the pre-hoist copies took when one of them lost its `[ -f ]` guard — must be caught
+# here and only here. Measured: the text pass still counts this 0.
+ctl_copy_drift="$(printf '%s\n' "$ctl_copy" | awk '!dropped && /empty needle/ { dropped = 1; next } { print }')"
+if [ "$ctl_copy_drift" = "$ctl_copy" ]; then
+  fail "control: the structural half catches the same copy once it has drifted" \
+    "the drift fixture came out identical to the copy — a no-op mutation proves nothing"
+else
+  out="$( eval "x=1; $ctl_copy_drift"; assert_hoisted_counters )"
+  if structural_red "$out"; then
+    pass "control: the structural half catches the same copy once it has drifted"
+  else
+    fail "control: the structural half catches the same copy once it has drifted" \
+      "$out — the copy drifted and nothing caught it"
+  fi
 fi
 
 report

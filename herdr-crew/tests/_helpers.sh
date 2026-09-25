@@ -136,8 +136,10 @@ present() {
 # is how the fourth copy lost its guard. Two halves assert the shape, split by
 # whose answer can differ:
 #
-#   assert_hoisted_counters  THIS suite's own file, so it stays with the caller —
-#                            one awk pass over one file
+#   assert_hoisted_counters  THIS suite, so it stays with the caller: its own file
+#                            read by one awk pass for the counts, and the definitions
+#                            bash resolved in the running shell compared against the
+#                            ones this file loaded (the half spelling cannot fool)
 #   assert_hoist_shape       the whole directory, whose answer cannot differ
 #                            between callers, so it is called ONCE per full run
 #                            rather than repeating the same violation three times
@@ -148,10 +150,13 @@ present() {
 # tests/test-herdr-crew-parity.sh pins them by comparing `cmp` over the two streams
 # AFTER substituting the plugin name, not the files themselves. An edit here —
 # including adding the missing guard — lands in one copy only and fails that CI
-# step. The exemption is asserted in both directions, so it cannot outlive its
-# reason: when orca-crew is retired, hoist that copy too and delete both this
-# paragraph and the exemption. A suite that legitimately wants one of these names
-# for something else must extend the list deliberately.
+# step. The exemption covers BOTH halves of assert_hoisted_counters, so that file
+# calls neither: bash resolves its own `pin` and `occurrences` there, deliberately,
+# and the structural half would report the drift that file intends. The exemption is
+# asserted in both directions, so it cannot outlive its reason: when orca-crew is
+# retired, hoist that copy too and delete both this paragraph and the exemption. A
+# suite that legitimately wants one of these names for something else must extend
+# the list deliberately.
 HOISTED_FNS="count_literal occurrences occurrences_flat count_of pin present"
 HOISTED_EXEMPT="test-fidelity-pins.sh"
 
@@ -207,16 +212,30 @@ HOISTED_EXEMPT="test-fidelity-pins.sh"
 #
 # Each spelling here has its own fixture among test-config-contract.sh's spelling
 # controls; a spelling listed without one is the same defect as a control that stops
-# matching. The reverse is NOT claimed: this is a list of what the rule above counts,
-# not a list of every spelling bash accepts. bash accepts more, and two axes outside
-# the rule are measured, unfixed and named here rather than left to be implied:
+# matching. The reverse is NOT claimed: this is a list of what the rule above counts, not
+# a list of every spelling bash accepts. bash accepts more, and those belong to the other
+# half, below.
 #
-#   * bash also takes ANY compound command as a body, so `pin() ( : )` and
-#     `pin() if true; then :; fi` define real functions this matcher does not count.
-#     Reported as a P2 in this round's seat report (#598), deferred.
-#   * both signature tests are anchored to the line START, so a definition sharing its
-#     line with another statement is not counted either — measured, `x=1; pin() { :; }`
-#     defines `pin` and counts 0. Measured, named here, reported, and unfixed like #598.
+# WHICH HALF OWNS WHAT. This pass owns the COUNT — the exact per-name counts the exemption's
+# `2 occurrences 1 pin 1` and the spelling controls' `1 pin 1` assert, which a structural
+# answer cannot express: bash reports that a name is defined, never how many times. What it
+# does not own is SPELLING, and it never did: bash takes ANY compound command as a body and a
+# definition may start anywhere a command may, so `pin() ( : )` and `if true; then pin() { :; }; fi`
+# are real definitions this scan counts 0. Since #598/#600 that is `assert_hoisted_counters`'
+# other half: it compares the definition bash RESOLVED against the one this file loaded, so a
+# copy is caught whatever its body form, wherever its line starts, and even when the source
+# never spells it as a definition at all — measured, `eval "pin() { :; }"` is counted 0 here
+# and caught there. Every one of those spellings has a control beside the #598/#600 controls,
+# each exercised through that half.
+#
+# THE BOUND THAT REMAINS, the only one: a copy that is byte-identical in bash's own rendering
+# AND does not start its line. This pass is blind to it by the line anchor, and the structural
+# half is blind by construction — an identical definition is not a different one. Measured in
+# both directions on a copy built from `declare -f`: verbatim, both halves report the suite
+# clean; with ONE body line dropped — the shape the four pre-hoist copies took when one of them
+# lost its `[ -f ]` guard (this file's header) — this pass still counts 0 while the structural
+# half reports drift. A copy cannot drift unnoticed, which is the day the bound stops being
+# harmless. Both are controls.
 #
 # The join is the one bash performs on an UNQUOTED backslash-newline. This scan reads
 # text, not a parse tree, so it also joins one inside a single-quoted string, where bash
@@ -227,8 +246,8 @@ HOISTED_EXEMPT="test-fidelity-pins.sh"
 # A CALL (`pin "$REF" ...`), a COMMENT (`# pin() { ...`) and a bare `name()` with no
 # body after it (`pin()` + `foo=1`, which bash rejects) are not definitions: that is why
 # the parens, the brace or the `function` keyword are required, and why a bare `name()`
-# only counts when the first line of code after it opens a BRACE GROUP — the one body
-# form this matcher recognizes, per the body-form bullet above.
+# only counts when the first line of code after it opens a BRACE GROUP — the one body form
+# this text pass recognizes. The structural half above is not restricted to it.
 count_shadows() { # <file> <fn>...
   awk -v names="$*" '
     BEGIN { n = split(names, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1 }
@@ -339,6 +358,14 @@ count_shadows() { # <file> <fn>...
     }' "$1"
 }
 
+# The hoisted definitions as BASH holds them, one entry per name in HOISTED_FNS order,
+# captured when this file is sourced. assert_hoisted_counters compares each live definition
+# against its entry: a definition is a definition whatever its body form and wherever on the
+# line it starts, so this half is blind to spelling by construction. Both sides come from the
+# same bash process, so no version skew can make an unchanged definition look drifted.
+HOISTED_DEF=()
+for _fn in $HOISTED_FNS; do HOISTED_DEF[${#HOISTED_DEF[@]}]="$(declare -f "$_fn")"; done
+
 # This suite's own file, from the caller that is running it. Cheap by design.
 assert_hoisted_counters() {
   _self="${BASH_SOURCE[1]:-}"
@@ -351,6 +378,23 @@ assert_hoisted_counters() {
   else
     fail "no copy of a hoisted counter in ${_self##*/}" \
       "$_shadows — a local definition shadows the one in _helpers.sh, and every assertion that calls it keeps passing"
+  fi
+  # The other half of the same claim, and the one that cannot be fooled by spelling: bash
+  # resolves the definition, and this compares what it resolved against what this file
+  # defined. The subject is the RUNNING SHELL — this suite — not a file, so a definition
+  # built by `eval`, by a command substitution or by a sourced file is caught here and is
+  # unreachable from the text pass above. The text pass stays the half that owns the counts;
+  # this one owns spelling, and neither substitutes for the other.
+  _i=0; _drift=""
+  for _fn in $HOISTED_FNS; do
+    [ "$(declare -f "$_fn")" = "${HOISTED_DEF[_i]}" ] || _drift="$_drift $_fn"
+    _i=$((_i + 1))
+  done
+  if [ -z "$_drift" ]; then
+    pass "the hoisted counters are the ones bash resolved in ${_self##*/}"
+  else
+    fail "the hoisted counters are the ones bash resolved in ${_self##*/}" \
+      "bash holds a different definition of:$_drift — a local definition shadows the one _helpers.sh loaded, spelled in a way the line-anchored text scan cannot count"
   fi
 }
 
