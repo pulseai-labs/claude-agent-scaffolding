@@ -192,6 +192,79 @@ t_capture "$OSS" worktree_remove canonical r0.s2.w1
 t_assert_rc 0 "dispatcher: clean worktree removes"
 [ -d "$WT3" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: dispatcher worktree dir survived removal"; } || T_PASS=$((T_PASS+1))
 
+# --- #120: the work-item id is a path component, so a traversal id must be
+# refused before any path is built from it. The victim is a REAL, clean,
+# registered worktree on a MERGED branch outside .worktrees - exactly what
+# worktree_remove would otherwise remove and whose branch `-d` would delete.
+# Measured before the fix: rc 0, victim worktree gone, branch gone.
+git -C "$TMP/canon" worktree add -q -b victim-branch "$TMP/victim" HEAD
+t_capture "$OSS" worktree_remove canonical ../../victim
+t_assert_rc 2 "#120: dispatcher worktree_remove refuses a traversal id at rc 2"
+t_assert_contains "$T_OUT" "not a work-item id" "#120: ...and says the id is not a work-item id"
+[ -d "$TMP/victim" ] && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: #120: the victim worktree outside .worktrees was removed"; }
+git -C "$TMP/canon" show-ref --verify --quiet refs/heads/victim-branch \
+  && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: #120: the victim's branch was deleted"; }
+t_capture oss_worktree_resolve canonical ../../victim
+t_assert_rc 2 "#120: worktree_resolve refuses a traversal id at rc 2 (not rc 0 with the victim's path)"
+# worktree_add was refused before only by accident - git rejects `work/../..`
+# as a branch name, at rc 8, after mkdir and the exclude write. rc 2 is the
+# check, and it answers before anything touches the repo.
+t_capture oss_worktree_add canonical ../../escape slug HEAD
+t_assert_rc 2 "#120: worktree_add refuses a traversal id at rc 2, before git is asked"
+t_capture oss_worktree_add canonical r0.s3 slug HEAD
+t_assert_rc 2 "#120: a SPINE id is not a work-item id either"
+# ADJACENT CONTROL: a valid id that names no worktree still answers rc 1 (not
+# found) - the check refuses the grammar, not the lookup.
+t_capture oss_worktree_resolve canonical r0.s3.w9
+t_assert_rc 1 "#120 control: a valid but unknown work-item id is still rc 1, not rc 2"
+git -C "$TMP/canon" worktree remove "$TMP/victim" >/dev/null 2>&1
+git -C "$TMP/canon" branch -D victim-branch >/dev/null 2>&1
+
+# --- #122: `git worktree add` fails AFTER creating the worktree and the branch
+# when a post-checkout hook exits nonzero. Before the fix both were left behind,
+# and the already-exists guard then refused every retry at rc 8, forever.
+printf '#!/bin/sh\nexit 1\n' > "$TMP/canon/.git/hooks/post-checkout"
+chmod +x "$TMP/canon/.git/hooks/post-checkout"
+t_capture "$OSS" worktree_add canonical r0.s3.w1 "hook-fails" HEAD
+t_assert_rc 8 "#122: a failing post-checkout hook still fails the add at rc 8"
+t_assert_contains "$T_OUT" "rolled back" "#122: ...and says the partial add was rolled back"
+[ -e "$TMP/canon/.worktrees/r0.s3.w1" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: #122: the partial worktree was left behind"; } || T_PASS=$((T_PASS+1))
+git -C "$TMP/canon" show-ref --verify --quiet refs/heads/work/r0.s3.w1-hook-fails \
+  && { T_FAIL=$((T_FAIL+1)); echo "FAIL: #122: the partial branch was left behind"; } || T_PASS=$((T_PASS+1))
+rm -f "$TMP/canon/.git/hooks/post-checkout"
+t_capture "$OSS" worktree_add canonical r0.s3.w1 "hook-fails" HEAD
+t_assert_rc 0 "#122: once the cause is fixed, the retry succeeds"
+t_assert_eq "$TMP/canon/.worktrees/r0.s3.w1" "$T_OUT" "#122: ...at the conventional path"
+oss_worktree_remove canonical r0.s3.w1 >/dev/null 2>&1
+
+# #122 CONTROL, the before-state half: a branch that EXISTED before the call is
+# never the rollback's to delete. git refuses `-b` for an existing branch before
+# creating anything, and the pre-existing branch must survive that failure.
+git -C "$TMP/canon" branch work/r0.s3.w2-taken HEAD
+t_capture "$OSS" worktree_add canonical r0.s3.w2 "taken" HEAD
+t_assert_rc 8 "#122 control: an add onto an existing branch fails at rc 8"
+git -C "$TMP/canon" show-ref --verify --quiet refs/heads/work/r0.s3.w2-taken \
+  && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: #122 control: a branch that predates the call was deleted by the rollback"; }
+git -C "$TMP/canon" branch -D work/r0.s3.w2-taken >/dev/null 2>&1
+
+# #122 CONTROL, the tip half: a hook that COMMITS before failing moves the new
+# branch off the base. That commit exists nowhere else, so the branch is kept and
+# named - never force-deleted - while the worktree (created by this call) goes.
+cat > "$TMP/canon/.git/hooks/post-checkout" <<'HOOK'
+#!/bin/sh
+git -c user.email=h@h -c user.name=h commit -q --allow-empty -m "hook commit" >/dev/null 2>&1
+exit 1
+HOOK
+chmod +x "$TMP/canon/.git/hooks/post-checkout"
+t_capture "$OSS" worktree_add canonical r0.s3.w3 "hook-commits" HEAD
+t_assert_rc 8 "#122 control: the committing hook fails the add at rc 8"
+t_assert_contains "$T_OUT" "no longer points at the base" "#122 control: ...and names the branch it would not delete"
+git -C "$TMP/canon" show-ref --verify --quiet refs/heads/work/r0.s3.w3-hook-commits \
+  && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: #122 control: a branch carrying a commit was force-deleted"; }
+[ -e "$TMP/canon/.worktrees/r0.s3.w3" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: #122 control: the worktree this call created was left behind"; } || T_PASS=$((T_PASS+1))
+rm -f "$TMP/canon/.git/hooks/post-checkout"
+git -C "$TMP/canon" branch -D work/r0.s3.w3-hook-commits >/dev/null 2>&1
+
 # ---------------------------------------------------------------------------
 # The spine-branch lifecycle the execution lane owns: cut AND CHECK OUT the
 # spine integration branch, spawn each work item off it, merge each back into
@@ -792,17 +865,17 @@ t_capture oss_worktree_orphans svc_a "$TWS"
 t_assert_rc 0 "topology twin: a repo with no .worktrees dir at all is rc 0"
 t_assert_eq "" "$T_OUT" "topology twin: no .worktrees dir reports nothing"
 
-t_capture oss_worktree_add svc_a t0.s1.w1 "first-ticket" HEAD
+t_capture oss_worktree_add svc_a r9.s9.w1 "first-ticket" HEAD
 t_assert_rc 0 "topology twin: worktree_add ok"
 TWA="$T_OUT"
-t_assert_eq "$TWT/svc_a/.worktrees/t0.s1.w1" "$TWA" "topology twin: worktree path convention"
+t_assert_eq "$TWT/svc_a/.worktrees/r9.s9.w1" "$TWA" "topology twin: worktree path convention"
 
 t_capture "$OSS" repo_root svc_b
 t_assert_eq "$TWT/svc_b" "$T_OUT" "topology twin: dispatcher repo_root resolves the second declared repo"
-t_capture "$OSS" worktree_add svc_b t0.s1.w2 "second-ticket" HEAD
+t_capture "$OSS" worktree_add svc_b r9.s9.w2 "second-ticket" HEAD
 t_assert_rc 0 "topology twin: dispatcher worktree_add ok on the second repo"
 TWB="$T_OUT"
-t_assert_eq "$TWT/svc_b/.worktrees/t0.s1.w2" "$TWB" "topology twin: the second repo's worktree lands under ITS OWN root, not svc_a's"
+t_assert_eq "$TWT/svc_b/.worktrees/r9.s9.w2" "$TWB" "topology twin: the second repo's worktree lands under ITS OWN root, not svc_a's"
 
 # Both worktrees above are claimed by NOTHING TWWI_A/TWWI_B carry (different
 # ids) - clean them before the orphan-scoping arms below, which start from
