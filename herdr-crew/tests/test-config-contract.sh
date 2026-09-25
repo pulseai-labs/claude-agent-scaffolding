@@ -603,6 +603,24 @@ case "$got" in
   *) fail "control: an unterminated body is refused, not counted" \
        "got [$got] — a zero here would certify lines the scan never read" ;;
 esac
+# Controls, #602 review round 2 finding 2 (the second half): a backslash inside a DOUBLE-quoted
+# delimiter is not part of it — bash removes it before `$`, a backtick, a quote or another
+# backslash. Measured before the fix: `cat <<"A\$B"` was waited for as `A\$B`, the body never
+# ended and the scan REFUSED the file. The adjacent controls are the other two kinds of quoting:
+# a single-quoted delimiter keeps its backslash, and a bare one loses it, so a rule that removed
+# every backslash would break the first of those.
+printf 'cat <<"A\\$B"\npin() {\n  :\n}\nA$B\npin() {\n  :\n}\n'  > "$ctl_sh/delim-backslash-double.sh"
+printf "cat <<'A\\\\\$B'\npin() {\n  :\n}\nA\\\\\$B\npin() {\n  :\n}\n" > "$ctl_sh/delim-backslash-single.sh"
+printf 'cat <<A\\B\npin() {\n  :\n}\nAB\npin() {\n  :\n}\n'      > "$ctl_sh/delim-backslash-bare.sh"
+for spelling in delim-backslash-double delim-backslash-single delim-backslash-bare; do
+  got="$(count_shadows "$ctl_sh/$spelling.sh" pin)"
+  if [ "$got" = "1 pin 1" ]; then
+    pass "control: a backslash in a delimiter is read the way bash reads it ($spelling)"
+  else
+    fail "control: a backslash in a delimiter is read the way bash reads it ($spelling)" \
+      "got [$got], expected [1 pin 1] — the delimiter does not match the line bash terminates on"
+  fi
+done
 rm -f "$ctl_sh"/*.sh
 if rmdir "$ctl_sh"; then
   pass "control: the spelling controls leave no fixture behind"
@@ -771,6 +789,38 @@ else
     fail "control: the structural half catches the same copy once it has drifted" \
       "$out — the copy drifted and nothing caught it"
   fi
+fi
+
+# Controls, #602 review round 2 finding 4: the structural comparison also runs at `report`, after
+# the suite body, because it sees the shell as of the call. A shadow defined after the suite asked
+# — and in a spelling the text pass counts 0 — was invisible to both halves: measured on the code
+# before this change, a `pin() ( : )` inserted immediately before `report` left the suite
+# reporting clean and exiting 0. The fixture is a whole suite, run as its own bash, and its
+# pristine twin is the adjacent control: a report-time check that failed everything would satisfy
+# the first one alone.
+ctl_late="$(mktemp -d)"
+printf '. "%s"\npin() ( : )\nreport\n' "$SCRIPT_DIR/_helpers.sh" > "$ctl_late/test-late-shadow.sh"
+printf '. "%s"\n:\nreport\n'             "$SCRIPT_DIR/_helpers.sh" > "$ctl_late/test-pristine.sh"
+out="$(bash "$ctl_late/test-late-shadow.sh" 2>&1)" && late_rc=0 || late_rc=$?
+if [ "$late_rc" -ne 0 ] &&
+   printf '%s' "$out" | grep -F 'no hoisted counter was redefined while test-late-shadow.sh ran' >/dev/null; then
+  pass "control: a shadow defined after the suite's own check is caught at report"
+else
+  fail "control: a shadow defined after the suite's own check is caught at report" \
+    "rc=$late_rc, output: [$out]"
+fi
+if out="$(bash "$ctl_late/test-pristine.sh" 2>&1)" && [ -n "$out" ]; then
+  pass "control: a suite that defines no shadow still reports clean at report"
+else
+  fail "control: a suite that defines no shadow still reports clean at report" \
+    "output: [$out]"
+fi
+rm -rf "$ctl_late"
+if [ ! -e "$ctl_late" ]; then
+  pass "control: the report-time controls leave no fixture behind"
+else
+  fail "control: the report-time controls leave no fixture behind" \
+    "$ctl_late survived its cleanup — a fixture was not removed"
 fi
 
 report

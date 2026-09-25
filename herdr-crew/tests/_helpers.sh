@@ -37,6 +37,14 @@ fail() {
 section() { printf '\n%s%s%s\n' "$DIM" "── $1 ──" "$RST"; }
 
 report() {
+  # The structural half runs once more here, after the suite body: a definition made after the
+  # suite asked assert_hoisted_counters — or a suite that never asks — is caught by this call and
+  # by nothing else. Measured before it existed: a `pin() ( : )` inserted immediately before this
+  # call left the suite reporting clean (#602 review round 2, finding 4). The exempted file
+  # redefines these names on purpose, so it is skipped by NAME, not by inference.
+  if [ "${BASH_SOURCE[1]##*/}" != "$HOISTED_EXEMPT" ]; then
+    hoisted_definitions_intact "no hoisted counter was redefined while ${BASH_SOURCE[1]##*/} ran"
+  fi
   printf '\n%s──%s %d passed, %d failed\n' "$DIM" "$RST" "$PASS" "$FAIL"
   [ "$FAIL" -eq 0 ] || return 1
   return 0
@@ -372,7 +380,17 @@ count_shadows() { # <file> <fn>...
         if (c == " " || c == "\t" || c == ";" || c == "|" || c == "&" || c == "(" || c == ")" || c == "<" || c == ">") break
         if (c == "\047" || c == "\042") {
           q = c; i++
-          while (i <= n && substr(line, i, 1) != q) { out = out substr(line, i, 1); i++ }
+          while (i <= n && substr(line, i, 1) != q) {
+            if (q == "\042" && substr(line, i, 1) == "\\") {
+              # Inside a double-quoted word bash removes a backslash before `$`, a backtick, a
+              # double quote or another backslash, and keeps it before anything else. Measured:
+              # `<<"A\$B"` is terminated by a line reading `A$B`, and copying the backslash
+              # verbatim left the body unterminated (#602 review round 2, finding 2).
+              nx = substr(line, i + 1, 1)
+              if (nx == "$" || nx == "`" || nx == "\042" || nx == "\\") { out = out nx; i += 2; continue }
+            }
+            out = out substr(line, i, 1); i++
+          }
           i++; continue
         }
         if (c == "\\") { i++; if (i <= n) { out = out substr(line, i, 1); i++ }; continue }
@@ -418,6 +436,24 @@ count_shadows() { # <file> <fn>...
 HOISTED_DEF=()
 for _fn in $HOISTED_FNS; do HOISTED_DEF[${#HOISTED_DEF[@]}]="$(declare -f "$_fn")"; done
 
+# The definitions bash RESOLVED in this shell against the ones this file loaded, as a pass or a
+# fail under <label>. Two callers, and the split is the whole point: assert_hoisted_counters
+# decides a suite where the suite asks, and report decides it again after the whole body has run,
+# so a shadow introduced in between is caught by the second even when the first saw a clean shell.
+hoisted_definitions_intact() { # <label>
+  _i=0; _drift=""
+  for _fn in $HOISTED_FNS; do
+    [ "$(declare -f "$_fn")" = "${HOISTED_DEF[_i]}" ] || _drift="$_drift $_fn"
+    _i=$((_i + 1))
+  done
+  if [ -z "$_drift" ]; then
+    pass "$1"
+  else
+    fail "$1" \
+      "bash holds a different definition of:$_drift — a local definition shadows the one _helpers.sh loaded, spelled in a way the line-anchored text scan cannot count"
+  fi
+}
+
 # This suite's own file, from the caller that is running it. Cheap by design.
 assert_hoisted_counters() {
   _self="${BASH_SOURCE[1]:-}"
@@ -436,18 +472,9 @@ assert_hoisted_counters() {
   # defined. The subject is the RUNNING SHELL — this suite — not a file, so a definition
   # built by `eval`, by a command substitution or by a sourced file is caught here and is
   # unreachable from the text pass above. The text pass stays the half that owns the counts;
-  # this one owns spelling, and neither substitutes for the other.
-  _i=0; _drift=""
-  for _fn in $HOISTED_FNS; do
-    [ "$(declare -f "$_fn")" = "${HOISTED_DEF[_i]}" ] || _drift="$_drift $_fn"
-    _i=$((_i + 1))
-  done
-  if [ -z "$_drift" ]; then
-    pass "the hoisted counters are the ones bash resolved in ${_self##*/}"
-  else
-    fail "the hoisted counters are the ones bash resolved in ${_self##*/}" \
-      "bash holds a different definition of:$_drift — a local definition shadows the one _helpers.sh loaded, spelled in a way the line-anchored text scan cannot count"
-  fi
+  # this one owns spelling, and neither substitutes for the other. It sees the shell as of THIS
+  # call, which is why report calls the same comparison again at the end.
+  hoisted_definitions_intact "the hoisted counters are the ones bash resolved in ${_self##*/}"
 }
 
 # The whole directory, plus the exemption in both directions. Called once per full

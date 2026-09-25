@@ -522,6 +522,15 @@ pin "$ROLES_MD" 'doctor session' \
 # where an unpaired backtick inside the SPAN is caught.
 span_of() { # <file> <start-line>
   awk -v s="$2" '
+    # An ATX heading, which can carry up to three leading spaces — a blank line followed by an
+    # indented `## `Refusals`` is still the end of the section, and reading it as an indented
+    # continuation made the span swallow the next section and refuse on its first bullet
+    # (#602 review round 2, finding 4). Four or more spaces is not a heading.
+    function is_heading(s,   k) {
+      k = 0
+      while (k < 3 && substr(s, k + 1, 1) == " ") k++
+      return substr(s, k + 1, 1) == "#"
+    }
     { line[NR] = $0 }
     END {
       if (s < 1 || s > NR) {
@@ -530,11 +539,11 @@ span_of() { # <file> <start-line>
       }
       end_at = NR; stopped_at_heading = 0
       for (i = s + 1; i <= NR; i++) {
-        if (line[i] ~ /^#/) { end_at = i - 1; stopped_at_heading = 1; break }
+        if (is_heading(line[i])) { end_at = i - 1; stopped_at_heading = 1; break }
         if (line[i] ~ /^[[:space:]]*$/) {
           j = i
           while (j < NR && line[j + 1] ~ /^[[:space:]]*$/) j++
-          if (j < NR && line[j + 1] ~ /^[[:space:]]/) { i = j; continue }
+          if (j < NR && !is_heading(line[j + 1]) && line[j + 1] ~ /^[[:space:]]/) { i = j; continue }
           end_at = i - 1; break
         }
         if (line[i] ~ /^- /) { end_at = i - 1; break }
@@ -553,14 +562,14 @@ span_of() { # <file> <start-line>
             if (j < NR && (line[j + 1] ~ /^- / || line[j + 1] ~ /^[[:space:]]/)) { i = j; region_end = j; continue }
             break
           }
-          if (line[i] ~ /^#/) break                  # a heading ends the section
+          if (is_heading(line[i])) break             # a heading ends the section
           if (line[i] ~ /^- / || line[i] ~ /^[[:space:]]/) { region_end = i; continue }
           break                                      # column-0 prose ends the block
         }
       }
       text = ""
       for (i = follow; i <= region_end; i++) text = text " " line[i]
-      if (!stopped_at_heading && region_end > 0 && line[follow] !~ /^#/ && text ~ /`[^`]*`/) {
+      if (!stopped_at_heading && region_end > 0 && !is_heading(line[follow]) && text ~ /`[^`]*`/) {
         printf "span_of refuses: the bullet at %s:%d ends at line %d, and the block after it (from line %d) carries a backticked token — the carve cannot tell whether that command belongs to this bullet, so it stops here rather than certify the commands before the break\n", FILENAME, s, end_at, follow
         exit 1
       }
@@ -927,6 +936,46 @@ if [ ! -e "$ctl_block" ]; then
 else
   fail "control: the block controls leave no fixture behind" \
     "$ctl_block survived its cleanup — a fixture was not removed"
+fi
+
+# C15 — an INDENTED heading, from #602 review round 2 finding 4. An ATX heading may carry up to
+# three leading spaces, and this one ends the section like any other: measured before the fix,
+# the carve read `   ## `Refusals`` as an indented continuation, swallowed the next section, and
+# refused on its first bullet — a false refusal of a valid document. C12 is the adjacent
+# control (a column-0 heading after a blank line, which must stay exempt).
+ctl_indent="$(mktemp -d)"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+
+   ## `Refusals`
+- `herdr status` fails: say so and stop.
+' > "$ctl_indent/indented-heading.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+
+    ## `Refusals`
+' > "$ctl_indent/four-space-line.md"
+if c15_span="$(span_of "$ctl_indent/indented-heading.md" 1)" &&
+   [ "$(printf '%s\n' "$c15_span" | commands_in_span | tr '\n' '|')" = 'alpha-one|' ]; then
+  pass "control: an indented heading ends the section, so the span stops at the anchor"
+else
+  fail "control: an indented heading ends the section, so the span stops at the anchor" \
+    "got [$c15_span] — the span swallowed the next section and its tokens read as commands"
+fi
+# The adjacent control for the indentation rule: four spaces is NOT a heading (markdown's own
+# limit), so this line is item content and the carve keeps it. Without this, widening the heading
+# test to any indent would pass the control above and swallow indented content.
+if c16_span="$(span_of "$ctl_indent/four-space-line.md" 1)" &&
+   [ "$(printf '%s\n' "$c16_span" | commands_in_span | tr '\n' '|')" = 'alpha-one|Refusals|' ]; then
+  pass "control: four leading spaces is not a heading, so the line stays in the span"
+else
+  fail "control: four leading spaces is not a heading, so the line stays in the span" \
+    "got [$c16_span] — markdown's three-space limit is part of the rule, not an implementation detail"
+fi
+rm -rf "$ctl_indent"
+if [ ! -e "$ctl_indent" ]; then
+  pass "control: the heading controls leave no fixture behind"
+else
+  fail "control: the heading controls leave no fixture behind" \
+    "$ctl_indent survived its cleanup — a fixture was not removed"
 fi
 
 section "the handoff carries the approved seats"
