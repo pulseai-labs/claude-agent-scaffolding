@@ -502,10 +502,16 @@ pin "$ROLES_MD" 'doctor session' \
 # line) and never a line inside a fenced code block (#602 F1), and a list item is any bullet
 # (`-`, `*`, `+`) or any ordered marker (`N.`, `N)`, 1-9 digits, then a blank, a tab or the end
 # of the line), read the same way by the carve AND by the block below, because a marker this
-# missed let a dispatched command through in silence (#602 F2). The fence gate is on EVERY
-# predicate that classifies a line — a fenced line is not a heading, not a list item and not the
-# column-0 line that ends a block (#602 F9) — because a gate on one predicate and not its sibling
-# is the same defect one level down.
+# missed let a dispatched command through in silence (#602 F2). The fence gate comes FIRST in
+# every loop that walks lines — the carve, the scan that picks the block's first line, and the
+# block scan itself — so a fenced line is read by that check alone and no classifier below it can
+# be reached with one: not a heading, not a list item, not a blank line, not an indented
+# continuation and not the column-0 line that ends a block (#602 F9). Gating the classifiers one
+# at a time is what left the blank test ABOVE the gate, and a blank line inside a code sample
+# then ended the item and dropped the command after it with rc 0 (#602 F13): the ordering is the
+# rule, not another predicate. `heading_at` and `list_item_at` keep their own gate as well, for
+# the lines the loops do not walk — the `j + 1` lookahead of both blank branches, and `follow` in
+# the refusal test.
 #
 # A carve that stops while a backticked token still sits after the span, in a position the
 # carve cannot certify as outside this bullet, REFUSES: rc 1, with a message naming the carve,
@@ -541,6 +547,7 @@ pin "$ROLES_MD" 'doctor session' \
 #   an ATX heading ends the section, 0-3 spaces in, and is exempt there         C8, C12, C15, C16
 #   `#597 backlog note` and `####### seven` are not headings                    C17
 #   fenced code is no structure at all — not a heading, not a list item         C18, C19, C24
+#   a blank line INSIDE fenced code ends nothing, in the carve or the block     C28, C30, C33, C34
 #   a list item directly under prose is in the block; a blank line fixes that   C23, C11, C23b
 #   the block's JOINED text decides the refusal                                 C13, C14
 #
@@ -625,6 +632,11 @@ span_of() { # <file> <start-line>
       }
       end_at = NR; stopped_at_heading = 0
       for (i = s + 1; i <= NR; i++) {
+        # FIRST, in every loop that walks lines: a fenced line is handled by this check ALONE.
+        # Here it is absorbed into the span and no classifier below it ever sees the line — which
+        # is the point, because gating the classifiers one at a time left the blank test ungated
+        # and a blank line inside a code sample ended the item (#602 F13).
+        if (fenced[i]) continue
         if (heading_at(i)) { end_at = i - 1; stopped_at_heading = 1; break }
         if (line[i] ~ /^[[:space:]]*$/) {
           j = i
@@ -635,12 +647,21 @@ span_of() { # <file> <start-line>
         if (list_item_at(i)) { end_at = i - 1; break }
       }
       follow = 0
-      for (i = end_at + 1; i <= NR; i++) if (line[i] !~ /^[[:space:]]*$/) { follow = i; break }
+      # The first line of the block is its first non-blank, NON-FENCED line: a fence there is
+      # code like any other fenced line, and taking it for the start of the block hid the line
+      # behind it — measured, a blank between the fence and the bullet then left the bullet and
+      # its command unread (#602 F13).
+      for (i = end_at + 1; i <= NR; i++) if (!fenced[i] && line[i] !~ /^[[:space:]]*$/) { follow = i; break }
       region_end = 0
       if (follow > 0) {
         region_end = follow
         in_run = list_item_at(follow)
         for (i = follow + 1; i <= NR; i++) {
+          # FIRST here too: a fenced line neither ends the block nor joins it, and no classifier
+          # below — the blank test, the heading, the list item, the indent, the column-0 prose
+          # break — runs on it. The blank test was above this check until #602 F13, and a blank
+          # line inside a code sample ended the block.
+          if (fenced[i]) continue
           if (line[i] ~ /^[[:space:]]*$/) {
             if (!in_run) break                       # a paragraph ends at a blank line; a list does not
             j = i
@@ -648,7 +669,6 @@ span_of() { # <file> <start-line>
             if (j < NR && (list_item_at(j + 1) || line[j + 1] ~ /^[[:space:]]/)) { i = j; region_end = j; continue }
             break
           }
-          if (fenced[i]) continue                    # fence content is not structure: it neither ends the block nor joins it
           if (heading_at(i)) break                   # a heading ends the section
           if (list_item_at(i) || line[i] ~ /^[[:space:]]/) { region_end = i; continue }
           break                                      # column-0 prose ends the block
@@ -1262,6 +1282,107 @@ if [ ! -e "$ctl_fenceblock" ]; then
 else
   fail "control: the block-fence controls leave no fixture behind" \
     "$ctl_fenceblock survived its cleanup — a fixture was not removed"
+fi
+
+# C28–C34 — #602 F13: the blank-line predicate was the one classifier still ungated, because
+# two rounds of gating the classifiers one at a time never moved the gate. The fix is the ORDER:
+# the fence check comes first in every loop in `span_of` that walks lines — the carve, the scan
+# that picks the block's first line, and the block scan itself — so a blank line inside a fenced
+# code sample is handled by that check alone and no classifier below it ever reads the line.
+# Measured on 2d9c389 before the fix: a fence holding a blank line dropped the dispatched command
+# after it with rc 0, in paragraph mode (the `!in_run` break) and in list-run mode (the blank
+# branch's lookahead, on a non-indented fence), and the carve stopped inside the fence on an item
+# whose continuation carried the command — a false refusal. The paragraph and list-run fixtures
+# each differ from their refusing control only by the fenced blank, C26's shape.
+#
+# C28 is the paragraph fixture: measured on 2d9c389, rc 0 with a one-line span and `gamma-three`
+# never read. C29 is its adjacent control — the same fixture without the fenced blank, which
+# refused there and must keep refusing: the fenced blank is the whole difference between them, so
+# the verdict cannot be read as following the fence instead of the blank line above the gate.
+ctl_f13="$(mktemp -d)"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n```\n\n```\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_f13/fence-blank-para.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n```\n```\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_f13/fence-noblank-para.md"
+if c28_out="$(span_of "$ctl_f13/fence-blank-para.md" 1)"; then
+  fail "control: a blank line inside a fence does not end the block (paragraph)" \
+    "rc 0 with [$c28_out] — the fence hid the bullet after it and its command went unchecked"
+elif printf '%s' "$c28_out" | grep -F 'span_of refuses' >/dev/null; then
+  pass "control: a blank line inside a fence does not end the block (paragraph)"
+else
+  fail "control: a blank line inside a fence does not end the block (paragraph)" "$c28_out"
+fi
+if c29_out="$(span_of "$ctl_f13/fence-noblank-para.md" 1)"; then
+  fail "control: the paragraph fixture without the fenced blank still refuses" \
+    "rc 0 with [$c29_out] — the blank line is what the verdict must not hang on"
+elif printf '%s' "$c29_out" | grep -F 'span_of refuses' >/dev/null; then
+  pass "control: the paragraph fixture without the fenced blank still refuses"
+else
+  fail "control: the paragraph fixture without the fenced blank still refuses" "$c29_out"
+fi
+
+# C30–C32 decide the list-run half, where the fence sits INSIDE the scanned block rather than in
+# front of it. C30 measured on 2d9c389: rc 0 with a one-line span and `delta-nine` never read.
+# C31 is the same run with no command after the fence, and it is what keeps the fence's own
+# backticks out of the joined text with the fence inside the scanned range — C27's property one
+# position along: measured, letting fenced lines into the text refuses it. C32 is C30's adjacent
+# control without the fenced blank.
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n- an item carrying no command\n```\n\n```\n- `delta-nine`, dispatched to a herdr session.\n' > "$ctl_f13/fence-blank-run.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n- an item carrying no command\n```\n\n```\n- an item carrying no command either\n' > "$ctl_f13/fence-blank-run-plain.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n- an item carrying no command\n```\n```\n- `delta-nine`, dispatched to a herdr session.\n' > "$ctl_f13/fence-noblank-run.md"
+if c30_out="$(span_of "$ctl_f13/fence-blank-run.md" 1)"; then
+  fail "control: a blank line inside a fence does not end the block (list run)" \
+    "rc 0 with [$c30_out] — the fence hid the item after it and its command went unchecked"
+elif printf '%s' "$c30_out" | grep -F 'span_of refuses' >/dev/null; then
+  pass "control: a blank line inside a fence does not end the block (list run)"
+else
+  fail "control: a blank line inside a fence does not end the block (list run)" "$c30_out"
+fi
+if c31_span="$(span_of "$ctl_f13/fence-blank-run-plain.md" 1)"; then
+  pass "control: a fence inside the scanned block contributes no text, so an item with no command does not refuse"
+else
+  fail "control: a fence inside the scanned block contributes no text, so an item with no command does not refuse" \
+    "refused: [$c31_span] — the backticks the fence is made of were read as a backticked token"
+fi
+if c32_out="$(span_of "$ctl_f13/fence-noblank-run.md" 1)"; then
+  fail "control: the list-run fixture without the fenced blank still refuses" \
+    "rc 0 with [$c32_out] — the blank line is what the verdict must not hang on"
+elif printf '%s' "$c32_out" | grep -F 'span_of refuses' >/dev/null; then
+  pass "control: the list-run fixture without the fenced blank still refuses"
+else
+  fail "control: the list-run fixture without the fenced blank still refuses" "$c32_out"
+fi
+
+# C33 and C34 pin the fix's other two loops, which the same finding names and which neither the
+# paragraph nor the list-run fixture reaches. C33 is the CARVE: a fenced blank, then an indented
+# continuation of the item carrying the command. Measured on 2d9c389, where the carve loop had no
+# gate at all: rc 1, a false refusal of a valid document — the carve stopped at the fence, and the
+# item's own continuation was then read as the block after it. Measured after the fix: rc 0 with
+# `gamma-three` inside the span, which is the command the document dispatches.
+# C34 is the scan that picks the block's FIRST line: the paragraph fixture with a BLANK between
+# the fence and the command bullet. Measured on 2d9c389: rc 0 with the command never read, the
+# same silent shape by the other route.
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n```\n\n```\n   `gamma-three`, dispatched to a herdr session.\n' > "$ctl_f13/fence-blank-carve.md"
+printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n```\n\n```\n\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_f13/fence-blank-separated.md"
+c33_out="$(span_of "$ctl_f13/fence-blank-carve.md" 1)" && c33_rc=0 || c33_rc=$?
+if [ "$c33_rc" -eq 0 ] && printf '%s\n' "$c33_out" | grep -F 'gamma-three' >/dev/null; then
+  pass "control: a fenced blank does not end the carve, so an indented continuation keeps its command"
+else
+  fail "control: a fenced blank does not end the carve, so an indented continuation keeps its command" \
+    "rc=$c33_rc, out=[$c33_out] — the carve stopped inside the fence and read the item's own continuation as the block after it"
+fi
+if c34_out="$(span_of "$ctl_f13/fence-blank-separated.md" 1)"; then
+  fail "control: a blank line between the fence and the bullet does not hide the bullet's command" \
+    "rc 0 with [$c34_out] — the scan took the fence for the block's first line and the command after it went unchecked"
+elif printf '%s' "$c34_out" | grep -F 'span_of refuses' >/dev/null; then
+  pass "control: a blank line between the fence and the bullet does not hide the bullet's command"
+else
+  fail "control: a blank line between the fence and the bullet does not hide the bullet's command" "$c34_out"
+fi
+rm -rf "$ctl_f13"
+if [ ! -e "$ctl_f13" ]; then
+  pass "control: the fenced-blank controls leave no fixture behind"
+else
+  fail "control: the fenced-blank controls leave no fixture behind" \
+    "$ctl_f13 survived its cleanup — a fixture was not removed"
 fi
 
 section "the handoff carries the approved seats"
