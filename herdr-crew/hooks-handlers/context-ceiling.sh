@@ -98,6 +98,15 @@ fi
 # command fails the new-work match (a non-new-work command stays silent), and an
 # empty transcript is its own notice.
 #
+# `.tool_input.command?` is optional indexing, not `.tool_input.command`: this
+# hook now reads .tool_input on the prompt path too, where the per-field spawns
+# never did, and a `tool_input` that is a scalar or an array raises on the index
+# — an error `// ""` cannot catch, which would take the whole pass down with it
+# and move the verdict in both directions (a prompt losing the figure's own
+# notice, a wake command inventing a "could not read" one). The other two fields
+# need no guard: they raise only when the payload itself is not an object, and
+# then the hook's first field raises too, which is the raw path both hooks take.
+#
 # @tsv, never a literal tab join: it escapes a tab, a newline and a backslash
 # inside a value, so the record can split only at the two tabs jq emitted.
 # `map(tostring)` keeps a field that is not a string the text the per-field
@@ -105,7 +114,7 @@ fi
 # in a csv row"), and one such field would take the whole pass, event included,
 # down the raw path with it — and `// ""` keeps an absent field empty instead of
 # the string "null", which is what the event's gate below reads.
-fields="$(printf '%s' "$input" | jq -r '[(.hook_event_name // ""), (.tool_input.command // ""), (.transcript_path // "")] | map(tostring) | @tsv' 2>/dev/null)"
+fields="$(printf '%s' "$input" | jq -r '[(.hook_event_name // ""), (.tool_input.command? // ""), (.transcript_path // "")] | map(tostring) | @tsv' 2>/dev/null)"
 # Split at the two tabs jq emitted: parameter expansion, not `read`. With IFS
 # set to a tab, `read` collapses a run of tabs, so an empty command between two
 # non-empty fields — a Bash call whose command field is empty — would take the
@@ -114,16 +123,20 @@ event="${fields%%$'\t'*}"
 rest="${fields#*$'\t'}"
 command="${rest%%$'\t'*}"
 transcript="${rest#*$'\t'}"
-# @tsv escaped a backslash inside a value as `\\`, where the per-field spawns
-# printed the value raw, so each field is put back. Without it a transcript path
-# with a backslash in it — legal on every host, the ordinary separator on some —
-# names nothing, and the handler exits silently over a figure it could have read,
-# which is the class it exists to remove. Only `\\` is put back: a tab or a
-# newline inside a value stays escaped, which no writer puts in a path, and
-# neither can reach the verb match, whose five verbs carry no escape at all.
-event="${event//'\\'/'\'}"
-command="${command//'\\'/'\'}"
-transcript="${transcript//'\\'/'\'}"
+# @tsv escapes a tab, a newline, a carriage return and a backslash inside a
+# value as `\t`, `\n`, `\r` and `\\` — jq's own definition — where the spawns it
+# replaced printed the value itself, so each field is decoded here. Without it a
+# transcript path carrying any of the four names nothing the handler can open,
+# and the hook exits silently over a figure it could have read, which is the
+# class it exists to remove. printf's %b is one left-to-right pass, which is what
+# the order needs: a value's own backslash arrives as `\\`, so `a\\tb` is a
+# backslash, a `t` and a `b`, and decoding by replacing `\\` and then `\t` in
+# sequence turns that into a tab instead — and a `\\` at the very end is the
+# same story. jq emits nothing else backslashed (measured: a control byte, DEL,
+# VT and FF pass through raw), so %b has only those four to decode.
+printf -v event '%b' "$event"
+printf -v command '%b' "$command"
+printf -v transcript '%b' "$transcript"
 if [ -z "$event" ]; then
   # jq read no event: the input is malformed, or the jq on PATH is broken.
   # Either way the figure was not read, and the same raw spellings say which

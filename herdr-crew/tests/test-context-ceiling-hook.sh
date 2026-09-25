@@ -196,17 +196,54 @@ expect_notice "no transcript_path in the hook input: unavailable notice" UserPro
   "figure unavailable (hook input has no transcript_path)" "ceiling of 500000"
 run "$(input UserPromptSubmit "$TMP/never-written.jsonl")"
 expect_silent "transcript not written yet: silent"
-# The one-pass read escapes a backslash inside a value as `\\` before the fields
-# are split, and puts it back after. A transcript whose own name carries a
-# backslash is legal on every host and reads its figure; without the put-back
-# the handler looks for a two-backslash name, finds nothing and exits silently —
-# a figure unread passed over in silence, which is the class it exists to remove.
-# Measured both ways: with the put-back removed this case is the one that fails.
-f="$TMP/back\\slash.jsonl"
-{ user_line; assistant_line msg_backslash 10 90 523014; } > "$f"
+# The one-pass read escapes a tab, a newline, a carriage return and a backslash
+# inside a value — jq's own @tsv definition — and decodes all four before the
+# fields are used. Each of these names a real transcript, so each reads its
+# figure; leave any one of the four escaped and the path names nothing the
+# handler can open, so it exits silently over a figure it could have read, which
+# is the class it exists to remove. One case per escape, because a single case
+# cannot see the other three: the backslash case was green over the whole
+# tab/CR/newline class (the verifier's rows), and a decoder that replaced `\\`
+# and then `\t` in sequence passes it while failing the tab case's neighbour.
+escape_case() { # <name> <the escape's name for the label> <the character itself>
+  f="$TMP/escape-$1-$3.jsonl"
+  { user_line; assistant_line "msg_esc_$1" 10 90 523014; } > "$f"
+  run "$(input UserPromptSubmit "$f")"
+  expect_notice "a transcript path containing a $2 still reads its figure" \
+    UserPromptSubmit "context 523114"
+}
+escape_case backslash backslash '\'
+escape_case tab tab "$(printf '\t')"
+# $'\n', not $(printf '\n'): a command substitution strips the trailing newline,
+# so the fixture would have carried no newline and the case would have passed
+# against a decoder that never decoded one — measured, it did exactly that
+# before this line was fixed.
+escape_case newline newline $'\n'
+escape_case cr "carriage return" "$(printf '\r')"
+# And the second spelling this decode must not be: replacing `\\` first and then
+# `\t` in sequence. A path whose own name carries a backslash followed by a `t`
+# arrives escaped as `\\t`, and a chained decode turns that into a tab — a name
+# that exists nowhere, so the hook goes silent. The tab case above cannot see
+# this one: there the tab's own `\t` was never preceded by an escaped backslash.
+f="$TMP/win\\temp.jsonl"
+{ user_line; assistant_line msg_win 10 90 523014; } > "$f"
 run "$(input UserPromptSubmit "$f")"
-expect_notice "a transcript path containing a backslash still reads its figure" \
+expect_notice "a transcript path whose name carries a backslash-t still reads its figure" \
   UserPromptSubmit "context 523114"
+# The one-pass read reads .tool_input on BOTH events, where the per-field spawns
+# read it only on the wake path — so a shape problem in that one field must not
+# invalidate the event and the transcript beside it. `.tool_input.command` raises
+# on a scalar or an array and `// ""` cannot catch a raised error, which failed
+# the whole pass: on a prompt that lost the figure's own notice, and on a wake
+# path that invented a "could not read" one where the old handler, whose command
+# spawn failed the same way, stayed silent. Optional indexing keeps both.
+run "$(jq -cn --arg t "$T_PAST" '{session_id: "s", transcript_path: $t, cwd: "/tmp",
+  hook_event_name: "UserPromptSubmit", prompt: "next", tool_input: "scalar"}')"
+expect_notice "a scalar tool_input on a prompt does not lose the notice" \
+  UserPromptSubmit "context 523114"
+run "$(jq -cn --arg t "$T_PAST" '{session_id: "s", transcript_path: $t, cwd: "/tmp",
+  hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: ["herdr tab create"]}')"
+expect_silent "an array tool_input on a wake does not invent a notice"
 # #527 — the adjacent case: a transcript path that names something the handler
 # cannot read. Before the fix the tail reads nothing, its empty output
 # classifies as "none", the wc redirection fails and the integer test raises
