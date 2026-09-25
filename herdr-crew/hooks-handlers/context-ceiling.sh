@@ -30,9 +30,26 @@ case "$ceiling" in ''|*[!0-9]*) ceiling=$DEFAULT_CEILING ;; esac
 
 input="$(cat)"
 
+# herdr's new-work commands, in one list: the fast path below and the PreToolUse
+# matcher both read it, so a verb rename is one edit and the suite's five-verb
+# loop keys on the same five strings. Matched by substring, so a command that
+# merely mentions one of those verbs also fires; that is deliberate — the notice
+# is advisory and never a block, and narrowing the pattern risks missing the real
+# forms (`herdr --machine x pane run`, `"$HERDR_BIN_PATH" pane run`). `agent
+# wait`, `pane read`, `pane list` and `agent list` carry none of the five and
+# stay silent.
+NEW_WORK_VERBS=('tab create' 'workspace create' 'worktree create' 'pane run' 'agent prompt')
+
+new_work() { # <text> — does the text carry one of those verbs?
+  for verb in "${NEW_WORK_VERBS[@]}"; do
+    case "$1" in *"$verb"*) return 0 ;; esac
+  done
+  return 1
+}
+
 case "$input" in    # fast path: most Bash calls are not herdr new-work commands
-  *UserPromptSubmit*|*'tab create'*|*'workspace create'*|*'worktree create'*|*'pane run'*|*'agent prompt'*) ;;
-  *) exit 0 ;;
+  *UserPromptSubmit*) ;;
+  *) new_work "$input" || exit 0 ;;
 esac
 
 # say <event> <line> — every caller passes a line with no double quote or backslash.
@@ -71,7 +88,32 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-event="$(printf '%s' "$input" | jq -r '.hook_event_name // empty' 2>/dev/null)"
+# One jq pass reads the three fields the verdicts need — the event, the
+# PreToolUse command, and the transcript path — where each had its own spawn
+# before: two on a prompt, three on an armed new-work command. The tail's own
+# pass below is separate and stays, since it reads a file's tail rather than the
+# payload. The pass is gated exactly as the three spawns were: a jq that fails
+# on the input leaves all three fields empty, and each field's emptiness is then
+# the verdict it always was — the event's gate below runs the raw path, an empty
+# command fails the new-work match (a non-new-work command stays silent), and an
+# empty transcript is its own notice.
+#
+# @tsv, never a literal tab join: it escapes a tab, a newline and a backslash
+# inside a value, so the record can split only at the two tabs jq emitted.
+# `map(tostring)` keeps a field that is not a string the text the per-field
+# spawns printed — @tsv refuses a container outright ("object (...) is not valid
+# in a csv row"), and one such field would take the whole pass, event included,
+# down the raw path with it — and `// ""` keeps an absent field empty instead of
+# the string "null", which is what the event's gate below reads.
+fields="$(printf '%s' "$input" | jq -r '[(.hook_event_name // ""), (.tool_input.command // ""), (.transcript_path // "")] | map(tostring) | @tsv' 2>/dev/null)"
+# Split at the two tabs jq emitted: parameter expansion, not `read`. With IFS
+# set to a tab, `read` collapses a run of tabs, so an empty command between two
+# non-empty fields — a Bash call whose command field is empty — would take the
+# transcript's place and read the wrong record.
+event="${fields%%$'\t'*}"
+rest="${fields#*$'\t'}"
+command="${rest%%$'\t'*}"
+transcript="${rest#*$'\t'}"
 if [ -z "$event" ]; then
   # jq read no event: the input is malformed, or the jq on PATH is broken.
   # Either way the figure was not read, and the same raw spellings say which
@@ -83,23 +125,10 @@ if [ -z "$event" ]; then
 fi
 case "$event" in
   UserPromptSubmit) ;;
-  PreToolUse)
-    command="$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null)"
-    case "$command" in
-      # herdr's new-work commands: tab/workspace/worktree creation, the seat
-      # launch (pane run) and the send (agent prompt). Matched by substring, so
-      # a command that merely mentions one of those verbs also fires; that is
-      # deliberate — the notice is advisory and never a block, and narrowing the
-      # pattern risks missing the real forms (`herdr --machine x pane run`,
-      # `"$HERDR_BIN_PATH" pane run`). `agent wait`, `pane read`, `pane list`
-      # and `agent list` carry none of the five and stay silent.
-      *'tab create'*|*'workspace create'*|*'worktree create'*|*'pane run'*|*'agent prompt'*) ;;
-      *) exit 0 ;;
-    esac ;;
+  PreToolUse) new_work "$command" || exit 0 ;;
   *) exit 0 ;;
 esac
 
-transcript="$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)"
 if [ -z "$transcript" ]; then unavailable "$event" "hook input has no transcript_path"; exit 0; fi
 # A session's first prompt can precede its transcript, so a path that names
 # nothing at all is silent. A path that names something the handler cannot read
