@@ -161,60 +161,92 @@ HOISTED_EXEMPT="test-fidelity-pins.sh"
 # point: an unreadable file used to yield an empty count whose arithmetic error read
 # as "no copies here", skipping the file in silence.
 #
-# One awk pass covers every name and the SIGNATURE spellings bash accepts, because a
-# shadow does not have to look like the copy it shadows. Measured with `bash -n`, all
-# of these define a real function and every one of them is matched:
+# One awk pass decides it by this rule: at the START of a logical line — indentation
+# aside — a NAME followed by `()`, every whitespace run around and inside the parens
+# allowed to be a run of any length (`pin ( ) {` and `pin<TAB>()<TAB>{` are the same
+# rule as `pin() {`), and a `{` group opening on that line or on the first line of code
+# after it — blank and comment-only lines in between change nothing; or the `function`
+# keyword followed by the name, with or without a body after it, a direction that
+# over-counts and is the fail-closed one for a gate. Every spelling below is one that
+# rule counts. A shadow does not have to look like the copy it shadows, so each was
+# measured TWICE: `bash -n` accepts the fixture, and a bash that sources it defines the
+# function — `declare -F` finds it. The second half is not ceremony: `bash -n` alone does
+# not establish the first, and `function "pin" {` is the proof — accepted by `bash -n`,
+# defines nothing.
 #
 #   pin() {     pin () {     pin<TAB>()<TAB>{     function pin {     function pin() {
 #   function pin () {        <indented>           (any of the above)
 #   pin()       + `{` on the next line, with any run of blank and comment-only lines
 #               between the two
 #   pin () # copied locally   + `{` on the next line
+#   pin ( ) {                a whitespace RUN inside the parens, not one space exactly:
+#                            `pin<TAB>(<TAB>)<TAB>{` is the same spelling
+#   pin () \                 a signature split with a backslash-newline — bash removes the
+#     {                      pair before it parses, so where the split falls changes
+#                            nothing: between the signature and the brace, between the
+#                            name and the parens (`pin \` + `() {`), inside the name
+#                            (`pi\` + `n() {`) are one rule, one fixture each
 #
-# NOT covered, and named here rather than left to be implied by the list above: bash
-# also takes ANY compound command as a body, so `pin() ( : )` and
-# `pin() if true; then :; fi` define real functions that this matcher does not count —
-# a suite using one of those would still report clean while shadowing it. Reported as
-# a P2 in this round's seat report and left unfixed under the round's stopping rule.
+# Each spelling here has its own fixture among test-config-contract.sh's spelling
+# controls; a spelling listed without one is the same defect as a control that stops
+# matching. The reverse is NOT claimed: this is a list of what the rule above counts,
+# not a list of every spelling bash accepts. bash accepts more, and two axes outside
+# the rule are measured, unfixed and named here rather than left to be implied:
 #
-# A CALL (`pin "$REF" ...`), a COMMENT (`# pin() { ...`) and a bare `name()` that no
-# `{` ever follows are not definitions: that is why the parens, the brace or the
-# `function` keyword are required, and why a bare `name()` only counts when the first
-# line of code after it opens a BRACE GROUP.
+#   * bash also takes ANY compound command as a body, so `pin() ( : )` and
+#     `pin() if true; then :; fi` define real functions this matcher does not count.
+#     Reported as a P2 in this round's seat report (#598), deferred.
+#   * both signature tests are anchored to the line START, so a definition sharing its
+#     line with another statement is not counted either — measured, `x=1; pin() { :; }`
+#     defines `pin` and counts 0. Measured, named here, reported, and unfixed like #598.
+#
+# The join is the one bash performs on an UNQUOTED backslash-newline. This scan reads
+# text, not a parse tree, so it also joins one inside a single-quoted string, where bash
+# keeps it — there the join is text, exactly as a `pin() {` inside a heredoc is.
+#
+# A CALL (`pin "$REF" ...`), a COMMENT (`# pin() { ...`) and a bare `name()` with no
+# body after it (`pin()` + `foo=1`, which bash rejects) are not definitions: that is why
+# the parens, the brace or the `function` keyword are required, and why a bare `name()`
+# only counts when the first line of code after it opens a BRACE GROUP — the one body
+# form this matcher recognizes, per the body-form bullet above.
 count_shadows() { # <file> <fn>...
   awk -v names="$*" '
     BEGIN { n = split(names, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1 }
-    {
-      code = $0
+    function see(code) {
       sub(/^[[:space:]]+/, "", code)          # an indented definition is a definition
       sub(/[[:space:]]*#.*$/, "", code)       # a trailing comment is not code
       sub(/[[:space:]]+$/, "", code)
 
       if (waiting != "") {
-        if (code == "") next                  # a blank or comment-only line: bash still waits for the brace
+        if (code == "") return                # a blank or comment-only line: bash still waits for the brace
         if (code ~ /^\{/) { if (waiting in want) hits[waiting]++ }
         waiting = ""
-        if (code ~ /^\{/) next
+        if (code ~ /^\{/) return
       }
-      if (code == "") next
+      if (code == "") return
 
       if (code ~ /^function[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/) {
         name = code; sub(/^function[[:space:]]+/, "", name); sub(/[^A-Za-z0-9_].*$/, "", name)
         if (name in want) hits[name]++
-        next
+        return
       }
-      if (code ~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*\{/) {
+      if (code ~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\([[:space:]]*\)[[:space:]]*\{/) {
         name = code; sub(/[[:space:]]*\(.*$/, "", name)
         if (name in want) hits[name]++
-        next
+        return
       }
-      if (code ~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*$/) {
-        name = code; sub(/[[:space:]]*\(\)[[:space:]]*$/, "", name)
+      if (code ~ /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\([[:space:]]*\)[[:space:]]*$/) {
+        name = code; sub(/[[:space:]]*\([[:space:]]*\)[[:space:]]*$/, "", name)
         waiting = name
-        next
+        return
       }
     }
+    { line = $0
+      if (cont != "") { line = cont $0; cont = "" }      # the join bash performs on an unquoted backslash-newline
+      if (line ~ /\\$/) { sub(/\\$/, "", line); cont = line; next }
+      see(line) }
     END {
+      if (cont != "") see(cont)                # a file ending in a continuation: no next line to join, and nothing to lose
       total = 0; tail = ""
       for (i = 1; i <= n; i++) if (a[i] in hits) { total += hits[a[i]]; tail = tail " " a[i] " " hits[a[i]] }
       print total tail

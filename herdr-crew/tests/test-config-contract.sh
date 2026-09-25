@@ -438,13 +438,15 @@ section "the hoisted counters are not re-copied"
 assert_hoisted_counters
 assert_hoist_shape
 
-# Controls: every spelling that defines a shadow is caught, and neither a call nor a
-# comment is. `pin` stands for the six names; each fixture below defines a real
-# `pin`, and the last defines none at all. The spellings are the ones bash ACCEPTS —
-# measured with `bash -n`, not assumed: a trailing comment may follow the signature,
-# a comment or a blank line may sit between the signature and the brace, `function`
-# may be spelled with or without parens, and any separator may be a tab. The
-# commented signature is the spelling that defeated the first version of the matcher.
+# Controls: the spelling half of the coverage claim _helpers.sh makes about
+# `count_shadows` — every spelling that comment names has its fixture here, so a
+# spelling named there without one is the same defect as a control that stops
+# matching. Neither a call nor a comment is a definition, and the last fixture is the
+# one that defines none at all. `pin` stands for the six names. Every fixture but the
+# last was measured twice: `bash -n` accepts it, and a bash that sources it defines the
+# function (`declare -F` finds it). The commented signature is the spelling that
+# defeated the first version of the matcher; space-inside-parens and continued-brace
+# are the two a delta re-review of the fix found still missing.
 ctl_sh="$(mktemp -d)"
 printf 'pin() {\n  :\n}\n'                      > "$ctl_sh/col0.sh"
 printf 'pin () {\n  :\n}\n'                     > "$ctl_sh/spaced-parens.sh"
@@ -457,11 +459,17 @@ printf 'pin()\n{\n  :\n}\n'                     > "$ctl_sh/brace-next-line.sh"
 printf 'pin () # copied locally\n{\n  :\n}\n'   > "$ctl_sh/commented-signature.sh"
 printf 'pin()\n# a comment between\n{\n  :\n}\n' > "$ctl_sh/comment-between.sh"
 printf 'pin()\n\n{\n  :\n}\n'                   > "$ctl_sh/blank-between.sh"
+printf 'pin ( ) {\n  :\n}\n'                    > "$ctl_sh/space-inside-parens.sh"
+printf 'pin\t(\t)\t{\n  :\n}\n'                 > "$ctl_sh/tab-inside-parens.sh"
+printf 'pin () \\\n{\n  :\n}\n'                 > "$ctl_sh/continued-brace.sh"
+printf 'pin \\\n() {\n  :\n}\n'                 > "$ctl_sh/continued-name.sh"
+printf 'pi\\\nn() {\n  :\n}\n'                  > "$ctl_sh/continued-in-name.sh"
 printf '# pin() { a comment is not a definition\npin "$REF" "a call is not a definition"\npin()\nfoo=1\n' \
   > "$ctl_sh/not-a-definition.sh"
 for spelling in col0 spaced-parens tab-separated indented function-keyword \
   function-parens function-spaced-parens brace-next-line commented-signature \
-  comment-between blank-between; do
+  comment-between blank-between space-inside-parens tab-inside-parens \
+  continued-brace continued-name continued-in-name; do
   got="$(count_shadows "$ctl_sh/$spelling.sh" pin)"
   if [ "$got" = "1 pin 1" ]; then pass "control: count_shadows catches the $spelling spelling"
   else fail "control: count_shadows catches the $spelling spelling" "got [$got], expected [1 pin 1]"; fi
