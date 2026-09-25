@@ -70,8 +70,10 @@ REF_BUDGET=200          # A3: each ossify reference stays under about 200 lines
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
-# shape the other suites adopted when their copies were hoisted. What is left
-# here is this suite's own: absent, absent_any, n_eq, nonempty, budget, keys.
+# shape the other suites adopted when their copies were hoisted. What is left here
+# is this suite's own ten: absent, absent_any, assert_set, budget, keys, n_eq,
+# nonempty, and — further down, beside the check they serve — span_of,
+# commands_in_span and span_balanced.
 #
 # `flat` is the fourth argument of pin/present, and it is used only where the
 # clause's own text is split by a line wrap today: a per-line pin could assert
@@ -504,13 +506,16 @@ commands_in_span() { # the span arrives on stdin
   tr '\n' ' ' | grep -o '`[^`]*`' | tr -d '` ,'
 }
 # The span's backtick count must be EVEN, and an odd one is refused with the count
-# rather than parsed. Measured: the live span is even (10). An odd count is what
-# produces the misleading RED — every token after the stray backtick pairs
-# wrongly, so prose fragments reach the config.md check and the per-command
-# failures name a fault that is not there. `grep -o` alone does NOT remove that:
-# on a fixture with one unpaired backtick, measured, both spellings lose the real
-# tokens and both feed a prose fragment to the check. The balance gate is what
-# turns that into a RED naming the actual defect.
+# rather than parsed. Measured: the live span is even (10). An odd count is ONE way
+# to produce a misleading RED — every token after the stray backtick pairs wrongly,
+# so prose fragments reach the config.md check and the per-command failures name a
+# fault that is not there. It is the way this gate covers, not the only way a span
+# can mislead: `span_of`'s own carve can drop a command with the check still green,
+# which this gate cannot see and which is tracked as #597.
+# `grep -o` alone does NOT remove the odd case: on a fixture with one unpaired
+# backtick, measured, both spellings lose the real tokens and both feed a prose
+# fragment to the check. The balance gate is what turns that into a RED naming the
+# actual defect.
 span_balanced() { # the span arrives on stdin
   _ticks="$(tr -cd '`' | wc -c | tr -d ' ')"
   [ $((_ticks % 2)) -eq 0 ] || { printf '%s' "$_ticks"; return 1; }
@@ -544,14 +549,19 @@ fi
 # Synthetic spans, shaped like the shipped bullet — a bold lead-in, comma-separated
 # backticked commands, a trailing sentence — so each control decides the extractor
 # and never the shipped list's content (a literal freeze of that list would fail on
-# the next legitimate command). They are fed straight to the extractor as span text:
-# `span_of` above is what carves a span out, and it is not what this item changed.
+# the next legitimate command). They are fed straight to the extractor as span text,
+# so the controls below decide the token extraction and the balance gate.
+#
+# What they do NOT cover is `span_of`'s own carve: its bullet rule can drop a
+# dispatched command — a bullet it takes for the end of the list — with the check
+# still green. That coverage is tracked as #597; the carve is unchanged here, and
+# this paragraph exists so the gap is stated where the controls are read.
 # Every expected value below is a literal, not something the code under test wrote.
 
 # C1 — the wrap. A token the line wrap splits is recovered WHOLE, and its halves
 # are not emitted as commands of their own. This pins the newline→space join, the
-# one part of the old spelling the replacement keeps: drop it and the token is
-# lost (M4 below).
+# one part of the old spelling the replacement keeps: drop the join and this control
+# goes RED, because the halves then arrive as separate tokens.
 ctl_wrap='- **Dispatched to a herdr session:** `alpha-
   one`, `beta-two`.'
 c1="$(printf '%s\n' "$ctl_wrap" | commands_in_span | tr '\n' '|')"
@@ -562,29 +572,43 @@ else
     "emitted [$c1], expected [alpha-one|beta-two|] — a lost or split token, not a wrap-joined one"
 fi
 
-# C2 — the even-field assumption. With ONE unpaired backtick in the span, no token
-# the extractor feeds the config.md check may come from OUTSIDE a backtick pair.
-# Measured, that is exactly what the old spelling does: it emits the sentence's
-# trailing `.` — the span's tail after the last backtick — and that prose fragment
-# is what the per-command RED then names. This is deliberately NOT a claim that the
-# real tokens survive an unpaired backtick: measured, they do not, and no
-# pairing-based extractor can recover them (the balance gate above is for that).
+# C2 — the even-field assumption. With ONE unpaired backtick in the span, every
+# token the extractor feeds the config.md check must be the content of a backtick
+# PAIR of that span. The old spelling additionally emits the sentence's trailing
+# `.`, which lies outside every pair, and that prose fragment is what the
+# per-command RED then names. The pair contents are computed here by walking the
+# span's own backticks — not by re-running the extractor — so the expectation comes
+# from the fixture rather than from the code under test. This is deliberately NOT a
+# claim that the real tokens survive an unpaired backtick: measured, they do not, and
+# no pairing-based extractor can recover them (the balance gate above is for that).
 ctl_unpaired='- **Dispatched to a herdr `session:**
   `alpha-one`, `beta-two`.'
 ctl_joined="$(printf '%s\n' "$ctl_unpaired" | tr '\n' ' ')"
-ctl_tail="$(printf '%s' "$ctl_joined" | sed 's/.*`//')"
+ctl_pairs="$(printf '%s' "$ctl_joined" | awk '{
+  s = $0
+  while ((i = index(s, "`")) > 0) {
+    rest = substr(s, i + 1); j = index(rest, "`")
+    if (j == 0) break
+    body = substr(rest, 1, j - 1); gsub(/[ ,]/, "", body)
+    if (body != "") print body
+    s = substr(rest, j + 1)
+  }
+}')"
 c2_n="$(printf '%s\n' "$ctl_unpaired" | commands_in_span | awk '{ if ($0 == "") next; n++ } END { print n+0 }')"
-c2_outside="$(printf '%s\n' "$ctl_unpaired" | commands_in_span | awk -v tail="$ctl_tail" '
-  { if ($0 == "") next; if (index(tail, $0) > 0) bad++ }
+c2_outside="$(printf '%s\n' "$ctl_unpaired" | commands_in_span | awk -v pairs="$ctl_pairs" '
+  { if ($0 == "") next
+    m = split(pairs, p, "\n"); found = 0
+    for (i = 1; i <= m; i++) if (p[i] == $0) { found = 1; break }
+    if (!found) bad++ }
   END { print bad+0 }')"
 if [ "$c2_n" -eq 0 ]; then
   fail "control: an unpaired backtick feeds no prose from outside a pair" \
     "the fixture emitted nothing at all — a control over an empty list certifies nothing"
 elif [ "$c2_outside" -eq 0 ]; then
-  pass "control: an unpaired backtick feeds no prose from outside a pair ($c2_n emitted, 0 from the span's tail)"
+  pass "control: an unpaired backtick feeds no prose from outside a pair ($c2_n emitted, each one a pair's content)"
 else
   fail "control: an unpaired backtick feeds no prose from outside a pair" \
-    "$c2_outside of $c2_n emitted tokens are prose from the span's tail [$ctl_tail]"
+    "$c2_outside of $c2_n emitted tokens are not the content of any backtick pair in the span"
 fi
 
 # C3 — the balance gate itself. The fixture half must FIRE; the live half is the
@@ -596,7 +620,15 @@ if ticks="$(printf '%s\n' "$ctl_unpaired" | span_balanced)"; then
 else
   pass "control: the balance gate refuses an unpaired backtick ($ticks backticks)"
 fi
-if printf '%s\n' "$span" | span_balanced; then
+# The live half reads the span the shipping check bound. When the anchor is missing
+# there is no span, and that must FAIL here rather than pass over empty input: the
+# suite is red above for the missing anchor, and this keeps the second RED honest
+# about what it is measuring.
+span="${span:-}"
+if [ -z "$span" ]; then
+  fail "control: the balance gate does not refuse the live span" \
+    "there is no live span to check — the anchor line is missing, so this control would otherwise pass over empty input"
+elif printf '%s\n' "$span" | span_balanced; then
   pass "control: the balance gate does not refuse the live span"
 else
   fail "control: the balance gate does not refuse the live span" \
