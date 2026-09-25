@@ -262,11 +262,28 @@ oss_reg_set_risk_gate_touch() { # $1=state $2=name $3=touch-csv
     "$(jq -n --arg n "$name" --argjson t "$touch" '{name:$n,touch:$t}')"
 }
 
+# The fake ledger's key is `boundary`: fake_status matches on it and rewrites
+# EVERY matching record, and expired_fakes reports each one. A second fake_add
+# for one boundary minted a second record that neither verb can tell apart
+# (#125), so the mint is refused here, as the bone and gate rails above refuse
+# theirs - inside the lock, on the write path only, so replay of a journal that
+# already holds a duplicate is unchanged. A boundary already in the ledger
+# changes through fake_status: `renewed` when a later spine keeps the fake,
+# `replaced` when it builds the real one (plan-spine's fake-ledger-discipline.md §1).
+_oss_reg_uniq_fake() { # $1=state-file $2=payload about to be minted -> 0, or 7 if the boundary exists
+  local b n
+  b="$(printf '%s' "$2" | jq -r '.boundary')" || return 4
+  n="$(_oss_reg_count "$1" '.fakes[] | select(.boundary == $v)' "fakes" "$b")" || return $?
+  [ "$n" -eq 0 ] || {
+    echo "oss: fake boundary '$b' is already in the ledger - one boundary keys one record, and fake_status rewrites every record it matches (#125); record a retained fake with 'oss fake_status $b renewed <reason> [new-expiry]', or a real replacement with 'oss fake_status $b replaced <reason>'" >&2; return 7; }
+}
+
 oss_reg_add_fake() { # $1=state $2=boundary $3=channel $4=reason $5=trigger $6=expiry-release
   case "$3" in real|fake|deferred) ;; *) echo "oss: channel must be real|fake|deferred" >&2; return 2;; esac
   oss_state_mutate "$1" add_fake \
     "$(jq -n --arg b "$2" --arg c "$3" --arg r "$4" --arg tr "$5" --arg ex "$6" --arg ts "$(_oss_now)" \
-      '{boundary:$b,channel:$c,reason:$r,replacement_trigger:$tr,expiry_release:$ex,status:"active",at:$ts}')"
+      '{boundary:$b,channel:$c,reason:$r,replacement_trigger:$tr,expiry_release:$ex,status:"active",at:$ts}')" \
+    "" _oss_reg_uniq_fake
 }
 
 oss_reg_add_feature() { # $1=state $2=name $3=value $4=class-guess $5=source

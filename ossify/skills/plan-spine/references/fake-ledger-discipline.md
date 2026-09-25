@@ -11,6 +11,15 @@ Any work item that **introduces or retains** a shell, stub, or fake records one 
 including fakes inherited from the skeleton and deliberately left in place. "It
 was already there" is the most common way a fake becomes permanent.
 
+**One boundary is one record.** `fake_add` records a boundary the ledger does not
+hold yet. If the boundary is already there, `fake_add` refuses with exit **7**
+and mints nothing, because `fake_status` rewrites every record that carries the
+boundary and could never change a second one on its own. A later spine records
+the existing boundary through `fake_status` (§3) instead:
+
+- it **keeps** the fake → `renewed`, with a new expiry release if the deadline moves;
+- it **built the real one** → `replaced`.
+
 _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
 
 ```bash
@@ -25,8 +34,9 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 | **replacement trigger** | The **condition** that makes the real one due. Never a date |
 | **expiry release** | The release by which it must be replaced or **explicitly renewed**. A release id (`r0`, `r1`, …) — `fake_add` does not check the shape, and anything else BLOCKS the release close as `unparseable-expiry` (`close/references/fake-expiry.md` §3) |
 
-The three channels: **`real`** records a boundary deliberately built real (useful
-when a previous spine faked it and this one replaced it); **`fake`** is a shell
+The three channels: **`real`** records a boundary deliberately built real from
+the start (a boundary an earlier spine faked is already in the ledger, so
+replacing it is `fake_status … replaced`, not a new record); **`fake`** is a shell
 standing in for a real implementation; **`deferred`** is a boundary not wired at
 all yet, where the product currently goes without.
 

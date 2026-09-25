@@ -17,6 +17,16 @@ t_capture oss_id_valid_release r0;    t_assert_rc 0 "r0 still valid"
 t_capture oss_id_valid_release r5;    t_assert_rc 0 "r5 still valid"
 t_capture oss_id_valid_release rX;    t_assert_rc 1 "rX still rejected"
 t_capture oss_id_valid_release 1;     t_assert_rc 1 "bare '1' still rejected"
+# PR #601 review: grep anchors per LINE, so a multi-line value whose FIRST line
+# is an id used to validate - and the worktree verbs built a path from the rest.
+# The whole argument must match, for every level of the grammar.
+t_capture oss_id_valid_work_item $'r0.s1.w1\n/../../victim'; t_assert_rc 1 "a multi-line value is not a work-item id"
+t_capture oss_id_valid_spine $'r0.s1\n../x';                  t_assert_rc 1 "...nor a spine id"
+t_capture oss_id_valid_release $'r0\nr1';                     t_assert_rc 1 "...nor a release id"
+t_capture oss_id_parse $'r0.s1.w1\n/x';                       t_assert_rc 1 "...and oss_id_parse refuses it"
+# ADJACENT CONTROL: multi-digit ids at every level still validate.
+t_capture oss_id_valid_work_item r12.s3.w45; t_assert_rc 0 "multi-digit work-item id still valid"
+t_capture oss_id_valid_spine r12.s3;         t_assert_rc 0 "multi-digit spine id still valid"
 
 t_capture oss_id_branch_name r0.s1 walking-skeleton
 t_assert_eq "spine/r0.s1-walking-skeleton" "$T_OUT" "branch name"

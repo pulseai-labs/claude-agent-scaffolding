@@ -172,6 +172,40 @@ t_assert_eq "replaced" "$T_OUT" "status actually changed"
 t_capture jq -r '.fakes[] | select(.boundary=="coach-llm") | .expiry_release' "$S"
 t_assert_eq "r1" "$T_OUT" "expiry_release is UNCHANGED when the 5th arg is omitted"
 
+# --- #125: fake_add refuses a boundary that is already in the ledger ---------
+# `boundary` is the key fake_status matches on, and it rewrites EVERY record it
+# matches, so a second record for one boundary can never be changed on its own.
+# Measured before the fix: two fake_add calls for one boundary, both rc 0, two
+# records. coach-llm is in the ledger (now `replaced`); a later spine re-adding
+# it in ANY channel - the old prose's "retained" and "built real" re-records -
+# is refused, and the refusal names the verb that records those instead.
+for ch in fake real deferred; do
+  t_capture oss_reg_add_fake "$S" "coach-llm" "$ch" "a later spine" "a trigger" r2
+  t_assert_rc 7 "#125: fake_add refuses an existing boundary (channel $ch)"
+done
+t_assert_contains "$T_OUT" "already in the ledger" "#125: ...and says the boundary is already recorded"
+t_assert_contains "$T_OUT" "fake_status coach-llm renewed" "#125: ...and names the retain route"
+t_assert_contains "$T_OUT" "fake_status coach-llm replaced" "#125: ...and the built-real route"
+t_capture jq '[.fakes[] | select(.boundary=="coach-llm")] | length' "$S"
+t_assert_eq "1" "$T_OUT" "#125: ...and no second record was minted"
+# In the lock, like the bone and gate rails: with the lock HELD a duplicate
+# answers rc 3, never rc 7 - a verb-side count would answer 7 here.
+mkdir "$S.lock"
+t_capture oss_reg_add_fake "$S" "coach-llm" fake "a later spine" "a trigger" r2
+t_assert_rc 3 "#125: a duplicate fake_add while the lock is held answers rc 3 - the rail is inside the lock"
+t_capture oss_reg_add_fake "$S" "brand-new-boundary" fake "why" "when" r2
+t_assert_rc 3 "#125 control: ...and so does a NEW boundary under the same lock"
+rmdir "$S.lock"
+# ADJACENT CONTROL: a distinct boundary still mints (the dispatcher-path row is
+# in test-dispatcher-ops.sh, which owns a dispatcher-resolved state).
+t_capture oss_reg_add_fake "$S" "email-sender" deferred "not wired yet" "the first real user" r2
+t_assert_rc 0 "#125 control: a distinct boundary is still added"
+# Replay stays permissive: a journal from an older build that already holds a
+# duplicate still applies, because the rail is the VERB's, not _oss_apply_op's.
+t_capture oss_state_mutate "$S" add_fake \
+  "$(jq -n --arg ts "$(_oss_now)" '{boundary:"coach-llm",channel:"fake",reason:"old journal",replacement_trigger:"t",expiry_release:"r1",status:"active",at:$ts}')"
+t_assert_rc 0 "#125 control: the raw op (the replay path) still applies a duplicate - replay is not refused"
+
 t_capture oss_reg_touch_check "$S" src/domain/dsl/compile.rs
 t_assert_rc 0 "domain path matches a bone"; t_assert_contains "$T_OUT" "bone ADR-0002" "bone named"
 t_capture oss_reg_touch_check "$S" src/adapters/broker/order.rs

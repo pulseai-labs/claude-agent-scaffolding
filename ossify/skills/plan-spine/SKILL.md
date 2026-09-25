@@ -400,7 +400,9 @@ fakes inherited from the skeleton and left in place:
 "$oss_bin" fake_add "<boundary>" "<real|fake|deferred>" "<reason>" "<replacement trigger>" "<expiry release>"
 ```
 
-The channel is validated against `real|fake|deferred` (exit **2** otherwise). Both
+The channel is validated against `real|fake|deferred` (exit **2** otherwise). A
+boundary already in the ledger exits **7**: record it with `fake_status` `renewed`
+or `replaced` instead (`references/fake-ledger-discipline.md` §1). Both
 the **replacement trigger** (a condition, never a date) and the **expiry release**
 are mandatory: a fake whose trigger has fired, or whose expiry release closes
 without a replacement, becomes a **blocking release-close finding**. Deferred

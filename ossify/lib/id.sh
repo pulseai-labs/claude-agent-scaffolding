@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # ossify ID grammar — single owner (spec §9.2 / OQ7). No VS- shapes.
 
-oss_id_valid_release()   { printf '%s' "$1" | { grep -Eq '^r[0-9]+$' || return 1; }; }
-oss_id_valid_spine()     { printf '%s' "$1" | { grep -Eq '^r[0-9]+\.s[0-9]+$' || return 1; }; }
-oss_id_valid_work_item() { printf '%s' "$1" | { grep -Eq '^r[0-9]+\.s[0-9]+\.w[0-9]+$' || return 1; }; }
+# The WHOLE argument must match, so `[[ =~ ]]` and not `printf | grep`: grep
+# anchors per LINE, and a value such as $'r0.s1.w1\n/../../victim' passed because
+# its first line did - the worktree verbs then built a path out of the rest
+# (#120, found in PR #601's review).
+oss_id_valid_release()   { [[ "$1" =~ ^r[0-9]+$ ]]; }
+oss_id_valid_spine()     { [[ "$1" =~ ^r[0-9]+\.s[0-9]+$ ]]; }
+oss_id_valid_work_item() { [[ "$1" =~ ^r[0-9]+\.s[0-9]+\.w[0-9]+$ ]]; }
 
 oss_id_parse() {
   local id="$1"

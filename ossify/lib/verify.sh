@@ -9,9 +9,16 @@
 # substitution and executes something other than what the spec declares.
 oss_verify_parse_acs() { # $1=spec-file ; TSV label \t command \t expectation
   [ -f "$1" ] || { echo "oss: spec not found: $1" >&2; return 2; }
+  # A MALFORMED auto: row - no backtick pair, or an empty command between the
+  # backticks - never yields a row, and it FAILS the parse (rc 3) once every row
+  # has been read, naming each one on stderr. Skipping it quietly let a report
+  # that never mentions that AC pass report_cross_check, and returning its rc
+  # only when it happened to be the LAST row (#126) made close halt or pass on
+  # line order alone. rc: 0 parsed, 2 spec not found, 3 malformed auto: row.
   { grep -E '^[[:space:]]*-[[:space:]]*\[[ xX]\][[:space:]]*AC-[0-9]+[[:space:]]+auto:' "$1" || true; } \
-  | while IFS= read -r line; do
-      local label cmd exp rest
+  | ( bad=0
+    while IFS= read -r line; do
+      local label cmd exp rest head
       # Anchor the label extraction on the CHECKBOX, not on a case class. An
       # earlier form used `^[^A-Z]*(AC-[0-9]+)`, which silently breaks on the
       # `- [X]` checkbox this function's own grep accepts: [^A-Z]* halts at the
@@ -20,20 +27,33 @@ oss_verify_parse_acs() { # $1=spec-file ; TSV label \t command \t expectation
       # report and never finds, failing a correct report.
       label="$(printf '%s' "$line" | sed -E 's/^.*\[[ xX]\][[:space:]]*(AC-[0-9]+).*/\1/')"
       rest="${line#*auto:}"
-      cmd="$(printf '%s' "$rest" | sed -E 's/^[^`]*`([^`]*)`.*/\1/')"
-      # If the sed did not match (no backtick pair in $rest), it passes $rest
+      # The command lives BEFORE the separator. `head` drops the last
+      # `→ expected:` and everything after it - greedy, as the `exp` split below
+      # is, so a command that itself contains an arrow survives - and the
+      # command is looked for there alone: a backticked word in the EXPECTATION
+      # (`output contains `ok``) used to be taken as the command when the
+      # command had no backticks (PR #601 review).
+      head="$(printf '%s' "$rest" | sed -E 's/^(.*)→[[:space:]]*expected:.*$/\1/')"
+      cmd="$(printf '%s' "$head" | sed -E 's/^[^`]*`([^`]*)`.*/\1/')"
+      # If the sed did not match (no backtick pair in $head), it passes $head
       # through unchanged as cmd. That makes the whole tail of the line —
       # including `→ expected: exit 0` — the command, which the RED gate runs
       # as garbage and reads as RED = proceed. Detect the no-match instead:
-      # when $rest contains no backtick, the AC is malformed — skip the row so
-      # it produces zero output, which Gate 2's "visibly has AC lines but this
-      # prints nothing" detector catches. (Codex P2 finding #4.)
-      case "$rest" in *\`*) ;; *)
-        echo "oss: AC line '$label' has no backticked command — skipping (malformed AC)" >&2; continue ;; esac
+      # when $head holds no backtick PAIR, the AC is malformed and yields no row.
+      # A pair, not one backtick: a lone backtick also defeats the sed, and the
+      # tail passed through as the command. (Codex P2 finding #4; PR #601.)
+      case "$head" in *\`*\`*) ;; *)
+        echo "oss: AC line '$label' has no backticked command (malformed AC)" >&2; bad=1; continue ;; esac
+      if [ -z "$cmd" ]; then
+        echo "oss: AC line '$label' has an empty command between its backticks (malformed AC)" >&2; bad=1; continue
+      fi
       exp="$(printf '%s' "$rest" | sed -E 's/.*→[[:space:]]*expected:[[:space:]]*//')"
       exp="${exp#"${exp%%[![:space:]]*}"}"; exp="${exp%"${exp##*[![:space:]]}"}"
-      [ -n "$cmd" ] && printf '%s\t%s\t%s\n' "$label" "$cmd" "$exp"
+      printf '%s\t%s\t%s\n' "$label" "$cmd" "$exp"
     done
+    # The pipeline's last element is this subshell, so its exit status is the
+    # function's: 3 when any row was malformed, whatever order the rows came in.
+    [ "$bad" -eq 0 ] || exit 3 )
 }
 
 # Run one AC in $1 and check it. EVERY arm fails closed: an unrecognized or
@@ -215,6 +235,7 @@ oss_verify_report_cross_check() { # $1=report-file $2=spec-file
   # over a spec it never read. Parse once, up front, where the rc is checkable.
   local rows rc=0
   rows="$(oss_verify_parse_acs "$2")" || rc=$?
+  [ "$rc" -ne 3 ] || { echo "oss: the spec '$2' has a malformed auto: AC (named above) - fix the spec; an AC that cannot be run is never skipped" >&2; return 2; }
   [ "$rc" -eq 0 ] || { echo "oss: cannot read the spec '$2' - the cross-check would otherwise pass by reading nothing" >&2; return 2; }
   # A readable spec with no `auto:` rows is only VACUOUSLY clean. Say so: the
   # usual cause is a mis-derived path (the handoff, or last round's spec) or AC
