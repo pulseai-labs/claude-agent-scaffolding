@@ -559,9 +559,14 @@ fi
 # Every expected value below is a literal, not something the code under test wrote.
 
 # C1 — the wrap. A token the line wrap splits is recovered WHOLE, and its halves
-# are not emitted as commands of their own. This pins the newline→space join, the
-# one part of the old spelling the replacement keeps: drop the join and this control
-# goes RED, because the halves then arrive as separate tokens.
+# are not emitted as commands of their own. What this pins is the JOIN — without it no
+# backtick pair spans the break. It does not pin the join's SEPARATOR, because nothing
+# downstream can see one: measured, a separator-less join (`tr -d '\n'` in place of
+# `tr '\n' ' '`) leaves this control GREEN, the extractor's last stage deleting every
+# space a token holds, the wrap's included. Remove the join stage instead and this
+# control goes RED by TOTAL LOSS — measured, the fixture then emits ONE EMPTY TOKEN
+# (the single pair that still forms, on the second line) and neither half arrives: not
+# as a token of its own, not at all.
 ctl_wrap='- **Dispatched to a herdr session:** `alpha-
   one`, `beta-two`.'
 c1="$(printf '%s\n' "$ctl_wrap" | commands_in_span | tr '\n' '|')"
