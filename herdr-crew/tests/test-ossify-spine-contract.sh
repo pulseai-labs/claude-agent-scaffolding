@@ -68,53 +68,18 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 
 REF_BUDGET=200          # A3: each ossify reference stays under about 200 lines
 
-occurrences() {
-  if [ -z "${2:-}" ]; then printf 'empty needle\n' >&2; return 1; fi
-  [ -f "$1" ] || { printf 'no such file\n' >&2; return 1; }
-  awk -v needle="$2" '
-    { line = $0
-      while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
-    END { print n+0 }' "$1"
-}
-
-# Occurrences of a literal substring in a file read as ONE logical line: every
-# whitespace run is squeezed to a single space first, which reassembles the space
-# a markdown wrap broke at (the newline plus the next line's indentation).
-# A per-line count is the default and stays the default: it is stricter, and a
-# needle that unexpectedly spans a wrap fails loudly rather than silently
-# matching. This counter exists for the clauses whose own text — the text a pin
-# must assert, not a prefix of it — is split by such a wrap today: there is no
-# contiguous needle that names them, so a per-line pin could only assert a
-# fragment and would report the clause absent. Two consequences worth stating:
-# an absence pin over a squeezed line also catches a reintroduction that wraps
-# differently, and a FALSE positive needs the surrounding prose to spell the
-# phrase across a line boundary, which none of the three sites here does.
-# Note the join is by SQUEEZING, not by the config suite's newline DELETION:
-# those clauses are personal names, which are space-less, while these are prose
-# whose words are separated by the very space the wrap consumed.
-occurrences_flat() {
-  if [ -z "${2:-}" ]; then printf 'empty needle\n' >&2; return 1; fi
-  [ -f "$1" ] || { printf 'no such file\n' >&2; return 1; }
-  awk -v needle="$2" '
-    { buf = buf " " $0 }
-    END {
-      gsub(/[[:space:]]+/, " ", buf)
-      while ((i = index(buf, needle)) > 0) { n++; buf = substr(buf, i + length(needle)) }
-      print n+0
-    }' "$1"
-}
-
-count_of() { # <file> <needle> [line|flat]
-  if [ "${3:-line}" = flat ]; then occurrences_flat "$1" "$2"; else occurrences "$1" "$2"; fi
-}
-
-pin() {
-  c="$(count_of "$1" "$2" "${4:-line}")" || { fail "$3" "unreadable file or empty needle: $1"; return 0; }
-  if [ "$c" -eq 1 ]; then pass "$3"
-  elif [ "$c" -eq 0 ]; then fail "$3" "not found in ${1##*/} — reworded away, or the pin now spans a line wrap. pin: $2"
-  else fail "$3" "found $c times in ${1##*/}; a pin must be unique. pin: $2"
-  fi
-}
+# occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
+# this suite's pin already took <file> <needle> <label> [line|flat], which is the
+# shape the other suites adopted when their copies were hoisted. What is left
+# here is this suite's own: absent, absent_any, n_eq, nonempty, budget, keys.
+#
+# `flat` is the fourth argument of pin/present, and it is used only where the
+# clause's own text is split by a line wrap today: a per-line pin could assert
+# only a fragment of it and would report the clause absent. The squeezed-line
+# join lives in _helpers.sh; the join is by SQUEEZING, not by the config suite's
+# newline DELETION — those clauses are personal names, which are space-less,
+# while these are prose whose words are separated by the very space the wrap
+# consumed.
 
 absent() {
   c="$(count_of "$1" "$2" "${4:-line}")" || { fail "$3" "unreadable file: $1"; return 0; }
@@ -996,5 +961,11 @@ budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
 budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget"
 budget "$BRIEFS_MD" "ossify-briefs.md is within the reference budget"
 budget "$WRITER_MD" "ossify-close-writer.md is within the reference budget"
+
+# #514, L1: the shape, asserted rather than assumed — a counter re-copied into any
+# suite shadows the hoisted one and keeps passing. This suite's copies were the
+# largest, so it is also the one most worth asserting from.
+section "the hoisted counters are not re-copied"
+assert_hoisted_counters
 
 report

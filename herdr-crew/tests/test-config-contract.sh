@@ -10,8 +10,9 @@
 # section headings a project file must use, the fallback rule, the halt rule
 # for an undefined seat, the readers rule, and the reference budget.
 #
-# Counting is one awk index() pass: `grep -c` counts LINES, and `… | grep -q`
-# can fail on a true match under pipefail.
+# Counting is one awk index() pass, hoisted to _helpers.sh with the pin/present
+# wrappers (#514, L1): `grep -c` counts LINES, and `… | grep -q` can fail on a
+# true match under pipefail.
 #
 # Usage:   bash herdr-crew/tests/test-config-contract.sh
 # Exit:    0 if every mechanical fact holds; 1 otherwise.
@@ -27,63 +28,39 @@ REF_BUDGET=200
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-occurrences() {
-  if [ -z "${2:-}" ]; then printf 'empty needle\n' >&2; return 1; fi
-  [ -f "$1" ] || { printf 'no such file\n' >&2; return 1; }
-  awk -v needle="$2" '
-    { line = $0
-      while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
-    END { print n+0 }
-  ' "$1"
-}
-
-pin() {
-  needle="$1"; label="$2"
-  count="$(occurrences "$CONFIG_MD" "$needle")" || { fail "$label" "count failed"; return 0; }
-  if [ "$count" -eq 1 ]; then pass "$label"
-  elif [ "$count" -eq 0 ]; then fail "$label" "not found, or the line wrapped: $needle"
-  else fail "$label" "found $count times; a pin must be unique: $needle"; fi
-}
-
-present() {
-  needle="$1"; label="$2"
-  count="$(occurrences "$CONFIG_MD" "$needle")" || { fail "$label" "count failed"; return 0; }
-  if [ "$count" -ge 1 ]; then pass "$label"; else fail "$label" "not found: $needle"; fi
-}
-
 printf '%sherdr-crew configuration contract%s\n\n' "$DIM" "$RST"
 
 section "the two files"
-pin '~/.claude/herdr-crew/agents.md' "the machine file's path is stated once"
-pin '`.herdr-crew/roles.md`' "the project file's path is stated once"
+pin "$CONFIG_MD" '~/.claude/herdr-crew/agents.md' "the machine file's path is stated once"
+pin "$CONFIG_MD" '`.herdr-crew/roles.md`' "the project file's path is stated once"
 
 section "the agent entry"
 for field in 'command:' 'expected_model:' 'effort:' 'model_shows:' 'brief_delivery:' 'can:' 'note:'; do
-  present "$field" "agent field $field is documented"
+  present "$CONFIG_MD" "$field" "agent field $field is documented"
 done
-present 'model_shows: banner' "banner is a documented value"
-present 'model_shows: screen' "screen is a documented value"
-present 'brief_delivery: inject' "inject is a documented value"
-present 'brief_delivery: file' "file delivery is a documented value"
+present "$CONFIG_MD" 'model_shows: banner' "banner is a documented value"
+present "$CONFIG_MD" 'model_shows: screen' "screen is a documented value"
+present "$CONFIG_MD" 'brief_delivery: inject' "inject is a documented value"
+present "$CONFIG_MD" 'brief_delivery: file' "file delivery is a documented value"
 
 section "the project file"
 for heading in '## Seats' '## My roles' '## Conditions'; do
-  present "$heading" "project-file heading $heading is documented"
+  present "$CONFIG_MD" "$heading" "project-file heading $heading is documented"
 done
 for key in 'at:' 'agent:' 'blocks:' 'brief:' 'replaces:'; do
-  present "$key" "role key $key is documented"
+  present "$CONFIG_MD" "$key" "role key $key is documented"
 done
 
 section "the rules that must survive a rewording"
-pin 'falls back to the agent this session is already running' \
+pin "$CONFIG_MD" 'falls back to the agent this session is already running' \
   "the no-file fallback survives"
-pin 'a seat name that neither file defines halts the run' \
+pin "$CONFIG_MD" 'a seat name that neither file defines halts the run' \
   "the undefined-seat halt survives"
-pin 'Workers never read either file' \
+pin "$CONFIG_MD" 'Workers never read either file' \
   "the readers rule survives"
-pin 'The project file wins' \
+pin "$CONFIG_MD" 'The project file wins' \
   "precedence survives"
-pin 'the first delegated dispatch' \
+pin "$CONFIG_MD" 'the first delegated dispatch' \
   "the no-config halt lands at the first delegated dispatch"
 
 section "budget"
@@ -97,12 +74,13 @@ fi
 
 section "briefs carry their seat inline"
 BRIEFS_MD="$PLUGIN_ROOT/skills/orchestrate/references/briefs.md"
+# The count and its refusal belong to the shared counter: this is the one pin
+# whose wanted count is not 1, so it cannot be `pin` itself. Until #514's hoist it
+# carried the first of this file's three inline copies of the loop — and, being
+# inline, it was the copy that never had the missing-file guard.
 brief_pin() {
   needle="$1"; label="$2"; want="$3"
-  count="$(awk -v needle="$needle" '
-    { line = $0
-      while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
-    END { print n+0 }' "$BRIEFS_MD")"
+  count="$(occurrences "$BRIEFS_MD" "$needle")" || { fail "$label" "count failed"; return 0; }
   if [ "$count" -eq "$want" ]; then pass "$label ($count)"
   else fail "$label" "found $count, expected $want: $needle"; fi
 }
@@ -118,10 +96,7 @@ brief_pin 'claude-glm' "no alias name survives in briefs.md" 0
 section "the named points exist in the run"
 LIFECYCLE_MD="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 for point in after-implementer before-review after-disposition before-merge-ask at-teardown; do
-  c_life="$(awk -v needle="$point" '
-    { line = $0
-      while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
-    END { print n+0 }' "$LIFECYCLE_MD")"
+  c_life="$(occurrences "$LIFECYCLE_MD" "$point")"
   c_cfg="$(occurrences "$CONFIG_MD" "$point")"
   if [ "$c_life" -ge 1 ] && [ "$c_cfg" -ge 1 ]; then pass "point $point is in both the run and config.md"
   else fail "point $point is in both" "lifecycle=$c_life config=$c_cfg"; fi
@@ -174,10 +149,11 @@ sweep_file() {
     # invisible to it: the whole milestone leans on this gate. The unreadable-file
     # guard above stays ahead of this pass, which is what keeps the three controls
     # that call this function exercising the join rather than the read.
-    c="$(tr -d '\n' < "$f" | awk -v needle="$needle" '
-      { line = $0
-        while ((i = index(line, needle)) > 0) { n++; line = substr(line, i + length(needle)) } }
-      END { print n+0 }')"
+    #
+    # The DELETING join stays here and is this sweep's own; only the loop moved to
+    # `count_literal` in _helpers.sh (#514, L1). Routed through `occurrences` — the
+    # per-line counter — the wrap-split name would be invisible again.
+    c="$(tr -d '\n' < "$f" | count_literal "$needle")"
     hits=$((hits + c))
   done
   if [ "$hits" -eq 0 ]; then pass "no personal name in $rel"; return 0; fi
@@ -265,13 +241,44 @@ else
 fi
 rm -f "$tmp_clean"
 
+# Control: the hoisted counter refuses a file it cannot open INSTEAD of returning
+# a count (#514, L1). This is the guard the copy in test-fidelity-pins.sh does not
+# carry, and it is the same failure mode as the unreadable-file control above: a
+# count is what a clean file returns, so a counter answering 0 for a file nobody
+# opened would certify it. The message is checked too, so a failure for another
+# reason does not read as the guard firing.
+ctl_dir="$(mktemp -d)"
+tmp_absent="$ctl_dir/absent.md"   # never created: the path is the fixture
+if out="$(occurrences "$tmp_absent" 'anything' 2>&1)"; then
+  fail "control: the hoisted counter refuses a missing file" \
+    "it returned a count for a file that does not exist: $out"
+elif printf '%s' "$out" | grep -F 'no such file' >/dev/null; then
+  pass "control: the hoisted counter refuses a missing file"
+else
+  fail "control: the hoisted counter refuses a missing file" \
+    "it failed, but not on the guard: $out"
+fi
+
+# Adjacent control: the same counter must still COUNT an existing, clean file.
+# Without it, a counter that refused every file would satisfy the control above —
+# which is the mirror of the sweep's own two controls, next to theirs.
+tmp_countable="$ctl_dir/countable.md"; printf 'nothing personal in here\n' > "$tmp_countable"
+if c="$(occurrences "$tmp_countable" 'nothing personal')" && [ "$c" -eq 1 ]; then
+  pass "control: the same counter still counts an existing file"
+else
+  fail "control: the same counter still counts an existing file" \
+    "an existing file holding one occurrence did not count once: ${c:-no output}"
+fi
+rm -f "$tmp_countable"
+rmdir "$ctl_dir"
+
 section "the dsh spine driver kind"
 DSH_MD="$PLUGIN_ROOT/skills/orchestrate/references/dsh-driver.md"
 EXEC_MD="$PLUGIN_ROOT/skills/orchestrate/references/ossify-execution.md"
 # Named at least twice since the agent-entries exception (PR review round 1); the
 # exact-once pin on that exception, in the section below, is the adjacent control.
-present 'kind: dsh-spine-driver' "config.md names the dsh spine driver kind"
-present '`dsh-driver.md`' "config.md points at dsh-driver.md"
+present "$CONFIG_MD" 'kind: dsh-spine-driver' "config.md names the dsh spine driver kind"
+present "$CONFIG_MD" '`dsh-driver.md`' "config.md points at dsh-driver.md"
 if [ -f "$DSH_MD" ]; then
   n="$(wc -l < "$DSH_MD" | tr -d ' ')"
   if [ "$n" -le "$REF_BUDGET" ]; then pass "dsh-driver.md within the reference budget ($n lines)"
@@ -327,7 +334,7 @@ LIFE_MD="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 NEST_MD="$PLUGIN_ROOT/skills/orchestrate/references/ossify-nested-run.md"
 SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
 CMD_MD="$PLUGIN_ROOT/commands/orchestrate.md"
-pin 'a `kind: dsh-spine-driver` entry has no `command:`' "config.md's agent entries admit the dsh kind"
+pin "$CONFIG_MD" 'a `kind: dsh-spine-driver` entry has no `command:`' "config.md's agent entries admit the dsh kind"
 while IFS='|' read -r f needle label; do
   c="$(occurrences "$f" "$needle")" || c=0
   if [ "$c" -ge 1 ]; then pass "$label"; else fail "$label" "not found: $needle"; fi
@@ -341,5 +348,11 @@ $DSH_MD|A close session is never rotated|a dsh close finishes past the ceiling
 $DSH_MD|never to a successor|a mid-round stop is recovered in the same session
 $DSH_MD|\`data.usage.totalTokens\` against|the ceiling is compared in tokens
 LIST
+
+# #514, L1: a counter re-copied into any suite shadows the hoisted one and keeps
+# passing, so the shape is asserted rather than assumed — here, in the suite the
+# fourth copy would most plausibly land beside.
+section "the hoisted counters are not re-copied"
+assert_hoisted_counters
 
 report
