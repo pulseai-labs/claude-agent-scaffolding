@@ -68,11 +68,24 @@ input() {
   fi
 }
 
-# run <stdin json> [NAME=value ...] -> OUT, RC; inside a herdr pane, setting unset
+# run <stdin json> [NAME=value ...] -> OUT, RC
+#
+# The handler runs inside a herdr pane (HERDR_PANE_ID=w1:p1) with the ceiling
+# option unset. A case names what it varies as NAME=value assignments, of which
+# two are this suite's fixtures: PATH=<dir> — the missing-binary cases run the
+# handler against a stripped PATH — and HERDR_PANE_ID= (empty), the case outside
+# a pane. The pane id is resolved here rather than left to the default, so a
+# caller's empty value is the one the handler sees whether or not env(1) keeps
+# the last of a repeated name (POSIX leaves that unspecified); the caller's own
+# assignment still travels in "$@", so the two cannot disagree.
 run() {
   stdin="$1"; shift
+  pane=w1:p1
+  for arg in "$@"; do
+    case "$arg" in HERDR_PANE_ID=*) pane="${arg#HERDR_PANE_ID=}" ;; esac
+  done
   OUT="$(printf '%s' "$stdin" | env -u CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING \
-    HERDR_PANE_ID=w1:p1 "$@" "$BASH_BIN" "$HOOK" 2>/dev/null)"
+    HERDR_PANE_ID="$pane" "$@" "$BASH_BIN" "$HOOK" 2>/dev/null)"
   RC=$?
 }
 
@@ -124,6 +137,17 @@ for entry in 'tab create|herdr tab create --workspace ws1 --cwd /tmp --label sea
   run "$(input PreToolUse "$T_PAST" "${entry#*|}")"
   expect_notice "past the ceiling: notice before '${entry%%|*}'" PreToolUse "context 523114"
 done
+# A tool_input.command that is not a string is not a shape Claude Code writes,
+# but the one-pass read of the three fields must not give it a different verdict
+# either: the per-field spawn printed the container and the verb's substring
+# match continued. @tsv alone refuses a container — "object (...) is not valid in
+# a csv row" — and one such field would take the whole pass, event included,
+# down the raw path; the expression stringifies each field to prevent that.
+run "$(jq -cn --arg t "$T_PAST" '{session_id: "s", transcript_path: $t, cwd: "/tmp",
+  hook_event_name: "PreToolUse", tool_name: "Bash",
+  tool_input: {command: {note: "herdr tab create"}, description: "d"}}')"
+expect_notice "a non-string tool_input.command carrying a verb still reads a figure" \
+  PreToolUse "context 523114"
 # Everything else a coordinator runs is not new work and stays silent.
 for entry in 'agent wait|herdr agent wait w7:p2 --until idle --timeout 60000' \
              'pane read|herdr pane read w7:p2' \
@@ -142,8 +166,10 @@ expect_silent "control: an Orca new-work command no longer arms the matcher"
 # so the silence below belongs to the gate and not to a handler that is mute anyway.
 run "$(input UserPromptSubmit "$T_PAST")"
 expect_notice "control: the same prompt inside a herdr pane fires" UserPromptSubmit "context 523114"
-OUT="$(printf '%s' "$(input UserPromptSubmit "$T_PAST")" | env -u HERDR_PANE_ID \
-  -u CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING "$BASH_BIN" "$HOOK" 2>/dev/null)"; RC=$?
+# The outside-a-pane fixture is an empty HERDR_PANE_ID through the helper: the
+# gate reads `${HERDR_PANE_ID:-}`, which cannot tell an empty value from an
+# unset one, and the invocation shape now lives in one place.
+run "$(input UserPromptSubmit "$T_PAST")" HERDR_PANE_ID=
 expect_silent "past the ceiling but outside a herdr pane: silent"
 
 section "the figure is the latest record, never a sum"
