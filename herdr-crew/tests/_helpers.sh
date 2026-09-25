@@ -281,12 +281,16 @@ count_shadows() { # <file> <fn>...
       }
     }
     # The line as bash reads it up to a comment: a `#` begins one only at the START of a word
-    # — line start, or after a blank, `;`, `&`, `|` or `(` — and only outside a quoted string.
-    # A cruder strip is wrong in both directions, and each direction is a control beside the
-    # #599 ones: `cat <<EOF#tag` is a delimiter bash reads whole, and stripping at its `#` made
-    # the skip wait for `EOF`, read nothing to the end of the file and count 0 with a real
-    # `pin()` under the body (#602 review round 1, finding 1); while a `#` that does begin a
-    # comment must go, or the `<<` inside it opens a phantom body.
+    # — line start, or after a blank, `;`, `&`, `|`, `(`, `)`, `<` or `>` — and only outside a
+    # quoted string. `)` is in that set because bash ends a case arm pattern with it and a
+    # comment may follow the operator directly; measured, `case x in x)# <<MISSING` is a
+    # comment to bash, and without `)` this scan opened a body that never ended and counted 0
+    # with a `pin()` under it (#602 review round 2, finding 1).
+    # A cruder strip is wrong in both directions, and each direction has a control: `cat
+    # <<EOF#tag` is a delimiter bash reads whole, and stripping at its `#` made the skip wait
+    # for `EOF`, read nothing to the end of the file and count 0 with a real `pin()` under the
+    # body (#602 review round 1, finding 1); while a `#` that does begin a comment must go, or
+    # the `<<` inside it opens a phantom body.
     function code_only(line,   i, c, p, n) {
       n = length(line)
       for (i = 1; i <= n; i++) {
@@ -294,7 +298,8 @@ count_shadows() { # <file> <fn>...
         if (c != "#") continue
         if (i > 1) {
           p = substr(line, i - 1, 1)
-          if (p != " " && p != "\t" && p != ";" && p != "&" && p != "|" && p != "(") continue
+          if (p != " " && p != "\t" && p != ";" && p != "&" && p != "|" && p != "(" &&
+              p != ")" && p != "<" && p != ">") continue
         }
         if (inside_quote(line, i)) continue
         return substr(line, 1, i - 1)
@@ -321,12 +326,27 @@ count_shadows() { # <file> <fn>...
       return st != ""
     }
     # The index of the first heredoc operator on this line, or 0. `<<<` is a
-    # herestring and not an operator; a `<<` inside a quoted string is text.
-    function heredoc_op(line,   i, n) {
+    # herestring and not an operator; a `<<` inside a quoted string is text; and a `<<`
+    # inside an arithmetic expansion is a SHIFT, not a redirection — measured,
+    # `x=$(( 1 << 2 ))` before a `pin()` definition read 0 here, because `2` had been
+    # taken for a delimiter and the skip ran to the end of the file
+    # (#602 review round 2, finding 2). The depth is carried across lines, because an
+    # arithmetic expansion may span them; a depth that never closes only makes later
+    # operators be ignored, which reads MORE text as code — the fail-closed direction.
+    function heredoc_op(line,   i, n, p) {
       n = length(line)
       for (i = 1; i < n; i++) {
+        if (substr(line, i, 2) == "))") { if (arith > 0) arith--; i++; continue }
+        if (substr(line, i, 2) == "((") {
+          p = (i > 1) ? substr(line, i - 1, 1) : ""
+          if (p == "$") { arith++; i++; continue }                      # an expansion: $(( … ))
+          if (p == "" || p == " " || p == "\t" || p == ";" || p == "&" || p == "|" || p == "(") {
+            arith++; i++; continue                                       # an arithmetic command: (( … ))
+          }
+        }
         if (substr(line, i, 2) != "<<") continue
         if (substr(line, i + 2, 1) == "<") { i += 2; continue }
+        if (arith > 0) continue
         if (inside_quote(line, i)) continue
         return i
       }
@@ -371,10 +391,19 @@ count_shadows() { # <file> <fn>...
       if (line ~ /\\$/) { sub(/\\$/, "", line); cont = line; next }
       code = code_only(line)                             # the operator is looked for in code, never in a comment
       op = heredoc_op(code)
-      if (op > 0) { hd = heredoc_delim(code, op); hd_on = 1 }
+      if (op > 0) { hd = heredoc_delim(code, op); hd_on = 1; hd_line = NR }
       see(line) }
     END {
       if (cont != "") see(cont)                # a file ending in a continuation: no next line to join, and nothing to lose
+      # A body that never ends is a read that did not finish, not a clean file: it is either an
+      # unterminated heredoc (which bash itself rejects) or an operator this scan misclassified
+      # — and a misclassified one would otherwise swallow every line after it IN SILENCE. Both
+      # are refused here, so the gate names the file instead of certifying it
+      # (#602 review round 2, finding 2; the same shape as the empty-read refusal above).
+      if (hd_on) {
+        printf "the heredoc body opened at line %d never ends — this scan cannot certify the lines after it\n", hd_line
+        exit 1
+      }
       total = 0; tail = ""
       for (i = 1; i <= n; i++) if (a[i] in hits) { total += hits[a[i]]; tail = tail " " a[i] " " hits[a[i]] }
       print total tail

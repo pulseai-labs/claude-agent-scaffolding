@@ -575,6 +575,34 @@ for ctl_empty in empty-delimiter-single empty-delimiter-double; do
       "got [$got], expected [1 pin 1] — the body's definition is data and the trailing one is not"
   fi
 done
+# Controls, #602 review round 2 findings 1 and 2: the two operators that are NOT heredocs and
+# were taken for one. Each fixture was measured twice — `bash -n` accepts it and a bash that
+# sources it defines `pin` — and each counted 0 before the fix, because a phantom body
+# swallowed the definition under it.
+printf 'case x in\n  x)# <<MISSING\n  ;;\nesac\npin() {\n  :\n}\n' > "$ctl_sh/comment-after-paren.sh"
+printf 'x=$(( 1 << 2 ))\npin() {\n  :\n}\n'                    > "$ctl_sh/arith-shift-expansion.sh"
+printf '(( 1 << 2 ))\npin() {\n  :\n}\n'                        > "$ctl_sh/arith-shift-command.sh"
+printf 'if (( 1 << 2 )); then :; fi\npin() {\n  :\n}\n'        > "$ctl_sh/arith-shift-in-if.sh"
+for spelling in comment-after-paren arith-shift-expansion arith-shift-command arith-shift-in-if; do
+  got="$(count_shadows "$ctl_sh/$spelling.sh" pin)"
+  if [ "$got" = "1 pin 1" ]; then
+    pass "control: the definition under a non-heredoc << still counts ($spelling)"
+  else
+    fail "control: the definition under a non-heredoc << still counts ($spelling)" \
+      "got [$got], expected [1 pin 1] — the << opened a body that swallowed the definition"
+  fi
+done
+# The adjacent control for that class: when a body really has no end, the scan must REFUSE
+# rather than print a count, because everything after the operator is uncertified. This is the
+# fail-closed half — a misclassified operator can only cost a loud RED, never silence — and the
+# fixture is bash-invalid on purpose (`bash -n` rejects an unterminated heredoc too).
+printf 'cat <<NEVER_ENDED\npin() {\n  :\n}\n' > "$ctl_sh/unterminated-body.sh"
+got="$(count_shadows "$ctl_sh/unterminated-body.sh" pin)"
+case "$got" in
+  *"heredoc body opened at line 1 never ends"*) pass "control: an unterminated body is refused, not counted" ;;
+  *) fail "control: an unterminated body is refused, not counted" \
+       "got [$got] — a zero here would certify lines the scan never read" ;;
+esac
 rm -f "$ctl_sh"/*.sh
 if rmdir "$ctl_sh"; then
   pass "control: the spelling controls leave no fixture behind"
@@ -655,12 +683,17 @@ fi
 # failure would certify the wrong instrument).
 ctl_self="${BASH_SOURCE[0]##*/}"
 structural_red() { # <output of assert_hoisted_counters> — the structural failure, naming pin
+  case "$1" in *"✗"*) ;; *) return 1 ;; esac                        # a failure happened at all
   case "$1" in *"different definition of:"*"pin"*) ;; *) return 1 ;; esac
   case "$1" in *"line-anchored text scan cannot count"*) ;; *) return 1 ;; esac
   case "$1" in *"every assertion that calls it keeps passing"*) return 1 ;; esac
   return 0
 }
 structural_clean() { # <output> — both halves report the suite clean
+  # The failure MARKER first, not just the expected labels: `fail` prints a label too, so a run
+  # in which the text half reported a copy and the structural half passed carries both labels
+  # and would otherwise read as clean (#602 review round 2, finding 3).
+  case "$1" in *"✗"*) return 1 ;; esac
   case "$1" in
     *"no copy of a hoisted counter in $ctl_self"*"the hoisted counters are the ones bash resolved in $ctl_self"*) return 0 ;;
   esac
@@ -708,6 +741,21 @@ else
   fail "control: a byte-identical copy off the line start is invisible to both halves (the named bound)" \
     "$out — if the text pass now counts it or bash resolves something else, the bound in _helpers.sh is wrong"
 fi
+# Adjacent control for the two predicates themselves: a run in which the TEXT half reported a
+# copy and the structural half passed must not read as clean. The string is the real print order
+# with the real failure detail, and it is not hypothetical — measured, the predicate without the
+# marker check called exactly this output CLEAN, which is how the control above could have gone
+# green over a red half (#602 review round 2, finding 3).
+ctl_text_fail="  ✗ no copy of a hoisted counter in $ctl_self
+      pin 1 — a local definition shadows the one in _helpers.sh, and every assertion that calls it keeps passing
+  ✓ the hoisted counters are the ones bash resolved in $ctl_self"
+if structural_clean "$ctl_text_fail"; then
+  fail "control: a run whose text half failed does not read as clean" \
+    "structural_clean accepted an output carrying a failure marker"
+else
+  pass "control: a run whose text half failed does not read as clean"
+fi
+
 # The adjacent control, the drift direction: the same copy with ONE body line dropped — the
 # shape the pre-hoist copies took when one of them lost its `[ -f ]` guard — must be caught
 # here and only here. Measured: the text pass still counts this 0.
