@@ -61,8 +61,8 @@ pin "skills/working-a-pr/SKILL.md" \
   "**One push per round.**" \
   "6  one push per round"
 pin "skills/working-a-pr/SKILL.md" \
-  "stop. Do not start a fourth round." \
-  "7  the round-3 stop"
+  "stop. Do not start another round." \
+  "7  the stop when the fixes are generating the findings"
 pin "skills/working-a-pr/SKILL.md" \
   "Never write the ledger into the reviewed repository" \
   "8  the ledger never lands in the reviewed repo"

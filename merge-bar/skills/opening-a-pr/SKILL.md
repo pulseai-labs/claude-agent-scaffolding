@@ -50,6 +50,10 @@ Merge bar block word for word. Its "Filling each field" section says what goes i
 
 ## 5. Open it
 
+Push the branch first if it has no upstream or is ahead of it — `gh pr create --head` skips any
+pushing, so a branch the remote does not have cannot be opened as a PR: `git push -u origin
+<branch>`. Never force-push.
+
 Write the body to a file and run
 `gh pr create --base <base> --head <branch> --title "<title>" --body-file <file>`.
 Open it ready for review, not as a draft, unless the caller asks for a draft. Report the URL.

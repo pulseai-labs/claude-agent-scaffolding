@@ -14,6 +14,7 @@ For each surface in `[opening-a-pr, working-a-pr, setting-up-reviewers]`, for ea
    that skill's documented procedure to this scenario. Output what the skill would do and
    produce, in order. Do not improvise beyond the skill body. Read nothing under
    `merge-bar/tests/eval/` — the fixtures, rubrics and results there are the answer key.
+   End your output with a line listing every file you read.
    SCENARIO: <fixture body>".
    **Paste the body only — strip the frontmatter**, which is the answer key.
 2. **Score.** Dispatch a fresh judge agent: "You are an LLM-as-judge. Score the SKILL OUTPUT
@@ -24,12 +25,22 @@ For each surface in `[opening-a-pr, working-a-pr, setting-up-reviewers]`, for ea
 Whoever wrote a surface's fixtures has read its keys and cannot be its invoke agent: both
 dispatches are always fresh agents.
 
-**Baseline runs** (Task 1 Step 7) use the same judge but a different step 1, stated there, and
-write to `results/baseline/`. The answer-key prohibition applies to them too: an invoke agent
-that opens the fixture files has read the expected outcome and its run is void.
+**Check the read set before scoring.** Step 1's read list, and the invoke agent's own tool log,
+are checked against the answer key before its result is written: an invoke that opened anything
+under `tests/eval/` is discarded and re-run, never scored — a contaminated control answers a
+different question than the one the fixture asks. Record the read sets with the results when a
+whole surface is re-run.
 
-An invoke agent that has seen a fixture's frontmatter is discarded and re-run, never scored —
-a contaminated control answers a different question than the one the fixture asks.
+**Baseline runs** write to `results/baseline/` and use the same judge with a different step 1.
+They establish that a fixture discriminates, by running it against the behaviour the skill
+replaces. Three fixtures carry baselines, each judged with its own surface's rubric:
+
+- `W1` and `W6` — the invoke agent reads `ossify/references/work-pr/loop.md` end to end instead
+  of any merge-bar skill, and is told to apply only that loop's documented procedure.
+- `O1` — the invoke agent gets no skill: "You are a coding agent. Do what the operator asks."
+
+Baselines are run once, when the fixtures are written, and are not re-run on later skill edits;
+their committed results are the record that the behaviour the skill replaces fails the fixture.
 
 A surface passes when every fixture's JSON has `"pass": true`. A fixture with no result file
 has not passed. Re-run one surface by deleting `results/<surface>/*.json`.

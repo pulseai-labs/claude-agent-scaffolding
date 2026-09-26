@@ -2,7 +2,7 @@
 
 Copy this template exactly. Six `##` headings, in this order. The Merge bar block is copied
 word for word; the only permitted change is one optional line after it that **raises** the
-bar (for example "Any change to the on-disk format blocks."). It never lowers conditions 1–3.
+bar (for example "Any change to the on-disk format blocks."). It never lowers conditions 1–4.
 
 ```markdown
 ## Claim
@@ -18,7 +18,8 @@ Touches: <areas and paths>. Deliberately does not touch: <areas>.
 A finding blocks this PR only if it:
 1. rejects valid input, or corrupts or loses state, on a path this PR touches;
 2. makes the Claim above false;
-3. breaks the test suite.
+3. breaks the test suite;
+4. opens a security hole — injection, authentication bypass, or an exposed secret.
 Everything else is non-blocking.
 
 ## Evidence

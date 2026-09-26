@@ -11,7 +11,8 @@ invariant reviewers most often have to explain.
 ### What can block a merge
 
 - Mark a finding as blocking only if the change rejects valid input, or corrupts or loses
-  state, on a path it touches — or it breaks the test suite. Say which of those it is.
+  state, on a path it touches — or it breaks the test suite, or it opens a security hole
+  (injection, an authentication bypass, an exposed secret). Say which of those it is.
   Safe path: everything else is a suggestion; mark it non-blocking.
 
 ### Edge cases the change does not handle

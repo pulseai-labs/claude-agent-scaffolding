@@ -1,6 +1,6 @@
 ---
 name: working-a-pr
-description: Drive an open pull request to a mergeable state against the merge bar its own body declares — fetch every reviewer finding, sort each as blocking or non-blocking by that bar, fix only the blocking ones in one push per round, answer the rest in the thread or record them as known limits, stop at round 3 when the fixes are generating the findings, and merge only on the operator's explicit ack. Use when working, driving, babysitting or landing a PR, addressing review comments, or when handed a PR number to get merged.
+description: Drive an open pull request to a mergeable state against the merge bar its own body declares — fetch every reviewer finding, sort each as blocking or non-blocking by that bar, fix only the blocking ones in one push per round, answer the rest in the thread or record them as known limits, stop at round 3 or later when the fixes are generating the findings, and merge only on the operator's explicit ack. Use when working, driving, babysitting or landing a PR, addressing review comments, or when handed a PR number to get merged.
 ---
 
 # Working a pull request — against its merge bar
@@ -110,6 +110,9 @@ This section is authoritative for this lane. The bar is the `## Merge bar` secti
 body. A finding is **blocking** if and only if it meets one of the bar's conditions, or the
 PR's one raising line. Decide by the condition, never by the reviewer's label: a bot's "P1"
 that meets no condition is non-blocking, and a "nit" that meets condition 1 is blocking.
+Condition 4 is the same: a finding that opens an injection, an authentication bypass or an
+exposed secret is blocking however it is labelled — its severity is the bar's, not the
+reviewer's or the operator's.
 
 Every ledger line ends in exactly one of these five dispositions:
 
@@ -132,8 +135,9 @@ Every ledger line ends in exactly one of these five dispositions:
 cut. It is never ack-to-merged, never deferred and never relabelled, no matter which round
 surfaced it or who asks — "just merge it" included.
 
-- **You drive the fix yourself:** edit, commit, push. Record `fixed in <sha>` only when the fix
-  is on the PR head the reviewer can see.
+- **You drive the fix yourself:** edit and commit. The push is §3.5's one push per round — never
+  one push per fix. Record `fixed in <sha>` only when the fix is on the PR head the reviewer can
+  see.
 - **Staleness:** a fix commit landing after a review makes that verdict stale. Re-fetch (§2)
   and re-review on the **new** head; the old verdict does not carry forward.
 - **Reviewer completeness:** green CI is not proof a reviewer ran; a skipped reviewer is not
@@ -160,14 +164,15 @@ opened PR.
   bar: does any line of it newly reject valid input, corrupt or lose state, or falsify the
   Claim? Most of round N's findings are on round N-1's fixes; the cheapest round to remove is
   the one you are about to cause.
-- **The round-3 stop.** At round 3, if blocking findings remain and they sit on lines your own
-  fix commits wrote (check with `git blame` against the fix SHAs), stop. Do not start a fourth round. Surface
+- **The stop.** At round 3 or any later round, if any blocking finding sits on lines your own
+  fix commits wrote (check with `git blame` against the fix SHAs), stop. Do not start another round. Surface
   the findings, the fix commits they sit on, and two options for the operator: **narrow the
   Claim** — moving an edge into Known limits, only where it does not meet condition 1 — or
-  **split the PR**, naming the parts. The operator chooses.
-- **Not the stop:** blocking findings at round 3 on lines the PR's original commits wrote. The
-  reviewers are excavating the design, not reacting to your fixes. Disposition each on its
-  merits and continue; a count alone never ends the loop.
+  **split the PR**, naming the parts. The operator chooses. Findings in that same round which
+  sit on the PR's original commits are dispositioned on their merits alongside the stop report.
+- **Not the stop:** blocking findings at round 3 or later on lines the PR's original commits
+  wrote. The reviewers are excavating the design, not reacting to your fixes. Disposition each
+  on its merits and continue; a count alone never ends the loop.
 
 **Unclaiming.** Narrowing the Claim is two edits, not one: the findings behind the claim keep
 their ledger lines — the unclaiming commit is the fix — and the claim itself comes out of every
@@ -216,8 +221,9 @@ report the PR URL and stop — the loop does not poll.
 ## 5. After the merge — write the ledger
 
 Only after the merge has succeeded. Collect every line of the final body's `## Known limits`
-(except `None.`), every `limit — [KL]` finding, and the one `outside scope → #N` issue if
-there is one. Write them as:
+(except `None.`) — an in-review `limit — [KL]` finding already reached the body through §3, so
+nothing is collected twice — and the one `outside scope → #N` issue if there is one. Write them
+as:
 
 ```
 - [KL] <area/path> — <the limit> — <why accepted> — revisit when <trigger> (PR #N)
@@ -247,8 +253,8 @@ where they go.
   target.
 - **Filing an issue per finding.** Out-of-scope defects share one issue; in-scope
   non-blocking findings get none.
-- **Counting rounds without reading them.** Round 3 stops the loop only when the reading says
-  your fixes are generating the findings.
+- **Counting rounds without reading them.** A round number never stops the loop on its own: the
+  stop fires only when the reading says your fixes are generating the findings.
 - **Ack-to-merging a blocking finding**, or letting "just merge it" relabel one as a limit.
 - **Trusting a pre-fix verdict on a post-fix head.**
 - **Auto-merging.** The merge is always the operator's explicit call.

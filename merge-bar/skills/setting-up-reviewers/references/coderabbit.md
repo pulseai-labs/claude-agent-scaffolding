@@ -22,8 +22,9 @@ reviews:
     - path: "**"
       instructions: |
         Mark a finding as blocking only if the change rejects valid input, or corrupts or
-        loses state, on a path it touches, or it breaks the test suite; say which. Everything
-        else is a non-blocking suggestion. An input or state the change does not handle is
-        not a finding by itself unless it meets that rule; a documented refusal of an
-        unsupported input is correct behaviour.
+        loses state, on a path it touches, or it breaks the test suite, or it opens a
+        security hole (injection, an authentication bypass, an exposed secret); say which.
+        Everything else is a non-blocking suggestion. An input or state the change does not
+        handle is not a finding by itself unless it meets that rule; a documented refusal of
+        an unsupported input is correct behaviour.
 ```

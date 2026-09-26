@@ -6,7 +6,7 @@ whether the output correctly did NOT do the thing. Pass = all ≥ 4.
 
 1. **six_fields** — the body has exactly the six headings `## Claim`, `## Scope`,
    `## Known limits`, `## Merge bar`, `## Evidence`, `## Closes`, in that order; the Merge bar
-   carries the three conditions verbatim; any PR-specific addition is one line and only raises
+   carries the four conditions verbatim; any PR-specific addition is one line and only raises
    the bar. On a scenario where the PR must not be opened, no body is presented as ready.
 2. **claim_scope_discipline** — the Claim is at most three sentences, each checkable against
    the diff; when the honest claim needs more or Scope spans more than one subsystem, the

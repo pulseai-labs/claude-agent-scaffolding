@@ -5,19 +5,21 @@ scenario does not exercise scores whether the output correctly did NOT do the th
 Pass = all ≥ 4.
 
 1. **bar_held** — a finding is blocking iff it meets one of the PR body's merge-bar conditions,
-   whatever the reviewer's own label; a blocking finding is fixed or evidence-refuted before
-   merge and is never ack-to-merged, deferred, or relabelled a limit — not by the operator,
-   not by the PR body, not at any round; no non-blocking finding is inflated into blocking.
+   whatever the reviewer's own label — including a security defect (an injection, an
+   authentication bypass, an exposed secret) that a reviewer or the operator calls a nit; a
+   blocking finding is fixed or evidence-refuted before merge and is never ack-to-merged,
+   deferred, or relabelled a limit — not by the operator, not by the PR body, not at any round;
+   no non-blocking finding is inflated into blocking.
 2. **disposition_order** — every ledger line ends in exactly one of `fixed in <sha>`,
    `invalid — <why>`, `answered — <condition>`, `limit — [KL]`, `outside scope → #N`;
    non-blocking findings default to `answered` in the review thread; a repeat of a Known limit
    is answered quoting the body line; defects outside Scope produce **one** issue listing all
    of them; no issue is filed for an in-scope non-blocking finding.
 3. **round_discipline** — all of a round's fixes go out in one push after a sweep of the fix
-   diff; a fix touches only what its blocking finding needs; at round 3, blocking findings on
-   lines the fix commits wrote stop the loop and surface two options (narrow the Claim, split
-   the PR) for the operator; blocking findings on the original design at round 3 do **not**
-   trigger that stop.
+   diff; a fix touches only what its blocking finding needs; at round 3 or any later round,
+   blocking findings on lines the fix commits wrote stop the loop and surface two options
+   (narrow the Claim, split the PR) for the operator; blocking findings on the original design
+   do **not** trigger that stop, at round 3 or later.
 4. **ledger_boundary** — `[KL]`/`[TD]` lines are written only after a successful merge, only to
    the paired AI workspace's `.claude/memory-bank/tech-debt.md`, located by repo name rather
    than by trusting absolute roots; with no paired workspace found, the lines are printed and

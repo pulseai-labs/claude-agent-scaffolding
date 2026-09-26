@@ -12,7 +12,8 @@ before any reviewer speaks, and judges every finding against it.
 A finding blocks this PR only if it:
 1. rejects valid input, or corrupts or loses state, on a path this PR touches;
 2. makes the Claim above false;
-3. breaks the test suite.
+3. breaks the test suite;
+4. opens a security hole — injection, authentication bypass, or an exposed secret.
 Everything else is non-blocking.
 ```
 
