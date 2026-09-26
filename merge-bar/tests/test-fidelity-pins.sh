@@ -50,7 +50,24 @@ pin "skills/opening-a-pr/SKILL.md" \
   "GitHub closes only the first issue of \`Closes #1, #2\`" \
   "3  one closing keyword per issue, with its reason"
 
-# ── pins for working-a-pr and setting-up-reviewers are added by Tasks 3 and 4 ──
+section "working-a-pr"
+pin "skills/working-a-pr/SKILL.md" \
+  "A finding that meets condition 1 cannot be a limit" \
+  "4  a condition-1 finding is never downgraded to a limit"
+pin "skills/working-a-pr/SKILL.md" \
+  "At most one issue per PR" \
+  "5  out-of-scope defects share one issue"
+pin "skills/working-a-pr/SKILL.md" \
+  "**One push per round.**" \
+  "6  one push per round"
+pin "skills/working-a-pr/SKILL.md" \
+  "stop. Do not start a fourth round." \
+  "7  the round-3 stop"
+pin "skills/working-a-pr/SKILL.md" \
+  "Never write the ledger into the reviewed repository" \
+  "8  the ledger never lands in the reviewed repo"
+
+# ── pins for setting-up-reviewers are added by Task 4 ──
 
 section "cap"
 [ "$PINS" -le 10 ] && pass "at most ten pins ($PINS)" || fail "at most ten pins" "$PINS"

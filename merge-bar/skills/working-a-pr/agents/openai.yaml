@@ -1,0 +1,3 @@
+interface:
+  display_name: "Work a PR"
+  short_description: "Drive a PR to merge against its own merge bar"
