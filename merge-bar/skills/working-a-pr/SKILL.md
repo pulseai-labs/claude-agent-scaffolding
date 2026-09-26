@@ -189,7 +189,11 @@ on the head that carries the final shape before the terminus ask.
 
 ## 4. Terminus — surface everything, then ask
 
-In one place, give the operator:
+First resolve the review thread of every inline finding — each has its final disposition by
+now (GraphQL `resolveReviewThread`). A repository can require resolved threads to merge, and
+an open one blocks it as surely as a red check.
+
+Then, in one place, give the operator:
 
 - the full disposition ledger,
 - CI state and per-reviewer status (ran / skipped / pending / stale),
