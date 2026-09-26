@@ -210,7 +210,7 @@ instead of merging unreviewed commits. The pin guards **commits, not
 verdicts** — a blocking review or a red CI rerun can land on the *same* head
 while the operator considers the ask — so after the ack and immediately
 before merging, re-fetch both finding signals and the checks once more;
-anything newly blocking re-enters §2 instead of merging. On a branch governed
+any new finding re-enters §2 instead of merging. On a branch governed
 by a merge queue, required checks must be **finished** before accepting the
 ack — with checks still pending, `gh pr merge` does not merge, it *enables
 auto-merge*, and this lane never auto-merges. Never merge over an unresolved
@@ -220,9 +220,13 @@ report the PR URL and stop — the loop does not poll.
 
 ## 5. After the merge — write the ledger
 
-Only after the merge has succeeded. Collect every line of the final body's `## Known limits`
-(except `None.`) — an in-review `limit — [KL]` finding already reached the body through §3, so
-nothing is collected twice — and the one `outside scope → #N` issue if there is one. Write them
+Only after the merge has succeeded: `gh pr view <PR> --json state` reads `MERGED`. Under a
+merge queue `gh pr merge` returns once the PR is queued, not merged. Not `MERGED` → write
+nothing; print the lines below and where they belong, for the operator to add once it merges
+(a later run cannot: §1 stops on a merged PR). Collect every line of the final body's
+`## Known limits` (except `None.`) — an in-review `limit — [KL]` finding already reached the
+body through §3, so nothing is collected twice — and the one `outside scope → #N` issue if
+there is one. Write them
 as:
 
 ```
