@@ -15,6 +15,10 @@ repository, and lands it as a pull request.
 - The forge: `git remote get-url origin`. Not GitHub → go straight to §5; nothing else here
   applies.
 - `gh repo view --json nameWithOwner,visibility,defaultBranchRef`
+- Start from the default branch, not the checkout's: with a clean tree (dirty → say what is
+  dirty and stop; never stash), `git fetch origin <default>` and
+  `git switch -c chore/review-rules origin/<default>`. Everything below reads and writes that
+  branch, so the PR carries the review rules and nothing else.
 - Whether a root `AGENTS.md` exists, and whether it already has a review-rules section.
 - Whether a `.coderabbit.yaml` exists.
 - The one domain invariant reviewers most often have to explain, if any: ask the operator, or
@@ -39,8 +43,8 @@ tier does not review private repositories. When the repository is public, use
 
 ## 4. Land it as a pull request
 
-Create a branch (`chore/review-rules`), commit following the repository's commit rules, push
-the branch, and open it with `opening-a-pr`. Never push to the default branch.
+On `chore/review-rules` (§1), commit following the repository's commit rules, push the branch,
+and open it with `opening-a-pr`. Never push to the default branch.
 
 ## 5. Azure DevOps and other forges
 
