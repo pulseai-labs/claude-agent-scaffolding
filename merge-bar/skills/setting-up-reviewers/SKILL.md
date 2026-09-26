@@ -12,6 +12,8 @@ repository, and lands it as a pull request.
 
 ## 1. Read the repository first
 
+- The forge: `git remote get-url origin`. Not GitHub → go straight to §5; nothing else here
+  applies.
 - `gh repo view --json nameWithOwner,visibility,defaultBranchRef`
 - Whether a root `AGENTS.md` exists, and whether it already has a review-rules section.
 - Whether a `.coderabbit.yaml` exists.

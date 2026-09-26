@@ -16,6 +16,11 @@ anything else.
 
 ## 2. Four checks before you write
 
+**Which forge.** Read `git remote get-url origin` first. Every `gh` command in this skill is
+GitHub's; on any other forge skip them — take the base from the caller or
+`git ls-remote --symref origin HEAD`, the title from the base's recent history — and end
+at §5's printed title and body.
+
 1. **Read the diff.** The base is the branch the caller names, else the repository default
    (`gh repo view --json defaultBranchRef`). Run `git fetch origin <base>` and
    `git diff --stat origin/<base>...HEAD`, then read the changes themselves.
