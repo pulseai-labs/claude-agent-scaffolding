@@ -145,6 +145,8 @@ const excludedPlugins = [
   "herdr-crew",
   // The DeepSeek Harness crew, same status: ships on Claude Code and Codex only.
   "dsh-crew",
+  // The PR lifecycle plugin, same status: ships on Claude Code and Codex only.
+  "merge-bar",
 ];
 
 const expectedAliases = {

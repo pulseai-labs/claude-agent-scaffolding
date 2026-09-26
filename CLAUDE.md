@@ -17,7 +17,7 @@ everywhere.
 
 Shipped: `workspace-init`, `scaffold-onboard`, `scaffold-dev`, `scaffold`, `ai-mentor`,
 `architect-critic`, `claude-security-audit`, `ossify`, `code-judo`, `orca-crew`, `herdr-crew`,
-`dsh-crew`.
+`dsh-crew`, `merge-bar`.
 
 This repo is the **public canonical half** of a dual-repo project. Design specs, session
 handoffs, review records and process exhaust live in a private sibling workspace and must

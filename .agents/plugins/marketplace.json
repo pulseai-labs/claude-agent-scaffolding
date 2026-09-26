@@ -136,6 +136,19 @@
       },
       "category": "Coding",
       "description": "The crew for DeepSeek Harness (dsh): a spine session on the crew-spine preset runs ossify's run-spine --external-executor, dispatching each work item to a configured subagent_implementer child, verifying it with a subagent_verifier child, computing ossify's result record from git and handing the round back. ossify state is the single authority; this plugin adds nothing to its contract. Two prose skills (dsh-executor, dsh-brief) and a presets reference the operator copies into the dsh home. No lib, no state, no commands."
+    },
+    {
+      "name": "merge-bar",
+      "source": {
+        "source": "local",
+        "path": "./merge-bar"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Coding",
+      "description": "The pull-request lifecycle against a merge bar fixed when the PR opens. Open a PR whose body carries six fields (Claim, Scope, Known limits, Merge bar, Evidence, Closes); work it by sorting every reviewer finding as blocking or non-blocking against that bar, one push per round, with a stop at round 3 when the fixes are generating the findings, and non-blocking findings answered in the thread or recorded as known limits in the paired AI workspace's tech-debt ledger instead of filed as issues; and teach a repository's reviewers the bar through an AGENTS.md Code Review Rules section and, on public repositories, a .coderabbit.yaml. Three prose skills, three slash commands, no lib, no state."
     }
   ]
 }
