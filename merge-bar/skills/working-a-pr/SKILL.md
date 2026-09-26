@@ -16,6 +16,9 @@ mechanical `git`/`gh` facts. Nothing here needs a manifest, a worktree, or any p
 keeping everything already there, and tell the operator you did. A bar written before the
 first disposition is a bar; one written after is a rationalisation.
 
+**A bar below the template?** Conditions 1–4 are a floor: if the body's bar drops or rewords
+one, judge by all four anyway and tell the operator.
+
 ## 1. Preflight — resolve the target, stop early, stop loudly
 
 - **The repo:** the one you are in, unless `--repo-root DIR` says otherwise —
