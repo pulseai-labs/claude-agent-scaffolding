@@ -552,4 +552,10 @@ else fail "the Claude manifest declares context_ceiling (number, default 500000)
 if [ -x "$PLUGIN_ROOT/hooks-handlers/context-ceiling.sh" ]; then pass "the handler is executable"
 else fail "the handler is executable"; fi
 
+# #514, L1: a counter re-copied into this suite would shadow the hoisted one and keep every
+# assertion that calls it passing. Both halves assert the shape: this one is the per-suite
+# half, and the directory-wide half runs once, from test-config-contract.sh.
+section "the hoisted counters are not re-copied"
+assert_hoisted_counters
+
 report

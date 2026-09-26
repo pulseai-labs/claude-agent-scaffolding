@@ -425,4 +425,10 @@ else
 fi
 rm -f "$ctl_ok"
 
+# #514, L1: a counter re-copied into this suite would shadow the hoisted one and keep every
+# assertion that calls it passing. Both halves assert the shape: this one is the per-suite
+# half, and the directory-wide half runs once, from test-config-contract.sh.
+section "the hoisted counters are not re-copied"
+assert_hoisted_counters
+
 report
