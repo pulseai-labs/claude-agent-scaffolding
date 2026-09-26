@@ -67,7 +67,13 @@ pin "skills/working-a-pr/SKILL.md" \
   "Never write the ledger into the reviewed repository" \
   "8  the ledger never lands in the reviewed repo"
 
-# ── pins for setting-up-reviewers are added by Task 4 ──
+section "setting-up-reviewers"
+pin "skills/setting-up-reviewers/references/code-review-rules.md" \
+  "## Code Review Rules" \
+  "9  the heading Codex reads, exactly"
+pin "skills/setting-up-reviewers/SKILL.md" \
+  "never overwrite an existing \`.coderabbit.yaml\`" \
+  "10 an existing CodeRabbit config is diffed and asked, never replaced"
 
 section "cap"
 [ "$PINS" -le 10 ] && pass "at most ten pins ($PINS)" || fail "at most ten pins" "$PINS"
