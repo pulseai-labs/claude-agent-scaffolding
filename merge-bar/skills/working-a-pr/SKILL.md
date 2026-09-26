@@ -239,6 +239,9 @@ workspace by looking next to this repository for a directory holding
 `.workspace/pairing.json` whose `canonical.name` is this repository's name (commonly
 `<repo>-ai`), or through ossify's `.ossify/topology.json`. The manifest's absolute `root`
 paths may belong to another machine — match by name and location, never by trusting them.
+The workspace is someone's working tree too: if it has staged changes or modified tracked
+files, write nothing — print the lines and where they belong, say what is dirty, and let the
+operator place them.
 If the file is absent, create it with the heading `# Tech debt — <repo>`. Commit and land it
 the way that repository's own `CLAUDE.md` says; if it says nothing, leave it uncommitted and
 tell the operator.
