@@ -51,7 +51,9 @@ segment, never Paseo's encoded string, which no worker can be expected to echo:
    taken its brief, and there is no TUI to wait on. The seat is the caller's subagent, drawn
    in Paseo's subagent track.
 3. **Model check.** `paseo inspect <id> --json`: `Model` must equal the expected model's full
-   id. A mismatch is a failed launch: archive the seat and report it (`roles.md`). The brief's
+   id. A mismatch is a failed launch: the seat took its brief as `initialPrompt` and may
+   already have written, so read its activity, reconcile anything it touched — never adopt
+   its artifacts — then archive it and report it (`roles.md`). The brief's
    "state your model in your first reply" is the second check, against the model segment, and
    the one that catches a lane whose provider silently reroutes, because `inspect` reports
    what Paseo asked for, not what answered.

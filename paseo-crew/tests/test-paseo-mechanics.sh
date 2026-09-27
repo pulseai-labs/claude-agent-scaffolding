@@ -27,7 +27,9 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # 2026-09-27, #608 review round 3: raised from 258 by 3 — the base is the placement's
 # ref with origin/main as its default (not a hard-coded base), and the failed-handoff
 # branch reconciles a successor that already resumed before anything is re-armed.
-REF_BUDGET=261
+# 2026-09-27, #608 review round 4: raised from 261 by 2 — a model mismatch reconciles
+# what the seat may have written before the check (the brief is its initialPrompt).
+REF_BUDGET=263
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -57,6 +59,9 @@ pin "$REF" '`origin/main` unless the run names another' "the base defaults to or
 present "$REF" '`checkout-pr` with' "a PR-head seat names its own ref"
 present "$REF" '`checkout-branch` with `branch`' "an existing-branch seat names its branch"
 pin "$REF" 'The orchestrator never runs `paseo run` for a worker' "paseo run is reserved for the handoff"
+# #608 review round 4: the brief is the seat's initialPrompt, so a model mismatch is
+# never a clean failed launch — what it already wrote is reconciled, never adopted.
+pin "$REF" 'reconcile anything it touched' "a mismatched seat's artifacts are reconciled, not adopted" flat
 
 section "D2: the report file is the finish"
 pin "$REF" 'the file is the contract' "the report-file contract survives"

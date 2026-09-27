@@ -94,8 +94,9 @@ Every command's syntax comes from Paseo's own `paseo` skill.
    and state from the first, CI for the named SHA from the rest — and anything beyond
    reading them becomes a verifier dispatch. A read-only item — one whose brief released
    it from the commit, push and PR line — has no PR to check: its report's evidence is the
-   completion, the verifier still checks it (step 7), and the review, the disposition and
-   the merge (steps 8-12) do not apply to it.
+   completion, the verifier still checks it (step 7), the review, the disposition and
+   the merge (steps 8-12) do not apply to it, and its seat and any workspace it used are
+   released there, as Teardown says, since no later step releases them for it.
 7. **Verify, once per work item.** One verifier session per work item, one brief
    listing every claim: each acceptance criterion of the work item's spec, the
    mutation of any new test, and the diff against the requirement. The suite result
@@ -209,7 +210,11 @@ until it passes or the operator overrules it — the orchestrator relays its sum
 the operator's word settles it, anything else is advice in the disposition. A role
 with `replaces:` takes a plugin step — `implementer`, `verifier`, `reviewer`:
 the named seat is not launched, the role runs at its point in its place, and the
-handoff says which step was the operator's. Every point above is the top's own — a
+handoff says which step was the operator's. A replacement for a **retained** role keeps
+that role's lifetime: an `implementer` or `verifier` replacement is retained across
+items and the fail-and-fix cycle as the built-in is, released when the built-in would
+be, never at its dispatch's end — step 7's correction and step 10's fixes need it to
+exist. Every point above is the top's own — a
 declared role is not yet carried into a delegated spine or work-PR session, so a
 `before-merge-ask` role does not fire on an activated spine (issue #500 holds it).
 

@@ -142,7 +142,9 @@ PLACEMENT: worktree <abs-path> checked out at PR <number>'s head <sha>.
 
 TASK: run `/code-review <number> <level>` — the level the orchestrator decided, not
 one you pick; outside an activated ossify spine the level is `medium` unless the
-orchestrator names another. Your first reply must state the model you are running; it is expected to
+orchestrator names another. A fix push the bots do not cover arrives as a second task
+naming its range, `<old sha>..<new sha>`: that is the scoped delta re-review — the
+review over that range alone — and it is the one re-review this seat runs. Your first reply must state the model you are running; it is expected to
 be SEAT_EXPECTED_MODEL, and a mismatch is a failed launch to report, not to work around.
 Let the review finish, then write your report file carrying, in this order:
 `Findings: none` on a clean review, or else every finding in this body, one per line
@@ -155,8 +157,8 @@ without it.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
-NEVER: edit any file other than your report file, post anything to GitHub, or run a second
-review. Your findings
+NEVER: edit any file other than your report file, post anything to GitHub, or run a review
+past the one whole-PR pass and the scoped delta pass a fix range names. Your findings
 travel only in your report file. If `/code-review` refuses or errors, report its output
 verbatim and stop. A blocking question goes in your report file, then wait; an
 escalation goes there too, then stop.

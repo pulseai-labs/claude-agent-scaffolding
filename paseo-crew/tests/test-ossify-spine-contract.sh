@@ -466,6 +466,17 @@ n_eq "$CONFIG_MD" '/ossify:run-spine' 2 \
 # The effort cell names a seat choice, never a runtime override.
 pin "$ROLES_MD" 'the profile is the only source of effort' \
   "a marked item is a seat choice, not a command edit"
+# #608 review round 4: roles.md's launch sequence still hard-coded origin/main after
+# paseo-mechanics.md was fixed; lifecycle step 3 sends coordinators here, so the two
+# launch descriptions have to agree.
+pin "$ROLES_MD" 'the placement'"'"'s mode/base' \
+  "roles.md's launch line defers the worktree base to the placement"
+pin "$LIFECYCLE_MD" 'verifier` replacement is retained across' \
+  "a replaced retained role keeps that role's lifetime"
+pin "$LIFECYCLE_MD" 'released there, as Teardown says' \
+  "a read-only item's seat and workspace are released at its close"
+pin "$GENERIC_BRIEFS_MD" 'the scoped delta pass a fix range names' \
+  "the reviewer contract carries the one scoped delta pass"
 # The close-review writer is a halt-time profile, not a project-file seat.
 pin "$CONFIG_MD" 'close session, work-PR session)' \
   "the writer is not a project-file seat"
@@ -1535,7 +1546,9 @@ pin "$PRBRIEFS_MD" 'ONE bounded correction request' \
 # retained through the fix rounds and released once the review is final.
 pin "$PRBRIEFS_MD" 'that seat is retained through the fix' \
   "the delegated reviewer is retained for the scoped delta re-review"
-pin "$PRBRIEFS_MD" 'a fresh seat from its REVIEWER row on a resumed dispatch' \
+pin "$PRBRIEFS_MD" 'the task names it `<old sha>..<new sha>`' \
+  "the delta re-review's task names its range, so the seat can run it"
+pin "$PRBRIEFS_MD" 'seat from its REVIEWER row on a resumed dispatch' \
   "a resumed dispatch with no live reviewer launches one for the delta"
 pin "$LIFECYCLE_MD" 'a fix push that needs the delta re-review goes to the same seat' \
   "lifecycle.md retains the reviewer for the fix range too"
@@ -1918,7 +1931,10 @@ budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
 # reviewer's retention took — the seat is retained for the fix range's delta
 # re-review and a resumed dispatch launches one, and the work-PR merge confirms
 # `MERGED` rather than a scheduled auto-merge.
-budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget" 205
+# #608 review round 4 (2026-09-27): raised from 205 to 206 — the delta re-review's
+# task now names its range `<old sha>..<new sha>` (round 4, finding 1: the reviewer
+# contract had no scoped pass to run, so a retained reviewer could refuse).
+budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget" 206
 # R16 (2026-09-27, fix round 1, issues 2 and 3): ossify-briefs.md's budget is raised
 # from 200 to 205, exactly the 5 lines restoring the item seat's placement ("in the
 # worktree ossify prepared for the item"), "with the verifier's summary", "a second

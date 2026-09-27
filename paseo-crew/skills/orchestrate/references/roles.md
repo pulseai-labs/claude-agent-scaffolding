@@ -29,7 +29,7 @@ this sequence:
 
 ```
 list_profiles                                   # resolve the seat's profile
-create_workspace   (only for a worktree seat)   # isolation: worktree, baseBranch: origin/main
+create_workspace   (only for a worktree seat)   # isolation: worktree, the placement's mode/base
 create_agent       title "seat: <role> (<profile>)", the materialised profile, initialPrompt <brief>
 paseo inspect <id> --json                       # Model equals the expected model's full id, before anything else
 ```
