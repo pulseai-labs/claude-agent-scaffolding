@@ -479,8 +479,12 @@ pin "$GENERIC_BRIEFS_MD" 'gets the delta form as its whole task' \
   "a fresh reviewer on the resumed path runs the delta form, not a second full review"
 pin "$LIFECYCLE_MD" 'released there, as Teardown says' \
   "a read-only item's seat and workspace are released at its close"
-pin "$GENERIC_BRIEFS_MD" 'the scoped delta pass a fix range names' \
+pin "$GENERIC_BRIEFS_MD" 'the scoped delta pass each uncovered fix push names' \
   "the reviewer contract carries the one scoped delta pass"
+# #608 review round 6: "the one re-review a seat runs" capped the seat at a single
+# delta pass, so a second uncovered push had no reviewer to validate it.
+pin "$GENERIC_BRIEFS_MD" 'one per uncovered fix push' \
+  "the delta pass is one per uncovered push, not one per seat"
 # The close-review writer is a halt-time profile, not a project-file seat.
 pin "$CONFIG_MD" 'close session, work-PR session)' \
   "the writer is not a project-file seat"
