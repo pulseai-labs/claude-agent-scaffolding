@@ -123,7 +123,10 @@ done
   answers is answered, with one fresh wait; one it does not answer goes to the operator. A
   seat that says it is waiting on its own background work is a false wake, not a finish:
   arm one fresh wait with the `idle` exit dropped for the rest of that dispatch, so `report`,
-  `permission`, `error` and `budget` remain.
+  `permission`, `error` and `budget` remain. An idle whose last message is neither — a
+  completion written only to its activity, or no message at all — is the missing-report
+  case: one bounded correction request asking it to write `REPORT_PATH`, and one fresh wait;
+  a second such idle escalates.
   Coordinator seats (a spine or work-PR session, a lane driver with subagents) are armed
   that way from the start, because their idle is not a finish.
 - `error`: read the seat's activity and its durable artifacts first — `error` does not say
@@ -252,7 +255,9 @@ orchestrator:
    `cancel_agent` the successor if one was created, read its activity and its children
    (`list_agents`) — every child it started is released before the archive, in whatever
    workspace: the cascade archives its same-workspace children and only detaches the
-   rest, so each one is cancelled and archived itself — and compare each live dispatch's
+   rest, so each one is cancelled and archived itself, and each child's own activity and
+   durable artifacts are read and reconciled first, because a worker it launched may have
+   committed, pushed or opened a PR before the cancel — and compare each live dispatch's
    report hash and identity against the handoff, so a report it already handled is not
    handled twice; then `archive_agent` it, and
    re-arm this session's own waits and a fresh heartbeat from the handoff it just

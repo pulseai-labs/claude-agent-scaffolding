@@ -36,7 +36,10 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # children are all released (the cascade detaches the ones in another workspace), the
 # detached launch names the featureValues it cannot carry, and the reviewer's release
 # is tied to the review being final.
-REF_BUDGET=270
+# 2026-09-27, #608 review round 9: raised from 270 by 5 — each failed successor child's
+# artifacts are reconciled before its archive, and an idle with no question and no
+# background-work claim is routed to the missing-report correction.
+REF_BUDGET=275
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -109,6 +112,11 @@ pin "$REF" '`archive_agent` it, and' "the failed successor is archived only afte
 # #608 review round 8: the detached command takes no feature values, and the seat's
 # retention runs to the review being final, not its first report.
 pin "$REF" 'hands on without them' "the handoff names the featureValues a detached launch drops" flat
+# #608 review round 9: each failed successor child's own activity and artifacts are
+# reconciled before it is archived, and an idle with neither a question nor a
+# background-work claim is the missing-report case rather than an unwatched dispatch.
+pin "$REF" 'durable artifacts are read and reconciled first' "each failed successor child's artifacts are reconciled" flat
+pin "$REF" 'one bounded correction request asking it to write `REPORT_PATH`' "an idle with no question and no report goes to the correction path" flat
 pin "$REF" 'the reviewer once the review is final' "the reviewer is released when the review is final, not at its first report" flat
 pin "$REF" 're-arm this session'"'"'s own waits and a fresh heartbeat' "after a parented launch this session re-arms and stays the orchestrator"
 pin "$REF" 'Never archive a predecessor while a subagent in its workspace runs' "the no-archive rule survives"

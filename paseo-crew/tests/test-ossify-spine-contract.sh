@@ -477,6 +477,10 @@ pin "$LIFECYCLE_MD" '`reviewer` replacement through the PR'"'"'s fix' \
   "a reviewer replacement keeps the built-in's lifetime through the fix rounds too"
 pin "$GENERIC_BRIEFS_MD" 'gets the delta form as its whole task' \
   "a fresh reviewer on the resumed path runs the delta form, not a second full review"
+# #608 review round 9: step 10's "No second /code-review" contradicted the delta pass
+# steps 8-10 require; it forbids the second WHOLE-PR review only.
+pin "$LIFECYCLE_MD" 'whole-PR `/code-review`' \
+  "step 10 forbids a second whole-PR review, not the scoped delta pass"
 pin "$LIFECYCLE_MD" 'released there, as Teardown says' \
   "a read-only item's seat and workspace are released at its close"
 pin "$GENERIC_BRIEFS_MD" 'the scoped delta pass each uncovered fix push names' \

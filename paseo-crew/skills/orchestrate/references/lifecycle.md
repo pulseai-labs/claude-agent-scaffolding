@@ -145,7 +145,8 @@ Every command's syntax comes from Paseo's own `paseo` skill.
     bot or human finding that arrives after the disposition returns to the
     orchestrator, and the implementer waits — it
     resolves the finding only after the orchestrator's decision (#410). No second
-    `/code-review`. Bot comments after each push stay in this stream, and review
+    whole-PR `/code-review` — a fixed head takes the one scoped delta pass step 8
+    names. Bot comments after each push stay in this stream, and review
     bodies and top-level PR conversation comments are part of it too —
     `reviewThreads` does not return them — refreshed after each push alongside the
     thread count. With ossify installed, this
