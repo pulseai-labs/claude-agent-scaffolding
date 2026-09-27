@@ -124,5 +124,72 @@ else
   fi
 fi
 
+# paseo-crew's Codex prompts, and the collision they exist to avoid (#535 in
+# herdr-crew, ported here because it is a general sibling-plugin hazard, not a
+# herdr-crew-specific one). The `interface.defaultPrompt` array is a user-facing
+# surface — the suggested actions on the Codex plugin page, where the string is
+# actually clickable — and it is exactly the kind of thing a blind name
+# substitution carries over verbatim from whichever plugin was copied. Both
+# herdr-crew and orca-crew stay installed alongside paseo-crew, so a sibling's
+# prompts landing here unnoticed would be silently revertible on the one
+# surface the operator actually clicks. The pin has two halves: paseo-crew's own
+# text, and the two-tree fact that makes it a fix — no prompt paseo-crew offers
+# is one herdr-crew offers, and none is one orca-crew offers, which is exactly
+# the claim a single plugin's own suite cannot see. `cmp` over the jq streams
+# rather than `[[ == ]]` on command substitution, for the reason the
+# description pin above states: `$( )` strips trailing newlines from both sides.
+CODEX_PASEO="$ROOT/paseo-crew/.codex-plugin/plugin.json"
+CODEX_HERDR="$ROOT/herdr-crew/.codex-plugin/plugin.json"
+CODEX_ORCA="$ROOT/orca-crew/.codex-plugin/plugin.json"
+if [[ ! -f "$CODEX_PASEO" || ! -f "$CODEX_HERDR" || ! -f "$CODEX_ORCA" ]]; then
+  fail "paseo-crew's, herdr-crew's and orca-crew's Codex manifests all exist — a missing one makes the prompt counts vacuous"
+else
+  expected_prompts='Start a Paseo orchestrator session for this objective.
+Dispatch a Paseo worker seat for this task.
+Review PR 123 in a fresh Paseo seat.'
+  if cmp -s <(jq -r '.interface.defaultPrompt[]' "$CODEX_PASEO") <(printf '%s\n' "$expected_prompts"); then
+    pass "paseo-crew's Codex prompts are the Paseo-specific three"
+  else
+    fail "paseo-crew's Codex prompts are the Paseo-specific three — read: $(jq -r '.interface.defaultPrompt[]' "$CODEX_PASEO" | tr '\n' '|')"
+  fi
+
+  # Half two, whole-line matches: a substring test would call a prompt shared whenever
+  # one merely CONTAINS another, and a count over an empty read certifies nothing, so
+  # the read is asserted non-empty before the comparison is believed. Checked against
+  # each sibling separately — the two comparisons are independent claims, and one
+  # sibling clearing it says nothing about the other.
+  shared=0
+  checked=0
+  while IFS= read -r prompt; do
+    [[ -n "$prompt" ]] || continue
+    checked=$((checked + 1))
+    n="$(jq -r '.interface.defaultPrompt[]' "$CODEX_HERDR" | awk -v p="$prompt" '$0 == p { n++ } END { print n+0 }')"
+    shared=$((shared + n))
+  done < <(jq -r '.interface.defaultPrompt[]' "$CODEX_PASEO")
+  if [[ "$checked" -eq 0 ]]; then
+    fail "no prompt paseo-crew offers is one herdr-crew offers — read no prompts at all"
+  elif [[ "$shared" -eq 0 ]]; then
+    pass "no prompt paseo-crew offers is one herdr-crew offers (checked $checked)"
+  else
+    fail "no prompt paseo-crew offers is one herdr-crew offers — $shared shared with herdr-crew"
+  fi
+
+  shared=0
+  checked=0
+  while IFS= read -r prompt; do
+    [[ -n "$prompt" ]] || continue
+    checked=$((checked + 1))
+    n="$(jq -r '.interface.defaultPrompt[]' "$CODEX_ORCA" | awk -v p="$prompt" '$0 == p { n++ } END { print n+0 }')"
+    shared=$((shared + n))
+  done < <(jq -r '.interface.defaultPrompt[]' "$CODEX_PASEO")
+  if [[ "$checked" -eq 0 ]]; then
+    fail "no prompt paseo-crew offers is one orca-crew offers — read no prompts at all"
+  elif [[ "$shared" -eq 0 ]]; then
+    pass "no prompt paseo-crew offers is one orca-crew offers (checked $checked)"
+  else
+    fail "no prompt paseo-crew offers is one orca-crew offers — $shared shared with orca-crew"
+  fi
+fi
+
 printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
