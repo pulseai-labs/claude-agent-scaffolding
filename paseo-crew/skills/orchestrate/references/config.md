@@ -19,7 +19,9 @@ single-repo project it is that repo. Its path is `.paseo-crew/roles.md`.
 
 The optional `~/.claude/paseo-crew/agents.md` holds `kind: dsh-spine-driver` entries only — a
 `dsh-session` runs outside Paseo entirely, so no profile can describe it (`dsh-driver.md`).
-Any other kind of entry in that file is a config defect, named at approval.
+Any other kind of entry in that file is a config defect, named at approval. It is written by
+the operator, with an agent's help, between runs and never edited during one, and nothing in
+it is project-specific.
 
 Resolution of the project file is a walk up from the session's working directory: the first
 one found on that walk is the one in force. The pairing manifest is not consulted — its
@@ -38,9 +40,9 @@ A seat's profile materialises into `create_agent` exactly as Paseo's own skill s
 seat launch, which also covers a profile with no `model` or no `modeId`; this file does not
 restate either gap).
 
-herdr-crew's agent-entry fields map like this:
+The agent-entry fields of the earlier crews map like this:
 
-| herdr-crew field | paseo-crew source |
+| earlier field | paseo-crew source |
 |---|---|
 | `command:` | the materialised `create_agent` call — nothing to type |
 | `expected_model:` | the profile's `model`, or the default id `paseo-mechanics.md` reads for one that has none |
@@ -48,9 +50,9 @@ herdr-crew's agent-entry fields map like this:
 | `can:` | a `can:` sentence in the profile's `notes` — every draco-desk profile's notes already state it |
 | `note:` | the rest of the profile's `notes` |
 
-`model_shows:` and `brief_delivery:` are gone: `paseo inspect --json` reports `Model` for
-every seat, and `initialPrompt` / `send_agent_prompt` carry text whole, so no composer can
-fragment it.
+The fields that said where a model shows and how a brief is delivered are gone:
+`paseo inspect --json` reports `Model` for every seat, and `initialPrompt` /
+`send_agent_prompt` carry text whole, so no composer can fragment it.
 
 **The one exception: a `kind: dsh-spine-driver` entry.** A `dsh-session` runs outside Paseo
 entirely, so no `provider`, `model`, `modeId`, `thinkingOptionId` or `featureValues` describes
