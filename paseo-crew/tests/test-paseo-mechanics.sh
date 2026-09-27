@@ -18,7 +18,8 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # tightening, for the expected-model paragraph (I1), the one-waiter, heartbeat and
 # DISPATCHED_AT rules (I3, I6, I7, M1, M2) and the handoff's resume prompt, launch
 # verify and stand-down wakes (C1, I2, I4).
-REF_BUDGET=242
+# 2026-09-27: raised from 242 by 2. I7 residual: operator-latency on permission answers.
+REF_BUDGET=244
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

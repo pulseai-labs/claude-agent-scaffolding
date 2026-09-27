@@ -107,8 +107,9 @@ done
 - `report`: read it. A plan, a question or a late finding gets the seat's next message and
   one fresh wait. An escalation goes to the operator.
 - `permission`: read the request with `list_pending_permissions`. Within the brief's scope,
-  allow it with `respond_to_permission`; otherwise put it to the operator and give the answer
-  the same way. Either way, one fresh wait.
+  allow it with `respond_to_permission` and arm one fresh wait, keeping `DISPATCHED_AT`;
+  otherwise put it to the operator, give the answer the same way, and arm one fresh wait —
+  that answer restarts `DISPATCHED_AT`, as a send after an operator wait does.
 - `idle`: read the seat's last message (`get_agent_activity`, limit 1). A question the brief
   answers is answered, with one fresh wait; one it does not answer goes to the operator. A
   seat that says it is waiting on its own background work is a false wake, not a finish:
@@ -146,10 +147,11 @@ first and then a new one. When the last dispatch settles, the orchestrator calls
 
 `TIME_BUDGET` and `SETTLE_WINDOW` (default 10 minutes) are brief fields (`briefs.md`), stated
 at dispatch. A dispatch's elapsed time runs from its start, recorded as `DISPATCHED_AT`: the
-brief's send, and again each send that follows a wait on the orchestrator or the operator (a
-plan approval, an answer, a fix task), because that wait is not the worker's time. An
-involuntary re-arm, after a heartbeat catch, a handoff, a lost wait or an `error` retry, keeps
-that start, so a re-arm never silently extends the budget.
+brief's send, and again whenever a wait on the orchestrator or the operator resolves — a send
+that follows it (a plan approval, an answer, a fix task) or a permission answer that reached
+the operator — because that wait is not the worker's time. An involuntary re-arm, after a
+heartbeat catch, a handoff, a lost wait or an `error` retry, keeps that start, so a re-arm
+never silently extends the budget.
 
 ## Sending a seat a message
 
