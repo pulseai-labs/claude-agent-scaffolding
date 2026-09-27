@@ -361,6 +361,13 @@ wi_manifest_write() {
     wi_log_error "wi_manifest_write: jq failed building manifest at $manifest"
     return 1
   fi
+  # The mode a plain redirect gave pairing.json, set only now that it is
+  # written (wi_mktemp_beside).
+  chmod "$(wi_umask_file_mode)" "$tmp" 2>/dev/null || {
+    rm -f "$tmp"
+    wi_log_error "wi_manifest_write: could not set the mode of $tmp"
+    return 1
+  }
 
   mv "$tmp" "$manifest" || {
     wi_log_error "wi_manifest_write: failed to mv tmp to $manifest"
@@ -871,14 +878,17 @@ wi_manifest_validate() {
          ((.well_known_paths | keys[] | ["well_known_paths", .]) as $p | nonempty($p)),
          # README: absolute path templates. The value must resolve to an
          # absolute path, so it starts with "/" or with a placeholder that
-         # expands to one, and every placeholder is one wi_manifest_resolve
-         # substitutes; any other ${...} would reach a consumer unresolved,
-         # and a relative value would resolve against whatever cwd reads it.
+         # expands to one (whatever follows it: ${HOME}.cache is absolute),
+         # and once every placeholder wi_manifest_resolve substitutes is
+         # removed, no "${" may be left: an unknown or unterminated one would
+         # reach a consumer unresolved, and a relative value would resolve
+         # against whatever cwd reads it.
          (.well_known_paths | to_entries[] | select(.value != "")
-          | if (.value | test("^(/|\\$\\{(ai_workspace\\.root|canonical\\.root|HOME|PLUGIN_DATA:[a-zA-Z0-9_-]+)\\}(/|$))") | not)
+          | if (.value | test("^(/|\\$\\{(ai_workspace\\.root|canonical\\.root|HOME|PLUGIN_DATA:[a-zA-Z0-9_-]+)\\})") | not)
             then "well_known_paths.\(.key) (must be an absolute path template: start with / or ${ai_workspace.root}, ${canonical.root}, ${HOME} or ${PLUGIN_DATA:<name>}, is \(.value | tojson))"
-            elif ([.value | scan("\\$\\{[^}]*\\}")]
-                  | all(test("^\\$\\{(ai_workspace\\.root|canonical\\.root|HOME|USER|PLUGIN_DATA:[a-zA-Z0-9_-]+)\\}$")) | not)
+            elif (.value
+                  | gsub("\\$\\{(ai_workspace\\.root|canonical\\.root|HOME|USER|PLUGIN_DATA:[a-zA-Z0-9_-]+)\\}"; "")
+                  | contains("${"))
             then "well_known_paths.\(.key) (has a placeholder wi_manifest_resolve does not substitute, is \(.value | tojson))"
             else empty end)
        else empty end),

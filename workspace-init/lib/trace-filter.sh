@@ -199,7 +199,9 @@ wi_trace_filter_install() {
     wi_log_error "wi_trace_filter_install: render failed"
     return 1
   fi
-  chmod +x "$tmp" || {
+  # The mode a plain redirect plus `chmod +x` gave the hook, set only now that
+  # it is written (wi_mktemp_beside). A bare +x is masked by the umask too.
+  { chmod "$(wi_umask_file_mode)" "$tmp" && chmod +x "$tmp"; } || {
     rm -f "$tmp"
     wi_log_error "wi_trace_filter_install: chmod failed: $tmp"
     return 1

@@ -1223,14 +1223,15 @@ test_T1_install_temp_file_is_not_predictable() {
 
 test_T2_install_keeps_the_umask_mode() {
   # mktemp creates 0600; the hook must keep the mode a
-  # plain redirect plus chmod +x gave it before #582 (+x is umask-masked too).
+  # plain redirect plus chmod +x gave it before #582 (+x is umask-masked too);
+  # under 0277 the render must still succeed and leave 0500.
   local d; d="$(wi_tmpdir)"; mkdir -p "$d"
   local ai="$d/foo-ai" cn="$d/foo" mask want
   mkdir -p "$ai/.workspace" "$cn"
   git -C "$cn" init -q 2>/dev/null
   "$WI_BIN" manifest_write "$ai" "$cn" personal >/dev/null 2>&1 || return 1
   local hook="$cn/.git/hooks/commit-msg"
-  for mask in 022:755 077:700; do
+  for mask in 022:755 077:700 0277:500; do
     want="${mask#*:}"
     ( umask "${mask%%:*}"; "$WI_BIN" trace_filter_install "$ai" "$cn" 2>/dev/null ) || {
       echo "    install failed under umask ${mask%%:*}"; return 1; }

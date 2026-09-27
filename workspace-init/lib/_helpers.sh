@@ -62,19 +62,30 @@ wi_resolve_root() {
 # its path. A predictable ${target}.tmp.$$ name lets anyone who can write the
 # directory plant a symlink there first, which the writer's redirect follows —
 # overwriting the link's target — and the rename then installs (#582). mktemp
-# creates the file exclusively under a random name. It creates it 0600, so the
-# mode is set to what a plain redirect would have given (0666 less the umask):
-# the installed file keeps the mode it had before this helper existed.
+# creates the file exclusively under a random name, and it is left owner-
+# writable (below), so the caller can write it whatever the umask. Before the rename the caller sets the mode a
+# plain redirect would have given with wi_umask_file_mode, so the installed
+# file keeps the mode it had before this helper existed. Setting it earlier
+# would break a umask that clears owner-write (0277): a redirect writes
+# through the descriptor it opened, but a file already chmod-ed 0400 cannot
+# be opened for writing at all.
+# mktemp's own 0600 is subject to the umask too (0277 leaves 0400), so owner
+# write is added back on the file it just created.
 # Returns 1, printing nothing, if the file cannot be created.
 wi_mktemp_beside() {
-  local tmp mode
+  local tmp
   tmp="$(mktemp "${1}.tmp.XXXXXX" 2>/dev/null)" || return 1
-  mode="$(printf '%o' "$(( 0666 & ~0$(umask) ))")"
-  if ! chmod "$mode" "$tmp" 2>/dev/null; then
+  if ! chmod u+w "$tmp" 2>/dev/null; then
     rm -f "$tmp"
     return 1
   fi
   printf '%s\n' "$tmp"
+}
+
+# wi_umask_file_mode
+# Print the mode a plain `>` redirect creates a file with: 0666 less the umask.
+wi_umask_file_mode() {
+  printf '%o\n' "$(( 0666 & ~0$(umask) ))"
 }
 
 # --- File-based locking via `set -o noclobber` ----------------------------

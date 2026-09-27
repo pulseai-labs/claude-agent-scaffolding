@@ -1006,6 +1006,8 @@ ${ai_workspace.rootx}/roadmap.json
 ${tooling_repo.root}/roadmap.json
 /srv/${nope}/roadmap.json
 ${ai_workspace.root}/${canonical.name}/roadmap.json
+/srv/${BROKEN/roadmap.json
+${HOME}/${
 CASES
   # Adjacent controls: every documented placeholder, a bare root, a plain
   # absolute path, and an absolute path through .. all still validate.
@@ -1020,6 +1022,8 @@ ${HOME}/.config/${USER}/roadmap.json
 ${PLUGIN_DATA:scaffold-onboard}/roadmap.json
 /srv/shared/roadmap.json
 ${ai_workspace.root}/../shared/roadmap.json
+${HOME}.cache/roadmap.json
+${canonical.root}-artifacts/roadmap.json
 CONTROLS
 }
 
@@ -1042,11 +1046,13 @@ test_W1_write_temp_file_is_not_predictable() {
 
 test_W2_write_keeps_the_umask_mode() {
   # mktemp creates 0600; the manifest must keep the
-  # mode a plain redirect gave it before #582, 0666 less the umask.
+  # mode a plain redirect gave it before #582, 0666 less the umask. 0277
+  # clears owner-write: the write must still succeed (it runs before the
+  # mode is set) and leave 0400, as the redirect did.
   local ai="$_WI_TMP/w2/foo-ai" cn="$_WI_TMP/w2/foo" mask want
   mkdir -p "$ai/.workspace" "$cn"
   local m="$ai/.workspace/pairing.json"
-  for mask in 022:644 027:640 077:600; do
+  for mask in 022:644 027:640 077:600 0277:400; do
     want="${mask#*:}"
     rm -f "$m"
     ( umask "${mask%%:*}"; "$WI_BIN" manifest_write "$ai" "$cn" personal 2>/dev/null ) || {
