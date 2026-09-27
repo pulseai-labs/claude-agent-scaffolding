@@ -32,7 +32,11 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # 2026-09-27, #608 review round 7 (CodeRabbit): raised from 263 by 2 — the failed
 # successor's live same-workspace children are released before it is archived, since
 # archiving cascades into them.
-REF_BUDGET=265
+# 2026-09-27, #608 review round 8: raised from 265 by 5 — the failed successor's
+# children are all released (the cascade detaches the ones in another workspace), the
+# detached launch names the featureValues it cannot carry, and the reviewer's release
+# is tied to the review being final.
+REF_BUDGET=270
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -97,10 +101,15 @@ pin "$REF" '`ParentAgentId` is `null`' "the successor is verified parentless"
 # left the run with no waiter at all (#608 review, round 1).
 pin "$REF" '`Status` is `idle` or `running`' "a successor still initializing is not a success" flat
 pin "$REF" '`cancel_agent` the successor if one was created' "a failed successor launch (parented, errored or no id) is cancelled"
-# #608 review round 7 (CodeRabbit): archiving a successor that already started seats
-# in the shared workspace cascades into them — they are released before the archive.
-pin "$REF" 'a live same-workspace seat it started is released before the' "the failed successor's live children are released, not cascaded" flat
+# #608 review round 7 (CodeRabbit) and round 8 (Codex): archiving a successor that
+# already started seats cascades into its same-workspace children and detaches the
+# rest, so EVERY child it started is released before the archive.
+pin "$REF" 'every child it started is released before the archive' "the failed successor's children are all released, not cascaded" flat
 pin "$REF" '`archive_agent` it, and' "the failed successor is archived only after that reconcile" flat
+# #608 review round 8: the detached command takes no feature values, and the seat's
+# retention runs to the review being final, not its first report.
+pin "$REF" 'hands on without them' "the handoff names the featureValues a detached launch drops" flat
+pin "$REF" 'the reviewer once the review is final' "the reviewer is released when the review is final, not at its first report" flat
 pin "$REF" 're-arm this session'"'"'s own waits and a fresh heartbeat' "after a parented launch this session re-arms and stays the orchestrator"
 pin "$REF" 'Never archive a predecessor while a subagent in its workspace runs' "the no-archive rule survives"
 pin "$REF" 'Kill this session'"'"'s armed background waits' "the predecessor stands down"

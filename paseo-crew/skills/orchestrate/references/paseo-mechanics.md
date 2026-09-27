@@ -197,8 +197,9 @@ Every seat runs on the daemon the orchestrator talks to; cross-machine seats are
 ## Teardown
 
 A seat is released with `archive_agent` once its artifacts are safe: the implementer after
-`lifecycle.md` step 12's merged-branch check, the reviewer once its report file validates
-(step 8), the verifier at pass or escalation. A worktree workspace the run created is
+`lifecycle.md` step 12's merged-branch check, the reviewer once the review is final —
+its report file validated and no fix push that needs its delta re-review pending
+(step 8) — the verifier at pass or escalation. A worktree workspace the run created is
 released with `archive_workspace` only after every seat in it is archived; Paseo then
 removes the worktree itself, once no active workspace references it.
 Close only what the run created: the orchestrator's own workspace, and any the operator
@@ -237,7 +238,10 @@ orchestrator:
        env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d --json --title "<run>: orchestrator" --workspace <current> --provider <provider>/<model> --mode <modeId> --thinking <thinkingOptionId> "<resume>"
 
    Both variables are unset because `paseo run` inside an agent reads its caller from them
-   and makes the new agent that caller's child.
+   and makes the new agent that caller's child. `paseo run` takes no feature values, so a
+   profile that sets them hands on without them: the handoff names every such value as the
+   loss it is, and the trade is the operator's — The seat launch materialises them, but it
+   parents the successor to this session.
 3. **Verify** that the launch returned an agent id, then with `paseo inspect <new id> --json`
    that `Status` is `idle` or `running` — an `initializing` launch is polled until it settles,
    bounded — and `ParentAgentId` is `null` (a non-null parent is a tree, its successor already
@@ -246,10 +250,11 @@ orchestrator:
    run with none.
    Any failure takes one branch:
    `cancel_agent` the successor if one was created, read its activity and its children
-   (`list_agents`) — a live same-workspace seat it started is released before the
-   archive, because archiving cascades — and compare each live dispatch's report hash
-   and identity against the handoff, so a report it already handled is not handled
-   twice; then `archive_agent` it, and
+   (`list_agents`) — every child it started is released before the archive, in whatever
+   workspace: the cascade archives its same-workspace children and only detaches the
+   rest, so each one is cancelled and archived itself — and compare each live dispatch's
+   report hash and identity against the handoff, so a report it already handled is not
+   handled twice; then `archive_agent` it, and
    re-arm this session's own waits and a fresh heartbeat from the handoff it just
    wrote; report the failed launch to the operator; and remain the orchestrator.
 4. **On success**, tell the operator which agent is now the orchestrator.
