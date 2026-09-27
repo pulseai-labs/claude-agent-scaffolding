@@ -245,9 +245,11 @@ orchestrator:
    bound expires, is a failure: a successor that dies before it arms its own waits leaves the
    run with none.
    Any failure takes one branch:
-   `cancel_agent` then `archive_agent` the successor if one was created; read its activity
-   and compare each live dispatch's report hash and identity against the handoff — a report
-   it already handled is not handled twice — before anything is re-armed;
+   `cancel_agent` the successor if one was created, read its activity and its children
+   (`list_agents`) — a live same-workspace seat it started is released before the
+   archive, because archiving cascades — and compare each live dispatch's report hash
+   and identity against the handoff, so a report it already handled is not handled
+   twice; then `archive_agent` it, and
    re-arm this session's own waits and a fresh heartbeat from the handoff it just
    wrote; report the failed launch to the operator; and remain the orchestrator.
 4. **On success**, tell the operator which agent is now the orchestrator.

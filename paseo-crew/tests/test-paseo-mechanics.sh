@@ -29,7 +29,10 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # branch reconciles a successor that already resumed before anything is re-armed.
 # 2026-09-27, #608 review round 4: raised from 261 by 2 — a model mismatch reconciles
 # what the seat may have written before the check (the brief is its initialPrompt).
-REF_BUDGET=263
+# 2026-09-27, #608 review round 7 (CodeRabbit): raised from 263 by 2 — the failed
+# successor's live same-workspace children are released before it is archived, since
+# archiving cascades into them.
+REF_BUDGET=265
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -93,7 +96,11 @@ pin "$REF" '`ParentAgentId` is `null`' "the successor is verified parentless"
 # Only error|closed rejected `initializing`, so a successor that died during startup
 # left the run with no waiter at all (#608 review, round 1).
 pin "$REF" '`Status` is `idle` or `running`' "a successor still initializing is not a success" flat
-pin "$REF" '`cancel_agent` then `archive_agent` the successor if one was created' "a failed successor launch (parented, errored or no id) is cancelled and archived"
+pin "$REF" '`cancel_agent` the successor if one was created' "a failed successor launch (parented, errored or no id) is cancelled"
+# #608 review round 7 (CodeRabbit): archiving a successor that already started seats
+# in the shared workspace cascades into them — they are released before the archive.
+pin "$REF" 'a live same-workspace seat it started is released before the' "the failed successor's live children are released, not cascaded" flat
+pin "$REF" '`archive_agent` it, and' "the failed successor is archived only after that reconcile" flat
 pin "$REF" 're-arm this session'"'"'s own waits and a fresh heartbeat' "after a parented launch this session re-arms and stays the orchestrator"
 pin "$REF" 'Never archive a predecessor while a subagent in its workspace runs' "the no-archive rule survives"
 pin "$REF" 'Kill this session'"'"'s armed background waits' "the predecessor stands down"
