@@ -162,6 +162,58 @@ test_render_template_missing_template_returns_error() {
 }
 
 # --- run all ---
+test_write_new_refuses_any_existing_entry() {
+  # wi_write_new (#582): the file is created with O_EXCL
+  # and written through that descriptor, so nothing already under the name —
+  # a regular file, a symlink to one, a dangling symlink, a link to a device —
+  # is written through.
+  local d; d="$(wi_tmpdir)"; mkdir -p "$d"
+  printf 'VICTIM\n' > "$d/victim"
+  printf 'OLD\n' > "$d/existing"
+  ln -s "$d/victim" "$d/to-file"
+  ln -s "$d/nowhere" "$d/dangling"
+  ln -s /dev/null "$d/to-device"
+  local n
+  for n in existing to-file dangling to-device; do
+    if wi_write_new "$d/$n" "" printf 'NEW\n' 2>/dev/null; then
+      echo "    wrote through $n"; return 1; fi
+  done
+  assert_eq "VICTIM" "$(cat "$d/victim")" "symlink target untouched" || return 1
+  assert_eq "OLD" "$(cat "$d/existing")" "existing file untouched" || return 1
+  [[ ! -e "$d/nowhere" ]] || { echo "    dangling link's target was created"; return 1; }
+  # Control: a new name is created and written.
+  wi_write_new "$d/fresh" "" printf 'NEW\n' || { echo "    control write failed"; return 1; }
+  assert_eq "NEW" "$(cat "$d/fresh")" "fresh file written" || return 1
+}
+
+test_write_new_sets_the_mode_at_creation() {
+  # The mode comes from the umask at creation, so a
+  # mode without owner-write is still written, and a failing command fails.
+  local d m; d="$(wi_tmpdir)"; mkdir -p "$d"
+  for m in 600 640 444 400; do
+    wi_write_new "$d/f$m" "$m" printf 'X\n' || { echo "    write failed at $m"; return 1; }
+    assert_eq "X" "$(cat "$d/f$m")" "content at $m" || return 1
+    assert_eq "$m" "$(wi_file_mode "$d/f$m")" "mode $m" || return 1
+  done
+  ( umask 027; wi_write_new "$d/umask" "" printf 'X\n' ) || return 1
+  assert_eq "640" "$(wi_file_mode "$d/umask")" "empty mode takes the umask" || return 1
+  local before; before="$(umask)"
+  wi_write_new "$d/keep" 400 printf 'X\n' || return 1
+  assert_eq "$before" "$(umask)" "caller's umask unchanged" || return 1
+  if wi_write_new "$d/fails" "" false; then echo "    a failing command succeeded"; return 1; fi
+}
+
+test_file_mode_reads_permission_bits() {
+  local d m; d="$(wi_tmpdir)"; mkdir -p "$d"
+  : > "$d/f"
+  for m in 644 600 444 751 4755 1777; do
+    chmod "$m" "$d/f"
+    assert_eq "$(( 8#$m & 8#777 ))" "$(( 8#$(wi_file_mode "$d/f") ))" "mode of $m" || return 1
+  done
+  chmod 4644 "$d/f"
+  assert_eq "644" "$(wi_file_mode "$d/f")" "setuid without execute" || return 1
+}
+
 wi_test_run test_log_info_writes_to_stderr_with_prefix
 wi_test_run test_log_warn_writes_to_stderr_with_prefix
 wi_test_run test_log_error_writes_to_stderr_with_prefix
@@ -177,5 +229,8 @@ wi_test_run test_log_op_creates_parent_dir_if_missing
 wi_test_run test_render_template_substitutes_single_var
 wi_test_run test_render_template_substitutes_multiple_vars
 wi_test_run test_render_template_missing_template_returns_error
+wi_test_run test_write_new_refuses_any_existing_entry
+wi_test_run test_write_new_sets_the_mode_at_creation
+wi_test_run test_file_mode_reads_permission_bits
 
 wi_test_summary

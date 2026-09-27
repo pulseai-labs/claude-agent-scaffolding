@@ -187,16 +187,24 @@ wi_trace_filter_install() {
     return 1
   fi
   # Render to a temp file and move it into place — a failed render must never
-  # destroy an existing hook (#457).
-  local tmp="${out}.tmp.$$"
-  if ! wi_trace_filter_render "$ai_root" > "$tmp" 2>/dev/null; then
-    rm -f "$tmp"
-    wi_log_error "wi_trace_filter_install: render failed"
+  # destroy an existing hook (#457). The temp name is unpredictable and the file
+  # is created and written through one descriptor, so a symlink planted or
+  # swapped in beside the hook cannot redirect the render (wi_write_new, #582).
+  local tmp
+  if ! tmp="$(wi_tmpname_beside "$out")"; then
+    wi_log_error "wi_trace_filter_install: could not name a temp file beside $out"
     return 1
   fi
+  if ! wi_write_new "$tmp" "" wi_trace_filter_render "$ai_root" 2>/dev/null; then
+    rm -f "$tmp"
+    wi_log_error "wi_trace_filter_install: could not create $tmp, or render failed"
+    return 1
+  fi
+  # The execute bit is the one step that still names the path: bash has no
+  # fchmod. A swap here can only add +x to the link's target, not write to it.
   chmod +x "$tmp" || {
     rm -f "$tmp"
-    wi_log_error "wi_trace_filter_install: chmod failed: $tmp"
+    wi_log_error "wi_trace_filter_install: chmod +x failed: $tmp"
     return 1
   }
   mv -f "$tmp" "$out" || {
