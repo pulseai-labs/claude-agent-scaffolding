@@ -866,7 +866,9 @@ test_L8_relocate_preserves_manifest_mode() {
   # 444 covers a read-only manifest: the staged copy
   # must be writable for the rewrite and read-only again afterwards. Only a
   # non-root run can see the write failure; the mode assertion holds for both.
-  for mode in 600 640 444; do
+  # 755 and 700 carry execute bits, which a redirect cannot create (Codex on
+  # #605): relocate adds them back.
+  for mode in 600 640 444 755 700; do
     chmod "$mode" "$m"
     ( umask 022; "$WI_BIN" manifest_relocate "$ai" 2>/dev/null ) || {
       echo "    relocate failed at mode $mode"; return 1; }
@@ -930,6 +932,252 @@ test_L9_relocate_temp_file_is_not_predictable() {
   jq -e '.ai_workspace.root' "$m" >/dev/null 2>&1 || { echo "    pairing.json lost its content"; return 1; }
 }
 
+test_V6_validate_rejects_unusable_values() {
+  # #582 items 1-3: a value of the right type can still
+  # be unusable. One edit per case, so each refusal names its own field.
+  local ai; ai="$(_setup_custom_pair v6)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v6/good"
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || {
+    echo "    control: rich manifest (remotes + tooling_repo) rejected"; return 1; }
+  local edit field
+  while IFS='|' read -r field edit; do
+    jq "$edit" "$_WI_TMP/v6/good" > "$m"
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v6/err"; then
+      echo "    validate accepted: $edit"; return 1; fi
+    grep -qF "$field" "$_WI_TMP/v6/err" || {
+      echo "    refusal does not name $field:"; cat "$_WI_TMP/v6/err"; return 1; }
+  done <<'CASES'
+well_known_paths.roadmap_state|.well_known_paths.roadmap_state = {"bad": true}
+well_known_paths.master_spec|.well_known_paths.master_spec = 7
+well_known_paths.memory_bank|.well_known_paths.memory_bank = ""
+well_known_paths|.well_known_paths = "a/path"
+routing.prd|.routing.prd = "elsewhere"
+routing.memory_bank|.routing.memory_bank = ""
+ai_workspace.root|.ai_workspace.root = ""
+ai_workspace.name|.ai_workspace.name = ""
+canonical.root|.canonical.root = ""
+canonical.name|.canonical.name = ""
+canonical.default_branch|.canonical.default_branch = ""
+tooling_repo.root|.tooling_repo.root = ""
+tooling_repo.name|.tooling_repo.name = ""
+CASES
+  # Adjacent controls: each selector value, and every optional shape of
+  # well_known_paths, must still validate.
+  local ok
+  for ok in '.routing.prd = "ai_workspace" | .routing.master_spec = "canonical"' \
+            'del(.well_known_paths)' \
+            '.well_known_paths = null' \
+            '.well_known_paths = {}' \
+            '.well_known_paths.project_state = "${ai_workspace.root}/.ossify/state.json"' \
+            'del(.tooling_repo)'; do
+    jq "$ok" "$_WI_TMP/v6/good" > "$m"
+    "$WI_BIN" manifest_validate "$ai" 2>/dev/null || {
+      echo "    control rejected: $ok"; return 1; }
+  done
+  # relocate runs the same validator, so it refuses the empty root the issue
+  # reproduced, without touching the file.
+  jq '.canonical.root = ""' "$_WI_TMP/v6/good" > "$m"; cp "$m" "$_WI_TMP/v6/empty"
+  if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
+    echo "    relocate accepted an empty canonical.root"; return 1; fi
+  cmp -s "$_WI_TMP/v6/empty" "$m" || { echo "    relocate modified the refused manifest"; return 1; }
+}
+
+test_V7_validate_well_known_paths_are_absolute_templates() {
+  # The README documents well_known_paths as absolute
+  # path templates. A relative value resolves against whatever cwd reads it,
+  # and a placeholder wi_manifest_resolve does not know reaches the consumer
+  # unresolved, so both are refused, naming the key.
+  local ai; ai="$(_setup_pair v7)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v7/good"
+  local v
+  while IFS= read -r v; do
+    jq --arg v "$v" '.well_known_paths.roadmap_state = $v' "$_WI_TMP/v7/good" > "$m"
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v7/err"; then
+      echo "    validate accepted: $v"; return 1; fi
+    grep -qF 'well_known_paths.roadmap_state' "$_WI_TMP/v7/err" || {
+      echo "    refusal does not name the key:"; cat "$_WI_TMP/v7/err"; return 1; }
+  done <<'CASES'
+relative/roadmap.json
+./roadmap.json
+../outside/roadmap.json
+${USER}/roadmap.json
+${elsewhere.root}/roadmap.json
+${ai_workspace.rootx}/roadmap.json
+${tooling_repo.root}/roadmap.json
+/srv/${nope}/roadmap.json
+${ai_workspace.root}/${canonical.name}/roadmap.json
+/srv/${BROKEN/roadmap.json
+${HOME}/${
+CASES
+  # Adjacent controls: every documented placeholder, a bare root, a plain
+  # absolute path, and an absolute path through .. all still validate.
+  while IFS= read -r v; do
+    jq --arg v "$v" '.well_known_paths.roadmap_state = $v' "$_WI_TMP/v7/good" > "$m"
+    "$WI_BIN" manifest_validate "$ai" 2>/dev/null || {
+      echo "    control rejected: $v"; return 1; }
+  done <<'CONTROLS'
+${ai_workspace.root}/.workspace/project-roadmap.json
+${canonical.root}
+${HOME}/.config/${USER}/roadmap.json
+${PLUGIN_DATA:scaffold-onboard}/roadmap.json
+/srv/shared/roadmap.json
+${ai_workspace.root}/../shared/roadmap.json
+${HOME}.cache/roadmap.json
+${canonical.root}-artifacts/roadmap.json
+CONTROLS
+}
+
+test_W1_write_temp_file_is_not_predictable() {
+  # #582 item 4: wi_manifest_write staged its output at
+  # ${manifest}.tmp.<pid>, so a symlink planted there was followed — its
+  # target overwritten — and then renamed over pairing.json. Same pin as L9:
+  # `exec` keeps the planting shell's PID, so the dispatcher's $$ is known.
+  local ai="$_WI_TMP/w1/foo-ai" cn="$_WI_TMP/w1/foo"
+  mkdir -p "$ai/.workspace" "$cn"
+  local m="$ai/.workspace/pairing.json" victim="$_WI_TMP/w1/victim"
+  printf 'VICTIM\n' > "$victim"
+  bash -c 'ln -s "$1" "$2.tmp.$$"; exec "$3" manifest_write "$4" "$5" personal' \
+    _ "$victim" "$m" "$WI_BIN" "$ai" "$cn" 2>/dev/null || {
+    echo "    write failed with a planted temp symlink"; return 1; }
+  assert_eq "VICTIM" "$(cat "$victim")" "planted symlink's target untouched" || return 1
+  [[ -f "$m" && ! -L "$m" ]] || { echo "    pairing.json is not a regular file"; return 1; }
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || { echo "    written manifest does not validate"; return 1; }
+}
+
+test_W2_write_keeps_the_umask_mode() {
+  # The manifest must keep the mode a plain redirect gave
+  # it before #582, 0666 less the umask. 0277 clears owner-write: the write
+  # must still succeed (through the descriptor that created the file) and
+  # leave 0400, as the redirect did.
+  local ai="$_WI_TMP/w2/foo-ai" cn="$_WI_TMP/w2/foo" mask want
+  mkdir -p "$ai/.workspace" "$cn"
+  local m="$ai/.workspace/pairing.json"
+  for mask in 022:644 027:640 077:600 0277:400; do
+    want="${mask#*:}"
+    rm -f "$m"
+    ( umask "${mask%%:*}"; "$WI_BIN" manifest_write "$ai" "$cn" personal 2>/dev/null ) || {
+      echo "    write failed under umask ${mask%%:*}"; return 1; }
+    local got; got="$(stat -c '%a' "$m" 2>/dev/null || stat -f '%Lp' "$m")"
+    assert_eq "$want" "$got" "manifest mode under umask ${mask%%:*}" || return 1
+  done
+  ls "$ai/.workspace" | grep -q '\.tmp\.' && { echo "    write left a tmp file behind"; return 1; }
+  return 0
+}
+
+test_W3_write_refuses_a_raced_temp_name() {
+  # Codex on #605: a random temp name is not enough if
+  # the file is created by name and written by name later — a watcher of the
+  # directory swaps the fresh temp file for a symlink in between and the write
+  # lands on its target. The stubbed mktemp wins that race every time; the
+  # write must be refused, the link's target and the manifest left alone.
+  local ai="$_WI_TMP/w3/foo-ai" cn="$_WI_TMP/w3/foo"
+  mkdir -p "$ai/.workspace" "$cn"
+  local m="$ai/.workspace/pairing.json" victim="$_WI_TMP/w3/victim" p
+  "$WI_BIN" manifest_write "$ai" "$cn" personal 2>/dev/null || return 1
+  cp "$m" "$_WI_TMP/w3/before"
+  printf 'VICTIM\n' > "$victim"
+  p="$(wi_race_mktemp_path "$_WI_TMP/w3/bin" "$victim")"
+  if PATH="$p" "$WI_BIN" manifest_write "$ai" "$cn" work 2>/dev/null; then
+    echo "    write succeeded through a raced temp name"; return 1; fi
+  assert_eq "VICTIM" "$(cat "$victim")" "raced symlink's target untouched" || return 1
+  cmp -s "$_WI_TMP/w3/before" "$m" || { echo "    the manifest changed"; return 1; }
+  ls "$ai/.workspace" | grep -q '\.tmp\.' && { echo "    write left the temp name behind"; return 1; }
+  # The same race against a device: bash opens an existing non-regular file
+  # without O_EXCL, so the regular-file check is what refuses it.
+  p="$(wi_race_mktemp_path "$_WI_TMP/w3/bin-dev" /dev/null)"
+  if PATH="$p" "$WI_BIN" manifest_write "$ai" "$cn" work 2>/dev/null; then
+    echo "    write succeeded through a temp name raced to /dev/null"; return 1; fi
+  cmp -s "$_WI_TMP/w3/before" "$m" || { echo "    the manifest changed (device)"; return 1; }
+  return 0
+}
+
+test_L10_relocate_refuses_a_raced_temp_name() {
+  # The same race against relocate, whose temp file was
+  # created by mktemp and then written by cp -p and a redirect, both by name.
+  local ai; ai="$(_setup_pair l10)" || return 1
+  local m="$ai/.workspace/pairing.json" victim="$_WI_TMP/l10/victim" p
+  cp "$m" "$_WI_TMP/l10/before"
+  printf 'VICTIM\n' > "$victim"
+  p="$(wi_race_mktemp_path "$_WI_TMP/l10/bin" "$victim")"
+  if PATH="$p" "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
+    echo "    relocate succeeded through a raced temp name"; return 1; fi
+  assert_eq "VICTIM" "$(cat "$victim")" "raced symlink's target untouched" || return 1
+  cmp -s "$_WI_TMP/l10/before" "$m" || { echo "    the manifest changed"; return 1; }
+  ls "$ai/.workspace" | grep -q '\.tmp\.' && { echo "    relocate left the temp name behind"; return 1; }
+  # Control: unraced, the same relocate succeeds.
+  "$WI_BIN" manifest_relocate "$ai" 2>/dev/null || { echo "    control relocate failed"; return 1; }
+}
+
+test_V8_validate_rejects_relative_roots() {
+  # Codex on #605: every template the V7 check accepts
+  # assumes ${ai_workspace.root} and ${canonical.root} expand to absolute paths;
+  # a relative root makes them resolve against the reader's cwd, and
+  # tooling_repo.root is cd-ed into. All three must be absolute.
+  local ai; ai="$(_setup_custom_pair v8)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v8/good"
+  local edit field
+  while IFS='|' read -r field edit; do
+    jq "$edit" "$_WI_TMP/v8/good" > "$m"
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v8/err"; then
+      echo "    validate accepted: $edit"; return 1; fi
+    grep -qF "$field (must be an absolute path" "$_WI_TMP/v8/err" || {
+      echo "    refusal does not name $field as relative:"; cat "$_WI_TMP/v8/err"; return 1; }
+  done <<'CASES'
+ai_workspace.root|.ai_workspace.root = "relative-ai"
+ai_workspace.root|.ai_workspace.root = "./proj-ai"
+canonical.root|.canonical.root = "../proj"
+canonical.root|.canonical.root = "~/proj"
+tooling_repo.root|.tooling_repo.root = "tools"
+CASES
+  # Controls: absolute roots, a root of "/" itself, and names (not paths),
+  # which stay free-form.
+  local ok
+  for ok in '.' '.canonical.root = "/"' '.ai_workspace.name = "relative-name"'; do
+    jq "$ok" "$_WI_TMP/v8/good" > "$m"
+    "$WI_BIN" manifest_validate "$ai" 2>/dev/null || {
+      echo "    control rejected: $ok"; return 1; }
+  done
+}
+
+test_W4_write_records_relative_roots_absolute() {
+  # A relative root given to manifest_write is anchored at
+  # the caller's cwd, as relocate does (L5), so the manifest validates. An
+  # absolute root is recorded exactly as given, symlink and all.
+  local base="$_WI_TMP/w4"
+  mkdir -p "$base/foo-ai/.workspace" "$base/foo" "$base/real-ai/.workspace"
+  ( cd "$base" && "$WI_BIN" manifest_write foo-ai ./foo personal 2>/dev/null ) || {
+    echo "    write with relative roots failed"; return 1; }
+  local m="$base/foo-ai/.workspace/pairing.json"
+  assert_eq "$(cd "$base/foo-ai" && pwd -P)" "$(jq -r .ai_workspace.root "$m")" "ai root anchored" || return 1
+  assert_eq "$(cd "$base/foo" && pwd -P)" "$(jq -r .canonical.root "$m")" "canonical root anchored" || return 1
+  "$WI_BIN" manifest_validate "$base/foo-ai" 2>/dev/null || { echo "    written manifest does not validate"; return 1; }
+  ln -s "$base/real-ai" "$base/link-ai"
+  "$WI_BIN" manifest_write "$base/link-ai" "$base/foo" personal 2>/dev/null || {
+    echo "    control write failed"; return 1; }
+  assert_eq "$base/link-ai" "$(jq -r .ai_workspace.root "$base/real-ai/.workspace/pairing.json")" \
+    "absolute root recorded as given" || return 1
+}
+
+test_W5_write_refuses_an_empty_canonical_root() {
+  # Codex on #605: an empty canonical root was written as
+  # canonical.root = "" with success reported, a manifest V6 refuses. It must
+  # be refused before anything is written.
+  local ai="$_WI_TMP/w5/foo-ai" cn="$_WI_TMP/w5/foo"
+  mkdir -p "$ai/.workspace" "$cn"
+  local m="$ai/.workspace/pairing.json"
+  if "$WI_BIN" manifest_write "$ai" "" personal 2>"$_WI_TMP/w5/err"; then
+    echo "    write accepted an empty canonical root"; return 1; fi
+  grep -qF "canonical root is empty" "$_WI_TMP/w5/err" || {
+    echo "    refusal does not say why:"; cat "$_WI_TMP/w5/err"; return 1; }
+  [[ ! -e "$m" ]] || { echo "    a manifest was written"; return 1; }
+  # Control: the same write with the root given succeeds and validates.
+  "$WI_BIN" manifest_write "$ai" "$cn" personal 2>/dev/null || { echo "    control write failed"; return 1; }
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || { echo "    control manifest does not validate"; return 1; }
+}
+
 wi_test_run test_L1_relocate_rewrites_ai_root_preserves_everything_else
 wi_test_run test_L2_relocate_canonical_root_only_with_flag
 wi_test_run test_L3_relocate_refuses_bad_manifest_unchanged
@@ -944,5 +1192,14 @@ wi_test_run test_L7_relocate_refuses_self_pairing
 wi_test_run test_L8_relocate_preserves_manifest_mode
 wi_test_run test_V5_validate_rejects_wrong_typed_leaves
 wi_test_run test_L9_relocate_temp_file_is_not_predictable
+wi_test_run test_V6_validate_rejects_unusable_values
+wi_test_run test_V7_validate_well_known_paths_are_absolute_templates
+wi_test_run test_W1_write_temp_file_is_not_predictable
+wi_test_run test_W2_write_keeps_the_umask_mode
+wi_test_run test_W3_write_refuses_a_raced_temp_name
+wi_test_run test_L10_relocate_refuses_a_raced_temp_name
+wi_test_run test_V8_validate_rejects_relative_roots
+wi_test_run test_W4_write_records_relative_roots_absolute
+wi_test_run test_W5_write_refuses_an_empty_canonical_root
 
 wi_test_summary

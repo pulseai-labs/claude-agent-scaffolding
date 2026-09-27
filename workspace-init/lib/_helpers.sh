@@ -57,6 +57,69 @@ wi_resolve_root() {
   printf '%s\n' "${resolved:-$p}"
 }
 
+# wi_tmpname_beside <target>
+# Print a random temp name beside <target> for a tmp-then-mv write, without
+# creating it. A predictable ${target}.tmp.$$ name lets anyone who can write
+# the directory plant a symlink there first, which the writer's redirect
+# follows — overwriting the link's target — and the rename then installs
+# (#582). Nothing exists under the name until wi_write_new creates it, so a
+# watcher of the directory has no file to find and swap beforehand.
+# Returns 1, printing nothing, if no name can be made.
+wi_tmpname_beside() {
+  mktemp -u "${1}.tmp.XXXXXX" 2>/dev/null
+}
+
+# wi_write_new <path> <mode> <command> [args...]
+# Create <path>, which must not exist yet, and run <command> with its stdout on
+# the new file. <mode> is the octal mode to create it with; "" gives what a
+# plain redirect gives, 0666 less the umask. A redirect creates from 0666, so
+# execute bits in <mode> are not set: a caller that needs them adds them.
+#
+# A file created by name and written by name later can be swapped for a
+# symlink in between by anyone who can write the directory, and the write then
+# lands on the link's target (#582). So the file is opened once, here, and
+# written only through that descriptor. noclobber makes bash create it with
+# O_EXCL, which refuses any existing entry — a symlink too, dangling or not —
+# except a non-regular file (a device, or a link to one), which bash opens
+# without O_EXCL; the -f test on the descriptor (bash fstat()s /dev/fd/N)
+# refuses that. The mode is set at creation through the umask, never by a
+# chmod on the path afterwards: a descriptor opened for writing stays writable
+# even when the mode it created the file with (0400, 0444) is not.
+# Returns non-zero if the file cannot be created or <command> fails; the
+# caller removes <path>.
+wi_write_new() {
+  local path="$1" mode="$2"
+  shift 2
+  (
+    set -C
+    if [[ -n "$mode" ]]; then
+      umask "$(printf '%o' $(( 0777 & ~0$mode )))" || exit 1
+    fi
+    { exec 3>"$path"; } 2>/dev/null || exit 1
+    [[ -f /dev/fd/3 ]] || exit 1
+    "$@" >&3
+  )
+}
+
+# wi_file_mode <file>
+# Print the permission bits of <file> (not following a symlink) as octal, read
+# from `ls -ld`: POSIX fixes its first ten characters on GNU and BSD alike,
+# where `stat` differs. setuid, setgid and sticky are not carried: s and t
+# count as the execute bit they sit on, S and T as its absence.
+wi_file_mode() {
+  local line m=0 i c
+  line="$(ls -ld "$1" 2>/dev/null)" || return 1
+  for (( i = 1; i <= 9; i++ )); do
+    c="${line:i:1}"
+    m=$(( m << 1 ))
+    case "$c" in
+      -|S|T) : ;;
+      *) m=$(( m | 1 )) ;;
+    esac
+  done
+  printf '%o\n' "$m"
+}
+
 # --- File-based locking via `set -o noclobber` ----------------------------
 # Mirror of architect-critic's ac_lock_acquire pattern. Retry budget is
 # configurable via WI_LOCK_RETRIES (default 5, one second between attempts)
