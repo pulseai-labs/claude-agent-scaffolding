@@ -105,18 +105,21 @@ carries the brief as `initialPrompt`, delivered whole, and what Paseo adds to a
 seat is environment such as `PASEO_AGENT_ID` and `PASEO_AGENT_CWD`, never prompt
 text, so the brief is the whole contract. That confound is genuinely gone.
 
-The predecessor plugin this harness was ported from named a third live channel
-here: an installed guide binary the spine-session and work-PR briefs made the
-seat's first command to run, carrying dispatch and authority rules of its own
-that this plugin deliberately overrode in places. Paseo has no equivalent — no
-CLI or MCP guide a seat is briefed to consult first, and no command surface
-installed outside this plugin that a seat's brief would invoke before its own
-contract applies. That channel is not carried forward; there is nothing here
-to name in its place.
-
-Two live channels remain, and they are why replacing only the source files
+Three live channels remain, and they are why replacing only the source files
 with a pre-change snapshot still does not isolate the product version:
 
+- **the guide the seat reads.** A coordinator seat that itself calls Paseo MCP
+  verbs (a spine session, a work-PR session) reads Paseo's own command
+  reference for them — the bundled `paseo` skill, the MCP tool descriptions,
+  and `paseo <cmd> --help` (`paseo-mechanics.md`'s "What this file is for") —
+  and that reference belongs to the installed skill and MCP server, not the
+  snapshot. It states guidance of its own, and this plugin deliberately
+  overrides some of it: Paseo's own `paseo-handoff` skill makes a rotation's
+  successor a subagent of the session standing down, where `paseo-mechanics.md`'s
+  Handoff launches it detached instead; and Paseo's "don't poll" / "the
+  notification will tell you" advice is overridden by the D2 background wait,
+  since the notice is one-shot (`paseo-mechanics.md`'s Completion). A seat
+  reading the live guide gets the live rules whatever the snapshot says.
 - **the mechanics the seat is pointed at.** `MECHANICS=` names the installed
   orchestrate skill's `references/paseo-mechanics.md`, not a substituted copy, so
   the seat-launch, model-check, wait, send and teardown mechanics a seat reads come
