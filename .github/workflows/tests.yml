@@ -84,6 +84,9 @@ jobs:
       - name: herdr-crew suite
         run: bash herdr-crew/run-tests.sh
 
+      - name: paseo-crew suite
+        run: bash paseo-crew/run-tests.sh
+
       - name: dsh-crew suite
         run: bash dsh-crew/run-tests.sh
 
@@ -108,6 +111,11 @@ jobs:
         # eval aggregator) and the manifest/marketplace description. A plugin
         # suite cannot see its sibling tree, so this one is repo-root.
         run: bash tests/test-herdr-crew-parity.sh
+
+      - name: paseo-crew parity pins (repo-root)
+        # paseo-crew's verbatim copies of herdr-crew (fidelity pins, dsh-driver.md)
+        # and ossify (the eval library), plus the manifest description restatement.
+        run: bash tests/test-paseo-crew-parity.sh
 
       - name: OpenCode runtime adapter unit suite
         run: node --test tests/test-opencode-runtime-adapter.mjs

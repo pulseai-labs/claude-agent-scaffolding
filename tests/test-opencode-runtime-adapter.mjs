@@ -147,6 +147,8 @@ const excludedPlugins = [
   "dsh-crew",
   // The PR lifecycle plugin, same status: ships on Claude Code and Codex only.
   "merge-bar",
+  // The Paseo port of herdr-crew, same status: ships on Claude Code and Codex only.
+  "paseo-crew",
 ];
 
 const expectedAliases = {

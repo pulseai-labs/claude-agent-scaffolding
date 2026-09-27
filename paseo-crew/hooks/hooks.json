@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|mcp__paseo__create_agent|mcp__paseo__send_agent_prompt|mcp__paseo__create_workspace",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks-handlers/context-ceiling.sh" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks-handlers/context-ceiling.sh" }
+        ]
+      }
+    ]
+  }
+}
