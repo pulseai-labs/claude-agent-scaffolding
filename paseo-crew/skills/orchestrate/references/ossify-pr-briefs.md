@@ -161,8 +161,9 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      the bots review every push where they are installed, so the current-head
      verdict is read there; where none is, the reviewer seat is re-dispatched
      over the fix range — the task names it `<old sha>..<new sha>` — and a fresh
-     seat from its REVIEWER row on a resumed dispatch whose reviewer is gone, still
-     one scoped delta re-review, never a second full review. A post-disposition
+     seat from its REVIEWER row on a resumed dispatch whose reviewer is gone takes
+     the delta form as its whole task, still one scoped delta re-review, never a
+     second full review. A post-disposition
      finding returns through a blocking
      question to the top before any seat acts on it, never fixed by you or
      silently deferred. Relay ONE batched summary per round;

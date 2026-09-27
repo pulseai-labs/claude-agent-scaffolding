@@ -212,8 +212,9 @@ with `replaces:` takes a plugin step — `implementer`, `verifier`, `reviewer`:
 the named seat is not launched, the role runs at its point in its place, and the
 handoff says which step was the operator's. A replacement for a **retained** role keeps
 that role's lifetime: an `implementer` or `verifier` replacement is retained across
-items and the fail-and-fix cycle as the built-in is, released when the built-in would
-be, never at its dispatch's end — step 7's correction and step 10's fixes need it to
+items and the fail-and-fix cycle, and a `reviewer` replacement through the PR's fix
+rounds, each released when the built-in would be, never at its dispatch's end —
+step 7's correction, step 8's delta re-review and step 10's fixes need the seat to
 exist. Every point above is the top's own — a
 declared role is not yet carried into a delegated spine or work-PR session, so a
 `before-merge-ask` role does not fire on an activated spine (issue #500 holds it).

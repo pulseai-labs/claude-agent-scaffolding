@@ -473,6 +473,10 @@ pin "$ROLES_MD" 'the placement'"'"'s mode/base' \
   "roles.md's launch line defers the worktree base to the placement"
 pin "$LIFECYCLE_MD" 'verifier` replacement is retained across' \
   "a replaced retained role keeps that role's lifetime"
+pin "$LIFECYCLE_MD" '`reviewer` replacement through the PR'"'"'s fix' \
+  "a reviewer replacement keeps the built-in's lifetime through the fix rounds too"
+pin "$GENERIC_BRIEFS_MD" 'gets the delta form as its whole task' \
+  "a fresh reviewer on the resumed path runs the delta form, not a second full review"
 pin "$LIFECYCLE_MD" 'released there, as Teardown says' \
   "a read-only item's seat and workspace are released at its close"
 pin "$GENERIC_BRIEFS_MD" 'the scoped delta pass a fix range names' \
@@ -1934,7 +1938,9 @@ budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
 # #608 review round 4 (2026-09-27): raised from 205 to 206 — the delta re-review's
 # task now names its range `<old sha>..<new sha>` (round 4, finding 1: the reviewer
 # contract had no scoped pass to run, so a retained reviewer could refuse).
-budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget" 206
+# #608 review round 5 (2026-09-27): raised from 206 to 207 — the resumed path's fresh
+# seat takes the delta form as its whole task (round 5, finding 1), one line.
+budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget" 207
 # R16 (2026-09-27, fix round 1, issues 2 and 3): ossify-briefs.md's budget is raised
 # from 200 to 205, exactly the 5 lines restoring the item seat's placement ("in the
 # worktree ossify prepared for the item"), "with the verifier's summary", "a second
