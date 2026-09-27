@@ -427,7 +427,11 @@ section "the resolved profile is one contract, stated once"
 # another seat's — 5 in ossify-briefs.md (spine, item implementer, item verifier,
 # and the SEATS block's own two rows), 4 in ossify-pr-briefs.md (close, work-PR,
 # REVIEWER, PRFIX).
-ROW='<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>'
+ROW='<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>'
+# #608 review round 3: the row dropped `featureValues`, which config.md's own launch
+# map materialises as `settings.features` — a coordinator launching from an injected
+# row (or a handoff carrying one) could not reproduce a profile that sets it. The
+# segment is `none` where the profile sets none, so the shape stays fixed.
 pin "$CONFIG_MD" "$ROW" "config.md defines the resolved-profile row"
 n_eq "$BRIEFS_MD" "$ROW" 5 "the spine, item bodies and SEATS rows carry the full resolved profile"
 n_eq "$PRBRIEFS_MD" "$ROW" 4 "the close, work-PR, REVIEWER and PRFIX rows carry the full resolved profile"
@@ -1746,7 +1750,7 @@ pin "$SKILL_MD" 'one background loop per dispatch' "SKILL.md names the wait prim
 pin "$SKILL_MD" 'a dispatch never holds two waits at once' \
   "SKILL.md states the wait rule as one waiter at a time, never a ban on re-arming"
 pin "$GENERIC_BRIEFS_MD" 'A read-only item' \
-  "the fast brief's commit/push line is conditional for the read-only class `bounded` covers" flat
+  "the fast brief's commit/push line is conditional for the read-only class \`bounded\` covers" flat
 # Each dispatched brief names the file its report is written to. Nine templates:
 # the generic five, plus the four dedicated dispatch templates in the same file.
 n_eq "$GENERIC_BRIEFS_MD" 'REPORT_PATH=<the absolute path this seat writes its report to>' 9 \

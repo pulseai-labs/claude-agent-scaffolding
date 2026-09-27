@@ -36,10 +36,11 @@ segment, never Paseo's encoded string, which no worker can be expected to echo:
 1. **Placement.** A seat that works in the orchestrator's tree runs in the orchestrator's
    workspace: omit `workspaceId`. A seat that needs its own worktree gets a workspace from
    `create_workspace` with `isolation: "worktree"`, `path: <the source repo>` and the mode
-   its PLACEMENT needs: `branch-off` with `branchName` and an explicit `baseBranch: origin/main`
-   for a new branch off the run's base, never an implied base (Paseo's ref rule);
-   `checkout-branch` with `branch` for one that works an existing branch; `checkout-pr` with
-   `prNumber` for one that works a PR's head — the reviewer's step-8 worktree. A seat in an
+   its PLACEMENT needs: `branch-off` with `branchName` and an explicit `baseBranch` — the
+   placement's own base ref, `origin/main` unless the run names another, never an implied
+   base (Paseo's ref rule); `checkout-branch` with `branch` for one that works an existing
+   branch; `checkout-pr` with `prNumber` for one that works a PR's head — the reviewer's
+   step-8 worktree. A seat in an
    existing tree gets `isolation: "local"` with that `path`. In the dual-repo case an
    implementer in a canonical worktree is a `worktree` workspace whose `path` is the
    canonical checkout.
@@ -242,8 +243,10 @@ orchestrator:
    bound expires, is a failure: a successor that dies before it arms its own waits leaves the
    run with none.
    Any failure takes one branch:
-   `cancel_agent` then `archive_agent` the successor if one was created (it holds no seats
-   yet); re-arm this session's own waits and a fresh heartbeat from the handoff it just
+   `cancel_agent` then `archive_agent` the successor if one was created; read its activity
+   and compare each live dispatch's report hash and identity against the handoff — a report
+   it already handled is not handled twice — before anything is re-armed;
+   re-arm this session's own waits and a fresh heartbeat from the handoff it just
    wrote; report the failed launch to the operator; and remain the orchestrator.
 4. **On success**, tell the operator which agent is now the orchestrator.
    Never archive a predecessor while a subagent in its workspace runs: the successor shares the

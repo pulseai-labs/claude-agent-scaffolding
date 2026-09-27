@@ -92,7 +92,10 @@ Every command's syntax comes from Paseo's own `paseo` skill.
    through the Status API instead of Checks, never the status rollup, both fetched
    against `--repo <owner/repo>`. These reads are the floor's PR-gate probes — identity
    and state from the first, CI for the named SHA from the rest — and anything beyond
-   reading them becomes a verifier dispatch.
+   reading them becomes a verifier dispatch. A read-only item — one whose brief released
+   it from the commit, push and PR line — has no PR to check: its report's evidence is the
+   completion, the verifier still checks it (step 7), and the review, the disposition and
+   the merge (steps 8-12) do not apply to it.
 7. **Verify, once per work item.** One verifier session per work item, one brief
    listing every claim: each acceptance criterion of the work item's spec, the
    mutation of any new test, and the diff against the requirement. The suite result

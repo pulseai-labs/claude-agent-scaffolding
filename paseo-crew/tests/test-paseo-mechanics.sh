@@ -24,7 +24,10 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # head, which `baseBranch` cannot name), the report identity as the inode (mtime can
 # hold across a replacement), the error retry's no-replay rule, and the successor
 # check's settled status (error|closed alone let `initializing` pass).
-REF_BUDGET=258
+# 2026-09-27, #608 review round 3: raised from 258 by 3 — the base is the placement's
+# ref with origin/main as its default (not a hard-coded base), and the failed-handoff
+# branch reconciles a successor that already resumed before anything is re-armed.
+REF_BUDGET=261
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -45,7 +48,10 @@ section "the seat launch"
 for v in 'create_agent' 'create_workspace' 'paseo inspect <id> --json' 'list_profiles'; do
   present "$REF" "$v" "the launch names $v"
 done
-present "$REF" 'baseBranch: origin/main' "a worktree seat names its base explicitly"
+present "$REF" 'an explicit `baseBranch`' "a worktree seat names its base explicitly"
+# #608 review round 3: the row named `origin/main` as if it were every run's base —
+# a run on a release branch (the briefs' `<base-branch>`) needs its own.
+pin "$REF" '`origin/main` unless the run names another' "the base defaults to origin/main, never hard-codes it" flat
 # A hard-coded base is only right for the seat that branches off it: a reviewer's
 # worktree is at a PR's head, which `baseBranch` cannot express (#608 review, round 1).
 present "$REF" '`checkout-pr` with' "a PR-head seat names its own ref"

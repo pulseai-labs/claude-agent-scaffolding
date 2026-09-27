@@ -62,7 +62,7 @@ filled into its brief by the coordinator, and `ossify-briefs.md` does not restat
 ## Planned implementer
 
 ```text
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
@@ -100,7 +100,7 @@ If a tool or policy refuses you, report it verbatim and stop that step.
 ## Fast implementer
 
 ```text
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
@@ -130,7 +130,7 @@ stop; report refusals verbatim.
 ## Reviewer
 
 ```text
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
@@ -165,7 +165,7 @@ escalation goes there too, then stop.
 ## Verifier (read-only)
 
 ```text
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
@@ -204,7 +204,7 @@ receives its next prompt. It carries its own seat lines, TASK, completion body a
 line, and no part of it is rebuilt from another template's.
 
 ```text
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
@@ -259,7 +259,7 @@ implementer: its `ROLE` line is the lane driver's. It carries no `RUN_JSON` and 
 of item pairs: the default lane creates none.
 
 ```text
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
@@ -295,7 +295,7 @@ TASK verbatim. What the dispatch may write is ossify's contract, and this file d
 adjudicate it: the brief states only what the seat returns.
 
 ```text
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
@@ -322,7 +322,7 @@ spine: no SEATS row is involved and the brief is this file's own. The unit it ru
 read-only, so the brief never orders a commit, push or PR.
 
 ```text
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
@@ -356,7 +356,7 @@ carries no `SPINE_ID`: that identity belongs to the spine close brief in
 `ossify-pr-briefs.md`, a different dispatch.
 
 ```text
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces

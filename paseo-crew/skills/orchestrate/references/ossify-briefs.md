@@ -21,7 +21,7 @@ running in your first reply, then continue.
 
 PLACEMENT: <abs path of the repo or worktree the lane runs from>.
 
-SPINE_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SPINE_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SPINE_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SPINE_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
@@ -31,8 +31,8 @@ RUN_JSON=<abs path of the run.json you write and own — never the top's>
 MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/paseo-mechanics.md
 SPINE_ID=<spine id>
 SEATS — the operator-approved seats for this spine. Use them verbatim.
-<item id> implementer: <profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-<item id> verifier:    <profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+<item id> implementer: <profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
+<item id> verifier:    <profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 A seat this block does not list halts the item and asks.
 HANDOFF_PATH=<a prior spine session's handoff path, or "none">
 Everything you tell the top — plan relay, question, halt, rotation, report — goes in your
@@ -115,7 +115,7 @@ running in your first reply, then continue.
 
 PLACEMENT: worktree <abs path>, branch <branch>, base <base-branch>. Use git -C
 for every git command; cd does not persist.
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
@@ -160,7 +160,7 @@ is `briefs.md`'s verifier CLAIMS body, supplied verbatim with the dispatch.
 ROLE: verifier for <work-item-id>, read-only, in worktree <abs path>, at the accepted result's
 `head_oid`, staged tree `tree_oid`. State the model you are running; SEAT_EXPECTED_MODEL below is the
 value to match — a mismatch is a failed launch to report and stop.
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<the model segment of the model this item's SEATS row names, as paseo-mechanics.md's The seat launch states it — fill this line; a coordinator never sends it blank>
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces

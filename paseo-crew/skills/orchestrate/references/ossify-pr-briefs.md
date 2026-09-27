@@ -20,7 +20,7 @@ SEAT_EXPECTED_MODEL is a failed launch to report, not to work around.
 
 PLACEMENT: <abs path of the worktree the spine's lane ran from>.
 
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
@@ -80,7 +80,7 @@ report, not to work around.
 
 PLACEMENT: REPO_ROOT — the worktree holding this PR's branch.
 
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
@@ -91,9 +91,9 @@ MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from
 PR_REPO=<owner/repo>
 PR_NUMBER=<number>
 REPO_ROOT=<abs path of this seat's worktree>
-REVIEWER=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+REVIEWER=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 REVIEW_LEVEL=<the /code-review level the top decided>
-PRFIX=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+PRFIX=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>
 PRIOR_REVIEW=<the prior dispatch's durable review record — ran, reviewed head,
 clean/findings state, summary, fix rounds run, ledger/comment refs — "none", or "covered">
 MERGE_EXECUTOR=<session|operator — the top's explicit assignment>

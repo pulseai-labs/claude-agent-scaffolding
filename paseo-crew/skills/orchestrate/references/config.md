@@ -65,7 +65,7 @@ this section's field list, named here rather than left implicit.
 
 A resolved profile renders as one row wherever it travels:
 
-`<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>`
+`<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId> | features: <featureValues, or none>`
 
 | field | set by | consumed at | travels |
 |---|---|---|---|
@@ -73,6 +73,7 @@ A resolved profile renders as one row wherever it travels:
 | `provider` / `model` | the profile | the launch, the model check | every resolved profile |
 | `modeId` | the profile | the launch | every resolved profile |
 | `thinkingOptionId` | the profile | the launch | every resolved profile |
+| `featureValues` | the profile | the launch (`settings.features`) | every resolved profile — the row's last segment, `none` where the profile sets none (#608 review round 3: a row that dropped it could not reproduce a profile the launch map materialises) |
 | `can:` | the profile's `notes` | the seat's approval | never — checked where a seat is approved |
 | `note:` | the profile's `notes` | the coordinator's read | never |
 
