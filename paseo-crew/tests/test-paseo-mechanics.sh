@@ -60,7 +60,8 @@ else fail "paseo wait is not a completion primitive" "$c occurrences"; fi
 section "D3: the detached handoff"
 pin "$REF" 'env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d' "the successor launch unsets both caller variables"
 pin "$REF" '`ParentAgentId` is `null`' "the successor is verified parentless"
-pin "$REF" 'do not stand down' "a parented successor stops the handover"
+pin "$REF" '`cancel_agent` then `archive_agent` the parented successor' "a parented successor is cancelled and archived"
+pin "$REF" 're-arm this session'"'"'s own waits and a fresh heartbeat' "after a parented launch this session re-arms and stays the orchestrator"
 pin "$REF" 'Never archive a predecessor while a subagent in its workspace runs' "the no-archive rule survives"
 pin "$REF" 'Kill this session'"'"'s armed background waits' "the predecessor stands down"
 
