@@ -14,7 +14,11 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
-REF_BUDGET=240
+# 2026-09-27, final-review fix wave: raised from 240 by the 2 lines left over after
+# tightening, for the expected-model paragraph (I1), the one-waiter, heartbeat and
+# DISPATCHED_AT rules (I3, I6, I7, M1, M2) and the handoff's resume prompt, launch
+# verify and stand-down wakes (C1, I2, I4).
+REF_BUDGET=242
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -60,7 +64,7 @@ else fail "paseo wait is not a completion primitive" "$c occurrences"; fi
 section "D3: the detached handoff"
 pin "$REF" 'env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d' "the successor launch unsets both caller variables"
 pin "$REF" '`ParentAgentId` is `null`' "the successor is verified parentless"
-pin "$REF" '`cancel_agent` then `archive_agent` the parented successor' "a parented successor is cancelled and archived"
+pin "$REF" '`cancel_agent` then `archive_agent` the successor if one was created' "a failed successor launch (parented, errored or no id) is cancelled and archived"
 pin "$REF" 're-arm this session'"'"'s own waits and a fresh heartbeat' "after a parented launch this session re-arms and stays the orchestrator"
 pin "$REF" 'Never archive a predecessor while a subagent in its workspace runs' "the no-archive rule survives"
 pin "$REF" 'Kill this session'"'"'s armed background waits' "the predecessor stands down"

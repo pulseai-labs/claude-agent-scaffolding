@@ -75,10 +75,11 @@ Every command's syntax comes from Paseo's own `paseo` skill.
    the one that just exited. What persists is the report file, not the seat's own
    state since moved on, so a seat that finishes while another item still works
    loses nothing; the round's barrier closes when every item's report file is in
-   hand. A seat at its `budget` exit does not hold the round: that item's report
-   file is not yet in hand, so the barrier closes on a later turn, once it is on
-   disk — woken by another item's still-running wait, or by the operator's word to
-   wait on that seat again — never by the orchestrator's own re-entry. At each task
+   hand. A seat at its `budget` exit gets `paseo-mechanics.md`'s one grace; if that
+   expires with no report, the seat is cancelled and escalated, and the barrier
+   waits on the operator's word — which may re-dispatch the item, arming a fresh
+   wait, but never resurrects the cancelled one — not on the orchestrator's own
+   re-entry. At each task
    boundary for a retained implementer, send `/context` and read the one reply
    before attaching the next task; the threshold, and the seat this probe does not
    reach, are in `roles.md`.
@@ -226,18 +227,20 @@ Then follow `paseo-mechanics.md`'s Handoff (D3), in the order it fixes so that n
 seat ever has two waiters and one report wakes one orchestrator: **stand down
 first** — kill this session's armed background waits and `delete_heartbeat`, and
 take no further dispatch action. **Launch the successor as `paseo-mechanics.md`'s
-Handoff states: detached, in this session's workspace, verified parentless.** A
-parented successor is cancelled and archived; this session re-arms its own waits
-and a fresh heartbeat from the handoff it just wrote, reports the parented launch
-to the operator, and remains the orchestrator. On success, send the new top its
-resume — `/ossify:handoff-resume <path>` with ossify, or the path as its first
-instruction without. The run file's `run.orchestrator` block still names
+Handoff states: detached, in this session's workspace, its resume as the launch
+prompt, verified started and parentless.** A failed launch is cancelled and archived
+where one was created; this session re-arms its own waits and a fresh heartbeat from
+the handoff it just wrote, reports the failed launch to the operator, and remains the
+orchestrator. The run file's `run.orchestrator` block still names
 this session's seat after the handover — the field dagr routes the operator's messages
 to — and the successor does not rebind it: issue #556 holds that gap.
 One report must wake one top — a live dispatch a successor is also
-waiting on otherwise advances twice, and a close, a PR or a merge runs twice with it. A
-wait that fires anyway is read and handed to the successor, never acted on. Then tell the
-operator which agent is now the orchestrator and that this one can close.
+waiting on otherwise advances twice, and a close, a PR or a merge runs twice with it.
+After stand-down every wake this session gets — a child seat's finish notice, a
+heartbeat turn, a wait that fires anyway — is read and handed to the successor, never
+acted on, unless a failed launch made it the orchestrator again. On success, tell the
+operator which agent is now the orchestrator, and that this session stays unarchived
+until the run's inherited seats are gone.
 The new top resumes by naming the parent's `run.json` path — there is no CLI call —
 and then, before the step the handoff named, re-arms with one fresh background wait
 per live dispatch the handoff listed, and a fresh heartbeat: a new session's first

@@ -20,13 +20,16 @@ materialised into one `create_agent` call as Paseo's skill maps it: `provider` +
 
 - **A profile with no `model`.** `create_agent` rejects a bare provider string. The launch
   reads that provider's default model id from `list_models` and materialises
-  `<provider>/<default id>`; that id is the seat's expected model. If no default can be read,
-  the launch halts and names the profile to fix (add `model`). Never a guessed id. Step 3's
-  `inspect` check is exact against that full id. The worker's self-report is checked only
-  for the model it names, the id's model segment (such as `deepseek-v4.1-flash`), never
-  Paseo's encoded provider string, which no worker can be expected to echo.
+  `<provider>/<default id>`. If no default can be read, the launch halts and names the
+  profile to fix (add `model`). Never a guessed id.
 - **A profile with no `modeId`** passes none. It never inherits the caller's mode: modes are
   provider-specific and do not carry across providers.
+
+**The expected model** is the id the launch materialised (the profile's `model`, or that
+default id), matched exactly by step 3's `inspect` check. A brief's `SEAT_EXPECTED_MODEL`
+(`SPINE_EXPECTED_MODEL` in the spine brief) and the worker's own check carry only its model
+segment, never Paseo's encoded string, which no worker can be expected to echo:
+`deepseek-v4.1-flash` of `m:custom_provider%3Aopencode-go:deepseek-v4.1-flash:v:thinking`.
 
 `<seat label>` is `seat: <role> (<profile id>)`. The launch is four steps:
 
@@ -43,12 +46,11 @@ materialised into one `create_agent` call as Paseo's skill maps it: `provider` +
    the brief as `initialPrompt`. There is no readiness wait: the agent returned has already
    taken its brief, and there is no TUI to wait on. The seat is the caller's subagent, drawn
    in Paseo's subagent track.
-3. **Model check.** `paseo inspect <id> --json`: `Model` must equal the profile's `model`, or
-   the default id read for a profile without one. A mismatch is a failed launch: archive the
-   seat and report it (`roles.md`). The brief's "state your model in your first reply" is the
-   second check, compared against the expected model as above, and the one that catches a lane
-   whose provider silently reroutes, because `inspect` reports what Paseo asked for, not what
-   answered.
+3. **Model check.** `paseo inspect <id> --json`: `Model` must equal the expected model's full
+   id. A mismatch is a failed launch: archive the seat and report it (`roles.md`). The brief's
+   "state your model in your first reply" is the second check, against the model segment, and
+   the one that catches a lane whose provider silently reroutes, because `inspect` reports
+   what Paseo asked for, not what answered.
 4. **Arm the wait**, as Completion states.
 
 The orchestrator never runs `paseo run` for a worker. That command arms no finish notice,
@@ -114,34 +116,40 @@ done
   `permission`, `error` and `budget` remain.
   Coordinator seats (a spine or work-PR session, a lane driver with subagents) are armed
   that way from the start, because their idle is not a finish.
-- `error`: on `error`, re-send the last message once on the same seat, with one fresh wait;
-  a second `error` escalates. On `closed` the seat is gone: escalate, with no retry.
+- `error`: on `error`, re-send the last message once on the same seat, with one fresh wait
+  whose `error` exit arms only once `Status` has left `error`; a second `error` escalates.
+  On `closed` the seat is gone: escalate, with no retry.
 - `budget`: send one status request and arm one wait whose budget is a short grace, counted
   from that request. If the grace expires with no report, `cancel_agent`, record the seat's
   last message, and escalate. A timeout is a checkpoint, never a silent re-arm: more time is
   the operator's decision.
 
 **The finish notice is a hint.** When `<paseo-system>Agent X finished …</paseo-system>`
-arrives, check that seat's report file. A new report is handled as `report`, once, whichever
-of the notice and the wait reaches it first. With no new report, do nothing: the wait is
-still armed. Paseo sends the notice once, on the seat's first idle after running, and loses
-it on a daemon restart, so it is never the only thing that can wake the run.
+arrives, check that seat's report file. A new report is handled as `report`, once, by
+whichever of the notice, the heartbeat and the wait reaches it first, and that handler kills
+the dispatch's still-armed wait before arming the next: no seat ever has two waiters. With
+no new report, do nothing: the wait is still armed. Paseo sends the notice once, on the
+seat's first idle after running, and loses it on a daemon restart, so it is never the only
+thing that can wake the run.
 
 **The heartbeat backstop.** While any dispatch is live, the orchestrator holds exactly one
-heartbeat, made with `create_heartbeat` (`cron` default `*/15 * * * *`, `expiresIn` just
-past the latest budget end, `DISPATCHED_AT` plus `TIME_BUDGET`, among live dispatches). Its
-prompt tells the session to check each live dispatch's report file and whether that
-dispatch's background wait is still running. A new report is handled. A wait that is
-gone without having exited (a session or daemon restart, host sleep) is re-armed once, and
-the re-arm is recorded. Otherwise the heartbeat's turn does nothing. A heartbeat cannot be
-updated, so replacing it is tied to arming: whenever a wait is armed whose budget ends after
-the heartbeat's expiry, replace the heartbeat, `delete_heartbeat` first and then a new one.
-When the last dispatch settles, the orchestrator calls `delete_heartbeat`.
+heartbeat, made with `create_heartbeat` (`cron` default `*/15 * * * *`, `expiresIn` at least
+the latest budget end among live dispatches, `DISPATCHED_AT` plus `TIME_BUDGET`, plus one
+cron interval and the `budget` exit's grace). Its prompt tells the session to check each live
+dispatch's report file and whether that dispatch's background wait is still running. A new
+report is handled once, by the finish notice's rule above. A wait that is
+gone without having exited (a session or daemon restart, host sleep) is re-armed, once per
+loss, and the re-arm is recorded. Otherwise the heartbeat's turn does nothing. A heartbeat
+cannot be updated, so replacing it is tied to arming: whenever a wait is armed that the
+heartbeat's expiry does not cover by that rule, replace the heartbeat, `delete_heartbeat`
+first and then a new one. When the last dispatch settles, the orchestrator calls `delete_heartbeat`.
 
 `TIME_BUDGET` and `SETTLE_WINDOW` (default 10 minutes) are brief fields (`briefs.md`), stated
-at dispatch. A dispatch's elapsed time runs from its first send, recorded as `DISPATCHED_AT`.
-A re-arm, whether after a heartbeat catch, a handoff, a plan or an answer, keeps that start,
-so a re-arm never silently extends the budget.
+at dispatch. A dispatch's elapsed time runs from its start, recorded as `DISPATCHED_AT`: the
+brief's send, and again each send that follows a wait on the orchestrator or the operator (a
+plan approval, an answer, a fix task), because that wait is not the worker's time. An
+involuntary re-arm, after a heartbeat catch, a handoff, a lost wait or an `error` retry, keeps
+that start, so a re-arm never silently extends the budget.
 
 ## Sending a seat a message
 
@@ -154,8 +162,9 @@ opened a turn surfaces as `idle` with no report. A seat with a pending permissio
 with `respond_to_permission` before anything else is sent to it.
 
 **The `/context` probe.** At a task boundary, a seat whose `can:` includes slash commands is
-sent `/context` with `send_agent_prompt`, with no wait armed, and its one reply is read with
-`get_agent_activity`. The token figure in that reply is the reading. `LastUsage` in
+sent `/context` with `send_agent_prompt` and `background: false`, the one exception to the
+send rule above (the form Probe P4 passed in), with no wait armed, and its one reply is read
+with `get_agent_activity`. The token figure in that reply is the reading. `LastUsage` in
 `paseo inspect` is not one: its token fields read zero after a real turn. A seat that cannot
 answer the probe rotates at its item boundary (`roles.md`).
 
@@ -193,35 +202,39 @@ information, not failure.
 
 The orchestrator's own rotation keeps its boundary: a fully acknowledged delivery with no
 operator question in flight. Paseo's `paseo-handoff` skill is not used, because it makes the
-successor a subagent of the session about to stand down. Write `/ossify:handoff`, recording
-every live seat's agent id, `REPORT_PATH`, noted hash and identity, `DISPATCHED_AT`,
-`TIME_BUDGET` and `SETTLE_WINDOW`. Then, in this order, so that no
-seat ever has two waiters and one report wakes one orchestrator:
+successor a subagent of the session about to stand down. Write the handoff (`/ossify:handoff`
+with ossify installed, the same file by hand without), recording every live seat's agent id,
+`REPORT_PATH`, noted hash and identity, `DISPATCHED_AT`, `TIME_BUDGET` and `SETTLE_WINDOW`.
+Then, in this order, so that no seat ever has two waiters and one report wakes one
+orchestrator:
 
 1. **Stand down first.** Kill this session's armed background waits and `delete_heartbeat`,
-   and take no further dispatch action. The gap until a waiter is re-armed loses nothing:
-   reports persist on disk, and a re-armed wait compares against the pair the handoff noted,
-   so a report written in the gap wakes it at once.
+   and take no further dispatch action. From here every wake (a child seat's finish notice,
+   a heartbeat turn that raced the deletion, a wait that fires anyway) is read and handed on,
+   never acted on, unless step 3's failure branch re-arms. The gap loses nothing: reports
+   persist on disk, and a re-armed wait compares against the pair the handoff noted, so a
+   report written in the gap wakes it at once.
 2. **Launch the successor detached**, from this session's own profile, materialised as The
-   seat launch states (`--mode` and `--thinking` only where the profile sets them). It
-   starts `/ossify:handoff-resume` at once:
+   seat launch states (`--mode` and `--thinking` only where the profile sets them). Its
+   launch prompt, `<resume>`, is `/ossify:handoff-resume <path>` with ossify installed, and
+   the handoff path as its first instruction without; it takes no second resume message:
 
-       env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d --json --title "<run>: orchestrator" --workspace <current> --provider <provider>/<model> --mode <modeId> --thinking <thinkingOptionId> "/ossify:handoff-resume <path>"
+       env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d --json --title "<run>: orchestrator" --workspace <current> --provider <provider>/<model> --mode <modeId> --thinking <thinkingOptionId> "<resume>"
 
    Both variables are unset because `paseo run` inside an agent reads its caller from them
    and makes the new agent that caller's child.
-3. **Verify** with `paseo inspect <new id> --json` that `ParentAgentId` is `null`. A
-   non-null parent means the launch built a tree, and that successor is already resuming.
-   `cancel_agent` then `archive_agent` the parented successor, which holds no seats yet;
-   re-arm this session's own waits and a fresh heartbeat from the handoff it just wrote;
-   report the parented launch to the operator; and remain the orchestrator.
-4. **On success**, tell the operator which agent is now the orchestrator. A wait of this
-   session's that fires anyway is read and handed on, never acted on.
-   Never archive a predecessor while a subagent in its workspace runs: the successor shares
-   the workspace, every live seat is still this session's child, and the cascade would take
-   them. This session is left unarchived; the operator archives it once the run's seats are
-   gone. The successor re-arms one wait per live dispatch the handoff lists, each keeping its
-   `DISPATCHED_AT`, plus a fresh heartbeat.
+3. **Verify** that the launch returned an agent id, then with `paseo inspect <new id> --json`
+   that `Status` is neither `error` nor `closed` and `ParentAgentId` is `null` (a non-null
+   parent is a tree, its successor already resuming). Any failure takes one branch:
+   `cancel_agent` then `archive_agent` the successor if one was created (it holds no seats
+   yet); re-arm this session's own waits and a fresh heartbeat from the handoff it just
+   wrote; report the failed launch to the operator; and remain the orchestrator.
+4. **On success**, tell the operator which agent is now the orchestrator.
+   Never archive a predecessor while a subagent in its workspace runs: the successor shares the
+   workspace, every live seat is still this session's child, and the cascade would take them.
+   This session stays unarchived until the run's inherited seats are gone; the operator
+   archives it then. The successor re-arms one wait per live dispatch the handoff lists, each
+   keeping its `DISPATCHED_AT`, plus a fresh heartbeat.
 
 A spine or work-PR session's rotation (`rotate:` / `open:` returns) keeps its shape. Its
 parent launches the successor as an ordinary subagent through The seat launch, not
