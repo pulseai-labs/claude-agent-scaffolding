@@ -605,6 +605,7 @@ function assertSelection(config, skills, selected, caseRoot, expectedSpec) {
     "orca-crew",
     "herdr-crew",
     "dsh-crew",
+    "merge-bar",
     "paseo-crew",
   ]) {
     const excludedRoot = path.join(root, excluded) + path.sep;
