@@ -18,7 +18,8 @@ repository, and lands it as a pull request.
 - Start from the default branch, not the checkout's: with a clean tree (dirty → say what is
   dirty and stop; never stash), `git fetch origin <default>` and
   `git switch -c chore/review-rules origin/<default>`. Everything below reads and writes that
-  branch, so the PR carries the review rules and nothing else.
+  branch, so the PR carries the review rules and nothing else. If `chore/review-rules` already
+  exists locally or on the remote, say so and ask whether to reuse it or choose a new name.
 - Whether a root `AGENTS.md` exists, and whether it already has a review-rules section.
 - Whether a `.coderabbit.yaml` exists.
 - The one domain invariant reviewers most often have to explain, if any: ask the operator, or
