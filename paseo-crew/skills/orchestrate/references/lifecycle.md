@@ -166,11 +166,13 @@ Every command's syntax comes from Paseo's own `paseo` skill.
     SHA: re-fetch the same full gate set for that SHA once more, then
     `gh pr merge <number> --repo <owner/repo> --merge --match-head-commit <sha>` —
     the orchestrator often sits outside the PR's repository, so every
-    read and the merge name the repo. On a branch governed by a merge queue a command
-    that finds required checks still pending does not refuse: it enables auto-merge,
-    which would land later with no revalidation — so confirm `MERGED` at the named SHA
-    right after the command, and on anything else `gh pr merge --disable-auto` it and
-    return to step 10. The read and merge are two
+    read and the merge name the repo. On a branch governed by a merge queue the command
+    never merges: with required checks pending it enables auto-merge, and with them
+    passing it enqueues the PR — either way a later landing bypasses this step's own
+    revalidation. So confirm `MERGED` at the named SHA: when the command left one of
+    those states instead, undo it (`dequeuePullRequest` on GitHub; `gh pr merge --disable-auto`
+    for the auto-merge arm) and surface the repo's queue to the operator
+    as the blocker — this step never leaves a merge scheduled. The read and merge are two
     operations — a signal can still land between them: the ruleset
     requires conversation resolution, GitHub refuses the merge while any thread
     is open, and a refusal returns to step 10, never a retry. Then

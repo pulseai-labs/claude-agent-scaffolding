@@ -62,8 +62,10 @@ Three consequences:
 - **`get_agent_activity` or `paseo inspect` only on an attention exit (`permission`,
   `idle`, `error`, `budget`) or a missing or malformed report, never to watch progress.**
   The wait primitive is one background loop per dispatch, stated in
-  `references/paseo-mechanics.md`. It returns once. A loop of waits, and restarting a
-  wait after it exits, stay forbidden. Beyond that, the only bounded reads are the launch's
+  `references/paseo-mechanics.md`, and its own `paseo inspect` poll is that primitive's,
+  not a read from this session. It returns once, and handling that exit arms the
+  dispatch's next wait — a dispatch never holds two waits at once, and an exited wait is
+  never restarted in place. Beyond that, the only bounded reads are the launch's
   model check (`references/roles.md`), and the one `/context` reply at each task boundary,
   sent with `send_agent_prompt` and read with `get_agent_activity`, for a seat that can
   answer the probe — one that cannot rotates at its item boundary instead

@@ -116,7 +116,9 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
 DONE: commit with a message written to a file and `git commit -F`; push; <open the PR
 from the worktree with `gh pr create --repo <owner/repo> --base <base-branch> --head
-<branch> | push to the existing PR>. Then write your report file with this body:
+<branch> | push to the existing PR>. A read-only item — the class this brief's `bounded`
+covers — has no change to commit: skip the commit, the push and the PR line, say so under
+Changed, and return the evidence its TASK named. Then write your report file with this body:
   Changed / Evidence / PR / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: merge, delete a branch, force-push, edit files outside the worktree, or run any

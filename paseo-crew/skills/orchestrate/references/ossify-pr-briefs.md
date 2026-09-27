@@ -172,7 +172,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      permission settings, never probe by attempting a merge. On `session`: on
      the reply, re-fetch the whole gate set once more and
      merge bound to the named SHA, as a merge commit, confirming `MERGED` at it
-     rather than a scheduled auto-merge (lifecycle.md step 12). On `operator`: your ask
+     rather than a scheduled auto-merge or a queue entry (lifecycle.md step 12). On `operator`: your ask
      names the operator as executor, the approved SHA and the merge-commit
      convention; on the reply you re-fetch the gates, the operator's landing
      is a merge commit on that same SHA — never a squash or rebase — and you

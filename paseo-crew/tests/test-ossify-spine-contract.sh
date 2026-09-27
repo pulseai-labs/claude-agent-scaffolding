@@ -1645,6 +1645,13 @@ pin "$LIFECYCLE_MD" 'autoMergeRequest` null' \
   "the gate set refuses a head already scheduled to land"
 pin "$LIFECYCLE_MD" '`gh pr merge --disable-auto`' \
   "an auto-merge a pending-checks merge scheduled is cancelled, never adopted"
+# #608 review round 2: with checks PASSING gh enqueues the PR instead, and --disable-auto
+# is not a dequeue — the rule has to cover the queue entry too, or the landing still
+# arrives without this step's revalidation.
+pin "$LIFECYCLE_MD" '`dequeuePullRequest` on GitHub' \
+  "a queued merge is dequeued, not left to land"
+pin "$LIFECYCLE_MD" 'never leaves a merge scheduled' \
+  "the step's rule is that it leaves no merge scheduled at all"
 pin "$PRBRIEFS_MD" 'rather than a scheduled auto-merge' \
   "the work-PR session confirms MERGED, not a queued auto-merge"
 pin "$PRBRIEFS_MD" 'never a squash or rebase' \
@@ -1733,6 +1740,13 @@ section "waits and completion bodies"
 # and SKILL.md names the wait primitive and defers to it rather than restating it.
 pin "$MECHANICS_MD" 'with the `idle` exit dropped' "the false-wake rule is stated once, in paseo-mechanics.md"
 pin "$SKILL_MD" 'one background loop per dispatch' "SKILL.md names the wait primitive and defers to the mechanics"
+# #608 review round 2: "restarting a wait after it exits" read as an absolute ban, which
+# contradicts the fresh wait every nonterminal exit arms — and the loop's own inspect
+# poll read as the ban's target. Stated as one-waiter-at-a-time instead.
+pin "$SKILL_MD" 'a dispatch never holds two waits at once' \
+  "SKILL.md states the wait rule as one waiter at a time, never a ban on re-arming"
+pin "$GENERIC_BRIEFS_MD" 'A read-only item' \
+  "the fast brief's commit/push line is conditional for the read-only class `bounded` covers" flat
 # Each dispatched brief names the file its report is written to. Nine templates:
 # the generic five, plus the four dedicated dispatch templates in the same file.
 n_eq "$GENERIC_BRIEFS_MD" 'REPORT_PATH=<the absolute path this seat writes its report to>' 9 \
