@@ -186,6 +186,29 @@ The two facts this step needs are not in state and are recovered, not guessed:
   lands that repo's share of the spine into the wrong line of development, and
   every downstream step then reports green.
 
+**The PR body, when merge-bar is installed.** Where this session lists the
+`merge-bar` plugin's `working-a-pr` skill, compose the six fields once, before the
+pass, into `$pr_fields` — hoisted like `$repo_base_branches`, one text for every
+hosting repo — from the template in the plugin root's
+`references/work-pr/pr-body.md`: its headings in order and its Merge bar block word
+for word, so the bar exists before the first review.
+
+- **Claim** — what this spine makes true, from `SPINE.md`'s demo contribution.
+- **Scope** — each hosting repo and the paths its share touches
+  (`git -C "<repo-root>" diff --stat "<base>...<spine-branch>"`), and what the
+  spine deliberately leaves alone.
+- **Known limits** — the spine's fakes still `active`, and the ledger lines its
+  planning left accepted, each with its reason.
+- **Evidence** — the gates each work item's close ran, with their results;
+  nothing that did not run.
+- **Closes** — one `Closes <owner>/<repo>#<n>` line per intake request this spine
+  pulled in.
+
+Without merge-bar, leave `$pr_fields` unset. The block appends it after the two
+lines the record pass reads — `spine close …` and `pushed-tip:` — never before
+them: the record pass takes the first `pushed-tip:` line as the lineage guard's
+input.
+
 ```bash
 # $spine_slug is NOT ambient — nothing in state holds it. Recover it from the
 # spine directory's name with the ambiguity guard, exactly as `harvest.md` §2
@@ -359,8 +382,13 @@ $repo:$merge_sha"
       # death - no shell state is trusted across the loop. --head pins the PR to
       # the branch this pass just pushed: gh defaults it to the CURRENT branch,
       # which after a resume or a work-pr loop is not necessarily the spine's.
+      # merge-bar's six fields, when composed, go AFTER these two lines: the
+      # record pass reads the first `pushed-tip:` line. `:+` keeps an unset
+      # $pr_fields legal under `set -u`.
       pr_body="spine close $spine_id -> $base_branch in $repo
-pushed-tip: $pre"
+pushed-tip: $pre${pr_fields:+
+
+$pr_fields}"
       pr_num="$( (cd "$repo_root" && gh --repo "$pr_slug" pr create --base "$base_branch" --head "$spine_branch" \
         --title "merge $spine_id" --body "$pr_body") 2>&1 )" \
         || { echo "close: gh cannot open the PR in $repo ($pr_num) - fix gh (auth, host) or record an operator-decided local merge - never a silent local fall-through - halt"; exit 1; }
@@ -415,14 +443,16 @@ accumulated diff landing — the smallest independently meaningful diff, which i
 why the tier sits here and not at the work item, whose merges stay local); the
 **merge convention is a merge commit** — a rebase or squash landing cannot feed
 §6's first-parent diff and is turned away at the record pass below; and that
-deferrals land as tracked issues **in that repo**, linked from the spine's
-retrospective (§8). **Review-fix commits are not re-gated** (#377): they land
+whatever the loop leaves owed lands **in that repo** and is linked from the
+spine's retrospective (§8) — a tracked deferral issue under the bundled loop;
+merge-bar's one out-of-scope issue and its `[KL]` ledger lines under
+`working-a-pr`. **Review-fix commits are not re-gated** (#377): they land
 after every work item's acceptance and impl-check gates have passed and the
 items were marked complete; this ceremony's coverage of them is the cumulative
 demo (§5) and the touch check (§6), and re-gating the fix lane is a tracked
 design question, not a hidden behavior. **History rewrites are not available on a spine PR**:
-work-pr's second exit — unclaiming by rewrite and force-with-lease — is
-REPLACED here by unclaiming in a follow-up commit, because the record pass's
+the loop's rewrite exit — unclaiming by rewrite and force-with-lease, in either
+loop — is REPLACED here by unclaiming in a follow-up commit, because the record pass's
 lineage guard binds to the pushed tip and a rewritten head cannot be recorded;
 if a rewrite has already happened, re-land the PR from the pushed tip or
 record an operator decision. The merge is the operator's explicit call inside work-pr —

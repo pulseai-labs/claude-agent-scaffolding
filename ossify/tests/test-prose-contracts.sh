@@ -633,5 +633,18 @@ else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: work-item-close.md no longer states the missing-worktree_path diagnosis at all - re-anchor this row or drop it"
 fi
 
+# 1.13.0 - /ossify:work-pr is a ROUTER: merge-bar's working-a-pr where that plugin
+# is installed, the bundled loop otherwise. Losing either arm strands a host:
+# without the fallback, an install with no merge-bar has no loop at all; without
+# the route, merge-bar is never used from ossify.
+_WP="$HERE/../commands/work-pr.md"
+for _lit in 'working-a-pr' 'references/work-pr/loop.md'; do
+  if grep -Fq -- "$_lit" "$_WP"; then
+    T_PASS=$((T_PASS+1))
+  else
+    T_FAIL=$((T_FAIL+1)); echo "FAIL: commands/work-pr.md no longer names '$_lit' - the router lost an arm"
+  fi
+done
+
 rm -rf "$_PC_TMP"
 t_summary
