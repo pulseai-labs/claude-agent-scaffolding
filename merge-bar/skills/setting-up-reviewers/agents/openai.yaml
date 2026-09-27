@@ -1,0 +1,5 @@
+interface:
+  display_name: "Set up reviewers"
+  short_description: "Teach a repository's review bots the merge bar"
+policy:
+  allow_implicit_invocation: false

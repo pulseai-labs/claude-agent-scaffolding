@@ -52,7 +52,7 @@ GITHUB_REPO="https://github.com/pulseai-labs/claude-agent-scaffolding.git"
 
 BASELINE_PLUGINS="workspace-init ai-mentor architect-critic ossify code-judo"
 EXPERIMENTAL_PLUGINS=""
-EXCLUDED_PLUGINS="scaffold scaffold-onboard scaffold-dev claude-security-audit orca-crew herdr-crew dsh-crew"
+EXCLUDED_PLUGINS="scaffold scaffold-onboard scaffold-dev claude-security-audit orca-crew herdr-crew dsh-crew merge-bar"
 
 # Ossify's Devin claim is exactly six canonical skills plus the local worker;
 # adopt, challenge, and wayfinder are deferred on this surface.
