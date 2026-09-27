@@ -84,6 +84,9 @@ jobs:
       - name: herdr-crew suite
         run: bash herdr-crew/run-tests.sh
 
+      - name: paseo-crew suite
+        run: bash paseo-crew/run-tests.sh
+
       - name: dsh-crew suite
         run: bash dsh-crew/run-tests.sh
 
