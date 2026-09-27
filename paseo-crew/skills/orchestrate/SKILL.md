@@ -63,8 +63,12 @@ Three consequences:
   `idle`, `error`, `budget`) or a missing or malformed report, never to watch progress.**
   The wait primitive is one background loop per dispatch, stated in
   `references/paseo-mechanics.md`. It returns once. A loop of waits, and restarting a
-  wait after it exits, stay forbidden. And a dsh spine driver's transcript reads, with the
-  one shell wait that bounds them (`references/dsh-driver.md` §5).
+  wait after it exits, stay forbidden. Beyond that, the only bounded reads are the launch's
+  model check (`references/roles.md`), and the one `/context` reply at each task boundary,
+  sent with `send_agent_prompt` and read with `get_agent_activity`, for a seat that can
+  answer the probe — one that cannot rotates at its item boundary instead
+  (`references/roles.md`) — and a dsh spine driver's transcript reads, with the one shell
+  wait that bounds them (`references/dsh-driver.md` §5).
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
   and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
 - **Verifying a worker's claim is a verifier dispatch**, not an orchestrator read. "Tests
