@@ -195,7 +195,7 @@ The orchestrator's own rotation keeps its boundary: a fully acknowledged deliver
 operator question in flight. Paseo's `paseo-handoff` skill is not used, because it makes the
 successor a subagent of the session about to stand down. Write `/ossify:handoff`, recording
 every live seat's agent id, `REPORT_PATH`, noted hash and identity, `DISPATCHED_AT`,
-`TIME_BUDGET` and `SETTLE_WINDOW`, and the heartbeat's id. Then, in this order, so that no
+`TIME_BUDGET` and `SETTLE_WINDOW`. Then, in this order, so that no
 seat ever has two waiters and one report wakes one orchestrator:
 
 1. **Stand down first.** Kill this session's armed background waits and `delete_heartbeat`,

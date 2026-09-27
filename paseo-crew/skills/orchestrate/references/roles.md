@@ -10,7 +10,7 @@ The seat names below are examples: the project file (`.paseo-crew/roles.md`,
 | Role | Seat | Effort | Lifetime | Class |
 |---|---|---|---|---|
 | Orchestrator | you — the operator launched this session | | one per run | |
-| Implementer, planned | `strong-coder` | the seat's — a marked item or a retry fills a higher-effort seat the project file's conditions name, and the machine entry is the only source of effort: never the same command edited | retained across work items and the PR's fix rounds, to the threshold below | `contract`: an interface, schema, contract, or architectural change, or a plan gate; the default when the item is not `bounded` |
+| Implementer, planned | `strong-coder` | the seat's — a marked item or a retry fills a higher-effort seat, which is a different profile the project file's conditions name; the profile is the only source of effort, so a profile is never edited mid-run to raise it | retained across work items and the PR's fix rounds, to the threshold below | `contract`: an interface, schema, contract, or architectural change, or a plan gate; the default when the item is not `bounded` |
 | Implementer, fast | `fast-coder` | the seat's | retained if a fix round follows, else released | `bounded` only when the item is one-file, mechanical, or read-only |
 | Reviewer | `sonnet-review` — once per PR; first task `/code-review <PR>`; never implements | the seat's | disposable; released after its report file validates | |
 | Verifier | `strong-coder` — the work-item verify; `fast-coder` for read-only probes and mechanical runs outside it (a suite, a count, a fact) | the seat's | retained until its item passes or escalates to the operator | |
@@ -18,14 +18,14 @@ The seat names below are examples: the project file (`.paseo-crew/roles.md`,
 
 ## The launch
 
-A seat is a name, never `--model`. The command it resolves to lives in the operator's
-machine file; run-time surfaces carry the name only, and a name neither file defines
-halts the run. **Both files must exist before this sequence is run**: a seat's role
-resolves through the project file and its launch command through the machine file, so
-with either absent there is nothing to resolve — that state is `config.md`'s, its
-"When a file is missing", not a decision this sequence makes. No single Paseo
-call creates a seat, launches it and delivers its brief, so the launch is this
-sequence:
+A seat is a name, never `--model`. An ordinary seat resolves through two sources, never a
+command: the project file names which profile fills the role, and `list_profiles` reads
+that profile's own values — the ones `create_agent` materialises (`paseo-mechanics.md`'s
+The seat launch). The optional dsh-only machine file `config.md` names plays no part in
+an ordinary seat's launch. With either source missing there is nothing to resolve — that
+state is `config.md`'s, its "When a file is missing", not a decision this sequence makes.
+No single Paseo call creates a seat, launches it and delivers its brief, so the launch is
+this sequence:
 
 ```
 list_profiles                                   # resolve the seat's profile

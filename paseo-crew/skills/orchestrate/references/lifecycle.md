@@ -96,8 +96,8 @@ Every command's syntax comes from Paseo's own `paseo` skill.
    listing every claim: each acceptance criterion of the work item's spec, the
    mutation of any new test, and the diff against the requirement. The suite result
    on the head is not a claim — the orchestrator reads that SHA's check-runs before
-   dispatching the verifier. The verifier seat runs at the effort its machine
-   entry names — the claims include judgment, and `cannot determine` counts as fail.
+   dispatching the verifier. The verifier seat runs at the effort its profile
+   names — the claims include judgment, and `cannot determine` counts as fail.
    On a fail, attach a fix task to the retained implementer by sending it the
    fast-implementer brief with the verifier's claims for a TASK (`briefs.md`;
    `paseo-mechanics.md` says how), wait for its report file
