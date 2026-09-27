@@ -246,6 +246,7 @@ workspace by looking next to this repository for a directory holding
 `.workspace/pairing.json` whose `canonical.name` is this repository's name (commonly
 `<repo>-ai`), or through ossify's `.ossify/topology.json`. The manifest's absolute `root`
 paths may belong to another machine — match by name and location, never by trusting them.
+Exactly one workspace must match: if none or more than one does, print the lines and ask.
 If the file is absent, create it with the heading `# Tech debt — <repo>`. Append the lines and
 leave them **uncommitted**: tell the operator which file changed, and that committing it
 belongs to that workspace's own session.
