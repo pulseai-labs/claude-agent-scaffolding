@@ -101,7 +101,8 @@ STOPPING_RULE=<the rule agreed before the PR opened>
 Everything you tell the top — a question, the round summary, the merge ask, your report —
 goes in your report file at REPORT_PATH; then wait, or stop where this brief says so.
 MECHANICS addresses a run's orchestrator, which for your own seats is you: every seat you
-launch, send to, wait on or release follows it.
+launch, send to, wait on or release follows it, except that where it says the operator,
+you mean the top, through your report file.
 
 TASK: drive PR_NUMBER to a merge on the top's word.
   1. Create RUN_JSON for your two seats and stay its single writer, as dagr's
@@ -116,14 +117,14 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      this PR and left durable evidence its delegated review ran but persisted no record:
      a resumed run, no reviewer created, the current head's signals as your baseline,
      and only where that review's findings survive it — proof of execution with none is
-     not `covered`: halt and ask the top. A record whose reviewed head equals the
-     current PR head is a resumed run: skip only step 3's reviewer creation — the
-     review already ran — and enter step 4 with the record and its unresolved
-     findings as your disposition baseline. A record on a moved head is a resumed
-     run too: re-fetch the GitHub signals; the prior review and its unresolved
-     findings still baseline the disposition. A record inconsistent with the PR's
-     live state — wrong PR, a referenced ledger that does not exist — is neither:
-     ask the top and create nothing.
+     not `covered`: halt and ask the top. Evidence absent the value is not spent; ask.
+     A record whose reviewed head equals the current PR head is a resumed run: skip
+     only step 3's reviewer creation — the review already ran — and enter step 4 with
+     the record and its unresolved findings as your disposition baseline. A record on
+     a moved head is a resumed run too: re-fetch the GitHub signals; the prior review
+     and its unresolved findings still baseline the disposition. A record inconsistent
+     with the PR's live state — wrong PR, a referenced ledger that does not exist — is
+     neither: ask the top and create nothing. You did not open this PR.
   3. Initial runs only: create the reviewer FIRST, as your own subagent, from its
      REVIEWER row — its model confirmed exactly as `paseo-mechanics.md`'s The seat
      launch requires, and from the first reply — briefed to run
@@ -153,8 +154,9 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      model confirmed exactly as `paseo-mechanics.md`'s The seat launch requires
      and by the worker's own check, before the first fix task; a mismatch is a
      failed launch to ask about, never to work around. The delegated review ran
-     once, and that seat is released after its report file validates. Each push
-     moves the head under that verdict: before the next disposition round,
+     once, on the head it was briefed with, and that seat is
+     released after its report file validates. Each push moves the head under
+     that verdict: before the next disposition round,
      re-fetch the GitHub review signals and the thread state on the new head —
      the bots review every push where they are installed, so the current-head
      verdict is read there; where none is, the reviewer seat is re-dispatched

@@ -111,11 +111,14 @@ nonempty() {
   else fail "$2" "$1 is missing or empty — every zero-count against it would be vacuous"; fi
 }
 
+# <limit> (3rd arg) overrides REF_BUDGET for a file the ruling raised (R16, 2026-09-27:
+# see the two per-file raises below, each naming the restored clauses that earned it).
 budget() {
   if [ ! -f "$1" ]; then fail "$2" "no such file: $1"; return 0; fi
   n="$(wc -l < "$1" | tr -d ' ')"
-  if [ "$n" -le "$REF_BUDGET" ]; then pass "$2 ($n lines)"
-  else fail "$2" "$n lines, over the $REF_BUDGET-line reference budget by $((n - REF_BUDGET))"; fi
+  lim="${3:-$REF_BUDGET}"
+  if [ "$n" -le "$lim" ]; then pass "$2 ($n lines)"
+  else fail "$2" "$n lines, over the $lim-line reference budget by $((n - lim))"; fi
 }
 
 # keys <file> <from-literal> <to-literal-or-empty> -> sorted `key:` names of
@@ -244,17 +247,29 @@ n_eq() { c="$(count_of "$1" "$2" "${5:-line}")" || { fail "$4" "unreadable file:
 n_eq "$BRIEFS_MD" 'REPORT_PATH=' 3 \
   "the spine, item implementer and item verifier briefs each name a report path"
 # D24: the approved model `paseo inspect` must match. D28's per-launch revalidation
-# becomes the verbatim rule: every item seat launches from its SEATS row. herdr's
-# per-role SPINE_COMMAND/SPINE_EXPECTED_MODEL/SPINE_EFFORT slots have no Paseo
-# equivalent — every dispatched brief in this plugin (`briefs.md`) carries the same
-# shared SEAT_ slots, once per templated seat, so the count is per-file (3: spine,
-# item implementer, item verifier), not a single ratified line.
-n_eq "$BRIEFS_MD" 'SEAT_EXPECTED_MODEL=' 3 \
-  "the spine, item implementer and item verifier bodies each inject their expected model"
-n_eq "$BRIEFS_MD" 'SEAT_PROFILE=' 3 \
-  "the spine, item implementer and item verifier bodies each inject their resolved profile"
-n_eq "$BRIEFS_MD" 'SEAT_EFFORT=' 3 \
-  "the spine, item implementer and item verifier bodies each inject their own effort"
+# becomes the verbatim rule: every item seat launches from its SEATS row. Fix round 1,
+# ruling R15: the herdr `SPINE_`/`SEAT_` split was policy, not transport — only
+# `*_COMMAND` ever named a command, which Paseo has none of, but the coordinator/worker
+# distinction survives. The spine's own dispatch APPENDS the item implementer, item
+# verifier and correction templates verbatim (`ossify-execution.md`), so one delivered
+# prompt carries the spine's own identity AND the templates it will later construct —
+# ambiguous if both use the same `SEAT_*` names. The spine's own identity is
+# `SPINE_PROFILE=`/`SPINE_EXPECTED_MODEL=`/`SPINE_EFFORT=`, exactly once each; the
+# appended item templates keep the shared `SEAT_*` names, twice each (item implementer,
+# item verifier). Close, work-PR and the close-review writer embed no child template,
+# so they keep `SEAT_*` for their own identity too (asserted where each is checked).
+pin "$BRIEFS_MD" 'SPINE_PROFILE=' \
+  "the spine brief injects its own resolved profile exactly once"
+pin "$BRIEFS_MD" 'SPINE_EXPECTED_MODEL=' \
+  "the spine brief injects its own ratified expected model exactly once"
+pin "$BRIEFS_MD" 'SPINE_EFFORT=' \
+  "the spine brief injects its own effort exactly once"
+n_eq "$BRIEFS_MD" 'SEAT_EXPECTED_MODEL=' 2 \
+  "the appended item implementer and item verifier templates each carry SEAT_EXPECTED_MODEL"
+n_eq "$BRIEFS_MD" 'SEAT_PROFILE=' 2 \
+  "the appended item implementer and item verifier templates each carry SEAT_PROFILE"
+n_eq "$BRIEFS_MD" 'SEAT_EFFORT=' 2 \
+  "the appended item implementer and item verifier templates each carry SEAT_EFFORT"
 pin "$BRIEFS_MD" 'from its SEATS row, verbatim' \
   "every item launch spends its SEATS row, not a re-read file"
 
@@ -416,20 +431,22 @@ ROW='<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOpt
 pin "$CONFIG_MD" "$ROW" "config.md defines the resolved-profile row"
 n_eq "$BRIEFS_MD" "$ROW" 5 "the spine, item bodies and SEATS rows carry the full resolved profile"
 n_eq "$PRBRIEFS_MD" "$ROW" 4 "the close, work-PR, REVIEWER and PRFIX rows carry the full resolved profile"
-# Any profile carrier anywhere is complete — no partial rows, and no partial
-# enumerations either: prose listing "command, expected model …" without the
-# delivery fields is the same defect in a sentence. The sweep runs over every
-# shipped surface and the evals, so a seventh site cannot land. The list is
-# unconditional: an unmatched fixture glob stays literal and fails the readability
-# guard below, rather than being skipped for a directory that has not arrived.
+# Any profile carrier anywhere is complete — no partial rows. Fix round 1, issue 4:
+# herdr's row-shape needles (`| model:`, `brief_delivery`, and the two prose phrases)
+# can never trip on a Paseo row, which carries neither field — this sweep was vacuous
+# on every file it could ever see. Re-keyed on the Paseo row itself: a line stating
+# part of it — `| mode:` or `<provider>/<model>` — without `thinking:` is a partial
+# row. The sweep runs over every shipped surface and the evals, so a seventh site
+# cannot land. The list is unconditional: an unmatched fixture glob stays literal and
+# fails the readability guard below, rather than being skipped for a directory that
+# has not arrived.
 CARRIERS=("$REF"/*.md "$SKILL_MD" "$COMMAND_MD" "$PLUGIN_README_MD"
           "$EVAL_DIR"/fixtures/ossify-spine-execution/*.md "$EVAL_RUBRIC_MD")
 for f in "${CARRIERS[@]}"; do
   if [ ! -r "$f" ]; then fail "no partial profile carrier in ${f##*/}" "missing or unreadable: $f"; continue; fi
-  n=$(awk 'index($0, "| model:") > 0 && index($0, "brief_delivery") == 0' "$f" | wc -l | tr -d ' ')
-  m=$(awk 'index($0, "command, expected model") + index($0, "expected model and effort") > 0 && index($0, "brief-delivery") + index($0, "brief_delivery") == 0' "$f" | wc -l | tr -d ' ')
-  if [ "$n" -eq 0 ] && [ "$m" -eq 0 ]; then pass "no partial profile carrier in ${f##*/}"
-  else fail "no partial profile carrier in ${f##*/}" "$n partial row(s), $m partial enumeration(s)"; fi
+  n=$(awk '(index($0, "| mode:") > 0 || index($0, "| <provider>/<model>") > 0) && index($0, "thinking:") == 0' "$f" | wc -l | tr -d ' ')
+  if [ "$n" -eq 0 ]; then pass "no partial profile carrier in ${f##*/}"
+  else fail "no partial profile carrier in ${f##*/}" "$n partial row(s)"; fi
 done
 # The handoff persists the coordinator profiles beside the item rows — a
 # resumed top launches them all without a fresh read.
@@ -454,16 +471,26 @@ pin "$CONFIG_MD" 'close session, work-PR session)' \
 pin "$CONFIG_MD" 'No profiles' "the no-profiles state is stated"
 pin "$CONFIG_MD" 'No project file' "the no-project-file state is stated"
 
-# Round 3, finding 2: a machine-entry field list that names the
-# launch-transport fields must name the launch fields too — a partial
-# enumeration is the same defect as a partial row.
+# Round 3, finding 2: a field list that names some of the launch-transport fields
+# must name the launch fields too — a partial enumeration is the same defect as a
+# partial row. Fix round 1, issue 4: re-keyed on the Paseo row's five fields —
+# profile id, provider, model, mode: (colon, so a bare "model" mention does not
+# double as a false "mode:" hit — "model" is a literal substring of "mode" itself),
+# thinking — since herdr's (command, expected_model, effort, model_shows,
+# brief_delivery) can never appear in this plugin's prose. Measured: config.md and
+# paseo-mechanics.md legitimately name three of the five together while documenting
+# the field MAP itself (`provider` + `model` → …, `modeId`, `thinkingOptionId`),
+# which is not an enumeration standing in for the row — so the threshold is exactly
+# `c == 4`, "missing ONE of the five" per the ruling, not "any three or four."  A
+# genuine full row names all five (c=5, not flagged) and ordinary prose naming three
+# together (c=3, not flagged) is common in the field-map text; only a line naming
+# four of five — a row missing exactly one field — is.
 for f in "${CARRIERS[@]}"; do
   if [ ! -r "$f" ]; then fail "no partial field-name enumeration in ${f##*/}" "missing or unreadable: $f"; continue; fi
-  l=$(awk 'index($0, "| model:") > 0 { next }
-      { c = (index($0,"command")>0) + (index($0,"expected_model")>0) + (index($0,"effort")>0) + (index($0,"model_shows")>0) + (index($0,"brief_delivery")>0)
-        if (c >= 3 && c < 5) print }' "$f" | wc -l | tr -d ' ')
+  l=$(awk '{ c = (index($0,"profile id")>0) + (index($0,"provider")>0) + (index($0,"model")>0) + (index($0,"mode:")>0) + (index($0,"thinking")>0)
+        if (c == 4) print }' "$f" | wc -l | tr -d ' ')
   if [ "$l" -eq 0 ]; then pass "no partial field-name enumeration in ${f##*/}"
-  else fail "no partial field-name enumeration in ${f##*/}" "$l line(s) name some launch fields but not all"; fi
+  else fail "no partial field-name enumeration in ${f##*/}" "$l line(s) name four of the five launch fields but not all"; fi
 done
 
 section "declared roles, capabilities, dispatched commands"
@@ -1848,8 +1875,19 @@ section "reference line budgets"
 
 budget "$EXEC_MD" "ossify-execution.md is within the reference budget"
 budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
-budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget"
-budget "$BRIEFS_MD" "ossify-briefs.md is within the reference budget"
+# R16 (2026-09-27, fix round 1, issue 3): ossify-pr-briefs.md's budget is raised from
+# 200 to 202, exactly the 2 lines restoring "Evidence absent the value is not spent;
+# ask.", "You did not open this PR.", "on the head it was briefed with", and "where
+# it says the operator, you mean the top, through your report file" put back — no
+# other change moved its line count.
+budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget" 202
+# R16 (2026-09-27, fix round 1, issues 2 and 3): ossify-briefs.md's budget is raised
+# from 200 to 205, exactly the 5 lines restoring the item seat's placement ("in the
+# worktree ossify prepared for the item"), "with the verifier's summary", "a second
+# failure asks again", "in your own state", "runs the ordinary work-item entry", and
+# the item verifier's "you are retained for this one until it passes or escalates"
+# put back — no other change moved its line count.
+budget "$BRIEFS_MD" "ossify-briefs.md is within the reference budget" 205
 budget "$WRITER_MD" "ossify-close-writer.md is within the reference budget"
 
 # #514, L1: the shape, asserted rather than assumed — a counter re-copied into any

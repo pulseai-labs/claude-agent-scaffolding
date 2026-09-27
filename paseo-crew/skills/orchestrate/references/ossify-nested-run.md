@@ -30,8 +30,8 @@ file, as dagr's producer contract requires.
 - every item task, and each round's barrier, is recorded in `RUN_JSON`, never in your `run.json`;
 - the spine session is the orchestrator of its own run, so it launches, sends to,
   waits on and releases its item seats as `paseo-mechanics.md` says: each its own
-  subagent, in the workspace The seat launch's placement step gives it — its own or
-  a worktree ossify prepared for the item;
+  subagent, in the worktree ossify prepared for the item — The seat launch's
+  placement step, an existing tree, never the spine's own workspace;
 - plan, gap, depth and other spine-level questions come up in its report file, and
   you answer by sending it its next message;
 - an item seat's question reaches the spine session the same way, in that seat's

@@ -21,9 +21,9 @@ running in your first reply, then continue.
 
 PLACEMENT: <abs path of the repo or worktree the lane runs from>.
 
-SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
-SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
+SPINE_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
+SPINE_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
+SPINE_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>
 SETTLE_WINDOW=<the duration of continuous idle that counts as a finish with no report; default 10m>
@@ -42,7 +42,7 @@ send to, wait on or release follows it, except where it says the operator, meani
 
 TASK: drive spine SPINE_ID to its final round barrier. With HANDOFF_PATH set, read that
 handoff first; ossify's own state says which round runs next. A first reply whose model
-is not SEAT_EXPECTED_MODEL is a failed launch to report, not to work around.
+is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
   1. Check the SEATS block against SPINE.md before anything else: every planned
      item has exactly one implementer row and one verifier row, and no row names
      an item the plan does not. A failure halts — ask, never substitute.
@@ -52,26 +52,30 @@ is not SEAT_EXPECTED_MODEL is a failed launch to report, not to work around.
      with `dagr check --strict` before it replaces the file.
   3. Invoke `/ossify:run-spine $SPINE_ID --external-executor`. On each round's
      execution requests, launch a fresh IMPLEMENTER seat per item from its SEATS row, verbatim,
-     as your own subagent exactly as `paseo-mechanics.md`'s The seat launch states, its model
-     confirmed by that section's step 3 and by the worker's own check; the effort is the given
-     launch argument. The verifier is created at step 5. A row that is missing or ambiguous
-     halts that launch and asks; only a top reply carrying replacement rows moves the block.
+     as your own subagent in the worktree ossify prepared for the item, exactly as
+     `paseo-mechanics.md`'s The seat launch states (an existing tree), its model
+     confirmed by that section's step 3 and by the worker's own check; the effort is the
+     given launch argument. The verifier is created at step 5. A row that is missing or
+     ambiguous halts that launch and asks; only a top reply carrying replacement rows
+     moves the block.
   4. Gather the round's implementation plans, each read from its implementer's
      report file, into ONE ordered relay to the top, and wait. Send each
      implementer the top's decision for its item before any edit starts.
   5. On each complete return, create and dispatch that item's fresh VERIFIER
      seat from its SEATS row's verifier profile and run the fixed all-claims
      procedure; `cannot determine` counts as fail. On the FIRST failure ask the
-     top — correct, replace, halt — and block: the pair idles until the reply.
-     Correct sends one consolidated correction to the SAME implementer and the
-     full recheck to the SAME verifier; replace releases the old pair, resets
-     the worktree to the request's base_sha with a clean porcelain (the rejected
-     staged work is discarded), and re-requests the item from clean. Every
+     top, with the verifier's summary and the three options — correct, replace,
+     halt — and block: the pair idles until the reply. Correct sends one
+     consolidated correction to the SAME implementer and the full recheck to
+     the SAME verifier; replace releases the old pair, resets the worktree to
+     the request's base_sha with a clean porcelain (the rejected staged work
+     is discarded), and re-requests the item so the fresh pair runs the
+     ordinary work-item entry from clean; a second failure asks again. Every
      execution — the run, each correction, each replacement — counts against
      ossify's three-iteration cap; once it is spent, the ask offers halt only.
-     On halt, release the pair, mark it halted, and if no other item can
-     proceed write a halt-shaped report to your report file, with the item and
-     reason; the spine stays at its barrier.
+     On halt, release the pair, mark it halted in your own state, and if no
+     other item can proceed write a halt-shaped report to your report file,
+     with the item and reason; the spine stays at its barrier.
   6. Return accepted results in declared decomposition order, closing each item
      before the next feeds: the lane gates, commits and merges `work/<wi>` into
      the spine branch — the per-item close, not the spine-close ceremony the top
@@ -172,7 +176,8 @@ determine, with commands and output verbatim — then the caveats; `cannot deter
 
 NEVER: commit, push, or edit a tracked file outside the mutation check. Leave `HEAD`, the
 staged tree and `git status --porcelain` exactly as found before you write your report file;
-scratch goes under the session scratchpad, never the worktree; do not verify a second work item.
+scratch goes under the session scratchpad, never the worktree. Do not verify a second work
+item; you are retained for this one until it passes or escalates.
 ```
 
 ---
