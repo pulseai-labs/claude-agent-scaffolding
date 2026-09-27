@@ -15,8 +15,5 @@
 
 ### The skill-first rule
 
-- Flag new runtime code shipped on a user's path that reads and reports rather than mutating
-  durable state, because this repository's skill-first rule makes that work prose — see
-  `docs/conventions/skill-first.md`, which is authoritative.
-  Safe path: deterministic code only where it mutates durable state; apply that file's
-  decidable test before adding library code under a `lib/`.
+- Flag new runtime code on a user's path that breaks this rule: **Code that MUTATES DURABLE STATE may be deterministic. Code that READS AND REPORTS must be prose.** `docs/conventions/skill-first.md` is authoritative for its scope and its decidable test.
+  Safe path: apply that file's decidable test before adding code under a `lib/`.
