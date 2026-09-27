@@ -95,6 +95,8 @@ spine or work item — a typo fix, a doc touch-up — it is not a close at all:
 run §3's pre-flight (the lane reads the registries and mutates state too),
 then route it to the patch lane (`references/patch-lane.md`), which resolves
 and records which declared repo the patch targets, never a forced ceremony.
+A defect in **shipped** behaviour, or a small request another project cannot
+fake, is not a close either: it is `/ossify:patch`, a versioned patch by PR.
 An AI-workspace edit needs no lane — no ceremony governs that repo.
 
 Full routing rules — the id grammar, the no-argument refusal, the shapes that are
@@ -365,6 +367,9 @@ Out-of-spine work has its own lane and its own routing judgment — the
 three-part test, `"$oss_bin" touch_check` as its mechanical two thirds, and the
 `"$oss_bin" patch_add` record — in **`references/patch-lane.md`**. The verb already
 exists; what that file adds is when to reach for it.
+A versioned patch — a shipped defect or a can't-fake request — is
+`/ossify:patch`'s, not this lane's; release close lists those from git
+(`references/release-close.md` §6).
 
 ---
 

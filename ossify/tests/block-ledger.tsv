@@ -183,6 +183,8 @@ I	skills/plan-spine/references/fake-ledger-discipline.md	3	single-verb calls: fa
 I	skills/plan-spine/references/citation-foldin.md	2	two ADR reads used to check citations by eye
 D	skills/plan-spine/references/intake-and-ledger.md	1	#138	the intake-queue listing (gh issue list --state open --limit 1000 --json labels, filtered by the from: label PREFIX because gh matches --label literally and a 'from:*' wildcard returns an empty list at rc 0) - its result branches the step (empty, truncated at the limit, or dispositioned one by one) and no suite executes it against a tracker
 I	skills/plan-spine/references/intake-and-ledger.md	1	a single grep over the AI workspace's tech-debt.md for [KL]/[TD] lines
+D	skills/patch/SKILL.md	2	#138	the patch-branch cut (fetch the default branch, THEN worktree add -b fix/<name>-<version> from origin/<default>, never switching a checkout a spine is parked on) and the post-merge tag (fetch, annotated tag on the merge commit, push the tag) - ordered git sequences where a skipped fetch cuts or tags from a stale ref; executed by no suite
+I	skills/patch/SKILL.md	1	a single gh pr create with <placeholder> args (the fallback PR open where merge-bar is not installed)
 D	skills/start/SKILL.md	1	#138	the topology-absent refusal, printed verbatim (the author/re-probe/halt remedy is prose outside this block)
 I	skills/start/SKILL.md	6	single-verb calls with <placeholder> args: feature_add, bone_add, risk_gate_add, posture_set, overlay_set, doctor
 D	skills/start/references/bones-registry.md	1	#138	the ADR-number minting block - two sed forms, a sort -n tail, and 10# base-10 forcing, all silently wrong on an empty or odd-named dir
@@ -247,6 +249,7 @@ H	skills/plan-spine/references/demo-amendments.md	1701789836-357
 H	skills/plan-spine/references/demo-authoring.md	1062611185-1621
 H	skills/plan-spine/references/fake-ledger-discipline.md	95797153-393
 H	skills/plan-spine/references/intake-and-ledger.md	3936310853-289
+H	skills/patch/SKILL.md	2505586866-556
 H	skills/start/SKILL.md	713231529-1195
 H	skills/start/references/bones-registry.md	3219690395-1177
 H	skills/start/references/journey-map.md	2970283972-104

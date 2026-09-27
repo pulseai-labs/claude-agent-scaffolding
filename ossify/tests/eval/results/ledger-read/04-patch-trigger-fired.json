@@ -1,0 +1,1 @@
+{"scores":{"overlap_selection":4,"disposition_each":5,"absent_is_one_line":5,"write_boundary":5},"pass":true,"notes":"overlap_selection is 4 because, although the non-overlapping [TD] src/client/pool.rs line correctly gets no disposition, the operator-facing ledger report still names it in a parenthetical rather than leaving it unlisted."}
