@@ -87,6 +87,9 @@ jobs:
       - name: dsh-crew suite
         run: bash dsh-crew/run-tests.sh
 
+      - name: merge-bar suite
+        run: bash merge-bar/run-tests.sh
+
       - name: dual-publish parity (repo-root)
         run: bash tests/test-codex-dual-publish.sh
 
