@@ -240,14 +240,20 @@ wi_manifest_write() {
     wi_log_error "wi_manifest_write: ai_root not a directory: $ai_root"
     return 1
   fi
+  # An empty canonical root (an unset shell variable, say) would be written as
+  # canonical.root = "" and canonical.name = "", a manifest wi_manifest_validate
+  # refuses, while the write reported success.
+  if [[ -z "$canonical_root" ]]; then
+    wi_log_error "wi_manifest_write: canonical root is empty"
+    return 1
+  fi
   # The roots are recorded as absolute paths: ${ai_workspace.root} and
   # ${canonical.root} are substituted into absolute path templates, and a
   # relative root would resolve against whatever cwd reads the manifest
   # (wi_manifest_validate refuses one). A relative argument is anchored at $PWD
   # here, as relocate does; an absolute one is recorded as given.
   [[ "$ai_root" == /* ]] || ai_root="$(wi_resolve_root "$ai_root")"
-  [[ -z "$canonical_root" || "$canonical_root" == /* ]] \
-    || canonical_root="$(wi_resolve_root "$canonical_root")"
+  [[ "$canonical_root" == /* ]] || canonical_root="$(wi_resolve_root "$canonical_root")"
 
   local ai_name canonical_name
   ai_name="$(basename "$ai_root")"
@@ -525,6 +531,14 @@ wi_manifest_relocate() {
       "$manifest" 2>/dev/null; then
     rm -f "$tmp"
     wi_log_error "wi_manifest_relocate: could not create $tmp, or jq failed rewriting $manifest"
+    return 1
+  fi
+  # A file created by redirect never gets an execute bit, whatever the umask. A
+  # manifest that had one gets it back here — by name, as the hook's +x is, so
+  # a swap at this moment can change a link target's mode but not write to it.
+  if (( 8#$mode & 8#111 )) && ! chmod "$mode" "$tmp" 2>/dev/null; then
+    rm -f "$tmp"
+    wi_log_error "wi_manifest_relocate: could not restore the mode of $manifest"
     return 1
   fi
   mv "$tmp" "$manifest" || {

@@ -866,7 +866,9 @@ test_L8_relocate_preserves_manifest_mode() {
   # 444 covers a read-only manifest: the staged copy
   # must be writable for the rewrite and read-only again afterwards. Only a
   # non-root run can see the write failure; the mode assertion holds for both.
-  for mode in 600 640 444; do
+  # 755 and 700 carry execute bits, which a redirect cannot create (Codex on
+  # #605): relocate adds them back.
+  for mode in 600 640 444 755 700; do
     chmod "$mode" "$m"
     ( umask 022; "$WI_BIN" manifest_relocate "$ai" 2>/dev/null ) || {
       echo "    relocate failed at mode $mode"; return 1; }
@@ -1159,6 +1161,23 @@ test_W4_write_records_relative_roots_absolute() {
     "absolute root recorded as given" || return 1
 }
 
+test_W5_write_refuses_an_empty_canonical_root() {
+  # Codex on #605: an empty canonical root was written as
+  # canonical.root = "" with success reported, a manifest V6 refuses. It must
+  # be refused before anything is written.
+  local ai="$_WI_TMP/w5/foo-ai" cn="$_WI_TMP/w5/foo"
+  mkdir -p "$ai/.workspace" "$cn"
+  local m="$ai/.workspace/pairing.json"
+  if "$WI_BIN" manifest_write "$ai" "" personal 2>"$_WI_TMP/w5/err"; then
+    echo "    write accepted an empty canonical root"; return 1; fi
+  grep -qF "canonical root is empty" "$_WI_TMP/w5/err" || {
+    echo "    refusal does not say why:"; cat "$_WI_TMP/w5/err"; return 1; }
+  [[ ! -e "$m" ]] || { echo "    a manifest was written"; return 1; }
+  # Control: the same write with the root given succeeds and validates.
+  "$WI_BIN" manifest_write "$ai" "$cn" personal 2>/dev/null || { echo "    control write failed"; return 1; }
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || { echo "    control manifest does not validate"; return 1; }
+}
+
 wi_test_run test_L1_relocate_rewrites_ai_root_preserves_everything_else
 wi_test_run test_L2_relocate_canonical_root_only_with_flag
 wi_test_run test_L3_relocate_refuses_bad_manifest_unchanged
@@ -1181,5 +1200,6 @@ wi_test_run test_W3_write_refuses_a_raced_temp_name
 wi_test_run test_L10_relocate_refuses_a_raced_temp_name
 wi_test_run test_V8_validate_rejects_relative_roots
 wi_test_run test_W4_write_records_relative_roots_absolute
+wi_test_run test_W5_write_refuses_an_empty_canonical_root
 
 wi_test_summary

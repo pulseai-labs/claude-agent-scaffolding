@@ -72,7 +72,8 @@ wi_tmpname_beside() {
 # wi_write_new <path> <mode> <command> [args...]
 # Create <path>, which must not exist yet, and run <command> with its stdout on
 # the new file. <mode> is the octal mode to create it with; "" gives what a
-# plain redirect gives, 0666 less the umask.
+# plain redirect gives, 0666 less the umask. A redirect creates from 0666, so
+# execute bits in <mode> are not set: a caller that needs them adds them.
 #
 # A file created by name and written by name later can be swapped for a
 # symlink in between by anyone who can write the directory, and the write then
