@@ -4,7 +4,7 @@ Executed by Claude Code in an interactive session. No API runner.
 
 ## Procedure (Claude executes)
 
-For each `surface` in `[posture-derivation, spike-contract-integrity, risk-gate-registration, start-topology-authoring, adopt-multi-repo, adopt-completion-floor, journey-line-floor, spine-class-declaration, release-ladder-labels, bone-touch-check, critic-veto-interpretation, run-spine-declared-repo, close-gate-integrity, close-per-repo, harvest-apply-integrity, rule-authoring-integrity, doctor-declared-repos, doctor-provenance, boundary-audit-integrity, handoff-compose, handoff-resume, work-pr-disposition, external-executor]`:
+For each `surface` in `[posture-derivation, spike-contract-integrity, risk-gate-registration, start-topology-authoring, adopt-multi-repo, adopt-completion-floor, journey-line-floor, spine-class-declaration, release-ladder-labels, bone-touch-check, critic-veto-interpretation, run-spine-declared-repo, close-gate-integrity, close-per-repo, harvest-apply-integrity, rule-authoring-integrity, doctor-declared-repos, doctor-provenance, boundary-audit-integrity, handoff-compose, handoff-resume, work-pr-disposition, external-executor, patch-routing, intake-at-planning, spine-freeze, ledger-read, glue-as-fake]`:
 
   For each `fixture.md` in `tests/eval/fixtures/<surface>/`:
 
@@ -17,6 +17,13 @@ For each `surface` in `[posture-derivation, spike-contract-integrity, risk-gate-
   `ossify/references/work-pr/loop.md` (for `work-pr-disposition`), plus the
   command wrappers in `ossify/commands/`; point the invoke agent there
   instead.
+
+  **Two 1.13.0 surfaces span several skills** — point the invoke agent at every
+  file the README's Surfaces table names for them. `spine-freeze` reads
+  `plan-spine/SKILL.md`, `plan-spine/references/intake-and-ledger.md` and
+  `work-item/references/round-orchestration.md`; `ledger-read` reads
+  `plan-spine/SKILL.md`, `plan-spine/references/intake-and-ledger.md` and
+  `patch/SKILL.md`.
 
   **Paste the fixture BODY ONLY — strip the frontmatter.** The frontmatter is the answer key. The judge in step 2 sees the whole fixture; the invoke agent must not. And **whoever authored a surface's fixtures has read its keys and cannot serve as its invoke agent** — dispatch fresh agents for both steps.
 
