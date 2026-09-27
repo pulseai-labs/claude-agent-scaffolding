@@ -646,5 +646,22 @@ for _lit in 'working-a-pr' 'references/work-pr/loop.md'; do
   fi
 done
 
+# 1.13.0 final review - four sentences whose absence was a finding.
+# (a) patch/SKILL.md: the separate worktree is cut BEFORE the reproduction and
+#     the fix are written - otherwise a model following the steps in order writes
+#     them into a checkout a running spine is parked on.
+_PS="$HERE/../skills/patch/SKILL.md"
+_wt="$(awk '/worktree/{print NR; exit}' "$_PS")"; _rp="$(awk '/Reproduce first/{print NR; exit}' "$_PS")"
+if [ -n "$_wt" ] && [ -n "$_rp" ] && [ "$_wt" -lt "$_rp" ]; then T_PASS=$((T_PASS+1)); else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: patch/SKILL.md does not direct the worktree cut before 'Reproduce first' (worktree line ${_wt:-none}, reproduce line ${_rp:-none})"; fi
+# (b)-(d) spine close's merge-bar seam and the barrier's own-scope paths.
+_SC="$HERE/../skills/close/references/spine-close.md"
+_RO="$HERE/../skills/work-item/references/round-orchestration.md"
+for _pair in "$_SC|keeps the first two lines" "$_SC|pr_fields=\"\$(cat" "$_RO|§7 fix-up"; do
+  _f="${_pair%%|*}"; _lit="${_pair#*|}"
+  if grep -Fq -- "$_lit" "$_f"; then T_PASS=$((T_PASS+1)); else
+    T_FAIL=$((T_FAIL+1)); echo "FAIL: $(basename "$_f") does not state '$_lit'"; fi
+done
+
 rm -rf "$_PC_TMP"
 t_summary

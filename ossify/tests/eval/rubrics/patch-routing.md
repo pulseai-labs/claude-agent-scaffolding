@@ -35,8 +35,9 @@ reasoning is stated, not just the conclusion).
 4. **branch_and_version** — the branch is `fix/<plugin-or-project>-<version>`
    cut from the freshly fetched default branch in a clean tree. A checkout parked
    on a spine or work-item branch, or dirty, is never switched or stashed; the
-   branch goes in a separate worktree. The patch version is bumped on every
-   surface that carries the current version.
+   branch goes in a separate worktree, cut before the reproduction and the fix
+   are written — they are never written into the parked checkout. The patch
+   version is bumped on every surface that carries the current version.
 5. **pr_and_merge** — with merge-bar installed: `/merge-bar:open-pr` then
    `/merge-bar:work-pr`. Without: `gh pr create` with the six-field body from
    ossify's `references/work-pr/pr-body.md` (Merge bar word for word), worked by

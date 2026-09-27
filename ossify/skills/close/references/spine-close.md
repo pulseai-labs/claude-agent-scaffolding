@@ -204,7 +204,10 @@ for word, so the bar exists before the first review.
 - **Closes** — one `Closes <owner>/<repo>#<n>` line per intake request this spine
   pulled in.
 
-Without merge-bar, leave `$pr_fields` unset. The block appends it after the two
+Write the fields to a file and load them with `pr_fields="$(cat "<fields-file>")"` —
+never as a quoted literal: the text routinely carries backticks, `$` and
+apostrophes, which a shell assignment would run or break on. Without merge-bar,
+leave `$pr_fields` unset. The block appends it after the two
 lines the record pass reads — `spine close …` and `pushed-tip:` — never before
 them: the record pass takes the first `pushed-tip:` line as the lineage guard's
 input.
@@ -446,7 +449,9 @@ why the tier sits here and not at the work item, whose merges stay local); the
 whatever the loop leaves owed lands **in that repo** and is linked from the
 spine's retrospective (§8) — a tracked deferral issue under the bundled loop;
 merge-bar's one out-of-scope issue and its `[KL]` ledger lines under
-`working-a-pr`. **Review-fix commits are not re-gated** (#377): they land
+`working-a-pr`; and that any edit to the PR body keeps the first two lines
+(`spine close …` and `pushed-tip: …`) verbatim — merge-bar's loop rewrites the body,
+and the record pass reads those lines back. **Review-fix commits are not re-gated** (#377): they land
 after every work item's acceptance and impl-check gates have passed and the
 items were marked complete; this ceremony's coverage of them is the cumulative
 demo (§5) and the touch check (§6), and re-gating the fix lane is a tracked

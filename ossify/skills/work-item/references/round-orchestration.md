@@ -453,8 +453,9 @@ first round has started (`plan-spine` SKILL.md §2). A request that arrives whil
 the rounds run — from the operator, another project, or a review — goes to the
 intake queue (`plan-spine/references/intake-and-ledger.md` §1) or to
 `/ossify:patch`. It never becomes a work item, an AC or a round here, however
-small. The one change a running spine takes is its own demo-line amendments
-(`plan-spine` SKILL.md §8e), unchanged.
+small. The spine's own planned scope keeps its two paths, both unchanged: §7 fix-up
+replans of a failed round (`plan-spine` SKILL.md §7) and its own demo-line
+amendments (`plan-spine` SKILL.md §8e).
 
 **When the final round clears this barrier, the spine is ready for
 `/close <spine-id>`.** That is where this lane ends — hand the baton over

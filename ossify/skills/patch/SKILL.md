@@ -55,6 +55,11 @@ Name the repo the fix goes into and the paths it will touch. Then:
 
 ## 3. Fix it — by kind
 
+**Cut the branch first (§4), and do all of this section inside it.** When the
+repo's checkout is parked on a spine or work-item branch, that means the separate
+worktree §4 creates — the reproduction and the fix are never written into a
+checkout a running spine owns, and never tested against its unshipped code.
+
 **Defect.** Reproduce first. Write the failing test — or, where no test can reach
 it, record the failing command and its output — and run it to watch it fail for
 the reported reason. Then find the root cause with the loop in
