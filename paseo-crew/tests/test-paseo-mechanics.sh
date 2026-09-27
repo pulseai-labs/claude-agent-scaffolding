@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+#
+# paseo-crew — the Paseo mechanics contract, mechanical facts only.
+#
+# Paseo's own `paseo` skill and its MCP tool descriptions are the command
+# reference. This reference states only what they cannot: the seat launch from a
+# resolved profile, the report-file finish and its attention states (D2), the send,
+# placement, teardown and the archive cascade, and the detached handoff (D3).
+#
+# Usage: bash paseo-crew/tests/test-paseo-mechanics.sh
+# Deps:  bash 3.2+, awk.
+
+set -u
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
+REF_BUDGET=240
+
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/_helpers.sh"
+
+printf '%spaseo-crew Paseo mechanics contract%s\n\n' "$DIM" "$RST"
+
+if [ ! -f "$REF" ]; then
+  fail "paseo-mechanics.md exists" "no such file"
+  report; exit $?
+fi
+
+section "the sections other files cite"
+for h in '## The seat launch' '## Completion' '## Sending a seat a message' '## Placement' '## Teardown' '## Handoff'; do
+  pin "$REF" "$h" "heading $h is stated once"
+done
+
+section "the seat launch"
+for v in 'create_agent' 'create_workspace' 'paseo inspect <id> --json' 'list_profiles'; do
+  present "$REF" "$v" "the launch names $v"
+done
+present "$REF" 'baseBranch: origin/main' "a worktree seat names its base explicitly"
+pin "$REF" 'The orchestrator never runs `paseo run` for a worker' "paseo run is reserved for the handoff"
+
+section "D2: the report file is the finish"
+pin "$REF" 'the file is the contract' "the report-file contract survives"
+pin "$REF" 'placed outside every seat'"'"'s worktree' "report files live outside every worktree"
+for exitname in '`report`' '`permission`' '`error`' '`idle`' '`budget`'; do
+  present "$REF" "$exitname" "the loop names the $exitname exit"
+done
+pin "$REF" 'The finish notice is a hint' "Paseo's notice is a hint, never the finish"
+pin "$REF" 'create_heartbeat' "the heartbeat backstop is named once"
+present "$REF" 'expiresIn' "the heartbeat carries expiresIn"
+pin "$REF" 'gone without having exited' "the heartbeat re-arms only a lost wait"
+pin "$REF" 'with the `idle` exit dropped' "a false wake drops the idle exit"
+pin "$REF" 'Coordinator seats' "coordinators are armed without the idle exit"
+pin "$REF" 'Both are compared, not merely recorded' "hash and identity are both compared"
+pin "$REF" 'inode or mtime' "the identity is defined once" flat
+# Controls: `paseo wait` returns on the first idle (F2), so it must never be the finish.
+c="$(occurrences "$REF" 'paseo wait')"
+if [ "$c" -le 1 ]; then pass "paseo wait is at most named as the thing not to use ($c)"
+else fail "paseo wait is not a completion primitive" "$c occurrences"; fi
+
+section "D3: the detached handoff"
+pin "$REF" 'env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d' "the successor launch unsets both caller variables"
+pin "$REF" '`ParentAgentId` is `null`' "the successor is verified parentless"
+pin "$REF" 'do not stand down' "a parented successor stops the handover"
+pin "$REF" 'Never archive a predecessor while a subagent in its workspace runs' "the no-archive rule survives"
+pin "$REF" 'Kill this session'"'"'s armed background waits' "the predecessor stands down"
+
+section "teardown and the cascade"
+present "$REF" 'archive_agent' "a seat is released with archive_agent"
+present "$REF" 'archive_workspace' "a run-created workspace is released with archive_workspace"
+pin "$REF" 'Close only what the run created' "only run-created things are archived"
+pin "$REF" 'after it reports its own children released' "a coordinator is archived after its children"
+
+section "herdr is gone"
+# Deliberate: these herdr strings are asserted ABSENT.
+for gone in 'herdr' 'HERDR_' 'pane' '--until' 'wait-output' '--machine'; do
+  c="$(occurrences "$REF" "$gone")"
+  if [ "$c" -eq 0 ]; then pass "no '$gone' in paseo-mechanics.md"
+  else fail "no '$gone' in paseo-mechanics.md" "$c occurrence(s)"; fi
+done
+
+section "budget"
+n="$(wc -l < "$REF" | tr -d ' ')"
+if [ "$n" -le "$REF_BUDGET" ]; then pass "paseo-mechanics.md within the reference budget ($n lines)"
+else fail "paseo-mechanics.md within the reference budget" "$n lines, over by $((n - REF_BUDGET))"; fi
+
+section "no personal name ships"
+hits=0
+for needle in claude-glm claude-glm-flash claude-sol glm-5.3 Fable; do
+  hits=$((hits + $(occurrences "$REF" "$needle")))
+done
+if [ "$hits" -eq 0 ]; then pass "no personal name in paseo-mechanics.md"
+else fail "no personal name in paseo-mechanics.md" "$hits occurrence(s)"; fi
+
+section "the hoisted counters are not re-copied"
+assert_hoisted_counters
+
+report
