@@ -677,7 +677,8 @@ mi_manifest_resolve() { wi_manifest_resolve "$@"; }
 #   - schema_version is in WI_MANIFEST_SUPPORTED_VERSIONS
 #   - All §6.4 "yes" required fields present, each with its schema type
 #   - Roots, names and default_branch non-empty; routing selectors are
-#     ai_workspace or canonical; well_known_paths entries are non-empty strings
+#     ai_workspace or canonical; well_known_paths entries are absolute path
+#     templates using only the placeholders wi_manifest_resolve substitutes
 #   - Every trace-filter rule the commit-msg hook fails closed on
 #
 # Returns 0 on valid, 1 with an error message to stderr otherwise. Error
@@ -867,7 +868,19 @@ wi_manifest_validate() {
          ((["tooling_repo","root"], ["tooling_repo","name"]) as $p | nonempty($p))
        else empty end),
       (if (.well_known_paths | type) == "object" then
-         ((.well_known_paths | keys[] | ["well_known_paths", .]) as $p | nonempty($p))
+         ((.well_known_paths | keys[] | ["well_known_paths", .]) as $p | nonempty($p)),
+         # README: absolute path templates. The value must resolve to an
+         # absolute path, so it starts with "/" or with a placeholder that
+         # expands to one, and every placeholder is one wi_manifest_resolve
+         # substitutes; any other ${...} would reach a consumer unresolved,
+         # and a relative value would resolve against whatever cwd reads it.
+         (.well_known_paths | to_entries[] | select(.value != "")
+          | if (.value | test("^(/|\\$\\{(ai_workspace\\.root|canonical\\.root|HOME|PLUGIN_DATA:[a-zA-Z0-9_-]+)\\}(/|$))") | not)
+            then "well_known_paths.\(.key) (must be an absolute path template: start with / or ${ai_workspace.root}, ${canonical.root}, ${HOME} or ${PLUGIN_DATA:<name>}, is \(.value | tojson))"
+            elif ([.value | scan("\\$\\{[^}]*\\}")]
+                  | all(test("^\\$\\{(ai_workspace\\.root|canonical\\.root|HOME|USER|PLUGIN_DATA:[a-zA-Z0-9_-]+)\\}$")) | not)
+            then "well_known_paths.\(.key) (has a placeholder wi_manifest_resolve does not substitute, is \(.value | tojson))"
+            else empty end)
        else empty end),
       (.routing | to_entries[]
        | select(.value != "ai_workspace" and .value != "canonical")

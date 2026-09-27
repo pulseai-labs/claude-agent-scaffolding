@@ -981,6 +981,48 @@ CASES
   cmp -s "$_WI_TMP/v6/empty" "$m" || { echo "    relocate modified the refused manifest"; return 1; }
 }
 
+test_V7_validate_well_known_paths_are_absolute_templates() {
+  # The README documents well_known_paths as absolute
+  # path templates. A relative value resolves against whatever cwd reads it,
+  # and a placeholder wi_manifest_resolve does not know reaches the consumer
+  # unresolved, so both are refused, naming the key.
+  local ai; ai="$(_setup_pair v7)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v7/good"
+  local v
+  while IFS= read -r v; do
+    jq --arg v "$v" '.well_known_paths.roadmap_state = $v' "$_WI_TMP/v7/good" > "$m"
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v7/err"; then
+      echo "    validate accepted: $v"; return 1; fi
+    grep -qF 'well_known_paths.roadmap_state' "$_WI_TMP/v7/err" || {
+      echo "    refusal does not name the key:"; cat "$_WI_TMP/v7/err"; return 1; }
+  done <<'CASES'
+relative/roadmap.json
+./roadmap.json
+../outside/roadmap.json
+${USER}/roadmap.json
+${elsewhere.root}/roadmap.json
+${ai_workspace.rootx}/roadmap.json
+${tooling_repo.root}/roadmap.json
+/srv/${nope}/roadmap.json
+${ai_workspace.root}/${canonical.name}/roadmap.json
+CASES
+  # Adjacent controls: every documented placeholder, a bare root, a plain
+  # absolute path, and an absolute path through .. all still validate.
+  while IFS= read -r v; do
+    jq --arg v "$v" '.well_known_paths.roadmap_state = $v' "$_WI_TMP/v7/good" > "$m"
+    "$WI_BIN" manifest_validate "$ai" 2>/dev/null || {
+      echo "    control rejected: $v"; return 1; }
+  done <<'CONTROLS'
+${ai_workspace.root}/.workspace/project-roadmap.json
+${canonical.root}
+${HOME}/.config/${USER}/roadmap.json
+${PLUGIN_DATA:scaffold-onboard}/roadmap.json
+/srv/shared/roadmap.json
+${ai_workspace.root}/../shared/roadmap.json
+CONTROLS
+}
+
 test_W1_write_temp_file_is_not_predictable() {
   # #582 item 4: wi_manifest_write staged its output at
   # ${manifest}.tmp.<pid>, so a symlink planted there was followed — its
@@ -1031,6 +1073,7 @@ wi_test_run test_L8_relocate_preserves_manifest_mode
 wi_test_run test_V5_validate_rejects_wrong_typed_leaves
 wi_test_run test_L9_relocate_temp_file_is_not_predictable
 wi_test_run test_V6_validate_rejects_unusable_values
+wi_test_run test_V7_validate_well_known_paths_are_absolute_templates
 wi_test_run test_W1_write_temp_file_is_not_predictable
 wi_test_run test_W2_write_keeps_the_umask_mode
 
