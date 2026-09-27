@@ -261,8 +261,13 @@ wi_manifest_write() {
     return 1
   }
 
-  # Build via `jq -n`. Tmp-then-mv for atomicity.
-  local tmp="${manifest}.tmp.$$"
+  # Build via `jq -n`. Tmp-then-mv for atomicity, under an unpredictable temp
+  # name (wi_mktemp_beside, #582).
+  local tmp
+  if ! tmp="$(wi_mktemp_beside "$manifest")"; then
+    wi_log_error "wi_manifest_write: could not create a temp file beside $manifest"
+    return 1
+  fi
   if ! jq -n \
       --arg schema_version           "$WI_MANIFEST_SCHEMA_VERSION" \
       --arg ai_root                  "$ai_root" \
@@ -670,7 +675,10 @@ mi_manifest_resolve() { wi_manifest_resolve "$@"; }
 # Checks:
 #   - Manifest exists and is valid JSON
 #   - schema_version is in WI_MANIFEST_SUPPORTED_VERSIONS
-#   - All §6.4 "yes" required fields present
+#   - All §6.4 "yes" required fields present, each with its schema type
+#   - Roots, names and default_branch non-empty; routing selectors are
+#     ai_workspace or canonical; well_known_paths entries are non-empty strings
+#   - Every trace-filter rule the commit-msg hook fails closed on
 #
 # Returns 0 on valid, 1 with an error message to stderr otherwise. Error
 # messages naming the manifest path so consumers can act on the message.
@@ -825,7 +833,13 @@ wi_manifest_validate() {
       (if has("tooling_repo") then
          ((["tooling_repo","root"], ["tooling_repo","name"]) as $p | want($p; ["string"])),
          (["tooling_repo","git_remote"] as $p | opt($p; ["string","null"]))
-       else empty end)
+       else empty end),
+      # well_known_paths is optional, but a present value is read as a path
+      # (scaffold-onboard reads roadmap_state with `jq -r`), so every entry
+      # must be a string: an object would be rendered as a path (#582).
+      (if (.well_known_paths | type) == "object" then
+         ((.well_known_paths | keys[] | ["well_known_paths", .]) as $p | want($p; ["string"]))
+       else (["well_known_paths"] as $p | opt($p; ["object","null"])) end)
     ] | join(", ")
   ' "$manifest" 2>/dev/null)"; then
     wi_log_error "wi_manifest_validate: $manifest has a required block of the wrong type; its required fields could not be checked"
@@ -833,6 +847,38 @@ wi_manifest_validate() {
   fi
   if [[ -n "$bad_types" ]]; then
     wi_log_error "wi_manifest_validate: $manifest has wrongly typed fields: $bad_types"
+    return 1
+  fi
+
+  # Values, now that every type is known (#582). A string of the right type can
+  # still be unusable: an empty root or name leaves ${canonical.root} unresolved
+  # and consumers read it as missing, an empty well-known path names no file,
+  # and a routing selector outside the two roots wi_manifest_resolve knows is
+  # interpolated as ${<selector>.root} and used as a destination unresolved.
+  local bad_values
+  if ! bad_values="$(jq -r '
+    def nonempty($path):
+      if getpath($path) == "" then "\($path | join(".")) (must not be empty)" else empty end;
+    [
+      ((["ai_workspace","root"], ["ai_workspace","name"],
+        ["canonical","root"], ["canonical","name"], ["canonical","default_branch"])
+         as $p | nonempty($p)),
+      (if has("tooling_repo") then
+         ((["tooling_repo","root"], ["tooling_repo","name"]) as $p | nonempty($p))
+       else empty end),
+      (if (.well_known_paths | type) == "object" then
+         ((.well_known_paths | keys[] | ["well_known_paths", .]) as $p | nonempty($p))
+       else empty end),
+      (.routing | to_entries[]
+       | select(.value != "ai_workspace" and .value != "canonical")
+       | "routing.\(.key) (must be ai_workspace or canonical, is \(.value | tojson))")
+    ] | join(", ")
+  ' "$manifest" 2>/dev/null)"; then
+    wi_log_error "wi_manifest_validate: $manifest has a required block of the wrong type; its required fields could not be checked"
+    return 1
+  fi
+  if [[ -n "$bad_values" ]]; then
+    wi_log_error "wi_manifest_validate: $manifest has invalid values: $bad_values"
     return 1
   fi
 

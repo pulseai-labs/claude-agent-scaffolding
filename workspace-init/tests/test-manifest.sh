@@ -930,6 +930,92 @@ test_L9_relocate_temp_file_is_not_predictable() {
   jq -e '.ai_workspace.root' "$m" >/dev/null 2>&1 || { echo "    pairing.json lost its content"; return 1; }
 }
 
+test_V6_validate_rejects_unusable_values() {
+  # #582 items 1-3: a value of the right type can still
+  # be unusable. One edit per case, so each refusal names its own field.
+  local ai; ai="$(_setup_custom_pair v6)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v6/good"
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || {
+    echo "    control: rich manifest (remotes + tooling_repo) rejected"; return 1; }
+  local edit field
+  while IFS='|' read -r field edit; do
+    jq "$edit" "$_WI_TMP/v6/good" > "$m"
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v6/err"; then
+      echo "    validate accepted: $edit"; return 1; fi
+    grep -qF "$field" "$_WI_TMP/v6/err" || {
+      echo "    refusal does not name $field:"; cat "$_WI_TMP/v6/err"; return 1; }
+  done <<'CASES'
+well_known_paths.roadmap_state|.well_known_paths.roadmap_state = {"bad": true}
+well_known_paths.master_spec|.well_known_paths.master_spec = 7
+well_known_paths.memory_bank|.well_known_paths.memory_bank = ""
+well_known_paths|.well_known_paths = "a/path"
+routing.prd|.routing.prd = "elsewhere"
+routing.memory_bank|.routing.memory_bank = ""
+ai_workspace.root|.ai_workspace.root = ""
+ai_workspace.name|.ai_workspace.name = ""
+canonical.root|.canonical.root = ""
+canonical.name|.canonical.name = ""
+canonical.default_branch|.canonical.default_branch = ""
+tooling_repo.root|.tooling_repo.root = ""
+tooling_repo.name|.tooling_repo.name = ""
+CASES
+  # Adjacent controls: each selector value, and every optional shape of
+  # well_known_paths, must still validate.
+  local ok
+  for ok in '.routing.prd = "ai_workspace" | .routing.master_spec = "canonical"' \
+            'del(.well_known_paths)' \
+            '.well_known_paths = null' \
+            '.well_known_paths = {}' \
+            '.well_known_paths.project_state = "${ai_workspace.root}/.ossify/state.json"' \
+            'del(.tooling_repo)'; do
+    jq "$ok" "$_WI_TMP/v6/good" > "$m"
+    "$WI_BIN" manifest_validate "$ai" 2>/dev/null || {
+      echo "    control rejected: $ok"; return 1; }
+  done
+  # relocate runs the same validator, so it refuses the empty root the issue
+  # reproduced, without touching the file.
+  jq '.canonical.root = ""' "$_WI_TMP/v6/good" > "$m"; cp "$m" "$_WI_TMP/v6/empty"
+  if "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
+    echo "    relocate accepted an empty canonical.root"; return 1; fi
+  cmp -s "$_WI_TMP/v6/empty" "$m" || { echo "    relocate modified the refused manifest"; return 1; }
+}
+
+test_W1_write_temp_file_is_not_predictable() {
+  # #582 item 4: wi_manifest_write staged its output at
+  # ${manifest}.tmp.<pid>, so a symlink planted there was followed — its
+  # target overwritten — and then renamed over pairing.json. Same pin as L9:
+  # `exec` keeps the planting shell's PID, so the dispatcher's $$ is known.
+  local ai="$_WI_TMP/w1/foo-ai" cn="$_WI_TMP/w1/foo"
+  mkdir -p "$ai/.workspace" "$cn"
+  local m="$ai/.workspace/pairing.json" victim="$_WI_TMP/w1/victim"
+  printf 'VICTIM\n' > "$victim"
+  bash -c 'ln -s "$1" "$2.tmp.$$"; exec "$3" manifest_write "$4" "$5" personal' \
+    _ "$victim" "$m" "$WI_BIN" "$ai" "$cn" 2>/dev/null || {
+    echo "    write failed with a planted temp symlink"; return 1; }
+  assert_eq "VICTIM" "$(cat "$victim")" "planted symlink's target untouched" || return 1
+  [[ -f "$m" && ! -L "$m" ]] || { echo "    pairing.json is not a regular file"; return 1; }
+  "$WI_BIN" manifest_validate "$ai" 2>/dev/null || { echo "    written manifest does not validate"; return 1; }
+}
+
+test_W2_write_keeps_the_umask_mode() {
+  # mktemp creates 0600; the manifest must keep the
+  # mode a plain redirect gave it before #582, 0666 less the umask.
+  local ai="$_WI_TMP/w2/foo-ai" cn="$_WI_TMP/w2/foo" mask want
+  mkdir -p "$ai/.workspace" "$cn"
+  local m="$ai/.workspace/pairing.json"
+  for mask in 022:644 027:640 077:600; do
+    want="${mask#*:}"
+    rm -f "$m"
+    ( umask "${mask%%:*}"; "$WI_BIN" manifest_write "$ai" "$cn" personal 2>/dev/null ) || {
+      echo "    write failed under umask ${mask%%:*}"; return 1; }
+    local got; got="$(stat -c '%a' "$m" 2>/dev/null || stat -f '%Lp' "$m")"
+    assert_eq "$want" "$got" "manifest mode under umask ${mask%%:*}" || return 1
+  done
+  ls "$ai/.workspace" | grep -q '\.tmp\.' && { echo "    write left a tmp file behind"; return 1; }
+  return 0
+}
+
 wi_test_run test_L1_relocate_rewrites_ai_root_preserves_everything_else
 wi_test_run test_L2_relocate_canonical_root_only_with_flag
 wi_test_run test_L3_relocate_refuses_bad_manifest_unchanged
@@ -944,5 +1030,8 @@ wi_test_run test_L7_relocate_refuses_self_pairing
 wi_test_run test_L8_relocate_preserves_manifest_mode
 wi_test_run test_V5_validate_rejects_wrong_typed_leaves
 wi_test_run test_L9_relocate_temp_file_is_not_predictable
+wi_test_run test_V6_validate_rejects_unusable_values
+wi_test_run test_W1_write_temp_file_is_not_predictable
+wi_test_run test_W2_write_keeps_the_umask_mode
 
 wi_test_summary

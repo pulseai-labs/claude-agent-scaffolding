@@ -57,6 +57,26 @@ wi_resolve_root() {
   printf '%s\n' "${resolved:-$p}"
 }
 
+# wi_mktemp_beside <target>
+# Create an empty temp file beside <target> for a tmp-then-mv write, and print
+# its path. A predictable ${target}.tmp.$$ name lets anyone who can write the
+# directory plant a symlink there first, which the writer's redirect follows —
+# overwriting the link's target — and the rename then installs (#582). mktemp
+# creates the file exclusively under a random name. It creates it 0600, so the
+# mode is set to what a plain redirect would have given (0666 less the umask):
+# the installed file keeps the mode it had before this helper existed.
+# Returns 1, printing nothing, if the file cannot be created.
+wi_mktemp_beside() {
+  local tmp mode
+  tmp="$(mktemp "${1}.tmp.XXXXXX" 2>/dev/null)" || return 1
+  mode="$(printf '%o' "$(( 0666 & ~0$(umask) ))")"
+  if ! chmod "$mode" "$tmp" 2>/dev/null; then
+    rm -f "$tmp"
+    return 1
+  fi
+  printf '%s\n' "$tmp"
+}
+
 # --- File-based locking via `set -o noclobber` ----------------------------
 # Mirror of architect-critic's ac_lock_acquire pattern. Retry budget is
 # configurable via WI_LOCK_RETRIES (default 5, one second between attempts)

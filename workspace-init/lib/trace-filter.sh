@@ -187,8 +187,13 @@ wi_trace_filter_install() {
     return 1
   fi
   # Render to a temp file and move it into place — a failed render must never
-  # destroy an existing hook (#457).
-  local tmp="${out}.tmp.$$"
+  # destroy an existing hook (#457). The temp name is unpredictable, so a
+  # symlink planted beside the hook cannot redirect the render (#582).
+  local tmp
+  if ! tmp="$(wi_mktemp_beside "$out")"; then
+    wi_log_error "wi_trace_filter_install: could not create a temp file beside $out"
+    return 1
+  fi
   if ! wi_trace_filter_render "$ai_root" > "$tmp" 2>/dev/null; then
     rm -f "$tmp"
     wi_log_error "wi_trace_filter_install: render failed"

@@ -1,5 +1,21 @@
 # workspace-init changelog
 
+## 0.7.1 (2026-09-27)
+
+The four `pairing.json` gaps deferred from the 0.7.0 review (#582). None were introduced by 0.7.0; the validator never checked these values, and two writers still used the predictable temp name 0.7.0 removed from `manifest_relocate`.
+
+### Fixed
+- **#582 — `wi_manifest_validate` rejects values a consumer cannot use.** It already checked each required field's type; it now also checks that the value is usable, and names every field that is not:
+  - **`well_known_paths` entries must be non-empty strings.** The block is optional, but consumers read a present value as a path (scaffold-onboard reads `roadmap_state` with `jq -r`), so `{"bad": true}` used to validate and be rendered as a filesystem path. The block itself, when present, must be an object (or `null`).
+  - **`routing` selectors must be `ai_workspace` or `canonical`**, the two roots `wi_manifest_resolve` knows. `routing.prd = "elsewhere"` used to validate, and scaffold-onboard then used `${elsewhere.root}/PRD.md`, unresolved, as a destination. Only the values are checked; `routing`'s keys and shape are unchanged.
+  - **Roots, names and `canonical.default_branch` must be non-empty**, as must `tooling_repo.root` and `tooling_repo.name` when `tooling_repo` is present. An empty `canonical.root` used to validate, `manifest_relocate` accepted it, and consumers then read it as missing and left `${canonical.root}` unresolved.
+
+  `manifest_relocate` runs the same validator, so it refuses these manifests too, changing nothing.
+- **#582 — `wi_manifest_write` and `wi_trace_filter_install` stage their output under an unpredictable name.** Both wrote to `<target>.tmp.<pid>` with a plain redirect, so anyone able to write the directory could plant a symlink there first: the redirect followed it, overwriting its target, and the rename installed the result. Both now create the temp file with `mktemp` beside the target, as `manifest_relocate` has since 0.7.0. The installed file keeps the mode it had before: `pairing.json` is 0666 less the umask, and the hook adds `+x` as before.
+
+### Compatibility
+- A hand-edited `pairing.json` carrying an empty required string, a routing selector other than the two roots, or a non-string `well_known_paths` entry now fails `wi manifest_validate` (and `manifest_relocate`) with the field named. Manifests written by workspace-init are unaffected.
+
 ## 0.7.0 (2026-09-24)
 
 The six workspace-init issues deferred from the 0.5.1 cycle (#482, #488, #490, #491, #492, #493): the dispatched default-branch probe no longer aborts, both hook installers validate the AI root before writing, a symlinked hook is never replaced, the moved-workspace repair can rewrite the manifest's recorded roots, and an empty blocked pattern fails closed.

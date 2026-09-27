@@ -1199,6 +1199,48 @@ test_D3_valid_symlink_to_our_hook_never_replaced() {
     echo "    rollback changed the link's target"; return 1; }
 }
 
+test_T1_install_temp_file_is_not_predictable() {
+  # #582 item 4: the hook was rendered to ${hook}.tmp.<pid>,
+  # so a symlink planted there was followed — its target overwritten — and then
+  # renamed into place as the hook. `exec` keeps the planting shell's PID, so
+  # the dispatcher's $$ is known (the pin #581 used for relocate).
+  local d; d="$(wi_tmpdir)"; mkdir -p "$d"
+  local ai="$d/foo-ai" cn="$d/foo" victim="$d/victim"
+  mkdir -p "$ai/.workspace" "$cn"
+  git -C "$cn" init -q 2>/dev/null
+  "$WI_BIN" manifest_write "$ai" "$cn" personal >/dev/null 2>&1 || return 1
+  local hook="$cn/.git/hooks/commit-msg"
+  mkdir -p "$cn/.git/hooks"
+  printf 'VICTIM\n' > "$victim"
+  bash -c 'ln -s "$1" "$2.tmp.$$"; exec "$3" trace_filter_install "$4" "$5"' \
+    _ "$victim" "$hook" "$WI_BIN" "$ai" "$cn" 2>/dev/null || {
+    echo "    install failed with a planted temp symlink"; return 1; }
+  assert_eq "VICTIM" "$(cat "$victim")" "planted symlink's target untouched" || return 1
+  [[ -f "$hook" && ! -L "$hook" && -x "$hook" ]] || {
+    echo "    the hook is not an executable regular file"; return 1; }
+  _wi_trace_filter_is_our_hook "$hook" || { echo "    the installed hook is not ours"; return 1; }
+}
+
+test_T2_install_keeps_the_umask_mode() {
+  # mktemp creates 0600; the hook must keep the mode a
+  # plain redirect plus chmod +x gave it before #582 (+x is umask-masked too).
+  local d; d="$(wi_tmpdir)"; mkdir -p "$d"
+  local ai="$d/foo-ai" cn="$d/foo" mask want
+  mkdir -p "$ai/.workspace" "$cn"
+  git -C "$cn" init -q 2>/dev/null
+  "$WI_BIN" manifest_write "$ai" "$cn" personal >/dev/null 2>&1 || return 1
+  local hook="$cn/.git/hooks/commit-msg"
+  for mask in 022:755 077:700; do
+    want="${mask#*:}"
+    ( umask "${mask%%:*}"; "$WI_BIN" trace_filter_install "$ai" "$cn" 2>/dev/null ) || {
+      echo "    install failed under umask ${mask%%:*}"; return 1; }
+    local got; got="$(stat -c '%a' "$hook" 2>/dev/null || stat -f '%Lp' "$hook")"
+    assert_eq "$want" "$got" "hook mode under umask ${mask%%:*}" || return 1
+  done
+  ls "$cn/.git/hooks" | grep -q '\.tmp\.' && { echo "    install left a tmp file behind"; return 1; }
+  return 0
+}
+
 test_D2_scenario_c_skill_documents_foreign_hook_refusal() {
   # Scenario C pairs populated repos — a foreign commit-msg hook is likely.
   # The skill must carry the refusal guidance as one contiguous line (RB4).
@@ -1300,5 +1342,9 @@ wi_test_run test_Q6_single_install_validates_ai_root_before_writes
 wi_test_run test_D1_dangling_symlink_hook_never_destroyed
 wi_test_run test_D3_valid_symlink_to_our_hook_never_replaced
 wi_test_run test_D2_scenario_c_skill_documents_foreign_hook_refusal
+
+# Unpredictable temp names (#582)
+wi_test_run test_T1_install_temp_file_is_not_predictable
+wi_test_run test_T2_install_keeps_the_umask_mode
 
 wi_test_summary
