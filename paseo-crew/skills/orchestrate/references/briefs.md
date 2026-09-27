@@ -142,11 +142,9 @@ PLACEMENT: worktree <abs-path> checked out at PR <number>'s head <sha>.
 
 TASK: run `/code-review <number> <level>` — the level the orchestrator decided, not
 one you pick; outside an activated ossify spine the level is `medium` unless the
-orchestrator names another. A seat created for a fix range — the resumed path, after
-the PR's first review — gets the delta form as its whole task instead: `/code-review`
-over `<old sha>..<new sha>` alone, never a whole-PR review. A retained seat receives
-the same range as a second task. Either way a delta pass is scoped to its own range:
-one per uncovered fix push, however many pushes that is. Your first reply must state the model you are running; it is expected to
+orchestrator names another. A fix-range task carries its range, `<old sha>..<new sha>`:
+that is the scoped delta pass — `/code-review` over that range alone, never a
+whole-PR review. Your first reply must state the model you are running; it is expected to
 be SEAT_EXPECTED_MODEL, and a mismatch is a failed launch to report, not to work around.
 Let the review finish, then write your report file carrying, in this order:
 `Findings: none` on a clean review, or else every finding in this body, one per line
@@ -159,8 +157,8 @@ without it.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
-NEVER: edit any file other than your report file, post anything to GitHub, or run a review
-past the one whole-PR pass and the scoped delta pass each uncovered fix push names. Your findings
+NEVER: edit any file other than your report file, post anything to GitHub, or run a second
+whole-PR review — the scoped delta pass of a fix range is the only re-review. Your findings
 travel only in your report file. If `/code-review` refuses or errors, report its output
 verbatim and stop. A blocking question goes in your report file, then wait; an
 escalation goes there too, then stop.

@@ -111,15 +111,12 @@ Every command's syntax comes from Paseo's own `paseo` skill.
    released only at pass or escalation.
 8. **Review.** A review runs exactly once per PR: the reviewer seat in a fresh worktree
    at the PR head, brief `/code-review <PR>`, every finding returned in the report file.
-   **A fixed head is revalidated, never re-reviewed whole**: the reviewer is re-dispatched from
-   its seat over the fix range alone — one scoped delta re-review — and its findings enter the
+   **Every pushed head gets a reviewed delta before the merge ask**: a fixed head is
+   revalidated over the fix range alone, never re-reviewed whole, and its findings enter the
    disposition baseline like any other, so a repository whose bot does not review a push still
    reaches a complete signal on the head it asks about. Every finding returned in the report file
    as file, line, severity, claim. The reviewer posts nothing to GitHub and edits
-   nothing, so that file is the sole copy of the review. It is retained while its PR can
-   still move — a fix push that needs the delta re-review goes to the same seat, never to a
-   new one — and released once the review is final: every fix range it could be needed for
-   revalidated, and no further fix push pending. Its report file must validate
+   nothing, so that file is the sole copy of the review. Its report file must validate
    before release — findings lines present in the stated schema, or
    `Findings: none` on a clean review, with the reviewed head equal to the PR head; on
    a malformed report, send one bounded correction request
@@ -145,8 +142,8 @@ Every command's syntax comes from Paseo's own `paseo` skill.
     bot or human finding that arrives after the disposition returns to the
     orchestrator, and the implementer waits — it
     resolves the finding only after the orchestrator's decision (#410). No second
-    whole-PR `/code-review` — a fixed head takes the one scoped delta pass step 8
-    names. Bot comments after each push stay in this stream, and review
+    whole-PR `/code-review` — a fixed head gets the scoped delta pass step 8 requires.
+    Bot comments after each push stay in this stream, and review
     bodies and top-level PR conversation comments are part of it too —
     `reviewThreads` does not return them — refreshed after each push alongside the
     thread count. With ossify installed, this
@@ -215,7 +212,7 @@ handoff says which step was the operator's. A replacement for a **retained** rol
 that role's lifetime: an `implementer` or `verifier` replacement is retained across
 items and the fail-and-fix cycle, and a `reviewer` replacement through the PR's fix
 rounds, each released when the built-in would be, never at its dispatch's end —
-step 7's correction, step 8's delta re-review and step 10's fixes need the seat to
+step 7's correction, step 8's reviewed delta and step 10's fixes need the seat to
 exist. Every point above is the top's own — a
 declared role is not yet carried into a delegated spine or work-PR session, so a
 `before-merge-ask` role does not fire on an activated spine (issue #500 holds it).
@@ -248,10 +245,10 @@ seat ever has two waiters and one report wakes one orchestrator: **stand down
 first** — kill this session's armed background waits and `delete_heartbeat`, and
 take no further dispatch action. **Launch the successor as `paseo-mechanics.md`'s
 Handoff states: detached, in this session's workspace, its resume as the launch
-prompt, verified settled and parentless.** A failed launch is cancelled and archived
-where one was created; this session re-arms its own waits and a fresh heartbeat from
-the handoff it just wrote, reports the failed launch to the operator, and remains the
-orchestrator. The run file's `run.orchestrator` block still names
+prompt, verified settled and parentless.** A failed launch is cancelled with `cancel_agent`
+and never archived; this session re-arms its own waits and a fresh heartbeat from
+the handoff it just wrote, reports the failed successor's agent id to the operator, and
+remains the orchestrator. The run file's `run.orchestrator` block still names
 this session's seat after the handover — the field dagr routes the operator's messages
 to — and the successor does not rebind it: issue #556 holds that gap.
 One report must wake one top — a live dispatch a successor is also

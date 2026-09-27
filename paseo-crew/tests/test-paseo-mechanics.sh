@@ -39,7 +39,10 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # 2026-09-27, #608 review round 9: raised from 270 by 5 — each failed successor child's
 # artifacts are reconciled before its archive, and an idle with no question and no
 # background-work claim is routed to the missing-report correction.
-REF_BUDGET=275
+# 2026-09-27: narrowed by operator ruling — the failed-successor branch is a fail-closed
+# stop (cancel, never archive, report the id) and the child-reconcile procedure is
+# deleted; the budget goes DOWN to the new count.
+REF_BUDGET=266
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -103,22 +106,20 @@ pin "$REF" '`ParentAgentId` is `null`' "the successor is verified parentless"
 # Only error|closed rejected `initializing`, so a successor that died during startup
 # left the run with no waiter at all (#608 review, round 1).
 pin "$REF" '`Status` is `idle` or `running`' "a successor still initializing is not a success" flat
-pin "$REF" '`cancel_agent` the successor if one was created' "a failed successor launch (parented, errored or no id) is cancelled"
-# #608 review round 7 (CodeRabbit) and round 8 (Codex): archiving a successor that
-# already started seats cascades into its same-workspace children and detaches the
-# rest, so EVERY child it started is released before the archive.
-pin "$REF" 'every child it started is released before the archive' "the failed successor's children are all released, not cascaded" flat
-pin "$REF" '`archive_agent` it, and' "the failed successor is archived only after that reconcile" flat
+# Operator ruling (2026-09-27): the failed-successor branch is a fail-closed stop —
+# cancel, never archive (the archive cascades into anything it started), report the
+# id, stay the orchestrator. The per-child reconcile procedure is deleted.
+pin "$REF" '`cancel_agent`, never archived' "a failed successor is cancelled, never archived"
+pin "$REF" 'reports the failed successor'"'"'s agent id to the operator' "the failed successor's id goes to the operator to act on" flat
 # #608 review round 8: the detached command takes no feature values, and the seat's
 # retention runs to the review being final, not its first report.
 pin "$REF" 'hands on without them' "the handoff names the featureValues a detached launch drops" flat
-# #608 review round 9: each failed successor child's own activity and artifacts are
-# reconciled before it is archived, and an idle with neither a question nor a
-# background-work claim is the missing-report case rather than an unwatched dispatch.
-pin "$REF" 'durable artifacts are read and reconciled first' "each failed successor child's artifacts are reconciled" flat
+# #608 review round 9: an idle with neither a question nor a background-work claim
+# is the missing-report case rather than an unwatched dispatch. (The child-reconcile
+# procedure this round added to the handoff branch was deleted by the operator ruling.)
 pin "$REF" 'one bounded correction request asking it to write `REPORT_PATH`' "an idle with no question and no report goes to the correction path" flat
 pin "$REF" 'the reviewer once the review is final' "the reviewer is released when the review is final, not at its first report" flat
-pin "$REF" 're-arm this session'"'"'s own waits and a fresh heartbeat' "after a parented launch this session re-arms and stays the orchestrator"
+pin "$REF" 're-arms its own waits and a fresh heartbeat' "after a failed launch this session re-arms and stays the orchestrator"
 pin "$REF" 'Never archive a predecessor while a subagent in its workspace runs' "the no-archive rule survives"
 pin "$REF" 'Kill this session'"'"'s armed background waits' "the predecessor stands down"
 

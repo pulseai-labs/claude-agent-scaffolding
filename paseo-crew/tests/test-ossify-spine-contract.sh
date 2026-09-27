@@ -475,20 +475,21 @@ pin "$LIFECYCLE_MD" 'verifier` replacement is retained across' \
   "a replaced retained role keeps that role's lifetime"
 pin "$LIFECYCLE_MD" '`reviewer` replacement through the PR'"'"'s fix' \
   "a reviewer replacement keeps the built-in's lifetime through the fix rounds too"
-pin "$GENERIC_BRIEFS_MD" 'gets the delta form as its whole task' \
-  "a fresh reviewer on the resumed path runs the delta form, not a second full review"
+# Operator ruling (2026-09-27): the re-review is stated as a requirement, not a
+# procedure — every pushed head gets a reviewed delta before the merge ask — and the
+# reviewer brief carries only the scoped pass and the no-second-whole-PR-review rule.
+pin "$GENERIC_BRIEFS_MD" 'that is the scoped delta pass' \
+  "the reviewer brief carries the scoped delta pass over a fix range"
+pin "$LIFECYCLE_MD" 'Every pushed head gets a reviewed delta before the merge ask' \
+  "the reviewed delta is a requirement on every pushed head, not a counted procedure"
 # #608 review round 9: step 10's "No second /code-review" contradicted the delta pass
 # steps 8-10 require; it forbids the second WHOLE-PR review only.
 pin "$LIFECYCLE_MD" 'whole-PR `/code-review`' \
   "step 10 forbids a second whole-PR review, not the scoped delta pass"
 pin "$LIFECYCLE_MD" 'released there, as Teardown says' \
   "a read-only item's seat and workspace are released at its close"
-pin "$GENERIC_BRIEFS_MD" 'the scoped delta pass each uncovered fix push names' \
-  "the reviewer contract carries the one scoped delta pass"
-# #608 review round 6: "the one re-review a seat runs" capped the seat at a single
-# delta pass, so a second uncovered push had no reviewer to validate it.
-pin "$GENERIC_BRIEFS_MD" 'one per uncovered fix push' \
-  "the delta pass is one per uncovered push, not one per seat"
+pin "$GENERIC_BRIEFS_MD" 'the scoped delta pass of a fix range is the only re-review' \
+  "the reviewer brief forbids a second whole-PR review and allows the scoped pass"
 # The close-review writer is a halt-time profile, not a project-file seat.
 pin "$CONFIG_MD" 'close session, work-PR session)' \
   "the writer is not a project-file seat"
@@ -1551,19 +1552,18 @@ pin "$PRBRIEFS_MD" 'open: <PR url> at <head sha>' \
 pin "$PRBRIEFS_MD" 'ONE bounded correction request' \
   "a malformed reviewer body is corrected once, then escalated"
 # R3-2 reverts to exactly-once: the reviewer template and lifecycle step 8 forbid a
-# second review, so a compliant reviewer would refuse. Staleness is answered by
-# re-fetching GitHub's own signals, which the bots regenerate on every push.
-# #608 review round 1: the seat those signals do not cover is re-dispatched over the
-# fix range, so it cannot have been released when its first report validated — it is
-# retained through the fix rounds and released once the review is final.
-pin "$PRBRIEFS_MD" 'that seat is retained through the fix' \
-  "the delegated reviewer is retained for the scoped delta re-review"
-pin "$PRBRIEFS_MD" 'the task names it `<old sha>..<new sha>`' \
-  "the delta re-review's task names its range, so the seat can run it"
-pin "$PRBRIEFS_MD" 'seat from its REVIEWER row on a resumed dispatch' \
-  "a resumed dispatch with no live reviewer launches one for the delta"
-pin "$LIFECYCLE_MD" 'a fix push that needs the delta re-review goes to the same seat' \
-  "lifecycle.md retains the reviewer for the fix range too"
+# second whole-PR review, so a compliant reviewer would refuse it. Staleness is
+# answered by re-fetching GitHub's own signals, which the bots regenerate on every
+# push — and where none covers the pushed head, the scoped delta pass does (operator
+# ruling, 2026-09-27: a requirement, not a counted procedure).
+pin "$PRBRIEFS_MD" '`<old sha>..<new sha>`, as a scoped delta pass' \
+  "the work-PR brief names the delta pass and its range"
+pin "$PRBRIEFS_MD" 'every pushed head gets a reviewed' \
+  "the work-PR brief states the requirement on the pushed head"
+pin "$PRBRIEFS_MD" 'never a second whole-PR review' \
+  "the work-PR brief forbids the second whole-PR review only"
+pin "$LIFECYCLE_MD" 'revalidated over the fix range alone, never re-reviewed whole' \
+  "lifecycle.md revalidates the fix range, never the whole PR again"
 pin "$PRBRIEFS_MD" 're-fetch the GitHub review signals' \
   "each new head is covered by re-fetching the signals, not by a second review"
 # N8/#467: the work-PR session's seats get the #455 teardown — release what it
@@ -1948,7 +1948,10 @@ budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
 # contract had no scoped pass to run, so a retained reviewer could refuse).
 # #608 review round 5 (2026-09-27): raised from 206 to 207 — the resumed path's fresh
 # seat takes the delta form as its whole task (round 5, finding 1), one line.
-budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget" 207
+# 2026-09-27: narrowed by operator ruling — the pass-counting and seat-routing prose is
+# deleted for the requirement ("every pushed head gets a reviewed delta"), so the
+# budget goes back down to the new count (205).
+budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget" 205
 # R16 (2026-09-27, fix round 1, issues 2 and 3): ossify-briefs.md's budget is raised
 # from 200 to 205, exactly the 5 lines restoring the item seat's placement ("in the
 # worktree ossify prepared for the item"), "with the verifier's summary", "a second

@@ -197,12 +197,18 @@ deletes its heartbeat — and only then launches its successor **detached**:
 `env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d`, with the resume as the launch
 prompt, so the new agent is not parented to the session standing down. `paseo inspect
 <new id> --json` then confirms the successor started and `ParentAgentId` is `null`; a
-failed launch is cancelled and the predecessor re-arms and stays the orchestrator. A
+failed successor is cancelled, never archived, and reported to the operator, while the
+predecessor re-arms and stays the orchestrator. A
 predecessor is never archived while its own seats still run — the successor shares its
 workspace, and the cascade would take them.
 
 ## Known limits
 
+- **The handoff's failure branch is fail-closed by ruling** (2026-09-27): a failed
+  successor is cancelled, never archived, and reported to the operator; nothing reads
+  what it started, and a successor that fails after the launch check passes is not
+  watched. Those limits, and the reviewed-delta requirement's, are recorded in
+  [issue #612](https://github.com/pulseai-labs/claude-agent-scaffolding/issues/612).
 - **Cross-machine seats are out of scope.** Every seat runs on the daemon the
   orchestrator talks to.
 - **Paseo's finish notice is one-shot upstream** (getpaseo/paseo#3875): it fires once, on

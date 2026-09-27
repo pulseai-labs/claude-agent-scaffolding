@@ -12,7 +12,7 @@ The seat names below are examples: the project file (`.paseo-crew/roles.md`,
 | Orchestrator | you — the operator launched this session | | one per run | |
 | Implementer, planned | `strong-coder` | the seat's — a marked item or a retry fills a higher-effort seat, which is a different profile the project file's conditions name; the profile is the only source of effort, so a profile is never edited mid-run to raise it | retained across work items and the PR's fix rounds, to the threshold below | `contract`: an interface, schema, contract, or architectural change, or a plan gate; the default when the item is not `bounded` |
 | Implementer, fast | `fast-coder` | the seat's | retained if a fix round follows, else released | `bounded` only when the item is one-file, mechanical, or read-only |
-| Reviewer | `sonnet-review` — once per PR; first task `/code-review <PR>`; never implements | the seat's | retained while its PR can move — the fix range's delta re-review goes to it — released when the review is final | |
+| Reviewer | `sonnet-review` — once per PR; first task `/code-review <PR>`; never implements | the seat's | retained until the review is final — every pushed head gets its reviewed delta first | |
 | Verifier | `strong-coder` — the work-item verify; `fast-coder` for read-only probes and mechanical runs outside it (a suite, a count, a fact) | the seat's | retained until its item passes or escalates to the operator | |
 | Operator | the human — the merge word, and decisions no session can own | | | |
 
@@ -55,8 +55,8 @@ implementer returns its handoff inputs in its report file; the orchestrator writ
 handoff into the next brief. Rotation happens between work items, never mid-PR: the
 retained implementer finishes the PR's fix rounds unless the harness auto-compacts.
 The reviewer owns nothing durable, but it is retained past its report while its PR can
-still move — a fix push the bots do not cover sends it the fix range, one scoped delta
-re-review — and is released when the review is final; the verifier seat is retained
+still move — every pushed head gets its reviewed delta — and is released when the review
+is final; the verifier seat is retained
 across a fail-and-fix cycle on the same item
 — the re-check attaches its task to the same verifier — and is released only when the
 item passes or goes to the operator. A seat is released as `paseo-mechanics.md`'s

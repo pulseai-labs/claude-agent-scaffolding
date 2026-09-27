@@ -170,10 +170,12 @@ These cases are named because they look like clashes and are not:
   to the retained implementer is `/ossify:work-pr <PR> --repo-root <worktree holding the
   PR branch>` with the disposition list embedded as a third finding signal — work-pr
   targets the invoking repository unless told otherwise, and the retained implementer
-  often sits elsewhere. `work-pr`'s "re-review on the new head" means re-fetching
-  GitHub signals after a push, so no second `/code-review` occurs. The worker stops at
+  often sits elsewhere. `work-pr`'s "re-review on the new head" means the signals are
+  re-fetched after a push, and where none covers the new head the scoped delta pass runs —
+  never a second whole-PR review. The worker stops at
   `work-pr`'s merge ask and returns its ledger in its report file; you relay the ask to the
-  operator and merge on the word with one `gh` command.
+  operator, and the merge lands under the brief's `MERGE_EXECUTOR` assignment — this
+  session's or the operator's — bound to the named SHA, never as a squash.
 
 ## 7. Refusals
 

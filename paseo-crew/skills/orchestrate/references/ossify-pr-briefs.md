@@ -159,11 +159,9 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      push moves the head under that verdict: before the next disposition round,
      re-fetch the GitHub review signals and the thread state on the new head —
      the bots review every push where they are installed, so the current-head
-     verdict is read there; where none is, the reviewer seat is re-dispatched
-     over the fix range — the task names it `<old sha>..<new sha>` — and a fresh
-     seat from its REVIEWER row on a resumed dispatch whose reviewer is gone takes
-     the delta form as its whole task, still one scoped delta re-review per uncovered
-     push, never a second full review. A post-disposition
+     verdict is read there; where none is, the reviewer runs the fix range,
+     `<old sha>..<new sha>`, as a scoped delta pass — every pushed head gets a reviewed
+     delta before the merge ask, never a second whole-PR review. A post-disposition
      finding returns through a blocking
      question to the top before any seat acts on it, never fixed by you or
      silently deferred. Relay ONE batched summary per round;
@@ -202,6 +200,6 @@ the record pass — a later merge is a new work-PR dispatch, not a resumption of
 one. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: talk to the operator — every question goes up to the top; squash; merge
-without the top's relayed word; delete a branch; or dispatch a second full review — one
-delegated review per PR (`roles.md`, step 8); a fixed head takes one scoped delta re-review.
+without the top's relayed word; delete a branch; or dispatch a second whole-PR review —
+one delegated review per PR, and a fixed head gets the scoped delta pass (step 8).
 ```

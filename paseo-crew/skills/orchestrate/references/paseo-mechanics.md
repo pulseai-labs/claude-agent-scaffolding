@@ -200,9 +200,8 @@ Every seat runs on the daemon the orchestrator talks to; cross-machine seats are
 ## Teardown
 
 A seat is released with `archive_agent` once its artifacts are safe: the implementer after
-`lifecycle.md` step 12's merged-branch check, the reviewer once the review is final —
-its report file validated and no fix push that needs its delta re-review pending
-(step 8) — the verifier at pass or escalation. A worktree workspace the run created is
+`lifecycle.md` step 12's merged-branch check, the reviewer once the review is final
+(step 8), the verifier at pass or escalation. A worktree workspace the run created is
 released with `archive_workspace` only after every seat in it is archived; Paseo then
 removes the worktree itself, once no active workspace references it.
 Close only what the run created: the orchestrator's own workspace, and any the operator
@@ -248,20 +247,12 @@ orchestrator:
 3. **Verify** that the launch returned an agent id, then with `paseo inspect <new id> --json`
    that `Status` is `idle` or `running` — an `initializing` launch is polled until it settles,
    bounded — and `ParentAgentId` is `null` (a non-null parent is a tree, its successor already
-   resuming). A launch that settles on `error` or `closed`, or is still `initializing` when the
-   bound expires, is a failure: a successor that dies before it arms its own waits leaves the
-   run with none.
-   Any failure takes one branch:
-   `cancel_agent` the successor if one was created, read its activity and its children
-   (`list_agents`) — every child it started is released before the archive, in whatever
-   workspace: the cascade archives its same-workspace children and only detaches the
-   rest, so each one is cancelled and archived itself, and each child's own activity and
-   durable artifacts are read and reconciled first, because a worker it launched may have
-   committed, pushed or opened a PR before the cancel — and compare each live dispatch's
-   report hash and identity against the handoff, so a report it already handled is not
-   handled twice; then `archive_agent` it, and
-   re-arm this session's own waits and a fresh heartbeat from the handoff it just
-   wrote; report the failed launch to the operator; and remain the orchestrator.
+   resuming). A launch that settles on `error` or `closed`, is still `initializing` when the
+   bound expires, or returns no agent id is a failure.
+   **A failed successor is cancelled with `cancel_agent`, never archived** — the archive
+   cascades into anything it started. This session re-arms its own waits and a fresh heartbeat
+   from the handoff it just wrote, stays the orchestrator, and reports the failed successor's
+   agent id to the operator, who decides what to do with it and anything it started.
 4. **On success**, tell the operator which agent is now the orchestrator.
    Never archive a predecessor while a subagent in its workspace runs: the successor shares the
    workspace, every live seat is still this session's child, and the cascade would take them.
