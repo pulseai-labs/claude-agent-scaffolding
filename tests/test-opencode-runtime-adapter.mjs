@@ -145,6 +145,8 @@ const excludedPlugins = [
   "herdr-crew",
   // The DeepSeek Harness crew, same status: ships on Claude Code and Codex only.
   "dsh-crew",
+  // The Paseo port of herdr-crew, same status: ships on Claude Code and Codex only.
+  "paseo-crew",
 ];
 
 const expectedAliases = {
