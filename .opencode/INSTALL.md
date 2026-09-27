@@ -98,7 +98,7 @@ selected skill as a same-name native slash command. The complete inventory is:
 | `workspace-init` | Default | `/initializing-dual-repo-workspace`, `/pairing-canonical-repo`, `/pairing-existing-dual` |
 | `ai-mentor` | Default | `/grill-me`, `/council`, `/eli10`, `/fool` |
 | `architect-critic` | Default | `/critiquing-spec`, `/reviewing-critique-history`, `/listing-principles`, `/promoting-principle`, `/checking-adversary-readiness`, `/managing-async-critique` |
-| `ossify` | Opt-in | `/start`, `/adopt`, `/plan-spine`, `/work-item`, `/close`, `/plan-release`, `/doctor`, `/challenge`, `/wayfinder` |
+| `ossify` | Opt-in | `/start`, `/adopt`, `/plan-spine`, `/work-item`, `/close`, `/plan-release`, `/doctor`, `/challenge`, `/wayfinder`, `/patch` |
 
 ## Differing Aliases
 

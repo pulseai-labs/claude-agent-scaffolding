@@ -45,11 +45,13 @@
 #   block unfindable and the failure read as "vacuous" rather than as wrong
 #   behaviour. Pick the anchor from the block's SCAFFOLDING, never from its FIX.
 #
-# Totals: 185 blocks - 73 operative (16 covered, 57 deferred), 112 illustrative.
+# Totals: 190 blocks - 76 operative (16 covered, 60 deferred), 114 illustrative.
 # DERIVED, never hand-counted: check 2's report line gives the total from a walk
-# of the TREE ("185 blocks accounted for"); one awk pass over the rows below
+# of the TREE ("190 blocks accounted for"); one awk pass over the rows below
 # gives the split (O rows counted, D and I summed). Two independent routes,
-# agreeing at 185 - that agreement IS the check. 1.11.0 added two illustrative
+# agreeing at 190 - that agreement IS the check. 1.13.0 added five blocks - the
+# intake listing (deferred), the patch branch cut and tag (deferred), the ledger
+# grep and the fallback PR open (illustrative) - the whole of the 185 -> 190 move. 1.11.0 added two illustrative
 # blocks (a bone_set_touch and a risk_gate_set_touch call) and no operative one,
 # the whole of the 182 -> 184 move. 1.11.2 added one - the doctor touch-surface
 # sweep - and then reclassified it from illustrative to COVERED once the #555

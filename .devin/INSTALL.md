@@ -31,7 +31,7 @@ Installing the meta-plugin installs exactly these five, and nothing else:
 | `workspace-init` | All 3 skills |
 | `ai-mentor` | All 4 skills |
 | `architect-critic` | All 6 skills — **host-only**, see below |
-| `ossify` | 6 skills (`start`, `plan-release`, `plan-spine`, `work-item`, `close`, `doctor`) plus the `work-item-worker` subagent. `adopt`, `challenge`, and `wayfinder` are deliberately not advertised on this surface. |
+| `ossify` | 6 skills (`start`, `plan-release`, `plan-spine`, `work-item`, `close`, `doctor`) plus the `work-item-worker` subagent. `adopt`, `challenge`, `wayfinder`, and `patch` are deliberately not advertised on this surface. |
 | `code-judo` | All 4 skills |
 
 `scaffold`, `scaffold-onboard`, `scaffold-dev`, `claude-security-audit`,
@@ -124,7 +124,7 @@ would give the Claude or Codex manifests.
   the `claude-agent-scaffolding-devin` meta-plugin.
 - `devin plugins info <name>` lists advertised skills; on the baseline install,
   ossify shows exactly its six skills plus `work-item-worker` — `adopt`,
-  `challenge`, and `wayfinder` absent is correct, not a load failure.
+  `challenge`, `wayfinder`, and `patch` absent is correct, not a load failure.
 - `ossify:doctor` reports its loaded-body versus expected version and bounds
   any mismatch to ossify activity already evidenced in the session.
 - A per-plugin `--local` install is linked to that checkout directory; if an
