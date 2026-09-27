@@ -22,10 +22,6 @@ Do not stuff reasoning steps inside `bash -c '...'` wrappers.
 Where it sits: `start` (spec-core onboarding) → `plan-release` (spines, classes,
 exit criteria, DAG) → **`plan-spine`** (you are here) → execution → `close`.
 
-This skill re-anchors the predecessor stack's `planning-vertical-slice`;
-where it differs (the 1-5 item bound, per-round specs, the grill-me gate,
-demo timing) the difference is stated at the point it applies.
-
 When invoked, work §3 through §9 below in order — each numbered block is one step
 of the conversation. **This skill plans; it does not execute:** worktree spin-up,
 implementer dispatch, verification, and merge belong to the execution engine
@@ -67,13 +63,11 @@ implementer dispatch, verification, and merge belong to the execution engine
 
 Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
 
-All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`, on `$PATH`
-because Claude Code adds each plugin's `bin/` automatically; the dispatcher's bash
-shebang forces a bash runtime under it regardless of the calling shell — required
-because Claude Code's Bash tool runs zsh by default on macOS). Call form:
-`oss <subcommand> [args...]` resolves to `oss_cmd_<subcommand>`. Never `source` the
-lib files directly from a skill body — under zsh `BASH_SOURCE` is unset and the
-libs break. Use `"$oss_bin" help` for discovery.
+All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`), whose bash
+shebang forces a bash runtime whatever the calling shell (Claude Code's Bash tool
+runs zsh by default on macOS). Call form: `oss <subcommand> [args...]` resolves to
+`oss_cmd_<subcommand>`. Never `source` the lib files directly from a skill body —
+under zsh `BASH_SOURCE` is unset and the libs break. `"$oss_bin" help` lists verbs.
 
 **Three probes, all fail-fast.**
 
@@ -140,6 +134,9 @@ every later verb resolves state on its own. **`"$oss_bin" doctor` is the state G
 amendments, quarantined lines, outstanding fakes, patch records, a held lock or
 orphan worktrees; those are the `ossify:doctor` skill's, and invoking this skill does
 not invoke it. Invoke `ossify:doctor` when you want them.
+**Then, before §4, read what arrived** since the release was planned — the intake
+queue and the tech-debt ledger lines on this spine's surface — and give each a
+disposition (`references/intake-and-ledger.md`).
 
 ---
 
@@ -431,15 +428,13 @@ Full list with the reasoning and worked cases in
 ## 10. Slash-command interaction
 
 The `/plan-spine` slash command (`commands/plan-spine.md`) exports the raw
-argument string as `$ARGUMENTS` via an env-var bridge — on shim-less channels
-(Devin, `Skill()`, natural language) nothing exports it; the spine id arrives
-as a literal token in the invocation/request text. **Parse `$ARGUMENTS` in
-bash; never reference `$1` / `$2` / `$N`** — Claude Code substitutes positional
-tokens in command bodies at template-render time and silently corrupts them.
-
-The only argument is the spine id (`r1.s2`). When it is absent, list the planned
-spines (`"$oss_bin" spine_list`) and ask which one — never pick for the user, and never
-infer a spine from a name when the id missed (§3).
+argument string as `$ARGUMENTS` via an env-var bridge; on shim-less channels
+(Devin, `Skill()`, natural language) the spine id arrives as a literal token in
+the request. **Parse `$ARGUMENTS` in bash; never reference `$1` / `$2` / `$N`** —
+Claude Code substitutes positional tokens in command bodies at template-render
+time and silently corrupts them. The only argument is the spine id (`r1.s2`);
+when it is absent, list the planned spines (`"$oss_bin" spine_list`) and ask which
+one — never pick for the user, never infer a spine from a name when the id missed (§3).
 
 ---
 

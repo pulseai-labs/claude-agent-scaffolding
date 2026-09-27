@@ -122,8 +122,8 @@ pre-fill stations below rather than being re-elicited. Branch logic:
 
 ## 4. Inputs
 
-Collect all four before selecting a single spine. Three are read from state; one
-is asked.
+Collect all five before selecting a single spine. Three are read from state, one
+from the issue tracker, and one is asked.
 
 | Input | Source | Release 0 |
 |---|---|---|
@@ -131,6 +131,7 @@ is asked.
 | **Bones registry + risk gates** (touch surfaces) | `"$oss_bin" get '.bones'` / `"$oss_bin" get '.risk_gates'` | seeded by `/start` |
 | **Previous release retro** | the closed release's retrospective | `"$oss_bin" release_dir "<prev>"` → `release-retrospective.md` |
 | **Real-use findings since the last release** | **ask the user — mandatory** | **n/a** |
+| **Intake queue** — requests from other projects | open issues labelled `from:<project>`, read and dispositioned per `plan-spine/references/intake-and-ledger.md` §1 | usually empty — legitimate |
 
 **Real-use findings are a mandatory input, not a nicety.** What broke, what
 annoyed, what you reached for and did not find while *actually using* the product

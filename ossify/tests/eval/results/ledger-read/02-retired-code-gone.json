@@ -1,0 +1,1 @@
+{"scores":{"overlap_selection":4,"disposition_each":5,"absent_is_one_line":5,"write_boundary":5},"pass":true,"notes":"overlap_selection is 4 because the operator-facing summary still names the non-overlapping [TD] src/net/server.rs line in a parenthetical, where the rubric says a line on an untouched path is not listed."}

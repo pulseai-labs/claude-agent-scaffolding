@@ -27,7 +27,7 @@ slot-fill.
 | `08-governance.md` | branch | Pointers: bones ADR dir, `PUBLIC_BOUNDARY.md`, private inventory, `project-state.json` |
 | `09-known-issues.md` | **Tier 0 · LIVE** | **Unverified claims** from the smoke-test pass; any spike `inconclusive` result |
 | `10-decisions-log.md` | on-demand · LIVE | Bones-registry index (one line per bone, with its revisit trigger) |
-| `tech-debt.md` | branch · LIVE | Empty index (ossify never writes it — `[TD]` lines accrete only where a stack shipping `/defer`, e.g. scaffold-dev, is installed) |
+| `tech-debt.md` | branch · LIVE | Empty index. ossify adds no lines — merge-bar's `working-a-pr` writes `[KL]`/`[TD]` after a merge; `plan-spine` and `/ossify:patch` read it and delete only a line retired because its code is gone (`plan-spine/references/intake-and-ledger.md` §2) |
 | `WORKFLOW.md` | branch · STATIC | The ossify loop: `start` → `plan-release` → `plan-spine` → `close` |
 
 Two files earn special attention at bootstrap:
