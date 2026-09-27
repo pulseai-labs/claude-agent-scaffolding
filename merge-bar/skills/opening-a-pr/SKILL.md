@@ -55,6 +55,9 @@ Merge bar block word for word. Its "Filling each field" section says what goes i
 
 ## 5. Open it
 
+If `<branch>` is `<base>` or the repository's default branch, stop and say so before any push —
+never push the default branch.
+
 Push the branch first if it has no upstream or is ahead of it — `gh pr create --head` skips any
 pushing, so a branch the remote does not have cannot be opened as a PR: `git push -u origin
 <branch>`. Never force-push.
