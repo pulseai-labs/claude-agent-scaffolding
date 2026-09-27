@@ -74,7 +74,7 @@ that profile rather than relying on the default.
 | Surface | What it carries |
 |---|---|
 | `orchestrate` (the skill) | The orchestrator session's playbook: the delegation floor and its decidable test, the role list, the run by reference, the briefs, the ossify seam, and the refusals. |
-| `references/paseo-mechanics.md` | The mechanics Paseo's own guide cannot state: the seat launch and its placement, the two gaps in the profile-to-`create_agent` map, the completion loop and its five attention exits, the finish notice as a hint, the heartbeat backstop, sending a seat a message, the `/context` probe, teardown and the cascade, and the handoff. It overrides the guide's default where the two differ. |
+| `references/paseo-mechanics.md` | The mechanics Paseo's own guide cannot state: the seat launch and its placement, the two gaps in the profile-to-`create_agent` map, the completion loop with its `report` exit and four attention exits, the finish notice as a hint, the heartbeat backstop, sending a seat a message, the `/context` probe, teardown and the cascade, and the handoff. It overrides the guide's default where the two differ. |
 | `references/roles.md` | The role table and the seats that fill it, the launch sequence, retention, the activated-ossify-spine exception, the session budget, placement for the dual-repo case, and the writers rules. |
 | `references/lifecycle.md` | The thirteen-step run, the operator's own roles and the named points they run at, and rotation past the context ceiling. |
 | `references/config.md` | The seat sources — Paseo profiles and the optional dsh-only machine file — the profile field map, the resolved-profile row and where each value travels, the project file's three sections, and what happens when a file is missing. |
@@ -192,12 +192,14 @@ runs them on a user's path.
 
 ## The handoff
 
-The orchestrator's own rotation launches its successor **detached**:
-`env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d`, so the new agent is not parented
-to the session standing down, and `paseo inspect <new id> --json` confirms
-`ParentAgentId` is `null` before the predecessor stands down for good. A predecessor is
-never archived while its own seats still run — the successor shares its workspace, and
-the cascade would take them.
+The orchestrator's own rotation **stands down first** — it kills its armed waits and
+deletes its heartbeat — and only then launches its successor **detached**:
+`env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d`, with the resume as the launch
+prompt, so the new agent is not parented to the session standing down. `paseo inspect
+<new id> --json` then confirms the successor started and `ParentAgentId` is `null`; a
+failed launch is cancelled and the predecessor re-arms and stays the orchestrator. A
+predecessor is never archived while its own seats still run — the successor shares its
+workspace, and the cascade would take them.
 
 ## Known limits
 
