@@ -42,6 +42,29 @@ wi_tmpdir() {
   echo "$d"
 }
 
+# --- temp-name race stub (#582) ---
+# wi_race_mktemp_path <dir> <link-target>
+# Print a PATH whose `mktemp` wins the race a watcher of the directory could
+# win: it makes the name the real mktemp would, then leaves a symlink to
+# <link-target> under it, whether or not the real call created a file there.
+# A writer that creates its temp file by name and writes it by name later
+# follows that link; one that creates and writes through a single descriptor
+# is refused.
+wi_race_mktemp_path() {
+  local dir="$1" target="$2" real
+  real="$(command -v mktemp)"
+  mkdir -p "$dir"
+  cat > "$dir/mktemp" <<STUB
+#!/usr/bin/env bash
+n="\$("$real" "\$@")" || exit 1
+rm -f "\$n"
+ln -s "$target" "\$n" || exit 1
+printf '%s\n' "\$n"
+STUB
+  chmod +x "$dir/mktemp"
+  printf '%s\n' "$dir:$PATH"
+}
+
 # --- assertions ---
 assert_eq() { # $1=expected $2=actual $3=desc
   if [[ "$1" == "$2" ]]; then return 0

@@ -1045,10 +1045,10 @@ test_W1_write_temp_file_is_not_predictable() {
 }
 
 test_W2_write_keeps_the_umask_mode() {
-  # mktemp creates 0600; the manifest must keep the
-  # mode a plain redirect gave it before #582, 0666 less the umask. 0277
-  # clears owner-write: the write must still succeed (it runs before the
-  # mode is set) and leave 0400, as the redirect did.
+  # The manifest must keep the mode a plain redirect gave
+  # it before #582, 0666 less the umask. 0277 clears owner-write: the write
+  # must still succeed (through the descriptor that created the file) and
+  # leave 0400, as the redirect did.
   local ai="$_WI_TMP/w2/foo-ai" cn="$_WI_TMP/w2/foo" mask want
   mkdir -p "$ai/.workspace" "$cn"
   local m="$ai/.workspace/pairing.json"
@@ -1062,6 +1062,101 @@ test_W2_write_keeps_the_umask_mode() {
   done
   ls "$ai/.workspace" | grep -q '\.tmp\.' && { echo "    write left a tmp file behind"; return 1; }
   return 0
+}
+
+test_W3_write_refuses_a_raced_temp_name() {
+  # Codex on #605: a random temp name is not enough if
+  # the file is created by name and written by name later — a watcher of the
+  # directory swaps the fresh temp file for a symlink in between and the write
+  # lands on its target. The stubbed mktemp wins that race every time; the
+  # write must be refused, the link's target and the manifest left alone.
+  local ai="$_WI_TMP/w3/foo-ai" cn="$_WI_TMP/w3/foo"
+  mkdir -p "$ai/.workspace" "$cn"
+  local m="$ai/.workspace/pairing.json" victim="$_WI_TMP/w3/victim" p
+  "$WI_BIN" manifest_write "$ai" "$cn" personal 2>/dev/null || return 1
+  cp "$m" "$_WI_TMP/w3/before"
+  printf 'VICTIM\n' > "$victim"
+  p="$(wi_race_mktemp_path "$_WI_TMP/w3/bin" "$victim")"
+  if PATH="$p" "$WI_BIN" manifest_write "$ai" "$cn" work 2>/dev/null; then
+    echo "    write succeeded through a raced temp name"; return 1; fi
+  assert_eq "VICTIM" "$(cat "$victim")" "raced symlink's target untouched" || return 1
+  cmp -s "$_WI_TMP/w3/before" "$m" || { echo "    the manifest changed"; return 1; }
+  ls "$ai/.workspace" | grep -q '\.tmp\.' && { echo "    write left the temp name behind"; return 1; }
+  # The same race against a device: bash opens an existing non-regular file
+  # without O_EXCL, so the regular-file check is what refuses it.
+  p="$(wi_race_mktemp_path "$_WI_TMP/w3/bin-dev" /dev/null)"
+  if PATH="$p" "$WI_BIN" manifest_write "$ai" "$cn" work 2>/dev/null; then
+    echo "    write succeeded through a temp name raced to /dev/null"; return 1; fi
+  cmp -s "$_WI_TMP/w3/before" "$m" || { echo "    the manifest changed (device)"; return 1; }
+  return 0
+}
+
+test_L10_relocate_refuses_a_raced_temp_name() {
+  # The same race against relocate, whose temp file was
+  # created by mktemp and then written by cp -p and a redirect, both by name.
+  local ai; ai="$(_setup_pair l10)" || return 1
+  local m="$ai/.workspace/pairing.json" victim="$_WI_TMP/l10/victim" p
+  cp "$m" "$_WI_TMP/l10/before"
+  printf 'VICTIM\n' > "$victim"
+  p="$(wi_race_mktemp_path "$_WI_TMP/l10/bin" "$victim")"
+  if PATH="$p" "$WI_BIN" manifest_relocate "$ai" 2>/dev/null; then
+    echo "    relocate succeeded through a raced temp name"; return 1; fi
+  assert_eq "VICTIM" "$(cat "$victim")" "raced symlink's target untouched" || return 1
+  cmp -s "$_WI_TMP/l10/before" "$m" || { echo "    the manifest changed"; return 1; }
+  ls "$ai/.workspace" | grep -q '\.tmp\.' && { echo "    relocate left the temp name behind"; return 1; }
+  # Control: unraced, the same relocate succeeds.
+  "$WI_BIN" manifest_relocate "$ai" 2>/dev/null || { echo "    control relocate failed"; return 1; }
+}
+
+test_V8_validate_rejects_relative_roots() {
+  # Codex on #605: every template the V7 check accepts
+  # assumes ${ai_workspace.root} and ${canonical.root} expand to absolute paths;
+  # a relative root makes them resolve against the reader's cwd, and
+  # tooling_repo.root is cd-ed into. All three must be absolute.
+  local ai; ai="$(_setup_custom_pair v8)" || return 1
+  local m="$ai/.workspace/pairing.json"
+  cp "$m" "$_WI_TMP/v8/good"
+  local edit field
+  while IFS='|' read -r field edit; do
+    jq "$edit" "$_WI_TMP/v8/good" > "$m"
+    if "$WI_BIN" manifest_validate "$ai" 2>"$_WI_TMP/v8/err"; then
+      echo "    validate accepted: $edit"; return 1; fi
+    grep -qF "$field (must be an absolute path" "$_WI_TMP/v8/err" || {
+      echo "    refusal does not name $field as relative:"; cat "$_WI_TMP/v8/err"; return 1; }
+  done <<'CASES'
+ai_workspace.root|.ai_workspace.root = "relative-ai"
+ai_workspace.root|.ai_workspace.root = "./proj-ai"
+canonical.root|.canonical.root = "../proj"
+canonical.root|.canonical.root = "~/proj"
+tooling_repo.root|.tooling_repo.root = "tools"
+CASES
+  # Controls: absolute roots, a root of "/" itself, and names (not paths),
+  # which stay free-form.
+  local ok
+  for ok in '.' '.canonical.root = "/"' '.ai_workspace.name = "relative-name"'; do
+    jq "$ok" "$_WI_TMP/v8/good" > "$m"
+    "$WI_BIN" manifest_validate "$ai" 2>/dev/null || {
+      echo "    control rejected: $ok"; return 1; }
+  done
+}
+
+test_W4_write_records_relative_roots_absolute() {
+  # A relative root given to manifest_write is anchored at
+  # the caller's cwd, as relocate does (L5), so the manifest validates. An
+  # absolute root is recorded exactly as given, symlink and all.
+  local base="$_WI_TMP/w4"
+  mkdir -p "$base/foo-ai/.workspace" "$base/foo" "$base/real-ai/.workspace"
+  ( cd "$base" && "$WI_BIN" manifest_write foo-ai ./foo personal 2>/dev/null ) || {
+    echo "    write with relative roots failed"; return 1; }
+  local m="$base/foo-ai/.workspace/pairing.json"
+  assert_eq "$(cd "$base/foo-ai" && pwd -P)" "$(jq -r .ai_workspace.root "$m")" "ai root anchored" || return 1
+  assert_eq "$(cd "$base/foo" && pwd -P)" "$(jq -r .canonical.root "$m")" "canonical root anchored" || return 1
+  "$WI_BIN" manifest_validate "$base/foo-ai" 2>/dev/null || { echo "    written manifest does not validate"; return 1; }
+  ln -s "$base/real-ai" "$base/link-ai"
+  "$WI_BIN" manifest_write "$base/link-ai" "$base/foo" personal 2>/dev/null || {
+    echo "    control write failed"; return 1; }
+  assert_eq "$base/link-ai" "$(jq -r .ai_workspace.root "$base/real-ai/.workspace/pairing.json")" \
+    "absolute root recorded as given" || return 1
 }
 
 wi_test_run test_L1_relocate_rewrites_ai_root_preserves_everything_else
@@ -1082,5 +1177,9 @@ wi_test_run test_V6_validate_rejects_unusable_values
 wi_test_run test_V7_validate_well_known_paths_are_absolute_templates
 wi_test_run test_W1_write_temp_file_is_not_predictable
 wi_test_run test_W2_write_keeps_the_umask_mode
+wi_test_run test_W3_write_refuses_a_raced_temp_name
+wi_test_run test_L10_relocate_refuses_a_raced_temp_name
+wi_test_run test_V8_validate_rejects_relative_roots
+wi_test_run test_W4_write_records_relative_roots_absolute
 
 wi_test_summary

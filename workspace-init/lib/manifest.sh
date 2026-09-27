@@ -240,6 +240,14 @@ wi_manifest_write() {
     wi_log_error "wi_manifest_write: ai_root not a directory: $ai_root"
     return 1
   fi
+  # The roots are recorded as absolute paths: ${ai_workspace.root} and
+  # ${canonical.root} are substituted into absolute path templates, and a
+  # relative root would resolve against whatever cwd reads the manifest
+  # (wi_manifest_validate refuses one). A relative argument is anchored at $PWD
+  # here, as relocate does; an absolute one is recorded as given.
+  [[ "$ai_root" == /* ]] || ai_root="$(wi_resolve_root "$ai_root")"
+  [[ -z "$canonical_root" || "$canonical_root" == /* ]] \
+    || canonical_root="$(wi_resolve_root "$canonical_root")"
 
   local ai_name canonical_name
   ai_name="$(basename "$ai_root")"
@@ -262,13 +270,14 @@ wi_manifest_write() {
   }
 
   # Build via `jq -n`. Tmp-then-mv for atomicity, under an unpredictable temp
-  # name (wi_mktemp_beside, #582).
+  # name, created and written through one descriptor (wi_write_new, #582). The
+  # temp file gets the mode a plain redirect gave pairing.json.
   local tmp
-  if ! tmp="$(wi_mktemp_beside "$manifest")"; then
-    wi_log_error "wi_manifest_write: could not create a temp file beside $manifest"
+  if ! tmp="$(wi_tmpname_beside "$manifest")"; then
+    wi_log_error "wi_manifest_write: could not name a temp file beside $manifest"
     return 1
   fi
-  if ! jq -n \
+  if ! wi_write_new "$tmp" "" jq -n \
       --arg schema_version           "$WI_MANIFEST_SCHEMA_VERSION" \
       --arg ai_root                  "$ai_root" \
       --arg ai_name                  "$ai_name" \
@@ -356,18 +365,11 @@ wi_manifest_write() {
          created_at: $created_at,
          created_by: $created_by
        }
-       | (if .tooling_repo == null then del(.tooling_repo) else . end)' > "$tmp" 2>/dev/null; then
+       | (if .tooling_repo == null then del(.tooling_repo) else . end)' 2>/dev/null; then
     rm -f "$tmp"
-    wi_log_error "wi_manifest_write: jq failed building manifest at $manifest"
+    wi_log_error "wi_manifest_write: could not create $tmp, or jq failed building manifest at $manifest"
     return 1
   fi
-  # The mode a plain redirect gave pairing.json, set only now that it is
-  # written (wi_mktemp_beside).
-  chmod "$(wi_umask_file_mode)" "$tmp" 2>/dev/null || {
-    rm -f "$tmp"
-    wi_log_error "wi_manifest_write: could not set the mode of $tmp"
-    return 1
-  }
 
   mv "$tmp" "$manifest" || {
     wi_log_error "wi_manifest_write: failed to mv tmp to $manifest"
@@ -495,32 +497,22 @@ wi_manifest_relocate() {
   ai_name="$(basename "$ai_root")"
   [[ -z "$canonical_root" ]] || cn_name="$(basename "$canonical_root")"
 
-  # Build the replacement in a copy of the original (cp -p), so the rename
-  # keeps the manifest's mode rather than the caller's umask: a 0600 manifest
-  # stays 0600. The redirect below truncates the copy but keeps its mode.
-  # The temp name must not be predictable: a ${manifest}.tmp.$$ name lets
-  # anyone who can write the directory plant a symlink there first, which cp
-  # and the redirect would follow (overwriting its target) and the rename
-  # would then install as pairing.json. mktemp creates the file exclusively
-  # under a random name; cp -p then copies the mode onto that regular file.
-  local tmp
-  if ! tmp="$(mktemp "${manifest}.tmp.XXXXXX" 2>/dev/null)"; then
-    wi_log_error "wi_manifest_relocate: could not create a temp file beside $manifest"
+  # Build the replacement under an unpredictable temp name, created with the
+  # manifest's own mode rather than the caller's umask — a 0600 manifest stays
+  # 0600, and a read-only 0444 one stays 0444 though it is still written through
+  # the descriptor that created it — and written only through that descriptor,
+  # so a symlink planted or swapped in beside pairing.json cannot redirect the
+  # write, and the rename cannot install one (wi_write_new, #582).
+  local tmp mode
+  if ! mode="$(wi_file_mode "$manifest")"; then
+    wi_log_error "wi_manifest_relocate: could not read the mode of $manifest"
     return 1
   fi
-  if ! cp -p "$manifest" "$tmp" 2>/dev/null; then
-    rm -f "$tmp"
-    wi_log_error "wi_manifest_relocate: could not stage a copy of $manifest"
+  if ! tmp="$(wi_tmpname_beside "$manifest")"; then
+    wi_log_error "wi_manifest_relocate: could not name a temp file beside $manifest"
     return 1
   fi
-  # A read-only manifest (0444) gives the copy no owner-write bit, and the
-  # redirect would fail. Open the copy for the rewrite, and take the bit away
-  # again afterwards if the original did not have it. `find -perm` is the
-  # POSIX way to read one mode bit on both GNU and BSD.
-  local owner_ro=0
-  [[ -n "$(find "$manifest" -prune -perm -u=w 2>/dev/null)" ]] || owner_ro=1
-  chmod u+w "$tmp" 2>/dev/null
-  if ! jq \
+  if ! wi_write_new "$tmp" "$mode" jq \
       --arg ai_root   "$ai_root" \
       --arg ai_name   "$ai_name" \
       --arg cn_root   "$canonical_root" \
@@ -530,14 +522,9 @@ wi_manifest_relocate() {
        | if $cn_root != "" then
            .canonical.root = $cn_root | .canonical.name = $cn_name
          else . end' \
-      "$manifest" > "$tmp" 2>/dev/null; then
+      "$manifest" 2>/dev/null; then
     rm -f "$tmp"
-    wi_log_error "wi_manifest_relocate: jq failed rewriting $manifest"
-    return 1
-  fi
-  if (( owner_ro )) && ! chmod u-w "$tmp" 2>/dev/null; then
-    rm -f "$tmp"
-    wi_log_error "wi_manifest_relocate: could not restore the read-only mode of $manifest"
+    wi_log_error "wi_manifest_relocate: could not create $tmp, or jq failed rewriting $manifest"
     return 1
   fi
   mv "$tmp" "$manifest" || {
@@ -860,19 +847,27 @@ wi_manifest_validate() {
 
   # Values, now that every type is known (#582). A string of the right type can
   # still be unusable: an empty root or name leaves ${canonical.root} unresolved
-  # and consumers read it as missing, an empty well-known path names no file,
+  # and consumers read it as missing, a relative root makes every template built
+  # on it resolve against the reader's cwd, an empty well-known path names no file,
   # and a routing selector outside the two roots wi_manifest_resolve knows is
   # interpolated as ${<selector>.root} and used as a destination unresolved.
   local bad_values
   if ! bad_values="$(jq -r '
     def nonempty($path):
       if getpath($path) == "" then "\($path | join(".")) (must not be empty)" else empty end;
+    def absroot($path):
+      getpath($path) as $v
+      | if $v == "" then "\($path | join(".")) (must not be empty)"
+        elif ($v | startswith("/") | not)
+        then "\($path | join(".")) (must be an absolute path, is \($v | tojson))"
+        else empty end;
     [
-      ((["ai_workspace","root"], ["ai_workspace","name"],
-        ["canonical","root"], ["canonical","name"], ["canonical","default_branch"])
+      ((["ai_workspace","root"], ["canonical","root"]) as $p | absroot($p)),
+      ((["ai_workspace","name"], ["canonical","name"], ["canonical","default_branch"])
          as $p | nonempty($p)),
       (if has("tooling_repo") then
-         ((["tooling_repo","root"], ["tooling_repo","name"]) as $p | nonempty($p))
+         (["tooling_repo","root"] as $p | absroot($p)),
+         (["tooling_repo","name"] as $p | nonempty($p))
        else empty end),
       (if (.well_known_paths | type) == "object" then
          ((.well_known_paths | keys[] | ["well_known_paths", .]) as $p | nonempty($p)),

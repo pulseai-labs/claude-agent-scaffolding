@@ -1221,9 +1221,32 @@ test_T1_install_temp_file_is_not_predictable() {
   _wi_trace_filter_is_our_hook "$hook" || { echo "    the installed hook is not ours"; return 1; }
 }
 
+test_T3_install_refuses_a_raced_temp_name() {
+  # Codex on #605: the fresh temp file swapped for a
+  # symlink between its creation and the render (the stubbed mktemp always
+  # wins that race). The install must be refused, the link's target and the
+  # installed hook left alone.
+  local d; d="$(wi_tmpdir)"; mkdir -p "$d"
+  local ai="$d/foo-ai" cn="$d/foo" victim="$d/victim" p
+  mkdir -p "$ai/.workspace" "$cn"
+  git -C "$cn" init -q 2>/dev/null
+  "$WI_BIN" manifest_write "$ai" "$cn" personal >/dev/null 2>&1 || return 1
+  "$WI_BIN" trace_filter_install "$ai" "$cn" >/dev/null 2>&1 || return 1
+  local hook="$cn/.git/hooks/commit-msg"
+  cp "$hook" "$d/before"
+  printf 'VICTIM\n' > "$victim"
+  p="$(wi_race_mktemp_path "$d/bin" "$victim")"
+  if PATH="$p" "$WI_BIN" trace_filter_install "$ai" "$cn" 2>/dev/null; then
+    echo "    install succeeded through a raced temp name"; return 1; fi
+  assert_eq "VICTIM" "$(cat "$victim")" "raced symlink's target untouched" || return 1
+  cmp -s "$d/before" "$hook" || { echo "    the installed hook changed"; return 1; }
+  ls "$cn/.git/hooks" | grep -q '\.tmp\.' && { echo "    install left the temp name behind"; return 1; }
+  return 0
+}
+
 test_T2_install_keeps_the_umask_mode() {
-  # mktemp creates 0600; the hook must keep the mode a
-  # plain redirect plus chmod +x gave it before #582 (+x is umask-masked too);
+  # The hook must keep the mode a plain redirect plus
+  # chmod +x gave it before #582 (+x is umask-masked too);
   # under 0277 the render must still succeed and leave 0500.
   local d; d="$(wi_tmpdir)"; mkdir -p "$d"
   local ai="$d/foo-ai" cn="$d/foo" mask want
@@ -1347,5 +1370,6 @@ wi_test_run test_D2_scenario_c_skill_documents_foreign_hook_refusal
 # Unpredictable temp names (#582)
 wi_test_run test_T1_install_temp_file_is_not_predictable
 wi_test_run test_T2_install_keeps_the_umask_mode
+wi_test_run test_T3_install_refuses_a_raced_temp_name
 
 wi_test_summary
