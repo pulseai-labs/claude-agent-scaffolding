@@ -154,13 +154,15 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      model confirmed exactly as `paseo-mechanics.md`'s The seat launch requires
      and by the worker's own check, before the first fix task; a mismatch is a
      failed launch to ask about, never to work around. The delegated review ran
-     once, on the head it was briefed with, and that seat is
-     released after its report file validates. Each push moves the head under
-     that verdict: before the next disposition round,
+     once, on the head it was briefed with; that seat is retained through the fix
+     rounds and released once the review is final, never mid-flight. Each
+     push moves the head under that verdict: before the next disposition round,
      re-fetch the GitHub review signals and the thread state on the new head —
      the bots review every push where they are installed, so the current-head
      verdict is read there; where none is, the reviewer seat is re-dispatched
-     over the fix range. A post-disposition finding returns through a blocking
+     over the fix range — a fresh seat from its REVIEWER row on a resumed dispatch
+     whose reviewer is gone, still one scoped delta re-review, never a second full
+     review. A post-disposition finding returns through a blocking
      question to the top before any seat acts on it, never fixed by you or
      silently deferred. Relay ONE batched summary per round;
      STOPPING_RULE decides when fixing stops, counting the fix rounds
@@ -169,7 +171,8 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      is the top's explicit assignment, not something you infer — never parse
      permission settings, never probe by attempting a merge. On `session`: on
      the reply, re-fetch the whole gate set once more and
-     merge bound to the named SHA, as a merge commit. On `operator`: your ask
+     merge bound to the named SHA, as a merge commit, confirming `MERGED` at it
+     rather than a scheduled auto-merge (lifecycle.md step 12). On `operator`: your ask
      names the operator as executor, the approved SHA and the merge-commit
      convention; on the reply you re-fetch the gates, the operator's landing
      is a merge commit on that same SHA — never a squash or rebase — and you

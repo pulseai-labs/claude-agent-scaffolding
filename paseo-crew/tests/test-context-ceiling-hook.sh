@@ -401,10 +401,25 @@ tail_line="{\"type\":\"user\",\"pad\":\"$tail_pad\"}"
 run "$(input UserPromptSubmit "$TMP/deep-tail.jsonl")"
 expect_notice "the latest assistant record predates the whole tail: unavailable notice" \
   UserPromptSubmit "figure unavailable (no assistant record in the last"
-{ printf '%s\n' 'e_tokens":1}}}'; user_line; assistant_line m_ok 10 90 523014; printf '%s\n' '{not json'; } \
-  > "$TMP/garbled.jsonl"
-run "$(input UserPromptSubmit "$TMP/garbled.jsonl")"
-expect_notice "unparseable lines around a valid record: the figure is still read" UserPromptSubmit "context 523114"
+# Position decides the verdict, so each side of the record gets its own case.
+# BEFORE the record: exactly the shape `tail -c` cuts, and the figure reads.
+{ printf '%s\n' 'e_tokens":1}}}'; user_line; assistant_line m_ok 10 90 523014; } \
+  > "$TMP/garbled-before.jsonl"
+run "$(input UserPromptSubmit "$TMP/garbled-before.jsonl")"
+expect_notice "an unparseable line before the record: the figure is still read" UserPromptSubmit "context 523114"
+# AFTER it: the line may be a newer record mid-write, so the older figure must not
+# be passed off as the current one — the check reports itself unread instead.
+{ user_line; assistant_line m_ok 10 90 523014; printf '%s\n' '{not json'; } \
+  > "$TMP/garbled-after.jsonl"
+run "$(input UserPromptSubmit "$TMP/garbled-after.jsonl")"
+expect_notice "unparseable content newer than the record: unavailable notice" \
+  UserPromptSubmit "figure unavailable (unparseable content newer"
+# A WHITESPACE-ONLY line is not content: it carries no record, so it stays the
+# silent-tolerance side of the same rule rather than turning the figure unavailable.
+{ user_line; assistant_line m_ok 10 90 523014; printf '%s\n' ''; } \
+  > "$TMP/blank-tail.jsonl"
+run "$(input UserPromptSubmit "$TMP/blank-tail.jsonl")"
+expect_notice "a blank tail line is not unparseable content" UserPromptSubmit "context 523114"
 # The PATH-stripped fixtures: each removes exactly the binary its case is about,
 # and nothing else. NOJQ keeps cat and tail (#516b's path — with jq absent the
 # input is read as text); NOTAIL keeps jq, wc and tr (fix round 1: the tail

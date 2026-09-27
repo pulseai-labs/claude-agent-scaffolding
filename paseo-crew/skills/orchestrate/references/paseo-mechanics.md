@@ -35,10 +35,13 @@ segment, never Paseo's encoded string, which no worker can be expected to echo:
 
 1. **Placement.** A seat that works in the orchestrator's tree runs in the orchestrator's
    workspace: omit `workspaceId`. A seat that needs its own worktree gets a workspace from
-   `create_workspace` with `isolation: "worktree"`, `path: <the source repo>`, `branchName`
-   and an explicit `baseBranch: origin/main`, never an implied base (Paseo's ref rule). A
-   seat in an existing tree gets `isolation: "local"` with that `path`. In the dual-repo case
-   an implementer in a canonical worktree is a `worktree` workspace whose `path` is the
+   `create_workspace` with `isolation: "worktree"`, `path: <the source repo>` and the mode
+   its PLACEMENT needs: `branch-off` with `branchName` and an explicit `baseBranch: origin/main`
+   for a new branch off the run's base, never an implied base (Paseo's ref rule);
+   `checkout-branch` with `branch` for one that works an existing branch; `checkout-pr` with
+   `prNumber` for one that works a PR's head — the reviewer's step-8 worktree. A seat in an
+   existing tree gets `isolation: "local"` with that `path`. In the dual-repo case an
+   implementer in a canonical worktree is a `worktree` workspace whose `path` is the
    canonical checkout.
 2. **Create.** `create_agent` with `title: "<seat label>"`, the materialised profile,
    `workspaceId` where step 1 made one, `labels: {"paseo-crew.run": "<run id>",
@@ -65,7 +68,10 @@ keeps is placed outside every seat's worktree, so archiving a workspace never ta
 The worker writes everything it says to the orchestrator there (a plan, a question, an
 escalation, a late finding, its report) and replaces the file whole (`briefs.md`). Before
 every message that sends a seat to work, note the file's hash (`git hash-object <path>`,
-empty if absent) and its identity (inode or mtime).
+empty if absent) and its identity — the inode, which a replacement always changes, because
+writing a temp file and renaming it over the path mints a new one. Never `mtime` alone:
+an atomic replacement inside the filesystem's timestamp granularity can hold both the old
+hash and the old `mtime`.
 Both are compared, not merely recorded, so a byte-identical replacement (a retained verifier
 repeating the same failure, a blocker restated after a clarification) still wakes the wait:
 same hash, new identity.
@@ -117,8 +123,12 @@ done
   `permission`, `error` and `budget` remain.
   Coordinator seats (a spine or work-PR session, a lane driver with subagents) are armed
   that way from the start, because their idle is not a finish.
-- `error`: on `error`, re-send the last message once on the same seat, with one fresh wait
-  whose `error` exit arms only once `Status` has left `error`; a second `error` escalates.
+- `error`: read the seat's activity and its durable artifacts first — `error` does not say
+  that nothing landed. A dispatch that may have mutated anything (a commit, a push, a PR, a
+  close) is never replayed: send a recovery instruction that names what already exists, or
+  escalate. Only a dispatch that cannot have mutated is re-sent once on the same seat, with
+  one fresh wait whose `error` exit arms only once `Status` has left `error`; a second
+  `error` escalates.
   On `closed` the seat is gone: escalate, with no retry.
 - `budget`: send one status request and arm one wait whose budget is a short grace, counted
   from that request. If the grace expires with no report, `cancel_agent`, record the seat's
@@ -226,8 +236,12 @@ orchestrator:
    Both variables are unset because `paseo run` inside an agent reads its caller from them
    and makes the new agent that caller's child.
 3. **Verify** that the launch returned an agent id, then with `paseo inspect <new id> --json`
-   that `Status` is neither `error` nor `closed` and `ParentAgentId` is `null` (a non-null
-   parent is a tree, its successor already resuming). Any failure takes one branch:
+   that `Status` is `idle` or `running` — an `initializing` launch is polled until it settles,
+   bounded — and `ParentAgentId` is `null` (a non-null parent is a tree, its successor already
+   resuming). A launch that settles on `error` or `closed`, or is still `initializing` when the
+   bound expires, is a failure: a successor that dies before it arms its own waits leaves the
+   run with none.
+   Any failure takes one branch:
    `cancel_agent` then `archive_agent` the successor if one was created (it holds no seats
    yet); re-arm this session's own waits and a fresh heartbeat from the handoff it just
    wrote; report the failed launch to the operator; and remain the orchestrator.

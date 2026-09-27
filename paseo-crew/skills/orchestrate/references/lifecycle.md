@@ -112,8 +112,11 @@ Every command's syntax comes from Paseo's own `paseo` skill.
    disposition baseline like any other, so a repository whose bot does not review a push still
    reaches a complete signal on the head it asks about. Every finding returned in the report file
    as file, line, severity, claim. The reviewer posts nothing to GitHub and edits
-   nothing, so that file is the sole copy of the review. Release the reviewer only
-   after its report file validates — findings lines present in the stated schema, or
+   nothing, so that file is the sole copy of the review. It is retained while its PR can
+   still move — a fix push that needs the delta re-review goes to the same seat, never to a
+   new one — and released once the review is final: every fix range it could be needed for
+   revalidated, and no further fix push pending. Its report file must validate
+   before release — findings lines present in the stated schema, or
    `Findings: none` on a clean review, with the reviewed head equal to the PR head; on
    a malformed report, send one bounded correction request
    before release.
@@ -152,7 +155,8 @@ Every command's syntax comes from Paseo's own `paseo` skill.
 12. **Merge gate.** Fetch the full gate set against `--repo <owner/repo>` for the head
     SHA immediately before asking: `isDraft`, `mergeable`, `mergeStateStatus`, every
     relevant check-run and status context — all must be successful — the unresolved
-    threads, and the non-thread signals of review bodies and PR conversation comments,
+    threads, `autoMergeRequest` null (nothing already scheduled to land this head),
+    and the non-thread signals of review bodies and PR conversation comments,
     which are clean when every finding in them has a terminal state recorded in the
     disposition comment (step 10).
     Ask only when every one is clean: a non-mergeable state is surfaced to the operator
@@ -162,7 +166,11 @@ Every command's syntax comes from Paseo's own `paseo` skill.
     SHA: re-fetch the same full gate set for that SHA once more, then
     `gh pr merge <number> --repo <owner/repo> --merge --match-head-commit <sha>` —
     the orchestrator often sits outside the PR's repository, so every
-    read and the merge name the repo. The read and merge are two
+    read and the merge name the repo. On a branch governed by a merge queue a command
+    that finds required checks still pending does not refuse: it enables auto-merge,
+    which would land later with no revalidation — so confirm `MERGED` at the named SHA
+    right after the command, and on anything else `gh pr merge --disable-auto` it and
+    return to step 10. The read and merge are two
     operations — a signal can still land between them: the ruleset
     requires conversation resolution, GitHub refuses the merge while any thread
     is open, and a refusal returns to step 10, never a retry. Then
@@ -228,7 +236,7 @@ seat ever has two waiters and one report wakes one orchestrator: **stand down
 first** — kill this session's armed background waits and `delete_heartbeat`, and
 take no further dispatch action. **Launch the successor as `paseo-mechanics.md`'s
 Handoff states: detached, in this session's workspace, its resume as the launch
-prompt, verified started and parentless.** A failed launch is cancelled and archived
+prompt, verified settled and parentless.** A failed launch is cancelled and archived
 where one was created; this session re-arms its own waits and a fresh heartbeat from
 the handoff it just wrote, reports the failed launch to the operator, and remains the
 orchestrator. The run file's `run.orchestrator` block still names

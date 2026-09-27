@@ -1526,8 +1526,15 @@ pin "$PRBRIEFS_MD" 'ONE bounded correction request' \
 # R3-2 reverts to exactly-once: the reviewer template and lifecycle step 8 forbid a
 # second review, so a compliant reviewer would refuse. Staleness is answered by
 # re-fetching GitHub's own signals, which the bots regenerate on every push.
-pin "$PRBRIEFS_MD" 'released after its report file validates' \
-  "the delegated review runs once and its seat is released"
+# #608 review round 1: the seat those signals do not cover is re-dispatched over the
+# fix range, so it cannot have been released when its first report validated — it is
+# retained through the fix rounds and released once the review is final.
+pin "$PRBRIEFS_MD" 'that seat is retained through the fix' \
+  "the delegated reviewer is retained for the scoped delta re-review"
+pin "$PRBRIEFS_MD" 'a fresh seat from its REVIEWER row on a resumed dispatch' \
+  "a resumed dispatch with no live reviewer launches one for the delta"
+pin "$LIFECYCLE_MD" 'a fix push that needs the delta re-review goes to the same seat' \
+  "lifecycle.md retains the reviewer for the fix range too"
 pin "$PRBRIEFS_MD" 're-fetch the GitHub review signals' \
   "each new head is covered by re-fetching the signals, not by a second review"
 # N8/#467: the work-PR session's seats get the #455 teardown — release what it
@@ -1631,6 +1638,15 @@ pin "$PRBRIEFS_MD" 'REVIEW_LEVEL=' \
   "the work-PR brief injects the decided review level"
 pin "$PRBRIEFS_MD" 'merge bound to the named SHA' \
   "the work-PR session merges bound to the SHA the top relayed"
+# #608 review round 1: `gh pr merge` on a merge-queue branch ENABLES AUTO-MERGE when
+# required checks are still pending — the command that was assumed to refuse does
+# not, and the later landing bypasses the gate this step just re-fetched.
+pin "$LIFECYCLE_MD" 'autoMergeRequest` null' \
+  "the gate set refuses a head already scheduled to land"
+pin "$LIFECYCLE_MD" '`gh pr merge --disable-auto`' \
+  "an auto-merge a pending-checks merge scheduled is cancelled, never adopted"
+pin "$PRBRIEFS_MD" 'rather than a scheduled auto-merge' \
+  "the work-PR session confirms MERGED, not a queued auto-merge"
 pin "$PRBRIEFS_MD" 'never a squash or rebase' \
   "the operator merge path is bound to the merge-commit convention too"
 pin "$LIFECYCLE_MD" 'dispatch a work-PR session' \
@@ -1880,7 +1896,11 @@ budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
 # ask.", "You did not open this PR.", "on the head it was briefed with", and "where
 # it says the operator, you mean the top, through your report file" put back — no
 # other change moved its line count.
-budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget" 202
+# #608 review round 1 (2026-09-27): raised from 202 to 205, exactly the 3 lines the
+# reviewer's retention took — the seat is retained for the fix range's delta
+# re-review and a resumed dispatch launches one, and the work-PR merge confirms
+# `MERGED` rather than a scheduled auto-merge.
+budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget" 205
 # R16 (2026-09-27, fix round 1, issues 2 and 3): ossify-briefs.md's budget is raised
 # from 200 to 205, exactly the 5 lines restoring the item seat's placement ("in the
 # worktree ossify prepared for the item"), "with the verifier's summary", "a second

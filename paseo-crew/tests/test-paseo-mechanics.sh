@@ -19,7 +19,12 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # DISPATCHED_AT rules (I3, I6, I7, M1, M2) and the handoff's resume prompt, launch
 # verify and stand-down wakes (C1, I2, I4).
 # 2026-09-27: raised from 242 by 2. I7 residual: operator-latency on permission answers.
-REF_BUDGET=244
+# 2026-09-27, #608 review round 1: raised from 244 by 14, exactly the lines four
+# findings needed and no others — the worktree mode/ref trio (a reviewer is at a PR
+# head, which `baseBranch` cannot name), the report identity as the inode (mtime can
+# hold across a replacement), the error retry's no-replay rule, and the successor
+# check's settled status (error|closed alone let `initializing` pass).
+REF_BUDGET=258
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -41,6 +46,10 @@ for v in 'create_agent' 'create_workspace' 'paseo inspect <id> --json' 'list_pro
   present "$REF" "$v" "the launch names $v"
 done
 present "$REF" 'baseBranch: origin/main' "a worktree seat names its base explicitly"
+# A hard-coded base is only right for the seat that branches off it: a reviewer's
+# worktree is at a PR's head, which `baseBranch` cannot express (#608 review, round 1).
+present "$REF" '`checkout-pr` with' "a PR-head seat names its own ref"
+present "$REF" '`checkout-branch` with `branch`' "an existing-branch seat names its branch"
 pin "$REF" 'The orchestrator never runs `paseo run` for a worker' "paseo run is reserved for the handoff"
 
 section "D2: the report file is the finish"
@@ -56,7 +65,12 @@ pin "$REF" 'gone without having exited' "the heartbeat re-arms only a lost wait"
 pin "$REF" 'with the `idle` exit dropped' "a false wake drops the idle exit"
 pin "$REF" 'Coordinator seats' "coordinators are armed without the idle exit"
 pin "$REF" 'Both are compared, not merely recorded' "hash and identity are both compared"
-pin "$REF" 'inode or mtime' "the identity is defined once" flat
+# The identity must change on every replacement: a rename mints a new inode, while
+# `mtime` can hold across one inside its timestamp granularity (#608 review, round 1).
+pin "$REF" 'Never `mtime` alone' "the identity is the inode, never mtime alone" flat
+# An `error` retry that replays a dispatch which may have mutated repeats its side
+# effects — a commit, a push, a PR, a close (#608 review, round 1).
+pin "$REF" 'is never replayed' "a dispatch that may have mutated is not replayed" flat
 # Controls: `paseo wait` returns on the first idle (F2), so it must never be the finish.
 c="$(occurrences "$REF" 'paseo wait')"
 if [ "$c" -le 1 ]; then pass "paseo wait is at most named as the thing not to use ($c)"
@@ -65,6 +79,9 @@ else fail "paseo wait is not a completion primitive" "$c occurrences"; fi
 section "D3: the detached handoff"
 pin "$REF" 'env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d' "the successor launch unsets both caller variables"
 pin "$REF" '`ParentAgentId` is `null`' "the successor is verified parentless"
+# Only error|closed rejected `initializing`, so a successor that died during startup
+# left the run with no waiter at all (#608 review, round 1).
+pin "$REF" '`Status` is `idle` or `running`' "a successor still initializing is not a success" flat
 pin "$REF" '`cancel_agent` then `archive_agent` the successor if one was created' "a failed successor launch (parented, errored or no id) is cancelled and archived"
 pin "$REF" 're-arm this session'"'"'s own waits and a fresh heartbeat' "after a parented launch this session re-arms and stays the orchestrator"
 pin "$REF" 'Never archive a predecessor while a subagent in its workspace runs' "the no-archive rule survives"

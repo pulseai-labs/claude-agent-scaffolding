@@ -217,9 +217,14 @@ fi
 # One jq pass over the tail classifies it: "figure <n>" (the latest assistant
 # record's usage summed), "nousage" (that record's usage is not a readable
 # object carrying all three counters — an older record's figure is never
-# substituted), "none" (no assistant record and every line parses) or "partial"
-# (no assistant record readable — a malformed or truncated tail cannot be told
-# from a lost record).
+# substituted), "stale" (an unparseable line sits AFTER the latest parseable
+# assistant record, so a newer figure may exist unread — the older figure is
+# never passed off as the current one), "none" (no assistant record and every
+# line parses) or "partial" (no assistant record readable — a malformed or
+# truncated tail cannot be told from a lost record). A whitespace-only line is
+# not unparseable content: it carries no record. A malformed line BEFORE the
+# record the figure comes from is tolerated — the `tail -c` cut opens on a
+# half line by construction.
 #
 # The tail's own status is the verdict's business, and the pipeline is the only
 # place it can be read: without pipefail the substitution reports jq's status, so
@@ -231,10 +236,21 @@ fi
 set -o pipefail
 verdict="$(tail -c "$TAIL_BYTES" "$transcript" 2>/dev/null | jq -Rrn '
   [inputs] as $lines
-  | ([$lines[] | fromjson?]) as $parsed
-  | ([$parsed[] | select(.type? == "assistant" and .isSidechain? != true)]) as $a
+  | [ range(0; ($lines | length)) as $i
+      | ($lines[$i] | try {ok: fromjson} catch {bad: true}) as $r
+      | {i: $i, raw: $lines[$i], ok: ($r | has("ok")), record: ($r.ok // null)} ] as $rows
+  | ([$rows[] | select(.ok and .record.type? == "assistant"
+                       and .record.isSidechain? != true)]) as $a
   | if ($a | length) > 0 then
-      (try ($a[-1].message.usage) catch null) as $u
+      ($a[-1].i) as $last
+      # Position is the whole point: unparseable text that may be NEWER than the
+      # record the figure would come from ("stale") is not the same case as
+      # unparseable text before it, which the tail cut explains.
+      | if ([$rows[] | select((.ok | not) and .i > $last
+                               and ((.raw | test("^\\s*$")) | not))] | length) > 0
+        then "stale"
+        else
+      (try ($a[-1].record.message.usage) catch null) as $u
       # Every one of the three counters must be present as a number. Reading
       # them with `// 0` turned an absent or renamed counter into a real figure
       # of zero — below any ceiling, so the check passed in silence. A usage
@@ -246,7 +262,8 @@ verdict="$(tail -c "$TAIL_BYTES" "$transcript" 2>/dev/null | jq -Rrn '
            and ($u.cache_read_input_tokens | type) == "number"
         then "figure \($u.input_tokens + $u.cache_creation_input_tokens + $u.cache_read_input_tokens)"
         else "nousage" end
-    elif ($parsed | length) < ($lines | length) then "partial"
+        end
+    elif ([$rows[] | select(.ok | not)] | length) > 0 then "partial"
     else "none" end' 2>/dev/null)"
 tail_status=$?
 set +o pipefail
@@ -257,6 +274,7 @@ fi
 case "$verdict" in
   figure\ *) figure="${verdict#figure }" ;;
   nousage) unavailable "$event" "no readable usage in the latest assistant record"; exit 0 ;;
+  stale) unavailable "$event" "unparseable content newer than the last assistant record"; exit 0 ;;
   none)
     # The tail is the whole transcript only when the file fits in it; a longer
     # transcript may have put its latest assistant record before the tail. The
