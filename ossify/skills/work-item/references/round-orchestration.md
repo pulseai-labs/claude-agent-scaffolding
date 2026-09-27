@@ -448,6 +448,14 @@ DAG guarantees the items do not depend on each other *logically*; it says
 nothing about two of them touching the same file, which is what serial merges
 onto one spine branch protect against.
 
+**The barrier is not an intake point.** A spine's work items are fixed once its
+first round has started (`plan-spine` SKILL.md §2). A request that arrives while
+the rounds run — from the operator, another project, or a review — goes to the
+intake queue (`plan-spine/references/intake-and-ledger.md` §1) or to
+`/ossify:patch`. It never becomes a work item, an AC or a round here, however
+small. The one change a running spine takes is its own demo-line amendments
+(`plan-spine` SKILL.md §8e), unchanged.
+
 **When the final round clears this barrier, the spine is ready for
 `/close <spine-id>`.** That is where this lane ends — hand the baton over
 explicitly rather than stopping silently.
@@ -486,6 +494,8 @@ contract. The honest statement is that the judgment half is uncovered.
 - **Counting iterations in the worker**, or expecting it to (§6).
 - **Pre-placing `report.md`** (§4).
 - **Starting round *K+1* with an `active` item behind you** (§7).
+- **Adding a work item or an AC at the barrier** for a request that arrived
+  mid-spine (§7).
 - **Committing inside the worktree yourself.** The implementer stages; the
   work-item close layer commits, after its gate. A commit here is a commit that
   skipped the gate.

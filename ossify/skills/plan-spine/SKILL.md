@@ -56,6 +56,9 @@ implementer dispatch, verification, and merge belong to the execution engine
   abandoned`) and re-declares the halves at plan-release. Never both on one spine.
   The withdrawal is enforced rather than declared: `work_item_status <wi-id>
   abandoned` is refused (rc 7) on a dispatched, `complete` or `active` item (§1).
+- **A request for a spine whose first round has started** (an item `active` or
+  `complete`): its items are fixed — the request goes to the intake queue or
+  `/ossify:patch` (`references/intake-and-ledger.md` §1). §7 fix-ups are unchanged.
 
 ---
 
@@ -460,6 +463,8 @@ one — never pick for the user, never infer a spine from a name when the id mis
   claims product value** in the exit criteria or contributes a `user:` line.
 - **Recording a demo line you intend to fix later.** The ledger is cumulative; a
   bad line is re-run at every future close.
+- **Adding a work item to a spine whose first round has started** for a request
+  that arrived after it did. Intake queue or `/ossify:patch` (§2).
 - **Deleting a demo line.** Supersede or retire it with a reason; archived, never
   deleted (§8e).
 - **Reading `"$oss_bin" touch_check`'s exit code backwards**, or folding its rc 2 into
