@@ -21,7 +21,7 @@ SEAT_EXPECTED_MODEL is a failed launch to report, not to work around.
 PLACEMENT: <abs path of the worktree the spine's lane ran from>.
 
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>
+SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>
@@ -81,7 +81,7 @@ report, not to work around.
 PLACEMENT: REPO_ROOT — the worktree holding this PR's branch.
 
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>
+SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>

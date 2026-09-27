@@ -45,7 +45,7 @@ The agent-entry fields of the earlier crews map like this:
 | earlier field | paseo-crew source |
 |---|---|
 | `command:` | the materialised `create_agent` call — nothing to type |
-| `expected_model:` | the profile's `model`, or the default id `paseo-mechanics.md` reads for one that has none |
+| `expected_model:` | the profile's `model`, or the default id `paseo-mechanics.md` reads for one that has none; a brief carries only its model segment (`paseo-mechanics.md`'s The seat launch) |
 | `effort:` | the profile's `thinkingOptionId`, or `(provider default)` |
 | `can:` | a `can:` sentence in the profile's `notes` — every draco-desk profile's notes already state it |
 | `note:` | the rest of the profile's `notes` |
@@ -69,7 +69,7 @@ A resolved profile renders as one row wherever it travels:
 
 | field | set by | consumed at | travels |
 |---|---|---|---|
-| profile id | the project file's Agent column | the seat label, the brief's `SEAT_PROFILE` | every resolved profile |
+| profile id | the project file's Agent column | the seat label, the brief's `SEAT_PROFILE` (`SPINE_PROFILE` in the spine brief) | every resolved profile |
 | `provider` / `model` | the profile | the launch, the model check | every resolved profile |
 | `modeId` | the profile | the launch | every resolved profile |
 | `thinkingOptionId` | the profile | the launch | every resolved profile |

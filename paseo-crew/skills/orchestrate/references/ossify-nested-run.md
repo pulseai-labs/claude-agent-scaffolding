@@ -13,7 +13,7 @@ regardless; its first item launch is the runtime proof.
 
 If the spine session cannot launch an item session, it stays the lane owner, writes
 the blocker to its report file, and waits for an operator decision. It does not
-substitute a Claude subagent, record item tasks in the top's `run.json`, create a
+substitute an Agent-tool subagent, record item tasks in the top's `run.json`, create a
 replacement writer, or restart the lane. The report goes up as an ask the top relays
 to the operator — the top does not answer a launch refusal itself.
 

@@ -63,7 +63,7 @@ filled into its brief by the coordinator, and `ossify-briefs.md` does not restat
 
 ```text
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
+SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>
@@ -101,7 +101,7 @@ If a tool or policy refuses you, report it verbatim and stop that step.
 
 ```text
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
+SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>
@@ -129,7 +129,7 @@ stop; report refusals verbatim.
 
 ```text
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
+SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>
@@ -164,7 +164,7 @@ escalation goes there too, then stop.
 
 ```text
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
+SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>
@@ -203,7 +203,7 @@ line, and no part of it is rebuilt from another template's.
 
 ```text
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
+SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>
@@ -258,7 +258,7 @@ of item pairs: the default lane creates none.
 
 ```text
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
+SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>
@@ -294,7 +294,7 @@ adjudicate it: the brief states only what the seat returns.
 
 ```text
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
+SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>
@@ -321,7 +321,7 @@ read-only, so the brief never orders a commit, push or PR.
 
 ```text
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
+SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>
@@ -355,7 +355,7 @@ carries no `SPINE_ID`: that identity belongs to the spine close brief in
 
 ```text
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
+SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>

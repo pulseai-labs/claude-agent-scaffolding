@@ -31,7 +31,7 @@ this sequence:
 list_profiles                                   # resolve the seat's profile
 create_workspace   (only for a worktree seat)   # isolation: worktree, baseBranch: origin/main
 create_agent       title "seat: <role> (<profile>)", the materialised profile, initialPrompt <brief>
-paseo inspect <id> --json                       # Model equals the profile's model, before anything else
+paseo inspect <id> --json                       # Model equals the expected model's full id, before anything else
 ```
 
 `references/paseo-mechanics.md` holds the full sequence. This file states only the role

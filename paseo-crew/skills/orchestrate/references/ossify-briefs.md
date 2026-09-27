@@ -22,7 +22,7 @@ running in your first reply, then continue.
 PLACEMENT: <abs path of the repo or worktree the lane runs from>.
 
 SPINE_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SPINE_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
+SPINE_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SPINE_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>
@@ -52,12 +52,12 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      with `dagr check --strict` before it replaces the file.
   3. Invoke `/ossify:run-spine $SPINE_ID --external-executor`. On each round's
      execution requests, launch a fresh IMPLEMENTER seat per item from its SEATS row, verbatim,
-     as your own subagent in the worktree ossify prepared for the item, exactly as
-     `paseo-mechanics.md`'s The seat launch states (an existing tree), its model
-     confirmed by that section's step 3 and by the worker's own check; the effort is the
-     given launch argument. The verifier is created at step 5. A row that is missing or
-     ambiguous halts that launch and asks; only a top reply carrying replacement rows
-     moves the block.
+     as your own subagent (a Paseo seat, never an Agent-tool subagent) in the worktree ossify
+     prepared for the item, exactly as `paseo-mechanics.md`'s The seat launch states (an
+     existing tree), its model confirmed by that section's step 3 and by the worker's own
+     check; the effort is the given launch argument. The verifier is created at step 5. A row
+     that is missing or ambiguous halts that launch and asks; only a top reply carrying
+     replacement rows moves the block.
   4. Gather the round's implementation plans, each read from its implementer's
      report file, into ONE ordered relay to the top, and wait. Send each
      implementer the top's decision for its item before any edit starts.
@@ -98,7 +98,7 @@ return — one report must wake one session. Never stop mid-round.
 The spine is at its final round barrier when you finish; the close ceremony is the
 top's, in a fresh close session that is never this session.
 
-NEVER: record an item task in the top's run.json; run a Claude subagent for a work item;
+NEVER: record an item task in the top's run.json; run an Agent-tool subagent for a work item;
 fall back to the default lane when an item launch fails; restart the lane; select the
 reviewer; run `/ossify:close` at all — the top dispatches it to a fresh close session.
 If no item session will launch, stay alive, report that, and wait for the operator's decision.
@@ -116,7 +116,7 @@ running in your first reply, then continue.
 PLACEMENT: worktree <abs path>, branch <branch>, base <base-branch>. Use git -C
 for every git command; cd does not persist.
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<the model paseo-mechanics.md's The seat launch names as this seat's expected model>; if the model you are running is not it, that is a failed launch — report it and stop
+SEAT_EXPECTED_MODEL=<this seat's expected model as paseo-mechanics.md's The seat launch states it: the model segment, never Paseo's encoded id>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>
@@ -161,7 +161,7 @@ ROLE: verifier for <work-item-id>, read-only, in worktree <abs path>, at the acc
 `head_oid`, staged tree `tree_oid`. State the model you are running; SEAT_EXPECTED_MODEL below is the
 value to match — a mismatch is a failed launch to report and stop.
 SEAT_PROFILE=<profile id> | <provider>/<model> | mode: <modeId> | thinking: <thinkingOptionId>
-SEAT_EXPECTED_MODEL=<this item's SEATS row names it — fill this line; a coordinator never sends it blank>
+SEAT_EXPECTED_MODEL=<the model segment of the model this item's SEATS row names, as paseo-mechanics.md's The seat launch states it — fill this line; a coordinator never sends it blank>
 SEAT_EFFORT=<the profile's thinkingOptionId, or (provider default)>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
 TIME_BUDGET=<the duration this dispatch is budgeted, from paseo-mechanics.md's Completion>

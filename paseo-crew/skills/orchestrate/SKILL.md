@@ -182,7 +182,8 @@ These cases are named because they look like clashes and are not:
   session's subagent.
 - **A seat is undefined or its agent is missing** (the seat name is neither a Paseo
   profile nor a `kind: dsh-spine-driver` entry, or `paseo inspect` shows a model other
-  than the profile's): report it to the operator and stop that dispatch. Never
+  than the expected model, `references/paseo-mechanics.md`'s The seat launch): report it
+  to the operator and stop that dispatch. Never
   substitute a guessed provider/model.
 - **A worker refuses on policy:** report the refusal verbatim. Do not retry it around, and
   do not rephrase the brief to slip past it.
