@@ -84,6 +84,9 @@ jobs:
       - name: herdr-crew suite
         run: bash herdr-crew/run-tests.sh
 
+      - name: paseo-crew suite
+        run: bash paseo-crew/run-tests.sh
+
       - name: dsh-crew suite
         run: bash dsh-crew/run-tests.sh
 
@@ -112,6 +115,11 @@ jobs:
       - name: merge-bar template parity (repo-root)
         # ossify's fallback PR-body template must match merge-bar's (ossify 1.13.0).
         run: bash tests/test-merge-bar-template-parity.sh
+
+      - name: paseo-crew parity pins (repo-root)
+        # paseo-crew's verbatim copies of herdr-crew (fidelity pins, dsh-driver.md)
+        # and ossify (the eval library), plus the manifest description restatement.
+        run: bash tests/test-paseo-crew-parity.sh
 
       - name: OpenCode runtime adapter unit suite
         run: node --test tests/test-opencode-runtime-adapter.mjs
