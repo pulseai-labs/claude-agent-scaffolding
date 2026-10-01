@@ -59,7 +59,7 @@ Name the repo the fix goes into and the paths it will touch. Then:
   refuse it as §1's large arm. On rc 2, say so and ask the operator before going on.
   These are the paths you expect to touch; before §5 opens the PR, run the check
   again on the paths the fix actually changed
-  (`git diff --name-only "<remote>/<default-branch>...HEAD"`), and treat a new hit
+  (`git diff --name-only "origin/<default-branch>...HEAD"`), and treat a new hit
   exactly as above.
 
 ## 3. Fix it — by kind
@@ -92,9 +92,9 @@ Cut `fix/<plugin-or-project>-<version>`, where `<version>` is the patch version
 this will ship as, from the **freshly fetched** default branch, in a **clean**
 checkout. If the repo's checkout is parked on a spine or work-item branch, or is
 dirty, do not switch it or stash it — a running spine owns it. Cut the branch in
-a separate worktree. `origin` in this skill's blocks stands for the repo's remote:
-read `git -C "<repo-root>" remote`, and where it is named otherwise, use that name
-in every fetch, push and `<remote>/<default-branch>` ref.
+a separate worktree. This lane, like merge-bar, expects the repo's remote to be
+named `origin`: if `git -C "<repo-root>" remote` lists no `origin`, say so and stop
+before cutting anything — the remedy is the operator's (add or rename the remote).
 
 ```bash
 git -C "<repo-root>" fetch origin "<default-branch>"
