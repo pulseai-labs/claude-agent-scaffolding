@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.1
+
+The `context_ceiling` setting and the hook now agree on what a valid one is (#611). The manifest's
+option schema says `type: number`, but the hook accepted a string of decimal digits alone and
+silently replaced anything else with the 500000 default — so a value written `100000.5`, or the
+exponent form a number past 1e21 renders as, never warned at the threshold the operator chose. The
+hook now reads the setting through jq's own number parser, which is the parser the rest of the hook
+already trusts: any number of 1 or more is the ceiling, a spelling that is not a number and any
+value below the schema's `min: 1` are the default the option's description names, and the
+comparison is jq's, so a fractional ceiling takes effect at the next whole token (100000.5 fires at
+100001) and an exponent form is compared rather than dropped. The notice quotes the number in force
+in jq's own rendering rather than the raw setting.
+
 ## 0.1.0
 
 First release: herdr-crew 0.2.1's orchestrator/worker session model, ported onto Paseo 0.9.2.

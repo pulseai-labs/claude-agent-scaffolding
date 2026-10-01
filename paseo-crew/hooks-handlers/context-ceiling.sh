@@ -24,9 +24,25 @@ set +e
 DEFAULT_CEILING=500000
 TAIL_BYTES=4000000    # the latest assistant record sits in the transcript's tail
 
-ceiling="${CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING:-}"
-case "$ceiling" in ''|*[!0-9]*) ceiling=$DEFAULT_CEILING ;; esac
-[ "$ceiling" -ge 1 ] || ceiling=$DEFAULT_CEILING    # the manifest's min is 1; 0 fires on every prompt
+# The ceiling is the manifest's `context_ceiling` option, and the two ends have to agree on what a
+# valid one is (#611). The manifest states the widest thing its schema can — `type: number, min: 1`;
+# Claude Code 2.1.284's option schema is `z(["string","number","boolean","directory","file"])` on a
+# strict object, so a manifest cannot say "integer" — and a hook is handed `String(value)` of the
+# stored number. `100000.5` therefore arrives as that text, `1e+21` as the exponent form `String()`
+# switches to past 1e21, and `Infinity` for a literal past 1e308, where the digits-only guard this
+# replaces dropped all three to the default in silence, at the threshold the operator chose.
+#
+# What a ceiling IS is jq's answer, not a case pattern's — the same number parser the rest of this
+# hook already trusts, used twice: once below to decide the setting, and once at the comparison that
+# reads it. A grammar of our own would be a second statement of the schema, kept in step with it by
+# hand and read by nobody else; jq's parser reads every spelling `String()` can emit, and the value it
+# produces is the one the comparison uses.
+#
+# Two variables, because the two jobs differ: `ceiling_raw` is the setting as it arrived, and
+# `ceiling` is the number in force — what the notices print and what the comparison compares against.
+ceiling_raw="${CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING:-}"
+ceiling="$ceiling_raw"
+[ -n "$ceiling" ] || ceiling=$DEFAULT_CEILING    # no option, nothing to parse: the default is the ceiling
 
 input="$(cat)"
 
@@ -54,7 +70,9 @@ case "$input" in    # fast path: most Bash calls are not Paseo new-work commands
   *) new_work "$input" || exit 0 ;;
 esac
 
-# say <event> <line> — every caller passes a line with no double quote or backslash.
+# say <event> <line> — every caller passes a line with no double quote or backslash. The ceiling in
+# a line is jq's rendering of the number in force, or the default — never the raw setting, whose own
+# text may carry anything.
 say() {
   printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"%s"}}\n' "$1" "$2"
 }
@@ -84,10 +102,35 @@ event_in_raw() {
 }
 
 if ! command -v jq >/dev/null 2>&1; then
-  # Without jq there is no figure to read on either event, so both are told.
+  # Without jq there is no figure to read on either event, so both are told. The ceiling quoted is
+  # the setting as written, unparsed: no jq is no comparison either, and the notice says the truth
+  # about what happened — this figure was not checked against it.
   event="$(event_in_raw "$input")"
   [ -n "$event" ] && unavailable "$event" "jq not found"
   exit 0
+fi
+
+# The option's verdict, before any notice can quote a ceiling: `tonumber?` is jq's own number
+# parser, the schema's `min: 1` is the lower bound, and `tostring` of the number in force is what
+# the notices print. That text is jq's rendering — for every setting an operator writes in decimal
+# it is the text they wrote, and for an exponent form it is jq's spelling of the same number — so a
+# quote, a backslash or a newline cannot reach a line this hook prints as JSON: the raw setting never
+# is printed, and jq's rendering of a number carries none of the three.
+#
+# A refused spelling and a value below 1 are the same answer, the default, which is what the
+# option's description tells the operator. `Infinity` needs no arm of its own: jq reads it as the
+# largest double it can hold, which is above every figure a transcript can carry, so the comparison
+# below is silent — which is that value's verdict exactly.
+#
+# This is one jq spawn on the armed paths, and it is deliberately not folded into the field pass
+# below: that pass reads the hook payload, its fields' emptiness is already three verdicts, and the
+# raw path a failed jq takes — where this setting still has to be quoted — has no fields at all.
+if [ -n "$ceiling_raw" ]; then
+  ceiling="$(jq -nr --arg s "$ceiling_raw" --argjson d "$DEFAULT_CEILING" '
+    ($s | tonumber?) as $c
+    | if ($c | type) == "number" and $c >= 1 then ($c | tostring)
+      else ($d | tostring) end' 2>/dev/null)"
+  [ -n "$ceiling" ] || ceiling=$DEFAULT_CEILING    # a jq that failed leaves a ceiling standing
 fi
 
 # One jq pass reads the three fields the verdicts need — the event, the
@@ -297,6 +340,11 @@ case "$figure" in
   ''|*[!0-9]*) unavailable "$event" "no readable usage in the latest assistant record"; exit 0 ;;
 esac
 
-[ "$figure" -ge "$ceiling" ] || exit 0
+# jq compares, and bash does not: the ceiling may be a fraction — `100000.5` fires at the next whole
+# token, which is the exact `figure >= ceiling` for a whole-number figure, not a floor — or an
+# exponent form, which `-ge` would refuse outright rather than compare. `false` and a ceiling jq
+# cannot parse are the same verdict here, silence, and for the largest value jq holds that verdict is
+# the exact one: no figure reaches it.
+[ "$(jq -n --arg f "$figure" --arg c "$ceiling" '($f | tonumber) >= ($c | tonumber)' 2>/dev/null)" = true ] || exit 0
 say "$event" "paseo-crew: context $figure >= ceiling $ceiling tokens. Finish the unit in hand and start no new one; a coordinator seat rotates at its next boundary (paseo-crew lifecycle.md, Rotation past the context ceiling)."
 exit 0
