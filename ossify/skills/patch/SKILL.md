@@ -31,7 +31,7 @@ the same `--repo`.
 |---|---|
 | A **defect in shipped behaviour** — a released version does something its docs, its tests or its users rely on it not doing | **here** — §3's defect arm |
 | A **small request from another project that it cannot fake** — one work item's worth, the yardstick `plan-spine` §4 uses, and no admissible glue on the requester's side (`plan-spine/references/fake-ledger-discipline.md` §1) | **here** — §3's request arm |
-| A **large** can't-fake request — more than one work item | **refuse** → plan a spine for it now: `/ossify:plan-spine` (after `/ossify:plan-release` if no release is open) |
+| A **large** can't-fake request — more than one work item | **refuse** → plan a spine for it now: `/ossify:plan-release` first (amend the open release, or plan one), which creates the spine, then `/ossify:plan-spine` on that spine's id |
 | A request the requester **can** fake, or **new scope** with no defect behind it | **refuse** → the intake queue, an issue labelled `from:<requesting project>` (`plan-spine/references/intake-and-ledger.md` §1). The project's own idea, with no requester, goes on the feature map at the next `/ossify:plan-release` |
 | A change **nothing observes** — a typo, a comment, a formatter run | **refuse** → close's direct-commit patch lane (`close/references/patch-lane.md`); it needs no version |
 
@@ -115,7 +115,9 @@ Commit following the repository's own rules for commit text (its `CLAUDE.md`,
 **Where the `merge-bar` plugin is installed** — this session lists its
 `opening-a-pr` and `working-a-pr` skills — open the PR with `opening-a-pr` and
 work it with `working-a-pr` (on Claude Code, `/merge-bar:open-pr` and
-`/merge-bar:work-pr`; Codex publishes the skills, not the commands).
+`/merge-bar:work-pr`; Codex publishes the skills, not the commands). Run both from
+the patch worktree, `<new-worktree-path>` — they read the current directory's
+branch and `HEAD`, so never from a checkout a spine is parked on.
 
 **Otherwise**, write the six-field body from ossify's copy of that template,
 `references/work-pr/pr-body.md` at the plugin root: its headings in order, and
