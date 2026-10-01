@@ -384,6 +384,14 @@ $repo:$merge_sha"
         || { echo "close: $repo's local spine tip ($pre) advanced past what PR #$pr_num contains - push the branch and update the PR, or re-open - halt"; exit 1; }
       echo "close: $repo already has PR #$pr_num for $spine_branch - not re-pushing, not re-opening"
     else
+      # merge-bar's fields load per repo, so each PR carries only its own
+      # repo's Known limits - and BEFORE the push, so a missing file halts
+      # with nothing published.
+      pr_fields=""
+      if [ -n "${pr_fields_dir:-}" ]; then
+        pr_fields="$(cat "$pr_fields_dir/$repo")" \
+          || { echo "close: no merge-bar fields file for $repo in $pr_fields_dir - write it or unset pr_fields_dir - halt"; exit 1; }
+      fi
       git -C "$repo_root" push -u "$remote_name" "$spine_branch" \
         || { echo "close: cannot push '$spine_branch' to '$remote_name' in $repo - halt"; exit 1; }
       # The body carries the pushed tip: the lineage guard's durable input.
@@ -393,13 +401,7 @@ $repo:$merge_sha"
       # which after a resume or a work-pr loop is not necessarily the spine's.
       # merge-bar's six fields, when composed, go AFTER these two lines: the
       # record pass reads the first `pushed-tip:` line. `:+` keeps an unset
-      # $pr_fields legal under `set -u`. Loaded per repo, so each PR carries
-      # only its own repo's Known limits.
-      pr_fields=""
-      if [ -n "${pr_fields_dir:-}" ]; then
-        pr_fields="$(cat "$pr_fields_dir/$repo")" \
-          || { echo "close: no merge-bar fields file for $repo in $pr_fields_dir - write it or unset pr_fields_dir - halt"; exit 1; }
-      fi
+      # $pr_fields legal under `set -u`; it was loaded before the push.
       pr_body="spine close $spine_id -> $base_branch in $repo
 pushed-tip: $pre${pr_fields:+
 

@@ -699,5 +699,16 @@ _wa="$(awk '/worktree add -b/{print NR; exit}' "$_PS")"
 _r=1; if [ -n "$_gh" ] && [ -n "$_wa" ] && [ "$_gh" -lt "$_wa" ]; then _r=0; fi
 _pin "$_r" "patch/SKILL.md §4 does not require a GitHub origin before the cut (check ${_gh:-none}, cut ${_wa:-none}) - a non-GitHub origin fails only at the PR step, after the commit"
 
+# #619 round 1 - three review findings, each pinned red before its fix.
+# (1b) release-close: patch discovery skips a filesystem-only root (no git, so no patch).
+_r=1; grep -Fq 'skip a root that is not a git repository' "$_RC" && _r=0
+_pin "$_r" "release-close.md's patch discovery runs git/gh against filesystem-only roots - release close fails on a supported topology"
+# (1c) patch §2: the final-diff path list keeps a rename's old path.
+_r=1; grep -Fq 'git diff --no-renames --name-only' "$_PS" && _r=0
+_pin "$_r" "patch/SKILL.md §2's final-diff list drops a renamed file's old path - its ledger line goes undispositioned"
+# (6b) patch §4: every origin push URL is checked, not only the fetch URL.
+_r=1; grep -Fq 'remote get-url --push --all origin' "$_PS" && _r=0
+_pin "$_r" "patch/SKILL.md §4 checks only origin's fetch URL - a non-GitHub pushurl passes"
+
 rm -rf "$_PC_TMP"
 t_summary

@@ -59,7 +59,8 @@ Name the repo the fix goes into and the paths it will touch. Then:
   refuse it as §1's large arm. On rc 2, say so and ask the operator before going on.
 
 These are the paths you expect to touch. Before §5 opens the PR, take the paths the
-fix actually changed (`git diff --name-only "origin/<default-branch>...HEAD"`),
+fix actually changed (`git diff --no-renames --name-only "origin/<default-branch>...HEAD"`,
+so a renamed file lists its old path as well as its new one),
 re-read the ledger lines overlapping the changed paths, and run `touch_check` on them
 again on an ossify project. Treat a new line or a new hit exactly as above.
 
@@ -97,7 +98,10 @@ a separate worktree. This lane, like merge-bar, expects the repo's remote to be
 named `origin` and to be on GitHub, because §5's PR and §6's tag go through `gh`.
 If `git -C "<repo-root>" remote` lists no `origin`, or
 `gh repo view "$(git -C "<repo-root>" remote get-url origin)" --json nameWithOwner`
-does not resolve it, say so and stop before cutting anything. The remedy is the
+does not resolve it, say so and stop before cutting anything. Push URLs can
+differ from the fetch URL, so run the same `gh repo view` on every URL
+`git -C "<repo-root>" remote get-url --push --all origin` prints, and stop the same
+way unless each resolves to the same repository as the fetch URL. The remedy is the
 operator's: add or rename the remote, or land the fix by hand outside this lane.
 
 ```bash

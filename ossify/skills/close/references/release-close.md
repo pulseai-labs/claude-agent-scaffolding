@@ -312,7 +312,10 @@ exists to make.
 writes none. Read every non-AI repo the resolved topology declares — the declared
 repos `references/boundary-audit.md` §2 enumerates, each resolved with
 `"$oss_bin" repo_root <repo>` — not only the repos this release's spines
-landed in: a patch can ship in a repo no spine touched. In each, fetch the tags
+landed in: a patch can ship in a repo no spine touched. Determine each root's
+shape as that §2 does, and skip a root that is not a git repository (its
+filesystem-only policy): it holds no tags and no PRs, so no patch. In each git
+repo, fetch the tags
 first — `git -C "<repo-root>" fetch --tags <remote>`, so a tag pushed from another
 clone is counted — then list the tags created since
 the release opened (its `created_at`:

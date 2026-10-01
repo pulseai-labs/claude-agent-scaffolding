@@ -1299,6 +1299,8 @@ t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SH
 t_assert_rc 1 "P1c: a missing per-repo fields file halts the close"
 t_assert_contains "$T_OUT" "no merge-bar fields file for canonical" "P1c: ...naming the repo whose file is missing"
 t_assert_eq 0 "$( [ -f "$PR_STATE/create_args" ] && echo 1 || echo 0 )" "P1c: ...and no PR is opened"
+t_assert_eq 0 "$(git --git-dir="$PR_ORIGIN" rev-parse --verify -q "refs/heads/$PR_BRANCH" >/dev/null && echo 1 || echo 0)" \
+  "P1c: ...and the spine branch never reaches origin - the halt has no remote side effect"
 
 # P2. THE THIRD LEG (A1): gh cannot operate on the remote — fail closed. The
 # probe runs before any push, and the halt never falls through to a local merge.
