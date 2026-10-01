@@ -7,7 +7,7 @@
     "context_ceiling": {
       "type": "number",
       "title": "Context ceiling (tokens)",
-      "description": "Past this many tokens of context, a paseo-crew coordinator seat (the top, a spine session, a work-PR session) is told to finish the unit in hand, start no new one and rotate at its next boundary. Any number of 1 or more is taken as the ceiling: a context figure is a whole number of tokens, so a fractional setting takes effect at the next whole token (100000.5 fires at 100001). A value below 1, or one that is not a number, is ignored and 500000 applies. 500000 is half a 1M window.",
+      "description": "Past this many tokens of context, a paseo-crew coordinator seat (the top, a spine session, a work-PR session) is told to finish the unit in hand, start no new one and rotate at its next boundary. Any JSON number of 1 or more is taken as the ceiling: a context figure is a whole number of tokens, so a fractional setting takes effect at the next whole token (100000.5 fires at 100001). A value below 1, or a spelling that is not a JSON number, is ignored and 500000 applies. 500000 is half a 1M window.",
       "default": 500000,
       "min": 1
     }

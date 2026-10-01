@@ -218,7 +218,7 @@ Don't run `/grill-me` and `/council` in the same session — different interacti
 ├── herdr-crew/                        # herdr-crew plugin (v0.2.1)
 ├── dsh-crew/                          # dsh-crew plugin (v0.3.1)
 ├── merge-bar/                         # merge-bar plugin (v0.1.0)
-├── paseo-crew/                        # paseo-crew plugin (v0.1.0)
+├── paseo-crew/                        # paseo-crew plugin (v0.1.1)
 ├── docs/
 │   ├── SPEC-ai-mentor.md              # ai-mentor spec (v1.1 amendments)
 │   ├── SPEC-scaffold.md               # scaffold spec (v1.0 amendments)

@@ -181,9 +181,9 @@ traffic out of the top's.
 One fail-open hook, gated on `PASEO_AGENT_ID`, tells a seat in a Paseo agent its own
 context figure once it reaches the `context_ceiling` setting (default 500000 tokens):
 finish the unit in hand and start no new one, and a coordinator seat rotates at the next
-boundary. Any number of 1 or more is taken as the ceiling, and a context figure is a whole
+boundary. Any JSON number of 1 or more is taken as the ceiling, and a context figure is a whole
 number of tokens, so a fractional setting takes effect at the next whole token — 100000.5
-fires at 100001 — while a value below 1, or one that is not a number, is ignored and the
+fires at 100001 — while a value below 1, or a spelling that is not a JSON number, is ignored and the
 default applies. It never allows, denies or asks, it is inert outside a Paseo agent, and it
 reports the figure as unavailable rather than guessing when it cannot read it. The
 rotation itself is prose, in `references/lifecycle.md`. That hook is the only
