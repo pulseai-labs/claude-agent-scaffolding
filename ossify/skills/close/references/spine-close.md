@@ -187,9 +187,8 @@ The two facts this step needs are not in state and are recovered, not guessed:
   every downstream step then reports green.
 
 **The PR body, when merge-bar is installed.** Where this session lists the
-`merge-bar` plugin's `working-a-pr` skill, compose the six fields once, before the
-pass, into `$pr_fields` — hoisted like `$repo_base_branches`, one text for every
-hosting repo — from the template in the plugin root's
+`merge-bar` plugin's `working-a-pr` skill, compose the six fields before the
+pass, **one file per hosting repo**, from the template in the plugin root's
 `references/work-pr/pr-body.md`: its headings in order and its Merge bar block word
 for word, so the bar exists before the first review.
 
@@ -197,18 +196,24 @@ for word, so the bar exists before the first review.
 - **Scope** — each hosting repo and the paths its share touches
   (`git -C "<repo-root>" diff --stat "<base>...<spine-branch>"`), and what the
   spine deliberately leaves alone.
-- **Known limits** — the spine's fakes still `active`, and the ledger lines its
-  planning left accepted, each with its reason.
+- **Known limits** — that repo's only: the spine's fakes still `active` and the
+  ledger lines its planning left accepted that sit on that repo's paths, each
+  with its reason. merge-bar writes each PR's limits to the ledger after its
+  merge, so a limit on two PRs lands twice. A limit that belongs to no one repo
+  goes on the first hosting repo's PR alone.
 - **Evidence** — the gates each work item's close ran, with their results;
   nothing that did not run.
 - **Closes** — `None.` The intake requests this spine pulled in are listed as
   `Refs <owner>/<repo>#<n>`, never `Closes`: they are closed after the landing is
   recorded (below the record pass), not by the first PR to merge.
 
-Write the fields to a file and load them with `pr_fields="$(cat "<fields-file>")"` —
-never as a quoted literal: the text routinely carries backticks, `$` and
+Claim, Evidence and Closes are the spine's and read the same in every file; Scope
+and Known limits are the repo's. Write each repo's fields to `<fields-dir>/<repo>`,
+named by the repo as `landing_repos` lists it, and set `pr_fields_dir` to that
+directory. The block loads the repo's file into `$pr_fields` per PR, with
+`cat` — never as a quoted literal: the text routinely carries backticks, `$` and
 apostrophes, which a shell assignment would run or break on. Without merge-bar,
-leave `$pr_fields` unset. The block appends it after the two
+leave `pr_fields_dir` unset. The block appends `$pr_fields` after the two
 lines the record pass reads — `spine close …` and `pushed-tip:` — never before
 them: the record pass takes the first `pushed-tip:` line as the lineage guard's
 input.
@@ -388,7 +393,13 @@ $repo:$merge_sha"
       # which after a resume or a work-pr loop is not necessarily the spine's.
       # merge-bar's six fields, when composed, go AFTER these two lines: the
       # record pass reads the first `pushed-tip:` line. `:+` keeps an unset
-      # $pr_fields legal under `set -u`.
+      # $pr_fields legal under `set -u`. Loaded per repo, so each PR carries
+      # only its own repo's Known limits.
+      pr_fields=""
+      if [ -n "${pr_fields_dir:-}" ]; then
+        pr_fields="$(cat "$pr_fields_dir/$repo")" \
+          || { echo "close: no merge-bar fields file for $repo in $pr_fields_dir - write it or unset pr_fields_dir - halt"; exit 1; }
+      fi
       pr_body="spine close $spine_id -> $base_branch in $repo
 pushed-tip: $pre${pr_fields:+
 

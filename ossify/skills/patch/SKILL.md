@@ -57,10 +57,11 @@ Name the repo the fix goes into and the paths it will touch. Then:
   required ACs of this patch. A `bone` hit is allowed only when the fix keeps the
   decision the bone's ADR records; a fix that changes that decision is a spine —
   refuse it as §1's large arm. On rc 2, say so and ask the operator before going on.
-  These are the paths you expect to touch; before §5 opens the PR, run the check
-  again on the paths the fix actually changed
-  (`git diff --name-only "origin/<default-branch>...HEAD"`), and treat a new hit
-  exactly as above.
+
+These are the paths you expect to touch. Before §5 opens the PR, take the paths the
+fix actually changed (`git diff --name-only "origin/<default-branch>...HEAD"`),
+re-read the ledger lines overlapping the changed paths, and run `touch_check` on them
+again on an ossify project. Treat a new line or a new hit exactly as above.
 
 ## 3. Fix it — by kind
 
@@ -93,8 +94,11 @@ this will ship as, from the **freshly fetched** default branch, in a **clean**
 checkout. If the repo's checkout is parked on a spine or work-item branch, or is
 dirty, do not switch it or stash it — a running spine owns it. Cut the branch in
 a separate worktree. This lane, like merge-bar, expects the repo's remote to be
-named `origin`: if `git -C "<repo-root>" remote` lists no `origin`, say so and stop
-before cutting anything — the remedy is the operator's (add or rename the remote).
+named `origin` and to be on GitHub, because §5's PR and §6's tag go through `gh`.
+If `git -C "<repo-root>" remote` lists no `origin`, or
+`gh repo view "$(git -C "<repo-root>" remote get-url origin)" --json nameWithOwner`
+does not resolve it, say so and stop before cutting anything. The remedy is the
+operator's: add or rename the remote, or land the fix by hand outside this lane.
 
 ```bash
 git -C "<repo-root>" fetch origin "<default-branch>"

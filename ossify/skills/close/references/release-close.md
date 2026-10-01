@@ -309,15 +309,20 @@ delivered rather than against what it promised — the one comparison the retro
 exists to make.
 
 **Patches shipped during the release come from git, not state** — `/ossify:patch`
-writes none. For each repo this release landed in, list the tags created since
+writes none. Read every non-AI repo the resolved topology declares — the declared
+repos `references/boundary-audit.md` §2 enumerates, each resolved with
+`"$oss_bin" repo_root <repo>` — not only the repos this release's spines
+landed in: a patch can ship in a repo no spine touched. In each, fetch the tags
+first — `git -C "<repo-root>" fetch --tags <remote>`, so a tag pushed from another
+clone is counted — then list the tags created since
 the release opened (its `created_at`:
 `"$oss_bin" get ".releases[] | select(.id==\"$rel\") | .created_at"`) with
 `git -C "<repo-root>" for-each-ref --sort=creatordate --format='%(creatordate:iso-strict) %(refname:short)' refs/tags`,
 and the merged PRs whose head branch starts `fix/` with
 `gh pr list --repo "<owner/repo>" --state merged --search "merged:>=<release-opened date>" --limit 1000 --json number,title,headRefName,mergedAt,url,closingIssuesReferences`.
 If that returns 1000 rows, raise the limit: a truncated list drops patches. A repo
-with no remote (spine close's local arm) has no PRs to list — skip the `gh` call
-there and read its tags alone. Read
+with no remote (spine close's local arm) has nothing to fetch and no PRs to
+list — skip the fetch and the `gh` call there and read its tags alone. Read
 both, and list each patch — its tag, its PR and the issues it closed — under the
 retrospective's "what shipped" and in the close summary (SKILL.md §10). A
 direct-commit patch-lane change (`references/patch-lane.md`) carries no version
