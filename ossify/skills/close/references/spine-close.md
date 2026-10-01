@@ -201,13 +201,9 @@ for word, so the bar exists before the first review.
   planning left accepted, each with its reason.
 - **Evidence** — the gates each work item's close ran, with their results;
   nothing that did not run.
-- **Closes** — one `Closes <owner>/<repo>#<n>` line per intake request this spine
-  pulled in, **only when the spine has one hosting repo with a PR**. With more than
-  one, the same text goes on every PR, and the first to merge would close each
-  request while the rest are still open: write those lines as
-  `Refs <owner>/<repo>#<n>` instead, and once pass two has recorded every hosting
-  repo's PR merged, close each request with
-  `gh issue close <n> --repo "<owner/repo>" --comment "<spine> landed: <PR URLs>"`.
+- **Closes** — `None.` The intake requests this spine pulled in are listed as
+  `Refs <owner>/<repo>#<n>`, never `Closes`: they are closed after the landing is
+  recorded (below the record pass), not by the first PR to merge.
 
 Write the fields to a file and load them with `pr_fields="$(cat "<fields-file>")"` —
 never as a quoted literal: the text routinely carries backticks, `$` and
@@ -587,6 +583,13 @@ done <<EOF
 $pr_lines
 EOF
 ```
+
+**Then close the intake requests this spine pulled in** — on every install, with
+or without merge-bar, and only once every hosting repo is recorded landed (pass
+one's local merges and the record pass above): for each,
+`gh issue close <n> --repo "<owner/repo>" --comment "<spine-id> landed: <PR URLs or merge SHAs>"`.
+No PR carries a `Closes` line for them: with several hosting repos, the first PR
+to merge would close a request while the rest are still open.
 
 **Resuming a halted spine close.** A halt at steps 4-11 leaves step 2's landing
 already done in **every** hosting repo. A halt **inside** step 2 is the other

@@ -32,7 +32,13 @@ requester.
 prints `1000`, raise the limit and list again. A truncated page drops requests
 silently. A closed issue is not in the queue.
 
-For each open request, record exactly one disposition:
+A request stays open until the spine that pulled it in lands, so the queue can
+return one an earlier planning already took. Read its comments
+(`gh issue view <n> --repo "<owner/repo>" --json comments`): one carrying a
+`pulled in — <spine or release id>` disposition is already assigned — list it as
+such, and never add it to the feature map or a spine again.
+
+For each other open request, record exactly one disposition:
 
 - **pulled in** — into this spine, as a named work item or an AC, only while the
   spine's first round has not started (SKILL.md §2). At release planning,
