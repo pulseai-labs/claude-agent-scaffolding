@@ -202,7 +202,12 @@ for word, so the bar exists before the first review.
 - **Evidence** — the gates each work item's close ran, with their results;
   nothing that did not run.
 - **Closes** — one `Closes <owner>/<repo>#<n>` line per intake request this spine
-  pulled in.
+  pulled in, **only when the spine has one hosting repo with a PR**. With more than
+  one, the same text goes on every PR, and the first to merge would close each
+  request while the rest are still open: write those lines as
+  `Refs <owner>/<repo>#<n>` instead, and once pass two has recorded every hosting
+  repo's PR merged, close each request with
+  `gh issue close <n> --repo "<owner/repo>" --comment "<spine> landed: <PR URLs>"`.
 
 Write the fields to a file and load them with `pr_fields="$(cat "<fields-file>")"` —
 never as a quoted literal: the text routinely carries backticks, `$` and
