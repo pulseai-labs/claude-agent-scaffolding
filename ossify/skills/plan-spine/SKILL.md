@@ -139,7 +139,7 @@ orphan worktrees; those are the `ossify:doctor` skill's, and invoking this skill
 not invoke it. Invoke `ossify:doctor` when you want them.
 **Then, before §4, read what arrived** since the release was planned — the intake
 queue and the tech-debt ledger lines on this spine's surface — and give each a
-disposition (`references/intake-and-ledger.md`).
+disposition (`references/intake-and-ledger.md`) — and again for any path §4 adds.
 
 ---
 

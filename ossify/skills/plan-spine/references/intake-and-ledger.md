@@ -82,7 +82,9 @@ grep -n -E '^- \[(KL|TD)\] ' "<ai-workspace>/.claude/memory-bank/tech-debt.md"
 
 The **surface** is what is being planned. At plan-spine pre-flight, it is the
 paths and areas the spine's release plan and feature entry name, plus any path
-§4's decomposition adds. For a patch, it is the files the fix will touch. A line
+§4's decomposition adds — the pre-flight read cannot see those yet, so read the
+ledger again for them before the decomposition is approved. For a patch, it is
+the files the fix will touch. A line
 **overlaps** when its `<area/path>` is one of those paths, a parent directory of
 one, or the same named area. Overlap is judgment; list only what overlaps — a line
 that does not overlap is not named at all, not even as skipped.
