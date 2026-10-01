@@ -113,8 +113,9 @@ Commit following the repository's own rules for commit text (its `CLAUDE.md`,
 ## 5. Open and work the PR
 
 **Where the `merge-bar` plugin is installed** — this session lists its
-`opening-a-pr` and `working-a-pr` skills — open the PR with `/merge-bar:open-pr`
-and work it with `/merge-bar:work-pr`.
+`opening-a-pr` and `working-a-pr` skills — open the PR with `opening-a-pr` and
+work it with `working-a-pr` (on Claude Code, `/merge-bar:open-pr` and
+`/merge-bar:work-pr`; Codex publishes the skills, not the commands).
 
 **Otherwise**, write the six-field body from ossify's copy of that template,
 `references/work-pr/pr-body.md` at the plugin root: its headings in order, and
