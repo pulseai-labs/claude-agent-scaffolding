@@ -19,8 +19,13 @@ release close finds them in git (`close/references/release-close.md` §6).
 
 ## 1. Is this a patch? Refuse the wrong lane, loudly, with the route
 
-Read the input — issue numbers (`gh issue view <n> --json number,title,body,labels,url`)
-or the described defect — and place it in exactly one lane:
+Read the input — issue numbers (`gh issue view <n> --repo "<owner/repo>" --json number,title,body,labels,url`)
+or the described defect — and place it in exactly one lane. An issue number belongs
+to the repo the fix goes into, so pass that repo explicitly: a bare `gh issue view`
+resolves against whatever checkout this session is in, which may be the AI
+workspace or another project. If the invocation does not say which repo, ask.
+Every later `gh` call on the issue (§3's AC comment, §6's adoption comment) uses
+the same `--repo`.
 
 | The work | Lane |
 |---|---|
@@ -52,6 +57,10 @@ Name the repo the fix goes into and the paths it will touch. Then:
   required ACs of this patch. A `bone` hit is allowed only when the fix keeps the
   decision the bone's ADR records; a fix that changes that decision is a spine —
   refuse it as §1's large arm. On rc 2, say so and ask the operator before going on.
+  These are the paths you expect to touch; before §5 opens the PR, run the check
+  again on the paths the fix actually changed
+  (`git diff --name-only "<remote>/<default-branch>...HEAD"`), and treat a new hit
+  exactly as above.
 
 ## 3. Fix it — by kind
 
@@ -83,7 +92,9 @@ Cut `fix/<plugin-or-project>-<version>`, where `<version>` is the patch version
 this will ship as, from the **freshly fetched** default branch, in a **clean**
 checkout. If the repo's checkout is parked on a spine or work-item branch, or is
 dirty, do not switch it or stash it — a running spine owns it. Cut the branch in
-a separate worktree:
+a separate worktree. `origin` in this skill's blocks stands for the repo's remote:
+read `git -C "<repo-root>" remote`, and where it is named otherwise, use that name
+in every fetch, push and `<remote>/<default-branch>` ref.
 
 ```bash
 git -C "<repo-root>" fetch origin "<default-branch>"
@@ -107,7 +118,9 @@ and work it with `/merge-bar:work-pr`.
 
 **Otherwise**, write the six-field body from ossify's copy of that template,
 `references/work-pr/pr-body.md` at the plugin root: its headings in order, and
-its Merge bar block word for word. Then open it:
+its Merge bar block word for word. Push the branch first —
+`git -C "<new-worktree-path>" push -u origin "fix/<plugin-or-project>-<version>"` —
+because `gh pr create --head` does no pushing of its own. Then open it:
 
 ```bash
 gh pr create --repo "<owner/repo>" --base "<default-branch>" --head "fix/<plugin-or-project>-<version>" --title "<title>" --body-file "<body-file>"
