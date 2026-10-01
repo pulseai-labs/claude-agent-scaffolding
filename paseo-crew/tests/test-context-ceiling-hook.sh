@@ -94,8 +94,12 @@ run() {
   for arg in "$@"; do
     case "$arg" in PASEO_AGENT_ID=*) agent="${arg#PASEO_AGENT_ID=}" ;; esac
   done
+  # stderr lands in $TMP/stderr rather than /dev/null: one case's evidence is the error channel
+  # (a comparison handed a value no arithmetic can compare raises there and nowhere else), and a
+  # file keeps that case's assertion inside this suite's one invocation shape. It is truncated by
+  # the redirection on every run, so a case reads its own handler's stderr and no other's.
   OUT="$(printf '%s' "$stdin" | env -u CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING \
-    PASEO_AGENT_ID="$agent" "$@" "$BASH_BIN" "$HOOK" 2>/dev/null)"
+    PASEO_AGENT_ID="$agent" "$@" "$BASH_BIN" "$HOOK" 2>"$TMP/stderr")"
   RC=$?
 }
 
@@ -569,6 +573,127 @@ run "$(input UserPromptSubmit "$T_BELOW")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=
 expect_silent "an empty setting falls back to 500000"
 run "$(input UserPromptSubmit "$T_BELOW")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=0
 expect_silent "a zero setting falls back to 500000"
+# #611. The manifest's schema says `type: number` and Claude Code hands a hook `String(value)` of
+# the stored number, so a fractional ceiling arrives as `100000.5` — and the digits-only guard this
+# replaces dropped it to the 500000 default, leaving the hook silent at the threshold the operator
+# chose. A context figure is a whole number of tokens, so the comparison is the exact
+# `figure >= ceiling`: a fractional ceiling takes effect at the next whole token.
+T_FRACTION="$(transcript s-fraction 100001)"
+run "$(input UserPromptSubmit "$T_FRACTION")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=100000.5
+expect_notice "a fractional setting fires at the next whole token (100000.5 at 100001)" \
+  UserPromptSubmit "context 100001" "ceiling 100000.5"
+# Its two adjacent controls. The first is the case a FLOOR would fail — floor(100000.5) is 100000,
+# which would fire a token early, and the issue asks for that choice to be deliberate. The second
+# shows the same fixture firing at the whole ceiling, so the silence above belongs to the fraction
+# and not to a figure that cannot reach a notice at all.
+T_ONE_BELOW="$(transcript s-one-below 100000)"
+run "$(input UserPromptSubmit "$T_ONE_BELOW")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=100000.5
+expect_silent "control: 100000.5 is not floored — one token below its next whole token is silent"
+run "$(input UserPromptSubmit "$T_ONE_BELOW")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=100000
+expect_notice "control: that same transcript fires at the whole ceiling 100000" \
+  UserPromptSubmit "context 100000" "ceiling 100000"
+# The schema's `min: 1` boundary, both sides of it (#615 F7). Exactly 1 is a ceiling, and the fixture
+# here is the one a ceiling of 1 fires on and the default does not — so a `>= 1` weakened to `> 1`
+# leaves the setting at the default and this case goes RED. Below 1 the setting is not a ceiling at
+# all, and the fixture is the one the default fires on, so the notice NAMING 500000 is what says the
+# fraction was refused: a `>= 1` weakened to `>= 0` names 0.999 here instead.
+run "$(input UserPromptSubmit "$T_FRACTION")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=1
+expect_notice "a setting of exactly the schema's min, 1, is a ceiling" \
+  UserPromptSubmit "ceiling 1 tokens"
+run "$(input UserPromptSubmit "$T600")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=0.999
+expect_notice "control: a setting just below 1 is the default" UserPromptSubmit "ceiling 500000"
+# Two more spellings the guard dropped, both of them `String()` output for a stored number this
+# large: the exponent form past 1e21, and `Infinity`, which a literal past 1e308 parses to. Each
+# sits above every figure a transcript can carry, so the verdict is silence — and that silence must
+# not be the handler tripping over the value on its way there. What the assertion below watches is
+# the handler's OWN error channel: bash's, raised by the integer arithmetic the setting used to be
+# handed. jq's stderr is not part of it — the handler redirects that itself, on every call.
+for setting in '1e+21' 'Infinity'; do
+  run "$(input UserPromptSubmit "$T_PAST")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING="$setting"
+  expect_silent "a setting above every figure is silent ($setting)"
+  if [ -s "$TMP/stderr" ]; then
+    fail "a setting above every figure raises nothing on stderr ($setting)" \
+      "stderr: $(cat "$TMP/stderr")"
+  else
+    pass "a setting above every figure raises nothing on stderr ($setting)"
+  fi
+done
+# Silence is the same verdict for a value that is honoured and one replaced by the default, so the
+# value being the one in force is pinned where a notice quotes the ceiling: 500000 is the default's
+# own text and the exponent form's is not.
+run "$(jq -cn '{session_id: "s", hook_event_name: "UserPromptSubmit", prompt: "p"}')" \
+  CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=1e+21
+expect_notice "an exponent-form setting is the ceiling in force, not the default" \
+  UserPromptSubmit "figure unavailable (hook input has no transcript_path)" "ceiling of 1"
+# And its spelling, accepted in either form jq's number printer has used for it: `1E+21` on 1.7.1 and
+# 1.8.1 here, and `1e+21` from the printer the finding that raised this names. Which of the two a
+# build prints is that build's business, and neither is asserted alone. The case does NOT ask jq what
+# to expect — an expectation derived from the tool under test is the verifier re-deriving its own
+# answer, which proves nothing about either (#615 F4). Its adjacent control is the assertion just
+# above: this case says which spelling, that one says a ceiling at all rather than the default.
+ctx_line="$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.additionalContext // ""' 2>/dev/null)"
+case "$ctx_line" in
+  *'ceiling of 1E+21 tokens'*|*'ceiling of 1e+21 tokens'*)
+    pass "the exponent form is quoted as an exponent, in either printer's spelling" ;;
+  *) fail "the exponent form is quoted as an exponent, in either printer's spelling" \
+       "line: $ctx_line" ;;
+esac
+# The widening's adjacent control (CLAUDE.md's testing discipline): the guard accepted digits alone
+# and now accepts a number, so what it must still refuse is pinned beside what it now accepts. Each
+# spelling is one careless step from an accepted one — `1e+` from `1e+21`, `1 000` from `1000` — or
+# below the schema's `min: 1`, and each is the 500000 the option's description names for them.
+#
+# The whitespace spellings and the two malformed decimals are the reason the accepted spelling is
+# stated in the handler rather than left to whichever jq is installed (#615 F3): measured, `tonumber`
+# reads `" 12 "`, `12 `, `12\t` and `12\n` on 1.7.1 where 1.8.1 refuses every one of them, and both
+# builds read `+5` and `1.` — none of which `String()` of a JSON number ever emits. This loop runs
+# under both builds and the verdict is the same on each, which is what the loop is here to hold.
+for setting in '0x10' '1 000' '1e+' '1.2.3' '100000.5.' 'nan' 'NaN' '-Infinity' '-5' '.5' \
+               '+5' '1.' '1_000' ' 12 ' '12 '; do
+  run "$(input UserPromptSubmit "$T600")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING="$setting"
+  expect_notice "a setting that is not a JSON number of 1 or more falls back to 500000: '$setting'" \
+    UserPromptSubmit "ceiling 500000"
+done
+# A trailing newline is the one whitespace form `^`/`$` anchors would let through — measured, `12\n`
+# matches `^…$` on both builds and `\A…\z` on neither — so this case is what holds the absolute
+# anchors in place. Its label carries the spelling rather than the byte: a raw newline in this
+# suite's output would break the one-line-per-case reading the rest of it keeps.
+run "$(input UserPromptSubmit "$T600")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=$'12\n'
+expect_notice "a setting with a trailing newline falls back to 500000" UserPromptSubmit "ceiling 500000"
+# The one path where the setting's parser cannot run at all: no jq, no figure either, and the notice
+# quotes the setting as written. Pinned because the value here is a fraction — the spelling that has
+# no meaning to a bash integer test — and the hook still has to say which ceiling went unchecked
+# rather than inventing one.
+run "$(input UserPromptSubmit "$T_PAST")" PATH="$NOJQ" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=100000.5
+expect_notice "without jq the setting is quoted as written" UserPromptSubmit \
+  "figure unavailable (jq not found)" "ceiling of 100000.5"
+# #615 F2: a jq that is present and FAILING is not a setting that is invalid, and the two must not be
+# confused. Nothing parsed this setting, so the notice names what the operator configured; the old
+# fallback said 500000 — a ceiling nobody set — and the case below is the adjacent control that keeps
+# the naming rule from becoming "print whatever arrived".
+run "$(input UserPromptSubmit "$T_PAST")" PATH="$BROKENJQ:$PATH" \
+  CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=100000.5
+expect_notice "a failing jq names the configured ceiling, not the default" UserPromptSubmit \
+  "figure unavailable (jq could not read the hook input)" "ceiling of 100000.5"
+run "$(input UserPromptSubmit "$T_PAST")" PATH="$BROKENJQ:$PATH" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=abc
+expect_notice "control: a failing jq names no ceiling at all for text that is not number-shaped" \
+  UserPromptSubmit "figure unavailable (jq could not read the hook input)" \
+  "no ceiling could be read from the setting"
+# #615 F1, the other half of that class: every path where jq cannot parse must still print valid JSON.
+# This setting carries the three characters that would break the notice's own template — a double
+# quote, a backslash and a newline — so the handler must name no ceiling rather than splice them in.
+# `jq -e .` over the whole line is the assertion, because "valid JSON" is exactly what it checks.
+NASTY_SETTING=$'12"3\\4\n5'
+run "$(input UserPromptSubmit "$T_PAST")" PATH="$NOJQ" \
+  CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING="$NASTY_SETTING"
+if [ "$RC" -eq 0 ] && printf '%s' "$OUT" | jq -e . >/dev/null 2>&1; then
+  pass "a setting carrying a quote, a backslash and a newline still prints valid JSON"
+else
+  fail "a setting carrying a quote, a backslash and a newline still prints valid JSON" \
+    "rc=$RC out=$OUT"
+fi
+expect_notice "and that setting is named as no ceiling" UserPromptSubmit \
+  "figure unavailable (jq not found)" "no ceiling could be read from the setting"
 
 section "the PreToolUse matcher covers the Paseo MCP new-work tools"
 m="$(jq -r '.hooks.PreToolUse[0].matcher' "$PLUGIN_ROOT/hooks/hooks.json")"
@@ -591,11 +716,15 @@ if jq -e --arg h 'hooks-handlers/context-ceiling.sh' '
 then pass "hooks.json registers the handler on PreToolUse and UserPromptSubmit"
 else fail "hooks.json registers the handler on PreToolUse and UserPromptSubmit" "$HJ"; fi
 M="$PLUGIN_ROOT/.claude-plugin/plugin.json"
+# The schema's half of #611's agreement, and the widest it can state: Claude Code 2.1.284's option
+# schema is `z(["string","number","boolean","directory","file"])` on a strict object, so a manifest
+# cannot say "integer" — and `type: number, min: 1` is what the "the setting" cases above hold the
+# handler to. `default` is the value those cases expect for everything this schema refuses.
 if jq -e '.userConfig.context_ceiling
-          | .type == "number" and .default == 500000
+          | .type == "number" and .min == 1 and .default == 500000
             and (.title | length > 0) and (.description | length > 0)' "$M" >/dev/null 2>&1
-then pass "the Claude manifest declares context_ceiling (number, default 500000)"
-else fail "the Claude manifest declares context_ceiling (number, default 500000)" "$M"; fi
+then pass "the Claude manifest declares context_ceiling (number, min 1, default 500000)"
+else fail "the Claude manifest declares context_ceiling (number, min 1, default 500000)" "$M"; fi
 if [ -x "$PLUGIN_ROOT/hooks-handlers/context-ceiling.sh" ]; then pass "the handler is executable"
 else fail "the handler is executable"; fi
 

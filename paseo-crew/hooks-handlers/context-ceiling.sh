@@ -24,9 +24,41 @@ set +e
 DEFAULT_CEILING=500000
 TAIL_BYTES=4000000    # the latest assistant record sits in the transcript's tail
 
-ceiling="${CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING:-}"
-case "$ceiling" in ''|*[!0-9]*) ceiling=$DEFAULT_CEILING ;; esac
-[ "$ceiling" -ge 1 ] || ceiling=$DEFAULT_CEILING    # the manifest's min is 1; 0 fires on every prompt
+# The ceiling is the manifest's `context_ceiling` option, and the two ends have to agree on what a
+# valid one is (#611). The manifest states the widest thing its schema can — `type: number, min: 1`;
+# Claude Code 2.1.284's option schema is `z(["string","number","boolean","directory","file"])` on a
+# strict object, so a manifest cannot say "integer" — and a hook is handed `String(value)` of the
+# stored number. `100000.5` therefore arrives as that text, `1e+21` as the exponent form `String()`
+# switches to past 1e21, and `Infinity` for a literal past 1e308, where the digits-only guard this
+# replaces dropped all three to the default in silence, at the threshold the operator chose.
+#
+# The value is jq's answer, not a case pattern's — the same parser the rest of this hook already
+# trusts. The SPELLING is stated here rather than left to that parser, because jq's is wider than the
+# schema's and not the same in every build. Measured on 1.7.1 and 1.8.1: `tonumber` reads `" 12 "`,
+# `12 `, `12<TAB>` and `12<NL>` on the first where the second refuses every one of them, and both
+# builds read `+5` and `1.` — none of which `String()` of a JSON number ever emits. The pattern below
+# is the JSON number grammar, anchored `\A`/`\z` rather than `^`/`$`: measured, `$` matches before a
+# trailing newline, so `12<NL>` would pass as 12.
+#
+# Three rules, and the option's description states the same three: the spelling must be a JSON number;
+# the value must be a number equal to itself — the one number that is not is NaN, and NaN is not a
+# ceiling — and at least 1, the schema's `min`; anything else is the default. `Infinity` is the one
+# spelling `String()` emits that JSON cannot hold, and it is kept as its own text: it is above every
+# figure a transcript can carry, and reporting the default instead would name a ceiling nobody set.
+#
+# Two variables, because the two jobs differ. `ceiling_raw` is the setting as it arrived. `ceiling` is
+# the text the notices name as the ceiling in force: jq's rendering where jq decided it, and on the
+# paths where jq cannot run at all — no jq on PATH, or a jq that fails — the setting itself, kept only
+# when every character of it is one a number may carry and no other, so that splicing it into the
+# notice cannot break the JSON this hook prints. Arbitrary text names no ceiling: it is never escaped
+# by hand, and it is never replaced by the default either, because that would report a ceiling the
+# operator did not set (#615 F1, F2).
+ceiling_raw="${CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING:-}"
+case "$ceiling_raw" in
+  '')                ceiling="$DEFAULT_CEILING" ;;    # no option: the default is the ceiling in force
+  *[!0-9.eE+-]*)     ceiling='' ;;                    # text no unescaped splice may carry
+  *)                 ceiling="$ceiling_raw" ;;        # number-shaped: name it as the operator wrote it
+esac
 
 input="$(cat)"
 
@@ -54,13 +86,23 @@ case "$input" in    # fast path: most Bash calls are not Paseo new-work commands
   *) new_work "$input" || exit 0 ;;
 esac
 
-# say <event> <line> — every caller passes a line with no double quote or backslash.
+# say <event> <line> — every caller passes a line with no double quote or backslash. The ceiling in a
+# line is jq's rendering of the number in force; on the paths where jq cannot run it is the setting
+# itself, and only when every character of that is one a number may carry (the `case` at the top).
+# Nothing else reaches a line, which is what keeps this template's output parseable JSON (#615 F1).
 say() {
   printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"%s"}}\n' "$1" "$2"
 }
 
 unavailable() { # <event> <reason>
-  say "$1" "paseo-crew: context figure unavailable ($2); the ceiling of $ceiling tokens was not checked."
+  # Two forms, because there are two states of knowing: a ceiling in force that can be named, and a
+  # setting nothing could read. The second names no number at all — quoting the default there would
+  # report a ceiling the operator did not set, which is what F1 and F2 are about.
+  if [ -n "$ceiling" ]; then
+    say "$1" "paseo-crew: context figure unavailable ($2); the ceiling of $ceiling tokens was not checked."
+  else
+    say "$1" "paseo-crew: context figure unavailable ($2); no ceiling could be read from the setting, so none was checked."
+  fi
 }
 
 # event_in_raw <input> — the event the raw input names, for the two paths where
@@ -84,10 +126,42 @@ event_in_raw() {
 }
 
 if ! command -v jq >/dev/null 2>&1; then
-  # Without jq there is no figure to read on either event, so both are told.
+  # Without jq there is no figure to read on either event, so both are told — and no comparison
+  # either, so the ceiling the notice names is what the `case` above kept: number-shaped text as the
+  # operator wrote it, or nothing at all for text no unescaped splice may carry.
   event="$(event_in_raw "$input")"
   [ -n "$event" ] && unavailable "$event" "jq not found"
   exit 0
+fi
+
+# The option's verdict, before any notice can quote a ceiling. `tostring` of the number in force is
+# what the notices print — for every setting an operator writes in decimal it is the text they wrote,
+# and for an exponent form it is jq's spelling of the same number — so out of a value jq has read, a
+# quote, a backslash or a newline cannot reach a line this hook prints as JSON.
+#
+# `// null` is what makes the program total, and the exit status is the other half of it. A
+# `tonumber?` that refuses a spelling yields NO value rather than null, so without the `//` the
+# program would print nothing and this layer could not tell a refused spelling from a jq that never
+# ran — which is the distinction this repair rests on:
+#
+#   jq ran and refused the spelling → it has answered: the default is in force (a refusal and a value
+#                                    below 1 are the same answer, and the description says so);
+#   jq failed, or jq is not there   → it has answered nothing, and the setting `case`d above stands.
+#
+# Taking the verdict only on jq's success is that rule in one line, and it is the whole of F2: a
+# ceiling the operator set is never overwritten by one they did not because a parser broke.
+#
+# This is one jq spawn on the armed paths, and it is deliberately not folded into the field pass
+# below: that pass reads the hook payload, its fields' emptiness is already three verdicts, and the
+# raw path a failed jq takes — where this setting still has to be quoted — has no fields at all.
+if [ -n "$ceiling_raw" ]; then
+  verdict="$(jq -nr --arg s "$ceiling_raw" --argjson d "$DEFAULT_CEILING" '
+    (($s | tonumber?) // null) as $c
+    | if $s == "Infinity" then $s
+      elif ($s | test("\\A-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][-+]?[0-9]+)?\\z"))
+           and ($c == $c) and $c >= 1
+        then ($c | tostring)
+        else ($d | tostring) end' 2>/dev/null)" && ceiling="$verdict"
 fi
 
 # One jq pass reads the three fields the verdicts need — the event, the
@@ -297,6 +371,12 @@ case "$figure" in
   ''|*[!0-9]*) unavailable "$event" "no readable usage in the latest assistant record"; exit 0 ;;
 esac
 
-[ "$figure" -ge "$ceiling" ] || exit 0
+# jq compares, and bash does not: the ceiling may be a fraction — `100000.5` fires at the next whole
+# token, which is the exact `figure >= ceiling` for a whole-number figure, not a floor — or an
+# exponent form, which `-ge` would refuse outright rather than compare. `false` and a ceiling jq
+# cannot parse — the empty text included, which is the state of a setting nothing could read — are the
+# same verdict here, silence, and for the largest value jq holds that verdict is the exact one: no
+# figure reaches it.
+[ "$(jq -n --arg f "$figure" --arg c "$ceiling" '($f | tonumber) >= ($c | tonumber)' 2>/dev/null)" = true ] || exit 0
 say "$event" "paseo-crew: context $figure >= ceiling $ceiling tokens. Finish the unit in hand and start no new one; a coordinator seat rotates at its next boundary (paseo-crew lifecycle.md, Rotation past the context ceiling)."
 exit 0

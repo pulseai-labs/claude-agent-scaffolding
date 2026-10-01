@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.1
+
+The `context_ceiling` setting and the hook now agree on what a valid one is (#611). The manifest's
+option schema says `type: number`, but the hook accepted a string of decimal digits alone and
+silently replaced anything else with the 500000 default — so a value written `100000.5`, or the
+exponent form a number past 1e21 renders as, never warned at the threshold the operator chose.
+
+The hook now decides the setting in `jq`, whose number parser the rest of it already trusts: a JSON
+number of 1 or more is the ceiling, a spelling that is not a JSON number and any value below the
+schema's `min: 1` are the default the option's description names, and the comparison is `jq`'s too,
+so a fractional ceiling takes effect at the next whole token rather than being floored (100000.5
+fires at 100001). The accepted spelling is stated in the hook rather than left to the installed
+`jq`, which is more permissive than the schema and is not the same in every build.
+
+Where `jq` cannot run at all — no `jq` on `PATH`, or a `jq` that fails — nothing was compared, and
+the notice names the setting itself when every character of it is one a number may carry, no ceiling
+at all when it is not, and never the 500000 default, which is a ceiling the operator did not set.
+
 ## 0.1.0
 
 First release: herdr-crew 0.2.1's orchestrator/worker session model, ported onto Paseo 0.9.2.
