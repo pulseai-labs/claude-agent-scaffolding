@@ -111,7 +111,9 @@ all. Run SKILL.md §3's pre-flight (the lane reads the registries and mutates
 state too), then route it to the patch lane (`references/patch-lane.md`),
 which resolves and records which declared repo the patch targets, never a
 forced ceremony. An AI-workspace edit needs no lane — no ceremony governs
-that repo. (SKILL.md §2 states the same rule at the routing table.)
+that repo. A defect in **shipped** behaviour, or a small request another project
+cannot fake, goes to `/ossify:patch` instead — a versioned patch by PR, never a
+close. (SKILL.md §2 states the same rule at the routing table.)
 
 `"$oss_bin" get` is `jq -r` without `-e`: a `select` matching nothing exits **0** with
 an empty string. Test the *output*, not the rc, whenever you resolve an id

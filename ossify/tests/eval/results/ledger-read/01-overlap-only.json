@@ -1,0 +1,1 @@
+{"scores":{"overlap_selection":5,"disposition_each":5,"absent_is_one_line":5,"write_boundary":5},"pass":true,"notes":"No score is below 5: only the tombstone line is surfaced, still accepted with its reason and an unfired r3.s1 trigger, nothing is invented, and nothing is written to state, the product repo or the ledger."}

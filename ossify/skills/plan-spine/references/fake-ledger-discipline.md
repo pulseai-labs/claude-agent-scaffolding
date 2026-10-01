@@ -40,6 +40,32 @@ replacing it is `fake_status … replaced`, not a new record); **`fake`** is a s
 standing in for a real implementation; **`deferred`** is a boundary not wired at
 all yet, where the product currently goes without.
 
+### Glue for a provider that has not shipped
+
+A consumer never waits on a provider project. When this spine needs something
+another project owns and has not shipped, build the glue here and record it as a
+fake like any other — `"$oss_bin" fake_add` with channel `fake`, a **reason** that
+names the provider and the request (`PulseDB #160 — batch reads; looped single
+gets until then`), a **replacement trigger** of the form "`<provider>` `<version
+or issue>` ships" (`PulseDB 0.9.0 ships`), and an **expiry release** that is the
+**consumer's** release that must adopt it — never the provider's release id,
+which this ledger cannot read.
+
+The request itself belongs in the provider's intake queue: an issue in the
+provider's repo labelled `from:<this project>`
+(`plan-spine/references/intake-and-ledger.md` §1). File it if it is not there,
+and cite its number in the reason.
+
+Glue is a fake, so §5 applies to it unchanged. Glue that swallows the provider's
+errors, bypasses its real entry point, or replaces an invariant it owns is a
+banned fake. If no admissible glue exists, the consumer **cannot fake** the
+request: it goes to the provider as a patch request (`/ossify:patch` there), not
+into a longer wait.
+
+Nothing else changes: `close` already blocks a release whose fakes have expired
+(`close/references/fake-expiry.md`), and §4's `fake-replacement` feature entry
+puts the adoption on the consumer's feature map.
+
 ---
 
 ## 2. Trigger and expiry are both mandatory

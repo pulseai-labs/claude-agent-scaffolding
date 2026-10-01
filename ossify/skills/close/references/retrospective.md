@@ -120,7 +120,8 @@ either from scrollback is how an auto-applied disposition goes unrecorded.
 ### `## 7. Fakes, deferrals and quarantines still standing`
 
 Everything this spine leaves owed: fakes still on `active`, deferrals accepted
-during the gate, quarantined demo lines. Each with the trigger or release that
+during the gate, what the PR loop left owed (tracked deferral issues, or
+merge-bar's out-of-scope issue and `[KL]` lines), quarantined demo lines. Each with the trigger or release that
 retires it. This is the section the next release close reads first.
 
 ### `## 8. What we learned about the work`

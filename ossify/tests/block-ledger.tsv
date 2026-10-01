@@ -45,11 +45,13 @@
 #   block unfindable and the failure read as "vacuous" rather than as wrong
 #   behaviour. Pick the anchor from the block's SCAFFOLDING, never from its FIX.
 #
-# Totals: 185 blocks - 73 operative (16 covered, 57 deferred), 112 illustrative.
+# Totals: 190 blocks - 76 operative (16 covered, 60 deferred), 114 illustrative.
 # DERIVED, never hand-counted: check 2's report line gives the total from a walk
-# of the TREE ("185 blocks accounted for"); one awk pass over the rows below
+# of the TREE ("190 blocks accounted for"); one awk pass over the rows below
 # gives the split (O rows counted, D and I summed). Two independent routes,
-# agreeing at 185 - that agreement IS the check. 1.11.0 added two illustrative
+# agreeing at 190 - that agreement IS the check. 1.13.0 added five blocks - the
+# intake listing (deferred), the patch branch cut and tag (deferred), the ledger
+# grep and the fallback PR open (illustrative) - the whole of the 185 -> 190 move. 1.11.0 added two illustrative
 # blocks (a bone_set_touch and a risk_gate_set_touch call) and no operative one,
 # the whole of the 182 -> 184 move. 1.11.2 added one - the doctor touch-surface
 # sweep - and then reclassified it from illustrative to COVERED once the #555
@@ -181,6 +183,10 @@ I	skills/plan-spine/references/demo-authoring.md	7	worked ledger_add_auto exampl
 I	skills/plan-spine/references/demo-amendments.md	3	single-verb calls: supersede, ledger read, quarantine
 I	skills/plan-spine/references/fake-ledger-discipline.md	3	single-verb calls: fake_add, fake_status, feature_add
 I	skills/plan-spine/references/citation-foldin.md	2	two ADR reads used to check citations by eye
+D	skills/plan-spine/references/intake-and-ledger.md	1	#138	the intake-queue listing (gh issue list --state open --limit 1000 --json labels, filtered by the from: label PREFIX because gh matches --label literally and a 'from:*' wildcard returns an empty list at rc 0) - its result branches the step (empty, truncated at the limit, or dispositioned one by one) and no suite executes it against a tracker
+I	skills/plan-spine/references/intake-and-ledger.md	1	a single grep over the AI workspace's tech-debt.md for [KL]/[TD] lines
+D	skills/patch/SKILL.md	2	#138	the patch-branch cut (fetch the default branch, THEN worktree add -b fix/<name>-<version> from origin/<default>, never switching a checkout a spine is parked on) and the post-merge tag (fetch, annotated tag on the merge commit, push the tag) - ordered git sequences where a skipped fetch cuts or tags from a stale ref; executed by no suite
+I	skills/patch/SKILL.md	1	a single gh pr create with <placeholder> args (the fallback PR open where merge-bar is not installed)
 D	skills/start/SKILL.md	1	#138	the topology-absent refusal, printed verbatim (the author/re-probe/halt remedy is prose outside this block)
 I	skills/start/SKILL.md	6	single-verb calls with <placeholder> args: feature_add, bone_add, risk_gate_add, posture_set, overlay_set, doctor
 D	skills/start/references/bones-registry.md	1	#138	the ADR-number minting block - two sed forms, a sort -n tail, and 10# base-10 forcing, all silently wrong on an empty or odd-named dir
@@ -220,7 +226,7 @@ H	skills/close/references/patch-lane.md	1122131773-2611
 H	skills/close/references/release-close.md	1444363264-13073
 H	skills/close/references/retrospective.md	1694933006-117
 H	skills/close/references/routing.md	2855300955-280
-H	skills/close/references/spine-close.md	2348298578-24971
+H	skills/close/references/spine-close.md	1793050222-25191
 H	skills/close/references/work-item-close.md	221691391-6030
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	1897652786-133
@@ -244,6 +250,8 @@ H	skills/plan-spine/references/decomposition.md	1735798245-670
 H	skills/plan-spine/references/demo-amendments.md	1701789836-357
 H	skills/plan-spine/references/demo-authoring.md	1062611185-1621
 H	skills/plan-spine/references/fake-ledger-discipline.md	95797153-393
+H	skills/plan-spine/references/intake-and-ledger.md	3936310853-289
+H	skills/patch/SKILL.md	2505586866-556
 H	skills/start/SKILL.md	713231529-1195
 H	skills/start/references/bones-registry.md	3219690395-1177
 H	skills/start/references/journey-map.md	2970283972-104

@@ -112,6 +112,10 @@ jobs:
         # suite cannot see its sibling tree, so this one is repo-root.
         run: bash tests/test-herdr-crew-parity.sh
 
+      - name: merge-bar template parity (repo-root)
+        # ossify's fallback PR-body template must match merge-bar's (ossify 1.13.0).
+        run: bash tests/test-merge-bar-template-parity.sh
+
       - name: paseo-crew parity pins (repo-root)
         # paseo-crew's verbatim copies of herdr-crew (fidelity pins, dsh-driver.md)
         # and ossify (the eval library), plus the manifest description restatement.

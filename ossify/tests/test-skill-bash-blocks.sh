@@ -383,13 +383,13 @@ check_6_budget() { # $1=ossify-root $2=workdir; writes $2/check6-report.txt
 # twelve-command set measured in #263, name-length-dependent) but are harness
 # rendering this test does not own; recorded here, not measured.
 #
-# HONESTY LINE: the thirteen-command surface measures 2278/3200 = 0.28% of
-# the window - 1.4x headroom, and just under §9.1's 0.3-0.4% band, because
-# three of the thirteen are standalone utilities §9.1 intended to surface
+# HONESTY LINE: the fourteen-command surface measures 2526/3200 = 0.32% of
+# the window (1.13.0 added /ossify:patch) - 1.3x headroom, now inside §9.1's
+# 0.3-0.4% band; three of the fourteen are standalone utilities §9.1 intended to surface
 # name-only (issue #282 records that divergence and why trimming is the
 # wrong fix: budget nobody is short of, traded against routing triggers).
 # This check is a regression guard against growth, not a tight budget; it
-# cannot fire until the surface grows another 40%. Know that is what it is.
+# cannot fire until the surface grows another 27%. Know that is what it is.
 #
 # DIVERGENCES recorded here, fixed elsewhere:
 #   D-2: §9.1 says "<=6 fully-described entry skills" and lists six;
@@ -425,7 +425,7 @@ check_7_descriptions() { # $1=ossify-root $2=workdir; writes $2/check7-report.tx
   echo "     TOTAL $total  (budget 3200, headroom $((3200 - total)))" >> "$2/check7-report.txt"
   [ "$total" -le 3200 ] || echo "command descriptions total $total bytes, over the 3200 every-call budget by $(( total - 3200 ))"
   n="$(ls -1 "$1"/commands/*.md 2>/dev/null | wc -l | tr -d ' ')"
-  [ "$n" -ge 13 ] || echo "check 7 saw only $n command files; the budget loop is not measuring the whole set"
+  [ "$n" -ge 14 ] || echo "check 7 saw only $n command files; the budget loop is not measuring the whole set"
 }
 
 # ---------------------------------------------------------------------------
@@ -562,7 +562,7 @@ C7="$(check_7_descriptions "$OSSIFY" "$WORK")"
 echo "-- check 7: command-description budget (the every-call listing cost)"
 cat "$WORK/check7-report.txt"
 t_assert_eq 0 "$(_count "$C7")" "check 7: command descriptions are within the 3200-byte every-call budget${C7:+ -- $C7}"
-t_assert_ge 14 "$(_lines "$WORK/check7-report.txt")" "check 7: the description loop saw every command (13 rows + the total)"
+t_assert_ge 15 "$(_lines "$WORK/check7-report.txt")" "check 7: the description loop saw every command (14 rows + the total)"
 
 C9="$(check_9_shadowed_tokens "$OSSIFY")"
 echo "-- check 9: shadowed Skill(ossify:) tokens"
@@ -686,9 +686,9 @@ _c7_command() { # $1=root $2=name $3=description-length
     printf 'description: '; printf 'd%.0s' $(seq 1 "$3"); echo
     echo "---"; echo "# $2"; } > "$1/commands/$2.md"
 }
-# Plant A: 13 commands = 3800 bytes (12 x 300 + 1 x 200), over the 3200 budget
-# by 600 - and at the full thirteen-file count, so ONLY the ceiling arm fires.
-for s in c7a c7b c7c c7d c7e c7f c7h c7i c7j c7k c7l c7n; do _c7_command "$FIX7" "$s" 300; done
+# Plant A: 14 commands = 4100 bytes (13 x 300 + 1 x 200), over the 3200 budget
+# by 900 - and at the full fourteen-file count, so ONLY the ceiling arm fires.
+for s in c7a c7b c7c c7d c7e c7f c7h c7i c7j c7k c7l c7n c7o; do _c7_command "$FIX7" "$s" 300; done
 _c7_command "$FIX7" c7m2 200
 # Plant B: only 2 commands, each comfortably under budget - the TOTAL passes,
 # so the only thing that can fire is the floor guard. That is the assertion
@@ -738,8 +738,8 @@ t_assert_contains "$F6" "c6/SKILL.md:501" "self-test: check 6 names the planted 
 
 F7="$(check_7_descriptions "$FIX7" "$WORK/fix7")"
 t_assert_eq 1 "$(_count "$F7")" "self-test: check 7 finds exactly its 1 planted over-budget command set${F7:+ -- $F7}"
-t_assert_contains "$F7" "total 3800 bytes" "self-test: check 7 names the measured total, not just that it is over"
-t_assert_contains "$F7" "over the 3200 every-call budget by 600" "self-test: check 7 names the exact overage"
+t_assert_contains "$F7" "total 4100 bytes" "self-test: check 7 names the measured total, not just that it is over"
+t_assert_contains "$F7" "over the 3200 every-call budget by 900" "self-test: check 7 names the exact overage"
 # The floor guard: a root the loop under-measures must RED even though its
 # total is far under budget. Without this, a glob that matched nothing would
 # sum to 0 and sail through - the way a budget check ends up unable to fail.

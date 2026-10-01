@@ -308,6 +308,21 @@ memory of the release is how a release quietly grades itself against what it
 delivered rather than against what it promised — the one comparison the retro
 exists to make.
 
+**Patches shipped during the release come from git, not state** — `/ossify:patch`
+writes none. For each repo this release landed in, list the tags created since
+the release opened (its `created_at`:
+`"$oss_bin" get ".releases[] | select(.id==\"$rel\") | .created_at"`) with
+`git -C "<repo-root>" for-each-ref --sort=creatordate --format='%(creatordate:iso-strict) %(refname:short)' refs/tags`,
+and the merged PRs whose head branch starts `fix/` with
+`gh pr list --repo "<owner/repo>" --state merged --search "merged:>=<release-opened date>" --limit 1000 --json number,title,headRefName,mergedAt,url,closingIssuesReferences`.
+If that returns 1000 rows, raise the limit: a truncated list drops patches. A repo
+with no remote (spine close's local arm) has no PRs to list — skip the `gh` call
+there and read its tags alone. Read
+both, and list each patch — its tag, its PR and the issues it closed — under the
+retrospective's "what shipped" and in the close summary (SKILL.md §10). A
+direct-commit patch-lane change (`references/patch-lane.md`) carries no version
+and is not in this list; `patch_records` counts those.
+
 **Two mechanics the port carried over from the sprint retro, and they are not
 optional:**
 

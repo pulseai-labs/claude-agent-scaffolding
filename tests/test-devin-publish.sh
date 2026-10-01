@@ -55,7 +55,7 @@ EXPERIMENTAL_PLUGINS=""
 EXCLUDED_PLUGINS="scaffold scaffold-onboard scaffold-dev claude-security-audit orca-crew herdr-crew dsh-crew merge-bar paseo-crew"
 
 # Ossify's Devin claim is exactly six canonical skills plus the local worker;
-# adopt, challenge, and wayfinder are deferred on this surface.
+# adopt, challenge, wayfinder, and patch are deferred on this surface.
 OSSIFY_DEVIN_SKILLS='["skills/start","skills/plan-release","skills/plan-spine","skills/work-item","skills/close","skills/doctor",".devin/skills"]'
 
 ALL_TARGET_PLUGINS="$BASELINE_PLUGINS $EXPERIMENTAL_PLUGINS"
@@ -189,7 +189,7 @@ for plugin in $ALL_TARGET_PLUGINS; do
 done
 
 # Ossify's skills selection is exactly the six-skill Devin claim plus the
-# .devin/skills worker directory — adopt/challenge/wayfinder stay unadvertised.
+# .devin/skills worker directory — adopt/challenge/wayfinder/patch stay unadvertised.
 if [[ "$(json_get '.skills | sort | join(",")' "$ROOT/ossify/.devin-plugin/plugin.json")" == \
      "$(printf '%s' "$OSSIFY_DEVIN_SKILLS" | jq -r 'sort | join(",")')" ]]; then
   pass "ossify skills array is the six-skill claim plus .devin/skills"

@@ -1,9 +1,9 @@
-# ossify (v1.12.1)
+# ossify (v1.13.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
-spines against a cumulative demo ledger. Nine entry skills (`start`, `adopt`,
+spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
 `plan-release`, `plan-spine`, `work-item`, `close`, `doctor`, `challenge`,
-`wayfinder`) plus `/ossify:run-spine`, which drives a planned spine's rounds
+`wayfinder`, `patch`) plus `/ossify:run-spine`, which drives a planned spine's rounds
 end to end, and the standalone utilities — session handoff
 (`/ossify:handoff`, `/ossify:handoff-resume`) and the PR review-fix-merge
 loop (`/ossify:work-pr`) — which work in any repository, ossify-initialised
@@ -27,6 +27,20 @@ rejected item is repaired through a correction continuation that returns the
 same `complete` shape, and Layer 4 runs inline there as it does everywhere.
 **`/ossify:run-spine <spine-id>` with no flag is
 completely unchanged** and still dispatches `ossify:implementer-agent`.
+
+Since 1.13.0, work that arrives mid-release has a lane that never reopens a
+running spine. A request from another project is an issue in this project's repo
+labelled `from:<project>` — the intake queue — which `plan-spine`'s pre-flight and
+`plan-release`'s grooming read and give a disposition; `plan-spine` also reads the
+tech-debt ledger merge-bar writes for the surface it plans. Once a spine's first
+round has started, its work items are fixed. A consumer that needs a provider's
+unshipped capability builds glue and records it as an ordinary fake. A defect in
+shipped behaviour, or a small request the requester cannot fake, ships through
+`/ossify:patch`: reproduce-first or acceptance-criteria-first by kind, a `fix/`
+branch off the default branch, a patch version, a PR and a tag. Release close
+lists those patches from git. `/ossify:work-pr` follows merge-bar's `working-a-pr`
+where merge-bar is installed and the bundled loop otherwise. No `lib/` code, no
+state change.
 
 Since 1.9.0, the deterministic gates close the vacuous-green family: the
 zero-tests guard no longer inverts a true match past the pipe buffer, flags

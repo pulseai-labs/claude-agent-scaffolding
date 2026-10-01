@@ -16,7 +16,7 @@ at each groom rather than in state (§2). Each entry:
 | `name` | short, the action ("save a named strategy") |
 | `value` | one line: why the actor wants it. A deferred entry may carry a trailing `— admitted when <condition>`, because there is no trigger field to hold it (§2) |
 | `class_guess` | `bone` or `flesh` — a **guess**, made before any plan existed |
-| `source` | `journey-map` · `spec` · `release-retro` · `deferral` · `real-use` · `fake-replacement` · `feature-map-return` |
+| `source` | `journey-map` · `spec` · `release-retro` · `deferral` · `real-use` · `fake-replacement` · `feature-map-return` · `intake` |
 
 _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
 
@@ -39,7 +39,10 @@ not a gap.
 ## 2. Grooming, in four passes
 
 **Pass 1 — absorb.** Fold in everything that arrived since the last groom:
-real-use findings (`references/real-use-findings.md`), deferrals filed during
+real-use findings (`references/real-use-findings.md`), the open intake queue —
+each request from another project pulled onto the map with source `intake`,
+deferred with a reason, or routed to `/ossify:patch`
+(`plan-spine/references/intake-and-ledger.md` §1) — deferrals filed during
 execution, fake-ledger replacement triggers that have fired, retro follow-ups, and
 any internal-enabler that returned because its consumer was dropped. Nothing that
 surfaced in the last release should be living only in someone's memory.
@@ -174,3 +177,6 @@ nobody can finish is the old sprint failure mode with new vocabulary.
   rather than as feature requests. That is exactly what they are supposed to
   arrive as.
 - **A map that only ever grows.** Prune in pass 4, out loud, with reasons.
+- **Grooming without the intake queue.** A request another project filed is real
+  use arriving from outside; it gets a disposition at every groom, not when
+  someone remembers it.

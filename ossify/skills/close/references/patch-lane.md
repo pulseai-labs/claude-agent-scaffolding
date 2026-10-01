@@ -18,6 +18,10 @@ are — split it, the same way a work item spanning two repos is split
 (`plan-spine/references/cross-repo.md` §1). The lane exists so that a typo fix
 does not need a spine, and it is bounded so that "it was only a typo" does not
 become the way real work escapes the ceremony.
+It is not the lane for a defect in **shipped** behaviour, or for a small request
+another project cannot fake: those ship as a versioned patch through
+`/ossify:patch` (`skills/patch/SKILL.md`), which this lane's three-part test would
+otherwise send to a spine.
 
 **The verb already exists.** `"$oss_bin" patch_add` has shipped since the ledger layer;
 what has never existed is the routing judgment that decides when to reach for it.
@@ -108,6 +112,7 @@ answer.
 | Adding a test | **Judgment, leaning patch** — unless it joins the ledger, in which case authoring it is `/plan-spine`'s, not yours |
 | Fixing a failing demo line's *product* cause | **Spine.** The ledger just told you the product is wrong; that is the opposite of demo-irrelevant |
 | Renaming an internal symbol nothing exported | **Judgment** — clean `touch_check` and no observable change, or it is a spine |
+| A defect in **shipped** behaviour, or a small request from another project that it cannot fake | **Neither — `/ossify:patch`.** A versioned patch through a PR off the default branch; never a work item in a running spine |
 | Anything under a path a bone or risk gate declares | **Spine**, always, whatever its size (§2) |
 | "It is only one line" | **Not a criterion.** The three-part test says nothing about diff size |
 
@@ -237,7 +242,7 @@ Two consequences worth stating:
   why "no demo-relevant behaviour" is the criterion that cannot be mechanized
   away.
 
-Anything heavier is a **flesh spine, however small**. The cost of a flesh spine
+Anything heavier is a **flesh spine, however small** — unless it is a shipped defect or a can't-fake request, which is `/ossify:patch`'s. The cost of a flesh spine
 is deliberately low — that is what makes "when in doubt, spine it" an affordable
 default rather than a threat.
 

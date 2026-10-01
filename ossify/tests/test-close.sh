@@ -1271,6 +1271,25 @@ else
 fi
 t_assert_eq "$(git -C "$PR_REPO" rev-parse "$PR_BRANCH")" "$(cat "$PR_STATE/pushed_tip")" \
   "P1: the PR body records the pushed tip (the lineage guard's durable input)"
+t_assert_eq 0 "$(grep -c '^## Merge bar$' "$PR_STATE/create_args")" \
+  "P1: with no \$pr_fields (merge-bar absent) the PR body carries no six fields"
+
+# P1b. THE MERGE-BAR SEAM (1.13.0): with $pr_fields composed, the six fields
+# land AFTER the two lines the record pass reads, so the pushed-tip line is
+# still the lineage guard's input. P1 above is the adjacent control: $pr_fields
+# unset under `set -u` must still open the PR.
+_pr_fixture p1b
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
+  "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; pr_fields='## Claim
+The tier spine lands.
+
+## Merge bar
+A finding blocks this PR only if it:'; . '$MERGE_BLOCK'"
+t_assert_rc 0 "P1b: the PR-arm pass runs clean with the six fields composed"
+t_assert_eq "$(git -C "$PR_REPO" rev-parse "$PR_BRANCH")" "$(cat "$PR_STATE/pushed_tip")" \
+  "P1b: the pushed-tip line still reaches the record pass with the six fields appended"
+t_assert_eq 1 "$(grep -c '^## Merge bar$' "$PR_STATE/create_args")" \
+  "P1b: ...and the PR body carries the Merge bar heading"
 
 # P2. THE THIRD LEG (A1): gh cannot operate on the remote — fail closed. The
 # probe runs before any push, and the halt never falls through to a local merge.

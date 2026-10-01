@@ -346,7 +346,8 @@ done
 for unexpected in \
   "ossify:adopt" \
   "ossify:challenge" \
-  "ossify:wayfinder"
+  "ossify:wayfinder" \
+  "ossify:patch"
 do
   if printf '%s\n' "$skill_names" | grep -qx "$unexpected"; then
     fail "deferred ossify skill advertised: $unexpected"
