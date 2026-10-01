@@ -97,7 +97,8 @@ For each overlapping line, record exactly one disposition:
   needs its own reason.
 - **retired** — the code it names is gone. Show the evidence
   (`git -C "<repo>" ls-files <path>` prints nothing, and the commit that removed
-  it), delete the line from `tech-debt.md`, and note the retirement in `SPINE.md`.
+  it), delete the line from `tech-debt.md`, and note the retirement in `SPINE.md` — for a
+  patch, which has no `SPINE.md` and never writes another spine's, in the PR's Evidence.
   This is the only write this section makes, and it is in the AI workspace.
 
 No ledger file, or no overlapping line → one line saying which. Never write the
