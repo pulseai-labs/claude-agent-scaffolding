@@ -799,7 +799,7 @@ _r=1; grep -Fq 'settle every occupied destination' "$_SS" && grep -Fq 'honour th
 _pin "$_r" "start/SKILL.md has no occupied-destination rule before its first write - an existing MASTER-SPEC, CLAUDE.md or LIVE memory-bank file is overwritten"
 # (#265c) the rule asks per file and never moves, merges or migrates on its own.
 _OD="$_OSSR/skills/start/references/occupied-destinations.md"
-_r=1; [ -f "$_OD" ] && grep -Fq 'oss repo_root ai_workspace' "$_OD" && grep -Fq 'no default, no automatic move, merge or migration' "$_OD" && grep -Fq 'Not offered for the MASTER-SPEC' "$_OD" && _r=0
+_r=1; [ -f "$_OD" ] && grep -Fq 'oss repo_root ai_workspace' "$_OD" && grep -Fq 'no default, no automatic move, merge or migration' "$_OD" && grep -Fq 'Not offered for the MASTER-SPEC' "$_OD" && grep -Fq 'Never write a file whose path was' "$_OD" && _r=0
 _pin "$_r" "occupied-destinations.md does not resolve the AI workspace or allows an answer the operator did not give"
 # (#266) doctor's and close's fail: state remedy names the ceremonies that own init.
 _r=0

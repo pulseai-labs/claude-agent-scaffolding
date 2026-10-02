@@ -27,7 +27,9 @@ file where the bank lives (`close/references/harvest.md`, "Where the bank is"),
 A MASTER-SPEC anywhere else in the workspace is not overwritten, but name it to
 the operator too: two specs side by side is a question, not a default. Bones ADRs take a
 fresh number from the `bones-registry.md` §3 scan, so they do not collide here;
-if one ever would, the same rule applies.
+if one ever would, the same rule applies. An output whose path no route names
+yet — an EXECUTIVE-SUMMARY with no routing key, the private inventory — cannot
+be checked here; §2's last paragraph checks it when its path is chosen.
 
 A destination that holds nothing is written as usual, with no question.
 
@@ -50,8 +52,10 @@ The operator may answer for several named files at once, or stop the ceremony
 here. Nothing has been overwritten either way. Never pick an answer the
 operator did not give: no default, no automatic move, merge or migration.
 
-Every later write honours the answer for its file. A destination that became
-occupied after §3 is asked about the same way before it is written.
+Every later write honours the answer for its file, and checks its destination
+again just before writing: one that became occupied after §3, or one §3 could
+not resolve, is asked about the same way. Never write a file whose path was
+not checked.
 
 ## 3. Why the route is a question
 
