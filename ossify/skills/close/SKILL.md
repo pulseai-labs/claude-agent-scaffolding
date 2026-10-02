@@ -135,7 +135,7 @@ ai_root="$("$oss_bin" repo_root ai_workspace)"
    | `fail: shape` | **`"$oss_bin" state_restore`** — a required key is missing; same rebuild |
    | `fail: schema`, version **below** this build | **`"$oss_bin" migrate`** — the state predates this build |
    | `fail: schema`, version **above** this build | **upgrade ossify** — `migrate` accepts v1/v2 only |
-   | `fail: state` | **`/ossify:start`** (a new project) or **`/ossify:adopt`** (one that already has code) — never initialised; each runs `init` itself, and a bare `init` first leaves state both refuse |
+   | `fail: state` | **`/ossify:start`** (a new project) or **`/ossify:adopt`** (one that already has code) — on Codex the `start`/`adopt` skills; on Devin run `adopt` on Claude Code or Codex — never initialised; each runs `init` itself, and a bare `init` first leaves state both refuse |
 
    Naming `state_restore` for every line wedges the close on a schema failure:
    against a v1/v2 state it prints `restore: state is already clean - nothing to
