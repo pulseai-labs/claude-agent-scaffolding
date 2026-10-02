@@ -350,9 +350,9 @@ and the root is unambiguous (then `"$oss_bin" composition_set "<root>"`).
 
 ## 11. Spec-core critic moment
 
-Fires **once**, at spec-core close: first author the lean MASTER-SPEC here, from
-§4–§10's outputs (§13 lists it as an output, not a later step), then audit it
-**before the bones harden** into Release-0 planning. The audit is ossify's own
+Fires **once**, at spec-core close: first author the lean MASTER-SPEC here, all
+seven sections (section 7 applies §12's floors; §13 lists the spec as an output,
+not a later step), then audit it **before the bones harden**. The audit is ossify's own
 `challenge` skill in audit mode; it always runs — no plugin's absence skips it.
 
 1. **Announce**, then end the turn: *"Spec-core close — running a close-depth

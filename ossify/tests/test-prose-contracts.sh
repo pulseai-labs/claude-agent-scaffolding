@@ -771,5 +771,13 @@ _pin "$_r" "the 1.12.0 notes name the dropped refusal and the shipped complete c
 _r=0; grep -Fq 'One guard ships' "$_OSSR/lib/entities.sh" && _r=1
 _pin "$_r" "entities.sh's rail header says one guard ships while the file defines two"
 
+# #633 round 1 - two Codex classes, each pinned red before its fix.
+# (A) start §11 authors all seven sections before the audit - section 7 applies §12's floors.
+_r=1; grep -Fq "section 7 applies §12's floors" "$_OSSR/skills/start/SKILL.md" && _r=0
+_pin "$_r" "start/SKILL.md §11 authors the spec from §4-§10 only - the audit reads it without section 7"
+# (B) spine-close reconciliation covers a MERGED resumed PR and repo-agnostic limits.
+_r=1; grep -Fq 'On a MERGED resumed PR' "$_SC" && grep -Fq 'every repeat of a repo-agnostic limit but one' "$_SC" && _r=0
+_pin "$_r" "spine-close.md's reconciliation skips a MERGED resumed PR or leaves repo-agnostic limits on every PR - duplicate [KL] lines still reach the ledger"
+
 rm -rf "$_PC_TMP"
 t_summary
