@@ -1,5 +1,5 @@
 ---
-description: Adopt an existing project into ossify — for a codebase that already has code, tests, history, and ADRs — five fail-closed gates, six conversions, Release 0 closed retroactively. Use when onboarding a project that already shipped; /ossify:start refuses it.
+description: Adopt an existing project into ossify — for a codebase that already has code, tests, history, and ADRs — six fail-closed gates, six conversions, Release 0 closed retroactively. Use when onboarding a project that already shipped; /ossify:start refuses it.
 argument-hint: "[project-name]"
 allowed-tools: Bash(bash:*), Read, Write, Edit, Glob, Grep, Skill
 ---
@@ -18,7 +18,7 @@ ARGS_FROM_CLAUDE="$ARGUMENTS" bash -c '
 Now load the skill body and follow it:
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/adopt/SKILL.md` end to end and follow it** —
-with the parsed project name. The skill body owns the whole ceremony: the five
+with the parsed project name. The skill body owns the whole ceremony: the six
 pre-flight gates, the six conversions (C1-C6), reconcile-only outputs, and the
 adoption record. Every gate refuses fail-closed, and nothing in the legacy
 stack's files is ever written.

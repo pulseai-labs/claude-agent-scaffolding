@@ -83,7 +83,7 @@ the verb, let the user run it.
 - The user wants to **plan, decompose, or execute** anything. Those are
   `/plan-release`, `/plan-spine`, `/work-item`.
 - The user asks to **fix** a finding you reported. Name the verb and let them
-  run it, unless it is one of the two explicit-write surfaces above.
+  run it, unless it is the one explicit-write surface above (rule authoring).
 - The spec and the state disagree on **what adoption did**. Read
   `<ai-workspace>/ADOPTION.md` if it exists — it is adoption's record
   (`adopt` §6); route the discrepancy there before re-deriving one side.

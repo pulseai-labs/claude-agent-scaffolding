@@ -1,4 +1,4 @@
-# ossify (v1.13.1)
+# ossify (v1.13.2)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
@@ -52,6 +52,18 @@ a spine landed in. A request pulled in at release planning is re-dispositioned
 to its spine when a spine takes it, so spine close closes the issue. No `lib/`
 code, no state change.
 
+Since 1.13.2 (#628, #579, #552, #296, #397, #342), shipped prose that disagreed
+with what ossify does is corrected. Spine close tells you to reconcile a resumed
+PR's Known limits with its repo's fields, for a PR opened under 1.13.0.
+`/ossify:patch` re-runs its changed-path ledger re-check after each review-fix
+round. The never-strand rail's notes name the refusal that did not ship apart
+from the `complete` clause that did, and the `active` refusal cites the doc that
+carries its closed-spine caveat. `external-executor.md` no longer claims close
+fingerprints the four `*_oid` values; adopt counts six gates; doctor names one
+write surface; `start` §11 authors the lean MASTER-SPEC before auditing it. The
+only `lib/` change is one refusal message's citation and one comment; no state
+change.
+
 Since 1.9.0, the deterministic gates close the vacuous-green family: the
 zero-tests guard no longer inverts a true match past the pipe buffer, flags
 only when a zero-marker has no positive-execution marker beside it (an
@@ -69,7 +81,8 @@ item minted and then withdrawn before any dispatch is marked `abandoned`
 and release close all skip it, where before it either blocked spine close as
 `planned` or recorded a merge that never happened as `complete`. The verb
 refuses it on an item that was already dispatched — a recorded branch or
-worktree is the dispatch, and withdrawing one would strand its work. And a
+worktree is the dispatch, and withdrawing one would strand its work
+(1.12.0 replaces this predicate; see its section below). And a
 bone's or risk gate's touch surface can be **re-pointed** after the code it
 covers moves (`oss bone_set_touch`, `oss risk_gate_set_touch`). That is a
 correction the caller applies, **not a detector**: nothing here notices that a
@@ -141,10 +154,12 @@ something other than a string rather than reading that as undispatched. One
 clause survives on the dispatch write, and it is the clause the withdrawal rail
 stands on: a `work_item_exec` whose payload records no dispatch at all is refused
 on an item that records one, because erasing the record is how the strand is
-entered. The mirror refusal, the landed-item refusal and the spine-level
-retirement refusal do **not** ship in this release (#563) — they are point checks
-over a record this same verb family can rewrite, and two review rounds found
-another disagreement each time; what the release claims is what it enforces. A
+entered. Three other refusals do **not** ship in this release (#563): the
+mirror refusal (a dispatch onto a withdrawn item), the landed-provenance refusal
+(marking `complete` an item that records no dispatch — a different check from the
+withdrawal's `complete` clause above, which does ship) and the spine-level
+retirement refusal. Two review rounds found another disagreement each time they
+were tried; what the release claims is what it enforces. A
 duplicate work-item id is named as a duplicate (rc 7, pointing at #305) instead
 of being misreported as a state-read failure, and it is refused for every status
 rather than for `abandoned` alone. No journal op, payload key or status value

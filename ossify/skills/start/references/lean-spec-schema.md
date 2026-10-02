@@ -19,7 +19,7 @@ a *record of a decision made*, never a prophecy.
 | 4 | **Bones-registry index** | One row per bone: ADR ref, title, touch surface, revisit trigger, verified/unverified claims. The ADR bodies live as separate files. | SKILL §7, §9 |
 | 5 | **Risk gates** | One row per gate: name, touch surface, control checklist. | SKILL §8 |
 | 6 | **Posture & boundary** | Posture, channel(s), overlay seam, `PUBLIC_BOUNDARY.md` pointer, private-inventory pointer. No moat item named in any public-routed copy. | SKILL §10 |
-| 7 | **Release-0 minimums** | What each artifact above is deliberately deferring, and the trigger that grows it. | SKILL §12 |
+| 7 | **Release-0 minimums** | What each artifact above is deliberately deferring, and the trigger that grows it. | SKILL §11, applying §12's floors |
 
 Two derived artifacts accompany it: **EXECUTIVE-SUMMARY.md** (a spec-derived
 read of sections 1-3, for a human skimming the project) and the **seed feature
