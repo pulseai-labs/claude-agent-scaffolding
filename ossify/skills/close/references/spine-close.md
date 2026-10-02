@@ -229,10 +229,10 @@ Edit only the body's `## Known limits` section, with `gh pr edit --body-file`:
 leave the first two lines and every other field as they are, since review may
 have changed them, and keep every limit the PR gained in review. Do it on an OPEN
 resumed PR before you hand it to `/ossify:work-pr`, and on a MERGED one too.
-On a MERGED resumed PR, merge-bar may already have
-written its limits to the tech-debt ledger. Read that ledger's lines for this PR.
-Remove each one that belongs to another repo, and
-every repeat of a repo-agnostic limit but one.
+On a MERGED resumed PR, merge-bar may already have written its limits to the
+tech-debt ledger, and this close does not repair those lines: a ledger line names
+its PR but not its repo, so a deletion could remove another repo's limit. Leave
+them, and name the PR in the close's report.
 
 ```bash
 # $spine_slug is NOT ambient — nothing in state holds it. Recover it from the

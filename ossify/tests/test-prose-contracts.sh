@@ -776,8 +776,10 @@ _pin "$_r" "entities.sh's rail header says one guard ships while the file define
 _r=1; grep -Fq "section 7 applies §12's floors" "$_OSSR/skills/start/SKILL.md" && _r=0
 _pin "$_r" "start/SKILL.md §11 authors the spec from §4-§10 only - the audit reads it without section 7"
 # (B) spine-close reconciliation covers a MERGED resumed PR and repo-agnostic limits.
-_r=1; grep -Fq 'On a MERGED resumed PR' "$_SC" && grep -Fq 'every repeat of a repo-agnostic limit but one' "$_SC" && _r=0
-_pin "$_r" "spine-close.md's reconciliation skips a MERGED resumed PR or leaves repo-agnostic limits on every PR - duplicate [KL] lines still reach the ledger"
+#     Narrowed at #633 round 3 (operator): no instruction deletes ledger lines - a line
+#     names its PR but not its repo, so a deletion can remove another repo's limit.
+_r=1; grep -Fq 'On a MERGED resumed PR' "$_SC" && grep -Fq 'a repo-agnostic limit stays only on the first hosting repo' "$_SC" && grep -Fq 'does not repair those lines' "$_SC" && ! grep -Fq 'Remove each one that belongs to another repo' "$_SC" && _r=0
+_pin "$_r" "spine-close.md's reconciliation skips a MERGED resumed PR, leaves repo-agnostic limits on every PR, or deletes ledger lines it cannot attribute to a repo"
 
 # #633 round 2 - one Codex class, pinned red before its fix.
 # (C) the reconciliation edits only the Known limits section, on open AND merged PRs.
