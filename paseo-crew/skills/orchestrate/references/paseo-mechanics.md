@@ -57,11 +57,10 @@ segment, never Paseo's encoded string, which no worker can be expected to echo:
 3. **Model check.** `paseo inspect <id> --json`: `Model` must equal the expected model's full
    id. A mismatch is a failed launch: the seat took its brief as `initialPrompt` and may
    already have written, so read its activity and reconcile anything it touched — never adopt
-   its artifacts — then `cancel_agent` it, the one release path that cancels a seat still
-   working, and release it under Teardown's no-longer-working precondition, reporting it. The
-   brief's "state your model in your first reply" is the second check, against the model
-   segment, and the one that catches a lane whose provider silently reroutes, because
-   `inspect` reports what Paseo asked for, not what answered.
+   its artifacts — then `cancel_agent` it and release it under Teardown's no-longer-working
+   precondition, reporting it. The brief's "state your model in your first reply" is the
+   second check, against the model segment, and the one that catches a lane whose provider
+   silently reroutes, because `inspect` reports what Paseo asked for, not what answered.
 4. **Arm the wait**, as Completion states.
 
 The orchestrator never runs `paseo run` for a worker. That command arms no finish notice,
