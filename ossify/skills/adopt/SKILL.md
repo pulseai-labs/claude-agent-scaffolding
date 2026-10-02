@@ -1,6 +1,6 @@
 ---
 name: adopt
-description: Adopt an existing project into ossify — five fail-closed gates, six conversions (journey re-marked shipped|next|later, the current cut as a present-tense clean-checkout test, bones back-derived from ADRs, Release 0 closed retroactively, artifacts reconciled, demo-ledger seed candidates recorded), and an adoption record. For the codebase that already has code, tests, history, and decisions; /ossify:start refuses it.
+description: Adopt an existing project into ossify — six fail-closed gates, six conversions (journey re-marked shipped|next|later, the current cut as a present-tense clean-checkout test, bones back-derived from ADRs, Release 0 closed retroactively, artifacts reconciled, demo-ledger seed candidates recorded), and an adoption record. For the codebase that already has code, tests, history, and decisions; /ossify:start refuses it.
 ---
 
 # adopt
@@ -98,7 +98,7 @@ slice close, then re-run — never "clean your tree", which fixes a symptom.
   file is inventory, not position). An active slice there refuses and
   names it.
 
-Once all five pass, **record a baseline SHA per declared repo** — `git -C
+Once all six pass, **record a baseline SHA per declared repo** — `git -C
 "$(oss repo_root <name>)" rev-parse HEAD` for each; the adoption record
 cites a **baseline table**, not one SHA, and everything downstream is
 relative to each repo's own baseline. Then `"$oss_bin" init "<project-name>"` —

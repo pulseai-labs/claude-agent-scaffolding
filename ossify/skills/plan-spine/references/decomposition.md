@@ -83,7 +83,10 @@ the dispatch (`work-item/references/round-orchestration.md` §3). The round walk
 spine close and release close all skip an `abandoned` item, so withdrawing any of
 those would strand its work. A withdrawal made by mistake is reversed with
 `"$oss_bin" work_item_status <wi-id> planned`; an `active` item takes that route
-too, once its round was abandoned without a landing.
+too, once its round was abandoned without a landing. Either reversal holds
+only while its spine is still open: inside a closed spine, a planned item lands
+its repo at the next release close, so carry the work into a new spine instead
+(`close/references/work-item-close.md` §1).
 
 **A withdrawal owes the demo ledger too.** If the withdrawn item was the reason
 this spine planned a `ledger_supersede` or `ledger_retire`, that amendment is
