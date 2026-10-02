@@ -67,7 +67,10 @@ reason.
 
 A profile with no `model` launches on its provider's default model id, read from
 `list_models`; an operator who wants a seat pinned to a specific model adds `model` to
-that profile rather than relying on the default.
+that profile rather than relying on the default. Every profile a seat names must carry
+`modeId`: Paseo refuses a launch whose mode the target provider does not offer, so a profile
+without one halts the first launch rather than picking a mode for it
+(`references/paseo-mechanics.md`, The seat launch).
 
 ## What ships
 

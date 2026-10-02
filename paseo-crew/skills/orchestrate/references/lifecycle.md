@@ -7,9 +7,9 @@ Every command's syntax comes from Paseo's own `paseo` skill.
    every command's syntax comes from that guide. Single-command probes only: branch,
    `git status`, open PRs, the run's `run.json` (and its `dagr check --strict`
    lint), `paseo status`, `paseo inspect <id> --json`. **The daemon must be at least
-   0.10.2**: the `paseo status` above reads `daemonVersion`, and a lower one is the
-   unreachable-daemon stop `SKILL.md` §7 states — say so and stop — because 0.9.2
-   crash-loops resuming an agent whose cwd was deleted. Then bind or create the run's
+   0.10.2**: the `paseo status` above reads `daemonVersion`, and a lower one stops the run
+   — say so and stop — because 0.9.2 crash-loops resuming an agent whose cwd was deleted.
+   Then bind or create the run's
    `run.json` for the objective — **binding** an existing one is naming its path, with no
    CLI call,
    and you continue from the one the operator names when resuming. **Creating**
