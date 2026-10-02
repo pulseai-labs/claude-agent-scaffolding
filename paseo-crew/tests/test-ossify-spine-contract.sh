@@ -1771,7 +1771,7 @@ section "the run's preconditions"
 # already include `paseo status`, which reports `daemonVersion`, so the check costs no new
 # command and SKILL.md §7 only points at it. `pin` is exactly-once, so a SECOND
 # restatement of the figure in that file is a RED rather than a silent duplicate.
-pin "$LIFECYCLE_MD" '0.10.2' "the minimum daemon version is stated once, in the orient step"
+pin "$LIFECYCLE_MD" '0.10.2' "the minimum daemon version is stated once, in lifecycle.md"
 
 # #621: the seat launch's no-`modeId` gap reads the provider's modes to name them, so the
 # MCP form is on the command's own tool list, beside `list_models`, which the no-`model`

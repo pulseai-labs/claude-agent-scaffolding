@@ -155,23 +155,43 @@ for gone in 'herdr' 'HERDR_' 'pane' '--until' 'wait-output' '--machine'; do
 done
 
 section "budget"
-# <file> → its over-budget line when the file is past REF_BUDGET, nothing when it is within
-# it. The check and the control below both go through this one comparison, so the control
-# exercises the predicate itself rather than restating its arithmetic.
-over_budget() {
-  _n="$(wc -l < "$1" | tr -d ' ')"
-  [ "$_n" -le "$REF_BUDGET" ] || printf '%s lines, over by %s\n' "$_n" "$((_n - REF_BUDGET))"
+# <file> → "<lines> <over-by>" on one line: the file's line count, and how far past
+# REF_BUDGET it is (0 when within). ONE read feeds both the count and the verdict — the pass
+# message used to recompute `wc -l`, a second read that could disagree with the predicate's —
+# and a file that cannot be read is REFUSED with a non-zero status rather than counted: an
+# empty count is exactly what a file within budget looks like, so returning one would
+# certify a file nobody read (#626 review round 1, findings 13-15). _helpers.sh carries no
+# line counter to reuse, so this is the minimal local one.
+budget_report() { # <file>
+  [ -f "${1:-}" ] || return 1
+  _n="$(wc -l < "$1" | tr -d ' ')" || return 1
+  [ -n "$_n" ] || return 1
+  if [ "$_n" -gt "$REF_BUDGET" ]; then printf '%s %s\n' "$_n" "$((_n - REF_BUDGET))"
+  else printf '%s 0\n' "$_n"; fi
 }
-if over="$(over_budget "$REF")" && [ -z "$over" ]; then pass "paseo-mechanics.md within the reference budget ($(wc -l < "$REF" | tr -d ' ') lines)"
-else fail "paseo-mechanics.md within the reference budget" "$over"; fi
+if r="$(budget_report "$REF")"; then
+  lines="${r%% *}"; over="${r##* }"
+  if [ "$over" -eq 0 ]; then pass "paseo-mechanics.md within the reference budget ($lines lines)"
+  else fail "paseo-mechanics.md within the reference budget" "$lines lines, over by $over"; fi
+else fail "paseo-mechanics.md within the reference budget" "unreadable: $REF"; fi
 # The 2026-10-02 raise above is a loosening, so its adjacent control sits here: a file past
-# the NEW limit must still fail the same comparison. A budget nothing can exceed does not
-# bound anything.
+# the NEW limit must still fail the same comparison, and one that cannot be read must be
+# refused rather than counted as within it. A budget nothing can exceed bounds nothing.
 ctl_over="$(mktemp)"
 awk -v n="$((REF_BUDGET + 1))" 'BEGIN { for (i = 0; i < n; i++) print "" }' > "$ctl_over"
-if over="$(over_budget "$ctl_over")" && [ -n "$over" ]; then pass "control: the budget still fails a file past the limit"
-else fail "control: the budget still fails a file past the limit" "an over-limit fixture read [$over] and passed"; fi
-rm -f "$ctl_over"
+if r="$(budget_report "$ctl_over")" && [ "${r##* }" -gt 0 ]; then pass "control: the budget still fails a file past the limit"
+else fail "control: the budget still fails a file past the limit" "an over-limit fixture read [$r] and passed"; fi
+if ! r="$(budget_report "$ctl_over/gone")"; then pass "control: an unreadable file is refused, not counted as within budget"
+else fail "control: an unreadable file is refused, not counted as within budget" "read [$r]"; fi
+# The real file sits exactly ON the limit, so its pass cannot separate "within" from
+# "over": a predicate that always reported an overshoot would read the same there. This
+# one line under the limit is the case that separates them — measured, mutating the
+# comparison to `[ "$_n" -ge 0 ]` left the suite green until this control existed.
+ctl_under="$(mktemp)"
+awk -v n="$((REF_BUDGET - 1))" 'BEGIN { for (i = 0; i < n; i++) print "" }' > "$ctl_under"
+if r="$(budget_report "$ctl_under")" && [ "${r##* }" -eq 0 ]; then pass "control: a file within the budget reports no overshoot"
+else fail "control: a file within the budget reports no overshoot" "read [$r]"; fi
+rm -f "$ctl_over" "$ctl_under"
 
 section "no personal name ships"
 hits=0
