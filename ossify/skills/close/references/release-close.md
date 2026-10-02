@@ -327,7 +327,10 @@ and, on origin's repository, the merged PRs whose head branch starts `fix/` with
 If that returns 1000 rows, raise the limit: a truncated list drops patches. A repo
 with no `origin` (spine close's local arm, or another remote name the patch lane
 refuses) has nothing to fetch from and no PRs to list — skip the fetch and the
-`gh` call there and read its local tags alone. Read
+`gh` call there and read its local tags alone. Likewise skip the `gh pr list` call where `gh repo view` cannot resolve `origin`
+(`gh repo view "$(git -C "<repo-root>" remote get-url origin)" --json url`): the
+patch lane refuses a non-GitHub origin, so it has no patch PRs there; its
+tags are still read. Read
 both, and list each patch — its tag, its PR and the issues it closed — under the
 retrospective's "what shipped" and in the close summary (SKILL.md §10). A
 direct-commit patch-lane change (`references/patch-lane.md`) carries no version

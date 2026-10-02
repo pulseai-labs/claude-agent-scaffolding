@@ -200,7 +200,8 @@ for word, so the bar exists before the first review.
   ledger lines its planning left accepted that sit on that repo's paths, each
   with its reason. merge-bar writes each PR's limits to the ledger after its
   merge, so a limit on two PRs lands twice. A limit that belongs to no one repo
-  goes on the first hosting repo's PR alone.
+  goes on the first hosting repo that opens a PR, and on that PR alone: a repo
+  with no remote takes the local arm and opens none.
 - **Evidence** — the gates each work item's close ran, with their results;
   nothing that did not run.
 - **Closes** — `None.` The intake requests this spine pulled in are listed as

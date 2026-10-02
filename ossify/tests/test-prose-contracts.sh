@@ -718,5 +718,13 @@ _pin "$_r" "patch/SKILL.md §4 compares origin URLs by nameWithOwner - two GitHu
 _r=1; grep -Fq 'fetch --tags origin' "$_RC" && ! grep -Fq 'fetch --tags <remote>' "$_RC" && _r=0
 _pin "$_r" "release-close.md fetches patch tags from an unnamed <remote> - a multi-remote repo can miss what /ossify:patch pushed to origin"
 
+# #619 round 3 (operator-approved) - two findings this PR introduced.
+# (2b) spine-close: a repo-agnostic limit goes on a repo that OPENS a PR - a local-arm repo has none.
+_r=1; grep -Fq 'first hosting repo that opens a PR' "$_SC" && _r=0
+_pin "$_r" "spine-close.md routes repo-agnostic Known limits to the first hosting repo, which may take the local arm and open no PR - the limit never reaches the ledger"
+# (4b) release-close: skip the PR lookup where origin is not a GitHub repository.
+_r=1; grep -Fq 'skip the `gh pr list` call where `gh repo view` cannot resolve `origin`' "$_RC" && _r=0
+_pin "$_r" "release-close.md runs gh pr list against a non-GitHub origin in a declared repo - patch discovery fails on a supported topology"
+
 rm -rf "$_PC_TMP"
 t_summary
