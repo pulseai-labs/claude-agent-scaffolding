@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.1.2
+
+Three gaps the 0.1.0 pilot found, all of them in what the run does to a seat rather than in the
+seats themselves (#620, #621).
+
+The seat launch no longer says a profile with no `modeId` "passes none" (#621). Paseo refuses a
+launch with no mode when the caller's mode is not one the target provider offers, and modes are
+provider-specific, so there is nothing to pass and nothing to inherit. A profile with no `modeId` is
+now the same kind of gap as a profile with no `model`: the launch reads the provider's mode ids
+(`inspect_provider` carries them as `{id, label}` pairs, and the refusal itself lists them) and halts,
+naming the profile to fix and listing them. It never picks a mode
+the operator did not — the handoff's successor materialisation carries the gap too, and the
+command's `allowed-tools` gains `mcp__paseo__inspect_provider` for the read.
+
+Teardown now waits for the seat to stop working (#620). A seat's `report` exit fires on its first
+write, so a seat that woke the waiter may still be running — the pilot's verifier was archived
+mid-rewrite — and a release reads `paseo inspect <id> --json` and requires `idle`, `error` or
+`closed` after the report rather than the report alone: a seat that escalated on `error` or was
+cancelled on `closed` never reaches `idle`, and one still working past the dispatch's
+`SETTLE_WINDOW` is escalated to the operator, whose call the cancel is.
+
+Before `archive_workspace` removes a run-created worktree, Teardown names the operator every seat in
+that workspace by its title and agent id, asks for those tabs to be closed in any connected client
+app, and archives only on the operator's confirmation (#620). That archive removes the cwd out from
+under a client that still holds a tab on the agent, and such a client keeps asking the daemon to
+resume it. That is why the minimum daemon is now 0.10.2, checked as an orient precondition
+(`lifecycle.md` step 1) — 0.9.2 crash-loops on exactly that resume, where 0.10.2 logs and keeps
+running.
+
 ## 0.1.1
 
 The `context_ceiling` setting and the hook now agree on what a valid one is (#611). The manifest's

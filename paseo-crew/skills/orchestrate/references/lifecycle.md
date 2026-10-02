@@ -6,8 +6,12 @@ Every command's syntax comes from Paseo's own `paseo` skill.
 1. **Orient.** Your first commands are Paseo's own `paseo` skill and `list_profiles`;
    every command's syntax comes from that guide. Single-command probes only: branch,
    `git status`, open PRs, the run's `run.json` (and its `dagr check --strict`
-   lint), `paseo status`, `paseo inspect <id> --json`. Then bind or create the run's `run.json` for the
-   objective — **binding** an existing one is naming its path, with no CLI call,
+   lint), `paseo status`, `paseo inspect <id> --json`. **The daemon must be at least
+   0.10.2**: the `paseo status` above reads `daemonVersion`, and a lower one stops the run
+   — say so and stop — because 0.9.2 crash-loops resuming an agent whose cwd was deleted.
+   Then bind or create the run's
+   `run.json` for the objective — **binding** an existing one is naming its path, with no
+   CLI call,
    and you continue from the one the operator names when resuming. **Creating**
    one is dagr's producer contract, never a bare write: resolve the `dagr`
    validator first (`dagr --skill`) and, with none available, do not start
@@ -61,7 +65,8 @@ Every command's syntax comes from Paseo's own `paseo` skill.
 3. **Launch.** The seat launch is `roles.md`'s "The launch." The "state your model"
    line is the worker's own second check: a model that is not `SEAT_EXPECTED_MODEL` is a
    failed launch it writes to its report file and stops on. A wrong model at the
-   launch's own model check: release the seat and report it.
+   launch's own model check is `paseo-mechanics.md`'s The seat launch, step 3, which owns
+   the cancel and the release; this step reports the failure.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes, the same
@@ -241,11 +246,13 @@ travels with it too — `/ossify:handoff` with ossify installed, the same file b
 without it.
 
 Then follow `paseo-mechanics.md`'s Handoff (D3), in the order it fixes so that no
-seat ever has two waiters and one report wakes one orchestrator: **stand down
-first** — kill this session's armed background waits and `delete_heartbeat`, and
-take no further dispatch action. **Launch the successor as `paseo-mechanics.md`'s
-Handoff states: detached, in this session's workspace, its resume as the launch
-prompt, verified settled and parentless.** A failed launch is cancelled with `cancel_agent`
+seat ever has two waiters and one report wakes one orchestrator: **materialise your
+successor's profile first** — its two gaps resolved — so a halt there leaves this
+session the orchestrator with its waits still armed. Then **stand down** — kill this
+session's armed background waits and `delete_heartbeat`, and take no further
+dispatch action — and **launch the successor as `paseo-mechanics.md`'s Handoff
+states: detached, in this session's workspace, its resume as the launch prompt,
+verified settled and parentless.** A failed launch is cancelled with `cancel_agent`
 and never archived; this session re-arms its own waits and a fresh heartbeat from
 the handoff it just wrote, reports the failed successor's agent id to the operator, and
 remains the orchestrator. The run file's `run.orchestrator` block still names

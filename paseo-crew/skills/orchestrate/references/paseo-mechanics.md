@@ -22,8 +22,12 @@ materialised into one `create_agent` call as Paseo's skill maps it: `provider` +
   reads that provider's default model id from `list_models` and materialises
   `<provider>/<default id>`. If no default can be read, the launch halts and names the
   profile to fix (add `model`). Never a guessed id.
-- **A profile with no `modeId`** passes none. It never inherits the caller's mode: modes are
-  provider-specific and do not carry across providers.
+- **A profile with no `modeId`.** It is a launch gap, never a mode to omit: Paseo refuses a
+  launch with no mode when the caller's mode is not one the target provider offers, and
+  modes are provider-specific — they do not carry across providers. Handle it as the
+  no-`model` gap: `inspect_provider` carries the provider's modes as `{id, label}` pairs,
+  and the refusal lists them too; read the ids there, then halt naming the profile to fix
+  (add `modeId`), listing them.
 
 **The expected model** is the id the launch materialised (the profile's `model`, or that
 default id), matched exactly by step 3's `inspect` check. A brief's `SEAT_EXPECTED_MODEL`
@@ -52,11 +56,11 @@ segment, never Paseo's encoded string, which no worker can be expected to echo:
    in Paseo's subagent track.
 3. **Model check.** `paseo inspect <id> --json`: `Model` must equal the expected model's full
    id. A mismatch is a failed launch: the seat took its brief as `initialPrompt` and may
-   already have written, so read its activity, reconcile anything it touched — never adopt
-   its artifacts — then archive it and report it (`roles.md`). The brief's
-   "state your model in your first reply" is the second check, against the model segment, and
-   the one that catches a lane whose provider silently reroutes, because `inspect` reports
-   what Paseo asked for, not what answered.
+   already have written, so read its activity and reconcile anything it touched — never adopt
+   its artifacts — then `cancel_agent` it and release it under Teardown's no-longer-working
+   precondition, reporting it. The brief's "state your model in your first reply" is the
+   second check, against the model segment, and the one that catches a lane whose provider
+   silently reroutes, because `inspect` reports what Paseo asked for, not what answered.
 4. **Arm the wait**, as Completion states.
 
 The orchestrator never runs `paseo run` for a worker. That command arms no finish notice,
@@ -199,10 +203,25 @@ Every seat runs on the daemon the orchestrator talks to; cross-machine seats are
 
 ## Teardown
 
-A seat is released with `archive_agent` once its artifacts are safe: the implementer after
-`lifecycle.md` step 12's merged-branch check, the reviewer once the review is final
-(step 8), the verifier at pass or escalation. A worktree workspace the run created is
-released with `archive_workspace` only after every seat in it is archived; Paseo then
+A seat is released with `archive_agent` once its artifacts are safe and it is no longer
+working — `paseo inspect <id> --json` reads `idle`, `error` or `closed`, never `running` or
+`initializing`: the implementer after `lifecycle.md` step 12's merged-branch check, the
+reviewer once the review is final (step 8), the verifier at pass or escalation. A `report`
+exit fires on the seat's first write, so a seat that woke the wait may still be running, and
+one that escalated on `error` or was cancelled on `closed` never reaches `idle` at all: the
+release waits for a settled status after the report, never for the report alone, cancelling a
+seat still working (The seat launch's model check). That wait is bounded by the
+dispatch's `SETTLE_WINDOW`: past it with the seat still working, escalate to the operator,
+whose call the cancel is, never a silent wait.
+Only the session that holds the operator archives a run-created workspace with
+`archive_workspace`, once every seat in it is archived and the operator has confirmed the
+tabs those seats hold are closed in any connected client app: that archive removes the
+worktree, and a client holding a tab on an agent whose cwd is gone keeps asking the daemon to
+resume it. So before that archive, name for the operator every seat in that workspace by its
+title and agent id, and ask for those tabs to be closed; archive only on the confirmation. A
+coordinator seat (a spine or work-PR session) holds no operator channel: it archives its own
+seats as above, and lists in its report every run-created workspace it did not archive — id,
+path, and each seat's title and agent id — for the top to confirm and archive. Paseo then
 removes the worktree itself, once no active workspace references it.
 Close only what the run created: the orchestrator's own workspace, and any the operator
 opened, are never archived by the run.
@@ -226,18 +245,22 @@ with ossify installed, the same file by hand without), recording every live seat
 Then, in this order, so that no seat ever has two waiters and one report wakes one
 orchestrator:
 
-1. **Stand down first.** Kill this session's armed background waits and `delete_heartbeat`,
+0. **Materialise the successor's profile first** — The seat launch's two gaps included — so
+   that a halt there leaves this session the orchestrator with nothing stood down.
+1. **Stand down.** Kill this session's armed background waits and `delete_heartbeat`,
    and take no further dispatch action. From here every wake (a child seat's finish notice,
    a heartbeat turn that raced the deletion, a wait that fires anyway) is read and handed on,
    never acted on, unless step 3's failure branch re-arms. The gap loses nothing: reports
    persist on disk, and a re-armed wait compares against the pair the handoff noted, so a
    report written in the gap wakes it at once.
 2. **Launch the successor detached**, from this session's own profile, materialised as The
-   seat launch states (`--mode` and `--thinking` only where the profile sets them). Its
-   launch prompt, `<resume>`, is `/ossify:handoff-resume <path>` with ossify installed, and
-   the handoff path as its first instruction without; it takes no second resume message:
+   seat launch states and already resolved in step 0 — so `--mode` is always passed, from
+   the profile's `modeId`. Its launch prompt, `<resume>`, is
+   `/ossify:handoff-resume <path>` with ossify installed, and the handoff path as its first
+   instruction without; it takes no second resume message:
 
-       env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d --json --title "<run>: orchestrator" --workspace <current> --provider <provider>/<model> --mode <modeId> --thinking <thinkingOptionId> "<resume>"
+       env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d --json --title "<run>: orchestrator" --workspace <current> --provider <provider>/<model> --mode <modeId> "<resume>"
+       # insert --thinking <thinkingOptionId> before <resume> only where the profile sets one
 
    Both variables are unset because `paseo run` inside an agent reads its caller from them
    and makes the new agent that caller's child. `paseo run` takes no feature values, so a

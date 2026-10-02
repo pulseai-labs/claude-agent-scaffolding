@@ -19,7 +19,7 @@ the two differ.
 
 ## Requirements
 
-- **Paseo 0.9.2 or later**, running, with its MCP server attached to the orchestrator
+- **Paseo 0.10.2 or later**, running, with its MCP server attached to the orchestrator
   session.
 - **This session is itself a Paseo agent** (`PASEO_AGENT_ID` set): the context-ceiling
   hook is gated on it, and every seat is launched as this session's own subagent, drawn in
@@ -67,7 +67,10 @@ reason.
 
 A profile with no `model` launches on its provider's default model id, read from
 `list_models`; an operator who wants a seat pinned to a specific model adds `model` to
-that profile rather than relying on the default.
+that profile rather than relying on the default. Every profile a seat names must carry
+`modeId`: Paseo refuses a launch whose mode the target provider does not offer, so a profile
+without one halts the first launch rather than picking a mode for it
+(`references/paseo-mechanics.md`, The seat launch).
 
 ## What ships
 
@@ -195,8 +198,9 @@ runs them on a user's path.
 
 ## The handoff
 
-The orchestrator's own rotation **stands down first** — it kills its armed waits and
-deletes its heartbeat — and only then launches its successor **detached**:
+The orchestrator's own rotation **materialises its successor's profile first** — so a gap
+halt leaves it the orchestrator with its waits armed — and **then stands down**: it kills
+its armed waits and deletes its heartbeat, and only then launches its successor **detached**:
 `env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d`, with the resume as the launch
 prompt, so the new agent is not parented to the session standing down. `paseo inspect
 <new id> --json` then confirms the successor started and `ParentAgentId` is `null`; a
