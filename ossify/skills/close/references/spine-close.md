@@ -222,11 +222,16 @@ input.
 On the resume arm the PR already exists, so the block loads no fields and the
 body is the one the PR was opened with. A close resumed after an upgrade can find
 a PR opened under 1.13.0, whose body carries the spine-wide Known limits. Before
-you hand a resumed PR to `/ossify:work-pr`, reconcile the resumed PR's Known limits
-with this repo's fields file. Where the body carries a limit that belongs to
-another repo, rewrite the fields after the `pushed-tip:` line with
-`gh pr edit --body-file`, and keep the first two lines byte for byte. Keep every
-limit the PR gained in review; remove only another repo's.
+the second pass records the landing, reconcile the resumed PR's Known limits with
+this repo's fields file, by the rule above: each PR keeps its own repo's limits,
+and a repo-agnostic limit stays only on the first hosting repo that opens a PR.
+On an OPEN resumed PR, do it before you hand the PR to `/ossify:work-pr`: rewrite
+the fields after the `pushed-tip:` line with `gh pr edit --body-file`, keep the
+first two lines byte for byte, and keep every limit the PR gained in review.
+On a MERGED resumed PR the body is past editing, and merge-bar may already have
+written its limits to the tech-debt ledger. Read that ledger's lines for this PR.
+Remove each one that belongs to another repo, and
+every repeat of a repo-agnostic limit but one.
 
 ```bash
 # $spine_slug is NOT ambient — nothing in state holds it. Recover it from the
