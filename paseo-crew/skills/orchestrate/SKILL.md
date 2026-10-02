@@ -66,7 +66,8 @@ Three consequences:
   not a read from this session. It returns once, and handling that exit arms the
   dispatch's next wait — a dispatch never holds two waits at once, and an exited wait is
   never restarted in place. Beyond that, the only bounded reads are the launch's
-  model check (`references/roles.md`), and the one `/context` reply at each task boundary,
+  model check (`references/roles.md`), the release's `Status` read
+  (`references/paseo-mechanics.md`'s Teardown), and the one `/context` reply at each task boundary,
   sent with `send_agent_prompt` and read with `get_agent_activity`, for a seat that can
   answer the probe — one that cannot rotates at its item boundary instead
   (`references/roles.md`) — and a dsh spine driver's transcript reads, with the one shell

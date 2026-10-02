@@ -53,7 +53,13 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # leaves this session the orchestrator, and its `--mode` is passed from that resolution
 # rather than left to the profile's omission. The mode-id source correction (#1) and the
 # refusal bullet (#11) are line-neutral.
-REF_BUDGET=281
+# 2026-10-02, #626 review round 1, teardown class (#2, #3, #4, #10): raised from 281 by 7 —
+# the release precondition is "no longer working" (`idle`, `error` or `closed`), because a
+# seat that escalated or was cancelled never reaches `idle` and could otherwise never be
+# archived; the wait for it is bounded by `SETTLE_WINDOW` and escalates rather than hanging;
+# and `archive_workspace` belongs to the session holding the operator, a coordinator seat
+# listing the workspaces it leaves instead of archiving them.
+REF_BUDGET=288
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

@@ -179,9 +179,10 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      confirm and report the resulting merge SHA, surfacing any deviation
      rather than adopting it. Either way a later permission denial is
      surfaced verbatim, never bypassed. Then release both seats, as MECHANICS's Teardown says, with
-     `list_agents` showing none of them — only what you can prove is yours;
-     report any teardown you cannot complete rather than claiming it. You
-     are exempt from any record-pass hold.
+     `list_agents` showing none of them — only what you can prove is yours; it
+     archives no workspace, listing each run-created one it leaves with its id, path
+     and each seat's title and agent id, as Teardown says. Report any teardown you
+     cannot complete rather than claiming it. You are exempt from any record-pass hold.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 

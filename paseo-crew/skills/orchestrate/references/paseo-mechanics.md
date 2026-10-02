@@ -203,19 +203,26 @@ Every seat runs on the daemon the orchestrator talks to; cross-machine seats are
 
 ## Teardown
 
-A seat is released with `archive_agent` once its artifacts are safe and its `Status` reads
-`idle` in `paseo inspect <id> --json`: the implementer after `lifecycle.md` step 12's
-merged-branch check, the reviewer once the review is final (step 8), the verifier at pass
-or escalation. A `report` exit fires on the seat's first write, so a seat that woke the
-wait may still be running — the release waits for `idle` after the report, never for the
-report alone.
-A worktree workspace the run created is released with `archive_workspace` only after every
-seat in it is archived and the operator has confirmed the tabs those seats hold are closed
-in any connected client app: that archive removes the worktree, and a client holding a tab
-on an agent whose cwd is gone keeps asking the daemon to resume it. So before that archive,
-name for the operator every seat in that workspace by its title and agent id, and ask for
-those tabs to be closed; archive only on the confirmation. Paseo then removes the worktree
-itself, once no active workspace references it.
+A seat is released with `archive_agent` once its artifacts are safe and it is no longer
+working — `paseo inspect <id> --json` reads `idle`, `error` or `closed`, never `running` or
+`initializing`: the implementer after `lifecycle.md` step 12's merged-branch check, the
+reviewer once the review is final (step 8), the verifier at pass or escalation. A `report`
+exit fires on the seat's first write, so a seat that woke the wait may still be running, and
+one that escalated on `error` or was cancelled on `closed` never reaches `idle` at all: the
+release waits for a settled status after the report, never for the report alone, cancelling a
+seat still working (`lifecycle.md` step 3's wrong-model check). That wait is bounded by the
+dispatch's `SETTLE_WINDOW`: past it with the seat still working, escalate to the operator,
+whose call the cancel is, never a silent wait.
+Only the session that holds the operator archives a run-created workspace with
+`archive_workspace`, once every seat in it is archived and the operator has confirmed the
+tabs those seats hold are closed in any connected client app: that archive removes the
+worktree, and a client holding a tab on an agent whose cwd is gone keeps asking the daemon to
+resume it. So before that archive, name for the operator every seat in that workspace by its
+title and agent id, and ask for those tabs to be closed; archive only on the confirmation. A
+coordinator seat (a spine or work-PR session) holds no operator channel: it archives its own
+seats as above, and lists in its report every run-created workspace it did not archive — id,
+path, and each seat's title and agent id — for the top to confirm and archive. Paseo then
+removes the worktree itself, once no active workspace references it.
 Close only what the run created: the orchestrator's own workspace, and any the operator
 opened, are never archived by the run.
 

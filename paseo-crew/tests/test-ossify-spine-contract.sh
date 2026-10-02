@@ -1980,14 +1980,19 @@ budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
 # 2026-09-27: narrowed by operator ruling — the pass-counting and seat-routing prose is
 # deleted for the requirement ("every pushed head gets a reviewed delta"), so the
 # budget goes back down to the new count (205).
-budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget" 205
+# #626 review round 1 (#3, 2026-10-02): raised from 205 to 206 — a coordinator seat holds
+# no operator channel, so it archives its own seats and lists the run-created workspaces
+# it leaves (id, path, each seat's title and agent id) for the top to confirm and archive.
+budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget" 206
 # R16 (2026-09-27, fix round 1, issues 2 and 3): ossify-briefs.md's budget is raised
 # from 200 to 205, exactly the 5 lines restoring the item seat's placement ("in the
 # worktree ossify prepared for the item"), "with the verifier's summary", "a second
 # failure asks again", "in your own state", "runs the ordinary work-item entry", and
 # the item verifier's "you are retained for this one until it passes or escalates"
 # put back — no other change moved its line count.
-budget "$BRIEFS_MD" "ossify-briefs.md is within the reference budget" 205
+# #626 review round 1 (#3, 2026-10-02): raised from 205 to 206 — the same coordinator
+# clause as ossify-pr-briefs.md's.
+budget "$BRIEFS_MD" "ossify-briefs.md is within the reference budget" 206
 budget "$WRITER_MD" "ossify-close-writer.md is within the reference budget"
 
 # #514, L1: the shape, asserted rather than assumed — a counter re-copied into any

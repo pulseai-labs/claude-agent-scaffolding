@@ -65,7 +65,8 @@ Every command's syntax comes from Paseo's own `paseo` skill.
 3. **Launch.** The seat launch is `roles.md`'s "The launch." The "state your model"
    line is the worker's own second check: a model that is not `SEAT_EXPECTED_MODEL` is a
    failed launch it writes to its report file and stops on. A wrong model at the
-   launch's own model check: release the seat and report it.
+   launch's own model check: cancel it, release it as `paseo-mechanics.md`'s Teardown
+   says, and report it.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes, the same
