@@ -88,8 +88,9 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 DONE: release every item pair, as MECHANICS's Teardown says, with
 `list_agents` showing none of them — every item seat archived and confirmed
 gone before this report reaches the top; this session is never archived to
-clean them up. Report teardown you cannot complete, never claim it. Then write
-your report file:
+clean them up and archives no workspace, listing each run-created one it leaves
+with its id, path and each seat's title and agent id, as Teardown says. Report
+teardown you cannot complete, never claim it. Then write your report file:
   Changed / Evidence / Open / Files as ids, SHAs, counts and a report path, and the path of RUN_JSON.
 ROTATE instead once the context-ceiling notice has fired: stop at the next round barrier,
 do the same teardown, write `/ossify:handoff`, and write `rotate: <handoff path>` to your

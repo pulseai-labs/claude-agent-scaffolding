@@ -42,7 +42,32 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # 2026-09-27: narrowed by operator ruling — the failed-successor branch is a fail-closed
 # stop (cancel, never archive, report the id) and the child-reconcile procedure is
 # deleted; the budget goes DOWN to the new count.
-REF_BUDGET=266
+# 2026-10-02, #620/#621 (0.1.2): raised from 266 by 13, exactly the lines the two issues
+# needed and no others — the no-`modeId` launch gap, which now halts and names the profile
+# rather than omitting a mode Paseo refuses (#621, +4); Teardown's `idle`-after-the-report
+# release and the client-tab confirmation before `archive_workspace` removes a run-created
+# worktree (#620, +8); and the handoff's successor materialisation carrying the two profile
+# gaps (#621, +1).
+# 2026-10-02, #626 review round 1, launch class (#1, #5, #11, #20): raised from 279 by 2 —
+# the handoff materialises the successor's profile before it stands down, so a gap halt
+# leaves this session the orchestrator, and its `--mode` is passed from that resolution
+# rather than left to the profile's omission. The mode-id source correction (#1) and the
+# refusal bullet (#11) are line-neutral.
+# 2026-10-02, #626 review round 1, teardown class (#2, #3, #4, #10): raised from 281 by 7 —
+# the release precondition is "no longer working" (`idle`, `error` or `closed`), because a
+# seat that escalated or was cancelled never reaches `idle` and could otherwise never be
+# archived; the wait for it is bounded by `SETTLE_WINDOW` and escalates rather than hanging;
+# and `archive_workspace` belongs to the session holding the operator, a coordinator seat
+# listing the workspaces it leaves instead of archiving them.
+# 2026-10-02, #626 fix round 2 (F5): raised from 288 by 1 — the handoff's launch line no
+# longer shows `--thinking` unconditionally; the flag is a commented insertion, so the
+# command as written is one a profile without `thinkingOptionId` can run. F1-F4 are
+# line-neutral here (lifecycle.md and the eval key carry no budget).
+# 2026-10-02, #626 fix round 3 (G1): raised from 289 by 1 — The seat launch's model check
+# now states the wrong-model release in full, `cancel_agent` before the release, since it is
+# the one path that cancels a still-working seat. G2 is a pointer in roles.md, which carries
+# no budget.
+REF_BUDGET=290
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -138,9 +163,43 @@ for gone in 'herdr' 'HERDR_' 'pane' '--until' 'wait-output' '--machine'; do
 done
 
 section "budget"
-n="$(wc -l < "$REF" | tr -d ' ')"
-if [ "$n" -le "$REF_BUDGET" ]; then pass "paseo-mechanics.md within the reference budget ($n lines)"
-else fail "paseo-mechanics.md within the reference budget" "$n lines, over by $((n - REF_BUDGET))"; fi
+# <file> → "<lines> <over-by>" on one line: the file's line count, and how far past
+# REF_BUDGET it is (0 when within). ONE read feeds both the count and the verdict — the pass
+# message used to recompute `wc -l`, a second read that could disagree with the predicate's —
+# and a file that cannot be read is REFUSED with a non-zero status rather than counted: an
+# empty count is exactly what a file within budget looks like, so returning one would
+# certify a file nobody read (#626 review round 1, findings 13-15). _helpers.sh carries no
+# line counter to reuse, so this is the minimal local one.
+budget_report() { # <file>
+  [ -f "${1:-}" ] || return 1
+  _n="$(wc -l < "$1" | tr -d ' ')" || return 1
+  [ -n "$_n" ] || return 1
+  if [ "$_n" -gt "$REF_BUDGET" ]; then printf '%s %s\n' "$_n" "$((_n - REF_BUDGET))"
+  else printf '%s 0\n' "$_n"; fi
+}
+if r="$(budget_report "$REF")"; then
+  lines="${r%% *}"; over="${r##* }"
+  if [ "$over" -eq 0 ]; then pass "paseo-mechanics.md within the reference budget ($lines lines)"
+  else fail "paseo-mechanics.md within the reference budget" "$lines lines, over by $over"; fi
+else fail "paseo-mechanics.md within the reference budget" "unreadable: $REF"; fi
+# The 2026-10-02 raise above is a loosening, so its adjacent control sits here: a file past
+# the NEW limit must still fail the same comparison, and one that cannot be read must be
+# refused rather than counted as within it. A budget nothing can exceed bounds nothing.
+ctl_over="$(mktemp)"
+awk -v n="$((REF_BUDGET + 1))" 'BEGIN { for (i = 0; i < n; i++) print "" }' > "$ctl_over"
+if r="$(budget_report "$ctl_over")" && [ "${r##* }" -gt 0 ]; then pass "control: the budget still fails a file past the limit"
+else fail "control: the budget still fails a file past the limit" "an over-limit fixture read [$r] and passed"; fi
+if ! r="$(budget_report "$ctl_over/gone")"; then pass "control: an unreadable file is refused, not counted as within budget"
+else fail "control: an unreadable file is refused, not counted as within budget" "read [$r]"; fi
+# The real file sits exactly ON the limit, so its pass cannot separate "within" from
+# "over": a predicate that always reported an overshoot would read the same there. This
+# one line under the limit is the case that separates them — measured, mutating the
+# comparison to `[ "$_n" -ge 0 ]` left the suite green until this control existed.
+ctl_under="$(mktemp)"
+awk -v n="$((REF_BUDGET - 1))" 'BEGIN { for (i = 0; i < n; i++) print "" }' > "$ctl_under"
+if r="$(budget_report "$ctl_under")" && [ "${r##* }" -eq 0 ]; then pass "control: a file within the budget reports no overshoot"
+else fail "control: a file within the budget reports no overshoot" "read [$r]"; fi
+rm -f "$ctl_over" "$ctl_under"
 
 section "no personal name ships"
 hits=0

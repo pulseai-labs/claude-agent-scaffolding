@@ -66,7 +66,8 @@ Three consequences:
   not a read from this session. It returns once, and handling that exit arms the
   dispatch's next wait — a dispatch never holds two waits at once, and an exited wait is
   never restarted in place. Beyond that, the only bounded reads are the launch's
-  model check (`references/roles.md`), and the one `/context` reply at each task boundary,
+  model check (`references/roles.md`), the release's `Status` read
+  (`references/paseo-mechanics.md`'s Teardown), and the one `/context` reply at each task boundary,
   sent with `send_agent_prompt` and read with `get_agent_activity`, for a seat that can
   answer the probe — one that cannot rotates at its item boundary instead
   (`references/roles.md`) — and a dsh spine driver's transcript reads, with the one shell
@@ -179,16 +180,18 @@ These cases are named because they look like clashes and are not:
 
 ## 7. Refusals
 
-- **Paseo's daemon is not reachable** (`paseo status` fails): say so and stop. No
-  fallback to the `Agent` tool or to inline work.
+- **Paseo's daemon is not reachable** (`paseo status` fails) **or is older than
+  `lifecycle.md` step 1 requires**: say so and stop. No fallback to the `Agent` tool or to
+  inline work.
 - **This session is not a Paseo agent** (`PASEO_AGENT_ID` is absent): say so and stop.
   The context-ceiling hook is gated on it and goes inert, and no seat could be this
   session's subagent.
 - **A seat is undefined or its agent is missing** (the seat name is neither a Paseo
-  profile nor a `kind: dsh-spine-driver` entry, or `paseo inspect` shows a model other
-  than the expected model, `references/paseo-mechanics.md`'s The seat launch): report it
-  to the operator and stop that dispatch. Never
-  substitute a guessed provider/model.
+  profile nor a `kind: dsh-spine-driver` entry, `paseo inspect` shows a model other than the
+  expected model, the profile carries no `modeId`, or it carries no `model` and no default
+  can be read for its provider — `references/paseo-mechanics.md`'s The seat launch): report
+  it to the operator and stop that dispatch. Never substitute a guessed provider/model or a
+  guessed mode.
 - **A worker refuses on policy:** report the refusal verbatim. Do not retry it around, and
   do not rephrase the brief to slip past it.
 - **`/code-review` is unavailable in the reviewer session:** the reviewer reports that in

@@ -36,10 +36,11 @@ paseo inspect <id> --json                       # Model equals the expected mode
 
 `references/paseo-mechanics.md` holds the full sequence. This file states only the role
 table and retention.
-A wrong model is a failed launch: release the seat and report
-it. Every brief also asks the worker to state its model in its first reply — the second
-check, and the worker's own: one that finds its model is not `SEAT_EXPECTED_MODEL` reports
-a failed launch in its report file and stops, rather than working around it.
+A wrong model is a failed launch, and `paseo-mechanics.md`'s The seat launch, step 3 owns
+what happens to that seat; this file does not restate it. Every brief also asks the worker
+to state its model in its first reply — the second check, and the worker's own: one that
+finds its model is not `SEAT_EXPECTED_MODEL` reports a failed launch in its report file and
+stops, rather than working around it.
 
 ## Retention follows artifacts
 
