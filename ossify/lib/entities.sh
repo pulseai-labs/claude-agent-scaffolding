@@ -61,7 +61,9 @@ _oss_entity_require_single() { # $1=state-file $2=collection-selector(uses $v) $
 }
 
 # THE never-strand rail (#529), NARROWED by the operator's ruling of 2026-09-23.
-# One guard ships and it guards ONE transition - the abandonment - because a
+# Two guards ship. This one guards ONE transition - the abandonment; the
+# second, _oss_entity_guard_wi_exec below, keeps the one dispatch-write clause
+# this guard stands on. The rest was dropped because a
 # guard set that reads a record the same verb family can rewrite was not
 # converging: two review rounds returned 15 findings each, three of round 2's
 # being fallout from round 1's own fixes, and the round-2 P1 (a newline truncating
@@ -148,7 +150,7 @@ _oss_entity_guard_wi_status() { # $1=state-file $2=payload about to be minted
   # spine is still open, because inside a CLOSED spine a planned item lands its
   # repo at the next release close instead (close/references/work-item-close.md §1).
   if [ "$st2" = "active" ]; then
-    echo "oss: work item '$wi' is active - its round is declared in flight, and 'abandoned' means withdrawn BEFORE any dispatch, so withdrawing it would drop that round out of every close-path reader instead of landing it. Land the round; or, if it was abandoned without a landing, return the item to planned first - \"oss work_item_status $wi planned\" - and only where the item's spine is still open, since inside a closed spine a planned item lands its repo at the next release close (plan-spine/references/decomposition.md §1)" >&2
+    echo "oss: work item '$wi' is active - its round is declared in flight, and 'abandoned' means withdrawn BEFORE any dispatch, so withdrawing it would drop that round out of every close-path reader instead of landing it. Land the round; or, if it was abandoned without a landing, return the item to planned first - \"oss work_item_status $wi planned\" - and only where the item's spine is still open, since inside a closed spine a planned item lands its repo at the next release close (close/references/work-item-close.md §1)" >&2
     return 7
   fi
 }

@@ -219,6 +219,15 @@ lines the record pass reads — `spine close …` and `pushed-tip:` — never be
 them: the record pass takes the first `pushed-tip:` line as the lineage guard's
 input.
 
+On the resume arm the PR already exists, so the block loads no fields and the
+body is the one the PR was opened with. A close resumed after an upgrade can find
+a PR opened under 1.13.0, whose body carries the spine-wide Known limits. Before
+you hand a resumed PR to `/ossify:work-pr`, reconcile the resumed PR's Known limits
+with this repo's fields file. Where the body carries a limit that belongs to
+another repo, rewrite the fields after the `pushed-tip:` line with
+`gh pr edit --body-file`, and keep the first two lines byte for byte. Keep every
+limit the PR gained in review; remove only another repo's.
+
 ```bash
 # $spine_slug is NOT ambient — nothing in state holds it. Recover it from the
 # spine directory's name with the ambiguity guard, exactly as `harvest.md` §2

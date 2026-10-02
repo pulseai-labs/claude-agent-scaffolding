@@ -118,8 +118,10 @@ than a fragment.
 
 The four `*_oid` values are the item's identity at the moment the caller
 finished: the staged index (`git write-tree`), `HEAD`, and the blob ids of
-`report.md` and `spec.md`. They are the same four components
-`close/references/work-item-close.md` §2 fingerprints, and for the same reason.
+`report.md` and `spec.md`. This section is the one definition of that
+four-part identity: no close reference computes it
+(`close/references/work-item-close.md` §2 is the implementation gate, and it
+compares no identity).
 
 ---
 

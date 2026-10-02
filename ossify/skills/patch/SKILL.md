@@ -140,6 +140,10 @@ gh pr create --repo "<owner/repo>" --base "<default-branch>" --head "fix/<plugin
 Then work it by the plugin root's `references/work-pr/loop.md` (on Claude Code,
 `/ossify:work-pr <PR>` routes there).
 
+Either way, re-run §2's changed-path re-check after each review-fix round, and
+once more before the merge ask: a fix round can touch a path the first re-check
+never saw. Treat a new ledger line or a new hit exactly as §2 says.
+
 Either way, the body carries one `Closes #<n>` line per issue this patch
 resolves, one per line: GitHub closes only the first issue of `Closes #1, #2`.
 **The merge is the operator's.**

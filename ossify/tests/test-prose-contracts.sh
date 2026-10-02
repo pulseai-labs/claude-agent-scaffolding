@@ -726,5 +726,50 @@ _pin "$_r" "spine-close.md routes repo-agnostic Known limits to the first hostin
 _r=1; grep -Fq 'skip the `gh pr list` call where `gh repo view` cannot resolve `origin`' "$_RC" && _r=0
 _pin "$_r" "release-close.md runs gh pr list against a non-GitHub origin in a declared repo - patch discovery fails on a supported topology"
 
+
+# 1.13.2 (#628 items 1-2, #579, #552, #296, #397, #342) - one pin per defect, each red on 1.13.1's text.
+_OSSR="$HERE/.."
+# (#628.1) spine-close: a resumed PR's Known limits are reconciled with this repo's fields file.
+_r=1; grep -Fq "reconcile the resumed PR's Known limits" "$_SC" && _r=0
+_pin "$_r" "spine-close.md's resume arm never reconciles a resumed PR's body with this repo's fields - a PR opened under 1.13.0 keeps the spine-wide Known limits"
+# (#628.2) patch §5: the changed-path re-check repeats after each review-fix round.
+_r=1; grep -Fq "re-run §2's changed-path re-check after each review-fix round" "$_PS" && _r=0
+_pin "$_r" "patch/SKILL.md does not repeat §2's changed-path re-check after review-fix rounds - a ledger line on a path a fix round touched reaches merge undispositioned"
+# (#552) external-executor §4 no longer claims close fingerprints the four oids.
+_r=0; grep -Fq 'same four components' "$_OSSR/skills/work-item/references/external-executor.md" && _r=1
+_pin "$_r" "external-executor.md still claims work-item-close.md §2 fingerprints the four *_oid components - it computes none"
+# (#296) adopt: six gates (A0-A5), never "five", in every place that counts them.
+_r=0
+for _f in "$_OSSR/skills/adopt/SKILL.md" "$_OSSR/commands/adopt.md" "$_OSSR/../.claude-plugin/marketplace.json"; do
+  tr '\n' ' ' < "$_f" | grep -Eq 'five +(fail-closed|pre-flight) +gates|all five pass' && { _r=1; echo "  (#296 site: $(basename "$_f"))"; }
+done
+_pin "$_r" "adopt is still described with five gates where §3 defines six (A0-A5) - A0's OSS_STATE_FILE guard reads as preamble"
+# (#397) doctor: the fix-finding route names the ONE write surface §1 defines.
+_r=0; grep -Fq 'two explicit-write surfaces' "$_OSSR/skills/doctor/SKILL.md" && _r=1
+_pin "$_r" "doctor/SKILL.md's fix-finding route excepts 'two explicit-write surfaces' - §1 defines exactly one"
+# (#342) start §11 authors the lean MASTER-SPEC before auditing it.
+_r=1; grep -Fq 'author the lean MASTER-SPEC here' "$_OSSR/skills/start/SKILL.md" && _r=0
+_pin "$_r" "start/SKILL.md §11 audits a lean MASTER-SPEC that no step before it authors - §13 only lists it as an output"
+# (#579.1) the active-clause refusal cites the doc that carries its closed-spine caveat...
+_al="$(grep -F "is active - its round is declared in flight" "$_OSSR/lib/entities.sh")"
+_r=1; case "$_al" in *"(close/references/work-item-close.md §1)"*) _r=0;; esac
+_pin "$_r" "entities.sh's active-clause refusal cites a doc that does not carry its closed-spine caveat"
+# ...and decomposition.md §1 carries the caveat beside the reversal it qualifies.
+_r=1; grep -Fq 'only while its spine is still open' "$_OSSR/skills/plan-spine/references/decomposition.md" && _r=0
+_pin "$_r" "decomposition.md §1 states the planned-reversal route without the closed-spine caveat"
+# (#579.2) the 1.11.0 notes point at the predicate 1.12.0 replaced it with.
+_r=1; grep -Fq '1.12.0 replaces this predicate' "$_OSSR/README.md" && _r=0
+_pin "$_r" "ossify/README.md's 1.11.0 section still teaches the branch-or-worktree predicate as current"
+# (#579.3) both READMEs name the dropped refusal so it cannot be read as the shipped complete clause.
+_r=0
+for _f in "$_OSSR/README.md" "$_OSSR/../README.md"; do
+  grep -Fq 'landed-provenance refusal' "$_f" || { _r=1; echo "  (#579.3 site: $_f)"; }
+  grep -Fq 'the landed-item refusal' "$_f" && { _r=1; echo "  (#579.3 old name still in: $_f)"; }
+done
+_pin "$_r" "the 1.12.0 notes name the dropped refusal and the shipped complete clause identically - they assert and deny the same transition"
+# (#579.4) the guard-set comment names both guards that ship.
+_r=0; grep -Fq 'One guard ships' "$_OSSR/lib/entities.sh" && _r=1
+_pin "$_r" "entities.sh's rail header says one guard ships while the file defines two"
+
 rm -rf "$_PC_TMP"
 t_summary
