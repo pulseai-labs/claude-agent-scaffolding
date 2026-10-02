@@ -1749,6 +1749,35 @@ for m in "$PLUGIN_ROOT/.claude-plugin/plugin.json" "$PLUGIN_ROOT/.codex-plugin/p
   else fail "${m%/*.json} manifest version matches the CHANGELOG head" "manifest '$mv_' vs CHANGELOG '$head_ver'"; fi
 done
 
+# #615 V2's defect, closed forward: after the 0.1.1 bump the repository README's tree still
+# named the plugin's previous version, and the comparison above cannot see it — that reads
+# the two manifests only. Both README sites are checked against the same DERIVED head, so
+# the next bump that misses one is a RED here rather than a release that ships two versions.
+# The repo root is the guard, not the README: this plugin also ships as a standalone tree,
+# where the parent directory is not a repository and there is no site to check.
+ROOT_README="$PLUGIN_ROOT/../README.md"
+if [ ! -f "$PLUGIN_ROOT/../.claude-plugin/marketplace.json" ]; then
+  pass "repository README version sites: none (a standalone plugin tree has no repo root)"
+else
+  present "$ROOT_README" "| [\`paseo-crew\`](./paseo-crew/) | v$head_ver |" \
+    "the repository README's catalogue row carries the head version"
+  present "$ROOT_README" "paseo-crew plugin (v$head_ver)" \
+    "the repository README's tree carries the head version"
+fi
+
+section "the run's preconditions"
+
+# #620: the daemon's floor is one fact and lifecycle.md step 1 owns it — the orient probes
+# already include `paseo status`, which reports `daemonVersion`, so the check costs no new
+# command and SKILL.md §7 only points at it. `pin` is exactly-once, so a SECOND
+# restatement of the figure in that file is a RED rather than a silent duplicate.
+pin "$LIFECYCLE_MD" '0.10.2' "the minimum daemon version is stated once, in the orient step"
+
+# #621: the seat launch's no-`modeId` gap reads the provider's modes to name them, so the
+# MCP form is on the command's own tool list, beside `list_models`, which the no-`model`
+# gap already reads.
+pin "$COMMAND_MD" 'mcp__paseo__inspect_provider' "the command's allowed-tools carry the provider-mode read"
+
 section "rotation past the context ceiling"
 
 pin "$LIFECYCLE_MD" "## Rotation past the context ceiling" "lifecycle.md carries the rotation section"

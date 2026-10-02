@@ -19,7 +19,7 @@ the two differ.
 
 ## Requirements
 
-- **Paseo 0.9.2 or later**, running, with its MCP server attached to the orchestrator
+- **Paseo 0.10.2 or later**, running, with its MCP server attached to the orchestrator
   session.
 - **This session is itself a Paseo agent** (`PASEO_AGENT_ID` set): the context-ceiling
   hook is gated on it, and every seat is launched as this session's own subagent, drawn in

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.1.2
+
+Three gaps the 0.1.0 pilot found, all of them in what the run does to a seat rather than in the
+seats themselves (#620, #621).
+
+The seat launch no longer says a profile with no `modeId` "passes none" (#621). Paseo refuses a
+launch with no mode when the caller's mode is not one the target provider offers, and modes are
+provider-specific, so there is nothing to pass and nothing to inherit. A profile with no `modeId` is
+now the same kind of gap as a profile with no `model`: the launch reads the modes the provider
+offers (`paseo provider ls --json` carries `modes` and `defaultMode` per provider; `inspect_provider`
+is the MCP form) and halts, naming the profile to fix and listing those modes. It never picks a mode
+the operator did not — the handoff's successor materialisation carries the gap too, and the
+command's `allowed-tools` gains `mcp__paseo__inspect_provider` for the read.
+
+Teardown now waits for `idle` (#620). A seat's `report` exit fires on its first write, so a seat
+that woke the waiter may still be running — the pilot's verifier was archived mid-rewrite — and a
+release reads `paseo inspect <id> --json` and waits for `Status: idle` after the report rather than
+for the report alone.
+
+Before `archive_workspace` removes a run-created worktree, Teardown names the operator every seat in
+that workspace by its title and agent id, asks for those tabs to be closed in any connected client
+app, and archives only on the operator's confirmation (#620). That archive removes the cwd out from
+under a client that still holds a tab on the agent, and such a client keeps asking the daemon to
+resume it. That is why the minimum daemon is now 0.10.2, checked as an orient precondition
+(`lifecycle.md` step 1) — 0.9.2 crash-loops on exactly that resume, where 0.10.2 logs and keeps
+running.
+
 ## 0.1.1
 
 The `context_ceiling` setting and the hook now agree on what a valid one is (#611). The manifest's

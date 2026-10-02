@@ -1,7 +1,7 @@
 ---
 description: Start or resume an orchestrator run over Paseo — bind the objective, then drive worker sessions by seat (planned and bounded implementers, one reviewer per PR, one retained verifier per work item) while this session keeps its context for decisions. Seats come from the operator's own files.
 argument-hint: "[objective]"
-allowed-tools: Bash(bash:*), Bash(dagr:*), Bash(paseo:*), Bash(env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run:*), Bash(git:*), Bash(gh:*), Bash(mv:*), Read, Write, Edit, mcp__paseo__list_profiles, mcp__paseo__list_models, mcp__paseo__create_workspace, mcp__paseo__create_agent, mcp__paseo__send_agent_prompt, mcp__paseo__get_agent_activity, mcp__paseo__list_pending_permissions, mcp__paseo__respond_to_permission, mcp__paseo__cancel_agent, mcp__paseo__archive_agent, mcp__paseo__archive_workspace, mcp__paseo__list_agents, mcp__paseo__list_workspaces, mcp__paseo__create_heartbeat, mcp__paseo__delete_heartbeat
+allowed-tools: Bash(bash:*), Bash(dagr:*), Bash(paseo:*), Bash(env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run:*), Bash(git:*), Bash(gh:*), Bash(mv:*), Read, Write, Edit, mcp__paseo__list_profiles, mcp__paseo__list_models, mcp__paseo__inspect_provider, mcp__paseo__create_workspace, mcp__paseo__create_agent, mcp__paseo__send_agent_prompt, mcp__paseo__get_agent_activity, mcp__paseo__list_pending_permissions, mcp__paseo__respond_to_permission, mcp__paseo__cancel_agent, mcp__paseo__archive_agent, mcp__paseo__archive_workspace, mcp__paseo__list_agents, mcp__paseo__list_workspaces, mcp__paseo__create_heartbeat, mcp__paseo__delete_heartbeat
 ---
 
 Parse the objective from `$ARGUMENTS` via the env-var bridge (no positional `$1`/`$2`):

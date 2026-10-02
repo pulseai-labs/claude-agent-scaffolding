@@ -179,8 +179,9 @@ These cases are named because they look like clashes and are not:
 
 ## 7. Refusals
 
-- **Paseo's daemon is not reachable** (`paseo status` fails): say so and stop. No
-  fallback to the `Agent` tool or to inline work.
+- **Paseo's daemon is not reachable** (`paseo status` fails) **or is older than
+  `lifecycle.md` step 1 requires**: say so and stop. No fallback to the `Agent` tool or to
+  inline work.
 - **This session is not a Paseo agent** (`PASEO_AGENT_ID` is absent): say so and stop.
   The context-ceiling hook is gated on it and goes inert, and no seat could be this
   session's subagent.

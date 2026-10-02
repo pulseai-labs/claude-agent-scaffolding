@@ -42,7 +42,13 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # 2026-09-27: narrowed by operator ruling — the failed-successor branch is a fail-closed
 # stop (cancel, never archive, report the id) and the child-reconcile procedure is
 # deleted; the budget goes DOWN to the new count.
-REF_BUDGET=266
+# 2026-10-02, #620/#621 (0.1.2): raised from 266 by 13, exactly the lines the two issues
+# needed and no others — the no-`modeId` launch gap, which now halts and names the profile
+# rather than omitting a mode Paseo refuses (#621, +4); Teardown's `idle`-after-the-report
+# release and the client-tab confirmation before `archive_workspace` removes a run-created
+# worktree (#620, +8); and the handoff's successor materialisation carrying the two profile
+# gaps (#621, +1).
+REF_BUDGET=279
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -138,9 +144,23 @@ for gone in 'herdr' 'HERDR_' 'pane' '--until' 'wait-output' '--machine'; do
 done
 
 section "budget"
-n="$(wc -l < "$REF" | tr -d ' ')"
-if [ "$n" -le "$REF_BUDGET" ]; then pass "paseo-mechanics.md within the reference budget ($n lines)"
-else fail "paseo-mechanics.md within the reference budget" "$n lines, over by $((n - REF_BUDGET))"; fi
+# <file> → its over-budget line when the file is past REF_BUDGET, nothing when it is within
+# it. The check and the control below both go through this one comparison, so the control
+# exercises the predicate itself rather than restating its arithmetic.
+over_budget() {
+  _n="$(wc -l < "$1" | tr -d ' ')"
+  [ "$_n" -le "$REF_BUDGET" ] || printf '%s lines, over by %s\n' "$_n" "$((_n - REF_BUDGET))"
+}
+if over="$(over_budget "$REF")" && [ -z "$over" ]; then pass "paseo-mechanics.md within the reference budget ($(wc -l < "$REF" | tr -d ' ') lines)"
+else fail "paseo-mechanics.md within the reference budget" "$over"; fi
+# The 2026-10-02 raise above is a loosening, so its adjacent control sits here: a file past
+# the NEW limit must still fail the same comparison. A budget nothing can exceed does not
+# bound anything.
+ctl_over="$(mktemp)"
+awk -v n="$((REF_BUDGET + 1))" 'BEGIN { for (i = 0; i < n; i++) print "" }' > "$ctl_over"
+if over="$(over_budget "$ctl_over")" && [ -n "$over" ]; then pass "control: the budget still fails a file past the limit"
+else fail "control: the budget still fails a file past the limit" "an over-limit fixture read [$over] and passed"; fi
+rm -f "$ctl_over"
 
 section "no personal name ships"
 hits=0
