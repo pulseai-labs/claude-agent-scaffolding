@@ -35,8 +35,15 @@ silently. A closed issue is not in the queue.
 A request stays open until the spine that pulled it in lands, so the queue can
 return one an earlier planning already took. Read its comments
 (`gh issue view <n> --repo "<owner/repo>" --json comments`): one carrying a
-`pulled in — <spine or release id>` disposition is already assigned — list it as
-such, and never add it to the feature map or a spine again.
+`pulled in — <spine id>` disposition is already assigned — list it as
+such, and never add it to the feature map or a spine again. A spine id has the
+`r<n>.s<m>` shape. A `pulled in — <release id>` request (`r<n>`) is on the feature
+map and not yet in any spine. At release planning, list it as already pulled in.
+At spine planning, when this spine takes the feature it came from, re-disposition it:
+`pulled in` to this spine, recorded in `SPINE.md`'s Context and commented on the
+issue as below, so spine close (`close/references/spine-close.md`) closes it when
+the spine lands. If this spine does not take that feature, leave the request as
+it is.
 
 For each other open request, record exactly one disposition:
 

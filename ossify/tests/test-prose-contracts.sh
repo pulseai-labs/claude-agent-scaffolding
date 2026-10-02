@@ -663,5 +663,68 @@ for _pair in "$_SC|keeps the first two lines" "$_SC|pr_fields=\"\$(cat" "$_RO|§
     T_FAIL=$((T_FAIL+1)); echo "FAIL: $(basename "$_f") does not state '$_lit'"; fi
 done
 
+# 1.13.1 (#614 items 1-6) - one pin per item, each red on 1.13.0's text.
+_IL="$HERE/../skills/plan-spine/references/intake-and-ledger.md"
+_RC="$HERE/../skills/close/references/release-close.md"
+_pin() { # $1=ok(0/1) $2=message
+  if [ "$1" = 0 ]; then T_PASS=$((T_PASS+1)); else T_FAIL=$((T_FAIL+1)); echo "FAIL: $2"; fi
+}
+# (1) patch §2: the re-check on the actual diff re-reads the ledger overlap, not only touch_check.
+_r=1; grep -Fq 're-read the ledger lines overlapping the changed paths' "$_PS" && _r=0
+_pin "$_r" "patch/SKILL.md §2's final-diff re-check does not re-read the ledger overlap - a ledger line on a path the fix touched unexpectedly goes undispositioned"
+# (2) spine-close: merge-bar's fields are loaded per hosting repo INSIDE the landing loop,
+#     so each repo's PR carries only its own Known limits.
+_lo="$(awk '/^while IFS= read -r repo; do/{print NR; exit}' "$_SC")"
+_ld="$(awk -v s="${_lo:-0}" 'NR>s && /^done <<EOF/{print NR; exit}' "$_SC")"
+_lf="$(awk '/pr_fields="\$\(cat "\$pr_fields_dir\/\$repo"\)"/{print NR; exit}' "$_SC")"
+_r=1; if [ -n "$_lo" ] && [ -n "$_ld" ] && [ -n "$_lf" ] && [ "$_lo" -lt "$_lf" ] && [ "$_lf" -lt "$_ld" ]; then _r=0; fi
+_pin "$_r" "spine-close.md does not load \$pr_fields per repo inside the landing loop (loop ${_lo:-none}-${_ld:-none}, load ${_lf:-none}) - every hosting PR carries the spine-wide Known limits"
+_r=0; grep -Fq 'one text for every' "$_SC" && _r=1
+_pin "$_r" "spine-close.md still composes one \$pr_fields text for every hosting repo"
+# (3) release-close: patch discovery fetches tags before listing them.
+_ft="$(awk '/fetch --tags/{print NR; exit}' "$_RC")"
+_fe="$(awk '/for-each-ref --sort=creatordate/{print NR; exit}' "$_RC")"
+_r=1; if [ -n "$_ft" ] && [ -n "$_fe" ] && [ "$_ft" -lt "$_fe" ]; then _r=0; fi
+_pin "$_r" "release-close.md lists patch tags without fetching them first (fetch ${_ft:-none}, list ${_fe:-none}) - a tag pushed from another clone is missed"
+# (4) release-close: patch discovery reads every declared non-AI repo, not only the landed ones.
+_r=1; grep -Fq 'every non-AI repo the resolved topology declares' "$_RC" && ! grep -Fq 'For each repo this release landed in' "$_RC" && _r=0
+_pin "$_r" "release-close.md's patch discovery covers only the repos the release landed in - a patch in a declared repo no spine touched is missed"
+# (5) intake-and-ledger §1: only a SPINE id assigns a request; a release-level pull-in
+#     is re-dispositioned to the spine and recorded in SPINE.md when the spine takes it.
+_r=1; grep -Fq 'pulled in — <spine id>` disposition is already assigned' "$_IL" && grep -Fq 're-disposition it' "$_IL" && _r=0
+_pin "$_r" "intake-and-ledger.md §1 treats a release-level 'pulled in' as assigned - no SPINE.md records the request and spine close never closes it"
+# (6) patch §4: origin must be a GitHub repository, checked before anything is cut.
+_gh="$(awk '/remote get-url origin/{print NR; exit}' "$_PS")"
+_wa="$(awk '/worktree add -b/{print NR; exit}' "$_PS")"
+_r=1; if [ -n "$_gh" ] && [ -n "$_wa" ] && [ "$_gh" -lt "$_wa" ]; then _r=0; fi
+_pin "$_r" "patch/SKILL.md §4 does not require a GitHub origin before the cut (check ${_gh:-none}, cut ${_wa:-none}) - a non-GitHub origin fails only at the PR step, after the commit"
+
+# #619 round 1 - three review findings, each pinned red before its fix.
+# (1b) release-close: patch discovery skips a filesystem-only root (no git, so no patch).
+_r=1; grep -Fq 'skip a root that is not a git repository' "$_RC" && _r=0
+_pin "$_r" "release-close.md's patch discovery runs git/gh against filesystem-only roots - release close fails on a supported topology"
+# (1c) patch §2: the final-diff path list keeps a rename's old path.
+_r=1; grep -Fq 'git diff --no-renames --name-only' "$_PS" && _r=0
+_pin "$_r" "patch/SKILL.md §2's final-diff list drops a renamed file's old path - its ledger line goes undispositioned"
+# (6b) patch §4: every origin push URL is checked, not only the fetch URL.
+_r=1; grep -Fq 'remote get-url --push --all origin' "$_PS" && _r=0
+_pin "$_r" "patch/SKILL.md §4 checks only origin's fetch URL - a non-GitHub pushurl passes"
+
+# #619 round 2 - two review findings, each pinned red before its fix.
+# (6c) patch §4: push and fetch URLs are compared host-and-all (gh's `url`), not by owner/repo.
+_r=1; grep -Fq -- '--json url' "$_PS" && ! grep -Fq -- '--json nameWithOwner' "$_PS" && _r=0
+_pin "$_r" "patch/SKILL.md §4 compares origin URLs by nameWithOwner - two GitHub hosts with one owner/repo pass"
+# (3b) release-close: patch tags are fetched from origin, the remote /ossify:patch pushes to.
+_r=1; grep -Fq 'fetch --tags origin' "$_RC" && ! grep -Fq 'fetch --tags <remote>' "$_RC" && _r=0
+_pin "$_r" "release-close.md fetches patch tags from an unnamed <remote> - a multi-remote repo can miss what /ossify:patch pushed to origin"
+
+# #619 round 3 (operator-approved) - two findings this PR introduced.
+# (2b) spine-close: a repo-agnostic limit goes on a repo that OPENS a PR - a local-arm repo has none.
+_r=1; grep -Fq 'first hosting repo that opens a PR' "$_SC" && _r=0
+_pin "$_r" "spine-close.md routes repo-agnostic Known limits to the first hosting repo, which may take the local arm and open no PR - the limit never reaches the ledger"
+# (4b) release-close: skip the PR lookup where origin is not a GitHub repository.
+_r=1; grep -Fq 'skip the `gh pr list` call where `gh repo view` cannot resolve `origin`' "$_RC" && _r=0
+_pin "$_r" "release-close.md runs gh pr list against a non-GitHub origin in a declared repo - patch discovery fails on a supported topology"
+
 rm -rf "$_PC_TMP"
 t_summary

@@ -1,4 +1,4 @@
-# ossify (v1.13.0)
+# ossify (v1.13.1)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
@@ -41,6 +41,16 @@ branch off the default branch, a patch version, a PR and a tag. Release close
 lists those patches from git. `/ossify:work-pr` follows merge-bar's `working-a-pr`
 where merge-bar is installed and the bundled loop otherwise. No `lib/` code, no
 state change.
+
+Since 1.13.1 (#614), six prose defects in that lane are fixed. `/ossify:patch`
+re-reads the tech-debt ledger for the paths a fix actually changed, and refuses
+before cutting anything when `origin` is not a GitHub repository. Spine close
+gives each hosting repo's PR only that repo's Known limits, so merge-bar no
+longer writes a multi-repo spine's limits once per PR. Release close fetches
+tags before listing patches and looks in every declared repo, not only the ones
+a spine landed in. A request pulled in at release planning is re-dispositioned
+to its spine when a spine takes it, so spine close closes the issue. No `lib/`
+code, no state change.
 
 Since 1.9.0, the deterministic gates close the vacuous-green family: the
 zero-tests guard no longer inverts a true match past the pipe buffer, flags
