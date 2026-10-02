@@ -91,6 +91,9 @@ belongs.
   <name>` per declared repo, `oss repo_root ai_workspace` for the workspace.
   Never hardcode against `$(pwd)`, and never write product code into the AI
   workspace.
+- **Never write over an existing file.** A destination that already holds one
+  is settled per file with the operator at §3, before `oss init`
+  (`occupied-destinations.md`).
 
 ---
 

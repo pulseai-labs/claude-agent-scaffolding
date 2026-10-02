@@ -181,7 +181,7 @@ The remedy differs by line, and the wrong one loops the operator:
 | `fail: shape` | **`"$oss_bin" state_restore`** — a required key is missing; same rebuild |
 | `fail: schema`, version **below** this build | **`"$oss_bin" migrate`** — the state predates this build |
 | `fail: schema`, version **above** this build | **upgrade ossify.** `migrate` accepts v1/v2 only; there is no downgrade |
-| `fail: state` | **`"$oss_bin" init <name>`** — this project was never initialised |
+| `fail: state` | **`/ossify:start`** (a new project) or **`/ossify:adopt`** (one that already has code) — never initialised; each runs `init` itself, and a bare `init` first leaves state both refuse |
 | `warn: lock` (stale) | `rmdir '<state>.lock'`, **only** if no ceremony is running |
 
 The rc rule SKILL.md §3 states — rc 0 unless a `fail:` line printed — holds only
