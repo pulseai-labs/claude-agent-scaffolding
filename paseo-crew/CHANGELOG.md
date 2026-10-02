@@ -8,9 +8,9 @@ seats themselves (#620, #621).
 The seat launch no longer says a profile with no `modeId` "passes none" (#621). Paseo refuses a
 launch with no mode when the caller's mode is not one the target provider offers, and modes are
 provider-specific, so there is nothing to pass and nothing to inherit. A profile with no `modeId` is
-now the same kind of gap as a profile with no `model`: the launch reads the modes the provider
-offers (`paseo provider ls --json` carries `modes` and `defaultMode` per provider; `inspect_provider`
-is the MCP form) and halts, naming the profile to fix and listing those modes. It never picks a mode
+now the same kind of gap as a profile with no `model`: the launch reads the provider's mode ids
+(`inspect_provider` carries them as `{id, label}` pairs, and the refusal itself lists them) and halts,
+naming the profile to fix and listing them. It never picks a mode
 the operator did not — the handoff's successor materialisation carries the gap too, and the
 command's `allowed-tools` gains `mcp__paseo__inspect_provider` for the read.
 

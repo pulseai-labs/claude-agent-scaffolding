@@ -23,11 +23,11 @@ materialised into one `create_agent` call as Paseo's skill maps it: `provider` +
   `<provider>/<default id>`. If no default can be read, the launch halts and names the
   profile to fix (add `model`). Never a guessed id.
 - **A profile with no `modeId`.** It is a launch gap, never a mode to omit: Paseo refuses a
-  launch with no mode when the caller's mode is not one the target provider offers — modes
-  are provider-specific and do not carry across providers — and the launch never guesses
-  one. Handle it as the no-`model` gap: read the provider's modes (`paseo provider ls --json`
-  carries `modes` and `defaultMode`; `inspect_provider` is the MCP form), then halt and name
-  the profile to fix (add `modeId`), listing those modes.
+  launch with no mode when the caller's mode is not one the target provider offers, and
+  modes are provider-specific — they do not carry across providers. Handle it as the
+  no-`model` gap: `inspect_provider` carries the provider's modes as `{id, label}` pairs,
+  and the refusal lists them too; read the ids there, then halt naming the profile to fix
+  (add `modeId`), listing them.
 
 **The expected model** is the id the launch materialised (the profile's `model`, or that
 default id), matched exactly by step 3's `inspect` check. A brief's `SEAT_EXPECTED_MODEL`
@@ -238,6 +238,8 @@ with ossify installed, the same file by hand without), recording every live seat
 Then, in this order, so that no seat ever has two waiters and one report wakes one
 orchestrator:
 
+0. **Materialise the successor's profile first** — The seat launch's two gaps included — so
+   that a halt there leaves this session the orchestrator with nothing stood down.
 1. **Stand down first.** Kill this session's armed background waits and `delete_heartbeat`,
    and take no further dispatch action. From here every wake (a child seat's finish notice,
    a heartbeat turn that raced the deletion, a wait that fires anyway) is read and handed on,
@@ -245,10 +247,10 @@ orchestrator:
    persist on disk, and a re-armed wait compares against the pair the handoff noted, so a
    report written in the gap wakes it at once.
 2. **Launch the successor detached**, from this session's own profile, materialised as The
-   seat launch states — its two profile gaps included — with `--mode` and `--thinking` only
-   where the profile sets them. Its launch prompt, `<resume>`, is
-   `/ossify:handoff-resume <path>` with ossify installed, and the handoff path as its first
-   instruction without; it takes no second resume message:
+   seat launch states and already resolved in step 0 — so `--mode` is always passed, from
+   the profile's `modeId`, and `--thinking` only where the profile sets it. Its launch
+   prompt, `<resume>`, is `/ossify:handoff-resume <path>` with ossify installed, and the
+   handoff path as its first instruction without; it takes no second resume message:
 
        env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d --json --title "<run>: orchestrator" --workspace <current> --provider <provider>/<model> --mode <modeId> --thinking <thinkingOptionId> "<resume>"
 

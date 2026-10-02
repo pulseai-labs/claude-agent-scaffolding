@@ -48,7 +48,12 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # release and the client-tab confirmation before `archive_workspace` removes a run-created
 # worktree (#620, +8); and the handoff's successor materialisation carrying the two profile
 # gaps (#621, +1).
-REF_BUDGET=279
+# 2026-10-02, #626 review round 1, launch class (#1, #5, #11, #20): raised from 279 by 2 —
+# the handoff materialises the successor's profile before it stands down, so a gap halt
+# leaves this session the orchestrator, and its `--mode` is passed from that resolution
+# rather than left to the profile's omission. The mode-id source correction (#1) and the
+# refusal bullet (#11) are line-neutral.
+REF_BUDGET=281
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
