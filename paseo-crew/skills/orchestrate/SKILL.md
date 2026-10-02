@@ -188,9 +188,10 @@ These cases are named because they look like clashes and are not:
   session's subagent.
 - **A seat is undefined or its agent is missing** (the seat name is neither a Paseo
   profile nor a `kind: dsh-spine-driver` entry, `paseo inspect` shows a model other than the
-  expected model, or the profile carries no `model` or no `modeId` —
-  `references/paseo-mechanics.md`'s The seat launch): report it to the operator and stop
-  that dispatch. Never substitute a guessed provider/model or a guessed mode.
+  expected model, the profile carries no `modeId`, or it carries no `model` and no default
+  can be read for its provider — `references/paseo-mechanics.md`'s The seat launch): report
+  it to the operator and stop that dispatch. Never substitute a guessed provider/model or a
+  guessed mode.
 - **A worker refuses on policy:** report the refusal verbatim. Do not retry it around, and
   do not rephrase the brief to slip past it.
 - **`/code-review` is unavailable in the reviewer session:** the reviewer reports that in

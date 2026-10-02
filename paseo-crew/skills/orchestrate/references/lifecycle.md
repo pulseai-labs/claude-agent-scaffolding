@@ -246,11 +246,13 @@ travels with it too — `/ossify:handoff` with ossify installed, the same file b
 without it.
 
 Then follow `paseo-mechanics.md`'s Handoff (D3), in the order it fixes so that no
-seat ever has two waiters and one report wakes one orchestrator: **stand down
-first** — kill this session's armed background waits and `delete_heartbeat`, and
-take no further dispatch action. **Launch the successor as `paseo-mechanics.md`'s
-Handoff states: detached, in this session's workspace, its resume as the launch
-prompt, verified settled and parentless.** A failed launch is cancelled with `cancel_agent`
+seat ever has two waiters and one report wakes one orchestrator: **materialise your
+successor's profile first** — its two gaps resolved — so a halt there leaves this
+session the orchestrator with its waits still armed. Then **stand down** — kill this
+session's armed background waits and `delete_heartbeat`, and take no further
+dispatch action — and **launch the successor as `paseo-mechanics.md`'s Handoff
+states: detached, in this session's workspace, its resume as the launch prompt,
+verified settled and parentless.** A failed launch is cancelled with `cancel_agent`
 and never archived; this session re-arms its own waits and a fresh heartbeat from
 the handoff it just wrote, reports the failed successor's agent id to the operator, and
 remains the orchestrator. The run file's `run.orchestrator` block still names

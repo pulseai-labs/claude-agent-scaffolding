@@ -247,7 +247,7 @@ orchestrator:
 
 0. **Materialise the successor's profile first** — The seat launch's two gaps included — so
    that a halt there leaves this session the orchestrator with nothing stood down.
-1. **Stand down first.** Kill this session's armed background waits and `delete_heartbeat`,
+1. **Stand down.** Kill this session's armed background waits and `delete_heartbeat`,
    and take no further dispatch action. From here every wake (a child seat's finish notice,
    a heartbeat turn that raced the deletion, a wait that fires anyway) is read and handed on,
    never acted on, unless step 3's failure branch re-arms. The gap loses nothing: reports
@@ -255,11 +255,12 @@ orchestrator:
    report written in the gap wakes it at once.
 2. **Launch the successor detached**, from this session's own profile, materialised as The
    seat launch states and already resolved in step 0 — so `--mode` is always passed, from
-   the profile's `modeId`, and `--thinking` only where the profile sets it. Its launch
-   prompt, `<resume>`, is `/ossify:handoff-resume <path>` with ossify installed, and the
-   handoff path as its first instruction without; it takes no second resume message:
+   the profile's `modeId`. Its launch prompt, `<resume>`, is
+   `/ossify:handoff-resume <path>` with ossify installed, and the handoff path as its first
+   instruction without; it takes no second resume message:
 
-       env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d --json --title "<run>: orchestrator" --workspace <current> --provider <provider>/<model> --mode <modeId> --thinking <thinkingOptionId> "<resume>"
+       env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d --json --title "<run>: orchestrator" --workspace <current> --provider <provider>/<model> --mode <modeId> "<resume>"
+       # insert --thinking <thinkingOptionId> before <resume> only where the profile sets one
 
    Both variables are unset because `paseo run` inside an agent reads its caller from them
    and makes the new agent that caller's child. `paseo run` takes no feature values, so a

@@ -198,8 +198,9 @@ runs them on a user's path.
 
 ## The handoff
 
-The orchestrator's own rotation **stands down first** — it kills its armed waits and
-deletes its heartbeat — and only then launches its successor **detached**:
+The orchestrator's own rotation **materialises its successor's profile first** — so a gap
+halt leaves it the orchestrator with its waits armed — and **then stands down**: it kills
+its armed waits and deletes its heartbeat, and only then launches its successor **detached**:
 `env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d`, with the resume as the launch
 prompt, so the new agent is not parented to the session standing down. `paseo inspect
 <new id> --json` then confirms the successor started and `ParentAgentId` is `null`; a

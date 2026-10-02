@@ -14,10 +14,12 @@ naming the profile to fix and listing them. It never picks a mode
 the operator did not — the handoff's successor materialisation carries the gap too, and the
 command's `allowed-tools` gains `mcp__paseo__inspect_provider` for the read.
 
-Teardown now waits for `idle` (#620). A seat's `report` exit fires on its first write, so a seat
-that woke the waiter may still be running — the pilot's verifier was archived mid-rewrite — and a
-release reads `paseo inspect <id> --json` and waits for `Status: idle` after the report rather than
-for the report alone.
+Teardown now waits for the seat to stop working (#620). A seat's `report` exit fires on its first
+write, so a seat that woke the waiter may still be running — the pilot's verifier was archived
+mid-rewrite — and a release reads `paseo inspect <id> --json` and requires `idle`, `error` or
+`closed` after the report rather than the report alone: a seat that escalated on `error` or was
+cancelled on `closed` never reaches `idle`, and one still working past the dispatch's
+`SETTLE_WINDOW` is escalated to the operator, whose call the cancel is.
 
 Before `archive_workspace` removes a run-created worktree, Teardown names the operator every seat in
 that workspace by its title and agent id, asks for those tabs to be closed in any connected client

@@ -59,7 +59,11 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # archived; the wait for it is bounded by `SETTLE_WINDOW` and escalates rather than hanging;
 # and `archive_workspace` belongs to the session holding the operator, a coordinator seat
 # listing the workspaces it leaves instead of archiving them.
-REF_BUDGET=288
+# 2026-10-02, #626 fix round 2 (F5): raised from 288 by 1 — the handoff's launch line no
+# longer shows `--thinking` unconditionally; the flag is a commented insertion, so the
+# command as written is one a profile without `thinkingOptionId` can run. F1-F4 are
+# line-neutral here (lifecycle.md and the eval key carry no budget).
+REF_BUDGET=289
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
