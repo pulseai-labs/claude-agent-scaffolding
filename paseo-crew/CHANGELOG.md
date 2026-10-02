@@ -5,19 +5,21 @@
 The 0.1.2 delta's own loose ends, found by review and by the pilot (#622, #629, #609).
 
 The report exit no longer treats a stale or in-progress file as the dispatch's final one (#622). It
-fires only once the seat that wrote the file has settled — `idle`, `error` or `closed` — so a worker
-that reports and then keeps working is not finished, and the handling reads the body against the
-dispatch it was sent before acting on it, so an earlier dispatch's body gets the missing-report
-correction rather than a handling. Teardown's account of a first-write exit and of the
-`SETTLE_WINDOW` wait around it is deleted, the condition it worked around having moved into the exit.
+fires only once the seat that wrote the file is `idle` — `error` and `closed` settle at the `error`
+exit — so a worker that reports and then keeps working is not finished, and the handling reads the
+body against the dispatch it was sent before acting on it, so an earlier dispatch's body gets the
+missing-report correction rather than a handling. Teardown's account of a first-write exit and of
+the `SETTLE_WINDOW` wait around it is deleted, the condition it worked around having moved into the
+exit.
 
 A seat that fails its model check is cancelled and reported to the operator, never archived (#629,
 J2 and J3). It may already have started children, and the archive cascades into them, so the site no
 longer routes its release through a no-longer-working precondition whose wait would be a report and
 a `SETTLE_WINDOW` that a launch failure never has. Step 12's release routes to Teardown's
-settled-status gate and the operator's tab confirmation, as steps 3 and 6 already do (D2), and the
-nested-run reference no longer scopes the spine session's own teardown as "the pairs and any
-workspace they used": a coordinator seat archives no workspace and lists the ones it leaves (D1).
+settled-status gate and the operator's tab confirmation on the workers whose retention ends there, as
+step 6 already does (D2), and the nested-run reference no longer scopes the spine session's own
+teardown as "the pairs and any workspace they used": a coordinator seat archives no workspace and
+lists the ones it leaves (D1).
 
 The handoff's successor launch passes `--thinking <thinkingOptionId>` whenever the materialised
 profile sets one — a requirement, not a comment a launch copying the command line drops (D6).

@@ -185,6 +185,10 @@ pin "$EXEC_MD" 'names agents, never commands' \
 # roles.md's sequence, where delivery is the step after readiness.
 pin "$LIFECYCLE_MD" 'is `roles.md`'"'"'s "The launch."' \
   "the lifecycle launches a seat through roles.md's launch sequence"
+# #632 F7: the same step said mechanics' model check owns "the cancel and the release".
+# The release is the operator's now, and the summary must not send a reader to archive.
+pin "$LIFECYCLE_MD" 'the cancel, its release going to the operator' \
+  "step 3 sends the wrong-model release to the operator, not to an archive" flat
 
 # The three procedures were never the sidecar's: they survive the deletion
 # byte-exact, still recorded so the spine session checks rather than chooses.
@@ -472,6 +476,10 @@ n_eq "$CONFIG_MD" '/ossify:run-spine' 2 \
 # The effort cell names a seat choice, never a runtime override.
 pin "$ROLES_MD" 'the profile is the only source of effort' \
   "a marked item is a seat choice, not a command edit"
+# #632 F14: the lifetime cell pointed at "the threshold below", which no threshold in the
+# file answers. It names the rotation rule it means.
+pin "$ROLES_MD" 'the `/context` rotation in `## Retention follows artifacts`' \
+  "the retention cell names the rotation rule it means"
 # #608 review round 4: roles.md's launch sequence still hard-coded origin/main after
 # paseo-mechanics.md was fixed; lifecycle step 3 sends coordinators here, so the two
 # launch descriptions have to agree.
@@ -1720,11 +1728,12 @@ pin "$LIFECYCLE_MD" 'a closed return skips the record pass' \
 # R2-10. The teardown gate names a merged PR; a `closed` spine never had one.
 pin "$LIFECYCLE_MD" 'closed spine has no PR to confirm' \
   "teardown after a closed return validates the local landing instead"
-# #629 D2: step 12's release is the top's main release path and Teardown cites it, so a
-# literal "release every worker" there released on the reports alone. It routes to
-# Teardown's settled-status gate and the operator's tab confirmation, as steps 3 and 6 do.
-pin "$LIFECYCLE_MD" 'release every worker as Teardown directs' \
-  "step 12's release routes to Teardown's gate, not to a report" flat
+# #629 D2 / #632 F6: step 12's release is the top's main release path, and a literal
+# "release every worker" there archived the retained implementer the next item is
+# dispatched to. It releases the workers whose retention ends here, which `roles.md` owns,
+# and routes to Teardown's settled-status gate and the operator's tab confirmation.
+pin "$LIFECYCLE_MD" 'release the workers whose retention ends here (`roles.md`), as Teardown directs' \
+  "step 12 releases only the workers whose retention ends there" flat
 pin "$ROLES_MD" 'the `spine session` seat the project file names' \
   "roles.md launches the spine seat from the project file"
 pin "$BRIEFS_MD" 'the `spine session` seat the project file names' \
