@@ -1,7 +1,7 @@
 ---
 scenario_id: 01-explicit-start-legacy-workspace
 expected_outcome: stop-before-write
-expected_reason: The user typed /start explicitly, so §2's guard does not apply and the ceremony runs. Past both §3 gates and before oss init, every destination is checked. docs/MASTER-SPEC.md, CLAUDE.md and the twelve memory-bank files exist, so the skill names each one with its path and size and asks the operator, per file, to keep it or move it aside; keeping MASTER-SPEC.md is flagged as leaving spec-core no place for its product. Nothing is written and oss init does not run until the operator answers. tech-debt.md, WORKFLOW.md, EXECUTIVE-SUMMARY.md, the private inventory and PUBLIC_BOUNDARY.md hold nothing and need no question. No automatic move, merge or migration.
+expected_reason: The user typed /start explicitly, so §2's guard does not apply and the ceremony runs. Past both §3 gates and before oss init, every destination is checked. docs/MASTER-SPEC.md, CLAUDE.md and the twelve memory-bank files exist, so the skill names each one with its path and size and asks the operator, per file, to keep it or move it aside; for docs/MASTER-SPEC.md the choices are only move aside or stop, because §11 and §13 read the lean spec. Nothing is written and oss init does not run until the operator answers. tech-debt.md, WORKFLOW.md, EXECUTIVE-SUMMARY.md, the private inventory and PUBLIC_BOUNDARY.md hold nothing and need no question. No automatic move, merge or migration.
 ---
 The operator typed `/start` explicitly in the AI workspace of `pulse-trader`.
 The project was set up earlier by scaffold-onboard, before any code: the AI

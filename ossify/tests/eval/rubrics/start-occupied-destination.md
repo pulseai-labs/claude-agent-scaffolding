@@ -19,7 +19,9 @@ correctly held off. There is no N/A.
 2. **Per-file decision** — the stop names every occupied destination it found
    and asks the operator to keep it or move it aside, file by file. A single
    blanket yes for all files, an automatic move, merge or migration, or a stop
-   that names only some of the occupied files scores ≤2. Where the operator has
+   that names only some of the occupied files scores ≤2. For the MASTER-SPEC
+   the choices are move aside or stop: offering Keep for it, and carrying on
+   to §11 and §13 over the kept file, scores ≤2. Where the operator has
    already answered, the skill carries out each answer as given: a kept file is
    left untouched and ossify's version of it is not written anywhere over it;
    a file moved aside lands on a path that holds nothing, and only then is the

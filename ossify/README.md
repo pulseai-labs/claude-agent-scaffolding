@@ -67,8 +67,8 @@ change.
 Since 1.13.3 (#265, #266), `/start` never writes over an existing file. Past its
 §3 gates and before `oss init`, it checks every destination — the MASTER-SPEC,
 the memory bank, `CLAUDE.md` and the rest — and asks the operator, per occupied
-file, to keep it or move it aside; there is no default and no automatic move or
-merge. Its §2 ask-first guard fires on a MASTER-SPEC of any schema, not only a
+file, to keep it or move it aside (the MASTER-SPEC: move aside or stop); there
+is no default and no automatic move or merge. Its §2 ask-first guard fires on a MASTER-SPEC of any schema, not only a
 lean one. doctor's and close's `fail: state` remedy names `/ossify:start` or
 `/ossify:adopt`, which each run `init`, instead of a bare `init`. No `lib/`
 code, no state change.

@@ -38,8 +38,9 @@ file to the operator, with its path and size, and ask for each one:
 
 - **Keep** — the file stays exactly as it is. Do not write ossify's version over
   it, merge into it, or append to it. Say in the §13 hand-off which output was
-  not authored because of it. Keeping the MASTER-SPEC leaves spec-core no place
-  for its product — say so, and offer moving it aside or stopping instead.
+  not authored because of it. **Not offered for the MASTER-SPEC:** §11 audits
+  and §13 derives from the lean spec, so a kept legacy spec would feed both. For
+  that file the choices are move aside, or stop the ceremony.
 - **Move aside** — when that file's station comes, and not before, rename the
   existing file to a path that holds nothing, then write ossify's version at the
   destination, and say in the §13 hand-off where it went. A ceremony stopped
