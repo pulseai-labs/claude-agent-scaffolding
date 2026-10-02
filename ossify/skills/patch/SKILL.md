@@ -97,11 +97,11 @@ dirty, do not switch it or stash it — a running spine owns it. Cut the branch 
 a separate worktree. This lane, like merge-bar, expects the repo's remote to be
 named `origin` and to be on GitHub, because §5's PR and §6's tag go through `gh`.
 If `git -C "<repo-root>" remote` lists no `origin`, or
-`gh repo view "$(git -C "<repo-root>" remote get-url origin)" --json nameWithOwner`
+`gh repo view "$(git -C "<repo-root>" remote get-url origin)" --json url`
 does not resolve it, say so and stop before cutting anything. Push URLs can
 differ from the fetch URL, so run the same `gh repo view` on every URL
 `git -C "<repo-root>" remote get-url --push --all origin` prints, and stop the same
-way unless each resolves to the same repository as the fetch URL. The remedy is the
+way unless each resolves to the same `url` as the fetch URL, host included. The remedy is the
 operator's: add or rename the remote, or land the fix by hand outside this lane.
 
 ```bash
