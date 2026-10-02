@@ -779,5 +779,10 @@ _pin "$_r" "start/SKILL.md §11 authors the spec from §4-§10 only - the audit 
 _r=1; grep -Fq 'On a MERGED resumed PR' "$_SC" && grep -Fq 'every repeat of a repo-agnostic limit but one' "$_SC" && _r=0
 _pin "$_r" "spine-close.md's reconciliation skips a MERGED resumed PR or leaves repo-agnostic limits on every PR - duplicate [KL] lines still reach the ledger"
 
+# #633 round 2 - one Codex class, pinned red before its fix.
+# (C) the reconciliation edits only the Known limits section, on open AND merged PRs.
+_r=1; grep -Fq "Edit only the body's \`## Known limits\` section" "$_SC" && ! grep -Fq 'past editing' "$_SC" && _r=0
+_pin "$_r" "spine-close.md's reconciliation rewrites every field after pushed-tip (discarding review edits) or calls a merged body uneditable"
+
 rm -rf "$_PC_TMP"
 t_summary
