@@ -63,7 +63,11 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # longer shows `--thinking` unconditionally; the flag is a commented insertion, so the
 # command as written is one a profile without `thinkingOptionId` can run. F1-F4 are
 # line-neutral here (lifecycle.md and the eval key carry no budget).
-REF_BUDGET=289
+# 2026-10-02, #626 fix round 3 (G1): raised from 289 by 1 — The seat launch's model check
+# now states the wrong-model release in full, `cancel_agent` before the release, since it is
+# the one path that cancels a still-working seat. G2 is a pointer in roles.md, which carries
+# no budget.
+REF_BUDGET=290
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

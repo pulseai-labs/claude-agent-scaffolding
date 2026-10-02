@@ -56,11 +56,12 @@ segment, never Paseo's encoded string, which no worker can be expected to echo:
    in Paseo's subagent track.
 3. **Model check.** `paseo inspect <id> --json`: `Model` must equal the expected model's full
    id. A mismatch is a failed launch: the seat took its brief as `initialPrompt` and may
-   already have written, so read its activity, reconcile anything it touched — never adopt
-   its artifacts — then archive it and report it (`roles.md`). The brief's
-   "state your model in your first reply" is the second check, against the model segment, and
-   the one that catches a lane whose provider silently reroutes, because `inspect` reports
-   what Paseo asked for, not what answered.
+   already have written, so read its activity and reconcile anything it touched — never adopt
+   its artifacts — then `cancel_agent` it, the one release path that cancels a seat still
+   working, and release it under Teardown's no-longer-working precondition, reporting it. The
+   brief's "state your model in your first reply" is the second check, against the model
+   segment, and the one that catches a lane whose provider silently reroutes, because
+   `inspect` reports what Paseo asked for, not what answered.
 4. **Arm the wait**, as Completion states.
 
 The orchestrator never runs `paseo run` for a worker. That command arms no finish notice,
@@ -210,7 +211,7 @@ reviewer once the review is final (step 8), the verifier at pass or escalation. 
 exit fires on the seat's first write, so a seat that woke the wait may still be running, and
 one that escalated on `error` or was cancelled on `closed` never reaches `idle` at all: the
 release waits for a settled status after the report, never for the report alone, cancelling a
-seat still working (`lifecycle.md` step 3's wrong-model check). That wait is bounded by the
+seat still working (The seat launch's model check). That wait is bounded by the
 dispatch's `SETTLE_WINDOW`: past it with the seat still working, escalate to the operator,
 whose call the cancel is, never a silent wait.
 Only the session that holds the operator archives a run-created workspace with
