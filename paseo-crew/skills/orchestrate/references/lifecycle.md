@@ -70,7 +70,7 @@ Every command's syntax comes from Paseo's own `paseo` skill.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes, the same
-   doorbell as completion (`paseo-mechanics.md`), and approves or amends it by sending
+   `report` exit as completion (`paseo-mechanics.md`), and approves or amends it by sending
    the seat its next message. The final report later overwrites the plan in the same
    file. Fast briefs skip this.
 5. **Wait.** One background wait per dispatch, as `paseo-mechanics.md`'s Completion

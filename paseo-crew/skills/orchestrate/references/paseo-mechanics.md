@@ -137,12 +137,13 @@ done
   a second such idle escalates.
   Coordinator seats (a spine or work-PR session, a lane driver with subagents) are armed
   that way from the start, because their idle is not a finish.
-- `error`: read the seat's activity and its durable artifacts first — `error` does not say
-  that nothing landed. A dispatch that may have mutated anything (a commit, a push, a PR, a
+- `error`: read the seat's activity, its durable artifacts and its `REPORT_PATH` first —
+  `error` does not say that nothing landed, and a changed body there gets the `report`
+  handling above. A dispatch that may have mutated anything (a commit, a push, a PR, a
   close) is never replayed: send a recovery instruction that names what already exists, or
-  escalate. Only a dispatch that cannot have mutated is re-sent once on the same seat, with
-  one fresh wait whose `error` exit arms only once `Status` has left `error`; a second
-  `error` escalates.
+  escalate. Only a dispatch that cannot have mutated is re-sent once on the same seat, one
+  fresh wait whose `error` exit arms only once `Status` has left `error`, keeping the noted
+  pair as the budget grace does; a second `error` escalates.
   On `closed` the seat is gone: escalate, with no retry.
 - `budget`: send one status request and arm one wait whose budget is a short grace, counted
   from that request, keeping the dispatch's noted pair: the changed file is still

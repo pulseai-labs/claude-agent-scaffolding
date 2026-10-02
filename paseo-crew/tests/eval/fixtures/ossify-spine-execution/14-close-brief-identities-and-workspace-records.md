@@ -2,9 +2,9 @@
 scenario_id: 14-close-brief-identities-and-workspace-records
 expected_outcome: refuse
 expected_reason: 'First, the return: a Paseo completion carries no ids - `Status`
-  has no body, so the file is the contract and the status is only the
-  doorbell. The close session''s result is its report file at the REPORT_PATH its
-  brief names, and no id settles it: the close brief this plugin ships
+  has no body, so the file is the contract, and `paseo-mechanics.md`''s exit row says
+  when a change to it is a report. The close session''s result is its report file at the
+  REPORT_PATH its brief names, and no id settles it: the close brief this plugin ships
   (`ossify-pr-briefs.md`) declares no lifecycle-id slot, so the
   TASK_ID=task_stale_r13s1 and DISPATCH_ID=ctx_stale_r13s1 lines the
   draft return spends name nothing the brief defines and have no return body to

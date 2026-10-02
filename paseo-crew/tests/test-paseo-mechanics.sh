@@ -67,7 +67,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # now states the wrong-model release in full, `cancel_agent` before the release, since it is
 # the one path that cancels a still-working seat. G2 is a pointer in roles.md, which carries
 # no budget.
-# 2026-10-02, #629/#622/#609 (0.1.3): held at 289, REF_BUDGET unchanged at 290.
+# 2026-10-02, #629/#622/#609 (0.1.3): at 290 after both fix rounds, REF_BUDGET unchanged.
 # #622's report exit now requires the seat settled and reads the body against the dispatch;
 # #632's fix round 1 tightens that gate to `idle` (the exit row is its only owner, and
 # `error`/`closed` settle at the `error` exit) and makes every other reader of a changed
@@ -227,8 +227,7 @@ if r="$(budget_report "$ctl_over")" && [ "${r##* }" -gt 0 ]; then pass "control:
 else fail "control: the budget still fails a file past the limit" "an over-limit fixture read [$r] and passed"; fi
 if ! r="$(budget_report "$ctl_over/gone")"; then pass "control: an unreadable file is refused, not counted as within budget"
 else fail "control: an unreadable file is refused, not counted as within budget" "read [$r]"; fi
-# The real file's own pass cannot separate "within" from "over" — a predicate that always
-# reported an overshoot would read the same there. This one line under the limit is the
+# This one line under the limit is the
 # case that separates them — measured, mutating the comparison to `[ "$_n" -ge 0 ]` left
 # the suite green until this control existed.
 ctl_under="$(mktemp)"
