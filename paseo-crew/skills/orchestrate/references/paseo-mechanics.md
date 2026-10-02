@@ -57,8 +57,9 @@ segment, never Paseo's encoded string, which no worker can be expected to echo:
 3. **Model check.** `paseo inspect <id> --json`: `Model` must equal the expected model's full
    id. A mismatch is a failed launch: the seat took its brief as `initialPrompt` and may
    already have written, so read its activity and reconcile anything it touched — never adopt
-   its artifacts — then `cancel_agent` it and release it under Teardown's no-longer-working
-   precondition, reporting it. The brief's "state your model in your first reply" is the
+   its artifacts — then `cancel_agent` it and report it to the operator, never archiving it:
+   the archive cascades into anything it started, and the operator decides its release and
+   anything it started. The brief's "state your model in your first reply" is the
    second check, against the model segment, and the one that catches a lane whose provider
    silently reroutes, because `inspect` reports what Paseo asked for, not what answered.
 4. **Arm the wait**, as Completion states.
@@ -92,7 +93,7 @@ idle, which a seat running background work of its own reaches long before it fin
 
 | Exit | Condition, checked on every poll |
 |---|---|
-| `report` | `REPORT_PATH`'s hash **or** identity differs from the noted pair |
+| `report` | `REPORT_PATH`'s hash **or** identity differs from the noted pair, and `Status` has settled (`idle`, `error` or `closed`): a body written by a seat that still runs is not yet a report |
 | `permission` | `PendingPermissions` in `paseo inspect <id> --json` is non-empty |
 | `error` | `Status` is `error` or `closed` |
 | `idle` | `Status` has been `idle` without a break, timed by the loop from when it first saw it, for longer than the brief's `SETTLE_WINDOW`, and no report has arrived |
@@ -105,7 +106,7 @@ the orchestrator adapts and does not copy:
 ```
 # one background call per dispatch; returns once with the exit reason
 while :; do
-  <report hash or identity changed>                    && { echo report; break; }
+  <report changed and Status settled>                  && { echo report; break; }
   s=$(paseo inspect <id> --json)
   <.PendingPermissions non-empty>                      && { echo permission; break; }
   <.Status is error or closed>                         && { echo error; break; }
@@ -117,8 +118,10 @@ done
 
 **Handling each exit.**
 
-- `report`: read it. A plan, a question or a late finding gets the seat's next message and
-  one fresh wait. An escalation goes to the operator.
+- `report`: read it against this dispatch — the round, head SHA or task it was sent — before
+  acting on it: a body that is an earlier dispatch's is not this dispatch's report, and gets
+  the missing-report correction below. A plan, a question or a late finding gets the seat's
+  next message and one fresh wait. An escalation goes to the operator.
 - `permission`: read the request with `list_pending_permissions`. Within the brief's scope,
   allow it with `respond_to_permission` and arm one fresh wait, keeping `DISPATCHED_AT`;
   otherwise put it to the operator, give the answer the same way, and arm one fresh wait —
@@ -205,14 +208,8 @@ Every seat runs on the daemon the orchestrator talks to; cross-machine seats are
 
 A seat is released with `archive_agent` once its artifacts are safe and it is no longer
 working — `paseo inspect <id> --json` reads `idle`, `error` or `closed`, never `running` or
-`initializing`: the implementer after `lifecycle.md` step 12's merged-branch check, the
-reviewer once the review is final (step 8), the verifier at pass or escalation. A `report`
-exit fires on the seat's first write, so a seat that woke the wait may still be running, and
-one that escalated on `error` or was cancelled on `closed` never reaches `idle` at all: the
-release waits for a settled status after the report, never for the report alone, cancelling a
-seat still working (The seat launch's model check). That wait is bounded by the
-dispatch's `SETTLE_WINDOW`: past it with the seat still working, escalate to the operator,
-whose call the cancel is, never a silent wait.
+`initializing`: the implementer when its retention ends (`roles.md`), the reviewer once the
+review is final (step 8), the verifier at pass or escalation.
 Only the session that holds the operator archives a run-created workspace with
 `archive_workspace`, once every seat in it is archived and the operator has confirmed the
 tabs those seats hold are closed in any connected client app: that archive removes the
@@ -255,12 +252,12 @@ orchestrator:
    report written in the gap wakes it at once.
 2. **Launch the successor detached**, from this session's own profile, materialised as The
    seat launch states and already resolved in step 0 — so `--mode` is always passed, from
-   the profile's `modeId`. Its launch prompt, `<resume>`, is
-   `/ossify:handoff-resume <path>` with ossify installed, and the handoff path as its first
-   instruction without; it takes no second resume message:
+   the profile's `modeId`, and `--thinking <thinkingOptionId>` whenever that materialised
+   profile sets one; a profile that sets none omits the flag. Its launch prompt, `<resume>`,
+   is `/ossify:handoff-resume <path>` with ossify installed, and the handoff path as its
+   first instruction without; it takes no second resume message:
 
        env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d --json --title "<run>: orchestrator" --workspace <current> --provider <provider>/<model> --mode <modeId> "<resume>"
-       # insert --thinking <thinkingOptionId> before <resume> only where the profile sets one
 
    Both variables are unset because `paseo run` inside an agent reads its caller from them
    and makes the new agent that caller's child. `paseo run` takes no feature values, so a

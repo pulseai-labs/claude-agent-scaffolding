@@ -347,6 +347,12 @@ pin "$BRIEFS_MD" 'as MECHANICS'"'"'s Teardown says' \
   "the spine brief releases its seats as paseo-mechanics.md's Teardown says"
 pin "$BRIEFS_MD" 'list_agents` showing none of them' \
   "the spine brief's teardown check is none of its own, not none at all"
+# #629 D1: the nested-run file scoped the spine session's own teardown as "the pairs and
+# any workspace they used", licensing the `archive_workspace` its brief and Teardown both
+# forbid a coordinator seat. The workspace question is Teardown's, and the coordinator
+# clause it defers to is the one this pin spends.
+pin "$NESTED_MD" 'archiving none and listing the run-created ones it leaves' \
+  "the nested-run teardown scope defers the workspaces to Teardown" flat
 # R7: the halt path and the completion bullet must name the report file, not
 # the deleted declaration slots' phrase.
 absent "$BRIEFS_MD" 'injected parent ids' \
@@ -1714,6 +1720,11 @@ pin "$LIFECYCLE_MD" 'a closed return skips the record pass' \
 # R2-10. The teardown gate names a merged PR; a `closed` spine never had one.
 pin "$LIFECYCLE_MD" 'closed spine has no PR to confirm' \
   "teardown after a closed return validates the local landing instead"
+# #629 D2: step 12's release is the top's main release path and Teardown cites it, so a
+# literal "release every worker" there released on the reports alone. It routes to
+# Teardown's settled-status gate and the operator's tab confirmation, as steps 3 and 6 do.
+pin "$LIFECYCLE_MD" 'release every worker as Teardown directs' \
+  "step 12's release routes to Teardown's gate, not to a report" flat
 pin "$ROLES_MD" 'the `spine session` seat the project file names' \
   "roles.md launches the spine seat from the project file"
 pin "$BRIEFS_MD" 'the `spine session` seat the project file names' \

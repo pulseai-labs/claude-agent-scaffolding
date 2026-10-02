@@ -182,12 +182,13 @@ Every command's syntax comes from Paseo's own `paseo` skill.
     as the blocker — this step never leaves a merge scheduled. The read and merge are two
     operations — a signal can still land between them: the ruleset
     requires conversation resolution, GitHub refuses the merge while any thread
-    is open, and a refusal returns to step 10, never a retry. Then
-    release every worker and delete the branch only after confirming a merged PR
-    exists whose head OID equals the branch tip — on an activated ossify spine (1b) the
-    merge lands on the word you relay under that dispatch's `MERGE_EXECUTOR`
-    assignment — always a merge commit on the named SHA, session or operator —
-    and that wait covers the top's spine-level teardown alone — work-PR seats
+    is open, and a refusal returns to step 10, never a retry. Then release every worker
+    as Teardown directs — its settled-status gate, and the operator's tab confirmation
+    before a run-created workspace is archived — and delete the branch only after
+    confirming a merged PR exists whose head OID equals the branch tip — on an activated
+    ossify spine (1b) the merge lands on the word you relay under that dispatch's
+    `MERGE_EXECUTOR` assignment — always a merge commit on the named SHA, session or
+    operator — and that wait covers the top's spine-level teardown alone — work-PR seats
     released when their work finished. **A closed spine has no PR to confirm**,
     so its teardown validates the close's own result instead — the local landing it
     recorded in each hosting repo — and waits for no record pass.

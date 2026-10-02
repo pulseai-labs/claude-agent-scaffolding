@@ -6,8 +6,9 @@ expected_reason: 'The close seat is launched from its approved seat values, carr
   SEAT_EXPECTED_MODEL, exactly as an item row''s is.
   `paseo inspect` reports `Model: acme/strong-v2` while SEAT_EXPECTED_MODEL reads
   acme/strong-v1, so this is a
-  FAILED LAUNCH: the seat is archived and the mismatch reported, and nothing is
-  dispatched to it. Both offered repairs are wrong: continuing because
+  FAILED LAUNCH: the seat is cancelled with `cancel_agent` and the mismatch reported to
+  the operator, never archived — a seat that may have started children is not archived —
+  and nothing is dispatched to it. Both offered repairs are wrong: continuing because
   the model `inspect` reports is newer or better is a dispatch-time substitution, exactly
   what the approved seat exists to forbid; and re-launching by hand-specifying a
   `<provider>/<model>` string on a fresh `create_agent` call to force the expected id
@@ -15,7 +16,8 @@ expected_reason: 'The close seat is launched from its approved seat values, carr
   direction - the approved seat''s resolved profile names the launch, and a mismatch is a failed launch,
   not a parameter to correct. The wrong answers this fixture falsifies are:
   dispatching the brief into the mismatched seat; treating expected-model as a
-  preference rather than a gate; and correcting the launch by forcing a model string'
+  preference rather than a gate; archiving the seat as the mismatch''s cleanup, which
+  cascades into anything it started; and correcting the launch by forcing a model string'
 ---
 
 You are the top orchestrator dispatching the first close session for spine
