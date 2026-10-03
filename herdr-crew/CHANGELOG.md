@@ -2,6 +2,16 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.2
+
+- **Guarded seats** (`references/herdr-mechanics.md`, the launch's step 2): an implementer,
+  verifier or reviewer spawn sets `SEAT_MODS_ROLE` and `SEAT_MODS_ALLOW` (its report directory and
+  its own scratch directory, `<run dir>/scratch/<seat label>`) for the seat-mods plugin. Coordinator
+  seats and the orchestrator never get them. A guarded seat whose status line lacks `seat: <role>`
+  runs unguarded, and the run record says so.
+- **Verifier briefs** (`briefs.md`, `ossify-briefs.md`) name that scratch directory as
+  `SCRATCH_DIR`, replacing the session scratchpad, which the seat-mods guard cannot locate.
+
 ## 0.2.1
 
 - **`references/dsh-driver.md` §3** recommends `.dsh-crew/roles.md`'s verifier as `driver`:

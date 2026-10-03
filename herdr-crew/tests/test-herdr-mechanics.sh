@@ -39,7 +39,11 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # two lines, 235 -> 237, to a file that entered the round at its gate (233 -> 235 having
 # spent the previous slack). The two lines are mechanics the file exists to state, so the
 # gate rose with them; it still fails over the limit.
-REF_BUDGET=237
+# 0.2.2 (seat-mods) added the guarded-seat paragraph to the launch's step 2 — the two
+# --env flags, the scratch directory and who never gets them: six lines, 237 -> 243,
+# again mechanics the file exists to state. The operator-facing rule (never in settings.json)
+# lives in seat-mods' README, not here.
+REF_BUDGET=243
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

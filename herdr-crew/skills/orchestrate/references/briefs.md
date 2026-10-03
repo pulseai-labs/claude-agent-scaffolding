@@ -182,8 +182,8 @@ DONE: write your report file, one line per claim, then the caveats:
 
 NEVER: commit or push, or edit a tracked file outside the mutation check. That check
 may temporarily edit one — in the disposable worktree, reverted before the report.
-Scratch output is fine — write it, never commit it — and run in a disposable
-worktree. Any other write: stop, and write an escalation to your report file instead.
+Scratch output is fine — write it under SCRATCH_DIR=<the seat's scratch directory>, never
+commit it — and run in a disposable worktree. Any other write: stop, and write an escalation to your report file instead.
 ```
 
 ## Fix round (retained implementer, after disposition)

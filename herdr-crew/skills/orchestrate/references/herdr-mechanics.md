@@ -30,6 +30,12 @@ is this sequence, in which `<seat label>` is `seat: <role> (<agent>)`:
    step 1 prescribes. `--cwd` is the lever that retargets the **source** repo: without it the
    call resolves its source from the *calling workspace's* repo. Read every id from the
    response, `result.root_pane.pane_id` included.
+
+   **Guarded seats** (seat-mods): an implementer, verifier or reviewer seat also gets
+   `--env SEAT_MODS_ROLE=<role>` and `--env SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch
+   directory>` on this call; the scratch directory, `<run dir>/scratch/<seat label>`, is created first
+   and named in the brief as `SCRATCH_DIR`. Never a coordinator seat or the orchestrator: an unset role
+   keeps a session unguarded. No `seat: <role>` in the seat's status line means no guards — record it.
 3. **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry —
    re-running a **launch** command into a pane whose foreground process is already that
    agent's TUI delivers its line to the agent as a prompt, the mechanism the undetected
@@ -200,7 +206,7 @@ A seat's tree is whatever `--cwd` names, so a seat may sit in another repository
 dual-repo case an orchestrator in the AI workspace places an implementer in the canonical
 tree — for a worktree seat, step 2's `--cwd` is what makes that true. `--env` (on
 `tab create` and `workspace create`) carries only a seat's own scratch, such as
-`OSSIFY_SEAT`. A lane's provider variables are invoked by name through `command:`, never
+`OSSIFY_SEAT`, `SEAT_MODS_ROLE` and `SEAT_MODS_ALLOW`. A lane's provider variables are invoked by name through `command:`, never
 replayed with `--env`: a replayed environment is the silent-reroute defect.
 
 `--trust-repository` on `herdr worktree` grants herdr's per-request Git trust, not Claude
