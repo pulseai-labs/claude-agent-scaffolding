@@ -28,10 +28,20 @@ checked **both** at `posture-block.md` §7's convention,
 `<ai-workspace>/docs/private-boundary-inventory.md`, **and** for any other
 `docs/*inventor*.md` beneath the `ai_workspace` root (a case-insensitive glob:
 this output is named by convention, not by a routed key, so a project adopted
-from another stack may hold its equivalent under its own name). A match under
-either name **is** this destination, occupied, and takes the same per-file
-answer; never write a second inventory beside one that already exists — §7's
-"read what is there, never create a second one" is the rule this check enforces.
+from another stack may hold its equivalent under its own name). **A name is not
+an equivalence**: read each candidate, and treat it as this destination only when
+its contents carry §7's own table — the moat columns (`Moat item`, `Channel`,
+`Where it lives`, the override/injection seam, the leak-risk note). A candidate
+that matches by name and **not** by structure (`docs/dependency-inventory.md`,
+`docs/asset-inventory.md`, an `inventory.md` about something else) is a
+**possible** inventory: name it to the operator as exactly that and ask whether
+it is the inventory or a file to leave alone — never silently equate it with the
+destination, and never write the inventory past an unanswered candidate, or the
+moat inventory is never authored and the release-close audit has no comparison
+artifact. A candidate that does carry the structure **is** this destination,
+occupied, and takes the same per-file answer; never write a second inventory
+beside one that already exists — §7's "read what is there, never create a second one"
+is the rule this check enforces.
 A MASTER-SPEC anywhere else in the workspace is not overwritten, but name it to
 the operator too: two specs side by side is a question, not a default. Bones ADRs take a
 fresh number from the `bones-registry.md` §3 scan, so they do not collide here;

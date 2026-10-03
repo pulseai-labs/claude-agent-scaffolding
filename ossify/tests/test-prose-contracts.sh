@@ -1251,6 +1251,12 @@ _pin "$_r" "state-inspection §5 bypasses the foreign-state gate when the manife
 _OD4="$_OSSR/skills/start/references/occupied-destinations.md"
 _r=1; grep -Fq 'docs/*inventor*.md' "$_OD4" && grep -Fq 'never create a second one' "$_OD4" && _r=0
 _pin "$_r" "occupied-destinations checks the inventory at the convention path only - an adopted project's own inventory name gets a silently minted duplicate beside it"
+# (C5, round 1) ... and a NAME match is not an equivalence: the glob also hits
+# `dependency-inventory.md` / `asset-inventory.md`, so the check probes contents
+# for §7's moat columns and names a name-only match to the operator as a
+# POSSIBLE inventory instead of equating it (which would suppress the real one).
+_r=1; grep -Fq 'A name is not' "$_OD4" && grep -Fq 'the moat columns' "$_OD4" && grep -Fq 'is a' "$_OD4" && grep -Fq '**possible** inventory' "$_OD4" && grep -Fq 'never write the inventory past an unanswered candidate' "$_OD4" && ! grep -Fq 'A match under' "$_OD4" && _r=0
+_pin "$_r" "occupied-destinations equates a filename match with the inventory - a docs/dependency-inventory.md is presented as the destination and keeping it suppresses the real moat inventory (round 1, C5)"
 # (R4) the eval rubric admits adoption as the third legal source, in both directions.
 _R4="$_OSSR/tests/eval/rubrics/harvest-apply-integrity.md"
 _r=1; grep -Fq '`report`, `handoff` or `adoption`' "$_R4" && grep -Fq 'adoption` is a legal source' "$_R4" && ! grep -Fq 'a source outside' "$_R4" && _r=0
