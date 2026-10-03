@@ -91,6 +91,7 @@ brief_pin() {
 brief_pin 'SEAT_COMMAND=' "every dispatched template names its seat's command" 9
 brief_pin 'SEAT_EXPECTED_MODEL=' "every dispatched template names its expected model" 9
 brief_pin 'SEAT_EFFORT=' "every dispatched template names its effort" 9
+brief_pin 'NOTIFY_PANE=' "every dispatched template names its ping target" 9
 brief_pin 'claude-glm' "no alias name survives in briefs.md" 0
 
 section "the named points exist in the run"

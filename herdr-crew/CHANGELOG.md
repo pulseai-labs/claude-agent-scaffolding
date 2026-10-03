@@ -2,6 +2,43 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.3
+
+**The worker ping and the heartbeat backstop (#640).** The orchestrator's wake was
+pull-only: a wait armed on the wrong report path, or one that died, failed silently, and a
+worker had no sanctioned way to say it had finished.
+
+- **The ping.** Every report-producing brief carries `NOTIFY_PANE` — the dispatcher's own
+  pane id, `none` where the seat's server cannot reach it — and after every atomic report
+  rename the worker sends one `REPORT READY: <task> <kind> <path>` line there: one send,
+  no `--wait`, no retry, and a failed send leaves the report intact. A coordinator fills
+  its children's slot with its own pane id.
+- **Consumption.** The generation check (hash or identity) comes first on any signal: a new
+  generation is read, noted, acted on once by kind, and retires that dispatch's armed wait
+  and companion; an already-consumed one is not read, not acted on, and retires nothing, so
+  a stale same-path ping never cancels the current phase's wait. A ping naming a path other
+  than the briefed report path is surfaced, never read. Deduplication governs the report and
+  its waits alone: a live dialog and a heartbeat tick are still handled.
+- **The heartbeat.** One bounded background timer of about 15 minutes per session holding a
+  live dispatch, re-armed per tick — not a completion wait, and never a re-entry. Each tick:
+  the generation check, then at most one health check per live seat; `working` asks nothing,
+  `blocked` takes the dialog procedure, and idle/done with no report, `unknown` or an
+  unreadable seat is surfaced once per dispatch as observed state and uncertainty — never as
+  a failed task and never as a retry. Killed when the last dispatch settles, at teardown and
+  at a rotation's stand-down, where the successor arms a fresh one.
+- **Reconciled prose.** `SKILL.md`'s "no keepalive" and the loop-of-waits rule now carve the
+  ping and the heartbeat out explicitly; `lifecycle.md` step 5 arms and kills the heartbeat
+  and step 3 fills `NOTIFY_PANE`; rotation hands the ping target over (a retained worker
+  keeps the predecessor's pane until the successor's next message carries its own, its
+  heartbeat covering the interval); `roles.md` and `ossify-execution.md` prefer a seat herdr
+  detects where the project file offers a choice, as prose over any profile field.
+- **Tests and budget.** The mechanical suites gained the `NOTIFY_PANE` slot counts and the
+  narrow command-policy carve-out — the ping is the one herdr command a brief states, with
+  an adjacent control proving any other agent command still fails. `herdr-mechanics.md`'s
+  ceiling rose 245 → 260 for the two new mechanics, traded back twelve lines elsewhere. No
+  new eval surface: the semantics are walked as recorded claims in the ordinary verifier
+  dispatch.
+
 ## 0.2.2
 
 - **Guarded seats** (`references/herdr-mechanics.md`, the launch's step 2): before an implementer,
