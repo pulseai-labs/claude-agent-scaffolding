@@ -36,14 +36,38 @@ const RULE_TEXT: Record<RuleId, string> = {
 
 const SEGMENT = /;|&&|\|\||\||\n/
 const TRAILER = /co-authored-by:|🤖 generated with/i
+// Command boundaries for matching; subshell parentheses count too.
+const COMMANDS = /;|&&|\|\||\||\n|\(|\)/
 // Heredoc bodies and quoted strings are text, not commands: a commit message may
-// name `git merge` or `-n`. They are blanked before matching; the trailer check
-// still reads the whole command.
+// name `git merge` or `-n`. Each is swapped for a numbered marker before matching,
+// and the trailer check expands the markers in the commit's own segment.
 const HEREDOC = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2(?=\n|$)/g
 const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/g
+const MARKER = /\u0000(\d+)\u0000/g
+// Words that run the next word as the command.
+const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup', 'time'])
 
-function commandsOnly(command: string): string {
-  return command.replace(HEREDOC, '<<HEREDOC').replace(QUOTED, 'QUOTED')
+function blank(command: string): { text: string; pieces: string[] } {
+  const pieces: string[] = []
+  const keep = (piece: string) => `\u0000${pieces.push(piece) - 1}\u0000`
+  return { text: command.replace(HEREDOC, keep).replace(QUOTED, keep), pieces }
+}
+
+// A segment's text with its blanked pieces put back, nested pieces included.
+function expand(text: string, pieces: readonly string[]): string {
+  return text.replace(MARKER, (_, i: string) => expand(pieces[Number(i)] ?? '', pieces))
+}
+
+// The command word and its arguments: leading VAR=value assignments and wrapper
+// words are skipped, and a path such as /usr/bin/git names git.
+function commandOf(tokens: readonly string[]): { name: string; args: string[] } | undefined {
+  let i = 0
+  for (;;) {
+    const token = tokens[i]
+    if (token === undefined) return undefined
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token) || WRAPPERS.has(token)) i += 1
+    else return { name: token.replace(/^.*\//, ''), args: tokens.slice(i + 1) }
+  }
 }
 
 export function parseRole(value: string | undefined): RoleState {
@@ -65,22 +89,24 @@ function tokensOf(segment: string): string[] {
 
 // The git subcommand and its arguments, skipping global options (-C and -c take a value).
 function gitOf(tokens: string[]): { sub: string; args: string[] } | undefined {
-  let i = tokens.indexOf('git')
-  if (i < 0) return undefined
-  i += 1
-  while (tokens[i]?.startsWith('-')) i += tokens[i] === '-C' || tokens[i] === '-c' ? 2 : 1
-  const sub = tokens[i]
-  return sub === undefined ? undefined : { sub, args: tokens.slice(i + 1) }
+  const command = commandOf(tokens)
+  if (command?.name !== 'git') return undefined
+  const rest = command.args
+  let i = 0
+  while (rest[i]?.startsWith('-')) i += rest[i] === '-C' || rest[i] === '-c' ? 2 : 1
+  const sub = rest[i]
+  return sub === undefined ? undefined : { sub, args: rest.slice(i + 1) }
 }
 
 export function bashRules(command: string, messageFileText = ''): RuleId[] {
   const found = new Set<RuleId>()
-  for (const segment of commandsOnly(command).split(SEGMENT)) {
+  const { text, pieces } = blank(command)
+  for (const segment of text.split(COMMANDS)) {
     const tokens = tokensOf(segment)
-    const gh = tokens.indexOf('gh')
-    if (gh >= 0 && tokens[gh + 1] === 'pr') {
-      if (tokens[gh + 2] === 'merge') found.add('merge')
-      if (tokens[gh + 2] === 'create') found.add('pr-create')
+    const head = commandOf(tokens)
+    if (head?.name === 'gh' && head.args[0] === 'pr') {
+      if (head.args[1] === 'merge') found.add('merge')
+      if (head.args[1] === 'create') found.add('pr-create')
     }
     const git = gitOf(tokens)
     if (git === undefined) continue
@@ -90,8 +116,8 @@ export function bashRules(command: string, messageFileText = ''): RuleId[] {
     if (sub === 'branch' && args.includes('-D')) found.add('branch-delete')
     if (sub === 'commit') {
       found.add('commit')
-      // The whole command, not the segment: a heredoc message spans several lines.
-      if (TRAILER.test(command) || TRAILER.test(messageFileText)) found.add('ai-trailer')
+      // The segment with its quoted and heredoc text put back: the message lives there.
+      if (TRAILER.test(expand(segment, pieces)) || TRAILER.test(messageFileText)) found.add('ai-trailer')
     }
     if (sub === 'push') {
       found.add('push')

@@ -70,13 +70,27 @@ describe('bashRules', () => {
     expect(bashRules("git commit -F - <<'EOF'\nfix\n\nCo-Authored-By: a\nEOF")).toContain('ai-trailer')
     expect(bashRules("git commit -F - <<'EOF'\nfix\nEOF\ngit push --force")).toContain('force-push')
   })
+  test('only the command word counts: echo or grep naming git is not git (merge-bar condition 1)', () => {
+    expect(bashRules('echo git merge')).toEqual([])
+    expect(bashRules('echo merge')).toEqual([])
+    expect(bashRules('grep -rn "git push --force" docs')).toEqual([])
+  })
+  test('control: wrappers and assignments before git are still git', () => {
+    expect(bashRules('GIT_TRACE=1 git merge main')).toContain('merge')
+    expect(bashRules('sudo git push --force')).toContain('force-push')
+    expect(bashRules('env A=1 /usr/bin/git branch -D b')).toContain('branch-delete')
+    expect(bashRules('(cd sub && git push -f)')).toContain('force-push')
+  })
+  test('the trailer check reads only the commit segment (merge-bar condition 1)', () => {
+    expect(bashRules('git commit -m x && grep -rn "Co-Authored-By:" hooks/')).toEqual(['commit'])
+    expect(bashRules('git commit -m "x\n\nCo-Authored-By: a" && echo done')).toContain('ai-trailer')
+  })
   test('a quoted -C path does not hide the subcommand', () => {
     expect(bashRules('git -C "/a b" push --force')).toContain('force-push')
   })
   test('quoted words are not subcommands (Review Focus 2)', () => {
     expect(bashRules('git commit -m "merge the fix"')).not.toContain('merge')
     expect(bashRules('git log --merges')).toEqual([])
-    expect(bashRules('echo git merge')).toContain('merge')
   })
 })
 

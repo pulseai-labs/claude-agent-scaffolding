@@ -48,9 +48,11 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 ## Limits
 
 - **The rails stop mistakes, not an adversary.** Bash matching is whitespace tokens split on `;`,
-  `&&`, `||`, `|` and newlines, after quoted strings and heredoc bodies are blanked as text, so a
-  commit message may mention `git merge` or `-n`. An obfuscated command (`g""it push`) passes, and an
-  unquoted `echo git merge` is read as a git merge.
+  `&&`, `||`, `|`, parentheses and newlines, after quoted strings and heredoc bodies are blanked as
+  text, so a commit message may mention `git merge` or `-n`. Only the command word counts, after any
+  `VAR=value` and `sudo`, `env`, `command`, `exec`, `nohup` or `time`; so `echo git merge` is not a
+  merge, and neither are `xargs git push --force`, `bash -c "git push -f"` or `g""it push`.
+  An AI trailer is looked for only in the commit's own command and its message file.
 - **A `-F` message file is read from the session's working directory.** A relative path after a
   `cd`, or a path in a shell variable, is not found and reads as empty, so a trailer in it passes.
   The repository's commit-msg hook remains the backstop.
