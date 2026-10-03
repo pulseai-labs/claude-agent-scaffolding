@@ -18,8 +18,9 @@ Two environment variables, both set **per spawn**:
 | | anything else | Fail closed. Every tool call is denied with a message that names the bad value and the valid roles. Respawn the seat with a valid value. |
 | `SEAT_MODS_ALLOW` | `:`-separated absolute directories | Extra directories the seat may write to: its report directory and its scratch directory. Relative entries and `/` are ignored. Unset, only the worktree is writable. |
 
-`herdr-crew` 0.2.2 and later sets both on implementer, verifier and reviewer spawns
-(`herdr tab create --env …`), and never on coordinator seats.
+`herdr-crew` 0.2.2 and later exports both in the pane of each implementer, verifier and reviewer
+seat before its command, and never on coordinator seats. Neither directory may contain `:`, the
+list separator.
 
 **Never set either variable in `~/.claude/settings.json`'s `env` block, in a shell profile, or in a
 machine-file `command:` line.** Each of those reaches the orchestrator, which must never be guarded.
