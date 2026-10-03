@@ -371,20 +371,43 @@ belong in the read-out when the sweep gives you reason to look:
   # Every failure that would otherwise READ AS AN ABSENCE is reported instead: an
   # unreadable registry makes every batch inconclusive, an unreadable repo
   # contributes no hits, and either one would turn every surface into a finding.
-  # The roster: what each warn line NAMES. `touch_check` answers "<kind> <id>"
-  # per match and never the glob, so the id-and-glob-list half of the report has
-  # no other source - and the `not-applicable` exclusion below is read from it.
-  roster="$("$oss_bin" get '[.bones[], .risk_gates[] | {id: (.adr // .name), touch: (.touch | join(", "))}]')" \
-    || roster=""
   probe_rc=0; "$oss_bin" touch_check . >/dev/null 2>&1 || probe_rc=$?
   state_rc=0; "$oss_bin" get 'true' >/dev/null 2>&1 || state_rc=$?
+  # Which state is IN PLAY, and is it this directory's? `$sf` follows the same
+  # precedence the reads below do ($OSS_STATE_FILE first); `$routed` is the
+  # manifest's answer regardless of the environment. §4 binds its worktree
+  # comparison with that pair, and the sweep needs the same gate: under an
+  # override pointing at another workspace's state, every surface THAT state
+  # knows and this directory's repos do not would be reported as matching no
+  # tracked file, after inspecting the wrong corpus. Paths are compared as
+  # WRITTEN - the blunt convention `_oss_resolve_state` announces - so an
+  # equivalent spelling of the same file skips too: visible, never a silent
+  # false clean. When the route cannot be resolved there is nothing to compare,
+  # and the corpus guard above has already spoken.
+  sf="${OSS_STATE_FILE:-}"
+  if [ -z "$sf" ]; then sf="$("$oss_bin" state_path 2>/dev/null)" || sf=""; fi
+  routed="$("$oss_bin" state_path 2>/dev/null)" || routed=""
   if [ -z "${repos:-}" ]; then
     echo "skip: touch - the declared repo keys could not be read, so the sweep did not run"
   elif [ "$state_rc" != 0 ]; then
     echo "skip: touch - the state could not be resolved or read, and touch_check returns its resolver's rc 1 WITHOUT checking anything, so an empty hit file would not be an absence"
+  elif [ -n "$routed" ] && [ "$sf" != "$routed" ]; then
+    echo "skip: touch - the inspected state is not this directory's manifest-routed state ('$sf' vs '$routed'), so a repo-vs-state comparison would cross projects, and the sweep did not run"
   elif [ "$probe_rc" = 2 ]; then
     echo "skip: touch - the bones/risk-gate registry could not be read (touch_check answers rc 2), so no absence below would be sound"
   else
+    # The roster: what each warn line NAMES, and WHICH VERB its remedy takes -
+    # never from memory. `touch_check` answers "<kind> <id>" per match, says
+    # nothing at all about a surface that matched nothing, and never the glob, so
+    # the id-kind-and-glob half of the report has no other source; the
+    # `not-applicable` exclusion below is read from it too. It is read HERE, past
+    # every refusal, so a skipped sweep reads no registry at all.
+    # Each branch is parenthesised: `[a[] | {…}, b[] | {…}]` binds the comma
+    # INSIDE the pipe and iterates the second projection over the first's
+    # elements, which answers rc 5 and empties the roster. The shape is load-
+    # bearing: every entry must carry `kind`, `id` and `touch` alike.
+    roster="$("$oss_bin" get '[(.bones[] | {kind: "bone", id: .adr, touch: (.touch | join(", "))}), (.risk_gates[] | {kind: "risk_gate", id: .name, touch: (.touch | join(", "))})]')" \
+      || roster=""
     hits="$(mktemp)"; skipped=""; read_any=""
     while IFS= read -r name; do
       [ -n "$name" ] || continue
@@ -395,7 +418,11 @@ belong in the read-out when the sweep gives you reason to look:
              skipped="$skipped $name"; rm -f "$listed"; continue; }
       read_any=1
       if [ -s "$listed" ]; then
-        xargs -0 -n 200 "$oss_bin" touch_check < "$listed" >> "$hits" || :
+        # No `-n`: xargs splits at the system's own argument limit, so a corpus
+        # costs one dispatcher per limit-sized batch rather than one per 200
+        # paths (#558). Every batch's rc is discarded, as the finding below is
+        # an absence rather than an exit status.
+        xargs -0 "$oss_bin" touch_check < "$listed" >> "$hits" || :
       fi
       rm -f "$listed"
     done < <(printf '%s\n' "$repos")
@@ -424,17 +451,30 @@ belong in the read-out when the sweep gives you reason to look:
   each reports its own failure instead of an absence it cannot support, so a
   sweep that did not run says that, rather than reporting every surface.
 
-  **The ids and the glob lists come from `$roster`**, never from memory: it pairs
-  every bone and gate with its touch list, which `touch_check`'s own output
-  cannot supply it prints `<kind> <id>` per match.
+  **The sweep is about THIS directory's state.** With `$OSS_STATE_FILE` pointing
+  at another workspace's state the block refuses the run — §4's own gate, one
+  unkeyed line naming both paths — because its surfaces would come from one
+  project while its corpus comes from another: every surface of the foreign
+  state would be reported as matching no tracked file, after inspecting the
+  wrong repos, with every command exiting 0.
+
+  **The ids, the KINDS and the glob lists come from `$roster`**, never from
+  memory: it pairs every bone and gate with its kind and its touch list, and
+  `touch_check`'s own output cannot supply the rest it prints `<kind> <id>` per
+  match and nothing for a surface that matched nothing.
   Two exclusions, both deliberate: a surface whose list carries `not-applicable`
   is left alone (it matches nothing *on purpose* — `bones-registry.md` §2/§6),
   while a surface with an **empty** list is reported, as its own line: that is the
-  §6 anti-pattern, "a comment, not a bone". The remedy is a re-point
-  (`bone_set_touch` / `risk_gate_set_touch`) or a legitimate `not-applicable`, and
-  which one it is belongs to the operator, per the section's closing rule.
+  §6 anti-pattern, "a comment, not a bone". The remedy is a re-point — with the
+  verb chosen from the surface's own `kind`, `bone_set_touch` for a `bone` and
+  `risk_gate_set_touch` for a `risk_gate`, never guessed from the id's shape —
+  or a legitimate `not-applicable`, and which one it is belongs to the operator,
+  per the section's closing rule.
 
-Report these as findings with their evidence. Do not repair them.
+Report these as findings with their evidence. Do not repair them. **Remove
+`$hits` once the warn lines are written** — `rm -f "$hits"` — it is this
+surface's only temp file (each repo's `$listed` is removed as it is read) and
+nothing else cleans it up (#558).
 
 **List the `abandoned` work items by id in the read-out** even when nothing is
 wrong with them — a line, not a finding: each is work the plan withdrew, and

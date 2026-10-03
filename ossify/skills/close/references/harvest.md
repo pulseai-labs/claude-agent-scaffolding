@@ -179,9 +179,11 @@ candidates into one to make the list shorter.
 The harvest has no executable half. There is no `oss` verb here: you perform
 the appends yourself, and the rules the deleted code enforced at rc 2 are now
 yours to hold. Each accepted entry carries four things — its **source**
-(`report` or `handoff`), its **source id** (the work-item id or handoff
-filename), its **target file**, and its **text** (verbatim; a §6 edit means the
-user's words, not yours).
+(`report`, `handoff` or `adoption`), its **source id** (the work-item id, the
+handoff filename, or adoption's baseline — `r0 baseline <sha>`, one
+`<repo>=<sha>` per declared repo when the adoption spans several), its
+**target file**, and its **text** (verbatim; a §6 edit means the user's words,
+not yours).
 
 **Where the bank is — this paragraph is the only copy; other surfaces route
 here.** Read the manifest — walk up from the cwd for `.ossify/topology.json`
@@ -204,11 +206,11 @@ own cwd — a cwd-composed path lands the writes in whichever repo you happen to
 be standing in, reads as success, and the real memory bank is never touched.
 
 **Validate the whole set before touching any file.** Every item must name an
-allowlisted target (§5), a source that is exactly `report` or `handoff`, a
-source id, and non-blank text. One bad item stops the whole set — no partial
-apply, no seeding, nothing written until every item passes. Fix the set (the
-target, usually) and apply the whole thing again; applying the valid items
-first is how one refusal becomes N partial states.
+allowlisted target (§5), a source that is exactly `report`, `handoff` or
+`adoption`, a source id, and non-blank text. One bad item stops the whole set —
+no partial apply, no seeding, nothing written until every item passes. Fix the
+set (the target, usually) and apply the whole thing again; applying the valid
+items first is how one refusal becomes N partial states.
 
 **Seed a missing live file with its real structure, never a bare header.**
 `09-known-issues.md` opens `# Known issues` with the section
@@ -228,8 +230,15 @@ filtered the set in §6.
 **Append**: a blank line, the text verbatim, then the provenance trailer:
 
 ```text
-<!-- ossify harvest: <source-id>, <YYYY-MM-DD (UTC)>; source: report|handoff -->
+<!-- ossify harvest: <source-id>, <YYYY-MM-DD (UTC)>; source: report|handoff|adoption -->
 ```
+
+**`adoption` is the third source, and it is `adopt`'s** (`adopt/SKILL.md` §C5):
+the entries an adoption pass writes into the bank carry the baseline that pass
+recorded — `r0 baseline <sha>`, or one `<repo>=<sha>` per declared repo when the
+adoption spans several. `close` never writes this one, so a reader can tell an
+adopted history from a harvested one without reading the entries themselves
+(#301).
 
 (Entries written before the conversion also carry an `h:<hash>` field in the
 trailer. It fed the deleted byte-identity check; nothing reads it now. Leave

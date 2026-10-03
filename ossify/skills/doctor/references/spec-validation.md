@@ -80,7 +80,38 @@ in `doctor` rather than in `/start`: it is a comparison between two artifacts,
 and only one of them is the spec.
 
 ```bash
-"$oss_bin" get '.bones | length' "$("$oss_bin" state_path)"
+# Both halves are pinned to THIS directory's manifest: $sf is the routed state,
+# never $OSS_STATE_FILE (see the note below). The section-4 heading is read as a
+# '## 4' line — a dot, a colon or whitespace after the number — and a spec with no
+# such heading REFUSES rather than reading an empty index set, because an
+# unreadable half is not an empty one. Only each row's FIRST cell counts, so an
+# ADR reference inside a row's prose ("supersedes ADR-0001") is not a row.
+sf="$("$oss_bin" state_path)"
+spec="$("$oss_bin" spec_path)"
+state_rc=0; reg_raw="$("$oss_bin" get '.bones[].adr' "$sf" 2>/dev/null)" || state_rc=$?
+spec_rc=0; [ -r "$spec" ] || spec_rc=1
+hdr=0; [ "$spec_rc" = 0 ] && hdr="$(grep -cE '^##[[:space:]]*4[.:[:space:]]' "$spec" 2>/dev/null)" || :
+if [ "$state_rc" != 0 ] || [ "$spec_rc" != 0 ]; then
+  echo "skip: spec - the bones drift check could not read both halves (registry rc $state_rc, spec rc $spec_rc), and an unreadable half is not an empty one"
+elif [ "${hdr:-0}" = 0 ]; then
+  echo "skip: spec - section 4 carries no '## 4' heading this check reads, so the index half is unreadable rather than empty"
+else
+  reg="$(printf '%s\n' "$reg_raw" | grep -oE 'ADR-[0-9]+' | sort -u)" || reg=""
+  idx="$(awk '/^##[[:space:]]*4[.:[:space:]]/ {f=1; next} /^##[[:space:]]/ {f=0} f' "$spec" \
+    | awk -F'|' '/^[[:space:]]*\|/ {c=$2; gsub(/[[:space:]]/,"",c); if (c ~ /^ADR-[0-9]+$/) print c}' \
+    | sort -u)" || idx=""
+  ra="$(mktemp)"; rb="$(mktemp)"
+  printf '%s\n' "$reg" > "$ra"; printf '%s\n' "$idx" > "$rb"
+  only_reg="$(awk 'NR==FNR { if ($0 != "") s[$0]=1; next } $0 != "" && !($0 in s)' "$rb" "$ra")"
+  only_idx="$(awk 'NR==FNR { if ($0 != "") s[$0]=1; next } $0 != "" && !($0 in s)' "$ra" "$rb")"
+  rm -f "$ra" "$rb"
+  if [ -n "$only_reg" ] || [ -n "$only_idx" ]; then
+    [ -z "$only_reg" ] || echo "fail: spec - registry entry with no index row: $(printf '%s' "$only_reg" | tr '\n' ' ')"
+    [ -z "$only_idx" ] || echo "fail: spec - index row with no registry entry: $(printf '%s' "$only_idx" | tr '\n' ' ')"
+  else
+    echo "ok: spec - bones index matches the registry: $(printf '%s' "$reg" | grep -c '[^[:space:]]') entries, $(printf '%s' "$idx" | grep -c '[^[:space:]]') rows"
+  fi
+fi
 ```
 
 **Pass the state path explicitly.** A bare `"$oss_bin" get` honours an exported
@@ -91,16 +122,20 @@ regardless of the override, which binds both halves of the comparison to the
 same project. (The interop surface, §7 of the skill body, reports the override
 separately; this comparison must not depend on the user having run it first.)
 
-Compare against the row count of section 4. The direction of the mismatch
-changes the finding:
+**Compare identifier *sets*, never their counts.** Cardinality cannot tell the
+two directions apart: replace `ADR-0002`'s row with `ADR-9999` and *both*
+directions are present while `.bones | length` and section 4's row count still
+agree — a count comparison reports clean on exactly the drift this check exists
+to find. The block above reports each direction with the identifiers that do not
+pair:
 
 | Mismatch | What it means | Report as |
 |---|---|---|
 | registry entry with no index row | a bone was recorded but never written into the spec | `fail: spec` — the spec understates the architecture |
-| index row with no registry entry | a row was hand-written, or an entry was lost | `fail: spec` — name both counts and the suspect row |
+| index row with no registry entry | a row was hand-written, or an entry was lost | `fail: spec` — name the direction and the rows that do not pair |
 
 Neither is auto-repairable: which artifact is right is a judgment about what
-actually happened. Name the two counts, name the rows that do not pair, and
+actually happened. Name the identifiers, name the direction each belongs to, and
 stop.
 
 ---

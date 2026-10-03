@@ -23,13 +23,15 @@ Resolve the path of every output in §13's table (`memory-bank-brief.md` §4 —
 never reaches it) and check whether a file already exists there: the
 MASTER-SPEC at `"$oss_bin" spec_path`, the EXECUTIVE-SUMMARY, each memory-bank
 file where the bank lives (`close/references/harvest.md`, "Where the bank is"),
-`CLAUDE.md`, each `PUBLIC_BOUNDARY.md`, and the private boundary inventory.
+`CLAUDE.md`, each `PUBLIC_BOUNDARY.md`, and the private boundary inventory at
+`posture-block.md` §7's convention,
+`<ai-workspace>/docs/private-boundary-inventory.md`.
 A MASTER-SPEC anywhere else in the workspace is not overwritten, but name it to
 the operator too: two specs side by side is a question, not a default. Bones ADRs take a
 fresh number from the `bones-registry.md` §3 scan, so they do not collide here;
 if one ever would, the same rule applies. An output whose path no route names
-yet — an EXECUTIVE-SUMMARY with no routing key, the private inventory — cannot
-be checked here; §2's last paragraph checks it when its path is chosen.
+yet — an EXECUTIVE-SUMMARY with no routing key — cannot be checked here; §2's
+last paragraph checks it when its path is chosen.
 
 A destination that holds nothing is written as usual, with no question.
 

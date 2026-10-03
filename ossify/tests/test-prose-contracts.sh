@@ -478,20 +478,24 @@ fi
 # passed; everything else the block must establish itself.
 OSS="$HERE/../bin/oss"
 SWWS="$_PC_TMP/sweepws"; mkdir -p "$SWWS/.ossify" "$SWWS/canon"
-printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"},"gone":{"root":"%s"}},"well_known_paths":{}}\n' \
-  "$SWWS/canon" "$SWWS/absent" > "$SWWS/.ossify/topology.json"
+SWS="$SWWS/state.json"
+# The state is ROUTED at $SWS and also exported as $OSS_STATE_FILE - the same
+# project either way, which is the pairing #561's gate accepts. An override that
+# is NOT this directory's manifest-routed state must skip the sweep instead.
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"},"gone":{"root":"%s"}},"well_known_paths":{"project_state":"%s"}}\n' \
+  "$SWWS/canon" "$SWWS/absent" "$SWS" > "$SWWS/.ossify/topology.json"
 ( cd "$SWWS/canon" && git init -q . && : > tracked.txt && git add tracked.txt \
   && git -c user.email=t@t -c user.name=t commit -qm fixture ) >/dev/null 2>&1
-SWS="$SWWS/state.json"
 ( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" init "sweep" ) >/dev/null 2>&1
 ( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" bone_add ADR-9091 "on a tracked file" "tracked.txt" ) >/dev/null 2>&1
 ( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" bone_add ADR-9092 "on nothing" "nowhere/at/all/**" ) >/dev/null 2>&1
+( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" risk_gate_add RG-7 "also/nowhere/**" "packages/core/**" ) >/dev/null 2>&1
 # cd in the MAIN shell, not a subshell: t_capture/t_assert mutate the T_PASS/
 # T_FAIL globals, and a subshell's mutations never propagate (test-manifest.sh
 # documents the vacuous-green trap this avoids).
 cd "$SWWS"
 t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" repos="$(printf 'canonical\ngone')" bash -c \
-  "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'SKIPPED[%s]\n' \"\$skipped\"; printf 'ROSTER%s\n' \"\$roster\"; printf 'INHITS%s\n' \"\$(grep -c ADR-9092 \"\$hits\" 2>/dev/null || true)\""
+  "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'SKIPPED[%s]\n' \"\$skipped\"; printf 'ROSTER%s\n' \"\$roster\"; printf 'KINDS%s\n' \"\$(printf '%s' \"\$roster\" | jq -r '[.[].kind]|join(\",\")')\"; printf 'INHITS%s\n' \"\$(grep -c ADR-9092 \"\$hits\" 2>/dev/null || true)\""
 cd "$HERE"
 t_assert_rc 0 "(d) the sweep COMPLETES with a declared repo unreadable - it reports the skip rather than exiting the whole run"
 t_assert_contains "$T_OUT" "skip: touch(gone)" "(d) ... naming the unreadable repo by key, in the §1 grammar"
@@ -504,6 +508,12 @@ t_assert_contains "$T_OUT" "SKIPPED[ gone]" "(d) ... and feeding \$skipped, whic
 # exclusion is unreadable - the same unassigned-variable class as $repos.
 t_assert_contains "$T_OUT" "ADR-9092" "(d) ... and $roster carrying a surface that matched NOTHING, which is exactly the one a warn line names"
 t_assert_contains "$T_OUT" "nowhere/at/all/**" "(d) ... with its glob list, which touch_check's own output cannot supply"
+# #561 (1): the roster must ALSO carry the surface KIND. It is what decides
+# which re-point verb a warn line's remedy names (`bone_set_touch` vs
+# `risk_gate_set_touch`), and for a surface that matched NOTHING `touch_check`
+# emits no line at all, so the kind has no other source. Both branches of the
+# projection are exercised: two bones and a risk gate.
+t_assert_contains "$T_OUT" "KINDSbone,bone,risk_gate" "(d) ... and the KIND of every surface, in touch_check's own vocabulary - the only thing that picks the re-point verb"
 # G4: with EVERY declared repo unreadable the read set is EMPTY, and the sweep
 # must report that rather than one absence per surface.
 t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" repos="gone" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
@@ -531,6 +541,54 @@ t_capture env oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_
 cd "$HERE"
 t_assert_rc 0 "(d) an unresolvable state route does not abort the sweep"
 t_assert_contains "$T_OUT" "state could not be resolved or read" "(d) ... it reports that instead of an absence, even though touch_check's rc 1 there looks exactly like clean"
+# #561 (2): the sweep must NOT run when the state in play is not this
+# directory's manifest-routed state. That is §4's worktree gate, and it is this
+# block's own hazard: with $OSS_STATE_FILE pointing at ANOTHER workspace's state,
+# every surface THAT state knows and these repos do not is reported as matching
+# no tracked file, after inspecting the wrong corpus, with every command exiting
+# 0. An unset `hits` and an unset `roster` are the signature of "did not run".
+SWF="$_PC_TMP/foreignws"; mkdir -p "$SWF/.ossify" "$SWF/canon"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"project_state":"%s/state.json"}}\n' \
+  "$SWF" "$SWF" > "$SWF/.ossify/topology.json"
+( cd "$SWF" && bash "$OSS" init foreign >/dev/null && bash "$OSS" bone_add ADR-7777 "a foreign-only surface" "foreign/only/**" ) >/dev/null 2>&1
+cd "$SWWS"
+t_capture env OSS_STATE_FILE="$SWF/state.json" oss_bin="$OSS" repos="canonical" bash -c \
+  "set -euo pipefail; . '$_SW'; printf 'HITS[%s]\n' \"\${hits:-unset}\"; printf 'ROSTER[%s]\n' \"\${roster:-unset}\""
+cd "$HERE"
+t_assert_rc 0 "#561: a foreign state does not abort the sweep"
+t_assert_contains "$T_OUT" "skip: touch - the inspected state is not this directory's manifest-routed state" "#561 ... it refuses the run in the §1 grammar, naming both paths"
+t_assert_contains "$T_OUT" "HITS[unset]" "#561 ... and nothing was swept: \$hits was never created"
+t_assert_contains "$T_OUT" "ROSTER[unset]" "#561 ... and no foreign registry was read, so no warn line can be composed from it"
+# CONTROL: with NO override the same fixture still sweeps - the gate refuses a
+# foreign state, not every run, and the routed state's roster still fills.
+cd "$SWWS"
+t_capture env oss_bin="$OSS" repos="canonical" bash -c \
+  "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'KINDS%s\n' \"\$(printf '%s' \"\$roster\" | jq -r '[.[].kind]|join(\",\")')\""
+cd "$HERE"
+t_assert_contains "$T_OUT" "bone ADR-9091" "#561 control: no override, so the routed state sweeps its corpus"
+t_assert_contains "$T_OUT" "KINDSbone,bone,risk_gate" "#561 control: ... and the roster comes from the routed state"
+# #558 / ledger line 87, both halves, resolved here.
+# (i) the block never removed its `$hits` temp file. The removal is prose the
+# agent performs once the warn lines are written, so it must be present OUTSIDE
+# the fence and absent INSIDE it - an in-fence removal would empty the report's
+# own source.
+if grep -Fq 'rm -f "$hits"' "$_SW"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep block deletes \$hits itself - the warn lines are composed FROM that file"
+else
+  T_PASS=$((T_PASS+1))
+fi
+if grep -Fq 'once the warn lines are written' "$SI" && grep -Fq 'rm -f "$hits"' "$SI"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep never removes its \$hits temp file - the leak stays open (#558)"
+fi
+# (ii) the arbitrary fixed batch: xargs splits at the system's own argument
+# limit, so `-n 200` only multiplies dispatcher spawns per corpus.
+if grep -Fq 'xargs -0 -n 200' "$_SW"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep still batches at a fixed 'xargs -n 200' - one dispatcher per 200 tracked paths (#558)"
+else
+  T_PASS=$((T_PASS+1))
+fi
 # R2-2: the legacy key set must exclude ai_workspace, or a planning file under it
 # can satisfy a stale product glob and suppress a real warning.
 if grep -Fq 'OTHER than `ai_workspace`' "$_SW"; then
@@ -538,6 +596,158 @@ if grep -Fq 'OTHER than `ai_workspace`' "$_SW"; then
 else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: the sweep's corpus comment does not exclude ai_workspace from the legacy pairing-manifest key set - a planning file then satisfies a stale product glob and the zero-match warning is suppressed"
 fi
+# --- phase (e): §3's bones drift check compares SETS, not counts (#154) -------
+#
+# Shipped as a cardinality comparison - `.bones | length` against section 4's row
+# count - which cannot tell the two documented directions apart. Replace a
+# registered bone's index row with a DIFFERENT hand-written id and both counts
+# stay at 1 while *both* directions are present, so the check reported clean on
+# exactly the drift it exists to find. The block is OPERATIVE by the ledger's
+# rule (control flow, a refusal arm, temp files, and a set difference), so it is
+# extracted AND executed here, and the fixture asserts its own shape (equal
+# counts) so the pin cannot drift into a trivially-unequal case that proves
+# nothing.
+_E_SVMD="$SKILLS/doctor/references/spec-validation.md"
+_E_SV="$_PC_TMP/sv-block.sh"
+if oss_block_extract "$_E_SVMD" 'only_reg=' "$_E_SV" 2>/dev/null && [ -s "$_E_SV" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: spec-validation.md §3's drift block no longer extracts - the checks below are vacuous"
+fi
+_E_WS="$_PC_TMP/driftws"; mkdir -p "$_E_WS/.ossify" "$_E_WS/canon" "$_E_WS/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
+  "$_E_WS" "$_E_WS" "$_E_WS" > "$_E_WS/.ossify/topology.json"
+( cd "$_E_WS" && bash "$OSS" init drift >/dev/null && bash "$OSS" bone_add ADR-0002 "the registered bone" "packages/core/**" >/dev/null ) >/dev/null 2>&1
+_e_spec() { # $1=ws ; remaining args = section-4 table rows
+  local ws="$1"; shift
+  {
+    printf '# MASTER-SPEC\n\n## 1. Vision\nx\n\n## 2. Posture & boundary\nx\n\n## 3. Feature map\nx\n\n## 4. Bones-registry index\n\n| ADR | Title |\n|---|---|\n'
+    printf '%s\n' "$@"
+    printf '\n## 5. Journeys\nx\n'
+  } > "$ws/docs/MASTER-SPEC.md"
+}
+_e_run() { ( cd "$1" && oss_bin="$OSS" bash -c "set -euo pipefail; . '$_E_SV'" ); }
+# The fixture's own shape: the two counts the OLD rule compared are EQUAL here,
+# so a regression back to cardinality reads this fixture as clean and fails (e1).
+_e_spec "$_E_WS" '| ADR-9999 | the hand-written row |'
+t_assert_eq "$(jq -r '.bones | length' "$_E_WS/.ossify/project-state.json")" \
+            "$(awk '/^## 4\./ {f=1; next} /^## / {f=0} f' "$_E_WS/docs/MASTER-SPEC.md" | grep -cE '^[[:space:]]*\|[[:space:]]*ADR-' || true)" \
+            "(e) the fixture carries EQUAL registry and index counts - without that this pin stops exercising #154"
+# (e1) THE DEFECT: equal counts, both directions present -> BOTH are named.
+t_capture _e_run "$_E_WS"
+t_assert_rc 0 "(e) the drift check runs to completion on an equal-count mismatch"
+t_assert_contains "$T_OUT" "registry entry with no index row: ADR-0002" "(e) ... naming the registered bone the index lost - the direction a count comparison cannot see"
+t_assert_contains "$T_OUT" "index row with no registry entry: ADR-9999" "(e) ... AND naming the hand-written row in the same run: equal counts is not a match"
+# (e2) CONTROL: the matched pair is clean, and the clean case SPEAKS (doctor's
+# own rule: silence is indistinguishable from a pass).
+_e_spec "$_E_WS" '| ADR-0002 | the registered bone |'
+t_capture _e_run "$_E_WS"
+t_assert_rc 0 "(e) the matched spec runs clean"
+t_assert_contains "$T_OUT" "ok: spec - bones index matches the registry" "(e) ... and it emits its line rather than staying silent"
+if printf '%s' "$T_OUT" | grep -Fq 'no index row'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) the matched fixture still produced a drift finding - the set difference is wrong in the other direction"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# (e3) CONTROL: one direction at a time. A comparison that reports both
+# directions whenever either fires is a count check wearing a set's clothes, and
+# the two directions have different remedies in the table.
+_e_spec "$_E_WS" '| ADR-0002 | the registered bone |' '| ADR-0007 | the extra row |'
+t_capture _e_run "$_E_WS"
+t_assert_contains "$T_OUT" "index row with no registry entry: ADR-0007" "(e) an extra index row alone is named"
+if printf '%s' "$T_OUT" | grep -Fq 'registry entry with no index row'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) a one-way mismatch also reported the OTHER direction - the halves are not being compared as sets"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# (e4) REFUSAL ARM: an index half that cannot be READ is not an EMPTY one. The
+# heading is what this recipe reads section 4 by, so its absence must refuse.
+printf '# MASTER-SPEC\n\n## Bones\n\n| ADR | Title |\n|---|---|\n| ADR-0002 | x |\n' > "$_E_WS/docs/MASTER-SPEC.md"
+t_capture _e_run "$_E_WS"
+t_assert_rc 0 "(e) a spec with no readable section-4 heading does not abort the run"
+t_assert_contains "$T_OUT" "section 4 carries no" "(e) ... it refuses the comparison instead of reading the index as empty - the same failure-read-as-absence class §5's sweep names"
+if printf '%s' "$T_OUT" | grep -Fq 'no index row'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) an unreadable index half was reported as a registry-only mismatch - that is the defect class this pin exists for"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# (e5) REFUSAL ARM: the registry half unreadable (jq cannot read `.bones[].adr`),
+# which must refuse rather than compare against an empty registry.
+_E_WS2="$_PC_TMP/driftws2"; mkdir -p "$_E_WS2/.ossify" "$_E_WS2/canon" "$_E_WS2/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
+  "$_E_WS2" "$_E_WS2" "$_E_WS2" > "$_E_WS2/.ossify/topology.json"
+printf '%s\n' '{"schema_version":9}' > "$_E_WS2/.ossify/project-state.json"
+_e_spec "$_E_WS2" '| ADR-0002 | x |'
+t_capture _e_run "$_E_WS2"
+t_assert_rc 0 "(e) an unreadable registry does not abort the run"
+t_assert_contains "$T_OUT" "could not read both halves" "(e) ... it names the unreadable half instead of reporting every index row as orphaned"
+if printf '%s' "$T_OUT" | grep -Fq 'no registry entry'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) an unreadable registry read as an EMPTY one - every index row was reported as a hand-written row"
+else
+  T_PASS=$((T_PASS+1))
+fi
+
+# --- phase (f): §3's ADR numbering scan must read an adopted series (#301) ----
+#
+# The scan matched `^adr-` and `^NNNN-` only. On an adopted series in the other
+# case - `ADR-001-redb-for-storage.md`, PulseDB's - it returned NOTHING, and an
+# empty answer is not "start at 1": it minted `ADR-0001` over an existing
+# `ADR-001`, duplicating the identifier bone citations and touch records key on.
+# Two further rules lived only in prose: the minted WIDTH (`%04d` regardless of
+# the series it read) and an unreadable `docs/adr/` answering like an empty one.
+# The block is OPERATIVE (a loop, `exit 1`, a format chosen at runtime), so it is
+# extracted AND executed.
+_AD="$SKILLS/start/references/bones-registry.md"
+_SC="$_PC_TMP/adr-scan.sh"
+if oss_block_extract "$_AD" 'matches=' "$_SC" 2>/dev/null && [ -s "$_SC" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: bones-registry.md §3's numbering scan no longer extracts - the checks below are vacuous"
+fi
+_o_ws() { # $1=name ; echoes a workspace whose canonical repo has an empty docs/adr
+  local d="$_PC_TMP/ni/$1"
+  mkdir -p "$d/.ossify" "$d/canon/docs/adr"
+  printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{}}\n' "$d" > "$d/.ossify/topology.json"
+  printf '%s\n' "$d"
+}
+_o_next() { ( cd "$1" && env oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SC'" ); }
+# THE DEFECT: an uppercase three-digit series is read, and the mint continues it.
+_O_U="$(_o_ws upper)"; : > "$_O_U/canon/docs/adr/ADR-001-redb-for-storage.md"; : > "$_O_U/canon/docs/adr/ADR-002-single-writer.md"
+t_capture _o_next "$_O_U"
+t_assert_rc 0 "#301: the numbering scan completes on an adopted series"
+t_assert_contains "$T_OUT" "ADR-003" "#301 ... and CONTINUES it: ADR-001/ADR-002 are read, so the next id is ADR-003 at the series' own width"
+if printf '%s' "$T_OUT" | grep -Fq 'ADR-001'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: #301 the scan minted an id that already exists - matching one case answers an empty series and restarts at 1"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# CONTROLS: every other form keeps working, and a non-series mints nothing from.
+_O_B="$(_o_ws bare)"; : > "$_O_B/canon/docs/adr/0003-record-architecture-decisions.md"
+t_capture _o_next "$_O_B"
+t_assert_contains "$T_OUT" "ADR-0004" "#301 control: the bare scaffold-onboard seed is still read"
+_O_L="$(_o_ws lower)"; : > "$_O_L/canon/docs/adr/adr-0007-hexagonal.md"
+t_capture _o_next "$_O_L"
+t_assert_contains "$T_OUT" "ADR-0008" "#301 control: the lowercase four-digit form is still read"
+_O_E="$(_o_ws empty)"
+t_capture _o_next "$_O_E"
+t_assert_contains "$T_OUT" "ADR-0001" "#301 control: an empty series starts at ADR-0001, four digits"
+_O_D="$(_o_ws decoy)"; : > "$_O_D/canon/docs/adr/README.md"; : > "$_O_D/canon/docs/adr/0001-notes.txt"
+t_capture _o_next "$_O_D"
+t_assert_contains "$T_OUT" "ADR-0001" "#301 control: README.md and a non-.md file are not a series to continue"
+# REFUSAL ARM: an unreadable docs/adr/ must not answer like an empty one, or the
+# next ADR is minted blind over whatever is in there.
+_O_P="$(_o_ws perm)"; chmod 000 "$_O_P/canon/docs/adr"
+t_capture _o_next "$_O_P"
+_o_prc=$T_RC
+chmod 755 "$_O_P/canon/docs/adr"
+t_assert_eq 1 "$_o_prc" "#301: an unreadable docs/adr/ refuses (rc 1) rather than answering as an empty series"
+t_assert_contains "$T_OUT" "could not read" "#301 ... naming the directory it could not read"
+if printf '%s' "$T_OUT" | grep -Fq 'ADR-'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: #301 an unreadable series was answered with a minted id - a failure read as an absence"
+else
+  T_PASS=$((T_PASS+1))
+fi
+
 # --- phase 3: the never-strand invariant's two surfaces must agree -----------
 #
 # The dispatch predicate is one definition used at four sites, and one of them is
@@ -809,6 +1019,47 @@ for _f in "$_OSSR/skills/doctor/references/state-inspection.md" "$_OSSR/skills/c
   grep -F '| `fail: state` |' "$_f" | grep -Fq 'on Devin run `adopt` on Claude Code or Codex' || { _r=1; echo "  (#636 no non-Claude route in: $(basename "$_f"))"; }
 done
 _pin "$_r" "the fail: state remedy names a bare init - following it leaves state that /start and /adopt both refuse"
+
+# --- 1.13.4 (#154, #561, #301, #299) -----------------------------------------
+# One pin per prose rule the four fixes ship. The behavioural half of each is
+# held by phases (d)-(f) above, which extract and EXECUTE the blocks; these hold
+# the words a model has to find to act at all. Each is red on 1.13.3's text.
+_SV4="$_OSSR/skills/doctor/references/spec-validation.md"
+_SI4="$_OSSR/skills/doctor/references/state-inspection.md"
+# (#154) the drift check says SETS, and refuses an unreadable half out loud.
+_r=1; grep -Fq 'Compare identifier *sets*, never their counts' "$_SV4" && grep -Fq 'an unreadable half is not an empty one' "$_SV4" && ! grep -Fq 'Compare against the row count of section 4' "$_SV4" && _r=0
+_pin "$_r" "spec-validation §3 still compares counts (or lost its refusal arm) - a mismatch with equal counts in both directions reads clean"
+# (#561) the re-point remedy takes its verb from the roster's KIND, and §5 names
+# the state-versus-manifest gate its block now applies.
+_r=1; grep -Fq "chosen from the surface's own" "$_SI4" && grep -Fq 'never guessed from the id' "$_SI4" && grep -Fq "The sweep is about THIS directory's state" "$_SI4" && _r=0
+_pin "$_r" "state-inspection §5 offers both re-point verbs for an unmatched surface, or does not document the state-versus-manifest gate"
+# (#301) the ADR file joins the series it finds; the default is only for an EMPTY
+# directory; the trailer admits adoption as a third source with adopt's baseline.
+_AD4="$_OSSR/skills/start/references/bones-registry.md"
+_r=1; grep -Fq 'joins the target repo' "$_AD4" && grep -Fq 'When that directory is **empty**' "$_AD4" && grep -Fq 'Never add the prefix to, or' "$_AD4" && _r=0
+_pin "$_r" "bones-registry §3 prescribes one filename form regardless of the repo's series - the rule contradicts the reason bone ADRs live in that repo"
+_HR4="$_OSSR/skills/close/references/harvest.md"
+_r=1; grep -Fq 'source: report|handoff|adoption' "$_HR4" && grep -Fq 'a source that is exactly `report`, `handoff` or' "$_HR4" && grep -Fq 'r0 baseline <sha>' "$_HR4" && _r=0
+_pin "$_r" "harvest's trailer grammar admits only report|handoff - an adopted series cannot be recorded honestly"
+_r=1; grep -Fq '`source: adoption`' "$_OSSR/skills/adopt/SKILL.md" && grep -Fq 'r0 baseline <sha>' "$_OSSR/skills/adopt/SKILL.md" && _r=0
+_pin "$_r" "adopt C5 routes to harvest's provenance trailer without naming its source - the actor's own site never says what to write"
+# (#299) the private boundary inventory has ONE address, stated where the actor
+# writes it, and the two sites that claimed a state index now say the truth.
+_PB4="$_OSSR/skills/start/references/posture-block.md"
+_r=1; grep -Fq '`<ai-workspace>/docs/private-boundary-inventory.md`' "$_PB4" && grep -Fq 'convention, not a route' "$_PB4" && ! grep -Fq 'indexed from `project-state.json`' "$_PB4" && _r=0
+_pin "$_r" "posture-block §7 leaves the private boundary inventory unnamed (or still claims a project-state index that does not exist) - every adopter names it differently"
+_r=1; ! grep -Fq 'indexed from' "$_OSSR/skills/close/references/boundary-audit.md" && grep -Fq 'docs/private-boundary-inventory.md' "$_OSSR/skills/close/references/boundary-audit.md" && grep -Fq "if it cannot be located, this step is" "$_OSSR/skills/close/references/boundary-audit.md" && _r=0
+_pin "$_r" "boundary-audit still names a state index for the inventory, drops its convention path, or loses the INCONCLUSIVE arm for an adopted file"
+# (#299) "root" is a PATH, not a repo key - the clause the Rust-workspace case
+# needs - and the critic's non-interactive default RECORDS that nobody answered.
+_r=1; grep -Fq 'The value is a PATH, not a repo key' "$_PB4" && grep -Fq 'the crate/workspace directory *inside*' "$_PB4" && _r=0
+_pin "$_r" "posture-block §10 leaves 'composition root' meaning both the repo and the crate inside it"
+_r=1; grep -Fq 'proceed and record that no operator' "$_OSSR/skills/start/SKILL.md" && grep -Fq 'recording that no operator' "$_OSSR/skills/start/references/critic-moment.md" && _r=0
+_pin "$_r" "the critic moment's non-interactive default proceeds without recording that no operator answered"
+# (#299) the inventory is a CHECKED destination now, not an output nobody can
+# find - occupied-destinations lists it with its path like every other output.
+_r=1; grep -Fq 'private boundary inventory at' "$_OSSR/skills/start/references/occupied-destinations.md" && grep -Fq '<ai-workspace>/docs/private-boundary-inventory.md' "$_OSSR/skills/start/references/occupied-destinations.md" && _r=0
+_pin "$_r" "occupied-destinations leaves the private inventory among the outputs no route names - /start cannot check a file it cannot address"
 
 rm -rf "$_PC_TMP"
 t_summary

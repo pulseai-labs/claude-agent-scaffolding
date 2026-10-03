@@ -133,16 +133,26 @@ covers — ask if that is not obvious from the surface named). Bones are
 decisions about the *product's* architecture, so they live with the product,
 not in the AI workspace beside the planning docs.
 
-**Filename:** `adr-NNNN-kebab-title.md`, four-digit zero-padded, matching the
-index reference — `ADR-0002` is `adr-0002-hexagonal-core-with-six-port-traits.md`.
+**Filename:** the file **joins the target repo's existing series** — the same
+prefix form, the same case, the same zero-padding width as the files already in
+that `docs/adr/`:
+`adr-0002-hexagonal-core-with-six-port-traits.md` beside an `adr-` series,
+`0014-…` beside scaffold-onboard's bare seed, `ADR-003-…` beside an uppercase
+three-digit series. When that directory is **empty**, the default is the
+prefixed, four-digit form matching the index reference:
+`adr-0002-hexagonal-core-with-six-port-traits.md`. Never add the prefix to, or
+strip it from, a series that already exists — a directory holding two forms at
+once is the state the numbering scan below reads both forms for, and this rule
+must not create it.
 
-The `adr-` prefix is **not** cosmetic: it is the form `scaffold-dev`'s ADR skill
-writes (`adr-NNNN-kebab.md`); `scaffold-onboard`'s seed is the unprefixed
-`0001-record-architecture-decisions.md` — which is exactly why the numbering
-scan below reads both forms.
-A project migrating to ossify already has that series, and the reason bone ADRs
+The forms differ by where the series came from: `scaffold-dev`'s ADR skill
+writes the prefixed `adr-NNNN-kebab.md`, `scaffold-onboard`'s seed is the bare
+`0001-record-architecture-decisions.md`, and an adopted project may carry the
+prefixed form in either case and at any width (PulseDB's series is
+`ADR-001-redb-for-storage.md`).
+A project migrating to ossify already has its series, and the reason bone ADRs
 live in the repo they concern is that the decision belongs with the code it
-governs — the file joins that repo's directory rather than starting a rival one
+governs — **the file joins that repo's series rather than starting a rival one**
 elsewhere. The NUMBER, though, comes from the project-wide sequence below.
 
 **Numbering is project-wide, across every declared repo:** the next number is
@@ -158,14 +168,29 @@ scan="$(mktemp)"
 while IFS= read -r name; do
   [ -n "$name" ] || continue
   root="$("$oss_bin" repo_root "$name")" || exit 1
-  mkdir -p "$root/docs/adr"
-  ls -1 "$root/docs/adr" 2>/dev/null >> "$scan"
+  mkdir -p "$root/docs/adr" || exit 1
+  # An unreadable directory is NOT an empty one: minting from a series that
+  # could not be read is how a duplicate id gets made, so this refuses instead.
+  if ! ls -1 "$root/docs/adr" >> "$scan" 2>/dev/null; then
+    echo "the numbering scan could not read $root/docs/adr - reading it as an empty series would mint an id that may already exist" >&2
+    exit 1
+  fi
 done <<EOF
 $repos
 EOF
-next="$(sed -n -e 's/^adr-\([0-9][0-9]*\)-.*\.md$/\1/p' \
-               -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' "$scan" | sort -n | tail -1)"
-printf 'ADR-%04d\n' "$(( 10#${next:-0} + 1 ))"
+# Every form an adopter's series can already be in: the prefixed form in EITHER
+# case (scaffold-dev writes `adr-`, PulseDB's series is `ADR-`) and the bare
+# form (scaffold-onboard's seed). Matching one case only returns NOTHING on the
+# other, and an empty answer there is not "start at 1" - it is a duplicate id.
+matches="$(sed -n -e 's/^[Aa][Dd][Rr]-\([0-9][0-9]*\)-.*\.md$/\1/p' \
+                   -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' "$scan")"
+highest="$(printf '%s\n' "$matches" | sort -n | tail -1)"
+# The WIDTH follows the series it found, never a fixed %04d: reading an
+# `ADR-001-` series and minting `ADR-0002` leaves the directory at two widths
+# and the next reader with the same problem. The width comes from the same
+# string the number does, so the two cannot disagree; empty series -> 4 digits.
+if [ -z "$highest" ]; then fmt='%04d'; else fmt="%0$(printf '%s' "$highest" | wc -c | tr -d ' ')d"; fi
+printf "ADR-${fmt}\n" "$(( 10#${highest:-0} + 1 ))"
 ```
 
 **Why project-wide and not per repo.** A bone record stores `adr`, `title` and
@@ -183,10 +208,19 @@ Things this has to get right, each of which has already produced a duplicate id:
 - **Every declared repo is scanned, not just the one the ADR lands in.** That is
   the whole point of the shared sequence; scanning one repo reintroduces the
   collision this block exists to prevent.
-- **Both filename forms are scanned.** A directory holding `adr-0002-…` matched
-  only against `NNNN-…` yields no number at all, so the scan restarts at 1 and
-  mints an `ADR-0002` that already exists — duplicating an identifier that bone
-  citations and touch records both key on.
+- **Every form a series can be in is scanned, case-insensitively.** A directory
+  holding `adr-0002-…` or `ADR-002-…` matched only against the bare `NNNN-…`
+  form — or matched case-sensitively — yields no number at all, so the scan
+  restarts at 1 and mints an id that already exists: duplicating an identifier
+  that bone citations and touch records both key on (#301).
+- **The minted WIDTH follows the series, not a fixed `%04d`.** Reading an
+  `ADR-001-…` series and answering `ADR-0002` leaves the directory at two
+  widths, and the next reader hits the same ambiguity (#301).
+- **An unreadable `docs/adr/` refuses; it never reads as empty.** `ls` failing
+  answers the same "no matches" as a first-ever ADR, and the two have opposite
+  remedies —
+  `exit 1` with the path named is the difference between minting the second id
+  for a decision and minting a new one.
 - **`10#` forces base-10.** Without it `0008` is an invalid octal literal and the
   arithmetic aborts under the dispatcher's `set -e`.
 
