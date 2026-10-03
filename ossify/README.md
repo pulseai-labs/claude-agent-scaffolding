@@ -1,4 +1,4 @@
-# ossify (v1.13.2)
+# ossify (v1.13.3)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
@@ -63,6 +63,15 @@ fingerprints the four `*_oid` values; adopt counts six gates; doctor names one
 write surface; `start` §11 authors the lean MASTER-SPEC before auditing it. The
 only `lib/` change is one refusal message's citation and one comment; no state
 change.
+
+Since 1.13.3 (#265, #266), `/start` never writes over an existing file. Past its
+§3 gates and before `oss init`, it checks every destination — the MASTER-SPEC,
+the memory bank, `CLAUDE.md` and the rest — and asks the operator, per occupied
+file, to keep it or move it aside (the MASTER-SPEC: move aside or stop); there
+is no default and no automatic move or merge. Its §2 ask-first guard fires on a MASTER-SPEC of any schema, not only a
+lean one. doctor's and close's `fail: state` remedy names `/ossify:start` or
+`/ossify:adopt`, which each run `init`, instead of a bare `init`. No `lib/`
+code, no state change.
 
 Since 1.9.0, the deterministic gates close the vacuous-green family: the
 zero-tests guard no longer inverts a true match past the pipe buffer, flags

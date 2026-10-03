@@ -52,8 +52,8 @@ no work item — `plan-release` owns those.
 - A lean MASTER-SPEC already exists and the user wants **one** change folded in
   — that is the `/amend-spec` utility, not a re-run of spec-core.
 - The user wants to close a spine or a release — that is `close`.
-- A lean MASTER-SPEC already exists at the routing destination AND the user did
-  not explicitly type `/start`. Silent re-authoring is destructive. Ask first.
+- A MASTER-SPEC of any schema, lean or legacy, already exists at the routing
+  destination AND the user did not explicitly type `/start`. Ask first.
 
 If it is ambiguous, ask: *"Fresh spec-core onboarding, or work with the existing
 spec?"*
@@ -99,9 +99,9 @@ and a bare pairing scaffold is neither. If so, author nothing and refuse,
 naming what you found and routing to **`/ossify:adopt`** — the adopt-forward
 path for a project that already has code (native `adopt` on Codex/OpenCode;
 on Devin run `adopt` on Claude Code or Codex — `.ossify` state is shared).
-Those tokens are load-bearing too. Past both gates:
-`"$oss_bin" init "<project-name>"`, which refuses if ossify state already exists — the
-"already onboarded" signal; route per §2 rather than forcing past it.
+Those tokens are load-bearing too. Past both gates, settle every occupied destination
+(`references/occupied-destinations.md`), then `"$oss_bin" init "<project-name>"`, which refuses
+if ossify state already exists — the "already onboarded" signal; route per §2, never force past it.
 
 **Wayfinder pre-flight.** If a map exists for this repo, its resolved decisions
 pre-fill stations below rather than being re-elicited. Branch logic:
@@ -413,9 +413,9 @@ Full minima in `references/lean-spec-schema.md`.
 The memory bank + `CLAUDE.md` are authored **by ossify**, in conversation, from
 the lean spec sections — not by calling scaffold-onboard, whose brief targets the
 retired 10-phase schema. Never emit fill-in markers; thin-and-true beats a `TODO`.
+**Never write over an existing file:** honour the per-file answers §3 collected (`references/occupied-destinations.md`).
 
-Full derivation brief in `references/memory-bank-brief.md`; section schema in
-`references/lean-spec-schema.md`.
+Full derivation brief in `references/memory-bank-brief.md`; section schema in `references/lean-spec-schema.md`.
 
 Before handing off, run the state gate and surface anything it reports:
 
