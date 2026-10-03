@@ -243,11 +243,13 @@ present "$REF" 'lane driver with subagents' "the coordinator clause names a lane
 pin "$REF" 'after it reports its own children released' "a coordinator is archived after its children"
 
 section "herdr is gone"
-# Deliberate: these herdr strings are asserted ABSENT.
+# Deliberate: these herdr strings are asserted ABSENT. Guarded like the other counts
+# (#635 N11's class): an unreadable file must say so rather than certify each absence.
 for gone in 'herdr' 'HERDR_' 'pane' '--until' 'wait-output' '--machine'; do
-  c="$(occurrences "$REF" "$gone")"
-  if [ "$c" -eq 0 ]; then pass "no '$gone' in paseo-mechanics.md"
-  else fail "no '$gone' in paseo-mechanics.md" "$c occurrence(s)"; fi
+  if c="$(occurrences "$REF" "$gone")"; then
+    if [ "$c" -eq 0 ]; then pass "no '$gone' in paseo-mechanics.md"
+    else fail "no '$gone' in paseo-mechanics.md" "$c occurrence(s)"; fi
+  else fail "the '$gone' absence control is readable" "unreadable file or empty needle: $REF"; break; fi
 done
 
 section "budget"
