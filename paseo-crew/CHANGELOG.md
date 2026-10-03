@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.4
+
+The 0.1.3 delta reviews' remaining findings, the reviewer's consolidation stall and Teardown's
+tab ask (#635, #637, #638).
+
+The dispatch's noted pair has one owner rule now (#635). The pair is re-taken when the handler has
+read the body at `REPORT_PATH` — a report or plan handled, a question answered, an `error`
+reconciliation — and kept when it has not: a permission answer, the budget grace's status request,
+an idle false-wake re-arm, a lost wait or a handoff. So an `error` retry re-takes the pair over the
+failed attempt's body, and an idle retry that writes nothing takes the missing-report path instead
+of passing the changed-file check on that body; a permission answer keeps the pair, so a body
+written before the permission still wakes the next `report`. M1 (the `error` exit's arm-guard)
+and N6 (an errored seat's pending permission) moved to #643. The rest of #635 is in with it:
+the suites pin the thinking-flag condition, the J3 control's unreadable-file refusal, and the
+errored body's evidence-never-a-report classification.
+
+The reviewer's stall is the orchestrator's to break (#637): a reviewer's first idle with no report
+takes one bounded request to consolidate the review's returned candidates into `REPORT_PATH`,
+because its `/code-review` fork returns before its finders do. No per-role budget guidance is
+added; #625 stands.
+
+Teardown no longer asks the operator to confirm tabs before a run-created workspace is archived
+(#638). On the floor `lifecycle.md` step 1 already requires (0.10.2), a client tab left on a
+removed worktree is the daemon's to handle: the 0.10.0 changelog fixed the crash the ask guarded,
+and the daemon refuses a resume whose cwd is gone rather than dying. A coordinator seat still lists
+the run-created workspaces it leaves for the top to archive, and its clause now names a lane driver
+too.
+
 ## 0.1.3
 
 The 0.1.2 delta's own loose ends, found by review and by the pilot (#622, #629, #609).
@@ -11,6 +39,14 @@ body against the dispatch it was sent before acting on it, so an earlier dispatc
 missing-report correction rather than a handling. Teardown's account of a first-write exit and of
 the `SETTLE_WINDOW` wait around it is deleted, the condition it worked around having moved into the
 exit.
+
+The release's later fix rounds settled three points inside that contract. The `error` handler
+reads the seat's `REPORT_PATH` with its activity and its artifacts, and a changed body there is
+evidence for the reconciliation, never a `report`. A retained implementer's lifetime runs to the
+`/context` rotation or the run's last merge, as `roles.md` states. And the `ossify-spine-execution`
+keys for fixtures 14, 21 and 22 follow the contract: 14's points at the exit row, 21's drops the
+cancelled seat's "operator's call" clause, and 22's quotes the finish-notice rule as the `report`
+exit's gate.
 
 A seat that fails its model check is cancelled and reported to the operator, never archived (#629,
 J2 and J3). It may already have started children, and the archive cascades into them, so the site no
