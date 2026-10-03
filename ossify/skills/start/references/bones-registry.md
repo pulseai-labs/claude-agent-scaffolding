@@ -133,39 +133,79 @@ covers — ask if that is not obvious from the surface named). Bones are
 decisions about the *product's* architecture, so they live with the product,
 not in the AI workspace beside the planning docs.
 
-**Filename:** `adr-NNNN-kebab-title.md`, four-digit zero-padded, matching the
-index reference — `ADR-0002` is `adr-0002-hexagonal-core-with-six-port-traits.md`.
+**Filename:** the file **joins the target repo's existing series** — the same
+prefix form, the same case, the same zero-padding width as the files already in
+that `docs/adr/`:
+`adr-0002-hexagonal-core-with-six-port-traits.md` beside an `adr-` series,
+`0014-…` beside scaffold-onboard's bare seed, `ADR-003-…` beside an uppercase
+three-digit series. When that directory is **empty**, the default is the
+prefixed, four-digit form matching the index reference:
+`adr-0002-hexagonal-core-with-six-port-traits.md`. Never add the prefix to, or
+strip it from, a series that already exists — a directory holding two forms at
+once is the state the numbering scan below reads both forms for, and this rule
+must not create it.
 
-The `adr-` prefix is **not** cosmetic: it is the form `scaffold-dev`'s ADR skill
-writes (`adr-NNNN-kebab.md`); `scaffold-onboard`'s seed is the unprefixed
-`0001-record-architecture-decisions.md` — which is exactly why the numbering
-scan below reads both forms.
-A project migrating to ossify already has that series, and the reason bone ADRs
+The forms differ by where the series came from: `scaffold-dev`'s ADR skill
+writes the prefixed `adr-NNNN-kebab.md`, `scaffold-onboard`'s seed is the bare
+`0001-record-architecture-decisions.md`, and an adopted project may carry the
+prefixed form in either case and at any width (PulseDB's series is
+`ADR-001-redb-for-storage.md`).
+A project migrating to ossify already has its series, and the reason bone ADRs
 live in the repo they concern is that the decision belongs with the code it
-governs — the file joins that repo's directory rather than starting a rival one
+governs — **the file joins that repo's series rather than starting a rival one**
 elsewhere. The NUMBER, though, comes from the project-wide sequence below.
 
 **Numbering is project-wide, across every declared repo:** the next number is
 the highest existing plus one **anywhere in the project**, **counting both
 forms**. The *file* still lands in the repo the decision concerns — only the
-SEQUENCE is shared. Read it, do not guess:
+SEQUENCE is shared — so the scan takes that repo as `$dest_repo` and takes the
+minted **width** from *its* series: the file must not be the odd one out in its
+own directory. Read it, do not guess:
 
 ```bash
-# $repos is NOT ambient: one declared repo name per line, the set the topology
-# declares (A1 for /adopt, the journey-map station for /start) - the same
-# convention spine-close.md's $repo_base_branches uses.
-scan="$(mktemp)"
+# $repos and $dest_repo are NOT ambient: $repos is one declared repo name per
+# line (the set the topology declares - the same convention
+# spine-close.md's $repo_base_branches uses), and $dest_repo is the repo the ADR
+# LANDS in, the one the decision concerns (§3, "Where"). The NUMBER is
+# project-wide; the minted WIDTH is the destination's own, because two repos may
+# pad differently (round 1, C2).
+scan="$(mktemp)"; dest="$(mktemp)"
 while IFS= read -r name; do
   [ -n "$name" ] || continue
-  root="$("$oss_bin" repo_root "$name")" || exit 1
-  mkdir -p "$root/docs/adr"
-  ls -1 "$root/docs/adr" 2>/dev/null >> "$scan"
+  root="$("$oss_bin" repo_root "$name")" || { echo "the numbering scan could not resolve a root for repo '$name'" >&2; rm -f "$scan" "$dest"; exit 1; }
+  # A refusal names its path (R9), and every exit path takes both temp files
+  # with it - one populated mktemp per mint is the leak this round closed (R6).
+  if ! mkdir -p "$root/docs/adr"; then
+    echo "the numbering scan could not create $root/docs/adr - reading it as an empty series would mint an id that may already exist" >&2
+    rm -f "$scan" "$dest"; exit 1
+  fi
+  # An unreadable directory is NOT an empty one: minting from a series that
+  # could not be read is how a duplicate id gets made, so this refuses instead.
+  if ! listing="$(ls -1 "$root/docs/adr" 2>/dev/null)"; then
+    echo "the numbering scan could not read $root/docs/adr - reading it as an empty series would mint an id that may already exist" >&2
+    rm -f "$scan" "$dest"; exit 1
+  fi
+  printf '%s\n' "$listing" >> "$scan"
+  if [ "$name" = "${dest_repo:-}" ]; then printf '%s\n' "$listing" > "$dest"; fi
 done <<EOF
 $repos
 EOF
-next="$(sed -n -e 's/^adr-\([0-9][0-9]*\)-.*\.md$/\1/p' \
-               -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' "$scan" | sort -n | tail -1)"
-printf 'ADR-%04d\n' "$(( 10#${next:-0} + 1 ))"
+# Every form an adopter's series can already be in: the prefixed form in EITHER
+# case (scaffold-dev writes `adr-`, PulseDB's series is `ADR-`) and the bare
+# form (scaffold-onboard's seed). Matching one case only returns NOTHING on the
+# other, and an empty answer there is not "start at 1" - it is a duplicate id.
+highest="$(sed -n -e 's/^[Aa][Dd][Rr]-\([0-9][0-9]*\)-.*\.md$/\1/p' \
+                    -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' "$scan" | sort -n | tail -1)"
+# The WIDTH follows the DESTINATION repo's series, never the project-wide one:
+# with an `ADR-099-*` series elsewhere and `adr-0007-*` in the destination, a
+# project-wide width mints `ADR-100` into a four-digit directory (round 1, C2).
+# It comes from the same string the destination's own highest number does, so
+# the two cannot disagree; a destination with no series yet -> 4 digits.
+narrow="$(sed -n -e 's/^[Aa][Dd][Rr]-\([0-9][0-9]*\)-.*\.md$/\1/p' \
+                   -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' "$dest" | sort -n | tail -1)"
+if [ -z "$narrow" ]; then fmt='%04d'; else fmt="%0$(printf '%s' "$narrow" | wc -c | tr -d ' ')d"; fi
+rm -f "$scan" "$dest"
+printf "ADR-${fmt}\n" "$(( 10#${highest:-0} + 1 ))"
 ```
 
 **Why project-wide and not per repo.** A bone record stores `adr`, `title` and
@@ -183,10 +223,25 @@ Things this has to get right, each of which has already produced a duplicate id:
 - **Every declared repo is scanned, not just the one the ADR lands in.** That is
   the whole point of the shared sequence; scanning one repo reintroduces the
   collision this block exists to prevent.
-- **Both filename forms are scanned.** A directory holding `adr-0002-…` matched
-  only against `NNNN-…` yields no number at all, so the scan restarts at 1 and
-  mints an `ADR-0002` that already exists — duplicating an identifier that bone
-  citations and touch records both key on.
+- **Every form a series can be in is scanned, case-insensitively.** A directory
+  holding `adr-0002-…` or `ADR-002-…` matched only against the bare `NNNN-…`
+  form — or matched case-sensitively — yields no number at all, so the scan
+  restarts at 1 and mints an id that already exists: duplicating an identifier
+  that bone citations and touch records both key on (#301).
+- **The minted WIDTH follows the DESTINATION repo's series, not a fixed `%04d`
+  and not the project-wide one.** With an `ADR-099-…` series elsewhere and
+  `adr-0007-…` in the destination, a project-wide width mints `ADR-100` into a
+  four-digit directory — two widths in the file the next reader must continue
+  (#301, round 1 C2).
+- **An unreadable `docs/adr/` refuses; it never reads as empty.** `ls` failing
+  answers the same "no matches" as a first-ever ADR, and the two have opposite
+  remedies — a refusal that names the path is the difference between minting the
+  second id for a decision and minting a new one. A `mkdir` that cannot create
+  the directory refuses the same way, also naming the path.
+- **Every exit path removes the scan's temp files.** The scan is one populated
+  `mktemp` per mint on the success path *and* on each refusal, so each `exit 1`
+  takes them with it (round 1 R6) — the same leak class §5's sweep closes for
+  its own `$hits` under #558.
 - **`10#` forces base-10.** Without it `0008` is an invalid octal literal and the
   arithmetic aborts under the dispatcher's `set -e`.
 

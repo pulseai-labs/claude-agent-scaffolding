@@ -32,9 +32,10 @@ imports the other's semantics.
 
 2. **Wait.** If the user types exactly `skip` (case-insensitive), log it and
    continue to the next block. Do not argue, do not re-offer. In a
-   non-interactive run the default is to **proceed** — `skip` is the only
-   bypass, and a scripted run is not a reason to skip the one adversarial look
-   the spec-core gets.
+   non-interactive run the default is to **proceed** — carrying "no operator
+   answered" into §13's hand-off line, which is the record — because `skip` is
+   the only bypass, and a scripted run is not a reason to skip the one
+   adversarial look the spec-core gets.
 
 3. **Run the audit.** Read
    `skills/challenge/references/audit.md` (relative to the plugin root) end to end and

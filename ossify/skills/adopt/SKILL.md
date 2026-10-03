@@ -218,7 +218,7 @@ no blank destinations — an adopted project is all occupied surface.
 | `MASTER-SPEC.md` | map legacy phases → the 7 lean sections; keep legacy sections (spec-validation reads their presence as legal) |
 | `CLAUDE.md` | merge ossify's loop section; preserve hand-authored zones |
 | `EXECUTIVE-SUMMARY.md` | leave; no gate reads it |
-| memory bank | append with harvest's provenance trailer (`close/references/harvest.md`); **never truncate**. For `09-known-issues.md` / `10-decisions-log.md`, harvest's never-regenerate rule wins — they hold the history adoption preserves (#268; the brief's conditional is still owed) |
+| memory bank | append with harvest's provenance trailer (`close/references/harvest.md`), declaring `source: adoption` with the baseline this pass recorded — `r0 baseline <sha>`, one `<repo>=<sha>` per declared repo when the adoption spans several; **never truncate**. For `09-known-issues.md` / `10-decisions-log.md`, harvest's never-regenerate rule wins — they hold the history adoption preserves (#268; the brief's conditional is still owed) |
 | `tech-debt.md`, `PUBLIC_BOUNDARY.md` | author (absent) |
 | each declared repo's `docs/adr/` | append only, continuing the series |
 

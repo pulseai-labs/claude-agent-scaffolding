@@ -99,7 +99,9 @@ point is enforceability evaporates at the end of the session — and a spike tha
 is declined or interrupted leaves no trace at all.
 
 **Both live in a `### Spike contract` section inside the affected bone's ADR
-file** (`bones-registry.md` §3, "Authoring the ADR file" — `<repo>/docs/adr/adr-NNNN-*.md`):
+file** (`bones-registry.md` §3, "Authoring the ADR file" — `<repo>/docs/adr/`,
+in whatever form that repo's series already uses: `adr-NNNN-…`, the bare
+`NNNN-…`, or an adopted `ADR-NNN-…`):
 
 - **Step 1** writes the six fields there, under a `Status: running` line, *before*
   the work starts. That is what makes the timebox and the falsifier binding

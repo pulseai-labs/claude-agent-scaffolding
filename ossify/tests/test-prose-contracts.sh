@@ -474,24 +474,31 @@ fi
 # That is what moves its ledger row from I to O.
 #
 # Run with NOTHING injected that the caller does not genuinely supply
-# (tests/lib/blocks.sh): `oss_bin` and `repos` ARE the caller's, so they are
-# passed; everything else the block must establish itself.
+# (tests/lib/blocks.sh): `oss_bin`, `repos` and `sf` ARE the caller's — the last
+# because §2 resolves it once for the whole read-out and §5 consumes it, never
+# re-deriving the precedence (#561 round 1, R14). Everything else the block must
+# establish itself.
 OSS="$HERE/../bin/oss"
 SWWS="$_PC_TMP/sweepws"; mkdir -p "$SWWS/.ossify" "$SWWS/canon"
-printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"},"gone":{"root":"%s"}},"well_known_paths":{}}\n' \
-  "$SWWS/canon" "$SWWS/absent" > "$SWWS/.ossify/topology.json"
+SWS="$SWWS/state.json"
+# The state is ROUTED at $SWS and also exported as $OSS_STATE_FILE - the same
+# project either way, which is the pairing #561's gate accepts. An override that
+# is NOT this directory's manifest-routed state must skip the sweep instead, and
+# so must a route that cannot be resolved at all (the round-1 R1 bypass).
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"},"gone":{"root":"%s"}},"well_known_paths":{"project_state":"%s"}}\n' \
+  "$SWWS/canon" "$SWWS/absent" "$SWS" > "$SWWS/.ossify/topology.json"
 ( cd "$SWWS/canon" && git init -q . && : > tracked.txt && git add tracked.txt \
   && git -c user.email=t@t -c user.name=t commit -qm fixture ) >/dev/null 2>&1
-SWS="$SWWS/state.json"
 ( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" init "sweep" ) >/dev/null 2>&1
 ( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" bone_add ADR-9091 "on a tracked file" "tracked.txt" ) >/dev/null 2>&1
 ( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" bone_add ADR-9092 "on nothing" "nowhere/at/all/**" ) >/dev/null 2>&1
+( cd "$SWWS" && OSS_STATE_FILE="$SWS" bash "$OSS" risk_gate_add RG-7 "also/nowhere/**" "packages/core/**" ) >/dev/null 2>&1
 # cd in the MAIN shell, not a subshell: t_capture/t_assert mutate the T_PASS/
 # T_FAIL globals, and a subshell's mutations never propagate (test-manifest.sh
 # documents the vacuous-green trap this avoids).
 cd "$SWWS"
-t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" repos="$(printf 'canonical\ngone')" bash -c \
-  "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'SKIPPED[%s]\n' \"\$skipped\"; printf 'ROSTER%s\n' \"\$roster\"; printf 'INHITS%s\n' \"\$(grep -c ADR-9092 \"\$hits\" 2>/dev/null || true)\""
+t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" sf="$SWS" repos="$(printf 'canonical\ngone')" bash -c \
+  "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'SKIPPED[%s]\n' \"\$skipped\"; printf 'ROSTER%s\n' \"\$roster\"; printf 'KINDS%s\n' \"\$(printf '%s' \"\$roster\" | jq -r '[.[].kind]|join(\",\")')\"; printf 'INHITS%s\n' \"\$(grep -c ADR-9092 \"\$hits\" 2>/dev/null || true)\""
 cd "$HERE"
 t_assert_rc 0 "(d) the sweep COMPLETES with a declared repo unreadable - it reports the skip rather than exiting the whole run"
 t_assert_contains "$T_OUT" "skip: touch(gone)" "(d) ... naming the unreadable repo by key, in the §1 grammar"
@@ -504,20 +511,38 @@ t_assert_contains "$T_OUT" "SKIPPED[ gone]" "(d) ... and feeding \$skipped, whic
 # exclusion is unreadable - the same unassigned-variable class as $repos.
 t_assert_contains "$T_OUT" "ADR-9092" "(d) ... and $roster carrying a surface that matched NOTHING, which is exactly the one a warn line names"
 t_assert_contains "$T_OUT" "nowhere/at/all/**" "(d) ... with its glob list, which touch_check's own output cannot supply"
+# #561 (1): the roster must ALSO carry the surface KIND. It is what decides
+# which re-point verb a warn line's remedy names (`bone_set_touch` vs
+# `risk_gate_set_touch`), and for a surface that matched NOTHING `touch_check`
+# emits no line at all, so the kind has no other source. Both branches of the
+# projection are exercised: two bones and a risk gate.
+t_assert_contains "$T_OUT" "KINDSbone,bone,risk_gate" "(d) ... and the KIND of every surface, in touch_check's own vocabulary - the only thing that picks the re-point verb"
 # G4: with EVERY declared repo unreadable the read set is EMPTY, and the sweep
-# must report that rather than one absence per surface.
-t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" repos="gone" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+# must report that rather than one absence per surface. Run from the workspace so
+# the route resolves: this arm is about the corpus loop, and the foreign-state
+# gate above would refuse first from a directory with no manifest (round 1, R1).
+cd "$SWWS"
+t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" sf="$SWS" repos="gone" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 t_assert_rc 0 "(d) a read set that came back EMPTY does not abort the sweep"
 t_assert_contains "$T_OUT" "no declared repo could be read" "(d) ... it reports that the sweep inspected nothing, rather than reporting every healthy surface as unmatched"
 # The corpus arm: `repos` UNSET under strict mode. This is the shipped defect
 # (an unassigned variable), so it is run with NOTHING injected.
-t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" sf="$SWS" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 t_assert_rc 0 "(d) an unset \$repos does not abort the sweep under strict mode"
 t_assert_contains "$T_OUT" "skip: touch - the declared repo keys could not be read" "(d) ... it says the sweep did not run, instead of sweeping an empty corpus and reporting every surface"
+cd "$HERE"
 # The registry arm: a batch that is INCONCLUSIVE leaves no hits either, so an
-# unreadable registry must not read as a whole-corpus absence.
-SWSB="$_PC_TMP/broken-state.json"; printf '%s\n' '{"schema_version":2}' > "$SWSB"
-t_capture env OSS_STATE_FILE="$SWSB" oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+# unreadable registry must not read as a whole-corpus absence. The workspace's
+# OWN route resolves to the broken state, so the foreign-state gate above is
+# satisfied and this arm still reaches touch_check's rc 2 (round 1, R1: an
+# unresolvable route now refuses before this point).
+SWBRK="$_PC_TMP/brokenroute"; mkdir -p "$SWBRK/.ossify"
+printf '%s\n' '{"schema_version":2}' > "$SWBRK/broken-state.json"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"project_state":"%s/broken-state.json"}}\n' \
+  "$SWBRK" "$SWBRK" > "$SWBRK/.ossify/topology.json"
+cd "$SWBRK"
+t_capture env oss_bin="$OSS" sf="$SWBRK/broken-state.json" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+cd "$HERE"
 t_assert_rc 0 "(d) an unreadable registry does not abort the sweep"
 t_assert_contains "$T_OUT" "registry could not be read" "(d) ... it reports the registry failure, so an empty \$hits is not read as every surface matching nothing"
 # The resolver arm: touch_check returns its RESOLVER's rc 1 before it ever looks
@@ -531,6 +556,70 @@ t_capture env oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_
 cd "$HERE"
 t_assert_rc 0 "(d) an unresolvable state route does not abort the sweep"
 t_assert_contains "$T_OUT" "state could not be resolved or read" "(d) ... it reports that instead of an absence, even though touch_check's rc 1 there looks exactly like clean"
+# #561 (2): the sweep must NOT run when the state in play is not this
+# directory's manifest-routed state. That is §4's worktree gate, and it is this
+# block's own hazard: with $OSS_STATE_FILE pointing at ANOTHER workspace's state,
+# every surface THAT state knows and these repos do not is reported as matching
+# no tracked file, after inspecting the wrong corpus, with every command exiting
+# 0. An unset `hits` and an unset `roster` are the signature of "did not run".
+SWF="$_PC_TMP/foreignws"; mkdir -p "$SWF/.ossify" "$SWF/canon"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"project_state":"%s/state.json"}}\n' \
+  "$SWF" "$SWF" > "$SWF/.ossify/topology.json"
+( cd "$SWF" && bash "$OSS" init foreign >/dev/null && bash "$OSS" bone_add ADR-7777 "a foreign-only surface" "foreign/only/**" ) >/dev/null 2>&1
+cd "$SWWS"
+t_capture env OSS_STATE_FILE="$SWF/state.json" oss_bin="$OSS" sf="$SWF/state.json" repos="canonical" bash -c \
+  "set -euo pipefail; . '$_SW'; printf 'HITS[%s]\n' \"\${hits:-unset}\"; printf 'ROSTER[%s]\n' \"\${roster:-unset}\""
+cd "$HERE"
+t_assert_rc 0 "#561: a foreign state does not abort the sweep"
+t_assert_contains "$T_OUT" "skip: touch - the state in play" "#561 ... it refuses the run in the §1 grammar, naming the state in play against the routed answer"
+t_assert_contains "$T_OUT" "HITS[unset]" "#561 ... and nothing was swept: \$hits was never created"
+t_assert_contains "$T_OUT" "ROSTER[unset]" "#561 ... and no foreign registry was read, so no warn line can be composed from it"
+# ROUND 1, R1: the gate must not be bypassed by a route that resolves to
+# NOTHING. A topology whose `project_state` value is relative makes
+# `"$oss_bin" state_path` refuse, and the old gate read that empty answer as
+# consent (its `[ -n "$routed" ] &&` guard) and swept a foreign registry against
+# this directory's repos. "Cannot be compared" is not "the same project".
+SWREL="$_PC_TMP/relroute"; mkdir -p "$SWREL/.ossify" "$SWREL/canon"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"project_state":"./state.json"}}\n' \
+  "$SWREL" > "$SWREL/.ossify/topology.json"
+cd "$SWREL"
+t_capture env OSS_STATE_FILE="$SWF/state.json" oss_bin="$OSS" sf="$SWF/state.json" repos="canonical" bash -c \
+  "set -euo pipefail; . '$_SW'; printf 'HITS[%s]\n' \"\${hits:-unset}\""
+cd "$HERE"
+t_assert_rc 0 "#561 R1: an unresolvable route does not abort the sweep"
+t_assert_contains "$T_OUT" "is not this directory's manifest-routed state" "#561 R1 ... it refuses: an empty routed answer is not consent to compare"
+t_assert_contains "$T_OUT" "unresolved" "#561 R1 ... and the line says the route could not be resolved"
+t_assert_contains "$T_OUT" "HITS[unset]" "#561 R1 ... and nothing was swept against this directory's repos"
+# CONTROL: with NO override the same fixture still sweeps - the gate refuses a
+# foreign state, not every run, and the routed state's roster still fills.
+cd "$SWWS"
+t_capture env oss_bin="$OSS" sf="$SWS" repos="canonical" bash -c \
+  "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'KINDS%s\n' \"\$(printf '%s' \"\$roster\" | jq -r '[.[].kind]|join(\",\")')\""
+cd "$HERE"
+t_assert_contains "$T_OUT" "bone ADR-9091" "#561 control: no override, so the routed state sweeps its corpus"
+t_assert_contains "$T_OUT" "KINDSbone,bone,risk_gate" "#561 control: ... and the roster comes from the routed state"
+# #558 / ledger line 87, both halves, resolved here.
+# (i) the block never removed its `$hits` temp file. The removal is prose the
+# agent performs once the warn lines are written, so it must be present OUTSIDE
+# the fence and absent INSIDE it - an in-fence removal would empty the report's
+# own source.
+if grep -Fq 'rm -f "$hits"' "$_SW"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep block deletes \$hits itself - the warn lines are composed FROM that file"
+else
+  T_PASS=$((T_PASS+1))
+fi
+if grep -Fq 'once the warn lines are written' "$SI" && grep -Fq 'rm -f "$hits"' "$SI"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep never removes its \$hits temp file - the leak stays open (#558)"
+fi
+# (ii) the arbitrary fixed batch: xargs splits at the system's own argument
+# limit, so `-n 200` only multiplies dispatcher spawns per corpus.
+if grep -Fq 'xargs -0 -n 200' "$_SW"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep still batches at a fixed 'xargs -n 200' - one dispatcher per 200 tracked paths (#558)"
+else
+  T_PASS=$((T_PASS+1))
+fi
 # R2-2: the legacy key set must exclude ai_workspace, or a planning file under it
 # can satisfy a stale product glob and suppress a real warning.
 if grep -Fq 'OTHER than `ai_workspace`' "$_SW"; then
@@ -538,6 +627,337 @@ if grep -Fq 'OTHER than `ai_workspace`' "$_SW"; then
 else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: the sweep's corpus comment does not exclude ai_workspace from the legacy pairing-manifest key set - a planning file then satisfies a stale product glob and the zero-match warning is suppressed"
 fi
+# --- phase (e): §3's bones drift check compares SETS, not counts (#154) -------
+#
+# Shipped as a cardinality comparison - `.bones | length` against section 4's row
+# count - which cannot tell the two documented directions apart. Replace a
+# registered bone's index row with a DIFFERENT hand-written id and both counts
+# stay at 1 while *both* directions are present, so the check reported clean on
+# exactly the drift it exists to find. The block is OPERATIVE by the ledger's
+# rule (control flow, a refusal arm, temp files, and a set difference), so it is
+# extracted AND executed here, and the fixture asserts its own shape (equal
+# counts) so the pin cannot drift into a trivially-unequal case that proves
+# nothing.
+_E_SVMD="$SKILLS/doctor/references/spec-validation.md"
+_E_SV="$_PC_TMP/sv-block.sh"
+if oss_block_extract "$_E_SVMD" 'only_reg=' "$_E_SV" 2>/dev/null && [ -s "$_E_SV" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: spec-validation.md §3's drift block no longer extracts - the checks below are vacuous"
+fi
+_E_WS="$_PC_TMP/driftws"; mkdir -p "$_E_WS/.ossify" "$_E_WS/canon" "$_E_WS/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
+  "$_E_WS" "$_E_WS" "$_E_WS" > "$_E_WS/.ossify/topology.json"
+( cd "$_E_WS" && bash "$OSS" init drift >/dev/null && bash "$OSS" bone_add ADR-0002 "the registered bone" "packages/core/**" >/dev/null ) >/dev/null 2>&1
+_e_spec() { # $1=ws ; remaining args = section-4 table rows
+  local ws="$1"; shift
+  {
+    printf '# MASTER-SPEC\n\n## 1. Vision\nx\n\n## 2. Posture & boundary\nx\n\n## 3. Feature map\nx\n\n## 4. Bones-registry index\n\n| ADR | Title |\n|---|---|\n'
+    printf '%s\n' "$@"
+    printf '\n## 5. Journeys\nx\n'
+  } > "$ws/docs/MASTER-SPEC.md"
+}
+_e_run() { ( cd "$1" && oss_bin="$OSS" bash -c "set -euo pipefail; . '$_E_SV'" ); }
+# The fixture's own shape: the two counts the OLD rule compared are EQUAL here,
+# so a regression back to cardinality reads this fixture as clean and fails (e1).
+_e_spec "$_E_WS" '| ADR-9999 | the hand-written row |'
+t_assert_eq "$(jq -r '.bones | length' "$_E_WS/.ossify/project-state.json")" \
+            "$(awk '/^## 4\./ {f=1; next} /^## / {f=0} f' "$_E_WS/docs/MASTER-SPEC.md" | grep -cE '^[[:space:]]*\|[[:space:]]*ADR-' || true)" \
+            "(e) the fixture carries EQUAL registry and index counts - without that this pin stops exercising #154"
+# (e1) THE DEFECT: equal counts, both directions present -> BOTH are named.
+t_capture _e_run "$_E_WS"
+t_assert_rc 0 "(e) the drift check runs to completion on an equal-count mismatch"
+t_assert_contains "$T_OUT" "registry entry with no index row: ADR-0002" "(e) ... naming the registered bone the index lost - the direction a count comparison cannot see"
+t_assert_contains "$T_OUT" "index row with no registry entry: ADR-9999" "(e) ... AND naming the hand-written row in the same run: equal counts is not a match"
+# (e2) CONTROL: the matched pair is clean, and the clean case SPEAKS (doctor's
+# own rule: silence is indistinguishable from a pass).
+_e_spec "$_E_WS" '| ADR-0002 | the registered bone |'
+t_capture _e_run "$_E_WS"
+t_assert_rc 0 "(e) the matched spec runs clean"
+t_assert_contains "$T_OUT" "ok: spec - bones index matches the registry" "(e) ... and it emits its line rather than staying silent"
+if printf '%s' "$T_OUT" | grep -Fq 'no index row'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) the matched fixture still produced a drift finding - the set difference is wrong in the other direction"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# (e3) CONTROL: one direction at a time. A comparison that reports both
+# directions whenever either fires is a count check wearing a set's clothes, and
+# the two directions have different remedies in the table.
+_e_spec "$_E_WS" '| ADR-0002 | the registered bone |' '| ADR-0007 | the extra row |'
+t_capture _e_run "$_E_WS"
+t_assert_contains "$T_OUT" "index row with no registry entry: ADR-0007" "(e) an extra index row alone is named"
+if printf '%s' "$T_OUT" | grep -Fq 'registry entry with no index row'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) a one-way mismatch also reported the OTHER direction - the halves are not being compared as sets"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# (e3b) ROUND 1, R2: the two halves are compared case-insensitively. An adopted
+# series may spell ids either way; the old block upper-cased neither, so a
+# lowercase pair matched nothing on both sides and printed a false
+# "0 entries, 0 rows" clean, while a mixed-case valid pair read as drift.
+_E_WS4="$_PC_TMP/driftws4"; mkdir -p "$_E_WS4/.ossify" "$_E_WS4/canon" "$_E_WS4/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
+  "$_E_WS4" "$_E_WS4" "$_E_WS4" > "$_E_WS4/.ossify/topology.json"
+( cd "$_E_WS4" && bash "$OSS" init lower >/dev/null && bash "$OSS" bone_add adr-0002 "a lowercase registry id" "packages/core/**" ) >/dev/null 2>&1
+_e_spec "$_E_WS4" '| adr-0002 | the same id, lowercase |'
+t_capture _e_run "$_E_WS4"
+t_assert_rc 0 "(e) R2: a lowercase pair runs clean"
+t_assert_contains "$T_OUT" "matches the registry: 1 entries, 1 rows" "(e) R2 ... it reads the pair as the ONE bone it is, not as the old false clean (\"0 entries, 0 rows\")"
+_e_spec "$_E_WS4" '| ADR-0002 | the same id, upper |'
+t_capture _e_run "$_E_WS4"
+t_assert_contains "$T_OUT" "matches the registry: 1 entries, 1 rows" "(e) R2 ... and a mixed-case valid pair is not reported as drift"
+# (e3c) ROUND 1, C1: "one row per registry entry" is the invariant, so a
+# duplicated index row is a finding even though the SET is unchanged.
+_e_spec "$_E_WS4" '| ADR-0002 | first copy |' '| ADR-0002 | the copy left behind |'
+t_capture _e_run "$_E_WS4"
+t_assert_rc 0 "(e) C1: duplicate index rows do not abort the check"
+t_assert_contains "$T_OUT" "carries more than one row for: ADR-0002" "(e) C1 ... a set comparison that collapses duplicates must still report them"
+if printf '%s' "$T_OUT" | grep -Fq 'ok: spec - bones index matches'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) C1: duplicated rows read as a clean match - sort -u hides the second row"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# (e3d) ROUND 1, R13: no temp files in this block at all - the comparison runs
+# over the two variables, and a mktemp pair is the machinery (and the leak) the
+# round-1 review rejected.
+if grep -Fq 'mktemp' "$_E_SV" || grep -Fq 'rm -f' "$_E_SV"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) R13: the drift block still round-trips through temp files - comm over the variables needs none"
+else
+  T_PASS=$((T_PASS+1))
+fi
+if grep -Fq 'comm -23' "$_E_SV" && grep -Fq 'comm -13' "$_E_SV"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) R13: the block does not compare the two halves with comm"
+fi
+# (e4) REFUSAL ARM: an index half that cannot be READ is not an EMPTY one. The
+# heading is what this recipe reads section 4 by, so its absence must refuse.
+printf '# MASTER-SPEC\n\n## Bones\n\n| ADR | Title |\n|---|---|\n| ADR-0002 | x |\n' > "$_E_WS/docs/MASTER-SPEC.md"
+t_capture _e_run "$_E_WS"
+t_assert_rc 0 "(e) a spec with no readable section-4 heading does not abort the run"
+t_assert_contains "$T_OUT" "section 4 carries no" "(e) ... it refuses the comparison instead of reading the index as empty - the same failure-read-as-absence class §5's sweep names"
+if printf '%s' "$T_OUT" | grep -Fq 'no index row'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) an unreadable index half was reported as a registry-only mismatch - that is the defect class this pin exists for"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# (e5) REFUSAL ARM: the registry half unreadable (jq cannot read `.bones[].adr`),
+# which must refuse rather than compare against an empty registry.
+_E_WS2="$_PC_TMP/driftws2"; mkdir -p "$_E_WS2/.ossify" "$_E_WS2/canon" "$_E_WS2/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
+  "$_E_WS2" "$_E_WS2" "$_E_WS2" > "$_E_WS2/.ossify/topology.json"
+printf '%s\n' '{"schema_version":9}' > "$_E_WS2/.ossify/project-state.json"
+_e_spec "$_E_WS2" '| ADR-0002 | x |'
+t_capture _e_run "$_E_WS2"
+t_assert_rc 0 "(e) an unreadable registry does not abort the run"
+t_assert_contains "$T_OUT" "could not read the registry half" "(e) ... it names the HALF that failed instead of claiming both, so \"registry rc 5, spec rc 0\" is never printed under a both-halves claim"
+if printf '%s' "$T_OUT" | grep -Fq 'both halves'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) R10: the refusal claims both halves while only one failed"
+else
+  T_PASS=$((T_PASS+1))
+fi
+if printf '%s' "$T_OUT" | grep -Fq 'no registry entry'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) an unreadable registry read as an EMPTY one - every index row was reported as a hand-written row"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# (e7) ROUND 1, C4: a legal NON-NUMERIC ref is compared as a complete value.
+# `bone_add` accepts `ADR-C2` (the registry suite's own fixture mints it), so the
+# old numeric-substring extractor dropped it from BOTH halves and printed
+# "ok: 0 entries, 0 rows" over a registry that has an entry - the same
+# failure-read-as-absence class as R2/C1, one step further out.
+_E_WS5="$_PC_TMP/driftws5"; mkdir -p "$_E_WS5/.ossify" "$_E_WS5/canon" "$_E_WS5/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
+  "$_E_WS5" "$_E_WS5" "$_E_WS5" > "$_E_WS5/.ossify/topology.json"
+( cd "$_E_WS5" && bash "$OSS" init c4 >/dev/null && bash "$OSS" bone_add ADR-C2 "a permitted non-numeric ref" "packages/core/**" ) >/dev/null 2>&1
+_e_spec "$_E_WS5"
+t_capture _e_run "$_E_WS5"
+t_assert_rc 0 "(e) C4: a non-numeric registry ref does not abort the check"
+t_assert_contains "$T_OUT" "registry entry with no index row: ADR-C2" "(e) C4 ... it is COMPARED, so its missing row is reported - the old substring extractor printed a false clean"
+if printf '%s' "$T_OUT" | grep -Fq 'ok: spec'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) C4: a non-numeric ref was dropped and the registry read as empty"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# CONTROLS: the same id compares equal when its row is present, and the numeric
+# series reads clean beside it.
+_e_spec "$_E_WS5" '| ADR-C2 | the non-numeric ref |'
+t_capture _e_run "$_E_WS5"
+t_assert_contains "$T_OUT" "matches the registry: 1 entries, 1 rows" "(e) C4 control: the non-numeric id compares equal when its row is present"
+( cd "$_E_WS5" && bash "$OSS" bone_add ADR-0002 "a numeric ref" "packages/core/**" ) >/dev/null 2>&1
+_e_spec "$_E_WS5" '| ADR-C2 | the non-numeric ref |' '| ADR-0002 | the numeric ref |'
+t_capture _e_run "$_E_WS5"
+t_assert_contains "$T_OUT" "matches the registry: 2 entries, 2 rows" "(e) C4 control: the numeric series still reads clean beside it"
+# (e8) C4's refusal arm: a value that is not an ADR reference at all refuses the
+# comparison instead of being filtered out of it.
+( cd "$_E_WS5" && bash "$OSS" bone_add "RFC-2119" "not an adr ref" "packages/core/**" ) >/dev/null 2>&1
+t_capture _e_run "$_E_WS5"
+t_assert_rc 0 "(e) C4: a non-ADR registry value does not abort the check"
+t_assert_contains "$T_OUT" "not an ADR reference ('RFC-2119')" "(e) C4 ... it REFUSES and names the value, instead of dropping it from the comparison"
+
+# (e9) ROUND 2, C6: a duplicate REGISTRY record is reported, not collapsed. A
+# legacy or hand-edited state can hold two bone records for one ref; the index
+# then has one row, and the old `sort -u` reduced the registry to a set and
+# printed ok. Reproduced live before the fix.
+_E_WS6="$_PC_TMP/driftws6"; mkdir -p "$_E_WS6/.ossify" "$_E_WS6/canon" "$_E_WS6/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
+  "$_E_WS6" "$_E_WS6" "$_E_WS6" > "$_E_WS6/.ossify/topology.json"
+( cd "$_E_WS6" && bash "$OSS" init r2 >/dev/null && bash "$OSS" bone_add ADR-0002 "the record" "packages/core/**" ) >/dev/null 2>&1
+jq '.bones += [.bones[0]]' "$_E_WS6/.ossify/project-state.json" > "$_E_WS6/dup.json" && mv "$_E_WS6/dup.json" "$_E_WS6/.ossify/project-state.json"
+_e_spec "$_E_WS6" '| ADR-0002 | the row |'
+t_capture _e_run "$_E_WS6"
+t_assert_rc 0 "(e) C6: duplicate registry records do not abort the check"
+t_assert_contains "$T_OUT" "the registry carries more than one bone record for: ADR-0002" "(e) C6 ... the duplicate registration is reported"
+if printf '%s' "$T_OUT" | grep -Fq 'ok: spec'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) C6: a duplicate registry record collapsed to a set and the check printed ok"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# (e10) ROUND 2, C7: a section-4 data row whose first cell is not an ADR
+# reference is reported, never filtered out of the comparison.
+jq '.bones = [.bones[0]]' "$_E_WS6/.ossify/project-state.json" > "$_E_WS6/one.json" && mv "$_E_WS6/one.json" "$_E_WS6/.ossify/project-state.json"
+_e_spec "$_E_WS6" '| ADR-0002 | the row |' '| RFC-2119 | not a bone ref |'
+t_capture _e_run "$_E_WS6"
+t_assert_rc 0 "(e) C7: an unnameable data row does not abort the check"
+t_assert_contains "$T_OUT" "section 4 carries a row whose first cell is not an ADR reference: RFC-2119" "(e) C7 ... it is reported rather than skipped"
+if printf '%s' "$T_OUT" | grep -Fq 'ok: spec'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) C7: an unnameable row was filtered out and the check printed ok"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# ... and the underscore variant, which is the other shape the reviewer named.
+_e_spec "$_E_WS6" '| ADR-0002 | the row |' '| ADR_9999 | malformed separator |'
+t_capture _e_run "$_E_WS6"
+t_assert_contains "$T_OUT" "not an ADR reference: ADR_9999" "(e) C7 ... an ADR_9999-style cell is reported too"
+# (e11) CONTROL, adjacent to the two checks above: a clean pair still prints ok,
+# and the header/separator cells are NOT mistaken for data rows.
+_e_spec "$_E_WS6" '| ADR-0002 | the row |'
+t_capture _e_run "$_E_WS6"
+t_assert_contains "$T_OUT" "ok: spec - bones index matches the registry: 1 entries, 1 rows" "(e) C6/C7 control: a clean registry/index pair still reads clean"
+printf '# MASTER-SPEC\n\n## 4. Bones-registry index\n\n| adr | title |\n| :--- | ---: |\n| ADR-0002 | the row |\n\n## 5. Journeys\nx\n' > "$_E_WS6/docs/MASTER-SPEC.md"
+t_capture _e_run "$_E_WS6"
+t_assert_contains "$T_OUT" "ok: spec - bones index matches the registry: 1 entries, 1 rows" "(e) C6/C7 control: a lowercase header and a colon-dash separator are passed over, not reported as unnameable rows"
+
+# (e6) ROUND 1, R3: an unresolvable route must REFUSE, not abort. Both resolver
+# calls in the block are guarded, so under `set -euo pipefail` it reaches its own
+# refusal arm instead of dying inside the command substitution - which is what
+# the shipped block did (`sv_state="$(...)"` aborted the whole sourced read-out).
+_E_WS3="$_PC_TMP/driftws3"; mkdir -p "$_E_WS3/.ossify" "$_E_WS3/canon" "$_E_WS3/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"./state.json"}}\n' \
+  "$_E_WS3" "$_E_WS3" > "$_E_WS3/.ossify/topology.json"
+_e_spec "$_E_WS3" '| ADR-0002 | x |'
+t_capture _e_run "$_E_WS3"
+t_assert_rc 0 "(e) R3: an unresolvable state route does not abort the drift check under strict mode"
+t_assert_contains "$T_OUT" "could not read" "(e) R3 ... it reaches its refusal arm and says which half it could not read"
+
+# --- phase (f): §3's ADR numbering scan must read an adopted series (#301) ----
+#
+# The scan matched `^adr-` and `^NNNN-` only. On an adopted series in the other
+# case - `ADR-001-redb-for-storage.md`, PulseDB's - it returned NOTHING, and an
+# empty answer is not "start at 1": it minted `ADR-0001` over an existing
+# `ADR-001`, duplicating the identifier bone citations and touch records key on.
+# Two further rules lived only in prose: the minted WIDTH (`%04d` regardless of
+# the series it read) and an unreadable `docs/adr/` answering like an empty one.
+# The block is OPERATIVE (a loop, `exit 1`, a format chosen at runtime), so it is
+# extracted AND executed.
+_AD="$SKILLS/start/references/bones-registry.md"
+_SC="$_PC_TMP/adr-scan.sh"
+if oss_block_extract "$_AD" 'narrow=' "$_SC" 2>/dev/null && [ -s "$_SC" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: bones-registry.md §3's numbering scan no longer extracts - the checks below are vacuous"
+fi
+_o_ws() { # $1=name ; echoes a workspace whose canonical repo has an empty docs/adr
+  local d="$_PC_TMP/ni/$1"
+  mkdir -p "$d/.ossify" "$d/canon/docs/adr"
+  printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{}}\n' "$d" > "$d/.ossify/topology.json"
+  printf '%s\n' "$d"
+}
+_o_next2() { # $1=dir $2=repos $3=destination repo (the block consumes both)
+  ( cd "$1" && env oss_bin="$OSS" dest_repo="$3" repos="$2" bash -c "set -euo pipefail; . '$_SC'" )
+}
+_o_next() { _o_next2 "$1" canonical canonical; }
+_o_next_keep() { # $1=dir ; prints the mint, then the temp paths the block used
+  ( cd "$1" && env oss_bin="$OSS" dest_repo=canonical repos=canonical bash -c "set -euo pipefail; . '$_SC'; printf 'SCAN[%s] DEST[%s]\n' \"\$scan\" \"\$dest\"" )
+}
+# THE DEFECT: an uppercase three-digit series is read, and the mint continues it.
+_O_U="$(_o_ws upper)"; : > "$_O_U/canon/docs/adr/ADR-001-redb-for-storage.md"; : > "$_O_U/canon/docs/adr/ADR-002-single-writer.md"
+t_capture _o_next "$_O_U"
+t_assert_rc 0 "#301: the numbering scan completes on an adopted series"
+t_assert_contains "$T_OUT" "ADR-003" "#301 ... and CONTINUES it: ADR-001/ADR-002 are read, so the next id is ADR-003 at the series' own width"
+if printf '%s' "$T_OUT" | grep -Fq 'ADR-001'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: #301 the scan minted an id that already exists - matching one case answers an empty series and restarts at 1"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# CONTROLS: every other form keeps working, and a non-series mints nothing from.
+_O_B="$(_o_ws bare)"; : > "$_O_B/canon/docs/adr/0003-record-architecture-decisions.md"
+t_capture _o_next "$_O_B"
+t_assert_contains "$T_OUT" "ADR-0004" "#301 control: the bare scaffold-onboard seed is still read"
+_O_L="$(_o_ws lower)"; : > "$_O_L/canon/docs/adr/adr-0007-hexagonal.md"
+t_capture _o_next "$_O_L"
+t_assert_contains "$T_OUT" "ADR-0008" "#301 control: the lowercase four-digit form is still read"
+_O_E="$(_o_ws empty)"
+t_capture _o_next "$_O_E"
+t_assert_contains "$T_OUT" "ADR-0001" "#301 control: an empty series starts at ADR-0001, four digits"
+_O_D="$(_o_ws decoy)"; : > "$_O_D/canon/docs/adr/README.md"; : > "$_O_D/canon/docs/adr/0001-notes.txt"
+t_capture _o_next "$_O_D"
+t_assert_contains "$T_OUT" "ADR-0001" "#301 control: README.md and a non-.md file are not a series to continue"
+# REFUSAL ARM: an unreadable docs/adr/ must not answer like an empty one, or the
+# next ADR is minted blind over whatever is in there.
+_O_P="$(_o_ws perm)"; chmod 000 "$_O_P/canon/docs/adr"
+# NOT ASSUMED TO BITE. Running as root ignores the mode bits, so an assertion
+# that cannot fail would read as coverage: probe first and say so out loud when
+# the arm is not exercised (round 1, R12/C3 - the pattern test-worktree.sh:746
+# uses). The symlink-loop arm below is this arm's root-proof twin.
+if ls -1 "$_O_P/canon/docs/adr" >/dev/null 2>&1; then
+  echo "NOTE: chmod 000 did not restrict this user (uid $(id -u)); the unreadable-directory arm is NOT exercised here - see the symlink-loop arm below"
+else
+  t_capture _o_next "$_O_P"
+  _o_prc=$T_RC
+  t_assert_eq 1 "$_o_prc" "#301: an unreadable docs/adr/ refuses (rc 1) rather than answering as an empty series"
+  t_assert_contains "$T_OUT" "could not read" "#301 ... naming the directory it could not read"
+  if printf '%s' "$T_OUT" | grep -Fq 'ADR-'; then
+    T_FAIL=$((T_FAIL+1)); echo "FAIL: #301 an unreadable series was answered with a minted id - a failure read as an absence"
+  else
+    T_PASS=$((T_PASS+1))
+  fi
+fi
+chmod 755 "$_O_P/canon/docs/adr"
+# (f4) ROUND 1, R9: a docs/adr/ that cannot even be CREATED refuses at rc 1
+# naming the path. The fixture is a self-referential symlink, which fails for
+# root as well as for anyone else - the root-proof half of the arm above.
+_O_LP="$_PC_TMP/ni/loop"; mkdir -p "$_O_LP/.ossify" "$_O_LP/canon/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{}}\n' "$_O_LP" > "$_O_LP/.ossify/topology.json"
+: > "$_O_LP/canon/docs/adr"   # a FILE where the directory must be: mkdir cannot succeed, as root either
+t_capture _o_next "$_O_LP"
+t_assert_eq 1 "$T_RC" "#301 R9: an uncreatable docs/adr/ refuses at rc 1"
+t_assert_contains "$T_OUT" "$_O_LP/canon/docs/adr" "#301 R9 ... and the refusal names the path it could not create"
+# (f5) ROUND 1, R6: every exit path takes the scan's temp files with it, so the
+# caller is left with no populated mktemp per mint.
+_O_CL="$(_o_ws clean)"; : > "$_O_CL/canon/docs/adr/adr-0001-a.md"
+t_capture _o_next_keep "$_O_CL"
+t_assert_contains "$T_OUT" "ADR-0002" "#301 R6 control: the mint still answers"
+_o_scan="$(printf '%s' "$T_OUT" | sed -n 's/.*SCAN\[\([^]]*\)\].*/\1/p')"
+_o_desc="$(printf '%s' "$T_OUT" | sed -n 's/.*DEST\[\([^]]*\)\].*/\1/p')"
+if [ -n "$_o_scan" ] && [ -n "$_o_desc" ] && [ ! -e "$_o_scan" ] && [ ! -e "$_o_desc" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: #301 R6: the scan left its temp files behind (scan='${_o_scan:-unset}' dest='${_o_desc:-unset}')"
+fi
+# (f6) ROUND 1, C2/CR2: the minted WIDTH comes from the DESTINATION repo's
+# series, not from the project-wide highest. Destination `adr-0007-…` (four
+# digits) with `ADR-099-…` in another repo: the number is 100 (project-wide),
+# the width is the destination's 4 - so ADR-0100, not the old ADR-100.
+_O_C2="$(_o_ws width)"; mkdir -p "$_O_C2/extra/docs/adr"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"},"extra":{"root":"%s/extra"}},"well_known_paths":{}}\n' \
+  "$_O_C2" "$_O_C2" > "$_O_C2/.ossify/topology.json"
+: > "$_O_C2/canon/docs/adr/adr-0007-hexagonal.md"
+: > "$_O_C2/extra/docs/adr/ADR-099-elsewhere.md"
+t_capture _o_next2 "$_O_C2" "$(printf 'canonical\nextra')" canonical
+t_assert_contains "$T_OUT" "ADR-0100" "#301 C2: the width is the destination repo's, so a four-digit series elsewhere cannot force a three-digit mint"
+t_assert_contains "$T_OUT" "ADR-0100" "#301 C2 control: the NUMBER is still project-wide (99 elsewhere -> 100)"
+
 # --- phase 3: the never-strand invariant's two surfaces must agree -----------
 #
 # The dispatch predicate is one definition used at four sites, and one of them is
@@ -809,6 +1229,85 @@ for _f in "$_OSSR/skills/doctor/references/state-inspection.md" "$_OSSR/skills/c
   grep -F '| `fail: state` |' "$_f" | grep -Fq 'on Devin run `adopt` on Claude Code or Codex' || { _r=1; echo "  (#636 no non-Claude route in: $(basename "$_f"))"; }
 done
 _pin "$_r" "the fail: state remedy names a bare init - following it leaves state that /start and /adopt both refuse"
+
+# --- 1.13.4 (#154, #561, #301, #299) -----------------------------------------
+# One pin per prose rule the four fixes ship. The behavioural half of each is
+# held by phases (d)-(f) above, which extract and EXECUTE the blocks; these hold
+# the words a model has to find to act at all. Each is red on 1.13.3's text.
+_SV4="$_OSSR/skills/doctor/references/spec-validation.md"
+_SI4="$_OSSR/skills/doctor/references/state-inspection.md"
+# (#154) the drift check says SETS, and refuses an unreadable half out loud.
+_r=1; grep -Fq 'Compare identifier *sets*, never their counts' "$_SV4" && grep -Fq 'an unreadable half is not an empty one' "$_SV4" && ! grep -Fq 'Compare against the row count of section 4' "$_SV4" && _r=0
+_pin "$_r" "spec-validation §3 still compares counts (or lost its refusal arm) - a mismatch with equal counts in both directions reads clean"
+# (#561) the re-point remedy takes its verb from the roster's KIND, and §5 names
+# the state-versus-manifest gate its block now applies.
+_r=1; grep -Fq "chosen from the surface's own" "$_SI4" && grep -Fq 'never guessed from the id' "$_SI4" && grep -Fq "The sweep is about THIS directory's state" "$_SI4" && _r=0
+_pin "$_r" "state-inspection §5 offers both re-point verbs for an unmatched surface, or does not document the state-versus-manifest gate"
+# (#301) the ADR file joins the series it finds; the default is only for an EMPTY
+# directory; the trailer admits adoption as a third source with adopt's baseline.
+_AD4="$_OSSR/skills/start/references/bones-registry.md"
+_r=1; grep -Fq 'joins the target repo' "$_AD4" && grep -Fq 'When that directory is **empty**' "$_AD4" && grep -Fq 'Never add the prefix to, or' "$_AD4" && _r=0
+_pin "$_r" "bones-registry §3 prescribes one filename form regardless of the repo's series - the rule contradicts the reason bone ADRs live in that repo"
+_HR4="$_OSSR/skills/close/references/harvest.md"
+_r=1; grep -Fq 'source: report|handoff|adoption' "$_HR4" && grep -Fq 'a source that is exactly `report`, `handoff` or' "$_HR4" && grep -Fq 'r0 baseline <sha>' "$_HR4" && _r=0
+_pin "$_r" "harvest's trailer grammar admits only report|handoff - an adopted series cannot be recorded honestly"
+_r=1; grep -Fq '`source: adoption`' "$_OSSR/skills/adopt/SKILL.md" && grep -Fq 'r0 baseline <sha>' "$_OSSR/skills/adopt/SKILL.md" && _r=0
+_pin "$_r" "adopt C5 routes to harvest's provenance trailer without naming its source - the actor's own site never says what to write"
+# (#299) the private boundary inventory has ONE address, stated where the actor
+# writes it, and the two sites that claimed a state index now say the truth.
+_PB4="$_OSSR/skills/start/references/posture-block.md"
+_r=1; grep -Fq '`<ai-workspace>/docs/private-boundary-inventory.md`' "$_PB4" && grep -Fq 'convention, not a route' "$_PB4" && ! grep -Fq 'indexed from `project-state.json`' "$_PB4" && _r=0
+_pin "$_r" "posture-block §7 leaves the private boundary inventory unnamed (or still claims a project-state index that does not exist) - every adopter names it differently"
+_r=1; ! grep -Fq 'indexed from' "$_OSSR/skills/close/references/boundary-audit.md" && grep -Fq 'docs/private-boundary-inventory.md' "$_OSSR/skills/close/references/boundary-audit.md" && grep -Fq "if it cannot be located, this step is" "$_OSSR/skills/close/references/boundary-audit.md" && _r=0
+_pin "$_r" "boundary-audit still names a state index for the inventory, drops its convention path, or loses the INCONCLUSIVE arm for an adopted file"
+# (#299) "root" is a PATH, not a repo key - the clause the Rust-workspace case
+# needs - and the critic's non-interactive default RECORDS that nobody answered.
+_r=1; grep -Fq 'The value is a PATH, not a repo key' "$_PB4" && grep -Fq 'the crate/workspace directory *inside*' "$_PB4" && _r=0
+_pin "$_r" "posture-block §10 leaves 'composition root' meaning both the repo and the crate inside it"
+_r=1; grep -Fq 'the audit ran with no operator answer' "$_OSSR/skills/start/SKILL.md" && grep -Fq "into §13's hand-off line, which is the record" "$_OSSR/skills/start/references/critic-moment.md" && ! grep -Fq 'record that no operator' "$_OSSR/skills/start/SKILL.md" && _r=0
+_pin "$_r" "the critic moment's non-interactive default records that no operator answered with no named destination - each run invents where the record lands (round 1, R11)"
+# (#299) the inventory is a CHECKED destination now, not an output nobody can
+# find - occupied-destinations lists it with its path like every other output.
+_r=1; grep -Fq 'and the private boundary inventory' "$_OSSR/skills/start/references/occupied-destinations.md" && grep -Fq '<ai-workspace>/docs/private-boundary-inventory.md' "$_OSSR/skills/start/references/occupied-destinations.md" && _r=0
+_pin "$_r" "occupied-destinations leaves the private inventory among the outputs no route names - /start cannot check a file it cannot address"
+
+# --- 1.13.4 round 1 (#561 R1/R8/R14/R15): one state-path name per surface -----
+# §5 consumes §2's resolved `$sf` (never a second spelling of the precedence, and
+# exactly ONE resolver call for the routed half); §3 keeps its own differently
+# named `sv_state` so a composed read-out cannot reassign either; and the gate's
+# rationale has one owner - the §5 prose - with the block comment pointing at it
+# instead of arguing a third time.
+_r=1; [ "$(grep -v '^[[:space:]]*#' "$_SW" | grep -c 'state_path')" = 1 ] && ! grep -Fq 'sf="${OSS_STATE_FILE:-}"' "$_SW" && grep -Fq 'consumed, never re-derived' "$_SW" && _r=0
+_pin "$_r" "state-inspection §5 re-derives the state path (a second precedence spelling, or more than one state_path call) instead of consuming §2's \$sf"
+_r=1; grep -Fq 'sv_state' "$_SV4" && grep -Fq 'not `sf`' "$_SV4" && grep -Fq 'sv_state' "$_SI4" && _r=0
+_pin "$_r" "spec-validation §3 names its manifest-routed state \$sf - the same name state-inspection §2 uses for the override-first path, so one surface can reassign the other's state"
+_r=1; grep -Fq 'owned by the prose under this fence' "$_SW" && [ "$(grep -c 'as written' "$_SI4")" = 1 ] && _r=0
+_pin "$_r" "state-inspection's foreign-gate rationale is argued in more than one place (or the block comment no longer points at its owner) - three independently-worded copies drift"
+# The gate must not read an empty routed answer as consent: an unresolvable route
+# refuses, and that arm must be reachable (the `-n "$routed"` precondition that
+# bypassed it is gone).
+_r=1; grep -Fq '[ -z "${sf:-}" ] || [ -z "$routed" ] || [ "$sf" != "$routed" ]' "$_SW" && ! grep -Fq 'elif [ -n "$routed" ] &&' "$_SW" && _r=0
+_pin "$_r" "state-inspection §5 bypasses the foreign-state gate when the manifest route resolves to nothing (F1) - a foreign registry is swept against this directory's repos"
+
+# --- 1.13.4 round 1 (d)(e): the inventory's other name, the rubric's third source, the last stale form
+# (R5 + CR1) an adopted inventory under another name must be FOUND, not duplicated.
+_OD4="$_OSSR/skills/start/references/occupied-destinations.md"
+_r=1; grep -Fq 'docs/*inventor*.md' "$_OD4" && grep -Fq 'never create a second one' "$_OD4" && _r=0
+_pin "$_r" "occupied-destinations checks the inventory at the convention path only - an adopted project's own inventory name gets a silently minted duplicate beside it"
+# (C5, round 1) ... and a NAME match is not an equivalence: the glob also hits
+# `dependency-inventory.md` / `asset-inventory.md`, so the check probes contents
+# for §7's moat columns and names a name-only match to the operator as a
+# POSSIBLE inventory instead of equating it (which would suppress the real one).
+_r=1; grep -Fq 'A name is not' "$_OD4" && grep -Fq 'the moat columns' "$_OD4" && grep -Fq 'is a' "$_OD4" && grep -Fq '**possible** inventory' "$_OD4" && grep -Fq 'never write the inventory past an unanswered candidate' "$_OD4" && ! grep -Fq 'A match under' "$_OD4" && _r=0
+_pin "$_r" "occupied-destinations equates a filename match with the inventory - a docs/dependency-inventory.md is presented as the destination and keeping it suppresses the real moat inventory (round 1, C5)"
+# (R4) the eval rubric admits adoption as the third legal source, in both directions.
+_R4="$_OSSR/tests/eval/rubrics/harvest-apply-integrity.md"
+_r=1; grep -Fq '`report`, `handoff` or `adoption`' "$_R4" && grep -Fq 'adoption` is a legal source' "$_R4" && ! grep -Fq 'a source outside' "$_R4" && _r=0
+_pin "$_r" "the harvest-apply-integrity rubric still grades a legal adoption set as a refusal - the judge contract contradicts the shipped prose"
+# (R7) no shipped site prescribes the fixed lowercase form any more.
+_SP4="$_OSSR/skills/start/references/spike-contract.md"
+_r=1; ! grep -Fq 'docs/adr/adr-NNNN-*.md' "$_SP4" && grep -Fq "whatever form that repo's series already uses" "$_SP4" && _r=0
+_pin "$_r" "spike-contract still points at the fixed adr-NNNN-*.md form - an actor on an adopted series writes a second form into one directory"
 
 rm -rf "$_PC_TMP"
 t_summary
