@@ -43,10 +43,10 @@ file, as dagr's producer contract requires.
 The nested run keeps item plans and item reports away from you: you read a batched
 plan relay, genuine spine-level decisions, and one final report.
 
-**Teardown is the pairs and any workspace they used, not the `run.json`.** The spine session
-releases every item pair, as
-`paseo-mechanics.md`'s Teardown says, before its final report. Nothing closes a
-`run.json`: dagr never writes one, and the file stays as the spine's record.
+**Teardown is the pairs, not the `run.json`.** The spine session releases every item pair, as
+`paseo-mechanics.md`'s Teardown says — the workspace question is that section's, a coordinator
+seat archiving none and listing the run-created ones it leaves — before its final report.
+Nothing closes a `run.json`: dagr never writes one, and the file stays as the spine's record.
 
 ## 3. The round procedure, as the spine session runs it
 

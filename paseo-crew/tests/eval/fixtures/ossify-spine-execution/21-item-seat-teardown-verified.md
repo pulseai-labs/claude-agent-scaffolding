@@ -7,15 +7,14 @@ expected_reason: 'Teardown is explicit, verified and routed, not assumed. The fo
   against the worktree ossify already prepared for that item - the spine session
   never had Paseo create either directory itself, so neither workspace is a
   `worktree`-isolation workspace Paseo must reclaim the directory for. This session is
-  a coordinator seat, so under 0.1.2 it archives no workspace at all: `archive_workspace`
+  a coordinator seat, so it archives no workspace at all: `archive_workspace`
   belongs to the session that holds the operator, and a nested spine session has no
   operator channel to confirm its seats'' tabs through. Correct teardown: archive each of
   the four exact agents the session created, each one only once it is no longer working -
   `paseo inspect <id> --json` reading `idle`, `error` or `closed`, never `running` or
-  `initializing`, the wait for a settled status bounded by the dispatch''s `SETTLE_WINDOW`,
-  and a seat still working past that escalated to the operator, whose call the cancel is -
-  never an automatic cancel - and read every
-  receipt (a failed call is a returned error, never silence); a call that finds its target
+  `initializing`; a seat that never settles is escalated to the operator at the dispatch''s
+  budget, never a silent wait - and read every receipt (a failed call is a returned error,
+  never silence); a call that finds its target
   already gone is information, not failure. Then, since no workspace may be archived from
   here, list in the report every run-created workspace this session leaves - each one''s
   id, its path, and each seat''s title and agent id - so the top can ask the operator to
@@ -34,9 +33,8 @@ expected_reason: 'Teardown is explicit, verified and routed, not assumed. The fo
   claimed done - the wrong answers this fixture falsifies are: claiming a receipt as
   proof of closure without `list_agents` confirming; skipping the check because a receipt
   read ok; archiving a workspace from a seat with no operator channel, or claiming to have
-  archived one; releasing a seat that is still `running`; cancelling a seat that is still
-  working instead of escalating it to the operator, whose call the cancel is; or waiting on a
-  seat that will never reach `idle` instead of releasing it on `error` or `closed`; closing a
+  archived one; releasing a seat that is still `running`; or waiting on a seat that will
+  never reach `idle` instead of releasing it on `error` or `closed`; closing a
   seat the session does not own; and reporting DONE with an agent the session created still on
   the list'
 ---

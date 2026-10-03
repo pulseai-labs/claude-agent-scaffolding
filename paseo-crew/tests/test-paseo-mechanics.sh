@@ -67,6 +67,16 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # now states the wrong-model release in full, `cancel_agent` before the release, since it is
 # the one path that cancels a still-working seat. G2 is a pointer in roles.md, which carries
 # no budget.
+# 2026-10-02, #629/#622/#609 (0.1.3): at 290 after both fix rounds, REF_BUDGET unchanged.
+# #622's report exit now requires the seat settled and reads the body against the dispatch;
+# #632's fix round 1 tightens that gate to `idle` (the exit row is its only owner, and
+# `error`/`closed` settle at the `error` exit) and makes every other reader of a changed
+# file point at the row. Teardown's first-write caveat and the `SETTLE_WINDOW` release wait
+# that worked around it are deleted. #629's model-check cancel names the operator through
+# the handoff's rule instead of a no-longer-working precondition this site has no wait for;
+# its `--thinking` requirement moves into the prose and the command's placeholder; and
+# #609's implementer release follows `roles.md`'s retention end rather than every item's
+# step-12 merge.
 REF_BUDGET=290
 
 # shellcheck source=/dev/null
@@ -100,6 +110,19 @@ pin "$REF" 'The orchestrator never runs `paseo run` for a worker' "paseo run is 
 # #608 review round 4: the brief is the seat's initialPrompt, so a model mismatch is
 # never a clean failed launch — what it already wrote is reconciled, never adopted.
 pin "$REF" 'reconcile anything it touched' "a mismatched seat's artifacts are reconciled, not adopted" flat
+# #629 J2: the same input class as the handoff's failed successor — a seat that may
+# have started children — so it is cancelled and reported, never archived: the
+# archive cascades into what it started.
+pin "$REF" 'report it to the operator, as Handoff'"'"'s' "a mismatched seat is cancelled, never archived" flat
+# #629 J3, the adjacent control: this site has no report to read and no armed wait,
+# so its release cannot route through a precondition whose wait is a report and a
+# `SETTLE_WINDOW`. Re-introducing the old route must fail this, and the operator
+# clause above is what the release waits on instead. Counted FLAT (#632 F11): a
+# reintroduction wrapped across two lines is the same clause, and a per-line count
+# reads it as absent.
+c="$(count_of "$REF" 'no-longer-working precondition' flat)"
+if [ "$c" -eq 0 ]; then pass "the model-check release depends on no report or settle window ($c)"
+else fail "the model-check release names no report-dependent precondition" "$c occurrence(s)"; fi
 
 section "D2: the report file is the finish"
 pin "$REF" 'the file is the contract' "the report-file contract survives"
@@ -114,6 +137,11 @@ pin "$REF" 'gone without having exited' "the heartbeat re-arms only a lost wait"
 pin "$REF" 'with the `idle` exit dropped' "a false wake drops the idle exit"
 pin "$REF" 'Coordinator seats' "coordinators are armed without the idle exit"
 pin "$REF" 'Both are compared, not merely recorded' "hash and identity are both compared"
+# #622 / #632 F1-F3: the change alone is not a report. The exit row is the single owner
+# of "changed file AND `Status` is `idle`" — `error` and `closed` settle at the `error`
+# exit — and every other reader of a changed file points at that row. Which is what lets
+# Teardown carry no first-write caveat and no release wait around one.
+pin "$REF" 'and `Status` is `idle`' "the report exit needs an idle seat, not a first write" flat
 # The identity must change on every replacement: a rename mints a new inode, while
 # `mtime` can hold across one inside its timestamp granularity (#608 review, round 1).
 pin "$REF" 'Never `mtime` alone' "the identity is the inode, never mtime alone" flat
@@ -139,11 +167,19 @@ pin "$REF" 'reports the failed successor'"'"'s agent id to the operator' "the fa
 # #608 review round 8: the detached command takes no feature values, and the seat's
 # retention runs to the review being final, not its first report.
 pin "$REF" 'hands on without them' "the handoff names the featureValues a detached launch drops" flat
+# #629 D6 / #632 F8: the thinking option was demoted to a comment, so a launch copying the
+# command line dropped a profile's `thinkingOptionId` silently. The command carries the
+# bracketed placeholder now, and the prose says when it is dropped.
+pin "$REF" '[--thinking <thinkingOptionId>]' "the launch line carries the optional thinking flag" flat
 # #608 review round 9: an idle with neither a question nor a background-work claim
 # is the missing-report case rather than an unwatched dispatch. (The child-reconcile
 # procedure this round added to the handoff branch was deleted by the operator ruling.)
 pin "$REF" 'one bounded correction request asking it to write `REPORT_PATH`' "an idle with no question and no report goes to the correction path" flat
 pin "$REF" 'the reviewer once the review is final' "the reviewer is released when the review is final, not at its first report" flat
+# #609: step 12's merge gate closes each item, so a release tied to it would archive the
+# retained implementer the next item is dispatched to. The retention's end is roles.md's
+# to say, and mechanics points there instead of naming the item boundary.
+pin "$REF" 'the implementer when its retention ends' "the implementer is released at its retention's end, not per item" flat
 pin "$REF" 're-arms its own waits and a fresh heartbeat' "after a failed launch this session re-arms and stays the orchestrator"
 pin "$REF" 'Never archive a predecessor while a subagent in its workspace runs' "the no-archive rule survives"
 pin "$REF" 'Kill this session'"'"'s armed background waits' "the predecessor stands down"
@@ -191,10 +227,9 @@ if r="$(budget_report "$ctl_over")" && [ "${r##* }" -gt 0 ]; then pass "control:
 else fail "control: the budget still fails a file past the limit" "an over-limit fixture read [$r] and passed"; fi
 if ! r="$(budget_report "$ctl_over/gone")"; then pass "control: an unreadable file is refused, not counted as within budget"
 else fail "control: an unreadable file is refused, not counted as within budget" "read [$r]"; fi
-# The real file sits exactly ON the limit, so its pass cannot separate "within" from
-# "over": a predicate that always reported an overshoot would read the same there. This
-# one line under the limit is the case that separates them — measured, mutating the
-# comparison to `[ "$_n" -ge 0 ]` left the suite green until this control existed.
+# This one line under the limit is the
+# case that separates them — measured, mutating the comparison to `[ "$_n" -ge 0 ]` left
+# the suite green until this control existed.
 ctl_under="$(mktemp)"
 awk -v n="$((REF_BUDGET - 1))" 'BEGIN { for (i = 0; i < n; i++) print "" }' > "$ctl_under"
 if r="$(budget_report "$ctl_under")" && [ "${r##* }" -eq 0 ]; then pass "control: a file within the budget reports no overshoot"

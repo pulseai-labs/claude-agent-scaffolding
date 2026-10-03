@@ -14,9 +14,10 @@ expected_reason: 'Routing, in both directions. The two item plan questions were 
   complete return would itself be a contract violation. The spine session''s own final
   report goes in its report file, naming RUN_JSON, which settles the top''s dispatch while
   the nested file stays the spine''s own record - and before writing it the spine session
-  releases every item pair and closes the workspace it created for them, so nothing of
-  its own outlives the spine and the top can still find the run. The wrong answers this
-  fixture falsifies are: the spine session approving the plans itself because it can read
+  releases every item pair, archiving no workspace and listing each run-created one it
+  leaves for the top, so the top can still find the run and archive what remains. The
+  wrong answers this fixture falsifies are: the spine session approving the plans itself
+  because it can read
   them; relaying two separate upward messages when one ordered relay carries the
   round; folding both items into one decision send; forwarding the verifier
   completion up as progress; and inventing a close-the-run.json step, which no

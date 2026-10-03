@@ -65,12 +65,12 @@ Every command's syntax comes from Paseo's own `paseo` skill.
 3. **Launch.** The seat launch is `roles.md`'s "The launch." The "state your model"
    line is the worker's own second check: a model that is not `SEAT_EXPECTED_MODEL` is a
    failed launch it writes to its report file and stops on. A wrong model at the
-   launch's own model check is `paseo-mechanics.md`'s The seat launch, step 3, which owns
-   the cancel and the release; this step reports the failure.
+   launch's own model check is `paseo-mechanics.md`'s The seat launch, step 3, which owns the
+   cancel, its release going to the operator; this step reports the failure.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes, the same
-   doorbell as completion (`paseo-mechanics.md`), and approves or amends it by sending
+   `report` exit as completion (`paseo-mechanics.md`), and approves or amends it by sending
    the seat its next message. The final report later overwrites the plan in the same
    file. Fast briefs skip this.
 5. **Wait.** One background wait per dispatch, as `paseo-mechanics.md`'s Completion
@@ -182,13 +182,14 @@ Every command's syntax comes from Paseo's own `paseo` skill.
     as the blocker — this step never leaves a merge scheduled. The read and merge are two
     operations — a signal can still land between them: the ruleset
     requires conversation resolution, GitHub refuses the merge while any thread
-    is open, and a refusal returns to step 10, never a retry. Then
-    release every worker and delete the branch only after confirming a merged PR
-    exists whose head OID equals the branch tip — on an activated ossify spine (1b) the
-    merge lands on the word you relay under that dispatch's `MERGE_EXECUTOR`
-    assignment — always a merge commit on the named SHA, session or operator —
-    and that wait covers the top's spine-level teardown alone — work-PR seats
-    released when their work finished. **A closed spine has no PR to confirm**,
+    is open, and a refusal returns to step 10, never a retry. Then release the workers
+    whose retention ends here (`roles.md`), as Teardown directs — its settled-status gate,
+    and the operator's tab confirmation before a run-created workspace is archived — and
+    delete the branch only after confirming a merged PR exists whose head OID equals the
+    branch tip — on an activated ossify spine (1b) the merge lands on the word you relay
+    under that dispatch's `MERGE_EXECUTOR` assignment — always a merge commit on the named
+    SHA, session or operator — and that wait covers the top's spine-level teardown alone —
+    work-PR seats released when their work finished. **A closed spine has no PR to confirm**,
     so its teardown validates the close's own result instead — the local landing it
     recorded in each hosting repo — and waits for no record pass.
 13. **Handoff.** If the run outlives the session, write a handoff naming the run's

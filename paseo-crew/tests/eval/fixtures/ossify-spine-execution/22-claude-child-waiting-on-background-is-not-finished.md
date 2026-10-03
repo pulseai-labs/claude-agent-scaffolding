@@ -2,9 +2,9 @@
 scenario_id: 22-claude-child-waiting-on-background-is-not-finished
 expected_outcome: proceed
 expected_reason: 'The finish notice is a hint, never the finish. `paseo-mechanics.md`''s
-  Completion section is explicit: a new report is handled as `report`, once, whichever
-  of the notice, the heartbeat and the wait reaches it first; with no new report, do
-  nothing — the wait is still armed. Here `w1-report.md`''s hash and identity are
+  Completion section is explicit: a change that meets the `report` exit is handled as
+  `report`, once, whichever of the notice, the heartbeat and the wait reaches it first;
+  otherwise, do nothing — the wait is still armed. Here `w1-report.md`''s hash and identity are
   unchanged from what was noted before the dispatch, so there is no new report: the
   notice names nothing to act on, and the correct move at notice time is silence. The
   armed wait is left exactly as it is — not killed, not re-armed, not joined by a second
