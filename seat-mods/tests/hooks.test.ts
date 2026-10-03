@@ -9,6 +9,8 @@ import type { On } from 'claude-code'
 // carrying the deny text. A mocked call answers { value }, or { deny } for a
 // missing path, as the kit requires.
 const DIRS = new Set(['/', '/w', '/w/seat-mods', '/w/seat x', '/etc', '/var', '/reports'])
+// A dangling symbolic link: it exists, but resolving it fails.
+const LINKS = new Set(['/w/link'])
 const FILES = new Map<string, string>([
   ['/w/README.md', 'readme'],
   ['/w/msg-trailer.txt', 'fix: a thing\n\nCo-Authored-By: someone <x@y>\n'],
@@ -39,6 +41,8 @@ function world(on: On, env: Record<string, string>) {
       : { exitCode: 1, stdout: '', stderr: 'unmocked', isStdoutTruncated: false } }) as never)
   on('fs.stat', (_$, e) => {
     const path = normal(e.path)
+    if (path !== undefined && LINKS.has(path) && !e.resolve)
+      return { value: { kind: 'other', size: 0, mtimeMs: 0, isLink: true } } as never
     if (path !== undefined && DIRS.has(path)) return { value: { kind: 'dir', size: 0, mtimeMs: 0, isLink: false, realPath: path } } as never
     if (path !== undefined && FILES.has(path)) return { value: { kind: 'file', size: 1, mtimeMs: 0, isLink: false, realPath: path } } as never
     return { deny: `ENOENT: ${e.path}` } as never
@@ -140,6 +144,11 @@ describe('write placement', () => {
     world(on, { SEAT_MODS_ROLE: 'reviewer', SEAT_MODS_ALLOW: '/reports/run-1' })
     const r = await $.tool.call({ tool: 'Write', file_path: '/reports/run-1/review.md', content: 'x' })
     expect(r.deny).toBeUndefined()
+  })
+  test('implementer: a Write through a dangling symlink is denied (PR #644 round 4)', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    const r = await $.tool.call({ tool: 'Write', file_path: '/w/link', content: 'x' })
+    expect(r.deny).toBeDefined()
   })
   test('implementer with no SEAT_MODS_ALLOW: the report directory is denied, naming the variable', async ($, on) => {
     world(on, { SEAT_MODS_ROLE: 'implementer' })

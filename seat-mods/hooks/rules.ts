@@ -34,7 +34,8 @@ const RULE_TEXT: Record<RuleId, string> = {
   'pr-create': 'no gh pr create',
 }
 
-const TRAILER = /co-authored-by:|🤖 generated with/i
+// At a line start, as the repository's commit-msg hook reads them; mid-line prose is not a trailer.
+const TRAILER = /^[ \t]*(?:co-authored-by:|🤖 generated with)/im
 // Command boundaries for matching; subshell parentheses count too.
 const COMMANDS = /;|&&|\|\||\||\n|\(|\)/
 // Heredoc bodies and quoted strings are text, not commands: a commit message may

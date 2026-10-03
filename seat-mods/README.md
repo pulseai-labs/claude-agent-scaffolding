@@ -3,7 +3,9 @@
 Role guards for worker seats, as a Claude Code mod. Requires Claude Code 2.1.287 or later.
 
 An orchestrator spawns a worker seat (an implementer, a verifier or a reviewer) and sets one
-environment variable on that spawn. The seat's tool calls then meet its role's rails. Without the
+environment variable on that spawn. The seat's tool calls then meet its role's rails: Edit and
+Write are placed by the file system, and Bash calls are matched against the common spellings of
+each rule — a best-effort catch for mistakes, not a shell parser. Without the
 variable the mod does nothing, so the orchestrator itself, and any session you start, keeps every
 access you have.
 
@@ -54,6 +56,10 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   `VAR=value` and `sudo`, `env`, `command`, `exec`, `nohup` or `time`; so `echo git merge` is not a
   merge, and neither are `xargs git push --force`, `bash -c "git push -f"`, `g""it push`, or a
   wrapper with its own options (`env -i git merge`, `sudo -u u git push -f`).
+- **Unparsed shell forms pass:** a single `&` list operator, abbreviated long options (`--mir`),
+  several heredocs on one command, value-taking git globals (`--git-dir x`) and quoted subcommands
+  or flags (`git "merge"`).
+- **A trailer counts only at a line start**, as the repository's commit-msg hook reads it.
 - **`git pull` is not guarded.** A pull that merges is not on the merge rail; the briefs' prose
   rule covers it.
 - **`implementer` is one profile for every implementer brief.** Briefs that stage and never

@@ -12,6 +12,8 @@ async function roleOf($: any): Promise<RoleState> {
 async function realOf($: any, path: string): Promise<string | undefined> {
   const own = await $.fs.stat(path, { resolve: true }).catch(() => undefined)
   if (own?.realPath !== undefined) return own.realPath
+  // A path that exists but does not resolve is a dangling link: a Write would follow it.
+  if (await $.fs.stat(path).then(() => true, () => false)) return undefined
   const cut = path.lastIndexOf('/')
   const folder = cut < 0 ? '.' : cut === 0 ? '/' : path.slice(0, cut)
   const name = path.slice(cut + 1)

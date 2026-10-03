@@ -126,6 +126,15 @@ describe('bashRules', () => {
   test('control: an unescaped operator still splits', () => {
     expect(bashRules('echo a;git push --force')).toContain('force-push')
   })
+  test('a trailer counts only at a line start, as the repo hook reads it (PR #644 round 4)', () => {
+    expect(bashRules('git commit -m "docs: explain Co-Authored-By: trailers"')).toEqual(['commit'])
+    expect(bashRules('git commit -m "chore: 🤖 Generated with marker stays mid-line"')).toEqual(['commit'])
+    expect(bashRules('git commit -F m', 'docs: noting that Co-Authored-By: trailers exist mid-line\n')).toEqual(['commit'])
+  })
+  test('control: a line-start trailer still counts, in any case', () => {
+    expect(bashRules('git commit -F m', 'fix\n\nco-authored-by: a <b>\n')).toContain('ai-trailer')
+    expect(bashRules('git commit -F m', 'fix\n\n🤖 Generated with x\n')).toContain('ai-trailer')
+  })
   test('a quoted -C path does not hide the subcommand', () => {
     expect(bashRules('git -C "/a b" push --force')).toContain('force-push')
   })
