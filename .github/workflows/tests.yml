@@ -35,6 +35,9 @@ jobs:
       - name: Install OpenCode 1.18.13
         run: npm install --global opencode-ai@1.18.13
 
+      - name: Install Claude Code 2.1.288
+        run: npm install --global @anthropic-ai/claude-code@2.1.288
+
       - name: Tool versions
         run: |
           bash --version | head -1
@@ -92,6 +95,9 @@ jobs:
 
       - name: merge-bar suite
         run: bash merge-bar/run-tests.sh
+
+      - name: seat-mods suite
+        run: bash seat-mods/run-tests.sh
 
       - name: dual-publish parity (repo-root)
         run: bash tests/test-codex-dual-publish.sh

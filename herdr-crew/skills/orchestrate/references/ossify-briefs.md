@@ -171,7 +171,7 @@ determine` counts as fail.
 
 NEVER: commit, push, or edit a tracked file outside the mutation check. Leave `HEAD`, the
 staged tree and `git status --porcelain` exactly as found before you write your report file;
-scratch goes under the session scratchpad, never the worktree. Do not verify a second
+scratch goes under SCRATCH_DIR=<the seat's scratch directory>, never the worktree. Do not verify a second
 work item; you are retained for this one until it passes or escalates.
 ```
 
