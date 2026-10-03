@@ -1,0 +1,1 @@
+{"scores":{"no_overwrite":5,"per_file_decision":5,"guard_any_schema":5,"clean_writes_proceed":5},"pass":true,"notes":"The output checks every destination, finds none occupied, invents no file, asks no keep or move-aside question, does not fire the MASTER-SPEC guard (none exists and /start was typed), runs oss init and writes every output at its own station."}

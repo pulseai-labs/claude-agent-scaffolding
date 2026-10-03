@@ -786,5 +786,29 @@ _pin "$_r" "spine-close.md's reconciliation skips a MERGED resumed PR, leaves re
 _r=1; grep -Fq "Edit only the body's \`## Known limits\` section" "$_SC" && ! grep -Fq 'past editing' "$_SC" && _r=0
 _pin "$_r" "spine-close.md's reconciliation rewrites every field after pushed-tip (discarding review edits) or calls a merged body uneditable"
 
+
+# 1.13.3 (#265, #266) - one pin per defect, each red on 1.13.2's text. The
+# behaviour itself is judged by the start-occupied-destination eval surface;
+# these pins hold only the wiring a model would need to find it.
+_SS="$_OSSR/skills/start/SKILL.md"
+# (#265a) start §2's re-authoring guard fires on a MASTER-SPEC of any schema.
+_r=1; grep -Fq 'A MASTER-SPEC of any schema, lean or legacy, already exists at the routing' "$_SS" && ! grep -Fq 'A lean MASTER-SPEC already exists at the routing destination' "$_SS" && _r=0
+_pin "$_r" "start/SKILL.md §2's re-authoring guard is keyed on a lean MASTER-SPEC - a legacy spec walks past it into the writes"
+# (#265b) start §3 settles occupied destinations before init, and §13 honours them.
+_r=1; grep -Fq 'settle every occupied destination' "$_SS" && grep -Fq 'honour the per-file answers §3 collected' "$_SS" && [ -f "$_OSSR/skills/start/references/occupied-destinations.md" ] && _r=0
+_pin "$_r" "start/SKILL.md has no occupied-destination rule before its first write - an existing MASTER-SPEC, CLAUDE.md or LIVE memory-bank file is overwritten"
+# (#265c) the rule asks per file and never moves, merges or migrates on its own.
+_OD="$_OSSR/skills/start/references/occupied-destinations.md"
+_r=1; [ -f "$_OD" ] && grep -Fq 'oss repo_root ai_workspace' "$_OD" && grep -Fq 'no default, no automatic move, merge or migration' "$_OD" && grep -Fq 'Not offered for the MASTER-SPEC' "$_OD" && grep -Fq 'Never write a file whose path was' "$_OD" && _r=0
+_pin "$_r" "occupied-destinations.md does not resolve the AI workspace or allows an answer the operator did not give"
+# (#266) doctor's and close's fail: state remedy names the ceremonies that own init.
+_r=0
+for _f in "$_OSSR/skills/doctor/references/state-inspection.md" "$_OSSR/skills/close/SKILL.md"; do
+  grep -Fq '`"$oss_bin" init <name>`' "$_f" && { _r=1; echo "  (#266 site: $(basename "$_f"))"; }
+  grep -F '| `fail: state` |' "$_f" | grep -Fq '/ossify:start' || { _r=1; echo "  (#266 no /ossify:start in: $(basename "$_f"))"; }
+  grep -F '| `fail: state` |' "$_f" | grep -Fq 'on Devin run `adopt` on Claude Code or Codex' || { _r=1; echo "  (#636 no non-Claude route in: $(basename "$_f"))"; }
+done
+_pin "$_r" "the fail: state remedy names a bare init - following it leaves state that /start and /adopt both refuse"
+
 rm -rf "$_PC_TMP"
 t_summary
