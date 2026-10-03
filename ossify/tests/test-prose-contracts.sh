@@ -1191,7 +1191,7 @@ _r=1; grep -Fq 'proceed and record that no operator' "$_OSSR/skills/start/SKILL.
 _pin "$_r" "the critic moment's non-interactive default proceeds without recording that no operator answered"
 # (#299) the inventory is a CHECKED destination now, not an output nobody can
 # find - occupied-destinations lists it with its path like every other output.
-_r=1; grep -Fq 'private boundary inventory at' "$_OSSR/skills/start/references/occupied-destinations.md" && grep -Fq '<ai-workspace>/docs/private-boundary-inventory.md' "$_OSSR/skills/start/references/occupied-destinations.md" && _r=0
+_r=1; grep -Fq 'and the private boundary inventory' "$_OSSR/skills/start/references/occupied-destinations.md" && grep -Fq '<ai-workspace>/docs/private-boundary-inventory.md' "$_OSSR/skills/start/references/occupied-destinations.md" && _r=0
 _pin "$_r" "occupied-destinations leaves the private inventory among the outputs no route names - /start cannot check a file it cannot address"
 
 # --- 1.13.4 round 1 (#561 R1/R8/R14/R15): one state-path name per surface -----
@@ -1211,6 +1211,20 @@ _pin "$_r" "state-inspection's foreign-gate rationale is argued in more than one
 # bypassed it is gone).
 _r=1; grep -Fq '[ -z "${sf:-}" ] || [ -z "$routed" ] || [ "$sf" != "$routed" ]' "$_SW" && ! grep -Fq 'elif [ -n "$routed" ] &&' "$_SW" && _r=0
 _pin "$_r" "state-inspection §5 bypasses the foreign-state gate when the manifest route resolves to nothing (F1) - a foreign registry is swept against this directory's repos"
+
+# --- 1.13.4 round 1 (d)(e): the inventory's other name, the rubric's third source, the last stale form
+# (R5 + CR1) an adopted inventory under another name must be FOUND, not duplicated.
+_OD4="$_OSSR/skills/start/references/occupied-destinations.md"
+_r=1; grep -Fq 'docs/*inventor*.md' "$_OD4" && grep -Fq 'never create a second one' "$_OD4" && _r=0
+_pin "$_r" "occupied-destinations checks the inventory at the convention path only - an adopted project's own inventory name gets a silently minted duplicate beside it"
+# (R4) the eval rubric admits adoption as the third legal source, in both directions.
+_R4="$_OSSR/tests/eval/rubrics/harvest-apply-integrity.md"
+_r=1; grep -Fq '`report`, `handoff` or `adoption`' "$_R4" && grep -Fq 'adoption` is a legal source' "$_R4" && ! grep -Fq 'a source outside' "$_R4" && _r=0
+_pin "$_r" "the harvest-apply-integrity rubric still grades a legal adoption set as a refusal - the judge contract contradicts the shipped prose"
+# (R7) no shipped site prescribes the fixed lowercase form any more.
+_SP4="$_OSSR/skills/start/references/spike-contract.md"
+_r=1; ! grep -Fq 'docs/adr/adr-NNNN-*.md' "$_SP4" && grep -Fq "whatever form that repo's series already uses" "$_SP4" && _r=0
+_pin "$_r" "spike-contract still points at the fixed adr-NNNN-*.md form - an actor on an adopted series writes a second form into one directory"
 
 rm -rf "$_PC_TMP"
 t_summary

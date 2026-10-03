@@ -23,9 +23,15 @@ Resolve the path of every output in §13's table (`memory-bank-brief.md` §4 —
 never reaches it) and check whether a file already exists there: the
 MASTER-SPEC at `"$oss_bin" spec_path`, the EXECUTIVE-SUMMARY, each memory-bank
 file where the bank lives (`close/references/harvest.md`, "Where the bank is"),
-`CLAUDE.md`, each `PUBLIC_BOUNDARY.md`, and the private boundary inventory at
-`posture-block.md` §7's convention,
-`<ai-workspace>/docs/private-boundary-inventory.md`.
+`CLAUDE.md`, each `PUBLIC_BOUNDARY.md`, and the private boundary inventory —
+checked **both** at `posture-block.md` §7's convention,
+`<ai-workspace>/docs/private-boundary-inventory.md`, **and** for any other
+`docs/*inventor*.md` beneath the `ai_workspace` root (a case-insensitive glob:
+this output is named by convention, not by a routed key, so a project adopted
+from another stack may hold its equivalent under its own name). A match under
+either name **is** this destination, occupied, and takes the same per-file
+answer; never write a second inventory beside one that already exists — §7's
+"read what is there, never create a second one" is the rule this check enforces.
 A MASTER-SPEC anywhere else in the workspace is not overwritten, but name it to
 the operator too: two specs side by side is a question, not a default. Bones ADRs take a
 fresh number from the `bones-registry.md` §3 scan, so they do not collide here;
