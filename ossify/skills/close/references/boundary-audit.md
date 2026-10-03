@@ -840,9 +840,12 @@ expected, which is indistinguishable from a real one — §2), and the
 private-canonical hygiene arm skips it as a named skip (nothing is disclosed
 from a private repo).
 
-**Read the private boundary inventory first** (`posture-block.md` §7 — the
-AI-workspace artifact naming moat items, channels and seams, indexed from
-`project-state.json`). The inventory is the
+**Read the private boundary inventory first** (`posture-block.md` §7): the
+AI-workspace artifact naming moat items, channels and seams, at its convention
+`<ai-workspace>/docs/private-boundary-inventory.md`. Nothing indexes it — no
+`well_known_paths` key, no `project-state.json` field, no verb writes it — so an
+adopted project may hold an equivalent file under another name; this step's
+subject is the file, not the address. The inventory is the
 comparison set for everything below; **if it cannot be located, this step is
 INCONCLUSIVE** — a finding with the `start`-time remediation pointer, not a
 clean pass.

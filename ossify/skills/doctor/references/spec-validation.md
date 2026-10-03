@@ -80,7 +80,86 @@ in `doctor` rather than in `/start`: it is a comparison between two artifacts,
 and only one of them is the spec.
 
 ```bash
-"$oss_bin" get '.bones | length' "$("$oss_bin" state_path)"
+# Both halves are pinned to THIS directory's manifest: `sv_state` is the routed
+# state, never $OSS_STATE_FILE (see the note below), and it is deliberately NOT
+# named `$sf` - state-inspection.md §2 owns that name for the override-first
+# path, and one surface of a composed read-out must not reassign another's. Both
+# resolver calls are guarded: an unresolvable route is the refusal below, never
+# an abort under `set -e`. The section-4 heading is read as a '## 4' line — a
+# dot, a colon or whitespace after the number — and a spec with no such heading
+# REFUSES rather than reading an empty index set, because an unreadable half is
+# not an empty one. Only each row's FIRST cell counts, so an ADR reference
+# inside a row's prose ("supersedes ADR-0001") is not a row.
+sv_state="$("$oss_bin" state_path 2>/dev/null)" || sv_state=""
+spec="$("$oss_bin" spec_path 2>/dev/null)" || spec=""
+state_rc=0
+if [ -n "$sv_state" ]; then
+  reg_raw="$("$oss_bin" get '.bones[].adr' "$sv_state" 2>/dev/null)" || state_rc=$?
+else
+  state_rc=1
+fi
+spec_rc=0; [ -r "$spec" ] || spec_rc=1
+hdr=0; [ "$spec_rc" = 0 ] && hdr="$(grep -cE '^##[[:space:]]*4[.:[:space:]]' "$spec" 2>/dev/null)" || :
+# Name the half that failed, never both: "registry rc 5, spec rc 0" under a
+# both-halves claim is a contradiction the operator has to resolve themselves.
+why=""
+[ "$state_rc" = 0 ] || why="the registry half (rc $state_rc)"
+[ "$spec_rc" = 0 ] || why="${why:+$why and }the spec half"
+if [ -n "$why" ]; then
+  echo "skip: spec - the bones drift check could not read $why, and an unreadable half is not an empty one"
+elif [ "${hdr:-0}" = 0 ]; then
+  echo "skip: spec - section 4 carries no '## 4' heading this check reads, so the index half is unreadable rather than empty"
+else
+  # A value the registry HOLDS but this check cannot NAME refuses the run - it is
+  # never filtered out: `bone_add` accepts any ref (`ADR-C2` is legal and in the
+  # registry suite's own fixtures), and dropping one would print "0 entries" over
+  # a registry that has entries (round 1, C4).
+  bad="$(printf '%s\n' "$reg_raw" | grep -vE '^[[:space:]]*[Aa][Dd][Rr]-[A-Za-z0-9]+[[:space:]]*$' | grep -v '^[[:space:]]*$')" || bad=""
+  if [ -n "$bad" ]; then
+    echo "skip: spec - the registry holds a value that is not an ADR reference ('$(printf '%s' "$bad" | tr '\n' ' ')'), and a value this check cannot name is not one it may drop"
+  else
+    # Both halves are UPPER-CASED before comparing, and ids are compared as
+    # COMPLETE values (`ADR-[A-Za-z0-9]+`, never a numeric substring, so a legal
+    # non-numeric ref like `ADR-C2` is compared too): an adopted series may spell
+    # an id in either case, and neither spelling is drift.
+    #
+    # NOTHING is dropped or collapsed from either half without being reported
+    # (round 2, C6/C7): the registry keeps its duplicates, and a section-4 data
+    # row whose first cell is not an ADR reference is a finding rather than a row
+    # this check quietly skips. Only two cells are passed over - a label (a first
+    # cell with no digit, i.e. the header row) and the `|---|` separator.
+    reg_all="$(printf '%s\n' "$reg_raw" | grep -oiE 'ADR-[A-Za-z0-9]+' | tr '[:lower:]' '[:upper:]' | sort)" || reg_all=""
+    reg="$(printf '%s\n' "$reg_all" | sort -u)" || reg=""
+    reg_dupes="$(printf '%s\n' "$reg_all" | grep -v '^$' | uniq -d)" || reg_dupes=""
+    idx_all="$(awk '/^##[[:space:]]*4[.:[:space:]]/ {f=1; next} /^##[[:space:]]/ {f=0} f' "$spec" \
+      | awk -F'|' '/^[[:space:]]*\|/ {c=$2; gsub(/[[:space:]]/,"",c);
+          if (c == "" || c ~ /^[-:]+$/) next;
+          if (c !~ /[0-9]/) next;
+          if (c ~ /^[Aa][Dd][Rr]-[A-Za-z0-9]+$/) print "OK " toupper(c); else print "BAD " c}')" || idx_all=""
+    idx_rows="$(printf '%s\n' "$idx_all" | sed -n 's/^OK //p')" || idx_rows=""
+    bad_rows="$(printf '%s\n' "$idx_all" | sed -n 's/^BAD //p')" || bad_rows=""
+    idx="$(printf '%s\n' "$idx_rows" | sort -u)" || idx=""
+    dupes="$(printf '%s\n' "$idx_rows" | grep -v '^$' | sort | uniq -d)" || dupes=""
+    # comm over the two variables - no temp files to create, leak or clean. An
+    # empty side is handled explicitly, because comm would count a lone blank
+    # line as a difference and manufacture a phantom id.
+    if [ -z "$reg" ] || [ -z "$idx" ]; then
+      only_reg="$reg"; only_idx="$idx"
+    else
+      only_reg="$(comm -23 <(printf '%s\n' "$reg") <(printf '%s\n' "$idx"))" || only_reg=""
+      only_idx="$(comm -13 <(printf '%s\n' "$reg") <(printf '%s\n' "$idx"))" || only_idx=""
+    fi
+    if [ -n "$only_reg" ] || [ -n "$only_idx" ] || [ -n "$dupes" ] || [ -n "$reg_dupes" ] || [ -n "$bad_rows" ]; then
+      [ -z "$only_reg" ] || echo "fail: spec - registry entry with no index row: $(printf '%s' "$only_reg" | tr '\n' ' ')"
+      [ -z "$only_idx" ] || echo "fail: spec - index row with no registry entry: $(printf '%s' "$only_idx" | tr '\n' ' ')"
+      [ -z "$dupes" ] || echo "fail: spec - section 4 carries more than one row for: $(printf '%s' "$dupes" | tr '\n' ' ')"
+      [ -z "$reg_dupes" ] || echo "fail: spec - the registry carries more than one bone record for: $(printf '%s' "$reg_dupes" | tr '\n' ' ')"
+      [ -z "$bad_rows" ] || echo "fail: spec - section 4 carries a row whose first cell is not an ADR reference: $(printf '%s' "$bad_rows" | tr '\n' ' ')"
+    else
+      echo "ok: spec - bones index matches the registry: $(printf '%s' "$reg" | grep -c '[^[:space:]]') entries, $(printf '%s' "$idx_rows" | grep -c '[^[:space:]]') rows"
+    fi
+  fi
+fi
 ```
 
 **Pass the state path explicitly.** A bare `"$oss_bin" get` honours an exported
@@ -88,19 +167,35 @@ and only one of them is the spec.
 project's* bones while `"$oss_bin" spec_path` read this one's spec — reporting drift
 between two unrelated projects. `"$oss_bin" state_path` is the manifest-routed answer
 regardless of the override, which binds both halves of the comparison to the
-same project. (The interop surface, §7 of the skill body, reports the override
-separately; this comparison must not depend on the user having run it first.)
+same project — which is why this block names it **`sv_state`** and not `sf`:
+state-inspection.md §2 owns `sf` for the override-first path the rest of a
+composed `doctor` read-out uses, and a shared name would let one surface
+silently reassign the other's state mid-run. (The interop surface, §7 of the
+skill body, reports the override separately; this comparison must not depend on
+the user having run it first.)
 
-Compare against the row count of section 4. The direction of the mismatch
-changes the finding:
+**Compare identifier *sets*, never their counts.** Cardinality cannot tell the
+two directions apart: replace `ADR-0002`'s row with `ADR-9999` and *both*
+directions are present while `.bones | length` and section 4's row count still
+agree — a count comparison reports clean on exactly the drift this check exists
+to find. Ids are compared **case-insensitively** (both halves upper-cased) and as
+**complete values** — `ADR-[A-Za-z0-9]+`, never a numeric substring, so a legal
+non-numeric ref such as `ADR-C2` is compared too: an adopted series may spell an
+id in either case, and neither spelling is drift. A registry value that is not
+an ADR reference at all **refuses the comparison** (`skip:`) rather than being
+filtered out — a value this check cannot name is not one it may drop. The block
+above reports each direction with the identifiers that do not pair:
 
 | Mismatch | What it means | Report as |
 |---|---|---|
 | registry entry with no index row | a bone was recorded but never written into the spec | `fail: spec` — the spec understates the architecture |
-| index row with no registry entry | a row was hand-written, or an entry was lost | `fail: spec` — name both counts and the suspect row |
+| index row with no registry entry | a row was hand-written, or an entry was lost | `fail: spec` — name the direction and the rows that do not pair |
+| more than one index row for one entry | the invariant is *one row per entry*; a copy left behind reads as agreement to a set comparison | `fail: spec` — name the duplicated ids |
+| more than one registry record for one entry | a legacy or hand-edited state carries a duplicate registration; the index cannot show which record is the extra one | `fail: spec` — name the duplicated ids, and repair the registry |
+| a section-4 row whose first cell is not an ADR reference | the row is unnameable: neither a bone nor a header label, so no comparison can pair it | `fail: spec` — name the row and say what a bone row must start with |
 
-Neither is auto-repairable: which artifact is right is a judgment about what
-actually happened. Name the two counts, name the rows that do not pair, and
+None is auto-repairable: which artifact is right is a judgment about what
+actually happened. Name the identifiers, name the direction each belongs to, and
 stop.
 
 ---

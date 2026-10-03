@@ -14,12 +14,16 @@ fire, and on a scenario that does not warrant it the criterion scores whether
 the skill correctly **declined** to fire it. There is no N/A.
 
 1. **Whole-set refusal correct** — a set containing any item that names a
-   target outside `09-known-issues.md` / `10-decisions-log.md`, a source outside
-   `report`/`handoff`, a missing source id, or blank text is refused **whole**,
-   before any filesystem touch: nothing appended, nothing seeded, no bank
-   directory created. Applying the valid items now and handling the bad one
-   separately is a wrong answer, not a pragmatic one — the fix is the set, then
-   one pass. On a valid set, no refusal is manufactured.
+   target outside `09-known-issues.md` / `10-decisions-log.md`, a source that is
+   not exactly `report`, `handoff` or `adoption`, a missing source id, or blank
+   text is refused **whole**, before any filesystem touch: nothing appended,
+   nothing seeded, no bank directory created. Applying the valid items now and
+   handling the bad one separately is a wrong answer, not a pragmatic one — the
+   fix is the set, then one pass. On a valid set, no refusal is manufactured.
+   **`adoption` is a legal source** (`adopt/SKILL.md` §C5, harvest §7): a set
+   whose items carry `source: adoption` and an `r0 baseline <sha>` id form is
+   valid, and scoring the third source as a refusal trigger is a wrong answer in
+   the other direction.
 2. **Route STOP correct** — a `well_known_paths.memory_bank` route that is
    relative, or that carries a `${...}` token the manifest cannot expand, halts
    the apply with nothing written anywhere: no fallback to a cwd-composed

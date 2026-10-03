@@ -358,9 +358,9 @@ not a later step), then audit it **before the bones harden**. The audit is ossif
 1. **Announce**, then end the turn: *"Spec-core close — running a close-depth
    audit on the lean MASTER-SPEC + bones registry + skeleton-cut before the
    bones harden. Type `skip` to bypass."*
-2. **Wait.** If the user types `skip` (case-insensitive), log it and continue
-   to §12. In a non-interactive run the default is to proceed — `skip` is the
-   only bypass.
+2. **Wait.** If the user types `skip` (case-insensitive), continue to §12 and
+   say so in §13's hand-off; in a non-interactive run, proceed and say the same
+   — the audit ran with no operator answer. That line is the record.
 3. **Run the audit.** Read
    `skills/challenge/references/audit.md` (relative to the plugin root) end to end and
    follow it: the lean MASTER-SPEC is the artifact, the depth is `close`.
@@ -408,7 +408,7 @@ Full minima in `references/lean-spec-schema.md`.
 | Bones-registry ADRs | the project's ADR directory |
 | Seed feature map | `project-state.json` (already written via `"$oss_bin" feature_add`) |
 | `PUBLIC_BOUNDARY.md` | **each public repo root** |
-| Private boundary inventory | AI workspace |
+| Private boundary inventory | AI workspace — `docs/private-boundary-inventory.md` |
 
 The memory bank + `CLAUDE.md` are authored **by ossify**, in conversation, from
 the lean spec sections — not by calling scaffold-onboard, whose brief targets the

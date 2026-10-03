@@ -239,9 +239,16 @@ The second artifact, routed to the **AI workspace** (private). A table:
 | Moat item | Channel | Where it lives | Override / injection seam | Leak-risk note |
 |---|---|---|---|---|
 
-Plus the composition root and the overlay wiring. This is the file that names
-things; it is consumed by the release-close semantic audit and by the phase-2
-`migrate` flow, and it is indexed from `project-state.json`.
+Plus the composition root and the overlay wiring. **It lives at
+`<ai-workspace>/docs/private-boundary-inventory.md`** — `docs/` beneath the root
+`"$oss_bin" repo_root ai_workspace` answers, beside the MASTER-SPEC. That address is
+a **convention, not a route**: no `well_known_paths` key and no
+`project-state.json` field records it and no verb writes it, which is why the
+release-close boundary audit locates it by this path and reports INCONCLUSIVE
+rather than guessing when it is not there. This is the file that names things; it
+is consumed by that audit and by the phase-2 `migrate` flow. An adopted project
+may already hold it under another name — read what is there, never create a
+second one.
 
 **Placement rule (hard):** the **AI workspace never holds product code**. Private
 code requires a `private_core` repo. An implementer may not shortcut private
@@ -342,6 +349,12 @@ the old rule could not close at all.
 "$oss_bin" composition_set "/abs/path/to/composition/root"   # N>1: required, absolute
 "$oss_bin" composition_set "<repo-relative composition root>" # exactly one repo: optional
 ```
+
+**The value is a PATH, not a repo key** — the working directory the cumulative
+demo runs from, which `"$oss_bin" demo_run` refuses when it does not exist: the
+repo root when the binary sits at it, or the crate/workspace directory *inside*
+the repo that holds it (`crates/app`). For a Rust workspace those differ, and this
+field names the directory, never the repo.
 
 Absolute under N>1 because a relative value composes against the sole declared
 repo's root, and there is no sole repo. With exactly one declared repo the field

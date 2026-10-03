@@ -1,4 +1,4 @@
-# ossify (v1.13.3)
+# ossify (v1.13.4)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
@@ -72,6 +72,27 @@ is no default and no automatic move or merge. Its §2 ask-first guard fires on a
 lean one. doctor's and close's `fail: state` remedy names `/ossify:start` or
 `/ossify:adopt`, which each run `init`, instead of a bare `init`. No `lib/`
 code, no state change.
+
+Since 1.13.4 (#154, #561, #301, #299), four prose defects that only a careful
+reader could catch are corrected, and each is pinned red-then-green. doctor's
+bones-drift check compares the registry's and the spec's identifier *sets*, so a
+mismatch with equal counts in both directions no longer reads clean (#154). Its
+touch-surface sweep carries each surface's KIND, so the re-point remedy names
+`bone_set_touch` or `risk_gate_set_touch` instead of offering both; it refuses
+the run when `$OSS_STATE_FILE` points at another workspace's state instead of
+reporting that project's surfaces against this repo's files; it removes its temp
+file; and it batches to the system's argument limit rather than one dispatcher
+per 200 paths (#561, #558). An adopted ADR series is now readable: the numbering
+scan matches either case, the minted width follows the series it finds, an
+unreadable `docs/adr/` refuses instead of reading as empty, and a new ADR joins
+the repo's existing form rather than starting a second one; harvest's provenance
+trailer admits `source: adoption` with the baseline adoption recorded (#301).
+The private boundary inventory has one address —
+`<ai-workspace>/docs/private-boundary-inventory.md` — the false
+`project-state.json` index claim is gone from both sites that carried it,
+"composition root" is defined as a path rather than a repo key, and the critic
+moment's non-interactive default records that no operator answered (#299). No
+`lib/` code, no state change.
 
 Since 1.9.0, the deterministic gates close the vacuous-green family: the
 zero-tests guard no longer inverts a true match past the pipe buffer, flags

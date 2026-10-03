@@ -8,8 +8,8 @@ expected_reason: 'Teardown is explicit, verified and routed, not assumed. The fo
   never had Paseo create either directory itself, so neither workspace is a
   `worktree`-isolation workspace Paseo must reclaim the directory for. This session is
   a coordinator seat, so it archives no workspace at all: `archive_workspace`
-  belongs to the session that holds the operator, and a nested spine session has no
-  operator channel to confirm its seats'' tabs through. Correct teardown: archive each of
+  belongs to the session that holds the operator, and a nested spine session holds no
+  operator channel to archive through. Correct teardown: archive each of
   the four exact agents the session created, each one only once it is no longer working -
   `paseo inspect <id> --json` reading `idle`, `error` or `closed`, never `running` or
   `initializing`; a seat that never settles is escalated to the operator at the dispatch''s
@@ -17,8 +17,8 @@ expected_reason: 'Teardown is explicit, verified and routed, not assumed. The fo
   never silence); a call that finds its target
   already gone is information, not failure. Then, since no workspace may be archived from
   here, list in the report every run-created workspace this session leaves - each one''s
-  id, its path, and each seat''s title and agent id - so the top can ask the operator to
-  close those tabs and archive them. The isolation still matters, to the top: a
+  id, its path, and each seat''s title and agent id - so the top can archive them. The
+  isolation still matters, to the top: a
   `local`-isolation workspace leaves the directory Paseo never created, a
   `worktree`-isolation one has Paseo remove the worktree itself once no active workspace
   references it, and archiving the agents inside a workspace does not implicitly remove

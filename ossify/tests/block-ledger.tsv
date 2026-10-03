@@ -45,7 +45,7 @@
 #   block unfindable and the failure read as "vacuous" rather than as wrong
 #   behaviour. Pick the anchor from the block's SCAFFOLDING, never from its FIX.
 #
-# Totals: 190 blocks - 76 operative (16 covered, 60 deferred), 114 illustrative.
+# Totals: 190 blocks - 77 operative (18 covered, 59 deferred), 113 illustrative.
 # DERIVED, never hand-counted: check 2's report line gives the total from a walk
 # of the TREE ("190 blocks accounted for"); one awk pass over the rows below
 # gives the split (O rows counted, D and I summed). Two independent routes,
@@ -147,9 +147,10 @@ D	commands/run-spine.md	1	#138	the $ARGUMENTS env-var bridge
 D	commands/start.md	1	#138	the $ARGUMENTS env-var bridge
 D	commands/work-item.md	1	#138	the $ARGUMENTS env-var bridge
 I	skills/doctor/SKILL.md	2	a single doctor call (interop_check's block went with its verb - §7 is performed by reading; rules_types' block went the same way - §6's type table is the reference's §3 prose now) and the surface-token placeholder assignment (the broken $ARGS parse became the family's prose-placeholder form - there is no parse logic left to cover; §12 owns $ARGUMENTS)
-O	skills/doctor/references/state-inspection.md	ls-files -z	tests/test-prose-contracts.sh	the §5 touch-surface sweep (#523): each declared repo's tracked-path corpus is fed to touch_check, whose OUTPUT is the finding - a surface that matches no tracked file is an ABSENCE from the accumulated hits, and every failure that would FAKE that absence (an unreadable repo, an unreadable registry, an empty corpus) is reported as itself instead
+O	skills/doctor/references/state-inspection.md	ls-files -z	tests/test-prose-contracts.sh	the §5 touch-surface sweep (#523): each declared repo's tracked-path corpus is fed to touch_check, whose OUTPUT is the finding - a surface that matches no tracked file is an ABSENCE from the accumulated hits, and every failure that would FAKE that absence (an unreadable repo, an unreadable registry, an empty corpus) is reported as itself instead Since 1.13.4 it also refuses a run whose state is not this directory's manifest-routed one (the gate §4 documents; #561), reads each surface's KIND from its roster so the re-point verb is determined rather than guessed, and removes its temp file (#558).
 I	skills/doctor/references/state-inspection.md	3	the reads the agent-performed half works from, now that doctor emits only its four gate lines: the four advisory counts, the `| type` guard that must precede them (jq's length answers on strings too, so a corrupt field returns a plausible number at rc 0), and the worktree_orphans call shapes one per repo key (#156). Each is a single read whose OUTPUT the prose interprets - the judgement is the prose
-I	skills/doctor/references/spec-validation.md	2	a spec_path resolve and a bones-count get bound to an explicit state path
+I	skills/doctor/references/spec-validation.md	1	a spec_path resolve bound to an explicit state path
+O	skills/doctor/references/spec-validation.md	only_reg=	tests/test-prose-contracts.sh	the §3 bones-drift set comparison (1.13.4, #154): the registry's ids come from the MANIFEST-ROUTED state and section 4's from the first cell of its rows, each direction reported separately - cardinality could not tell them apart, so a same-count swap read clean. An unreadable state, a missing spec and a spec with no readable section-4 heading each REFUSE rather than comparing against an empty set
 I	skills/doctor/references/interop-check.md	3	the resolution calls the agent-performed check reads FROM, now that the verb is gone: the ai_workspace + declared-repo root reads, the declared-repo git work-tree probe (#272/#310 Task 10: was canonical-only), and state_path vs $OSS_STATE_FILE. Each is a single call whose OUTPUT the prose interprets - the judgement is the prose, so executing these would test the fixture rather than the check
 D	skills/doctor/references/budget-check.md	2	#138	both budget probes now self-locate the ossify root from the `oss` dispatcher and consume it on the next line - operative by the stated rule. The two forms they replaced (a repo-relative path, then ${CLAUDE_PLUGIN_ROOT}) both failed SILENTLY, the second by expanding to empty and reading /tests/..., so a regression here looks exactly like a working command
 D	skills/close/SKILL.md	2	#138	the id-shape router and the manifest-refusal + doctor gate
@@ -189,7 +190,7 @@ D	skills/patch/SKILL.md	2	#138	the patch-branch cut (fetch the default branch, T
 I	skills/patch/SKILL.md	1	a single gh pr create with <placeholder> args (the fallback PR open where merge-bar is not installed)
 D	skills/start/SKILL.md	1	#138	the topology-absent refusal, printed verbatim (the author/re-probe/halt remedy is prose outside this block)
 I	skills/start/SKILL.md	6	single-verb calls with <placeholder> args: feature_add, bone_add, risk_gate_add, posture_set, overlay_set, doctor
-D	skills/start/references/bones-registry.md	1	#138	the ADR-number minting block - two sed forms, a sort -n tail, and 10# base-10 forcing, all silently wrong on an empty or odd-named dir
+O	skills/start/references/bones-registry.md	narrow=	tests/test-prose-contracts.sh	the §3 ADR-number mint (1.13.4, #301, executing the D row #138 filed): every declared repo's docs/adr is read, both prefixed forms in EITHER case plus scaffold-onboard's bare seed, the minted width follows the DESTINATION repo's series (round 1, C2) rather than a fixed %04d or the project-wide one, an uncreatable or unreadable directory REFUSES (rc 1) naming its path (round 1, R9/R6) instead of answering like an empty series, and every exit path removes the scan's temp files - which is how the deferred defect shipped: ADR-001/ADR-002 minted a duplicate ADR-0001
 I	skills/start/references/bones-registry.md	3	a bone_add shape, a worked bone_add example, and the bone_set_touch corrective append (1.11.0)
 I	skills/start/references/journey-map.md	1	a single feature_add call
 I	skills/start/references/posture-block.md	4	single-verb calls: posture_set, overlay_set, bone_add, composition_set
@@ -232,8 +233,8 @@ H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	1897652786-133
 H	skills/doctor/references/budget-check.md	3813294467-2669
 H	skills/doctor/references/interop-check.md	3316355601-827
-H	skills/doctor/references/spec-validation.md	906553258-123
-H	skills/doctor/references/state-inspection.md	4093638061-4242
+H	skills/doctor/references/spec-validation.md	886019882-5569
+H	skills/doctor/references/state-inspection.md	778749236-5777
 H	skills/plan-release/SKILL.md	1172871519-2561
 H	skills/plan-release/references/bone-touch-judge.md	3422967488-1278
 H	skills/plan-release/references/class-declaration.md	2145716635-323
@@ -253,7 +254,7 @@ H	skills/plan-spine/references/fake-ledger-discipline.md	95797153-393
 H	skills/plan-spine/references/intake-and-ledger.md	3936310853-289
 H	skills/patch/SKILL.md	2505586866-556
 H	skills/start/SKILL.md	713231529-1195
-H	skills/start/references/bones-registry.md	3219690395-1177
+H	skills/start/references/bones-registry.md	3819544032-3304
 H	skills/start/references/journey-map.md	2970283972-104
 H	skills/start/references/posture-block.md	663882063-607
 H	skills/start/references/risk-gates.md	152052469-950

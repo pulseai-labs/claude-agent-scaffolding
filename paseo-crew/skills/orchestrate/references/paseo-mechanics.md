@@ -62,7 +62,7 @@ segment, never Paseo's encoded string, which no worker can be expected to echo:
    The brief's "state your model in your first reply" is the second check, against the
    model segment, and the one that catches a lane whose provider silently reroutes, because
    `inspect` reports what Paseo asked for, not what answered.
-4. **Arm the wait**, as Completion states.
+4. **Note the pair and arm the wait**, as Completion states.
 
 The orchestrator never runs `paseo run` for a worker. That command arms no finish notice,
 and from inside an agent it still makes the new agent the caller's child. Its one use is the
@@ -75,15 +75,18 @@ keeps is placed outside every seat's worktree, so archiving a workspace never ta
 `Status` carries no body, so the file is the contract; the exit table below says when a
 change to it is a report.
 The worker writes everything it says to the orchestrator there (a plan, a question, an
-escalation, a late finding, its report) and replaces the file whole (`briefs.md`). Before
-every message that sends a seat to work, note the file's hash (`git hash-object <path>`,
-empty if absent) and its identity — the inode, which a replacement always changes, because
-writing a temp file and renaming it over the path mints a new one. Never `mtime` alone:
-an atomic replacement inside the filesystem's timestamp granularity can hold both the old
-hash and the old `mtime`.
+escalation, a late finding, its report) and replaces the file whole (`briefs.md`). The noted
+pair is the file's hash (`git hash-object <path>`, empty if absent) and its identity — the
+inode, which a replacement always changes: writing a temp file and renaming it over the path
+mints a new one. Never `mtime` alone: an atomic replacement inside the filesystem's timestamp
+granularity can hold both the old hash and the old `mtime`.
 Both are compared, not merely recorded, so a byte-identical replacement (a retained verifier
 repeating the same failure, a blocker restated after a clarification) still wakes the wait:
 same hash, new identity.
+The pair is re-taken when the handler has read the body at `REPORT_PATH` — a report or plan
+handled, a question answered, an `error` reconciliation — and kept when it has not: a
+permission answer, the budget grace's status request, an idle false-wake re-arm, a lost wait
+or a handoff, so a read body cannot be the next `report` and a pending body is not hidden.
 
 **The wait** is one background shell call (Claude Code: the Bash tool's `run_in_background`)
 that polls inside itself and returns once, with one exit reason. The orchestrator writes it
@@ -126,16 +129,18 @@ done
 - `permission`: read the request with `list_pending_permissions`. Within the brief's scope,
   allow it with `respond_to_permission` and arm one fresh wait, keeping `DISPATCHED_AT`;
   otherwise put it to the operator, give the answer the same way, and arm one fresh wait —
-  that answer restarts `DISPATCHED_AT`, as a send after an operator wait does.
-- `idle`: read the seat's last message (`get_agent_activity`, limit 1). A question the brief
-  answers is answered, with one fresh wait; one it does not answer goes to the operator. A
-  seat that says it is waiting on its own background work is a false wake, not a finish:
-  arm one fresh wait with the `idle` exit dropped for the rest of that dispatch, so `report`,
-  `permission`, `error` and `budget` remain. An idle whose last message is neither — a
-  completion written only to its activity, or no message at all — is the missing-report
-  case: one bounded correction request asking it to write `REPORT_PATH`, and one fresh wait;
-  a second such idle escalates.
-  Coordinator seats (a spine or work-PR session, a lane driver with subagents) are armed
+  that answer restarts `DISPATCHED_AT`; the pair is kept either way (`Completion`).
+- `idle`: read the seat's last message (`get_agent_activity`, limit 1). A reviewer's first
+  reportless idle — whatever its last message says — is sent one bounded request to consolidate
+  the review's returned candidates into `REPORT_PATH`, then one fresh wait as for any send; a
+  second one takes the missing-report case below. A question the brief answers is answered, with
+  one fresh wait; one it does not answer goes to the operator. A seat that says it is waiting
+  on its own background work is a false wake, not a finish: arm one fresh wait
+  with the `idle` exit dropped for the rest of that dispatch, the pair kept (`Completion`), so
+  `report`, `permission`, `error` and `budget` remain. An idle whose last message is neither —
+  a completion written only to its activity, or no message at all — is the missing-report case:
+  one bounded correction request asking it to write `REPORT_PATH`, and one fresh wait; a second
+  such idle escalates. Coordinator seats — Teardown's coordinator clause names them — are armed
   that way from the start, because their idle is not a finish.
 - `error`: read the seat's activity, its durable artifacts and its `REPORT_PATH` first —
   `error` does not say that nothing landed, and a changed body there is evidence for this
@@ -143,13 +148,12 @@ done
   push, a PR, a close) is never replayed: send a recovery instruction that names what
   already exists, or escalate. Only a dispatch that cannot have mutated is re-sent once on
   the same seat, one fresh wait whose `error` exit arms only once `Status` has left `error`,
-  keeping the noted pair as the budget grace does; a second `error` escalates.
+  the pair re-taken over the body read above (`Completion`); a second `error` escalates.
   On `closed` the seat is gone: escalate, with no retry.
 - `budget`: send one status request and arm one wait whose budget is a short grace, counted
-  from that request, keeping the dispatch's noted pair: the changed file is still
-  unconsumed, and re-noting it would hide it from the next `report`. If the grace expires
-  with no report, `cancel_agent`, record the seat's last message, and escalate. A timeout is
-  a checkpoint, never a silent re-arm: more time is the operator's decision.
+  from that request, the pair kept (`Completion`). If the grace expires with no report,
+  `cancel_agent`, record the seat's last message, and escalate. A timeout is a checkpoint,
+  never a silent re-arm: more time is the operator's decision.
 
 **The finish notice is a hint.** When `<paseo-system>Agent X finished …</paseo-system>`
 arrives, check that seat's report file. A change that meets the `report` exit above is
@@ -184,8 +188,8 @@ never silently extends the budget.
 This is the one statement of how the orchestrator sends a seat anything after its brief (a
 fix task, an answer, a plan approval, a correction); other files say "send" and mean this.
 `send_agent_prompt` with `background: true` and `notifyOnFinish: true`. The text arrives
-whole, so nothing fragments it and no pointer file is needed. Note the report file's hash and
-identity first, then arm one fresh wait. There is no turn-start check: a send that never
+whole, so nothing fragments it and no pointer file is needed. Apply `Completion`'s pair rule,
+then arm one fresh wait. There is no turn-start check: a send that never
 opened a turn surfaces as `idle` with no report. A seat with a pending permission is answered
 with `respond_to_permission` before anything else is sent to it.
 
@@ -213,23 +217,19 @@ A seat is released with `archive_agent` once its artifacts are safe and it is no
 working — `paseo inspect <id> --json` reads `idle`, `error` or `closed`, never `running` or
 `initializing`: the implementer when its retention ends (`roles.md`), the reviewer once the
 review is final (step 8), the verifier at pass or escalation.
-Only the session that holds the operator archives a run-created workspace with
-`archive_workspace`, once every seat in it is archived and the operator has confirmed the
-tabs those seats hold are closed in any connected client app: that archive removes the
-worktree, and a client holding a tab on an agent whose cwd is gone keeps asking the daemon to
-resume it. So before that archive, name for the operator every seat in that workspace by its
-title and agent id, and ask for those tabs to be closed; archive only on the confirmation. A
-coordinator seat (a spine or work-PR session) holds no operator channel: it archives its own
-seats as above, and lists in its report every run-created workspace it did not archive — id,
-path, and each seat's title and agent id — for the top to confirm and archive. Paseo then
-removes the worktree itself, once no active workspace references it.
+Only the session that holds the operator archives a run-created workspace with `archive_workspace`,
+once every seat in it is archived — Paseo then removes the worktree, once no active workspace
+references it. A client tab on it is the daemon's to handle (`lifecycle.md` step 1 sets the floor).
+A coordinator seat (a spine or work-PR session, a lane driver with subagents) holds no operator
+channel: it archives its own seats as above, and lists in its report every run-created workspace
+it leaves — id, path, and each seat's title and agent id — for the top to archive.
 Close only what the run created: the orchestrator's own workspace, and any the operator
 opened, are never archived by the run.
 
 **The cascade.** Archiving an agent archives its same-workspace children that have no open
-tab and detaches the rest, recursively. So a coordinator seat (a spine or work-PR session)
-is archived only after it reports its own children released, never to clean up its item
-seats. A predecessor orchestrator is Handoff's case.
+tab and detaches the rest, recursively. So Teardown's coordinator seat is archived only
+after it reports its own children released, never to clean up its item seats. A predecessor
+orchestrator is Handoff's case.
 
 Read every receipt, and confirm with `list_agents` / `list_workspaces`, never assume: an
 archive may take more than its target, and one that finds its target already gone is
