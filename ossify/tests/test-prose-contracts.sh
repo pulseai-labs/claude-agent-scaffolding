@@ -1187,8 +1187,8 @@ _pin "$_r" "boundary-audit still names a state index for the inventory, drops it
 # needs - and the critic's non-interactive default RECORDS that nobody answered.
 _r=1; grep -Fq 'The value is a PATH, not a repo key' "$_PB4" && grep -Fq 'the crate/workspace directory *inside*' "$_PB4" && _r=0
 _pin "$_r" "posture-block §10 leaves 'composition root' meaning both the repo and the crate inside it"
-_r=1; grep -Fq 'proceed and record that no operator' "$_OSSR/skills/start/SKILL.md" && grep -Fq 'recording that no operator' "$_OSSR/skills/start/references/critic-moment.md" && _r=0
-_pin "$_r" "the critic moment's non-interactive default proceeds without recording that no operator answered"
+_r=1; grep -Fq 'the audit ran with no operator answer' "$_OSSR/skills/start/SKILL.md" && grep -Fq "into §13's hand-off line, which is the record" "$_OSSR/skills/start/references/critic-moment.md" && ! grep -Fq 'record that no operator' "$_OSSR/skills/start/SKILL.md" && _r=0
+_pin "$_r" "the critic moment's non-interactive default records that no operator answered with no named destination - each run invents where the record lands (round 1, R11)"
 # (#299) the inventory is a CHECKED destination now, not an output nobody can
 # find - occupied-destinations lists it with its path like every other output.
 _r=1; grep -Fq 'and the private boundary inventory' "$_OSSR/skills/start/references/occupied-destinations.md" && grep -Fq '<ai-workspace>/docs/private-boundary-inventory.md' "$_OSSR/skills/start/references/occupied-destinations.md" && _r=0
