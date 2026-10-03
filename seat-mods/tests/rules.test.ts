@@ -106,6 +106,19 @@ describe('bashRules', () => {
   test('control: a body line that only starts with the delimiter does not end the heredoc', () => {
     expect(bashRules("git commit -F - <<'MSG'\nfix\nMSG-not-the-end\ngit merge x\nMSG\ngit push --force")).toEqual(['commit', 'push', 'force-push'])
   })
+  test('PR #644 round 2: spellings that slipped past', () => {
+    expect(bashRules('git push \\\n  --force origin b')).toContain('force-push')
+    expect(bashRules('git branch -d -f victim')).toContain('branch-delete')
+    expect(bashRules('git branch -d --force victim')).toContain('branch-delete')
+    expect(bashRules('git push --mirror origin')).toContain('force-push')
+    expect(bashRules('git push --prune origin')).toContain('branch-delete')
+    expect(bashRules('gh pr --repo o/r merge 12')).toContain('merge')
+    expect(bashRules('gh pr -R o/r create --fill')).toContain('pr-create')
+  })
+  test('control: a backslash-newline joins lines, a plain newline still splits', () => {
+    expect(bashRules('git push origin b\ngit status')).toEqual(['push'])
+    expect(bashRules('gh pr --repo o/r view 12')).toEqual([])
+  })
   test('a quoted -C path does not hide the subcommand', () => {
     expect(bashRules('git -C "/a b" push --force')).toContain('force-push')
   })
@@ -126,6 +139,10 @@ describe('commitMessageFiles', () => {
   })
   test('every commit in the call, not only the first (PR #644 review)', () => {
     expect(commitMessageFiles('git commit -F /m/clean && git commit -F /m/other')).toEqual(['/m/clean', '/m/other'])
+  })
+  test('the attached -F form names the file (PR #644 round 2)', () => {
+    expect(commitMessageFiles('git commit -F/tmp/msg')).toEqual(['/tmp/msg'])
+    expect(commitMessageFiles('git commit -F"/r/scratch/msg"')).toEqual(['/r/scratch/msg'])
   })
   test('stdin and no file are empty', () => {
     expect(commitMessageFiles('git commit -F -')).toEqual([])

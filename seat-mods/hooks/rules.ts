@@ -77,7 +77,9 @@ function blankHeredocs(command: string, keep: (piece: string) => string): string
 function blank(command: string): { text: string; pieces: string[] } {
   const pieces: string[] = []
   const keep = (piece: string) => `\u0000${pieces.push(piece) - 1}\u0000`
-  return { text: blankHeredocs(command, keep).replace(QUOTED, keep), pieces }
+  // An unquoted backslash-newline is a line continuation, not a command boundary.
+  const joined = command.replace(/\\\n/g, ' ')
+  return { text: blankHeredocs(joined, keep).replace(QUOTED, keep), pieces }
 }
 
 // A short-option bundle such as `-fqu` that holds the letter.
@@ -137,8 +139,12 @@ export function bashRules(command: string, messageFileText = ''): RuleId[] {
     const tokens = tokensOf(segment)
     const head = commandOf(tokens)
     if (head?.name === 'gh' && head.args[0] === 'pr') {
-      if (head.args[1] === 'merge') found.add('merge')
-      if (head.args[1] === 'create') found.add('pr-create')
+      // `gh pr` takes -R/--repo before its subcommand.
+      let k = 1
+      while (head.args[k] === '-R' || head.args[k] === '--repo' || head.args[k]?.startsWith('--repo='))
+        k += head.args[k]?.startsWith('--repo=') ? 1 : 2
+      if (head.args[k] === 'merge') found.add('merge')
+      if (head.args[k] === 'create') found.add('pr-create')
     }
     const git = gitOf(tokens)
     if (git === undefined) continue
@@ -146,7 +152,8 @@ export function bashRules(command: string, messageFileText = ''): RuleId[] {
     if (args.includes('--no-verify') || (sub === 'commit' && hasShort(args, 'n'))) found.add('no-verify')
     if (sub === 'merge') found.add('merge')
     if (sub === 'branch' && (hasShort(args, 'D') ||
-      (args.includes('--delete') && (args.includes('--force') || hasShort(args, 'f'))))) found.add('branch-delete')
+      ((args.includes('--delete') || hasShort(args, 'd')) && (args.includes('--force') || hasShort(args, 'f')))))
+      found.add('branch-delete')
     if (sub === 'commit') {
       found.add('commit')
       // The segment with its quoted and heredoc text put back: the message lives there.
@@ -154,9 +161,10 @@ export function bashRules(command: string, messageFileText = ''): RuleId[] {
     }
     if (sub === 'push') {
       found.add('push')
-      if (hasShort(args, 'f') || args.some(a => a === '--force' || a.startsWith('--force-with-lease') || a.startsWith('+')))
+      if (hasShort(args, 'f') ||
+        args.some(a => a === '--force' || a === '--mirror' || a.startsWith('--force-with-lease') || a.startsWith('+')))
         found.add('force-push')
-      if (args.includes('--delete') || hasShort(args, 'd') || args.some(a => a.startsWith(':')))
+      if (args.includes('--delete') || args.includes('--prune') || hasShort(args, 'd') || args.some(a => a.startsWith(':')))
         found.add('branch-delete')
     }
   }
@@ -173,7 +181,8 @@ export function commitMessageFiles(command: string): string[] {
     const { args } = git
     for (const [i, arg] of args.entries()) {
       const value = arg === '-F' || arg === '--file' ? args[i + 1]
-        : arg.startsWith('--file=') ? arg.slice('--file='.length) : undefined
+        : arg.startsWith('--file=') ? arg.slice('--file='.length)
+        : arg.startsWith('-F') ? arg.slice(2) : undefined
       if (value === undefined) continue
       const path = expand(value, pieces).replace(/^(['"])(.*)\1$/s, '$2')
       if (path !== '' && path !== '-') files.push(path)

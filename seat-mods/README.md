@@ -31,8 +31,8 @@ Each is a `tool.call` deny on Bash, Edit or Write.
 
 | Guard | implementer | verifier | reviewer |
 |---|---|---|---|
-| `git merge`, `gh pr merge` | deny | deny | deny |
-| Force-push (`--force`, `-f`, `--force-with-lease`, a `+` refspec), `git branch -D`, `git push --delete` / `-d` / `:branch` | deny | deny | deny |
+| `git merge`, `gh pr merge` (also after `gh pr -R/--repo`) | deny | deny | deny |
+| Force-push (`--force`, `-f` alone or bundled, `--force-with-lease`, `--mirror`, a `+` refspec); branch deletion (`git branch -D`, or `-d`/`--delete` with `-f`/`--force`; `git push --delete` / `-d` / `--prune` / `:branch`) | deny | deny | deny |
 | `--no-verify` on any git command (and `git commit -n`) | deny | deny | deny |
 | A commit message with `Co-Authored-By:` or `🤖 Generated with` — on the command line, in a heredoc, or in the `-F` / `--file` message file | deny | deny | deny |
 | Edit or Write outside the worktree and outside every `SEAT_MODS_ALLOW` directory | deny | deny | deny |
