@@ -99,7 +99,7 @@ idle, which a seat running background work of its own reaches long before it fin
 |---|---|
 | `report` | `REPORT_PATH`'s hash **or** identity differs from the noted pair, and `Status` is `idle` — `error` and `closed` settle at the `error` exit, and a body written by a seat that still runs is not yet a report |
 | `permission` | `PendingPermissions` in `paseo inspect <id> --json` is non-empty |
-| `error` | `Status` is `error` or `closed` — at once for `closed` (a seat there never leaves it), and for `error` only once a re-armed wait has seen the seat leave it |
+| `error` | `Status` is `error` or `closed` — taken at once, except by a wait armed while the seat was already at `error`: that one takes it only once it has seen the seat leave `error` |
 | `idle` | `Status` has been `idle` without a break, timed by the loop from when it first saw it, for longer than the brief's `SETTLE_WINDOW`, and no report has arrived |
 | `budget` | time since the dispatch's `DISPATCHED_AT` exceeds the brief's `TIME_BUDGET` |
 
@@ -111,7 +111,7 @@ the orchestrator adapts and does not copy:
 # one background call per dispatch; returns once with the exit reason
 while :; do
   s=$(paseo inspect <id> --json)
-  <.Status is error or closed>                         && { echo error; break; }
+  <.Status is error or closed, per the `error` row>    && { echo error; break; }
   <report changed and Status is idle>                  && { echo report; break; }
   <.PendingPermissions non-empty>                      && { echo permission; break; }
   <idle continuously > SETTLE_WINDOW, unless dropped>  && { echo idle; break; }
@@ -136,20 +136,20 @@ done
   one fresh wait with the `idle` exit dropped for the rest of that dispatch, the pair kept
   (`Completion`), so `report`, `permission`, `error` and `budget` remain — but a reviewer's
   first idle with no report takes one bounded request, to consolidate the review's returned
-  candidates into `REPORT_PATH` (its fork returns before its finders do). An idle whose last
-  message is neither — a completion written only to its activity, or no message at all — is
-  the missing-report case: one bounded correction request asking it to write `REPORT_PATH`,
-  and one fresh wait; a second such idle escalates.
-  Coordinator seats (a spine or work-PR session, a lane driver with subagents) are armed
-  that way from the start, because their idle is not a finish.
-- `error`: read the seat's activity, its pending permissions, its durable artifacts and its
-  `REPORT_PATH` first — `error` does not say that nothing landed, and a changed body there is
-  evidence for this reconciliation, never a `report`. A dispatch that may have mutated
-  anything (a commit, a push, a PR, a close) is never replayed: send a recovery instruction
-  that names what already exists, or escalate. Only a dispatch that cannot have mutated is
-  re-sent once on the same seat, one fresh wait, the pair re-taken over the body read above
-  (`Completion`; the guard is the `error` row's); a second `error` escalates.
-  On `closed` the seat is gone: escalate, with no retry.
+  candidates into `REPORT_PATH`, before that same drop (its fork returns before its finders
+  do). An idle whose last message is neither — a completion written only to its activity, or
+  no message at all — is the missing-report case: one bounded correction request asking it to
+  write `REPORT_PATH`, and one fresh wait; a second such idle escalates.
+  Coordinator seats — Teardown's coordinator clause names them — are armed that way from the
+  start, because their idle is not a finish.
+- `error`: read its activity, its pending permissions, its durable artifacts and its `REPORT_PATH`
+  first — a pending request is answered as the `permission` handler directs, before the route
+  sends — `error` does not say that nothing landed, and a changed body there is evidence for this
+  reconciliation, never a `report`. A dispatch that may have mutated anything (a commit, a push,
+  a PR, a close) is never replayed: send a recovery instruction that names what already exists,
+  or escalate. Only a dispatch that cannot have mutated is re-sent once on the same seat, one
+  fresh wait, the pair re-taken over the body read above (`Completion`; the guard is the `error`
+  row's); a second `error` escalates. On `closed` the seat is gone: escalate, with no retry.
 - `budget`: send one status request and arm one wait whose budget is a short grace, counted
   from that request, the pair kept (`Completion`). If the grace expires with no report,
   `cancel_agent`, record the seat's last message, and escalate. A timeout is a checkpoint,
@@ -227,9 +227,9 @@ Close only what the run created: the orchestrator's own workspace, and any the o
 opened, are never archived by the run.
 
 **The cascade.** Archiving an agent archives its same-workspace children that have no open
-tab and detaches the rest, recursively. So a coordinator seat (a spine or work-PR session)
-is archived only after it reports its own children released, never to clean up its item
-seats. A predecessor orchestrator is Handoff's case.
+tab and detaches the rest, recursively. So Teardown's coordinator seat is archived only
+after it reports its own children released, never for its item seats. A predecessor
+orchestrator is Handoff's case.
 
 Read every receipt, and confirm with `list_agents` / `list_workspaces`, never assume: an
 archive may take more than its target, and one that finds its target already gone is

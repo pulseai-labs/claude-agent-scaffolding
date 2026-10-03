@@ -144,8 +144,8 @@ present "$REF" 'expiresIn' "the heartbeat carries expiresIn"
 pin "$REF" 'gone without having exited' "the heartbeat re-arms only a lost wait"
 pin "$REF" 'with the `idle` exit dropped' "a false wake drops the idle exit"
 # #637: a reviewer's `/code-review` fork returns before its finders do, so its first reportless
-# idle takes one bounded consolidation request before the idle exit is dropped — the pc-013
-# workaround, because only a message starts the turn the fork ended.
+# idle takes one bounded consolidation request before the idle exit is dropped, because only a
+# message starts the turn the fork ended.
 pin "$REF" "a reviewer's first idle with no report takes one bounded request" "a reviewer's first reportless idle takes one consolidation request" flat
 pin "$REF" 'Coordinator seats' "coordinators are armed without the idle exit"
 pin "$REF" 'Both are compared, not merely recorded' "hash and identity are both compared"
@@ -158,10 +158,13 @@ if c="$(count_of "$REF" '(`Completion`' flat)"; then
   if [ "$c" -eq 5 ]; then pass "the five handlers point at the pair rule ($c)"
   else fail "the five handlers point at the pair rule" "$c occurrence(s)"; fi
 else fail "the pair-rule pointers are countable" "unreadable file or empty needle: $REF"; fi
-# #635 M1: the arm-guard is the `error` row's — the row is the only site that says when the
-# exit fires — and `closed` is taken at once, since a seat there never leaves it.
-pin "$REF" 'for `error` only once a re-armed wait has seen the seat leave it' "the error row owns a re-armed wait's guard" flat
-present "$REF" 'at once for `closed`' "closed is taken at once, never guarded"
+# #635 M1 / #639 G1: the arm-guard is the `error` row's — the row is the only site that says
+# when the exit fires — and the guard is scoped to a wait armed while the seat was already at
+# `error`, so a first dispatch wait (and `closed`) takes it at once. The needle runs to the
+# clause's end: a shorter one stayed green when the guard was widened to `closed` (measured),
+# while this one fails on an unguarded row, on a guard widened to first waits or to `closed`,
+# and on a guard dropped entirely.
+pin "$REF" 'taken at once, except by a wait armed while the seat was already at `error`: that one takes it only once it has seen the seat leave `error`' "the error row owns a re-armed wait's guard" flat
 # #622 / #632 F1-F3: the change alone is not a report. The exit row is the single owner
 # of "changed file AND `Status` is `idle`" — `error` and `closed` settle at the `error`
 # exit — and every other reader of a changed file points at that row. Which is what lets
@@ -181,7 +184,9 @@ pin "$REF" 'its pending permissions, its durable artifacts' "the error route rea
 # #635 M5: round 2's contract change was unpinned — restoring `186623e`'s paseo-mechanics.md
 # left this suite green. The route reads the seat's `REPORT_PATH` with its activity and
 # artifacts, and a changed body there is evidence for that reconciliation, never a `report`
-# (#632 fix rounds 2 and 3); neither pin has a match at 186623e or f756693.
+# (#632 fix rounds 2 and 3). Measured against the two snapshots, flat: the read pin 0 at
+# 186623e and 1 at f756693, the classification pin 0 at both — so the read pin alone carries
+# the f756693 boundary.
 pin "$REF" 'its durable artifacts and its `REPORT_PATH` first' "the error route reads REPORT_PATH with its artifacts" flat
 pin "$REF" 'evidence for this reconciliation, never a `report`' "an errored seat's changed body is evidence, never a report" flat
 # Controls: `paseo wait` returns on the first idle (F2), so it must never be the finish.
@@ -239,7 +244,10 @@ if c="$(count_of "$REF" 'ask for those tabs to be closed' flat)"; then
   else fail "the operator tab confirmation is gone" "$c occurrence(s)"; fi
 else fail "the teardown tab-ask control is readable" "unreadable file or empty needle: $REF"; fi
 pin "$REF" "A client tab on it is the daemon's to handle" "the removed ask's replacement names the daemon" flat
-present "$REF" 'lane driver with subagents' "the coordinator clause names a lane driver too"
+# #639 V11: the old needle also sat in the idle handler, so reverting Teardown's clause left it
+# green. This phrase now exists only in that clause (the Completion and cascade sites point at
+# it), so a revert of the clause alone goes RED.
+pin "$REF" 'a spine or work-PR session, a lane driver with subagents' "the coordinator clause names a lane driver too" flat
 pin "$REF" 'after it reports its own children released' "a coordinator is archived after its children"
 
 section "herdr is gone"
@@ -291,11 +299,14 @@ else fail "control: a file within the budget reports no overshoot" "read [$r]"; 
 rm -f "$ctl_over" "$ctl_under"
 
 section "no personal name ships"
-hits=0
+# Guarded like the other counts (#635 N11's class, #639 G8): a refused read must say so rather
+# than leave `hits` at 0 and certify every absence in a file nobody opened.
+hits=0; refused=0
 for needle in claude-glm claude-glm-flash claude-sol glm-5.3 Fable; do
-  hits=$((hits + $(occurrences "$REF" "$needle")))
+  if c="$(occurrences "$REF" "$needle")"; then hits=$((hits + c)); else refused=1; break; fi
 done
-if [ "$hits" -eq 0 ]; then pass "no personal name in paseo-mechanics.md"
+if [ "$refused" -eq 1 ]; then fail "the personal-name sweep is readable" "unreadable file or empty needle: $REF"
+elif [ "$hits" -eq 0 ]; then pass "no personal name in paseo-mechanics.md"
 else fail "no personal name in paseo-mechanics.md" "$hits occurrence(s)"; fi
 
 section "the hoisted counters are not re-copied"

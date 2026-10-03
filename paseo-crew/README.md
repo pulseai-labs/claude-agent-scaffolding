@@ -163,13 +163,12 @@ brief names; Paseo's typed status carries no body, so the file is the contract, 
 to it is acted on at a settled `idle`. The orchestrator writes one background wait per
 dispatch — Claude Code's Bash tool with `run_in_background` — that polls inside itself and
 returns once, on the report of an idle seat, or on one of four attention exits: a pending
-permission, continuous idle past the brief's `SETTLE_WINDOW` with no report, an error or
-closed status, or the dispatch's `TIME_BUDGET` exceeded. A round of N parallel items is N
-such waits, one per
-seat, each waking the session when it exits — never a loop, and never a re-entry after an
-empty timeout. Paseo's `notifyOnFinish` notice is a hint only: it fires once, on the
-seat's first idle, and is lost on a daemon restart, so a heartbeat backstop re-arms a lost
-wait while any dispatch is live.
+permission, continuous idle past the brief's `SETTLE_WINDOW` with no report, an `error` or
+`closed` status as the exit row states it, or the dispatch's `TIME_BUDGET` exceeded. A round of
+N parallel items is N such waits, one per seat, each waking the session when it exits — never a
+loop, and never a re-entry after an empty timeout. Paseo's `notifyOnFinish` notice is a hint
+only: it fires once, on the seat's first idle, and is lost on a daemon restart, so a heartbeat
+backstop re-arms a lost wait while any dispatch is live.
 
 ## The run's state
 
