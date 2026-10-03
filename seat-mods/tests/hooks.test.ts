@@ -8,10 +8,11 @@ import type { On } from 'claude-code'
 // call that reaches it answers `ran`; a denied call resolves with { deny }
 // carrying the deny text. A mocked call answers { value }, or { deny } for a
 // missing path, as the kit requires.
-const DIRS = new Set(['/', '/w', '/w/seat-mods', '/etc', '/var', '/reports'])
+const DIRS = new Set(['/', '/w', '/w/seat-mods', '/w/seat x', '/etc', '/var', '/reports'])
 const FILES = new Map<string, string>([
   ['/w/README.md', 'readme'],
   ['/w/msg-trailer.txt', 'fix: a thing\n\nCo-Authored-By: someone <x@y>\n'],
+  ['/w/seat x/msg.txt', 'fix\n\nCo-Authored-By: someone <x@y>\n'],
 ])
 
 // What realpath gives for the mock: `.` and `..` resolved, no links. Like
@@ -94,6 +95,13 @@ describe('Bash guards', () => {
     expect(r.deny).toContain('AI trailers')
     const clean = await $.tool.call({ tool: 'Bash', command: 'git commit -F /w/README.md' })
     expect(clean.deny).toBeUndefined()
+  })
+  test('a trailer in a second -F file, or a quoted path with spaces, is denied (PR #644 review)', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    const second = await $.tool.call({ tool: 'Bash', command: 'git commit -F /w/README.md && git commit -F /w/msg-trailer.txt' })
+    expect(second.deny).toContain('AI trailers')
+    const spaced = await $.tool.call({ tool: 'Bash', command: 'git commit -F "/w/seat x/msg.txt"' })
+    expect(spaced.deny).toContain('AI trailers')
   })
 })
 

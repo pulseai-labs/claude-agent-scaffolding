@@ -34,23 +34,55 @@ const RULE_TEXT: Record<RuleId, string> = {
   'pr-create': 'no gh pr create',
 }
 
-const SEGMENT = /;|&&|\|\||\||\n/
 const TRAILER = /co-authored-by:|🤖 generated with/i
 // Command boundaries for matching; subshell parentheses count too.
 const COMMANDS = /;|&&|\|\||\||\n|\(|\)/
 // Heredoc bodies and quoted strings are text, not commands: a commit message may
 // name `git merge` or `-n`. Each is swapped for a numbered marker before matching,
 // and the trailer check expands the markers in the commit's own segment.
-const HEREDOC = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2(?=\n|$)/g
+// A heredoc opener; its delimiter is any quoted word, or a bare word.
+const HEREDOC = /<<(-?)[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|([^\s;&|<>()'"]+))/g
 const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/g
 const MARKER = /\u0000(\d+)\u0000/g
 // Words that run the next word as the command.
 const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup', 'time'])
 
+// Each heredoc, opener through its closing line, becomes one piece. The body ends at
+// the first line that is exactly the delimiter (leading tabs allowed after `<<-`);
+// a heredoc with no closing line runs to the end of the command, as in Bash.
+function blankHeredocs(command: string, keep: (piece: string) => string): string {
+  let out = ''
+  let from = 0
+  for (;;) {
+    HEREDOC.lastIndex = from
+    const open = HEREDOC.exec(command)
+    if (open === null) return out + command.slice(from)
+    const delimiter = open[2] ?? open[3] ?? open[4] ?? ''
+    const bodyStart = command.indexOf('\n', HEREDOC.lastIndex)
+    if (bodyStart < 0) return out + command.slice(from)
+    let end = command.length
+    for (let line = bodyStart + 1; line <= command.length; ) {
+      const next = command.indexOf('\n', line)
+      const stop = next < 0 ? command.length : next
+      const text = command.slice(line, stop)
+      if ((open[1] === '-' ? text.replace(/^\t+/, '') : text) === delimiter) { end = stop; break }
+      if (next < 0) break
+      line = next + 1
+    }
+    out += command.slice(from, open.index) + keep(command.slice(open.index, end))
+    from = end
+  }
+}
+
 function blank(command: string): { text: string; pieces: string[] } {
   const pieces: string[] = []
   const keep = (piece: string) => `\u0000${pieces.push(piece) - 1}\u0000`
-  return { text: command.replace(HEREDOC, keep).replace(QUOTED, keep), pieces }
+  return { text: blankHeredocs(command, keep).replace(QUOTED, keep), pieces }
+}
+
+// A short-option bundle such as `-fqu` that holds the letter.
+function hasShort(args: readonly string[], letter: string): boolean {
+  return args.some(arg => /^-[A-Za-z]+$/.test(arg) && arg.slice(1).includes(letter))
 }
 
 // A segment's text with its blanked pieces put back, nested pieces included.
@@ -111,9 +143,10 @@ export function bashRules(command: string, messageFileText = ''): RuleId[] {
     const git = gitOf(tokens)
     if (git === undefined) continue
     const { sub, args } = git
-    if (args.includes('--no-verify') || (sub === 'commit' && args.includes('-n'))) found.add('no-verify')
+    if (args.includes('--no-verify') || (sub === 'commit' && hasShort(args, 'n'))) found.add('no-verify')
     if (sub === 'merge') found.add('merge')
-    if (sub === 'branch' && args.includes('-D')) found.add('branch-delete')
+    if (sub === 'branch' && (hasShort(args, 'D') ||
+      (args.includes('--delete') && (args.includes('--force') || hasShort(args, 'f'))))) found.add('branch-delete')
     if (sub === 'commit') {
       found.add('commit')
       // The segment with its quoted and heredoc text put back: the message lives there.
@@ -121,28 +154,32 @@ export function bashRules(command: string, messageFileText = ''): RuleId[] {
     }
     if (sub === 'push') {
       found.add('push')
-      if (args.some(a => a === '--force' || a === '-f' || a.startsWith('--force-with-lease') || a.startsWith('+')))
+      if (hasShort(args, 'f') || args.some(a => a === '--force' || a.startsWith('--force-with-lease') || a.startsWith('+')))
         found.add('force-push')
-      if (args.includes('--delete') || args.includes('-d') || args.some(a => a.startsWith(':')))
+      if (args.includes('--delete') || hasShort(args, 'd') || args.some(a => a.startsWith(':')))
         found.add('branch-delete')
     }
   }
   return [...found]
 }
 
-export function commitMessageFile(command: string): string | undefined {
-  for (const segment of command.split(SEGMENT)) {
+// Every commit message file the call names (-F, --file, --file=), quoted paths whole.
+export function commitMessageFiles(command: string): string[] {
+  const files: string[] = []
+  const { text, pieces } = blank(command)
+  for (const segment of text.split(COMMANDS)) {
     const git = gitOf(tokensOf(segment))
     if (git?.sub !== 'commit') continue
     const { args } = git
     for (const [i, arg] of args.entries()) {
       const value = arg === '-F' || arg === '--file' ? args[i + 1]
         : arg.startsWith('--file=') ? arg.slice('--file='.length) : undefined
-      const path = value?.replace(/^['"]|['"]$/g, '')
-      if (path !== undefined && path !== '' && path !== '-') return path
+      if (value === undefined) continue
+      const path = expand(value, pieces).replace(/^(['"])(.*)\1$/s, '$2')
+      if (path !== '' && path !== '-') files.push(path)
     }
   }
-  return undefined
+  return files
 }
 
 export function placeOf(target: string, root: string, allow: readonly string[]): Place {

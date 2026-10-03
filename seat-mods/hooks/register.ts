@@ -1,5 +1,5 @@
 import type { Register } from 'claude-code'
-import { parseRole, parseAllow, bashRules, commitMessageFile, placeOf, decide, invalidText } from './rules'
+import { parseRole, parseAllow, bashRules, commitMessageFiles, placeOf, decide, invalidText } from './rules'
 import type { RoleState } from './rules'
 
 async function roleOf($: any): Promise<RoleState> {
@@ -48,8 +48,8 @@ export const register: Register = on => {
     if (state.kind === 'invalid') return { deny: invalidText(state.value) }
 
     if (e.tool === 'Bash') {
-      const file = commitMessageFile(e.command)
-      const text = file === undefined ? '' : await $.fs.read(file).catch(() => '')
+      const texts = await Promise.all(commitMessageFiles(e.command).map(file => $.fs.read(file).catch(() => '')))
+      const text = texts.join('\n')
       const deny = decide(state.role, { kind: 'bash', rules: bashRules(e.command, text) })
       return deny === undefined ? next(e) : { deny }
     }

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { parseRole, parseAllow, bashRules, commitMessageFile, placeOf, decide, invalidText } from '../hooks/rules'
+import { parseRole, parseAllow, bashRules, commitMessageFiles, placeOf, decide, invalidText } from '../hooks/rules'
 
 describe('parseRole', () => {
   test('unset and empty are off', () => {
@@ -85,6 +85,27 @@ describe('bashRules', () => {
     expect(bashRules('git commit -m x && grep -rn "Co-Authored-By:" hooks/')).toEqual(['commit'])
     expect(bashRules('git commit -m "x\n\nCo-Authored-By: a" && echo done')).toContain('ai-trailer')
   })
+  test('bundled short flags count (PR #644 review)', () => {
+    expect(bashRules('git push -fqu origin b')).toContain('force-push')
+    expect(bashRules('git branch -Df x')).toContain('branch-delete')
+    expect(bashRules('git branch --delete --force x')).toContain('branch-delete')
+    expect(bashRules('git push -du origin b')).toContain('branch-delete')
+    expect(bashRules('git commit -anm x')).toContain('no-verify')
+  })
+  test('control: bundles without the letter do not count', () => {
+    expect(bashRules('git push -qu origin b')).toEqual(['push'])
+    expect(bashRules('git branch -d x')).toEqual([])
+    expect(bashRules('git commit -am x')).toEqual(['commit'])
+  })
+  test('any heredoc delimiter is message text (PR #644 review)', () => {
+    expect(bashRules("git commit -F - <<'COMMIT-MSG'\nfix\n\ngit merge main\nCOMMIT-MSG")).toEqual(['commit'])
+    expect(bashRules('git commit -F - <<"END MSG"\nfix\ngit push -f\nEND MSG')).toEqual(['commit'])
+    expect(bashRules('git commit -F - <<-EOF.1\n\tfix\n\tgit merge x\n\tEOF.1')).toEqual(['commit'])
+    expect(bashRules('git commit -F - <<-EOF.1\n\tfix\n\tEOF.1\ngit push --force')).toContain('force-push')
+  })
+  test('control: a body line that only starts with the delimiter does not end the heredoc', () => {
+    expect(bashRules("git commit -F - <<'MSG'\nfix\nMSG-not-the-end\ngit merge x\nMSG\ngit push --force")).toEqual(['commit', 'push', 'force-push'])
+  })
   test('a quoted -C path does not hide the subcommand', () => {
     expect(bashRules('git -C "/a b" push --force')).toContain('force-push')
   })
@@ -94,15 +115,21 @@ describe('bashRules', () => {
   })
 })
 
-describe('commitMessageFile', () => {
+describe('commitMessageFiles', () => {
   test('finds -F, --file and --file=', () => {
-    expect(commitMessageFile('git commit -F /m/a')).toBe('/m/a')
-    expect(commitMessageFile('git commit --file "/m/b"')).toBe('/m/b')
-    expect(commitMessageFile('git add . && git commit --file=/m/c')).toBe('/m/c')
+    expect(commitMessageFiles('git commit -F /m/a')).toEqual(['/m/a'])
+    expect(commitMessageFiles('git commit --file "/m/b"')).toEqual(['/m/b'])
+    expect(commitMessageFiles('git add . && git commit --file=/m/c')).toEqual(['/m/c'])
   })
-  test('stdin and no file are undefined', () => {
-    expect(commitMessageFile('git commit -F -')).toBeUndefined()
-    expect(commitMessageFile('git commit -m x')).toBeUndefined()
+  test('a quoted path with spaces stays whole (PR #644 review)', () => {
+    expect(commitMessageFiles('git commit -F "/r/scratch/seat x/msg"')).toEqual(['/r/scratch/seat x/msg'])
+  })
+  test('every commit in the call, not only the first (PR #644 review)', () => {
+    expect(commitMessageFiles('git commit -F /m/clean && git commit -F /m/other')).toEqual(['/m/clean', '/m/other'])
+  })
+  test('stdin and no file are empty', () => {
+    expect(commitMessageFiles('git commit -F -')).toEqual([])
+    expect(commitMessageFiles('git commit -m x')).toEqual([])
   })
 })
 
