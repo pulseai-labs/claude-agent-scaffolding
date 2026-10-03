@@ -81,12 +81,9 @@ function blank(command: string): { text: string; pieces: string[] } {
   // An unquoted backslash-newline is a line continuation, not a command boundary.
   const joined = command.replace(/\\\n/g, ' ')
   // A backslash outside quotes makes the next character text (`\\|` is not a pipe).
-  return { text: blankHeredocs(joined, keep).replace(QUOTED, keep).replace(/\\./g, keep), pieces }
-}
-
-// A short-option bundle such as `-fqu` that holds the letter.
-function hasShort(args: readonly string[], letter: string): boolean {
-  return args.some(arg => /^-[A-Za-z]+$/.test(arg) && arg.slice(1).includes(letter))
+  // A `#` that starts a word begins a comment, which runs no command.
+  const text = blankHeredocs(joined, keep).replace(QUOTED, keep).replace(/\\./g, keep)
+  return { text: text.replace(/(^|[ \t])#[^\n]*/gm, '$1'), pieces }
 }
 
 // A segment's text with its blanked pieces put back, nested pieces included.
@@ -151,10 +148,10 @@ export function bashRules(command: string, messageFileText = ''): RuleId[] {
     const git = gitOf(tokens)
     if (git === undefined) continue
     const { sub, args } = git
-    if (args.includes('--no-verify') || (sub === 'commit' && hasShort(args, 'n'))) found.add('no-verify')
+    if (args.includes('--no-verify') || (sub === 'commit' && args.includes('-n'))) found.add('no-verify')
     if (sub === 'merge') found.add('merge')
-    if (sub === 'branch' && (hasShort(args, 'D') ||
-      ((args.includes('--delete') || hasShort(args, 'd')) && (args.includes('--force') || hasShort(args, 'f')))))
+    if (sub === 'branch' && (args.includes('-D') ||
+      ((args.includes('--delete') || args.includes('-d')) && (args.includes('--force') || args.includes('-f')))))
       found.add('branch-delete')
     if (sub === 'commit') {
       found.add('commit')
@@ -163,10 +160,10 @@ export function bashRules(command: string, messageFileText = ''): RuleId[] {
     }
     if (sub === 'push') {
       found.add('push')
-      if (hasShort(args, 'f') ||
+      if (args.includes('-f') ||
         args.some(a => a === '--force' || a === '--mirror' || a.startsWith('--force-with-lease') || a.startsWith('+')))
         found.add('force-push')
-      if (args.includes('--delete') || args.includes('--prune') || hasShort(args, 'd') || args.some(a => a.startsWith(':')))
+      if (args.includes('--delete') || args.includes('--prune') || args.includes('-d') || args.some(a => a.startsWith(':')))
         found.add('branch-delete')
     }
   }

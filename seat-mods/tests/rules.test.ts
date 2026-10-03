@@ -85,12 +85,20 @@ describe('bashRules', () => {
     expect(bashRules('git commit -m x && grep -rn "Co-Authored-By:" hooks/')).toEqual(['commit'])
     expect(bashRules('git commit -m "x\n\nCo-Authored-By: a" && echo done')).toContain('ai-trailer')
   })
-  test('bundled short flags count (PR #644 review)', () => {
-    expect(bashRules('git push -fqu origin b')).toContain('force-push')
-    expect(bashRules('git branch -Df x')).toContain('branch-delete')
+  test('separate force and delete flags count', () => {
     expect(bashRules('git branch --delete --force x')).toContain('branch-delete')
-    expect(bashRules('git push -du origin b')).toContain('branch-delete')
-    expect(bashRules('git commit -anm x')).toContain('no-verify')
+    expect(bashRules('git push -d origin b')).toContain('branch-delete')
+  })
+  test('an attached option value is not a flag bundle (PR #644 round 5)', () => {
+    expect(bashRules('git commit -mfixing')).toEqual(['commit'])
+    expect(bashRules('git push -ofoo origin b')).toEqual(['push'])
+  })
+  test('a comment is not a command (PR #644 round 5)', () => {
+    expect(bashRules('echo ok # ; git push --force')).toEqual([])
+  })
+  test('control: a command before a comment still counts', () => {
+    expect(bashRules('echo ok; git push --force # note')).toContain('force-push')
+    expect(bashRules('git push origin b#tag')).toEqual(['push'])
   })
   test('control: bundles without the letter do not count', () => {
     expect(bashRules('git push -qu origin b')).toEqual(['push'])

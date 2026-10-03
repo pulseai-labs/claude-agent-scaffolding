@@ -34,7 +34,7 @@ Each is a `tool.call` deny on Bash, Edit or Write.
 | Guard | implementer | verifier | reviewer |
 |---|---|---|---|
 | `git merge`, `gh pr merge` (also after `gh pr -R/--repo`) | deny | deny | deny |
-| Force-push (`--force`, `-f` alone or bundled, `--force-with-lease`, `--mirror`, a `+` refspec); branch deletion (`git branch -D`, or `-d`/`--delete` with `-f`/`--force`; `git push --delete` / `-d` / `--prune` / `:branch`) | deny | deny | deny |
+| Force-push (`--force`, `-f`, `--force-with-lease`, `--mirror`, a `+` refspec); branch deletion (`git branch -D`, or `-d`/`--delete` with `-f`/`--force`; `git push --delete` / `-d` / `--prune` / `:branch`) | deny | deny | deny |
 | `--no-verify` on any git command (and `git commit -n`) | deny | deny | deny |
 | A commit message with `Co-Authored-By:` or `🤖 Generated with` — on the command line, in a heredoc, or in the `-F` / `--file` message file | deny | deny | deny |
 | Edit or Write outside the worktree and outside every `SEAT_MODS_ALLOW` directory | deny | deny | deny |
@@ -56,9 +56,10 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   `VAR=value` and `sudo`, `env`, `command`, `exec`, `nohup` or `time`; so `echo git merge` is not a
   merge, and neither are `xargs git push --force`, `bash -c "git push -f"`, `g""it push`, or a
   wrapper with its own options (`env -i git merge`, `sudo -u u git push -f`).
-- **Unparsed shell forms pass:** a single `&` list operator, abbreviated long options (`--mir`),
-  several heredocs on one command, value-taking git globals (`--git-dir x`) and quoted subcommands
-  or flags (`git "merge"`).
+- **Unparsed shell forms pass:** a single `&` list operator, bundled short flags (`-fqu`),
+  abbreviated long options (`--mir`), several heredocs on one command, a heredoc example inside a
+  quoted message, value-taking git globals (`--git-dir x`) and quoted subcommands or flags
+  (`git "merge"`). A trailer that opens an `-m` message, or comes from `--trailer`, also passes.
 - **A trailer counts only at a line start**, as the repository's commit-msg hook reads it.
 - **`git pull` is not guarded.** A pull that merges is not on the merge rail; the briefs' prose
   rule covers it.
