@@ -158,23 +158,35 @@ elsewhere. The NUMBER, though, comes from the project-wide sequence below.
 **Numbering is project-wide, across every declared repo:** the next number is
 the highest existing plus one **anywhere in the project**, **counting both
 forms**. The *file* still lands in the repo the decision concerns — only the
-SEQUENCE is shared. Read it, do not guess:
+SEQUENCE is shared — so the scan takes that repo as `$dest_repo` and takes the
+minted **width** from *its* series: the file must not be the odd one out in its
+own directory. Read it, do not guess:
 
 ```bash
-# $repos is NOT ambient: one declared repo name per line, the set the topology
-# declares (A1 for /adopt, the journey-map station for /start) - the same
-# convention spine-close.md's $repo_base_branches uses.
-scan="$(mktemp)"
+# $repos and $dest_repo are NOT ambient: $repos is one declared repo name per
+# line (the set the topology declares - the same convention
+# spine-close.md's $repo_base_branches uses), and $dest_repo is the repo the ADR
+# LANDS in, the one the decision concerns (§3, "Where"). The NUMBER is
+# project-wide; the minted WIDTH is the destination's own, because two repos may
+# pad differently (round 1, C2).
+scan="$(mktemp)"; dest="$(mktemp)"
 while IFS= read -r name; do
   [ -n "$name" ] || continue
-  root="$("$oss_bin" repo_root "$name")" || exit 1
-  mkdir -p "$root/docs/adr" || exit 1
+  root="$("$oss_bin" repo_root "$name")" || { echo "the numbering scan could not resolve a root for repo '$name'" >&2; rm -f "$scan" "$dest"; exit 1; }
+  # A refusal names its path (R9), and every exit path takes both temp files
+  # with it - one populated mktemp per mint is the leak this round closed (R6).
+  if ! mkdir -p "$root/docs/adr"; then
+    echo "the numbering scan could not create $root/docs/adr - reading it as an empty series would mint an id that may already exist" >&2
+    rm -f "$scan" "$dest"; exit 1
+  fi
   # An unreadable directory is NOT an empty one: minting from a series that
   # could not be read is how a duplicate id gets made, so this refuses instead.
-  if ! ls -1 "$root/docs/adr" >> "$scan" 2>/dev/null; then
+  if ! listing="$(ls -1 "$root/docs/adr" 2>/dev/null)"; then
     echo "the numbering scan could not read $root/docs/adr - reading it as an empty series would mint an id that may already exist" >&2
-    exit 1
+    rm -f "$scan" "$dest"; exit 1
   fi
+  printf '%s\n' "$listing" >> "$scan"
+  if [ "$name" = "${dest_repo:-}" ]; then printf '%s\n' "$listing" > "$dest"; fi
 done <<EOF
 $repos
 EOF
@@ -182,14 +194,17 @@ EOF
 # case (scaffold-dev writes `adr-`, PulseDB's series is `ADR-`) and the bare
 # form (scaffold-onboard's seed). Matching one case only returns NOTHING on the
 # other, and an empty answer there is not "start at 1" - it is a duplicate id.
-matches="$(sed -n -e 's/^[Aa][Dd][Rr]-\([0-9][0-9]*\)-.*\.md$/\1/p' \
-                   -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' "$scan")"
-highest="$(printf '%s\n' "$matches" | sort -n | tail -1)"
-# The WIDTH follows the series it found, never a fixed %04d: reading an
-# `ADR-001-` series and minting `ADR-0002` leaves the directory at two widths
-# and the next reader with the same problem. The width comes from the same
-# string the number does, so the two cannot disagree; empty series -> 4 digits.
-if [ -z "$highest" ]; then fmt='%04d'; else fmt="%0$(printf '%s' "$highest" | wc -c | tr -d ' ')d"; fi
+highest="$(sed -n -e 's/^[Aa][Dd][Rr]-\([0-9][0-9]*\)-.*\.md$/\1/p' \
+                    -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' "$scan" | sort -n | tail -1)"
+# The WIDTH follows the DESTINATION repo's series, never the project-wide one:
+# with an `ADR-099-*` series elsewhere and `adr-0007-*` in the destination, a
+# project-wide width mints `ADR-100` into a four-digit directory (round 1, C2).
+# It comes from the same string the destination's own highest number does, so
+# the two cannot disagree; a destination with no series yet -> 4 digits.
+narrow="$(sed -n -e 's/^[Aa][Dd][Rr]-\([0-9][0-9]*\)-.*\.md$/\1/p' \
+                   -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' "$dest" | sort -n | tail -1)"
+if [ -z "$narrow" ]; then fmt='%04d'; else fmt="%0$(printf '%s' "$narrow" | wc -c | tr -d ' ')d"; fi
+rm -f "$scan" "$dest"
 printf "ADR-${fmt}\n" "$(( 10#${highest:-0} + 1 ))"
 ```
 
@@ -213,14 +228,20 @@ Things this has to get right, each of which has already produced a duplicate id:
   form — or matched case-sensitively — yields no number at all, so the scan
   restarts at 1 and mints an id that already exists: duplicating an identifier
   that bone citations and touch records both key on (#301).
-- **The minted WIDTH follows the series, not a fixed `%04d`.** Reading an
-  `ADR-001-…` series and answering `ADR-0002` leaves the directory at two
-  widths, and the next reader hits the same ambiguity (#301).
+- **The minted WIDTH follows the DESTINATION repo's series, not a fixed `%04d`
+  and not the project-wide one.** With an `ADR-099-…` series elsewhere and
+  `adr-0007-…` in the destination, a project-wide width mints `ADR-100` into a
+  four-digit directory — two widths in the file the next reader must continue
+  (#301, round 1 C2).
 - **An unreadable `docs/adr/` refuses; it never reads as empty.** `ls` failing
   answers the same "no matches" as a first-ever ADR, and the two have opposite
-  remedies —
-  `exit 1` with the path named is the difference between minting the second id
-  for a decision and minting a new one.
+  remedies — a refusal that names the path is the difference between minting the
+  second id for a decision and minting a new one. A `mkdir` that cannot create
+  the directory refuses the same way, also naming the path.
+- **Every exit path removes the scan's temp files.** The scan is one populated
+  `mktemp` per mint on the success path *and* on each refusal, so each `exit 1`
+  takes them with it (round 1 R6) — the same leak class §5's sweep closes for
+  its own `$hits` under #558.
 - **`10#` forces base-10.** Without it `0008` is an invalid octal literal and the
   arithmetic aborts under the dispatcher's `set -e`.
 

@@ -785,7 +785,7 @@ t_assert_contains "$T_OUT" "could not read" "(e) R3 ... it reaches its refusal a
 # extracted AND executed.
 _AD="$SKILLS/start/references/bones-registry.md"
 _SC="$_PC_TMP/adr-scan.sh"
-if oss_block_extract "$_AD" 'matches=' "$_SC" 2>/dev/null && [ -s "$_SC" ]; then
+if oss_block_extract "$_AD" 'narrow=' "$_SC" 2>/dev/null && [ -s "$_SC" ]; then
   T_PASS=$((T_PASS+1))
 else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: bones-registry.md §3's numbering scan no longer extracts - the checks below are vacuous"
@@ -796,7 +796,13 @@ _o_ws() { # $1=name ; echoes a workspace whose canonical repo has an empty docs/
   printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{}}\n' "$d" > "$d/.ossify/topology.json"
   printf '%s\n' "$d"
 }
-_o_next() { ( cd "$1" && env oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SC'" ); }
+_o_next2() { # $1=dir $2=repos $3=destination repo (the block consumes both)
+  ( cd "$1" && env oss_bin="$OSS" dest_repo="$3" repos="$2" bash -c "set -euo pipefail; . '$_SC'" )
+}
+_o_next() { _o_next2 "$1" canonical canonical; }
+_o_next_keep() { # $1=dir ; prints the mint, then the temp paths the block used
+  ( cd "$1" && env oss_bin="$OSS" dest_repo=canonical repos=canonical bash -c "set -euo pipefail; . '$_SC'; printf 'SCAN[%s] DEST[%s]\n' \"\$scan\" \"\$dest\"" )
+}
 # THE DEFECT: an uppercase three-digit series is read, and the mint continues it.
 _O_U="$(_o_ws upper)"; : > "$_O_U/canon/docs/adr/ADR-001-redb-for-storage.md"; : > "$_O_U/canon/docs/adr/ADR-002-single-writer.md"
 t_capture _o_next "$_O_U"
@@ -823,16 +829,57 @@ t_assert_contains "$T_OUT" "ADR-0001" "#301 control: README.md and a non-.md fil
 # REFUSAL ARM: an unreadable docs/adr/ must not answer like an empty one, or the
 # next ADR is minted blind over whatever is in there.
 _O_P="$(_o_ws perm)"; chmod 000 "$_O_P/canon/docs/adr"
-t_capture _o_next "$_O_P"
-_o_prc=$T_RC
-chmod 755 "$_O_P/canon/docs/adr"
-t_assert_eq 1 "$_o_prc" "#301: an unreadable docs/adr/ refuses (rc 1) rather than answering as an empty series"
-t_assert_contains "$T_OUT" "could not read" "#301 ... naming the directory it could not read"
-if printf '%s' "$T_OUT" | grep -Fq 'ADR-'; then
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: #301 an unreadable series was answered with a minted id - a failure read as an absence"
+# NOT ASSUMED TO BITE. Running as root ignores the mode bits, so an assertion
+# that cannot fail would read as coverage: probe first and say so out loud when
+# the arm is not exercised (round 1, R12/C3 - the pattern test-worktree.sh:746
+# uses). The symlink-loop arm below is this arm's root-proof twin.
+if ls -1 "$_O_P/canon/docs/adr" >/dev/null 2>&1; then
+  echo "NOTE: chmod 000 did not restrict this user (uid $(id -u)); the unreadable-directory arm is NOT exercised here - see the symlink-loop arm below"
 else
-  T_PASS=$((T_PASS+1))
+  t_capture _o_next "$_O_P"
+  _o_prc=$T_RC
+  t_assert_eq 1 "$_o_prc" "#301: an unreadable docs/adr/ refuses (rc 1) rather than answering as an empty series"
+  t_assert_contains "$T_OUT" "could not read" "#301 ... naming the directory it could not read"
+  if printf '%s' "$T_OUT" | grep -Fq 'ADR-'; then
+    T_FAIL=$((T_FAIL+1)); echo "FAIL: #301 an unreadable series was answered with a minted id - a failure read as an absence"
+  else
+    T_PASS=$((T_PASS+1))
+  fi
 fi
+chmod 755 "$_O_P/canon/docs/adr"
+# (f4) ROUND 1, R9: a docs/adr/ that cannot even be CREATED refuses at rc 1
+# naming the path. The fixture is a self-referential symlink, which fails for
+# root as well as for anyone else - the root-proof half of the arm above.
+_O_LP="$_PC_TMP/ni/loop"; mkdir -p "$_O_LP/.ossify" "$_O_LP/canon/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{}}\n' "$_O_LP" > "$_O_LP/.ossify/topology.json"
+: > "$_O_LP/canon/docs/adr"   # a FILE where the directory must be: mkdir cannot succeed, as root either
+t_capture _o_next "$_O_LP"
+t_assert_eq 1 "$T_RC" "#301 R9: an uncreatable docs/adr/ refuses at rc 1"
+t_assert_contains "$T_OUT" "$_O_LP/canon/docs/adr" "#301 R9 ... and the refusal names the path it could not create"
+# (f5) ROUND 1, R6: every exit path takes the scan's temp files with it, so the
+# caller is left with no populated mktemp per mint.
+_O_CL="$(_o_ws clean)"; : > "$_O_CL/canon/docs/adr/adr-0001-a.md"
+t_capture _o_next_keep "$_O_CL"
+t_assert_contains "$T_OUT" "ADR-0002" "#301 R6 control: the mint still answers"
+_o_scan="$(printf '%s' "$T_OUT" | sed -n 's/.*SCAN\[\([^]]*\)\].*/\1/p')"
+_o_desc="$(printf '%s' "$T_OUT" | sed -n 's/.*DEST\[\([^]]*\)\].*/\1/p')"
+if [ -n "$_o_scan" ] && [ -n "$_o_desc" ] && [ ! -e "$_o_scan" ] && [ ! -e "$_o_desc" ]; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: #301 R6: the scan left its temp files behind (scan='${_o_scan:-unset}' dest='${_o_desc:-unset}')"
+fi
+# (f6) ROUND 1, C2/CR2: the minted WIDTH comes from the DESTINATION repo's
+# series, not from the project-wide highest. Destination `adr-0007-…` (four
+# digits) with `ADR-099-…` in another repo: the number is 100 (project-wide),
+# the width is the destination's 4 - so ADR-0100, not the old ADR-100.
+_O_C2="$(_o_ws width)"; mkdir -p "$_O_C2/extra/docs/adr"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"},"extra":{"root":"%s/extra"}},"well_known_paths":{}}\n' \
+  "$_O_C2" "$_O_C2" > "$_O_C2/.ossify/topology.json"
+: > "$_O_C2/canon/docs/adr/adr-0007-hexagonal.md"
+: > "$_O_C2/extra/docs/adr/ADR-099-elsewhere.md"
+t_capture _o_next2 "$_O_C2" "$(printf 'canonical\nextra')" canonical
+t_assert_contains "$T_OUT" "ADR-0100" "#301 C2: the width is the destination repo's, so a four-digit series elsewhere cannot force a three-digit mint"
+t_assert_contains "$T_OUT" "ADR-0100" "#301 C2 control: the NUMBER is still project-wide (99 elsewhere -> 100)"
 
 # --- phase 3: the never-strand invariant's two surfaces must agree -----------
 #
