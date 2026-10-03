@@ -11,8 +11,9 @@ reconciliation — and kept when it has not: a permission answer, the budget gra
 an idle false-wake re-arm, a lost wait or a handoff. So an `error` retry re-takes the pair over the
 failed attempt's body, and an idle retry that writes nothing takes the missing-report path instead
 of passing the changed-file check on that body; a permission answer keeps the pair, so a body
-written before the permission still wakes the next `report`. The `error` exit's arm-guard lives on
-the exit row, `closed` taken at once. The rest of #635 is in with it: a seat that settles `error`
+written before the permission still wakes the next `report`. The `error` exit's guard is the exit
+row's, keyed to the error route's re-send wait: every other wait, `closed` included, takes it
+at once. The rest of #635 is in with it: a seat that settles `error`
 or `closed` with a request pending wakes as `error` — the loop reads `error` first — and the route
 now reads that pending request with its activity and artifacts; the suites pin the thinking-flag
 condition, the J3 control's unreadable-file refusal, and the errored body's

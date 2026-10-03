@@ -146,7 +146,7 @@ pin "$REF" 'with the `idle` exit dropped' "a false wake drops the idle exit"
 # #637: a reviewer's `/code-review` fork returns before its finders do, so its first reportless
 # idle takes one bounded consolidation request before the idle exit is dropped, because only a
 # message starts the turn the fork ended.
-pin "$REF" "a reviewer's first idle with no report takes one bounded request" "a reviewer's first reportless idle takes one consolidation request" flat
+pin "$REF" "reportless idle — whatever its last message says — is sent one bounded request to consolidate the review's returned candidates into \`REPORT_PATH\`, then one fresh wait as for any send; a second one takes the missing-report case below" "a reviewer's first reportless idle takes one consolidation request, then a plain send-wait" flat
 pin "$REF" 'Coordinator seats' "coordinators are armed without the idle exit"
 pin "$REF" 'Both are compared, not merely recorded' "hash and identity are both compared"
 # #635 AC1: the pair rule has ONE owner sentence, and the five handlers point at it (budget,
@@ -158,13 +158,14 @@ if c="$(count_of "$REF" '(`Completion`' flat)"; then
   if [ "$c" -eq 5 ]; then pass "the five handlers point at the pair rule ($c)"
   else fail "the five handlers point at the pair rule" "$c occurrence(s)"; fi
 else fail "the pair-rule pointers are countable" "unreadable file or empty needle: $REF"; fi
-# #635 M1 / #639 G1: the arm-guard is the `error` row's — the row is the only site that says
-# when the exit fires — and the guard is scoped to a wait armed while the seat was already at
-# `error`, so a first dispatch wait (and `closed`) takes it at once. The needle runs to the
-# clause's end: a shorter one stayed green when the guard was widened to `closed` (measured),
-# while this one fails on an unguarded row, on a guard widened to first waits or to `closed`,
-# and on a guard dropped entirely.
-pin "$REF" 'taken at once, except by a wait armed while the seat was already at `error`: that one takes it only once it has seen the seat leave `error`' "the error row owns a re-armed wait's guard" flat
+# #635 M1 / #639 G1 / H1: the guard is the `error` row's, keyed to the error route's re-send
+# wait — not to the seat's status when a wait is armed, which hid a first-attempt error to the
+# budget (round 1's P1). The needle runs to the clause's end so a guard widened to first waits
+# or dropped entirely fails it.
+pin "$REF" "only the error route's re-send wait holds \`error\` until it has seen \`Status\` leave it" "the error row keys its guard to the re-send wait" flat
+# #639 H2/H11: the explicit `closed` carve-out, pinned beside the row pin because deleting it
+# stayed green after the old combined pin went (measured).
+pin "$REF" 'taken at once by every wait, `closed` included' "the error row takes closed at once by every wait" flat
 # #622 / #632 F1-F3: the change alone is not a report. The exit row is the single owner
 # of "changed file AND `Status` is `idle`" — `error` and `closed` settle at the `error`
 # exit — and every other reader of a changed file points at that row. Which is what lets

@@ -99,7 +99,7 @@ idle, which a seat running background work of its own reaches long before it fin
 |---|---|
 | `report` | `REPORT_PATH`'s hash **or** identity differs from the noted pair, and `Status` is `idle` — `error` and `closed` settle at the `error` exit, and a body written by a seat that still runs is not yet a report |
 | `permission` | `PendingPermissions` in `paseo inspect <id> --json` is non-empty |
-| `error` | `Status` is `error` or `closed` — taken at once, except by a wait armed while the seat was already at `error`: that one takes it only once it has seen the seat leave `error` |
+| `error` | `Status` is `error` or `closed` — taken at once by every wait, `closed` included; only the error route's re-send wait holds `error` until it has seen `Status` leave it |
 | `idle` | `Status` has been `idle` without a break, timed by the loop from when it first saw it, for longer than the brief's `SETTLE_WINDOW`, and no report has arrived |
 | `budget` | time since the dispatch's `DISPATCHED_AT` exceeds the brief's `TIME_BUDGET` |
 
@@ -130,21 +130,21 @@ done
   allow it with `respond_to_permission` and arm one fresh wait, keeping `DISPATCHED_AT`;
   otherwise put it to the operator, give the answer the same way, and arm one fresh wait —
   that answer restarts `DISPATCHED_AT`; the pair is kept either way (`Completion`).
-- `idle`: read the seat's last message (`get_agent_activity`, limit 1). A question the brief
-  answers is answered, with one fresh wait; one it does not answer goes to the operator. A
-  seat that says it is waiting on its own background work is a false wake, not a finish: arm
-  one fresh wait with the `idle` exit dropped for the rest of that dispatch, the pair kept
-  (`Completion`), so `report`, `permission`, `error` and `budget` remain — but a reviewer's
-  first idle with no report takes one bounded request, to consolidate the review's returned
-  candidates into `REPORT_PATH`, before that same drop (its fork returns before its finders
-  do). An idle whose last message is neither — a completion written only to its activity, or
-  no message at all — is the missing-report case: one bounded correction request asking it to
-  write `REPORT_PATH`, and one fresh wait; a second such idle escalates.
-  Coordinator seats — Teardown's coordinator clause names them — are armed that way from the
-  start, because their idle is not a finish.
+- `idle`: read the seat's last message (`get_agent_activity`, limit 1). A reviewer's first
+  reportless idle — whatever its last message says — is sent one bounded request to consolidate
+  the review's returned candidates into `REPORT_PATH`, then one fresh wait as for any send; a
+  second one takes the missing-report case below. A question the brief answers is answered, with
+  one fresh wait; one it does not answer goes to the operator. A seat that says it is waiting
+  on its own background work is a false wake, not a finish: arm one fresh wait
+  with the `idle` exit dropped for the rest of that dispatch, the pair kept (`Completion`), so
+  `report`, `permission`, `error` and `budget` remain. An idle whose last message is neither —
+  a completion written only to its activity, or no message at all — is the missing-report case:
+  one bounded correction request asking it to write `REPORT_PATH`, and one fresh wait; a second
+  such idle escalates. Coordinator seats — Teardown's coordinator clause names them — are armed
+  that way from the start, because their idle is not a finish.
 - `error`: read its activity, its pending permissions, its durable artifacts and its `REPORT_PATH`
-  first — a pending request is answered as the `permission` handler directs, before the route
-  sends — `error` does not say that nothing landed, and a changed body there is evidence for this
+  first — a pending request is answered with `respond_to_permission`, arming no wait — `error`
+  does not say that nothing landed, and a changed body there is evidence for this
   reconciliation, never a `report`. A dispatch that may have mutated anything (a commit, a push,
   a PR, a close) is never replayed: send a recovery instruction that names what already exists,
   or escalate. Only a dispatch that cannot have mutated is re-sent once on the same seat, one
@@ -188,8 +188,8 @@ never silently extends the budget.
 This is the one statement of how the orchestrator sends a seat anything after its brief (a
 fix task, an answer, a plan approval, a correction); other files say "send" and mean this.
 `send_agent_prompt` with `background: true` and `notifyOnFinish: true`. The text arrives
-whole, so nothing fragments it and no pointer file is needed. Note the pair first
-(`Completion`), then arm one fresh wait. There is no turn-start check: a send that never
+whole, so nothing fragments it and no pointer file is needed. (`Completion`'s pair rule decides
+it), then arm one fresh wait. There is no turn-start check: a send that never
 opened a turn surfaces as `idle` with no report. A seat with a pending permission is answered
 with `respond_to_permission` before anything else is sent to it.
 
@@ -228,7 +228,7 @@ opened, are never archived by the run.
 
 **The cascade.** Archiving an agent archives its same-workspace children that have no open
 tab and detaches the rest, recursively. So Teardown's coordinator seat is archived only
-after it reports its own children released, never for its item seats. A predecessor
+after it reports its own children released, never to clean up its item seats. A predecessor
 orchestrator is Handoff's case.
 
 Read every receipt, and confirm with `list_agents` / `list_workspaces`, never assume: an
