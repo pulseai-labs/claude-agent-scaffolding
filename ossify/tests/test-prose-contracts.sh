@@ -474,14 +474,17 @@ fi
 # That is what moves its ledger row from I to O.
 #
 # Run with NOTHING injected that the caller does not genuinely supply
-# (tests/lib/blocks.sh): `oss_bin` and `repos` ARE the caller's, so they are
-# passed; everything else the block must establish itself.
+# (tests/lib/blocks.sh): `oss_bin`, `repos` and `sf` ARE the caller's — the last
+# because §2 resolves it once for the whole read-out and §5 consumes it, never
+# re-deriving the precedence (#561 round 1, R14). Everything else the block must
+# establish itself.
 OSS="$HERE/../bin/oss"
 SWWS="$_PC_TMP/sweepws"; mkdir -p "$SWWS/.ossify" "$SWWS/canon"
 SWS="$SWWS/state.json"
 # The state is ROUTED at $SWS and also exported as $OSS_STATE_FILE - the same
 # project either way, which is the pairing #561's gate accepts. An override that
-# is NOT this directory's manifest-routed state must skip the sweep instead.
+# is NOT this directory's manifest-routed state must skip the sweep instead, and
+# so must a route that cannot be resolved at all (the round-1 R1 bypass).
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"},"gone":{"root":"%s"}},"well_known_paths":{"project_state":"%s"}}\n' \
   "$SWWS/canon" "$SWWS/absent" "$SWS" > "$SWWS/.ossify/topology.json"
 ( cd "$SWWS/canon" && git init -q . && : > tracked.txt && git add tracked.txt \
@@ -494,7 +497,7 @@ printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"},"gone":{"root":"%
 # T_FAIL globals, and a subshell's mutations never propagate (test-manifest.sh
 # documents the vacuous-green trap this avoids).
 cd "$SWWS"
-t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" repos="$(printf 'canonical\ngone')" bash -c \
+t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" sf="$SWS" repos="$(printf 'canonical\ngone')" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'SKIPPED[%s]\n' \"\$skipped\"; printf 'ROSTER%s\n' \"\$roster\"; printf 'KINDS%s\n' \"\$(printf '%s' \"\$roster\" | jq -r '[.[].kind]|join(\",\")')\"; printf 'INHITS%s\n' \"\$(grep -c ADR-9092 \"\$hits\" 2>/dev/null || true)\""
 cd "$HERE"
 t_assert_rc 0 "(d) the sweep COMPLETES with a declared repo unreadable - it reports the skip rather than exiting the whole run"
@@ -515,19 +518,31 @@ t_assert_contains "$T_OUT" "nowhere/at/all/**" "(d) ... with its glob list, whic
 # projection are exercised: two bones and a risk gate.
 t_assert_contains "$T_OUT" "KINDSbone,bone,risk_gate" "(d) ... and the KIND of every surface, in touch_check's own vocabulary - the only thing that picks the re-point verb"
 # G4: with EVERY declared repo unreadable the read set is EMPTY, and the sweep
-# must report that rather than one absence per surface.
-t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" repos="gone" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+# must report that rather than one absence per surface. Run from the workspace so
+# the route resolves: this arm is about the corpus loop, and the foreign-state
+# gate above would refuse first from a directory with no manifest (round 1, R1).
+cd "$SWWS"
+t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" sf="$SWS" repos="gone" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 t_assert_rc 0 "(d) a read set that came back EMPTY does not abort the sweep"
 t_assert_contains "$T_OUT" "no declared repo could be read" "(d) ... it reports that the sweep inspected nothing, rather than reporting every healthy surface as unmatched"
 # The corpus arm: `repos` UNSET under strict mode. This is the shipped defect
 # (an unassigned variable), so it is run with NOTHING injected.
-t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" sf="$SWS" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 t_assert_rc 0 "(d) an unset \$repos does not abort the sweep under strict mode"
 t_assert_contains "$T_OUT" "skip: touch - the declared repo keys could not be read" "(d) ... it says the sweep did not run, instead of sweeping an empty corpus and reporting every surface"
+cd "$HERE"
 # The registry arm: a batch that is INCONCLUSIVE leaves no hits either, so an
-# unreadable registry must not read as a whole-corpus absence.
-SWSB="$_PC_TMP/broken-state.json"; printf '%s\n' '{"schema_version":2}' > "$SWSB"
-t_capture env OSS_STATE_FILE="$SWSB" oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+# unreadable registry must not read as a whole-corpus absence. The workspace's
+# OWN route resolves to the broken state, so the foreign-state gate above is
+# satisfied and this arm still reaches touch_check's rc 2 (round 1, R1: an
+# unresolvable route now refuses before this point).
+SWBRK="$_PC_TMP/brokenroute"; mkdir -p "$SWBRK/.ossify"
+printf '%s\n' '{"schema_version":2}' > "$SWBRK/broken-state.json"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"project_state":"%s/broken-state.json"}}\n' \
+  "$SWBRK" "$SWBRK" > "$SWBRK/.ossify/topology.json"
+cd "$SWBRK"
+t_capture env oss_bin="$OSS" sf="$SWBRK/broken-state.json" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+cd "$HERE"
 t_assert_rc 0 "(d) an unreadable registry does not abort the sweep"
 t_assert_contains "$T_OUT" "registry could not be read" "(d) ... it reports the registry failure, so an empty \$hits is not read as every surface matching nothing"
 # The resolver arm: touch_check returns its RESOLVER's rc 1 before it ever looks
@@ -552,17 +567,33 @@ printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_know
   "$SWF" "$SWF" > "$SWF/.ossify/topology.json"
 ( cd "$SWF" && bash "$OSS" init foreign >/dev/null && bash "$OSS" bone_add ADR-7777 "a foreign-only surface" "foreign/only/**" ) >/dev/null 2>&1
 cd "$SWWS"
-t_capture env OSS_STATE_FILE="$SWF/state.json" oss_bin="$OSS" repos="canonical" bash -c \
+t_capture env OSS_STATE_FILE="$SWF/state.json" oss_bin="$OSS" sf="$SWF/state.json" repos="canonical" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS[%s]\n' \"\${hits:-unset}\"; printf 'ROSTER[%s]\n' \"\${roster:-unset}\""
 cd "$HERE"
 t_assert_rc 0 "#561: a foreign state does not abort the sweep"
-t_assert_contains "$T_OUT" "skip: touch - the inspected state is not this directory's manifest-routed state" "#561 ... it refuses the run in the §1 grammar, naming both paths"
+t_assert_contains "$T_OUT" "skip: touch - the state in play" "#561 ... it refuses the run in the §1 grammar, naming the state in play against the routed answer"
 t_assert_contains "$T_OUT" "HITS[unset]" "#561 ... and nothing was swept: \$hits was never created"
 t_assert_contains "$T_OUT" "ROSTER[unset]" "#561 ... and no foreign registry was read, so no warn line can be composed from it"
+# ROUND 1, R1: the gate must not be bypassed by a route that resolves to
+# NOTHING. A topology whose `project_state` value is relative makes
+# `"$oss_bin" state_path` refuse, and the old gate read that empty answer as
+# consent (its `[ -n "$routed" ] &&` guard) and swept a foreign registry against
+# this directory's repos. "Cannot be compared" is not "the same project".
+SWREL="$_PC_TMP/relroute"; mkdir -p "$SWREL/.ossify" "$SWREL/canon"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"project_state":"./state.json"}}\n' \
+  "$SWREL" > "$SWREL/.ossify/topology.json"
+cd "$SWREL"
+t_capture env OSS_STATE_FILE="$SWF/state.json" oss_bin="$OSS" sf="$SWF/state.json" repos="canonical" bash -c \
+  "set -euo pipefail; . '$_SW'; printf 'HITS[%s]\n' \"\${hits:-unset}\""
+cd "$HERE"
+t_assert_rc 0 "#561 R1: an unresolvable route does not abort the sweep"
+t_assert_contains "$T_OUT" "is not this directory's manifest-routed state" "#561 R1 ... it refuses: an empty routed answer is not consent to compare"
+t_assert_contains "$T_OUT" "unresolved" "#561 R1 ... and the line says the route could not be resolved"
+t_assert_contains "$T_OUT" "HITS[unset]" "#561 R1 ... and nothing was swept against this directory's repos"
 # CONTROL: with NO override the same fixture still sweeps - the gate refuses a
 # foreign state, not every run, and the routed state's roster still fills.
 cd "$SWWS"
-t_capture env oss_bin="$OSS" repos="canonical" bash -c \
+t_capture env oss_bin="$OSS" sf="$SWS" repos="canonical" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'KINDS%s\n' \"\$(printf '%s' \"\$roster\" | jq -r '[.[].kind]|join(\",\")')\""
 cd "$HERE"
 t_assert_contains "$T_OUT" "bone ADR-9091" "#561 control: no override, so the routed state sweeps its corpus"
@@ -686,6 +717,17 @@ if printf '%s' "$T_OUT" | grep -Fq 'no registry entry'; then
 else
   T_PASS=$((T_PASS+1))
 fi
+# (e6) ROUND 1, R3: an unresolvable route must REFUSE, not abort. Both resolver
+# calls in the block are guarded, so under `set -euo pipefail` it reaches its own
+# refusal arm instead of dying inside the command substitution - which is what
+# the shipped block did (`sv_state="$(...)"` aborted the whole sourced read-out).
+_E_WS3="$_PC_TMP/driftws3"; mkdir -p "$_E_WS3/.ossify" "$_E_WS3/canon" "$_E_WS3/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"./state.json"}}\n' \
+  "$_E_WS3" "$_E_WS3" > "$_E_WS3/.ossify/topology.json"
+_e_spec "$_E_WS3" '| ADR-0002 | x |'
+t_capture _e_run "$_E_WS3"
+t_assert_rc 0 "(e) R3: an unresolvable state route does not abort the drift check under strict mode"
+t_assert_contains "$T_OUT" "could not read" "(e) R3 ... it reaches its refusal arm and says which half it could not read"
 
 # --- phase (f): §3's ADR numbering scan must read an adopted series (#301) ----
 #
@@ -1060,6 +1102,24 @@ _pin "$_r" "the critic moment's non-interactive default proceeds without recordi
 # find - occupied-destinations lists it with its path like every other output.
 _r=1; grep -Fq 'private boundary inventory at' "$_OSSR/skills/start/references/occupied-destinations.md" && grep -Fq '<ai-workspace>/docs/private-boundary-inventory.md' "$_OSSR/skills/start/references/occupied-destinations.md" && _r=0
 _pin "$_r" "occupied-destinations leaves the private inventory among the outputs no route names - /start cannot check a file it cannot address"
+
+# --- 1.13.4 round 1 (#561 R1/R8/R14/R15): one state-path name per surface -----
+# §5 consumes §2's resolved `$sf` (never a second spelling of the precedence, and
+# exactly ONE resolver call for the routed half); §3 keeps its own differently
+# named `sv_state` so a composed read-out cannot reassign either; and the gate's
+# rationale has one owner - the §5 prose - with the block comment pointing at it
+# instead of arguing a third time.
+_r=1; [ "$(grep -v '^[[:space:]]*#' "$_SW" | grep -c 'state_path')" = 1 ] && ! grep -Fq 'sf="${OSS_STATE_FILE:-}"' "$_SW" && grep -Fq 'consumed, never re-derived' "$_SW" && _r=0
+_pin "$_r" "state-inspection §5 re-derives the state path (a second precedence spelling, or more than one state_path call) instead of consuming §2's \$sf"
+_r=1; grep -Fq 'sv_state' "$_SV4" && grep -Fq 'not `sf`' "$_SV4" && grep -Fq 'sv_state' "$_SI4" && _r=0
+_pin "$_r" "spec-validation §3 names its manifest-routed state \$sf - the same name state-inspection §2 uses for the override-first path, so one surface can reassign the other's state"
+_r=1; grep -Fq 'owned by the prose under this fence' "$_SW" && [ "$(grep -c 'as written' "$_SI4")" = 1 ] && _r=0
+_pin "$_r" "state-inspection's foreign-gate rationale is argued in more than one place (or the block comment no longer points at its owner) - three independently-worded copies drift"
+# The gate must not read an empty routed answer as consent: an unresolvable route
+# refuses, and that arm must be reachable (the `-n "$routed"` precondition that
+# bypassed it is gone).
+_r=1; grep -Fq '[ -z "${sf:-}" ] || [ -z "$routed" ] || [ "$sf" != "$routed" ]' "$_SW" && ! grep -Fq 'elif [ -n "$routed" ] &&' "$_SW" && _r=0
+_pin "$_r" "state-inspection §5 bypasses the foreign-state gate when the manifest route resolves to nothing (F1) - a foreign registry is swept against this directory's repos"
 
 rm -rf "$_PC_TMP"
 t_summary

@@ -80,15 +80,24 @@ in `doctor` rather than in `/start`: it is a comparison between two artifacts,
 and only one of them is the spec.
 
 ```bash
-# Both halves are pinned to THIS directory's manifest: $sf is the routed state,
-# never $OSS_STATE_FILE (see the note below). The section-4 heading is read as a
-# '## 4' line — a dot, a colon or whitespace after the number — and a spec with no
-# such heading REFUSES rather than reading an empty index set, because an
-# unreadable half is not an empty one. Only each row's FIRST cell counts, so an
-# ADR reference inside a row's prose ("supersedes ADR-0001") is not a row.
-sf="$("$oss_bin" state_path)"
-spec="$("$oss_bin" spec_path)"
-state_rc=0; reg_raw="$("$oss_bin" get '.bones[].adr' "$sf" 2>/dev/null)" || state_rc=$?
+# Both halves are pinned to THIS directory's manifest: `sv_state` is the routed
+# state, never $OSS_STATE_FILE (see the note below), and it is deliberately NOT
+# named `$sf` - state-inspection.md §2 owns that name for the override-first
+# path, and one surface of a composed read-out must not reassign another's. Both
+# resolver calls are guarded: an unresolvable route is the refusal below, never
+# an abort under `set -e`. The section-4 heading is read as a '## 4' line — a
+# dot, a colon or whitespace after the number — and a spec with no such heading
+# REFUSES rather than reading an empty index set, because an unreadable half is
+# not an empty one. Only each row's FIRST cell counts, so an ADR reference
+# inside a row's prose ("supersedes ADR-0001") is not a row.
+sv_state="$("$oss_bin" state_path 2>/dev/null)" || sv_state=""
+spec="$("$oss_bin" spec_path 2>/dev/null)" || spec=""
+state_rc=0
+if [ -n "$sv_state" ]; then
+  reg_raw="$("$oss_bin" get '.bones[].adr' "$sv_state" 2>/dev/null)" || state_rc=$?
+else
+  state_rc=1
+fi
 spec_rc=0; [ -r "$spec" ] || spec_rc=1
 hdr=0; [ "$spec_rc" = 0 ] && hdr="$(grep -cE '^##[[:space:]]*4[.:[:space:]]' "$spec" 2>/dev/null)" || :
 if [ "$state_rc" != 0 ] || [ "$spec_rc" != 0 ]; then
@@ -119,8 +128,12 @@ fi
 project's* bones while `"$oss_bin" spec_path` read this one's spec — reporting drift
 between two unrelated projects. `"$oss_bin" state_path` is the manifest-routed answer
 regardless of the override, which binds both halves of the comparison to the
-same project. (The interop surface, §7 of the skill body, reports the override
-separately; this comparison must not depend on the user having run it first.)
+same project — which is why this block names it **`sv_state`** and not `sf`:
+state-inspection.md §2 owns `sf` for the override-first path the rest of a
+composed `doctor` read-out uses, and a shared name would let one surface
+silently reassign the other's state mid-run. (The interop surface, §7 of the
+skill body, reports the override separately; this comparison must not depend on
+the user having run it first.)
 
 **Compare identifier *sets*, never their counts.** Cardinality cannot tell the
 two directions apart: replace `ADR-0002`'s row with `ADR-9999` and *both*

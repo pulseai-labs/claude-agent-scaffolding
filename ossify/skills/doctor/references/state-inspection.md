@@ -100,7 +100,8 @@ There, the bones-vs-spec comparison deliberately pins to `"$oss_bin" state_path`
 *regardless* of the override, because it is binding two different artifacts to one
 project. Here the job is to describe **the state `"$oss_bin" doctor` just gated**, so the
 read must follow doctor's own resolution. Do not harmonise them; the difference is
-the point.
+the point — and §3 carries it in a differently named variable (`sv_state`), so a
+composed session cannot reassign this surface's `sf` or vice versa.
 
 | Yours | Reads | Emit |
 |---|---|---|
@@ -373,26 +374,17 @@ belong in the read-out when the sweep gives you reason to look:
   # contributes no hits, and either one would turn every surface into a finding.
   probe_rc=0; "$oss_bin" touch_check . >/dev/null 2>&1 || probe_rc=$?
   state_rc=0; "$oss_bin" get 'true' >/dev/null 2>&1 || state_rc=$?
-  # Which state is IN PLAY, and is it this directory's? `$sf` follows the same
-  # precedence the reads below do ($OSS_STATE_FILE first); `$routed` is the
-  # manifest's answer regardless of the environment. §4 binds its worktree
-  # comparison with that pair, and the sweep needs the same gate: under an
-  # override pointing at another workspace's state, every surface THAT state
-  # knows and this directory's repos do not would be reported as matching no
-  # tracked file, after inspecting the wrong corpus. Paths are compared as
-  # WRITTEN - the blunt convention `_oss_resolve_state` announces - so an
-  # equivalent spelling of the same file skips too: visible, never a silent
-  # false clean. When the route cannot be resolved there is nothing to compare,
-  # and the corpus guard above has already spoken.
-  sf="${OSS_STATE_FILE:-}"
-  if [ -z "$sf" ]; then sf="$("$oss_bin" state_path 2>/dev/null)" || sf=""; fi
+  # The state IN PLAY is §2's resolved "$sf" - consumed, never re-derived: this
+  # block owns no copy of the precedence and makes no second resolver call. The
+  # routed half comes from the ONE state_path call below, to compare against.
+  # What the gate refuses, and why, is owned by the prose under this fence.
   routed="$("$oss_bin" state_path 2>/dev/null)" || routed=""
   if [ -z "${repos:-}" ]; then
     echo "skip: touch - the declared repo keys could not be read, so the sweep did not run"
   elif [ "$state_rc" != 0 ]; then
     echo "skip: touch - the state could not be resolved or read, and touch_check returns its resolver's rc 1 WITHOUT checking anything, so an empty hit file would not be an absence"
-  elif [ -n "$routed" ] && [ "$sf" != "$routed" ]; then
-    echo "skip: touch - the inspected state is not this directory's manifest-routed state ('$sf' vs '$routed'), so a repo-vs-state comparison would cross projects, and the sweep did not run"
+  elif [ -z "${sf:-}" ] || [ -z "$routed" ] || [ "$sf" != "$routed" ]; then
+    echo "skip: touch - the state in play ('${sf:-unset}') is not this directory's manifest-routed state ('${routed:-unresolved}'), so a repo-vs-state comparison would cross projects, and the sweep did not run"
   elif [ "$probe_rc" = 2 ]; then
     echo "skip: touch - the bones/risk-gate registry could not be read (touch_check answers rc 2), so no absence below would be sound"
   else
@@ -451,12 +443,20 @@ belong in the read-out when the sweep gives you reason to look:
   each reports its own failure instead of an absence it cannot support, so a
   sweep that did not run says that, rather than reporting every surface.
 
-  **The sweep is about THIS directory's state.** With `$OSS_STATE_FILE` pointing
-  at another workspace's state the block refuses the run — §4's own gate, one
-  unkeyed line naming both paths — because its surfaces would come from one
-  project while its corpus comes from another: every surface of the foreign
-  state would be reported as matching no tracked file, after inspecting the
-  wrong repos, with every command exiting 0.
+  **The sweep is about THIS directory's state, and this paragraph owns the
+  gate.** §2 resolved `$sf`; the block compares it against ONE `state_path`
+  answer and refuses the run — §4's rule, one unkeyed line naming both paths —
+  whenever they differ **or the route cannot be resolved at all**, because
+  "cannot be compared" is not "the same project": a manifest whose
+  `project_state` value is not absolute resolves to nothing, and a gate that
+  treats that as consent sweeps a foreign registry against this directory's
+  repos. Paths are compared **as written** — the blunt convention
+  `_oss_resolve_state` announces — so an equivalent spelling of the same file
+  refuses too: visible, never a silent false clean. The harm it prevents is
+  exact: the surfaces would come from one project while the corpus comes from
+  another, so every surface of the foreign state would be reported as matching
+  no tracked file, after inspecting the wrong repos, with every command exiting
+  0.
 
   **The ids, the KINDS and the glob lists come from `$roster`**, never from
   memory: it pairs every bone and gate with its kind and its touch list, and
