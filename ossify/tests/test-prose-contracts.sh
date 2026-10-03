@@ -795,6 +795,49 @@ t_capture _e_run "$_E_WS5"
 t_assert_rc 0 "(e) C4: a non-ADR registry value does not abort the check"
 t_assert_contains "$T_OUT" "not an ADR reference ('RFC-2119')" "(e) C4 ... it REFUSES and names the value, instead of dropping it from the comparison"
 
+# (e9) ROUND 2, C6: a duplicate REGISTRY record is reported, not collapsed. A
+# legacy or hand-edited state can hold two bone records for one ref; the index
+# then has one row, and the old `sort -u` reduced the registry to a set and
+# printed ok. Reproduced live before the fix.
+_E_WS6="$_PC_TMP/driftws6"; mkdir -p "$_E_WS6/.ossify" "$_E_WS6/canon" "$_E_WS6/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
+  "$_E_WS6" "$_E_WS6" "$_E_WS6" > "$_E_WS6/.ossify/topology.json"
+( cd "$_E_WS6" && bash "$OSS" init r2 >/dev/null && bash "$OSS" bone_add ADR-0002 "the record" "packages/core/**" ) >/dev/null 2>&1
+jq '.bones += [.bones[0]]' "$_E_WS6/.ossify/project-state.json" > "$_E_WS6/dup.json" && mv "$_E_WS6/dup.json" "$_E_WS6/.ossify/project-state.json"
+_e_spec "$_E_WS6" '| ADR-0002 | the row |'
+t_capture _e_run "$_E_WS6"
+t_assert_rc 0 "(e) C6: duplicate registry records do not abort the check"
+t_assert_contains "$T_OUT" "the registry carries more than one bone record for: ADR-0002" "(e) C6 ... the duplicate registration is reported"
+if printf '%s' "$T_OUT" | grep -Fq 'ok: spec'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) C6: a duplicate registry record collapsed to a set and the check printed ok"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# (e10) ROUND 2, C7: a section-4 data row whose first cell is not an ADR
+# reference is reported, never filtered out of the comparison.
+jq '.bones = [.bones[0]]' "$_E_WS6/.ossify/project-state.json" > "$_E_WS6/one.json" && mv "$_E_WS6/one.json" "$_E_WS6/.ossify/project-state.json"
+_e_spec "$_E_WS6" '| ADR-0002 | the row |' '| RFC-2119 | not a bone ref |'
+t_capture _e_run "$_E_WS6"
+t_assert_rc 0 "(e) C7: an unnameable data row does not abort the check"
+t_assert_contains "$T_OUT" "section 4 carries a row whose first cell is not an ADR reference: RFC-2119" "(e) C7 ... it is reported rather than skipped"
+if printf '%s' "$T_OUT" | grep -Fq 'ok: spec'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) C7: an unnameable row was filtered out and the check printed ok"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# ... and the underscore variant, which is the other shape the reviewer named.
+_e_spec "$_E_WS6" '| ADR-0002 | the row |' '| ADR_9999 | malformed separator |'
+t_capture _e_run "$_E_WS6"
+t_assert_contains "$T_OUT" "not an ADR reference: ADR_9999" "(e) C7 ... an ADR_9999-style cell is reported too"
+# (e11) CONTROL, adjacent to the two checks above: a clean pair still prints ok,
+# and the header/separator cells are NOT mistaken for data rows.
+_e_spec "$_E_WS6" '| ADR-0002 | the row |'
+t_capture _e_run "$_E_WS6"
+t_assert_contains "$T_OUT" "ok: spec - bones index matches the registry: 1 entries, 1 rows" "(e) C6/C7 control: a clean registry/index pair still reads clean"
+printf '# MASTER-SPEC\n\n## 4. Bones-registry index\n\n| adr | title |\n| :--- | ---: |\n| ADR-0002 | the row |\n\n## 5. Journeys\nx\n' > "$_E_WS6/docs/MASTER-SPEC.md"
+t_capture _e_run "$_E_WS6"
+t_assert_contains "$T_OUT" "ok: spec - bones index matches the registry: 1 entries, 1 rows" "(e) C6/C7 control: a lowercase header and a colon-dash separator are passed over, not reported as unnameable rows"
+
 # (e6) ROUND 1, R3: an unresolvable route must REFUSE, not abort. Both resolver
 # calls in the block are guarded, so under `set -euo pipefail` it reaches its own
 # refusal arm instead of dying inside the command substitution - which is what

@@ -121,11 +121,23 @@ else
     # Both halves are UPPER-CASED before comparing, and ids are compared as
     # COMPLETE values (`ADR-[A-Za-z0-9]+`, never a numeric substring, so a legal
     # non-numeric ref like `ADR-C2` is compared too): an adopted series may spell
-    # an id in either case, and neither spelling is drift. The index half keeps
-    # its rows WITH duplicates, because "one row per entry" is the invariant.
-    reg="$(printf '%s\n' "$reg_raw" | grep -oiE 'ADR-[A-Za-z0-9]+' | tr '[:lower:]' '[:upper:]' | sort -u)" || reg=""
-    idx_rows="$(awk '/^##[[:space:]]*4[.:[:space:]]/ {f=1; next} /^##[[:space:]]/ {f=0} f' "$spec" \
-      | awk -F'|' '/^[[:space:]]*\|/ {c=$2; gsub(/[[:space:]]/,"",c); if (c ~ /^[Aa][Dd][Rr]-[A-Za-z0-9]+$/) print toupper(c)}')" || idx_rows=""
+    # an id in either case, and neither spelling is drift.
+    #
+    # NOTHING is dropped or collapsed from either half without being reported
+    # (round 2, C6/C7): the registry keeps its duplicates, and a section-4 data
+    # row whose first cell is not an ADR reference is a finding rather than a row
+    # this check quietly skips. Only two cells are passed over - a label (a first
+    # cell with no digit, i.e. the header row) and the `|---|` separator.
+    reg_all="$(printf '%s\n' "$reg_raw" | grep -oiE 'ADR-[A-Za-z0-9]+' | tr '[:lower:]' '[:upper:]' | sort)" || reg_all=""
+    reg="$(printf '%s\n' "$reg_all" | sort -u)" || reg=""
+    reg_dupes="$(printf '%s\n' "$reg_all" | grep -v '^$' | uniq -d)" || reg_dupes=""
+    idx_all="$(awk '/^##[[:space:]]*4[.:[:space:]]/ {f=1; next} /^##[[:space:]]/ {f=0} f' "$spec" \
+      | awk -F'|' '/^[[:space:]]*\|/ {c=$2; gsub(/[[:space:]]/,"",c);
+          if (c == "" || c ~ /^[-:]+$/) next;
+          if (c !~ /[0-9]/) next;
+          if (c ~ /^[Aa][Dd][Rr]-[A-Za-z0-9]+$/) print "OK " toupper(c); else print "BAD " c}')" || idx_all=""
+    idx_rows="$(printf '%s\n' "$idx_all" | sed -n 's/^OK //p')" || idx_rows=""
+    bad_rows="$(printf '%s\n' "$idx_all" | sed -n 's/^BAD //p')" || bad_rows=""
     idx="$(printf '%s\n' "$idx_rows" | sort -u)" || idx=""
     dupes="$(printf '%s\n' "$idx_rows" | grep -v '^$' | sort | uniq -d)" || dupes=""
     # comm over the two variables - no temp files to create, leak or clean. An
@@ -137,10 +149,12 @@ else
       only_reg="$(comm -23 <(printf '%s\n' "$reg") <(printf '%s\n' "$idx"))" || only_reg=""
       only_idx="$(comm -13 <(printf '%s\n' "$reg") <(printf '%s\n' "$idx"))" || only_idx=""
     fi
-    if [ -n "$only_reg" ] || [ -n "$only_idx" ] || [ -n "$dupes" ]; then
+    if [ -n "$only_reg" ] || [ -n "$only_idx" ] || [ -n "$dupes" ] || [ -n "$reg_dupes" ] || [ -n "$bad_rows" ]; then
       [ -z "$only_reg" ] || echo "fail: spec - registry entry with no index row: $(printf '%s' "$only_reg" | tr '\n' ' ')"
       [ -z "$only_idx" ] || echo "fail: spec - index row with no registry entry: $(printf '%s' "$only_idx" | tr '\n' ' ')"
       [ -z "$dupes" ] || echo "fail: spec - section 4 carries more than one row for: $(printf '%s' "$dupes" | tr '\n' ' ')"
+      [ -z "$reg_dupes" ] || echo "fail: spec - the registry carries more than one bone record for: $(printf '%s' "$reg_dupes" | tr '\n' ' ')"
+      [ -z "$bad_rows" ] || echo "fail: spec - section 4 carries a row whose first cell is not an ADR reference: $(printf '%s' "$bad_rows" | tr '\n' ' ')"
     else
       echo "ok: spec - bones index matches the registry: $(printf '%s' "$reg" | grep -c '[^[:space:]]') entries, $(printf '%s' "$idx_rows" | grep -c '[^[:space:]]') rows"
     fi
@@ -177,6 +191,8 @@ above reports each direction with the identifiers that do not pair:
 | registry entry with no index row | a bone was recorded but never written into the spec | `fail: spec` — the spec understates the architecture |
 | index row with no registry entry | a row was hand-written, or an entry was lost | `fail: spec` — name the direction and the rows that do not pair |
 | more than one index row for one entry | the invariant is *one row per entry*; a copy left behind reads as agreement to a set comparison | `fail: spec` — name the duplicated ids |
+| more than one registry record for one entry | a legacy or hand-edited state carries a duplicate registration; the index cannot show which record is the extra one | `fail: spec` — name the duplicated ids, and repair the registry |
+| a section-4 row whose first cell is not an ADR reference | the row is unnameable: neither a bone nor a header label, so no comparison can pair it | `fail: spec` — name the row and say what a bone row must start with |
 
 None is auto-repairable: which artifact is right is a judgment about what
 actually happened. Name the identifiers, name the direction each belongs to, and
