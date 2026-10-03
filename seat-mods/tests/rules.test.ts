@@ -119,6 +119,13 @@ describe('bashRules', () => {
     expect(bashRules('git push origin b\ngit status')).toEqual(['push'])
     expect(bashRules('gh pr --repo o/r view 12')).toEqual([])
   })
+  test('an escaped operator is text, not a boundary (PR #644 round 3)', () => {
+    expect(bashRules("printf '<%s>\\n' foo\\|git merge")).toEqual([])
+    expect(bashRules('echo a\\;git push --force')).toEqual([])
+  })
+  test('control: an unescaped operator still splits', () => {
+    expect(bashRules('echo a;git push --force')).toContain('force-push')
+  })
   test('a quoted -C path does not hide the subcommand', () => {
     expect(bashRules('git -C "/a b" push --force')).toContain('force-push')
   })

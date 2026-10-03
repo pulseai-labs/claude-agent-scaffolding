@@ -79,7 +79,8 @@ function blank(command: string): { text: string; pieces: string[] } {
   const keep = (piece: string) => `\u0000${pieces.push(piece) - 1}\u0000`
   // An unquoted backslash-newline is a line continuation, not a command boundary.
   const joined = command.replace(/\\\n/g, ' ')
-  return { text: blankHeredocs(joined, keep).replace(QUOTED, keep), pieces }
+  // A backslash outside quotes makes the next character text (`\\|` is not a pipe).
+  return { text: blankHeredocs(joined, keep).replace(QUOTED, keep).replace(/\\./g, keep), pieces }
 }
 
 // A short-option bundle such as `-fqu` that holds the letter.

@@ -52,7 +52,13 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   `&&`, `||`, `|`, parentheses and newlines, after quoted strings and heredoc bodies are blanked as
   text, so a commit message may mention `git merge` or `-n`. Only the command word counts, after any
   `VAR=value` and `sudo`, `env`, `command`, `exec`, `nohup` or `time`; so `echo git merge` is not a
-  merge, and neither are `xargs git push --force`, `bash -c "git push -f"` or `g""it push`.
+  merge, and neither are `xargs git push --force`, `bash -c "git push -f"`, `g""it push`, or a
+  wrapper with its own options (`env -i git merge`, `sudo -u u git push -f`).
+- **`git pull` is not guarded.** A pull that merges is not on the merge rail; the briefs' prose
+  rule covers it.
+- **`implementer` is one profile for every implementer brief.** Briefs that stage and never
+  commit (ossify's work-item implementer, the direct work item) keep that rule as prose; the mod
+  allows `git commit`, `git push` and `gh pr create` for every implementer.
   An AI trailer is looked for only in the commit's own command and its message file.
 - **A `-F` message file is read from the session's working directory.** A relative path after a
   `cd`, or a path in a shell variable, is not found and reads as empty, so a trailer in it passes.
