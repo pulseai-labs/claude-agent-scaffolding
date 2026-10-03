@@ -59,7 +59,11 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 - **Unparsed shell forms pass:** a single `&` list operator, bundled short flags (`-fqu`),
   abbreviated long options (`--mir`), several heredocs on one command, a heredoc example inside a
   quoted message, value-taking git globals (`--git-dir x`) and quoted subcommands or flags
-  (`git "merge"`). A trailer that opens an `-m` message, or comes from `--trailer`, also passes.
+  (`git "merge"`). A trailer that opens an `-m` message, comes from `--trailer`, or follows a
+  backslash-newline inside single quotes, also passes.
+- **The guarded launch needs a POSIX shell in the seat's pane.** herdr-crew sets the variables
+  with `export`; a pane whose shell is Nushell leaves them unset, and the missing `seat: <role>`
+  shows it.
 - **A trailer counts only at a line start**, as the repository's commit-msg hook reads it.
 - **`git pull` is not guarded.** A pull that merges is not on the merge rail; the briefs' prose
   rule covers it.

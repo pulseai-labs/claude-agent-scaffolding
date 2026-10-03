@@ -90,7 +90,8 @@ open the PR from the worktree with `gh pr create --repo <owner/repo> --base
   Files: <paths touched, plus any separate file holding longer narrative>
 
 NEVER: merge, delete a branch, force-push, edit files outside the worktree, or run any
-subagent — your report file at REPORT_PATH is the one exception outside it, as the ossify
+subagent — your report file at REPORT_PATH and files under SCRATCH_DIR are the exceptions
+outside it, as the ossify
 briefs say. When blocked, write the question to your report file and wait; when stuck,
 write an escalation there and stop.
 If a tool or policy refuses you, report it verbatim and stop that step.
@@ -118,7 +119,8 @@ from the worktree with `gh pr create --repo <owner/repo> --base <base-branch> --
   Changed / Evidence / PR / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: merge, delete a branch, force-push, edit files outside the worktree, or run any
-subagent — your report file at REPORT_PATH is the one exception outside it. When blocked,
+subagent — your report file at REPORT_PATH and files under SCRATCH_DIR are the exceptions
+outside it. When blocked,
 write the question to your report file and wait; when stuck, write an escalation there and
 stop; report refusals verbatim.
 ```
@@ -130,7 +132,6 @@ SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
-SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: reviewer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path> checked out at PR <number>'s head <sha>.
@@ -235,7 +236,8 @@ branch. Then write your report file with this body:
   Changed / Evidence / PR / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: merge, delete a branch, force-push, edit files outside the worktree, or run any
-subagent — your report file at REPORT_PATH is the one exception outside it. When blocked,
+subagent — your report file at REPORT_PATH and files under SCRATCH_DIR are the exceptions
+outside it. When blocked,
 write the question to your report file and wait; when stuck, write an escalation there and
 stop; report refusals verbatim.
 ```
@@ -315,7 +317,6 @@ SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
-SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: implementer, direct work item. State the model you are running in your first reply,
 then continue.
 

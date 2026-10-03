@@ -12,9 +12,10 @@ All notable changes to the `herdr-crew` plugin.
   runs unguarded, and the run record says so. An ossify implementer's list adds its handoff's
   directory, where it writes `report.md`. Neither variable ever goes in `settings.json`, a shell
   profile or a `command:` line.
-- **Guarded-role briefs** (`briefs.md`: implementer, fix round, direct work item, reviewer,
-  verifier; `ossify-briefs.md`: item verifier) name that scratch directory as `SCRATCH_DIR`, and
-  commit-message files for `git commit -F` go there. It replaces the session scratchpad, which the
+- **Briefs that use scratch** (`briefs.md`: planned and fast implementer, fix round, verifier;
+  `ossify-briefs.md`: item verifier) name that scratch directory as `SCRATCH_DIR`; commit-message
+  files for `git commit -F` go there, and the implementer `NEVER` clauses list it beside
+  `REPORT_PATH` as an exception outside the worktree. It replaces the session scratchpad, which the
   seat-mods guard cannot locate.
 
 ## 0.2.1

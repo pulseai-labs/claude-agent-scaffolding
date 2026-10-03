@@ -96,6 +96,16 @@ describe('bashRules', () => {
   test('a comment is not a command (PR #644 round 5)', () => {
     expect(bashRules('echo ok # ; git push --force')).toEqual([])
   })
+  test('a comment right after an operator is a comment (PR #644 round 6)', () => {
+    expect(bashRules('echo ok;# x; git push --force')).toEqual([])
+  })
+  test('flags stop at -- (PR #644 round 6)', () => {
+    expect(bashRules('git add -- --no-verify')).toEqual([])
+    expect(bashRules('git commit -m x -- -n')).toEqual(['commit'])
+  })
+  test('control: flags before -- still count', () => {
+    expect(bashRules('git commit --no-verify -m x -- a.ts')).toContain('no-verify')
+  })
   test('control: a command before a comment still counts', () => {
     expect(bashRules('echo ok; git push --force # note')).toContain('force-push')
     expect(bashRules('git push origin b#tag')).toEqual(['push'])

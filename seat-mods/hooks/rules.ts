@@ -83,7 +83,7 @@ function blank(command: string): { text: string; pieces: string[] } {
   // A backslash outside quotes makes the next character text (`\\|` is not a pipe).
   // A `#` that starts a word begins a comment, which runs no command.
   const text = blankHeredocs(joined, keep).replace(QUOTED, keep).replace(/\\./g, keep)
-  return { text: text.replace(/(^|[ \t])#[^\n]*/gm, '$1'), pieces }
+  return { text: text.replace(/(^|[ \t;&|()])#[^\n]*/gm, '$1'), pieces }
 }
 
 // A segment's text with its blanked pieces put back, nested pieces included.
@@ -128,7 +128,11 @@ function gitOf(tokens: string[]): { sub: string; args: string[] } | undefined {
   let i = 0
   while (rest[i]?.startsWith('-')) i += rest[i] === '-C' || rest[i] === '-c' ? 2 : 1
   const sub = rest[i]
-  return sub === undefined ? undefined : { sub, args: rest.slice(i + 1) }
+  if (sub === undefined) return undefined
+  // Arguments after `--` are paths, never options.
+  const args = rest.slice(i + 1)
+  const end = args.indexOf('--')
+  return { sub, args: end < 0 ? args : args.slice(0, end) }
 }
 
 export function bashRules(command: string, messageFileText = ''): RuleId[] {
