@@ -92,7 +92,7 @@ aligned.
    spine-level questions, and one final report** — never raw item plan traffic
    or per-item completions; and nothing closes a `run.json`, because teardown is the
    seats, with every run-created workspace listed for the top and archived by the
-   session that holds the operator on its confirmation, not the file. Putting item tasks in the top's
+   session that holds the operator, not the file. Putting item tasks in the top's
    `run.json`, letting per-item completions reach the top, or inventing a
    close-the-`run.json` step is a wrong answer.
 3. **Profiles are bound by the SEATS block and never substituted.** Each item's

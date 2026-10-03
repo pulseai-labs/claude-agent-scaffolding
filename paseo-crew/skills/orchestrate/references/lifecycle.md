@@ -184,7 +184,7 @@ Every command's syntax comes from Paseo's own `paseo` skill.
     requires conversation resolution, GitHub refuses the merge while any thread
     is open, and a refusal returns to step 10, never a retry. Then release the workers
     whose retention ends here (`roles.md`), as Teardown directs — its settled-status gate,
-    and the operator's tab confirmation before a run-created workspace is archived — and
+    and its archive of a run-created workspace — and
     delete the branch only after confirming a merged PR exists whose head OID equals the
     branch tip — on an activated ossify spine (1b) the merge lands on the word you relay
     under that dispatch's `MERGE_EXECUTOR` assignment — always a merge commit on the named

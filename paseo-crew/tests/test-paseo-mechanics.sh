@@ -77,6 +77,10 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # its `--thinking` requirement moves into the prose and the command's placeholder; and
 # #609's implementer release follows `roles.md`'s retention end rather than every item's
 # step-12 merge.
+# 2026-10-03, #635/#637/#638 (0.1.4): at 290 after the fix, REF_BUDGET unchanged. #635's pair
+# rule gains one owner sentence in Completion and a pointer in each of the five handlers;
+# #637 adds the reviewer's consolidation request to the `idle` handler; and #638 deletes
+# Teardown's tab ask and its rationale, which pays for both.
 REF_BUDGET=290
 
 # shellcheck source=/dev/null
@@ -119,10 +123,13 @@ pin "$REF" 'report it to the operator, as Handoff'"'"'s' "a mismatched seat is c
 # `SETTLE_WINDOW`. Re-introducing the old route must fail this, and the operator
 # clause above is what the release waits on instead. Counted FLAT (#632 F11): a
 # reintroduction wrapped across two lines is the same clause, and a per-line count
-# reads it as absent.
-c="$(count_of "$REF" 'no-longer-working precondition' flat)"
-if [ "$c" -eq 0 ]; then pass "the model-check release depends on no report or settle window ($c)"
-else fail "the model-check release names no report-dependent precondition" "$c occurrence(s)"; fi
+# reads it as absent. Guarded (#635 N11): `flat`'s refusal on an unreadable file
+# otherwise surfaced as "integer expression expected" with no cause, which reads as
+# a broken suite rather than as a control that could not read its file.
+if c="$(count_of "$REF" 'no-longer-working precondition' flat)"; then
+  if [ "$c" -eq 0 ]; then pass "the model-check release depends on no report or settle window ($c)"
+  else fail "the model-check release names no report-dependent precondition" "$c occurrence(s)"; fi
+else fail "the model-check release control is readable" "unreadable file or empty needle: $REF"; fi
 
 section "D2: the report file is the finish"
 pin "$REF" 'the file is the contract' "the report-file contract survives"
@@ -135,8 +142,20 @@ pin "$REF" 'create_heartbeat' "the heartbeat backstop is named once"
 present "$REF" 'expiresIn' "the heartbeat carries expiresIn"
 pin "$REF" 'gone without having exited' "the heartbeat re-arms only a lost wait"
 pin "$REF" 'with the `idle` exit dropped' "a false wake drops the idle exit"
+# #637: a reviewer's `/code-review` fork returns before its finders do, so its first reportless
+# idle takes one bounded consolidation request, because only a message starts the turn the
+# fork ended.
+pin "$REF" "reportless idle — whatever its last message says — is sent one bounded request to consolidate the review's returned candidates into \`REPORT_PATH\`, then one fresh wait as for any send; a second one takes the missing-report case below" "a reviewer's first reportless idle takes one consolidation request, then a plain send-wait" flat
 pin "$REF" 'Coordinator seats' "coordinators are armed without the idle exit"
 pin "$REF" 'Both are compared, not merely recorded' "hash and identity are both compared"
+# #635 AC1: the pair rule has ONE owner sentence, and the five handlers point at it (budget,
+# `error`, `permission`, `idle`, a send) — so the owner cannot be reworded away while its five
+# pointers keep reading as rules of their own.
+pin "$REF" 'The pair is re-taken when the handler has read the body at `REPORT_PATH`' "the pair rule has one owner sentence" flat
+if c="$(count_of "$REF" '`Completion`' flat)"; then
+  if [ "$c" -eq 5 ]; then pass "the five handlers point at the pair rule ($c)"
+  else fail "the five handlers point at the pair rule" "$c occurrence(s)"; fi
+else fail "the pair-rule pointers are countable" "unreadable file or empty needle: $REF"; fi
 # #622 / #632 F1-F3: the change alone is not a report. The exit row is the single owner
 # of "changed file AND `Status` is `idle`" — `error` and `closed` settle at the `error`
 # exit — and every other reader of a changed file points at that row. Which is what lets
@@ -148,10 +167,21 @@ pin "$REF" 'Never `mtime` alone' "the identity is the inode, never mtime alone" 
 # An `error` retry that replays a dispatch which may have mutated repeats its side
 # effects — a commit, a push, a PR, a close (#608 review, round 1).
 pin "$REF" 'is never replayed' "a dispatch that may have mutated is not replayed" flat
+# #635 M5: round 2's contract change was unpinned — restoring `186623e`'s paseo-mechanics.md
+# left this suite green. The route reads the seat's `REPORT_PATH` with its activity and
+# artifacts, and a changed body there is evidence for that reconciliation, never a `report`
+# (#632 fix rounds 2 and 3). Measured against the two snapshots, flat: the read pin 0 at
+# 186623e and 1 at f756693, the classification pin 0 at both — so the read pin alone carries
+# the f756693 boundary.
+pin "$REF" 'its durable artifacts and its `REPORT_PATH` first' "the error route reads REPORT_PATH with its artifacts" flat
+pin "$REF" 'evidence for this reconciliation, never a `report`' "an errored seat's changed body is evidence, never a report" flat
 # Controls: `paseo wait` returns on the first idle (F2), so it must never be the finish.
-c="$(occurrences "$REF" 'paseo wait')"
-if [ "$c" -le 1 ]; then pass "paseo wait is at most named as the thing not to use ($c)"
-else fail "paseo wait is not a completion primitive" "$c occurrences"; fi
+# Guarded like the J3 control above (#635 N11's class: a count that cannot read its file
+# must say so, not surface as an arithmetic error).
+if c="$(occurrences "$REF" 'paseo wait')"; then
+  if [ "$c" -le 1 ]; then pass "paseo wait is at most named as the thing not to use ($c)"
+  else fail "paseo wait is not a completion primitive" "$c occurrences"; fi
+else fail "the paseo-wait control is readable" "unreadable file or empty needle: $REF"; fi
 
 section "D3: the detached handoff"
 pin "$REF" 'env -u PASEO_AGENT_ID -u PASEO_AGENT_CWD paseo run -d' "the successor launch unsets both caller variables"
@@ -171,6 +201,10 @@ pin "$REF" 'hands on without them' "the handoff names the featureValues a detach
 # command line dropped a profile's `thinkingOptionId` silently. The command carries the
 # bracketed placeholder now, and the prose says when it is dropped.
 pin "$REF" '[--thinking <thinkingOptionId>]' "the launch line carries the optional thinking flag" flat
+# #635 N10: the F8 swap left the CONDITION unpinned — the command token alone stays green if
+# the prose stops saying when the flag is dropped, which was the #629 D6 defect. This is the
+# condition the demoted comment used to carry.
+pin "$REF" 'dropped for a profile that sets none' "the thinking flag is dropped for a profile that sets none" flat
 # #608 review round 9: an idle with neither a question nor a background-work claim
 # is the missing-report case rather than an unwatched dispatch. (The child-reconcile
 # procedure this round added to the handoff branch was deleted by the operator ruling.)
@@ -188,14 +222,28 @@ section "teardown and the cascade"
 present "$REF" 'archive_agent' "a seat is released with archive_agent"
 present "$REF" 'archive_workspace' "a run-created workspace is released with archive_workspace"
 pin "$REF" 'Close only what the run created' "only run-created things are archived"
+# #638: the operator's tab confirmation is gone, and the clause that replaced it names the
+# daemon's own handling — an absence check with its guard, because a reintroduced ask must fail
+# here rather than pass unread, and its replacement cannot be dropped silently beside it.
+if c="$(count_of "$REF" 'ask for those tabs to be closed' flat)"; then
+  if [ "$c" -eq 0 ]; then pass "no operator tab confirmation is required ($c)"
+  else fail "the operator tab confirmation is gone" "$c occurrence(s)"; fi
+else fail "the teardown tab-ask control is readable" "unreadable file or empty needle: $REF"; fi
+pin "$REF" "A client tab on it is the daemon's to handle" "the removed ask's replacement names the daemon" flat
+# #639 V11: the old needle also sat in the idle handler, so reverting Teardown's clause left it
+# green. This phrase now exists only in that clause (the Completion and cascade sites point at
+# it), so a revert of the clause alone goes RED.
+pin "$REF" 'a spine or work-PR session, a lane driver with subagents' "the coordinator clause names a lane driver too" flat
 pin "$REF" 'after it reports its own children released' "a coordinator is archived after its children"
 
 section "herdr is gone"
-# Deliberate: these herdr strings are asserted ABSENT.
+# Deliberate: these herdr strings are asserted ABSENT. Guarded like the other counts
+# (#635 N11's class): an unreadable file must say so rather than certify each absence.
 for gone in 'herdr' 'HERDR_' 'pane' '--until' 'wait-output' '--machine'; do
-  c="$(occurrences "$REF" "$gone")"
-  if [ "$c" -eq 0 ]; then pass "no '$gone' in paseo-mechanics.md"
-  else fail "no '$gone' in paseo-mechanics.md" "$c occurrence(s)"; fi
+  if c="$(occurrences "$REF" "$gone")"; then
+    if [ "$c" -eq 0 ]; then pass "no '$gone' in paseo-mechanics.md"
+    else fail "no '$gone' in paseo-mechanics.md" "$c occurrence(s)"; fi
+  else fail "the '$gone' absence control is readable" "unreadable file or empty needle: $REF"; break; fi
 done
 
 section "budget"
@@ -227,9 +275,9 @@ if r="$(budget_report "$ctl_over")" && [ "${r##* }" -gt 0 ]; then pass "control:
 else fail "control: the budget still fails a file past the limit" "an over-limit fixture read [$r] and passed"; fi
 if ! r="$(budget_report "$ctl_over/gone")"; then pass "control: an unreadable file is refused, not counted as within budget"
 else fail "control: an unreadable file is refused, not counted as within budget" "read [$r]"; fi
-# This one line under the limit is the
-# case that separates them — measured, mutating the comparison to `[ "$_n" -ge 0 ]` left
-# the suite green until this control existed.
+# This within-budget line separates a comparison that measures the overshoot from one that
+# accepts any count — measured, mutating the comparison to `[ "$_n" -ge 0 ]` left the suite
+# green until this control existed.
 ctl_under="$(mktemp)"
 awk -v n="$((REF_BUDGET - 1))" 'BEGIN { for (i = 0; i < n; i++) print "" }' > "$ctl_under"
 if r="$(budget_report "$ctl_under")" && [ "${r##* }" -eq 0 ]; then pass "control: a file within the budget reports no overshoot"
@@ -237,11 +285,14 @@ else fail "control: a file within the budget reports no overshoot" "read [$r]"; 
 rm -f "$ctl_over" "$ctl_under"
 
 section "no personal name ships"
-hits=0
+# Guarded like the other counts (#635 N11's class, #639 G8): a refused read must say so rather
+# than leave `hits` at 0 and certify every absence in a file nobody opened.
+hits=0; refused=0
 for needle in claude-glm claude-glm-flash claude-sol glm-5.3 Fable; do
-  hits=$((hits + $(occurrences "$REF" "$needle")))
+  if c="$(occurrences "$REF" "$needle")"; then hits=$((hits + c)); else refused=1; break; fi
 done
-if [ "$hits" -eq 0 ]; then pass "no personal name in paseo-mechanics.md"
+if [ "$refused" -eq 1 ]; then fail "the personal-name sweep is readable" "unreadable file or empty needle: $REF"
+elif [ "$hits" -eq 0 ]; then pass "no personal name in paseo-mechanics.md"
 else fail "no personal name in paseo-mechanics.md" "$hits occurrence(s)"; fi
 
 section "the hoisted counters are not re-copied"

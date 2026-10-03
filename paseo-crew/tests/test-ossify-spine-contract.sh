@@ -1731,7 +1731,8 @@ pin "$LIFECYCLE_MD" 'closed spine has no PR to confirm' \
 # #629 D2 / #632 F6: step 12's release is the top's main release path, and a literal
 # "release every worker" there archived the retained implementer the next item is
 # dispatched to. It releases the workers whose retention ends here, which `roles.md` owns,
-# and routes to Teardown's settled-status gate and the operator's tab confirmation.
+# and routes to Teardown's settled-status gate and its workspace archive (#638 dropped the
+# operator's tab confirmation, so the pin's needle stops at "as Teardown directs").
 pin "$LIFECYCLE_MD" 'release the workers whose retention ends here (`roles.md`), as Teardown directs' \
   "step 12 releases only the workers whose retention ends there" flat
 pin "$ROLES_MD" 'the `spine session` seat the project file names' \
