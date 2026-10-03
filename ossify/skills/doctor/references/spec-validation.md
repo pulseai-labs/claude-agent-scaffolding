@@ -110,29 +110,40 @@ if [ -n "$why" ]; then
 elif [ "${hdr:-0}" = 0 ]; then
   echo "skip: spec - section 4 carries no '## 4' heading this check reads, so the index half is unreadable rather than empty"
 else
-  # Both halves are UPPER-CASED before comparing: an adopted series may spell an
-  # id in either case, and neither spelling is drift. The index half keeps its
-  # rows WITH duplicates, because "one row per entry" is the invariant.
-  reg="$(printf '%s\n' "$reg_raw" | grep -oiE 'ADR-[0-9]+' | tr '[:lower:]' '[:upper:]' | sort -u)" || reg=""
-  idx_rows="$(awk '/^##[[:space:]]*4[.:[:space:]]/ {f=1; next} /^##[[:space:]]/ {f=0} f' "$spec" \
-    | awk -F'|' '/^[[:space:]]*\|/ {c=$2; gsub(/[[:space:]]/,"",c); if (c ~ /^[Aa][Dd][Rr]-[0-9]+$/) print toupper(c)}')" || idx_rows=""
-  idx="$(printf '%s\n' "$idx_rows" | sort -u)" || idx=""
-  dupes="$(printf '%s\n' "$idx_rows" | grep -v '^$' | sort | uniq -d)" || dupes=""
-  # comm over the two variables - no temp files to create, leak or clean. An
-  # empty side is handled explicitly, because comm would count a lone blank line
-  # as a difference and manufacture a phantom id.
-  if [ -z "$reg" ] || [ -z "$idx" ]; then
-    only_reg="$reg"; only_idx="$idx"
+  # A value the registry HOLDS but this check cannot NAME refuses the run - it is
+  # never filtered out: `bone_add` accepts any ref (`ADR-C2` is legal and in the
+  # registry suite's own fixtures), and dropping one would print "0 entries" over
+  # a registry that has entries (round 1, C4).
+  bad="$(printf '%s\n' "$reg_raw" | grep -vE '^[[:space:]]*[Aa][Dd][Rr]-[A-Za-z0-9]+[[:space:]]*$' | grep -v '^[[:space:]]*$')" || bad=""
+  if [ -n "$bad" ]; then
+    echo "skip: spec - the registry holds a value that is not an ADR reference ('$(printf '%s' "$bad" | tr '\n' ' ')'), and a value this check cannot name is not one it may drop"
   else
-    only_reg="$(comm -23 <(printf '%s\n' "$reg") <(printf '%s\n' "$idx"))" || only_reg=""
-    only_idx="$(comm -13 <(printf '%s\n' "$reg") <(printf '%s\n' "$idx"))" || only_idx=""
-  fi
-  if [ -n "$only_reg" ] || [ -n "$only_idx" ] || [ -n "$dupes" ]; then
-    [ -z "$only_reg" ] || echo "fail: spec - registry entry with no index row: $(printf '%s' "$only_reg" | tr '\n' ' ')"
-    [ -z "$only_idx" ] || echo "fail: spec - index row with no registry entry: $(printf '%s' "$only_idx" | tr '\n' ' ')"
-    [ -z "$dupes" ] || echo "fail: spec - section 4 carries more than one row for: $(printf '%s' "$dupes" | tr '\n' ' ')"
-  else
-    echo "ok: spec - bones index matches the registry: $(printf '%s' "$reg" | grep -c '[^[:space:]]') entries, $(printf '%s' "$idx_rows" | grep -c '[^[:space:]]') rows"
+    # Both halves are UPPER-CASED before comparing, and ids are compared as
+    # COMPLETE values (`ADR-[A-Za-z0-9]+`, never a numeric substring, so a legal
+    # non-numeric ref like `ADR-C2` is compared too): an adopted series may spell
+    # an id in either case, and neither spelling is drift. The index half keeps
+    # its rows WITH duplicates, because "one row per entry" is the invariant.
+    reg="$(printf '%s\n' "$reg_raw" | grep -oiE 'ADR-[A-Za-z0-9]+' | tr '[:lower:]' '[:upper:]' | sort -u)" || reg=""
+    idx_rows="$(awk '/^##[[:space:]]*4[.:[:space:]]/ {f=1; next} /^##[[:space:]]/ {f=0} f' "$spec" \
+      | awk -F'|' '/^[[:space:]]*\|/ {c=$2; gsub(/[[:space:]]/,"",c); if (c ~ /^[Aa][Dd][Rr]-[A-Za-z0-9]+$/) print toupper(c)}')" || idx_rows=""
+    idx="$(printf '%s\n' "$idx_rows" | sort -u)" || idx=""
+    dupes="$(printf '%s\n' "$idx_rows" | grep -v '^$' | sort | uniq -d)" || dupes=""
+    # comm over the two variables - no temp files to create, leak or clean. An
+    # empty side is handled explicitly, because comm would count a lone blank
+    # line as a difference and manufacture a phantom id.
+    if [ -z "$reg" ] || [ -z "$idx" ]; then
+      only_reg="$reg"; only_idx="$idx"
+    else
+      only_reg="$(comm -23 <(printf '%s\n' "$reg") <(printf '%s\n' "$idx"))" || only_reg=""
+      only_idx="$(comm -13 <(printf '%s\n' "$reg") <(printf '%s\n' "$idx"))" || only_idx=""
+    fi
+    if [ -n "$only_reg" ] || [ -n "$only_idx" ] || [ -n "$dupes" ]; then
+      [ -z "$only_reg" ] || echo "fail: spec - registry entry with no index row: $(printf '%s' "$only_reg" | tr '\n' ' ')"
+      [ -z "$only_idx" ] || echo "fail: spec - index row with no registry entry: $(printf '%s' "$only_idx" | tr '\n' ' ')"
+      [ -z "$dupes" ] || echo "fail: spec - section 4 carries more than one row for: $(printf '%s' "$dupes" | tr '\n' ' ')"
+    else
+      echo "ok: spec - bones index matches the registry: $(printf '%s' "$reg" | grep -c '[^[:space:]]') entries, $(printf '%s' "$idx_rows" | grep -c '[^[:space:]]') rows"
+    fi
   fi
 fi
 ```
@@ -153,9 +164,13 @@ the user having run it first.)
 two directions apart: replace `ADR-0002`'s row with `ADR-9999` and *both*
 directions are present while `.bones | length` and section 4's row count still
 agree — a count comparison reports clean on exactly the drift this check exists
-to find. Ids are compared **case-insensitively** (both halves upper-cased): an
-adopted series may spell them either way, and neither spelling is drift. The
-block above reports each direction with the identifiers that do not pair:
+to find. Ids are compared **case-insensitively** (both halves upper-cased) and as
+**complete values** — `ADR-[A-Za-z0-9]+`, never a numeric substring, so a legal
+non-numeric ref such as `ADR-C2` is compared too: an adopted series may spell an
+id in either case, and neither spelling is drift. A registry value that is not
+an ADR reference at all **refuses the comparison** (`skip:`) rather than being
+filtered out — a value this check cannot name is not one it may drop. The block
+above reports each direction with the identifiers that do not pair:
 
 | Mismatch | What it means | Report as |
 |---|---|---|

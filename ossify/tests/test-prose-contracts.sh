@@ -761,6 +761,40 @@ if printf '%s' "$T_OUT" | grep -Fq 'no registry entry'; then
 else
   T_PASS=$((T_PASS+1))
 fi
+# (e7) ROUND 1, C4: a legal NON-NUMERIC ref is compared as a complete value.
+# `bone_add` accepts `ADR-C2` (the registry suite's own fixture mints it), so the
+# old numeric-substring extractor dropped it from BOTH halves and printed
+# "ok: 0 entries, 0 rows" over a registry that has an entry - the same
+# failure-read-as-absence class as R2/C1, one step further out.
+_E_WS5="$_PC_TMP/driftws5"; mkdir -p "$_E_WS5/.ossify" "$_E_WS5/canon" "$_E_WS5/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
+  "$_E_WS5" "$_E_WS5" "$_E_WS5" > "$_E_WS5/.ossify/topology.json"
+( cd "$_E_WS5" && bash "$OSS" init c4 >/dev/null && bash "$OSS" bone_add ADR-C2 "a permitted non-numeric ref" "packages/core/**" ) >/dev/null 2>&1
+_e_spec "$_E_WS5"
+t_capture _e_run "$_E_WS5"
+t_assert_rc 0 "(e) C4: a non-numeric registry ref does not abort the check"
+t_assert_contains "$T_OUT" "registry entry with no index row: ADR-C2" "(e) C4 ... it is COMPARED, so its missing row is reported - the old substring extractor printed a false clean"
+if printf '%s' "$T_OUT" | grep -Fq 'ok: spec'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) C4: a non-numeric ref was dropped and the registry read as empty"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# CONTROLS: the same id compares equal when its row is present, and the numeric
+# series reads clean beside it.
+_e_spec "$_E_WS5" '| ADR-C2 | the non-numeric ref |'
+t_capture _e_run "$_E_WS5"
+t_assert_contains "$T_OUT" "matches the registry: 1 entries, 1 rows" "(e) C4 control: the non-numeric id compares equal when its row is present"
+( cd "$_E_WS5" && bash "$OSS" bone_add ADR-0002 "a numeric ref" "packages/core/**" ) >/dev/null 2>&1
+_e_spec "$_E_WS5" '| ADR-C2 | the non-numeric ref |' '| ADR-0002 | the numeric ref |'
+t_capture _e_run "$_E_WS5"
+t_assert_contains "$T_OUT" "matches the registry: 2 entries, 2 rows" "(e) C4 control: the numeric series still reads clean beside it"
+# (e8) C4's refusal arm: a value that is not an ADR reference at all refuses the
+# comparison instead of being filtered out of it.
+( cd "$_E_WS5" && bash "$OSS" bone_add "RFC-2119" "not an adr ref" "packages/core/**" ) >/dev/null 2>&1
+t_capture _e_run "$_E_WS5"
+t_assert_rc 0 "(e) C4: a non-ADR registry value does not abort the check"
+t_assert_contains "$T_OUT" "not an ADR reference ('RFC-2119')" "(e) C4 ... it REFUSES and names the value, instead of dropping it from the comparison"
+
 # (e6) ROUND 1, R3: an unresolvable route must REFUSE, not abort. Both resolver
 # calls in the block are guarded, so under `set -euo pipefail` it reaches its own
 # refusal arm instead of dying inside the command substitution - which is what
