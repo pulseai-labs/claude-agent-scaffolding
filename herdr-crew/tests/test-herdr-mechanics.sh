@@ -44,7 +44,14 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # again mechanics the file exists to state. The operator-facing rule (never in settings.json)
 # first lived only in seat-mods' README. The final review restored it here (spec §5 binds
 # both places) with an ossify implementer's handoff directory: two lines, 243 -> 245.
-REF_BUDGET=245
+# 0.2.3 (#640) added the worker ping and the heartbeat backstop: the ping line, the
+# generation-first consumption rules — including what deduplication does NOT suppress, a
+# live dialog and the tick's health check — the wrong-path refusal, and the heartbeat's
+# classification and kill points. +27 lines on insertion, traded back 12 (detection events,
+# the wait-output caveat, the typed-wait set, the two-dead-ends and doorbell paragraphs, the
+# launch intro and steps 1/3/5, and the teardown close paragraph) to land at 260. The gate
+# rose with the mechanics the file exists to state and still fails over the limit.
+REF_BUDGET=260
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

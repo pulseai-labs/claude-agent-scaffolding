@@ -16,6 +16,12 @@ The seat names below are examples: the project file (`.herdr-crew/roles.md`,
 | Verifier | `strong-coder` — the work-item verify; `fast-coder` for read-only probes and mechanical runs outside it (a suite, a count, a fact) | the seat's | retained until its item passes or escalates to the operator | |
 | Operator | the human — the merge word, and decisions no session can own | | | |
 
+Herdr's own answer decides a seat's wait path, so where the project file offers a choice,
+prefer an agent herdr detects (a `claude-*` lane, `devin-*`, `pi`) for the implementer and
+verifier roles: the typed wait then covers a live state instead of the report file alone. An
+undetected seat stays legal — it is waited on through its report file and pings like any
+other — and no profile field declares the path: detection is read live at launch.
+
 ## The launch
 
 A seat is a name, never `--model`. The command it resolves to lives in the operator's

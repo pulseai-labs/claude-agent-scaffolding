@@ -20,7 +20,8 @@ CLOSE_EXPECTED_MODEL is a failed launch to report, not to work around.
 PLACEMENT: <abs path of the worktree the spine's lane ran from>.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — the dispatcher fills it with its own $HERDR_PANE_ID, or `none` when your pane's server cannot reach it>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry: `herdr agent prompt <NOTIFY_PANE> "REPORT READY: <task id> <kind> <path>"`. The report file is the contract.
 SPINE_ID=<spine id>
 CLOSE_COMMAND=<the command this seat was launched with, from its machine entry>
 CLOSE_EXPECTED_MODEL=<the model the banner or screen must show>
@@ -81,7 +82,8 @@ report, not to work around.
 PLACEMENT: REPO_ROOT — the worktree holding this PR's branch.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — the dispatcher fills it with its own $HERDR_PANE_ID, or `none` when your pane's server cannot reach it>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry: `herdr agent prompt <NOTIFY_PANE> "REPORT READY: <task id> <kind> <path>"`. The report file is the contract.
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
 MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
 PR_REPO=<owner/repo>
@@ -170,12 +172,11 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      names the operator as executor, the approved SHA and the merge-commit
      convention; on the reply you re-fetch the gates, the operator's landing
      is a merge commit on that same SHA — never a squash or rebase — and you
-     confirm and report the resulting merge SHA, surfacing any deviation
-     rather than adopting it. Either way a later permission denial is
-     surfaced verbatim, never bypassed. Then release both seats and close the
-     workspaces you created for them, as MECHANICS's Teardown says, with
-     `herdr workspace list` showing none of them — only what you can prove is
-     yours; report any teardown you cannot complete rather than claiming it.
+     confirm and report the resulting merge SHA, surfacing any deviation rather than
+     adopting it. Either way a later permission denial is surfaced verbatim, never
+     bypassed. Then release both seats and close the workspaces you created for them;
+     as MECHANICS's Teardown says, with `herdr workspace list` showing none of them — only what
+     you can prove is yours; report any teardown you cannot complete rather than claiming it.
      You are exempt from any record-pass hold.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
@@ -189,10 +190,9 @@ report must wake one session (`lifecycle.md`, "Your own rotation"). On the open 
 whether the delegated review ran, its reviewed head, its clean/findings state and
 summary, the fix rounds run, and the durable ledger/comment references — the next
 fresh work-PR dispatch receives it as PRIOR_REVIEW in a fresh brief, the review
-state reused. Both settle this dispatch; release both seats and close their
-workspaces as step 6 directs. On the open shape the top does not advance to
-the record pass — a later merge is a new work-PR dispatch, not a resumption of this
-one. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
+state reused. Both settle this dispatch; on the open shape the top does not advance to the record
+pass — a later merge is a new work-PR dispatch, not a resumption of this one. Then:
+Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
 NEVER: talk to the operator — every question goes up to the top; squash; merge
 without the top's relayed word; delete a branch; or dispatch a second full review — one

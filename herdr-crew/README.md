@@ -21,7 +21,7 @@ placement, teardown, and machines — and it wins where the two differ.
 | Surface | What it carries |
 |---|---|
 | `orchestrate` (the skill) | The orchestrator session's playbook: the delegation floor and its decidable test, the role list, the run by reference, the briefs, the ossify seam, and the refusals. |
-| `references/herdr-mechanics.md` | The mechanics `herdr --skill` cannot state: the seat launch and its placement, the two readiness paths, the typed wait, the turn-start check on a send, the report-file doorbell, teardown, and machines. It overrides the guide's default placement. |
+| `references/herdr-mechanics.md` | The mechanics `herdr --skill` cannot state: the seat launch and its placement, the two readiness paths, the typed wait, the turn-start check on a send, the report-file doorbell, the worker ping and its one-generation consumption rule, the heartbeat backstop, teardown, and machines. It overrides the guide's default placement. |
 | `references/roles.md` | The role table and the seats that fill it, the launch sequence, retention, the session budget, placement for the dual-repo case, and the writers rules. |
 | `references/lifecycle.md` | The thirteen-step run, the operator's own roles and the named points they run at, and rotation past the context ceiling. |
 | `references/config.md` | The operator's two files, the agent entries and their fields, the resolved profile and where each value travels, the project file's three sections, and what happens when a file is missing. |
@@ -125,6 +125,16 @@ the wait in the foreground inside that host's cap where it does not — never a 
 never a re-entry after an empty timeout. A round of N parallel items is N such waits, one
 per pane, each waking the session when it exits; the round's barrier closes when every
 item's report file is in hand.
+
+**A worker also pings.** Every brief names its parent's pane as `NOTIFY_PANE`, and after
+every atomic report rename the worker sends one `REPORT READY: <task> <kind> <path>` line
+there — one send, no `--wait`, no retry, and a failed send leaves the report intact. The
+parent consumes a given hash/identity generation once and retires that dispatch's wait when
+it does; a ping naming a path other than the briefed report path is surfaced, never read.
+**The heartbeat backstop** is one background timer of about 15 minutes per session holding a
+live dispatch: one health check per live seat per tick, never a completion wait and never a
+re-entry, catching a stopped, blocked or unreadable seat whose wait missed its wake. It is
+killed at teardown and at a rotation's stand-down, and the successor arms a fresh one.
 
 ## The run's state
 
