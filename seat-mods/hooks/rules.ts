@@ -59,8 +59,9 @@ function gitOf(tokens: string[]): { sub: string; args: string[] } | undefined {
   let i = tokens.indexOf('git')
   if (i < 0) return undefined
   i += 1
-  while (i < tokens.length && tokens[i].startsWith('-')) i += tokens[i] === '-C' || tokens[i] === '-c' ? 2 : 1
-  return i < tokens.length ? { sub: tokens[i], args: tokens.slice(i + 1) } : undefined
+  while (tokens[i]?.startsWith('-')) i += tokens[i] === '-C' || tokens[i] === '-c' ? 2 : 1
+  const sub = tokens[i]
+  return sub === undefined ? undefined : { sub, args: tokens.slice(i + 1) }
 }
 
 export function bashRules(command: string, messageFileText = ''): RuleId[] {
@@ -99,9 +100,9 @@ export function commitMessageFile(command: string): string | undefined {
     const git = gitOf(tokensOf(segment))
     if (git?.sub !== 'commit') continue
     const { args } = git
-    for (let i = 0; i < args.length; i++) {
-      const value = args[i] === '-F' || args[i] === '--file' ? args[i + 1]
-        : args[i].startsWith('--file=') ? args[i].slice('--file='.length) : undefined
+    for (const [i, arg] of args.entries()) {
+      const value = arg === '-F' || arg === '--file' ? args[i + 1]
+        : arg.startsWith('--file=') ? arg.slice('--file='.length) : undefined
       const path = value?.replace(/^['"]|['"]$/g, '')
       if (path !== undefined && path !== '' && path !== '-') return path
     }
