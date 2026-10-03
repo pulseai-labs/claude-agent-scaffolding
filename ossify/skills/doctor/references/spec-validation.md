@@ -100,25 +100,39 @@ else
 fi
 spec_rc=0; [ -r "$spec" ] || spec_rc=1
 hdr=0; [ "$spec_rc" = 0 ] && hdr="$(grep -cE '^##[[:space:]]*4[.:[:space:]]' "$spec" 2>/dev/null)" || :
-if [ "$state_rc" != 0 ] || [ "$spec_rc" != 0 ]; then
-  echo "skip: spec - the bones drift check could not read both halves (registry rc $state_rc, spec rc $spec_rc), and an unreadable half is not an empty one"
+# Name the half that failed, never both: "registry rc 5, spec rc 0" under a
+# both-halves claim is a contradiction the operator has to resolve themselves.
+why=""
+[ "$state_rc" = 0 ] || why="the registry half (rc $state_rc)"
+[ "$spec_rc" = 0 ] || why="${why:+$why and }the spec half"
+if [ -n "$why" ]; then
+  echo "skip: spec - the bones drift check could not read $why, and an unreadable half is not an empty one"
 elif [ "${hdr:-0}" = 0 ]; then
   echo "skip: spec - section 4 carries no '## 4' heading this check reads, so the index half is unreadable rather than empty"
 else
-  reg="$(printf '%s\n' "$reg_raw" | grep -oE 'ADR-[0-9]+' | sort -u)" || reg=""
-  idx="$(awk '/^##[[:space:]]*4[.:[:space:]]/ {f=1; next} /^##[[:space:]]/ {f=0} f' "$spec" \
-    | awk -F'|' '/^[[:space:]]*\|/ {c=$2; gsub(/[[:space:]]/,"",c); if (c ~ /^ADR-[0-9]+$/) print c}' \
-    | sort -u)" || idx=""
-  ra="$(mktemp)"; rb="$(mktemp)"
-  printf '%s\n' "$reg" > "$ra"; printf '%s\n' "$idx" > "$rb"
-  only_reg="$(awk 'NR==FNR { if ($0 != "") s[$0]=1; next } $0 != "" && !($0 in s)' "$rb" "$ra")"
-  only_idx="$(awk 'NR==FNR { if ($0 != "") s[$0]=1; next } $0 != "" && !($0 in s)' "$ra" "$rb")"
-  rm -f "$ra" "$rb"
-  if [ -n "$only_reg" ] || [ -n "$only_idx" ]; then
+  # Both halves are UPPER-CASED before comparing: an adopted series may spell an
+  # id in either case, and neither spelling is drift. The index half keeps its
+  # rows WITH duplicates, because "one row per entry" is the invariant.
+  reg="$(printf '%s\n' "$reg_raw" | grep -oiE 'ADR-[0-9]+' | tr '[:lower:]' '[:upper:]' | sort -u)" || reg=""
+  idx_rows="$(awk '/^##[[:space:]]*4[.:[:space:]]/ {f=1; next} /^##[[:space:]]/ {f=0} f' "$spec" \
+    | awk -F'|' '/^[[:space:]]*\|/ {c=$2; gsub(/[[:space:]]/,"",c); if (c ~ /^[Aa][Dd][Rr]-[0-9]+$/) print toupper(c)}')" || idx_rows=""
+  idx="$(printf '%s\n' "$idx_rows" | sort -u)" || idx=""
+  dupes="$(printf '%s\n' "$idx_rows" | grep -v '^$' | sort | uniq -d)" || dupes=""
+  # comm over the two variables - no temp files to create, leak or clean. An
+  # empty side is handled explicitly, because comm would count a lone blank line
+  # as a difference and manufacture a phantom id.
+  if [ -z "$reg" ] || [ -z "$idx" ]; then
+    only_reg="$reg"; only_idx="$idx"
+  else
+    only_reg="$(comm -23 <(printf '%s\n' "$reg") <(printf '%s\n' "$idx"))" || only_reg=""
+    only_idx="$(comm -13 <(printf '%s\n' "$reg") <(printf '%s\n' "$idx"))" || only_idx=""
+  fi
+  if [ -n "$only_reg" ] || [ -n "$only_idx" ] || [ -n "$dupes" ]; then
     [ -z "$only_reg" ] || echo "fail: spec - registry entry with no index row: $(printf '%s' "$only_reg" | tr '\n' ' ')"
     [ -z "$only_idx" ] || echo "fail: spec - index row with no registry entry: $(printf '%s' "$only_idx" | tr '\n' ' ')"
+    [ -z "$dupes" ] || echo "fail: spec - section 4 carries more than one row for: $(printf '%s' "$dupes" | tr '\n' ' ')"
   else
-    echo "ok: spec - bones index matches the registry: $(printf '%s' "$reg" | grep -c '[^[:space:]]') entries, $(printf '%s' "$idx" | grep -c '[^[:space:]]') rows"
+    echo "ok: spec - bones index matches the registry: $(printf '%s' "$reg" | grep -c '[^[:space:]]') entries, $(printf '%s' "$idx_rows" | grep -c '[^[:space:]]') rows"
   fi
 fi
 ```
@@ -139,15 +153,17 @@ the user having run it first.)
 two directions apart: replace `ADR-0002`'s row with `ADR-9999` and *both*
 directions are present while `.bones | length` and section 4's row count still
 agree — a count comparison reports clean on exactly the drift this check exists
-to find. The block above reports each direction with the identifiers that do not
-pair:
+to find. Ids are compared **case-insensitively** (both halves upper-cased): an
+adopted series may spell them either way, and neither spelling is drift. The
+block above reports each direction with the identifiers that do not pair:
 
 | Mismatch | What it means | Report as |
 |---|---|---|
 | registry entry with no index row | a bone was recorded but never written into the spec | `fail: spec` — the spec understates the architecture |
 | index row with no registry entry | a row was hand-written, or an entry was lost | `fail: spec` — name the direction and the rows that do not pair |
+| more than one index row for one entry | the invariant is *one row per entry*; a copy left behind reads as agreement to a set comparison | `fail: spec` — name the duplicated ids |
 
-Neither is auto-repairable: which artifact is right is a judgment about what
+None is auto-repairable: which artifact is right is a judgment about what
 actually happened. Name the identifiers, name the direction each belongs to, and
 stop.
 

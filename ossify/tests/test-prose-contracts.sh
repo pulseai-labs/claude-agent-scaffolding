@@ -691,6 +691,45 @@ if printf '%s' "$T_OUT" | grep -Fq 'registry entry with no index row'; then
 else
   T_PASS=$((T_PASS+1))
 fi
+# (e3b) ROUND 1, R2: the two halves are compared case-insensitively. An adopted
+# series may spell ids either way; the old block upper-cased neither, so a
+# lowercase pair matched nothing on both sides and printed a false
+# "0 entries, 0 rows" clean, while a mixed-case valid pair read as drift.
+_E_WS4="$_PC_TMP/driftws4"; mkdir -p "$_E_WS4/.ossify" "$_E_WS4/canon" "$_E_WS4/docs"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
+  "$_E_WS4" "$_E_WS4" "$_E_WS4" > "$_E_WS4/.ossify/topology.json"
+( cd "$_E_WS4" && bash "$OSS" init lower >/dev/null && bash "$OSS" bone_add adr-0002 "a lowercase registry id" "packages/core/**" ) >/dev/null 2>&1
+_e_spec "$_E_WS4" '| adr-0002 | the same id, lowercase |'
+t_capture _e_run "$_E_WS4"
+t_assert_rc 0 "(e) R2: a lowercase pair runs clean"
+t_assert_contains "$T_OUT" "matches the registry: 1 entries, 1 rows" "(e) R2 ... it reads the pair as the ONE bone it is, not as the old false clean (\"0 entries, 0 rows\")"
+_e_spec "$_E_WS4" '| ADR-0002 | the same id, upper |'
+t_capture _e_run "$_E_WS4"
+t_assert_contains "$T_OUT" "matches the registry: 1 entries, 1 rows" "(e) R2 ... and a mixed-case valid pair is not reported as drift"
+# (e3c) ROUND 1, C1: "one row per registry entry" is the invariant, so a
+# duplicated index row is a finding even though the SET is unchanged.
+_e_spec "$_E_WS4" '| ADR-0002 | first copy |' '| ADR-0002 | the copy left behind |'
+t_capture _e_run "$_E_WS4"
+t_assert_rc 0 "(e) C1: duplicate index rows do not abort the check"
+t_assert_contains "$T_OUT" "carries more than one row for: ADR-0002" "(e) C1 ... a set comparison that collapses duplicates must still report them"
+if printf '%s' "$T_OUT" | grep -Fq 'ok: spec - bones index matches'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) C1: duplicated rows read as a clean match - sort -u hides the second row"
+else
+  T_PASS=$((T_PASS+1))
+fi
+# (e3d) ROUND 1, R13: no temp files in this block at all - the comparison runs
+# over the two variables, and a mktemp pair is the machinery (and the leak) the
+# round-1 review rejected.
+if grep -Fq 'mktemp' "$_E_SV" || grep -Fq 'rm -f' "$_E_SV"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) R13: the drift block still round-trips through temp files - comm over the variables needs none"
+else
+  T_PASS=$((T_PASS+1))
+fi
+if grep -Fq 'comm -23' "$_E_SV" && grep -Fq 'comm -13' "$_E_SV"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) R13: the block does not compare the two halves with comm"
+fi
 # (e4) REFUSAL ARM: an index half that cannot be READ is not an EMPTY one. The
 # heading is what this recipe reads section 4 by, so its absence must refuse.
 printf '# MASTER-SPEC\n\n## Bones\n\n| ADR | Title |\n|---|---|\n| ADR-0002 | x |\n' > "$_E_WS/docs/MASTER-SPEC.md"
@@ -711,7 +750,12 @@ printf '%s\n' '{"schema_version":9}' > "$_E_WS2/.ossify/project-state.json"
 _e_spec "$_E_WS2" '| ADR-0002 | x |'
 t_capture _e_run "$_E_WS2"
 t_assert_rc 0 "(e) an unreadable registry does not abort the run"
-t_assert_contains "$T_OUT" "could not read both halves" "(e) ... it names the unreadable half instead of reporting every index row as orphaned"
+t_assert_contains "$T_OUT" "could not read the registry half" "(e) ... it names the HALF that failed instead of claiming both, so \"registry rc 5, spec rc 0\" is never printed under a both-halves claim"
+if printf '%s' "$T_OUT" | grep -Fq 'both halves'; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) R10: the refusal claims both halves while only one failed"
+else
+  T_PASS=$((T_PASS+1))
+fi
 if printf '%s' "$T_OUT" | grep -Fq 'no registry entry'; then
   T_FAIL=$((T_FAIL+1)); echo "FAIL: (e) an unreadable registry read as an EMPTY one - every index row was reported as a hand-written row"
 else
