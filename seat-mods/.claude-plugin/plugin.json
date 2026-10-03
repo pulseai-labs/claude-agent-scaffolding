@@ -1,0 +1,6 @@
+{
+  "name": "seat-mods",
+  "version": "0.1.0",
+  "description": "Role guards for worker seats, as a Claude Code mod. Set SEAT_MODS_ROLE (implementer, verifier or reviewer) on a seat's spawn and its tool calls meet that role's rails: no merges, force-pushes, branch deletion, --no-verify or AI trailers for any seat; no commit, push or PR for a verifier or reviewer; Edit and Write only inside the worktree and the directories SEAT_MODS_ALLOW lists. Unset, it does nothing, so an orchestrator or operator session is never guarded. Requires Claude Code 2.1.287 or later. No lib, no state.",
+  "author": { "name": "Pras" }
+}
