@@ -78,10 +78,9 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/paseo-mechanics.md"
 # #609's implementer release follows `roles.md`'s retention end rather than every item's
 # step-12 merge.
 # 2026-10-03, #635/#637/#638 (0.1.4): at 290 after the fix, REF_BUDGET unchanged. #635's pair
-# rule gains one owner sentence in Completion and a pointer in each of the five handlers,
-# plus the `error` row's re-armed-wait guard; #637 adds the reviewer's consolidation request
-# to the `idle` handler; and #638 deletes Teardown's tab ask and its rationale, which pays
-# for both.
+# rule gains one owner sentence in Completion and a pointer in each of the five handlers;
+# #637 adds the reviewer's consolidation request to the `idle` handler; and #638 deletes
+# Teardown's tab ask and its rationale, which pays for both.
 REF_BUDGET=290
 
 # shellcheck source=/dev/null
@@ -144,28 +143,19 @@ present "$REF" 'expiresIn' "the heartbeat carries expiresIn"
 pin "$REF" 'gone without having exited' "the heartbeat re-arms only a lost wait"
 pin "$REF" 'with the `idle` exit dropped' "a false wake drops the idle exit"
 # #637: a reviewer's `/code-review` fork returns before its finders do, so its first reportless
-# idle takes one bounded consolidation request before the idle exit is dropped, because only a
-# message starts the turn the fork ended.
+# idle takes one bounded consolidation request, because only a message starts the turn the
+# fork ended.
 pin "$REF" "reportless idle — whatever its last message says — is sent one bounded request to consolidate the review's returned candidates into \`REPORT_PATH\`, then one fresh wait as for any send; a second one takes the missing-report case below" "a reviewer's first reportless idle takes one consolidation request, then a plain send-wait" flat
 pin "$REF" 'Coordinator seats' "coordinators are armed without the idle exit"
 pin "$REF" 'Both are compared, not merely recorded' "hash and identity are both compared"
 # #635 AC1: the pair rule has ONE owner sentence, and the five handlers point at it (budget,
 # `error`, `permission`, `idle`, a send) — so the owner cannot be reworded away while its five
-# pointers keep reading as rules of their own. `(`Completion`` rather than the closed form:
-# the `error` route's pointer carries the row's guard inside the same parenthesis.
+# pointers keep reading as rules of their own.
 pin "$REF" 'The pair is re-taken when the handler has read the body at `REPORT_PATH`' "the pair rule has one owner sentence" flat
-if c="$(count_of "$REF" '(`Completion`' flat)"; then
+if c="$(count_of "$REF" '`Completion`' flat)"; then
   if [ "$c" -eq 5 ]; then pass "the five handlers point at the pair rule ($c)"
   else fail "the five handlers point at the pair rule" "$c occurrence(s)"; fi
 else fail "the pair-rule pointers are countable" "unreadable file or empty needle: $REF"; fi
-# #635 M1 / #639 G1 / H1: the guard is the `error` row's, keyed to the error route's re-send
-# wait — not to the seat's status when a wait is armed, which hid a first-attempt error to the
-# budget (round 1's P1). The needle runs to the clause's end so a guard widened to first waits
-# or dropped entirely fails it.
-pin "$REF" "only the error route's re-send wait holds \`error\` until it has seen \`Status\` leave it" "the error row keys its guard to the re-send wait" flat
-# #639 H2/H11: the explicit `closed` carve-out, pinned beside the row pin because deleting it
-# stayed green after the old combined pin went (measured).
-pin "$REF" 'taken at once by every wait, `closed` included' "the error row takes closed at once by every wait" flat
 # #622 / #632 F1-F3: the change alone is not a report. The exit row is the single owner
 # of "changed file AND `Status` is `idle`" — `error` and `closed` settle at the `error`
 # exit — and every other reader of a changed file points at that row. Which is what lets
@@ -177,11 +167,6 @@ pin "$REF" 'Never `mtime` alone' "the identity is the inode, never mtime alone" 
 # An `error` retry that replays a dispatch which may have mutated repeats its side
 # effects — a commit, a push, a PR, a close (#608 review, round 1).
 pin "$REF" 'is never replayed' "a dispatch that may have mutated is not replayed" flat
-# #635 N6: the loop checks `error` before `permission`, so a seat that settles `error` or
-# `closed` with a request pending wakes as `error`. The route therefore reads the pending
-# request with the activity and artifacts, rather than leaving it unread on the escalate and
-# `closed` arms.
-pin "$REF" 'its pending permissions, its durable artifacts' "the error route reads the seat's pending permissions" flat
 # #635 M5: round 2's contract change was unpinned — restoring `186623e`'s paseo-mechanics.md
 # left this suite green. The route reads the seat's `REPORT_PATH` with its activity and
 # artifacts, and a changed body there is evidence for that reconciliation, never a `report`

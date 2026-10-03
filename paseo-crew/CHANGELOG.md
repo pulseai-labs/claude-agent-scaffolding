@@ -11,18 +11,15 @@ reconciliation — and kept when it has not: a permission answer, the budget gra
 an idle false-wake re-arm, a lost wait or a handoff. So an `error` retry re-takes the pair over the
 failed attempt's body, and an idle retry that writes nothing takes the missing-report path instead
 of passing the changed-file check on that body; a permission answer keeps the pair, so a body
-written before the permission still wakes the next `report`. The `error` exit's guard is the exit
-row's, keyed to the error route's re-send wait: every other wait, `closed` included, takes it
-at once. The rest of #635 is in with it: a seat that settles `error`
-or `closed` with a request pending wakes as `error` — the loop reads `error` first — and the route
-now reads that pending request with its activity and artifacts; the suites pin the thinking-flag
-condition, the J3 control's unreadable-file refusal, and the errored body's
-evidence-never-a-report classification.
+written before the permission still wakes the next `report`. M1 (the `error` exit's arm-guard)
+and N6 (an errored seat's pending permission) moved to #643. The rest of #635 is in with it:
+the suites pin the thinking-flag condition, the J3 control's unreadable-file refusal, and the
+errored body's evidence-never-a-report classification.
 
 The reviewer's stall is the orchestrator's to break (#637): a reviewer's first idle with no report
-takes one bounded request to consolidate the review's returned candidates into `REPORT_PATH` before
-the `idle` exit is dropped for that dispatch, because its `/code-review` fork returns before its
-finders do. No per-role budget guidance is added; #625 stands.
+takes one bounded request to consolidate the review's returned candidates into `REPORT_PATH`,
+because its `/code-review` fork returns before its finders do. No per-role budget guidance is
+added; #625 stands.
 
 Teardown no longer asks the operator to confirm tabs before a run-created workspace is archived
 (#638). On the floor `lifecycle.md` step 1 already requires (0.10.2), a client tab left on a

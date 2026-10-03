@@ -99,7 +99,7 @@ idle, which a seat running background work of its own reaches long before it fin
 |---|---|
 | `report` | `REPORT_PATH`'s hash **or** identity differs from the noted pair, and `Status` is `idle` — `error` and `closed` settle at the `error` exit, and a body written by a seat that still runs is not yet a report |
 | `permission` | `PendingPermissions` in `paseo inspect <id> --json` is non-empty |
-| `error` | `Status` is `error` or `closed` — taken at once by every wait, `closed` included; only the error route's re-send wait holds `error` until it has seen `Status` leave it |
+| `error` | `Status` is `error` or `closed` |
 | `idle` | `Status` has been `idle` without a break, timed by the loop from when it first saw it, for longer than the brief's `SETTLE_WINDOW`, and no report has arrived |
 | `budget` | time since the dispatch's `DISPATCHED_AT` exceeds the brief's `TIME_BUDGET` |
 
@@ -111,7 +111,7 @@ the orchestrator adapts and does not copy:
 # one background call per dispatch; returns once with the exit reason
 while :; do
   s=$(paseo inspect <id> --json)
-  <.Status is error or closed, per the `error` row>    && { echo error; break; }
+  <.Status is error or closed>                         && { echo error; break; }
   <report changed and Status is idle>                  && { echo report; break; }
   <.PendingPermissions non-empty>                      && { echo permission; break; }
   <idle continuously > SETTLE_WINDOW, unless dropped>  && { echo idle; break; }
@@ -142,14 +142,14 @@ done
   one bounded correction request asking it to write `REPORT_PATH`, and one fresh wait; a second
   such idle escalates. Coordinator seats — Teardown's coordinator clause names them — are armed
   that way from the start, because their idle is not a finish.
-- `error`: read its activity, its pending permissions, its durable artifacts and its `REPORT_PATH`
-  first — a pending request is answered with `respond_to_permission`, arming no wait — `error`
-  does not say that nothing landed, and a changed body there is evidence for this
-  reconciliation, never a `report`. A dispatch that may have mutated anything (a commit, a push,
-  a PR, a close) is never replayed: send a recovery instruction that names what already exists,
-  or escalate. Only a dispatch that cannot have mutated is re-sent once on the same seat, one
-  fresh wait, the pair re-taken over the body read above (`Completion`; the guard is the `error`
-  row's); a second `error` escalates. On `closed` the seat is gone: escalate, with no retry.
+- `error`: read the seat's activity, its durable artifacts and its `REPORT_PATH` first —
+  `error` does not say that nothing landed, and a changed body there is evidence for this
+  reconciliation, never a `report`. A dispatch that may have mutated anything (a commit, a
+  push, a PR, a close) is never replayed: send a recovery instruction that names what
+  already exists, or escalate. Only a dispatch that cannot have mutated is re-sent once on
+  the same seat, one fresh wait whose `error` exit arms only once `Status` has left `error`,
+  the pair re-taken over the body read above (`Completion`); a second `error` escalates.
+  On `closed` the seat is gone: escalate, with no retry.
 - `budget`: send one status request and arm one wait whose budget is a short grace, counted
   from that request, the pair kept (`Completion`). If the grace expires with no report,
   `cancel_agent`, record the seat's last message, and escalate. A timeout is a checkpoint,
@@ -188,8 +188,8 @@ never silently extends the budget.
 This is the one statement of how the orchestrator sends a seat anything after its brief (a
 fix task, an answer, a plan approval, a correction); other files say "send" and mean this.
 `send_agent_prompt` with `background: true` and `notifyOnFinish: true`. The text arrives
-whole, so nothing fragments it and no pointer file is needed. (`Completion`'s pair rule decides
-it), then arm one fresh wait. There is no turn-start check: a send that never
+whole, so nothing fragments it and no pointer file is needed. Apply `Completion`'s pair rule,
+then arm one fresh wait. There is no turn-start check: a send that never
 opened a turn surfaces as `idle` with no report. A seat with a pending permission is answered
 with `respond_to_permission` before anything else is sent to it.
 
