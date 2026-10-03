@@ -66,6 +66,7 @@ SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
+SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: implementer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path>, branch <branch>, base <base-branch>. Use git -C for every
@@ -79,7 +80,7 @@ PLAN GATE: before your first edit, write your plan (files to touch, order, tests
 to your report file at REPORT_PATH, then wait. Implement only what the orchestrator's
 reply approves.
 
-DONE: commit on <branch> with messages written to a file and `git commit -F`; push;
+DONE: commit on <branch> with messages written to a file under SCRATCH_DIR and `git commit -F`; push;
 open the PR from the worktree with `gh pr create --repo <owner/repo> --base
 <base-branch> --head <branch>`. Then write your report file with this body:
   Changed: <commit SHAs and the count of files touched>
@@ -102,6 +103,7 @@ SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
+SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: implementer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path>, branch <branch>, base <base-branch>. Use git -C for every
@@ -110,7 +112,7 @@ git command; cd does not persist.
 TASK: <one bounded change, with the exact test command that proves it>.
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
-DONE: commit with a message written to a file and `git commit -F`; push; <open the PR
+DONE: commit with a message written to a file under SCRATCH_DIR and `git commit -F`; push; <open the PR
 from the worktree with `gh pr create --repo <owner/repo> --base <base-branch> --head
 <branch> | push to the existing PR>. Then write your report file with this body:
   Changed / Evidence / PR / Open / Files as ids, SHAs, counts and a report path.
@@ -128,6 +130,7 @@ SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
+SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: reviewer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path> checked out at PR <number>'s head <sha>.
@@ -161,6 +164,7 @@ SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
+SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: verifier, read-only. State the model you are running in your first reply, then
 continue.
 
@@ -198,6 +202,7 @@ SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
+SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: implementer, fix round. State the model you are running in your first reply, then
 continue.
 
@@ -225,7 +230,7 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 A finding that arrives after the disposition is not on that list: write it to your
 report file and wait, resolving it only once the orchestrator's answer arrives.
 
-DONE: commit with a message written to a file and `git commit -F`; push to the PR's
+DONE: commit with a message written to a file under SCRATCH_DIR and `git commit -F`; push to the PR's
 branch. Then write your report file with this body:
   Changed / Evidence / PR / Open / Files as ids, SHAs, counts and a report path.
 
@@ -310,6 +315,7 @@ SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces
+SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: implementer, direct work item. State the model you are running in your first reply,
 then continue.
 

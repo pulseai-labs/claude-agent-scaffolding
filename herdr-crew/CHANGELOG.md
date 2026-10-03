@@ -8,9 +8,13 @@ All notable changes to the `herdr-crew` plugin.
   verifier or reviewer spawn sets `SEAT_MODS_ROLE` and `SEAT_MODS_ALLOW` (its report directory and
   its own scratch directory, `<run dir>/scratch/<seat label>`) for the seat-mods plugin. Coordinator
   seats and the orchestrator never get them. A guarded seat whose status line lacks `seat: <role>`
-  runs unguarded, and the run record says so.
-- **Verifier briefs** (`briefs.md`, `ossify-briefs.md`) name that scratch directory as
-  `SCRATCH_DIR`, replacing the session scratchpad, which the seat-mods guard cannot locate.
+  runs unguarded, and the run record says so. An ossify implementer's list adds its handoff's
+  directory, where it writes `report.md`. Neither variable ever goes in `settings.json`, a shell
+  profile or a `command:` line.
+- **Guarded-role briefs** (`briefs.md`: implementer, fix round, direct work item, reviewer,
+  verifier; `ossify-briefs.md`: item verifier) name that scratch directory as `SCRATCH_DIR`, and
+  commit-message files for `git commit -F` go there. It replaces the session scratchpad, which the
+  seat-mods guard cannot locate.
 
 ## 0.2.1
 

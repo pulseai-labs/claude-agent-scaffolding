@@ -6,15 +6,19 @@ async function roleOf($: any): Promise<RoleState> {
   return parseRole(await $.env.get('SEAT_MODS_ROLE'))
 }
 
-// Where a path lands: the file if it stats, else its folder plus the name (a Write
-// may name a file that is not there yet). Undefined when neither resolves.
+// Where a path lands: the path itself if it stats, else its nearest existing
+// ancestor plus the rest (a Write may create the file and its folders). A `..`
+// below a folder that does not exist cannot be resolved, so it is undefined.
 async function realOf($: any, path: string): Promise<string | undefined> {
   const own = await $.fs.stat(path, { resolve: true }).catch(() => undefined)
   if (own?.realPath !== undefined) return own.realPath
   const cut = path.lastIndexOf('/')
   const folder = cut < 0 ? '.' : cut === 0 ? '/' : path.slice(0, cut)
-  const dir = await $.fs.stat(folder, { resolve: true }).catch(() => undefined)
-  return dir?.realPath === undefined ? undefined : `${dir.realPath.replace(/\/$/, '')}/${path.slice(cut + 1)}`
+  const name = path.slice(cut + 1)
+  if (folder === path || name === '..') return undefined
+  const dir = await realOf($, folder)
+  if (dir === undefined) return undefined
+  return name === '' || name === '.' ? dir : `${dir.replace(/\/$/, '')}/${name}`
 }
 
 // The git top level of the session's working directory, or the directory itself outside git.

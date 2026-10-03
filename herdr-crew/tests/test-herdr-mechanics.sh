@@ -42,8 +42,9 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # 0.2.2 (seat-mods) added the guarded-seat paragraph to the launch's step 2 — the two
 # --env flags, the scratch directory and who never gets them: six lines, 237 -> 243,
 # again mechanics the file exists to state. The operator-facing rule (never in settings.json)
-# lives in seat-mods' README, not here.
-REF_BUDGET=243
+# first lived only in seat-mods' README. The final review restored it here (spec §5 binds
+# both places) with an ossify implementer's handoff directory: two lines, 243 -> 245.
+REF_BUDGET=245
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

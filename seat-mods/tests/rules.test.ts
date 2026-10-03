@@ -58,6 +58,21 @@ describe('bashRules', () => {
     expect(bashRules('git commit -F m && git push origin b')).toEqual(expect.arrayContaining(['commit', 'push']))
     expect(bashRules('gh pr create --fill')).toContain('pr-create')
   })
+  test('commit message text is not read as commands (final review #2)', () => {
+    const heredoc = "git commit -F - <<'EOF'\nfeat: guards\n\nDenies git merge and git push --force on seats.\nEOF"
+    expect(bashRules(heredoc)).toEqual(['commit'])
+    const substituted = 'git commit -m "$(cat <<\'EOF\'\nfeat: guards\n\ngh pr merge is denied.\nEOF\n)"'
+    expect(bashRules(substituted)).toEqual(['commit'])
+    expect(bashRules('git commit -m "add the -n flag"')).toEqual(['commit'])
+    expect(bashRules('git commit -m "mention --no-verify | git merge"')).toEqual(['commit'])
+  })
+  test('a heredoc trailer is still found, and real commands after the message still count', () => {
+    expect(bashRules("git commit -F - <<'EOF'\nfix\n\nCo-Authored-By: a\nEOF")).toContain('ai-trailer')
+    expect(bashRules("git commit -F - <<'EOF'\nfix\nEOF\ngit push --force")).toContain('force-push')
+  })
+  test('a quoted -C path does not hide the subcommand', () => {
+    expect(bashRules('git -C "/a b" push --force')).toContain('force-push')
+  })
   test('quoted words are not subcommands (Review Focus 2)', () => {
     expect(bashRules('git commit -m "merge the fix"')).not.toContain('merge')
     expect(bashRules('git log --merges')).toEqual([])

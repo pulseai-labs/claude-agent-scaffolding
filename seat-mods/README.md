@@ -40,16 +40,20 @@ Each is a `tool.call` deny on Bash, Edit or Write.
 | Edit or Write inside a `SEAT_MODS_ALLOW` directory | allow | allow | allow |
 
 The worktree is the git top level of the session's working directory. Paths are compared after
-the file system resolves them, so `..` and symbolic links land where they really point; a file that
-does not exist yet is placed by its folder.
+the file system resolves them, so `..` and symbolic links land where they really point; a file in
+folders that do not exist yet is placed by its nearest existing folder.
 
 A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report it instead.`
 
 ## Limits
 
 - **The rails stop mistakes, not an adversary.** Bash matching is whitespace tokens split on `;`,
-  `&&`, `||`, `|` and newlines. An obfuscated command (`g""it push`) passes, and a quoted word such as
-  `echo git merge` is read as a git merge.
+  `&&`, `||`, `|` and newlines, after quoted strings and heredoc bodies are blanked as text, so a
+  commit message may mention `git merge` or `-n`. An obfuscated command (`g""it push`) passes, and an
+  unquoted `echo git merge` is read as a git merge.
+- **A `-F` message file is read from the session's working directory.** A relative path after a
+  `cd`, or a path in a shell variable, is not found and reads as empty, so a trailer in it passes.
+  The repository's commit-msg hook remains the backstop.
 - **File writes made through Bash** (`cat >`, `sed -i`, `mv`) are not path-checked. Only the Edit
   and Write tools are.
 - **The guards fail open.** If the module does not load, or a hook throws, Claude Code skips it and

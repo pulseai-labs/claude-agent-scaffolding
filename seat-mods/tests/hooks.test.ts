@@ -14,13 +14,16 @@ const FILES = new Map<string, string>([
   ['/w/msg-trailer.txt', 'fix: a thing\n\nCo-Authored-By: someone <x@y>\n'],
 ])
 
-// What realpath gives for the mock: `.` and `..` resolved, no links.
-function normal(path: string): string {
+// What realpath gives for the mock: `.` and `..` resolved, no links. Like
+// realpath, `..` through a folder that does not exist fails (undefined).
+function normal(path: string): string | undefined {
   const parts: string[] = []
   for (const part of path.split('/')) {
     if (part === '' || part === '.') continue
-    if (part === '..') parts.pop()
-    else parts.push(part)
+    if (part === '..') {
+      if (!DIRS.has('/' + parts.join('/'))) return undefined
+      parts.pop()
+    } else parts.push(part)
   }
   return '/' + parts.join('/')
 }
@@ -35,12 +38,13 @@ function world(on: On, env: Record<string, string>) {
       : { exitCode: 1, stdout: '', stderr: 'unmocked', isStdoutTruncated: false } }) as never)
   on('fs.stat', (_$, e) => {
     const path = normal(e.path)
-    if (DIRS.has(path)) return { value: { kind: 'dir', size: 0, mtimeMs: 0, isLink: false, realPath: path } } as never
-    if (FILES.has(path)) return { value: { kind: 'file', size: 1, mtimeMs: 0, isLink: false, realPath: path } } as never
+    if (path !== undefined && DIRS.has(path)) return { value: { kind: 'dir', size: 0, mtimeMs: 0, isLink: false, realPath: path } } as never
+    if (path !== undefined && FILES.has(path)) return { value: { kind: 'file', size: 1, mtimeMs: 0, isLink: false, realPath: path } } as never
     return { deny: `ENOENT: ${e.path}` } as never
   })
   on('fs.read', (_$, e) => {
-    const text = FILES.get(normal(e.path))
+    const path = normal(e.path)
+    const text = path === undefined ? undefined : FILES.get(path)
     if (text === undefined) return { deny: `ENOENT: ${e.path}` } as never
     return { value: text } as never
   })
@@ -113,6 +117,21 @@ describe('write placement', () => {
     world(on, { SEAT_MODS_ROLE: 'implementer' })
     const r = await $.tool.call({ tool: 'Edit', file_path: '/w/seat-mods/../../escape.md', old_string: 'a', new_string: 'b' })
     expect(r.deny).toBeDefined()
+  })
+  test('implementer: a file in new nested folders inside the worktree is allowed (final review #1)', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    const r = await $.tool.call({ tool: 'Write', file_path: '/w/newdir/sub/a.ts', content: 'x' })
+    expect(r.deny).toBeUndefined()
+  })
+  test('implementer: .. under a folder that does not exist is denied, not appended as text', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    const r = await $.tool.call({ tool: 'Write', file_path: '/w/newdir/../../escape.md', content: 'x' })
+    expect(r.deny).toBeDefined()
+  })
+  test('reviewer: a SEAT_MODS_ALLOW directory not created yet still allows its report', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'reviewer', SEAT_MODS_ALLOW: '/reports/run-1' })
+    const r = await $.tool.call({ tool: 'Write', file_path: '/reports/run-1/review.md', content: 'x' })
+    expect(r.deny).toBeUndefined()
   })
   test('implementer with no SEAT_MODS_ALLOW: the report directory is denied, naming the variable', async ($, on) => {
     world(on, { SEAT_MODS_ROLE: 'implementer' })

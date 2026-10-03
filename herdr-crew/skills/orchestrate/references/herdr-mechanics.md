@@ -34,8 +34,10 @@ is this sequence, in which `<seat label>` is `seat: <role> (<agent>)`:
    **Guarded seats** (seat-mods): an implementer, verifier or reviewer seat also gets
    `--env SEAT_MODS_ROLE=<role>` and `--env SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch
    directory>` on this call; the scratch directory, `<run dir>/scratch/<seat label>`, is created first
-   and named in the brief as `SCRATCH_DIR`. Never a coordinator seat or the orchestrator: an unset role
-   keeps a session unguarded. No `seat: <role>` in the seat's status line means no guards — record it.
+   and named in the brief as `SCRATCH_DIR`; an ossify implementer's list adds its handoff's directory,
+   where it writes `report.md`. Never a coordinator seat or the orchestrator: an unset role keeps a
+   session unguarded, so never put either variable in `settings.json`'s `env`, a shell profile or a
+   `command:` line. No `seat: <role>` in the seat's status line means no guards — record it.
 3. **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry —
    re-running a **launch** command into a pane whose foreground process is already that
    agent's TUI delivers its line to the agent as a prompt, the mechanism the undetected

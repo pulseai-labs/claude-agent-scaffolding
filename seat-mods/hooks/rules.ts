@@ -36,6 +36,15 @@ const RULE_TEXT: Record<RuleId, string> = {
 
 const SEGMENT = /;|&&|\|\||\||\n/
 const TRAILER = /co-authored-by:|🤖 generated with/i
+// Heredoc bodies and quoted strings are text, not commands: a commit message may
+// name `git merge` or `-n`. They are blanked before matching; the trailer check
+// still reads the whole command.
+const HEREDOC = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2(?=\n|$)/g
+const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/g
+
+function commandsOnly(command: string): string {
+  return command.replace(HEREDOC, '<<HEREDOC').replace(QUOTED, 'QUOTED')
+}
 
 export function parseRole(value: string | undefined): RoleState {
   if (value === undefined || value === '') return { kind: 'off' }
@@ -66,7 +75,7 @@ function gitOf(tokens: string[]): { sub: string; args: string[] } | undefined {
 
 export function bashRules(command: string, messageFileText = ''): RuleId[] {
   const found = new Set<RuleId>()
-  for (const segment of command.split(SEGMENT)) {
+  for (const segment of commandsOnly(command).split(SEGMENT)) {
     const tokens = tokensOf(segment)
     const gh = tokens.indexOf('gh')
     if (gh >= 0 && tokens[gh + 1] === 'pr') {
