@@ -9,15 +9,14 @@ edits, not a fact the plugin hard-codes: nothing parses the two files that follo
 launch. It is written by the operator, with an agent's help, between runs and never
 edited during one, and nothing in it is project-specific.
 
-`.herdr-crew/roles.md` sits at the project root — which agent fills each role for the
-work at hand, plus the conditions that choose between seats. The orchestrator writes
-it on the operator's instruction at spine planning, and the operator approves it
-before use. It names agents by name, never by command, so no machine detail reaches a
-repo. For a dual-repo project the project root is the AI workspace, which is where
-orchestrators launch; for a single-repo project it is that repo.
+`.herdr-crew/roles.md` sits at the project root — which agent fills each role for the work
+at hand, plus the conditions that choose between seats. The orchestrator writes it on the
+operator's instruction at spine planning, and the operator approves it before use; it names
+agents by name, never by command, so no machine detail reaches a repo. For a dual-repo project
+the project root is the AI workspace, where orchestrators launch; a single-repo project uses
+that repo.
 
-Resolution is a walk up from the session's working directory: the first project file found on
-that walk is the one in force. The pairing manifest is not consulted — its absolute roots are wrong on this host.
+Resolution is a walk up from the session's working directory; the first project file found wins. The pairing manifest is not consulted — its absolute roots can belong to another host.
 
 The project file wins for anything it names — a seat, an extra role, a condition; it never
 redefines how an agent is launched. Workers never read either file — a brief is the whole contract a worker sees.
@@ -93,9 +92,7 @@ A resolved profile renders as one row wherever it travels:
 A brief's record of its own seat's launch is the row's first three values only —
 a session launches nothing with its own profile.
 
-`can:` is checked where a seat is approved — the project-file approval, the
-spine-seat approval, the PR-transition ask, the close-review halt ask — never at
-dispatch. The requirement is per role: a role whose shipped or declared brief invokes a slash command needs
+`can:` is checked where a seat is approved — the project-file approval, the spine-seat approval, the PR-transition ask, the close-review halt ask — never at dispatch. The requirement is per role: a role whose shipped or declared brief invokes a slash command needs
 `can: slash-commands` on the agent that fills it.
 
 | role | its brief invokes | needs |
@@ -161,7 +158,10 @@ brief: ./briefs/security-audit.md
   overrules it; anything else it returns is advice the orchestrator records.
 - `brief:` — the file the coordinator sends as that role's brief. It must carry a
   report envelope — a `REPORT_PATH` and a completion shape — checked at approval
-  with `can:` and the block's other fields; without one the role cannot return.
+  with `can:` and the block's other fields; without one the role cannot return. The
+  coordinator sends a copy carrying the run's `NOTIFY_PANE` slot and ping step beside that
+  envelope (`briefs.md`), and edits no stored file: a stored brief whose fixed target differs from
+  the run's is a conflict surfaced to the operator, never overridden; an equal target is no conflict, kept as it is.
 - `replaces:` — hands the role a step the plugin owns; the valid targets are
   `implementer`, `verifier`, `reviewer` only. The named seat is not launched for
   that run — the operator's role runs at the step's point in its place, and the

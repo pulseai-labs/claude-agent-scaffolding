@@ -68,12 +68,17 @@ Every command's syntax comes from `herdr --skill`.
    session's brief already carries. The "state your model" line is the worker's own second check: a
    model that is not `SEAT_EXPECTED_MODEL` is a failed launch it writes to its report file
    and stops on. Wrong model at the banner read: release the seat and report it.
+   Every brief this session dispatches names its own pane in the brief's `NOTIFY_PANE` slot —
+   this session's `$HERDR_PANE_ID` when herdr detects this pane and the seat shares its server,
+   otherwise the sentinel `none` — so an eligible worker's ping comes back here; a coordinator
+   fills its children's slot the same way, and an operator's `brief:` is sent as a copy carrying
+   the slot and the ping step, never edited in place (`briefs.md`).
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
-   orchestrator reads the plan from that file when its bounded wait wakes, the same
-   doorbell as completion (`herdr-mechanics.md`), and approves or amends it by sending
-   the seat its next message. The final report later overwrites the plan in the same
-   file. Fast briefs skip this.
+   orchestrator reads the plan from that file when its bounded wait wakes or the plan's
+   ping arrives, the same doorbell as completion (`herdr-mechanics.md`), and approves or
+   amends it by sending the seat its next message. The final report later overwrites the
+   plan in the same file. Fast briefs skip this.
 5. **Wait.** One bounded wait per dispatch, run in the background as `herdr-mechanics.md`
    states it: for a detected seat that is not a coordinator
    `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>`,
@@ -91,9 +96,20 @@ Every command's syntax comes from `herdr --skill`.
    observed state — stopped, at a dialog, or still at work — is reported to the operator,
    and the false wake follows the doorbell rule that file states for the rest of that
    dispatch, paging no one. Neither is a failure, and neither is re-entered here. A loop of
-   waits, and restarting a wait after an empty timeout, both stay forbidden. `herdr pane read`
-   only on a `blocked` wake, a missing or malformed report, a timeout's checkpoint, or the
-   false wake's own read, never to watch progress.
+   waits, and restarting a wait after an empty timeout, both stay forbidden. The run's ping
+   and its heartbeat are not that loop. A ping is a wake that arrives as a turn: the
+   generation check precedes it as it does any wake (`herdr-mechanics.md`), and a ping for a
+   generation already consumed is a no-op — it retires no wait and acts on nothing. The
+   heartbeat is one bounded background timer of about 15 minutes, re-armed per tick, at most
+   one health check per live seat per tick; it is not a completion wait and never re-enters
+   or restarts one. This session arms it with the first live herdr-pane dispatch — a typed-wait
+   seat is in scope, not only a report-file wait — and kills it when its last dispatch settles,
+   at teardown, and at a rotation's stand-down; a dsh session keeps `dsh-driver.md`'s own route,
+   and a host with no background timer keeps the wait/ping fallback, never a rolling foreground
+   loop (`herdr-mechanics.md`).
+   `herdr pane read`
+   only on a `blocked` wake, a missing or malformed report, a timeout's checkpoint, the
+   false wake's own read, or the heartbeat tick's one check per live seat — never to watch progress.
    A round's N parallel items are N bounded background waits, one per pane, each waking the
    session when it exits — not the forbidden loop, since each targets a different
    pane rather than re-entering the one that just timed out. What persists is the
@@ -261,10 +277,14 @@ this session's pane after the handover — the field dagr routes the operator's 
 to — and the successor does not rebind it: issue #556 holds that gap. Send the new top its
 resume — `/ossify:handoff-resume <path>` with ossify, or the path as its first
 instruction without — confirm its turn started, then **stand down**: kill this session's
-armed background waits before the successor re-arms the same panes, and take no dispatch
-action from here on. One report must wake one top — a live dispatch a successor is also
-waiting on otherwise advances twice, and a close, a PR or a merge runs twice with it. A
-wait that fires anyway is read and handed to the successor, never acted on. Then tell the
+armed background waits and its heartbeat before the successor re-arms the same panes and
+arms its own, and take no dispatch action from here on. One report must wake one top — a
+live dispatch a successor is also waiting on otherwise advances twice, and a close, a PR
+or a merge runs twice with it. A wake that fires anyway — a stale ping naming this
+session's pane included — is read and handed to the successor, never acted on: until that
+successor's next message to a retained worker carries its own pane id as the new
+`NOTIFY_PANE`, the worker keeps pinging this pane, and the successor's heartbeat covers the
+interval. Then tell the
 operator which tab to use and that this one can close.
 The new top resumes by naming the parent's `run.json` path — there is no CLI call —
 and then, before the step the handoff named, issues one fresh bounded background
@@ -272,4 +292,5 @@ wait per live pane the handoff listed, through the machine the handoff names for
 remote one, which every later operation on that pane carries too (`herdr-mechanics.md`,
 Machines): a new session's first wait, not a re-entry,
 which re-arms what the `run.json` cannot — and it can re-arm them because the
-predecessor stood down, so each pane has exactly one waiter.
+predecessor stood down, so each pane has exactly one waiter — and arms one fresh
+heartbeat, the predecessor's having been killed at stand-down.

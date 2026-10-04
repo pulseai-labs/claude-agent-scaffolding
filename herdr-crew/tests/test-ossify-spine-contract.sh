@@ -278,6 +278,15 @@ n_eq "$PRBRIEFS_MD" 'REPORT_PATH=' 2 \
   "the close and work-PR briefs each name a report path"
 pin "$WRITER_MD" 'REPORT_PATH=' \
   "the close-review writer's brief names its report path"
+# The ping target rides the report-path slot line, one per report-producing
+# template: three spine-layer sessions, two PR-layer, one writer. A template
+# missing its slot lowers the count, which is what makes the count the check.
+n_eq "$BRIEFS_MD" 'NOTIFY_PANE=' 3 \
+  "all three spine briefs carry the ping target"
+n_eq "$PRBRIEFS_MD" 'NOTIFY_PANE=' 2 \
+  "the close and work-PR briefs carry the ping target"
+pin "$WRITER_MD" 'NOTIFY_PANE=' \
+  "the close-review writer's brief carries the ping target"
 for id in RUN_JSON MECHANICS; do
   pin "$PRBRIEFS_MD" "$id=" "the work-PR brief injects $id exactly once"
 done
@@ -368,14 +377,44 @@ done
 section "one mechanic, one statement"
 
 # Every launch, send, wait, read and release is stated in herdr-mechanics.md
-# and deferred to. Two names are sanctioned in these files: `herdr --skill`,
-# the entry point, and `herdr workspace list`, the teardown check. A command
-# from any of these groups is a restatement waiting to drift.
+# and deferred to. Two names are sanctioned as deferrals: `herdr --skill`, the
+# entry point, and `herdr workspace list`, the teardown check — neither of them
+# here. The ping is the one exception with a reason: a brief is the whole
+# contract its worker sees, so the worker's own one-line ping must be stated in
+# the brief it was dispatched with, not deferred. The fence is therefore
+# per-file: the two non-brief references state no herdr command at all, and in a
+# brief file every `herdr agent ` occurrence IS the ping line — counted both
+# ways, so any other agent command breaks the equality. The adjacent control
+# below proves the equality still flags one.
+PING_CMD='herdr agent prompt <NOTIFY_PANE>'
+agent_commands_are_pings() { # <file> <expected ping lines>
+  _a="$(count_of "$1" 'herdr agent ')" || return 1
+  _p="$(count_of "$1" "$PING_CMD")" || return 1
+  [ "$_a" -eq "$2" ] && [ "$_p" -eq "$2" ]
+}
 for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD"; do
-  for g in 'herdr agent ' 'herdr pane ' 'herdr tab ' 'herdr worktree '; do
+  for g in 'herdr pane ' 'herdr tab ' 'herdr worktree '; do
     absent "$f" "$g" "${f##*/} restates no '$g' command"
   done
 done
+for f in "$EXEC_MD" "$NESTED_MD"; do
+  if agent_commands_are_pings "$f" 0; then pass "${f##*/} states no herdr-agent command"
+  else fail "${f##*/} states no herdr-agent command" "an agent command is back"; fi
+done
+for pair in "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:1"; do
+  _f="${pair%:*}"; _want="${pair##*:}"
+  if agent_commands_are_pings "$_f" "$_want"; then pass "${_f##*/}: every herdr-agent command is the ping line ($_want)"
+  else fail "${_f##*/}: every herdr-agent command is the ping line" "expected $_want of each"; fi
+done
+# Adjacent control: the loosened fence admits the ping line and nothing else.
+ctl_extra="$(mktemp)"; ctl_ping="$(mktemp)"
+printf '%s\n%s\n' "$PING_CMD" 'herdr agent wait w9:p1 --until idle' > "$ctl_extra"
+printf '%s\n' "$PING_CMD" > "$ctl_ping"
+if agent_commands_are_pings "$ctl_extra" 1; then fail "control: a second agent command is still flagged" "accepted it"
+else pass "control: a second agent command is still flagged"; fi
+if agent_commands_are_pings "$ctl_ping" 1; then pass "control: the ping line alone is accepted"
+else fail "control: the ping line alone is accepted" "refused it"; fi
+rm -f "$ctl_extra" "$ctl_ping"
 # #574, the generic layer's half: briefs.md is where a brief-writer meets the doorbell, so
 # it must name what the doorbell compares — the hash or the file's identity — while still
 # deferring to herdr-mechanics.md for the rule. The mechanics file states it once (its own

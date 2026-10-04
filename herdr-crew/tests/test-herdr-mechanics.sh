@@ -44,7 +44,14 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # again mechanics the file exists to state. The operator-facing rule (never in settings.json)
 # first lived only in seat-mods' README. The final review restored it here (spec §5 binds
 # both places) with an ossify implementer's handoff directory: two lines, 243 -> 245.
-REF_BUDGET=245
+# 0.2.3 (#640) added the worker ping and the heartbeat backstop: the ping line, the
+# generation-first consumption rules — including what deduplication does NOT suppress, a
+# live dialog and the tick's health check — the wrong-path refusal, and the heartbeat's
+# classification and kill points. +27 lines on insertion, traded back 12 (detection events,
+# the wait-output caveat, the typed-wait set, the two-dead-ends and doorbell paragraphs, the
+# launch intro and steps 1/3/5, and the teardown close paragraph) to land at 260. The gate
+# rose with the mechanics the file exists to state and still fails over the limit.
+REF_BUDGET=260
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -115,6 +122,11 @@ pin "$REF" 'inode or mtime' \
   "the identity is defined once — inode or mtime, not restated (#574)" flat
 pin "$REF" 'the identity noted at dispatch' \
   "the doorbell paragraph refers back to the dispatch-time note (#574)"
+# #650 R1-1: one generation rule. The typed wake's novelty test must be the same
+# hash-or-identity comparison the ping and the doorbell use; hash alone is the old
+# form, and it read a byte-identical atomic replacement as a false wake.
+pin "$REF" 'a different hash or identity' \
+  "the typed wake's novelty is the same hash-or-identity generation (#650 R1-1)" flat
 
 # #575: the pair is re-armed, not restarted, after a dialog the operator answered.
 pin "$REF" 'An answered dialog re-arms the pair' \

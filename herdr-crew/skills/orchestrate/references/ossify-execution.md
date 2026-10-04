@@ -63,7 +63,9 @@ from the project file's seats and conditions — scope, risk and cost,
 item by item — and the three coordinator seats beside them. Present **every** seat
 to the operator in one approval phase and write nothing until all of it is decided
 — a half-approved set looks binding and is not. Record the recommendation and any
-override.
+override. Prefer an agent herdr detects for an item row where the choice is open: the
+typed wait then covers that seat, and an undetected seat stays legal, waited on through
+its report file — the path is read live, never declared in a profile.
 
 **Writing.** On approval, record the set in the project file's section for this
 spine — each item's implementer and verifier agent name, keyed by item, and the
@@ -76,7 +78,11 @@ so an edit made for another spine cannot reach a
 spine already running. **The item briefs travel with it**: append that file's item implementer,
 item verifier and correction templates — and the generic verifier body from `briefs.md`, whose
 claims list the item verifier template instantiates — to the same dispatch, as `briefs.md`'s
-header requires. A seat that needs to change mid-spine is a new operator
+header requires. The spine session's own brief carries `NOTIFY_PANE` with the top's
+`$HERDR_PANE_ID` when herdr detects the top's pane and the seat shares its server (otherwise
+`none`), and each item brief the spine session constructs carries the spine session's own pane
+id the same way — the dispatcher fills it, the worker never rediscovers it. A seat
+that needs to change mid-spine is a new operator
 decision you relay down through the reply; no session re-reads the file for it.
 
 A handoff the top writes **carries the approved seats verbatim** — the item rows
