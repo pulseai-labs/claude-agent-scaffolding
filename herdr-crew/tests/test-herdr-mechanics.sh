@@ -51,7 +51,12 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the wait-output caveat, the typed-wait set, the two-dead-ends and doorbell paragraphs, the
 # launch intro and steps 1/3/5, and the teardown close paragraph) to land at 260. The gate
 # rose with the mechanics the file exists to state and still fails over the limit.
-REF_BUDGET=260
+# 0.2.4 (#651 part 5) made step 2 state the guard's own reach — a coordinator's child
+# seats and every replacement launch — the never-guarded complement it enumerates, and
+# the status line read at the model read: four lines, 260 -> 264. The gate rose with the
+# mechanics, keeps its adjacent control (a file one line over is refused), and still
+# fails over the limit.
+REF_BUDGET=264
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -143,6 +148,18 @@ section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"
 if [ "$n" -le "$REF_BUDGET" ]; then pass "herdr-mechanics.md within the reference budget ($n lines)"
 else fail "herdr-mechanics.md within the reference budget" "$n lines, over by $((n - REF_BUDGET))"; fi
+# Adjacent control (#651): the 0.2.4 bump went with the guard's four lines and must not
+# have neutered the gate — a synthetic file at budget + 1 line is refused by the same
+# comparison the check above uses.
+ctl="$(mktemp)"
+awk -v n="$((REF_BUDGET + 1))" 'BEGIN { for (i = 0; i < n; i++) print "x" }' > "$ctl"
+ctl_n="$(wc -l < "$ctl" | tr -d ' ')"
+if [ "$ctl_n" -le "$REF_BUDGET" ]; then
+  fail "control: budget + 1 lines is refused" "accepted $ctl_n lines at budget $REF_BUDGET"
+else
+  pass "control: budget + 1 lines is refused"
+fi
+rm -f "$ctl"
 
 section "no personal name ships"
 hits=0

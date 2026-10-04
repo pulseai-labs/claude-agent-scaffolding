@@ -66,7 +66,10 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=200          # A3: each ossify reference stays under about 200 lines
+REF_BUDGET=204          # A3: each ossify reference stays under about 200 lines.
+                        # 0.2.4 (#651 part 5): 200 -> 204 — the guard clause each launch
+                        # site gained. The budget section's adjacent control still
+                        # refuses a file one line over.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
@@ -1874,6 +1877,120 @@ pin "$COMMAND_MD" 'Bash(mv:*)' \
 n_eq "$BRIEFS_MD" 'RULES THAT DO NOT LOAD HERE' 3 \
   "all three session briefs carry the rules slot"
 
+section "the seat-mods guard reaches every launch site"
+
+# The guard is a launch-time export (`herdr-mechanics.md`, the launch's step 2), and the
+# rows a coordinator receives name no such thing ("verbatim from its row" wins), so every
+# site that orders one of those launches must order the guard beside it. One pin per
+# site; the label names the site, so a removal reads as that site. S1's complement pins
+# keep the never-guarded enumeration beside the binding.
+pin "$MECHANICS_MD" 'This binds a coordinator launching its own child' \
+  "step 2 binds a coordinator's own child seats"
+pin "$MECHANICS_MD" 'and every replacement launch' \
+  "step 2 binds every replacement launch"
+pin "$MECHANICS_MD" 'the spine, close or work-PR session, the doctor session, the lane driver' \
+  "step 2's never-guarded complement enumerates the coordinator seats" flat
+pin "$MECHANICS_MD" 'nor the orchestrator, a rotation successor included' \
+  "step 2's complement includes the top's rotation successor"
+pin "$MECHANICS_MD" 'also reads the status line for `seat: <role>`' \
+  "the model read also reads the guarded seat's status line"
+pin "$MECHANICS_MD" 'records that in its report file (to the top)' \
+  "a missing status line is recorded in the coordinator's report file"
+
+pin "$ROLES_MD" 'export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir>' \
+  "roles.md's launch block shows the guard export"
+pin "$ROLES_MD" 'implementer, verifier or reviewer seat only, before its command' \
+  "roles.md scopes the export to the guarded roles"
+
+pin "$LIFECYCLE_MD" 'runs the guarded-seat export `herdr-mechanics.md` step 2 states' \
+  "lifecycle step 3 requires the guard and points at step 2"
+
+pin "$BRIEFS_MD" 'Guard it before its command as' \
+  "the spine brief guards the item implementer launch (step 3)"
+pin "$BRIEFS_MD" 'verifier command — guard it before its command as' \
+  "the spine brief guards the item verifier launch (step 5)"
+pin "$BRIEFS_MD" 'two fresh seats guarded exactly as the initial pair'"'"'s were' \
+  "the spine brief guards a replacement pair" flat
+
+pin "$NESTED_MD" '`brief_delivery` says. Guard it' \
+  "the nested run guards the implementer launch (step 3)"
+pin "$NESTED_MD" 'Guard it before its command as `herdr-mechanics.md` step 2 says — role `verifier`' \
+  "the nested run guards the verifier launch (step 5)" flat
+pin "$NESTED_MD" 'Both replacement seats are guarded exactly as the first pair'"'"'s were' \
+  "the nested run guards a replacement pair" flat
+
+pin "$PRBRIEFS_MD" 'every launch or re-creation of it carries the guard before its command (role `reviewer`' \
+  "the work-PR brief guards the reviewer launch and its re-creation" flat
+pin "$PRBRIEFS_MD" 'every launch of it carries the guard before its command (role `implementer`' \
+  "the work-PR brief guards the PR-fix launch" flat
+pin "$PRBRIEFS_MD" 're-created if it was released, and guarded again as its first launch was' \
+  "the reviewer's re-dispatch is guarded again"
+
+pin "$WRITER_MD" 'launches each writer' \
+  "the close-review writer is dispatched as a guarded seat"
+pin "$WRITER_MD" 'as a guarded seat: role `implementer`' \
+  "the close-review writer's guard role is implementer"
+
+# The complement, decidable: no shipped file assigns `SEAT_MODS_ROLE` a coordinator or
+# orchestrator value, and no line ties `SEAT_MODS` to one of those role names. Two seeded
+# controls below prove both shapes are flagged; the shipped sweep then certifies zero.
+# The bounded reads are per line, the shape the assignments actually take; the residual —
+# an assignment split across a wrap — is accepted, as a value split at the `=` could not
+# run as written either.
+COORD_VALUES='SEAT_MODS_ROLE=spine
+SEAT_MODS_ROLE=close
+SEAT_MODS_ROLE=work-pr
+SEAT_MODS_ROLE=work-PR
+SEAT_MODS_ROLE=workpr
+SEAT_MODS_ROLE=doctor
+SEAT_MODS_ROLE=lane
+SEAT_MODS_ROLE=orchestrator'
+
+coordinator_guard_hits() { # <file> -> count; an unreadable file is refused
+  [ -r "$1" ] || return 1
+  _cg_h=0
+  for _cg_v in $COORD_VALUES; do
+    _cg_c="$(occurrences "$1" "$_cg_v")" || return 1
+    _cg_h=$((_cg_h + _cg_c))
+  done
+  _cg_c="$(awk 'index($0, "SEAT_MODS") > 0 && (index($0, "spine session") || index($0, "close session") || index($0, "work-PR session") || index($0, "doctor session") || index($0, "lane driver") || index($0, "orchestrator"))' "$1" | wc -l | tr -d ' ')" || return 1
+  _cg_h=$((_cg_h + _cg_c))
+  printf '%s' "$_cg_h"
+}
+
+seed="$(mktemp)"
+printf '%s\n' 'export SEAT_MODS_ROLE=spine in its pane' > "$seed"
+if [ "$(coordinator_guard_hits "$seed")" -gt 0 ]; then
+  pass "control: a coordinator-valued guard assignment is flagged"
+else
+  fail "control: a coordinator-valued guard assignment is flagged" "accepted it"
+fi
+printf '%s\n' 'the close session exports SEAT_MODS_ROLE before its command' > "$seed"
+if [ "$(coordinator_guard_hits "$seed")" -gt 0 ]; then
+  pass "control: a guard mention naming a coordinator seat is flagged"
+else
+  fail "control: a guard mention naming a coordinator seat is flagged" "accepted it"
+fi
+rm -f "$seed"
+
+SHIPPED=("$PLUGIN_ROOT"/README.md "$PLUGIN_ROOT"/CHANGELOG.md "$PLUGIN_ROOT"/LICENSE \
+         "$PLUGIN_ROOT"/hooks.json "$PLUGIN_ROOT"/hooks-handlers/* \
+         "$PLUGIN_ROOT"/skills/orchestrate/SKILL.md "$REF"/*.md \
+         "$PLUGIN_ROOT"/skills/orchestrate/agents/* "$PLUGIN_ROOT"/commands/* \
+         "$PLUGIN_ROOT"/.claude-plugin/plugin.json "$PLUGIN_ROOT"/.codex-plugin/plugin.json)
+shipped_count=0
+for f in "${SHIPPED[@]}"; do
+  [ -f "$f" ] && shipped_count=$((shipped_count + 1))
+done
+if [ "$shipped_count" -ge 15 ]; then pass "the shipped-file scan covers $shipped_count files"
+else fail "the shipped-file scan covers the plugin's surfaces" "only $shipped_count file(s) — a zero-count over nothing certifies nothing"; fi
+for f in "${SHIPPED[@]}"; do
+  [ -f "$f" ] || continue
+  h="$(coordinator_guard_hits "$f")" || { fail "no coordinator-valued guard in ${f##*/}" "unreadable file"; continue; }
+  if [ "$h" -eq 0 ]; then pass "no coordinator-valued guard in ${f##*/}"
+  else fail "no coordinator-valued guard in ${f##*/}" "$h occurrence(s) — the guard only ever names implementer, verifier or reviewer"; fi
+done
+
 section "reference line budgets"
 
 budget "$EXEC_MD" "ossify-execution.md is within the reference budget"
@@ -1881,6 +1998,19 @@ budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
 budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget"
 budget "$BRIEFS_MD" "ossify-briefs.md is within the reference budget"
 budget "$WRITER_MD" "ossify-close-writer.md is within the reference budget"
+# Adjacent control (#651): the 200 -> 204 raise must not have neutered the gate. The
+# suite's own budget predicate, run in a subshell against a synthetic file one line over,
+# must report the failure; a budget that accepts it makes this control fail.
+ctl="$(mktemp)"
+awk -v n="$((REF_BUDGET + 1))" 'BEGIN { for (i = 0; i < n; i++) print "x" }' > "$ctl"
+parent_fail="$FAIL"
+ctl_fail="$( budget "$ctl" "control: one line over the reference budget is refused" >/dev/null 2>&1; printf '%s' "$FAIL" )"
+if [ "$ctl_fail" -eq $((parent_fail + 1)) ]; then
+  pass "control: one line over the reference budget is refused"
+else
+  fail "control: one line over the reference budget is refused" "budget accepted it"
+fi
+rm -f "$ctl"
 
 # #514, L1: the shape, asserted rather than assumed — a counter re-copied into any
 # suite shadows the hoisted one and keeps passing. This suite's copies were the
