@@ -17,6 +17,11 @@ describe('markerPath', () => {
 })
 
 describe('resolvePath (review focus 4)', () => {
+  test('Windows drive and UNC paths are absolute', () => {
+    expect(resolvePath('C:\\repo\\h.md', 'C:\\work', 'C:\\Users\\u')).toBe('C:\\repo\\h.md')
+    expect(resolvePath('C:/repo/h.md', 'C:\\work', 'C:\\Users\\u')).toBe('C:/repo/h.md')
+    expect(resolvePath('\\\\server\\share\\h.md', 'C:\\work', 'C:\\Users\\u')).toBe('\\\\server\\share\\h.md')
+  })
   test('absolute, home and relative', () => {
     expect(resolvePath('/x/h.md', '/repo', '/home/u')).toBe('/x/h.md')
     expect(resolvePath('~/h.md', '/repo', '/home/u')).toBe('/home/u/h.md')

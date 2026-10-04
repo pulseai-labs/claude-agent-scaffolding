@@ -12,7 +12,8 @@ export function markerPath(answer: string): string | undefined {
 
 export function resolvePath(path: string, cwd: string, home: string): string {
   if (path.startsWith('~/')) return `${home}/${path.slice(2)}`
-  if (path.startsWith('/')) return path
+  // POSIX absolute, a Windows drive path (C:\ or C:/), or a UNC path (\\server\share).
+  if (path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path) || path.startsWith('\\\\')) return path
   return `${cwd.replace(/\/+$/, '')}/${path}`
 }
 
