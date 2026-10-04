@@ -6,6 +6,10 @@ import type { MoltConfig } from './config'
 import { CHARS_PER_TOKEN, atLeast, projectedPercent, stageOf, thresholdsFor } from './measure'
 import { gateAllows, isProgress } from './gate'
 import { markerPath } from './handoff'
+import { briefPrompt, extractFacts, factsBrief, isUsableSummary, pickHandoff, resolvePath } from './handoff'
+import type { Handoff, Message } from './handoff'
+import { fallbackPath, lineagePath, parseLineage } from './records'
+import type { Lineage } from './records'
 import type { Stage, Thresholds } from './measure'
 import { activePath, autonomicPath, logPath, parseAutonomic, safeSessionId } from './records'
 import { DEFAULT_INSTRUCTIONS, DEFAULT_SEED, HARD_NOTE, expandHome, fill } from './templates'
@@ -32,6 +36,8 @@ const nudged = new Set<string>()          // sessions told once at a tool result
 const stopBlocks = new Map<string, number>()
 const lastMd = new Map<string, string>()  // the last .md a session wrote past soft
 const forced = new Set<string>()          // /molt now: soft whatever the fill
+let unattended = 0                        // molts since the operator last sent a prompt
+let pending: { oldSession: string; handoff: string; chain: string; depth: number } | undefined
 
 const USAGE = 'usage: /molt now | off | on | status'
 
@@ -88,6 +94,73 @@ async function instruction($: Engine, sessionId: string): Promise<string> {
   const values = { percent: Math.round(lastPercent ?? t.soft), soft: Math.round(t.soft), hard: Math.round(t.hard) }
   const text = fill(await template($, cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS), values)
   return atLeast(stage, 'hard') ? `${text}\n\n${fill(HARD_NOTE, values)}` : text
+}
+
+async function ring($: Engine, bell: string, message: string): Promise<void> {
+  try {
+    await $.process.run(['sh', '-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${bell}`, 'sh', message])
+  } catch (err) {
+    await log($, `bell failed ${String(err)}`)
+  }
+}
+
+async function pause($: Engine, sessionId: string, text: string, bell: string | undefined): Promise<void> {
+  paused = sessionId
+  await setNotice($, { text, tone: 'warn' })
+  $.ui.toast(text)
+  showStatus($, sessionId)
+  if (bell !== undefined) await ring($, bell, text)
+  await log($, `pause session=${sessionId} ${text}`)
+}
+
+async function fallbackBrief($: Engine, sessionId: string): Promise<string> {
+  const raw = await $.session.messages()
+  const messages = (Array.isArray(raw) ? raw : []) as Message[]
+  const facts = extractFacts(messages)
+  let summary: string | undefined
+  try {
+    const r = await $.model.complete({
+      model: 'haiku',
+      system: 'You write precise handoff briefs for coding sessions.',
+      prompt: briefPrompt(messages, facts),
+      maxTokens: 4000,
+      timeoutMs: 60_000,
+    })
+    if (r.isAnswered && isUsableSummary(r.text)) summary = r.text
+    else await log($, `haiku brief unusable session=${sessionId} reason=${r.isAnswered ? 'no Next step section' : r.reason}`)
+  } catch (err) {
+    await log($, `haiku brief error session=${sessionId} ${String(err)}`)
+  }
+  const path = fallbackPath(await home($), sessionId)
+  await $.fs.write(path, factsBrief(facts, { sessionId, percent: lastPercent, summary }))
+  return path
+}
+
+async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<void> {
+  const h = await home($)
+  const record = parseAutonomic(await readText($, autonomicPath(h, sessionId)))
+  const own = parseLineage(await readText($, lineagePath(h, sessionId)))
+  if (record.mode === 'manual' && unattended >= cfg.manualMaxMolts) {
+    return pause($, sessionId, `molt paused: ${unattended} molts in a row with no message from you. ` +
+      `Send a message to resume; the handoff is at ${handoff.path}.`, undefined)
+  }
+  if (record.mode === 'autopilot' && own !== undefined && progress === 0) {
+    return pause($, sessionId, 'molt paused: no progress since the last molt (no Write, Edit or commit). ' +
+      `Autopilot stops here; the handoff is at ${handoff.path}.`, record.bell)
+  }
+  inFlight = true
+  pending = { oldSession: sessionId, handoff: handoff.path, chain: own?.chain ?? sessionId, depth: (own?.depth ?? 0) + 1 }
+  unattended += 1
+  progress = 0
+  forced.delete(sessionId)
+  await setNotice($, { text: `molt: handing off at ${Math.round(lastPercent ?? 0)}% — ${handoff.path}`, tone: 'info' })
+  await log($, `molt session=${sessionId} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent}`)
+  $.command.run({ command: 'clear' }).catch(async (err: unknown) => {
+    pending = undefined
+    inFlight = false
+    await setNotice($, { text: `molt: /clear was rejected; this session keeps going. The handoff is at ${handoff.path}.`, tone: 'warn' })
+    await log($, `clear rejected session=${sessionId} ${String(err)}`)
+  })
 }
 
 function showStatus($: Engine, sessionId: string): void {
@@ -163,8 +236,29 @@ export const register: Register = (on, options) => {
     try {
       if (e.source === 'startup') await writeMissingTemplates($)
       await touchActive($, e.session_id)
+      if (e.source === 'clear' && pending !== undefined) {
+        const p = pending
+        pending = undefined
+        const sessionId = e.session_id
+        const lineage: Lineage = { from: p.oldSession, chain: p.chain, depth: p.depth, handoff: p.handoff }
+        await $.fs.write(lineagePath(await home($), sessionId), `${JSON.stringify(lineage, null, 2)}\n`)
+        seeded = { session: sessionId }
+        unmeasured = 0
+        stage = 'below'
+        lastPercent = undefined
+        const seed = fill(await template($, cfg.seedTemplate, DEFAULT_SEED), { path: p.handoff })
+        // Not awaited: the seed's turn cannot start until this hook returns.
+        $.prompt.submit({ text: seed }).catch(async (err: unknown) => {
+          await setNotice($, { text: `molt: the seed was rejected. Resume by hand from ${p.handoff}.`, tone: 'warn' })
+          await log($, `seed rejected session=${sessionId} ${String(err)}`)
+        })
+        await setNotice($, { text: `molt: resumed from ${p.handoff}`, tone: 'info' })
+        await log($, `seeded session=${sessionId} from=${p.oldSession} depth=${p.depth}`)
+      }
     } catch (err) {
       await log($, `SessionStart error ${String(err)}`)
+    } finally {
+      inFlight = false
     }
     return r
   })
@@ -174,6 +268,7 @@ export const register: Register = (on, options) => {
       const sessionId = await $.session.id()
       await touchActive($, sessionId)
       if (e.origin.kind === 'composer' || e.origin.kind === 'bridge') {
+        unattended = 0
         if (paused === sessionId) paused = undefined
         const value = await read($, notice)
         if (value !== null && (value.tone === 'info' || paused === undefined)) await setNotice($, null)
@@ -267,6 +362,35 @@ export const register: Register = (on, options) => {
     return r
   })
 
+  on('turn.complete', async ($, e, next) => {
+    const r = await next(e)
+    if (e.agentId !== undefined || e.isAborted) return r
+    try {
+      const sessionId = await $.session.id()
+      await touchActive($, sessionId)
+      if (off.has(sessionId) || inFlight || paused === sessionId) { showStatus($, sessionId); return r }
+      await measure($, sessionId)
+      showStatus($, sessionId)
+      const marker = markerPath(e.answer)
+      if (marker === undefined && !atLeast(stage, 'soft')) return r
+      const resolved = marker === undefined ? undefined : resolvePath(marker, await $.session.cwd(), await home($))
+      let handoff = pickHandoff(resolved, lastMd.get(sessionId))
+      if (handoff !== undefined && !(await $.fs.exists(handoff.path))) {
+        await log($, `handoff path missing session=${sessionId} path=${handoff.path}`)
+        handoff = undefined
+      }
+      if (handoff === undefined) {
+        // The session still has room to write it: the Stop reflex asks again, up to its cap.
+        if (!atLeast(stage, 'fallback') && (stopBlocks.get(sessionId) ?? 0) < MAX_STOP_BLOCKS) return r
+        handoff = { path: await fallbackBrief($, sessionId), source: 'fallback' }
+      }
+      await molt($, sessionId, handoff)
+    } catch (err) {
+      await log($, `turn.complete error ${String(err)}`)
+    }
+    return r
+  })
+
   on('command.run', { command: 'molt' }, async ($, e) => {
     const sessionId = await $.session.id()
     const arg = (e.args ?? '').trim()
@@ -281,6 +405,18 @@ export const register: Register = (on, options) => {
       await touchActive($, sessionId)
       showStatus($, sessionId)
       return { text: 'molt is on for this session.' }
+    }
+    if (arg === 'now') {
+      off.delete(sessionId)
+      paused = undefined
+      forced.add(sessionId)
+      await measure($, sessionId)
+      // The host refuses $.prompt.submit here: it would wait on the turn this hook holds.
+      // The request goes in the prompt box for one Enter, or rides the next prompt.
+      const text = await instruction($, sessionId)
+      const { isFilled } = await $.prompt.fill({ text })
+      if (isFilled) return { text: 'molt: the handoff request is in the prompt box. Press Enter to send it.' }
+      return { text: 'molt: the next prompt you send carries the handoff request.', context: [text] }
     }
     if (arg === 'status') return { text: await status($, sessionId) }
     return { text: USAGE }

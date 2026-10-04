@@ -9,6 +9,8 @@ export type World = {
   files: Map<string, string>
   runs: string[][]
   prompts: string[]
+  fills: string[]              // what molt put in the prompt box
+  hasBox: boolean              // false: the session binds no prompt box (a -p run)
   clears: number
   toasts: string[]
   statuses: Array<string | undefined>
@@ -27,7 +29,7 @@ const ZERO = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, ca
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string> } = {}): World {
   const w: World = {
     files: new Map(Object.entries(opts.files ?? {})),
-    runs: [], prompts: [], clears: 0, toasts: [], statuses: [],
+    runs: [], prompts: [], fills: [], hasBox: true, clears: 0, toasts: [], statuses: [],
     usage: { tokens: 100_000, window: 1_000_000 },
     session: { id: 's1', cwd: '/repo' },
     messages: [],
@@ -61,6 +63,11 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   on('ui.status', (_$, e) => { w.statuses.push(e.text); return { value: undefined } as never })
   on('command.register', () => ({ value: undefined }) as never)
   on('command.run', { command: 'clear' }, () => { w.clears += 1; return { text: '' } })
+  on('prompt.fill', (_$, e) => {
+    if (!w.hasBox) return { isFilled: false, cause: 'no_composer' } as never
+    w.fills.push(e.text)
+    return { isFilled: true } as never
+  })
   on('prompt.submit', (_$, e) => { w.prompts.push(e.text); return { text: e.text } as never })
   on('tool.call', () => ({ result: 'ran', text: w.toolText }) as never)
   on('classic.Stop', () => (w.stopBlock === undefined ? {} : { block: w.stopBlock }))
