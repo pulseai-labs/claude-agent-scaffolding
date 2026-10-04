@@ -28,10 +28,9 @@ it; it lints every write with `dagr check --strict` before the write replaces th
 file, as dagr's producer contract requires.
 
 - every item task, and each round's barrier, is recorded in `RUN_JSON`, never in your `run.json`;
-- the spine session is the orchestrator of its own run, so it launches, sends to,
-  waits on and releases its item seats as `herdr-mechanics.md` says: each a tab in
-  the workspace it creates for that run, with its own `--cwd`, the worktree ossify
-  prepared for the item;
+- the spine session is the orchestrator of its own run, so it launches, sends to, waits
+  on and releases its item seats as `herdr-mechanics.md` says — each a tab in its run's
+  workspace, with its own `--cwd`, the worktree ossify prepared for the item;
 - plan, gap, depth and other spine-level questions come up in its report file, and
   you answer by sending it its next message;
 - an item seat's question reaches the spine session the same way, in that seat's
@@ -124,11 +123,12 @@ The spine session stops at the final round barrier — where `/ossify:run-spine`
 the baton to `/ossify:close <spine-id>` — and never runs the close on its own
 initiative.
 
-**A `rotate: <handoff path>` completion is not the final barrier.** The spine session
-stopped at an earlier round barrier past the context ceiling (`lifecycle.md`). Confirm the
-handoff path resolves, then dispatch a fresh spine session on the same spine-session
-seat — the same approved SEATS block injected again — with `HANDOFF_PATH` set and the
-same `RUN_JSON`, which it continues. The close waits for a completion at the final barrier.
+**A `rotate: <handoff path>` completion is not the final barrier.** The spine session stopped
+at an earlier round barrier past the ceiling (`lifecycle.md`). Confirm the handoff resolves,
+then dispatch a fresh spine session on the same spine-session seat — the same approved SEATS
+block injected again — with `HANDOFF_PATH` set and the same `RUN_JSON`, which it continues,
+rebinding `run.orchestrator` to its own pane (its brief's step 2 says). The close waits for a
+completion at the final barrier.
 
 When its final report lands, **you dispatch** `/ossify:close <spine-id>` to a close
 session that is **always a fresh seat** you create, never the spine driver's: it

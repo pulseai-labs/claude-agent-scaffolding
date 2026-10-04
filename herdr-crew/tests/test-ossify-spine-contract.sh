@@ -1691,11 +1691,32 @@ section "rotation past the context ceiling"
 
 pin "$LIFECYCLE_MD" "## Rotation past the context ceiling" "lifecycle.md carries the rotation section"
 pin "$LIFECYCLE_MD" 'resumes by naming the parent'"'"'s `run.json` path' \
-  "a new top rebinds the parent run by naming its run.json path"
+  "a new top binds the parent run by naming its run.json path"
 pin "$BRIEFS_MD" "HANDOFF_PATH=<" "the spine brief takes HANDOFF_PATH"
 pin "$BRIEFS_MD" "rotate: <handoff path>" "the spine brief returns rotate: past the ceiling"
 pin "$NESTED_MD" "rotate: <handoff path>" "the top's spine-completion step handles rotate:"
 pin "$PRBRIEFS_MD" "context-ceiling notice" "the work-PR brief returns open: past the ceiling"
+
+# #556: the rebind. One statement — a session that binds a `run.json` it did not
+# create rewrites `run.orchestrator` to its own pane — carried to each successor's
+# own contract: the top's rotation, the spine brief's continue (the rotate
+# successor), and the work-PR brief's continue (the `open:` successor). The
+# handoffs record the pane the block names at writing; the gap sentence is gone.
+# The sequence's judgment — who writes when, the queued-message interval — is the
+# rubric's, not this file's.
+REBIND='A session that binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr'"'"'s stable-agent fallback otherwise — in the same producer loop every other write takes.'
+rebind_life="$(count_of "$LIFECYCLE_MD" "$REBIND" flat)"
+if [ "$rebind_life" -eq 2 ]; then pass "lifecycle states the rebind rule at step 1 and carries it to the rotation (2)"
+else fail "lifecycle states the rebind rule at step 1 and carries it to the rotation" "found $rebind_life, expected 2"; fi
+pin "$BRIEFS_MD" "$REBIND" "the spine brief rebinds a continued RUN_JSON (rotate successor)" flat
+pin "$PRBRIEFS_MD" "$REBIND" "the work-PR brief rebinds a continued RUN_JSON (open successor)" flat
+pin "$NESTED_MD" 'rebinding `run.orchestrator` to its own pane' "nested-run §4 says the rotate successor rebinds" flat
+pin "$LIFECYCLE_MD" 'the pane `run.orchestrator` names at writing, and the next step' "step 13's handoff records the pane the block names" flat
+pin "$LIFECYCLE_MD" 'the pane `run.orchestrator` names at writing, and, per live dispatch' "the rotation handoff records the pane the block names" flat
+pin "$BRIEFS_MD" 'the path of RUN_JSON and the pane `run.orchestrator` names at writing' "the spine rotate return records the pane the block names" flat
+pin "$PRBRIEFS_MD" "RUN_JSON's path and the pane its \`run.orchestrator\`" "the work-PR open return records the pane the block names" flat
+absent "$LIFECYCLE_MD" 'does not rebind it' "the #556 gap sentence is gone"
+absent "$LIFECYCLE_MD" 'issue #556' "no text cites the issue as an open gap"
 
 section "waits and completion bodies"
 

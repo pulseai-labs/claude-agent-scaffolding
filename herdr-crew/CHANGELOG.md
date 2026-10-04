@@ -2,6 +2,38 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.4
+
+**The `run.orchestrator` rebind (#556).** dagr routes the operator's `m` composer to
+`run.orchestrator`, and nothing rebound it: after a rotation the field still named the
+pane the file was created in, so the operator's messages queued at a top that had stood
+down.
+
+- **One rule, carried to each successor's own contract.** A session that binds an
+  existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr's
+  stable-agent fallback otherwise — in the same producer loop every other write takes.
+  It is stated at `lifecycle.md` step 1 and carried verbatim to the top's rotation, the
+  spine brief's continue (`ossify-briefs.md`, the `rotate:` successor), and the work-PR
+  brief's continue (`ossify-pr-briefs.md`, the `open:` successor), because a brief is the
+  whole contract its reader sees; `ossify-nested-run.md` §4 says the new spine session
+  rebinds.
+- **One writer, one router.** The handoff is the predecessor's last write; from the
+  handoff on the predecessor writes nothing to the run file and takes no dispatch action,
+  and the successor's rebind is its first write — it does not wait on the stand-down,
+  which kills waits and writes nothing. An operator message dagr queued at the old pane
+  in the interval is a wake that fires anyway: read and handed to the successor, never
+  acted on. The handoffs record the pane the block names at writing — lifecycle step 13,
+  the rotation handoff, the spine `rotate:` return, and the work-PR `open:` return.
+- **The #556 gap sentence is gone** from `lifecycle.md`; the plugin `README.md`'s binding
+  sentence carries the rebind.
+- **Tests and budgets.** `tests/test-ossify-spine-contract.sh` pins the carried sentence
+  at all three sites (flat-counted), the four handoff records, and the absence of the gap
+  sentence and the issue citation; every pin was mutation-tested with a semantic revert
+  that applies and runs. The three budgeted files land at the 200-line gate
+  (`ossify-briefs.md` 200, `ossify-pr-briefs.md` 200, `ossify-nested-run.md` 200) by
+  trading lines inside each file, no raise. No new eval surface: the sequence is walked
+  as recorded claims in the verifier dispatch.
+
 ## 0.2.3
 
 **The worker ping and the heartbeat backstop (#640).** The orchestrator's wake was
