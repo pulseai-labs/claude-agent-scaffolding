@@ -16,7 +16,7 @@ agents by name, never by command, so no machine detail reaches a repo. For a dua
 the project root is the AI workspace, where orchestrators launch; a single-repo project uses
 that repo.
 
-Resolution is a walk up from the session's working directory; the first project file found wins.
+Resolution is a walk up from the session's working directory; the first project file found wins. The pairing manifest is not consulted — its absolute roots can belong to another host.
 
 The project file wins for anything it names — a seat, an extra role, a condition; it never
 redefines how an agent is launched. Workers never read either file — a brief is the whole contract a worker sees.
@@ -160,8 +160,8 @@ brief: ./briefs/security-audit.md
   report envelope — a `REPORT_PATH` and a completion shape — checked at approval
   with `can:` and the block's other fields; without one the role cannot return. The
   coordinator sends a copy carrying the run's `NOTIFY_PANE` slot and ping step beside that
-  envelope (`briefs.md`), and edits no stored file: a stored brief that fixes its own
-  notification target is a conflict surfaced to the operator, never overridden.
+  envelope (`briefs.md`), and edits no stored file: a stored brief whose fixed target differs from
+  the run's is a conflict surfaced to the operator, never overridden; an equal target is no conflict, kept as it is.
 - `replaces:` — hands the role a step the plugin owns; the valid targets are
   `implementer`, `verifier`, `reviewer` only. The named seat is not launched for
   that run — the operator's role runs at the step's point in its place, and the

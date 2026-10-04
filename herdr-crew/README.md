@@ -139,7 +139,8 @@ surfaced, never read.
 live herdr-pane dispatch — a typed-wait seat included; a dsh session keeps its own route: one
 health check per live seat per tick, never a completion wait and never a
 re-entry, catching a stopped, blocked or unreadable seat whose wait missed its wake. It is
-killed at teardown and at a rotation's stand-down, and the successor arms a fresh one.
+killed at teardown and at a rotation's stand-down, and the successor arms a fresh one; a host
+with no background timer keeps the wait/ping fallback, never a rolling foreground loop.
 
 ## The run's state
 

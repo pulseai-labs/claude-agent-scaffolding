@@ -39,8 +39,8 @@ single-quoted literal argument (a single quote in it is written `'\''`; `$` and 
 literal). The ping only wakes the parent — a parent undetected or on another server keeps the
 report-file wait and the run's heartbeat, no push promised — and a failed send is left as it is.
 An operator's own `brief:` is dispatched as a copy carrying the same envelope; the stored file is
-never edited, and a stored brief that fixes its own notification target is surfaced, not
-overridden.
+never edited, and a stored brief whose fixed target differs from the run's is surfaced, not
+overridden; an equal target is no conflict, kept as it is.
 
 ## A template is a whole contract
 
