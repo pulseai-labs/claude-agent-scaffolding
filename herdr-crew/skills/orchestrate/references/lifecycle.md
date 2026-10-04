@@ -40,7 +40,9 @@ Every command's syntax comes from `herdr --skill`.
    earlier work-PR dispatch has covered, `covered` when one has and left durable
    evidence its review ran but no record,
    otherwise the record its last `open:` result
-   persisted), and the child templates it will construct, verbatim as `briefs.md`'s
+   persisted), the `RUN_JSON` path that PR's last `open:` return named (a resumed
+   dispatch continues and rebinds that file; a first dispatch names a fresh one), and
+   the child templates it will construct, verbatim as `briefs.md`'s
    dispatch matrix lists them for a work-PR session: steps 8-12 are that session's loop,
    and you relay the merge word to it rather than merging yourself. Once every returned
    PR has merged, dispatch the record pass — a second close — and only then tear down:
@@ -255,8 +257,9 @@ mid-item. At its next boundary it settles its dispatch with a return that carrie
 forward, and its parent launches a fresh seat to resume: the spine session writes
 `/ossify:handoff`, returns `rotate: <handoff path>`, and resumes from the same
 project-file seat with that path as `HANDOFF_PATH`; a work-PR session returns `open: <PR url> at
-<head sha>` with its review record, and its successor resumes from `PRIOR_REVIEW` — it
-takes no `HANDOFF_PATH`. A figure the hook reports as unavailable is relayed upward once,
+<head sha>` with its review record and the `RUN_JSON` path it continued, and its successor
+resumes from `PRIOR_REVIEW` with that same `RUN_JSON` — it takes no `HANDOFF_PATH`.
+A figure the hook reports as unavailable is relayed upward once,
 never guessed. Both sessions' boundaries and returns are in their briefs
 (`ossify-briefs.md`, `ossify-pr-briefs.md`); a spine `rotate:` is
 `ossify-nested-run.md` §4.

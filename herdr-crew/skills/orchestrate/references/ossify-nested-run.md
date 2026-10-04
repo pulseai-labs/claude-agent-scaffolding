@@ -173,17 +173,17 @@ fresh close, which re-runs the review over every amended diff. Neither the
 close nor the work-PR session applies these fixes, and no seat is created for
 this permanently.
 
-**Then one work-PR session per returned PR**, each created in that PR's own
-hosting-repo worktree, launched from the `work-PR session` seat the project file
-names, and briefed with the two profiles you decided at the PR transition
-(`ossify-execution.md` §5), the merge-executor assignment, and `PRIOR_REVIEW` — `none`
-for a PR no earlier work-PR dispatch has covered, `covered` when one has and left
-durable evidence its review ran but no record, otherwise the durable record that
-PR's last `open:` result persisted. It owns both PR seats in a `run.json` of its own,
-relays one summary per round, and asks you for the merge word; you ask the operator,
-and the merge lands under the reply's executor — a merge commit on the SHA the reply
-names, session or operator alike. `lifecycle.md` steps 8-12 are that
-session's loop, not yours.
+**Then one work-PR session per returned PR**, each created in that PR's hosting-repo
+worktree, launched from the project file's `work-PR session` seat, and briefed with the
+two profiles you decided at the PR transition (`ossify-execution.md` §5), the
+merge-executor assignment, `PRIOR_REVIEW` — `none` for a PR no earlier work-PR dispatch
+has covered, `covered` when one has and left durable evidence its review ran but no
+record, otherwise the durable record that PR's last `open:` result persisted — and the
+`RUN_JSON` path that return named: a resumed successor continues and rebinds that file,
+a first dispatch names a fresh one. It owns both PR seats in a `run.json` of its own,
+relays one summary per round, and asks you for the merge word; you ask the operator, and
+the merge lands under the reply's executor — a merge commit on the named SHA, session or
+operator alike. `lifecycle.md` steps 8-12 are that session's loop, not yours.
 
 **Then, once every returned PR has merged, one record pass** — a second
 `/ossify:close <spine-id>`, to another fresh close session. **Hold step 12's teardown —

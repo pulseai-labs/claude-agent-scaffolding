@@ -1718,6 +1718,20 @@ pin "$PRBRIEFS_MD" "RUN_JSON's path and the pane its \`run.orchestrator\`" "the 
 absent "$LIFECYCLE_MD" 'does not rebind it' "the #556 gap sentence is gone"
 absent "$LIFECYCLE_MD" 'issue #556' "no text cites the issue as an open gap"
 
+# #556 round 1, finding 1: the work-PR `open:` successor's dispatch must carry the
+# predecessor's RUN_JSON path, or its continue branch and rebind are unreachable and
+# it mints a second run file. One phrase per top-facing contract that builds that
+# dispatch: lifecycle step 1b, lifecycle's rotation paragraph, nested-run §4, and
+# ossify-execution.md's top column.
+pin "$LIFECYCLE_MD" 'the `RUN_JSON` path that PR'"'"'s last `open:` return named' \
+  "lifecycle step 1b carries the resumed work-PR dispatch's RUN_JSON" flat
+pin "$LIFECYCLE_MD" 'with that same `RUN_JSON`' \
+  "lifecycle's rotation carries RUN_JSON into the work-PR successor" flat
+pin "$NESTED_MD" 'the `RUN_JSON` path that return named' \
+  "nested-run §4 carries RUN_JSON into a resumed work-PR dispatch" flat
+pin "$EXEC_MD" 'the `RUN_JSON` path that record'"'"'s return named' \
+  "ossify-execution's top column carries RUN_JSON into a resumed work-PR dispatch" flat
+
 section "waits and completion bodies"
 
 # The typed wait is stated once, in herdr-mechanics.md; lifecycle step 5 and
