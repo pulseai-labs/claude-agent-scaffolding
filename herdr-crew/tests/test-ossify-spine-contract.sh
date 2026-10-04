@@ -2063,14 +2063,14 @@ pin "$COMMAND_MD" 'start one spine session — marked `coordinator`' \
   "commands/orchestrate.md marks the spine start" flat
 pin "$LIFECYCLE_MD" 'A declared role with no `replaces:` is marked a guarded `implementer`' \
   "lifecycle marks an operator role with no replaces as a guarded implementer" flat
-pin "$SKILL_MD" 'The direct work-item seat is a guarded `implementer`' \
-  "SKILL.md §6 marks the direct work-item seat as a guarded implementer" flat
+pin "$SKILL_MD" 'The direct work-item seat is a guarded `implementer` — its report, scratch and handoff directories' \
+  "SKILL.md §6 marks the direct work-item seat and its handoff directory" flat
 pin "$SKILL_MD" 'a non-spine close is a coordinator seat, marked `coordinator`' \
   "SKILL.md §6 marks the non-spine close as a coordinator seat" flat
 pin "$SKILL_MD" 'Mark the doctor seat `coordinator` before its command' \
   "SKILL.md §6 marks the doctor seat as a coordinator seat" flat
-pin "$GENERIC_BRIEFS_MD" 'Launched as a guarded `implementer`' \
-  "the direct work-item template states the guarded implementer marking" flat
+pin "$GENERIC_BRIEFS_MD" 'seat — its report, scratch and handoff directories in `SEAT_MODS_ALLOW`' \
+  "the direct work-item template marks its handoff directory too" flat
 pin "$GENERIC_BRIEFS_MD" 'The top marks it `coordinator` before its' \
   "the non-spine close template states the coordinator marking" flat
 pin "$PLUGIN_README_MD" 'Every launch that places a seat in a herdr pane marks it' \
@@ -2083,20 +2083,30 @@ pin "$PLUGIN_README_MD" 'Every launch that places a seat in a herdr pane marks i
 # mention test is gone (its valid sentence "a coordinator guards its own children"
 # false-RED'd). A value is valid only when the role word is followed by end of line,
 # whitespace, a backtick (a code span's close), or — after an opening quote — the
-# matching closing quote; a bare value may also end at a quote that closes an
-# earlier-opened quote on the same line, which is the roles.md pane-run recipe's
-# closing `"`. Anything else fails: `coordinator,`, `coordinator;`, `orchestrator.`,
-# an unbalanced `"coordinator`, a stray trailing quote, a value outside the five, and
-# an empty value (`SEAT_MODS_ROLE=` at end of line, or `""`). The only placeholder
-# accepted is the shipped `<role>` slot (`<>` and `<close-session>` fail); a coordinator
-# noun (spine, close, work-pr, work-PR, workpr, doctor, lane) is not a role. The seeded
-# controls below prove each class; the shipped-file scan runs the same predicate.
+# matching closing quote followed by that same terminator; a bare value may also end at
+# a quote that closes an earlier-opened quote on the same line, which is the roles.md
+# pane-run recipe's closing `"`. Anything else fails: `coordinator,`, `coordinator;`,
+# `orchestrator.`, an unbalanced `"coordinator`, a stray trailing quote, a quoted value
+# followed by junk (`"coordinator"junk`), a value outside the five, and an empty value
+# (`SEAT_MODS_ROLE=` at end of line, or `""`). The only placeholder accepted is the
+# shipped `<role>` slot (`<>` and `<close-session>` fail); a coordinator noun (spine,
+# close, work-pr, work-PR, workpr, doctor, lane) is not a role. The seeded controls
+# below prove each class; the shipped-file scan runs the same predicate.
 invalid_role_value_hits() { # <file> -> count; an unreadable file is refused
   [ -r "$1" ] || return 1
   awk '
     function allowed(v) {
       return v == "implementer" || v == "verifier" || v == "reviewer" ||
              v == "coordinator" || v == "orchestrator" || v == "<role>"
+    }
+    function terminated(tail, prefix,   t, pc, n) {
+      t = substr(tail, 1, 1)
+      if (t == "" || t == " " || t == "\t" || t == "`") return 1
+      if (t == "\"" || t == "\047") {
+        pc = prefix; n = gsub(t, "", pc)
+        if (n % 2 == 1) return 1
+      }
+      return 0
     }
     {
       line = $0
@@ -2111,12 +2121,10 @@ invalid_role_value_hits() { # <file> -> count; an unreadable file is refused
         after = body
         if (match(body, /^[A-Za-z0-9_<>-]+/)) { v = substr(body, RSTART, RLENGTH); after = substr(body, RLENGTH + 1) }
         ok = 0
-        t = substr(after, 1, 1)
-        if (quoted) { if (t == q) ok = 1 }
-        else if (t == "" || t == " " || t == "\t" || t == "`") ok = 1
-        else if (t == "\"" || t == "\047") {
-          pc = pre; n = gsub(t, "", pc)
-          if (n % 2 == 1) ok = 1
+        if (quoted) {
+          if (substr(after, 1, 1) == q) ok = terminated(substr(after, 2), pre q v q)
+        } else {
+          ok = terminated(after, pre)
         }
         if (!ok || !allowed(v)) hits++
       }
@@ -2141,6 +2149,9 @@ value_control 1 'SEAT_MODS_ROLE=coordinator;' "a value followed by a semicolon i
 value_control 1 'SEAT_MODS_ROLE=orchestrator.' "a value followed by a period is flagged"
 value_control 1 'SEAT_MODS_ROLE="coordinator' "an unterminated quoted value is flagged"
 value_control 1 'SEAT_MODS_ROLE=coordinator"' "a stray trailing quote is flagged"
+value_control 1 'SEAT_MODS_ROLE="coordinator"junk' "junk after a quoted value's closing quote is flagged"
+value_control 1 "SEAT_MODS_ROLE='verifier'x" "a letter after a quoted value's closing quote is flagged"
+value_control 0 'SEAT_MODS_ROLE="coordinator" X=1' "a quoted value followed by whitespace is accepted"
 value_control 1 'SEAT_MODS_ROLE=' "an empty value at end of line is flagged"
 value_control 1 'SEAT_MODS_ROLE=""' "an empty quoted value is flagged"
 value_control 1 'SEAT_MODS_ROLE=<>' "an empty slot is flagged"

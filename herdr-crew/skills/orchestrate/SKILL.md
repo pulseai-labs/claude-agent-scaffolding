@@ -169,7 +169,7 @@ These cases are named because they look like clashes and are not:
   and the spine close brief names `SPINE_ID`. Dispatch them from `references/briefs.md`'s own —
   the direct work-item template, or the non-spine close one — filled: the TASK is the operator's
   command verbatim and the DONE body that command's own result, so the seat has a `REPORT_PATH` and
-  a body, and never the implementer's commit/push line where the unit is read-only. The direct work-item seat is a guarded `implementer` — its report and scratch directories in `SEAT_MODS_ALLOW` (`herdr-mechanics.md` step 2); a non-spine close is a coordinator seat, marked `coordinator` before its command (same step).
+  a body, and never the implementer's commit/push line where the unit is read-only. The direct work-item seat is a guarded `implementer` — its report, scratch and handoff directories in `SEAT_MODS_ALLOW` (`herdr-mechanics.md` step 2); a non-spine close is a coordinator seat, marked `coordinator` before its command (same step).
 - **`doctor`.** One fresh tab and pane per dispatch, launched from the project-file
   `doctor session` seat and released on return (`references/roles.md`). Mark the doctor seat `coordinator` before its command (`herdr-mechanics.md` step 2). Its brief is
   `references/briefs.md`'s doctor-dispatch template, filled: the TASK is the operator's dispatch
