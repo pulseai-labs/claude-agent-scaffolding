@@ -73,3 +73,6 @@ scaffold-onboard/tests/fixtures/
 # Anchored, for the same reason `/.claude/` is: an unanchored pattern would also
 # hide any `.worktrees` fixture a test creates under a plugin subtree.
 /.worktrees/
+
+# Types the Claude Code engine writes beside a loaded mod (rewritten on every load).
+*/.claude-plugin/types/
