@@ -18,9 +18,9 @@ time and fire a close or a merge twice.
 | Fill | What molt does |
 |---|---|
 | below soft | Nothing. The status line shows `molt <fill>%/<soft>%`. |
-| soft | Once per session, after a tool result, the handoff instruction rides along as context (the nudge). At the end of a turn with no `MOLT-HANDOFF:` line, the Stop reflex blocks the stop with the same instruction, at most twice. |
+| soft | Once per session, after a tool result, the handoff instruction rides along as context (the nudge). At the end of a turn with no `MOLT-HANDOFF:` line, or with one that names a file that does not exist, the Stop reflex blocks the stop and asks again, at most twice. |
 | hard | Only Write, Edit, Skill, and Bash made only of `git add` and `git commit` run. Every other tool call, reads included, is refused with the instruction and a note on the hard limit. |
-| fallback (hard + margin) | With no handoff, molt writes one: Haiku summarises the transcript into `~/.claude/state/molt/briefs/<id>.md`, above the facts molt extracts itself (files written, commits, issues, the last request). If Haiku fails, the facts alone stand in. |
+| fallback (hard + margin) | molt stops waiting. With no handoff, it writes one: Haiku summarises the transcript into `~/.claude/state/molt/briefs/<id>.md`, above the facts molt extracts itself (files written, commits, issues, the last request). If Haiku fails, the facts alone stand in. |
 
 The instruction asks the session to write a handoff (with `ossify:handoff` where it is installed)
 and to end its reply with one line:
@@ -32,9 +32,15 @@ MOLT-HANDOFF: <absolute path of the handoff file>
 At the end of that turn, molt checks that the file exists, runs `/clear`, writes the lineage
 record, and submits one seed prompt: continue from the handoff at `<path>` (with
 `ossify:handoff-resume` where it is installed). A relative path resolves against the session's
-working directory; `~/` resolves against `$HOME`. A path that names no file does not molt while
-the Stop reflex still has asks left. Past those asks, the last `.md` file the session wrote past
-soft is the handoff; at fallback, molt writes its own.
+working directory; `~/` resolves against `$HOME`. Below soft (and without `/molt now`) a
+`MOLT-HANDOFF:` line is ignored, so a quoted or example line never clears the session.
+
+When the turn ends past soft without a usable marker:
+
+- **No marker line:** the last `.md` file the session wrote or edited past soft is the handoff.
+- **A marker that names no file**, or no marker and no such `.md` file: molt waits while the Stop
+  reflex has asks left. Once both asks are spent, or at the fallback threshold whatever the asks,
+  molt writes a fallback brief and molts on that.
 
 A subagent's turn and an interrupted turn never molt, and a subagent's tool calls are never
 gated. A `/clear` you run yourself seeds nothing.
@@ -50,7 +56,7 @@ Set them in `/config` → molt (the plugin's `userConfig`).
 |---|---|---|
 | `softPercent` | 50 | Past this fill the session is asked to finish its step and write a handoff. |
 | `hardPercent` | 65 | Past this fill only the handoff's tools run. |
-| `fallbackMargin` | 5 | With no handoff by hard + this margin, molt writes a fallback brief and molts. |
+| `fallbackMargin` | 5 | At hard + this margin, molt stops waiting for a handoff: with none, it writes a fallback brief and molts. |
 | `minRoomPercent` | 15 | A seeded session's soft threshold is at least this many points above its starting fill. |
 | `manualMaxMolts` | 2 | In manual mode, molt pauses after this many molts in a row with no prompt from you. |
 | `instructionsTemplate` | `~/.claude/molt/instructions.md` | What the session is told at soft. `{{percent}}`, `{{soft}}` and `{{hard}}` are filled in. |
@@ -96,8 +102,10 @@ session is in manual mode. The loop guards differ by mode:
   a band, and names the handoff. Your next message resumes it. The seed prompt does not count as
   a message from you.
 - **Autopilot.** There is no count limit. A molt with no progress since the previous one — no
-  Write, Edit or NotebookEdit, and no `git commit` — pauses the session and rings the record's
-  bell, a shell command run with `AUTONOMIC_MESSAGE` set to the reason.
+  Write, Edit or NotebookEdit, and no `git commit`, made below soft — pauses the session and rings
+  the record's bell, a shell command run with `AUTONOMIC_MESSAGE` set to the reason. Work past
+  soft does not count: there the session writes and commits the handoff itself, which would make
+  every molt look like progress.
 
 ## With the crews
 

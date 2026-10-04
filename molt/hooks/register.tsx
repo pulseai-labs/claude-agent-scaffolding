@@ -155,7 +155,18 @@ async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<voi
   forced.delete(sessionId)
   await setNotice($, { text: `molt: handing off at ${Math.round(lastPercent ?? 0)}% — ${handoff.path}`, tone: 'info' })
   await log($, `molt session=${sessionId} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent}`)
-  $.command.run({ command: 'clear' }).catch(async (err: unknown) => {
+  const p = pending
+  $.command.run({ command: 'clear' }).then(async () => {
+    // A SessionStart consumes pending before /clear resolves. When it did not, and the
+    // session id is unchanged, a hook answered /clear without clearing.
+    try {
+      if (pending !== p || (await $.session.id()) !== sessionId) return
+      pending = undefined
+      inFlight = false
+      await setNotice($, { text: `molt: /clear did not clear this session; it keeps going. The handoff is at ${handoff.path}.`, tone: 'warn' })
+      await log($, `clear did not clear session=${sessionId}`)
+    } catch {}
+  }, async (err: unknown) => {
     pending = undefined
     inFlight = false
     await setNotice($, { text: `molt: /clear was rejected; this session keeps going. The handoff is at ${handoff.path}.`, tone: 'warn' })
@@ -298,7 +309,9 @@ export const register: Register = (on, options) => {
     const r = await next(e)
     if (typeof r.text === 'string') unmeasured += Math.ceil(r.text.length / CHARS_PER_TOKEN)
     if (r.deny === undefined && r.isError === undefined) {
-      if (isProgress(e.tool, args)) progress += 1
+      // Below soft only: past it the session writes and commits the handoff itself, which
+      // would make every molt look like progress to the autopilot loop guard.
+      if (isProgress(e.tool, args) && !atLeast(stage, 'soft')) progress += 1
       const path = args.file_path
       if ((e.tool === 'Write' || e.tool === 'Edit') && typeof path === 'string' && path.endsWith('.md')
         && sessionId !== '' && atLeast(stage, 'soft')) lastMd.set(sessionId, path)
@@ -328,11 +341,20 @@ export const register: Register = (on, options) => {
       const sessionId = e.session_id
       if (off.has(sessionId) || inFlight || paused === sessionId) return r
       await measure($, sessionId)
-      if (!atLeast(stage, 'soft') || markerPath(e.last_assistant_message ?? '') !== undefined) return r
+      if (!atLeast(stage, 'soft')) return r
+      const marker = markerPath(e.last_assistant_message ?? '')
+      let missing: string | undefined
+      if (marker !== undefined) {
+        const path = resolvePath(marker, await $.session.cwd(), await home($))
+        if (await $.fs.exists(path)) return r
+        missing = path
+      }
       const n = stopBlocks.get(sessionId) ?? 0
       if (n >= MAX_STOP_BLOCKS) return r
       stopBlocks.set(sessionId, n + 1)
-      const text = await instruction($, sessionId)
+      const text = missing === undefined
+        ? await instruction($, sessionId)
+        : `molt: the MOLT-HANDOFF line names ${missing}, but ${missing} does not exist. Write the handoff file, then end your reply with MOLT-HANDOFF: <its absolute path>.`
       return { ...r, block: r.block === undefined ? text : `${r.block}\n\n${text}` }
     } catch (err) {
       await log($, `Stop error ${String(err)}`)
@@ -371,8 +393,10 @@ export const register: Register = (on, options) => {
       if (off.has(sessionId) || inFlight || paused === sessionId) { showStatus($, sessionId); return r }
       await measure($, sessionId)
       showStatus($, sessionId)
+      // Below soft a marker is not a molt: a seeded session keeps its minimum room, and a
+      // quoted or example marker line does not clear the session. /molt now sets soft.
+      if (!atLeast(stage, 'soft')) return r
       const marker = markerPath(e.answer)
-      if (marker === undefined && !atLeast(stage, 'soft')) return r
       const resolved = marker === undefined ? undefined : resolvePath(marker, await $.session.cwd(), await home($))
       let handoff = pickHandoff(resolved, lastMd.get(sessionId))
       if (handoff !== undefined && !(await $.fs.exists(handoff.path))) {

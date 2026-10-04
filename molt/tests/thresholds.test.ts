@@ -37,8 +37,12 @@ describe('past soft', () => {
     expect((await $.classic.Stop(STOP('done'))).block).toBeUndefined()
   })
   test('a reply that carries the marker is not blocked', async ($, on) => {
-    const w = world(on); at(w, 52)
+    const w = world(on, { files: { '/r/h.md': '#' } }); at(w, 52)
     expect((await $.classic.Stop(STOP('ok\nMOLT-HANDOFF: /r/h.md'))).block).toBeUndefined()
+  })
+  test('a marker that names a missing file is blocked with its path (review focus 4)', async ($, on) => {
+    const w = world(on); at(w, 52)
+    expect((await $.classic.Stop(STOP('ok\nMOLT-HANDOFF: /r/typo.md'))).block).toContain('/r/typo.md does not exist')
   })
   test("another plugin's block is kept, and molt's text is added to it", async ($, on) => {
     const w = world(on); at(w, 52)

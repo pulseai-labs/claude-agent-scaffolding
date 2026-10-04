@@ -23,8 +23,15 @@ describe('a molt from a marker', () => {
   })
   test('a relative marker path resolves against the cwd (review focus 4)', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
+    at(w, 52)
     await $.turn.complete(TURN('MOLT-HANDOFF: docs/handoff.md'))
     expect(w.clears).toBe(1)
+  })
+  test('a marker below soft does not molt (minimum room)', async ($, on) => {
+    const w = world(on, { files: { [H]: '# handoff' } })
+    at(w, 10)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(0)
   })
   test('a marker that names no file does not molt while the Stop reflex has asks left', async ($, on) => {
     const w = world(on)
@@ -34,6 +41,7 @@ describe('a molt from a marker', () => {
   })
   test('the chain and depth carry across a second molt', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
+    at(w, 52)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     w.session.id = 's2'
     await $.classic.SessionStart(CLEAR('s2'))
@@ -98,9 +106,33 @@ describe('what never molts', () => {
   })
 })
 
+describe('a /clear that never clears', () => {
+  // Another plugin can answer /clear with { text }: the call resolves, and no SessionStart follows.
+  test('the next prompt lifts the molt in flight; a later /clear of yours seeds nothing', async ($, on) => {
+    const w = world(on, { files: { [H]: '#' } })
+    at(w, 52)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(1)
+    await $.prompt.submit({ text: 'go', wait: false, origin: { kind: 'composer' } })
+    at(w, 80)
+    expect((await $.tool.call({ tool: 'Read', file_path: '/repo/a' } as never)).deny).toBeDefined()
+    w.session.id = 's2'
+    await $.classic.SessionStart(CLEAR('s2'))
+    expect(w.prompts.some(p => p.includes(H))).toBe(false)
+  })
+  test('the next turn end lifts it too, and can molt again', async ($, on) => {
+    const w = world(on, { files: { [H]: '#' } })
+    at(w, 52)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(2)
+  })
+})
+
 describe('loop guards', () => {
   test('manual: the third molt in a row with no message pauses', async ($, on) => {
     const w = world(on, { files: { [H]: '#' } })
+    at(w, 52)
     for (const id of ['s1', 's2']) {
       w.session.id = id
       await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
@@ -113,6 +145,7 @@ describe('loop guards', () => {
   })
   test('manual: a message from you resets the count (control)', async ($, on) => {
     const w = world(on, { files: { [H]: '#' } })
+    at(w, 52)
     for (const id of ['s1', 's2', 's3']) {
       w.session.id = id
       await $.prompt.submit({ text: 'go', wait: false, origin: { kind: 'composer' } })
@@ -124,6 +157,16 @@ describe('loop guards', () => {
   test('autopilot: a molt with no progress since the last one pauses and rings the bell', async ($, on) => {
     const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
       '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
+    at(w, 52)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(0)
+    expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
+  })
+  test('autopilot: writing and committing only the handoff past soft is no progress', async ($, on) => {
+    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
+    at(w, 52)
+    await $.tool.call({ tool: 'Write', file_path: H, content: '# h' })
+    await $.tool.call({ tool: 'Bash', command: `git add ${H} && git commit -F /tmp/m` })
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(0)
     expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
@@ -132,6 +175,7 @@ describe('loop guards', () => {
     const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
       '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
     await $.tool.call({ tool: 'Bash', command: 'git add a && git commit -F /tmp/m' })
+    at(w, 52)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(1)
   })
