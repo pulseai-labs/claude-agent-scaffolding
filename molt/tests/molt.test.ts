@@ -12,6 +12,7 @@ const AUTOPILOT = { '/home/u/.claude/state/autonomic/sessions/s1.json': '{"mode"
 describe('a molt from a marker', () => {
   test('clears, writes lineage, seeds the new session with the handoff', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
+    w.clearTo.push('s2')
     at(w, 52)
     await $.turn.complete(TURN(`done\nMOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(1)
@@ -42,6 +43,7 @@ describe('a molt from a marker', () => {
   test('the chain and depth carry across a second molt', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
     at(w, 52)
+    w.clearTo.push('s2', 's3')
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     w.session.id = 's2'
     await $.classic.SessionStart(CLEAR('s2'))
@@ -61,6 +63,7 @@ describe('no handoff', () => {
     at(w, 52)
     await $.classic.Stop(STOP); await $.classic.Stop(STOP)
     await $.tool.call({ tool: 'Write', file_path: '/repo/h2.md', content: '# h' })
+    w.clearTo.push('s2')
     await $.turn.complete(TURN('done'))
     expect(w.clears).toBe(1)
     w.session.id = 's2'
@@ -120,6 +123,13 @@ describe('a /clear that never clears', () => {
     await $.classic.SessionStart(CLEAR('s2'))
     expect(w.prompts.some(p => p.includes(H))).toBe(false)
   })
+  test('a clear that never cleared is not counted as a molt', async ($, on) => {
+    const w = world(on, { files: { [H]: '#' } })
+    at(w, 52)
+    for (let i = 0; i < 3; i++) await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(3)
+    expect(w.toasts.some(t => t.includes('molt paused'))).toBe(false)
+  })
   test('the next turn end lifts it too, and can molt again', async ($, on) => {
     const w = world(on, { files: { [H]: '#' } })
     at(w, 52)
@@ -134,6 +144,7 @@ describe('loop guards', () => {
     const w = world(on, { files: { [H]: '#' } })
     at(w, 52)
     for (const id of ['s1', 's2']) {
+      w.clearTo.push(`${id}x`)
       w.session.id = id
       await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
       await $.classic.SessionStart(CLEAR(`${id}x`))
@@ -147,6 +158,7 @@ describe('loop guards', () => {
     const w = world(on, { files: { [H]: '#' } })
     at(w, 52)
     for (const id of ['s1', 's2', 's3']) {
+      w.clearTo.push(`${id}x`)
       w.session.id = id
       await $.prompt.submit({ text: 'go', wait: false, origin: { kind: 'composer' } })
       await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))

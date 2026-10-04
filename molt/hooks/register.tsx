@@ -150,9 +150,6 @@ async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<voi
   }
   inFlight = true
   pending = { oldSession: sessionId, handoff: handoff.path, chain: own?.chain ?? sessionId, depth: (own?.depth ?? 0) + 1 }
-  unattended += 1
-  progress = 0
-  forced.delete(sessionId)
   await setNotice($, { text: `molt: handing off at ${Math.round(lastPercent ?? 0)}% — ${handoff.path}`, tone: 'info' })
   await log($, `molt session=${sessionId} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent}`)
   const p = pending
@@ -250,6 +247,11 @@ export const register: Register = (on, options) => {
       if (e.source === 'clear' && pending !== undefined) {
         const p = pending
         pending = undefined
+        // Counted here, once the clear happened: a /clear that is rejected or never clears
+        // is not a molt for the loop guards.
+        unattended += 1
+        progress = 0
+        forced.delete(p.oldSession)
         const sessionId = e.session_id
         const lineage: Lineage = { from: p.oldSession, chain: p.chain, depth: p.depth, handoff: p.handoff }
         await $.fs.write(lineagePath(await home($), sessionId), `${JSON.stringify(lineage, null, 2)}\n`)
