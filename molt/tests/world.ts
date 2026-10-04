@@ -22,6 +22,7 @@ export type World = {
   haiku: { isAnswered: true; text: string } | { isAnswered: false; reason: 'empty-reply' }
   modelCalls: number
   toolText: string             // what every tool call's result text is
+  failWrites?: RegExp          // fs.write to a matching path is refused (a read-only or full disk)
   stopBlock?: string           // a block another plugin beneath molt returns at Stop
 }
 
@@ -48,7 +49,11 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     const text = w.files.get(e.path)
     return (text === undefined ? { deny: `ENOENT: ${e.path}` } : { value: text }) as never
   })
-  on('fs.write', (_$, e) => { w.files.set(e.path, e.text); return { value: undefined } as never })
+  on('fs.write', (_$, e) => {
+    if (w.failWrites?.test(e.path)) return { deny: `EROFS: ${e.path}` } as never
+    w.files.set(e.path, e.text)
+    return { value: undefined } as never
+  })
   on('fs.exists', (_$, e) => ({ value: w.files.has(e.path) }) as never)
   on('process.run', (_$, e) => {
     const argv = [...e.argv]

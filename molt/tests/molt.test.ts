@@ -22,6 +22,15 @@ describe('a molt from a marker', () => {
       .toEqual({ from: 's1', chain: 's1', depth: 1, handoff: H })
     expect(w.prompts.at(-1)).toContain(H)
   })
+  test('a lineage record that cannot be written does not stop the seed', async ($, on) => {
+    const w = world(on, { files: { [H]: '# handoff' } })
+    w.failWrites = /\/lineage\//
+    w.clearTo.push('s2')
+    at(w, 52)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    await $.classic.SessionStart(CLEAR('s2'))
+    expect(w.prompts.at(-1)).toContain(H)
+  })
   test('a relative marker path resolves against the cwd (review focus 4)', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
     at(w, 52)

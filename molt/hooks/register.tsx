@@ -253,18 +253,24 @@ export const register: Register = (on, options) => {
         progress = 0
         forced.delete(p.oldSession)
         const sessionId = e.session_id
-        const lineage: Lineage = { from: p.oldSession, chain: p.chain, depth: p.depth, handoff: p.handoff }
-        await $.fs.write(lineagePath(await home($), sessionId), `${JSON.stringify(lineage, null, 2)}\n`)
         seeded = { session: sessionId }
         unmeasured = 0
         stage = 'below'
         lastPercent = undefined
-        const seed = fill(await template($, cfg.seedTemplate, DEFAULT_SEED), { path: p.handoff })
+        // The session is already cleared: nothing below may stop the seed from going out.
+        let seedText = fill(DEFAULT_SEED, { path: p.handoff })
+        try { seedText = fill(await template($, cfg.seedTemplate, DEFAULT_SEED), { path: p.handoff }) } catch {}
         // Not awaited: the seed's turn cannot start until this hook returns.
-        $.prompt.submit({ text: seed }).catch(async (err: unknown) => {
+        $.prompt.submit({ text: seedText }).catch(async (err: unknown) => {
           await setNotice($, { text: `molt: the seed was rejected. Resume by hand from ${p.handoff}.`, tone: 'warn' })
           await log($, `seed rejected session=${sessionId} ${String(err)}`)
         })
+        try {
+          const lineage: Lineage = { from: p.oldSession, chain: p.chain, depth: p.depth, handoff: p.handoff }
+          await $.fs.write(lineagePath(await home($), sessionId), `${JSON.stringify(lineage, null, 2)}\n`)
+        } catch (err) {
+          await log($, `lineage write failed session=${sessionId} ${String(err)}`)
+        }
         await setNotice($, { text: `molt: resumed from ${p.handoff}`, tone: 'info' })
         await log($, `seeded session=${sessionId} from=${p.oldSession} depth=${p.depth}`)
       }
