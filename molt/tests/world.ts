@@ -23,15 +23,22 @@ export type World = {
   modelCalls: number
   toolText: string             // what every tool call's result text is
   failWrites?: RegExp          // fs.write to a matching path is refused (a read-only or full disk)
+  rejectSeeds?: boolean        // a plugin's prompt.submit is refused
+  slowWrites?: RegExp          // fs.write to a matching path takes 20 ms
+  staged?: boolean             // Write/Edit results come back staged: held for review, file unchanged
+  notices: unknown[]           // every value molt wrote to its notice, in order
   stopBlock?: string           // a block another plugin beneath molt returns at Stop
 }
+
+// The test runtime has timers; the engine's types declare none, so reach it through globalThis.
+const sleep = (globalThis as unknown as { setTimeout: (f: (v?: unknown) => void, ms: number) => unknown }).setTimeout
 
 const ZERO = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
 
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string> } = {}): World {
   const w: World = {
     files: new Map(Object.entries(opts.files ?? {})),
-    runs: [], prompts: [], fills: [], hasBox: true, clears: 0, clearTo: [], toasts: [], statuses: [],
+    runs: [], prompts: [], fills: [], hasBox: true, clears: 0, clearTo: [], notices: [], toasts: [], statuses: [],
     usage: { tokens: 100_000, window: 1_000_000 },
     session: { id: 's1', cwd: '/repo' },
     messages: [],
@@ -41,6 +48,11 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   }
   mock.env(on, { HOME: '/home/u', ...(opts.env ?? {}) })
   mock.store(on)
+  on('state.set', (_$, e, next) => {
+    const w8 = e as unknown as { key?: string; value?: unknown }
+    if (w8.key === 'notice') w.notices.push(w8.value)
+    return next(e)
+  })
   on('session.id', () => ({ value: w.session.id }) as never)
   on('session.cwd', () => ({ value: w.session.cwd }) as never)
   on('session.usage', () => ({ value: { startedAt: 0, context: { ...w.usage, breakdown: w.breakdown }, rateLimits: [] } }) as never)
@@ -49,7 +61,8 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     const text = w.files.get(e.path)
     return (text === undefined ? { deny: `ENOENT: ${e.path}` } : { value: text }) as never
   })
-  on('fs.write', (_$, e) => {
+  on('fs.write', async (_$, e) => {
+    if (w.slowWrites?.test(e.path)) await new Promise(resolve => sleep(resolve, 20))
     if (w.failWrites?.test(e.path)) return { deny: `EROFS: ${e.path}` } as never
     w.files.set(e.path, e.text)
     return { value: undefined } as never
@@ -81,8 +94,15 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     w.fills.push(e.text)
     return { isFilled: true } as never
   })
-  on('prompt.submit', (_$, e) => { w.prompts.push(e.text); return { text: e.text } as never })
-  on('tool.call', () => ({ result: 'ran', text: w.toolText }) as never)
+  on('prompt.submit', (_$, e) => {
+    if (w.rejectSeeds && e.origin.kind === 'plugin') throw new Error('prompt refused')
+    w.prompts.push(e.text)
+    return { text: e.text } as never
+  })
+  on('tool.call', (_$, e) => ({
+    result: w.staged && (e.tool === 'Write' || e.tool === 'Edit') ? { staged: true } : 'ran',
+    text: w.toolText,
+  }) as never)
   on('classic.Stop', () => (w.stopBlock === undefined ? {} : { block: w.stopBlock }))
   on('classic.PostToolUse', () => ({}))
   on('classic.SessionStart', () => ({}))

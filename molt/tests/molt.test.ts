@@ -31,6 +31,28 @@ describe('a molt from a marker', () => {
     await $.classic.SessionStart(CLEAR('s2'))
     expect(w.prompts.at(-1)).toContain(H)
   })
+  test('a rejected seed leaves the warning, not "resumed"', async ($, on) => {
+    const w = world(on, { files: { [H]: '# handoff' } })
+    w.rejectSeeds = true
+    w.slowWrites = /\/lineage\//      // the rejection lands while the lineage write is in flight
+    w.clearTo.push('s2')
+    at(w, 52)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    await $.classic.SessionStart(CLEAR('s2'))
+    for (let i = 0; i < 5; i++) await $.prompt.submit({ text: 'tick', wait: false, origin: { kind: 'sdk' } } as never)
+    expect((w.notices.at(-1) as { tone?: string } | null)?.tone).toBe('warn')
+  })
+  test('a staged edit of a markdown file past soft is not the handoff', async ($, on) => {
+    const w = world(on, { files: { '/repo/old.md': '# old' } })
+    w.staged = true
+    w.clearTo.push('s2')
+    at(w, 52)
+    await $.classic.Stop(STOP); await $.classic.Stop(STOP)
+    await $.tool.call({ tool: 'Edit', file_path: '/repo/old.md', old_string: 'old', new_string: 'h' })
+    await $.turn.complete(TURN('done'))
+    await $.classic.SessionStart(CLEAR('s2'))
+    expect(w.prompts.at(-1)).not.toContain('/repo/old.md')
+  })
   test('a relative marker path resolves against the cwd (review focus 4)', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
     at(w, 52)
@@ -182,6 +204,14 @@ describe('loop guards', () => {
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(0)
     expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
+  })
+  test('autopilot: a staged write below soft is no progress', async ($, on) => {
+    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
+    w.staged = true
+    await $.tool.call({ tool: 'Write', file_path: '/repo/x.ts', content: 'x' })
+    at(w, 52)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(0)
   })
   test('autopilot: writing and committing only the handoff past soft is no progress', async ($, on) => {
     const w = world(on, { files: { [H]: '#', ...AUTOPILOT, '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })

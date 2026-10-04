@@ -40,6 +40,14 @@ describe('past soft', () => {
     const w = world(on, { files: { '/r/h.md': '#' } }); at(w, 52)
     expect((await $.classic.Stop(STOP('ok\nMOLT-HANDOFF: /r/h.md'))).block).toBeUndefined()
   })
+  test('a /clear of your own resets the stage: no figure afterwards gates nothing', async ($, on) => {
+    const w = world(on); at(w, 80)
+    expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeDefined()
+    w.session.id = 's2'
+    await $.classic.SessionStart({ source: 'clear', session_id: 's2' } as never)
+    w.usage = { window: 1_000_000 }
+    expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeUndefined()
+  })
   test('a marker that names a missing file is blocked with its path (review focus 4)', async ($, on) => {
     const w = world(on); at(w, 52)
     expect((await $.classic.Stop(STOP('ok\nMOLT-HANDOFF: /r/typo.md'))).block).toContain('/r/typo.md does not exist')

@@ -244,6 +244,12 @@ export const register: Register = (on, options) => {
     try {
       if (e.source === 'startup') await writeMissingTemplates($)
       await touchActive($, e.session_id)
+      // Module state survives a clear, a compact and a resume; the fill it measured does not.
+      if (e.source === 'clear' || e.source === 'compact' || e.source === 'resume') {
+        stage = 'below'
+        lastPercent = undefined
+        unmeasured = 0
+      }
       if (e.source === 'clear' && pending !== undefined) {
         const p = pending
         pending = undefined
@@ -254,12 +260,11 @@ export const register: Register = (on, options) => {
         forced.delete(p.oldSession)
         const sessionId = e.session_id
         seeded = { session: sessionId }
-        unmeasured = 0
-        stage = 'below'
-        lastPercent = undefined
         // The session is already cleared: nothing below may stop the seed from going out.
         let seedText = fill(DEFAULT_SEED, { path: p.handoff })
         try { seedText = fill(await template($, cfg.seedTemplate, DEFAULT_SEED), { path: p.handoff }) } catch {}
+        // Set before the submit: a rejection's warning must land after it, never under it.
+        await setNotice($, { text: `molt: resumed from ${p.handoff}`, tone: 'info' })
         // Not awaited: the seed's turn cannot start until this hook returns.
         $.prompt.submit({ text: seedText }).catch(async (err: unknown) => {
           await setNotice($, { text: `molt: the seed was rejected. Resume by hand from ${p.handoff}.`, tone: 'warn' })
@@ -271,7 +276,6 @@ export const register: Register = (on, options) => {
         } catch (err) {
           await log($, `lineage write failed session=${sessionId} ${String(err)}`)
         }
-        await setNotice($, { text: `molt: resumed from ${p.handoff}`, tone: 'info' })
         await log($, `seeded session=${sessionId} from=${p.oldSession} depth=${p.depth}`)
       }
     } catch (err) {
@@ -316,7 +320,9 @@ export const register: Register = (on, options) => {
     }
     const r = await next(e)
     if (typeof r.text === 'string') unmeasured += Math.ceil(r.text.length / CHARS_PER_TOKEN)
-    if (r.deny === undefined && r.isError === undefined) {
+    // A staged Write or Edit is held for review and leaves the file unchanged.
+    const staged = (r.result as { staged?: unknown } | undefined)?.staged === true
+    if (r.deny === undefined && r.isError === undefined && !staged) {
       // Below soft only: past it the session writes and commits the handoff itself, which
       // would make every molt look like progress to the autopilot loop guard.
       if (isProgress(e.tool, args) && !atLeast(stage, 'soft')) progress += 1
