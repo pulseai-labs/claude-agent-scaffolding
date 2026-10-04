@@ -56,7 +56,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the status line read at the model read: four lines, 260 -> 264. Fix round 1 put the
 # guard in its pane-run form, where the launcher's own shell cannot arm itself, and added
 # the replaces: rule: two lines, 264 -> 266.
-# 0.2.6 (seat-mods 0.2.0) rewrote step 2 as seat marking — the two free roles' exports, the
+# 0.2.7 (seat-mods 0.2.0) rewrote step 2 as seat marking — the two free roles' exports, the
 # operator's own top, and the #658 fold-ins (<run dir>, the banner status read, the
 # missing-status-line route and disposition): the paragraph grew with the mechanics it
 # exists to state and the gate rose with it, 266 -> 272. The adjacent control runs the

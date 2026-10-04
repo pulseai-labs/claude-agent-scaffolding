@@ -67,7 +67,7 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 . "$SCRIPT_DIR/_helpers.sh"
 
 REF_BUDGET=209          # A3: each ossify reference stays under 209 lines.
-                        # 0.2.6 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
+                        # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
                         # each launch site gained; the files' own maximum is 209
                         # (`ossify-nested-run.md`), and the budget section's adjacent
                         # control holds the gate at that minimum — one line over the
@@ -2007,7 +2007,7 @@ pin "$WRITER_MD" 'launches each writer' \
 pin "$WRITER_MD" 'as a guarded seat: role `implementer`' \
   "the close-review writer's guard role is implementer"
 
-# 0.2.6 (seat-mods 0.2.0): the two free roles are marked at launch, never left absent. Every site
+# 0.2.7 (seat-mods 0.2.0): the two free roles are marked at launch, never left absent. Every site
 # that orders a coordinator seat's launch names `coordinator` beside it, the top's own
 # successor `orchestrator`; each points at step 2. One pin per site; the label names the
 # site, so a removal reads as that site.
@@ -2119,9 +2119,9 @@ else
 fi
 printf '%s\n' 'SEAT_MODS_ROLE=coordinator' > "$seed"
 if [ "$(invalid_role_value_hits "$seed")" -eq 0 ]; then
-  pass "control: the coordinator value is accepted (the 0.2.6 flip)"
+  pass "control: the coordinator value is accepted (the 0.2.7 flip)"
 else
-  fail "control: the coordinator value is accepted (the 0.2.6 flip)" "flagged it"
+  fail "control: the coordinator value is accepted (the 0.2.7 flip)" "flagged it"
 fi
 printf '%s\n' 'SEAT_MODS_ROLE="orchestrator"' > "$seed"
 if [ "$(invalid_role_value_hits "$seed")" -eq 0 ]; then

@@ -137,7 +137,8 @@ line to that seat's context: finish the unit in hand, start no new one, rotate a
 boundary. The rotation itself is prose (`skills/orchestrate/references/lifecycle.md`,
 "Rotation past the context ceiling"). The hook runs only inside Orca terminals, never
 blocks a command, and says so when it cannot read the figure. Set `context_ceiling` in the
-plugin's configuration.
+plugin's configuration. Since 0.8.2 the hook is silent in a session where the `molt` mod is
+active, because `molt` owns the context boundary there.
 
 ## Configuration
 

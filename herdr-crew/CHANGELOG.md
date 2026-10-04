@@ -2,13 +2,13 @@
 
 All notable changes to the `herdr-crew` plugin.
 
-## 0.2.6
+## 0.2.7
 
 **Every launch marks its session for seat-mods 0.2.0.** seat-mods 0.2.0 guards a session
 whose `SEAT_MODS_ROLE` is unset or empty as an implementer, and treats exactly
 `orchestrator` and `coordinator` as unguarded — so herdr-crew 0.2.5's coordinator seats,
 and the top's rotation successor, would have launched as guarded implementers that cannot
-merge. 0.2.6 marks every seat it launches.
+merge. 0.2.7 marks every seat it launches.
 
 - **The two free roles are marked at launch.** `herdr-mechanics.md` step 2 is rewritten
   from the never-guarded complement to the marking: a guarded seat — implementer, verifier
@@ -54,8 +54,18 @@ only — no seat-mods code.
 
 **Known limit.** seat-mods 0.1.0 reads `coordinator` and `orchestrator` as invalid roles
 and denies every tool call (`seat-mods/hooks/rules.ts:106-110` and `register.ts:50` at tag
-`seat-mods-v0.1.0`), so herdr-crew 0.2.6 must be installed together with seat-mods 0.2.0.
+`seat-mods-v0.1.0`), so herdr-crew 0.2.7 must be installed together with seat-mods 0.2.0.
 paseo-crew, orca-crew and dsh-crew do not mark sessions yet.
+
+## 0.2.6
+
+**The context-ceiling hook stands down where `molt` is active.** In a session whose
+`molt` marker (`~/.claude/state/molt/active/<session_id>`) is under a day old, the hook
+prints nothing: `molt` hands the session off in place at its own threshold, and a second,
+conflicting rotation order would leave two tops on one run. Without `molt` installed no
+marker exists and nothing changes. A stale marker is ignored, a session id that is not a
+plain name is never a marker, and without `jq` the id is read as text. The rotation prose
+is unchanged in this release.
 
 ## 0.2.5
 
