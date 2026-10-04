@@ -44,9 +44,9 @@ export function extractFacts(messages: readonly Message[]): Facts {
       if ((use.tool === 'Write' || use.tool === 'Edit') && typeof path === 'string') files.add(path)
       const command = use.input.command
       if (use.tool === 'Bash' && typeof command === 'string' && /\bgit\b[^\n]*\bcommit\b/.test(command))
-        commits.push(command.split('\n')[0].slice(0, 160))
+        commits.push((command.split('\n')[0] ?? '').slice(0, 160))
     }
-    for (const ref of m.text.matchAll(/(?:^|[\s(])(#\d{1,6})\b/g)) issues.add(ref[1])
+    for (const ref of m.text.matchAll(/(?:^|[\s(])(#\d{1,6})\b/g)) if (ref[1] !== undefined) issues.add(ref[1])
   }
   return { files: [...files], commits, issues: [...issues], lastRequest: lastRequest.slice(0, 600) }
 }
