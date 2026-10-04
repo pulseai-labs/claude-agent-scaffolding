@@ -283,10 +283,10 @@ ask fixes: a successor is a seat like any other, and one sent its resume before 
 accepts input never binds the run. The file's `run.orchestrator` block — where dagr
 routes the operator's messages — is the successor's first write: A session that binds an
 existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr's
-stable-agent fallback otherwise — in the same producer loop every other write takes. It
-does not wait on this session's stand-down — that kills waits, and writes nothing — and
-from the handoff on this session writes nothing to the run file and takes no dispatch
-action. Send the new top its
+stable-agent fallback otherwise — in the same producer loop every other write takes. The
+rebind does not wait on this session's stand-down — that kills waits, and writes
+nothing — and from the handoff on this session writes nothing to the run file and takes
+no dispatch action. Send the new top its
 resume — `/ossify:handoff-resume <path>` with ossify, or the path as its first
 instruction without — confirm its turn started, then **stand down**: kill this session's
 armed background waits and its heartbeat before the successor re-arms the same panes and

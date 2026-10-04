@@ -16,23 +16,29 @@ down.
   spine brief's continue (`ossify-briefs.md`, the `rotate:` successor), and the work-PR
   brief's continue (`ossify-pr-briefs.md`, the `open:` successor), because a brief is the
   whole contract its reader sees; `ossify-nested-run.md` §4 says the new spine session
-  rebinds.
+  rebinds. The contracts that build a work-PR dispatch — `lifecycle.md` step 1b and its
+  rotation paragraph, `ossify-nested-run.md` §4 and `ossify-execution.md`'s top column —
+  carry the predecessor's `RUN_JSON` path into a resumed dispatch, so the successor's
+  continue branch and its rebind are reachable instead of a second run file being minted.
 - **One writer, one router.** The handoff is the predecessor's last write; from the
   handoff on the predecessor writes nothing to the run file and takes no dispatch action,
-  and the successor's rebind is its first write — it does not wait on the stand-down,
-  which kills waits and writes nothing. An operator message dagr queued at the old pane
-  in the interval is a wake that fires anyway: read and handed to the successor, never
-  acted on. The handoffs record the pane the block names at writing — lifecycle step 13,
-  the rotation handoff, the spine `rotate:` return, and the work-PR `open:` return.
+  and the successor's rebind is its first write — the rebind does not wait on the
+  stand-down, which kills waits and writes nothing. An operator message dagr queued at the
+  old pane in the interval is a wake that fires anyway: read and handed to the successor,
+  never acted on. The handoffs record the pane the block names at writing — lifecycle
+  step 13, the rotation handoff, the spine `rotate:` return, and the work-PR `open:`
+  return.
 - **The #556 gap sentence is gone** from `lifecycle.md`; the plugin `README.md`'s binding
   sentence carries the rebind.
 - **Tests and budgets.** `tests/test-ossify-spine-contract.sh` pins the carried sentence
-  at all three sites (flat-counted), the four handoff records, and the absence of the gap
-  sentence and the issue citation; every pin was mutation-tested with a semantic revert
-  that applies and runs. The three budgeted files land at the 200-line gate
-  (`ossify-briefs.md` 200, `ossify-pr-briefs.md` 200, `ossify-nested-run.md` 200) by
-  trading lines inside each file, no raise. No new eval surface: the sequence is walked
-  as recorded claims in the verifier dispatch.
+  at all three sites (flat-counted), the four handoff records, the four dispatch carriers
+  of a resumed work-PR `RUN_JSON`, and the gap sentence's absence as a flat, plugin-wide
+  sweep; every pin was mutation-tested with a semantic mutation that applies and runs. The
+  three budgeted files land at the 200-line gate (`ossify-briefs.md` 200,
+  `ossify-pr-briefs.md` 200, `ossify-nested-run.md` 200) by trading lines inside each file,
+  no raise. No new eval surface and no rubric criterion: the rebind sequence is checked by
+  the recorded-claims walkthrough in the verification dispatch, and no eval result covers
+  it.
 
 ## 0.2.3
 

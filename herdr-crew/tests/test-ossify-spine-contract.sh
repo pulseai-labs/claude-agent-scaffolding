@@ -1702,11 +1702,13 @@ pin "$PRBRIEFS_MD" "context-ceiling notice" "the work-PR brief returns open: pas
 # own contract: the top's rotation, the spine brief's continue (the rotate
 # successor), and the work-PR brief's continue (the `open:` successor). The
 # handoffs record the pane the block names at writing; the gap sentence is gone.
-# The sequence's judgment — who writes when, the queued-message interval — is the
-# rubric's, not this file's.
+# The sequence's judgment — who writes when, the queued-message interval — is not
+# parsed here and has no rubric criterion; it is checked by the recorded-claims
+# walkthrough in the verification dispatch (no eval result covers it).
 REBIND='A session that binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr'"'"'s stable-agent fallback otherwise — in the same producer loop every other write takes.'
-rebind_life="$(count_of "$LIFECYCLE_MD" "$REBIND" flat)"
-if [ "$rebind_life" -eq 2 ]; then pass "lifecycle states the rebind rule at step 1 and carries it to the rotation (2)"
+if ! rebind_life="$(count_of "$LIFECYCLE_MD" "$REBIND" flat)"; then
+  fail "lifecycle states the rebind rule at step 1 and carries it to the rotation" "count failed — unreadable file or empty needle"
+elif [ "$rebind_life" -eq 2 ]; then pass "lifecycle states the rebind rule at step 1 and carries it to the rotation (2)"
 else fail "lifecycle states the rebind rule at step 1 and carries it to the rotation" "found $rebind_life, expected 2"; fi
 pin "$BRIEFS_MD" "$REBIND" "the spine brief rebinds a continued RUN_JSON (rotate successor)" flat
 pin "$PRBRIEFS_MD" "$REBIND" "the work-PR brief rebinds a continued RUN_JSON (open successor)" flat
@@ -1715,8 +1717,27 @@ pin "$LIFECYCLE_MD" 'the pane `run.orchestrator` names at writing, and the next 
 pin "$LIFECYCLE_MD" 'the pane `run.orchestrator` names at writing, and, per live dispatch' "the rotation handoff records the pane the block names" flat
 pin "$BRIEFS_MD" 'the path of RUN_JSON and the pane `run.orchestrator` names at writing' "the spine rotate return records the pane the block names" flat
 pin "$PRBRIEFS_MD" "RUN_JSON's path and the pane its \`run.orchestrator\`" "the work-PR open return records the pane the block names" flat
-absent "$LIFECYCLE_MD" 'does not rebind it' "the #556 gap sentence is gone"
-absent "$LIFECYCLE_MD" 'issue #556' "no text cites the issue as an open gap"
+# #556 round 1, finding 6: the gap sentence's absence is plugin-wide and must be
+# wrap-proof. Flat mode reassembles a phrase a markdown wrap broke; the sweep reads
+# every shipped carrier plus the manifests, fixtures and rubric — CHANGELOG included
+# (its 0.2.4 entry names the issue, never the sentence). This test file is the
+# reader, so its own pin arguments are not swept.
+gap_absent() { # <file>
+  gap_rel="${1#"$PLUGIN_ROOT"/}"
+  if [ ! -r "$1" ]; then fail "no #556 gap text in $gap_rel" "missing or unreadable: $1"; return 0; fi
+  gap_hits=0
+  for gap_needle in 'does not rebind it' 'issue #556 holds that gap'; do
+    gap_c="$(occurrences_flat "$1" "$gap_needle")" || { fail "no #556 gap text in $gap_rel" "unreadable file: $1"; return 0; }
+    gap_hits=$((gap_hits + gap_c))
+  done
+  if [ "$gap_hits" -eq 0 ]; then pass "no #556 gap text in $gap_rel"
+  else fail "no #556 gap text in $gap_rel" "$gap_hits occurrence(s)"; fi
+}
+GAP_CARRIERS=("$PLUGIN_ROOT/README.md" "$SKILL_MD" "$COMMAND_MD" "$REF"/*.md \
+  "$PLUGIN_ROOT/CHANGELOG.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json" \
+  "$PLUGIN_ROOT/.codex-plugin/plugin.json" \
+  "$EVAL_DIR"/fixtures/ossify-spine-execution/*.md "$EVAL_RUBRIC_MD")
+for gap_f in "${GAP_CARRIERS[@]}"; do gap_absent "$gap_f"; done
 
 # #556 round 1, finding 1: the work-PR `open:` successor's dispatch must carry the
 # predecessor's RUN_JSON path, or its continue branch and rebind are unreachable and
