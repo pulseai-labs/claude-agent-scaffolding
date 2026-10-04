@@ -3,10 +3,12 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Notice } from '../types'
 import { DEFAULTS, parseConfig } from './config'
 import type { MoltConfig } from './config'
-import { stageOf, thresholdsFor } from './measure'
+import { CHARS_PER_TOKEN, atLeast, projectedPercent, stageOf, thresholdsFor } from './measure'
+import { gateAllows, isProgress } from './gate'
+import { markerPath } from './handoff'
 import type { Stage, Thresholds } from './measure'
 import { activePath, autonomicPath, logPath, parseAutonomic, safeSessionId } from './records'
-import { DEFAULT_INSTRUCTIONS, DEFAULT_SEED, expandHome } from './templates'
+import { DEFAULT_INSTRUCTIONS, DEFAULT_SEED, HARD_NOTE, expandHome, fill } from './templates'
 
 // molt: in-place context handoff (spec §2). Module variables survive /clear, which is
 // what a molt needs to carry across; $.state does not, and holds only the band.
@@ -21,6 +23,15 @@ let lastPercent: number | undefined
 const off = new Set<string>()
 let paused: string | undefined
 let seeded: { session: string; startPercent?: number } | undefined
+
+const MAX_STOP_BLOCKS = 2
+let unmeasured = 0                        // tool and response output no response has measured yet
+let inFlight = false                      // a molt between /clear and its seed
+let progress = 0                          // Write, Edit or commit since the last molt
+const nudged = new Set<string>()          // sessions told once at a tool result
+const stopBlocks = new Map<string, number>()
+const lastMd = new Map<string, string>()  // the last .md a session wrote past soft
+const forced = new Set<string>()          // /molt now: soft whatever the fill
 
 const USAGE = 'usage: /molt now | off | on | status'
 
@@ -60,6 +71,23 @@ async function setNotice($: Engine, value: Notice): Promise<void> {
 
 function currentThresholds(sessionId: string): Thresholds {
   return thresholdsFor(cfg, seeded?.session === sessionId ? seeded.startPercent : undefined)
+}
+
+async function measure($: Engine, sessionId: string): Promise<number | undefined> {
+  const percent = projectedPercent((await $.session.usage()).context, unmeasured)
+  if (percent !== undefined) {
+    lastPercent = percent
+    stage = stageOf(percent, currentThresholds(sessionId))
+  }
+  if (forced.has(sessionId) && stage === 'below') stage = 'soft'
+  return percent
+}
+
+async function instruction($: Engine, sessionId: string): Promise<string> {
+  const t = currentThresholds(sessionId)
+  const values = { percent: Math.round(lastPercent ?? t.soft), soft: Math.round(t.soft), hard: Math.round(t.hard) }
+  const text = fill(await template($, cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS), values)
+  return atLeast(stage, 'hard') ? `${text}\n\n${fill(HARD_NOTE, values)}` : text
 }
 
 function showStatus($: Engine, sessionId: string): void {
@@ -156,6 +184,89 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  on('tool.call', async ($, e, next) => {
+    if (e.agentId !== undefined) return next(e)
+    const args = e as unknown as Readonly<Record<string, unknown>>
+    let sessionId = ''
+    try {
+      sessionId = await $.session.id()
+      if (!off.has(sessionId) && !inFlight) {
+        await measure($, sessionId)
+        if (atLeast(stage, 'hard') && !gateAllows(e.tool, args)) {
+          await log($, `gate denied session=${sessionId} tool=${e.tool} percent=${lastPercent}`)
+          return { deny: await instruction($, sessionId) }
+        }
+      }
+    } catch (err) {
+      await log($, `tool.call gate error ${String(err)}`)
+    }
+    const r = await next(e)
+    if (typeof r.text === 'string') unmeasured += Math.ceil(r.text.length / CHARS_PER_TOKEN)
+    if (r.deny === undefined && r.isError === undefined) {
+      if (isProgress(e.tool, args)) progress += 1
+      const path = args.file_path
+      if ((e.tool === 'Write' || e.tool === 'Edit') && typeof path === 'string' && path.endsWith('.md')
+        && sessionId !== '' && atLeast(stage, 'soft')) lastMd.set(sessionId, path)
+    }
+    return r
+  })
+
+  on('classic.PostToolUse', async ($, e, next) => {
+    const r = await next(e)
+    try {
+      if ((e as { agent_id?: string }).agent_id !== undefined) return r
+      const sessionId = e.session_id
+      if (off.has(sessionId) || inFlight || nudged.has(sessionId)) return r
+      await measure($, sessionId)
+      if (!atLeast(stage, 'soft')) return r
+      nudged.add(sessionId)
+      return { ...r, additionalContext: [...(r.additionalContext ?? []), await instruction($, sessionId)] }
+    } catch (err) {
+      await log($, `PostToolUse error ${String(err)}`)
+      return r
+    }
+  })
+
+  on('classic.Stop', async ($, e, next) => {
+    const r = await next(e)
+    try {
+      const sessionId = e.session_id
+      if (off.has(sessionId) || inFlight || paused === sessionId) return r
+      await measure($, sessionId)
+      if (!atLeast(stage, 'soft') || markerPath(e.last_assistant_message ?? '') !== undefined) return r
+      const n = stopBlocks.get(sessionId) ?? 0
+      if (n >= MAX_STOP_BLOCKS) return r
+      stopBlocks.set(sessionId, n + 1)
+      const text = await instruction($, sessionId)
+      return { ...r, block: r.block === undefined ? text : `${r.block}\n\n${text}` }
+    } catch (err) {
+      await log($, `Stop error ${String(err)}`)
+      return r
+    }
+  })
+
+  on('turn.step', async function* ($, e, next) {
+    if (e.agentId !== undefined) return yield* next(e)
+    const before = unmeasured
+    const r = yield* next(e)
+    try {
+      if (r.usage) {
+        // The response measured everything up to its request; its own output, and any
+        // tool output that landed while it streamed, are new.
+        unmeasured = Math.max(0, unmeasured - before) + (r.usage.output_tokens ?? 0)
+        const sessionId = await $.session.id()
+        if (seeded?.session === sessionId && seeded.startPercent === undefined) {
+          const window = (await $.session.usage()).context.window
+          const input = (r.usage.input_tokens ?? 0) + (r.usage.cache_read_input_tokens ?? 0) + (r.usage.cache_creation_input_tokens ?? 0)
+          if (window > 0) seeded.startPercent = (input / window) * 100
+        }
+      }
+    } catch (err) {
+      await log($, `turn.step error ${String(err)}`)
+    }
+    return r
+  })
+
   on('command.run', { command: 'molt' }, async ($, e) => {
     const sessionId = await $.session.id()
     const arg = (e.args ?? '').trim()
@@ -187,6 +298,3 @@ export const register: Register = (on, options) => {
     )
   })
 }
-
-// Used by Tasks 8 and 9; exported so the type checker sees them used meanwhile.
-export const internals = { stageOf, setStage: (s: Stage) => { stage = s }, getStage: () => stage }
