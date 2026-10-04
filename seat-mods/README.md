@@ -41,6 +41,39 @@ list separator.
 **Never set either variable in `~/.claude/settings.json`'s `env` block, in a shell profile, or in a
 machine-file `command:` line.** Each of those reaches the orchestrator, which must never be guarded.
 
+## Without an orchestrator plugin
+
+seat-mods reads only its two variables. It does not call herdr, Paseo, Orca or any other
+orchestrator, and it does not need one installed. An orchestrator plugin is one launcher that sets
+the variables; with none installed, you are the launcher. Set the role on each command that starts
+a session:
+
+```bash
+# Sessions you drive yourself: unguarded.
+alias claude-orch='SEAT_MODS_ROLE=orchestrator claude'
+
+# Worker sessions you start by hand: guarded by role.
+claude-impl() {
+  SEAT_MODS_ROLE=implementer SEAT_MODS_ALLOW="$HOME/seat-scratch/impl" claude "$@"
+}
+claude-verify() {
+  SEAT_MODS_ROLE=verifier SEAT_MODS_ALLOW="$HOME/seat-scratch/verify" claude "$@"
+}
+claude-review() { SEAT_MODS_ROLE=reviewer claude "$@"; }
+```
+
+A plain `claude` with no role is a guarded implementer — the default above. So start every
+session you drive through the `orchestrator` launcher, or that session cannot merge, push a
+deletion or write outside its worktree.
+
+An alias or function that sets the variable on one command does not break the rule above. The
+variable reaches only the session that command starts. An `export` in a shell profile reaches
+every session, the orchestrator's included.
+
+The role names are the contract between seat-mods and any launcher. A launcher that writes
+`orchestrator` or `coordinator` needs seat-mods 0.2.0 or later: 0.1.0 reads both as invalid and
+denies every tool call.
+
 ## The guards
 
 Each is a `tool.call` deny on Bash, Edit or Write.
