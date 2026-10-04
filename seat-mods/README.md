@@ -14,7 +14,7 @@ orchestrator (or any session you start to drive work) and `SEAT_MODS_ROLE=coordi
 close, work-PR and doctor sessions and lane drivers; both are unguarded.
 
 **Rollout: do not install 0.2.0 until every launcher you use — and your own interactive sessions —
-marks its free sessions.** `herdr-crew` 0.2.6 will (not yet released); `paseo-crew`, `orca-crew` and
+marks its free sessions.** `herdr-crew` 0.2.6 does; `paseo-crew`, `orca-crew` and
 `dsh-crew` do not set `SEAT_MODS_ROLE` yet; set `SEAT_MODS_ROLE=orchestrator` yourself, e.g. in your
 launch alias. Until then a coordinator or a bare `claude` session starts guarded as an implementer
 and cannot merge.
@@ -31,10 +31,11 @@ Two environment variables, both set **per spawn**:
 | | anything else | Fail closed. Every tool call is denied with a message that names the bad value and the valid roles. Respawn the seat with a valid value. |
 | `SEAT_MODS_ALLOW` | `:`-separated absolute directories | Extra directories the seat may write to: its report directory and its scratch directory. Relative entries and `/` are ignored. Unset, only the worktree is writable. |
 
-`herdr-crew` 0.2.2 and later (0.2.4 today) exports both in the pane of each implementer, verifier
+`herdr-crew` 0.2.2 through 0.2.5 exports both in the pane of each implementer, verifier
 and reviewer seat before its command and leaves every other pane unset; with this release an unset
-pane is a guarded implementer. `herdr-crew` 0.2.6 will set `SEAT_MODS_ROLE=orchestrator` on the
-orchestrator pane and `coordinator` on coordinator seats. Neither directory may contain `:`, the
+pane is a guarded implementer. `herdr-crew` 0.2.6 sets `SEAT_MODS_ROLE=orchestrator` on the
+top's rotation successor and `coordinator` on its coordinator seats (the spine, close and work-PR
+sessions, the doctor session, the lane driver). Neither directory may contain `:`, the
 list separator.
 
 **Never set either variable in `~/.claude/settings.json`'s `env` block, in a shell profile, or in a

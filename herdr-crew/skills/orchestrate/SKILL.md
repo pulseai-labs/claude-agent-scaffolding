@@ -140,7 +140,8 @@ These cases are named because they look like clashes and are not:
 - **`run-spine`, by default.** Dispatch `/ossify:run-spine <id>` to one lane-driver
   session — the seat the project file names for it, `can: subagents` on its machine
   entry since the lane spawns `ossify:implementer-agent` subagents through the
-  `Agent` tool. From ossify's point of view that
+  `Agent` tool. Mark it `coordinator` before its command (`herdr-mechanics.md` step 2).
+  From ossify's point of view that
   session is its orchestrator: it holds the state lock, commits at each close,
   merges at the barrier. The `Agent`-tool ban in §2 applies
   to this session only. You
@@ -150,7 +151,8 @@ These cases are named because they look like clashes and are not:
   its own ROLE, PLACEMENT, TASK, completion body and NEVER line, so none of them is
   assembled from another template's. When its barrier lands, the close transition
   `lifecycle.md` step 1b defines is this path's too: dispatch `/ossify:close <spine-id>` to a
-  fresh close session, then a work-PR session per returned PR, then the record pass — otherwise
+  fresh close session, then a work-PR session per returned PR, then the record pass — each
+  marked `coordinator` before its command (`herdr-mechanics.md` step 2) — otherwise
   a successful default lane has no defined next step and nothing records what it opened.
 - **`run-spine`, when this session just planned the spine.** Then the items deserve
   their own models, and inherited-runtime subagents cannot give them that.

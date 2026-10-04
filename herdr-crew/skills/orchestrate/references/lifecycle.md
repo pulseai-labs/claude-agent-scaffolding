@@ -24,18 +24,21 @@ Every command's syntax comes from `herdr --skill`.
    item and the three coordinator seats with the operator into the project file,
    inject them as the spine session's SEATS block, ask the
    operator to confirm nested worker depth is 2, and
-   start **one** spine session that creates a nested `run.json` of its own and launches every
+   start **one** spine session — marked `coordinator` before its command
+   (`herdr-mechanics.md` step 2) — that creates a nested `run.json` of its own and launches every
    item pair. You approve relayed worker plans and wait on that one completion; you
    launch no item pane. **That completion is the final round barrier, not a PR.** When
    it lands you **dispatch** `/ossify:close <spine-id>` to a **fresh** close session —
-   launched from the project file's close-session seat — never
+   launched from the project file's close-session seat, marked `coordinator` before its
+   command (`herdr-mechanics.md` step 2) — never
    the spine driver's pane, and wait on its report file, which returns **every** PR
    it opened, one per remote product hosting repo — a remote-less repo lands
    locally and is never a PR; an AI-workspace record arm is not one —
    or `closed`; `close` is a dispatched command (§6),
    not one you run here. Then **dispatch a work-PR session** per returned PR, in that
    PR's own hosting-repo worktree, launched from the project file's work-PR
-   seat, carrying the reviewer **and** PR-fix profiles you
+   seat, marked `coordinator` before its command (`herdr-mechanics.md` step 2),
+   carrying the reviewer **and** PR-fix profiles you
    decide now, the merge-executor assignment, `PRIOR_REVIEW` (`none` for a PR no
    earlier work-PR dispatch has covered, `covered` when one has and left durable
    evidence its review ran but no record,
@@ -45,7 +48,8 @@ Every command's syntax comes from `herdr --skill`.
    the child templates it will construct, verbatim as `briefs.md`'s
    dispatch matrix lists them for a work-PR session: steps 8-12 are that session's loop,
    and you relay the merge word to it rather than merging yourself. Once every returned
-   PR has merged, dispatch the record pass — a second close — and only then tear down:
+   PR has merged, dispatch the record pass — a second close, marked `coordinator` before
+   its command (`herdr-mechanics.md` step 2) — and only then tear down:
    **step 12's worker release and branch deletion wait for that pass** — the work-PR
    session's own reviewer and PR-fix seats are exempt: it releases them when their work
    finishes, and the hold covers the top's spine-level teardown, not seats in a work-PR
@@ -257,7 +261,8 @@ plugin setting `context_ceiling`, default 500000 tokens). The top, the spine ses
 work-PR session act on it; a close session and every leaf seat simply finish their unit.
 Past the ceiling a seat finishes the unit in hand and starts no new one, never stopping
 mid-item. At its next boundary it settles its dispatch with a return that carries its state
-forward, and its parent launches a fresh seat to resume: the spine session writes
+forward, and its parent launches a fresh seat to resume, marked `coordinator` before its
+command as `herdr-mechanics.md` step 2 says: the spine session writes
 `/ossify:handoff`, returns `rotate: <handoff path>`, and resumes from the same
 project-file seat with that path as `HANDOFF_PATH`; a work-PR session returns `open: <PR url> at
 <head sha>` with its review record and the `RUN_JSON` path it continued, and its successor
@@ -280,7 +285,8 @@ and pane with the launch command the handoff recorded — ask the operator once 
 did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`,
 which herdr sets in every pane it hosts (as it does `HERDR_PANE_ID`), the top's own
 workspace, never the run's, which closes last. **Launch it as the seat launch
-`herdr-mechanics.md` states** — the readiness path, the model read against the profile the
+`herdr-mechanics.md` states** — marked `orchestrator` before its command (`herdr-mechanics.md`
+step 2) — the readiness path, the model read against the profile the
 handoff recorded, then the second detection ask — and send its resume on the route that
 ask fixes: a successor is a seat like any other, and one sent its resume before its TUI
 accepts input never binds the run. The file's `run.orchestrator` block — where dagr

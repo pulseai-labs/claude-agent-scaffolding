@@ -2,6 +2,61 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.6
+
+**Every launch marks its session for seat-mods 0.2.0.** seat-mods 0.2.0 guards a session
+whose `SEAT_MODS_ROLE` is unset or empty as an implementer, and treats exactly
+`orchestrator` and `coordinator` as unguarded — so herdr-crew 0.2.5's coordinator seats,
+and the top's rotation successor, would have launched as guarded implementers that cannot
+merge. 0.2.6 marks every seat it launches.
+
+- **The two free roles are marked at launch.** `herdr-mechanics.md` step 2 is rewritten
+  from the never-guarded complement to the marking: a guarded seat — implementer, verifier
+  or reviewer, and a `replaces:` role as the role it replaces — exports its role with
+  `SEAT_MODS_ALLOW`; a coordinator seat — the spine, close or work-PR session, the doctor
+  session, the lane driver — exports `SEAT_MODS_ROLE=coordinator`; the top's rotation
+  successor exports `SEAT_MODS_ROLE=orchestrator`; neither free role gets
+  `SEAT_MODS_ALLOW`. The operator's own top is not launched here — the operator starts it
+  through a `claude-orch` alias that sets `orchestrator`. Every site that orders one of
+  these launches names the marking and points at step 2, as 0.2.5's guard clauses do:
+  `ossify-execution.md`'s top column; `ossify-nested-run.md` §4 (the spine `rotate:`
+  successor, the first close, a re-dispatched close, the work-PR session, the record
+  pass); the close and work-PR sections of `ossify-pr-briefs.md`; the spine brief's
+  header; `lifecycle.md` step 1b and the rotation section (the top's own successor, whose
+  marking is `orchestrator`); `SKILL.md` §6's lane-driver dispatch and its
+  close/work-PR/record-pass transition; and `roles.md`'s spine-session sentence, session
+  budget, doctor sentence and launch block.
+- **The #658 findings deferred from #655 are folded in.** Step 2 now defines `<run dir>` —
+  the directory holding the run's `run.json`, outside every worktree; the
+  missing-status-line record routes the top's own launches as well as a coordinator's (a
+  coordinator records it to the top, the top to the operator) and states its disposition —
+  no halt, no re-launch, never silent; the status line is read from the rendered viewport
+  (`--source visible`) even where a `banner` seat's model read is the default stream; both
+  budget controls' failure messages name the remedy — "lower REF_BUDGET to N" — instead of
+  reading as over-budget failures; the root README's "Since 0.2.5" sentence drops the
+  launch class that does not exist and adds the close-review writer; and the plugin README
+  describes the marking. This is every #658 item: the altitude one is re-homed as #663
+  (the marking stays at prose launch sites, so a new site added without a clause still
+  passes the suite).
+- **Tests and budgets.** The spine-contract suite's value sweep flips from "no
+  coordinator-valued guard anywhere" to a whitelist — an assignment must be implementer,
+  verifier, reviewer, coordinator or orchestrator, or a `<role>` slot, and a coordinator
+  noun or any other value fails — with seeded controls for each invalid spelling, both
+  accepted free roles and the assignment-less prose control; one pin per coordinator and
+  orchestrator site sits beside 0.2.5's guard-site pins. The reference budgets enforce 272
+  for `herdr-mechanics.md` (266 -> 272) and 209 for the ossify references (204 -> 209),
+  each raised only to the new minimum; each adjacent control still refuses a file one line
+  over the real reference and now names the lowering remedy when it fires.
+
+No runtime library, no ossify contract change. `dsh-driver.md` is untouched: dsh sessions
+are not herdr panes and do not load Claude Code mods. seat-mods' own docs changed wording
+only — no seat-mods code.
+
+**Known limit.** seat-mods 0.1.0 reads `coordinator` and `orchestrator` as invalid roles
+and denies every tool call (`seat-mods/hooks/rules.ts:106-110` and `register.ts:50` at tag
+`seat-mods-v0.1.0`), so herdr-crew 0.2.6 must be installed together with seat-mods 0.2.0.
+paseo-crew, orca-crew and dsh-crew do not mark sessions yet.
+
 ## 0.2.5
 
 **The seat-mods guard reaches every launch site (#651, part 5).** The guard rule lived

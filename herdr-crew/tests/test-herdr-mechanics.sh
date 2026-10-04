@@ -55,10 +55,15 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # seats and every replacement launch — the never-guarded complement it enumerates, and
 # the status line read at the model read: four lines, 260 -> 264. Fix round 1 put the
 # guard in its pane-run form, where the launcher's own shell cannot arm itself, and added
-# the replaces: rule: two lines, 264 -> 266. The gate rose with the mechanics and still
-# fails over the limit; its adjacent control runs the same predicate on a file one line
-# over the real reference.
-REF_BUDGET=266
+# the replaces: rule: two lines, 264 -> 266.
+# 0.2.6 (seat-mods 0.2.0) rewrote step 2 as seat marking — the two free roles' exports, the
+# operator's own top, and the #658 fold-ins (<run dir>, the banner status read, the
+# missing-status-line route and disposition): the paragraph grew with the mechanics it
+# exists to state and the gate rose with it, 266 -> 272. The adjacent control runs the
+# same predicate on a file one line over the real reference and, when that is accepted,
+# names the remedy (lower REF_BUDGET to the real file's count) instead of reading as an
+# over-budget failure.
+REF_BUDGET=272
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -166,7 +171,7 @@ else fail "herdr-mechanics.md within the reference budget" "$n lines, over by $(
 ctl="$(mktemp)"
 awk -v n="$(( $(wc -l < "$REF" | tr -d ' ') + 1 ))" 'BEGIN { for (i = 0; i < n; i++) print "x" }' > "$ctl"
 if within_budget "$ctl"; then
-  fail "control: one line over the real reference file is refused" "accepted $(wc -l < "$ctl" | tr -d ' ') lines at budget $REF_BUDGET"
+  fail "control: one line over the real reference file is refused" "accepted $(wc -l < "$ctl" | tr -d ' ') lines at REF_BUDGET=$REF_BUDGET — the real reference is $n lines; lower REF_BUDGET to $n"
 else
   pass "control: one line over the real reference file is refused"
 fi
