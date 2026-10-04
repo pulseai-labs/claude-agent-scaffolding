@@ -4,7 +4,15 @@
 export type Role = 'implementer' | 'verifier' | 'reviewer'
 export const ROLES: readonly Role[] = ['implementer', 'verifier', 'reviewer']
 
-export type RoleState = { kind: 'off' } | { kind: 'on'; role: Role } | { kind: 'invalid'; value: string }
+// Operator-marked roles the mod never guards: no denies, no write placement checks.
+export type FreeRole = 'orchestrator' | 'coordinator'
+export const FREE_ROLES: readonly FreeRole[] = ['orchestrator', 'coordinator']
+
+export type RoleState =
+  | { kind: 'on'; role: Role }         // explicit implementer, verifier, reviewer
+  | { kind: 'default'; role: Role }    // SEAT_MODS_ROLE unset or empty: guarded as implementer
+  | { kind: 'free'; role: FreeRole }   // orchestrator, coordinator: unguarded
+  | { kind: 'invalid'; value: string } // any other non-empty value: deny everything
 
 export type RuleId =
   | 'merge' | 'force-push' | 'branch-delete' | 'no-verify' | 'ai-trailer'
@@ -104,9 +112,19 @@ function commandOf(tokens: readonly string[]): { name: string; args: string[] } 
 }
 
 export function parseRole(value: string | undefined): RoleState {
-  if (value === undefined || value === '') return { kind: 'off' }
+  if (value === undefined || value === '') return { kind: 'default', role: 'implementer' }
   const role = ROLES.find(r => r === value)
-  return role === undefined ? { kind: 'invalid', value } : { kind: 'on', role }
+  if (role !== undefined) return { kind: 'on', role }
+  const free = FREE_ROLES.find(r => r === value)
+  return free === undefined ? { kind: 'invalid', value } : { kind: 'free', role: free }
+}
+
+// The session's status line: every state reads distinctly, so an unmarked session is visible.
+export function statusText(state: RoleState): string {
+  if (state.kind === 'on') return `seat: ${state.role}`
+  if (state.kind === 'default') return `seat: ${state.role} (default: SEAT_MODS_ROLE unset)`
+  if (state.kind === 'free') return `seat: ${state.role}`
+  return `seat: INVALID ROLE "${state.value}"`
 }
 
 export function parseAllow(value: string | undefined): string[] {
@@ -218,6 +236,7 @@ export function decide(role: Role, facts: Facts): string | undefined {
 }
 
 export function invalidText(value: string): string {
-  return `seat-mods: SEAT_MODS_ROLE="${value}" is not a role (valid: implementer, verifier, reviewer). ` +
+  return `seat-mods: SEAT_MODS_ROLE="${value}" is not a role ` +
+    '(valid: implementer, verifier, reviewer, orchestrator, coordinator). ' +
     'Every tool call is denied; respawn this seat with a valid role.'
 }

@@ -1,17 +1,27 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { parseRole, parseAllow, bashRules, commitMessageFiles, placeOf, decide, invalidText } from '../hooks/rules'
+import { parseRole, parseAllow, bashRules, commitMessageFiles, placeOf, decide, invalidText, statusText } from '../hooks/rules'
 
 describe('parseRole', () => {
-  test('unset and empty are off', () => {
-    expect(parseRole(undefined)).toEqual({ kind: 'off' })
-    expect(parseRole('')).toEqual({ kind: 'off' })
+  test('unset and empty default to the guarded implementer', () => {
+    expect(parseRole(undefined)).toEqual({ kind: 'default', role: 'implementer' })
+    expect(parseRole('')).toEqual({ kind: 'default', role: 'implementer' })
   })
-  test('the three roles are on', () => {
+  test('the three guarded roles are on', () => {
     for (const role of ['implementer', 'verifier', 'reviewer']) expect(parseRole(role)).toEqual({ kind: 'on', role })
   })
-  test('anything else is invalid, case included', () => {
-    expect(parseRole('Implementer')).toEqual({ kind: 'invalid', value: 'Implementer' })
-    expect(parseRole('orchestrator')).toEqual({ kind: 'invalid', value: 'orchestrator' })
+  test('orchestrator and coordinator are free; near misses stay invalid', () => {
+    for (const role of ['orchestrator', 'coordinator']) expect(parseRole(role)).toEqual({ kind: 'free', role })
+    for (const value of ['Implementer', 'Orchestrator', 'orchestrator ', 'orchestrater', 'Coordinator', 'co-ordinator'])
+      expect(parseRole(value)).toEqual({ kind: 'invalid', value })
+  })
+})
+
+describe('statusText', () => {
+  test('every state reads distinctly', () => {
+    expect(statusText({ kind: 'on', role: 'implementer' })).toBe('seat: implementer')
+    expect(statusText({ kind: 'default', role: 'implementer' })).toBe('seat: implementer (default: SEAT_MODS_ROLE unset)')
+    expect(statusText({ kind: 'free', role: 'orchestrator' })).toBe('seat: orchestrator')
+    expect(statusText({ kind: 'invalid', value: 'impl' })).toBe('seat: INVALID ROLE "impl"')
   })
 })
 
@@ -227,5 +237,6 @@ describe('decide', () => {
   test('invalidText names the value and the roles', () => {
     expect(invalidText('impl')).toContain('"impl"')
     expect(invalidText('impl')).toContain('implementer, verifier, reviewer')
+    expect(invalidText('impl')).toContain('orchestrator, coordinator')
   })
 })

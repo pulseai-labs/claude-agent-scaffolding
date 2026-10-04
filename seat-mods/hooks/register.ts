@@ -1,5 +1,5 @@
 import type { Register } from 'claude-code'
-import { parseRole, parseAllow, bashRules, commitMessageFiles, placeOf, decide, invalidText } from './rules'
+import { parseRole, parseAllow, bashRules, commitMessageFiles, placeOf, decide, invalidText, statusText } from './rules'
 import type { RoleState } from './rules'
 
 async function roleOf($: any): Promise<RoleState> {
@@ -38,28 +38,27 @@ async function allowOf($: any): Promise<string[]> {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    const state = await roleOf($)
-    if (state.kind === 'on') $.ui.status(`seat: ${state.role}`)
-    if (state.kind === 'invalid') $.ui.status(`seat: INVALID ROLE "${state.value}"`)
+    $.ui.status(statusText(await roleOf($)))
     return next(e)
   })
 
   on('tool.call', async ($, e, next) => {
     const state = await roleOf($)
-    if (state.kind === 'off') return next(e)
+    if (state.kind === 'free') return next(e)
     if (state.kind === 'invalid') return { deny: invalidText(state.value) }
+    const role = state.role // 'on' or 'default'
 
     if (e.tool === 'Bash') {
       const texts = await Promise.all(commitMessageFiles(e.command).map(file => $.fs.read(file).catch(() => '')))
       const text = texts.join('\n')
-      const deny = decide(state.role, { kind: 'bash', rules: bashRules(e.command, text) })
+      const deny = decide(role, { kind: 'bash', rules: bashRules(e.command, text) })
       return deny === undefined ? next(e) : { deny }
     }
 
     if (e.tool === 'Edit' || e.tool === 'Write') {
       const [target, root, allow] = await Promise.all([realOf($, e.file_path), worktreeOf($), allowOf($)])
       const place = target === undefined || root === undefined ? 'outside' : placeOf(target, root, allow)
-      const deny = decide(state.role, { kind: 'write', place })
+      const deny = decide(role, { kind: 'write', place })
       return deny === undefined ? next(e) : { deny }
     }
 

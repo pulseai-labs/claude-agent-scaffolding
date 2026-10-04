@@ -2,6 +2,21 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.2.0 — 2026-10-04
+
+- **BREAKING** for unmarked sessions: `SEAT_MODS_ROLE` unset or empty no longer disables the mod —
+  the session is guarded as an `implementer` by default, so a forgotten launcher export fails
+  closed, and the status line reads `seat: implementer (default: SEAT_MODS_ROLE unset)`. Two
+  explicit unguarded roles are added: `orchestrator` (the top orchestrator, or any session started
+  to drive work) and `coordinator` (spine, close, work-PR and doctor sessions, lane drivers);
+  `implementer`, `verifier` and `reviewer` are unchanged, and any other value still denies every
+  tool call. Install only once every launcher sets `coordinator`/`orchestrator` for its free
+  sessions (`herdr-crew` 0.2.5 will); until then a coordinator or a bare `claude` session starts
+  guarded as an implementer and cannot merge. A default-guarded session writes only inside the
+  worktree — outside a git repository, its working directory — and the `SEAT_MODS_ALLOW`
+  directories, so Claude Code's own writes outside them (memory files, plan files) are denied;
+  a default-guarded session is a worker, and an operator session marks itself `orchestrator`.
+
 ## 0.1.0 — 2026-10-03
 
 - First release. `tool.call` guards per role (implementer, verifier, reviewer), turned on by
