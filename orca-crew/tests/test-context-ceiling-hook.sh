@@ -196,6 +196,40 @@ OUT="$(printf '%s' "$(input UserPromptSubmit "$T_PAST")" | env -u CLAUDE_PLUGIN_
   ORCA_TERMINAL_HANDLE=term_test PATH="$NOJQ" "$BASH_BIN" "$HOOK" 2>/dev/null)"; RC=$?
 expect_notice "no jq on PATH: unavailable notice on a prompt" UserPromptSubmit "figure unavailable (jq not found)"
 
+section "molt is active in this session: the hook stands down (spec D9)"
+# Every silent case has a control beside it that differs in one thing and must still
+# fire, so a handler that prints nothing for every input cannot pass this section.
+MOLT_HOME="$TMP/molt-home"; mkdir -p "$MOLT_HOME/.claude/state/molt/active"
+MARK="$MOLT_HOME/.claude/state/molt/active/s"
+NO_MOLT_HOME="$TMP/no-molt-home"; mkdir -p "$NO_MOLT_HOME"
+touch "$MARK"
+run "$(input UserPromptSubmit "$T_PAST")" HOME="$MOLT_HOME"
+expect_silent "fresh molt marker for this session: silent on a prompt"
+run "$(input PreToolUse "$T_PAST" 'orca terminal create --worktree active --command claude --json')" HOME="$MOLT_HOME"
+expect_silent "fresh molt marker for this session: silent before 'terminal create'"
+run "$(input UserPromptSubmit "$T_PAST")" HOME="$NO_MOLT_HOME"
+expect_notice "no marker: the notice still fires" UserPromptSubmit "context 523114"
+run "$(input UserPromptSubmit "$T_PAST")" HOME=
+expect_notice "HOME empty: no marker is read, the notice fires" UserPromptSubmit "context 523114"
+touch -t 202001010000 "$MARK"
+run "$(input UserPromptSubmit "$T_PAST")" HOME="$MOLT_HOME"
+expect_notice "a marker older than a day is stale: the notice fires" UserPromptSubmit "context 523114"
+touch "$MARK"
+run "$(jq -cn --arg t "$T_PAST" '{session_id: "other", transcript_path: $t, cwd: "/tmp",
+  hook_event_name: "UserPromptSubmit", prompt: "next"}')" HOME="$MOLT_HOME"
+expect_notice "a marker for another session: the notice fires" UserPromptSubmit "context 523114"
+run "$(jq -cn --arg t "$T_PAST" '{session_id: "../active/s", transcript_path: $t, cwd: "/tmp",
+  hook_event_name: "UserPromptSubmit", prompt: "next"}')" HOME="$MOLT_HOME"
+expect_notice "a session id that is a path is not a marker name: the notice fires" \
+  UserPromptSubmit "context 523114"
+NOJQ_FIND="$TMP/nojq-find-bin"; mkdir -p "$NOJQ_FIND"
+for b in cat tail find; do ln -s "$(command -v "$b")" "$NOJQ_FIND/$b"; done
+run "$(input UserPromptSubmit "$T_PAST")" HOME="$MOLT_HOME" PATH="$NOJQ_FIND"
+expect_silent "no jq on PATH, fresh marker: silent (the session id is read as text)"
+run "$(input UserPromptSubmit "$T_PAST")" HOME="$NO_MOLT_HOME" PATH="$NOJQ_FIND"
+expect_notice "no jq on PATH, no marker: the unavailable notice still fires" \
+  UserPromptSubmit "figure unavailable (jq not found)"
+
 section "the setting"
 T150="$(transcript s150 150000)"
 run "$(input UserPromptSubmit "$T150")" CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING=100000
