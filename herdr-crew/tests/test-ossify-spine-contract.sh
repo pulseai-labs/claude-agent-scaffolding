@@ -66,11 +66,12 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=205          # A3: each ossify reference stays under 205 lines.
+REF_BUDGET=204          # A3: each ossify reference stays under 204 lines.
                         # 0.2.4 (#651 part 5): raised from 200 for the guard clause each
-                        # launch site gained; fix round 1's B2 clause took 204 -> 205.
-                        # The budget section's adjacent control still refuses a file one
-                        # line over the longest budgeted reference.
+                        # launch site gained; after the #653 merge (its reflow traded a
+                        # line) the files' own maximum is 204, and the budget section's
+                        # adjacent control holds the gate at that minimum — one line over
+                        # the longest budgeted reference is still refused.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
@@ -1695,11 +1696,67 @@ section "rotation past the context ceiling"
 
 pin "$LIFECYCLE_MD" "## Rotation past the context ceiling" "lifecycle.md carries the rotation section"
 pin "$LIFECYCLE_MD" 'resumes by naming the parent'"'"'s `run.json` path' \
-  "a new top rebinds the parent run by naming its run.json path"
+  "a new top binds the parent run by naming its run.json path"
 pin "$BRIEFS_MD" "HANDOFF_PATH=<" "the spine brief takes HANDOFF_PATH"
 pin "$BRIEFS_MD" "rotate: <handoff path>" "the spine brief returns rotate: past the ceiling"
 pin "$NESTED_MD" "rotate: <handoff path>" "the top's spine-completion step handles rotate:"
 pin "$PRBRIEFS_MD" "context-ceiling notice" "the work-PR brief returns open: past the ceiling"
+
+# #556: the rebind. One statement — a session that binds a `run.json` it did not
+# create rewrites `run.orchestrator` to its own pane — carried to each successor's
+# own contract: the top's rotation, the spine brief's continue (the rotate
+# successor), and the work-PR brief's continue (the `open:` successor). The
+# handoffs record the pane the block names at writing; the gap sentence is gone.
+# The sequence's judgment — who writes when, the queued-message interval — is not
+# parsed here and has no rubric criterion; it is checked by the recorded-claims
+# walkthrough in the verification dispatch (no eval result covers it).
+REBIND='A session that binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr'"'"'s stable-agent fallback otherwise — in the same producer loop every other write takes.'
+if ! rebind_life="$(count_of "$LIFECYCLE_MD" "$REBIND" flat)"; then
+  fail "lifecycle states the rebind rule at step 1 and carries it to the rotation" "count failed — unreadable file or empty needle"
+elif [ "$rebind_life" -eq 2 ]; then pass "lifecycle states the rebind rule at step 1 and carries it to the rotation (2)"
+else fail "lifecycle states the rebind rule at step 1 and carries it to the rotation" "found $rebind_life, expected 2"; fi
+pin "$BRIEFS_MD" "$REBIND" "the spine brief rebinds a continued RUN_JSON (rotate successor)" flat
+pin "$PRBRIEFS_MD" "$REBIND" "the work-PR brief rebinds a continued RUN_JSON (open successor)" flat
+pin "$NESTED_MD" 'rebinding `run.orchestrator` to its own pane' "nested-run §4 says the rotate successor rebinds" flat
+pin "$LIFECYCLE_MD" 'the pane `run.orchestrator` names at writing, and the next step' "step 13's handoff records the pane the block names" flat
+pin "$LIFECYCLE_MD" 'the pane `run.orchestrator` names at writing, and, per live dispatch' "the rotation handoff records the pane the block names" flat
+pin "$BRIEFS_MD" 'the path of RUN_JSON and the pane `run.orchestrator` names at writing' "the spine rotate return records the pane the block names" flat
+pin "$PRBRIEFS_MD" "RUN_JSON's path and the pane its \`run.orchestrator\`" "the work-PR open return records the pane the block names" flat
+# #556 round 1, finding 6: the gap sentence's absence is plugin-wide and must be
+# wrap-proof. Flat mode reassembles a phrase a markdown wrap broke; the sweep reads
+# every shipped carrier plus the manifests, fixtures and rubric — CHANGELOG included
+# (its 0.2.4 entry names the issue, never the sentence). This test file is the
+# reader, so its own pin arguments are not swept.
+gap_absent() { # <file>
+  gap_rel="${1#"$PLUGIN_ROOT"/}"
+  if [ ! -r "$1" ]; then fail "no #556 gap text in $gap_rel" "missing or unreadable: $1"; return 0; fi
+  gap_hits=0
+  for gap_needle in 'does not rebind it' 'issue #556 holds that gap'; do
+    gap_c="$(occurrences_flat "$1" "$gap_needle")" || { fail "no #556 gap text in $gap_rel" "unreadable file: $1"; return 0; }
+    gap_hits=$((gap_hits + gap_c))
+  done
+  if [ "$gap_hits" -eq 0 ]; then pass "no #556 gap text in $gap_rel"
+  else fail "no #556 gap text in $gap_rel" "$gap_hits occurrence(s)"; fi
+}
+GAP_CARRIERS=("$PLUGIN_ROOT/README.md" "$SKILL_MD" "$COMMAND_MD" "$REF"/*.md \
+  "$PLUGIN_ROOT/CHANGELOG.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json" \
+  "$PLUGIN_ROOT/.codex-plugin/plugin.json" \
+  "$EVAL_DIR"/fixtures/ossify-spine-execution/*.md "$EVAL_RUBRIC_MD")
+for gap_f in "${GAP_CARRIERS[@]}"; do gap_absent "$gap_f"; done
+
+# #556 round 1, finding 1: the work-PR `open:` successor's dispatch must carry the
+# predecessor's RUN_JSON path, or its continue branch and rebind are unreachable and
+# it mints a second run file. One phrase per top-facing contract that builds that
+# dispatch: lifecycle step 1b, lifecycle's rotation paragraph, nested-run §4, and
+# ossify-execution.md's top column.
+pin "$LIFECYCLE_MD" 'the `RUN_JSON` path that PR'"'"'s last `open:` return named' \
+  "lifecycle step 1b carries the resumed work-PR dispatch's RUN_JSON" flat
+pin "$LIFECYCLE_MD" 'with that same `RUN_JSON`' \
+  "lifecycle's rotation carries RUN_JSON into the work-PR successor" flat
+pin "$NESTED_MD" 'the `RUN_JSON` path that return named' \
+  "nested-run §4 carries RUN_JSON into a resumed work-PR dispatch" flat
+pin "$EXEC_MD" 'the `RUN_JSON` path that record'"'"'s return named' \
+  "ossify-execution's top column carries RUN_JSON into a resumed work-PR dispatch" flat
 
 section "waits and completion bodies"
 
