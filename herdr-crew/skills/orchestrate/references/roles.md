@@ -37,6 +37,7 @@ sequence (take exact flag syntax from `herdr --skill`):
 herdr workspace create --cwd <path> --label "run: <objective>"   # once per run, not per seat
 herdr tab create --workspace <id> --cwd <path> --label "seat: <role> (<agent>)"
 herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir>"   # implementer, verifier or reviewer seat only, before its command; herdr-mechanics.md step 2
+herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator"   # a coordinator seat only — the spine, close or work-PR session, a `/ossify:doctor` session, the lane driver — before its command, with no SEAT_MODS_ALLOW; herdr-mechanics.md step 2
 herdr pane run <pane> "<command:>"
 herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>
 herdr pane read <pane>                      # confirm expected_model: before dispatch
@@ -96,7 +97,8 @@ escalates. A pair never crosses work items there.
 Everything else on this page — the class routing, the retention rule, the placement
 and writer rules, and the budget below — is unchanged and still governs every session
 outside such a spine. The spine session itself is launched **from the `spine session` seat the project file names**
-for that spine, so the generic lane-driver policy does not select it.
+for that spine — marked `coordinator` before its command (`herdr-mechanics.md` step 2) —
+so the generic lane-driver policy does not select it.
 
 ## Session budget
 
@@ -118,7 +120,8 @@ seat lingering past its span, is the planning defect the rule still catches.
 the spine session, one per spine; a close
 session, a fresh tab and pane per close dispatch; a work-PR session, one per returned
 PR — each launched from its own seat in the project file (`spine session`,
-`close session`, `work-PR session`), the model confirmed as its profile's
+`close session`, `work-PR session`), marked `coordinator` before its command
+(`herdr-mechanics.md` step 2), the model confirmed as its profile's
 `model_shows` says and by the worker's own check, as an item row's is — and a close-review writer,
 one per affected hosting repo at a `halted: close-review`, launched from the profile the operator
 names at that halt (`ossify-close-writer.md`), never a seat the file pre-defines.** The
@@ -129,7 +132,8 @@ profiles at the PR transition and injects them, and neither survives the merge. 
 implementer is retained into a spine PR: every item pair was released at its item's
 close. None of these seats exists anywhere else. A `doctor session` — one fresh
 tab and pane per `/ossify:doctor` dispatch, released on return — sits outside the
-budget too, launched from the project-file seat of the same name.
+budget too, launched from the project-file seat of the same name, marked `coordinator`
+before its command (`herdr-mechanics.md` step 2).
 
 ## Placement
 

@@ -14,7 +14,7 @@ orchestrator (or any session you start to drive work) and `SEAT_MODS_ROLE=coordi
 close, work-PR and doctor sessions and lane drivers; both are unguarded.
 
 **Rollout: do not install 0.2.0 until every launcher you use — and your own interactive sessions —
-marks its free sessions.** A later `herdr-crew` release will; `paseo-crew`, `orca-crew` and
+marks its free sessions.** `herdr-crew` 0.2.7 does; `paseo-crew`, `orca-crew` and
 `dsh-crew` do not set `SEAT_MODS_ROLE` yet; set `SEAT_MODS_ROLE=orchestrator` yourself, e.g. in your
 launch alias. Until then a coordinator or a bare `claude` session starts guarded as an implementer
 and cannot merge.
@@ -29,16 +29,50 @@ Two environment variables, both set **per spawn**:
 | | `implementer`, `verifier`, `reviewer` | That role's guards are on. The status line shows `seat: <role>`. |
 | | `orchestrator`, `coordinator` | Unguarded: no denies, no write placement checks. The status line shows `seat: <role>`. |
 | | anything else | Fail closed. Every tool call is denied with a message that names the bad value and the valid roles. Respawn the seat with a valid value. |
-| `SEAT_MODS_ALLOW` | `:`-separated absolute directories | Extra directories the seat may write to: its report directory and its scratch directory. Relative entries and `/` are ignored. Unset, only the worktree is writable. |
+| `SEAT_MODS_ALLOW` | `:`-separated absolute directories | Extra directories the seat may write to: its report directory and its scratch directory. Relative entries and `/` are ignored. Unset, only the worktree is writable — and a reviewer, whose profile may write only in these directories, then writes nothing. |
 
-`herdr-crew` 0.2.2 and later (0.2.4 today) exports both in the pane of each implementer, verifier
+`herdr-crew` 0.2.2 through 0.2.6 exports both in the pane of each implementer, verifier
 and reviewer seat before its command and leaves every other pane unset; with this release an unset
-pane is a guarded implementer. A later `herdr-crew` release will set `SEAT_MODS_ROLE=orchestrator` on the
-orchestrator pane and `coordinator` on coordinator seats. Neither directory may contain `:`, the
+pane is a guarded implementer. `herdr-crew` 0.2.7 sets `SEAT_MODS_ROLE=orchestrator` on the
+top's rotation successor and `coordinator` on its coordinator seats (the spine, close and work-PR
+sessions, the doctor session, the lane driver). Neither directory may contain `:`, the
 list separator.
 
 **Never set either variable in `~/.claude/settings.json`'s `env` block, in a shell profile, or in a
 machine-file `command:` line.** Each of those reaches the orchestrator, which must never be guarded.
+
+## Without an orchestrator plugin
+
+seat-mods reads only its two variables. It does not call herdr, Paseo, Orca or any other
+orchestrator, and it does not need one installed. An orchestrator plugin is one launcher that sets
+the variables; with none installed, you are the launcher. Set the role on each command that starts
+a session:
+
+```bash
+# Sessions you drive yourself: unguarded.
+alias claude-orch='SEAT_MODS_ROLE=orchestrator claude'
+
+# Worker sessions you start by hand: guarded by role.
+claude-impl() {
+  SEAT_MODS_ROLE=implementer SEAT_MODS_ALLOW="$HOME/seat-scratch/impl" claude "$@"
+}
+claude-verify() {
+  SEAT_MODS_ROLE=verifier SEAT_MODS_ALLOW="$HOME/seat-scratch/verify" claude "$@"
+}
+claude-review() { SEAT_MODS_ROLE=reviewer SEAT_MODS_ALLOW="$HOME/seat-scratch/review" claude "$@"; }
+```
+
+A plain `claude` with no role is a guarded implementer — the default above. So start every
+session you drive through the `orchestrator` launcher, or that session cannot merge, push a
+deletion or write outside its worktree.
+
+An alias or function that sets the variable on one command does not break the rule above. The
+variable reaches only the session that command starts. An `export` in a shell profile reaches
+every session, the orchestrator's included.
+
+The role names are the contract between seat-mods and any launcher. A launcher that writes
+`orchestrator` or `coordinator` needs seat-mods 0.2.0 or later: 0.1.0 reads both as invalid and
+denies every tool call.
 
 ## The guards
 

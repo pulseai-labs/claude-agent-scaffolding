@@ -12,7 +12,8 @@ every slot and delete nothing else.
 ## Spine session (one per spine, dispatched by the top orchestrator)
 
 The lane driver, launched **from the `spine session` seat the project file names** —
-the top copies its approved profile in. A coordinator too, so it carries scope identities.
+the top copies its approved profile in — and marked `coordinator` before its command
+(`herdr-mechanics.md` step 2). A coordinator too, so it carries scope identities.
 
 ```text
 ROLE: ossify spine session and nested coordinator. State the model you are
