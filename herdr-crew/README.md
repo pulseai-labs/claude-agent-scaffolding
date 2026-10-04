@@ -126,13 +126,18 @@ never a re-entry after an empty timeout. A round of N parallel items is N such w
 per pane, each waking the session when it exits; the round's barrier closes when every
 item's report file is in hand.
 
-**A worker also pings.** Every brief names its parent's pane as `NOTIFY_PANE`, and after
-every atomic report rename the worker sends one `REPORT READY: <task> <kind> <path>` line
-there — one send, no `--wait`, no retry, and a failed send leaves the report intact. The
-parent consumes a given hash/identity generation once and retires that dispatch's wait when
-it does; a ping naming a path other than the briefed report path is surfaced, never read.
+**A worker also pings.** Every brief names its parent's pane as `NOTIFY_PANE` — the
+dispatcher's own pane id only when herdr detects it and the seat shares its server, otherwise
+the sentinel `none` — and after every atomic report rename the worker sends one literal
+`REPORT READY: <task> <kind> <path>` line there, single-quoted as one argument and skipped
+when the target is `none`: one send, no `--wait`, no retry, and a failed send leaves the report
+intact. A parent herdr cannot target keeps the report-file wait and this heartbeat, no push
+promised. The parent consumes a given hash/identity generation once and retires that
+dispatch's wait when it does; a ping naming a path other than the briefed report path is
+surfaced, never read.
 **The heartbeat backstop** is one background timer of about 15 minutes per session holding a
-live dispatch: one health check per live seat per tick, never a completion wait and never a
+live herdr-pane dispatch — a typed-wait seat included; a dsh session keeps its own route: one
+health check per live seat per tick, never a completion wait and never a
 re-entry, catching a stopped, blocked or unreadable seat whose wait missed its wake. It is
 killed at teardown and at a rotation's stand-down, and the successor arms a fresh one.
 

@@ -30,11 +30,17 @@ truncation and parse half a report. No tool here documents an atomic rename, so 
 requirement is the writer's, not the tool's. A plan, a question and a final report all
 replace the file the same way.
 
-Every report-producing brief names its parent's pane as `NOTIFY_PANE`, beside its report
-path: the dispatcher fills it with its own `$HERDR_PANE_ID` — `none` when the seat's server
-cannot reach that pane — and the worker's step after every rename is one `agent prompt` send
-there, no `--wait` and no retry, naming the file it actually renamed over. The ping only
-wakes the parent; the report file is the contract, and a failed send is left as it is.
+Every report-producing brief names its parent's pane as `NOTIFY_PANE`, beside its report path:
+the dispatcher fills it with its own `$HERDR_PANE_ID` only when herdr detects that pane and the
+seat shares its server — otherwise the sentinel `none`, never a target and never sent to — and
+the worker's step after every rename is one `agent prompt` send there, no `--wait` and no retry,
+only when the target is not `none`, naming the file it actually renamed over. The message is one
+single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay
+literal). The ping only wakes the parent — a parent undetected or on another server keeps the
+report-file wait and the run's heartbeat, no push promised — and a failed send is left as it is.
+An operator's own `brief:` is dispatched as a copy carrying the same envelope; the stored file is
+never edited, and a stored brief that fixes its own notification target is surfaced, not
+overridden.
 
 ## A template is a whole contract
 
@@ -71,8 +77,8 @@ filled into its brief by the coordinator, and `ossify-briefs.md` does not restat
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — the dispatcher fills it with its own $HERDR_PANE_ID, or `none` when your pane's server cannot reach it>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry: `herdr agent prompt <NOTIFY_PANE> "REPORT READY: <task id> <kind> <path>"`. The report file is the contract.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
 SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: implementer. State the model you are running in your first reply, then continue.
 
@@ -110,8 +116,8 @@ If a tool or policy refuses you, report it verbatim and stop that step.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — the dispatcher fills it with its own $HERDR_PANE_ID, or `none` when your pane's server cannot reach it>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry: `herdr agent prompt <NOTIFY_PANE> "REPORT READY: <task id> <kind> <path>"`. The report file is the contract.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
 SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: implementer. State the model you are running in your first reply, then continue.
 
@@ -139,8 +145,8 @@ stop; report refusals verbatim.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — the dispatcher fills it with its own $HERDR_PANE_ID, or `none` when your pane's server cannot reach it>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry: `herdr agent prompt <NOTIFY_PANE> "REPORT READY: <task id> <kind> <path>"`. The report file is the contract.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
 ROLE: reviewer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path> checked out at PR <number>'s head <sha>.
@@ -173,8 +179,8 @@ escalation goes there too, then stop.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — the dispatcher fills it with its own $HERDR_PANE_ID, or `none` when your pane's server cannot reach it>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry: `herdr agent prompt <NOTIFY_PANE> "REPORT READY: <task id> <kind> <path>"`. The report file is the contract.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
 SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: verifier, read-only. State the model you are running in your first reply, then
 continue.
@@ -212,8 +218,8 @@ part of it is rebuilt from another template's.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — the dispatcher fills it with its own $HERDR_PANE_ID, or `none` when your pane's server cannot reach it>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry: `herdr agent prompt <NOTIFY_PANE> "REPORT READY: <task id> <kind> <path>"`. The report file is the contract.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
 SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: implementer, fix round. State the model you are running in your first reply, then
 continue.
@@ -268,8 +274,8 @@ of item pairs: the default lane creates none.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — the dispatcher fills it with its own $HERDR_PANE_ID, or `none` when your pane's server cannot reach it>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry: `herdr agent prompt <NOTIFY_PANE> "REPORT READY: <task id> <kind> <path>"`. The report file is the contract.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
 ROLE: lane driver for ossify spine <spine id> — ossify's orchestrator for that spine, not an
 implementer. State the model you are running in your first reply, then continue.
 
@@ -303,8 +309,8 @@ adjudicate it: the brief states only what the seat returns.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — the dispatcher fills it with its own $HERDR_PANE_ID, or `none` when your pane's server cannot reach it>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry: `herdr agent prompt <NOTIFY_PANE> "REPORT READY: <task id> <kind> <path>"`. The report file is the contract.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
 ROLE: doctor session. State the model you are running in your first reply, then continue.
 
 PLACEMENT: <the tree the dispatch runs from — abs path>.
@@ -329,8 +335,8 @@ read-only, so the brief never orders a commit, push or PR.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — the dispatcher fills it with its own $HERDR_PANE_ID, or `none` when your pane's server cannot reach it>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry: `herdr agent prompt <NOTIFY_PANE> "REPORT READY: <task id> <kind> <path>"`. The report file is the contract.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
 ROLE: implementer, direct work item. State the model you are running in your first reply,
 then continue.
 
@@ -362,8 +368,8 @@ carries no `SPINE_ID`: that identity belongs to the spine close brief in
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — the dispatcher fills it with its own $HERDR_PANE_ID, or `none` when your pane's server cannot reach it>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry: `herdr agent prompt <NOTIFY_PANE> "REPORT READY: <task id> <kind> <path>"`. The report file is the contract.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
 ROLE: close session. State the model you are running in your first reply, then continue.
 
 PLACEMENT: <the tree the close runs from — abs path>.

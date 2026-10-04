@@ -59,13 +59,15 @@ Three consequences:
   leave no herdr provenance. Every helper is a herdr session.
 - **`herdr pane read` only on a `blocked` wake, a missing or malformed report, a
   timeout's checkpoint, the false wake's own read, or the heartbeat tick's one check per
-  live seat**, never to watch progress. A single bounded `herdr agent wait`, on
+  live seat (`herdr agent get` where herdr holds a record, else one `herdr pane read`)**,
+  never to watch progress. A single bounded `herdr agent wait`, on
   the state set `references/herdr-mechanics.md` states and always with a `--timeout`, is
   the wait primitive for a detected seat that is not a coordinator, over a typed state
   (`idle｜working｜blocked｜done｜unknown`); a seat herdr does not detect, and a coordinator
   seat, wait on their report files instead, with no keepalive and no re-entry — the run's
   ping and its heartbeat are neither: the ping is a wake the worker sends, and the
-  heartbeat is that file's timer. The two dead
+  heartbeat is a session-level timer over every live herdr-pane dispatch, typed-wait seats
+  included (a dsh session keeps its own route). The two dead
   ends — a timeout, and a wake with nothing new in the report while the seat still works —
   are that file's, and it names the next action for each. A loop of waits, and restarting a
   wait after an empty timeout, stays forbidden; the ping and the heartbeat are not that
@@ -116,8 +118,10 @@ failed launch the worker reports and stops on rather than works around, and that
 report reaches you in its report file, like everything else it says — and that file is
 the wait's own wake, so a brief naming no `REPORT_PATH` gives the wait for it nothing.
 Every brief also carries the pane the worker pings after each report rename — `NOTIFY_PANE`,
-filled with the dispatching session's own `$HERDR_PANE_ID`, never rediscovered; a
-coordinator fills its children's with its own pane id the same way. This session's own check is
+filled with the dispatching session's own `$HERDR_PANE_ID` only when herdr detects that pane and
+the seat shares its server, otherwise the sentinel `none` (never a target, never sent to); a
+coordinator fills its children's with its own pane id the same way, and an operator's custom brief
+gains the same envelope in the dispatched copy, never in the stored file. This session's own check is
 the launch's banner read (`references/roles.md`), made
 before dispatch.
 

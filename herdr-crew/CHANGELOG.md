@@ -9,23 +9,31 @@ pull-only: a wait armed on the wrong report path, or one that died, failed silen
 worker had no sanctioned way to say it had finished.
 
 - **The ping.** Every report-producing brief carries `NOTIFY_PANE` — the dispatcher's own
-  pane id, `none` where the seat's server cannot reach it — and after every atomic report
-  rename the worker sends one `REPORT READY: <task> <kind> <path>` line there: one send,
-  no `--wait`, no retry, and a failed send leaves the report intact. A coordinator fills
-  its children's slot with its own pane id.
-- **Consumption.** The generation check (hash or identity) comes first on any signal: a new
-  generation is read, noted, acted on once by kind, and retires that dispatch's armed wait
-  and companion; an already-consumed one is not read, not acted on, and retires nothing, so
-  a stale same-path ping never cancels the current phase's wait. A ping naming a path other
-  than the briefed report path is surfaced, never read. Deduplication governs the report and
-  its waits alone: a live dialog and a heartbeat tick are still handled.
-- **The heartbeat.** One bounded background timer of about 15 minutes per session holding a
-  live dispatch, re-armed per tick — not a completion wait, and never a re-entry. Each tick:
-  the generation check, then at most one health check per live seat; `working` asks nothing,
+  pane id only when herdr detects it and the seat shares its server, otherwise the sentinel
+  `none` — and after every atomic report rename the worker sends one literal
+  `REPORT READY: <task> <kind> <path>` line there: single-quoted as one argument so `$` and
+  backticks stay data, skipped when the target is `none`, one send, no `--wait`, no retry, and
+  a failed send leaves the report intact. A coordinator fills its children's slot with its own
+  pane id; an operator's `brief:` gets the same envelope in the dispatched copy, never in the
+  stored file. A parent herdr cannot target keeps the report-file wait and the heartbeat, no
+  push promised.
+- **Consumption.** One generation rule (hash or identity) comes first on any signal: the
+  typed wake treats a byte-identical atomic replacement as new, exactly as the ping and the
+  doorbell do; a new generation is read, noted, acted on once by kind, and retires that
+  dispatch's armed wait and companion; an already-consumed one is not read, not acted on, and
+  retires nothing, so a stale same-path ping never cancels the current phase's wait. A ping
+  naming a path other than the briefed report path is surfaced, never read. Deduplication
+  governs the report and its waits alone: a live dialog and a heartbeat tick are still handled.
+- **The heartbeat.** One bounded background timer of about 15 minutes per session holding any
+  live herdr-pane dispatch — a typed-wait seat included, not only a report-file wait; a dsh
+  session, which has no pane or `REPORT_PATH`, keeps `dsh-driver.md`'s own route — re-armed per
+  tick, not a completion wait and never a re-entry. Each tick: the
+  generation check, then at most one health check per live seat; `working` asks nothing,
   `blocked` takes the dialog procedure, and idle/done with no report, `unknown` or an
   unreadable seat is surfaced once per dispatch as observed state and uncertainty — never as
   a failed task and never as a retry. Killed when the last dispatch settles, at teardown and
-  at a rotation's stand-down, where the successor arms a fresh one.
+  at a rotation's stand-down, where the successor arms a fresh one; a host with no background
+  timer keeps the wait/ping fallback, never a rolling foreground loop.
 - **Reconciled prose.** `SKILL.md`'s "no keepalive" and the loop-of-waits rule now carve the
   ping and the heartbeat out explicitly; `lifecycle.md` step 5 arms and kills the heartbeat
   and step 3 fills `NOTIFY_PANE`; rotation hands the ping target over (a retained worker

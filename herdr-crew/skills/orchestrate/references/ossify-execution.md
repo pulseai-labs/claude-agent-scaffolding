@@ -79,8 +79,9 @@ spine already running. **The item briefs travel with it**: append that file's it
 item verifier and correction templates — and the generic verifier body from `briefs.md`, whose
 claims list the item verifier template instantiates — to the same dispatch, as `briefs.md`'s
 header requires. The spine session's own brief carries `NOTIFY_PANE` with the top's
-`$HERDR_PANE_ID`, and each item brief the spine session constructs carries the spine
-session's own pane id — the dispatcher fills it, the worker never rediscovers it. A seat
+`$HERDR_PANE_ID` when herdr detects the top's pane and the seat shares its server (otherwise
+`none`), and each item brief the spine session constructs carries the spine session's own pane
+id the same way — the dispatcher fills it, the worker never rediscovers it. A seat
 that needs to change mid-spine is a new operator
 decision you relay down through the reply; no session re-reads the file for it.
 

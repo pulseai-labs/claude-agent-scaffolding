@@ -69,8 +69,10 @@ Every command's syntax comes from `herdr --skill`.
    model that is not `SEAT_EXPECTED_MODEL` is a failed launch it writes to its report file
    and stops on. Wrong model at the banner read: release the seat and report it.
    Every brief this session dispatches names its own pane in the brief's `NOTIFY_PANE` slot —
-   this session's `$HERDR_PANE_ID` — so the worker's ping comes back here; a coordinator
-   fills its children's slot with its own pane id the same way (`briefs.md`).
+   this session's `$HERDR_PANE_ID` when herdr detects this pane and the seat shares its server,
+   otherwise the sentinel `none` — so an eligible worker's ping comes back here; a coordinator
+   fills its children's slot the same way, and an operator's `brief:` is sent as a copy carrying
+   the slot and the ping step, never edited in place (`briefs.md`).
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes or the plan's
@@ -100,8 +102,11 @@ Every command's syntax comes from `herdr --skill`.
    generation already consumed is a no-op — it retires no wait and acts on nothing. The
    heartbeat is one bounded background timer of about 15 minutes, re-armed per tick, at most
    one health check per live seat per tick; it is not a completion wait and never re-enters
-   or restarts one. This session arms it with the first live dispatch and kills it when its
-   last dispatch settles, at teardown, and at a rotation's stand-down (`herdr-mechanics.md`).
+   or restarts one. This session arms it with the first live herdr-pane dispatch — a typed-wait
+   seat is in scope, not only a report-file wait — and kills it when its last dispatch settles,
+   at teardown, and at a rotation's stand-down; a dsh session keeps `dsh-driver.md`'s own route,
+   and a host with no background timer keeps the wait/ping fallback, never a rolling foreground
+   loop (`herdr-mechanics.md`).
    `herdr pane read`
    only on a `blocked` wake, a missing or malformed report, a timeout's checkpoint, the
    false wake's own read, or the heartbeat tick's one check per live seat — never to watch progress.

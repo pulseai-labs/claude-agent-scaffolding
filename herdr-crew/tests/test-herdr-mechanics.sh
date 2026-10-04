@@ -122,6 +122,11 @@ pin "$REF" 'inode or mtime' \
   "the identity is defined once — inode or mtime, not restated (#574)" flat
 pin "$REF" 'the identity noted at dispatch' \
   "the doorbell paragraph refers back to the dispatch-time note (#574)"
+# #650 R1-1: one generation rule. The typed wake's novelty test must be the same
+# hash-or-identity comparison the ping and the doorbell use; hash alone is the old
+# form, and it read a byte-identical atomic replacement as a false wake.
+pin "$REF" 'a different hash or identity' \
+  "the typed wake's novelty is the same hash-or-identity generation (#650 R1-1)" flat
 
 # #575: the pair is re-armed, not restarted, after a dialog the operator answered.
 pin "$REF" 'An answered dialog re-arms the pair' \
