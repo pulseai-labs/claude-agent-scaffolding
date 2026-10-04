@@ -158,7 +158,8 @@ figure once it reaches the `context_ceiling` setting (default 500000 tokens): fi
 unit in hand and start no new one, and a coordinator seat rotates at the next boundary. It
 never allows, denies or asks, it is inert outside a herdr pane, and it reports the figure as
 unavailable rather than guessing when it cannot read it. The rotation itself is prose, in
-`references/lifecycle.md`. That hook is the only deterministic code a run executes: a run
+`references/lifecycle.md`. Since 0.2.6 the hook is silent in a session where the `molt` mod
+is active, because `molt` owns the context boundary there. That hook is the only deterministic code a run executes: a run
 has **no `lib/`, no state directory, no parser** — `agents.md` and `roles.md` are read as
 prose and nothing parses them. The suites and the eval harness under `tests/` are
 build-and-test tooling; the plugin never runs them on a user's path.

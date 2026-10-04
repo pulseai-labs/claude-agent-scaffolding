@@ -11,7 +11,7 @@ All notable changes to the `seat-mods` plugin.
   started to drive work) and `coordinator` (spine, close, work-PR and doctor sessions, lane
   drivers); `implementer`, `verifier` and `reviewer` are unchanged, and any other value still
   denies every tool call. Do not install until every launcher you use — and your own interactive
-  sessions — marks its free sessions: `herdr-crew` 0.2.6 will (not yet released); `paseo-crew`,
+  sessions — marks its free sessions: a later `herdr-crew` release will; `paseo-crew`,
   `orca-crew` and `dsh-crew` do not set `SEAT_MODS_ROLE` yet; set `SEAT_MODS_ROLE=orchestrator`
   yourself, e.g. in your launch alias. Until then a coordinator or a bare `claude` session starts
   guarded as an implementer and cannot merge. A default-guarded session writes only inside the

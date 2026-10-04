@@ -2,6 +2,16 @@
 
 All notable changes to the `orca-crew` plugin.
 
+## 0.8.2
+
+- **The context-ceiling hook stands down where `molt` is active.** In a session whose
+  `molt` marker (`~/.claude/state/molt/active/<session_id>`) is under a day old, the hook
+  prints nothing: `molt` hands the session off in place at its own threshold, and a second,
+  conflicting rotation order would leave two tops on one run. Without `molt` installed no
+  marker exists and nothing changes. A stale marker is ignored, a session id that is not a
+  plain name is never a marker, and without `jq` the id is read as text. The rotation prose
+  is unchanged in this release.
+
 ## 0.8.1
 
 - **`references/dsh-driver.md` §3** recommends `.dsh-crew/roles.md`'s verifier as `driver`:

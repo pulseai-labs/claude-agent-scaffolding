@@ -31,6 +31,28 @@ case "$input" in    # fast path: most Bash calls are not Orca commands
   *) exit 0 ;;
 esac
 
+# molt wins the context boundary (autonomic + molt spec, D9). In a session where the
+# molt mod is active, molt hands the session off in place at its own threshold, and
+# this notice would order a second, conflicting rotation: two tops on one run. molt
+# keeps one marker per session fresh on every prompt and turn. A marker older than a
+# day is stale (a crash skipped its removal) and is ignored. Without find on PATH the
+# marker cannot be dated, so the hook speaks as before.
+session_of() { # <hook input> — its session_id, or empty
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$1" | jq -r '.session_id? // "" | tostring' 2>/dev/null
+  else
+    case "$1" in *'"session_id":"'*) s="${1#*\"session_id\":\"}"; printf '%s' "${s%%\"*}" ;; esac
+  fi
+}
+molt_active() { # <session id> — is a fresh molt marker there for it?
+  case "$1" in ''|*[!A-Za-z0-9_-]*) return 1 ;; esac
+  [ -n "${HOME:-}" ] || return 1
+  m="$HOME/.claude/state/molt/active/$1"
+  [ -f "$m" ] || return 1
+  [ -n "$(find "$m" -mmin -1440 2>/dev/null)" ]
+}
+molt_active "$(session_of "$input")" && exit 0
+
 # say <event> <line> — every caller passes a line with no double quote or backslash.
 say() {
   printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"%s"}}\n' "$1" "$2"

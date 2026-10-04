@@ -14,7 +14,7 @@ orchestrator (or any session you start to drive work) and `SEAT_MODS_ROLE=coordi
 close, work-PR and doctor sessions and lane drivers; both are unguarded.
 
 **Rollout: do not install 0.2.0 until every launcher you use — and your own interactive sessions —
-marks its free sessions.** `herdr-crew` 0.2.6 will (not yet released); `paseo-crew`, `orca-crew` and
+marks its free sessions.** A later `herdr-crew` release will; `paseo-crew`, `orca-crew` and
 `dsh-crew` do not set `SEAT_MODS_ROLE` yet; set `SEAT_MODS_ROLE=orchestrator` yourself, e.g. in your
 launch alias. Until then a coordinator or a bare `claude` session starts guarded as an implementer
 and cannot merge.
@@ -33,7 +33,7 @@ Two environment variables, both set **per spawn**:
 
 `herdr-crew` 0.2.2 and later (0.2.4 today) exports both in the pane of each implementer, verifier
 and reviewer seat before its command and leaves every other pane unset; with this release an unset
-pane is a guarded implementer. `herdr-crew` 0.2.6 will set `SEAT_MODS_ROLE=orchestrator` on the
+pane is a guarded implementer. A later `herdr-crew` release will set `SEAT_MODS_ROLE=orchestrator` on the
 orchestrator pane and `coordinator` on coordinator seats. Neither directory may contain `:`, the
 list separator.
 

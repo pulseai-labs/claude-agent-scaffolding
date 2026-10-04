@@ -189,7 +189,8 @@ number of tokens, so a fractional setting takes effect at the next whole token �
 fires at 100001 — while a value below 1, or a spelling that is not a JSON number, is ignored and the
 default applies. It never allows, denies or asks, it is inert outside a Paseo agent, and it
 reports the figure as unavailable rather than guessing when it cannot read it. The
-rotation itself is prose, in `references/lifecycle.md`. That hook is the only
+rotation itself is prose, in `references/lifecycle.md`. Since 0.1.5 the hook is silent in a
+session where the `molt` mod is active, because `molt` owns the context boundary there. That hook is the only
 deterministic code a run executes: a run has **no `lib/`, no state directory, no
 parser** — profiles are read through `list_profiles` and `roles.md` is read as prose;
 nothing parses either. The
