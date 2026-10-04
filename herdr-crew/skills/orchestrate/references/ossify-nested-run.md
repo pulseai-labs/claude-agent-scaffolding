@@ -28,10 +28,9 @@ it; it lints every write with `dagr check --strict` before the write replaces th
 file, as dagr's producer contract requires.
 
 - every item task, and each round's barrier, is recorded in `RUN_JSON`, never in your `run.json`;
-- the spine session is the orchestrator of its own run, so it launches, sends to,
-  waits on and releases its item seats as `herdr-mechanics.md` says: each a tab in
-  the workspace it creates for that run, with its own `--cwd`, the worktree ossify
-  prepared for the item;
+- the spine session is the orchestrator of its own run, so it launches, sends to, waits
+  on and releases its item seats as `herdr-mechanics.md` says — each a tab in its run's
+  workspace, with its own `--cwd`, the worktree ossify prepared for the item;
 - plan, gap, depth and other spine-level questions come up in its report file, and
   you answer by sending it its next message;
 - an item seat's question reaches the spine session the same way, in that seat's
@@ -63,7 +62,9 @@ releases every item pair and closes the workspace it created, as
    same-round worktree and handoff first, then hands over one request per item.
 3. For each item, launch a **fresh implementer seat** from its SEATS row's
    exact command — the verifier is not created yet; it has nothing to verify until
-   step 5 — and deliver its brief as its row's `brief_delivery` says.
+   step 5 — and deliver its brief as its row's `brief_delivery` says. Guard it
+   before its command as `herdr-mechanics.md` step 2 says — role `implementer`,
+   its scratch directory created first under your own run directory.
 4. Each implementer confirms its model, reads, and writes a detailed plan to its
    report file, then waits. Gather the round's plans into **one** ordered ask to you;
    return an independent approve-or-amend per item; the spine session sends each
@@ -72,7 +73,8 @@ releases every item pair and closes the workspace it created, as
    `tree_oid`, `report_oid` and `spec_oid`, the four ids the external-executor result envelope
    declares (`ossify/skills/work-item/references/external-executor.md` §4) — then create and
    dispatch that item's **fresh verifier seat** from its SEATS row's exact
-   command, in the same worktree, against the fixed all-claims procedure.
+   command, in the same worktree, against the fixed all-claims procedure. Guard it
+   before its command as `herdr-mechanics.md` step 2 says — role `verifier`.
    `cannot determine` = fail.
 6. On the **first** verifier failure, write one question to its own report file with
    the verifier's summary and three options —
@@ -85,7 +87,8 @@ releases every item pair and closes the workspace it created, as
    item is re-requested as a fresh `external_execution_request` carrying the original
    `branch` and `worktree_path`. The fresh pair then runs the ordinary
    `/ossify:work-item` entry from clean, because that entry's pre-flight requires an
-   empty porcelain and no fresh session may adopt another's staged tree.
+   empty porcelain and no fresh session may adopt another's staged tree. Both
+   replacement seats are guarded exactly as the first pair's were.
    The correction packet is for *correct* only — it is same-executor by
    construction, and never two pairs live on one item. A replacement at a **different**
    seat is the operator's call — the top relays the approved row and it becomes the
@@ -124,11 +127,12 @@ The spine session stops at the final round barrier — where `/ossify:run-spine`
 the baton to `/ossify:close <spine-id>` — and never runs the close on its own
 initiative.
 
-**A `rotate: <handoff path>` completion is not the final barrier.** The spine session
-stopped at an earlier round barrier past the context ceiling (`lifecycle.md`). Confirm the
-handoff path resolves, then dispatch a fresh spine session on the same spine-session
-seat — the same approved SEATS block injected again — with `HANDOFF_PATH` set and the
-same `RUN_JSON`, which it continues. The close waits for a completion at the final barrier.
+**A `rotate: <handoff path>` completion is not the final barrier.** The spine session stopped
+at an earlier round barrier past the ceiling (`lifecycle.md`). Confirm the handoff resolves,
+then dispatch a fresh spine session on the same spine-session seat — the same approved SEATS
+block injected again — with `HANDOFF_PATH` set and the same `RUN_JSON`, which it continues,
+rebinding `run.orchestrator` to its own pane (its brief's step 2 says). The close waits for a
+completion at the final barrier.
 
 When its final report lands, **you dispatch** `/ossify:close <spine-id>` to a close
 session that is **always a fresh seat** you create, never the spine driver's: it
@@ -173,17 +177,17 @@ fresh close, which re-runs the review over every amended diff. Neither the
 close nor the work-PR session applies these fixes, and no seat is created for
 this permanently.
 
-**Then one work-PR session per returned PR**, each created in that PR's own
-hosting-repo worktree, launched from the `work-PR session` seat the project file
-names, and briefed with the two profiles you decided at the PR transition
-(`ossify-execution.md` §5), the merge-executor assignment, and `PRIOR_REVIEW` — `none`
-for a PR no earlier work-PR dispatch has covered, `covered` when one has and left
-durable evidence its review ran but no record, otherwise the durable record that
-PR's last `open:` result persisted. It owns both PR seats in a `run.json` of its own,
-relays one summary per round, and asks you for the merge word; you ask the operator,
-and the merge lands under the reply's executor — a merge commit on the SHA the reply
-names, session or operator alike. `lifecycle.md` steps 8-12 are that
-session's loop, not yours.
+**Then one work-PR session per returned PR**, each created in that PR's hosting-repo
+worktree, launched from the project file's `work-PR session` seat, and briefed with the
+two profiles you decided at the PR transition (`ossify-execution.md` §5), the
+merge-executor assignment, `PRIOR_REVIEW` — `none` for a PR no earlier work-PR dispatch
+has covered, `covered` when one has and left durable evidence its review ran but no
+record, otherwise the durable record that PR's last `open:` result persisted — and the
+`RUN_JSON` path that return named: a resumed successor continues and rebinds that file,
+a first dispatch names a fresh one. It owns both PR seats in a `run.json` of its own,
+relays one summary per round, and asks you for the merge word; you ask the operator, and
+the merge lands under the reply's executor — a merge commit on the named SHA, session or
+operator alike. `lifecycle.md` steps 8-12 are that session's loop, not yours.
 
 **Then, once every returned PR has merged, one record pass** — a second
 `/ossify:close <spine-id>`, to another fresh close session. **Hold step 12's teardown —

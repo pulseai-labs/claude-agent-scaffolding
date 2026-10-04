@@ -66,7 +66,12 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=200          # A3: each ossify reference stays under about 200 lines
+REF_BUDGET=204          # A3: each ossify reference stays under 204 lines.
+                        # 0.2.5 (#651 part 5): raised from 200 for the guard clause each
+                        # launch site gained; after the #653 merge (its reflow traded a
+                        # line) the files' own maximum is 204, and the budget section's
+                        # adjacent control holds the gate at that minimum — one line over
+                        # the longest budgeted reference is still refused.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
@@ -1691,11 +1696,67 @@ section "rotation past the context ceiling"
 
 pin "$LIFECYCLE_MD" "## Rotation past the context ceiling" "lifecycle.md carries the rotation section"
 pin "$LIFECYCLE_MD" 'resumes by naming the parent'"'"'s `run.json` path' \
-  "a new top rebinds the parent run by naming its run.json path"
+  "a new top binds the parent run by naming its run.json path"
 pin "$BRIEFS_MD" "HANDOFF_PATH=<" "the spine brief takes HANDOFF_PATH"
 pin "$BRIEFS_MD" "rotate: <handoff path>" "the spine brief returns rotate: past the ceiling"
 pin "$NESTED_MD" "rotate: <handoff path>" "the top's spine-completion step handles rotate:"
 pin "$PRBRIEFS_MD" "context-ceiling notice" "the work-PR brief returns open: past the ceiling"
+
+# #556: the rebind. One statement — a session that binds a `run.json` it did not
+# create rewrites `run.orchestrator` to its own pane — carried to each successor's
+# own contract: the top's rotation, the spine brief's continue (the rotate
+# successor), and the work-PR brief's continue (the `open:` successor). The
+# handoffs record the pane the block names at writing; the gap sentence is gone.
+# The sequence's judgment — who writes when, the queued-message interval — is not
+# parsed here and has no rubric criterion; it is checked by the recorded-claims
+# walkthrough in the verification dispatch (no eval result covers it).
+REBIND='A session that binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr'"'"'s stable-agent fallback otherwise — in the same producer loop every other write takes.'
+if ! rebind_life="$(count_of "$LIFECYCLE_MD" "$REBIND" flat)"; then
+  fail "lifecycle states the rebind rule at step 1 and carries it to the rotation" "count failed — unreadable file or empty needle"
+elif [ "$rebind_life" -eq 2 ]; then pass "lifecycle states the rebind rule at step 1 and carries it to the rotation (2)"
+else fail "lifecycle states the rebind rule at step 1 and carries it to the rotation" "found $rebind_life, expected 2"; fi
+pin "$BRIEFS_MD" "$REBIND" "the spine brief rebinds a continued RUN_JSON (rotate successor)" flat
+pin "$PRBRIEFS_MD" "$REBIND" "the work-PR brief rebinds a continued RUN_JSON (open successor)" flat
+pin "$NESTED_MD" 'rebinding `run.orchestrator` to its own pane' "nested-run §4 says the rotate successor rebinds" flat
+pin "$LIFECYCLE_MD" 'the pane `run.orchestrator` names at writing, and the next step' "step 13's handoff records the pane the block names" flat
+pin "$LIFECYCLE_MD" 'the pane `run.orchestrator` names at writing, and, per live dispatch' "the rotation handoff records the pane the block names" flat
+pin "$BRIEFS_MD" 'the path of RUN_JSON and the pane `run.orchestrator` names at writing' "the spine rotate return records the pane the block names" flat
+pin "$PRBRIEFS_MD" "RUN_JSON's path and the pane its \`run.orchestrator\`" "the work-PR open return records the pane the block names" flat
+# #556 round 1, finding 6: the gap sentence's absence is plugin-wide and must be
+# wrap-proof. Flat mode reassembles a phrase a markdown wrap broke; the sweep reads
+# every shipped carrier plus the manifests, fixtures and rubric — CHANGELOG included
+# (its 0.2.4 entry names the issue, never the sentence). This test file is the
+# reader, so its own pin arguments are not swept.
+gap_absent() { # <file>
+  gap_rel="${1#"$PLUGIN_ROOT"/}"
+  if [ ! -r "$1" ]; then fail "no #556 gap text in $gap_rel" "missing or unreadable: $1"; return 0; fi
+  gap_hits=0
+  for gap_needle in 'does not rebind it' 'issue #556 holds that gap'; do
+    gap_c="$(occurrences_flat "$1" "$gap_needle")" || { fail "no #556 gap text in $gap_rel" "unreadable file: $1"; return 0; }
+    gap_hits=$((gap_hits + gap_c))
+  done
+  if [ "$gap_hits" -eq 0 ]; then pass "no #556 gap text in $gap_rel"
+  else fail "no #556 gap text in $gap_rel" "$gap_hits occurrence(s)"; fi
+}
+GAP_CARRIERS=("$PLUGIN_ROOT/README.md" "$SKILL_MD" "$COMMAND_MD" "$REF"/*.md \
+  "$PLUGIN_ROOT/CHANGELOG.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json" \
+  "$PLUGIN_ROOT/.codex-plugin/plugin.json" \
+  "$EVAL_DIR"/fixtures/ossify-spine-execution/*.md "$EVAL_RUBRIC_MD")
+for gap_f in "${GAP_CARRIERS[@]}"; do gap_absent "$gap_f"; done
+
+# #556 round 1, finding 1: the work-PR `open:` successor's dispatch must carry the
+# predecessor's RUN_JSON path, or its continue branch and rebind are unreachable and
+# it mints a second run file. One phrase per top-facing contract that builds that
+# dispatch: lifecycle step 1b, lifecycle's rotation paragraph, nested-run §4, and
+# ossify-execution.md's top column.
+pin "$LIFECYCLE_MD" 'the `RUN_JSON` path that PR'"'"'s last `open:` return named' \
+  "lifecycle step 1b carries the resumed work-PR dispatch's RUN_JSON" flat
+pin "$LIFECYCLE_MD" 'with that same `RUN_JSON`' \
+  "lifecycle's rotation carries RUN_JSON into the work-PR successor" flat
+pin "$NESTED_MD" 'the `RUN_JSON` path that return named' \
+  "nested-run §4 carries RUN_JSON into a resumed work-PR dispatch" flat
+pin "$EXEC_MD" 'the `RUN_JSON` path that record'"'"'s return named' \
+  "ossify-execution's top column carries RUN_JSON into a resumed work-PR dispatch" flat
 
 section "waits and completion bodies"
 
@@ -1874,6 +1935,136 @@ pin "$COMMAND_MD" 'Bash(mv:*)' \
 n_eq "$BRIEFS_MD" 'RULES THAT DO NOT LOAD HERE' 3 \
   "all three session briefs carry the rules slot"
 
+section "the seat-mods guard reaches every launch site"
+
+# The guard is a launch-time export (`herdr-mechanics.md`, the launch's step 2), and the
+# rows a coordinator receives name no such thing ("verbatim from its row" wins), so every
+# site that orders one of those launches must order the guard beside it. One pin per
+# site; the label names the site, so a removal reads as that site. S1's complement pins
+# keep the never-guarded enumeration beside the binding.
+pin "$MECHANICS_MD" 'This binds a coordinator launching its own child' \
+  "step 2 binds a coordinator's own child seats"
+pin "$MECHANICS_MD" 'and every replacement launch' \
+  "step 2 binds every replacement launch" flat
+pin "$MECHANICS_MD" 'the spine, close or work-PR session, the doctor session, the lane driver' \
+  "step 2's never-guarded complement enumerates the coordinator seats" flat
+pin "$MECHANICS_MD" 'nor the orchestrator, a rotation successor included' \
+  "step 2's complement includes the top's rotation successor" flat
+pin "$MECHANICS_MD" 'also reads the status line for `seat: <role>`' \
+  "the model read also reads the guarded seat's status line" flat
+pin "$MECHANICS_MD" 'records that in its report file (to the top)' \
+  "a missing status line is recorded in the coordinator's report file" flat
+pin "$MECHANICS_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role>' \
+  "step 2 spells the guard as the send into the seat's pane"
+pin "$MECHANICS_MD" 'A project-file role whose `replaces:` names one of those roles is guarded as that role' \
+  "a replacing project-file role is guarded as the role it replaces"
+
+pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir>"' \
+  "roles.md's launch block shows the guard export as the send into the seat's pane"
+pin "$ROLES_MD" 'implementer, verifier or reviewer seat only, before its command' \
+  "roles.md scopes the export to the guarded roles"
+
+pin "$LIFECYCLE_MD" 'runs the guarded-seat export `herdr-mechanics.md` step 2 states' \
+  "lifecycle step 3 requires the guard and points at step 2"
+
+pin "$BRIEFS_MD" 'Guard it before its command as' \
+  "the spine brief guards the item implementer launch (step 3)"
+pin "$BRIEFS_MD" 'verifier command — guard it before its command as' \
+  "the spine brief guards the item verifier launch (step 5)"
+pin "$BRIEFS_MD" 'two fresh seats guarded exactly as the initial pair'"'"'s were' \
+  "the spine brief guards a replacement pair" flat
+
+pin "$NESTED_MD" '`brief_delivery` says. Guard it' \
+  "the nested run guards the implementer launch (step 3)"
+pin "$NESTED_MD" 'Guard it before its command as `herdr-mechanics.md` step 2 says — role `verifier`' \
+  "the nested run guards the verifier launch (step 5)" flat
+pin "$NESTED_MD" 'Both replacement seats are guarded exactly as the first pair'"'"'s were' \
+  "the nested run guards a replacement pair" flat
+
+pin "$PRBRIEFS_MD" 'every launch or re-creation of it carries the guard before its command (role `reviewer`' \
+  "the work-PR brief guards the reviewer launch and its re-creation" flat
+pin "$PRBRIEFS_MD" 'every launch of it carries the guard before its command (role `implementer`' \
+  "the work-PR brief guards the PR-fix launch" flat
+pin "$PRBRIEFS_MD" 're-created if it was released, and guarded before its command then (role `reviewer`, `MECHANICS` step 2)' \
+  "a resumed run's re-created reviewer carries its own guard requirement" flat
+
+pin "$WRITER_MD" 'launches each writer' \
+  "the close-review writer is dispatched as a guarded seat"
+pin "$WRITER_MD" 'as a guarded seat: role `implementer`' \
+  "the close-review writer's guard role is implementer"
+
+# The complement, decidable: no shipped file assigns `SEAT_MODS_ROLE` a coordinator or
+# orchestrator value. Only an ASSIGNMENT is flagged — prose in which a coordinator arms
+# its own child seats is the rule working, so the first cut's line-based mention test is
+# gone (its valid sentence "a coordinator guards its own children" false-RED'd). Bare and
+# quoted values are both read, the two spellings a sheet copies; the seeded controls
+# below prove each is flagged and the prose control proves it is not.
+COORD_VALUES='spine close work-pr work-PR workpr doctor lane orchestrator coordinator'
+
+coordinator_guard_hits() { # <file> -> count; an unreadable file is refused
+  [ -r "$1" ] || return 1
+  _cg_h=0
+  for _cg_v in $COORD_VALUES; do
+    for _cg_q in '' '"' "'"; do
+      _cg_c="$(occurrences "$1" "SEAT_MODS_ROLE=$_cg_q$_cg_v$_cg_q")" || return 1
+      _cg_h=$((_cg_h + _cg_c))
+    done
+  done
+  printf '%s' "$_cg_h"
+}
+
+seed="$(mktemp)"
+printf '%s\n' 'export SEAT_MODS_ROLE=spine in its pane' > "$seed"
+if [ "$(coordinator_guard_hits "$seed")" -gt 0 ]; then
+  pass "control: a bare coordinator-valued guard assignment is flagged"
+else
+  fail "control: a bare coordinator-valued guard assignment is flagged" "accepted it"
+fi
+printf '%s\n' 'SEAT_MODS_ROLE="spine"' > "$seed"
+if [ "$(coordinator_guard_hits "$seed")" -gt 0 ]; then
+  pass "control: a quoted coordinator-valued guard assignment is flagged"
+else
+  fail "control: a quoted coordinator-valued guard assignment is flagged" "accepted it"
+fi
+printf '%s\n' 'SEAT_MODS_ROLE=coordinator' > "$seed"
+if [ "$(coordinator_guard_hits "$seed")" -gt 0 ]; then
+  pass "control: a literal coordinator guard value is flagged"
+else
+  fail "control: a literal coordinator guard value is flagged" "accepted it"
+fi
+printf '%s\n' 'a coordinator guards its own children — it sends SEAT_MODS_ROLE to each child pane' > "$seed"
+if [ "$(coordinator_guard_hits "$seed")" -eq 0 ]; then
+  pass "control: coordinator prose with no assignment is not flagged"
+else
+  fail "control: coordinator prose with no assignment is not flagged" "flagged it"
+fi
+rm -f "$seed"
+
+# Every listed path must EXIST: a missing one is a failed assertion, never a skip — a
+# typo'd path (this list held hooks.json for a file at hooks/hooks.json) silently shrank
+# the sweep. Each entry is a literal or a glob that must match.
+SHIPPED=("$PLUGIN_ROOT"/README.md "$PLUGIN_ROOT"/CHANGELOG.md "$PLUGIN_ROOT"/LICENSE \
+         "$PLUGIN_ROOT"/hooks/hooks.json "$PLUGIN_ROOT"/hooks-handlers/* \
+         "$PLUGIN_ROOT"/skills/orchestrate/SKILL.md "$REF"/*.md \
+         "$PLUGIN_ROOT"/skills/orchestrate/agents/* "$PLUGIN_ROOT"/commands/* \
+         "$PLUGIN_ROOT"/.claude-plugin/plugin.json "$PLUGIN_ROOT"/.codex-plugin/plugin.json)
+shipped_count=0
+for f in "${SHIPPED[@]}"; do
+  if [ -f "$f" ]; then
+    shipped_count=$((shipped_count + 1))
+  else
+    fail "every listed shipped file exists" "missing: $f"
+  fi
+done
+if [ "$shipped_count" -ge 15 ]; then pass "the shipped-file scan covers $shipped_count files"
+else fail "the shipped-file scan covers the plugin's surfaces" "only $shipped_count file(s) — a zero-count over nothing certifies nothing"; fi
+for f in "${SHIPPED[@]}"; do
+  [ -f "$f" ] || continue
+  h="$(coordinator_guard_hits "$f")" || { fail "no coordinator-valued guard in ${f##*/}" "unreadable file"; continue; }
+  if [ "$h" -eq 0 ]; then pass "no coordinator-valued guard in ${f##*/}"
+  else fail "no coordinator-valued guard in ${f##*/}" "$h occurrence(s) — the guard only ever names implementer, verifier or reviewer"; fi
+done
+
 section "reference line budgets"
 
 budget "$EXEC_MD" "ossify-execution.md is within the reference budget"
@@ -1881,6 +2072,27 @@ budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
 budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget"
 budget "$BRIEFS_MD" "ossify-briefs.md is within the reference budget"
 budget "$WRITER_MD" "ossify-close-writer.md is within the reference budget"
+# Adjacent control (#651, fix round 1 N4): the raise must not have neutered the gate. The
+# fixture is one line longer than the longest reference the budget holds, and the suite's
+# own budget predicate, run in a subshell, must report the failure. A REF_BUDGET-derived
+# fixture cannot see the constant move — raise REF_BUDGET and the fixture scales with it —
+# so the fixture comes from the files: a gate rebuilt around a raised constant accepts it
+# and this control fails.
+ctl="$(mktemp)"
+budget_max=0
+for f in "$EXEC_MD" "$NESTED_MD" "$PRBRIEFS_MD" "$BRIEFS_MD" "$WRITER_MD"; do
+  b_n="$(wc -l < "$f" | tr -d ' ')"
+  [ "$b_n" -gt "$budget_max" ] && budget_max="$b_n"
+done
+awk -v n="$((budget_max + 1))" 'BEGIN { for (i = 0; i < n; i++) print "x" }' > "$ctl"
+parent_fail="$FAIL"
+ctl_fail="$( budget "$ctl" "control: one line over the longest budgeted reference is refused" >/dev/null 2>&1; printf '%s' "$FAIL" )"
+if [ "$ctl_fail" -eq $((parent_fail + 1)) ]; then
+  pass "control: one line over the longest budgeted reference is refused"
+else
+  fail "control: one line over the longest budgeted reference is refused" "budget accepted it"
+fi
+rm -f "$ctl"
 
 # #514, L1: the shape, asserted rather than assumed — a counter re-copied into any
 # suite shadows the hoisted one and keeps passing. This suite's copies were the

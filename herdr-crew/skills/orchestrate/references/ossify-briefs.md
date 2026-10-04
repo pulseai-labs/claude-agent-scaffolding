@@ -5,8 +5,7 @@ is the whole contract its reader will ever see, angle brackets are slots, fill
 every slot and delete nothing else.
 
 > **Editing note.** Asserted to contain no subagent invocation form
-> (`tests/test-ossify-spine-contract.sh`). Say the prohibition; never paste the
-> call shape.
+> (`tests/test-ossify-spine-contract.sh`): say the prohibition, never the call shape.
 
 ---
 
@@ -47,22 +46,27 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
   1. Check the SEATS block against SPINE.md before anything else: every planned
      item has exactly one implementer row and one verifier row, and no row names
      an item the plan does not. A failure halts — ask, never substitute.
-  2. Create RUN_JSON for your item tasks, or continue it if it exists, as its single
-     writer per dagr's producer contract (`dagr --skill`): one task per item, and each
-     round's barrier a gate node whose fan-in is that round's items. Lint every write
-     with `dagr check --strict` before it replaces the file.
+  2. Create RUN_JSON for your item tasks, or continue it if it exists. A session that
+     binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID`
+     — dagr's stable-agent fallback otherwise — in the same producer loop every other write
+     takes. Stay its single writer per dagr's producer contract (`dagr --skill`): one task
+     per item, and each round's barrier a gate node whose fan-in is that round's items.
+     Lint every write with `dagr check --strict` before it replaces the file.
   3. Invoke `/ossify:run-spine $SPINE_ID --external-executor`. On the round's
      execution requests, launch a fresh IMPLEMENTER seat per item from its SEATS row, verbatim —
      never a substitute value — as a tab of the workspace you create for your run (created
      again first if `herdr workspace list` no longer shows it: closing its last pane may take
-     it), its `--cwd` the worktree ossify prepared. The verifier is created at step 5, once
-     a complete return exists. Confirm each model as its row's `model_shows` says and by
+     it), its `--cwd` the worktree ossify prepared. Guard it before its command as
+     `MECHANICS` step 2 says — role `implementer`, its scratch directory created
+     first under your own run directory. Confirm each model as its row's
+     `model_shows` says and by
      the worker's own check; the effort is the given launch argument. A row that is missing or
      ambiguous halts that launch and asks; only a top reply carrying replacement rows moves the block.
   4. Gather the round's implementation plans — each read from its implementer's report file — into
      ONE ordered relay to the top, and wait; send each implementer the top's decision before any edit starts.
   5. On each complete return, create and dispatch that item's fresh VERIFIER
-     seat from its SEATS row's verifier command and run the fixed all-claims
+     seat from its SEATS row's verifier command — guard it before its command as
+     `MECHANICS` step 2 says, role `verifier` — and run the fixed all-claims
      procedure; `cannot determine` counts as fail. On the FIRST failure ask the
      top, with the verifier's summary and the three options — correct, replace,
      halt — and block: the pair idles until the reply. Correct sends one
@@ -70,7 +74,8 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      SAME verifier; replace releases the old pair, resets that item's worktree to
      the request's base_sha with a clean porcelain (the rejected staged work is
      discarded), and re-requests the item so the fresh pair runs the ordinary
-     work-item entry from clean; a second failure asks again. Every execution of
+     work-item entry from clean, its two fresh seats guarded exactly as the
+     initial pair's were; a second failure asks again. Every execution of
      an item — the initial run, each correction, each replacement — counts against
      ossify's three-iteration cap, and once it is spent the ask offers halt only.
      On halt, release that item's pair, mark it halted in your own state, and if no
@@ -91,8 +96,9 @@ teardown you cannot complete, never claim it. Then write your report file:
   Changed / Evidence / Open / Files as ids, SHAs, counts and a report path, and the path of RUN_JSON.
 ROTATE instead once the context-ceiling notice has fired: stop at the next round barrier,
 do the same teardown, write `/ossify:handoff`, and write `rotate: <handoff path>` to your
-report file with the path of RUN_JSON, then stand down your own armed waits before you
-return — one report must wake one session. Never stop mid-round.
+report file with the path of RUN_JSON and the pane `run.orchestrator` names at writing,
+then stand down your own armed waits before you return — one report must wake one session.
+Never stop mid-round.
 
 NEVER: record an item task in the top's run.json; run a Claude subagent for a work item;
 fall back to the default lane when an item launch fails; restart the lane; select the
@@ -103,8 +109,6 @@ If no item session will launch, stay alive, report that, and wait for the operat
 ---
 
 ## Item implementer (one fresh seat per work item)
-
-Launched from its SEATS row's implementer command, verbatim.
 
 ```text
 ROLE: ossify work-item implementer for <work-item-id>. State the model you are

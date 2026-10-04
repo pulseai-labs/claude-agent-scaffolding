@@ -145,8 +145,8 @@ with no background timer keeps the wait/ping fallback, never a rolling foregroun
 ## The run's state
 
 A run's state lives in a dagr `run.json` the plugin's prose owns and no binary writes.
-**Binding** an existing one is naming its path, and one run
-is one file per objective. **Creating** one is dagr's producer contract — a temp-file
+**Binding** an existing one is naming its path — and rebinding its `run.orchestrator`
+block to the binding session's own pane — and one run is one file per objective. **Creating** one is dagr's producer contract — a temp-file
 write, `dagr check --strict`, then the rename (`references/lifecycle.md`, step 1). The top
 binds the run's file; a spine session creates a nested one of its own, which keeps item
 traffic out of the top's.

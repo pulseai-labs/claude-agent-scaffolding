@@ -29,13 +29,19 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    call resolves its source from the *calling workspace's* repo. Read every id from the
    response, `result.root_pane.pane_id` included.
 
-   **Guarded seats** (seat-mods): before an implementer, verifier or reviewer seat's command, run
-   `export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory>`
-   in its pane (`worktree create` takes no `--env`). The scratch directory, created first, is
-   `<run dir>/scratch/<role>-<n>` — no `:` or space in either directory, as `:` separates the list. An
-   ossify implementer's list adds its handoff's directory; a brief with scratch work names it
-   `SCRATCH_DIR`. Never a coordinator seat or the orchestrator, and never in `settings.json`'s `env`,
-   a shell profile or a `command:` line. No `seat: <role>` in the status line means no guards — record it.
+   **Guarded seats** (seat-mods): before an implementer, verifier or reviewer seat's command, arm
+   it — `herdr pane run <pane> "export SEAT_MODS_ROLE=<role>
+   SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory>"` (`worktree create` takes no
+   `--env`). A project-file role whose `replaces:` names one of those roles is guarded as that role.
+   This binds a coordinator launching its own child seats exactly as it binds the top, and every
+   replacement launch. The scratch directory, created first, is `<run dir>/scratch/<role>-<n>` — no
+   `:` or space in either directory, as `:` separates the list. An ossify implementer's list adds
+   its handoff's directory; a brief with scratch work names it `SCRATCH_DIR`. Never a coordinator
+   seat — the spine, close or work-PR session, the doctor session, the lane driver — nor the
+   orchestrator, a rotation successor included — and never in `settings.json`'s `env`, a shell
+   profile or a `command:` line. The model read of a guarded seat also reads the status line for
+   `seat: <role>`; its absence there means no guards — a coordinator records that in its report file
+   (to the top), never silently.
 3. **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry —
    re-running a **launch** command into a pane whose foreground process is already that
    agent's TUI delivers its line as a prompt, the mechanism the undetected seat's one-line

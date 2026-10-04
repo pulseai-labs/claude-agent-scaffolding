@@ -2,6 +2,75 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.5
+
+**The seat-mods guard reaches every launch site (#651, part 5).** The guard rule lived
+only in `herdr-mechanics.md`'s launch, step 2, while a coordinator spends the rows it
+receives "verbatim" — command, model, effort and delivery carry no guard — so a
+replacement PR-fix seat went out unguarded in a live run.
+
+- **Every launch site states the requirement; the mechanics stay in one place.** The
+  work-PR brief guards the reviewer and the PR-fix seats (a released reviewer re-created
+  for a delta re-review, guarded again), the spine brief and the nested-run round
+  procedure guard the item seats and the replacement pair, and the close-review writer
+  is dispatched as a guarded seat under role `implementer`. Each site names the role it
+  guards and points at `herdr-mechanics.md` step 2; none restates the export. The top's
+  own launch reads the same requirement from `lifecycle.md` step 3, and `roles.md`'s
+  launch block shows the export line for those roles.
+- **The complement is stated where the rule is.** Step 2 binds a coordinator launching
+  its own child seats exactly as it binds the top, and every replacement launch; the
+  coordinator seats (the spine, close or work-PR session, the doctor session, the lane
+  driver) and the orchestrator — a rotation successor included — are never guarded. A
+  guarded seat whose status line lacks `seat: <role>` is recorded by its coordinator in
+  its report file, never silently ignored.
+- **Tests and budgets.** A new section of the spine-contract suite pins every launch
+  site's guard clause, the binding, complement and status-line clauses, and sweeps every
+  shipped file for a coordinator-valued `SEAT_MODS_ROLE` with two seeded controls; the
+  reference budgets enforce 266 for `herdr-mechanics.md` (260 -> 266) and 204 for the
+  ossify references (200 -> 204), each with an adjacent control that a file one line
+  over the real reference is still refused.
+
+No runtime library, no ossify contract change. `dsh-driver.md` is untouched: dsh sessions
+are not herdr panes and do not load Claude Code mods.
+
+## 0.2.4
+
+**The `run.orchestrator` rebind (#556).** dagr routes the operator's `m` composer to
+`run.orchestrator`, and nothing rebound it: after a rotation the field still named the
+pane the file was created in, so the operator's messages queued at a top that had stood
+down.
+
+- **One rule, carried to each successor's own contract.** A session that binds an
+  existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr's
+  stable-agent fallback otherwise — in the same producer loop every other write takes.
+  It is stated at `lifecycle.md` step 1 and carried verbatim to the top's rotation, the
+  spine brief's continue (`ossify-briefs.md`, the `rotate:` successor), and the work-PR
+  brief's continue (`ossify-pr-briefs.md`, the `open:` successor), because a brief is the
+  whole contract its reader sees; `ossify-nested-run.md` §4 says the new spine session
+  rebinds. The contracts that build a work-PR dispatch — `lifecycle.md` step 1b and its
+  rotation paragraph, `ossify-nested-run.md` §4 and `ossify-execution.md`'s top column —
+  carry the predecessor's `RUN_JSON` path into a resumed dispatch, so the successor's
+  continue branch and its rebind are reachable instead of a second run file being minted.
+- **One writer, one router.** The handoff is the predecessor's last write; from the
+  handoff on the predecessor writes nothing to the run file and takes no dispatch action,
+  and the successor's rebind is its first write — the rebind does not wait on the
+  stand-down, which kills waits and writes nothing. An operator message dagr queued at the
+  old pane in the interval is a wake that fires anyway: read and handed to the successor,
+  never acted on. The handoffs record the pane the block names at writing — lifecycle
+  step 13, the rotation handoff, the spine `rotate:` return, and the work-PR `open:`
+  return.
+- **The #556 gap sentence is gone** from `lifecycle.md`; the plugin `README.md`'s binding
+  sentence carries the rebind.
+- **Tests and budgets.** `tests/test-ossify-spine-contract.sh` pins the carried sentence
+  at all three sites (flat-counted), the four handoff records, the four dispatch carriers
+  of a resumed work-PR `RUN_JSON`, and the gap sentence's absence as a flat, plugin-wide
+  sweep; every pin was mutation-tested with a semantic mutation that applies and runs. The
+  three budgeted files land at the 200-line gate (`ossify-briefs.md` 200,
+  `ossify-pr-briefs.md` 200, `ossify-nested-run.md` 200) by trading lines inside each file,
+  no raise. No new eval surface and no rubric criterion: the rebind sequence is checked by
+  the recorded-claims walkthrough in the verification dispatch, and no eval result covers
+  it.
+
 ## 0.2.3
 
 **The worker ping and the heartbeat backstop (#640).** The orchestrator's wake was
