@@ -67,7 +67,7 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 . "$SCRIPT_DIR/_helpers.sh"
 
 REF_BUDGET=204          # A3: each ossify reference stays under 204 lines.
-                        # 0.2.4 (#651 part 5): raised from 200 for the guard clause each
+                        # 0.2.5 (#651 part 5): raised from 200 for the guard clause each
                         # launch site gained; after the #653 merge (its reflow traded a
                         # line) the files' own maximum is 204, and the budget section's
                         # adjacent control holds the gate at that minimum — one line over

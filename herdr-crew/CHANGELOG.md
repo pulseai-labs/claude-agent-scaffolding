@@ -2,7 +2,7 @@
 
 All notable changes to the `herdr-crew` plugin.
 
-## 0.2.4
+## 0.2.5
 
 **The seat-mods guard reaches every launch site (#651, part 5).** The guard rule lived
 only in `herdr-mechanics.md`'s launch, step 2, while a coordinator spends the rows it
@@ -26,8 +26,9 @@ replacement PR-fix seat went out unguarded in a live run.
 - **Tests and budgets.** A new section of the spine-contract suite pins every launch
   site's guard clause, the binding, complement and status-line clauses, and sweeps every
   shipped file for a coordinator-valued `SEAT_MODS_ROLE` with two seeded controls; the
-  reference budgets rose 260 -> 264 and 200 -> 204, each with an adjacent control that a
-  file one line over is still refused.
+  reference budgets enforce 266 for `herdr-mechanics.md` (260 -> 266) and 204 for the
+  ossify references (200 -> 204), each with an adjacent control that a file one line
+  over the real reference is still refused.
 
 No runtime library, no ossify contract change. `dsh-driver.md` is untouched: dsh sessions
 are not herdr panes and do not load Claude Code mods.

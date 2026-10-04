@@ -51,7 +51,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the wait-output caveat, the typed-wait set, the two-dead-ends and doorbell paragraphs, the
 # launch intro and steps 1/3/5, and the teardown close paragraph) to land at 260. The gate
 # rose with the mechanics the file exists to state and still fails over the limit.
-# 0.2.4 (#651 part 5) made step 2 state the guard's own reach — a coordinator's child
+# 0.2.5 (#651 part 5) made step 2 state the guard's own reach — a coordinator's child
 # seats and every replacement launch — the never-guarded complement it enumerates, and
 # the status line read at the model read: four lines, 260 -> 264. Fix round 1 put the
 # guard in its pane-run form, where the launcher's own shell cannot arm itself, and added
