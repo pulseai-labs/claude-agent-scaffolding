@@ -25,6 +25,9 @@ describe('thresholdsFor', () => {
   test('a seeded session gets minRoom points above its start, gaps kept', () => {
     expect(thresholdsFor(DEFAULTS, 45)).toEqual({ soft: 60, hard: 75, fallback: 80 })
   })
+  test('a seeded session that started high keeps fallback inside the window', () => {
+    expect(thresholdsFor(DEFAULTS, 80)).toEqual({ soft: 79, hard: 94, fallback: 99 })
+  })
   test('a seeded session that started small keeps the plain thresholds', () => {
     expect(thresholdsFor(DEFAULTS, 10)).toEqual({ soft: 50, hard: 65, fallback: 70 })
   })

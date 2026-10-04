@@ -47,6 +47,8 @@ gated. A `/clear` you run yourself seeds nothing.
 
 A seeded session gets room before it can molt again: its soft threshold is at least
 `minRoomPercent` points above the fill it started at, with the gaps to hard and fallback kept.
+The thresholds move up only as far as keeps fallback at 99% or below, so a session that starts
+very full is asked for a handoff sooner rather than never gated.
 
 ## Settings
 
@@ -57,7 +59,7 @@ Set them in `/config` → molt (the plugin's `userConfig`).
 | `softPercent` | 50 | Past this fill the session is asked to finish its step and write a handoff. |
 | `hardPercent` | 65 | Past this fill only the handoff's tools run. |
 | `fallbackMargin` | 5 | At hard + this margin, molt stops waiting for a handoff: with none, it writes a fallback brief and molts. |
-| `minRoomPercent` | 15 | A seeded session's soft threshold is at least this many points above its starting fill. |
+| `minRoomPercent` | 15 | A seeded session's soft threshold is this many points above its starting fill, as far as fallback stays at 99% or below. |
 | `manualMaxMolts` | 2 | In manual mode, molt pauses after this many molts in a row with no prompt from you. |
 | `instructionsTemplate` | `~/.claude/molt/instructions.md` | What the session is told at soft. `{{percent}}`, `{{soft}}` and `{{hard}}` are filled in. |
 | `seedTemplate` | `~/.claude/molt/seed.md` | The one prompt the fresh session receives. `{{path}}` is the handoff. |

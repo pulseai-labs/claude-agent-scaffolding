@@ -22,13 +22,16 @@ export function projectedPercent(
 
 // A seeded session starts with its handoff and the resume already in context. It gets
 // minRoom points of room above that start before soft applies, and the soft-to-hard
-// and hard-to-fallback gaps are kept.
+// and hard-to-fallback gaps are kept — but the set moves up only as far as keeps
+// fallback at 99% or below, so the hard gate and the fallback stay reachable.
 export function thresholdsFor(
   cfg: Pick<MoltConfig, 'soft' | 'hard' | 'fallback' | 'minRoom'>,
   startPercent?: number,
 ): Thresholds {
-  const soft = startPercent === undefined ? cfg.soft : Math.max(cfg.soft, startPercent + cfg.minRoom)
-  const hard = soft + (cfg.hard - cfg.soft)
+  const wanted = startPercent === undefined ? 0 : Math.max(0, startPercent + cfg.minRoom - cfg.soft)
+  const shift = Math.min(wanted, Math.max(0, 99 - (cfg.hard + cfg.fallback)))
+  const soft = cfg.soft + shift
+  const hard = cfg.hard + shift
   return { soft, hard, fallback: hard + cfg.fallback }
 }
 
