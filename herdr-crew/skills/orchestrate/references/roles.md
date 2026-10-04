@@ -36,7 +36,7 @@ sequence (take exact flag syntax from `herdr --skill`):
 ```bash
 herdr workspace create --cwd <path> --label "run: <objective>"   # once per run, not per seat
 herdr tab create --workspace <id> --cwd <path> --label "seat: <role> (<agent>)"
-export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir>   # implementer, verifier or reviewer seat only, before its command; herdr-mechanics.md step 2
+herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir>"   # implementer, verifier or reviewer seat only, before its command; herdr-mechanics.md step 2
 herdr pane run <pane> "<command:>"
 herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>
 herdr pane read <pane>                      # confirm expected_model: before dispatch

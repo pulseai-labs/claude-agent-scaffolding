@@ -66,10 +66,11 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=204          # A3: each ossify reference stays under about 200 lines.
-                        # 0.2.4 (#651 part 5): 200 -> 204 — the guard clause each launch
-                        # site gained. The budget section's adjacent control still
-                        # refuses a file one line over.
+REF_BUDGET=205          # A3: each ossify reference stays under 205 lines.
+                        # 0.2.4 (#651 part 5): raised from 200 for the guard clause each
+                        # launch site gained; fix round 1's B2 clause took 204 -> 205.
+                        # The budget section's adjacent control still refuses a file one
+                        # line over the longest budgeted reference.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
@@ -1887,18 +1888,22 @@ section "the seat-mods guard reaches every launch site"
 pin "$MECHANICS_MD" 'This binds a coordinator launching its own child' \
   "step 2 binds a coordinator's own child seats"
 pin "$MECHANICS_MD" 'and every replacement launch' \
-  "step 2 binds every replacement launch"
+  "step 2 binds every replacement launch" flat
 pin "$MECHANICS_MD" 'the spine, close or work-PR session, the doctor session, the lane driver' \
   "step 2's never-guarded complement enumerates the coordinator seats" flat
 pin "$MECHANICS_MD" 'nor the orchestrator, a rotation successor included' \
-  "step 2's complement includes the top's rotation successor"
+  "step 2's complement includes the top's rotation successor" flat
 pin "$MECHANICS_MD" 'also reads the status line for `seat: <role>`' \
-  "the model read also reads the guarded seat's status line"
+  "the model read also reads the guarded seat's status line" flat
 pin "$MECHANICS_MD" 'records that in its report file (to the top)' \
-  "a missing status line is recorded in the coordinator's report file"
+  "a missing status line is recorded in the coordinator's report file" flat
+pin "$MECHANICS_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role>' \
+  "step 2 spells the guard as the send into the seat's pane"
+pin "$MECHANICS_MD" 'A project-file role whose `replaces:` names one of those roles is guarded as that role' \
+  "a replacing project-file role is guarded as the role it replaces"
 
-pin "$ROLES_MD" 'export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir>' \
-  "roles.md's launch block shows the guard export"
+pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir>"' \
+  "roles.md's launch block shows the guard export as the send into the seat's pane"
 pin "$ROLES_MD" 'implementer, verifier or reviewer seat only, before its command' \
   "roles.md scopes the export to the guarded roles"
 
@@ -1923,8 +1928,8 @@ pin "$PRBRIEFS_MD" 'every launch or re-creation of it carries the guard before i
   "the work-PR brief guards the reviewer launch and its re-creation" flat
 pin "$PRBRIEFS_MD" 'every launch of it carries the guard before its command (role `implementer`' \
   "the work-PR brief guards the PR-fix launch" flat
-pin "$PRBRIEFS_MD" 're-created if it was released, and guarded again as its first launch was' \
-  "the reviewer's re-dispatch is guarded again"
+pin "$PRBRIEFS_MD" 're-created if it was released, and guarded before its command then (role `reviewer`, `MECHANICS` step 2)' \
+  "a resumed run's re-created reviewer carries its own guard requirement" flat
 
 pin "$WRITER_MD" 'launches each writer' \
   "the close-review writer is dispatched as a guarded seat"
@@ -1932,55 +1937,67 @@ pin "$WRITER_MD" 'as a guarded seat: role `implementer`' \
   "the close-review writer's guard role is implementer"
 
 # The complement, decidable: no shipped file assigns `SEAT_MODS_ROLE` a coordinator or
-# orchestrator value, and no line ties `SEAT_MODS` to one of those role names. Two seeded
-# controls below prove both shapes are flagged; the shipped sweep then certifies zero.
-# The bounded reads are per line, the shape the assignments actually take; the residual —
-# an assignment split across a wrap — is accepted, as a value split at the `=` could not
-# run as written either.
-COORD_VALUES='SEAT_MODS_ROLE=spine
-SEAT_MODS_ROLE=close
-SEAT_MODS_ROLE=work-pr
-SEAT_MODS_ROLE=work-PR
-SEAT_MODS_ROLE=workpr
-SEAT_MODS_ROLE=doctor
-SEAT_MODS_ROLE=lane
-SEAT_MODS_ROLE=orchestrator'
+# orchestrator value. Only an ASSIGNMENT is flagged — prose in which a coordinator arms
+# its own child seats is the rule working, so the first cut's line-based mention test is
+# gone (its valid sentence "a coordinator guards its own children" false-RED'd). Bare and
+# quoted values are both read, the two spellings a sheet copies; the seeded controls
+# below prove each is flagged and the prose control proves it is not.
+COORD_VALUES='spine close work-pr work-PR workpr doctor lane orchestrator coordinator'
 
 coordinator_guard_hits() { # <file> -> count; an unreadable file is refused
   [ -r "$1" ] || return 1
   _cg_h=0
   for _cg_v in $COORD_VALUES; do
-    _cg_c="$(occurrences "$1" "$_cg_v")" || return 1
-    _cg_h=$((_cg_h + _cg_c))
+    for _cg_q in '' '"' "'"; do
+      _cg_c="$(occurrences "$1" "SEAT_MODS_ROLE=$_cg_q$_cg_v$_cg_q")" || return 1
+      _cg_h=$((_cg_h + _cg_c))
+    done
   done
-  _cg_c="$(awk 'index($0, "SEAT_MODS") > 0 && (index($0, "spine session") || index($0, "close session") || index($0, "work-PR session") || index($0, "doctor session") || index($0, "lane driver") || index($0, "orchestrator"))' "$1" | wc -l | tr -d ' ')" || return 1
-  _cg_h=$((_cg_h + _cg_c))
   printf '%s' "$_cg_h"
 }
 
 seed="$(mktemp)"
 printf '%s\n' 'export SEAT_MODS_ROLE=spine in its pane' > "$seed"
 if [ "$(coordinator_guard_hits "$seed")" -gt 0 ]; then
-  pass "control: a coordinator-valued guard assignment is flagged"
+  pass "control: a bare coordinator-valued guard assignment is flagged"
 else
-  fail "control: a coordinator-valued guard assignment is flagged" "accepted it"
+  fail "control: a bare coordinator-valued guard assignment is flagged" "accepted it"
 fi
-printf '%s\n' 'the close session exports SEAT_MODS_ROLE before its command' > "$seed"
+printf '%s\n' 'SEAT_MODS_ROLE="spine"' > "$seed"
 if [ "$(coordinator_guard_hits "$seed")" -gt 0 ]; then
-  pass "control: a guard mention naming a coordinator seat is flagged"
+  pass "control: a quoted coordinator-valued guard assignment is flagged"
 else
-  fail "control: a guard mention naming a coordinator seat is flagged" "accepted it"
+  fail "control: a quoted coordinator-valued guard assignment is flagged" "accepted it"
+fi
+printf '%s\n' 'SEAT_MODS_ROLE=coordinator' > "$seed"
+if [ "$(coordinator_guard_hits "$seed")" -gt 0 ]; then
+  pass "control: a literal coordinator guard value is flagged"
+else
+  fail "control: a literal coordinator guard value is flagged" "accepted it"
+fi
+printf '%s\n' 'a coordinator guards its own children — it sends SEAT_MODS_ROLE to each child pane' > "$seed"
+if [ "$(coordinator_guard_hits "$seed")" -eq 0 ]; then
+  pass "control: coordinator prose with no assignment is not flagged"
+else
+  fail "control: coordinator prose with no assignment is not flagged" "flagged it"
 fi
 rm -f "$seed"
 
+# Every listed path must EXIST: a missing one is a failed assertion, never a skip — a
+# typo'd path (this list held hooks.json for a file at hooks/hooks.json) silently shrank
+# the sweep. Each entry is a literal or a glob that must match.
 SHIPPED=("$PLUGIN_ROOT"/README.md "$PLUGIN_ROOT"/CHANGELOG.md "$PLUGIN_ROOT"/LICENSE \
-         "$PLUGIN_ROOT"/hooks.json "$PLUGIN_ROOT"/hooks-handlers/* \
+         "$PLUGIN_ROOT"/hooks/hooks.json "$PLUGIN_ROOT"/hooks-handlers/* \
          "$PLUGIN_ROOT"/skills/orchestrate/SKILL.md "$REF"/*.md \
          "$PLUGIN_ROOT"/skills/orchestrate/agents/* "$PLUGIN_ROOT"/commands/* \
          "$PLUGIN_ROOT"/.claude-plugin/plugin.json "$PLUGIN_ROOT"/.codex-plugin/plugin.json)
 shipped_count=0
 for f in "${SHIPPED[@]}"; do
-  [ -f "$f" ] && shipped_count=$((shipped_count + 1))
+  if [ -f "$f" ]; then
+    shipped_count=$((shipped_count + 1))
+  else
+    fail "every listed shipped file exists" "missing: $f"
+  fi
 done
 if [ "$shipped_count" -ge 15 ]; then pass "the shipped-file scan covers $shipped_count files"
 else fail "the shipped-file scan covers the plugin's surfaces" "only $shipped_count file(s) — a zero-count over nothing certifies nothing"; fi
@@ -1998,17 +2015,25 @@ budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
 budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget"
 budget "$BRIEFS_MD" "ossify-briefs.md is within the reference budget"
 budget "$WRITER_MD" "ossify-close-writer.md is within the reference budget"
-# Adjacent control (#651): the 200 -> 204 raise must not have neutered the gate. The
-# suite's own budget predicate, run in a subshell against a synthetic file one line over,
-# must report the failure; a budget that accepts it makes this control fail.
+# Adjacent control (#651, fix round 1 N4): the raise must not have neutered the gate. The
+# fixture is one line longer than the longest reference the budget holds, and the suite's
+# own budget predicate, run in a subshell, must report the failure. A REF_BUDGET-derived
+# fixture cannot see the constant move — raise REF_BUDGET and the fixture scales with it —
+# so the fixture comes from the files: a gate rebuilt around a raised constant accepts it
+# and this control fails.
 ctl="$(mktemp)"
-awk -v n="$((REF_BUDGET + 1))" 'BEGIN { for (i = 0; i < n; i++) print "x" }' > "$ctl"
+budget_max=0
+for f in "$EXEC_MD" "$NESTED_MD" "$PRBRIEFS_MD" "$BRIEFS_MD" "$WRITER_MD"; do
+  b_n="$(wc -l < "$f" | tr -d ' ')"
+  [ "$b_n" -gt "$budget_max" ] && budget_max="$b_n"
+done
+awk -v n="$((budget_max + 1))" 'BEGIN { for (i = 0; i < n; i++) print "x" }' > "$ctl"
 parent_fail="$FAIL"
-ctl_fail="$( budget "$ctl" "control: one line over the reference budget is refused" >/dev/null 2>&1; printf '%s' "$FAIL" )"
+ctl_fail="$( budget "$ctl" "control: one line over the longest budgeted reference is refused" >/dev/null 2>&1; printf '%s' "$FAIL" )"
 if [ "$ctl_fail" -eq $((parent_fail + 1)) ]; then
-  pass "control: one line over the reference budget is refused"
+  pass "control: one line over the longest budgeted reference is refused"
 else
-  fail "control: one line over the reference budget is refused" "budget accepted it"
+  fail "control: one line over the longest budgeted reference is refused" "budget accepted it"
 fi
 rm -f "$ctl"
 

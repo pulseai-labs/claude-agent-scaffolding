@@ -163,7 +163,8 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      re-fetch the GitHub review signals and the thread state on the new head —
      the bots review every push where they are installed, so the current-head verdict is read
      there; where none is, the reviewer seat is re-dispatched over the fix range —
-     re-created if it was released, and guarded again as its first launch was. A post-disposition finding returns
+     re-created if it was released, and guarded before its command then (role
+     `reviewer`, `MECHANICS` step 2). A post-disposition finding returns
      through a blocking question to the top before any seat acts on it, never
      fixed by you or silently deferred. Relay ONE batched summary per round;
      STOPPING_RULE decides when fixing stops, counting the fix rounds

@@ -53,10 +53,12 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # rose with the mechanics the file exists to state and still fails over the limit.
 # 0.2.4 (#651 part 5) made step 2 state the guard's own reach — a coordinator's child
 # seats and every replacement launch — the never-guarded complement it enumerates, and
-# the status line read at the model read: four lines, 260 -> 264. The gate rose with the
-# mechanics, keeps its adjacent control (a file one line over is refused), and still
-# fails over the limit.
-REF_BUDGET=264
+# the status line read at the model read: four lines, 260 -> 264. Fix round 1 put the
+# guard in its pane-run form, where the launcher's own shell cannot arm itself, and added
+# the replaces: rule: two lines, 264 -> 266. The gate rose with the mechanics and still
+# fails over the limit; its adjacent control runs the same predicate on a file one line
+# over the real reference.
+REF_BUDGET=266
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -144,20 +146,29 @@ present "$REF" '--cwd' "a seat's tree is set with --cwd"
 present "$REF" '--label' "a seat's tab is labelled"
 present "$REF" '--base <base-branch>' "a worktree seat's base is a slot, not a literal"
 
+# The one gate: both the real check and its control go through this predicate, so the
+# control cannot re-implement a comparison this suite may have changed (#651 fix round 1,
+# N4). An unreadable file is refused, not counted.
+within_budget() { # <file>
+  [ -r "$1" ] || return 2
+  [ "$(wc -l < "$1" | tr -d ' ')" -le "$REF_BUDGET" ]
+}
+
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"
-if [ "$n" -le "$REF_BUDGET" ]; then pass "herdr-mechanics.md within the reference budget ($n lines)"
+if within_budget "$REF"; then pass "herdr-mechanics.md within the reference budget ($n lines)"
 else fail "herdr-mechanics.md within the reference budget" "$n lines, over by $((n - REF_BUDGET))"; fi
-# Adjacent control (#651): the 0.2.4 bump went with the guard's four lines and must not
-# have neutered the gate — a synthetic file at budget + 1 line is refused by the same
-# comparison the check above uses.
+# Adjacent control (#651, fix round 1 N4): the fixture is one line longer than the REAL
+# reference file and the SAME predicate must refuse it. A REF_BUDGET-derived fixture
+# cannot see the constant move — raise REF_BUDGET and budget+1 scales with it, leaving the
+# control green — so this one is derived from the file: a gate rebuilt around a raised
+# constant accepts the fixture and fails here.
 ctl="$(mktemp)"
-awk -v n="$((REF_BUDGET + 1))" 'BEGIN { for (i = 0; i < n; i++) print "x" }' > "$ctl"
-ctl_n="$(wc -l < "$ctl" | tr -d ' ')"
-if [ "$ctl_n" -le "$REF_BUDGET" ]; then
-  fail "control: budget + 1 lines is refused" "accepted $ctl_n lines at budget $REF_BUDGET"
+awk -v n="$(( $(wc -l < "$REF" | tr -d ' ') + 1 ))" 'BEGIN { for (i = 0; i < n; i++) print "x" }' > "$ctl"
+if within_budget "$ctl"; then
+  fail "control: one line over the real reference file is refused" "accepted $(wc -l < "$ctl" | tr -d ' ') lines at budget $REF_BUDGET"
 else
-  pass "control: budget + 1 lines is refused"
+  pass "control: one line over the real reference file is refused"
 fi
 rm -f "$ctl"
 
