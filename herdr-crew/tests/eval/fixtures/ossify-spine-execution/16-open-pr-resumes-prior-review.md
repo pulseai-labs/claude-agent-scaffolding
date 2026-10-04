@@ -4,8 +4,10 @@ expected_outcome: proceed
 expected_reason: 'Three states, each scored on its own - a later state never rides on
   an earlier one''s answer. (a) The open: result persists the review record - whether
   the delegated review ran, its reviewed head, its clean/findings state and summary,
-  and the durable ledger/comment references - and the next fresh work-PR dispatch
-  receives it as PRIOR_REVIEW in a fresh brief, the review
+  and the durable ledger/comment references - and it carries the RUN_JSON path it
+  continued and the pane its run.orchestrator names at writing; the next fresh
+  work-PR dispatch receives that same RUN_JSON to continue and rebind (never a fresh
+  one) together with the record as PRIOR_REVIEW in a fresh brief, the review
   state reused. (b) Resume, same head: the branch is taken BEFORE any reviewer
   exists - PRIOR_REVIEW''s record head equals the current PR head, so no reviewer is
   created and zero additional delegated reviews are commissioned; the session enters
@@ -23,7 +25,8 @@ expected_reason: 'Three states, each scored on its own - a later state never rid
 ---
 
 You are the work-PR session for PR #34 in `product-web`. Your dispatch injects
-`PRIOR_REVIEW` and `MERGE_EXECUTOR=operator`. Four states reach you in sequence
+`PRIOR_REVIEW`, `RUN_JSON=<the path that PR's prior open: return named>`, and
+`MERGE_EXECUTOR=operator`. Four states reach you in sequence
 over this PR's life; treat each as it arrives.
 
 **(a)** Earlier, a previous work-PR dispatch on this same PR was relayed the
