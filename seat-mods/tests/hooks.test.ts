@@ -31,13 +31,15 @@ function normal(path: string): string | undefined {
   return '/' + parts.join('/')
 }
 
-function world(on: On, env: Record<string, string>) {
+function world(on: On, env: Record<string, string>, gitRepo = true) {
   mock.env(on, env)
   on('tool.call', () => ({ result: 'ran' }) as never)
   on('session.cwd', () => ({ value: '/w/seat-mods' }))
   on('process.run', (_$, e) =>
     ({ value: e.argv.includes('rev-parse')
-      ? { exitCode: 0, stdout: '/w\n', stderr: '', isStdoutTruncated: false }
+      ? (gitRepo
+        ? { exitCode: 0, stdout: '/w\n', stderr: '', isStdoutTruncated: false }
+        : { exitCode: 128, stdout: '', stderr: 'fatal: not a git repository', isStdoutTruncated: false })
       : { exitCode: 1, stdout: '', stderr: 'unmocked', isStdoutTruncated: false } }) as never)
   on('fs.stat', (_$, e) => {
     const path = normal(e.path)
@@ -55,18 +57,47 @@ function world(on: On, env: Record<string, string>) {
   })
 }
 
-const GUARDED = ['git merge main', 'git push --force', 'git commit --no-verify -F m', 'gh pr merge 1']
-
-describe('no role: inert (spec §5)', () => {
-  test('every guard case reaches the engine', async ($, on) => {
+describe('unset role: guarded as the default implementer', () => {
+  test('unset: merge denied, a plain commit allowed, an outside write denied', async ($, on) => {
     world(on, {})
-    for (const command of GUARDED) {
-      const r = await $.tool.call({ tool: 'Bash', command })
-      expect(r.deny).toBeUndefined()
-    }
-    const w = await $.tool.call({ tool: 'Write', file_path: '/var/seat-mods-never', content: 'x' })
-    expect(w.deny).toBeUndefined()
+    const merge = await $.tool.call({ tool: 'Bash', command: 'git merge main' })
+    expect(merge.deny).toContain('seat-mods (implementer): no merges')
+    const commit = await $.tool.call({ tool: 'Bash', command: 'git commit -m "fix"' })
+    expect(commit.deny).toBeUndefined()
+    const outside = await $.tool.call({ tool: 'Write', file_path: '/var/seat-mods-never', content: 'x' })
+    expect(outside.deny).toBeDefined()
+    expect(outside.deny).toContain('SEAT_MODS_ALLOW')
   })
+  test('empty string: the same default', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: '' })
+    const merge = await $.tool.call({ tool: 'Bash', command: 'git merge main' })
+    expect(merge.deny).toBeDefined()
+    const outside = await $.tool.call({ tool: 'Write', file_path: '/var/seat-mods-never', content: 'x' })
+    expect(outside.deny).toBeDefined()
+  })
+  test('outside a git repo the session cwd is the worktree', async ($, on) => {
+    world(on, {}, false)
+    const inside = await $.tool.call({ tool: 'Write', file_path: '/w/seat-mods/notes.md', content: 'x' })
+    expect(inside.deny).toBeUndefined()
+    const sibling = await $.tool.call({ tool: 'Write', file_path: '/w/README.md', content: 'x' })
+    expect(sibling.deny).toBeDefined()
+    const outside = await $.tool.call({ tool: 'Write', file_path: '/etc/notes.md', content: 'x' })
+    expect(outside.deny).toBeDefined()
+  })
+})
+
+describe('free roles: no rails', () => {
+  for (const role of ['orchestrator', 'coordinator']) {
+    test(`${role}: merge, force-push and an outside write pass through`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: role })
+      const merge = await $.tool.call({ tool: 'Bash', command: 'gh pr merge 1' })
+      expect(merge.deny).toBeUndefined()
+      const force = await $.tool.call({ tool: 'Bash', command: 'git push --force' })
+      expect(force.deny).toBeUndefined()
+      const outside = await $.tool.call({ tool: 'Write', file_path: '/var/seat-mods-x', content: 'x' })
+      expect(outside.deny).toBeUndefined()
+    })
+  }
 })
 
 describe('invalid role: fail closed', () => {
@@ -76,6 +107,14 @@ describe('invalid role: fail closed', () => {
     expect(r.deny).toBeDefined()
     expect(r.deny).toContain('"implementr"')
   })
+  for (const value of ['orchestrater', 'Orchestrator', 'orchestrator ', 'Coordinator']) {
+    test(`${value}: denied as invalid, not free`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: value })
+      const r = await $.tool.call({ tool: 'Write', file_path: '/w/README.md', content: 'x' })
+      expect(r.deny).toBeDefined()
+      expect(r.deny).toContain(`"${value}"`)
+    })
+  }
 })
 
 describe('Bash guards', () => {
