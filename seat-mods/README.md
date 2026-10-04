@@ -29,9 +29,9 @@ Two environment variables, both set **per spawn**:
 | | `implementer`, `verifier`, `reviewer` | That role's guards are on. The status line shows `seat: <role>`. |
 | | `orchestrator`, `coordinator` | Unguarded: no denies, no write placement checks. The status line shows `seat: <role>`. |
 | | anything else | Fail closed. Every tool call is denied with a message that names the bad value and the valid roles. Respawn the seat with a valid value. |
-| `SEAT_MODS_ALLOW` | `:`-separated absolute directories | Extra directories the seat may write to: its report directory and its scratch directory. Relative entries and `/` are ignored. Unset, only the worktree is writable. |
+| `SEAT_MODS_ALLOW` | `:`-separated absolute directories | Extra directories the seat may write to: its report directory and its scratch directory. Relative entries and `/` are ignored. Unset, only the worktree is writable — and a reviewer, whose profile may write only in these directories, then writes nothing. |
 
-`herdr-crew` 0.2.2 through 0.2.5 exports both in the pane of each implementer, verifier
+`herdr-crew` 0.2.2 through 0.2.6 exports both in the pane of each implementer, verifier
 and reviewer seat before its command and leaves every other pane unset; with this release an unset
 pane is a guarded implementer. `herdr-crew` 0.2.7 sets `SEAT_MODS_ROLE=orchestrator` on the
 top's rotation successor and `coordinator` on its coordinator seats (the spine, close and work-PR
@@ -59,7 +59,7 @@ claude-impl() {
 claude-verify() {
   SEAT_MODS_ROLE=verifier SEAT_MODS_ALLOW="$HOME/seat-scratch/verify" claude "$@"
 }
-claude-review() { SEAT_MODS_ROLE=reviewer claude "$@"; }
+claude-review() { SEAT_MODS_ROLE=reviewer SEAT_MODS_ALLOW="$HOME/seat-scratch/review" claude "$@"; }
 ```
 
 A plain `claude` with no role is a guarded implementer — the default above. So start every

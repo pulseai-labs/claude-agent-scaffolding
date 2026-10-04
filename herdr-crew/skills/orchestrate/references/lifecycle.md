@@ -250,7 +250,9 @@ until it passes or the operator overrules it — the orchestrator relays its sum
 the operator's word settles it, anything else is advice in the disposition. A role
 with `replaces:` takes a plugin step — `implementer`, `verifier`, `reviewer`:
 the named seat is not launched, the role runs at its point in its place, and the
-handoff says which step was the operator's. Every point above is the top's own — a
+handoff says which step was the operator's. A declared role with no `replaces:` is marked a guarded `implementer` — its report
+directory and its scratch directory in `SEAT_MODS_ALLOW` (`herdr-mechanics.md` step 2);
+it runs under implementer rails. Every point above is the top's own — a
 declared role is not yet carried into a delegated spine or work-PR session, so a
 `before-merge-ask` role does not fire on an activated spine (issue #500 holds it).
 

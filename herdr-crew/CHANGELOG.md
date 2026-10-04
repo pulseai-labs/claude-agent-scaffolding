@@ -8,24 +8,30 @@ All notable changes to the `herdr-crew` plugin.
 whose `SEAT_MODS_ROLE` is unset or empty as an implementer, and treats exactly
 `orchestrator` and `coordinator` as unguarded — so herdr-crew 0.2.5's coordinator seats,
 and the top's rotation successor, would have launched as guarded implementers that cannot
-merge. 0.2.7 marks every seat it launches.
+merge. 0.2.7 marks every seat it launches into a herdr pane — and an operator-declared
+role with no `replaces:` as a guarded `implementer`.
 
 - **The two free roles are marked at launch.** `herdr-mechanics.md` step 2 is rewritten
-  from the never-guarded complement to the marking: a guarded seat — implementer, verifier
+  from the 0.2.5 complement (coordinator seats listed as unguarded) to the marking: a guarded seat — implementer, verifier
   or reviewer, and a `replaces:` role as the role it replaces — exports its role with
-  `SEAT_MODS_ALLOW`; a coordinator seat — the spine, close or work-PR session, the doctor
-  session, the lane driver — exports `SEAT_MODS_ROLE=coordinator`; the top's rotation
-  successor exports `SEAT_MODS_ROLE=orchestrator`; neither free role gets
-  `SEAT_MODS_ALLOW`. The operator's own top is not launched here — the operator starts it
-  through a `claude-orch` alias that sets `orchestrator`. Every site that orders one of
-  these launches names the marking and points at step 2, as 0.2.5's guard clauses do:
-  `ossify-execution.md`'s top column; `ossify-nested-run.md` §4 (the spine `rotate:`
-  successor, the first close, a re-dispatched close, the work-PR session, the record
-  pass); the close and work-PR sections of `ossify-pr-briefs.md`; the spine brief's
-  header; `lifecycle.md` step 1b and the rotation section (the top's own successor, whose
-  marking is `orchestrator`); `SKILL.md` §6's lane-driver dispatch and its
-  close/work-PR/record-pass transition; and `roles.md`'s spine-session sentence, session
-  budget, doctor sentence and launch block.
+  `SEAT_MODS_ALLOW`; a project-file role with no `replaces:` is marked a guarded
+  `implementer`, its report and scratch directories in `SEAT_MODS_ALLOW`; a coordinator
+  seat — the spine, close or work-PR session, the doctor session, the lane driver — exports
+  `SEAT_MODS_ROLE=coordinator`; the top's rotation successor exports
+  `SEAT_MODS_ROLE=orchestrator`; neither free role gets `SEAT_MODS_ALLOW`. The operator's
+  own top is not launched here — the operator starts it through a `claude-orch` alias that
+  sets `orchestrator`. Every site that orders one of these launches names the marking and
+  points at step 2, as 0.2.5's guard clauses do: `ossify-execution.md`'s top column;
+  `ossify-nested-run.md` §4 (the spine `rotate:` successor, the first close, a
+  re-dispatched close, the work-PR session, the record pass); the close and work-PR
+  sections of `ossify-pr-briefs.md`; the spine brief's header; `lifecycle.md` step 1b, the
+  rotation section (the top's own successor, whose marking is `orchestrator`) and the
+  `## My roles` clause; `SKILL.md` §6's lane-driver dispatch, its close/work-PR/record-pass
+  transition, and its doctor, non-spine-close and direct-work-item bullets; `briefs.md`'s
+  direct-work-item and non-spine-close template headers; `commands/orchestrate.md`'s spine
+  start; and `roles.md`'s spine-session sentence, session budget, doctor sentence and
+  launch block. The marking is a herdr pane's: a `kind: dsh-spine-driver` seat is a dsh
+  session, not a pane, and is never marked (`dsh-driver.md`).
 - **The #658 findings deferred from #655 are folded in.** Step 2 now defines `<run dir>` —
   the directory holding the run's `run.json`, outside every worktree; the
   missing-status-line record routes the top's own launches as well as a coordinator's (a
@@ -39,23 +45,28 @@ merge. 0.2.7 marks every seat it launches.
   (the marking stays at prose launch sites, so a new site added without a clause still
   passes the suite).
 - **Tests and budgets.** The spine-contract suite's value sweep flips from "no
-  coordinator-valued guard anywhere" to a whitelist — an assignment must be implementer,
-  verifier, reviewer, coordinator or orchestrator, or a `<role>` slot, and a coordinator
-  noun or any other value fails — with seeded controls for each invalid spelling, both
-  accepted free roles and the assignment-less prose control; one pin per coordinator and
-  orchestrator site sits beside 0.2.5's guard-site pins. The reference budgets enforce 272
-  for `herdr-mechanics.md` (266 -> 272) and 209 for the ossify references (204 -> 209),
-  each raised only to the new minimum; each adjacent control still refuses a file one line
-  over the real reference and now names the lowering remedy when it fires.
+  coordinator-valued guard anywhere" to a whitelist over the exact assigned word — one of
+  the five roles, or the shipped `<role>` slot, terminated by end of line, whitespace or
+  its closing quote — with seeded controls for each invalid shape (a coordinator noun, a
+  trailing comma, semicolon or period, an unbalanced or stray quote, an empty value, `<>`
+  and `<close-session>`), for both accepted free roles, for the pane-run recipe's closing
+  quote, and for the assignment-less prose control; one pin per coordinator, orchestrator
+  and operator-role site sits beside 0.2.5's guard-site pins, and the plugin README's
+  pane-scoped opening is pinned. The reference budgets enforce 275 for
+  `herdr-mechanics.md` (272 -> 275) and 209 for the ossify references (204 -> 209), each
+  raised only to the new minimum; each adjacent control still refuses a file one line over
+  the real reference and now names the lowering remedy when it fires.
 
 No runtime library, no ossify contract change. `dsh-driver.md` is untouched: dsh sessions
-are not herdr panes and do not load Claude Code mods. seat-mods' own docs changed wording
-only — no seat-mods code.
+are not herdr panes and do not load Claude Code mods. seat-mods 0.2.1 carries this
+release's docs only — the rollout wording, the "Without an orchestrator plugin" section
+and a reviewer `SEAT_MODS_ALLOW` example — no seat-mods code.
 
 **Known limit.** seat-mods 0.1.0 reads `coordinator` and `orchestrator` as invalid roles
 and denies every tool call (`seat-mods/hooks/rules.ts:106-110` and `register.ts:50` at tag
 `seat-mods-v0.1.0`), so herdr-crew 0.2.7 must be installed together with seat-mods 0.2.0.
-paseo-crew, orca-crew and dsh-crew do not mark sessions yet.
+paseo-crew, orca-crew and dsh-crew do not mark sessions yet. An operator-declared role
+with no `replaces:` is marked a guarded `implementer` and runs under implementer rails.
 
 ## 0.2.6
 

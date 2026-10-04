@@ -1940,14 +1940,18 @@ section "the seat-mods guard reaches every launch site"
 # The guard is a launch-time export (`herdr-mechanics.md`, the launch's step 2), and the
 # rows a coordinator receives name no such thing ("verbatim from its row" wins), so every
 # site that orders one of those launches must order the guard beside it. One pin per
-# site; the label names the site, so a removal reads as that site. S1's complement pins
-# keep the never-guarded enumeration beside the binding.
-pin "$MECHANICS_MD" 'This binds a coordinator launching its own child' \
-  "step 2 binds a coordinator's own child seats"
-pin "$MECHANICS_MD" 'and every replacement launch' \
-  "step 2 binds every replacement launch" flat
+# site; the label names the site, so a removal reads as that site. 0.2.7's
+# coordinator-marking pins sit beside these, one per site.
+pin "$MECHANICS_MD" 'every launch that places a seat in a herdr pane marks it' \
+  "step 2's opening states every herdr-pane launch is marked"
+pin "$MECHANICS_MD" 'in the pane, before the command' \
+  "step 2 binds the marking to the launch, before the command" flat
 pin "$MECHANICS_MD" 'the spine, close or work-PR session, the doctor session, the lane driver' \
   "step 2's coordinator marking enumerates the coordinator seats" flat
+pin "$MECHANICS_MD" 'A project-file role with no `replaces:` is marked a guarded `implementer`' \
+  "step 2 marks an operator role with no replaces as a guarded implementer" flat
+pin "$MECHANICS_MD" '`kind: dsh-spine-driver` seat is a dsh session, not a pane' \
+  "step 2 carves out dsh seats once" flat
 pin "$MECHANICS_MD" 'the top'"'"'s rotation successor exports `SEAT_MODS_ROLE=orchestrator`' \
   "step 2 marks the top's rotation successor orchestrator" flat
 pin "$MECHANICS_MD" '`SEAT_MODS_ROLE=coordinator`' \
@@ -2057,90 +2061,97 @@ pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator"' \
   "roles.md's launch block shows the coordinator export"
 pin "$COMMAND_MD" 'start one spine session — marked `coordinator`' \
   "commands/orchestrate.md marks the spine start" flat
+pin "$LIFECYCLE_MD" 'A declared role with no `replaces:` is marked a guarded `implementer`' \
+  "lifecycle marks an operator role with no replaces as a guarded implementer" flat
+pin "$SKILL_MD" 'The direct work-item seat is a guarded `implementer`' \
+  "SKILL.md §6 marks the direct work-item seat as a guarded implementer" flat
+pin "$SKILL_MD" 'a non-spine close is a coordinator seat, marked `coordinator`' \
+  "SKILL.md §6 marks the non-spine close as a coordinator seat" flat
+pin "$SKILL_MD" 'Mark the doctor seat `coordinator` before its command' \
+  "SKILL.md §6 marks the doctor seat as a coordinator seat" flat
+pin "$GENERIC_BRIEFS_MD" 'Launched as a guarded `implementer`' \
+  "the direct work-item template states the guarded implementer marking" flat
+pin "$GENERIC_BRIEFS_MD" 'The top marks it `coordinator` before its' \
+  "the non-spine close template states the coordinator marking" flat
+pin "$PLUGIN_README_MD" 'Every launch that places a seat in a herdr pane marks it' \
+  "the plugin README scopes the marking to herdr panes"
 
-# seat-mods 0.2.0: the role set is implementer, verifier, reviewer and the
-# two free roles coordinator and orchestrator — and this is a WHITELIST. Every
-# `SEAT_MODS_ROLE=` assignment in a shipped file must carry one of the five; a `<…>`
-# slot is the mechanics' placeholder, not a value, and is allowed. A coordinator NOUN
-# (spine, close, work-pr, work-PR, workpr, doctor, lane) is not a role and fails, and so
-# does anything else, empty included. Only an ASSIGNMENT is read — prose that names the
-# variable is the rule working, so the first cut's line-based mention test is gone (its
-# valid sentence "a coordinator guards its own children" false-RED'd) — and bare,
-# single- and double-quoted spellings are all read, the shapes a sheet copies. The seeded
-# controls prove each invalid spelling is flagged, both free roles are accepted, and the
-# prose control proves an assignment-less mention is not.
+# seat-mods 0.2.0: the role set is implementer, verifier, reviewer and the two free
+# roles coordinator and orchestrator — and this is a WHITELIST over the exact assigned
+# word. Only an ASSIGNMENT is read (`SEAT_MODS_ROLE=`), bare or in matching quotes;
+# prose that names the variable is the rule working, so the first cut's line-based
+# mention test is gone (its valid sentence "a coordinator guards its own children"
+# false-RED'd). A value is valid only when the role word is followed by end of line,
+# whitespace, a backtick (a code span's close), or — after an opening quote — the
+# matching closing quote; a bare value may also end at a quote that closes an
+# earlier-opened quote on the same line, which is the roles.md pane-run recipe's
+# closing `"`. Anything else fails: `coordinator,`, `coordinator;`, `orchestrator.`,
+# an unbalanced `"coordinator`, a stray trailing quote, a value outside the five, and
+# an empty value (`SEAT_MODS_ROLE=` at end of line, or `""`). The only placeholder
+# accepted is the shipped `<role>` slot (`<>` and `<close-session>` fail); a coordinator
+# noun (spine, close, work-pr, work-PR, workpr, doctor, lane) is not a role. The seeded
+# controls below prove each class; the shipped-file scan runs the same predicate.
 invalid_role_value_hits() { # <file> -> count; an unreadable file is refused
   [ -r "$1" ] || return 1
   awk '
     function allowed(v) {
       return v == "implementer" || v == "verifier" || v == "reviewer" ||
-             v == "coordinator" || v == "orchestrator" || v ~ /^<[^>]*>$/
+             v == "coordinator" || v == "orchestrator" || v == "<role>"
     }
     {
       line = $0
       while (match(line, /SEAT_MODS_ROLE=/)) {
+        pre = substr(line, 1, RSTART - 1)
         rest = substr(line, RSTART + RLENGTH)
         line = rest
         q = substr(rest, 1, 1)
-        if (q == "\"" || q == "\047") rest = substr(rest, 2)
+        quoted = (q == "\"" || q == "\047")
+        if (quoted) body = substr(rest, 2); else body = rest
         v = ""
-        if (match(rest, /^[A-Za-z0-9_<>-]+/)) v = substr(rest, RSTART, RLENGTH)
-        if (!allowed(v)) hits++
+        after = body
+        if (match(body, /^[A-Za-z0-9_<>-]+/)) { v = substr(body, RSTART, RLENGTH); after = substr(body, RLENGTH + 1) }
+        ok = 0
+        t = substr(after, 1, 1)
+        if (quoted) { if (t == q) ok = 1 }
+        else if (t == "" || t == " " || t == "\t" || t == "`") ok = 1
+        else if (t == "\"" || t == "\047") {
+          pc = pre; n = gsub(t, "", pc)
+          if (n % 2 == 1) ok = 1
+        }
+        if (!ok || !allowed(v)) hits++
       }
     }
     END { printf "%d", hits + 0 }
   ' "$1"
 }
 
+value_control() { # <expected hits> <fixture> <label>
+  printf '%s\n' "$2" > "$seed"
+  _vc="$(invalid_role_value_hits "$seed")" || _vc=-1
+  if [ "$_vc" -eq "$1" ]; then pass "control: $3"
+  else fail "control: $3" "$_vc hit(s), expected $1"; fi
+}
+
 seed="$(mktemp)"
-printf '%s\n' 'export SEAT_MODS_ROLE=spine in its pane' > "$seed"
-if [ "$(invalid_role_value_hits "$seed")" -gt 0 ]; then
-  pass "control: a bare coordinator-valued guard assignment is flagged"
-else
-  fail "control: a bare coordinator-valued guard assignment is flagged" "accepted it"
-fi
-printf '%s\n' 'SEAT_MODS_ROLE="spine"' > "$seed"
-if [ "$(invalid_role_value_hits "$seed")" -gt 0 ]; then
-  pass "control: a quoted coordinator-valued guard assignment is flagged"
-else
-  fail "control: a quoted coordinator-valued guard assignment is flagged" "accepted it"
-fi
-printf '%s\n' "SEAT_MODS_ROLE='close'" > "$seed"
-if [ "$(invalid_role_value_hits "$seed")" -gt 0 ]; then
-  pass "control: a single-quoted coordinator noun is flagged"
-else
-  fail "control: a single-quoted coordinator noun is flagged" "accepted it"
-fi
-printf '%s\n' 'SEAT_MODS_ROLE=foo' > "$seed"
-if [ "$(invalid_role_value_hits "$seed")" -gt 0 ]; then
-  pass "control: an assignment outside the role set is flagged"
-else
-  fail "control: an assignment outside the role set is flagged" "accepted it"
-fi
-printf '%s\n' 'SEAT_MODS_ROLE=coordinator' > "$seed"
-if [ "$(invalid_role_value_hits "$seed")" -eq 0 ]; then
-  pass "control: the coordinator value is accepted (the 0.2.7 flip)"
-else
-  fail "control: the coordinator value is accepted (the 0.2.7 flip)" "flagged it"
-fi
-printf '%s\n' 'SEAT_MODS_ROLE="orchestrator"' > "$seed"
-if [ "$(invalid_role_value_hits "$seed")" -eq 0 ]; then
-  pass "control: the quoted orchestrator value is accepted"
-else
-  fail "control: the quoted orchestrator value is accepted" "flagged it"
-fi
-printf '%s\n' 'SEAT_MODS_ROLE=<role>' > "$seed"
-if [ "$(invalid_role_value_hits "$seed")" -eq 0 ]; then
-  pass "control: the <role> slot placeholder is accepted"
-else
-  fail "control: the <role> slot placeholder is accepted" "flagged it"
-fi
-printf '%s\n' 'a coordinator guards its own children — it sends SEAT_MODS_ROLE to each child pane' > "$seed"
-if [ "$(invalid_role_value_hits "$seed")" -eq 0 ]; then
-  pass "control: coordinator prose with no assignment is not flagged"
-else
-  fail "control: coordinator prose with no assignment is not flagged" "flagged it"
-fi
+value_control 1 'export SEAT_MODS_ROLE=spine in its pane' "a bare coordinator-valued guard assignment is flagged"
+value_control 1 'SEAT_MODS_ROLE="spine"' "a quoted coordinator-valued guard assignment is flagged"
+value_control 1 "SEAT_MODS_ROLE='close'" "a single-quoted coordinator noun is flagged"
+value_control 1 'SEAT_MODS_ROLE=coordinator,' "a value followed by a comma is flagged"
+value_control 1 'SEAT_MODS_ROLE=coordinator;' "a value followed by a semicolon is flagged"
+value_control 1 'SEAT_MODS_ROLE=orchestrator.' "a value followed by a period is flagged"
+value_control 1 'SEAT_MODS_ROLE="coordinator' "an unterminated quoted value is flagged"
+value_control 1 'SEAT_MODS_ROLE=coordinator"' "a stray trailing quote is flagged"
+value_control 1 'SEAT_MODS_ROLE=' "an empty value at end of line is flagged"
+value_control 1 'SEAT_MODS_ROLE=""' "an empty quoted value is flagged"
+value_control 1 'SEAT_MODS_ROLE=<>' "an empty slot is flagged"
+value_control 1 'SEAT_MODS_ROLE=<close-session>' "a hyphenated non-role slot is flagged"
+value_control 1 'SEAT_MODS_ROLE=foo' "an assignment outside the role set is flagged"
+value_control 0 'SEAT_MODS_ROLE=coordinator' "the coordinator value is accepted (the 0.2.7 flip)"
+value_control 0 'SEAT_MODS_ROLE="orchestrator"' "the quoted orchestrator value is accepted"
+value_control 0 'SEAT_MODS_ROLE=implementer SEAT_MODS_ALLOW=/w' "a bare valid role followed by whitespace is accepted"
+value_control 0 'SEAT_MODS_ROLE=<role>' "the <role> slot placeholder is accepted"
+value_control 0 'herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator"' "the pane-run recipe's closing quote terminates the value"
+value_control 0 'a coordinator guards its own children — it sends SEAT_MODS_ROLE to each child pane' "coordinator prose with no assignment is not flagged"
 rm -f "$seed"
 
 # Every listed path must EXIST: a missing one is a failed assertion, never a skip — a
@@ -2165,7 +2176,7 @@ for f in "${SHIPPED[@]}"; do
   [ -f "$f" ] || continue
   h="$(invalid_role_value_hits "$f")" || { fail "no invalid SEAT_MODS_ROLE value in ${f##*/}" "unreadable file"; continue; }
   if [ "$h" -eq 0 ]; then pass "no invalid SEAT_MODS_ROLE value in ${f##*/}"
-  else fail "no invalid SEAT_MODS_ROLE value in ${f##*/}" "$h occurrence(s) — the value must be implementer, verifier, reviewer, coordinator, orchestrator or a <role> slot"; fi
+  else fail "no invalid SEAT_MODS_ROLE value in ${f##*/}" "$h occurrence(s) — the value must be implementer, verifier, reviewer, coordinator, orchestrator or the <role> slot, terminated by end of line, whitespace or its closing quote"; fi
 done
 
 section "reference line budgets"

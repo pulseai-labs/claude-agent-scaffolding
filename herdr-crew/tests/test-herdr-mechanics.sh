@@ -52,18 +52,20 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # launch intro and steps 1/3/5, and the teardown close paragraph) to land at 260. The gate
 # rose with the mechanics the file exists to state and still fails over the limit.
 # 0.2.5 (#651 part 5) made step 2 state the guard's own reach — a coordinator's child
-# seats and every replacement launch — the never-guarded complement it enumerates, and
-# the status line read at the model read: four lines, 260 -> 264. Fix round 1 put the
+# seats and every replacement launch — and list the coordinator classes as unguarded,
+# with the status line read at the model read: four lines, 260 -> 264. Fix round 1 put the
 # guard in its pane-run form, where the launcher's own shell cannot arm itself, and added
 # the replaces: rule: two lines, 264 -> 266.
 # 0.2.7 (seat-mods 0.2.0) rewrote step 2 as seat marking — the two free roles' exports, the
 # operator's own top, and the #658 fold-ins (<run dir>, the banner status read, the
 # missing-status-line route and disposition): the paragraph grew with the mechanics it
-# exists to state and the gate rose with it, 266 -> 272. The adjacent control runs the
-# same predicate on a file one line over the real reference and, when that is accepted,
-# names the remedy (lower REF_BUDGET to the real file's count) instead of reading as an
-# over-budget failure.
-REF_BUDGET=272
+# exists to state and the gate rose with it, 266 -> 272. Fix round 1 added the operator-role
+# class (guarded as implementer, with its report and scratch directories in SEAT_MODS_ALLOW)
+# and the once-only dsh carve-out, deleted the vestigial 0.2.5 binding sentence and reworded
+# the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
+# file one line over the real reference and, when that is accepted, names the remedy (lower
+# REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
+REF_BUDGET=275
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

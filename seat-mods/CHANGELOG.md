@@ -2,6 +2,21 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.2.1 — 2026-10-05
+
+Docs only — no code change.
+
+- The rollout guidance now names `herdr-crew` 0.2.7, which marks the two free roles
+  (`orchestrator` and `coordinator`) at launch; `paseo-crew`, `orca-crew` and `dsh-crew`
+  do not set `SEAT_MODS_ROLE` yet.
+- New README section "Without an orchestrator plugin": with none installed you are the
+  launcher — worked aliases and functions for the unguarded and guarded roles, and the
+  note that a launcher writing `orchestrator` or `coordinator` needs seat-mods 0.2.0 or
+  later.
+- The README's `claude-review()` example now sets `SEAT_MODS_ALLOW`, because a reviewer
+  may write only in those directories, and the `SEAT_MODS_ALLOW` table row says so for
+  the reviewer profile.
+
 ## 0.2.0 — 2026-10-04
 
 - **BREAKING** for unmarked sessions: `SEAT_MODS_ROLE` unset or empty no longer disables the mod —
@@ -11,7 +26,7 @@ All notable changes to the `seat-mods` plugin.
   started to drive work) and `coordinator` (spine, close, work-PR and doctor sessions, lane
   drivers); `implementer`, `verifier` and `reviewer` are unchanged, and any other value still
   denies every tool call. Do not install until every launcher you use — and your own interactive
-  sessions — marks its free sessions: `herdr-crew` 0.2.7 sets them; `paseo-crew`,
+  sessions — marks its free sessions: a later `herdr-crew` release will; `paseo-crew`,
   `orca-crew` and `dsh-crew` do not set `SEAT_MODS_ROLE` yet; set `SEAT_MODS_ROLE=orchestrator`
   yourself, e.g. in your launch alias. Until then a coordinator or a bare `claude` session starts
   guarded as an implementer and cannot merge. A default-guarded session writes only inside the
