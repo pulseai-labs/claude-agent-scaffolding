@@ -128,14 +128,16 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      findings still baseline the disposition. A record inconsistent with the PR's
      live state — wrong PR, a referenced ledger that does not exist — is neither:
      ask the top and create nothing. You did not open this PR.
-  3. Initial runs only: create the reviewer FIRST from its REVIEWER row — confirm the model
-     as its row's `model_shows` says and from the first reply, and brief it to run
-     `/code-review PR_NUMBER REVIEW_LEVEL`. Read the findings from its report file — it posts
-     nothing; that file is the only copy. Validate it against the reviewer brief's schema —
-     `Findings: none` with `Reviewed head:` and `Summary:`, or finding lines plus both — before
-     passing anything on; on a malformed body send ONE bounded correction request and
-     re-validate, escalating a second malformed body to the top. A mismatched reviewed head
-     makes the review historical — re-fetch the GitHub signals rather than commissioning
+  3. Initial runs only: create the reviewer FIRST from its REVIEWER row — every launch or
+     re-creation of it carries the guard before its command (role `reviewer`, `MECHANICS`
+     step 2) — confirm the model as its row's `model_shows` says and from the first reply,
+     and brief it to run `/code-review PR_NUMBER REVIEW_LEVEL`. Read the findings from its
+     report file — it posts nothing; that file is the only copy. Validate it against the
+     reviewer brief's schema — `Findings: none` with `Reviewed head:` and `Summary:`, or
+     finding lines plus both — before passing anything on; on a malformed body send
+     ONE bounded correction request and re-validate, escalating a second malformed body to
+     the top. A mismatched reviewed head makes the review historical — re-fetch the GitHub
+     signals rather than commissioning
      another; absent or untriaged signals never satisfy the merge gate.
   4. THEN run `/ossify:work-pr $PR_NUMBER --repo-root $REPO_ROOT` — initial
      runs carrying those findings in as its disposition inputs, resumed runs
@@ -152,17 +154,19 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      second merge loop inside this one; it works the fix list you give it,
      pushes, and returns `fixed in <sha>` per finding, never running work-pr or
      asking a merge — created from its PRFIX row —
-     confirm its model as the row's `model_shows` says and by the worker's own check before the
+     every launch of it carries the guard before its command (role `implementer`,
+     `MECHANICS` step 2); confirm its model as the row's `model_shows` says and by the worker's own check before the
      first fix task; a mismatch is a failed launch to ask about, never to work
      around. The delegated review ran once, on the head it was briefed with, and that seat is
      released after its report file validates. Each push moves the head under that verdict:
      before the next disposition round, re-fetch the GitHub review signals and the thread state
      on the new head — the bots review every push where they are installed, so the current-head
-     verdict is read there; where none is, the reviewer seat is re-dispatched over the fix
-     range. A post-disposition finding returns through a blocking question to the top before
-     any seat acts on it, never fixed by you or silently deferred. Relay ONE batched summary
-     per round; STOPPING_RULE decides when fixing stops, counting the fix rounds PRIOR_REVIEW
-     carries.
+     verdict is read there; where none is, the reviewer seat is re-dispatched over the fix range
+     — re-created if it was released, and guarded before its command then (role `reviewer`,
+     `MECHANICS` step 2). A post-disposition finding returns through a blocking question to the
+     top before any seat acts on it, never fixed by you or silently deferred. Relay ONE batched
+     summary per round; STOPPING_RULE decides when fixing stops, counting the fix rounds
+     PRIOR_REVIEW carries.
   6. When the gate is clean, ask the top for the merge word. MERGE_EXECUTOR
      is the top's explicit assignment, not something you infer — never parse
      permission settings, never probe by attempting a merge. On `session`: on

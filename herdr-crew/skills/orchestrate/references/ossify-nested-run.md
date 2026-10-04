@@ -62,7 +62,9 @@ releases every item pair and closes the workspace it created, as
    same-round worktree and handoff first, then hands over one request per item.
 3. For each item, launch a **fresh implementer seat** from its SEATS row's
    exact command — the verifier is not created yet; it has nothing to verify until
-   step 5 — and deliver its brief as its row's `brief_delivery` says.
+   step 5 — and deliver its brief as its row's `brief_delivery` says. Guard it
+   before its command as `herdr-mechanics.md` step 2 says — role `implementer`,
+   its scratch directory created first under your own run directory.
 4. Each implementer confirms its model, reads, and writes a detailed plan to its
    report file, then waits. Gather the round's plans into **one** ordered ask to you;
    return an independent approve-or-amend per item; the spine session sends each
@@ -71,7 +73,8 @@ releases every item pair and closes the workspace it created, as
    `tree_oid`, `report_oid` and `spec_oid`, the four ids the external-executor result envelope
    declares (`ossify/skills/work-item/references/external-executor.md` §4) — then create and
    dispatch that item's **fresh verifier seat** from its SEATS row's exact
-   command, in the same worktree, against the fixed all-claims procedure.
+   command, in the same worktree, against the fixed all-claims procedure. Guard it
+   before its command as `herdr-mechanics.md` step 2 says — role `verifier`.
    `cannot determine` = fail.
 6. On the **first** verifier failure, write one question to its own report file with
    the verifier's summary and three options —
@@ -84,7 +87,8 @@ releases every item pair and closes the workspace it created, as
    item is re-requested as a fresh `external_execution_request` carrying the original
    `branch` and `worktree_path`. The fresh pair then runs the ordinary
    `/ossify:work-item` entry from clean, because that entry's pre-flight requires an
-   empty porcelain and no fresh session may adopt another's staged tree.
+   empty porcelain and no fresh session may adopt another's staged tree. Both
+   replacement seats are guarded exactly as the first pair's were.
    The correction packet is for *correct* only — it is same-executor by
    construction, and never two pairs live on one item. A replacement at a **different**
    seat is the operator's call — the top relays the approved row and it becomes the

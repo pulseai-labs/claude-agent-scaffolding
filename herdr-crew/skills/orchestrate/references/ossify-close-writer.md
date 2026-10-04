@@ -1,7 +1,9 @@
 # The close-review writer — the seat a `fix now` close review dispatches
 
 Dispatched by the top when a close returns `halted: close-review`
-(`ossify-nested-run.md` §4, `ossify-execution.md` §5). Not the PR-fix seat,
+(`ossify-nested-run.md` §4, `ossify-execution.md` §5). The top launches each writer
+as a guarded seat: role `implementer`, with the export `herdr-mechanics.md`'s
+launch step 2 states run before its command. Not the PR-fix seat,
 and not a project-file seat: the profile is asked of the operator at the halt, as
 the reviewer is asked at the PR transition, because the seat does not exist
 before the moment that creates it.

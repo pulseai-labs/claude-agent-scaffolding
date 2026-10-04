@@ -67,8 +67,11 @@ Every command's syntax comes from `herdr --skill`.
    confirms the model, then the brief delivered as `brief_delivery` says (inject or
    file) on the route `herdr-mechanics.md` fixes from its second detection ask after
    that read — is `roles.md`'s "The launch," with the undetected-seat path in
-   `herdr-mechanics.md`. The run's workspace can go before the run does — a first seat's
-   release may take it — so a later launch whose `herdr workspace list` no longer shows it
+   `herdr-mechanics.md`. An implementer, verifier or reviewer seat's launch also
+   runs the guarded-seat export `herdr-mechanics.md` step 2 states, before its
+   command — `roles.md`'s launch block carries the line. The run's workspace can
+   go before the run does — a first seat's release may take it — so a later launch
+   whose `herdr workspace list` no longer shows it
    creates it again first and binds the id that call returns, the clause the spine
    session's brief already carries. The "state your model" line is the worker's own second check: a
    model that is not `SEAT_EXPECTED_MODEL` is a failed launch it writes to its report file
