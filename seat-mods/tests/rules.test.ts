@@ -19,7 +19,7 @@ describe('parseRole', () => {
 describe('statusText', () => {
   test('every state reads distinctly', () => {
     expect(statusText({ kind: 'on', role: 'implementer' })).toBe('seat: implementer')
-    expect(statusText({ kind: 'default', role: 'implementer' })).toBe('seat: implementer (default: SEAT_MODS_ROLE unset)')
+    expect(statusText({ kind: 'default', role: 'implementer' })).toBe('seat: implementer (default: SEAT_MODS_ROLE unset or empty)')
     expect(statusText({ kind: 'free', role: 'orchestrator' })).toBe('seat: orchestrator')
     expect(statusText({ kind: 'invalid', value: 'impl' })).toBe('seat: INVALID ROLE "impl"')
   })

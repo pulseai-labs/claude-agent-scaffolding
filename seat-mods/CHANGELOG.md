@@ -6,12 +6,14 @@ All notable changes to the `seat-mods` plugin.
 
 - **BREAKING** for unmarked sessions: `SEAT_MODS_ROLE` unset or empty no longer disables the mod —
   the session is guarded as an `implementer` by default, so a forgotten launcher export fails
-  closed, and the status line reads `seat: implementer (default: SEAT_MODS_ROLE unset)`. Two
-  explicit unguarded roles are added: `orchestrator` (the top orchestrator, or any session started
-  to drive work) and `coordinator` (spine, close, work-PR and doctor sessions, lane drivers);
-  `implementer`, `verifier` and `reviewer` are unchanged, and any other value still denies every
-  tool call. Install only once every launcher sets `coordinator`/`orchestrator` for its free
-  sessions (`herdr-crew` 0.2.5 will); until then a coordinator or a bare `claude` session starts
+  closed, and the status line reads `seat: implementer (default: SEAT_MODS_ROLE unset or empty)`.
+  Two explicit unguarded roles are added: `orchestrator` (the top orchestrator, or any session
+  started to drive work) and `coordinator` (spine, close, work-PR and doctor sessions, lane
+  drivers); `implementer`, `verifier` and `reviewer` are unchanged, and any other value still
+  denies every tool call. Do not install until every launcher you use — and your own interactive
+  sessions — marks its free sessions: `herdr-crew` 0.2.5 will (not yet released); `paseo-crew`,
+  `orca-crew` and `dsh-crew` do not set `SEAT_MODS_ROLE` yet; set `SEAT_MODS_ROLE=orchestrator`
+  yourself, e.g. in your launch alias. Until then a coordinator or a bare `claude` session starts
   guarded as an implementer and cannot merge. A default-guarded session writes only inside the
   worktree — outside a git repository, its working directory — and the `SEAT_MODS_ALLOW`
   directories, so Claude Code's own writes outside them (memory files, plan files) are denied;

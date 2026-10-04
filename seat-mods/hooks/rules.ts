@@ -122,7 +122,7 @@ export function parseRole(value: string | undefined): RoleState {
 // The session's status line: every state reads distinctly, so an unmarked session is visible.
 export function statusText(state: RoleState): string {
   if (state.kind === 'on') return `seat: ${state.role}`
-  if (state.kind === 'default') return `seat: ${state.role} (default: SEAT_MODS_ROLE unset)`
+  if (state.kind === 'default') return `seat: ${state.role} (default: SEAT_MODS_ROLE unset or empty)`
   if (state.kind === 'free') return `seat: ${state.role}`
   return `seat: INVALID ROLE "${state.value}"`
 }

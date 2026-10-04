@@ -7,14 +7,17 @@ environment variable on that spawn. The seat's tool calls then meet its role's r
 Write are placed by the file system, and Bash calls are matched against the common spellings of
 each rule — a best-effort catch for mistakes, not a shell parser. **The default is guarded:** a
 session with `SEAT_MODS_ROLE` unset or empty runs under the implementer rails, so a forgotten
-export fails closed, and its status line reads `seat: implementer (default: SEAT_MODS_ROLE unset)`.
+export fails closed, and its status line reads
+`seat: implementer (default: SEAT_MODS_ROLE unset or empty)`.
 A session that is not a worker marks itself explicitly: `SEAT_MODS_ROLE=orchestrator` for the top
 orchestrator (or any session you start to drive work) and `SEAT_MODS_ROLE=coordinator` for spine,
 close, work-PR and doctor sessions and lane drivers; both are unguarded.
 
-**Rollout: install 0.2.0 only once every launcher you use sets `coordinator` or `orchestrator` for
-its free sessions.** `herdr-crew` 0.2.5 will; until then a coordinator or a bare `claude` session
-starts guarded as an implementer and cannot merge.
+**Rollout: do not install 0.2.0 until every launcher you use — and your own interactive sessions —
+marks its free sessions.** `herdr-crew` 0.2.5 will (not yet released); `paseo-crew`, `orca-crew` and
+`dsh-crew` do not set `SEAT_MODS_ROLE` yet; set `SEAT_MODS_ROLE=orchestrator` yourself, e.g. in your
+launch alias. Until then a coordinator or a bare `claude` session starts guarded as an implementer
+and cannot merge.
 
 ## The contract
 
@@ -22,16 +25,17 @@ Two environment variables, both set **per spawn**:
 
 | Variable | Value | Effect |
 |---|---|---|
-| `SEAT_MODS_ROLE` | unset or empty | Guarded as `implementer` by default. The status line reads `seat: implementer (default: SEAT_MODS_ROLE unset)`. |
+| `SEAT_MODS_ROLE` | unset or empty | Guarded as `implementer` by default. The status line reads `seat: implementer (default: SEAT_MODS_ROLE unset or empty)`. |
 | | `implementer`, `verifier`, `reviewer` | That role's guards are on. The status line shows `seat: <role>`. |
 | | `orchestrator`, `coordinator` | Unguarded: no denies, no write placement checks. The status line shows `seat: <role>`. |
 | | anything else | Fail closed. Every tool call is denied with a message that names the bad value and the valid roles. Respawn the seat with a valid value. |
 | `SEAT_MODS_ALLOW` | `:`-separated absolute directories | Extra directories the seat may write to: its report directory and its scratch directory. Relative entries and `/` are ignored. Unset, only the worktree is writable. |
 
-`herdr-crew` 0.2.2–0.2.4 exports both in the pane of each implementer, verifier and reviewer seat
-before its command and leaves every other pane unset; with this release an unset pane is a guarded
-implementer. `herdr-crew` 0.2.5 adds `SEAT_MODS_ROLE=orchestrator` to the orchestrator pane and
-`coordinator` to coordinator seats. Neither directory may contain `:`, the list separator.
+`herdr-crew` 0.2.2 and later (0.2.3 today) exports both in the pane of each implementer, verifier
+and reviewer seat before its command and leaves every other pane unset; with this release an unset
+pane is a guarded implementer. `herdr-crew` 0.2.5 will set `SEAT_MODS_ROLE=orchestrator` on the
+orchestrator pane and `coordinator` on coordinator seats. Neither directory may contain `:`, the
+list separator.
 
 **Never set either variable in `~/.claude/settings.json`'s `env` block, in a shell profile, or in a
 machine-file `command:` line.** Each of those reaches the orchestrator, which must never be guarded.
@@ -74,7 +78,7 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 - **The guarded launch needs a POSIX shell in the seat's pane.** herdr-crew sets the variables
   with `export`; a pane whose shell is Nushell leaves them unset, and the session runs under the
   default implementer rails — the status line reads `seat: implementer (default: SEAT_MODS_ROLE
-  unset)`.
+  unset or empty)`.
 - **A trailer counts only at a line start**, as the repository's commit-msg hook reads it.
 - **`git pull` is not guarded.** A pull that merges is not on the merge rail; the briefs' prose
   rule covers it.
@@ -92,6 +96,10 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   Code's own writes outside them, such as memory files under `~/.claude/projects/*/memory` and
   plan files under `~/.claude/plans`, are denied. That is the intended shape: a default-guarded
   session is a worker, and an operator session marks itself `orchestrator`.
+- **A failed `git rev-parse --show-toplevel` is read as "not a repository".** Any failure of that
+  spawn — a non-zero exit, git missing, a rejected spawn — makes the session's working directory
+  the worktree, so a default-guarded session whose git spawn fails gets everything under its cwd
+  writable. Pre-existing behaviour, now reachable by more sessions.
 - **The guards fail open.** If the module does not load, or a hook throws, Claude Code skips it and
   the seat runs unguarded. The sign is a missing `seat: <role>` in the status line; the debug log
   (`claude --debug`) names the plugin and the reason. Claude Code also holds installed plugins'
