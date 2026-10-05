@@ -319,3 +319,21 @@ Machines): a new session's first wait, not a re-entry,
 which re-arms what the `run.json` cannot — and it can re-arm them because the
 predecessor stood down, so each pane has exactly one waiter — and arms one fresh
 heartbeat, the predecessor's having been killed at stand-down.
+
+**Where molt runs, you molt in place instead.** The `molt` mod's active marker silences this
+plugin's hook (0.2.6), so past molt's soft threshold molt's handoff ask arrives in the hook's
+place. Take the ask at your next fully acknowledged delivery with no operator question in
+flight — not at a later boundary: past molt's hard threshold every `herdr` command is refused.
+Write the handoff your own rotation writes, and add to it the id of every background task you
+have running — each live dispatch's wait and companion, and the heartbeat — and, verbatim, any
+operator question you are holding. Start no dispatch after it, and end that reply with
+`MOLT-HANDOFF: <path>`. molt runs `/clear` in this pane and seeds the fresh session with the
+handoff. There is no stand-down and no successor launch: the pane, its `HERDR_PANE_ID`, its
+seat marking and every armed wait survive the clear, and every worker's `NOTIFY_PANE` still
+names this pane. The resumed top reads the handoff and confirms `run.orchestrator` names its
+own `$HERDR_PANE_ID`, rewriting it only where it does not. It arms no wait and no heartbeat the
+handoff lists: they keep running, and their notifications are its own. It runs the generation
+check once per live dispatch against the hash the handoff noted, so a report that landed
+across the clear is acted on once and retires its listed wait by id; the later notification
+for that generation retires nothing. With `/molt off` the marker goes, the hook speaks again,
+and the rotation above applies.

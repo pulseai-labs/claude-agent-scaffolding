@@ -2219,6 +2219,26 @@ else
 fi
 rm -f "$ctl"
 
+# 0.2.8 (#659): where the molt mod runs, its handoff ask replaces the ceiling notice
+# (0.2.6 silences the hook on molt's marker) and the seat molts in place. The old
+# rotation stays for a host without molt and for `/molt off`; its pins above are
+# untouched. Each clause below is one decision of the #659 plan.
+section "in-place molt (0.2.8)"
+pin "$LIFECYCLE_MD" "**Where molt runs, you molt in place instead.**" \
+  "lifecycle: the top's molt path exists" flat
+pin "$LIFECYCLE_MD" "Take the ask at your next fully acknowledged delivery with no operator question in flight" \
+  "lifecycle: the top's molt boundary is a delivery, not a later boundary" flat
+pin "$LIFECYCLE_MD" "add to it the id of every background task you have running" \
+  "lifecycle: the top's molt handoff lists live task ids" flat
+pin "$LIFECYCLE_MD" "There is no stand-down and no successor launch" \
+  "lifecycle: the molt path launches nothing" flat
+pin "$LIFECYCLE_MD" "It arms no wait and no heartbeat the handoff lists" \
+  "lifecycle: the resumed top re-arms nothing listed (P6)" flat
+pin "$LIFECYCLE_MD" "runs the generation check once per live dispatch against the hash the handoff noted" \
+  "lifecycle: a report landed across the clear is acted on once" flat
+pin "$LIFECYCLE_MD" "With \`/molt off\` the marker goes, the hook speaks again, and the rotation above applies." \
+  "lifecycle: /molt off falls back to the rotation" flat
+
 # #514, L1: the shape, asserted rather than assumed — a counter re-copied into any
 # suite shadows the hoisted one and keeps passing. This suite's copies were the
 # largest, so it is also the one most worth asserting from.
