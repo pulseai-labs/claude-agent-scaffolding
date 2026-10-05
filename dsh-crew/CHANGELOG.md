@@ -2,6 +2,32 @@
 
 All notable changes to the `dsh-crew` plugin.
 
+## 0.3.2
+
+Rely on ossify 1.14.0's run-spine re-entry, and adopt its staged-result rule.
+
+- **The `crew-spine` persona drops its issue-133 continuation exception.** ossify 1.14.0's
+  run-spine re-enters a started spine itself: the same command prints a reconcile read-out
+  and halts before any mutation on anything it cannot reconcile, so the persona no longer
+  carries a hand-rolled continuation (cut no branch, stay parked on it, reconcile
+  from state, re-issue gaps items, take each base from the handoffs). It says to continue a
+  started spine by running the same command, after the `dsh-executor` §2 step 0 checks, as
+  for any run; a resume from a handoff ends the same way.
+- **`dsh-executor` adopts the staged-result rule (`external-executor.md` §2a).** A request
+  whose worktree already holds a staged result with `report.md` at request time runs no
+  implementer: the verifier child runs alone, the result record is computed from git as
+  usual, and nothing is counted.
+- **`dsh-executor` counts corrections and replacements.** Before each, run
+  `oss work_item_dispatched <wi-id>`; at a count of 3, offer halt only.
+- **Needs ossify ≥ 1.14.0.** On an older ossify, the re-run halts on the existing spine
+  branch as before, and the operator recovers by hand.
+
+**Upgrading.** Copy `presets/crew-spine/` into `~/.dsh/.agent-presets/` again (and re-apply
+`references/presets.md` §5's rows to a headless `crew` profile), and re-link the skills
+root to the 0.3.2 skills, **together** (`references/presets.md` §0): a 0.3.1 `dsh-executor`
+re-entered on a staged worktree dispatches an implementer into it, which comes back as a
+well-formed gaps naming the dirty tree — one dispatch spent, never a wrong merge.
+
 ## 0.3.1
 
 The verifier runs the driver's route, because 0.3.0's `crew-spine` could not run a spine.

@@ -83,7 +83,7 @@ delegation group reduced to the two configured child tools plus the subagent con
 itself starts is one of the two; a web profile carrying §8's rows adds the reviewer as a
 third). Its persona:
 - runs a spine;
-- continues a halted spine from its recorded state (ossify cannot resume one itself);
+- continues a started spine by re-running the same command (ossify's run-spine re-enters it itself);
 - runs `/close`;
 - hands off and resumes through ossify's handoff procedures;
 - keeps every `ask_user_question` short, with the detail posted as a chat message first.
@@ -142,21 +142,10 @@ the run, so a spine with any chance of a gap belongs in the web UI.
       it with that spine id, executing each round through the `dsh-executor` skill. Never
       edit ossify state except through `oss`. Commit, merge and push only where ossify's
       lane and close tell you to; your children never commit. ossify state is the single
-      authority. One exception exists because run-spine cannot resume a halted spine
-      (ossify issue 133): when the operator asks you to continue `<spine-id>` from its
-      recorded state, do not cut the spine branch and do not halt on it already existing;
-      stay parked on it. Run those §2 step 0 checks first, and stop on any failure before any
-      mutation. Then reconcile from ossify state, each spawned item's handoff and
-      the spine's round records files. Re-issue each item whose last record is a gaps
-      record and whose handoff has since gained a `## Clarifications` dispatch as one
-      single-item request, per the `work-item` skill's references/external-executor.md §5b,
-      through `dsh-executor`; close what is accepted as round-orchestration.md says; then
-      run the remaining rounds, spawning only items that have no worktree and taking each
-      handoff's `base_branch` from that repo's existing handoffs' `base_branch:` lines, never
-      from HEAD and never from SPINE.md's planned base; a hosting repo with no handoff yet
-      has no recorded base, so ask the operator for the branch its spine branch was cut from
-      before authoring that handoff. If the recorded state does not reconcile cleanly, stop
-      and ask the operator before any mutation. When the lane has ended and the operator or orchestrator asks
+      authority. To continue a spine that has already started, run the same command: ossify's
+      run-spine re-enters it on its own (round-orchestration.md §2b), printing a
+      reconcile read-out and halting before any mutation on anything it cannot
+      reconcile. Run the dsh-executor skill's §2 step 0 checks first, as for any run. When the lane has ended and the operator or orchestrator asks
       you to close a spine (`/close <spine-id>`), load the `close` skill and follow it
       for that spine id, including every walk it hands to the operator. When told to
       hand off, stop at the next persisted round barrier — after `dsh-executor` has written
@@ -167,7 +156,7 @@ the run, so a spine with any chance of a gap belongs in the web UI.
       directory) end to end and follow it; if it commits, commit only the handoff file,
       never the spine's other uncommitted records. Report the handoff's path, and stop.
       When told to resume from a handoff, read that directory's resume.md end to end and
-      follow it, then continue under the continuation rule above. Keep every
+      follow it, then re-run the spine command. Keep every
       ask_user_question short: a one-line question and short option labels. Post any
       detail the operator needs as a chat message first, then ask, because a long
       question card hides its options and its Submit button.

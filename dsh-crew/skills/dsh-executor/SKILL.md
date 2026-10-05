@@ -41,8 +41,9 @@ Take the round in this order — every baseline first, then the dispatches:
      installed (a 0.3.0 preset has no `subagent_verifier`; `references/presets.md` §2). Stop,
      and tell the operator to copy the plugin's `crew-spine` again, or for the headless
      `crew` profile to re-apply `references/presets.md` §5's rows. If run-spine has already
-     prepared this round, name its prepared items: a fresh session's continuation skips an
-     item that has a worktree, so recovering them is the operator's.
+     prepared this round, name its prepared items: the fresh session re-runs the same
+     command, and ossify's re-entry takes each prepared item from its own route
+     (`round-orchestration.md` §2b).
    - **No file:** there is no selection this round. Send no `provider`, `model` or
      `reasoning_effort` on any child call; every child runs your route and effort. Say so once
      in the hand-back (§7).
@@ -70,12 +71,23 @@ Take the round in this order — every baseline first, then the dispatches:
    a baseline taken after that dispatch cannot see it. This is the only comparison that can
    see a child editing its own contract at all: ossify recomputes the spec's oid from the
    same file at §5a, so a weakened spec agrees with itself and passes.
-2. Then, for every request in declared order: fill the implementer prompt (`dsh-brief` §2)
-   with the seven request fields, verbatim, and call `subagent_implementer` with
-   `description: "work item <work_item_id>"`, that prompt, and `run_in_background: true`.
-   Note the job id it returns against the item. When step 0 resolved an implementer route,
-   the call also carries `provider`, `model` and `reasoning_effort` from that row, copied,
-   never chosen.
+2. Then, for every request in declared order: a request whose worktree already holds a
+   staged result with `report.md` at request time runs no implementer — the worker
+   finished and its return died with the session that dispatched it. Run the verifier
+   child only: verify the staged result (§4), compute the result record from git as usual
+   (§5), and count nothing. The complete return is the one ossify's lane builds for its
+   `close-finished` route (`round-orchestration.md` §3), and the rule is scoped to that
+   route — one this session has not executed — so a correction or a replacement is never
+   read this way (`external-executor.md` §2a). Every other request: fill the implementer
+   prompt (`dsh-brief` §2) with the seven request fields, verbatim, and call
+   `subagent_implementer` with `description: "work item <work_item_id>"`, that prompt, and
+   `run_in_background: true`. Note the job id it returns against the item. When step 0
+   resolved an implementer route, the call also carries `provider`, `model` and
+   `reasoning_effort` from that row, copied, never chosen.
+3. Count the executions ossify's lane leaves to the caller: before each correction or
+   replacement, run `oss work_item_dispatched <wi-id>`; at a count of 3, offer halt only —
+   never a fourth execution (`external-executor.md` §2a). The lane counts the requests it
+   issues for a round; these two are yours.
 
 Items within a round are parallel by construction; dispatch them all, then wait.
 
@@ -164,8 +176,8 @@ Foreground, one item at a time, in declared order:
    gate would have refused: `head_oid` and `tree_oid` go into the packet. A correction is a
    dispatch of the item and counts against ossify's cap of three dispatches
    (`correction-continuation.md` §4, `round-orchestration.md` §6) — the original, every gaps
-   replacement, every correction.
-   If this correction would be the fourth, it is not sent: the stop rule (§3).
+   replacement, every correction. Count it as §2 step 3 says, and if it would be the
+   fourth, it is not sent: the stop rule (§3).
 2. Fill the correction prompt (`dsh-brief` §4) with the packet: `handoff_path`,
    `work_item_id`, `expected_branch` = the request's `branch`, `expected_head_sha`,
    `expected_tree_oid`, `failures` = the verifier's FAILURES lines.
