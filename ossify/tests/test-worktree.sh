@@ -1115,5 +1115,97 @@ git -C "$TMP/link" worktree add -q -b work/r9.s2.w1-l "$LNK_WT" HEAD; rm -rf "$L
 t_capture _oss_worktree_reattach_locked "$TMP/link" r9.s2.w1 work/r9.s2.w1-l
 t_assert_rc 0 "reattach: a repo root reached through a symlink still matches its stale registration"
 
+# --- #673 E1/E2: dead holders, dual holders, and an add that fails late ------
+#
+# E1: the pre-fix guard suffix-matched ANY root and then used `add -f` over the
+# dead registration, leaving TWO holders behind - every later reattach refused
+# rc 8 with no sanctioned recovery (§2b forbids prune and `-f -f`). The fix
+# clears this item's own dead registration(s) with `git worktree remove` and
+# adds PLAIN, so one holder is all that can remain.
+E1_WT="$(oss_worktree_add canonical r9.s1.w6 "e1" HEAD)"
+E1_MOVED="$TMP/oldroot/.worktrees/r9.s1.w6"; mkdir -p "$(dirname "$E1_MOVED")"
+git -C "$TMP/canon" worktree move "$E1_WT" "$E1_MOVED"   # registered under another root spelling
+rm -rf "$E1_MOVED"                                        # ...and dead there
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w6 work/r9.s1.w6-e1
+t_assert_rc 0 "E1: a dead registration under ANOTHER root spelling re-attaches"
+t_assert_eq "$TMP/canon/.worktrees/r9.s1.w6" "$T_OUT" "E1: ...at the conventional path"
+t_assert_eq "1" "$(git -C "$TMP/canon" worktree list --porcelain | awk '/^worktree /{w=substr($0,10); if (w ~ /r9\.s1\.w6$/) c++} END{print c+0}')" "E1: ...with exactly ONE holder - the old registration was cleared, not overridden"
+
+# E1b: the wedge the old code already created - TWO dead registrations, both
+# this item's own path under different root spellings - is recovered, not
+# stuck: both are cleared, then the plain add. (Constructed with `add -f` while
+# the first holder was still live, exactly as the old reattach did it.)
+E1B_WT="$(oss_worktree_add canonical r9.s1.w7 "e1b" HEAD)"
+E1B_ALT="$TMP/altroot/.worktrees/r9.s1.w7"; mkdir -p "$(dirname "$E1B_ALT")"
+git -C "$TMP/canon" worktree add -q -f "$E1B_ALT" work/r9.s1.w7-e1b
+rm -rf "$E1B_WT" "$E1B_ALT"
+t_assert_eq "2" "$(git -C "$TMP/canon" worktree list --porcelain | awk '/^worktree /{w=substr($0,10); if (w ~ /r9\.s1\.w7$/) c++} END{print c+0}')" "E1b setup: the dual-holder shape really holds two dead registrations"
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w7 work/r9.s1.w7-e1b
+t_assert_rc 0 "E1b: the pre-existing dual-holder shape recovers"
+t_assert_eq "1" "$(git -C "$TMP/canon" worktree list --porcelain | awk '/^worktree /{w=substr($0,10); if (w ~ /r9\.s1\.w7$/) c++} END{print c+0}')" "E1b: ...leaving exactly one holder"
+
+# E2: an add that fails AFTER registering the path (a post-checkout hook that
+# exits nonzero) is rolled back - the pre-fix form reported rc 8 and left the
+# worktree, which the next inventory classified differently and every later
+# reattach refused because the path existed.
+E2_WT="$(oss_worktree_add canonical r9.s1.w8 "e2" HEAD)"
+rm -rf "$E2_WT"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$TMP/canon/.git/hooks/post-checkout"
+chmod +x "$TMP/canon/.git/hooks/post-checkout"
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w8 work/r9.s1.w8-e2
+t_assert_rc 8 "E2: an add that fails in the checkout returns rc 8"
+t_assert_contains "$T_OUT" "rolled back" "E2: ...and reports the rollback"
+[ -e "$E2_WT" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: E2: the failed reattach left the worktree path behind"; } || T_PASS=$((T_PASS+1))
+t_assert_eq "present" "$(git -C "$TMP/canon" show-ref --verify --quiet refs/heads/work/r9.s1.w8-e2 && echo present || echo gone)" "E2: ...preserving the pre-existing branch"
+t_assert_eq "0" "$(git -C "$TMP/canon" worktree list --porcelain | awk '/^worktree /{w=substr($0,10); if (w ~ /r9\.s1\.w8$/) c++} END{print c+0}')" "E2: ...and no registration survives"
+rm -f "$TMP/canon/.git/hooks/post-checkout"
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w8 work/r9.s1.w8-e2
+t_assert_rc 0 "E2 control: with the failing hook gone, the same reattach succeeds"
+
+# --- #673 A5: worktree_remove tolerates a worktree whose DIRECTORY is gone ---
+# The re-entry inventory routes a merged item with a deleted worktree `skip` /
+# `finish-status`; spine close then calls worktree_remove for it at step 10,
+# which used to refuse rc 1 (its resolver requires the directory) - cleanup
+# wedged at its last step for exactly those shapes. State supplies the branch.
+# A separate workspace: the minted item id here is r0.s1.w1, whose path the
+# main fixture's canon already used.
+A5WS="$TMP/a5ws"; A5CAN="$TMP/a5canon"
+mkdir -p "$A5WS/.workspace" "$A5CAN"
+git -C "$A5CAN" init -q -b main; git -C "$A5CAN" config user.email t@t; git -C "$A5CAN" config user.name t
+echo s > "$A5CAN/f"; git -C "$A5CAN" add .; git -C "$A5CAN" commit -qm s
+printf '{"schema_version":"1.0","ai_workspace":{"root":"%s"},"canonical":{"root":"%s"},"well_known_paths":{}}' "$A5WS" "$A5CAN" > "$A5WS/.workspace/pairing.json"
+cd "$A5WS"
+A5S="$A5WS/state.json"
+oss_state_init "$A5S" a5-demo >/dev/null
+A5REL="$(oss_entity_add_release "$A5S" "a5-rel" "a goal")"
+A5SP="$(oss_entity_add_spine "$A5S" "$A5REL" "a5" flesh canonical)"
+A5WI="$(oss_entity_add_work_item "$A5S" "$A5SP" "t1" canonical)"
+A5WT="$(oss_worktree_add canonical "$A5WI" "a5" HEAD)"
+echo a > "$A5WT/a"; git -C "$A5WT" add a; git -C "$A5WT" commit -qm a5
+oss_entity_set_work_item_exec "$A5S" "$A5WI" "work/$A5WI-a5" "$A5WT" "$(git -C "$A5WT" rev-parse HEAD)" >/dev/null
+git -C "$A5CAN" merge -q "work/$A5WI-a5" -m "merge $A5WI"
+# TWO dead registrations for the same item (the pre-fix dual-holder shape) -
+# the missing-dir arm must clear ALL of them, or the leftover holder blocks
+# the branch delete below ("used by worktree").
+A5ALT="$A5CAN/../a5alt/.worktrees/$A5WI"; mkdir -p "$(dirname "$A5ALT")"
+git -C "$A5CAN" worktree add -q -f "$A5ALT" "work/$A5WI-a5"
+rm -rf "$A5WT" "$A5ALT"
+t_assert_eq "2" "$(git -C "$A5CAN" worktree list --porcelain | awk -v s="/.worktrees/$A5WI" '/^worktree /{w=substr($0,10); if (length(w)>=length(s) && substr(w,length(w)-length(s)+1)==s) c++} END{print c+0}')" "A5 setup: the dual dead-registration shape really holds two entries"
+t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI"
+t_assert_rc 0 "A5: a deleted directory no longer wedges worktree_remove"
+t_assert_eq "gone" "$(git -C "$A5CAN" show-ref --verify --quiet "refs/heads/work/$A5WI-a5" && echo present || echo gone)" "A5: ...and the merged branch is deleted"
+t_assert_eq "0" "$(git -C "$A5CAN" worktree list --porcelain | awk -v s="/.worktrees/$A5WI" '/^worktree /{w=substr($0,10); if (length(w)>=length(s) && substr(w,length(w)-length(s)+1)==s) c++} END{print c+0}')" "A5: ...ALL stale registrations are cleared"
+t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI"
+t_assert_rc 0 "A5b: a second call (dir and branch both already gone) is clean"
+# A5c: a record naming a branch that is NOT this item's (the pre-fix adopt's
+# `main`) must never be deleted by cleanup - the base branch is not ours.
+A5WI2="$(oss_entity_add_work_item "$A5S" "$A5SP" "t2" canonical)"
+A5DEFLT="$(git -C "$A5CAN" rev-parse --abbrev-ref HEAD)"
+oss_entity_set_work_item_exec "$A5S" "$A5WI2" "$A5DEFLT" "$A5CAN/.worktrees/$A5WI2" "$(git -C "$A5CAN" rev-parse HEAD)" >/dev/null
+t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI2"
+t_assert_rc 0 "A5c: a record naming a foreign branch is left alone"
+t_assert_contains "$T_OUT" "not a work/$A5WI2-" "A5c: ...and says so"
+t_assert_eq "present" "$(git -C "$A5CAN" show-ref --verify --quiet "refs/heads/$A5DEFLT" && echo present || echo gone)" "A5c: ...the branch still exists"
+
 cd /; rm -rf "$QRT" "$TMP"
 t_summary
