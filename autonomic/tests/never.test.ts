@@ -1,8 +1,9 @@
 import { describe, test, expect } from 'claude-code/testing'
 import { neverRules } from '../hooks/never'
+import type { Where } from '../hooks/never'
 
-const W = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x', defaultBranch: 'main' }
-const rules = (c: string, w = W) => neverRules(c, w).sort()
+const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x', defaultBranch: 'main' }
+const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   test('force push, in every spelling', () => {
