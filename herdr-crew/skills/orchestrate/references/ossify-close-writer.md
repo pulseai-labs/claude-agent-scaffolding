@@ -51,6 +51,16 @@ DONE: write your report file, carrying ACCEPTED_LEDGER back with one line per
 finding — `fixed in <sha>` or `blocked: <reason>` — plus:
   Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
+MOLT: if the molt mod asks you for a handoff, first finish any report rename in progress
+and send its ping; only then write the handoff, by hand, to the path REPORT_PATH names
+with `.molt.md` appended — never with `/ossify:handoff`, never into a repository, never
+committed; that file is an exception to every NEVER below. Past the molt hard threshold
+the ping is refused like every herdr command; the report-file wait and the heartbeat
+still find the report. The handoff holds this brief verbatim, where you are in it, and
+the id of every background task you have running. End that reply with `MOLT-HANDOFF:
+<that path>`. After the clear, the seeded session reads it, continues this brief, and
+arms no wait it lists.
+
 NEVER: push, open a PR, merge, edit outside this worktree (your report file
 excepted), run the close or any review, dispatch or create anything, or work
 around a finding you cannot fix — report it. When blocked, write the question

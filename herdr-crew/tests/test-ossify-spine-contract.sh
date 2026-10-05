@@ -66,7 +66,7 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=216          # A3: each ossify reference stays within REF_BUDGET lines.
+REF_BUDGET=236          # A3: each ossify reference stays within REF_BUDGET lines.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
                         # each launch site gained; the files' own maximum is 209
                         # (`ossify-nested-run.md`), and the budget section's adjacent
@@ -75,6 +75,9 @@ REF_BUDGET=216          # A3: each ossify reference stays within REF_BUDGET line
                         # 0.2.8 (#659): raised from 209 for the in-place molt — the spine
                         # brief's MOLT clause (`ossify-briefs.md`, now the maximum, 216) and
                         # nested-run §4's in-place-molt sentence.
+                        # Then 216 -> 236 for the MOLT line every other template carries
+                        # (two item templates in `ossify-briefs.md`, now 236; the close
+                        # session and the work-PR clause in `ossify-pr-briefs.md`, 228).
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
@@ -2249,6 +2252,38 @@ pin "$BRIEFS_MD" "the SEATS block included" "spine brief: the molt handoff carri
 pin "$BRIEFS_MD" "Write nothing to your report file and return no \`rotate:\`." \
   "spine brief: the molt returns nothing" flat
 pin "$NESTED_MD" "**An in-place molt returns nothing.**" "nested-run §4: an in-place molt is not a completion" flat
+MOLT_LINE='MOLT: if the molt mod asks you for a handoff, first finish any report rename in progress and send its ping; only then write the handoff, by hand, to the path REPORT_PATH names with `.molt.md` appended — never with `/ossify:handoff`, never into a repository, never committed; that file is an exception to every NEVER below. Past the molt hard threshold the ping is refused like every herdr command; the report-file wait and the heartbeat still find the report. The handoff holds this brief verbatim, where you are in it, and the id of every background task you have running. End that reply with `MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues this brief, and arms no wait it lists.'
+# One pin per template, labelled by name, so a miss names its site (0.2.5 and 0.2.7
+# were both caught on unnamed launch sites). The span is the Nth ```text fence of the
+# file; a pin is exact, so a template carrying the line twice fails too.
+molt_in_template() { # <file> <fence n> <template name>
+  span="$(mktemp)"
+  awk -v n="$2" '/^```text/{t++; if (t == n) { on = 1; next } } on && /^```$/{exit} on' "$1" >"$span"
+  pin "$span" "$MOLT_LINE" "${1##*/} — $3 carries the MOLT line" flat
+  rm -f "$span"
+}
+molt_in_template "$GENERIC_BRIEFS_MD" 1 "Planned implementer"
+molt_in_template "$GENERIC_BRIEFS_MD" 2 "Fast implementer"
+molt_in_template "$GENERIC_BRIEFS_MD" 3 "Reviewer"
+molt_in_template "$GENERIC_BRIEFS_MD" 4 "Verifier"
+molt_in_template "$GENERIC_BRIEFS_MD" 5 "Fix round"
+molt_in_template "$GENERIC_BRIEFS_MD" 6 "Lane driver"
+molt_in_template "$GENERIC_BRIEFS_MD" 7 "Doctor dispatch"
+molt_in_template "$GENERIC_BRIEFS_MD" 8 "Direct work-item"
+molt_in_template "$GENERIC_BRIEFS_MD" 9 "Non-spine close"
+molt_in_template "$BRIEFS_MD" 2 "Item implementer"
+molt_in_template "$BRIEFS_MD" 3 "Item verifier"
+molt_in_template "$PRBRIEFS_MD" 1 "Close session"
+molt_in_template "$WRITER_MD" 1 "Close-review writer"
+# Adjacent control: the Correction request is a send, not a session, and takes no line.
+if [ "$(count_of "$GENERIC_BRIEFS_MD" "$MOLT_LINE" flat)" -eq 9 ]; then pass "briefs.md carries the MOLT line 9 times, not in the Correction request"
+else fail "briefs.md carries the MOLT line 9 times, not in the Correction request" "count differs from 9"; fi
+pin "$PRBRIEFS_MD" "MOLT instead, where the molt mod runs, at a fix-round step boundary:" \
+  "work-PR brief: the molt clause exists" flat
+pin "$PRBRIEFS_MD" "Write nothing to your report file and return no \`open:\`." \
+  "work-PR brief: the molt returns nothing" flat
+pin "$PRBRIEFS_MD" "the PR seats keep running and keep pinging this pane" \
+  "work-PR brief: the molt tears nothing down" flat
 
 # #514, L1: the shape, asserted rather than assumed — a counter re-copied into any
 # suite shadows the hoisted one and keeps passing. This suite's copies were the

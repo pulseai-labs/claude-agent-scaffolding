@@ -58,6 +58,16 @@ PRs strands them. Whenever the close review ran, carry its ledger verbatim too,
 naming each finding, its `target_repo`, its decision and the reason: the record pass
 cannot reconstruct it. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
+MOLT: if the molt mod asks you for a handoff, first finish any report rename in progress
+and send its ping; only then write the handoff, by hand, to the path REPORT_PATH names
+with `.molt.md` appended — never with `/ossify:handoff`, never into a repository, never
+committed; that file is an exception to every NEVER below. Past the molt hard threshold
+the ping is refused like every herdr command; the report-file wait and the heartbeat
+still find the report. The handoff holds this brief verbatim, where you are in it, and
+the id of every background task you have running. End that reply with `MOLT-HANDOFF:
+<that path>`. After the clear, the seeded session reads it, continues this brief, and
+arms no wait it lists.
+
 NEVER: create a seat, merge on your own authority, ask the operator anything
 (questions go up to the top in your report file), or re-invoke `/ossify:close` — a halt
 settles this dispatch; remediated, the top dispatches a fresh close session.
@@ -199,6 +209,18 @@ fresh work-PR dispatch receives it as PRIOR_REVIEW in a fresh brief, the review
 state reused. Both settle this dispatch; on the open shape the top does not advance to the record
 pass — a later merge is a new work-PR dispatch, not a resumption of this one. Then:
 Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
+
+MOLT instead, where the molt mod runs, at a fix-round step boundary: its handoff ask
+comes in place of the ceiling notice — no push half-done, no thread reply half-posted,
+and before molt's hard threshold, past which every herdr and gh command is refused. Tear
+nothing down: the PR seats keep running and keep pinging this pane. Write the handoff by
+hand to the path REPORT_PATH names with `.molt.md` appended — never with
+`/ossify:handoff`, never into a repository, never committed: this brief verbatim, the
+review record PRIOR_REVIEW would carry, per live PR seat its pane id, REPORT_PATH, the
+hash last noted and the id of its background wait, and your heartbeat's id. Write
+nothing to your report file and return no `open:`. End that reply with `MOLT-HANDOFF:
+<that path>`. After the clear, the seeded session reads it, continues this brief, arms
+no wait it lists, and runs the generation check once per listed seat.
 
 NEVER: talk to the operator — every question goes up to the top; squash; merge
 without the top's relayed word; delete a branch; or dispatch a second full review — one

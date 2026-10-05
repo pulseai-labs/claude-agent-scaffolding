@@ -152,6 +152,16 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 DONE: write your report file, carrying the work-item return verbatim, plus:
   Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
+MOLT: if the molt mod asks you for a handoff, first finish any report rename in progress
+and send its ping; only then write the handoff, by hand, to the path REPORT_PATH names
+with `.molt.md` appended — never with `/ossify:handoff`, never into a repository, never
+committed; that file is an exception to every NEVER below. Past the molt hard threshold
+the ping is refused like every herdr command; the report-file wait and the heartbeat
+still find the report. The handoff holds this brief verbatim, where you are in it, and
+the id of every background task you have running. End that reply with `MOLT-HANDOFF:
+<that path>`. After the clear, the seeded session reads it, continues this brief, and
+arms no wait it lists.
+
 NEVER: commit, push, merge, edit outside this worktree, run a subagent, or work
 a second work item. The two exceptions to that scope are this item's own
 report.md, which the work-item contract has you author beside the handoff and
@@ -184,6 +194,16 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 DONE: write your report file with one line per claim — pass | fail | cannot
 determine, with commands and output verbatim — then the caveats. `Cannot
 determine` counts as fail.
+
+MOLT: if the molt mod asks you for a handoff, first finish any report rename in progress
+and send its ping; only then write the handoff, by hand, to the path REPORT_PATH names
+with `.molt.md` appended — never with `/ossify:handoff`, never into a repository, never
+committed; that file is an exception to every NEVER below. Past the molt hard threshold
+the ping is refused like every herdr command; the report-file wait and the heartbeat
+still find the report. The handoff holds this brief verbatim, where you are in it, and
+the id of every background task you have running. End that reply with `MOLT-HANDOFF:
+<that path>`. After the clear, the seeded session reads it, continues this brief, and
+arms no wait it lists.
 
 NEVER: commit, push, or edit a tracked file outside the mutation check. Leave `HEAD`, the
 staged tree and `git status --porcelain` exactly as found before you write your report file;
