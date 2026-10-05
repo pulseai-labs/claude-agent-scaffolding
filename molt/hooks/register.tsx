@@ -156,7 +156,8 @@ async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<voi
   }
   inFlight = true
   pending = { oldSession: sessionId, handoff: handoff.path, chain: own?.chain ?? sessionId, depth: (own?.depth ?? 0) + 1 }
-  await setNotice($, { text: `molt: handing off at ${Math.round(lastPercent ?? 0)}% — ${handoff.path}`, tone: 'info' })
+  // Best-effort: inFlight and pending are set, so nothing between here and /clear may throw.
+  try { await setNotice($, { text: `molt: handing off at ${Math.round(lastPercent ?? 0)}% — ${handoff.path}`, tone: 'info' }) } catch {}
   await log($, `molt session=${sessionId} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent}`)
   const p = pending
   $.command.run({ command: 'clear' }).then(async () => {

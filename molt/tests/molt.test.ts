@@ -37,6 +37,7 @@ describe('a molt from a marker', () => {
     w.clearTo.push('s2')
     at(w, 52)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(1)          // the notice before the clear is best-effort too
     await $.classic.SessionStart(CLEAR('s2')).catch(() => undefined)
     expect(w.prompts.at(-1)).toContain(H)
   })
