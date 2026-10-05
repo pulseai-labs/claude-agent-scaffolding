@@ -326,12 +326,13 @@ place. Take the ask at your next fully acknowledged delivery with no operator qu
 flight — not at a later boundary: past molt's hard threshold every `herdr` command is refused.
 Write the handoff your own rotation writes, and add to it the id of every background task you
 have running — each live dispatch's wait and companion, and the heartbeat — and, verbatim, any
-operator question you are holding. Start no dispatch after it, and end that reply with
-`MOLT-HANDOFF: <path>`. molt runs `/clear` in this pane and seeds the fresh session with the
-handoff. There is no stand-down and no successor launch: the pane, its `HERDR_PANE_ID`, its
-seat marking and every armed wait survive the clear, and every worker's `NOTIFY_PANE` still
-names this pane. The resumed top reads the handoff and confirms `run.orchestrator` names its
-own `$HERDR_PANE_ID`, rewriting it only where it does not. It arms no wait and no heartbeat the
+operator question you are holding. Start no dispatch after it; a wake or message that reaches
+you after it is added to it verbatim, never acted on, and end that reply with `MOLT-HANDOFF:
+<path>`. molt runs `/clear` in this pane and seeds the fresh session with the handoff. There
+is no stand-down and no successor launch: the pane, its `HERDR_PANE_ID`, its seat marking and
+every armed wait survive the clear, and every worker's `NOTIFY_PANE` still names this pane.
+The resumed top reads the handoff and confirms `run.orchestrator` names its own
+`$HERDR_PANE_ID`, rewriting it only where it does not. It arms no wait and no heartbeat the
 handoff lists: they keep running, and their notifications are its own. It runs the generation
 check once per live dispatch against the hash the handoff noted, so a report that landed
 across the clear is acted on once and retires its listed wait by id; the later notification

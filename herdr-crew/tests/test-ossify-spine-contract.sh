@@ -66,7 +66,7 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=236          # A3: each ossify reference stays within REF_BUDGET lines.
+REF_BUDGET=239          # A3: each ossify reference stays within REF_BUDGET lines.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
                         # each launch site gained; the files' own maximum is 209
                         # (`ossify-nested-run.md`), and the budget section's adjacent
@@ -78,6 +78,8 @@ REF_BUDGET=236          # A3: each ossify reference stays within REF_BUDGET line
                         # Then 216 -> 236 for the MOLT line every other template carries
                         # (two item templates in `ossify-briefs.md`, now 236; the close
                         # session and the work-PR clause in `ossify-pr-briefs.md`, 228).
+                        # Then 236 -> 239 for the class-sweep sentence: a wake or message
+                        # landing between the molt handoff and the clear is handed over.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
@@ -2251,8 +2253,17 @@ pin "$BRIEFS_MD" "Tear nothing down: your item seats keep running and keep pingi
 pin "$BRIEFS_MD" "the SEATS block included" "spine brief: the molt handoff carries every brief slot" flat
 pin "$BRIEFS_MD" "Write nothing to your report file and return no \`rotate:\`." \
   "spine brief: the molt returns nothing" flat
+# Task 7 sweep (#659): a wake or message landing between the handoff write and the
+# clear is added to the handoff, never acted on — else the resumed session's
+# generation check acts on that report a second time, or a leaf's message is lost.
+pin "$LIFECYCLE_MD" "a wake or message that reaches you after it is added to it verbatim, never acted on" \
+  "lifecycle: a wake after the top's molt handoff is handed over, not acted on" flat
+pin "$BRIEFS_MD" "A wake or message that reaches you after that write is added to the handoff verbatim, never acted on." \
+  "spine brief: a wake after the molt handoff is handed over, not acted on" flat
+pin "$PRBRIEFS_MD" "A wake or message that reaches you after that write is added to the handoff verbatim, never acted on." \
+  "work-PR brief: a wake after the molt handoff is handed over, not acted on" flat
 pin "$NESTED_MD" "**An in-place molt returns nothing.**" "nested-run §4: an in-place molt is not a completion" flat
-MOLT_LINE='MOLT: if the molt mod asks you for a handoff, first finish any report rename in progress and send its ping; only then write the handoff, by hand, to the path REPORT_PATH names with `.molt.md` appended — never with `/ossify:handoff`, never into a repository, never committed; that file is an exception to every NEVER below. Past the molt hard threshold the ping is refused like every herdr command; the report-file wait and the heartbeat still find the report. The handoff holds this brief verbatim, where you are in it, and the id of every background task you have running. End that reply with `MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues this brief, and arms no wait it lists.'
+MOLT_LINE='MOLT: if the molt mod asks you for a handoff, first finish any report rename in progress and send its ping; only then write the handoff, by hand, to the path REPORT_PATH names with `.molt.md` appended — never with `/ossify:handoff`, never into a repository, never committed; that file is an exception to every NEVER below. Past the molt hard threshold the ping is refused like every herdr command; the report-file wait and the heartbeat still find the report. The handoff holds this brief verbatim, where you are in it, and the id of every background task you have running. A message that reaches you after that write is added to the handoff verbatim, never acted on. End that reply with `MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues this brief, and arms no wait it lists.'
 # One pin per template, labelled by name, so a miss names its site (0.2.5 and 0.2.7
 # were both caught on unnamed launch sites). The span is the Nth ```text fence of the
 # file; a pin is exact, so a template carrying the line twice fails too.

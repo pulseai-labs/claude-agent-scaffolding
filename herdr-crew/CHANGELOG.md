@@ -38,6 +38,10 @@ line across a molt) were measured on draco-desk before the rewrite.
   beside `REPORT_PATH`, never with `/ossify:handoff`, never into a repository, never
   committed. A ping refused past the hard threshold is covered by the report-file wait and
   the heartbeat.
+- **Between the handoff and the clear**, a wake or message that reaches any of these
+  sessions is added to the handoff verbatim and never acted on: acting on it would let the
+  resumed session's generation check act on the same report again, and a leaf's message
+  would be lost with the clear.
 - Tests: one pin per clause, one named pin per template. The ossify reference budget rises
   209 -> 236 and the herdr-mechanics budget 275 -> 280, each with its control kept.
 - Scope: herdr-crew only. paseo-crew is #666 and orca-crew is #667, each with its own probe

@@ -64,9 +64,10 @@ with `.molt.md` appended — never with `/ossify:handoff`, never into a reposito
 committed; that file is an exception to every NEVER below. Past the molt hard threshold
 the ping is refused like every herdr command; the report-file wait and the heartbeat
 still find the report. The handoff holds this brief verbatim, where you are in it, and
-the id of every background task you have running. End that reply with `MOLT-HANDOFF:
-<that path>`. After the clear, the seeded session reads it, continues this brief, and
-arms no wait it lists.
+the id of every background task you have running. A message that reaches you after that
+write is added to the handoff verbatim, never acted on. End that reply with
+`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues
+this brief, and arms no wait it lists.
 
 NEVER: create a seat, merge on your own authority, ask the operator anything
 (questions go up to the top in your report file), or re-invoke `/ossify:close` — a halt
@@ -217,10 +218,11 @@ nothing down: the PR seats keep running and keep pinging this pane. Write the ha
 hand to the path REPORT_PATH names with `.molt.md` appended — never with
 `/ossify:handoff`, never into a repository, never committed: this brief verbatim, the
 review record PRIOR_REVIEW would carry, per live PR seat its pane id, REPORT_PATH, the
-hash last noted and the id of its background wait, and your heartbeat's id. Write
-nothing to your report file and return no `open:`. End that reply with `MOLT-HANDOFF:
-<that path>`. After the clear, the seeded session reads it, continues this brief, arms
-no wait it lists, and runs the generation check once per listed seat.
+hash last noted and the id of its background wait, and your heartbeat's id. A wake or
+message that reaches you after that write is added to the handoff verbatim, never acted
+on. Write nothing to your report file and return no `open:`. End that reply with
+`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues
+this brief, arms no wait it lists, and runs the generation check once per listed seat.
 
 NEVER: talk to the operator — every question goes up to the top; squash; merge
 without the top's relayed word; delete a branch; or dispatch a second full review — one

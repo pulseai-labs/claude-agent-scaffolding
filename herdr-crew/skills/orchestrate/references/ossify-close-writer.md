@@ -57,9 +57,10 @@ with `.molt.md` appended — never with `/ossify:handoff`, never into a reposito
 committed; that file is an exception to every NEVER below. Past the molt hard threshold
 the ping is refused like every herdr command; the report-file wait and the heartbeat
 still find the report. The handoff holds this brief verbatim, where you are in it, and
-the id of every background task you have running. End that reply with `MOLT-HANDOFF:
-<that path>`. After the clear, the seeded session reads it, continues this brief, and
-arms no wait it lists.
+the id of every background task you have running. A message that reaches you after that
+write is added to the handoff verbatim, never acted on. End that reply with
+`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues
+this brief, and arms no wait it lists.
 
 NEVER: push, open a PR, merge, edit outside this worktree (your report file
 excepted), run the close or any review, dispatch or create anything, or work
