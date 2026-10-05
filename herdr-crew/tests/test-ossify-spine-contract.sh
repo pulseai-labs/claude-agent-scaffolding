@@ -1977,8 +1977,8 @@ pin "$MECHANICS_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role>' \
 pin "$MECHANICS_MD" 'A project-file role whose `replaces:` names one of those roles is guarded as that role' \
   "a replacing project-file role is guarded as the role it replaces"
 
-pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir>"' \
-  "roles.md's launch block shows the guard export as the send into the seat's pane"
+pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status"' \
+  "roles.md's launch block shows the guard export, molt marking included, as the send into the seat's pane"
 pin "$ROLES_MD" 'implementer, verifier or reviewer seat only, before its command' \
   "roles.md scopes the export to the guarded roles"
 
@@ -2057,8 +2057,10 @@ pin "$ROLES_MD" '`work-PR session`), marked `coordinator` before its command' \
   "roles.md's budget marks the close and work-PR launches" flat
 pin "$ROLES_MD" 'seat of the same name, marked `coordinator`' \
   "roles.md marks the doctor session's launch" flat
-pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator"' \
-  "roles.md's launch block shows the coordinator export"
+pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status"' \
+  "roles.md's launch block shows the coordinator export, molt marking included"
+absent "$MECHANICS_MD" 'SEAT_MODS_ROLE=orchestrator MOLT_HANDOFF' "the top's successor export carries no molt marking"
+absent "$ROLES_MD" 'SEAT_MODS_ROLE=orchestrator MOLT_HANDOFF' "roles.md carries no marked orchestrator export"
 pin "$COMMAND_MD" 'start one spine session — marked `coordinator`' \
   "commands/orchestrate.md marks the spine start" flat
 pin "$LIFECYCLE_MD" 'A declared role with no `replaces:` is marked a guarded `implementer`' \

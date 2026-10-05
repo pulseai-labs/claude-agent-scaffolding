@@ -51,6 +51,19 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    coordinator records that in its report file (to the top), the top records one from its
    own launches to the operator, and a missing status line halts no seat, re-launches none
    and is never silently dropped.
+   **molt marking.** The same export marks each child a molt child — every guarded seat, every
+   coordinator seat and every operator-declared role — by adding `MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status`,
+   `<REPORT_PATH>` the path that seat's brief names. molt then never clears that session; it
+   hands off to its parent (Completion, "A child past molt's warnings"). The operator's first
+   top and the top's rotation successor are roots and take neither; a dsh seat is not a pane
+   and takes neither.
+   **A molt is not a launch.** The top's in-place molt (`lifecycle.md`, "Where molt runs")
+   keeps the pane's process and its exports, so its `orchestrator` marking stands across the
+   clear, and seat-mods reads the role from the environment on every tool call. The
+   status-line check belongs to the launch read; a later read that finds no `seat: <role>`
+   after a molt is not a missing marking. A respawned child is a launch: this step runs
+   again in full — a fresh export naming its new `MOLT_STATUS_PATH`, its `SEAT_MODS_ALLOW`
+   rebuilt, and the status-line read, a missing `seat: <role>` recorded as at any launch.
 3. **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry —
    re-running a **launch** command into a pane whose foreground process is already that
    agent's TUI delivers its line as a prompt, the mechanism the undetected seat's one-line

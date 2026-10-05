@@ -65,7 +65,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=275
+REF_BUDGET=288  # 0.2.8: raised from 275 for step 2's molt marking clauses.
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -160,6 +160,18 @@ within_budget() { # <file>
   [ -r "$1" ] || return 2
   [ "$(wc -l < "$1" | tr -d ' ')" -le "$REF_BUDGET" ]
 }
+
+section "molt children (0.2.8)"
+pin "$REF" '**molt marking.**' "step 2 has the molt marking clause" flat
+pin "$REF" 'MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status' \
+  "step 2 names the child marking exactly" flat
+pin "$REF" 'every guarded seat, every coordinator seat and every operator-declared role' \
+  "step 2 marks every child kind" flat
+pin "$REF" 'The operator'"'"'s first top and the top'"'"'s rotation successor are roots and take neither' \
+  "step 2 never marks the top" flat
+pin "$REF" '**A molt is not a launch.**' "step 2: a molt keeps the top's marking" flat
+pin "$REF" 'A respawned child is a launch: this step runs again in full' \
+  "step 2: a respawn re-runs the marking, the allow list and the status-line read (Review Focus 6)" flat
 
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"
