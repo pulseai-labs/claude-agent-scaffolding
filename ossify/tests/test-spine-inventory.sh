@@ -94,4 +94,119 @@ rm -rf "$F/ws/docs/specs/r0/r0.s1-demo"; inv "$F"; t_assert_rc 2 "R7: no spine d
 rm -rf "$F/ws/docs/specs/r0"; inv "$F"; t_assert_rc 2 "R7: no release dir rc 2"
 t_assert_contains "$T_OUT" "found 0" "R7: ...and the message says found 0"
 
+# ---- item routes: one healthy spine fixture, mutated per scenario -------------
+# fx: core hosts items; spine branch cut and parked; base recorded.
+fx() { # $1=dir $2=number of items
+  mkfix "$1"; local i=1
+  while [ "$i" -le "$2" ]; do oss_in "$1" work_item_add r0.s1 "Item $i" core >/dev/null; i=$((i+1)); done
+  git -C "$1/core" checkout -q -b spine/r0.s1-demo; oss_in "$1" spine_base_set r0.s1 core main >/dev/null
+}
+# spawn an item exactly as round-orchestration §3 does, through the real verbs.
+spawn() { # $1=dir $2=wi-id $3=slug
+  local wt; wt="$(oss_in "$1" worktree_add core "$2" "$3" spine/r0.s1-demo)"
+  oss_in "$1" work_item_exec "$2" "$(git -C "$wt" rev-parse --abbrev-ref HEAD)" "$wt" "$(git -C "$wt" rev-parse HEAD)" >/dev/null
+  oss_in "$1" work_item_status "$2" active >/dev/null
+  printf '%s\n' "$wt"
+}
+# close an item exactly as work-item-close §4 does: commit, merge --no-ff, status.
+close_item() { # $1=dir $2=wi-id $3=wt
+  git -C "$3" commit -qm "close $2"
+  git -C "$1/core" merge -q --no-ff "$(git -C "$3" rev-parse --abbrev-ref HEAD)" -m "merge $2"
+  oss_in "$1" work_item_status "$2" complete >/dev/null
+}
+route() { field item "$1" 4; }
+
+# S1 (#362): round 1 complete+merged, round 2 planned -> skip / spawn, rc 0.
+F="$TMP/s1"; fx "$F" 2
+WT1="$(spawn "$F" r0.s1.w1 one)"; echo a > "$WT1/a"; git -C "$WT1" add a; close_item "$F" r0.s1.w1 "$WT1"
+inv "$F"
+t_assert_eq "skip" "$(route r0.s1.w1)" "S1: a complete, merged item is skip"
+t_assert_eq "spawn" "$(route r0.s1.w2)" "S1: an unspawned planned item is spawn"
+t_assert_rc 0 "S1 (#362): the healthy barrier has no halt"
+
+# S2: active, clean at base_sha -> redispatch (resume after a gap return).
+F="$TMP/s2"; fx "$F" 1; spawn "$F" r0.s1.w1 one >/dev/null; inv "$F"
+t_assert_eq "redispatch" "$(route r0.s1.w1)" "S2: a clean active item at its base is redispatch"
+
+# S4: finished shape -> close-finished; S5 dirty variants -> halt (each its own fixture).
+F="$TMP/s4"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a
+mkdir -p "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1"
+inv "$F"; t_assert_eq "halt:dirty-worktree" "$(route r0.s1.w1)" "S5a: staged but no report.md halts"
+echo r > "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1/report.md"
+inv "$F"; t_assert_eq "close-finished" "$(route r0.s1.w1)" "S4: staged + report.md is close-finished"
+t_assert_rc 0 "S4: ...not a halt"
+echo b > "$WT/b"; inv "$F"
+t_assert_eq "halt:dirty-worktree" "$(route r0.s1.w1)" "S5b: an untracked file beside the staged result halts"
+rm "$WT/b"; echo more >> "$WT/a"; inv "$F"
+t_assert_eq "halt:dirty-worktree" "$(route r0.s1.w1)" "S5c: an unstaged edit on top of the staged result halts"
+git -C "$WT" add a; inv "$F"
+t_assert_eq "close-finished" "$(route r0.s1.w1)" "S5 control: re-staging restores close-finished"
+
+# S6/S7/S8: deleted worktree.
+F="$TMP/s6"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"; rm -rf "$WT"; inv "$F"
+t_assert_eq "reattach" "$(route r0.s1.w1)" "S6: worktree gone, branch at base -> reattach"
+F="$TMP/s7"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm c; rm -rf "$WT"; inv "$F"
+t_assert_eq "reattach" "$(route r0.s1.w1)" "S7: worktree gone, branch ahead -> reattach"
+git -C "$F/core" worktree prune; git -C "$F/core" branch -D work/r0.s1.w1-one -q; inv "$F"
+t_assert_eq "halt:work-lost" "$(route r0.s1.w1)" "S8: worktree and branch both gone -> halt:work-lost"
+
+# S9: committed, not merged -> finish-merge.
+F="$TMP/s9"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm "close r0.s1.w1"; inv "$F"
+t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S9: a commit past base, unmerged -> finish-merge"
+
+# S10: merged, status still active -> finish-status.
+git -C "$F/core" merge -q --no-ff work/r0.s1.w1-one -m "merge r0.s1.w1"; inv "$F"
+t_assert_eq "finish-status" "$(route r0.s1.w1)" "S10: merged while still active -> finish-status"
+
+# S11: planned with a worktree (crash between worktree_add and work_item_exec) -> adopt.
+F="$TMP/s11"; fx "$F" 2
+WT2="$(oss_in "$F" worktree_add core r0.s1.w2 two spine/r0.s1-demo)"; inv "$F"
+t_assert_eq "adopt" "$(route r0.s1.w2)" "S11: a planned item with a clean worktree at the tip -> adopt"
+# S11b (Review Focus 3): a sibling merged since it spawned - still adopt, not a halt.
+WT1="$(spawn "$F" r0.s1.w1 one)"; echo a > "$WT1/a"; git -C "$WT1" add a; close_item "$F" r0.s1.w1 "$WT1"; inv "$F"
+t_assert_eq "adopt" "$(route r0.s1.w2)" "S11b: spawned before a sibling merged -> still adopt"
+echo x > "$WT2/x"; inv "$F"
+t_assert_eq "halt:planned-with-worktree" "$(route r0.s1.w2)" "S11c: a planned item's DIRTY worktree halts"
+
+# S12: complete but not merged -> halt:state-claims-merge (control: S1's merged item is skip).
+F="$TMP/s12"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm c
+oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null; inv "$F"
+t_assert_eq "halt:state-claims-merge" "$(route r0.s1.w1)" "S12: complete but unmerged halts"
+t_assert_rc 3 "S12: ...rc 3"
+
+# S13 (Review Focus 2): a decoy branch whose name only differs by the dots.
+F="$TMP/s13"; fx "$F" 1; git -C "$F/core" branch work/r0s1w1-decoy; inv "$F"
+t_assert_eq "spawn" "$(route r0.s1.w1)" "S13: work/r0s1w1-* is not this item's branch - still spawn"
+git -C "$F/core" branch work/r0.s1.w1-stray; inv "$F"
+t_assert_eq "halt:unclassified" "$(route r0.s1.w1)" "S13 control: a real work/r0.s1.w1-* branch with no exec record halts"
+
+# S16: abandoned -> skip.
+F="$TMP/s16"; fx "$F" 2; oss_in "$F" work_item_status r0.s1.w2 abandoned >/dev/null; inv "$F"
+t_assert_eq "skip" "$(route r0.s1.w2)" "S16: abandoned is skip"
+
+# S17: READ-ONLY PROOF - nothing changes, including on an rc-3 run.
+# The state file is .ossify/project-state.json (measured in Task 1), not the brief's
+# state.json. And the snapshot's own status takes --no-optional-locks: a plain
+# `git status` refreshes the touched entry and rewrites <repo>/.git/index, so the
+# FIRST snapshot would itself dirty the index the assertion compares (measured:
+# cksum 738945841 -> 3633717726 across two plain snapshots). A read-only apparatus
+# is what makes this snapshot a measurement; mutation (e) on _oss_inv_git proves
+# it still catches a writing verb.
+snap() { # $1=dir ; everything inventory could disturb
+  { cksum < "$1/ws/.ossify/project-state.json"
+    for r in core ui; do
+      git -C "$1/$r" for-each-ref; git -C "$1/$r" worktree list --porcelain
+      cksum < "$1/$r/.git/index"; git -C "$1/$r" --no-optional-locks status --porcelain
+    done; } 2>/dev/null
+}
+F="$TMP/s17"; fx "$F" 2; WT="$(spawn "$F" r0.s1.w1 one)"; echo d > "$WT/d"
+sleep 1; touch "$F/core/f"    # stale stat info: plain `git status` would rewrite the index
+BEFORE="$(snap "$F")"; inv "$F"
+t_assert_rc 3 "S17 setup: this run has a halt row (dirty worktree)"
+t_assert_eq "$BEFORE" "$(snap "$F")" "S17: state, refs, worktrees, index and status are byte-identical after inventory"
+
 t_summary
