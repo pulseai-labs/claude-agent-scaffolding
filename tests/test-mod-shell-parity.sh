@@ -7,7 +7,7 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE="$ROOT/seat-mods/hooks/rules.ts"
-COPIES="molt/hooks/shell.ts"
+COPIES="molt/hooks/shell.ts autonomic/hooks/shell.ts"
 NAMES="COMMANDS HEREDOC QUOTED WRAPPERS blankHeredocs blank commandOf tokensOf gitOf"
 
 # decl <file> <name>: the declaration's comment block, its first line, and for a
