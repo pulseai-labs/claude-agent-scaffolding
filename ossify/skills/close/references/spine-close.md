@@ -63,7 +63,7 @@ live="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .statu
 [ -n "$live" ] || [ -n "$withdrawn" ] \
   || { echo "close: $spine_id has no work items - there is nothing to land, review, demo or harvest, and a spine that ran nothing is retired rather than closed. Decompose it with \"$oss_bin\" work_item_add $spine_id <title> <target-repo> - the repo is required once more than one is declared, because the verb refuses to guess a default, or retire it with \"$oss_bin\" spine_status $spine_id abandoned - halt"; exit 1; }
 [ -n "$live" ] \
-  || { echo "close: $spine_id records only withdrawn work items ($withdrawn) - there is nothing to land, review, demo or harvest, and a spine that ran nothing is retired rather than closed. Retire it with \"$oss_bin\" spine_status $spine_id abandoned, AFTER the two obligations the retirement carries: (1) the demo ledger - an amendment this spine planned is still pending, so clear it with \"$oss_bin\" ledger_unplan <line-id> $spine_id, and an ordinary ACTIVE line whose only implementation was withdrawn is retired or replaced with \"$oss_bin\" ledger_retire <line-id> <spine-id> <reason> or \"$oss_bin\" ledger_supersede <line-id> <spine-id> <reason> - keyed to a spine that will CLOSE, never $spine_id, which is the spine being retired here: both are planning verbs whose amendment is applied by the close of the spine named there, so naming the retiring spine leaves the line active and the amendment pending forever, silently (demo-amendments.md §3) (ledger_unplan answers rc 7 for an active line, so it is not the tool for that case either); (2) any repo ARMED for this spine - restore its checkout, or record it as parked in SPINE.md, where the base-branch table and the withdrawal's own reason both already live: this halt writes no close record, because it exits before §9's state writes. To reverse the withdrawal instead: \"$oss_bin\" work_item_status <wi-id> planned - which restores the STATUS, and the item can run only where the lane can still cut its branch: work-item/references/round-orchestration.md §2 halts on an existing spine branch, which close leaves behind in every hosting repo (issue #133 is the open reconciliation). Where it cannot, carry the item into a NEW spine (decomposition.md §1's whole-spine arm). The account is split: plan-spine/references/decomposition.md §1 owns the demo-ledger half, and §3 below owns the armed-repo half this halt exits before reaching - halt"; exit 1; }
+  || { echo "close: $spine_id records only withdrawn work items ($withdrawn) - there is nothing to land, review, demo or harvest, and a spine that ran nothing is retired rather than closed. Retire it with \"$oss_bin\" spine_status $spine_id abandoned, AFTER the two obligations the retirement carries: (1) the demo ledger - an amendment this spine planned is still pending, so clear it with \"$oss_bin\" ledger_unplan <line-id> $spine_id, and an ordinary ACTIVE line whose only implementation was withdrawn is retired or replaced with \"$oss_bin\" ledger_retire <line-id> <spine-id> <reason> or \"$oss_bin\" ledger_supersede <line-id> <spine-id> <reason> - keyed to a spine that will CLOSE, never $spine_id, which is the spine being retired here: both are planning verbs whose amendment is applied by the close of the spine named there, so naming the retiring spine leaves the line active and the amendment pending forever, silently (demo-amendments.md §3) (ledger_unplan answers rc 7 for an active line, so it is not the tool for that case either); (2) any repo ARMED for this spine - restore its checkout, or record it as parked in SPINE.md, where the base-branch table and the withdrawal's own reason both already live: this halt writes no close record, because it exits before §9's state writes. To reverse the withdrawal instead: \"$oss_bin\" work_item_status <wi-id> planned - which restores the STATUS, and the item can run only where the lane can still take it: round-orchestration.md §2's re-entry arm would route the un-withdrawn item onto the spine branch close has already landed in every hosting repo, a branch nothing merges again. Carry the item into a NEW spine (decomposition.md §1's whole-spine arm). The account is split: plan-spine/references/decomposition.md §1 owns the demo-ledger half, and §3 below owns the armed-repo half this halt exits before reaching - halt"; exit 1; }
 [ -z "$withdrawn" ] \
   || echo "close: $spine_id withdrew work items before dispatch: $withdrawn - SPINE.md records why; they contribute nothing to this close"
 ```
@@ -180,8 +180,9 @@ The two facts this step needs are not in state and are recovered, not guessed:
   (`plan-spine/references/spec-authoring.md` §1), where `plan-spine` authored
   one planned base **per hosting repo** at planning time, as the cross-check —
   read that repo's row, never a single spine-wide value. **If the two disagree for a repo, halt and name both, and the
-  repo** — the lane cuts from HEAD (issue 133), so a planned base that never
-  matched the cut base is exactly the wrong-merge hazard, repo by repo. **If
+  repo** — the lane records the base it actually cut from (`spine_base_set`), so
+  a planned base that never matched the recorded base is exactly the wrong-merge
+  hazard, repo by repo. **If
   either cannot be resolved for a repo, halt** — guessing the default branch
   lands that repo's share of the spine into the wrong line of development, and
   every downstream step then reports green.
@@ -665,8 +666,9 @@ claimed; the edges reviewers have enumerated across this PR's review history
 are tracked as one follow-up issue rather than grown here, because each new
 auto-recovery edge has been a new review finding in its own right.
 
-Issue #133 is the execution-lane counterpart, not a substitute for
-this.
+The execution lane's re-entry arm
+(`work-item/references/round-orchestration.md` §2b, #133) is its counterpart,
+not a substitute for this.
 
 ---
 

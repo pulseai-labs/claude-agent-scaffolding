@@ -64,16 +64,18 @@ one-paragraph statement of what the spine is for. Then three branch facts:
 - `spine_branch:` the integration branch this repo is parked on.
 - `base_branch:` the branch this repo was on when the spine branch was cut.
 
-`base_branch` is carried here because **no state field holds it** and spine close
-needs it to switch back before merging. Copy it into every handoff in the spine,
+`base_branch` is carried here because spine close needs it to switch back
+before merging; **state holds it per repo since ossify 1.14.0**
+(`spines[].bases`). Copy it into every handoff in the spine,
 including re-dispatches. **This is the branch the spine was actually cut from,
 in this repo; `SPINE.md`'s spine-context section holds the branch it was
-*planned* to be cut from. They can differ** — the lane takes HEAD, not the plan
-(`round-orchestration.md` §2) — and spine close reads **this field first**,
+*planned* to be cut from. They can differ** — the lane records what each repo
+was parked on when it cut the spine branch (`round-orchestration.md` §2a,
+`spine_base_set`), not the plan — and spine close reads **this field first**,
 cross-checking against `SPINE.md`'s planned base and halting on disagreement
 (`close/references/spine-close.md` §3). A value copied from the plan instead of
-the worktree hides the very mismatch that halt exists to catch. Record the
-observed one here; it is the evidence.
+the recorded base hides the very mismatch that halt exists to catch. Copy it from
+`"$oss_bin" spine_base_get <spine-id> <repo>`; it is the evidence.
 
 ### `## 3. Work item identifiers`
 
@@ -243,8 +245,9 @@ are both evidence, and the retrospective reads them.
 
 - **Omitting `spec_path`** because the spec is "obviously" beside the handoff.
   Gate 1 does not infer paths; every dispatch returns gaps and no work starts.
-- **Copying `SPINE.md`'s planned base into `base_branch`** instead of reading the
-  worktree's actual base. The cross-check then compares a value against itself.
+- **Copying `SPINE.md`'s planned base into `base_branch`** instead of copying
+  the base the lane recorded for that repo (`"$oss_bin" spine_base_get <spine-id>
+  <repo>`). The cross-check then compares a value against itself.
 - **A §2 `repo:` that does not match §3's `target_repo`.** They record the same
   fact twice on purpose — one as spine-context, one as a work-item identifier —
   and a drift between them means one was copied from the wrong place rather

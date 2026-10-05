@@ -339,10 +339,13 @@ fi
 # item's spine is already closed, un-withdrawing it puts a planned item inside a
 # closed spine, which release close's tag selector then accepts. And the arm may
 # not prescribe reopening it either: close leaves the spine's integration branch
-# in place, the lane halts on an existing branch (round-orchestration.md section
-# 2), so the arm has to name THAT obstruction and the route that can run - a new
-# spine. The first form of this assertion pinned `spine_status`, i.e. the reopen
-# that does not work; it was replaced when the round-3 review proved it out.
+# landed in every hosting repo, and the lane's re-entry arm
+# (round-orchestration.md section 2b) would route the un-withdrawn item onto a
+# branch nothing merges again, so the arm has to name THAT obstruction and the
+# route that can run - a new spine. The first form of this assertion pinned
+# `spine_status`, i.e. the reopen that does not work; it was replaced when the
+# round-3 review proved it out, and updated again when 1.14.0's re-entry arm
+# replaced the halt.
 for _lit in 'work_item_status' 'spine_add' 'round-orchestration.md' 'decomposition.md'; do
   if grep -Fq "$_lit" "$_F"; then
     T_PASS=$((T_PASS+1))
@@ -1308,6 +1311,28 @@ _pin "$_r" "the harvest-apply-integrity rubric still grades a legal adoption set
 _SP4="$_OSSR/skills/start/references/spike-contract.md"
 _r=1; ! grep -Fq 'docs/adr/adr-NNNN-*.md' "$_SP4" && grep -Fq "whatever form that repo's series already uses" "$_SP4" && _r=0
 _pin "$_r" "spike-contract still points at the fixed adr-NNNN-*.md form - an actor on an adopted series writes a second form into one directory"
+
+# --- 1.14.0 (#133, #362): run-spine re-entry -------------------------------------
+_RO="$HERE/../skills/work-item/references/round-orchestration.md"
+_EX="$HERE/../skills/work-item/references/external-executor.md"
+_HC="$HERE/../skills/work-item/references/handoff-contract.md"
+_WC="$HERE/../skills/close/references/work-item-close.md"
+_SA="$HERE/../skills/plan-spine/references/spec-authoring.md"
+_RS="$HERE/../commands/run-spine.md"
+for _pair in "$_RO|spine_inventory" "$_RO|The count lives in state" "$_RO|halt:out-of-order" \
+             "$_EX|staged result" "$_EX|work_item_dispatched" "$_HC|spine_base_get" \
+             "$_SA|re-entering" "$_RS|resumes"; do
+  _f="${_pair%%|*}"; _lit="${_pair#*|}"
+  _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
+  _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.14.0 re-entry)"
+done
+# The old claims must be GONE - each was true of 1.13 and is false now.
+for _pair in "$_RO|does not resume it" "$_RO|here or nowhere" "$_RO|is taken from HEAD in this release" \
+             "$_HC|the lane takes HEAD, not the plan" "$_WC|is the open reconciliation"; do
+  _f="${_pair%%|*}"; _lit="${_pair#*|}"
+  _r=0; grep -Fq -- "$_lit" "$_f" && _r=1
+  _pin "$_r" "$(basename "$_f") still claims '$_lit' - false since 1.14.0"
+done
 
 rm -rf "$_PC_TMP"
 t_summary

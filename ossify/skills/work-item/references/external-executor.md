@@ -64,6 +64,30 @@ serial is everything after the returns — see §5a.
 
 ---
 
+## 2a. Re-entry — counting, and a staged result at request time
+
+**The lane counts each request it issues** (`"$oss_bin" work_item_dispatched
+<wi-id>`, `round-orchestration.md` §5), except a `close-finished` item's. **The
+caller counts every further execution it runs for an item** — a correction, a
+replacement — with the same verb, before it runs it, and stops offering anything
+but halt once the item's count reaches 3. The count lives in state, so a caller
+session that hands off mid-round does not reset it.
+
+**A staged result at request time.** On re-entry a request can name a worktree
+that already holds a staged result with its `report.md` at the handoff's report
+path: the worker finished, and its return died with the session that dispatched
+it (`round-orchestration.md` §2b, route `close-finished`). The request record is
+unchanged — no field is added. **If the worktree already holds a staged result
+with `report.md` at request time, verify it and return a result record without
+executing.** Launch no implementer, and do not count it as a dispatch. §5a
+then validates the record's identity against the live tree, exactly as for any
+other result. A caller that predates this rule launches an implementer into a
+staged worktree, and the implementer's Gate 3 returns a well-formed
+`gaps-surfaced` naming the dirty tree. That costs one dispatch, never a wrong
+merge.
+
+---
+
 ## 3. The request record
 
 One per work item, every field required, no field optional and none added:

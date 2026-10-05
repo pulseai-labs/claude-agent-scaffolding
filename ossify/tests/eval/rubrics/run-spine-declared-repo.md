@@ -15,13 +15,14 @@ about it, the same convention `adopt-multi-repo` uses. There is no N/A.
 1. **The spine-branch cut is a real loop over every hosting repo, not
    canonical alone.** Before round 1, the lane cuts and checks out the spine
    branch in every repo that hosts at least one of the spine's work items —
-   the distinct `target_repo` values, not a fixed single repo. A dirty
-   working tree, an already-existing spine branch, or a detached HEAD in
-   *any* hosting repo halts the cut, even when canonical (or the first repo
-   checked) is clean. Stopping the check after canonical comes back clean and
-   never reaching a second or third hosting repo is a wrong answer here even
-   when it happens to land on the right verdict for the fixture in front of
-   it.
+   the distinct `target_repo` values, not a fixed single repo. A dirty working
+   tree or a detached HEAD in *any* hosting repo halts the cut, and an
+   already-existing spine branch in any of them selects §2's re-entry arm
+   (whose read-out halts, naming the repo, when it cannot reconcile), even
+   when canonical (or the first repo checked) is clean. Stopping the check
+   after canonical comes back clean and never reaching a second or third
+   hosting repo is a wrong answer here even when it happens to land on the
+   right verdict for the fixture in front of it.
 2. **Any declared repo executes a work item; the halt is not
    canonical-only.** A work item whose `target_repo` is a declared repo other
    than canonical gets a worktree, a dispatch, and a handoff — it does not

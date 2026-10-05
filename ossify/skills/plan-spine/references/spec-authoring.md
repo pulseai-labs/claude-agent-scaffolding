@@ -132,7 +132,10 @@ blocking gap **at pre-flight** rather than a confusing failure at the close gate
 
 **Author round 1's specs now.** A later round's spec may be authored when its
 round starts — by then the rounds ahead of it will have taught you something, and
-a spec written before that is a spec written twice.
+a spec written before that is a spec written twice. Authoring later rounds is
+supported by re-entering `/run-spine` once per round: the lane's re-entry arm
+(`work-item/references/round-orchestration.md` §2b) picks up at the next round
+without a flag.
 
 What is **not** deferred is the **plan**. The user and the critic see the whole
 spine at once: every work item, the round structure, the demo contribution, the
