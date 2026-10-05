@@ -65,7 +65,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=288  # 0.2.8: raised from 275 for step 2's molt marking clauses.
+REF_BUDGET=306  # 0.2.8: raised from 275 for step 2's molt marking clauses and Completion's molt-child paragraph.
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -172,6 +172,19 @@ pin "$REF" 'The operator'"'"'s first top and the top'"'"'s rotation successor ar
 pin "$REF" '**A molt is not a launch.**' "step 2: a molt keeps the top's marking" flat
 pin "$REF" 'A respawned child is a launch: this step runs again in full' \
   "step 2: a respawn re-runs the marking, the allow list and the status-line read (Review Focus 6)" flat
+pin "$REF" "**A child past molt's warnings.**" "Completion holds the parent rules once" flat
+pin "$REF" 'MOLT WARNING <pct> <task id>' "the ping text is named" flat
+pin "$REF" 'per tick, per live dispatch, also reads its `<REPORT_PATH>.molt-status`' \
+  "the heartbeat reads each child's status file (Review Focus 2)" flat
+pin "$REF" 'note it and send that seat no new unit' "a warned child gets no new unit" flat
+pin "$REF" 'launch a fresh seat from the same row, marked the same, with a fresh `REPORT_PATH`' \
+  "a respawn takes a fresh REPORT_PATH, so a fresh status file (Review Focus 1)" flat
+pin "$REF" 'RESUME FROM: <handoff path>' "the respawned brief names the handoff" flat
+pin "$REF" 'in the same report directory, reusing its predecessor'"'"'s scratch directory' \
+  "a respawn keeps the report and scratch directories writable (Review Focus 6)" flat
+pin "$REF" 'a spine session that hands off with no `rotate:` was cut mid-round' \
+  "a spine cut mid-round goes to the operator (Review Focus 4)" flat
+pin "$REF" 'relay it to the operator with its handoff path' "a skill-run cut is relayed" flat
 
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"

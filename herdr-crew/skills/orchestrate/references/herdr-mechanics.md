@@ -234,6 +234,24 @@ surfaced once per dispatch, not per tick, as observed state and uncertainty — 
 task, never a retry. Killed when the last dispatch settles, at teardown and at stand-down,
 where the successor arms a fresh one.
 
+**A child past molt's warnings.** A seat marked a molt child (step 2) is never cleared by molt.
+At each of molt's two warnings it sends one ping, `MOLT WARNING <pct> <task id>`, to its
+`NOTIFY_PANE`, and molt appends `warned <n>`, `handoff required` and `handed-off <path>` to its
+`<REPORT_PATH>.molt-status` — molt's own writes, never the seat's. The heartbeat, per tick,
+per live dispatch, also reads its `<REPORT_PATH>.molt-status`, so a skipped ping costs at most
+one tick. On a `MOLT WARNING` ping, or a status line not yet noted: note it and send that seat
+no new unit. A `rotate:` or `open:` return is respawned as `lifecycle.md` says. On a report
+`handoff: <path>`, or a last status line `handed-off <path>` that no report has named: launch a
+fresh seat from the same row, marked the same, with a fresh `REPORT_PATH` — so its status file
+starts empty — in the same report directory, reusing its predecessor's scratch directory (and
+an ossify implementer's handoff directory) in its `SEAT_MODS_ALLOW`, since step 2 runs again
+for it; its brief is re-sent whole plus one line, `RESUME FROM: <handoff path>`. Then release
+the old pane as Teardown says. Two cuts cannot be resumed by a fresh session, so for each,
+relay it to the operator with its handoff path: a spine session that hands off with no
+`rotate:` was cut mid-round (ossify issue 133); and a close, work-item, lane-driver or doctor
+seat that hands off mid-ceremony. Without molt none of this fires, and the ceiling hook's
+rotation applies.
+
 ## Placement
 
     workspace "run: <objective>"          one per run, closed last
