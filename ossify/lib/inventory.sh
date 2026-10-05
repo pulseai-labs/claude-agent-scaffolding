@@ -71,7 +71,7 @@ EOF
 # still AT base_sha is trivially an ancestor and has merged nothing.
 _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if any halt
   local sf="$1" spine="$2" spine_dir="$3" sb="$4" halt=0
-  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands
+  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys
   while IFS="$(printf '\t')" read -r wi st repo br wtp bs dc; do
     # `read` folds a RUN of empty fields when IFS holds only whitespace, and tab
     # IS whitespace: a planned item's three empty exec fields collapsed into one,
@@ -91,12 +91,27 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
       conv="$root/.worktrees/$wi"
       has_exec=0; { [ -n "$br" ] || [ -n "$wtp" ] || [ -n "$bs" ]; } && has_exec=1
       [ -n "$wtp" ] || wtp="$conv"
-      # A worktree is "present" only if the directory is a worktree on the recorded branch.
-      if [ -d "$wtp" ] && _oss_inv_git -C "$wtp" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        wt=present
-        por="$(_oss_inv_git -C "$wtp" status --porcelain)"
-        if [ -z "$por" ]; then clean=yes; else clean=no; fi
-      else wt=gone; fi
+      # A worktree counts as present only as the TOP LEVEL of a LINKED worktree.
+      # `-d` plus `--is-inside-work-tree` alone is true for a PLAIN directory at
+      # the derived path, because that path sits inside the hosting repo's own
+      # checkout: a planned item then routed `adopt` and the lane adopted the
+      # SPINE CHECKOUT as the item's worktree (review round 1). Required here:
+      # show-toplevel IS this directory - compared physically, since git prints
+      # symlink-resolved paths (macOS /tmp) - and the git dir is a per-worktree
+      # admin dir rather than the common one.
+      wt=gone
+      if [ -d "$wtp" ]; then
+        wtp_phys="$(cd -P "$wtp" 2>/dev/null && pwd)" || wtp_phys=""
+        top_phys="$(_oss_inv_git -C "$wtp" rev-parse --show-toplevel 2>/dev/null || true)"
+        if [ -n "$top_phys" ]; then top_phys="$(cd -P "$top_phys" 2>/dev/null && pwd || true)"; fi
+        if [ -n "$wtp_phys" ] && [ "$wtp_phys" = "$top_phys" ] \
+           && [ "$(_oss_inv_git -C "$wtp" rev-parse --path-format=absolute --git-dir 2>/dev/null)" \
+                != "$(_oss_inv_git -C "$wtp" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" ]; then
+          wt=present
+          por="$(_oss_inv_git -C "$wtp" status --porcelain)"
+          if [ -z "$por" ]; then clean=yes; else clean=no; fi
+        fi
+      fi
       if [ -n "$br" ] && _oss_inv_git -C "$root" show-ref --verify --quiet "refs/heads/$br"; then
         tip="$(_oss_inv_git -C "$root" rev-parse "refs/heads/$br")"
         if [ "$tip" = "$bs" ]; then hab=yes; else hab=no; fi
@@ -115,11 +130,19 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
           elif [ "$has_exec" = 1 ]; then
             if [ "$hab" != - ] && [ "$wtp" = "$conv" ]; then route=reattach; else route=halt:unclassified; fi
           else
-            # Exact prefix `work/<wi-id>-`: for-each-ref patterns are path globs, and
-            # the awk index() check rejects a decoy like work/r0s1w1-x outright.
-            cands="$(_oss_inv_git -C "$root" for-each-ref --format='%(refname:short)' 'refs/heads/work/' \
-              | awk -v p="work/$wi-" 'index($0, p) == 1')"
-            if [ -z "$cands" ]; then route=spawn; else route=halt:unclassified; fi
+            # A stray path at the derived worktree location is not spawn-safe
+            # either: worktree_add refuses (rc 8) when the path exists, so
+            # `spawn` would stop the lane one step later, with a worse message.
+            # It is not a worktree (the presence check above proved that) and
+            # not nothing - halt:planned-with-worktree names the real shape.
+            if [ -e "$conv" ]; then route=halt:planned-with-worktree
+            else
+              # Exact prefix `work/<wi-id>-`: for-each-ref patterns are path globs, and
+              # the awk index() check rejects a decoy like work/r0s1w1-x outright.
+              cands="$(_oss_inv_git -C "$root" for-each-ref --format='%(refname:short)' 'refs/heads/work/' \
+                | awk -v p="work/$wi-" 'index($0, p) == 1')"
+              if [ -z "$cands" ]; then route=spawn; else route=halt:unclassified; fi
+            fi
           fi ;;
         active)
           if [ "$has_exec" = 0 ]; then route=halt:unclassified

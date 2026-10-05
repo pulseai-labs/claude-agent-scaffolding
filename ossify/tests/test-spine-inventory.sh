@@ -171,6 +171,20 @@ t_assert_eq "adopt" "$(route r0.s1.w2)" "S11b: spawned before a sibling merged -
 echo x > "$WT2/x"; inv "$F"
 t_assert_eq "halt:planned-with-worktree" "$(route r0.s1.w2)" "S11c: a planned item's DIRTY worktree halts"
 
+# S18 (fix round 1): a PLAIN DIRECTORY at the derived path is not a worktree. That path
+# sits inside the hosting repo's own checkout, so --is-inside-work-tree is true for it;
+# only the top level of a LINKED worktree may count. S11 above is the same-shape
+# control: a real worktree at the same path routes adopt. A stray directory is not
+# spawn-safe either - worktree_add refuses (rc 8) when the path exists.
+F="$TMP/s18"; fx "$F" 1; mkdir -p "$F/core/.worktrees/r0.s1.w1"; inv "$F"
+t_assert_eq "halt:planned-with-worktree" "$(route r0.s1.w1)" "S18: a plain dir at the derived path halts a planned item"
+t_assert_rc 3 "S18: ...rc 3"
+
+# S19 (fix round 1): an active item whose recorded worktree_path is a plain directory is
+# not a live worktree - it must not be read as present to redispatch or close-finished.
+F="$TMP/s19"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"; rm -rf "$WT"; mkdir -p "$WT"; inv "$F"
+t_assert_eq "reattach" "$(route r0.s1.w1)" "S19: a plain dir at the recorded path is not redispatch/close-finished"
+
 # S12: complete but not merged -> halt:state-claims-merge (control: S1's merged item is skip).
 F="$TMP/s12"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
 echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm c
