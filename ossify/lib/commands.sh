@@ -212,6 +212,8 @@ oss_cmd_work_item_exec()   { _oss_need 4 work_item_exec "<wi-id> <branch> <workt
 oss_cmd_spine_base_set()   { _oss_need 3 spine_base_set "<spine-id> <repo-key> <base-branch>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_set_spine_base "$sf" "$1" "$2" "$3"; }
 oss_cmd_spine_base_get()   { _oss_need 2 spine_base_get "<spine-id> <repo-key>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_get_spine_base "$sf" "$1" "$2"; }
 oss_cmd_work_item_dispatched() { _oss_need 1 work_item_dispatched "<wi-id>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_work_item_dispatched "$sf" "$1"; }
+# #133/#362: the re-entry arm's read-out. Read-only; rc 3 = halt rows present.
+oss_cmd_spine_inventory() { _oss_need 1 spine_inventory "<spine-id>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_spine_inventory "$sf" "$1"; }
 
 # §9.2's explicit, never-silent migration. Journals a `migrate_schema` op rather
 # than rewriting the file in place, so `$sf.base.json` stays v1 and replay still
