@@ -2,6 +2,21 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.2.1 — 2026-10-05
+
+Docs only — no code change.
+
+- The rollout guidance now names `herdr-crew` 0.2.7, which marks the two free roles
+  (`orchestrator` and `coordinator`) at launch; `paseo-crew`, `orca-crew` and `dsh-crew`
+  do not set `SEAT_MODS_ROLE` yet.
+- New README section "Without an orchestrator plugin": with none installed you are the
+  launcher — worked aliases and functions for the unguarded and guarded roles, and the
+  note that a launcher writing `orchestrator` or `coordinator` needs seat-mods 0.2.0 or
+  later.
+- The README's `claude-review()` example now sets `SEAT_MODS_ALLOW`, because a reviewer
+  may write only in those directories, and the `SEAT_MODS_ALLOW` table row says so for
+  the reviewer profile.
+
 ## 0.2.0 — 2026-10-04
 
 - **BREAKING** for unmarked sessions: `SEAT_MODS_ROLE` unset or empty no longer disables the mod —

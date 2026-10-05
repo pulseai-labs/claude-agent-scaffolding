@@ -10,6 +10,7 @@ whole contract its reader will ever see — fill every slot, delete nothing else
 
 ## Close session (one fresh seat per dispatch, created by the top)
 
+The top marks it `coordinator` before its command (`herdr-mechanics.md` step 2).
 It creates nothing, returns a list; only the successful record pass is single and conditional.
 
 ```text
@@ -69,7 +70,8 @@ Report a refusal verbatim.
 
 Created by the top **in that PR's hosting-repo worktree**, so REPO_ROOT is the path this
 seat already sits in, never a fixed canonical path. Launched from the `work-PR session`
-seat the project file names, with the top's merge-executor assignment and PRIOR_REVIEW, it
+seat the project file names — marked `coordinator` before its command
+(`herdr-mechanics.md` step 2) — with the top's merge-executor assignment and PRIOR_REVIEW, it
 owns both PR seats inside a `run.json` of its own. The top waits on it as a coordinator
 seat (`herdr-mechanics.md`, Completion).
 

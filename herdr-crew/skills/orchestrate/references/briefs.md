@@ -329,7 +329,8 @@ write an escalation there and stop; report refusals verbatim.
 
 A `/ossify:work-item <handoff path>` the operator asked for directly, with no activated
 spine: no SEATS row is involved and the brief is this file's own. The unit it runs may be
-read-only, so the brief never orders a commit, push or PR.
+read-only, so the brief never orders a commit, push or PR. Launched as a guarded `implementer`
+seat — its report, scratch and handoff directories in `SEAT_MODS_ALLOW` (`herdr-mechanics.md` step 2).
 
 ```text
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
@@ -362,7 +363,8 @@ verbatim.
 
 A `/ossify:close r1` or `r1.s2.w3` the operator asked for directly. Close-shaped, and it
 carries no `SPINE_ID`: that identity belongs to the spine close brief in
-`ossify-pr-briefs.md`, a different dispatch.
+`ossify-pr-briefs.md`, a different dispatch. The top marks it `coordinator` before its
+command (`herdr-mechanics.md` step 2).
 
 ```text
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>

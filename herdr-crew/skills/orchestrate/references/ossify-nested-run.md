@@ -129,13 +129,15 @@ initiative.
 
 **A `rotate: <handoff path>` completion is not the final barrier.** The spine session stopped
 at an earlier round barrier past the ceiling (`lifecycle.md`). Confirm the handoff resolves,
-then dispatch a fresh spine session on the same spine-session seat — the same approved SEATS
+then dispatch a fresh spine session on the same spine-session seat — marked `coordinator`
+before its command as `herdr-mechanics.md` step 2 says — the same approved SEATS
 block injected again — with `HANDOFF_PATH` set and the same `RUN_JSON`, which it continues,
 rebinding `run.orchestrator` to its own pane (its brief's step 2 says). The close waits for a
 completion at the final barrier.
 
 When its final report lands, **you dispatch** `/ossify:close <spine-id>` to a close
-session that is **always a fresh seat** you create, never the spine driver's: it
+session that is **always a fresh seat** you create, never the spine driver's — marked
+`coordinator` before its command (`herdr-mechanics.md` step 2): it
 creates nothing, runs the close, and returns what the close opened
 (`ossify-pr-briefs.md`). You do not run it here — SKILL.md §6 lists `close` among the
 dispatched commands, and the delegation floor keeps suites out of your session.
@@ -164,7 +166,8 @@ A multi-repo close can also open a PR in one repo and then halt on a later one, 
 returns `halted:` naming what it opened so far. **Dispatch nothing downstream — no
 work-PR session, no record pass — until a close returns a complete PR list or `closed`.**
 A halt settles that dispatch only: remediate the blocker it names, then dispatch a
-**fresh** close session, as many times as that takes.
+**fresh** close session — marked `coordinator` before its command (`herdr-mechanics.md`
+step 2) — as many times as that takes.
 
 **A close that halts on its own review returns `halted: close-review` with the
 ledger.** The ceremony's accumulated-diff review is the close seat's to run, never to
@@ -178,7 +181,8 @@ close nor the work-PR session applies these fixes, and no seat is created for
 this permanently.
 
 **Then one work-PR session per returned PR**, each created in that PR's hosting-repo
-worktree, launched from the project file's `work-PR session` seat, and briefed with the
+worktree, launched from the project file's `work-PR session` seat — marked `coordinator`
+before its command (`herdr-mechanics.md` step 2) — and briefed with the
 two profiles you decided at the PR transition (`ossify-execution.md` §5), the
 merge-executor assignment, `PRIOR_REVIEW` — `none` for a PR no earlier work-PR dispatch
 has covered, `covered` when one has and left durable evidence its review ran but no
@@ -190,7 +194,8 @@ the merge lands under the reply's executor — a merge commit on the named SHA, 
 operator alike. `lifecycle.md` steps 8-12 are that session's loop, not yours.
 
 **Then, once every returned PR has merged, one record pass** — a second
-`/ossify:close <spine-id>`, to another fresh close session. **Hold step 12's teardown —
+`/ossify:close <spine-id>`, to another fresh close session — marked `coordinator` before
+its command (`herdr-mechanics.md` step 2). **Hold step 12's teardown —
 worker release, branch deletion — until that pass returns:** it resolves the spine
 branch again. That hold is the top's spine-level teardown; the work-PR
 session's own seats released when their work finished (#448).

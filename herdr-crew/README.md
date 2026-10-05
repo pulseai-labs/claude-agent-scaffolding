@@ -104,6 +104,25 @@ coordinate an agent" defaults to a sibling split in the current tab — a seat r
 that guide does not split. A run of five seats is five readable tabs. The orchestrator
 stays in the pane the operator launched it in, and herdr-crew does not move it.
 
+## Seat marking
+
+Every launch that places a seat in a herdr pane marks it, in the pane, before the command
+(`references/herdr-mechanics.md`, step 2): an implementer, verifier or reviewer seat is
+marked with its role and `SEAT_MODS_ALLOW`; a coordinator seat — the spine, close or work-PR
+session, the doctor session, the lane driver — with `SEAT_MODS_ROLE=coordinator`; and
+the top's rotation successor with `SEAT_MODS_ROLE=orchestrator`. The two free roles
+carry no `SEAT_MODS_ALLOW`. Never through `settings.json`'s `env`, a shell profile or a
+`command:` line. The operator's own top is launched by the operator, through an alias that
+sets `orchestrator`; herdr-crew launches no top but a rotation successor. A
+`kind: dsh-spine-driver` seat is a dsh session, not a herdr pane, and is never marked
+(`references/dsh-driver.md`).
+
+**Known limit.** `seat-mods` 0.1.0 does not know the two free roles: it reads either as an
+invalid role and denies every tool call, so herdr-crew 0.2.7 must be installed together
+with `seat-mods` 0.2.0. `paseo-crew`, `orca-crew` and `dsh-crew` do not mark sessions yet.
+An operator-declared role with no `replaces:` is marked a guarded `implementer` and runs
+under implementer rails.
+
 ## Readiness and completion
 
 **Readiness is derived, never declared.** herdr answers live which path a seat takes:
