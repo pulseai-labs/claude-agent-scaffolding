@@ -27,25 +27,34 @@ line across a molt) were measured on draco-desk before the rewrite.
   missing marking.
 - **The spine session** (`ossify-briefs.md` MOLT clause; `ossify-nested-run.md` §4): hands
   off at its next acknowledged delivery, never waiting for a round barrier, tears nothing
-  down, writes its handoff by hand to `<REPORT_PATH>.molt.md` with the brief verbatim (the
-  SEATS block included) and every live wait id, and returns no `rotate:`; an in-place molt is
-  not a completion the top acts on.
-- **The work-PR session** (`ossify-pr-briefs.md` MOLT clause): the same at a fix-round step
-  boundary, returning no `open:`.
+  down, and writes its handoff by hand to `<REPORT_PATH>.molt.md` with the brief verbatim
+  (the SEATS block included), every live wait id, and each report's hash and identity. After
+  the clear it never re-invokes `/ossify:run-spine` — a run cut mid-round cannot resume
+  (ossify issue 133) — and reports `halted: molt mid-round`, which the top relays.
+- **The work-PR session** (`ossify-pr-briefs.md` MOLT clause): hands off at a fix-round step
+  boundary, returns no `open:`, and resumes as a resumed dispatch — the handoff's review
+  record is its `PRIOR_REVIEW`, so no reviewer is created again.
 - **Every other brief template** — the nine in `briefs.md`, the item implementer and item
-  verifier, the close session and the close-review writer — carries one identical `MOLT:`
-  line: finish any report rename and send its ping first, then write the handoff by hand
+  verifier, the close session and the close-review writer — carries a `MOLT:` line: finish any report rename and send its ping first, then write the handoff by hand
   beside `REPORT_PATH`, never with `/ossify:handoff`, never into a repository, never
   committed. A ping refused past the hard threshold is covered by the report-file wait and
-  the heartbeat.
+  the heartbeat. A seat whose task is one skill run (lane driver, doctor, direct work-item,
+  non-spine close, item implementer, close session) carries the halting variant: it never
+  re-runs that command after the clear, and reports `halted: molt mid-skill`. A reviewer
+  cut off re-runs its review whole; that is not a second review.
+- **Resumed checks** use the hash and the identity the handoff noted, a carried wake
+  included, and a heartbeat tick the handoff carries means that heartbeat ended: the resumed
+  session arms a fresh one.
 - **Between the handoff and the clear**, a wake or message that reaches any of these
   sessions is added to the handoff verbatim and never acted on: acting on it would let the
   resumed session's generation check act on the same report again, and a leaf's message
   would be lost with the clear.
 - Tests: one pin per clause, one named pin per template. The ossify reference budget rises
-  209 -> 236 and the herdr-mechanics budget 275 -> 280, each with its control kept.
+  209 -> 244 and the herdr-mechanics budget 275 -> 280, each with its control kept.
 - Scope: herdr-crew only. paseo-crew is #666 and orca-crew is #667, each with its own probe
-  first. A paused molt keeps its marker and so silences this hook: #668.
+  first. A paused molt keeps its marker and so silences this hook, and worker pings reset
+  molt's manual pause count: #668. A per-seat molt opt-out, so skill-run seats keep the
+  rotation instead of halting, is planned for molt 0.1.1 (#665).
 
 ## 0.2.7
 

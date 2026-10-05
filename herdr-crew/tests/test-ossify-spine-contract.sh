@@ -66,7 +66,7 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=239          # A3: each ossify reference stays within REF_BUDGET lines.
+REF_BUDGET=244          # A3: each ossify reference stays within REF_BUDGET lines.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
                         # each launch site gained; the files' own maximum is 209
                         # (`ossify-nested-run.md`), and the budget section's adjacent
@@ -80,6 +80,9 @@ REF_BUDGET=239          # A3: each ossify reference stays within REF_BUDGET line
                         # session and the work-PR clause in `ossify-pr-briefs.md`, 228).
                         # Then 236 -> 239 for the class-sweep sentence: a wake or message
                         # landing between the molt handoff and the clear is handed over.
+                        # Then 239 -> 244 for the final review's fix pass: the halting
+                        # MOLT line for skill-run seats, identity in the generation check,
+                        # the carried heartbeat tick, the resumed work-PR's PRIOR_REVIEW.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
@@ -2242,7 +2245,7 @@ pin "$LIFECYCLE_MD" "There is no stand-down and no successor launch" \
   "lifecycle: the molt path launches nothing" flat
 pin "$LIFECYCLE_MD" "It arms no wait and no heartbeat the handoff lists" \
   "lifecycle: the resumed top re-arms nothing listed (P6)" flat
-pin "$LIFECYCLE_MD" "runs the generation check once per live dispatch against the hash the handoff noted" \
+pin "$LIFECYCLE_MD" "runs the generation check once per live dispatch against the hash and identity the handoff noted" \
   "lifecycle: a report landed across the clear is acted on once" flat
 pin "$LIFECYCLE_MD" "With \`/molt off\` the marker goes, the hook speaks again, and the rotation above applies." \
   "lifecycle: /molt off falls back to the rotation" flat
@@ -2251,8 +2254,8 @@ pin "$BRIEFS_MD" "never waiting for a round barrier" "spine brief: the molt boun
 pin "$BRIEFS_MD" "Tear nothing down: your item seats keep running and keep pinging this pane." \
   "spine brief: the molt tears nothing down" flat
 pin "$BRIEFS_MD" "the SEATS block included" "spine brief: the molt handoff carries every brief slot" flat
-pin "$BRIEFS_MD" "Write nothing to your report file and return no \`rotate:\`." \
-  "spine brief: the molt returns nothing" flat
+pin "$BRIEFS_MD" "Write nothing to your report file before the clear and return no \`rotate:\`." \
+  "spine brief: the molt returns nothing before the clear" flat
 # Task 7 sweep (#659): a wake or message landing between the handoff write and the
 # clear is added to the handoff, never acted on — else the resumed session's
 # generation check acts on that report a second time, or a leaf's message is lost.
@@ -2262,33 +2265,36 @@ pin "$BRIEFS_MD" "A wake or message that reaches you after that write is added t
   "spine brief: a wake after the molt handoff is handed over, not acted on" flat
 pin "$PRBRIEFS_MD" "A wake or message that reaches you after that write is added to the handoff verbatim, never acted on." \
   "work-PR brief: a wake after the molt handoff is handed over, not acted on" flat
-pin "$NESTED_MD" "**An in-place molt returns nothing.**" "nested-run §4: an in-place molt is not a completion" flat
+pin "$NESTED_MD" "**An in-place molt mid-round ends in a halt.**" "nested-run §4: an in-place molt mid-round is relayed as a halt" flat
 MOLT_LINE='MOLT: if the molt mod asks you for a handoff, first finish any report rename in progress and send its ping; only then write the handoff, by hand, to the path REPORT_PATH names with `.molt.md` appended — never with `/ossify:handoff`, never into a repository, never committed; that file is an exception to every NEVER below. Past the molt hard threshold the ping is refused like every herdr command; the report-file wait and the heartbeat still find the report. The handoff holds this brief verbatim, where you are in it, and the id of every background task you have running. A message that reaches you after that write is added to the handoff verbatim, never acted on. End that reply with `MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues this brief, and arms no wait it lists.'
+MOLT_SKILL_LINE='MOLT: if the molt mod asks you for a handoff, first finish any report rename in progress and send its ping; only then write the handoff, by hand, to the path REPORT_PATH names with `.molt.md` appended — never with `/ossify:handoff`, never into a repository, never committed; that file is an exception to every NEVER below. Past the molt hard threshold the ping is refused like every herdr command; the report-file wait and the heartbeat still find the report. The handoff holds this brief verbatim, where you are in it, and the id of every background task you have running. A message that reaches you after that write is added to the handoff verbatim, never acted on. End that reply with `MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it and arms no wait it lists, but never re-runs the command your TASK names: a skill run cut by a molt cannot resume. It writes `halted: molt mid-skill` and the handoff path to your report file, and stops.'
 # One pin per template, labelled by name, so a miss names its site (0.2.5 and 0.2.7
 # were both caught on unnamed launch sites). The span is the Nth ```text fence of the
 # file; a pin is exact, so a template carrying the line twice fails too.
-molt_in_template() { # <file> <fence n> <template name>
+molt_in_template() { # <file> <fence n> <template name> [line]
   span="$(mktemp)"
   awk -v n="$2" '/^```text/{t++; if (t == n) { on = 1; next } } on && /^```$/{exit} on' "$1" >"$span"
-  pin "$span" "$MOLT_LINE" "${1##*/} — $3 carries the MOLT line" flat
+  pin "$span" "${4:-$MOLT_LINE}" "${1##*/} — $3 carries the MOLT line" flat
   rm -f "$span"
 }
+# A seat whose TASK is one skill run cannot resume it after the clear (ossify issue 133 for
+# run-spine): it carries the halting variant, and must not also carry the resuming one.
 molt_in_template "$GENERIC_BRIEFS_MD" 1 "Planned implementer"
 molt_in_template "$GENERIC_BRIEFS_MD" 2 "Fast implementer"
 molt_in_template "$GENERIC_BRIEFS_MD" 3 "Reviewer"
 molt_in_template "$GENERIC_BRIEFS_MD" 4 "Verifier"
 molt_in_template "$GENERIC_BRIEFS_MD" 5 "Fix round"
-molt_in_template "$GENERIC_BRIEFS_MD" 6 "Lane driver"
-molt_in_template "$GENERIC_BRIEFS_MD" 7 "Doctor dispatch"
-molt_in_template "$GENERIC_BRIEFS_MD" 8 "Direct work-item"
-molt_in_template "$GENERIC_BRIEFS_MD" 9 "Non-spine close"
-molt_in_template "$BRIEFS_MD" 2 "Item implementer"
+molt_in_template "$GENERIC_BRIEFS_MD" 6 "Lane driver" "$MOLT_SKILL_LINE"
+molt_in_template "$GENERIC_BRIEFS_MD" 7 "Doctor dispatch" "$MOLT_SKILL_LINE"
+molt_in_template "$GENERIC_BRIEFS_MD" 8 "Direct work-item" "$MOLT_SKILL_LINE"
+molt_in_template "$GENERIC_BRIEFS_MD" 9 "Non-spine close" "$MOLT_SKILL_LINE"
+molt_in_template "$BRIEFS_MD" 2 "Item implementer" "$MOLT_SKILL_LINE"
 molt_in_template "$BRIEFS_MD" 3 "Item verifier"
-molt_in_template "$PRBRIEFS_MD" 1 "Close session"
+molt_in_template "$PRBRIEFS_MD" 1 "Close session" "$MOLT_SKILL_LINE"
 molt_in_template "$WRITER_MD" 1 "Close-review writer"
 # Adjacent control: the Correction request is a send, not a session, and takes no line.
-if [ "$(count_of "$GENERIC_BRIEFS_MD" "$MOLT_LINE" flat)" -eq 9 ]; then pass "briefs.md carries the MOLT line 9 times, not in the Correction request"
-else fail "briefs.md carries the MOLT line 9 times, not in the Correction request" "count differs from 9"; fi
+if [ "$(count_of "$GENERIC_BRIEFS_MD" "$MOLT_LINE" flat)" -eq 5 ] && [ "$(count_of "$GENERIC_BRIEFS_MD" "$MOLT_SKILL_LINE" flat)" -eq 4 ]; then pass "briefs.md carries 5 resuming and 4 halting MOLT lines, none in the Correction request"
+else fail "briefs.md carries 5 resuming and 4 halting MOLT lines, none in the Correction request" "counts differ from 5 and 4"; fi
 pin "$PRBRIEFS_MD" "MOLT instead, where the molt mod runs, at a fix-round step boundary:" \
   "work-PR brief: the molt clause exists" flat
 pin "$PRBRIEFS_MD" "Write nothing to your report file and return no \`open:\`." \
@@ -2299,6 +2305,25 @@ pin "$SKILL_MD" "where the \`molt\` mod runs, its handoff ask comes instead and 
   "SKILL: the ceiling bullet names the molt path" flat
 pin "$PLUGIN_README_MD" "Since 0.2.8, a seat where \`molt\` runs molts in place past the ceiling" \
   "README: the context-ceiling section names the in-place molt" flat
+
+# #659 final review: Important 1 (a skill run cannot resume after the clear), 2 (the
+# generation check needs identity, not only the hash), 3 (a carried heartbeat tick means
+# the heartbeat ended), and the stale only-path sentences.
+pin "$LIFECYCLE_MD" "or at once when nothing is in flight" "lifecycle: an idle top hands off at once" flat
+pin "$LIFECYCLE_MD" "A heartbeat tick the handoff carries means that heartbeat has ended: the resumed top arms a fresh one." \
+  "lifecycle: a carried heartbeat tick re-arms the heartbeat" flat
+pin "$LIFECYCLE_MD" "was cut inside a skill run that cannot resume: relay it to the operator like any halt" \
+  "lifecycle: a molt halt is relayed like any halt" flat
+pin "$LIFECYCLE_MD" "where molt runs, every seat molts in place instead (below)" "lifecycle: the finish-the-unit sentence names the molt path" flat
+pin "$BRIEFS_MD" "never re-invokes \`/ossify:run-spine\`" "spine brief: a molted spine does not re-enter run-spine" flat
+pin "$BRIEFS_MD" "the hash last noted and the file's identity beside it" "spine brief: the molt handoff keeps identity" flat
+pin "$PRBRIEFS_MD" "the hash last noted and the file's identity beside it" "work-PR brief: the molt handoff keeps identity" flat
+pin "$PRBRIEFS_MD" "the handoff's review record is its PRIOR_REVIEW, so no reviewer is created again" \
+  "work-PR brief: the resumed session is a resumed dispatch" flat
+pin "$PRBRIEFS_MD" "a fresh heartbeat when the handoff carries a heartbeat tick" "work-PR brief: a carried tick re-arms the heartbeat" flat
+pin "$GENERIC_BRIEFS_MD" "A review the molt cut off is re-run whole after the clear: that is this review, not a second one." \
+  "reviewer: a re-run after a molt is not a second review" flat
+pin "$ROLES_MD" "or molt molts it in place" "roles: the retained implementer's rotation names the molt" flat
 
 # #514, L1: the shape, asserted rather than assumed — a counter re-copied into any
 # suite shadows the hoisted one and keeps passing. This suite's copies were the

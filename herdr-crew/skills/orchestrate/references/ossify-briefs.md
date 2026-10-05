@@ -107,11 +107,14 @@ your item seats keep running and keep pinging this pane. Write the handoff by ha
 the path REPORT_PATH names with `.molt.md` appended — never with `/ossify:handoff`,
 never into a repository, never committed: this brief verbatim, the SEATS block included;
 the round and each item's state; per live item seat its pane id, REPORT_PATH, the hash
-last noted and the id of its background wait; and your heartbeat's id. A wake or message
-that reaches you after that write is added to the handoff verbatim, never acted on.
-Write nothing to your report file and return no `rotate:`. End that reply with
-`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues
-this brief, arms no wait it lists, and runs the generation check once per listed seat.
+last noted and the file's identity beside it, and the id of its background wait; and
+your heartbeat's id. A wake or message that reaches you after that write is added to the
+handoff verbatim, never acted on. Write nothing to your report file before the clear and
+return no `rotate:`. End that reply with `MOLT-HANDOFF: <that path>`. After the clear,
+the seeded session reads it and arms no wait it lists, but never re-invokes
+`/ossify:run-spine`: a run cut mid-round cannot resume (ossify issue 133). It writes
+`halted: molt mid-round` and the handoff path to your report file, and stops — it acts
+on no later wake; the item seats keep running and the top decides.
 
 NEVER: record an item task in the top's run.json; run a Claude subagent for a work item;
 fall back to the default lane when an item launch fails; restart the lane; select the
@@ -161,8 +164,10 @@ the ping is refused like every herdr command; the report-file wait and the heart
 still find the report. The handoff holds this brief verbatim, where you are in it, and
 the id of every background task you have running. A message that reaches you after that
 write is added to the handoff verbatim, never acted on. End that reply with
-`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues
-this brief, and arms no wait it lists.
+`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it and arms no
+wait it lists, but never re-runs the command your TASK names: a skill run cut by a molt
+cannot resume. It writes `halted: molt mid-skill` and the handoff path to your report
+file, and stops.
 
 NEVER: commit, push, merge, edit outside this worktree, run a subagent, or work
 a second work item. The two exceptions to that scope are this item's own

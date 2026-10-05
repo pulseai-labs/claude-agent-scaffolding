@@ -66,8 +66,10 @@ the ping is refused like every herdr command; the report-file wait and the heart
 still find the report. The handoff holds this brief verbatim, where you are in it, and
 the id of every background task you have running. A message that reaches you after that
 write is added to the handoff verbatim, never acted on. End that reply with
-`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues
-this brief, and arms no wait it lists.
+`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it and arms no
+wait it lists, but never re-runs the command your TASK names: a skill run cut by a molt
+cannot resume. It writes `halted: molt mid-skill` and the handoff path to your report
+file, and stops.
 
 NEVER: create a seat, merge on your own authority, ask the operator anything
 (questions go up to the top in your report file), or re-invoke `/ossify:close` — a halt
@@ -218,11 +220,14 @@ nothing down: the PR seats keep running and keep pinging this pane. Write the ha
 hand to the path REPORT_PATH names with `.molt.md` appended — never with
 `/ossify:handoff`, never into a repository, never committed: this brief verbatim, the
 review record PRIOR_REVIEW would carry, per live PR seat its pane id, REPORT_PATH, the
-hash last noted and the id of its background wait, and your heartbeat's id. A wake or
-message that reaches you after that write is added to the handoff verbatim, never acted
-on. Write nothing to your report file and return no `open:`. End that reply with
-`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues
-this brief, arms no wait it lists, and runs the generation check once per listed seat.
+hash last noted and the file's identity beside it, and the id of its background wait,
+and your heartbeat's id. A wake or message that reaches you after that write is added to
+the handoff verbatim, never acted on. Write nothing to your report file and return no
+`open:`. End that reply with `MOLT-HANDOFF: <that path>`. After the clear, the seeded
+session reads it and continues this brief as a resumed dispatch: the handoff's review
+record is its PRIOR_REVIEW, so no reviewer is created again. It arms no wait it lists,
+but a fresh heartbeat when the handoff carries a heartbeat tick, and runs the generation
+check once per listed seat against the hash and identity noted.
 
 NEVER: talk to the operator — every question goes up to the top; squash; merge
 without the top's relayed word; delete a branch; or dispatch a second full review — one

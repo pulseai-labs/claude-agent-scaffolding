@@ -179,10 +179,13 @@ never allows, denies or asks, it is inert outside a herdr pane, and it reports t
 unavailable rather than guessing when it cannot read it. The rotation itself is prose, in
 `references/lifecycle.md`. Since 0.2.6 the hook is silent in a session where the `molt` mod
 is active, because `molt` owns the context boundary there.
-Since 0.2.8, a seat where `molt` runs molts in place past the ceiling: the top, the spine
-session and the work-PR session each hand off at their next acknowledged delivery, launch no
-successor and return no `rotate:` or `open:`; every armed wait survives the clear, and the
-resumed session arms none it already has (`references/lifecycle.md`, "Where molt runs").
+Since 0.2.8, a seat where `molt` runs molts in place past the ceiling: no successor is
+launched and no `rotate:` or `open:` is returned; every armed wait survives the clear, and the
+resumed session arms none it already has (`references/lifecycle.md`, "Where molt runs"). The
+top hands off at its next acknowledged delivery and the work-PR session at a fix-round step
+boundary, and both resume. A seat whose task is one skill run — the spine, close, work-item,
+lane-driver and doctor sessions — cannot resume that skill after the clear, so it reports
+`halted: molt mid-skill` (the spine: `mid-round`) and the top relays the halt.
 Without molt, or after `/molt off`, the rotation is unchanged. Install molt on a herdr-crew
 host only with herdr-crew 0.2.8 or later. That hook is the only deterministic code a run executes: a run
 has **no `lib/`, no state directory, no parser** — `agents.md` and `roles.md` are read as

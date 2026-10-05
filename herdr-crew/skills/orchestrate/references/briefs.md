@@ -197,7 +197,8 @@ still find the report. The handoff holds this brief verbatim, where you are in i
 the id of every background task you have running. A message that reaches you after that
 write is added to the handoff verbatim, never acted on. End that reply with
 `MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues
-this brief, and arms no wait it lists.
+this brief, and arms no wait it lists. A review the molt cut off is re-run whole after
+the clear: that is this review, not a second one.
 
 NEVER: edit any file other than your report file, post anything to GitHub, or run a second
 review. Your findings
@@ -355,8 +356,10 @@ the ping is refused like every herdr command; the report-file wait and the heart
 still find the report. The handoff holds this brief verbatim, where you are in it, and
 the id of every background task you have running. A message that reaches you after that
 write is added to the handoff verbatim, never acted on. End that reply with
-`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues
-this brief, and arms no wait it lists.
+`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it and arms no
+wait it lists, but never re-runs the command your TASK names: a skill run cut by a molt
+cannot resume. It writes `halted: molt mid-skill` and the handoff path to your report
+file, and stops.
 
 NEVER: run a second review — ossify's own gates are the lane's review; edit ossify's
 contract or any other plugin; work an item yourself. Running this lane's subagents and
@@ -395,8 +398,10 @@ the ping is refused like every herdr command; the report-file wait and the heart
 still find the report. The handoff holds this brief verbatim, where you are in it, and
 the id of every background task you have running. A message that reaches you after that
 write is added to the handoff verbatim, never acted on. End that reply with
-`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues
-this brief, and arms no wait it lists.
+`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it and arms no
+wait it lists, but never re-runs the command your TASK names: a skill run cut by a molt
+cannot resume. It writes `halted: molt mid-skill` and the handoff path to your report
+file, and stops.
 
 NEVER: commit, push, open a PR, or merge. Questions and escalations go in your report
 file, not to the operator: when blocked, write the question there and wait; when stuck,
@@ -438,8 +443,10 @@ the ping is refused like every herdr command; the report-file wait and the heart
 still find the report. The handoff holds this brief verbatim, where you are in it, and
 the id of every background task you have running. A message that reaches you after that
 write is added to the handoff verbatim, never acted on. End that reply with
-`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues
-this brief, and arms no wait it lists.
+`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it and arms no
+wait it lists, but never re-runs the command your TASK names: a skill run cut by a molt
+cannot resume. It writes `halted: molt mid-skill` and the handoff path to your report
+file, and stops.
 
 NEVER: commit, push, open a PR, or merge; edit files outside this worktree; or run any
 subagent. The two exceptions to that scope are this item's own report.md, which the
@@ -488,8 +495,10 @@ the ping is refused like every herdr command; the report-file wait and the heart
 still find the report. The handoff holds this brief verbatim, where you are in it, and
 the id of every background task you have running. A message that reaches you after that
 write is added to the handoff verbatim, never acted on. End that reply with
-`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it, continues
-this brief, and arms no wait it lists.
+`MOLT-HANDOFF: <that path>`. After the clear, the seeded session reads it and arms no
+wait it lists, but never re-runs the command your TASK names: a skill run cut by a molt
+cannot resume. It writes `halted: molt mid-skill` and the handoff path to your report
+file, and stops.
 
 NEVER: create a seat, merge on your own authority, re-invoke `/ossify:close`, or open a PR
 of your own — a halt settles this dispatch, and a remediated one is a fresh session the
