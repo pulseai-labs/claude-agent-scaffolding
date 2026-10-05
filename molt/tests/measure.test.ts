@@ -20,30 +20,32 @@ describe('projectedPercent', () => {
 
 describe('thresholdsFor', () => {
   test('a fresh session uses the settings', () => {
-    expect(thresholdsFor(DEFAULTS)).toEqual({ soft: 50, hard: 65, fallback: 70 })
+    expect(thresholdsFor(DEFAULTS)).toEqual({ warn: 40, warnAgain: 50, command: 65, block: 75, fallback: 80 })
   })
-  test('a seeded session gets minRoom points above its start, gaps kept', () => {
-    expect(thresholdsFor(DEFAULTS, 45)).toEqual({ soft: 60, hard: 75, fallback: 80 })
+  test('a seeded session gets minRoom points above its start before the first warning, gaps kept', () => {
+    expect(thresholdsFor(DEFAULTS, 30)).toEqual({ warn: 45, warnAgain: 55, command: 70, block: 80, fallback: 85 })
   })
   test('a seeded session that started high keeps fallback inside the window', () => {
-    expect(thresholdsFor(DEFAULTS, 80)).toEqual({ soft: 79, hard: 94, fallback: 99 })
+    expect(thresholdsFor(DEFAULTS, 80)).toEqual({ warn: 59, warnAgain: 69, command: 84, block: 94, fallback: 99 })
   })
   test('a seeded session that started small keeps the plain thresholds', () => {
-    expect(thresholdsFor(DEFAULTS, 10)).toEqual({ soft: 50, hard: 65, fallback: 70 })
+    expect(thresholdsFor(DEFAULTS, 10)).toEqual({ warn: 40, warnAgain: 50, command: 65, block: 75, fallback: 80 })
   })
 })
 
 describe('stageOf', () => {
-  const t = { soft: 50, hard: 65, fallback: 70 }
+  const t = { warn: 40, warnAgain: 50, command: 65, block: 75, fallback: 80 }
   test('each boundary is inclusive', () => {
-    expect(stageOf(49.9, t)).toBe('below')
-    expect(stageOf(50, t)).toBe('soft')
-    expect(stageOf(65, t)).toBe('hard')
-    expect(stageOf(70, t)).toBe('fallback')
+    expect(stageOf(39.9, t)).toBe('below')
+    expect(stageOf(40, t)).toBe('warn')
+    expect(stageOf(50, t)).toBe('warnAgain')
+    expect(stageOf(65, t)).toBe('command')
+    expect(stageOf(75, t)).toBe('block')
+    expect(stageOf(80, t)).toBe('fallback')
   })
   test('atLeast orders the stages', () => {
-    expect(atLeast('hard', 'soft')).toBe(true)
-    expect(atLeast('soft', 'hard')).toBe(false)
-    expect(atLeast('below', 'below')).toBe(true)
+    expect(atLeast('block', 'command')).toBe(true)
+    expect(atLeast('warnAgain', 'command')).toBe(false)
+    expect(atLeast('warn', 'below')).toBe(true)
   })
 })

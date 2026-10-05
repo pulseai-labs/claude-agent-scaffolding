@@ -12,7 +12,7 @@ MOLT-HANDOFF: <absolute path of the handoff file>
 
 molt then clears this session and resumes it from that file in the same pane.`
 
-export const HARD_NOTE = `Context is past molt's hard threshold ({{hard}}%). Only Write, Edit, Skill, git add and git commit run now; use git -C <dir>, not cd. Write the handoff and end your reply with the MOLT-HANDOFF line.`
+export const BLOCK_NOTE = `Context is past molt's block threshold ({{block}}%). Only Write, Edit, Skill, git add and git commit run now; use git -C <dir>, not cd. Write the handoff and end your reply with the MOLT-HANDOFF line.`
 
 export const DEFAULT_SEED = `↪ molt: this session continues from the handoff at {{path}}. If the ossify:handoff-resume skill is available, use it on that file. Otherwise read the file, check its claims against the repository, and follow its next step.`
 

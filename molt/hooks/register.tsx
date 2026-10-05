@@ -12,7 +12,7 @@ import { fallbackPath, lineagePath, parseLineage } from './records'
 import type { Lineage } from './records'
 import type { Stage, Thresholds } from './measure'
 import { activePath, autonomicPath, logPath, parseAutonomic, safeSessionId } from './records'
-import { DEFAULT_INSTRUCTIONS, DEFAULT_SEED, HARD_NOTE, expandHome, fill } from './templates'
+import { DEFAULT_INSTRUCTIONS, DEFAULT_SEED, BLOCK_NOTE, expandHome, fill } from './templates'
 
 // molt: in-place context handoff (spec §2). Module variables survive /clear, which is
 // what a molt needs to carry across; $.state does not, and holds only the band.
@@ -34,8 +34,8 @@ let inFlight = false                      // a molt between /clear and its seed
 let progress = 0                          // Write, Edit or commit since the last molt
 const nudged = new Set<string>()          // sessions told once at a tool result
 const stopBlocks = new Map<string, number>()
-const lastMd = new Map<string, string>()  // the last .md a session wrote past soft
-const forced = new Set<string>()          // /molt now: soft whatever the fill
+const lastMd = new Map<string, string>()  // the last .md a session wrote past the command
+const forced = new Set<string>()          // /molt now: the command stage whatever the fill
 let unattended = 0                        // molts since the operator last sent a prompt
 let pending: { oldSession: string; handoff: string; chain: string; depth: number } | undefined
 
@@ -90,15 +90,18 @@ async function measure($: Engine, sessionId: string): Promise<number | undefined
     lastPercent = percent
     stage = stageOf(percent, currentThresholds(sessionId))
   }
-  if (forced.has(sessionId) && stage === 'below') stage = 'soft'
+  if (forced.has(sessionId) && stage === 'below') stage = 'command'
   return percent
 }
 
 async function instruction($: Engine, sessionId: string): Promise<string> {
   const t = currentThresholds(sessionId)
-  const values = { percent: Math.round(lastPercent ?? t.soft), soft: Math.round(t.soft), hard: Math.round(t.hard) }
+  const values = {
+    percent: Math.round(lastPercent ?? t.command), command: Math.round(t.command), block: Math.round(t.block),
+    soft: Math.round(t.command), hard: Math.round(t.block),   // 0.1.0 template names (plan decision 5)
+  }
   const text = fill(await template($, cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS), values)
-  return atLeast(stage, 'hard') ? `${text}\n\n${fill(HARD_NOTE, values)}` : text
+  return atLeast(stage, 'block') ? `${text}\n\n${fill(BLOCK_NOTE, values)}` : text
 }
 
 async function ring($: Engine, bell: string, message: string): Promise<void> {
@@ -214,7 +217,7 @@ function showStatus($: Engine, sessionId: string): void {
   if (off.has(sessionId)) return $.ui.status('molt: off')
   if (paused === sessionId) return $.ui.status('molt: paused')
   const t = currentThresholds(sessionId)
-  $.ui.status(lastPercent === undefined ? 'molt' : `molt ${Math.round(lastPercent)}%/${Math.round(t.soft)}%`)
+  $.ui.status(lastPercent === undefined ? 'molt' : `molt ${Math.round(lastPercent)}%/${Math.round(t.command)}%`)
 }
 
 async function template($: Engine, path: string, fallback: string): Promise<string> {
@@ -241,7 +244,7 @@ async function status($: Engine, sessionId: string): Promise<string> {
   const record = parseAutonomic(await readText($, autonomicPath(await home($), sessionId)))
   const lines = [
     `molt is ${off.has(sessionId) ? 'off' : paused === sessionId ? 'paused' : 'on'} for this session.`,
-    `fill: ${lastPercent === undefined ? 'not measured yet' : `${Math.round(lastPercent)}%`} — soft ${Math.round(t.soft)}%, hard ${Math.round(t.hard)}%, fallback ${Math.round(t.fallback)}%`,
+    `fill: ${lastPercent === undefined ? 'not measured yet' : `${Math.round(lastPercent)}%`} — warnings ${Math.round(t.warn)}% and ${Math.round(t.warnAgain)}%, handoff ${Math.round(t.command)}%, block ${Math.round(t.block)}%, fallback ${Math.round(t.fallback)}%`,
     `mode (autonomic's record): ${record.mode}`,
   ]
   const b = usage.context.breakdown
@@ -249,9 +252,9 @@ async function status($: Engine, sessionId: string): Promise<string> {
   else if (!b.isAutoCompactEnabled || b.autoCompactThreshold === undefined) lines.push('auto-compact is off.')
   else {
     const at = (b.autoCompactThreshold / b.rawMaxTokens) * 100
-    lines.push(at <= t.hard
-      ? `WARNING: auto-compact runs at ${Math.round(at)}%, at or below molt's hard threshold (${Math.round(t.hard)}%). Raise auto-compact or lower molt's thresholds, or auto-compact acts first.`
-      : `auto-compact at ${Math.round(at)}%: above molt's hard threshold.`)
+    lines.push(at <= t.block
+      ? `WARNING: auto-compact runs at ${Math.round(at)}%, at or below molt's block threshold (${Math.round(t.block)}%). Raise auto-compact or lower molt's thresholds, or auto-compact acts first.`
+      : `auto-compact at ${Math.round(at)}%: above molt's block threshold.`)
   }
   if (cfg.problems.length) lines.push(`settings: ${cfg.problems.join('; ')}`)
   return lines.join('\n')
@@ -331,7 +334,7 @@ export const register: Register = (on, options) => {
       sessionId = await $.session.id()
       if (!off.has(sessionId) && !inFlight) {
         await measure($, sessionId)
-        if (atLeast(stage, 'hard') && !gateAllows(e.tool, args)) {
+        if (atLeast(stage, 'block') && !gateAllows(e.tool, args)) {
           await log($, `gate denied session=${sessionId} tool=${e.tool} percent=${lastPercent}`)
           return { deny: await instruction($, sessionId) }
         }
@@ -346,10 +349,10 @@ export const register: Register = (on, options) => {
     if (r.deny === undefined && r.isError === undefined && !staged) {
       // Below soft only: past it the session writes and commits the handoff itself, which
       // would make every molt look like progress to the autopilot loop guard.
-      if (isProgress(e.tool, args) && !atLeast(stage, 'soft')) progress += 1
+      if (isProgress(e.tool, args) && !atLeast(stage, 'command')) progress += 1
       const path = args.file_path
       if ((e.tool === 'Write' || e.tool === 'Edit') && typeof path === 'string' && path.endsWith('.md')
-        && sessionId !== '' && atLeast(stage, 'soft')) lastMd.set(sessionId, path)
+        && sessionId !== '' && atLeast(stage, 'command')) lastMd.set(sessionId, path)
     }
     return r
   })
@@ -361,7 +364,7 @@ export const register: Register = (on, options) => {
       const sessionId = e.session_id
       if (off.has(sessionId) || inFlight || nudged.has(sessionId)) return r
       await measure($, sessionId)
-      if (!atLeast(stage, 'soft')) return r
+      if (!atLeast(stage, 'command')) return r
       nudged.add(sessionId)
       return { ...r, additionalContext: [...(r.additionalContext ?? []), await instruction($, sessionId)] }
     } catch (err) {
@@ -376,7 +379,7 @@ export const register: Register = (on, options) => {
       const sessionId = e.session_id
       if (off.has(sessionId) || inFlight || paused === sessionId) return r
       await measure($, sessionId)
-      if (!atLeast(stage, 'soft')) return r
+      if (!atLeast(stage, 'command')) return r
       const marker = markerPath(e.last_assistant_message ?? '')
       let missing: string | undefined
       if (marker !== undefined) {
@@ -430,7 +433,7 @@ export const register: Register = (on, options) => {
       showStatus($, sessionId)
       // Below soft a marker is not a molt: a seeded session keeps its minimum room, and a
       // quoted or example marker line does not clear the session. /molt now sets soft.
-      if (!atLeast(stage, 'soft')) return r
+      if (!atLeast(stage, 'command')) return r
       const marker = markerPath(e.answer)
       const resolved = marker === undefined ? undefined : resolvePath(marker, await $.session.cwd(), await home($))
       let handoff = pickHandoff(resolved, lastMd.get(sessionId))
