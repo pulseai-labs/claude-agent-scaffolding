@@ -113,4 +113,6 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   return w
 }
 
+// A full prompt.compose input: the engine refuses a next() without promptModel.
+export const COMPOSE = { model: 'claude-opus-5-5', promptModel: 'claude-opus-5-5', surfaces: [], tools: [], outputStyle: null, traits: [] } as never
 export const ledgerLines = (w: World) => (w.files.get(LEDGER) ?? '').split('\n').filter(Boolean)
