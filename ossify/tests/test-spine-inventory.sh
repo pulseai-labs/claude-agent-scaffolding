@@ -473,6 +473,30 @@ inv "$F"
 t_assert_eq "halt:unclassified" "$(route r0.s1.w1)" "S32b: an active item reset below base_sha halts, never finish-status"
 t_assert_rc 3 "S32b: ...rc 3"
 
+# S33 (#673 I2): a COMPLETE item's dirty worktree halts the read-out on every
+# route - merged+`skip` and unmerged+`finish-merge` alike - because close's
+# cleanup calls `worktree_remove`, which refuses a dirty worktree at its last
+# step, long after re-entry had run other repairs. The clean controls are the
+# pre-dirt states (S1's merged landing skips; S12's unmerged one finishes).
+F="$TMP/s33"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; close_item "$F" r0.s1.w1 "$WT"
+inv "$F"
+t_assert_eq "skip" "$(route r0.s1.w1)" "S33 control: complete + merged + clean is skip"
+echo dirt > "$WT/scratch"
+inv "$F"
+t_assert_eq "halt:dirty-worktree" "$(route r0.s1.w1)" "S33a: complete + merged + dirty halts, never skip"
+t_assert_rc 3 "S33a: ...rc 3"
+rm "$WT/scratch"
+F="$TMP/s33b"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm c
+oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null
+inv "$F"
+t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S33 control: complete + unmerged + clean is finish-merge"
+echo dirt > "$WT/scratch"
+inv "$F"
+t_assert_eq "halt:dirty-worktree" "$(route r0.s1.w1)" "S33b: complete + unmerged + dirty halts before the merge"
+t_assert_rc 3 "S33b: ...rc 3"
+
 # ---- the shipped §2 re-entry blocks, extracted and RUN (block-ledger O rows) ----
 SKILLS="$HERE/../skills"
 ROUND="$SKILLS/work-item/references/round-orchestration.md"

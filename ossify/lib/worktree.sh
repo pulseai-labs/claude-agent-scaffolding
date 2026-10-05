@@ -227,9 +227,20 @@ _oss_worktree_reattach_locked() { # $1=root $2=wi-id $3=branch ; echoes abs path
     /^worktree /{if (hit) print p "\t" lk; p=substr($0,10); lk=0; hit=0; next}
     /^locked/{lk=1; next}
     $0=="branch " b {hit=1}
-    END{if (hit) print p "\t" lk}')" || holders=""
+    END{if (hit) print p "\t" lk}')" || {
+      # #673 G1's old form (`|| holders=""`), closed here too: an unreadable
+      # list is not an empty one. A hidden live or locked holder would only
+      # be re-discovered by git's own refusal one step later - or, worse,
+      # overridden by the plain add below.
+      echo "oss: cannot read the worktree list for $root - refusing to reattach $wi" >&2
+      return 8; }
   n="$(printf '%s' "$holders" | awk 'END{print NR}')"
   if [ "$n" -gt 0 ]; then
+    # PASS 1 - inspect and validate EVERY holder; mutate nothing (#673 I1).
+    # The pre-fix loop removed each dead entry as it validated it, so with an
+    # unlocked registration ahead of a locked one it cleared the unlocked
+    # entry and THEN refused rc 8 on the lock - mutating Git metadata while
+    # promising to leave the stale entries as found.
     while IFS="$(printf '\t')" read -r hp hl; do
       [ -n "$hp" ] || continue
       if [ -e "$hp" ]; then
@@ -241,8 +252,13 @@ _oss_worktree_reattach_locked() { # $1=root $2=wi-id $3=branch ; echoes abs path
         */.worktrees/"$wi") ;;
         *) echo "oss: branch '$branch' is held by a stale registration at $hp - not this item's missing worktree (…/.worktrees/$wi); refusing" >&2; return 8 ;;
       esac
-      # The dead entry for this item is cleared BEFORE the add, so the add can
-      # be plain and cannot mint a second holder.
+    done <<HOLD
+$holders
+HOLD
+    # PASS 2 - the whole set is acceptable; only now clear the dead entries,
+    # so the add below can be plain and cannot mint a second holder.
+    while IFS="$(printf '\t')" read -r hp hl; do
+      [ -n "$hp" ] || continue
       git -C "$root" worktree remove "$hp" \
         || { echo "oss: cannot clear the stale registration at $hp - git worktree remove failed" >&2; return 8; }
     done <<HOLD

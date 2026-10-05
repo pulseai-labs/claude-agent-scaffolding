@@ -246,6 +246,14 @@ HOLD
       fi
       case "$st" in
         complete)
+          # #673 I2: a dirty linked worktree is a halt for EVERY complete
+          # route, `skip` included - the already-computed clean=no was
+          # otherwise consulted nowhere on this arm, so re-entry ran other
+          # repairs and handed the spine to close, where cleanup's
+          # `worktree_remove` refuses the dirty worktree at its last step.
+          # Halting here is what keeps the promise that the read-out stops
+          # the lane before anything mutates.
+          if [ "$clean" = no ]; then route=halt:dirty-worktree
           # A branch that no longer exists is the POST-CLEANUP shape (#673 A5):
           # spine close step 10's `worktree_remove` deletes it with `git branch
           # -d`, which REFUSES an unmerged branch - so a deleted work branch is
@@ -254,7 +262,7 @@ HOLD
           # owning repair and made the hand-over-to-close arm unreachable for
           # exactly the cleanup-finished spine it describes. `skip`; the close
           # cleanup now tolerates the missing branch and a stale registration.
-          if [ "$brx" = no ]; then route=skip
+          elif [ "$brx" = no ]; then route=skip
           elif [ "$merged" = yes ]; then route=skip
           # A recorded-branch/absent-base half-write cannot be classified: the
           # row stays non-benign (#673 A1).

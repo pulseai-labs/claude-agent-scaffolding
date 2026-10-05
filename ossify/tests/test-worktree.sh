@@ -1162,6 +1162,48 @@ rm -f "$TMP/canon/.git/hooks/post-checkout"
 t_capture bash "$OSS" worktree_reattach canonical r9.s1.w8 work/r9.s1.w8-e2
 t_assert_rc 0 "E2 control: with the failing hook gone, the same reattach succeeds"
 
+# I1: with SEVERAL dead registrations for one item, every holder is validated
+# BEFORE any is removed. The pre-fix loop cleared entries as it went, so an
+# unlocked registration ahead of a locked one was removed and the function
+# still returned rc 8 - Git metadata mutated while the contract promises to
+# leave stale entries as found. Order is by path (git lists worktrees sorted),
+# so the fixture's unlocked entry sorts first and the locked one second - both
+# asserted, so a reordering on another git cannot quietly stop this fixture
+# from exercising the finding's order.
+I1_UNLOCK="$TMP/i1a/.worktrees/r9.s1.w9"; I1_LOCKED="$TMP/i1z/.worktrees/r9.s1.w9"
+git -C "$TMP/canon" branch work/r9.s1.w9-rd
+mkdir -p "$(dirname "$I1_UNLOCK")" "$(dirname "$I1_LOCKED")"
+git -C "$TMP/canon" worktree add -q "$I1_UNLOCK" work/r9.s1.w9-rd
+rm -rf "$I1_UNLOCK"
+git -C "$TMP/canon" worktree add -q -f "$I1_LOCKED" work/r9.s1.w9-rd
+git -C "$TMP/canon" worktree lock "$I1_LOCKED"
+rm -rf "$I1_LOCKED"
+t_assert_eq "2" "$(git -C "$TMP/canon" worktree list --porcelain | awk -v s="/.worktrees/r9.s1.w9" '/^worktree /{w=substr($0,10); if (length(w)>=length(s) && substr(w,length(w)-length(s)+1)==s) c++} END{print c+0}')" "I1 setup: two dead registrations for one item"
+t_assert_eq "$I1_UNLOCK" "$(git -C "$TMP/canon" worktree list --porcelain | awk -v s="/.worktrees/r9.s1.w9" '/^worktree /{w=substr($0,10); if (length(w)>=length(s) && substr(w,length(w)-length(s)+1)==s) {print w; exit}}')" "I1 setup: the UNLOCKED registration lists FIRST (the finding's order)"
+t_assert_eq "locked" "$(git -C "$TMP/canon" worktree list --porcelain | awk -v l="$I1_LOCKED" '/^worktree /{w=substr($0,10)} /^locked/{if (w==l) print "locked"}')" "I1 setup: ...and the SECOND carries the lock"
+I1_BEFORE="$(git -C "$TMP/canon" worktree list --porcelain)"
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w9 work/r9.s1.w9-rd
+t_assert_rc 8 "I1: a locked registration later in the set refuses the reattach"
+t_assert_contains "$T_OUT" "is locked" "I1: ...naming the lock"
+t_assert_eq "$I1_BEFORE" "$(git -C "$TMP/canon" worktree list --porcelain)" "I1: ...and NOTHING was removed - both stale registrations stand, as found"
+git -C "$TMP/canon" worktree unlock "$I1_LOCKED" 2>/dev/null || true
+git -C "$TMP/canon" worktree prune
+git -C "$TMP/canon" branch -D work/r9.s1.w9-rd >/dev/null 2>&1
+
+# I1b: an unreadable worktree list refuses (fail closed) instead of reading
+# as "no holders" and adding over a hidden holder - the same old form as the
+# inventory's `|| holders=""`. The shim fails ONLY `worktree list`, so the
+# function's other git calls still resolve; the path is left absent.
+git -C "$TMP/canon" branch work/r9.s1.w10-rd
+mkdir -p "$TMP/failgit-i1"
+printf '#!/usr/bin/env bash\ncase " $* " in *" worktree list "*) echo "fatal: simulated worktree list failure" >&2; exit 128;; esac\nexec %s "$@"\n' "$(command -v git)" > "$TMP/failgit-i1/git"
+chmod +x "$TMP/failgit-i1/git"
+t_capture env PATH="$TMP/failgit-i1:$PATH" bash "$OSS" worktree_reattach canonical r9.s1.w10 work/r9.s1.w10-rd
+t_assert_rc 8 "I1b: an unreadable worktree list refuses the reattach"
+t_assert_contains "$T_OUT" "cannot read the worktree list" "I1b: ...naming the read failure"
+[ -e "$TMP/canon/.worktrees/r9.s1.w10" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: I1b: the refused reattach left a worktree path behind"; } || T_PASS=$((T_PASS+1))
+git -C "$TMP/canon" branch -D work/r9.s1.w10-rd >/dev/null 2>&1
+
 # --- #673 A5: worktree_remove tolerates a worktree whose DIRECTORY is gone ---
 # The re-entry inventory routes a merged item with a deleted worktree `skip` /
 # `finish-status`; spine close then calls worktree_remove for it at step 10,
