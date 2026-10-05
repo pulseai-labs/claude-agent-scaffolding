@@ -22,6 +22,20 @@ describe('a molt from a marker', () => {
       .toEqual({ from: 's1', chain: 's1', depth: 1, handoff: H })
     expect(w.prompts.at(-1)).toContain(H)
   })
+  test('a seed into a session already past the first warning carries no warning (PR #670 review)', async ($, on) => {
+    const w = world(on, { files: { [H]: '# handoff' } })
+    w.clearTo.push('s2')
+    at(w, 67)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    w.session.id = 's2'
+    at(w, 45)
+    await $.classic.SessionStart(CLEAR('s2'))
+    // On the host the seed may enter only after SessionStart returns, before any response
+    // has measured the session's starting fill.
+    const n = w.contexts.length
+    await $.prompt.submit({ text: `continue from ${H}`, wait: false, origin: { kind: 'plugin' } } as never)
+    expect(w.contexts.slice(n).join('\n')).not.toContain('warning')
+  })
   test('a lineage record that cannot be written does not stop the seed', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
     w.failWrites = /\/lineage\//

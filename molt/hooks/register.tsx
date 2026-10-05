@@ -390,8 +390,12 @@ export const register: Register = (on, options) => {
       if (e.origin.kind === 'composer' || e.origin.kind === 'bridge') {
         unattended = 0
         if (paused === sessionId) paused = undefined
-        const value = await read($, notice)
-        if (value !== null && (value.tone === 'info' || paused === undefined)) await setNotice($, null)
+        try {
+          const value = await read($, notice)
+          if (value !== null && (value.tone === 'info' || paused === undefined)) await setNotice($, null)
+        } catch (err) {
+          await log($, `prompt.submit notice error ${String(err)}`)
+        }
       }
       // After the pause check, so a lifted pause brings the marker back in this hook (#668).
       await touchActive($, sessionId)
@@ -401,7 +405,10 @@ export const register: Register = (on, options) => {
     let warning: { sessionId: string; due: 1 | 2; text: string } | undefined
     try {
       const sessionId = await $.session.id()
-      if (!off.has(sessionId) && !inFlight && paused !== sessionId) {
+      // A seeded session's ladder sits above its starting fill, unknown until a response
+      // measures it: its seed carries no warning.
+      const unshifted = seeded?.session === sessionId && seeded.startPercent === undefined
+      if (!off.has(sessionId) && !inFlight && paused !== sessionId && !unshifted) {
         await measure($, sessionId)
         const due = dueWarning(sessionId)
         if (due !== undefined && !handedOff.has(sessionId)) warning = { sessionId, due, text: await warningText($, sessionId, due) }

@@ -61,6 +61,24 @@ describe('the active marker (spec §7.1)', () => {
     await $.prompt.submit({ text: 'go on', wait: false, origin: { kind: 'composer' } } as never)
     expect(w.files.has(MARK('s3'))).toBe(true)
   })
+
+  test('a lifted pause brings the marker back even when clearing the notice fails (PR #670 review)', async ($, on) => {
+    const H = '/repo/docs/handoff.md'
+    const w = world(on, { files: { [H]: '#' } })
+    w.usage = { tokens: 670_000, window: 1_000_000 }
+    const TURN = { answer: `MOLT-HANDOFF: ${H}`, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never
+    for (const id of ['s1', 's2']) {
+      w.clearTo.push(`${id}x`); w.session.id = id
+      await $.turn.complete(TURN)
+      await $.classic.SessionStart({ source: 'clear', session_id: `${id}x` } as never)
+    }
+    w.session.id = 's3'
+    await $.turn.complete(TURN)
+    expect(w.files.has(MARK('s3'))).toBe(false)
+    w.failNotices = true
+    await $.prompt.submit({ text: 'go on', wait: false, origin: { kind: 'composer' } } as never)
+    expect(w.files.has(MARK('s3'))).toBe(true)
+  })
 })
 
 describe('templates on first start', () => {
