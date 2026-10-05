@@ -75,8 +75,8 @@ export MOLT_HANDOFF=parent MOLT_STATUS_PATH=<a file beside the child's report>
 `MOLT_HANDOFF` must be exactly `parent` (surrounding spaces trimmed); any other value, or none,
 is a root. molt appends one line per event to `MOLT_STATUS_PATH`, as `<ISO time> <event>`:
 `warned <n>`, `handoff required`, `handed-off <path>`. Each event rewrites the file with the new
-line added, so a file molt can write but not read would lose its earlier lines. molt writes
-nothing there for a root. A file it cannot write is logged once to `molt.log`; the
+line added; a file that exists but cannot be read is left alone and logged, never truncated.
+molt writes nothing there for a root. A file it cannot write is logged once to `molt.log`; the
 warning or the handoff goes ahead regardless. The child itself never writes this file — molt's
 appends are its own file writes, not tool calls. Who the parent is, how the child tells it, and
 how it is replaced are the launcher's and the crew's business, never molt's.

@@ -44,6 +44,18 @@ describe('a child session', () => {
     const logged = w.runs.filter(r => r.join(' ').includes('status write failed'))
     expect(logged).toHaveLength(1)
   })
+  test('a status file that exists but cannot be read keeps its lines; the warning still arrives (final review 2)', async ($, on) => {
+    const w = world(on, { env: CHILD, files: { [S]: '2026-10-05T00:00:00.000Z earlier\n' } }); w.failReads = /molt-status$/
+    at(w, 42)
+    expect((await $.classic.PostToolUse(POST)).additionalContext?.join('\n')).toContain("molt's first warning")
+    expect(w.files.get(S)).toBe('2026-10-05T00:00:00.000Z earlier\n')
+    expect(w.runs.filter(r => r.join(' ').includes('status write failed'))).toHaveLength(1)
+  })
+  test('a readable status file gets the new line after its earlier ones (control)', async ($, on) => {
+    const w = world(on, { env: CHILD, files: { [S]: '2026-10-05T00:00:00.000Z earlier\n' } })
+    at(w, 42); await $.classic.PostToolUse(POST)
+    expect(events(w)).toEqual(['earlier', 'warned 40'])
+  })
   test('MOLT_HANDOFF=Parent is a root: it clears (review focus 4)', async ($, on) => {
     const w = world(on, { env: { MOLT_HANDOFF: 'Parent', MOLT_STATUS_PATH: S }, files: { [H]: '#' } })
     w.clearTo.push('s2'); at(w, 67)

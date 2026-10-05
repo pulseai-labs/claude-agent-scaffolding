@@ -132,8 +132,11 @@ async function appendStatus($: Engine, event: string): Promise<void> {
   const path = ((await $.env.get('MOLT_STATUS_PATH')) ?? '').trim()
   if (path === '') return
   try {
-    const old = (await readText($, path)) ?? ''
-    await $.fs.write(path, `${old}${new Date().toISOString()} ${event}\n`)
+    // The host has no append, so each event rewrites the file. A file that exists but
+    // cannot be read is left alone: rewriting it would drop the parent's earlier lines.
+    const old = await readText($, path)
+    if (old === undefined && await $.fs.exists(path)) throw new Error('exists but cannot be read')
+    await $.fs.write(path, `${old ?? ''}${new Date().toISOString()} ${event}\n`)
   } catch (err) {
     if (statusFailed) return
     statusFailed = true

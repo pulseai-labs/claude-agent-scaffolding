@@ -24,6 +24,7 @@ export type World = {
   modelCalls: number
   toolText: string             // what every tool call's result text is
   failWrites?: RegExp          // fs.write to a matching path is refused (a read-only or full disk)
+  failReads?: RegExp           // fs.read of a matching path is refused though the file exists (no read permission)
   rejectSeeds?: boolean        // a plugin's prompt.submit is refused
   slowWrites?: RegExp          // fs.write to a matching path takes 20 ms
   staged?: boolean             // Write/Edit results come back staged: held for review, file unchanged
@@ -66,6 +67,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   on('session.messages', () => ({ value: w.messages }) as never)
   on('fs.read', (_$, e) => {
     if (w.dirs.has(e.path)) return { deny: `EISDIR: ${e.path}` } as never
+    if (w.failReads?.test(e.path) && w.files.has(e.path)) return { deny: `EACCES: ${e.path}` } as never
     const text = w.files.get(e.path)
     return (text === undefined ? { deny: `ENOENT: ${e.path}` } : { value: text }) as never
   })
