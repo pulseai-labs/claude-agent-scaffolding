@@ -221,6 +221,16 @@ _oss_apply_op() { # $1=op $2=payload-json
       jq --argjson p "$payload" '
         (.spines[] | select(.id == $p.spine)) |=
           (.bases = ((.bases // {}) + {($p.repo): $p.base_branch}))' ;;
+    # #673 D1: the sanctioned CORRECTION for a recorded base. Same payload and
+    # same assignment as set_spine_base; a distinct op so the journal shows the
+    # overwrite as what it is. The refusal to overwrite lives in
+    # set_spine_base's guard, not here - this op is the route the guard's
+    # message names, and the entity-level verb validates its input exactly as
+    # the setter does.
+    reset_spine_base)
+      jq --argjson p "$payload" '
+        (.spines[] | select(.id == $p.spine)) |=
+          (.bases = ((.bases // {}) + {($p.repo): $p.base_branch}))' ;;
     # #133: the 3-dispatch cap survives a respawned session. `// 0` reads a
     # legacy item as never dispatched; a non-number makes jq fail, which is the
     # rc-4 apply failure - never a silent reset.

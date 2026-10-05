@@ -107,8 +107,11 @@ round runs. Two optional state fields carry what a respawned session cannot
 recover from context, and both read as absent on a journal an earlier 1.x
 wrote, so there is no schema bump: `spines[].bases`, recorded by the fresh arm
 at cut time with `oss spine_base_set` and read back with `oss spine_base_get`
-(a recorded base is evidence — a different value refuses rc 7 — and it is never
-re-derived from HEAD, which is the spine branch by then), and
+(a recorded base is validated — it must be a local branch that exists in that
+repo — and it is evidence: a different value refuses rc 7, with
+`oss spine_base_reset` named as the sanctioned operator correction, journaled
+as its own op; it is never re-derived from HEAD, which is the spine branch by
+then), and
 `work_items[].dispatches`, counted with `oss work_item_dispatched` before every
 dispatch, so the 3-dispatch cap survives a session loss. `oss worktree_reattach`
 re-attaches a work item's worktree whose directory was deleted but whose branch

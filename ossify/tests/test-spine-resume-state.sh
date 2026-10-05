@@ -9,9 +9,14 @@ OSS="$HERE/../bin/oss"
 TMP="$(mktemp -d)"
 mkdir -p "$TMP/ws/.ossify" "$TMP/core" "$TMP/ui"
 for r in core ui; do
-  git -C "$TMP/$r" init -q; git -C "$TMP/$r" config user.email t@t; git -C "$TMP/$r" config user.name t
+  git -C "$TMP/$r" init -q -b main; git -C "$TMP/$r" config user.email t@t; git -C "$TMP/$r" config user.name t
   echo seed > "$TMP/$r/f"; git -C "$TMP/$r" add .; git -C "$TMP/$r" commit -qm seed
 done
+# The branches every base below names must EXIST (#673 D1: spine_base_set now
+# journals only a local branch that is really there - `develop`, `other` and
+# the fixture's default branch are each created for that reason).
+git -C "$TMP/core" branch other
+git -C "$TMP/ui" branch develop
 cat > "$TMP/ws/.ossify/topology.json" <<JSON
 {"schema_version":1,"repos":{"core":{"root":"$TMP/core"},"ui":{"root":"$TMP/ui"}},"well_known_paths":{}}
 JSON
@@ -59,6 +64,51 @@ t_capture bash "$OSS" spine_base_get r0.s9 core
 t_assert_rc 7 "get: an unknown spine is rc 7, distinct from rc 1 unrecorded"
 t_capture bash "$OSS" spine_base_set r0.s1 core
 t_assert_rc 2 "set: too few args is the usage rc 2 under the dispatcher's set -u"
+
+# --- #673 D1: validation + the sanctioned correction --------------------------
+# A branch that does not exist locally is refused BEFORE anything is journaled:
+# the legacy base-backfill path takes an operator-supplied value, and a typo
+# used to be recorded as immutable evidence (retrying with the right value was
+# then refused as an overwrite - a permanent wedge).
+N_BEFORE="$(bash "$OSS" get '.mutations | length')"
+t_capture bash "$OSS" spine_base_set r0.s1 core mian
+t_assert_rc 2 "set: a branch that does not exist in the repo is refused rc 2"
+t_assert_contains "$T_OUT" "no local branch 'mian'" "set: ...naming the missing branch"
+t_capture bash "$OSS" spine_base_set r0.s1 core 'bad..name'
+t_assert_rc 2 "set: an invalid ref name is refused rc 2"
+t_assert_eq "$N_BEFORE" "$(bash "$OSS" get '.mutations | length')" "set: ...and nothing is journaled for either refusal"
+t_assert_eq "main" "$(bash "$OSS" spine_base_get r0.s1 core)" "set: ...and the recorded value is untouched"
+
+# The wedge case itself: a typo recorded on a repo with NO base yet (the
+# legacy base-backfill shape) used to succeed rc 0 and become immutable.
+bash "$OSS" spine_add r0 "Spine two" bone core >/dev/null
+t_capture bash "$OSS" spine_base_set r0.s2 core mian
+t_assert_rc 2 "set: a typo on an UNRECORDED repo is refused - the base-backfill wedge case"
+t_capture bash "$OSS" spine_base_get r0.s2 core
+t_assert_rc 1 "set: ...and nothing was recorded for it"
+
+# The correction route: the rc-7 overwrite refusal names it, and it replaces a
+# recorded base in one journaled op (the replay check below covers it).
+t_capture bash "$OSS" spine_base_set r0.s1 core other
+t_assert_rc 7 "reset setup: a different EXISTING branch still refuses rc 7 on the setter"
+t_assert_contains "$T_OUT" "spine_base_reset r0.s1 core" "reset setup: ...and the refusal names the correction route"
+t_capture bash "$OSS" spine_base_reset r0.s1 core other
+t_assert_rc 0 "reset: the correction is accepted rc 0"
+t_capture bash "$OSS" spine_base_get r0.s1 core
+t_assert_eq "other" "$T_OUT" "reset: ...and the recorded base is replaced"
+t_capture bash "$OSS" get '.spines[0].bases.core'
+t_assert_eq "other" "$T_OUT" "reset: state shape: the map holds the corrected value"
+t_capture bash "$OSS" spine_base_reset r0.s1 core mian
+t_assert_rc 2 "reset: the correction validates too - a typo is refused"
+t_assert_eq "other" "$(bash "$OSS" spine_base_get r0.s1 core)" "reset: ...and the corrected value survives the refusal"
+t_capture bash "$OSS" spine_base_reset r0.s1 ai_workspace main
+t_assert_rc 2 "reset: ai_workspace is refused rc 2"
+t_capture bash "$OSS" spine_base_reset r0.s9 core main
+t_assert_rc 7 "reset: an unknown spine is rc 7"
+t_capture bash "$OSS" spine_base_reset r0.s1 core
+t_assert_rc 2 "reset: too few args is the usage rc 2 under the dispatcher's set -u"
+# Restore for the readers below that expect the original pair.
+bash "$OSS" spine_base_reset r0.s1 core main >/dev/null
 
 # Replay: the journal rebuilds the same bases (doctor's replay check).
 t_capture bash "$OSS" doctor
