@@ -392,7 +392,9 @@ section "one mechanic, one statement"
 # per-file: the two non-brief references state no herdr command at all, and in a
 # brief file every `herdr agent ` occurrence IS the ping line — counted both
 # ways, so any other agent command breaks the equality. The adjacent control
-# below proves the equality still flags one.
+# below proves the equality still flags one. 0.2.8: a leaf template's MOLT line states the
+# worker's second own ping, `MOLT WARNING`, to the same NOTIFY_PANE, for the same reason —
+# so each count below adds one per MOLT line in that file.
 PING_CMD='herdr agent prompt <NOTIFY_PANE>'
 agent_commands_are_pings() { # <file> <expected ping lines>
   _a="$(count_of "$1" 'herdr agent ')" || return 1
@@ -408,7 +410,7 @@ for f in "$EXEC_MD" "$NESTED_MD"; do
   if agent_commands_are_pings "$f" 0; then pass "${f##*/} states no herdr-agent command"
   else fail "${f##*/} states no herdr-agent command" "an agent command is back"; fi
 done
-for pair in "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:1"; do
+for pair in "$BRIEFS_MD:5" "$PRBRIEFS_MD:3" "$WRITER_MD:2"; do
   _f="${pair%:*}"; _want="${pair##*:}"
   if agent_commands_are_pings "$_f" "$_want"; then pass "${_f##*/}: every herdr-agent command is the ping line ($_want)"
   else fail "${_f##*/}: every herdr-agent command is the ping line" "expected $_want of each"; fi
@@ -2220,6 +2222,32 @@ pin "$NESTED_MD" 'A spine session that rotated on a molt warning returns the sam
   "nested-run §4: a molt-triggered rotate is the same rotate" flat
 pin "$NESTED_MD" 'one cut mid-round returns none and goes to the operator' \
   "nested-run §4: a mid-round cut goes to the operator (Review Focus 4)" flat
+MOLT_LINE='MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> '"'"'MOLT WARNING <pct> <task id>'"'"'` (never to `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
+# One pin per template, labelled by name, so a miss names its site (0.2.5 and 0.2.7 were
+# both caught on unnamed launch sites). The span is the Nth ```text fence of the file.
+molt_in_template() { # <file> <fence n> <template name>
+  span="$(mktemp)"
+  awk -v n="$2" '/^```text/{t++; if (t == n) { on = 1; next } } on && /^```$/{exit} on' "$1" >"$span"
+  pin "$span" "$MOLT_LINE" "${1##*/} — $3 carries the MOLT line" flat
+  rm -f "$span"
+}
+molt_in_template "$GENERIC_BRIEFS_MD" 1 "Planned implementer"
+molt_in_template "$GENERIC_BRIEFS_MD" 2 "Fast implementer"
+molt_in_template "$GENERIC_BRIEFS_MD" 3 "Reviewer"
+molt_in_template "$GENERIC_BRIEFS_MD" 4 "Verifier"
+molt_in_template "$GENERIC_BRIEFS_MD" 5 "Fix round"
+molt_in_template "$GENERIC_BRIEFS_MD" 6 "Lane driver"
+molt_in_template "$GENERIC_BRIEFS_MD" 7 "Doctor dispatch"
+molt_in_template "$GENERIC_BRIEFS_MD" 8 "Direct work-item"
+molt_in_template "$GENERIC_BRIEFS_MD" 9 "Non-spine close"
+molt_in_template "$BRIEFS_MD" 2 "Item implementer"
+molt_in_template "$BRIEFS_MD" 3 "Item verifier"
+molt_in_template "$PRBRIEFS_MD" 1 "Close session"
+molt_in_template "$WRITER_MD" 1 "Close-review writer"
+# Adjacent controls: exactly one line per leaf template — the Correction request (a send,
+# not a session) takes none — and no template carries it twice.
+n_eq "$GENERIC_BRIEFS_MD" "$MOLT_LINE" 9 "briefs.md carries the MOLT line 9 times, none in the Correction request"
+n_eq "$BRIEFS_MD" "$MOLT_LINE" 2 "ossify-briefs.md carries the leaf MOLT line twice (item pair only)"
 
 section "reference line budgets"
 

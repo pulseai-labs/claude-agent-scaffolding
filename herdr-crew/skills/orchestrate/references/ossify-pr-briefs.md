@@ -58,6 +58,7 @@ PRs strands them. Whenever the close review ran, carry its ledger verbatim too,
 naming each finding, its `target_repo`, its decision and the reason: the record pass
 cannot reconstruct it. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
+MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: create a seat, merge on your own authority, ask the operator anything
 (questions go up to the top in your report file), or re-invoke `/ossify:close` — a halt
 settles this dispatch; remediated, the top dispatches a fresh close session.
