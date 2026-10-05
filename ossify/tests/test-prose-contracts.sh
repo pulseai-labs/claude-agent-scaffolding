@@ -1378,5 +1378,36 @@ _r=1; grep -Fq 'on re-entry a request for a' "$_OSSR/README.md" \
   && grep -Fq 'one this session has not executed' "$_OSSR/README.md" && _r=0
 _pin "$_r" "ossify/README.md's 1.14.0 note states the staged-result rule without its close-finished, not-executed-this-session scope (m1)"
 
+# Fix round (#673), one pin per class of claim the round's findings named.
+_SC="$HERE/../skills/close/references/spine-close.md"
+_SI="$HERE/../skills/doctor/references/state-inspection.md"
+_IC="$HERE/../skills/close/references/impl-check.md"
+# A6: recorded execution state with no spine branch is a halt, not a re-cut.
+_r=1; grep -Fq 'refs are gone while its state survives' "$_RO" \
+  && grep -Fq 'no item records execution' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §2's arm selector does not halt on recorded execution state with no spine branch (A6)"
+# C1/C3/B2: the finish-merge row carries its own tip recovery and report gate.
+_r=1; grep -Fq 'refs/heads/$wi_branch' "$_RO" \
+  && grep -Fq 'halt:unverified-merge' "$_RO" \
+  && grep -Fq 'the row reads `wt=present` but state holds no `worktree_path` yet' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §2b's finish-merge row drops the work-branch tip recovery / report gate, or the adopt row leaves \$wt undefined again (C1/C3/B2)"
+# C2: the rejection is durable and its route is named.
+_r=1; grep -Fq 'halt:close-rejected' "$_RO" \
+  && grep -Fq 'durable rejection record' "$_IC" \
+  && grep -Fq 'is recorded durably' "$_WC" && _r=0
+_pin "$_r" "the C2 rejection record is not named where it is written (impl-check/work-item-close) or where it routes (round-orchestration)"
+# D1: the correction route is named in the lane, and the setter validates.
+_r=1; grep -Fq 'spine_base_reset' "$_RO" \
+  && grep -Fq 'must EXIST locally' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md no longer names spine_base_reset for a wrong recorded base, or drops the setter's branch-exists validation note (D1)"
+# F2: close §3 reads the RECORDED base; the old false claim is gone.
+_r=1; grep -Fq 'spine_base_get' "$_SC" \
+  && ! grep -Fq 'The two facts this step needs are not in state' "$_SC" && _r=0
+_pin "$_r" "spine-close.md §3 does not read the recorded base (spine_base_get), or still claims both facts are absent from state (F2)"
+# F3: both 'was this item dispatched' enumerations carry the count.
+_r=1; grep -Fq 'a `dispatches` count above zero' "$_WC" \
+  && grep -Fq 'positive `dispatches` count' "$_SI" && _r=0
+_pin "$_r" "the abandoned-item drift enumerations (close §1, doctor §5) omit the dispatches count again (F3)"
+
 rm -rf "$_PC_TMP"
 t_summary

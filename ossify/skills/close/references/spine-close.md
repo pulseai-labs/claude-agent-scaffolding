@@ -138,8 +138,9 @@ that withdrawal is valid precisely because the item itself was never dispatched.
 The landing set above excludes the repo, correctly (there is nothing to land),
 so nothing in this loop switches it back and no cleanup removes the branch. The
 tell is mechanical: **the spine branch still resolves in that repo**. Restore
-the checkout where a base is recorded for it (`SPINE.md`'s base-branch table, or
-a handoff's `base_branch:` line), and where none is, say so in the close record
+the checkout where a base is recorded for it (`"$oss_bin" spine_base_get
+<spine-id> <repo>`, `SPINE.md`'s base-branch table, or a handoff's
+`base_branch:` line), and where none is, say so in the close record
 and name the repo as parked — never report a repo as landed on its base branch
 while it is sitting on the spine branch, which is the audit-trail failure this
 step exists to prevent.
@@ -167,25 +168,30 @@ each open PR to `/ossify:work-pr`. Pass two records the merged PRs against
 freshly fetched refs. `$merge_shas` — the `repo:sha` pairs §6's touch check
 reads — accumulates across both passes.
 
-The two facts this step needs are not in state and are recovered, not guessed:
+One of the two facts this step needs is not in state; the other is:
 
-- **The spine slug**, once, from the spine directory's name, exactly as the
-  execution lane recovers it (`work-item/references/round-orchestration.md` §2).
-  Nothing persists a slug, and it is the same slug in every repo.
-- **`base_branch`, once per hosting repo.** The primary source is that repo's own
-  handoffs' `## 2. Spine context` `base_branch:` lines
-  (`work-item/references/handoff-contract.md` §2) — the lane records there the
-  branch *that repo* was ACTUALLY on when it cut the spine branch — with
-  `SPINE.md`'s spine-context **base-branch table**
+- **The spine slug** — not in state. Recovered once, from the spine directory's
+  name, exactly as the execution lane recovers it
+  (`work-item/references/round-orchestration.md` §2). Nothing persists a slug,
+  and it is the same slug in every repo.
+- **`base_branch`, once per hosting repo — recorded in state since 1.14.0.**
+  Read `"$oss_bin" spine_base_get <spine-id> <repo>`: the lane recorded there
+  the branch *that repo* was ACTUALLY parked on when it cut the spine branch
+  (`spine_base_set`), and a recorded base is evidence, never a preference. The
+  cross-check is `SPINE.md`'s spine-context **base-branch table**
   (`plan-spine/references/spec-authoring.md` §1), where `plan-spine` authored
-  one planned base **per hosting repo** at planning time, as the cross-check —
-  read that repo's row, never a single spine-wide value. **If the two disagree for a repo, halt and name both, and the
-  repo** — the lane records the base it actually cut from (`spine_base_set`), so
-  a planned base that never matched the recorded base is exactly the wrong-merge
-  hazard, repo by repo. **If
-  either cannot be resolved for a repo, halt** — guessing the default branch
-  lands that repo's share of the spine into the wrong line of development, and
-  every downstream step then reports green.
+  one planned base **per hosting repo** at planning time — read that repo's
+  row, never a single spine-wide value. **If the recorded base and the planned
+  row disagree for a repo, halt and name both, and the repo** — a planned base
+  that never matched the recorded base is exactly the wrong-merge hazard, repo
+  by repo. For a spine cut before 1.14.0 (no recorded base: rc 1), fall back to
+  that repo's own handoffs' `## 2. Spine context` `base_branch:` lines
+  (`work-item/references/handoff-contract.md` §2) and cross-check those against
+  the planned row the same way — **never against each other alone**, which
+  compares the plan with a copy of itself while the recorded truth sits one
+  verb away. **If no source resolves for a repo, halt** — guessing the default
+  branch lands that repo's share of the spine into the wrong line of
+  development, and every downstream step then reports green.
 
 **The PR body, when merge-bar is installed.** Where this session lists the
 `merge-bar` plugin's `working-a-pr` skill, compose the six fields before the
@@ -249,9 +255,11 @@ them, and name the PR in the close's report.
 spine_branch="$("$oss_bin" branch_name "$spine_id" "$spine_slug")"
 
 # $repo_base_branches is NOT ambient either: one "<repo>:<base_branch>" pair per
-# line, one line per hosting repo, recovered by the cross-check above and
-# hoisted once, same as the slug. Branch names cannot contain ":" (git refuses
-# it), so splitting each line on the first colon is unambiguous.
+# line, one line per hosting repo, recovered above - `"$oss_bin" spine_base_get
+# <spine-id> <repo>` (the recorded base; handoffs only as the pre-1.14.0
+# fallback when rc 1) cross-checked against SPINE.md's planned row - and hoisted
+# once, same as the slug. Branch names cannot contain ":" (git refuses it), so
+# splitting each line on the first colon is unambiguous.
 
 # THE REPO SET IS READ AS AN ASSIGNMENT, never from a process substitution
 # (round 5 sweep): a selector failure inside `< <(...)` is invisible - the

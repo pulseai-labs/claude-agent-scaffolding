@@ -284,6 +284,16 @@ spine-close code review (`references/code-review.md`) reads that file as an inpu
 Advisory means advisory: no pattern or absence finding halts, delays, or re-runs
 this close (D5).
 
+**A halting run's finding set is written to `verify.md` too, the `[fidelity]`
+finding included — that write is the durable rejection record (#673 C2).**
+Without it, a staged worktree after a rejection is byte-identical to a
+`close-finished` result: a fresh session's re-entry re-verifies and returns the
+very result the gate rejected, and a stochastic Layer 4 pass can accept it
+without the correction. `work-item-close.md` §2 owns the write; the re-entry
+inventory reads a `[fidelity]` line there as route `halt:close-rejected`; the
+next completed Layer 4 run overwrites the file (deleted at zero findings),
+which is what clears the record.
+
 **If a `fidelity` and an `absence` finding land on the same underlying gap**
 (the lenses can both notice it despite the partition above) — normalize before
 applying the halt: an absence-shaped gap is `absence`, never `fidelity`,
