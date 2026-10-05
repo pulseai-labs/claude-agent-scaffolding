@@ -66,13 +66,13 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=211          # A3: each ossify reference stays under 209 lines.
+REF_BUDGET=213          # A3: each ossify reference stays under 209 lines.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
                         # each launch site gained; the files' own maximum is 209
                         # (`ossify-nested-run.md`), and the budget section's adjacent
                         # control holds the gate at that minimum — one line over the
                         # longest budgeted reference is still refused.
-                        # 0.2.8: raised for the molt clauses — nested-run §4 (211), then the
+                        # 0.2.8: raised for the molt clauses — nested-run §4 (211), the spine brief (213), then the
                         # spine, work-PR and leaf MOLT lines; it always equals the maximum.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
@@ -2265,6 +2265,15 @@ pin "$PRBRIEFS_MD" 'End the reply that writes `open:` with `MOLT-HANDOFF: <REPOR
   "work-PR brief: the open reply names its report for molt (D5)" flat
 pin "$SKILL_MD" 'Where molt runs, its warnings replace the notice' "SKILL.md names the molt path" flat
 pin "$ROLES_MD" 'a warned seat gets no new unit' "roles.md: a warned retained seat is replaced, not reused" flat
+# PR #671 round 1.
+pin "$LIFECYCLE_MD" 'per live seat, the molt status path recorded at its launch and the last status line noted' \
+  "lifecycle step 13: the top's handoff carries each seat's status path" flat
+pin "$LIFECYCLE_MD" 'per live seat, its molt status path recorded at launch and the last status line noted' \
+  "lifecycle: the top's own rotation handoff carries each seat's status path" flat
+pin "$GENERIC_BRIEFS_MD" 'the leaf templates'"'"' `MOLT:` line included' \
+  "briefs.md: an operator brief's envelope carries the MOLT line" flat
+pin "$BRIEFS_MD" 'a `correct` decision on it first launches the item'"'"'s implementer in that worktree' \
+  "spine brief: a staged result's correction has an implementer to receive it" flat
 pin "$CHANGELOG_MD" '## 0.2.8' "CHANGELOG has 0.2.8"
 
 section "reference line budgets"

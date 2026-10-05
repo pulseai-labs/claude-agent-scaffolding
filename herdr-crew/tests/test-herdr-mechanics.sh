@@ -65,7 +65,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=316  # 0.2.8: raised from 275 for step 2's molt marking clauses and Completion's molt-child paragraph.
+REF_BUDGET=319  # 0.2.8: raised from 275 for step 2's molt marking clauses and Completion's molt-child paragraph.
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -195,6 +195,11 @@ pin "$REF" 'Close the predecessor'"'"'s pane only after the new tab exists' "the
 pin "$REF" 'every respawn, after `rotate:` and `open:` included' "a rotate/open respawn takes a fresh REPORT_PATH too" flat
 pin "$REF" 'whose seat has returned no `rotate:`, `open:` or `handoff:`' \
   "a handed-off line that is a return's own respawns nothing twice" flat
+# PR #671 round 1.
+pin "$REF" 'Before a retained seat'"'"'s next unit, read its recorded status file' \
+  "an idle retained seat's status is read before it gets another unit" flat
+pin "$REF" 'a reviewer that hands off before its report validates' \
+  "a reviewer cut mid-review goes to the operator, never a second review" flat
 pin "$REF" 'SEAT_MODS_ALLOW=<REPORT_PATH'"'"'s directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status' \
   "step 2's quoted guarded export carries the molt marking" flat
 

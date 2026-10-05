@@ -178,7 +178,7 @@ unit in hand and start no new one, and a coordinator seat rotates at the next bo
 never allows, denies or asks, it is inert outside a herdr pane, and it reports the figure as
 unavailable rather than guessing when it cannot read it. The rotation itself is prose, in
 `references/lifecycle.md`. Since 0.2.6 the hook is silent in a session where the `molt` mod
-is active, because `molt` owns the context boundary there. Since 0.2.8, every child seat is
+is active, because `molt` owns the context boundary there. Since 0.2.8, every child seat in a herdr pane is
 launched as a molt child (`MOLT_HANDOFF=parent`): at molt's warnings it pings its parent and
 hands off at its next boundary, and molt never clears it; only the top molts in place
 (`references/lifecycle.md`, "Where molt runs"). Install molt 0.2.0 and herdr-crew 0.2.8

@@ -38,7 +38,8 @@ only when the target is not `none`, naming the file it actually renamed over. Th
 single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay
 literal). The ping only wakes the parent — a parent undetected or on another server keeps the
 report-file wait and the run's heartbeat, no push promised — and a failed send is left as it is.
-An operator's own `brief:` is dispatched as a copy carrying the same envelope; the stored file is
+An operator's own `brief:` is dispatched as a copy carrying the same envelope, the leaf
+templates' `MOLT:` line included; the stored file is
 never edited, and a stored brief whose fixed target differs from the run's is surfaced, not
 overridden; an equal target is no conflict, kept as it is.
 

@@ -61,7 +61,9 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      `MECHANICS` step 2 says — role `implementer`, its scratch directory created
      first under your own run directory. A request whose worktree already holds a staged result
      with its `report.md` (ossify's close-finished route) launches no implementer and counts no
-     dispatch: go straight to step 5's verifier, then return the result record as usual.
+     dispatch: go straight to step 5's verifier, then return the result record as usual; a
+     `correct` decision on it first launches the item's implementer in that worktree from its
+     SEATS row, guarded as above, to receive the correction.
      Confirm each model as its row's
      `model_shows` says and by
      the worker's own check; the effort is the given launch argument. A row that is missing or

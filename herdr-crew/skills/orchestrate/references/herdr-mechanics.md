@@ -241,7 +241,9 @@ request. molt appends `warned <n>`, `handoff required` and `handed-off <path>` t
 file the seat was launched with — molt's own writes, never the seat's. Record that path per
 seat at launch: molt reads `MOLT_STATUS_PATH` once, so no later brief of a retained seat moves
 it, whatever `REPORT_PATH` that brief names. The heartbeat, per tick, per live seat, also reads
-its recorded status file, so a skipped ping costs at most one tick. On a `MOLT WARNING` ping,
+its recorded status file, so a skipped ping costs at most one tick while a dispatch is live.
+Before a retained seat's next unit, read its recorded status file: the heartbeat ends when
+the last dispatch settles, so an idle seat's warning may be noted only there. On a `MOLT WARNING` ping,
 or a status line not yet noted: note it and send that seat no new unit. It finishes the unit
 in hand; its next unit (a fix round, a re-check, the next item) goes to a fresh seat, and the
 warned seat is released once that unit's report is read. A `rotate:` or `open:` return is
@@ -258,8 +260,9 @@ the predecessor's handoff, or for a warned seat that handed off nothing, its las
 the predecessor's pane only after the new tab exists; a worktree is released only as Teardown
 says, once its branch's work is safe. Two cuts cannot be resumed by a fresh session, so for
 each, relay it to the operator with its handoff path: a spine session that hands off with no
-`rotate:` was cut mid-round (ossify issue 133); and a close, work-item, lane-driver or doctor
-seat that hands off mid-ceremony. Without molt none of this fires, and the ceiling hook's
+`rotate:` was cut mid-round (ossify issue 133); a close, work-item, lane-driver or doctor
+seat that hands off mid-ceremony; and a reviewer that hands off before its report validates,
+since a fresh one would run the PR's one review a second time. Without molt none of this fires, and the ceiling hook's
 rotation applies.
 
 ## Placement
