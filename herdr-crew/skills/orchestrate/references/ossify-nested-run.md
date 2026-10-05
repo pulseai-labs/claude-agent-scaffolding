@@ -133,7 +133,9 @@ then dispatch a fresh spine session on the same spine-session seat — marked `c
 before its command as `herdr-mechanics.md` step 2 says — the same approved SEATS
 block injected again — with `HANDOFF_PATH` set and the same `RUN_JSON`, which it continues,
 rebinding `run.orchestrator` to its own pane (its brief's step 2 says). The close waits for a
-completion at the final barrier.
+completion at the final barrier. **An in-place molt returns nothing.** A spine session where
+molt runs molts in place (its brief's MOLT clause): its report file does not change, and your
+wait on it stays armed.
 
 When its final report lands, **you dispatch** `/ossify:close <spine-id>` to a close
 session that is **always a fresh seat** you create, never the spine driver's — marked

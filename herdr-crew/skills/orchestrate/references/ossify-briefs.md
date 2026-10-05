@@ -100,6 +100,17 @@ do the same teardown, write `/ossify:handoff`, and write `rotate: <handoff path>
 report file with the path of RUN_JSON and the pane `run.orchestrator` names at writing,
 then stand down your own armed waits before you return — one report must wake one session.
 Never stop mid-round.
+MOLT instead, where the molt mod runs: its handoff ask comes in place of the ceiling
+notice. Take it at your next fully acknowledged delivery, never waiting for a round
+barrier — past molt's hard threshold every herdr command is refused. Tear nothing down:
+your item seats keep running and keep pinging this pane. Write the handoff by hand to the
+path REPORT_PATH names with `.molt.md` appended — never with `/ossify:handoff`, never into
+a repository, never committed: this brief verbatim, the SEATS block included; the round
+and each item's state; per live item seat its pane id, REPORT_PATH, the hash last noted
+and the id of its background wait; and your heartbeat's id. Write nothing to your report
+file and return no `rotate:`. End that reply with `MOLT-HANDOFF: <that path>`. After the
+clear, the seeded session reads it, continues this brief, arms no wait it lists, and runs
+the generation check once per listed seat.
 
 NEVER: record an item task in the top's run.json; run a Claude subagent for a work item;
 fall back to the default lane when an item launch fails; restart the lane; select the

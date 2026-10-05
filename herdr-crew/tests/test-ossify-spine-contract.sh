@@ -66,12 +66,15 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=209          # A3: each ossify reference stays under 209 lines.
+REF_BUDGET=216          # A3: each ossify reference stays within REF_BUDGET lines.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
                         # each launch site gained; the files' own maximum is 209
                         # (`ossify-nested-run.md`), and the budget section's adjacent
                         # control holds the gate at that minimum — one line over the
                         # longest budgeted reference is still refused.
+                        # 0.2.8 (#659): raised from 209 for the in-place molt — the spine
+                        # brief's MOLT clause (`ossify-briefs.md`, now the maximum, 216) and
+                        # nested-run §4's in-place-molt sentence.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
@@ -2238,6 +2241,14 @@ pin "$LIFECYCLE_MD" "runs the generation check once per live dispatch against th
   "lifecycle: a report landed across the clear is acted on once" flat
 pin "$LIFECYCLE_MD" "With \`/molt off\` the marker goes, the hook speaks again, and the rotation above applies." \
   "lifecycle: /molt off falls back to the rotation" flat
+pin "$BRIEFS_MD" "MOLT instead, where the molt mod runs:" "spine brief: the molt clause exists" flat
+pin "$BRIEFS_MD" "never waiting for a round barrier" "spine brief: the molt boundary is not the round barrier" flat
+pin "$BRIEFS_MD" "Tear nothing down: your item seats keep running and keep pinging this pane." \
+  "spine brief: the molt tears nothing down" flat
+pin "$BRIEFS_MD" "the SEATS block included" "spine brief: the molt handoff carries every brief slot" flat
+pin "$BRIEFS_MD" "Write nothing to your report file and return no \`rotate:\`." \
+  "spine brief: the molt returns nothing" flat
+pin "$NESTED_MD" "**An in-place molt returns nothing.**" "nested-run §4: an in-place molt is not a completion" flat
 
 # #514, L1: the shape, asserted rather than assumed — a counter re-copied into any
 # suite shadows the hoisted one and keeps passing. This suite's copies were the
