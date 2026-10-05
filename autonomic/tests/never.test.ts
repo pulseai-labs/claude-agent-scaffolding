@@ -67,4 +67,21 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     for (const c of ['bash run-tests.sh', 'timeout 60 make test', 'xargs ls', 'if true; then echo hi; fi'])
       expect([c, rules(c)]).toEqual([c, []])
   })
+  test('quoted, escaped and variable words, glued & and redirects are read or listed (PR #672 round 1)', () => {
+    const main = { ...W, branch: 'main' }
+    for (const c of ['git push origin "main"', 'git push origin "$BRANCH"', 'git push origin $BRANCH', 'BRANCH=main git push origin "$BRANCH"',
+      'git push -u origin "$(git branch --show-current)"', 'git "push" -f', '"git" push -f', '\\rm -rf /', 'git push "--force"'])
+      expect([c, rules(c)]).toEqual([c, ['unreadable']])
+    expect(rules('git push origin -- feat/x:main')).toContain('default-branch-push')
+    expect(rules('sleep 1&git push -f')).toContain('force-push')
+    expect(rules('git push -f>/dev/null')).toContain('force-push')
+    expect(rules('git push origin main>log')).toContain('default-branch-push')
+    expect(rules('git push >/dev/null 2>&1', main)).toContain('default-branch-push')
+    expect(rules('git push 2> err.log', main)).toContain('default-branch-push')
+  })
+  test('the same syntax with no danger, or on the session branch, stays off the list (control)', () => {
+    for (const c of ['git "status"', 'git push -u origin feat/x 2>&1', 'git push origin feat/x >/dev/null 2>&1', 'git commit -m "push it"',
+      'git log --format="%h" 2>/dev/null', 'make test >log 2>&1 &', 'echo a&echo b', 'git push origin -- feat/x'])
+      expect([c, rules(c)]).toEqual([c, []])
+  })
 })
