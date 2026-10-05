@@ -975,6 +975,24 @@ t_capture env "PATH=$TMP/shim-w5:$PATH" "oss_bin=$TMP/shim-w5/oss" bash -c "set 
 t_assert_contains "$T_OUT" "arm=re-entry" "W5: an existing spine branch -> re-entry (the #362 per-round case)"
 t_assert_eq "" "$(git -C "$W5" status --porcelain)" "W5: the selector mutates nothing"
 
+# W5b (fix round 1, I1) — a failed work-item read HALTS; the selector must not
+# pick an arm off an empty list. The pre-fix form read the repos inside the
+# here-doc substitution, where `get`'s rc is uncatchable — reproduced with a
+# shim that answers `get` with rc 2.
+W5B="$TMP/shim-w5b"; mkdir -p "$W5B"
+{ printf '#!/usr/bin/env bash\ncase "$1 $2" in\n'
+  printf '  "branch_name "*) echo spine/r0.s9-demo ;;\n'
+  printf '  *"target_repo"*) echo "oss: get: unreadable state" >&2; exit 2 ;;\n'
+  printf '  *) exec bash "%s" "$@" ;;\nesac\n' "$OSS"
+} > "$W5B/oss"; chmod +x "$W5B/oss"
+t_capture env "PATH=$W5B:$PATH" "oss_bin=$W5B/oss" bash -c "set -euo pipefail; . '$W_ARM'"
+t_assert_rc 1 "W5b: a failed work-item read HALTS (not rc 0 with an empty list)"
+t_assert_contains "$T_OUT" "cannot read the spine's work items" "W5b: ...naming the unreadable state"
+case "$T_OUT" in
+  *arm=fresh*) T_FAIL=$((T_FAIL+1)); echo "FAIL: W5b: the failed read still picked the fresh arm";;
+  *) T_PASS=$((T_PASS+1));;
+esac
+
 # ---------------------------------------------------------------------------
 # D1-D4: the cumulative-demo MEASUREMENT block. Timing is advisory; the demo
 # result is the gate. Written as a bare `oss demo_run` with the budget report

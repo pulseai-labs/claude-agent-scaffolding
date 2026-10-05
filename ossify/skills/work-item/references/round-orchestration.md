@@ -79,13 +79,19 @@ branch exist in any hosting repo?**
 
 ```bash
 spine_branch="$("$oss_bin" branch_name "<spine-id>" "<spine-slug>")"
+# Read the hosting-repo list in its OWN assignment, never inside the here-doc
+# below: a command substitution there cannot carry its rc, so a failed state
+# read would fall through to arm=fresh off an empty list. `unique[]` does the
+# dedup jq-side, so no pipe stands between `get` and the `||` either.
+repos="$("$oss_bin" get '[.work_items[] | select(.spine=="<spine-id>" and .status != "abandoned") | .target_repo] | unique[]')" \
+  || { echo "halt: cannot read the spine's work items from state"; exit 1; }
 arm=fresh
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue
   root="$("$oss_bin" repo_root "$repo")" || exit 1     # undeclared repo halts HERE
   if git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch"; then arm=re-entry; fi
 done <<EOF
-$("$oss_bin" get '.work_items[] | select(.spine=="<spine-id>" and .status != "abandoned") | .target_repo' | sort -u)
+$repos
 EOF
 echo "arm=$arm"
 ```
@@ -154,12 +160,13 @@ read-only; the `checkout -b` only runs once all of them have passed.
 
 **`$repo_bases` is a per-repo MAPPING, not a variable.** `base_branch` was a
 single name overwritten on every iteration, so only the last repo's value
-survived the loop — and the handoff authored afterwards has to record *each*
-target repo's observed base branch (`handoff-contract.md` §2), which spine close
-then treats as its primary merge destination. Writing one repo's base into
-another repo's handoff either halts the close or merges into a same-named branch
-that happens to exist there. Read this file when authoring each handoff; never
-carry a surviving `$base_branch`.
+survived the loop — and §2a's RECORD pass must write *each* target repo's
+observed base into state (`spine_base_set`), the value every handoff copies
+and spine close treats as its primary merge destination. Writing one repo's
+base into another repo's handoff either halts the close or merges into a
+same-named branch that happens to exist there. **Handoffs read the base from
+state, in both arms** — copy `base_branch:` from `"$oss_bin" spine_base_get
+<spine-id> <repo>`; never carry a surviving `$base_branch`.
 
 **`"$oss_bin" repo_root "$repo"`, never a bare `<repo-root>` placeholder.** The verb
 resolves the declared repo's root from the topology declaration
