@@ -91,4 +91,23 @@ for row in "rev-parse --abbrev-ref HEAD" "rev-parse HEAD" "write-tree" "status -
   has "$SKILL" "$row" && pass "row: $row" || fail "row: $row"
 done
 
+section "counting: the caller counts corrections only, reading before it checks"
+# Final fix wave (I2). The lane issues and counts the §5b gaps replacement
+# itself, so a caller counting "a correction or replacement" moves the counter
+# twice; and an increment-first "at a count of 3, halt" refuses the third
+# execution the cap allows (the third increment echoes 3). The order is the
+# lane's - read, check, count, run - so the old list and the old order must
+# both stay gone on both sides of the seam.
+if has "$SKILL" 'a correction, not a gaps' \
+   && has "$SKILL" 'read `dispatches` first' \
+   && has "$REF/external-executor.md" 'each execution the lane did not request' \
+   && ! has "$SKILL" 'correction or replacement' \
+   && ! has "$SKILL" 'at a count of 3' \
+   && ! has "$REF/external-executor.md" 'a correction, a replacement'; then
+  pass "caller counting: corrections only, read before check (dsh-executor <-> external-executor §2a)"
+else
+  fail "caller counting: corrections only, read before check (dsh-executor <-> external-executor §2a)" \
+    "old wording survived on one side, or the read-first order is missing"
+fi
+
 report

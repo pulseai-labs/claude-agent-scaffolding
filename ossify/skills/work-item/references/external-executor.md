@@ -48,14 +48,18 @@ default.
 
 ## 2. Round sequencing
 
-Do all of §3 and §4 for **every item in the round, in declared decomposition
-order, before building any request.** An `abandoned` item is skipped at the top
-of `round-orchestration.md` §3 and gets no request. Worktrees created and
-journaled, handoffs
+Take **every item in the round** through `round-orchestration.md` §3 in
+declared decomposition order, before building any request — its route decides
+what §3 and §4 actually do for it. An `abandoned` item is skipped at the top of
+§3, and an item whose route is already `complete` — a `skip` row for a merged
+item, or a `finish-status` / `finish-merge` row §2b step 4 repaired on
+re-entry — gets no step there either; neither gets a request. Worktrees created
+and journaled, handoffs
 authored, specs confirmed to parse — the whole round's preparation lands first.
 
-Then build one request per item, still in declared order, and invoke the
-caller-supplied procedure **once for the round**, handing it the whole set.
+Then build the round's requests, one per item that needs one, still in declared
+order, and invoke the caller-supplied procedure **once for the round**, handing
+it the whole set.
 
 The caller may execute the round's requests concurrently; nothing here requires
 otherwise, and §7's note that items within a round are parallel by construction
@@ -67,11 +71,13 @@ serial is everything after the returns — see §5a.
 ## 2a. Re-entry — counting, and a staged result at request time
 
 **The lane counts each request it issues** (`"$oss_bin" work_item_dispatched
-<wi-id>`, `round-orchestration.md` §5), except a `close-finished` item's. **The
-caller counts every further execution it runs for an item** — a correction, a
-replacement — with the same verb, before it runs it, and stops offering anything
-but halt once the item's count reaches 3. The count lives in state, so a caller
-session that hands off mid-round does not reset it.
+<wi-id>`, `round-orchestration.md` §5), except a `close-finished` item's; the
+§5b gaps replacement is one of those requests, so the lane counts it too. **The
+caller counts each execution the lane did not request** — a correction — with
+the same verb, and checks the way the lane does: read `dispatches` first; at 3
+or more, offer halt only, never a fourth execution; otherwise call
+`work_item_dispatched`, then run the correction. The count lives in state, so a
+caller session that hands off mid-round does not reset it.
 
 **A staged result at request time.** On re-entry a request can name a worktree
 that already holds a staged result with its `report.md` at the handoff's report

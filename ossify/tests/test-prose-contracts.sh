@@ -1344,6 +1344,39 @@ for _pair in "$_RO|does not resume it" "$_RO|here or nowhere" "$_RO|is taken fro
   _r=0; grep -Fq -- "$_lit" "$_f" && _r=1
   _pin "$_r" "$(basename "$_f") still claims '$_lit' - false since 1.14.0"
 done
+# Final fix wave (I1, I2, M6, M2, M1, m1). §3 must route the items §2b step 4
+# repaired: an adopt item is active/clean/at-base and takes the redispatch path,
+# a reattached item follows its re-run route, and an item now complete (skip,
+# finish-merge, finish-status) gets no step and no second wait at §7. A literal
+# reader without this sends a repaired item down the spawn path, where
+# worktree_add returns rc 8. §2 of external-executor agrees: complete items get
+# no request. Separately: a failed reattach halts; the §1 field list carries
+# dispatches; the cut-missing repair completes a cut rather than unwinding one;
+# and the external caller counts only what the lane did not request, reading
+# the count before it checks it.
+_r=1; grep -Fq 'takes the `redispatch` path too' "$_RO" \
+  && grep -Fq 'no handoff, no request, no dispatch' "$_RO" \
+  && grep -Fq 'does not wait on it again' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §3 leaves the items §2b step 4 repaired unrouted - adopt gets no redispatch path, complete gets no skip (I1)"
+_r=1; grep -Fq 'takes whatever route the re-run' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §3 drops a reattached item's re-run route (I1)"
+_r=1; grep -Fq 'halts naming the git error' "$_RO" \
+  && grep -Fq 'never `git worktree prune`, never `-f -f`' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §2b step 4 no longer halts a failed reattach naming the git error, or reopens prune/-f -f (M6)"
+_r=1; grep -Fq -- '{branch, worktree_path, base_sha, dispatches}' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §1's work_items[] field list omits dispatches while §5 reads it (M2)"
+_r=1; grep -Fq 'completes now: it cuts the branch in the repos the halt never reached' "$_RO" \
+  && ! grep -Fq 'unwinds now' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §2 still says the cut-missing repair unwinds the earlier cut - it completes it, from the recorded base (M1)"
+_r=1; grep -Fq 'each execution the lane did not request' "$_EX" \
+  && grep -Fq 'read `dispatches` first' "$_EX" \
+  && ! grep -Fq 'a correction, a replacement' "$_EX" && _r=0
+_pin "$_r" "external-executor.md §2a still leaves the gaps replacement on the caller's count list, or checks the count after incrementing (I2)"
+_r=1; grep -Fq 'neither gets a request' "$_EX" && _r=0
+_pin "$_r" "external-executor.md §2 no longer says a complete item gets no request (I1)"
+_r=1; grep -Fq 'on re-entry a request for a' "$_OSSR/README.md" \
+  && grep -Fq 'one this session has not executed' "$_OSSR/README.md" && _r=0
+_pin "$_r" "ossify/README.md's 1.14.0 note states the staged-result rule without its close-finished, not-executed-this-session scope (m1)"
 
 rm -rf "$_PC_TMP"
 t_summary

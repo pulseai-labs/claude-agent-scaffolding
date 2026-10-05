@@ -62,10 +62,10 @@ Read them from there. Two ways to get this wrong, both silent:
 
 **No state field holds the work-item rounds.** `work_items[]` carries
 `{spine, title, target_repo, status, created_at}`, plus the
-`{branch, worktree_path, base_sha}` this lane writes — no dependency key, no
-round key. Persisting the round structure as state is **deferred**; until it
-lands the plan document is the only record. Say so if a user asks where the
-rounds are stored; do not imply the read is machine-backed.
+`{branch, worktree_path, base_sha, dispatches}` this lane writes — no dependency
+key, no round key. Persisting the round structure as state is **deferred**;
+until it lands the plan document is the only record. Say so if a user asks where
+the rounds are stored; do not imply the read is machine-backed.
 
 ---
 
@@ -154,9 +154,11 @@ that checked and mutated per repo. With an earlier-sorted repo clean and a later
 one dirty, detached, or already carrying the spine branch, the first repo's
 branch was already cut when the halt fired — and re-running then failed that
 repo's own already-exists guard, which the re-entry arm's `cut-missing` repair
-(§2b) unwinds now. A condition that should merely block dispatch instead wedged
-the spine until someone repaired the repos by hand. The checks are cheap and
-read-only; the `checkout -b` only runs once all of them have passed.
+(§2b) completes now: it cuts the branch in the repos the halt never reached,
+from each repo's recorded base. A condition that should merely block dispatch
+instead wedged the spine until someone repaired the repos by hand. The checks
+are cheap and read-only; the `checkout -b` only runs once all of them have
+passed.
 
 **`$repo_bases` is a per-repo MAPPING, not a variable.** `base_branch` was a
 single name overwritten on every iteration, so only the last repo's value
@@ -253,7 +255,7 @@ the verb that already owns the step:
 
 | Route | Do |
 |---|---|
-| `reattach` | `"$oss_bin" worktree_reattach <repo> <wi-id> <recorded branch>`, then re-run the inventory and act on that item's new route |
+| `reattach` | `"$oss_bin" worktree_reattach <repo> <wi-id> <recorded branch>`; a non-zero result **halts naming the git error**, leaving the stale entry and the branch as found — never `git worktree prune`, never `-f -f`. On success, re-run the inventory and act on that item's new route |
 | `adopt` | `"$oss_bin" work_item_exec <wi-id> "$(git -C "$wt" rev-parse --abbrev-ref HEAD)" "$wt" "$(git -C "$wt" rev-parse HEAD)"`, then `"$oss_bin" work_item_status <wi-id> active` — the crash came between §3's spawn and its journal |
 | `finish-merge` | close's `work-item-close.md` §4 from the merge onward (merge, reachability check, then status). A commit on the work branch exists only after a green gate, so the gate is not re-run |
 | `finish-status` | `"$oss_bin" work_item_status <wi-id> complete` — the merge landed and the status write did not |
@@ -293,12 +295,19 @@ planning decision (`"$oss_bin" work_item_status <wi-id> planned`), made in
 
 **On re-entry, follow the item's route.** `spawn` takes the path below
 unchanged. `redispatch` reuses the recorded worktree and its existing handoff
-(author it now if it is missing) and goes straight to §5. `close-finished`
-skips dispatch entirely — default mode hands it to close Route A as a complete
-return with the recorded `report_path`, summary `recovered on resume: return
-lost with the prior session`, and `stage_status all_staged` (close's gate runs
-in full); external mode sends it in the round's request set
-(`external-executor.md` §2a).
+(author it now if it is missing) and goes straight to §5. An `adopt` item that
+§2b step 4 just repaired is in exactly that shape — active, clean, at its
+recorded base — so it takes the `redispatch` path too, authoring the handoff
+first when it is missing. A `reattach` item takes whatever route the re-run
+inventory gave it. `close-finished` skips dispatch entirely — default mode
+hands it to close Route A as a complete return with the recorded `report_path`,
+summary `recovered on resume: return lost with the prior session`, and
+`stage_status all_staged` (close's gate runs in full); external mode sends it
+in the round's request set (`external-executor.md` §2a). An item already
+`complete` — a `skip` row for a merged item, or a `finish-status` /
+`finish-merge` row §2b step 4 just repaired — gets nothing here: no worktree,
+no handoff, no request, no dispatch. §7 does not wait on it again (it is
+complete).
 
 **Before spawning anything: confirm the round's specs exist and parse.**
 `plan-spine` may legitimately defer a later round's specs until that round starts

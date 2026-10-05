@@ -114,13 +114,14 @@ dispatch, so the 3-dispatch cap survives a session loss. `oss worktree_reattach`
 re-attaches a work item's worktree whose directory was deleted but whose branch
 survives, refusing a branch that is live elsewhere, a locked registration, or a
 missing branch — and pruning nothing. On the external seam,
-`external-executor.md` §2a binds the caller: it counts every further execution
-it runs (a correction, a replacement) with `work_item_dispatched` and stops
-offering anything but halt at 3, and a request whose worktree already holds a
-staged result with `report.md` at request time is verified and returned without
-executing — no implementer launched, no dispatch counted. The 1.13 claims that
-an existing spine branch halts rather than resumes, and that the base is taken
-from HEAD, are retired.
+`external-executor.md` §2a binds the caller: it counts each execution the lane
+did not request — a correction — with `work_item_dispatched`, reading the count
+first and offering halt only at 3 or more; and on re-entry a request for a
+`close-finished` item — one this session has not executed — whose worktree
+already holds a staged result with `report.md` at request time is verified and
+returned without executing — no implementer launched, no dispatch counted. The
+1.13 claims that an existing spine branch halts rather than resumes, and that
+the base is taken from HEAD, are retired.
 
 Since 1.9.0, the deterministic gates close the vacuous-green family: the
 zero-tests guard no longer inverts a true match past the pipe buffer, flags

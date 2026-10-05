@@ -13,12 +13,15 @@ Rely on ossify 1.14.0's run-spine re-entry, and adopt its staged-result rule.
   from state, re-issue gaps items, take each base from the handoffs). It says to continue a
   started spine by running the same command, after the `dsh-executor` §2 step 0 checks, as
   for any run; a resume from a handoff ends the same way.
-- **`dsh-executor` adopts the staged-result rule (`external-executor.md` §2a).** A request
+- **`dsh-executor` adopts the staged-result rule (`external-executor.md` §2a).** On
+  re-entry a request for a `close-finished` item — one this session has not executed —
   whose worktree already holds a staged result with `report.md` at request time runs no
   implementer: the verifier child runs alone, the result record is computed from git as
   usual, and nothing is counted.
-- **`dsh-executor` counts corrections and replacements.** Before each, run
-  `oss work_item_dispatched <wi-id>`; at a count of 3, offer halt only.
+- **`dsh-executor` counts the caller's own executions.** Before each correction — the lane
+  issues and counts the gaps replacement itself — read `dispatches` first; at 3 or more,
+  offer halt only, never a fourth execution; otherwise run
+  `oss work_item_dispatched <wi-id>`, then run the correction.
 - **Needs ossify ≥ 1.14.0.** On an older ossify, the re-run halts on the existing spine
   branch as before, and the operator recovers by hand.
 

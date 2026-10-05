@@ -84,10 +84,11 @@ Take the round in this order — every baseline first, then the dispatches:
    `run_in_background: true`. Note the job id it returns against the item. When step 0
    resolved an implementer route, the call also carries `provider`, `model` and
    `reasoning_effort` from that row, copied, never chosen.
-3. Count the executions ossify's lane leaves to the caller: before each correction or
-   replacement, run `oss work_item_dispatched <wi-id>`; at a count of 3, offer halt only —
-   never a fourth execution (`external-executor.md` §2a). The lane counts the requests it
-   issues for a round; these two are yours.
+3. Count the executions ossify's lane leaves to the caller — a correction, not a gaps
+   replacement: the lane issues and counts that replacement request itself
+   (`external-executor.md` §2a). Before each correction, check the way the lane does: read
+   `dispatches` first; at 3 or more, offer halt only — never a fourth execution; otherwise
+   run `oss work_item_dispatched <wi-id>`, then run the correction.
 
 Items within a round are parallel by construction; dispatch them all, then wait.
 
@@ -176,8 +177,9 @@ Foreground, one item at a time, in declared order:
    gate would have refused: `head_oid` and `tree_oid` go into the packet. A correction is a
    dispatch of the item and counts against ossify's cap of three dispatches
    (`correction-continuation.md` §4, `round-orchestration.md` §6) — the original, every gaps
-   replacement, every correction. Count it as §2 step 3 says, and if it would be the
-   fourth, it is not sent: the stop rule (§3).
+   replacement, every correction. Count it as §2 step 3 says: read `dispatches` first; at 3
+   or more the correction would be the fourth and is not sent — the stop rule (§3);
+   otherwise run `oss work_item_dispatched <wi-id>` before the dispatch in step 3.
 2. Fill the correction prompt (`dsh-brief` §4) with the packet: `handoff_path`,
    `work_item_id`, `expected_branch` = the request's `branch`, `expected_head_sha`,
    `expected_tree_oid`, `failures` = the verifier's FAILURES lines.
