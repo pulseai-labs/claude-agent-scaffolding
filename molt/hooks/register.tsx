@@ -71,7 +71,7 @@ async function log($: Engine, line: string): Promise<void> {
 }
 
 async function touchActive($: Engine, sessionId: string): Promise<void> {
-  if (!safeSessionId(sessionId) || off.has(sessionId)) return
+  if (!safeSessionId(sessionId) || off.has(sessionId) || paused === sessionId) return
   try { await $.fs.write(activePath(await home($), sessionId), `${new Date().toISOString()}\n`) } catch {}
 }
 
@@ -177,6 +177,7 @@ async function ring($: Engine, bell: string, message: string): Promise<void> {
 
 async function pause($: Engine, sessionId: string, text: string, bell: string | undefined): Promise<void> {
   paused = sessionId
+  await dropActive($, sessionId)
   await setNotice($, { text, tone: 'warn' })
   $.ui.toast(text)
   showStatus($, sessionId)
@@ -383,13 +384,14 @@ export const register: Register = (on, options) => {
   on('prompt.submit', async ($, e, next) => {
     try {
       const sessionId = await $.session.id()
-      await touchActive($, sessionId)
       if (e.origin.kind === 'composer' || e.origin.kind === 'bridge') {
         unattended = 0
         if (paused === sessionId) paused = undefined
         const value = await read($, notice)
         if (value !== null && (value.tone === 'info' || paused === undefined)) await setNotice($, null)
       }
+      // After the pause check, so a lifted pause brings the marker back in this hook (#668).
+      await touchActive($, sessionId)
     } catch (err) {
       await log($, `prompt.submit error ${String(err)}`)
     }
