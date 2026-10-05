@@ -11,6 +11,9 @@ import { DEFAULT_POLICY, POLICY_ID, expandHome } from './policy'
 import { scopeMessage } from './prompts'
 import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath } from './records'
 import type { SessionRecord } from './records'
+import { hasMoltMarker, statusYields } from './floor'
+import { turnEndPrompt } from './prompts'
+import { parseTurn } from './verdict'
 
 // autonomic: autopilot reflexes (spec §3). Module variables survive /clear; the session
 // record file carries the mode across a molt by way of molt's lineage file.
@@ -202,6 +205,14 @@ async function statusReport($: Engine, id: string): Promise<string> {
   return lines.join('\n')
 }
 
+// Tools that change nothing: a turn of these alone is no progress for the loop guard.
+const READ_ONLY = new Set(['Read', 'Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch', 'ToolSearch', 'AskUserQuestion', 'TaskOutput', 'TodoWrite'])
+
+async function readStatus($: Engine): Promise<string | undefined> {
+  const path = ((await $.env.get('MOLT_STATUS_PATH')) ?? '').trim()
+  return path === '' ? undefined : readText($, path)
+}
+
 export const register: Register = (on, options) => {
   cfg = parseConfig(options as Readonly<Record<string, unknown>> | undefined)
 
@@ -280,6 +291,69 @@ export const register: Register = (on, options) => {
     const { isFilled } = await $.prompt.fill({ text: msg })
     if (isFilled) return { text: 'autopilot is on. The scope message is in the prompt box: press Enter to send it.' }
     return { text: 'autopilot is on. The next prompt you send carries the scope.', context: [msg] }
+  })
+
+  on('tool.call', async ($, e, next) => {
+    if (e.agentId !== undefined) return next(e)
+    const r = await next(e)
+    try {
+      if (r.deny === undefined && r.isError === undefined && !READ_ONLY.has(e.tool)) changed.add(await $.session.id())
+    } catch {}
+    return r
+  })
+
+  on('classic.Stop', async ($, e, next) => {
+    const r = await next(e)
+    try {
+      const id = e.session_id
+      if ((await modeOf($)).mode !== 'autopilot') return r
+      // Another plugin continues this turn already (molt's command, plan decision 4).
+      if (r.block !== undefined) { await log($, `stop: a block beneath stands session=${id}`); return r }
+      const answer = e.last_assistant_message ?? ''
+      if (hasMoltMarker(answer) || statusYields(await readStatus($))) {
+        pushes.delete(id)
+        changed.delete(id)
+        await record($, id, 'molt', 'turn end in a molt handoff', 'let it stop', 'molt owns this turn end (amendment A2)')
+        return r
+      }
+      const n = changed.has(id) ? 0 : (pushes.get(id) ?? 0)
+      changed.delete(id)
+      if (n >= cfg.loopMax) {
+        pushes.delete(id)
+        await record($, id, 'pain', 'turn end', 'ask the operator', `autopilot loop: ${n} pushes with no change`)
+        await pain($, id, 'autopilot loop', `${n} turn ends pushed on with no change made`)
+        return r
+      }
+      const j = await judge($, turnEndPrompt(answer.slice(-cfg.tailChars), (await policyText($)) ?? ''), parseTurn)
+      if ('skip' in j) return r
+      if ('fail' in j) {
+        pushes.delete(id)
+        await record($, id, 'pain', 'turn end', 'ask the operator', j.fail)
+        await pain($, id, 'fork failed', j.fail)
+        return r
+      }
+      const v = j.v
+      if (v.case === 'covered' || v.case === 'stalled') {
+        const a = v.case === 'covered' ? (v.answer ?? '') : (v.next_step ?? '')
+        if (!(await record($, id, v.case, v.question ?? 'turn end', a, v.reason, j.usage))) return r
+        pushes.set(id, n + 1)
+        const text = v.case === 'covered' ? `Autopilot: ${a}. Proceed.` : `Autopilot: continue — ${a}.`
+        return { ...r, block: text }
+      }
+      pushes.delete(id)
+      if (v.case === 'waiting') return r
+      if (v.case === 'done') {
+        await record($, id, 'done', 'turn end', 'stop', v.reason, j.usage)
+        $.ui.toast(`autopilot: done — ${oneLine(v.reason, 160)}`)
+        return r
+      }
+      await record($, id, 'pain', v.question ?? 'turn end', 'ask the operator', v.reason, j.usage)
+      await pain($, id, 'pain', v.question ?? v.reason)
+      return r
+    } catch (err) {
+      await log($, `Stop error ${String(err)}`)
+      return r
+    }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
