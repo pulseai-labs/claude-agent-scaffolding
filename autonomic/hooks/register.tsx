@@ -11,6 +11,9 @@ import { DEFAULT_POLICY, POLICY_ID, expandHome } from './policy'
 import { scopeMessage } from './prompts'
 import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath } from './records'
 import type { SessionRecord } from './records'
+import { askPrompt } from './prompts'
+import { parseAsk } from './verdict'
+import type { Question } from './verdict'
 import { hasMoltMarker, statusYields } from './floor'
 import { turnEndPrompt } from './prompts'
 import { parseTurn } from './verdict'
@@ -213,6 +216,22 @@ async function readStatus($: Engine): Promise<string | undefined> {
   return path === '' ? undefined : readText($, path)
 }
 
+// The ask reflex (spec §3.2): answer from the policy and scope, or let the operator see
+// the question and ring. A decision that cannot be recorded is not taken.
+async function askReflex($: Engine, questions: readonly Question[]): Promise<{ questions: readonly Question[]; answers: Record<string, string> } | undefined> {
+  if ((await modeOf($)).mode !== 'autopilot' || questions.length === 0) return undefined
+  const id = await $.session.id()
+  const j = await judge($, askPrompt(questions, (await policyText($)) ?? ''), t => parseAsk(t, questions))
+  if ('v' in j && j.v.covered) {
+    const { answers, reason } = j.v
+    for (const q of questions) if (!(await record($, id, 'ask', q.question, answers[q.question] ?? '', reason, j.usage))) return undefined
+    return { questions, answers }
+  }
+  const why = 'v' in j ? j.v.reason : 'fail' in j ? j.fail : 'nothing to judge yet'
+  await pain($, id, 'question for you', `${questions[0]?.question ?? 'a question'} (${why})`)
+  return undefined
+}
+
 export const register: Register = (on, options) => {
   cfg = parseConfig(options as Readonly<Record<string, unknown>> | undefined)
 
@@ -295,6 +314,16 @@ export const register: Register = (on, options) => {
 
   on('tool.call', async ($, e, next) => {
     if (e.agentId !== undefined) return next(e)
+    if (e.tool === 'AskUserQuestion') {
+      try {
+        const questions = (e as unknown as { questions?: Question[] }).questions ?? []
+        const result = await askReflex($, questions)
+        if (result !== undefined) return { result } as never
+      } catch (err) {
+        await log($, `ask reflex error ${String(err)}`)
+      }
+      return next(e)
+    }
     const r = await next(e)
     try {
       if (r.deny === undefined && r.isError === undefined && !READ_ONLY.has(e.tool)) changed.add(await $.session.id())
