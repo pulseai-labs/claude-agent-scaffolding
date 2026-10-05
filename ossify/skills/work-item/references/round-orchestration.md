@@ -75,7 +75,9 @@ This section runs on **every** `/run-spine`. The hosting repos are the distinct
 `target_repo` values across the spine's work items **other than `abandoned`
 ones**, read from state — an item withdrawn before dispatch runs nowhere, so a
 repo only it names gets no branch. **One observable picks the arm: does the spine
-branch exist in any hosting repo?**
+branch exist in any hosting repo?** — with a second, fail-closed probe behind it:
+recorded execution state with no spine branch anywhere is a **halt**, never a
+fresh re-cut (below).
 
 ```bash
 spine_branch="$("$oss_bin" branch_name "<spine-id>" "<spine-slug>")"
@@ -93,11 +95,26 @@ while IFS= read -r repo; do
 done <<EOF
 $repos
 EOF
+# THE SECOND PROBE (#673 A6). The spine refs can be GONE while durable
+# execution state survives - a deleted branch, a cleaned checkout - and the ref
+# test alone then selected the fresh arm: it records bases and CUTS new spine
+# branches before §3's worktree_add collides with the surviving work, mutation
+# before the promised halt. Recorded execution evidence - any item's branch,
+# worktree_path or base_sha, a status past `planned`, or a dispatch count -
+# means the spine started. With no spine branch anywhere, that is a halt.
+started="$("$oss_bin" get '[.work_items[] | select(.spine=="<spine-id>")  # abandoned items are DELIBERATELY included: the conjunct is for reads that must skip a withdrawn item; here a withdrawn item still proves the spine started
+  | select(((.branch // "") != "") or ((.worktree_path // "") != "") or ((.base_sha // "") != "")
+           or .status == "active" or .status == "complete" or ((.dispatches // 0) > 0))] | length')" \
+  || { echo "halt: cannot read the spine's work items from state"; exit 1; }
+if [ "$arm" = fresh ] && [ "$started" != "0" ]; then
+  echo "halt: no hosting repo has $spine_branch, but state records execution for this spine (an item records a branch, a worktree_path, a base_sha, a status past planned, or a dispatch count) - the spine's refs are gone while its state survives, and re-cutting would collide with that work. Nothing was changed; a human decides which record is right"
+  exit 1
+fi
 echo "arm=$arm"
 ```
 
-- `arm=fresh` — no hosting repo has the branch: this is the spine's first run.
-  Take **§2a**.
+- `arm=fresh` — no hosting repo has the branch **and no item records execution
+  state**: this is the spine's first run. Take **§2a**.
 - `arm=re-entry` — some hosting repo has it: an earlier run got here first. That
   is the **normal** state at the top of every round after the first (a later
   round's spec may be authored when its round starts — `plan-spine`'s
@@ -141,6 +158,16 @@ done < "$repo_bases"
 ```
 
 Each of these is load-bearing:
+
+**A RECORD pass can legitimately refuse (rc 7), and the refusal names the one
+correction route.** `spine_base_set` refuses when a base is already recorded and
+the observed one differs — a crash inside this pass, or a hosting repo re-parked
+since — because a recorded base is evidence of what the lane was about to cut
+from. It validates the value before recording too: the branch must EXIST locally
+in that repo, so a typo can no longer be journaled as evidence. The correction
+is `oss spine_base_reset <spine-id> <repo> <branch>` (a validation-checked
+replacement, journaled as `reset_spine_base`) — an OPERATOR decision about which
+value is right, which the lane never makes or calls on its own.
 
 **A spine branch cut here is local until spine close pushes it.** The branch is
 created, never pushed — rounds land work items onto it locally, and only spine
@@ -255,12 +282,26 @@ the verb that already owns the step:
 
 | Route | Do |
 |---|---|
-| `reattach` | `"$oss_bin" worktree_reattach <repo> <wi-id> <recorded branch>`; a non-zero result **halts naming the git error**, leaving the stale entry and the branch as found — never `git worktree prune`, never `-f -f`. On success, re-run the inventory and act on that item's new route |
-| `adopt` | `"$oss_bin" work_item_exec <wi-id> "$(git -C "$wt" rev-parse --abbrev-ref HEAD)" "$wt" "$(git -C "$wt" rev-parse HEAD)"`, then `"$oss_bin" work_item_status <wi-id> active` — the crash came between §3's spawn and its journal |
-| `finish-merge` | close's `work-item-close.md` §4 from the merge onward (merge, reachability check, then status). A commit on the work branch exists only after a green gate, so the gate is not re-run |
+| `reattach` | `"$oss_bin" worktree_reattach <repo> <wi-id> <recorded branch>`; a non-zero result **halts naming the git error**, leaving the stale entry and the branch as found — never `git worktree prune`, never `-f -f`. It clears only this item's OWN dead registration (`…/.worktrees/<wi-id>` whose directory is gone, via `git worktree remove`); a live holder or a stale entry at any other path refuses rc 8 (#673 E1/E2). On success, re-run the inventory and act on that item's new route |
+| `adopt` | the row reads `wt=present` but state holds no `worktree_path` yet and §2b defines no `$wt` for you (#673 B2): set `root="$("$oss_bin" repo_root "<the item's target_repo>")"` and `wt="$root/.worktrees/<wi-id>"` (the derived path, exactly as `worktree_add` builds it) — then `"$oss_bin" work_item_exec <wi-id> "$(git -C "$wt" rev-parse --abbrev-ref HEAD)" "$wt" "$(git -C "$wt" rev-parse HEAD)"`, then `"$oss_bin" work_item_status <wi-id> active` — the crash came between §3's spawn and its journal |
+| `finish-merge` | close's `work-item-close.md` §4 from the merge onward, with the two values §4 derives before its merge recovered FIRST — a fresh session never ran §4's commit, so they are not in scope (#673 C3): `wi_branch` from state (`work_items[].branch`) and `wi_sha="$(git -C "$repo_root" rev-parse "refs/heads/$wi_branch")"`, the work-branch tip the reachability check compares. **The merge requires the item's `report.md` as gate evidence** (#673 C1): a commit on the work branch is not proof a gate ran — an implementer's stage-never-commit violation leaves the same shape — so the inventory routes this arm only when `report.md` is present, and `halt:unverified-merge` otherwise. The gate itself is still not re-run |
 | `finish-status` | `"$oss_bin" work_item_status <wi-id> complete` — the merge landed and the status write did not |
 | `redispatch`, `close-finished`, `spawn` | nothing here — §3 handles them |
 | `skip` | nothing |
+
+**Every `halt:` row owns a repair; the read-out stops the lane and the repair
+runs outside it, then `/run-spine` re-inventories.** The item-level rows this
+arm's own repairs can hand back, and their routes out:
+
+| Halt row | The repair it names |
+|---|---|
+| `halt:state-claims-merge` — a `complete` item whose branch still sits at its recorded base | the branch holds no commits past its base, so no merge can be reconstructed from repo state: if the item's work exists elsewhere, return it to `planned` (`"$oss_bin" work_item_status <wi-id> planned`) and re-run its round; if it truly landed nothing, the state is the record to repair. (`complete` items whose branch holds unmerged commits now route `finish-merge` instead; a branch that is gone is the cleanup arm and routes `skip` — #673 A5) |
+| `halt:base-unknown` — an ITEM row: a branch is recorded with no `base_sha` | a half-written `work_item_exec` record; repair it with a full re-dispatch — `"$oss_bin" work_item_exec <wi-id> <branch> <worktree_path> <the base the branch was cut at>` — which replaces all three fields (#673 A1) |
+| `halt:worktree-held` | the branch is checked out somewhere that is not this item's own missing registration (`git -C <repo-root> worktree list`); reconcile with the holder — the lane touches nothing on the holder's behalf (#673 A4) |
+| `halt:unverified-merge` | a clean, committed work branch with no `report.md` evidence: a human decides whether the commit is gated work (restore or author the report, then re-run) or the round must be re-run |
+| `halt:close-rejected` | the staged result's last completed gate run recorded a `[fidelity]` finding (durable in `verify.md`); the correction must complete — the external seam's continuation or the close's recovery menu — before anything re-verifies the result (#673 C2) |
+| `halt:unreadable` | a repo root, a `git status`, or the state feed could not be read; fix that and re-run — nothing here is in the lane's hands (#673 A2/A3) |
+| `halt:work-lost`, `halt:unclassified`, `halt:planned-with-worktree`, `halt:dirty-worktree` | state and repos disagree, or the shape is outside this table; surface both and decide |
 
 **5. Continue into §3 for round *R*.**
 
@@ -272,11 +313,21 @@ stuck `active` behind the barrier.
 
 **`base_branch` comes from state, in both arms.** §2a records what each repo
 was parked on at the cut (`spine_base_set`); every handoff copies `base_branch:`
-from `"$oss_bin" spine_base_get <spine-id> <repo>`, never from HEAD.
-`plan-spine` still authors the *planned* base into `SPINE.md`, and spine close
-cross-checks the two (`close/references/spine-close.md` §3) — a mismatch there
-is a halt, not a note. Park each hosting repo on its intended base before the
-first run: the recorded base is whatever it was parked on.
+from `"$oss_bin" spine_base_get <spine-id> <repo>`, never from HEAD. Park each
+hosting repo on its intended base before the first run: the recorded base is
+whatever it was parked on.
+
+**Cross-check the base against the plan BEFORE the first dispatch — a mismatch
+is a halt, not a note.** `plan-spine` authors a *planned* base per hosting repo
+into `SPINE.md`'s base-branch table (`plan-spine/references/spec-authoring.md`
+§1). Compare that repo's row against the value state holds — the base about to
+be recorded in the fresh arm (§2a's RECORD, checked as PASS 1 observes it), or
+the recorded base in the re-entry arm before §3 dispatches anything in that
+repo. A wrong-base cut caught here costs one parked repo to re-park; caught
+only at spine close §3, where the same cross-check runs, it costs the whole
+spine, every round already merged onto the branch. Where `SPINE.md` carries no
+row for a repo (a legacy spine), say so in the run's summary rather than
+inventing one — the close still cross-checks at landing time.
 
 ---
 

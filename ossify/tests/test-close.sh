@@ -866,6 +866,9 @@ _wshim() { # $1=dir-to-return $2=spine-branch $3=wi-branch-or-repo $4=shim-dir
     printf '  "repo_root canonical") echo %s ;;\n' "$1"
     printf '  "branch_name "*)       echo %s ;;\n' "$2"
     printf '  *"target_repo"*)       echo canonical ;;\n'
+    # #673 A6: the arm selector's second probe reads recorded execution state
+    # (its jq names `dispatches`); "0" keeps this fixture on the fresh arm.
+    printf '  *"dispatches"*)        echo 0 ;;\n'
     printf '  "spine_base_set "*)    : ;;\n'
     printf '  "get "*)               echo %s ;;\n' "$3"
     printf '  *) exec bash "%s" "$@" ;;\nesac\n' "$OSS"
@@ -974,6 +977,31 @@ git -C "$W5" branch spine/r0.s9-demo
 t_capture env "PATH=$TMP/shim-w5:$PATH" "oss_bin=$TMP/shim-w5/oss" bash -c "set -euo pipefail; . '$W_ARM'"
 t_assert_contains "$T_OUT" "arm=re-entry" "W5: an existing spine branch -> re-entry (the #362 per-round case)"
 t_assert_eq "" "$(git -C "$W5" status --porcelain)" "W5: the selector mutates nothing"
+
+# W5c (#673 A6) — the spine refs GONE while recorded execution state survives:
+# the ref test alone picks `fresh`, whose §2a would record bases and CUT a new
+# spine branch before §3's worktree_add collided with the surviving work -
+# mutation before the promised halt. The second probe must halt instead.
+W5C="$TMP/w5c"; mkdir -p "$W5C"; git -C "$W5C" init -q
+git -C "$W5C" config user.email t@t; git -C "$W5C" config user.name t
+echo s > "$W5C/f"; git -C "$W5C" add .; git -C "$W5C" commit -qm s
+W5CS="$TMP/shim-w5c"; mkdir -p "$W5CS"
+{ printf '#!/usr/bin/env bash\ncase "$1 $2" in\n'
+  printf '  "repo_root canonical") echo %s ;;\n' "$W5C"
+  printf '  "branch_name "*)       echo spine/r0.s9-demo ;;\n'
+  printf '  *"target_repo"*)       echo canonical ;;\n'
+  printf '  *"dispatches"*)        echo 1 ;;\n'
+  printf '  "get "*)               echo canonical ;;\n'
+  printf '  *) exec bash "%s" "$@" ;;\nesac\n' "$OSS"
+} > "$W5CS/oss"; chmod +x "$W5CS/oss"
+t_capture env "PATH=$W5CS:$PATH" "oss_bin=$W5CS/oss" bash -c "set -euo pipefail; . '$W_ARM'"
+t_assert_rc 1 "W5c: recorded execution state with NO spine branch HALTS (not a fresh re-cut)"
+t_assert_contains "$T_OUT" "refs are gone" "W5c: ...naming the surviving state"
+t_assert_eq "" "$(git -C "$W5C" branch --list 'spine/*' | tr -d ' *')" "W5c: ...and cut nothing"
+case "$T_OUT" in
+  *arm=fresh*) T_FAIL=$((T_FAIL+1)); echo "FAIL: W5c: the deleted-ref shape still picked the fresh arm";;
+  *) T_PASS=$((T_PASS+1));;
+esac
 
 # W5b (fix round 1, I1) — a failed work-item read HALTS; the selector must not
 # pick an arm off an empty list. The pre-fix form read the repos inside the
