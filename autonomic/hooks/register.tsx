@@ -320,6 +320,7 @@ export const register: Register = (on, options) => {
 
   on('prompt.submit', async ($, e, next) => {
     const context: string[] = []
+    let announcing: string | undefined
     try {
       const id = await $.session.id()
       if (e.origin.kind === 'composer' || e.origin.kind === 'bridge') {
@@ -328,13 +329,17 @@ export const register: Register = (on, options) => {
       }
       const rec = await modeOf($)
       if (rec.mode === 'autopilot' && rec.source === 'lineage' && rec.scope.length > 0 && !announced.has(id)) {
-        announced.add(id)
+        announcing = id
         context.push(scopeMessage(rec.scope))
       }
     } catch (err) {
       await log($, `prompt.submit error ${String(err)}`)
     }
-    return context.length === 0 ? next(e) : next({ ...e, context: [...(e.context ?? []), ...context] })
+    if (context.length === 0) return next(e)
+    const r = await next({ ...e, context: [...(e.context ?? []), ...context] })
+    // A prompt refused beneath autonomic carried no scope: the next prompt that enters does.
+    if (announcing !== undefined && r.drop === undefined) announced.add(announcing)
+    return r
   })
 
   on('command.run', { command: 'autopilot' }, async ($, e) => {

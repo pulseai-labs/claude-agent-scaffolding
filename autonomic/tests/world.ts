@@ -30,6 +30,7 @@ export type World = {
   stopBlock?: string           // a block a plugin beneath autonomic returns at Stop
   usage: { tokens?: number; window: number; percent?: number }   // the context figure
   readOnly?: boolean           // core marks every tool call read-only
+  dropPrompts?: boolean        // a hook beneath autonomic refuses every prompt (the result's drop arm)
 }
 
 const USAGE = { input_tokens: 900, output_tokens: 40, cache_read_input_tokens: 50_000, cache_creation_input_tokens: 100 }
@@ -111,7 +112,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     w.fills.push(e.text)
     return { isFilled: true } as never
   })
-  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  on('prompt.submit', (_$, e) => (w.dropPrompts ? { drop: 'refused beneath autonomic' } : { text: e.text, context: e.context }) as never)
   on('tool.call', (_$, e) => {
     if (e.tool === 'AskUserQuestion') { w.asked += 1; return { result: 'the operator answered', text: 'the operator answered' } as never }
     if (w.toolDeny !== undefined) return { deny: w.toolDeny } as never

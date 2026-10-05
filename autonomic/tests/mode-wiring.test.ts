@@ -100,6 +100,17 @@ describe('mode resolution (spec §1, amendment A1)', () => {
     const second = await $.prompt.submit(SUBMIT())
     expect(second.context ?? []).toEqual([])
   })
+  test('a prompt dropped beneath autonomic does not use up the scope announcement (PR #672 round 3)', async ($, on) => {
+    const w = world(on, { files: {
+      [REC('s0')]: JSON.stringify({ mode: 'autopilot', scope: ['/plan.md'], source: 'command' }),
+      '/home/u/.claude/state/molt/lineage/s1.json': JSON.stringify({ from: 's0', chain: 's0', depth: 1, handoff: '/h.md' }),
+    } })
+    w.dropPrompts = true
+    await $.prompt.submit(SUBMIT('plugin'))
+    w.dropPrompts = false
+    const next = await $.prompt.submit(SUBMIT())
+    expect((next.context ?? []).join('\n')).toContain('- /plan.md')
+  })
 })
 
 describe('/autopilot (spec §1)', () => {
