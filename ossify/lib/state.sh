@@ -214,6 +214,13 @@ _oss_apply_op() { # $1=op $2=payload-json
       jq --argjson p "$payload" '
         (.work_items[] | select(.id == $p.work_item)) |=
           (.branch = $p.branch | .worktree_path = $p.worktree_path | .base_sha = $p.base_sha)' ;;
+    # #133: the base each hosting repo's spine branch was cut from, recorded at
+    # cut time so a re-entering /run-spine never re-derives it from HEAD (which
+    # is the spine branch by then). A map keyed by repo; `+` keeps other repos.
+    set_spine_base)
+      jq --argjson p "$payload" '
+        (.spines[] | select(.id == $p.spine)) |=
+          (.bases = ((.bases // {}) + {($p.repo): $p.base_branch}))' ;;
     # §9.2's migration registry, realized. Pure, TOTAL and VERSION-AGNOSTIC:
     # replay re-applies it from the base snapshot (v1 or v2, whichever the
     # project started from) so base+journal still rebuilds live exactly and

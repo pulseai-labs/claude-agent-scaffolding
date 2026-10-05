@@ -333,3 +333,38 @@ oss_entity_set_work_item_exec() { # $1=state $2=wi-id $3=branch $4=worktree-path
       '{work_item:$w,branch:$b,worktree_path:$p,base_sha:$s}')" \
     "" _oss_entity_guard_wi_exec
 }
+
+# #133: spines[].bases. The guard runs INSIDE oss_state_mutate's lock (the `$5`
+# slot), so two sessions recording different bases for one repo cannot both win.
+# A recorded base is evidence of what the lane actually cut from - overwriting it
+# with a different value is refused (rc 7); the same value is a no-op retry.
+_oss_entity_guard_spine_base() { # $1=state $2=payload ; 0 let through, 7 refuse
+  local cur want
+  cur="$(jq -r --argjson p "$2" '.spines[] | select(.id == $p.spine) | ((.bases // {})[$p.repo] // "")' "$1")" || return 2
+  want="$(jq -r '.base_branch' <<<"$2")" || return 2
+  if [ -z "$cur" ] || [ "$cur" = "$want" ]; then return 0; fi
+  echo "oss: spine '$(jq -r '.spine' <<<"$2")' already records base '$cur' for repo '$(jq -r '.repo' <<<"$2")' - a recorded base is evidence of what the lane cut from, so it is never overwritten with '$want'" >&2
+  return 7
+}
+
+oss_entity_set_spine_base() { # $1=state $2=spine-id $3=repo-key $4=base-branch
+  local sf="$1" spine="$2" repo="$3" br="$4"
+  case "$repo" in ''|ai_workspace)
+    echo "oss: spine_base_set needs a declared hosting repo, not '${repo:-<empty>}' (ai_workspace hosts no spine branch)" >&2; return 2 ;; esac
+  _oss_repo_root "$repo" >/dev/null || return 2
+  case "$br" in ''|HEAD)
+    echo "oss: spine_base_set needs a branch name, not '${br:-<empty>}' - a detached HEAD has no base to record" >&2; return 2 ;; esac
+  _oss_entity_require_single "$sf" '.spines[] | select(.id == $v)' "spine" "$spine" || return $?
+  oss_state_mutate "$sf" set_spine_base \
+    "$(jq -n --arg s "$spine" --arg r "$repo" --arg b "$br" --arg ts "$(_oss_now)" \
+      '{spine:$s,repo:$r,base_branch:$b,at:$ts}')" \
+    "" _oss_entity_guard_spine_base
+}
+
+oss_entity_get_spine_base() { # $1=state $2=spine-id $3=repo-key ; rc 1 unrecorded
+  local sf="$1" spine="$2" repo="$3" b
+  _oss_entity_require_single "$sf" '.spines[] | select(.id == $v)' "spine" "$spine" || return $?
+  b="$(jq -r --arg s "$spine" --arg r "$repo" '.spines[] | select(.id == $s) | ((.bases // {})[$r] // "")' "$sf")" || return 2
+  [ -n "$b" ] || { echo "oss: no base_branch recorded for spine '$spine' in repo '$repo'" >&2; return 1; }
+  printf '%s\n' "$b"
+}
