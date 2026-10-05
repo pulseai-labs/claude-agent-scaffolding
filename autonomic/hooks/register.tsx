@@ -438,8 +438,7 @@ export const register: Register = (on, options) => {
   on('tool.check', async ($, e, next) => {
     const r = await next(e)
     try {
-      // A tool whose permission prompt is the operator's own dialog is never approved (final review C1).
-      if (r.decision === 'allow' || USER_DIALOG.has(e.tool)) return r
+      if (r.decision === 'allow') return r
       if ((await modeOf($)).mode !== 'autopilot') return r
       const id = await $.session.id()
       if (r.decision === 'deny') {
@@ -450,6 +449,8 @@ export const register: Register = (on, options) => {
         }
         return r
       }
+      // A tool whose permission prompt is the operator's own dialog is never approved (final review C1).
+      if (USER_DIALOG.has(e.tool)) return r
       const raw = (e.input as { command?: unknown } | undefined)?.command
       if (typeof raw === 'string') {
         const command = raw
