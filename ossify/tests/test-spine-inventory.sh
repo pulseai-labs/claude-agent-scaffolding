@@ -91,5 +91,7 @@ t_assert_eq "" "$(row repo ui)" "R6: a repo only an abandoned item names gets no
 inv_bad() { T_OUT="$(cd "$1/ws" && bash "$OSS" spine_inventory "$2" 2>&1)"; T_RC=$?; }
 inv_bad "$F" r0.s9; t_assert_rc 2 "R7: unknown spine rc 2"
 rm -rf "$F/ws/docs/specs/r0/r0.s1-demo"; inv "$F"; t_assert_rc 2 "R7: no spine dir rc 2"
+rm -rf "$F/ws/docs/specs/r0"; inv "$F"; t_assert_rc 2 "R7: no release dir rc 2"
+t_assert_contains "$T_OUT" "found 0" "R7: ...and the message says found 0"
 
 t_summary

@@ -18,7 +18,9 @@ oss_spine_inventory() { # $1=state $2=spine-id
   rel="r$(oss_id_parse "$spine" | awk '{print $2}')"
   ai="$(_oss_repo_root ai_workspace)" || return 2
   rel_dir="$ai/$(oss_id_release_dir "$rel")"
-  matches="$(find "$rel_dir" -maxdepth 1 -type d -name "$spine-*" 2>/dev/null)"
+  # `|| true`: a missing rel_dir makes find exit 1, and the dispatcher's set -e
+  # would abort at rc 1 with no output - the count guard below is the decider.
+  matches="$(find "$rel_dir" -maxdepth 1 -type d -name "$spine-*" 2>/dev/null || true)"
   n="$(printf '%s\n' "$matches" | grep -c . || true)"
   [ "$n" -eq 1 ] || { echo "oss: spine_inventory: expected exactly one spine dir for $spine under $rel_dir, found $n" >&2; return 2; }
   spine_dir="$matches"; slug="${spine_dir##*/}"; slug="${slug#$spine-}"
