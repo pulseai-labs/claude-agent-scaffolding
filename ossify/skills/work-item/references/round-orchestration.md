@@ -302,7 +302,7 @@ arm's own repairs can hand back, and their routes out:
 | `halt:unverified-merge` | a clean, committed work branch with no `report.md` evidence: a human decides whether the commit is gated work (restore or author the report, then re-run) or the round must be re-run |
 | `halt:close-rejected` | the staged result's last completed gate run recorded a `[fidelity]` finding (durable in `verify.md`); the correction must complete — the external seam's continuation or the close's recovery menu — before anything re-verifies the result (#673 C2) |
 | `halt:unreadable` | a repo root, a `git status`, a `verify.md` rejection record, or the state feed could not be read; fix that and re-run — nothing here is in the lane's hands (#673 A2/A3/G2) |
-| `halt:work-lost`, `halt:unclassified`, `halt:planned-with-worktree`, `halt:dirty-worktree` | state and repos disagree, or the shape is outside this table; surface both and decide |
+| `halt:work-lost`, `halt:unclassified`, `halt:planned-with-worktree`, `halt:dirty-worktree` | state and repos disagree, or the shape is outside this table; surface both and decide — a branch no longer descended from its recorded `base_sha` is a history rewrite, never a landing: restore the expected history or re-dispatch the item (#673 H1) |
 
 **5. Continue into §3 for round *R*.**
 

@@ -116,7 +116,7 @@ EOF
 # still AT base_sha is trivially an ancestor and has merged nothing.
 _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if any halt
   local sf="$1" spine="$2" spine_dir="$3" sb="$4" halt=0
-  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys held holders hp adopt_br brx feed feed_rc=0 gr
+  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys held holders hp adopt_br brx feed feed_rc=0 gr descends
   # The feed's own rc is caught, and each item renders inside a `try`/`catch`
   # (#673 A2): one unrenderable field used to collapse the WHOLE stream - the
   # shell read a partial feed with no error channel, the empty-field skip
@@ -156,7 +156,7 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
     [ "$wtp" = "-" ] && wtp=""
     [ "$bs" = "-" ] && bs=""
     [ -n "$wi" ] || continue
-    wt=-; clean=-; hab=-; merged=-; report=no; route=""
+    wt=-; clean=-; hab=-; merged=-; report=no; route=""; descends=-
     held=0; brx=no
     [ -f "$spine_dir/work-$wi/report.md" ] && report=yes
     if [ "$st" = abandoned ]; then route=skip
@@ -197,12 +197,21 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
         brx=yes
         tip="$(_oss_inv_git -C "$root" rev-parse "refs/heads/$br")"
         if [ "$tip" = "$bs" ]; then hab=yes; else hab=no; fi
+        # #673 H1: the tip must also DESCEND from the recorded base_sha. A
+        # branch RESET to an ancestor of its cut point (a history rewrite)
+        # still differs from the base and is still an ancestor of the spine
+        # branch, so the A1 predicate alone read it as merged although no
+        # item work sits past the cut point - an active item then routed
+        # finish-status and a complete one skip, marking lost work landed.
+        # `descends` is the shared ancestry fact: merged needs it, and every
+        # arm that could otherwise act on the branch halts without it.
+        if [ -n "$bs" ] && _oss_inv_git -C "$root" merge-base --is-ancestor "$bs" "refs/heads/$br" 2>/dev/null; then descends=yes; else descends=no; fi
         # "merged" REQUIRES a recorded base (#673 A1). With base_sha unrecorded
         # ("-" unwrapped to ""), `tip != bs` is trivially true and a branch still
         # AT its cut point - which IS an ancestor of the spine branch - read as
         # merged with nothing merged: a `complete` item routed skip and an active
         # one finish-status, marked done with nothing landed.
-        if [ -n "$bs" ] && [ "$tip" != "$bs" ] \
+        if [ "$descends" = yes ] && [ "$tip" != "$bs" ] \
            && _oss_inv_git -C "$root" show-ref --verify --quiet "refs/heads/$sb" \
            && _oss_inv_git -C "$root" merge-base --is-ancestor "$tip" "refs/heads/$sb"; then merged=yes; else merged=no; fi
         # #673 A4: who holds this branch? §2b runs its REPO repairs before its
@@ -253,6 +262,10 @@ HOLD
           # At its own cut point: no commits past the base, so there is no
           # merge to reconstruct and no repair that could make the claim true.
           elif [ "$hab" = yes ]; then route=halt:state-claims-merge
+          # #673 H1: the branch no longer descends from its recorded base - a
+          # history rewrite, not a landing and not a missing merge. Merging
+          # it would re-land a branch whose item work may be gone.
+          elif [ "$descends" != yes ]; then route=halt:unclassified
           # The branch still holds the item's commits but the spine branch does
           # not contain them: the merge the state claims is missing. Re-land it
           # through close's §4 merge-onward (the owning repair for this shape).
@@ -315,7 +328,10 @@ HOLD
               # sibling close-finished route's evidence - report.md - is
               # required here too; without it the route is REFUSED, never
               # guessed: a human decides whether the commit is gated work.
-              elif ! _oss_inv_git -C "$root" merge-base --is-ancestor "$bs" "refs/heads/$br" 2>/dev/null; then route=halt:unclassified
+              # `descends` (#673 H1) folds in the ancestry test this arm used
+              # to run inline: halt unless the branch is verifiably descended
+              # from its recorded base - a rewrite is never merge-repairable.
+              elif [ "$descends" != yes ]; then route=halt:unclassified
               elif [ "$report" = yes ]; then route=finish-merge
               else route=halt:unverified-merge; fi
             elif [ "$hab" = yes ] && [ "$report" = yes ] \

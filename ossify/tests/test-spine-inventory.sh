@@ -436,6 +436,43 @@ t_assert_eq "halt:worktree-held" "$(route r0.s1.w2)" "S31: an unreadable holder 
 t_assert_eq "halt:worktree-held" "$(route r0.s1.w1)" "S31: ...and the active item halts"
 t_assert_rc 3 "S31: ...rc 3"
 
+# S32 (#673 H1): a work branch RESET to an ancestor of its recorded base_sha
+# still differs from the base and is still an ancestor of the spine branch -
+# the A1 predicate alone called that merged, so a complete item routed skip
+# and an active one finish-status although no item work sits past the cut
+# point. Merged-ness now requires the tip to DESCEND from base_sha; the
+# rewrite halts. The controls prove the fixture's own landing routes normally:
+# S32's pre-rewrite state is skip, S32b's is finish-status (S1/S12 too).
+F="$TMP/s32"; mkfix "$F"
+oss_in "$F" work_item_add r0.s1 One core >/dev/null
+git -C "$F/core" commit -qm second --allow-empty      # an ancestor exists for the reset target
+git -C "$F/core" checkout -q -b spine/r0.s1-demo
+oss_in "$F" spine_base_set r0.s1 core main >/dev/null
+WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; close_item "$F" r0.s1.w1 "$WT"
+inv "$F"
+t_assert_eq "skip" "$(route r0.s1.w1)" "S32 control: the un-rewritten landing is skip"
+git -C "$WT" reset -q --hard "$(git -C "$F/core" rev-parse main~1)"   # an ancestor of base_sha
+inv "$F"
+t_assert_eq "halt:unclassified" "$(route r0.s1.w1)" "S32: a complete item reset below base_sha halts, never skip"
+t_assert_rc 3 "S32: ...rc 3"
+# S32b: the ACTIVE variant - the same rewrite the predicate used to call a
+# landing, routing finish-status.
+F="$TMP/s32b"; mkfix "$F"
+oss_in "$F" work_item_add r0.s1 One core >/dev/null
+git -C "$F/core" commit -qm second --allow-empty
+git -C "$F/core" checkout -q -b spine/r0.s1-demo
+oss_in "$F" spine_base_set r0.s1 core main >/dev/null
+WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm "close r0.s1.w1"
+git -C "$F/core" merge -q --no-ff work/r0.s1.w1-one -m "merge r0.s1.w1"
+inv "$F"
+t_assert_eq "finish-status" "$(route r0.s1.w1)" "S32b control: a genuine active landing is finish-status"
+git -C "$WT" reset -q --hard "$(git -C "$F/core" rev-parse main~1)"
+inv "$F"
+t_assert_eq "halt:unclassified" "$(route r0.s1.w1)" "S32b: an active item reset below base_sha halts, never finish-status"
+t_assert_rc 3 "S32b: ...rc 3"
+
 # ---- the shipped §2 re-entry blocks, extracted and RUN (block-ledger O rows) ----
 SKILLS="$HERE/../skills"
 ROUND="$SKILLS/work-item/references/round-orchestration.md"
