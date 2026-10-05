@@ -41,7 +41,7 @@ You are in autopilot. The operator planned this work and is not watching. Keep t
 
 ## Standing orders
 
-- Take the recommended option and state it in one line. Do not end a turn on "Shall I proceed?" or "Which first?" when the spec, the plan, the grill record or your brief already decides it.
+- When the spec, the plan, the grill record or your brief already decides a choice, take that option and state it in one line. Do not end a turn on "Shall I proceed?" or "Which first?" in that case.
 - Merge authority: once a pull request has passed its work-pr or merge-bar loop, the orchestrator merges it without asking.
 - When a step is done, start the next step of the plan.
 
@@ -59,6 +59,7 @@ Leave everything else to the operator.
 
 - product ambiguity: the scope does not say what the product should do;
 - a tradeoff the scope does not settle;
+- an approval gate: a step your process gives to the operator, such as reviewing or approving a spec, a design, a plan or a release scope, or choosing how a plan is executed, even when you recommend an option;
 - credentials or secrets;
 - a one-way door: data loss, an external publish, a delete;
 - a hard deny;
