@@ -11,6 +11,10 @@ import { DEFAULT_POLICY, POLICY_ID, expandHome } from './policy'
 import { scopeMessage } from './prompts'
 import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath } from './records'
 import type { SessionRecord } from './records'
+import { neverRules } from './never'
+import type { Where } from './never'
+import { permissionPrompt } from './prompts'
+import { parsePermission } from './verdict'
 import { askPrompt } from './prompts'
 import { parseAsk } from './verdict'
 import type { Question } from './verdict'
@@ -232,6 +236,27 @@ async function askReflex($: Engine, questions: readonly Question[]): Promise<{ q
   return undefined
 }
 
+const painedDeny = new Set<string>()   // session, tool and reason of each hard deny already rung
+
+async function where($: Engine): Promise<Where> {
+  const cwd = await $.session.cwd()
+  const out = async (argv: string[]): Promise<string | undefined> => {
+    try {
+      const r = await $.process.run(argv)
+      return r.exitCode === 0 ? r.stdout.trim() || undefined : undefined
+    } catch {
+      return undefined
+    }
+  }
+  const root = (await out(['git', '-C', cwd, 'rev-parse', '--show-toplevel'])) ?? cwd
+  const branch = await out(['git', '-C', cwd, 'rev-parse', '--abbrev-ref', 'HEAD'])
+  const originHead = await out(['git', '-C', cwd, 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
+  const w: Where = { cwd, root, home: await home($) }
+  if (branch !== undefined && branch !== 'HEAD') w.branch = branch
+  if (originHead !== undefined) w.defaultBranch = originHead.replace(/^origin\//, '')
+  return w
+}
+
 export const register: Register = (on, options) => {
   cfg = parseConfig(options as Readonly<Record<string, unknown>> | undefined)
 
@@ -381,6 +406,46 @@ export const register: Register = (on, options) => {
       return r
     } catch (err) {
       await log($, `Stop error ${String(err)}`)
+      return r
+    }
+  })
+
+  on('tool.check', async ($, e, next) => {
+    const r = await next(e)
+    try {
+      if (r.decision === 'allow') return r
+      if ((await modeOf($)).mode !== 'autopilot') return r
+      const id = await $.session.id()
+      if (r.decision === 'deny') {
+        const key = `${id}\u0000${e.tool}\u0000${r.reason ?? ''}`
+        if (!painedDeny.has(key)) {
+          painedDeny.add(key)
+          await pain($, id, 'hard deny', `${e.tool}: ${r.reason ?? 'denied'}`)
+        }
+        return r
+      }
+      if (e.tool === 'Bash') {
+        const command = String((e.input as { command?: unknown } | undefined)?.command ?? '')
+        const rules = neverRules(command, await where($))
+        if (rules.length > 0) {
+          await record($, id, 'permission', `Bash: ${command}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
+          await pain($, id, 'never-approve', `${rules.join(', ')} — ${command}`)
+          return r
+        }
+      }
+      const j = await judge($, permissionPrompt(e.tool, e.input, (await policyText($)) ?? ''), parsePermission)
+      if ('v' in j && j.v.decision === 'allow') {
+        let shown = ''
+        try { shown = JSON.stringify(e.input) ?? '' } catch {}
+        if (await record($, id, 'permission', `${e.tool}: ${shown}`, 'allow', j.v.reason, j.usage))
+          return { ...r, decision: 'allow', reason: `autonomic: ${j.v.reason}` }
+        return r
+      }
+      const why = 'v' in j ? j.v.reason : 'fail' in j ? j.fail : 'nothing to judge yet'
+      await pain($, id, 'permission for you', `${e.tool} (${why})`)
+      return r
+    } catch (err) {
+      await log($, `tool.check error ${String(err)}`)
       return r
     }
   })
