@@ -35,8 +35,8 @@ jobs:
       - name: Install OpenCode 1.18.13
         run: npm install --global opencode-ai@1.18.13
 
-      - name: Install Claude Code 2.1.288
-        run: npm install --global @anthropic-ai/claude-code@2.1.288
+      - name: Install Claude Code 2.1.289
+        run: npm install --global @anthropic-ai/claude-code@2.1.289
 
       - name: Tool versions
         run: |
@@ -99,8 +99,14 @@ jobs:
       - name: seat-mods suite
         run: bash seat-mods/run-tests.sh
 
+      - name: molt suite
+        run: bash molt/run-tests.sh
+
       - name: dual-publish parity (repo-root)
         run: bash tests/test-codex-dual-publish.sh
+
+      - name: mod shell-reader parity (repo-root)
+        run: bash tests/test-mod-shell-parity.sh
 
       - name: Devin publish contract (repo-root)
         # Model-free manifest/docs contract only. The devin binary is not

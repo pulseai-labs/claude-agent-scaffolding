@@ -6,8 +6,8 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MARKETPLACE="$ROOT/.agents/plugins/marketplace.json"
 CLAUDE_MARKETPLACE="$ROOT/.claude-plugin/marketplace.json"
-# seat-mods is a Claude Code mod (hooks.json "modules"); Codex has no mod runtime.
-DEFERRED_PLUGINS="scaffold seat-mods"
+# seat-mods and molt are Claude Code mods (hooks.json "modules"); Codex has no mod runtime.
+DEFERRED_PLUGINS="scaffold seat-mods molt"
 
 # THE INVENTORY IS THE FILESYSTEM, NOT A MARKETPLACE.
 #

@@ -95,6 +95,12 @@
       "description": "Role guards for worker seats as a Claude Code mod: SEAT_MODS_ROLE on a seat's spawn turns on that role's tool-call rails; unset or empty, it guards as an implementer by default, and orchestrator and coordinator are explicit unguarded roles.",
       "category": "workflow",
       "source": "./seat-mods"
+    },
+    {
+      "name": "molt",
+      "description": "Context handoff as a Claude Code mod: past a share of the context window the session writes a handoff, then molt clears it in place and resumes it from that handoff.",
+      "category": "workflow",
+      "source": "./molt"
     }
   ]
 }
