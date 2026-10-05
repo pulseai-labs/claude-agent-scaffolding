@@ -15,7 +15,7 @@ import { neverRules } from './never'
 import type { Where } from './never'
 import { permissionPrompt } from './prompts'
 import { parsePermission } from './verdict'
-import { MAX_INPUT, askPrompt } from './prompts'
+import { MAX_INPUT, askPrompt, shownInput } from './prompts'
 import { parseAsk } from './verdict'
 import type { Question } from './verdict'
 import { hasMoltMarker, statusYields } from './floor'
@@ -102,13 +102,17 @@ async function guard($: Engine, rec: Live): Promise<Live> {
   return clean
 }
 
-// A record that cannot be written cannot reach a molt successor: autopilot ends (spec §4).
+// A record that cannot be written cannot reach a molt successor: autopilot ends (spec §4),
+// and the operator is told, since an older record on disk may still say autopilot.
 async function save($: Engine, id: string, rec: Live): Promise<Live> {
   let out = rec
   if (safeSessionId(id)) {
     try { await $.fs.write(sessionPath(await home($), id), serializeRecord(rec)) } catch (err) {
       await log($, `record write failed session=${id} ${String(err)}`)
-      if (rec.mode === 'autopilot') out = { ...rec, mode: 'manual', problem: 'record not writable' }
+      if (rec.mode === 'autopilot' || live.get(id)?.mode === 'autopilot') {
+        out = { ...rec, mode: 'manual', problem: 'record not writable' }
+        $.ui.toast(`autonomic: the session record could not be saved (${sessionPath(await home($), id)}); this session is manual.`)
+      }
     }
   }
   live.set(id, out)
@@ -149,8 +153,12 @@ async function modeOf($: Engine): Promise<Live> {
 // One ledger line. A ledger that cannot be written ends autopilot (spec §4: no ledger,
 // no autopilot); the caller must not act on a decision that was not recorded.
 async function record($: Engine, id: string, kase: LedgerCase, q: string, a: string, why: string, usage?: Usage): Promise<boolean> {
-  const line = ledgerLine({ time: new Date().toISOString(), session: id, kase, q, a, why, usage })
-  if (await appendLine($, await ledgerPath($), line)) return true
+  return recordAll($, id, [ledgerLine({ time: new Date().toISOString(), session: id, kase, q, a, why, usage })])
+}
+
+// Several ledger lines in one append: all are recorded, or none.
+async function recordAll($: Engine, id: string, lines: readonly string[]): Promise<boolean> {
+  if (await appendLine($, await ledgerPath($), lines.join('\n'))) return true
   const rec = live.get(id)
   if (rec !== undefined) await save($, id, { ...rec, mode: 'manual', problem: 'ledger not writable' })
   $.ui.toast('autonomic: the ledger is not writable; this session is manual now.')
@@ -250,7 +258,9 @@ async function askReflex($: Engine, questions: readonly Question[]): Promise<{ q
   const j = await judge($, askPrompt(questions, (await policyText($)) ?? ''), t => parseAsk(t, questions))
   if ('v' in j && j.v.covered) {
     const { answers, reason } = j.v
-    for (const q of questions) if (!(await record($, id, 'ask', q.question, answers[q.question] ?? '', reason, j.usage))) return undefined
+    const time = new Date().toISOString()
+    const lines = questions.map(q => ledgerLine({ time, session: id, kase: 'ask', q: q.question, a: answers[q.question] ?? '', why: reason, usage: j.usage }))
+    if (!(await recordAll($, id, lines))) return undefined
     return { questions, answers, note: `autonomic answered in the operator's place, from the autopilot policy and scope: ${reason}` }
   }
   const why = 'v' in j ? j.v.reason : 'fail' in j ? j.fail : 'nothing to judge yet'
@@ -334,8 +344,10 @@ export const register: Register = (on, options) => {
     if (c.kind === 'status') return { text: await statusReport($, id) }
     const prev = await modeOf($)
     if (c.kind === 'off') {
-      await save($, id, { ...prev, mode: 'manual', source: 'command', problem: undefined, invalid: undefined })
+      const off = await save($, id, { ...prev, mode: 'manual', source: 'command', problem: undefined, invalid: undefined })
       pushes.delete(id)
+      if (off.problem === 'record not writable')
+        return { text: `autopilot is off for this session, but its record could not be saved: a molt successor may still start in autopilot. Check that ${sessionPath(await home($), id)} can be written.` }
       return { text: 'autopilot is off for this session: every ask reaches you.' }
     }
     const cwd = await $.session.cwd()
@@ -464,7 +476,7 @@ export const register: Register = (on, options) => {
       let shown = ''
       try { shown = JSON.stringify(e.input) ?? '' } catch {}
       // The fork sees at most MAX_INPUT characters: a longer call stays with the operator (final review I6).
-      if (shown.length > MAX_INPUT) {
+      if (shownInput(e.input).length > MAX_INPUT) {
         await pain($, id, 'permission for you', `${e.tool} (input too long to judge)`)
         return r
       }

@@ -57,6 +57,20 @@ describe('mode resolution (spec §1, amendment A1)', () => {
     const r = await $.command.run(RUN('on'))
     expect(r.text).toContain('record not writable')
   })
+  test('off with a record that cannot be written says so (PR #672 round 2)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    await $.session.start(START)
+    w.failWrite = /sessions\//
+    const r = await $.command.run(RUN('off'))
+    expect(r.text).toContain('could not be saved')
+    expect(w.toasts.some(t => t.includes('could not be saved'))).toBe(true)
+  })
+  test('a manual session whose record cannot be written stays plain manual (control)', async ($, on) => {
+    const w = world(on)
+    w.failWrite = /sessions\//
+    await $.session.start(START)
+    expect(w.statuses.at(-1)).toBe('manual')
+  })
   test('AUTONOMIC_LEDGER moves the ledger', async ($, on) => {
     const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot', AUTONOMIC_LEDGER: '/ai/.autonomic/ledger.md' } })
     await $.session.start(START)

@@ -53,4 +53,20 @@ describe('the ask reflex (spec §3.2)', () => {
     await $.tool.call(ASK)
     expect(w.asked).toBe(1)
   })
+  test('two answers are one ledger write: a failed write records neither (PR #672 round 2)', async ($, on) => {
+    const w = world(on, { env: AP })
+    const Q2 = [...QS, { question: 'Which size?', header: 'Size', options: [{ label: 'S', description: '' }, { label: 'L', description: '' }], multiSelect: false }]
+    w.forks.push(fork({ covered: true, answers: { 'Which colour?': 'Blue', 'Which size?': 'L' }, reason: 'spec' }))
+    await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
+    w.appendsLeft = 1
+    await $.tool.call({ tool: 'AskUserQuestion', questions: Q2 } as never)
+    expect(w.asked).toBe(0)
+    expect(ledgerLines(w).filter(l => l.includes(' · ask · '))).toHaveLength(2)
+    w.forks.push(fork({ covered: true, answers: { 'Which colour?': 'Red', 'Which size?': 'S' }, reason: 'spec' }))
+    w.appendsLeft = 0
+    await $.tool.call({ tool: 'AskUserQuestion', questions: Q2 } as never)
+    expect(w.asked).toBe(1)
+    expect(ledgerLines(w).filter(l => l.includes(' · ask · '))).toHaveLength(2)
+    w.appendsLeft = undefined
+  })
 })

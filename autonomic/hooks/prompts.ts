@@ -49,9 +49,13 @@ ${JSON.stringify(listed, null, 2)}
 </questions>`
 }
 
+// A tool call's input exactly as the permission fork is shown it; the length gate measures this.
+export function shownInput(input: unknown): string {
+  try { return JSON.stringify(input, null, 2) ?? '' } catch { return String(input) }
+}
+
 export function permissionPrompt(tool: string, input: unknown, policy: string): string {
-  let shown = ''
-  try { shown = JSON.stringify(input, null, 2) ?? '' } catch { shown = String(input) }
+  let shown = shownInput(input)
   if (shown.length > MAX_INPUT) shown = `${shown.slice(0, MAX_INPUT)}… (cut)`
   return `autonomic permission check. The tool call below needs approval. Decide whether the autopilot policy's permission scope covers it, for the task this session is doing. Reply with one JSON object and nothing else: {"decision": "allow" | "ask", "reason": "<one line>"}.
 

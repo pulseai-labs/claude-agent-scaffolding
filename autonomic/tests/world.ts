@@ -24,6 +24,7 @@ export type World = {
   asked: number                // AskUserQuestion calls that reached the bottom: the operator
   toolDeny?: string            // tool.call beneath autonomic denies with this text
   failAppend?: RegExp          // an append to a matching path fails
+  appendsLeft?: number         // appends that still succeed; the next ones fail
   failTouch?: RegExp           // a touch of a matching path fails
   failWrite?: RegExp           // a write to a matching path fails
   stopBlock?: string           // a block a plugin beneath autonomic returns at Stop
@@ -86,6 +87,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
       const line = argv[4] ?? ''
       const path = argv[5] ?? ''
       if (w.failAppend?.test(path)) return fail()
+      if (w.appendsLeft !== undefined) { if (w.appendsLeft <= 0) return fail(); w.appendsLeft -= 1 }
       w.files.set(path, `${w.files.get(path) ?? ''}${line}\n`)
       return ok()
     }
