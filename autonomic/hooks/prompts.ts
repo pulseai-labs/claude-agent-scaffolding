@@ -17,6 +17,7 @@ Cases:
 
 molt (context handoff): molt's warnings at 40% and 50% of the context window mean work goes on; they are never a reason to stop. Once molt has told the session to write its handoff now (65%), or the session has written it, the case is "waiting".
 
+A reply that asks the operator to approve or review a spec, design, plan or release scope, or to choose between options the scope does not decide, is "pain" even when it recommends one option: a recommendation is not a decision.
 When in doubt between "pain" and any other case, answer "pain".
 Every case gives "reason": one line naming the policy line or scope document that decides it.
 Shape: {"case": "...", "question": "...", "answer": "...", "next_step": "...", "reason": "..."}

@@ -4,7 +4,7 @@ import { askPrompt, permissionPrompt, scopeMessage, turnEndPrompt } from '../hoo
 describe('fork prompts', () => {
   test('the turn-end prompt carries the policy, the tail, every case and the molt rule', () => {
     const p = turnEndPrompt('…Shall I proceed?', 'POLICY-TEXT')
-    for (const s of ['POLICY-TEXT', '…Shall I proceed?', '"covered"', '"stalled"', '"waiting"', '"done"', '"pain"', '40%', '65%'])
+    for (const s of ['POLICY-TEXT', '…Shall I proceed?', '"covered"', '"stalled"', '"waiting"', '"done"', '"pain"', '40%', '65%', 'a recommendation is not a decision'])
       expect(p).toContain(s)
   })
   test('the ask prompt lists every question and its labels', () => {
