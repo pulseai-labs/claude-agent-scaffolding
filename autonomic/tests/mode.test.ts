@@ -18,6 +18,7 @@ describe('mode (spec §1)', () => {
     expect(parseCommand('status')).toEqual({ kind: 'status' })
     expect(parseCommand('')).toEqual({ kind: 'usage' })
     expect(parseCommand('onn')).toEqual({ kind: 'usage' })
+    expect(parseCommand(`on "docs/release plan.md" 'a b.md' c\\ d.md e.md`)).toEqual({ kind: 'on', scope: ['docs/release plan.md', 'a b.md', 'c d.md', 'e.md'] })
   })
   test('scope docs resolve', () => {
     expect(resolveDoc('a.md', '/repo', '/h')).toBe('/repo/a.md')

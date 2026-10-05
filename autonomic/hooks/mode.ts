@@ -12,8 +12,17 @@ export function parseEnvMode(v: string | undefined): { mode: Mode; invalid?: str
 
 export type Command = { kind: 'on'; scope: string[] } | { kind: 'off' } | { kind: 'status' } | { kind: 'usage' }
 
+// Words as a shell splits them: quotes and a backslash keep a space inside a path.
+function words(args: string): string[] {
+  const out: string[] = []
+  for (const m of args.matchAll(/(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|\\(.)|([^\s"'\\]+))+/g)) {
+    out.push(m[0].replace(/"((?:[^"\\]|\\.)*)"|'([^']*)'|\\(.)/g, (_, d, s, e) => d !== undefined ? d.replace(/\\(.)/g, '$1') : s ?? e))
+  }
+  return out
+}
+
 export function parseCommand(args: string): Command {
-  const [word, ...rest] = args.trim().split(/\s+/).filter(Boolean)
+  const [word, ...rest] = words(args)
   if (word === 'on') return { kind: 'on', scope: rest }
   if (word === 'off' && rest.length === 0) return { kind: 'off' }
   if (word === 'status' && rest.length === 0) return { kind: 'status' }

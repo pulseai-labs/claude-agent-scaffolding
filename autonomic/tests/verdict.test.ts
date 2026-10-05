@@ -38,6 +38,11 @@ describe('ask verdicts (spec §3.2, review focus 4)', () => {
     const v = parseAsk('{"covered":true,"answers":{"Which parts?":"A,B"},"reason":"r"}', M)
     expect(v).toEqual({ covered: true, answers: { 'Which parts?': 'A, B' }, reason: 'r' })
   })
+  test('a multi-select label that holds a comma is one label (PR #672 round 1)', () => {
+    const C = [{ question: 'Order?', options: [{ label: 'API, then UI' }, { label: 'UI' }], multiSelect: true }]
+    expect(parseAsk('{"covered":true,"answers":{"Order?":"API, then UI"},"reason":"r"}', C)?.covered).toBe(true)
+    expect(parseAsk('{"covered":true,"answers":{"Order?":"API, then UI, UI"},"reason":"r"}', C)?.covered).toBe(false)
+  })
   test('not covered is an answer; junk is not', () => {
     expect(parseAsk('{"covered":false,"reason":"open product question"}', Q)).toEqual({ covered: false, reason: 'open product question' })
     expect(parseAsk('{"covered":"yes"}', Q)).toBeUndefined()
