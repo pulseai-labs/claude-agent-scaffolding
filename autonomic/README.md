@@ -101,7 +101,10 @@ the **never-approve list** keeps the ask with you and rings:
 - `rm -r` of a path outside the worktree, or of a path autonomic cannot read (a variable, a
   quoted path, anything after a `cd`);
 - `--no-verify`, or `git commit -n` (a cluster such as `-nm` or `-uf` is read flag by flag);
-- a command the reader cannot follow — led by `bash`/`sh -c`, `eval`, `xargs`, `timeout`, `nice`, `find`, `ssh` and the like, a wrapper with options (`sudo -u`, `env -i`), or a backtick or `$(` outside quotes — when it names `push`, `rm`, `branch`, `commit` or `--no-verify` at all.
+- a push whose remote, refspec or flag is quoted or a variable — `git push origin "$BRANCH"` and
+  `git push -u origin "$(git branch --show-current)"` included, even to a feature branch: autonomic
+  cannot see what the shell will expand, so it does not guess;
+- a command the reader cannot follow — led by `bash`/`sh -c`, `eval`, `xargs`, `timeout`, `nice`, `find`, `ssh` and the like, a wrapper with options (`sudo -u`, `env -i`), or a backtick or `$(` outside quotes — when it names `push`, `rm`, `branch`, `commit` or `--no-verify` at all. A `$(…)` or backtick inside double quotes is read as a command of its own.
 
 The list reads each command segment with seat-mods' shell reader (copied, and held identical by
 `tests/test-mod-shell-parity.sh`). Otherwise the fork judges the call against the policy's

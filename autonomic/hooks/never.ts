@@ -121,8 +121,42 @@ function gitDirOf(tokens: readonly string[], dir: string | undefined, home: stri
   return at
 }
 
+// The bodies of $(…) and `…` inside double quotes: Bash runs them, though the shared reader
+// blanks the quoted text around them. Each body is read as a command of its own.
+function quotedSubstitutions(command: string): string[] {
+  const out: string[] = []
+  let inDouble = false
+  for (let i = 0; i < command.length; ) {
+    const c = command[i]
+    if (c === '\\') { i += 2; continue }
+    if (!inDouble && c === "'") { const j = command.indexOf("'", i + 1); i = j < 0 ? command.length : j + 1; continue }
+    if (c === '"') { inDouble = !inDouble; i += 1; continue }
+    if (inDouble && c === '$' && command[i + 1] === '(') {
+      let depth = 1
+      let j = i + 2
+      for (; j < command.length && depth > 0; j++) {
+        if (command[j] === '\\') j += 1
+        else if (command[j] === '(') depth += 1
+        else if (command[j] === ')') depth -= 1
+      }
+      out.push(command.slice(i + 2, depth === 0 ? j - 1 : j))
+      i = j
+      continue
+    }
+    if (inDouble && c === '`') {
+      const j = command.indexOf('`', i + 1)
+      out.push(command.slice(i + 1, j < 0 ? command.length : j))
+      i = j < 0 ? command.length : j + 1
+      continue
+    }
+    i += 1
+  }
+  return out
+}
+
 export function neverRules(command: string, where: Where): NeverRule[] {
   const found = new Set<NeverRule>()
+  for (const body of quotedSubstitutions(command)) for (const r of neverRules(body, where)) found.add(r)
   let cwd: string | undefined = where.cwd
   let dir: string | undefined = where.cwd   // followed through cd, for the repo check only
   for (const tokens of segments(command).flatMap(pieces)) {

@@ -96,4 +96,10 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
       'git commit -m "msg"', 'git commit -am "msg"', 'git commit -F "$f"', 'git commit --message "x" --author "A <a@b>"', 'rm -f x.txt'])
       expect([c, rules(c)]).toEqual([c, []])
   })
+  test('a substitution inside double quotes is read as a command (PR #672 round 3)', () => {
+    for (const c of ['echo "$(git push -f)"', 'OUT="$(git push origin main 2>&1)"', 'echo "`git push -f`"', 'X="a $(echo "$(git push -f)")"'])
+      expect([c, rules(c).length > 0]).toEqual([c, true])
+    for (const c of ['git commit -m "$(cat <<\'EOF\'\nfix(x): push the branch (see #1)\nEOF\n)"', 'echo "$(git branch --show-current)"', 'echo "push $(date)"'])
+      expect([c, rules(c)]).toEqual([c, []])
+  })
 })
