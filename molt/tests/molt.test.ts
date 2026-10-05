@@ -53,6 +53,21 @@ describe('a molt from a marker', () => {
     await $.classic.SessionStart(CLEAR('s2'))
     expect(w.prompts.at(-1)).not.toContain('/repo/old.md')
   })
+  test('a marker that names a directory does not molt', async ($, on) => {
+    const w = world(on)
+    w.dirs.add('/repo/docs')
+    at(w, 52)
+    await $.turn.complete(TURN('MOLT-HANDOFF: /repo/docs'))
+    expect(w.clears).toBe(0)
+  })
+  test('after /compact, a markdown file written before it is not the handoff', async ($, on) => {
+    const w = world(on, { files: { '/repo/old.md': '# old' } })
+    at(w, 52)
+    await $.tool.call({ tool: 'Write', file_path: '/repo/old.md', content: '# old' })
+    await $.classic.SessionStart({ source: 'compact', session_id: 's1' } as never)
+    await $.turn.complete(TURN('done'))
+    expect(w.clears).toBe(0)
+  })
   test('a relative marker path resolves against the cwd (review focus 4)', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
     at(w, 52)
@@ -204,6 +219,16 @@ describe('loop guards', () => {
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(0)
     expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
+  })
+  test('autopilot: /molt now lifts a no-progress pause and the molt goes ahead', async ($, on) => {
+    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
+    at(w, 52)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(0)
+    await $.command.run({ command: 'molt', args: 'now', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } } as never)
+    await $.prompt.submit({ text: w.fills.at(-1) ?? '', wait: false, origin: { kind: 'composer' } })
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(1)
   })
   test('autopilot: a staged write below soft is no progress', async ($, on) => {
     const w = world(on, { files: { [H]: '#', ...AUTOPILOT, '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })

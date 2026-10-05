@@ -27,6 +27,7 @@ export type World = {
   slowWrites?: RegExp          // fs.write to a matching path takes 20 ms
   staged?: boolean             // Write/Edit results come back staged: held for review, file unchanged
   notices: unknown[]           // every value molt wrote to its notice, in order
+  dirs: Set<string>            // paths that exist as directories: exists, but cannot be read
   stopBlock?: string           // a block another plugin beneath molt returns at Stop
 }
 
@@ -38,7 +39,7 @@ const ZERO = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, ca
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string> } = {}): World {
   const w: World = {
     files: new Map(Object.entries(opts.files ?? {})),
-    runs: [], prompts: [], fills: [], hasBox: true, clears: 0, clearTo: [], notices: [], toasts: [], statuses: [],
+    runs: [], prompts: [], fills: [], hasBox: true, clears: 0, clearTo: [], notices: [], dirs: new Set(), toasts: [], statuses: [],
     usage: { tokens: 100_000, window: 1_000_000 },
     session: { id: 's1', cwd: '/repo' },
     messages: [],
@@ -58,6 +59,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   on('session.usage', () => ({ value: { startedAt: 0, context: { ...w.usage, breakdown: w.breakdown }, rateLimits: [] } }) as never)
   on('session.messages', () => ({ value: w.messages }) as never)
   on('fs.read', (_$, e) => {
+    if (w.dirs.has(e.path)) return { deny: `EISDIR: ${e.path}` } as never
     const text = w.files.get(e.path)
     return (text === undefined ? { deny: `ENOENT: ${e.path}` } : { value: text }) as never
   })
@@ -67,7 +69,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     w.files.set(e.path, e.text)
     return { value: undefined } as never
   })
-  on('fs.exists', (_$, e) => ({ value: w.files.has(e.path) }) as never)
+  on('fs.exists', (_$, e) => ({ value: w.files.has(e.path) || w.dirs.has(e.path) }) as never)
   on('process.run', (_$, e) => {
     const argv = [...e.argv]
     w.runs.push(argv)

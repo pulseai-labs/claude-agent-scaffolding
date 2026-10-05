@@ -54,6 +54,11 @@ async function readText($: Engine, path: string): Promise<string | undefined> {
   }
 }
 
+// A handoff must be a file the resumed session can read; a directory exists but cannot be.
+async function isReadableFile($: Engine, path: string): Promise<boolean> {
+  return (await readText($, path)) !== undefined
+}
+
 async function log($: Engine, line: string): Promise<void> {
   try {
     await $.process.run(['sh', '-c', 'mkdir -p "$(dirname "$2")" && printf "%s\\n" "$1" >> "$2"',
@@ -144,7 +149,8 @@ async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<voi
     return pause($, sessionId, `molt paused: ${unattended} molts in a row with no message from you. ` +
       `Send a message to resume; the handoff is at ${handoff.path}.`, undefined)
   }
-  if (record.mode === 'autopilot' && own !== undefined && progress === 0) {
+  // /molt now is the operator asking for this molt: it is not a loop, whatever the progress.
+  if (record.mode === 'autopilot' && own !== undefined && progress === 0 && !forced.has(sessionId)) {
     return pause($, sessionId, 'molt paused: no progress since the last molt (no Write, Edit or commit). ' +
       `Autopilot stops here; the handoff is at ${handoff.path}.`, record.bell)
   }
@@ -249,6 +255,10 @@ export const register: Register = (on, options) => {
         stage = 'below'
         lastPercent = undefined
         unmeasured = 0
+        // A compact keeps the session id: the new window gets a whole handoff cycle again.
+        nudged.delete(e.session_id)
+        stopBlocks.delete(e.session_id)
+        lastMd.delete(e.session_id)
       }
       if (e.source === 'clear' && pending !== undefined) {
         const p = pending
@@ -360,7 +370,7 @@ export const register: Register = (on, options) => {
       let missing: string | undefined
       if (marker !== undefined) {
         const path = resolvePath(marker, await $.session.cwd(), await home($))
-        if (await $.fs.exists(path)) return r
+        if (await isReadableFile($, path)) return r
         missing = path
       }
       const n = stopBlocks.get(sessionId) ?? 0
@@ -368,7 +378,7 @@ export const register: Register = (on, options) => {
       stopBlocks.set(sessionId, n + 1)
       const text = missing === undefined
         ? await instruction($, sessionId)
-        : `molt: the MOLT-HANDOFF line names ${missing}, but ${missing} does not exist. Write the handoff file, then end your reply with MOLT-HANDOFF: <its absolute path>.`
+        : `molt: the MOLT-HANDOFF line names ${missing}, but ${missing} does not exist or is not a readable file. Write the handoff file, then end your reply with MOLT-HANDOFF: <its absolute path>.`
       return { ...r, block: r.block === undefined ? text : `${r.block}\n\n${text}` }
     } catch (err) {
       await log($, `Stop error ${String(err)}`)
@@ -413,7 +423,7 @@ export const register: Register = (on, options) => {
       const marker = markerPath(e.answer)
       const resolved = marker === undefined ? undefined : resolvePath(marker, await $.session.cwd(), await home($))
       let handoff = pickHandoff(resolved, lastMd.get(sessionId))
-      if (handoff !== undefined && !(await $.fs.exists(handoff.path))) {
+      if (handoff !== undefined && !(await isReadableFile($, handoff.path))) {
         await log($, `handoff path missing session=${sessionId} path=${handoff.path}`)
         handoff = undefined
       }

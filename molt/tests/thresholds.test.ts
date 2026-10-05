@@ -48,6 +48,18 @@ describe('past soft', () => {
     w.usage = { window: 1_000_000 }
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeUndefined()
   })
+  test('after /compact the nudge and both Stop asks come back', async ($, on) => {
+    const w = world(on); at(w, 52)
+    expect((await $.classic.Stop(STOP('done'))).block).toContain('MOLT-HANDOFF:')
+    expect((await $.classic.Stop(STOP('done'))).block).toContain('MOLT-HANDOFF:')
+    expect((await $.classic.Stop(STOP('done'))).block).toBeUndefined()
+    await $.classic.SessionStart({ source: 'compact', session_id: 's1' } as never)
+    expect((await $.classic.Stop(STOP('done'))).block).toContain('MOLT-HANDOFF:')
+  })
+  test('a marker that names a directory is blocked like a missing file', async ($, on) => {
+    const w = world(on); w.dirs.add('/r/docs'); at(w, 52)
+    expect((await $.classic.Stop(STOP('ok\nMOLT-HANDOFF: /r/docs'))).block).toContain('/r/docs')
+  })
   test('a marker that names a missing file is blocked with its path (review focus 4)', async ($, on) => {
     const w = world(on); at(w, 52)
     expect((await $.classic.Stop(STOP('ok\nMOLT-HANDOFF: /r/typo.md'))).block).toContain('/r/typo.md does not exist')

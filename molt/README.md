@@ -29,7 +29,7 @@ and to end its reply with one line:
 MOLT-HANDOFF: <absolute path of the handoff file>
 ```
 
-At the end of that turn, molt checks that the file exists, runs `/clear`, writes the lineage
+At the end of that turn, molt checks that it names a readable file, runs `/clear`, writes the lineage
 record, and submits one seed prompt: continue from the handoff at `<path>` (with
 `ossify:handoff-resume` where it is installed). A relative path resolves against the session's
 working directory; `~/` resolves against `$HOME`. Below soft (and without `/molt now`) a
