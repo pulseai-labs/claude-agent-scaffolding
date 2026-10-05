@@ -165,14 +165,15 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
               route=close-finished
             else route=halt:dirty-worktree; fi
           elif [ "$hab" = - ]; then route=halt:work-lost
+          elif [ "$merged" = yes ]; then route=finish-status
           # reattach is a repair for a directory that is GONE (spec §2); when a
           # path exists but is not a linked worktree, `oss worktree_reattach`
           # refuses (rc 8) - and the lane meets that refusal only after its
           # earlier repairs have already mutated state (§3 step 5 runs item
           # repairs after repo repairs), breaking "halts before any mutation".
-          # Halt here instead, where the halt is still pre-mutation.
+          # The check guards ONLY the reattach decision (round 3): a merged
+          # item's repair is finish-status, which touches no worktree.
           elif [ -e "$wtp" ]; then route=halt:unclassified
-          elif [ "$merged" = yes ]; then route=finish-status
           elif [ "$wtp" = "$conv" ]; then route=reattach
           else route=halt:unclassified; fi ;;
         *) route=halt:unclassified ;;

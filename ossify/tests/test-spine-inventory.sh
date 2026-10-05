@@ -199,6 +199,17 @@ rm -rf "$WT"; mkdir -p "$WT"; inv "$F"
 t_assert_eq "halt:planned-with-worktree" "$(route r0.s1.w1)" "S20: a planned item with an exec record and a plain dir halts, not reattach"
 t_assert_rc 3 "S20: ...rc 3"
 
+# S21 (fix round 3): a MERGED active item routes finish-status even when the recorded path
+# exists as a non-worktree directory: the existence check guards ONLY the reattach decision,
+# and finish-status touches no worktree. S19 above stays the halt control (unmerged + plain
+# dir); order: work-lost -> merged -> finish-status -> path exists -> reattach.
+F="$TMP/s21"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm "close r0.s1.w1"
+git -C "$F/core" merge -q --no-ff work/r0.s1.w1-one -m "merge r0.s1.w1"
+rm -rf "$WT"; mkdir -p "$WT"; inv "$F"
+t_assert_eq "finish-status" "$(route r0.s1.w1)" "S21: merged + a plain dir at the recorded path is finish-status"
+t_assert_rc 0 "S21: ...rc 0 - not a halt"
+
 # S12: complete but not merged -> halt:state-claims-merge (control: S1's merged item is skip).
 F="$TMP/s12"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
 echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm c
