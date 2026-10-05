@@ -31,6 +31,38 @@ describe('a molt from a marker', () => {
     await $.classic.SessionStart(CLEAR('s2'))
     expect(w.prompts.at(-1)).toContain(H)
   })
+  test('nothing after the clear stops the seed: a refused notice write', async ($, on) => {
+    const w = world(on, { files: { [H]: '# handoff' } })
+    w.failNotices = true
+    w.clearTo.push('s2')
+    at(w, 52)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    await $.classic.SessionStart(CLEAR('s2')).catch(() => undefined)
+    expect(w.prompts.at(-1)).toContain(H)
+  })
+  test('nothing after the clear stops the seed: another plugin failing at SessionStart', async ($, on) => {
+    const w = world(on, { files: { [H]: '# handoff' } })
+    w.failSessionStart = true
+    w.clearTo.push('s2')
+    at(w, 52)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    await $.classic.SessionStart(CLEAR('s2')).catch(() => undefined)
+    expect(w.prompts.at(-1)).toContain(H)
+    w.failSessionStart = false
+    at(w, 80)
+    expect((await $.tool.call({ tool: 'Read', file_path: '/repo/a' } as never)).deny).toBeDefined()
+  })
+  test('a seed rejected while "resumed" is being written still leaves the warning', async ($, on) => {
+    const w = world(on, { files: { [H]: '# handoff' } })
+    w.rejectSeeds = true
+    w.slowInfoNotices = true
+    w.clearTo.push('s2')
+    at(w, 52)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    await $.classic.SessionStart(CLEAR('s2'))
+    for (let i = 0; i < 5; i++) await $.prompt.submit({ text: 'tick', wait: false, origin: { kind: 'sdk' } } as never)
+    expect((w.notices.at(-1) as { tone?: string } | null)?.tone).toBe('warn')
+  })
   test('a rejected seed leaves the warning, not "resumed"', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
     w.rejectSeeds = true

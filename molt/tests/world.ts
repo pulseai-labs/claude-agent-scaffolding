@@ -28,6 +28,9 @@ export type World = {
   staged?: boolean             // Write/Edit results come back staged: held for review, file unchanged
   notices: unknown[]           // every value molt wrote to its notice, in order
   dirs: Set<string>            // paths that exist as directories: exists, but cannot be read
+  failNotices?: boolean        // molt's notice write is refused (another mod, or the state store)
+  slowInfoNotices?: boolean    // an info notice write takes 20 ms (a rejection can land meanwhile)
+  failSessionStart?: boolean   // a plugin beneath molt throws in its SessionStart hook
   stopBlock?: string           // a block another plugin beneath molt returns at Stop
 }
 
@@ -49,8 +52,10 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   }
   mock.env(on, { HOME: '/home/u', ...(opts.env ?? {}) })
   mock.store(on)
-  on('state.set', (_$, e, next) => {
+  on('state.set', async (_$, e, next) => {
     const w8 = e as unknown as { key?: string; value?: unknown }
+    if (w8.key === 'notice' && w.failNotices) return { deny: 'state refused' } as never
+    if (w8.key === 'notice' && w.slowInfoNotices && (w8.value as { tone?: string } | null)?.tone === 'info') await new Promise(resolve => sleep(resolve, 20))
     if (w8.key === 'notice') w.notices.push(w8.value)
     return next(e)
   })
@@ -107,7 +112,10 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   }) as never)
   on('classic.Stop', () => (w.stopBlock === undefined ? {} : { block: w.stopBlock }))
   on('classic.PostToolUse', () => ({}))
-  on('classic.SessionStart', () => ({}))
+  on('classic.SessionStart', () => {
+    if (w.failSessionStart) throw new Error('another plugin failed')
+    return {}
+  })
   on('turn.complete', (_$, e) => ({ text: e.answer }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
   on('session.end', (_$, e) => ({ sessionId: e.sessionId }) as never)

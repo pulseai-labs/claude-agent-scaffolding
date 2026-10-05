@@ -177,6 +177,38 @@ async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<voi
   })
 }
 
+// The seed of a molt that has cleared the session. It is submitted before any step that
+// can fail; every step after it is best-effort, and a rejection's warning always wins.
+async function seed($: Engine, sessionId: string, p: NonNullable<typeof pending>): Promise<void> {
+  // Counted here, once the clear happened: a /clear that is rejected or never clears is not
+  // a molt for the loop guards.
+  unattended += 1
+  progress = 0
+  forced.delete(p.oldSession)
+  seeded = { session: sessionId }
+  let text = fill(DEFAULT_SEED, { path: p.handoff })
+  try { text = fill(await template($, cfg.seedTemplate, DEFAULT_SEED), { path: p.handoff }) } catch {}
+  const warning = { text: `molt: the seed was rejected. Resume by hand from ${p.handoff}.`, tone: 'warn' } as const
+  let rejected = false
+  // Not awaited: the seed's turn cannot start until this hook returns.
+  $.prompt.submit({ text }).catch(async (err: unknown) => {
+    rejected = true
+    try { await setNotice($, warning) } catch {}
+    await log($, `seed rejected session=${sessionId} ${String(err)}`)
+  })
+  try {
+    await setNotice($, { text: `molt: resumed from ${p.handoff}`, tone: 'info' })
+    if (rejected) await setNotice($, warning)
+  } catch {}
+  try {
+    const lineage: Lineage = { from: p.oldSession, chain: p.chain, depth: p.depth, handoff: p.handoff }
+    await $.fs.write(lineagePath(await home($), sessionId), `${JSON.stringify(lineage, null, 2)}\n`)
+  } catch (err) {
+    await log($, `lineage write failed session=${sessionId} ${String(err)}`)
+  }
+  await log($, `seeded session=${sessionId} from=${p.oldSession} depth=${p.depth}`)
+}
+
 function showStatus($: Engine, sessionId: string): void {
   if (off.has(sessionId)) return $.ui.status('molt: off')
   if (paused === sessionId) return $.ui.status('molt: paused')
@@ -246,52 +278,30 @@ export const register: Register = (on, options) => {
   })
 
   on('classic.SessionStart', async ($, e, next) => {
+    // A molt's seed goes out first. The session is already cleared, so nothing after this
+    // point — another plugin's SessionStart included — may stop it.
+    const p = e.source === 'clear' ? pending : undefined
+    if (p !== undefined) pending = undefined
+    // Module state survives a clear, a compact and a resume; the fill it measured does not.
+    if (e.source === 'clear' || e.source === 'compact' || e.source === 'resume') {
+      stage = 'below'
+      lastPercent = undefined
+      unmeasured = 0
+      // A compact keeps the session id: the new window gets a whole handoff cycle again.
+      nudged.delete(e.session_id)
+      stopBlocks.delete(e.session_id)
+      lastMd.delete(e.session_id)
+    }
+    if (p !== undefined) {
+      try { await seed($, e.session_id, p) } catch (err) { await log($, `seed error ${String(err)}`) }
+    }
+    inFlight = false
     const r = await next(e)
     try {
       if (e.source === 'startup') await writeMissingTemplates($)
       await touchActive($, e.session_id)
-      // Module state survives a clear, a compact and a resume; the fill it measured does not.
-      if (e.source === 'clear' || e.source === 'compact' || e.source === 'resume') {
-        stage = 'below'
-        lastPercent = undefined
-        unmeasured = 0
-        // A compact keeps the session id: the new window gets a whole handoff cycle again.
-        nudged.delete(e.session_id)
-        stopBlocks.delete(e.session_id)
-        lastMd.delete(e.session_id)
-      }
-      if (e.source === 'clear' && pending !== undefined) {
-        const p = pending
-        pending = undefined
-        // Counted here, once the clear happened: a /clear that is rejected or never clears
-        // is not a molt for the loop guards.
-        unattended += 1
-        progress = 0
-        forced.delete(p.oldSession)
-        const sessionId = e.session_id
-        seeded = { session: sessionId }
-        // The session is already cleared: nothing below may stop the seed from going out.
-        let seedText = fill(DEFAULT_SEED, { path: p.handoff })
-        try { seedText = fill(await template($, cfg.seedTemplate, DEFAULT_SEED), { path: p.handoff }) } catch {}
-        // Set before the submit: a rejection's warning must land after it, never under it.
-        await setNotice($, { text: `molt: resumed from ${p.handoff}`, tone: 'info' })
-        // Not awaited: the seed's turn cannot start until this hook returns.
-        $.prompt.submit({ text: seedText }).catch(async (err: unknown) => {
-          await setNotice($, { text: `molt: the seed was rejected. Resume by hand from ${p.handoff}.`, tone: 'warn' })
-          await log($, `seed rejected session=${sessionId} ${String(err)}`)
-        })
-        try {
-          const lineage: Lineage = { from: p.oldSession, chain: p.chain, depth: p.depth, handoff: p.handoff }
-          await $.fs.write(lineagePath(await home($), sessionId), `${JSON.stringify(lineage, null, 2)}\n`)
-        } catch (err) {
-          await log($, `lineage write failed session=${sessionId} ${String(err)}`)
-        }
-        await log($, `seeded session=${sessionId} from=${p.oldSession} depth=${p.depth}`)
-      }
     } catch (err) {
       await log($, `SessionStart error ${String(err)}`)
-    } finally {
-      inFlight = false
     }
     return r
   })
