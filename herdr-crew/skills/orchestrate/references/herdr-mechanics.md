@@ -51,6 +51,11 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    coordinator records that in its report file (to the top), the top records one from its
    own launches to the operator, and a missing status line halts no seat, re-launches none
    and is never silently dropped.
+   **A molt is not a launch.** An in-place molt (`lifecycle.md`, "Where molt runs") keeps the
+   pane's process and its exports, so every marking above stands across it — the top's
+   `orchestrator`, every `coordinator`, every guarded role — and seat-mods reads the role from
+   the environment on every tool call. The status-line check belongs to the launch read; a
+   heartbeat or later read that finds no `seat: <role>` after a molt is not a missing marking.
 3. **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry —
    re-running a **launch** command into a pane whose foreground process is already that
    agent's TUI delivers its line as a prompt, the mechanism the undetected seat's one-line

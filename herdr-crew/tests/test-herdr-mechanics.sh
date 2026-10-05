@@ -65,7 +65,9 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=275
+# 0.2.8 (#659) added step 2's "A molt is not a launch" clause — an in-place molt keeps
+# every marking, and the status-line check is the launch read's: 275 -> 280.
+REF_BUDGET=280
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -178,6 +180,19 @@ else
   pass "control: one line over the real reference file is refused"
 fi
 rm -f "$ctl"
+
+# 0.2.8 (#659): an in-place molt keeps the pane process and its exports, so every
+# marking survives it (probe P9: a reviewer's guard and status both held across a
+# mod-run /clear); the status-line check is scoped to the launch read, and a heartbeat
+# read after a molt that misses it is not a missing marking (peer correction 2).
+section "a molt is not a launch (0.2.8)"
+pin "$REF" "**A molt is not a launch.**" "step 2: the molt clause exists" flat
+pin "$REF" "keeps the pane's process and its exports, so every marking above stands across it" \
+  "step 2: an in-place molt keeps every marking" flat
+pin "$REF" "seat-mods reads the role from the environment on every tool call" \
+  "step 2: the guard does not depend on the status line" flat
+pin "$REF" "a heartbeat or later read that finds no \`seat: <role>\` after a molt is not a missing marking" \
+  "step 2: the no-guards rule is scoped to the launch read" flat
 
 section "no personal name ships"
 hits=0
