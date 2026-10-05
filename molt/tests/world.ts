@@ -9,6 +9,7 @@ export type World = {
   files: Map<string, string>
   runs: string[][]
   prompts: string[]
+  contexts: string[]           // what reached the model beside each prompt, in order
   fills: string[]              // what molt put in the prompt box
   hasBox: boolean              // false: the session binds no prompt box (a -p run)
   clears: number
@@ -42,7 +43,7 @@ const ZERO = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, ca
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string> } = {}): World {
   const w: World = {
     files: new Map(Object.entries(opts.files ?? {})),
-    runs: [], prompts: [], fills: [], hasBox: true, clears: 0, clearTo: [], notices: [], dirs: new Set(), toasts: [], statuses: [],
+    runs: [], prompts: [], contexts: [], fills: [], hasBox: true, clears: 0, clearTo: [], notices: [], dirs: new Set(), toasts: [], statuses: [],
     usage: { tokens: 100_000, window: 1_000_000 },
     session: { id: 's1', cwd: '/repo' },
     messages: [],
@@ -104,6 +105,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   on('prompt.submit', (_$, e) => {
     if (w.rejectSeeds && e.origin.kind === 'plugin') throw new Error('prompt refused')
     w.prompts.push(e.text)
+    w.contexts.push(...(e.context ?? []))
     return { text: e.text } as never
   })
   on('tool.call', (_$, e) => ({
