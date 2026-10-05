@@ -102,12 +102,18 @@ async function guard($: Engine, rec: Live): Promise<Live> {
   return clean
 }
 
-async function save($: Engine, id: string, rec: Live): Promise<void> {
-  live.set(id, rec)
+// A record that cannot be written cannot reach a molt successor: autopilot ends (spec §4).
+async function save($: Engine, id: string, rec: Live): Promise<Live> {
+  let out = rec
   if (safeSessionId(id)) {
-    try { await $.fs.write(sessionPath(await home($), id), serializeRecord(rec)) } catch (err) { await log($, `record write failed session=${id} ${String(err)}`) }
+    try { await $.fs.write(sessionPath(await home($), id), serializeRecord(rec)) } catch (err) {
+      await log($, `record write failed session=${id} ${String(err)}`)
+      if (rec.mode === 'autopilot') out = { ...rec, mode: 'manual', problem: 'record not writable' }
+    }
   }
-  $.ui.status(statusText(rec))
+  live.set(id, out)
+  $.ui.status(statusText(out))
+  return out
 }
 
 // The record for the current session: its own file, else its molt parent's (amendment
@@ -115,7 +121,13 @@ async function save($: Engine, id: string, rec: Live): Promise<void> {
 async function modeOf($: Engine): Promise<Live> {
   const id = await $.session.id()
   const known = live.get(id)
-  if (known !== undefined) return known
+  // The policy is read again each time: one removed mid-session ends autopilot (spec §4).
+  if (known !== undefined && (known.mode !== 'autopilot' || (await policyText($)) !== undefined)) return known
+  if (known !== undefined) {
+    const off = await save($, id, { ...known, mode: 'manual', problem: 'no policy' })
+    $.ui.toast('autonomic: autopilot refused — no policy')
+    return off
+  }
   const h = await home($)
   const safe = safeSessionId(id)
   let rec: Live | undefined = safe ? parseRecord(await readText($, sessionPath(h, id))) : undefined
@@ -129,8 +141,7 @@ async function modeOf($: Engine): Promise<Live> {
     const bell = await bellOf($)
     rec = { mode: env.mode, scope: [], source: 'env', ...(bell === undefined ? {} : { bell }), ...(env.invalid === undefined ? {} : { invalid: env.invalid }) }
   }
-  const checked = await guard($, rec)
-  await save($, id, checked)
+  const checked = await save($, id, await guard($, rec))
   if (checked.problem !== undefined) $.ui.toast(`autonomic: autopilot refused — ${checked.problem}`)
   return checked
 }
@@ -334,10 +345,10 @@ export const register: Register = (on, options) => {
     for (const p of scope) if ((await readText($, p)) === undefined) missing.push(p)
     if (missing.length > 0) return { text: `autopilot stays ${prev.mode}: cannot read ${missing.join(', ')}.` }
     const bell = prev.bell ?? (await bellOf($))
-    const rec = await guard($, { mode: 'autopilot', scope, source: 'command', ...(bell === undefined ? {} : { bell }) })
-    await save($, id, rec)
+    const rec = await save($, id, await guard($, { mode: 'autopilot', scope, source: 'command', ...(bell === undefined ? {} : { bell }) }))
     if (rec.mode !== 'autopilot') {
-      const fix = rec.problem === 'no policy' ? `Write ${expandHome(cfg.policyPath, h)}.` : `Check that ${await ledgerPath($)} can be written.`
+      const fix = rec.problem === 'no policy' ? `Write ${expandHome(cfg.policyPath, h)}.`
+        : rec.problem === 'record not writable' ? `Check that ${sessionPath(h, id)} can be written.` : `Check that ${await ledgerPath($)} can be written.`
       return { text: `autopilot refused: ${rec.problem}. ${fix}` }
     }
     pushes.delete(id)

@@ -25,6 +25,7 @@ export type World = {
   toolDeny?: string            // tool.call beneath autonomic denies with this text
   failAppend?: RegExp          // an append to a matching path fails
   failTouch?: RegExp           // a touch of a matching path fails
+  failWrite?: RegExp           // a write to a matching path fails
   stopBlock?: string           // a block a plugin beneath autonomic returns at Stop
   usage: { tokens?: number; window: number; percent?: number }   // the context figure
   readOnly?: boolean           // core marks every tool call read-only
@@ -63,7 +64,11 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     const text = w.files.get(e.path)
     return (text === undefined ? { deny: `ENOENT: ${e.path}` } : { value: text }) as never
   })
-  on('fs.write', (_$, e) => { w.files.set(e.path, e.text); return { value: undefined } as never })
+  on('fs.write', (_$, e) => {
+    if (w.failWrite?.test(e.path)) return { deny: `EACCES: ${e.path}` } as never
+    w.files.set(e.path, e.text)
+    return { value: undefined } as never
+  })
   on('fs.exists', (_$, e) => ({ value: w.files.has(e.path) }) as never)
   on('process.run', (_$, e) => {
     const argv = [...e.argv]

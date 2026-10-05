@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { ledgerLines, world } from './world'
+import { POLICY, ledgerLines, world } from './world'
 
 const AP = { AUTONOMIC_MODE: 'autopilot' }
 const BASH = (command: string) => ({ tool: 'Bash', input: { command } }) as never
@@ -44,6 +44,22 @@ describe('the permission reflex (spec §3.3)', () => {
     expect((await $.tool.check(BASH('y'))).decision).toBe('deny')
     expect(w.forkPrompts).toEqual([])
     expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(1)
+  })
+  test('a hard deny of a user-dialog tool rings too (PR #672 round 1)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'deny', reason: 'settings deny' }
+    expect((await $.tool.check({ tool: 'ExitPlanMode', input: {} } as never)).decision).toBe('deny')
+    expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(1)
+  })
+  test('a policy removed mid-session ends autopilot: no fork, the ask stands (PR #672 round 1)', async ($, on) => {
+    const w = world(on, { env: AP })
+    expect((await $.tool.check(BASH('make'))).decision).toBe('ask')
+    const before = w.forkPrompts.length
+    w.files.delete(POLICY)
+    w.forks.push(fork({ decision: 'allow', reason: 'r' }))
+    expect((await $.tool.check(BASH('make'))).decision).toBe('ask')
+    expect(w.forkPrompts).toHaveLength(before)
+    expect(w.statuses.at(-1)).toBe('autopilot: no policy')
   })
   test('manual: no fork, the ask stands', async ($, on) => {
     const w = world(on)
