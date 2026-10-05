@@ -36,8 +36,8 @@ sequence (take exact flag syntax from `herdr --skill`):
 ```bash
 herdr workspace create --cwd <path> --label "run: <objective>"   # once per run, not per seat
 herdr tab create --workspace <id> --cwd <path> --label "seat: <role> (<agent>)"
-herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir>"   # implementer, verifier or reviewer seat only, before its command; herdr-mechanics.md step 2
-herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator"   # a coordinator seat only — the spine, close or work-PR session, a `/ossify:doctor` session, the lane driver — before its command, with no SEAT_MODS_ALLOW; herdr-mechanics.md step 2
+herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status"   # implementer, verifier or reviewer seat only, before its command; herdr-mechanics.md step 2
+herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status"   # a coordinator seat only — the spine, close or work-PR session, a `/ossify:doctor` session, the lane driver — before its command, with no SEAT_MODS_ALLOW; herdr-mechanics.md step 2
 herdr pane run <pane> "<command:>"
 herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>
 herdr pane read <pane>                      # confirm expected_model: before dispatch
@@ -74,7 +74,9 @@ is never sent the probe, and rotates at its item boundary instead, on the run's 
 the item it has just finished, not a probe it cannot answer. The
 implementer returns its handoff inputs in its report file; the orchestrator writes the
 handoff into the next brief. Rotation happens between work items, never mid-PR: the
-retained implementer finishes the PR's fix rounds unless the harness auto-compacts.
+retained implementer finishes the PR's fix rounds unless the harness auto-compacts or molt
+warns it: a warned seat gets no new unit, and its next one goes to a fresh seat
+(`herdr-mechanics.md`, "A child past molt's warnings").
 The reviewer owns nothing durable and is released the moment its report file is
 processed; the verifier seat is retained across a fail-and-fix cycle on the same item
 — the re-check attaches its task to the same verifier — and is released only when the

@@ -66,12 +66,14 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=209          # A3: each ossify reference stays under 209 lines.
+REF_BUDGET=214          # A3: each ossify reference stays under 209 lines.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
                         # each launch site gained; the files' own maximum is 209
                         # (`ossify-nested-run.md`), and the budget section's adjacent
                         # control holds the gate at that minimum — one line over the
                         # longest budgeted reference is still refused.
+                        # 0.2.8: raised for the molt clauses — nested-run §4 (211), the spine brief (214), then the
+                        # spine, work-PR and leaf MOLT lines; it always equals the maximum.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
@@ -390,7 +392,9 @@ section "one mechanic, one statement"
 # per-file: the two non-brief references state no herdr command at all, and in a
 # brief file every `herdr agent ` occurrence IS the ping line — counted both
 # ways, so any other agent command breaks the equality. The adjacent control
-# below proves the equality still flags one.
+# below proves the equality still flags one. 0.2.8: a leaf template's MOLT line states the
+# worker's second own ping, `MOLT WARNING`, to the same NOTIFY_PANE, for the same reason —
+# so each count below adds one per MOLT line in that file.
 PING_CMD='herdr agent prompt <NOTIFY_PANE>'
 agent_commands_are_pings() { # <file> <expected ping lines>
   _a="$(count_of "$1" 'herdr agent ')" || return 1
@@ -406,7 +410,7 @@ for f in "$EXEC_MD" "$NESTED_MD"; do
   if agent_commands_are_pings "$f" 0; then pass "${f##*/} states no herdr-agent command"
   else fail "${f##*/} states no herdr-agent command" "an agent command is back"; fi
 done
-for pair in "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:1"; do
+for pair in "$BRIEFS_MD:6" "$PRBRIEFS_MD:4" "$WRITER_MD:2"; do
   _f="${pair%:*}"; _want="${pair##*:}"
   if agent_commands_are_pings "$_f" "$_want"; then pass "${_f##*/}: every herdr-agent command is the ping line ($_want)"
   else fail "${_f##*/}: every herdr-agent command is the ping line" "expected $_want of each"; fi
@@ -1977,8 +1981,8 @@ pin "$MECHANICS_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role>' \
 pin "$MECHANICS_MD" 'A project-file role whose `replaces:` names one of those roles is guarded as that role' \
   "a replacing project-file role is guarded as the role it replaces"
 
-pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir>"' \
-  "roles.md's launch block shows the guard export as the send into the seat's pane"
+pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status"' \
+  "roles.md's launch block shows the guard export, molt marking included, as the send into the seat's pane"
 pin "$ROLES_MD" 'implementer, verifier or reviewer seat only, before its command' \
   "roles.md scopes the export to the guarded roles"
 
@@ -2057,8 +2061,10 @@ pin "$ROLES_MD" '`work-PR session`), marked `coordinator` before its command' \
   "roles.md's budget marks the close and work-PR launches" flat
 pin "$ROLES_MD" 'seat of the same name, marked `coordinator`' \
   "roles.md marks the doctor session's launch" flat
-pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator"' \
-  "roles.md's launch block shows the coordinator export"
+pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status"' \
+  "roles.md's launch block shows the coordinator export, molt marking included"
+absent "$MECHANICS_MD" 'SEAT_MODS_ROLE=orchestrator MOLT_HANDOFF' "the top's successor export carries no molt marking"
+absent "$ROLES_MD" 'SEAT_MODS_ROLE=orchestrator MOLT_HANDOFF' "roles.md carries no marked orchestrator export"
 pin "$COMMAND_MD" 'start one spine session — marked `coordinator`' \
   "commands/orchestrate.md marks the spine start" flat
 pin "$LIFECYCLE_MD" 'A declared role with no `replaces:` is marked a guarded `implementer`' \
@@ -2189,6 +2195,94 @@ for f in "${SHIPPED[@]}"; do
   if [ "$h" -eq 0 ]; then pass "no invalid SEAT_MODS_ROLE value in ${f##*/}"
   else fail "no invalid SEAT_MODS_ROLE value in ${f##*/}" "$h occurrence(s) — the value must be implementer, verifier, reviewer, coordinator, orchestrator or the <role> slot, terminated by end of line, whitespace or its closing quote"; fi
 done
+
+# 0.2.8: molt's warnings replace the ceiling notice where molt runs (0.2.6 silences the
+# hook on molt's marker). Every seat but the top hands off to its parent; the top molts
+# in place. Carried by hand from closed PR #669 where marked; the rotation pins above
+# are untouched (/molt off and a host without molt keep them).
+section "molt (0.2.8)"
+pin "$LIFECYCLE_MD" 'Where molt runs, its warnings take the notice'"'"'s place' \
+  "lifecycle: the ladder replaces the notice where molt runs" flat
+pin "$LIFECYCLE_MD" "**Where molt runs, you molt in place instead.**" "lifecycle: the top's molt path exists (#669)" flat
+pin "$LIFECYCLE_MD" 'take your next fully acknowledged delivery with no operator question in flight, or hand off at once when nothing is in flight' \
+  "lifecycle: the top's warning boundary" flat
+pin "$LIFECYCLE_MD" 'add to it the id of every background task you have running' \
+  "lifecycle: the top's molt handoff lists live task ids (#669)" flat
+pin "$LIFECYCLE_MD" 'a wake or message that reaches you after it is added to it verbatim, never acted on' \
+  "lifecycle: a wake after the top's handoff is handed over (Review Focus 5)" flat
+pin "$LIFECYCLE_MD" 'There is no stand-down and no successor launch' "lifecycle: the molt path launches nothing (#669)" flat
+pin "$LIFECYCLE_MD" 'It arms no wait and no heartbeat the handoff lists' "lifecycle: the resumed top re-arms nothing listed (#669)" flat
+pin "$LIFECYCLE_MD" 'A heartbeat tick the handoff carries means that heartbeat has ended' \
+  "lifecycle: a carried tick re-arms the heartbeat (#669)" flat
+pin "$LIFECYCLE_MD" 'runs the generation check once per live dispatch against the hash and identity the handoff noted' \
+  "lifecycle: a report landed across the clear is acted on once (#669)" flat
+pin "$LIFECYCLE_MD" 'With `/molt off` the marker goes, the hook speaks again, and the rotation above applies.' \
+  "lifecycle: /molt off falls back to the rotation (#669)" flat
+pin "$NESTED_MD" 'A spine session that rotated on a molt warning returns the same `rotate:`' \
+  "nested-run §4: a molt-triggered rotate is the same rotate" flat
+pin "$NESTED_MD" 'one cut mid-round returns none and goes to the operator' \
+  "nested-run §4: a mid-round cut goes to the operator (Review Focus 4)" flat
+MOLT_LINE='MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> '"'"'MOLT WARNING <pct> <task id>'"'"'` (never to `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
+# One pin per template, labelled by name, so a miss names its site (0.2.5 and 0.2.7 were
+# both caught on unnamed launch sites). The span is the Nth ```text fence of the file.
+molt_in_template() { # <file> <fence n> <template name>
+  span="$(mktemp)"
+  awk -v n="$2" '/^```text/{t++; if (t == n) { on = 1; next } } on && /^```$/{exit} on' "$1" >"$span"
+  pin "$span" "$MOLT_LINE" "${1##*/} — $3 carries the MOLT line" flat
+  rm -f "$span"
+}
+molt_in_template "$GENERIC_BRIEFS_MD" 1 "Planned implementer"
+molt_in_template "$GENERIC_BRIEFS_MD" 2 "Fast implementer"
+molt_in_template "$GENERIC_BRIEFS_MD" 3 "Reviewer"
+molt_in_template "$GENERIC_BRIEFS_MD" 4 "Verifier"
+molt_in_template "$GENERIC_BRIEFS_MD" 5 "Fix round"
+molt_in_template "$GENERIC_BRIEFS_MD" 6 "Lane driver"
+molt_in_template "$GENERIC_BRIEFS_MD" 7 "Doctor dispatch"
+molt_in_template "$GENERIC_BRIEFS_MD" 8 "Direct work-item"
+molt_in_template "$GENERIC_BRIEFS_MD" 9 "Non-spine close"
+molt_in_template "$BRIEFS_MD" 2 "Item implementer"
+molt_in_template "$BRIEFS_MD" 3 "Item verifier"
+molt_in_template "$PRBRIEFS_MD" 1 "Close session"
+molt_in_template "$WRITER_MD" 1 "Close-review writer"
+# Adjacent controls: exactly one line per leaf template — the Correction request (a send,
+# not a session) takes none — and no template carries it twice.
+n_eq "$GENERIC_BRIEFS_MD" "$MOLT_LINE" 9 "briefs.md carries the MOLT line 9 times, none in the Correction request"
+n_eq "$BRIEFS_MD" "$MOLT_LINE" 2 "ossify-briefs.md carries the leaf MOLT line twice (item pair only)"
+pin "$BRIEFS_MD" 'ROTATE instead once the context-ceiling notice or a molt warning has fired' \
+  "spine brief: a molt warning triggers the existing ROTATE" flat
+pin "$BRIEFS_MD" 'MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> '"'"'MOLT WARNING <pct> <SPINE_ID>'"'"'` (never to `none`), and ROTATE at the next round barrier' \
+  "spine brief: the MOLT line" flat
+pin "$BRIEFS_MD" 'End the reply that writes `rotate:` with `MOLT-HANDOFF: <handoff path>`' \
+  "spine brief: the rotate reply names the handoff for molt (D5)" flat
+pin "$BRIEFS_MD" 'If molt'"'"'s handoff command arrives mid-round, still finish the round' \
+  "spine brief: never stop mid-round, molt included (D3)" flat
+pin "$BRIEFS_MD" 'already holds a staged result with its `report.md`' \
+  "spine brief: the staged-result caller rule (D6)" flat
+pin "$PRBRIEFS_MD" 'at a fix-round boundary once the context-ceiling notice or a molt warning has fired' \
+  "work-PR brief: a molt warning triggers the existing open:" flat
+pin "$PRBRIEFS_MD" 'and return `open:` at the next fix-round boundary' "work-PR brief: the MOLT line" flat
+pin "$PRBRIEFS_MD" 'End the reply that writes `open:` with `MOLT-HANDOFF: <REPORT_PATH>`' \
+  "work-PR brief: the open reply names its report for molt (D5)" flat
+pin "$SKILL_MD" 'Where molt runs, its warnings replace the notice' "SKILL.md names the molt path" flat
+pin "$ROLES_MD" 'a warned seat gets no new unit' "roles.md: a warned retained seat is replaced, not reused" flat
+# PR #671 round 1.
+pin "$LIFECYCLE_MD" 'per live seat, the molt status path recorded at its launch and the last status line noted' \
+  "lifecycle step 13: the top's handoff carries each seat's status path" flat
+pin "$LIFECYCLE_MD" 'per live seat, its molt status path recorded at launch and the last status line noted' \
+  "lifecycle: the top's own rotation handoff carries each seat's status path" flat
+pin "$GENERIC_BRIEFS_MD" 'the leaf templates'"'"' `MOLT:` line included' \
+  "briefs.md: an operator brief's envelope carries the MOLT line" flat
+pin "$BRIEFS_MD" 'a `correct` decision on it first launches the item'"'"'s implementer in that worktree' \
+  "spine brief: a staged result's correction has an implementer to receive it" flat
+# PR #671 round 2.
+pin "$BRIEFS_MD" 'sends it the item-implementer brief with the correction as its task' \
+  "spine brief: the late implementer gets its whole brief" flat
+pin "$PRBRIEFS_MD" 'On the open shape, first release both seats and close the workspaces you created for them' \
+  "work-PR brief: the open shape releases its child seats" flat
+pin "$PRBRIEFS_MD" 'with no fix round in hand, return `open:` at once' "work-PR MOLT line: an immediate exit" flat
+pin "$PRBRIEFS_MD" 'If molt'"'"'s handoff command arrives mid-round, still finish the round' \
+  "work-PR MOLT line: never stop mid-round, as the spine" flat
+pin "$CHANGELOG_MD" '## 0.2.8' "CHANGELOG has 0.2.8"
 
 section "reference line budgets"
 

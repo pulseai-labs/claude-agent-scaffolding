@@ -58,6 +58,7 @@ PRs strands them. Whenever the close review ran, carry its ledger verbatim too,
 naming each finding, its `target_repo`, its decision and the reason: the record pass
 cannot reconstruct it. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
+MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: create a seat, merge on your own authority, ask the operator anything
 (questions go up to the top in your report file), or re-invoke `/ossify:close` — a halt
 settles this dispatch; remediated, the top dispatches a fresh close session.
@@ -190,9 +191,9 @@ DONE: write your report file, returning PR_REPO, PR_NUMBER and every ledger
 comment id, plus one of two outcomes: the merge SHA; or
 `open: <PR url> at <head sha>`, with RUN_JSON's path and the pane its `run.orchestrator`
 names at writing, when the word you were relayed was wait or leave
-open, or at a fix-round boundary once the context-ceiling notice has fired — then stand
+open, or at a fix-round boundary once the context-ceiling notice or a molt warning has fired — then stand
 down your own armed waits before you return, as the top and a spine session do: one
-report must wake one session (`lifecycle.md`, "Your own rotation"). On the open shape, persist its review record —
+report must wake one session (`lifecycle.md`, "Your own rotation"). On the open shape, first release both seats and close the workspaces you created for them, as step 6 does; then persist its review record —
 whether the delegated review ran, its reviewed head, its clean/findings state and
 summary, the fix rounds run, and the durable ledger/comment references — the next
 fresh work-PR dispatch receives it as PRIOR_REVIEW in a fresh brief, the review
@@ -200,6 +201,7 @@ state reused. Both settle this dispatch; on the open shape the top does not adva
 pass — a later merge is a new work-PR dispatch, not a resumption of this one. Then:
 Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
+MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), and return `open:` at the next fix-round boundary, or, with no fix round in hand, return `open:` at once; molt never clears this session. If molt's handoff command arrives mid-round, still finish the round: a round molt's block cuts short is relayed to the operator by your parent. End the reply that writes `open:` with `MOLT-HANDOFF: <REPORT_PATH>`. A wake or message after that write is added to your report verbatim, never acted on.
 NEVER: talk to the operator — every question goes up to the top; squash; merge
 without the top's relayed word; delete a branch; or dispatch a second full review — one
 delegated review per PR (`roles.md`, step 8); a fixed head takes one scoped delta re-review.

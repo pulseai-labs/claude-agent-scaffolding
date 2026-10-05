@@ -33,11 +33,11 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    command — one `herdr pane run <pane> "export …"` (`worktree create` takes no `--env`); a
    `kind: dsh-spine-driver` seat is a dsh session, not a pane, and is never marked (`dsh-driver.md`).
    A guarded seat — implementer, verifier or reviewer — is marked by its launcher, before its command, with `herdr pane run <pane> "export SEAT_MODS_ROLE=<role>
-   SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory>"`. A project-file role whose `replaces:` names one of those roles is guarded as that role.
+   SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status"`. A project-file role whose `replaces:` names one of those roles is guarded as that role.
    A project-file role with no `replaces:` is marked a guarded `implementer` — its own
    report directory and its scratch directory in its `SEAT_MODS_ALLOW`. A coordinator seat —
    the spine, close or work-PR session, the doctor session, the lane driver — exports
-   `SEAT_MODS_ROLE=coordinator`; the top's rotation successor exports
+   `SEAT_MODS_ROLE=coordinator` with the molt marking below; the top's rotation successor exports
    `SEAT_MODS_ROLE=orchestrator`; neither free role gets `SEAT_MODS_ALLOW`. The operator's
    own first top is not launched here — the operator starts it through a `claude-orch` alias
    that sets `orchestrator`. The scratch directory, created first, is
@@ -51,6 +51,19 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    coordinator records that in its report file (to the top), the top records one from its
    own launches to the operator, and a missing status line halts no seat, re-launches none
    and is never silently dropped.
+   **molt marking.** The same export marks each child a molt child — every guarded seat, every
+   coordinator seat and every operator-declared role — by adding `MOLT_HANDOFF=parent` and `MOLT_STATUS_PATH=<REPORT_PATH>.molt-status` (the guarded export above shows both),
+   `<REPORT_PATH>` the path that seat's brief names. molt then never clears that session; it
+   hands off to its parent (Completion, "A child past molt's warnings"). The operator's first
+   top and the top's rotation successor are roots and take neither; a dsh seat is not a pane
+   and takes neither.
+   **A molt is not a launch.** The top's in-place molt (`lifecycle.md`, "Where molt runs")
+   keeps the pane's process and its exports, so its `orchestrator` marking stands across the
+   clear, and seat-mods reads the role from the environment on every tool call. The
+   status-line check belongs to the launch read; a later read that finds no `seat: <role>`
+   after a molt is not a missing marking. A respawned child is a launch: this step runs
+   again in full — a fresh export naming its new `MOLT_STATUS_PATH`, its `SEAT_MODS_ALLOW`
+   rebuilt, and the status-line read, a missing `seat: <role>` recorded as at any launch.
 3. **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry —
    re-running a **launch** command into a pane whose foreground process is already that
    agent's TUI delivers its line as a prompt, the mechanism the undetected seat's one-line
@@ -220,6 +233,40 @@ diagnostic read included; idle, done with no new report, `unknown` or an unreada
 surfaced once per dispatch, not per tick, as observed state and uncertainty — never a failed
 task, never a retry. Killed when the last dispatch settles, at teardown and at stand-down,
 where the successor arms a fresh one.
+
+**A child past molt's warnings.** A seat marked a molt child (step 2) is never cleared by molt.
+At each of molt's two warnings it sends one ping, `MOLT WARNING <pct> <task id>`, to its
+`NOTIFY_PANE` — not a report ping: it names no path, opens no report and gets no correction
+request. molt appends `warned <n>`, `handoff required` and `handed-off <path>` to the status
+file the seat was launched with — molt's own writes, never the seat's. Record that path per
+seat at launch: molt reads `MOLT_STATUS_PATH` once, so no later brief of a retained seat moves
+it, whatever `REPORT_PATH` that brief names. The heartbeat, per tick, per live seat, also reads
+its recorded status file, so a skipped ping costs at most one tick while a dispatch is live.
+Before a retained seat's next unit, read its recorded status file: the heartbeat ends when
+the last dispatch settles, so an idle seat's warning may be noted only there. On a `MOLT WARNING` ping,
+or a status line not yet noted: note it and send that seat no new unit. It finishes the unit
+in hand; its next unit (a fix round, a re-check, the next item) goes to a fresh seat, and the
+warned seat is released once that unit's report is read. A `rotate:` or `open:` return is
+respawned as `lifecycle.md` says, and the `handed-off` line beside it is that return, not a
+second one. On a report `handoff: <path>`, or a last status line `handed-off <path>` whose seat
+has returned no `rotate:`, `open:` or `handoff:`, settle the predecessor's dispatch first —
+a status-only handoff writes no report generation, so kill its report-file wait and companion
+— then launch a fresh seat. **A fresh seat** — every
+respawn, after `rotate:` and `open:` included — is launched from the same row, marked the same,
+with a fresh `REPORT_PATH` in the same report directory, so its status file starts empty; it
+reuses its predecessor's scratch directory (and an ossify implementer's handoff directory) in
+its `SEAT_MODS_ALLOW`, since step 2 runs again for it; and an implementer's opens as a new tab
+of its predecessor's worktree workspace, never a new `worktree create`, so it can write the
+tree its predecessor left. Its brief is re-sent whole, plus one line, `RESUME FROM: <handoff path>` —
+the predecessor's handoff, or for a warned seat that handed off nothing, its last report. Close
+the predecessor's pane only after the new tab exists; a worktree is released only as Teardown
+says, once its branch's work is safe. These cuts cannot be resumed by a fresh session, so for
+each, relay it to the operator with its handoff path: a spine session that hands off with no
+`rotate:` was cut mid-round (ossify issue 133); a work-PR session that hands off with no
+`open:`, cut inside a fix round; a close, work-item, lane-driver or doctor
+seat that hands off mid-ceremony; and a reviewer that hands off before its report validates,
+since a fresh one would run the PR's one review a second time. Without molt none of this fires, and the ceiling hook's
+rotation applies.
 
 ## Placement
 

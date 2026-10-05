@@ -65,7 +65,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=275
+REF_BUDGET=322  # 0.2.8: raised from 275 for step 2's molt marking clauses and Completion's molt-child paragraph.
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -160,6 +160,51 @@ within_budget() { # <file>
   [ -r "$1" ] || return 2
   [ "$(wc -l < "$1" | tr -d ' ')" -le "$REF_BUDGET" ]
 }
+
+section "molt children (0.2.8)"
+pin "$REF" '**molt marking.**' "step 2 has the molt marking clause" flat
+pin "$REF" 'MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status' \
+  "step 2 names the child marking exactly" flat
+pin "$REF" 'every guarded seat, every coordinator seat and every operator-declared role' \
+  "step 2 marks every child kind" flat
+pin "$REF" 'The operator'"'"'s first top and the top'"'"'s rotation successor are roots and take neither' \
+  "step 2 never marks the top" flat
+pin "$REF" '**A molt is not a launch.**' "step 2: a molt keeps the top's marking" flat
+pin "$REF" 'A respawned child is a launch: this step runs again in full' \
+  "step 2: a respawn re-runs the marking, the allow list and the status-line read (Review Focus 6)" flat
+pin "$REF" "**A child past molt's warnings.**" "Completion holds the parent rules once" flat
+pin "$REF" 'MOLT WARNING <pct> <task id>' "the ping text is named" flat
+pin "$REF" 'per tick, per live seat, also reads its recorded status file' \
+  "the heartbeat reads each child's status file (Review Focus 2)" flat
+pin "$REF" 'note it and send that seat no new unit' "a warned child gets no new unit" flat
+pin "$REF" 'launched from the same row, marked the same, with a fresh `REPORT_PATH`' \
+  "a respawn takes a fresh REPORT_PATH, so a fresh status file (Review Focus 1)" flat
+pin "$REF" 'RESUME FROM: <handoff path>' "the respawned brief names the handoff" flat
+pin "$REF" 'it reuses its predecessor'"'"'s scratch directory' \
+  "a respawn keeps the report and scratch directories writable (Review Focus 6)" flat
+pin "$REF" 'a spine session that hands off with no `rotate:` was cut mid-round' \
+  "a spine cut mid-round goes to the operator (Review Focus 4)" flat
+pin "$REF" 'relay it to the operator with its handoff path' "a skill-run cut is relayed" flat
+# Final review (0.2.8) — each pin is one finding.
+pin "$REF" 'not a report ping: it names no path' "the MOLT WARNING ping gets no correction request" flat
+pin "$REF" 'Record that path per seat at launch' "a retained seat's status file is the launch one" flat
+pin "$REF" 'its next unit (a fix round, a re-check, the next item) goes to a fresh seat' \
+  "a warned seat's next unit goes to a fresh seat, so the run never stalls" flat
+pin "$REF" 'never a new `worktree create`' "a respawned implementer keeps its predecessor's worktree" flat
+pin "$REF" 'Close the predecessor'"'"'s pane only after the new tab exists' "the old pane outlives the new tab" flat
+pin "$REF" 'every respawn, after `rotate:` and `open:` included' "a rotate/open respawn takes a fresh REPORT_PATH too" flat
+pin "$REF" 'whose seat has returned no `rotate:`, `open:` or `handoff:`' \
+  "a handed-off line that is a return's own respawns nothing twice" flat
+# PR #671 round 1.
+pin "$REF" 'Before a retained seat'"'"'s next unit, read its recorded status file' \
+  "an idle retained seat's status is read before it gets another unit" flat
+pin "$REF" 'a reviewer that hands off before its report validates' \
+  "a reviewer cut mid-review goes to the operator, never a second review" flat
+# PR #671 round 2.
+pin "$REF" 'settle the predecessor'"'"'s dispatch first' "a status-only handoff retires the old wait before the respawn" flat
+pin "$REF" 'a work-PR session that hands off with no `open:`' "a work-PR cut mid-round goes to the operator" flat
+pin "$REF" 'SEAT_MODS_ALLOW=<REPORT_PATH'"'"'s directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status' \
+  "step 2's quoted guarded export carries the molt marking" flat
 
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"

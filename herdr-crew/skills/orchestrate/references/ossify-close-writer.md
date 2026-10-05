@@ -51,6 +51,7 @@ DONE: write your report file, carrying ACCEPTED_LEDGER back with one line per
 finding — `fixed in <sha>` or `blocked: <reason>` — plus:
   Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
+MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: push, open a PR, merge, edit outside this worktree (your report file
 excepted), run the close or any review, dispatch or create anything, or work
 around a finding you cannot fix — report it. When blocked, write the question
