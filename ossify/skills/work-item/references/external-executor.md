@@ -77,12 +77,18 @@ session that hands off mid-round does not reset it.
 that already holds a staged result with its `report.md` at the handoff's report
 path: the worker finished, and its return died with the session that dispatched
 it (`round-orchestration.md` §2b, route `close-finished`). The request record is
-unchanged — no field is added. **If the worktree already holds a staged result
-with `report.md` at request time, verify it and return a result record without
-executing.** Launch no implementer, and do not count it as a dispatch. §5a
-then validates the record's identity against the live tree, exactly as for any
-other result. A caller that predates this rule launches an implementer into a
-staged worktree, and the implementer's Gate 3 returns a well-formed
+unchanged — no field is added. **The rule is scoped to `close-finished` items:
+when the request the lane issues on re-entry is for an item whose route is
+`close-finished` — one the caller has not executed in this session — and the
+worktree already holds a staged result with `report.md` at request time, verify
+it and return a result record without executing.** A worktree staged by a
+close-rejected result is a different case and is §7's, never this rule
+(`references/correction-continuation.md`): the item HAS been executed in this
+session, and its correction or replacement must run rather than be handed the
+rejected result back. Launch no implementer, and do not count it as a dispatch.
+§5a then validates the record's identity against the live tree, exactly as for
+any other result. A caller that predates this rule launches an implementer into
+a staged worktree, and the implementer's Gate 3 returns a well-formed
 `gaps-surfaced` naming the dirty tree. That costs one dispatch, never a wrong
 merge.
 

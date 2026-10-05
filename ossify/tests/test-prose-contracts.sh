@@ -1326,6 +1326,17 @@ for _pair in "$_RO|spine_inventory" "$_RO|The count lives in state" "$_RO|halt:o
   _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
   _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.14.0 re-entry)"
 done
+# Fix round 1: the staged-result rule is SCOPED to a `close-finished` item -
+# one the caller has not executed in this session. A close-rejected result also
+# leaves a staged worktree, and a literal reading would hand that rejected
+# result back instead of running §7's correction. `close-finished` alone cannot
+# pin the scope (the pre-fix paragraph already named the route in its
+# parenthetical), so the pin is the scoping clause's own gloss.
+for _pair in "$_EX|without executing" "$_EX|one the caller has not executed in this session"; do
+  _f="${_pair%%|*}"; _lit="${_pair#*|}"
+  _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
+  _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.14.0 re-entry, fix round 1)"
+done
 # The old claims must be GONE - each was true of 1.13 and is false now.
 for _pair in "$_RO|does not resume it" "$_RO|here or nowhere" "$_RO|is taken from HEAD in this release" \
              "$_HC|the lane takes HEAD, not the plan" "$_WC|is the open reconciliation"; do
