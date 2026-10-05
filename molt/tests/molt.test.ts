@@ -13,7 +13,7 @@ describe('a molt from a marker', () => {
   test('clears, writes lineage, seeds the new session with the handoff', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
     w.clearTo.push('s2')
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN(`done\nMOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(1)
     w.session.id = 's2'
@@ -22,11 +22,25 @@ describe('a molt from a marker', () => {
       .toEqual({ from: 's1', chain: 's1', depth: 1, handoff: H })
     expect(w.prompts.at(-1)).toContain(H)
   })
+  test('a seed into a session already past the first warning carries no warning (PR #670 review)', async ($, on) => {
+    const w = world(on, { files: { [H]: '# handoff' } })
+    w.clearTo.push('s2')
+    at(w, 67)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    w.session.id = 's2'
+    at(w, 45)
+    await $.classic.SessionStart(CLEAR('s2'))
+    // On the host the seed may enter only after SessionStart returns, before any response
+    // has measured the session's starting fill.
+    const n = w.contexts.length
+    await $.prompt.submit({ text: `continue from ${H}`, wait: false, origin: { kind: 'plugin' } } as never)
+    expect(w.contexts.slice(n).join('\n')).not.toContain('warning')
+  })
   test('a lineage record that cannot be written does not stop the seed', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
     w.failWrites = /\/lineage\//
     w.clearTo.push('s2')
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     await $.classic.SessionStart(CLEAR('s2'))
     expect(w.prompts.at(-1)).toContain(H)
@@ -35,7 +49,7 @@ describe('a molt from a marker', () => {
     const w = world(on, { files: { [H]: '# handoff' } })
     w.failNotices = true
     w.clearTo.push('s2')
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(1)          // the notice before the clear is best-effort too
     await $.classic.SessionStart(CLEAR('s2')).catch(() => undefined)
@@ -45,12 +59,12 @@ describe('a molt from a marker', () => {
     const w = world(on, { files: { [H]: '# handoff' } })
     w.failSessionStart = true
     w.clearTo.push('s2')
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     await $.classic.SessionStart(CLEAR('s2')).catch(() => undefined)
     expect(w.prompts.at(-1)).toContain(H)
     w.failSessionStart = false
-    at(w, 80)
+    at(w, 85)
     expect((await $.tool.call({ tool: 'Read', file_path: '/repo/a' } as never)).deny).toBeDefined()
   })
   test('a seed rejected while "resumed" is being written still leaves the warning', async ($, on) => {
@@ -58,7 +72,7 @@ describe('a molt from a marker', () => {
     w.rejectSeeds = true
     w.slowInfoNotices = true
     w.clearTo.push('s2')
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     await $.classic.SessionStart(CLEAR('s2'))
     for (let i = 0; i < 5; i++) await $.prompt.submit({ text: 'tick', wait: false, origin: { kind: 'sdk' } } as never)
@@ -69,7 +83,7 @@ describe('a molt from a marker', () => {
     w.rejectSeeds = true
     w.slowWrites = /\/lineage\//      // the rejection lands while the lineage write is in flight
     w.clearTo.push('s2')
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     await $.classic.SessionStart(CLEAR('s2'))
     for (let i = 0; i < 5; i++) await $.prompt.submit({ text: 'tick', wait: false, origin: { kind: 'sdk' } } as never)
@@ -79,7 +93,7 @@ describe('a molt from a marker', () => {
     const w = world(on, { files: { '/repo/old.md': '# old' } })
     w.staged = true
     w.clearTo.push('s2')
-    at(w, 52)
+    at(w, 67)
     await $.classic.Stop(STOP); await $.classic.Stop(STOP)
     await $.tool.call({ tool: 'Edit', file_path: '/repo/old.md', old_string: 'old', new_string: 'h' })
     await $.turn.complete(TURN('done'))
@@ -89,13 +103,13 @@ describe('a molt from a marker', () => {
   test('a marker that names a directory does not molt', async ($, on) => {
     const w = world(on)
     w.dirs.add('/repo/docs')
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN('MOLT-HANDOFF: /repo/docs'))
     expect(w.clears).toBe(0)
   })
   test('after /compact, a markdown file written before it is not the handoff', async ($, on) => {
     const w = world(on, { files: { '/repo/old.md': '# old' } })
-    at(w, 52)
+    at(w, 67)
     await $.tool.call({ tool: 'Write', file_path: '/repo/old.md', content: '# old' })
     await $.classic.SessionStart({ source: 'compact', session_id: 's1' } as never)
     await $.turn.complete(TURN('done'))
@@ -103,7 +117,7 @@ describe('a molt from a marker', () => {
   })
   test('a relative marker path resolves against the cwd (review focus 4)', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN('MOLT-HANDOFF: docs/handoff.md'))
     expect(w.clears).toBe(1)
   })
@@ -115,13 +129,13 @@ describe('a molt from a marker', () => {
   })
   test('a marker that names no file does not molt while the Stop reflex has asks left', async ($, on) => {
     const w = world(on)
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN('MOLT-HANDOFF: /repo/typo.md'))
     expect(w.clears).toBe(0)
   })
   test('the chain and depth carry across a second molt', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
-    at(w, 52)
+    at(w, 67)
     w.clearTo.push('s2', 's3')
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     w.session.id = 's2'
@@ -139,7 +153,7 @@ describe('a molt from a marker', () => {
 describe('no handoff', () => {
   test('past the Stop asks: the last markdown written past soft is used', async ($, on) => {
     const w = world(on, { files: { '/repo/h2.md': '# h' } })
-    at(w, 52)
+    at(w, 67)
     await $.classic.Stop(STOP); await $.classic.Stop(STOP)
     await $.tool.call({ tool: 'Write', file_path: '/repo/h2.md', content: '# h' })
     w.clearTo.push('s2')
@@ -152,7 +166,7 @@ describe('no handoff', () => {
   test('past fallback: Haiku writes the brief; molt proceeds', async ($, on) => {
     const w = world(on)
     w.haiku = { isAnswered: true, text: '## Work in progress\nx\n## Next step\nship' }
-    at(w, 71)
+    at(w, 81)
     await $.turn.complete(TURN('done'))
     const brief = w.files.get('/home/u/.claude/state/molt/briefs/s1.md') ?? ''
     expect(brief).toContain('ship')
@@ -160,7 +174,7 @@ describe('no handoff', () => {
   })
   test('Haiku fails: a facts-only brief stands in', async ($, on) => {
     const w = world(on)
-    at(w, 71)
+    at(w, 81)
     await $.turn.complete(TURN('done'))
     expect(w.files.get('/home/u/.claude/state/molt/briefs/s1.md')).toContain('## Files written or edited')
     expect(w.clears).toBe(1)
@@ -170,7 +184,7 @@ describe('no handoff', () => {
 describe('what never molts', () => {
   test("a subagent's turn (review focus 2)", async ($, on) => {
     const w = world(on, { files: { [H]: '#' } })
-    at(w, 71)
+    at(w, 81)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`, { agentId: 'a1' }))
     expect(w.clears).toBe(0)
   })
@@ -192,11 +206,11 @@ describe('a /clear that never clears', () => {
   // Another plugin can answer /clear with { text }: the call resolves, and no SessionStart follows.
   test('the next prompt lifts the molt in flight; a later /clear of yours seeds nothing', async ($, on) => {
     const w = world(on, { files: { [H]: '#' } })
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(1)
     await $.prompt.submit({ text: 'go', wait: false, origin: { kind: 'composer' } })
-    at(w, 80)
+    at(w, 85)
     expect((await $.tool.call({ tool: 'Read', file_path: '/repo/a' } as never)).deny).toBeDefined()
     w.session.id = 's2'
     await $.classic.SessionStart(CLEAR('s2'))
@@ -204,14 +218,14 @@ describe('a /clear that never clears', () => {
   })
   test('a clear that never cleared is not counted as a molt', async ($, on) => {
     const w = world(on, { files: { [H]: '#' } })
-    at(w, 52)
+    at(w, 67)
     for (let i = 0; i < 3; i++) await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(3)
     expect(w.toasts.some(t => t.includes('molt paused'))).toBe(false)
   })
   test('the next turn end lifts it too, and can molt again', async ($, on) => {
     const w = world(on, { files: { [H]: '#' } })
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(2)
@@ -221,7 +235,7 @@ describe('a /clear that never clears', () => {
 describe('loop guards', () => {
   test('manual: the third molt in a row with no message pauses', async ($, on) => {
     const w = world(on, { files: { [H]: '#' } })
-    at(w, 52)
+    at(w, 67)
     for (const id of ['s1', 's2']) {
       w.clearTo.push(`${id}x`)
       w.session.id = id
@@ -235,7 +249,7 @@ describe('loop guards', () => {
   })
   test('manual: a message from you resets the count (control)', async ($, on) => {
     const w = world(on, { files: { [H]: '#' } })
-    at(w, 52)
+    at(w, 67)
     for (const id of ['s1', 's2', 's3']) {
       w.clearTo.push(`${id}x`)
       w.session.id = id
@@ -248,14 +262,14 @@ describe('loop guards', () => {
   test('autopilot: a molt with no progress since the last one pauses and rings the bell', async ($, on) => {
     const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
       '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(0)
     expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
   })
   test('autopilot: /molt now lifts a no-progress pause and the molt goes ahead', async ($, on) => {
     const w = world(on, { files: { [H]: '#', ...AUTOPILOT, '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(0)
     await $.command.run({ command: 'molt', args: 'now', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } } as never)
@@ -267,13 +281,13 @@ describe('loop guards', () => {
     const w = world(on, { files: { [H]: '#', ...AUTOPILOT, '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
     w.staged = true
     await $.tool.call({ tool: 'Write', file_path: '/repo/x.ts', content: 'x' })
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(0)
   })
   test('autopilot: writing and committing only the handoff past soft is no progress', async ($, on) => {
     const w = world(on, { files: { [H]: '#', ...AUTOPILOT, '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
-    at(w, 52)
+    at(w, 67)
     await $.tool.call({ tool: 'Write', file_path: H, content: '# h' })
     await $.tool.call({ tool: 'Bash', command: `git add ${H} && git commit -F /tmp/m` })
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
@@ -284,7 +298,7 @@ describe('loop guards', () => {
     const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
       '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
     await $.tool.call({ tool: 'Bash', command: 'git add a && git commit -F /tmp/m' })
-    at(w, 52)
+    at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(1)
   })
@@ -307,6 +321,12 @@ describe('/molt now', () => {
     at(w, 10)
     const r = await $.command.run(NOW)
     expect(r.context?.at(-1)).toContain('MOLT-HANDOFF:')
+  })
+  test('arms the Stop reflex between the warnings and the command (PR #670 review)', async ($, on) => {
+    const w = world(on)
+    at(w, 45)
+    await $.command.run(NOW)
+    expect((await $.classic.Stop(STOP)).block).toContain('MOLT-HANDOFF:')
   })
   test('arms the Stop reflex below soft', async ($, on) => {
     const w = world(on)

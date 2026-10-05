@@ -9,6 +9,7 @@ export type World = {
   files: Map<string, string>
   runs: string[][]
   prompts: string[]
+  contexts: string[]           // what reached the model beside each prompt, in order
   fills: string[]              // what molt put in the prompt box
   hasBox: boolean              // false: the session binds no prompt box (a -p run)
   clears: number
@@ -23,7 +24,9 @@ export type World = {
   modelCalls: number
   toolText: string             // what every tool call's result text is
   failWrites?: RegExp          // fs.write to a matching path is refused (a read-only or full disk)
+  failReads?: RegExp           // fs.read of a matching path is refused though the file exists (no read permission)
   rejectSeeds?: boolean        // a plugin's prompt.submit is refused
+  dropPrompts?: boolean        // a hook beneath molt refuses every prompt (the result's drop arm)
   slowWrites?: RegExp          // fs.write to a matching path takes 20 ms
   staged?: boolean             // Write/Edit results come back staged: held for review, file unchanged
   notices: unknown[]           // every value molt wrote to its notice, in order
@@ -42,7 +45,7 @@ const ZERO = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, ca
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string> } = {}): World {
   const w: World = {
     files: new Map(Object.entries(opts.files ?? {})),
-    runs: [], prompts: [], fills: [], hasBox: true, clears: 0, clearTo: [], notices: [], dirs: new Set(), toasts: [], statuses: [],
+    runs: [], prompts: [], contexts: [], fills: [], hasBox: true, clears: 0, clearTo: [], notices: [], dirs: new Set(), toasts: [], statuses: [],
     usage: { tokens: 100_000, window: 1_000_000 },
     session: { id: 's1', cwd: '/repo' },
     messages: [],
@@ -65,6 +68,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   on('session.messages', () => ({ value: w.messages }) as never)
   on('fs.read', (_$, e) => {
     if (w.dirs.has(e.path)) return { deny: `EISDIR: ${e.path}` } as never
+    if (w.failReads?.test(e.path) && w.files.has(e.path)) return { deny: `EACCES: ${e.path}` } as never
     const text = w.files.get(e.path)
     return (text === undefined ? { deny: `ENOENT: ${e.path}` } : { value: text }) as never
   })
@@ -103,7 +107,9 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   })
   on('prompt.submit', (_$, e) => {
     if (w.rejectSeeds && e.origin.kind === 'plugin') throw new Error('prompt refused')
+    if (w.dropPrompts) return { drop: 'refused by a hook beneath molt' } as never
     w.prompts.push(e.text)
+    w.contexts.push(...(e.context ?? []))
     return { text: e.text } as never
   })
   on('tool.call', (_$, e) => ({

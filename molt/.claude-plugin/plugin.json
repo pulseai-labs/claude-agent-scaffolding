@@ -1,16 +1,88 @@
 {
   "name": "molt",
-  "version": "0.1.0",
-  "description": "Context handoff as a Claude Code mod. Past a soft threshold of the context window (default 50%) the session is asked to finish its step and write a handoff; past a hard threshold (65%) only the handoff's own tools run. molt then runs /clear in the same pane and seeds the fresh session with the handoff, so no successor session is launched. Works in any terminal or orchestration layer. Requires Claude Code 2.1.289 or later.",
-  "author": { "name": "Pras" },
+  "version": "0.2.0",
+  "description": "Context handoff as a Claude Code mod. molt warns the session at 40% and 50% of the context window to find a good point and hand off, tells it to hand off now at 65%, and past 75% lets only the handoff's own tools run. A root session is then cleared in the same pane and seeded with the handoff, so no successor session is launched; a child session (MOLT_HANDOFF=parent) is never cleared and hands off to its parent. Works in any terminal or orchestration layer. Requires Claude Code 2.1.289 or later.",
+  "author": {
+    "name": "Pras"
+  },
   "types": "./types/index.d.ts",
   "userConfig": {
-    "softPercent": { "type": "number", "title": "Soft threshold (% of the context window)", "description": "Past this fill the session is asked, once, to finish its step and write a handoff.", "default": 50, "min": 1 },
-    "hardPercent": { "type": "number", "title": "Hard threshold (% of the context window)", "description": "Past this fill only Write, Edit, Skill, git add and git commit run until the session molts.", "default": 65, "min": 1 },
-    "fallbackMargin": { "type": "number", "title": "Fallback margin (points above hard)", "description": "With no handoff by hard + this margin, molt writes a fallback brief from the transcript and molts.", "default": 5, "min": 1 },
-    "minRoomPercent": { "type": "number", "title": "Room for a fresh session (points)", "description": "A seeded session does not reach its soft threshold until its fill is this many points above its starting fill, as far as the fallback threshold stays at 99% or below.", "default": 15, "min": 1 },
-    "manualMaxMolts": { "type": "number", "title": "Molts in a row without a message (manual mode)", "description": "In manual mode molt pauses after this many molts with no prompt from you.", "default": 2, "min": 1 },
-    "instructionsTemplate": { "type": "string", "title": "Handoff instruction file", "description": "What the session is told at the soft threshold. Written with the default on first start; edit it freely.", "default": "~/.claude/molt/instructions.md" },
-    "seedTemplate": { "type": "string", "title": "Seed file", "description": "The one prompt the fresh session receives. {{path}} is the handoff. Written with the default on first start.", "default": "~/.claude/molt/seed.md" }
+    "warnPercent": {
+      "type": "number",
+      "title": "First warning (% of the context window)",
+      "description": "Past this fill the session is warned, once, to find a good point to hand off. Work continues.",
+      "default": 40,
+      "min": 1
+    },
+    "warnAgainPercent": {
+      "type": "number",
+      "title": "Second warning (% of the context window)",
+      "description": "Past this fill the session is told, once, that the handoff is past due. Work continues.",
+      "default": 50,
+      "min": 1
+    },
+    "commandPercent": {
+      "type": "number",
+      "title": "Handoff command (% of the context window)",
+      "description": "Past this fill the session is told to write its handoff now. Unset: 65.",
+      "min": 1
+    },
+    "blockPercent": {
+      "type": "number",
+      "title": "Block (% of the context window)",
+      "description": "Past this fill only Write, Edit, Skill, git add and git commit run until the session hands off. Unset: 75.",
+      "min": 1
+    },
+    "fallbackMargin": {
+      "type": "number",
+      "title": "Fallback margin (points above block)",
+      "description": "With no handoff by block + this margin, molt writes a fallback brief from the transcript.",
+      "default": 5,
+      "min": 1
+    },
+    "minRoomPercent": {
+      "type": "number",
+      "title": "Room for a fresh session (points)",
+      "description": "A seeded session gets its first warning only once its fill is this many points above its starting fill, as far as the fallback stays at 99% or below.",
+      "default": 15,
+      "min": 1
+    },
+    "manualMaxMolts": {
+      "type": "number",
+      "title": "Molts in a row without a message (manual mode)",
+      "description": "In manual mode molt pauses after this many molts with no prompt from you.",
+      "default": 2,
+      "min": 1
+    },
+    "instructionsTemplate": {
+      "type": "string",
+      "title": "Handoff instruction file",
+      "description": "What the session is told at the handoff command. Written with the default on first start; edit it freely.",
+      "default": "~/.claude/molt/instructions.md"
+    },
+    "warningTemplate": {
+      "type": "string",
+      "title": "Warning file",
+      "description": "What the session is told at the two warnings. {{percent}}, {{stage}} and {{command}} are filled. Written with the default on first start; edit it freely.",
+      "default": "~/.claude/molt/warning.md"
+    },
+    "seedTemplate": {
+      "type": "string",
+      "title": "Seed file",
+      "description": "The one prompt the fresh session receives. {{path}} is the handoff. Written with the default on first start.",
+      "default": "~/.claude/molt/seed.md"
+    },
+    "softPercent": {
+      "type": "number",
+      "title": "Renamed: use commandPercent",
+      "description": "molt 0.1.0's soft threshold. Read once as commandPercent when that is unset.",
+      "min": 1
+    },
+    "hardPercent": {
+      "type": "number",
+      "title": "Renamed: use blockPercent",
+      "description": "molt 0.1.0's hard threshold. Read once as blockPercent when that is unset.",
+      "min": 1
+    }
   }
 }

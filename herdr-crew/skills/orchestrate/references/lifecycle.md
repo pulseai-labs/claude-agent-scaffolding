@@ -231,7 +231,8 @@ Every command's syntax comes from `herdr --skill`.
     and the next step — every seat's pane id, with
     its machine label where the seat is not on this machine, and,
     per live dispatch, its `REPORT_PATH`, the hash last noted, and the file's identity
-    noted beside that hash — inode or mtime; on an activated
+    noted beside that hash — inode or mtime, and, per live seat, the molt status path
+    recorded at its launch and the last status line noted; on an activated
     ossify spine, also the spine's approved `SEATS` block, the resolved coordinator
     profiles and the accumulated close-review ledger (oldest first). With ossify
     installed, that is `/ossify:handoff`.
@@ -261,6 +262,9 @@ declared role is not yet carried into a delegated spine or work-PR session, so a
 herdr-crew's hook tells a session its own context figure once it reaches the ceiling (the
 plugin setting `context_ceiling`, default 500000 tokens). The top, the spine session and the
 work-PR session act on it; a close session and every leaf seat simply finish their unit.
+Where molt runs, its warnings take the notice's place: every seat but the top hands off to
+its parent (`herdr-mechanics.md`, "A child past molt's warnings"), and the top molts in place
+(below).
 Past the ceiling a seat finishes the unit in hand and starts no new one, never stopping
 mid-item. At its next boundary it settles its dispatch with a return that carries its state
 forward, and its parent launches a fresh seat to resume, marked `coordinator` before its
@@ -281,7 +285,8 @@ inherits their waits: they are this session's background calls, and rebinding a
 machine label where the seat is not on this machine, the pane `run.orchestrator` names at
 writing, and, per live dispatch, its
 `REPORT_PATH`, the hash last noted, and the file's identity noted beside that hash — inode
-or mtime — and your own resolved profile
+or mtime — and, per live seat, its molt status path recorded at launch and the last status
+line noted, and your own resolved profile
 — `/ossify:handoff` with ossify installed, the same file by hand without it. Open a new tab
 and pane with the launch command the handoff recorded — ask the operator once when none
 did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`,
@@ -319,3 +324,25 @@ Machines): a new session's first wait, not a re-entry,
 which re-arms what the `run.json` cannot — and it can re-arm them because the
 predecessor stood down, so each pane has exactly one waiter — and arms one fresh
 heartbeat, the predecessor's having been killed at stand-down.
+
+**Where molt runs, you molt in place instead.** The top is molt's root: it is never marked a
+molt child, and molt's active marker silences this plugin's hook (0.2.6). molt's two warnings
+(40% and 50% of the window by default) mean: take your next fully acknowledged delivery with
+no operator question in flight, or hand off at once when nothing is in flight. Its handoff
+command (65%) means now: past its block threshold (75%) every `herdr` command is refused.
+Write the handoff your own rotation writes, and add to it the id of every background task you
+have running — each live dispatch's wait and companion, and the heartbeat — and, verbatim, any
+operator question you are holding. Start no dispatch after it; a wake or message that reaches
+you after it is added to it verbatim, never acted on, and end that reply with
+`MOLT-HANDOFF: <path>`. molt runs `/clear` in this pane and seeds the fresh session with the
+handoff. There is no stand-down and no successor launch: the pane, its `HERDR_PANE_ID`, its
+seat marking (`herdr-mechanics.md` step 2, "A molt is not a launch") and every armed wait
+survive the clear, and every worker's `NOTIFY_PANE` still names this pane. The resumed top
+reads the handoff and confirms `run.orchestrator` names its own `$HERDR_PANE_ID`, rewriting it
+only where it does not. It arms no wait and no heartbeat the handoff lists: they keep running,
+and their notifications are its own. A heartbeat tick the handoff carries means that heartbeat
+has ended: the resumed top arms a fresh one. It runs the generation check once per live
+dispatch against the hash and identity the handoff noted, a carried wake included, so a report
+that landed across the clear is acted on once and retires its listed wait by id; the later
+notification for that generation retires nothing. With `/molt off` the marker goes, the hook
+speaks again, and the rotation above applies.
