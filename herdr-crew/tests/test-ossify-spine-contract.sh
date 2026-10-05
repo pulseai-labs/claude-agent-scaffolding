@@ -66,13 +66,13 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=213          # A3: each ossify reference stays under 209 lines.
+REF_BUDGET=214          # A3: each ossify reference stays under 209 lines.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
                         # each launch site gained; the files' own maximum is 209
                         # (`ossify-nested-run.md`), and the budget section's adjacent
                         # control holds the gate at that minimum — one line over the
                         # longest budgeted reference is still refused.
-                        # 0.2.8: raised for the molt clauses — nested-run §4 (211), the spine brief (213), then the
+                        # 0.2.8: raised for the molt clauses — nested-run §4 (211), the spine brief (214), then the
                         # spine, work-PR and leaf MOLT lines; it always equals the maximum.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
@@ -2274,6 +2274,14 @@ pin "$GENERIC_BRIEFS_MD" 'the leaf templates'"'"' `MOLT:` line included' \
   "briefs.md: an operator brief's envelope carries the MOLT line" flat
 pin "$BRIEFS_MD" 'a `correct` decision on it first launches the item'"'"'s implementer in that worktree' \
   "spine brief: a staged result's correction has an implementer to receive it" flat
+# PR #671 round 2.
+pin "$BRIEFS_MD" 'sends it the item-implementer brief with the correction as its task' \
+  "spine brief: the late implementer gets its whole brief" flat
+pin "$PRBRIEFS_MD" 'On the open shape, first release both seats and close the workspaces you created for them' \
+  "work-PR brief: the open shape releases its child seats" flat
+pin "$PRBRIEFS_MD" 'with no fix round in hand, return `open:` at once' "work-PR MOLT line: an immediate exit" flat
+pin "$PRBRIEFS_MD" 'If molt'"'"'s handoff command arrives mid-round, still finish the round' \
+  "work-PR MOLT line: never stop mid-round, as the spine" flat
 pin "$CHANGELOG_MD" '## 0.2.8' "CHANGELOG has 0.2.8"
 
 section "reference line budgets"

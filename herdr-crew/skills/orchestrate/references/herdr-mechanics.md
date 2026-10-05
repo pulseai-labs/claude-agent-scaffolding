@@ -249,7 +249,9 @@ in hand; its next unit (a fix round, a re-check, the next item) goes to a fresh 
 warned seat is released once that unit's report is read. A `rotate:` or `open:` return is
 respawned as `lifecycle.md` says, and the `handed-off` line beside it is that return, not a
 second one. On a report `handoff: <path>`, or a last status line `handed-off <path>` whose seat
-has returned no `rotate:`, `open:` or `handoff:`, launch a fresh seat. **A fresh seat** — every
+has returned no `rotate:`, `open:` or `handoff:`, settle the predecessor's dispatch first —
+a status-only handoff writes no report generation, so kill its report-file wait and companion
+— then launch a fresh seat. **A fresh seat** — every
 respawn, after `rotate:` and `open:` included — is launched from the same row, marked the same,
 with a fresh `REPORT_PATH` in the same report directory, so its status file starts empty; it
 reuses its predecessor's scratch directory (and an ossify implementer's handoff directory) in
@@ -258,9 +260,10 @@ of its predecessor's worktree workspace, never a new `worktree create`, so it ca
 tree its predecessor left. Its brief is re-sent whole, plus one line, `RESUME FROM: <handoff path>` —
 the predecessor's handoff, or for a warned seat that handed off nothing, its last report. Close
 the predecessor's pane only after the new tab exists; a worktree is released only as Teardown
-says, once its branch's work is safe. Two cuts cannot be resumed by a fresh session, so for
+says, once its branch's work is safe. These cuts cannot be resumed by a fresh session, so for
 each, relay it to the operator with its handoff path: a spine session that hands off with no
-`rotate:` was cut mid-round (ossify issue 133); a close, work-item, lane-driver or doctor
+`rotate:` was cut mid-round (ossify issue 133); a work-PR session that hands off with no
+`open:`, cut inside a fix round; a close, work-item, lane-driver or doctor
 seat that hands off mid-ceremony; and a reviewer that hands off before its report validates,
 since a fresh one would run the PR's one review a second time. Without molt none of this fires, and the ceiling hook's
 rotation applies.

@@ -17,8 +17,8 @@ mode). Install with molt 0.2.0, never before it.
   a `handoff:` report or a `handed-off` status line respawns the seat. Every respawn takes a
   fresh `REPORT_PATH` in the same report directory, reuses the scratch directory and, for an
   implementer, the same worktree, and carries its brief plus `RESUME FROM:`.
-  A spine cut mid-round and a close, work-item, lane-driver or doctor seat cut mid-ceremony
-  go to the operator.
+  A spine or work-PR session cut mid-round, a close, work-item, lane-driver or doctor seat cut
+  mid-ceremony, and a reviewer cut before its report validates go to the operator.
 - **Templates.** The 13 leaf templates carry one `MOLT:` line (ping, finish the unit; on
   molt's command mid-unit, a hand-written handoff at `<REPORT_PATH>.molt.md`). A molt warning
   moves the spine's `ROTATE` and the work-PR's `open:` as the ceiling notice does; the spine
