@@ -410,7 +410,7 @@ for f in "$EXEC_MD" "$NESTED_MD"; do
   if agent_commands_are_pings "$f" 0; then pass "${f##*/} states no herdr-agent command"
   else fail "${f##*/} states no herdr-agent command" "an agent command is back"; fi
 done
-for pair in "$BRIEFS_MD:5" "$PRBRIEFS_MD:3" "$WRITER_MD:2"; do
+for pair in "$BRIEFS_MD:6" "$PRBRIEFS_MD:4" "$WRITER_MD:2"; do
   _f="${pair%:*}"; _want="${pair##*:}"
   if agent_commands_are_pings "$_f" "$_want"; then pass "${_f##*/}: every herdr-agent command is the ping line ($_want)"
   else fail "${_f##*/}: every herdr-agent command is the ping line" "expected $_want of each"; fi
@@ -2248,6 +2248,21 @@ molt_in_template "$WRITER_MD" 1 "Close-review writer"
 # not a session) takes none — and no template carries it twice.
 n_eq "$GENERIC_BRIEFS_MD" "$MOLT_LINE" 9 "briefs.md carries the MOLT line 9 times, none in the Correction request"
 n_eq "$BRIEFS_MD" "$MOLT_LINE" 2 "ossify-briefs.md carries the leaf MOLT line twice (item pair only)"
+pin "$BRIEFS_MD" 'ROTATE instead once the context-ceiling notice or a molt warning has fired' \
+  "spine brief: a molt warning triggers the existing ROTATE" flat
+pin "$BRIEFS_MD" 'MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> '"'"'MOLT WARNING <pct> <SPINE_ID>'"'"'` (never to `none`), and ROTATE at the next round barrier' \
+  "spine brief: the MOLT line" flat
+pin "$BRIEFS_MD" 'End the reply that writes `rotate:` with `MOLT-HANDOFF: <handoff path>`' \
+  "spine brief: the rotate reply names the handoff for molt (D5)" flat
+pin "$BRIEFS_MD" 'If molt'"'"'s handoff command arrives mid-round, still finish the round' \
+  "spine brief: never stop mid-round, molt included (D3)" flat
+pin "$BRIEFS_MD" 'already holds a staged result with its `report.md`' \
+  "spine brief: the staged-result caller rule (D6)" flat
+pin "$PRBRIEFS_MD" 'at a fix-round boundary once the context-ceiling notice or a molt warning has fired' \
+  "work-PR brief: a molt warning triggers the existing open:" flat
+pin "$PRBRIEFS_MD" 'and return `open:` at the next fix-round boundary' "work-PR brief: the MOLT line" flat
+pin "$PRBRIEFS_MD" 'End the reply that writes `open:` with `MOLT-HANDOFF: <REPORT_PATH>`' \
+  "work-PR brief: the open reply names its report for molt (D5)" flat
 
 section "reference line budgets"
 

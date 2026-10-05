@@ -59,7 +59,10 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      again first if `herdr workspace list` no longer shows it: closing its last pane may take
      it), its `--cwd` the worktree ossify prepared. Guard it before its command as
      `MECHANICS` step 2 says — role `implementer`, its scratch directory created
-     first under your own run directory. Confirm each model as its row's
+     first under your own run directory. A request whose worktree already holds a staged result
+     with its `report.md` (ossify's close-finished route) launches no implementer and counts no
+     dispatch: go straight to step 5's verifier, then return the result record as usual.
+     Confirm each model as its row's
      `model_shows` says and by
      the worker's own check; the effort is the given launch argument. A row that is missing or
      ambiguous halts that launch and asks; only a top reply carrying replacement rows moves the block.
@@ -95,11 +98,12 @@ DONE: release every item pair and close the workspace you created for them,
 as MECHANICS's Teardown says, with `herdr workspace list` showing none of them; report
 teardown you cannot complete, never claim it. Then write your report file:
   Changed / Evidence / Open / Files as ids, SHAs, counts and a report path, and the path of RUN_JSON.
-ROTATE instead once the context-ceiling notice has fired: stop at the next round barrier,
+ROTATE instead once the context-ceiling notice or a molt warning has fired: stop at the next round barrier,
 do the same teardown, write `/ossify:handoff`, and write `rotate: <handoff path>` to your
 report file with the path of RUN_JSON and the pane `run.orchestrator` names at writing,
 then stand down your own armed waits before you return — one report must wake one session.
 Never stop mid-round.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <SPINE_ID>'` (never to `none`), and ROTATE at the next round barrier; molt never clears this session. End the reply that writes `rotate:` with `MOLT-HANDOFF: <handoff path>`. If molt's handoff command arrives mid-round, still finish the round: a round molt's block cuts short is relayed to the operator by your parent. A wake or message after the handoff is written is added to it verbatim, never acted on.
 
 NEVER: record an item task in the top's run.json; run a Claude subagent for a work item;
 fall back to the default lane when an item launch fails; restart the lane; select the
