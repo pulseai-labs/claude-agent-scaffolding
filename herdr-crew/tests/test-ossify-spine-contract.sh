@@ -2222,7 +2222,7 @@ pin "$NESTED_MD" 'A spine session that rotated on a molt warning returns the sam
   "nested-run §4: a molt-triggered rotate is the same rotate" flat
 pin "$NESTED_MD" 'one cut mid-round returns none and goes to the operator' \
   "nested-run §4: a mid-round cut goes to the operator (Review Focus 4)" flat
-MOLT_LINE='MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> '"'"'MOLT WARNING <pct> <task id>'"'"'` (never to `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
+MOLT_LINE='MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> '"'"'MOLT WARNING <pct> <task id>'"'"'` (never to `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
 # One pin per template, labelled by name, so a miss names its site (0.2.5 and 0.2.7 were
 # both caught on unnamed launch sites). The span is the Nth ```text fence of the file.
 molt_in_template() { # <file> <fence n> <template name>
@@ -2264,6 +2264,7 @@ pin "$PRBRIEFS_MD" 'and return `open:` at the next fix-round boundary' "work-PR 
 pin "$PRBRIEFS_MD" 'End the reply that writes `open:` with `MOLT-HANDOFF: <REPORT_PATH>`' \
   "work-PR brief: the open reply names its report for molt (D5)" flat
 pin "$SKILL_MD" 'Where molt runs, its warnings replace the notice' "SKILL.md names the molt path" flat
+pin "$ROLES_MD" 'a warned seat gets no new unit' "roles.md: a warned retained seat is replaced, not reused" flat
 pin "$CHANGELOG_MD" '## 0.2.8' "CHANGELOG has 0.2.8"
 
 section "reference line budgets"

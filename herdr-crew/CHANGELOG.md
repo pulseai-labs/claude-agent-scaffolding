@@ -12,9 +12,11 @@ mode). Install with molt 0.2.0, never before it.
   operator-declared role; `roles.md`'s launch block carries the combined exports. The top and
   its rotation successor stay roots. A respawned child is a launch: step 2 runs again.
 - **Parents answer** (`herdr-mechanics.md`, "A child past molt's warnings"): a `MOLT WARNING`
-  ping or a new status line means no new unit; the heartbeat reads each child's status file; a
-  `handoff:` report or a `handed-off` status line respawns the seat with a fresh `REPORT_PATH`
-  in the same report directory, its scratch directory reused, its brief plus `RESUME FROM:`.
+  ping (not a report ping) or a new status line means no new unit — the warned seat's next
+  unit goes to a fresh seat; the heartbeat reads the status file each seat was launched with;
+  a `handoff:` report or a `handed-off` status line respawns the seat. Every respawn takes a
+  fresh `REPORT_PATH` in the same report directory, reuses the scratch directory and, for an
+  implementer, the same worktree, and carries its brief plus `RESUME FROM:`.
   A spine cut mid-round and a close, work-item, lane-driver or doctor seat cut mid-ceremony
   go to the operator.
 - **Templates.** The 13 leaf templates carry one `MOLT:` line (ping, finish the unit; on
