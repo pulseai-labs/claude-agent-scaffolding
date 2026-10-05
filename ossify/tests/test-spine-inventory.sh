@@ -379,6 +379,63 @@ inv "$F"
 t_assert_eq "halt:close-rejected" "$(route r0.s1.w1)" "S28: a recorded [fidelity] rejection halts re-entry"
 t_assert_rc 3 "S28: ...rc 3"
 
+# S29 (#673 G3): a RECORDED base that no longer resolves halts the read-out -
+# a repo row naming it - instead of classifying `cut-missing` and failing
+# mid-repair after the earlier repos were already cut. The control (same
+# fixture, base still present) is R4's cut-missing / rc 0 above.
+F="$TMP/s29"; mkfix "$F"
+oss_in "$F" work_item_add r0.s1 One core >/dev/null; oss_in "$F" work_item_add r0.s1 Two ui >/dev/null
+git -C "$F/core" checkout -q -b spine/r0.s1-demo
+oss_in "$F" spine_base_set r0.s1 core main >/dev/null
+oss_in "$F" spine_base_set r0.s1 ui main >/dev/null
+inv "$F"
+t_assert_eq "cut-missing" "$(field repo ui 3)" "S29 control: ui's base resolves -> cut-missing, not a halt"
+t_assert_rc 0 "S29 control: ...rc 0 - the repairable shape stays repairable"
+git -C "$F/ui" branch -m main main-renamed
+inv "$F"
+t_assert_eq "halt:base-unresolved" "$(field repo ui 3)" "S29: a recorded base renamed after the fact halts the read-out"
+t_assert_eq "base=main" "$(field repo ui 7)" "S29: ...naming the recorded base that no longer resolves"
+t_assert_eq "ok" "$(field repo core 3)" "S29: ...while the healthy repo's row is untouched"
+t_assert_rc 3 "S29: ...rc 3, before any repo repair can cut elsewhere"
+
+# S30 (#673 G2): a rejection record that EXISTS but cannot be read is not an
+# absent one - the staged result must halt, not route close-finished into the
+# stochastic gate. Two controls: S4 (no verify.md at all = no record, still
+# close-finished) and S28's first half (readable, no [fidelity] = cleared).
+F="$TMP/s30"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a
+mkdir -p "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1"
+echo r > "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1/report.md"
+inv "$F"
+t_assert_eq "close-finished" "$(route r0.s1.w1)" "S30 control: no verify.md at all is the cleared state"
+mkdir "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1/verify.md"   # a path that IS there, unreadable as a record
+inv "$F"
+t_assert_eq "halt:unreadable" "$(route r0.s1.w1)" "S30: an unreadable verify.md halts, never close-finished"
+t_assert_rc 3 "S30: ...rc 3"
+
+# S31 (#673 G1): an unreadable holder list reads exactly like "no holders" -
+# the pre-fix `|| holders=""` routed a planned item with a recorded branch and
+# a missing derived path to `reattach`, one mutation before it would have met
+# the refusal. The list failing must read as HELD. The PATH shim is what makes
+# the pipeline fail under the dispatcher's pipefail (sourcing the lib cannot:
+# without pipefail the awk stage still exits 0); the control run proves the
+# fixture really routes reattach when the list reads.
+F="$TMP/s31"; fx "$F" 2
+WT2="$(oss_in "$F" worktree_add core r0.s1.w2 two spine/r0.s1-demo)"
+oss_in "$F" work_item_exec r0.s1.w2 "$(git -C "$WT2" rev-parse --abbrev-ref HEAD)" "$WT2" "$(git -C "$WT2" rev-parse HEAD)" >/dev/null
+rm -rf "$WT2"                                    # planned + exec record + dir gone: a reattach candidate
+WT1="$(spawn "$F" r0.s1.w1 one)"; rm -rf "$WT1"  # active + dir gone: the other arm that consults held
+inv "$F"
+t_assert_eq "reattach" "$(route r0.s1.w2)" "S31 control: a readable list routes the planned item reattach"
+t_assert_eq "reattach" "$(route r0.s1.w1)" "S31 control: ...and the active item too"
+SHG="$TMP/failgit-s31"; mkdir -p "$SHG"
+printf '#!/usr/bin/env bash\ncase " $* " in *" worktree list "*) echo "fatal: simulated worktree list failure" >&2; exit 128;; esac\nexec %s "$@"\n' "$(command -v git)" > "$SHG/git"
+chmod +x "$SHG/git"
+T_OUT="$(cd "$F/ws" && PATH="$SHG:$PATH" bash "$OSS" spine_inventory r0.s1 2>&1)"; T_RC=$?
+t_assert_eq "halt:worktree-held" "$(route r0.s1.w2)" "S31: an unreadable holder list is HELD - the planned item halts"
+t_assert_eq "halt:worktree-held" "$(route r0.s1.w1)" "S31: ...and the active item halts"
+t_assert_rc 3 "S31: ...rc 3"
+
 # ---- the shipped §2 re-entry blocks, extracted and RUN (block-ledger O rows) ----
 SKILLS="$HERE/../skills"
 ROUND="$SKILLS/work-item/references/round-orchestration.md"

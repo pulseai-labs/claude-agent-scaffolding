@@ -11,6 +11,22 @@
 
 _oss_inv_git() { git --no-optional-locks "$@"; }
 
+# #673 G2/J1: the durable rejection record is read TRI-STATE, never as a bare
+# match. `grep -qF` says 0 (found) and 1 (no finding) - but 2 means it could
+# not read the file at all, and that must not degrade to the benign "no
+# rejection" the merge arms act on: the record gates MERGES. A MISSING file is
+# not an error, though: every completed Layer 4 run overwrites or deletes
+# verify.md (work-item-close §2), so absence means no rejection stands. Only a
+# path that IS there and cannot be read is the halt case - and a broken
+# symlink counts as there: `-e` follows the link and fails, `-L` does not.
+_oss_inv_rejection() { # $1=verify.md ; rc 0 rejected · rc 1 no record · rc 2 unreadable
+  local rc=0
+  [ -e "$1" ] || [ -L "$1" ] || return 1
+  grep -qF '[fidelity]' "$1" 2>/dev/null || rc=$?
+  [ "$rc" -le 1 ] || rc=2
+  return "$rc"
+}
+
 oss_spine_inventory() { # $1=state $2=spine-id
   local sf="$1" spine="$2" rel ai rel_dir matches n slug spine_dir spine_branch halt=0
   _oss_entity_require_single "$sf" '.spines[] | select(.id == $v)' "spine" "$spine" >/dev/null 2>&1 \
@@ -64,6 +80,18 @@ EOF
       printf 'repo\t%s\thalt:unreadable\tbranch=%s\thead=%s\tclean=-\tbase=-\n' "$repo" "$present" "$head"; halt=1; continue
     fi
     base="$(oss_entity_get_spine_base "$sf" "$spine" "$repo" 2>/dev/null)" || base=unrecorded
+    # #673 G3: a RECORDED base that no longer resolves must halt the read-out.
+    # §2b runs its repo repairs before its item repairs, so with several repos
+    # needing `cut-missing` it would create and check out the spine branch in
+    # the earlier repos and only then fail `git checkout -b ... "$base"` in
+    # this one - a partial mutation despite the pre-mutation reconciliation
+    # guarantee. `spine_base_set` validates the branch EXISTS at record time,
+    # so a missing ref here means the base was renamed or deleted afterwards;
+    # no repair may guess a replacement (that is the operator's call).
+    if [ "$base" != unrecorded ] && ! _oss_inv_git -C "$root" show-ref --verify --quiet "refs/heads/$base"; then
+      printf 'repo\t%s\thalt:base-unresolved\tbranch=%s\thead=%s\tclean=%s\tbase=%s\n' "$repo" "$present" "$head" "$clean" "$base"
+      halt=1; continue
+    fi
     if [ "$any" -eq 0 ]; then verdict=fresh
     elif [ "$clean" = no ]; then verdict=halt:dirty
     elif [ "$head" = DETACHED ]; then verdict=halt:detached
@@ -88,7 +116,7 @@ EOF
 # still AT base_sha is trivially an ancestor and has merged nothing.
 _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if any halt
   local sf="$1" spine="$2" spine_dir="$3" sb="$4" halt=0
-  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys held holders hp adopt_br brx feed feed_rc=0
+  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys held holders hp adopt_br brx feed feed_rc=0 gr
   # The feed's own rc is caught, and each item renders inside a `try`/`catch`
   # (#673 A2): one unrenderable field used to collapse the WHOLE stream - the
   # shell read a partial feed with no error channel, the empty-field skip
@@ -183,10 +211,20 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
         # the read-out, before anything mutates. `held=1` unless every holder is
         # this item's own stale registration - `…/.worktrees/<wi>` (any root
         # spelling of this repo's own path) whose directory is gone.
-        holders="$(_oss_inv_git -C "$root" worktree list --porcelain | awk -v b="refs/heads/$br" '
+        # #673 G1: an unreadable holder list reads exactly like "no holders".
+        # `|| holders=""` converted a failed pipeline (bin/oss runs under
+        # `pipefail`) into the benign empty list, so a planned item with a
+        # recorded branch and a missing derived worktree path routed `reattach`
+        # instead of halting - and reattach would have to re-discover the
+        # unreadable state one mutation later. Fail closed: the list failing
+        # means the branch is treated as HELD, and the route that consults
+        # `held` halts with a repair the operator can run (`git worktree list`).
+        if ! holders="$(_oss_inv_git -C "$root" worktree list --porcelain | awk -v b="refs/heads/$br" '
           /^worktree /{if (hit) print p; p=substr($0,10); hit=0; next}
           $0=="branch " b {hit=1}
-          END{if (hit) print p}')" || holders=""
+          END{if (hit) print p}')"; then
+          held=1; holders=""
+        fi
         while IFS= read -r hp; do
           [ -n "$hp" ] || continue
           case "$hp" in
@@ -288,11 +326,15 @@ HOLD
               # (impl-check §4b). Byte-identical to a close-finished result
               # otherwise, and re-entry must not hand the rejected result back
               # to a stochastic gate: the correction has to complete first.
-              if grep -qF '[fidelity]' "$spine_dir/work-$wi/verify.md" 2>/dev/null; then
-                route=halt:close-rejected
-              else
-                route=close-finished
-              fi
+              # #673 G2: the read is TRI-state via _oss_inv_rejection - an
+              # unreadable record is NOT an absent one, and halts rather than
+              # routing the rejected result close-finished.
+              gr=0; _oss_inv_rejection "$spine_dir/work-$wi/verify.md" || gr=$?
+              case "$gr" in
+                0) route=halt:close-rejected ;;
+                1) route=close-finished ;;
+                *) route=halt:unreadable ;;
+              esac
             else route=halt:dirty-worktree; fi
           elif [ "$hab" = - ]; then route=halt:work-lost
           elif [ "$merged" = yes ]; then route=finish-status

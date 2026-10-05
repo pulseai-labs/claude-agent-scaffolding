@@ -262,7 +262,7 @@ over to `/close <spine-id>`, as §7 does.
   disagree, halt and name the handoffs. If none exist, ask the operator once for
   the branch the spine branch was cut from, then record it the same way.
   **Never** take it from HEAD, which is the spine branch by now.
-- `cut-missing` (a crash inside §2a's PASS 2):
+- `cut-missing` (a crash inside §2a's PASS 2). **The recorded base is validated before this loop runs**: the inventory emits `halt:base-unresolved` for a repo whose base no longer resolves, so a rename or deletion halts the read-out instead of failing here after the earlier repos were already cut (#673 G3):
 
 ```bash
 spine_branch="$("$oss_bin" branch_name "<spine-id>" "<spine-slug>")"
@@ -297,10 +297,11 @@ arm's own repairs can hand back, and their routes out:
 |---|---|
 | `halt:state-claims-merge` — a `complete` item whose branch still sits at its recorded base | the branch holds no commits past its base, so no merge can be reconstructed from repo state: if the item's work exists elsewhere, return it to `planned` (`"$oss_bin" work_item_status <wi-id> planned`) and re-run its round; if it truly landed nothing, the state is the record to repair. (`complete` items whose branch holds unmerged commits now route `finish-merge` instead; a branch that is gone is the cleanup arm and routes `skip` — #673 A5) |
 | `halt:base-unknown` — an ITEM row: a branch is recorded with no `base_sha` | a half-written `work_item_exec` record; repair it with a full re-dispatch — `"$oss_bin" work_item_exec <wi-id> <branch> <worktree_path> <the base the branch was cut at>` — which replaces all three fields (#673 A1) |
-| `halt:worktree-held` | the branch is checked out somewhere that is not this item's own missing registration (`git -C <repo-root> worktree list`); reconcile with the holder — the lane touches nothing on the holder's behalf (#673 A4) |
+| `halt:base-unresolved` — a repo row: the recorded base branch no longer resolves locally (renamed or deleted since it was recorded) | the `cut-missing` repair cuts from that ref, so re-entry would create the spine branch in the earlier repos and only then fail here — a partial mutation. Restore the branch, or, if it was renamed, record the new name with `"$oss_bin" spine_base_reset <spine-id> <repo> <new-branch>` (an operator decision, §2a); the lane never guesses a replacement (#673 G3) |
+| `halt:worktree-held` | the branch is checked out somewhere that is not this item's own missing registration (`git -C <repo-root> worktree list`) — or that list itself could not be read, which reads the same way (#673 A4/G1); reconcile with the holder — the lane touches nothing on the holder's behalf (#673 A4) |
 | `halt:unverified-merge` | a clean, committed work branch with no `report.md` evidence: a human decides whether the commit is gated work (restore or author the report, then re-run) or the round must be re-run |
 | `halt:close-rejected` | the staged result's last completed gate run recorded a `[fidelity]` finding (durable in `verify.md`); the correction must complete — the external seam's continuation or the close's recovery menu — before anything re-verifies the result (#673 C2) |
-| `halt:unreadable` | a repo root, a `git status`, or the state feed could not be read; fix that and re-run — nothing here is in the lane's hands (#673 A2/A3) |
+| `halt:unreadable` | a repo root, a `git status`, a `verify.md` rejection record, or the state feed could not be read; fix that and re-run — nothing here is in the lane's hands (#673 A2/A3/G2) |
 | `halt:work-lost`, `halt:unclassified`, `halt:planned-with-worktree`, `halt:dirty-worktree` | state and repos disagree, or the shape is outside this table; surface both and decide |
 
 **5. Continue into §3 for round *R*.**
