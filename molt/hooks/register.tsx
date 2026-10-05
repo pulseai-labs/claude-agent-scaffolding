@@ -39,6 +39,9 @@ const forced = new Set<string>()          // /molt now: the command stage whatev
 let unattended = 0                        // molts since the operator last sent a prompt
 let pending: { oldSession: string; handoff: string; chain: string; depth: number } | undefined
 const warned = new Map<string, number>()   // warnings delivered per session: 0, 1 or 2
+const handedOff = new Set<string>()        // child sessions that have named their handoff
+const commandNoted = new Set<string>()     // child sessions whose status file says 'handoff required'
+let statusFailed = false                   // the status-file failure is logged once per process
 
 const USAGE = 'usage: /molt now | off | on | status'
 
@@ -120,6 +123,41 @@ function dueWarning(sessionId: string): 1 | 2 | undefined {
   const done = warned.get(sessionId) ?? 0
   if (stage === 'warnAgain') return done < 2 ? 2 : undefined
   return done < 1 ? 1 : undefined
+}
+
+// A child's events, one line each, appended for its parent to read (spec §1.4). Never
+// for a root; a failure here never stops a warning or a handoff.
+async function appendStatus($: Engine, event: string): Promise<void> {
+  if (!(await isChild($))) return
+  const path = ((await $.env.get('MOLT_STATUS_PATH')) ?? '').trim()
+  if (path === '') return
+  try {
+    const old = (await readText($, path)) ?? ''
+    await $.fs.write(path, `${old}${new Date().toISOString()} ${event}\n`)
+  } catch (err) {
+    if (statusFailed) return
+    statusFailed = true
+    await log($, `status write failed ${path} ${String(err)}`)
+  }
+}
+
+async function noteCommand($: Engine, sessionId: string): Promise<void> {
+  if (commandNoted.has(sessionId)) return
+  commandNoted.add(sessionId)
+  await appendStatus($, 'handoff required')
+}
+
+function warnedAt(sessionId: string, which: 1 | 2): number {
+  const t = currentThresholds(sessionId)
+  return Math.round(which === 1 ? t.warn : t.warnAgain)
+}
+
+// A child is never cleared: its parent replaces it (spec §1.3).
+async function handOff($: Engine, sessionId: string, handoff: Handoff): Promise<void> {
+  handedOff.add(sessionId)
+  await appendStatus($, `handed-off ${handoff.path}`)
+  try { await setNotice($, { text: `molt: handed off to the parent — ${handoff.path}`, tone: 'info' }) } catch {}
+  await log($, `handed off session=${sessionId} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent}`)
 }
 
 async function warningText($: Engine, sessionId: string, which: 1 | 2): Promise<string> {
@@ -324,6 +362,7 @@ export const register: Register = (on, options) => {
       // A compact keeps the session id: the new window gets a whole handoff cycle again.
       nudged.delete(e.session_id)
       warned.delete(e.session_id)
+      commandNoted.delete(e.session_id)
       stopBlocks.delete(e.session_id)
       lastMd.delete(e.session_id)
     }
@@ -359,8 +398,9 @@ export const register: Register = (on, options) => {
       if (!off.has(sessionId) && !inFlight && paused !== sessionId) {
         await measure($, sessionId)
         const due = dueWarning(sessionId)
-        if (due !== undefined) {
+        if (due !== undefined && !handedOff.has(sessionId)) {
           warned.set(sessionId, due)
+          await appendStatus($, `warned ${warnedAt(sessionId, due)}`)
           return next({ ...e, context: [...(e.context ?? []), await warningText($, sessionId, due)] })
         }
       }
@@ -406,17 +446,19 @@ export const register: Register = (on, options) => {
     try {
       if ((e as { agent_id?: string }).agent_id !== undefined) return r
       const sessionId = e.session_id
-      if (off.has(sessionId) || inFlight) return r
+      if (off.has(sessionId) || inFlight || handedOff.has(sessionId)) return r
       await measure($, sessionId)
       if (atLeast(stage, 'command')) {
         if (nudged.has(sessionId)) return r
         warned.set(sessionId, 2)
         nudged.add(sessionId)
+        await noteCommand($, sessionId)
         return { ...r, additionalContext: [...(r.additionalContext ?? []), await instruction($, sessionId)] }
       }
       const due = dueWarning(sessionId)
       if (due === undefined) return r
       warned.set(sessionId, due)
+      await appendStatus($, `warned ${warnedAt(sessionId, due)}`)
       return { ...r, additionalContext: [...(r.additionalContext ?? []), await warningText($, sessionId, due)] }
     } catch (err) {
       await log($, `PostToolUse error ${String(err)}`)
@@ -428,7 +470,7 @@ export const register: Register = (on, options) => {
     const r = await next(e)
     try {
       const sessionId = e.session_id
-      if (off.has(sessionId) || inFlight || paused === sessionId) return r
+      if (off.has(sessionId) || inFlight || paused === sessionId || handedOff.has(sessionId)) return r
       await measure($, sessionId)
       if (!atLeast(stage, 'command')) return r
       const marker = markerPath(e.last_assistant_message ?? '')
@@ -441,6 +483,7 @@ export const register: Register = (on, options) => {
       const n = stopBlocks.get(sessionId) ?? 0
       if (n >= MAX_STOP_BLOCKS) return r
       stopBlocks.set(sessionId, n + 1)
+      if (missing === undefined) await noteCommand($, sessionId)
       const text = missing === undefined
         ? await instruction($, sessionId)
         : `molt: the MOLT-HANDOFF line names ${missing}, but ${missing} does not exist or is not a readable file. Write the handoff file, then end your reply with MOLT-HANDOFF: <its absolute path>.`
@@ -479,7 +522,7 @@ export const register: Register = (on, options) => {
     try {
       const sessionId = await $.session.id()
       await touchActive($, sessionId)
-      if (off.has(sessionId) || inFlight || paused === sessionId) { showStatus($, sessionId); return r }
+      if (off.has(sessionId) || inFlight || paused === sessionId || handedOff.has(sessionId)) { showStatus($, sessionId); return r }
       await measure($, sessionId)
       showStatus($, sessionId)
       // Below soft a marker is not a molt: a seeded session keeps its minimum room, and a
@@ -499,7 +542,8 @@ export const register: Register = (on, options) => {
         if (!atLeast(stage, 'fallback') && (stopBlocks.get(sessionId) ?? 0) < MAX_STOP_BLOCKS) return r
         handoff = { path: await fallbackBrief($, sessionId), source: 'fallback' }
       }
-      await molt($, sessionId, handoff)
+      if (await isChild($)) await handOff($, sessionId, handoff)
+      else await molt($, sessionId, handoff)
     } catch (err) {
       await log($, `turn.complete error ${String(err)}`)
     }
