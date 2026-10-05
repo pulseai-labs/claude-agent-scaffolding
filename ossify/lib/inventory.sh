@@ -128,7 +128,13 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
               route=adopt
             else route=halt:planned-with-worktree; fi
           elif [ "$has_exec" = 1 ]; then
-            if [ "$hab" != - ] && [ "$wtp" = "$conv" ]; then route=reattach; else route=halt:unclassified; fi
+            # Same guard as the active arm: a path that exists is not a
+            # `reattach` - worktree_reattach would refuse rc 8 after earlier
+            # repairs had mutated state. A planned item's stray path at the
+            # recorded location is the planned-with-worktree shape.
+            if [ -e "$wtp" ]; then route=halt:planned-with-worktree
+            elif [ "$hab" != - ] && [ "$wtp" = "$conv" ]; then route=reattach
+            else route=halt:unclassified; fi
           else
             # A stray path at the derived worktree location is not spawn-safe
             # either: worktree_add refuses (rc 8) when the path exists, so
@@ -159,6 +165,13 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
               route=close-finished
             else route=halt:dirty-worktree; fi
           elif [ "$hab" = - ]; then route=halt:work-lost
+          # reattach is a repair for a directory that is GONE (spec §2); when a
+          # path exists but is not a linked worktree, `oss worktree_reattach`
+          # refuses (rc 8) - and the lane meets that refusal only after its
+          # earlier repairs have already mutated state (§3 step 5 runs item
+          # repairs after repo repairs), breaking "halts before any mutation".
+          # Halt here instead, where the halt is still pre-mutation.
+          elif [ -e "$wtp" ]; then route=halt:unclassified
           elif [ "$merged" = yes ]; then route=finish-status
           elif [ "$wtp" = "$conv" ]; then route=reattach
           else route=halt:unclassified; fi ;;

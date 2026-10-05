@@ -180,10 +180,24 @@ F="$TMP/s18"; fx "$F" 1; mkdir -p "$F/core/.worktrees/r0.s1.w1"; inv "$F"
 t_assert_eq "halt:planned-with-worktree" "$(route r0.s1.w1)" "S18: a plain dir at the derived path halts a planned item"
 t_assert_rc 3 "S18: ...rc 3"
 
-# S19 (fix round 1): an active item whose recorded worktree_path is a plain directory is
-# not a live worktree - it must not be read as present to redispatch or close-finished.
+# S19 (fix rounds 1-2): an active item whose recorded worktree_path is a plain directory is
+# not a live worktree - and must NOT route reattach either: that repair is for a directory
+# that is GONE. worktree_reattach refuses rc 8 when the path exists, and the lane meets that
+# refusal only after its earlier repairs have already mutated state (§3 step 5 runs item
+# repairs after repo repairs), breaking "halts before any mutation". S6 above is the control:
+# a truly gone directory routes reattach.
 F="$TMP/s19"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"; rm -rf "$WT"; mkdir -p "$WT"; inv "$F"
-t_assert_eq "reattach" "$(route r0.s1.w1)" "S19: a plain dir at the recorded path is not redispatch/close-finished"
+t_assert_eq "halt:unclassified" "$(route r0.s1.w1)" "S19: a plain dir at the recorded path halts, not reattach"
+t_assert_rc 3 "S19: ...rc 3 - the halt is reported before any mutation"
+
+# S20 (fix round 2): the same shape for a PLANNED item that HAS an exec record - the crash
+# a worktree_add + work_item_exec left behind, its directory then replaced by a plain dir.
+F="$TMP/s20"; fx "$F" 1
+WT="$(oss_in "$F" worktree_add core r0.s1.w1 one spine/r0.s1-demo)"
+oss_in "$F" work_item_exec r0.s1.w1 "$(git -C "$WT" rev-parse --abbrev-ref HEAD)" "$WT" "$(git -C "$WT" rev-parse HEAD)" >/dev/null
+rm -rf "$WT"; mkdir -p "$WT"; inv "$F"
+t_assert_eq "halt:planned-with-worktree" "$(route r0.s1.w1)" "S20: a planned item with an exec record and a plain dir halts, not reattach"
+t_assert_rc 3 "S20: ...rc 3"
 
 # S12: complete but not merged -> halt:state-claims-merge (control: S1's merged item is skip).
 F="$TMP/s12"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
