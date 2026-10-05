@@ -177,6 +177,55 @@ _oss_worktree_add_rollback() { # $1=root $2=path $3=branch $4=had-branch(0|1) $5
   [ -z "$undone" ] || echo "oss: rolled back the partial add (removed:$undone) - fix the cause above and retry" >&2
 }
 
+# #133: re-attach a work item's worktree whose DIRECTORY is gone but whose
+# branch still holds the item's work. `git worktree add -b` cannot (the branch
+# exists), and a plain add refuses while git still registers the deleted path.
+# `-f` overrides exactly that - so it is used only after proving the branch's
+# one registration is THIS item's missing path. The match is on the
+# `.worktrees/<wi-id>` suffix, never the full path: git prints a symlink-resolved
+# path (macOS /tmp) that a string compare would miss. Nothing is pruned - a
+# sibling's stale registration is another item's evidence.
+oss_worktree_reattach() { # $1=repo-key $2=wi-id $3=branch ; echoes abs path
+  local key="$1" wi="$2" branch="$3" root cd lock rc=0
+  _oss_worktree_id_check "$wi" || return $?
+  root="$(_oss_repo_root "$key")" || return $?
+  cd="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
+    || { echo "oss: cannot resolve git common dir for $root" >&2; return 8; }
+  lock="$cd/ossify-worktree-add.$wi.lock"
+  mkdir "$lock" 2>/dev/null || {
+    echo "oss: another worktree operation for $wi is running (lock $lock) - if none is, remove the lock with: rmdir $(printf '%q' "$lock")" >&2
+    return 8; }
+  _oss_worktree_reattach_locked "$root" "$wi" "$branch" || rc=$?
+  rmdir "$lock" 2>/dev/null || true
+  return "$rc"
+}
+
+_oss_worktree_reattach_locked() { # $1=root $2=wi-id $3=branch ; echoes abs path
+  local root="$1" wi="$2" branch="$3" path holders n
+  path="$root/.worktrees/$wi"
+  [ -e "$path" ] && { echo "oss: $path exists - there is nothing to reattach" >&2; return 8; }
+  git -C "$root" show-ref --verify --quiet "refs/heads/$branch" \
+    || { echo "oss: branch '$branch' does not exist in $root - reattach cannot recover this item's work" >&2; return 8; }
+  # Every registered worktree holding this branch, with whether git marks it locked.
+  holders="$(git -C "$root" worktree list --porcelain | awk -v b="refs/heads/$branch" '
+    /^worktree /{p=substr($0,10); lk=0} /^locked/{lk=1}
+    $0=="branch " b {print p "\t" lk}')"
+  n="$(printf '%s' "$holders" | awk 'END{print NR}')"
+  if [ "$n" -eq 0 ]; then
+    git -C "$root" worktree add -q "$path" "$branch" \
+      || { echo "oss: git worktree add failed reattaching $wi on $branch" >&2; return 8; }
+  else
+    local hp hl
+    hp="$(printf '%s\n' "$holders" | cut -f1)"; hl="$(printf '%s\n' "$holders" | cut -f2)"
+    [ "$n" -eq 1 ] && case "$hp" in */.worktrees/"$wi") true ;; *) false ;; esac && [ ! -e "$hp" ] \
+      || { echo "oss: branch '$branch' is checked out at $(printf '%s' "$hp" | tr '\n' ' ')- not this item's missing worktree; refusing" >&2; return 8; }
+    [ "$hl" = 0 ] || { echo "oss: the stale registration at $hp is locked - unlock it with git worktree unlock first" >&2; return 8; }
+    git -C "$root" worktree add -q -f "$path" "$branch" \
+      || { echo "oss: git worktree add -f failed reattaching $wi on $branch" >&2; return 8; }
+  fi
+  printf '%s\n' "$path"
+}
+
 # The worktree root lives INSIDE the repo, so without this every spawn leaves
 # `?? .worktrees/` in that repo's status - a dirty tree ossify itself
 # created, in the very repo whose cleanliness the close ceremony checks. The

@@ -308,6 +308,7 @@ oss_cmd_repo_root() {
 oss_cmd_worktree_add()     { _oss_need 3 worktree_add "<repo-key> <wi-id> <slug> [base-ref]" "$@" || return 2; oss_worktree_add "$1" "$2" "$3" "${4:-HEAD}"; }
 oss_cmd_worktree_resolve() { _oss_need 2 worktree_resolve "<repo-key> <wi-id>" "$@" || return 2; oss_worktree_resolve "$1" "$2"; }
 oss_cmd_worktree_remove()  { _oss_need 2 worktree_remove "<repo-key> <wi-id>" "$@" || return 2; oss_worktree_remove "$1" "$2"; }
+oss_cmd_worktree_reattach() { _oss_need 3 worktree_reattach "<repo-key> <wi-id> <branch>" "$@" || return 2; oss_worktree_reattach "$1" "$2" "$3"; }
 # `oss_cmd_worktree_list` was REMOVED in v0.2.0, with its lib function. STATE is
 # the source of truth for worktrees ossify created - `work_item_exec` journals
 # `worktree_path`, and spine-close.md §10 removes each one by reading state, not

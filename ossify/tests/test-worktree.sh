@@ -1005,5 +1005,60 @@ case "$T_OUT" in
 esac
 cd /; rm -rf "$LGT"
 
+# --- worktree_reattach (#133) ---------------------------------------------------
+# A worktree directory deleted by hand leaves git a stale registration and the
+# branch still "checked out" there, so a plain re-add refuses. reattach re-adds on
+# the EXISTING branch (no -b) and overrides only that one stale registration.
+#
+# FIXTURE (recorded deviation from the brief's literal placement): this block sits
+# at the file's end, where the LGT teardown above left the cwd at `/` while
+# `$TMP/ws` - the workspace whose manifest is the main fixture's, `canonical` ->
+# `$TMP/canon` - is still on disk. `_oss_repo_root` resolves by walking up from
+# $PWD, so the block re-enters that workspace first; without it every
+# `canonical` lookup below resolves against no manifest at all. No assertion was
+# changed.
+cd "$TMP/ws"
+RA_WT="$(oss_worktree_add canonical r9.s1.w1 "ra" HEAD)"
+echo work > "$RA_WT/ra.txt"; git -C "$RA_WT" add ra.txt; git -C "$RA_WT" commit -qm "ra work"
+RA_TIP="$(git -C "$RA_WT" rev-parse HEAD)"
+rm -rf "$RA_WT"
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w1 work/r9.s1.w1-ra
+t_assert_rc 0 "reattach: a deleted worktree with its branch intact re-attaches"
+t_assert_eq "$TMP/canon/.worktrees/r9.s1.w1" "$T_OUT" "reattach: echoes the conventional path"
+t_assert_eq "work/r9.s1.w1-ra" "$(git -C "$RA_WT" rev-parse --abbrev-ref HEAD)" "reattach: ...on the existing branch"
+t_assert_eq "$RA_TIP" "$(git -C "$RA_WT" rev-parse HEAD)" "reattach: ...at its tip - no commit lost, no new branch cut"
+t_assert_eq "1" "$(git -C "$TMP/canon" worktree list --porcelain | grep -c "^worktree .*/r9.s1.w1\$")" "reattach: exactly one registration for the path"
+
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w1 work/r9.s1.w1-ra
+t_assert_rc 8 "reattach: refuses when the path exists"
+
+rm -rf "$RA_WT"
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w1 work/r9.s1.w1-nope
+t_assert_rc 8 "reattach: refuses a branch that does not exist"
+t_assert_contains "$T_OUT" "does not exist" "reattach: ...naming it"
+
+# The branch is live in ANOTHER worktree: -f must never be used to steal it.
+OTHER="$TMP/other-wt"; git -C "$TMP/canon" worktree prune
+git -C "$TMP/canon" worktree add -q "$OTHER" work/r9.s1.w1-ra
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w1 work/r9.s1.w1-ra
+t_assert_rc 8 "reattach: refuses when the branch is checked out in a different, live worktree"
+t_assert_eq "work/r9.s1.w1-ra" "$(git -C "$OTHER" rev-parse --abbrev-ref HEAD)" "reattach: ...and leaves that worktree untouched"
+git -C "$TMP/canon" worktree remove --force "$OTHER"
+
+# A stale registration of ANOTHER item must survive (never prune globally).
+SIB="$(oss_worktree_add canonical r9.s1.w2 "sib" HEAD)"; rm -rf "$SIB"
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w1 work/r9.s1.w1-ra
+t_assert_rc 0 "reattach: works after the stale entry was already pruned (plain add path)"
+t_assert_contains "$(git -C "$TMP/canon" worktree list --porcelain)" "r9.s1.w2" "reattach: a sibling's stale registration is NOT pruned"
+
+# Review Focus 1: the repo reached through a symlink.
+mkdir -p "$TMP/real"; ln -s "$TMP/real" "$TMP/link"
+git -C "$TMP/real" init -q; git -C "$TMP/real" config user.email t@t; git -C "$TMP/real" config user.name t
+echo s > "$TMP/real/f"; git -C "$TMP/real" add .; git -C "$TMP/real" commit -qm s
+LNK_WT="$TMP/link/.worktrees/r9.s2.w1"
+git -C "$TMP/link" worktree add -q -b work/r9.s2.w1-l "$LNK_WT" HEAD; rm -rf "$LNK_WT"
+t_capture _oss_worktree_reattach_locked "$TMP/link" r9.s2.w1 work/r9.s2.w1-l
+t_assert_rc 0 "reattach: a repo root reached through a symlink still matches its stale registration"
+
 cd /; rm -rf "$QRT" "$TMP"
 t_summary
