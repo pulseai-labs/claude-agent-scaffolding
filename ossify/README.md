@@ -1,4 +1,4 @@
-# ossify (v1.13.4)
+# ossify (v1.14.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
@@ -93,6 +93,34 @@ The private boundary inventory has one address —
 "composition root" is defined as a path rather than a repo key, and the critic
 moment's non-interactive default records that no operator answered (#299). No
 `lib/` code, no state change.
+
+Since 1.14.0 (#133, #362), `/ossify:run-spine` re-enters a started spine on its
+own — at the top of every round after the first, and mid-round after a halted
+or interrupted run — and there is no resume flag: the same command is the
+resume. Before anything mutates it prints a reconcile read-out from the new
+read-only `oss spine_inventory` — one row per hosting repo (`fresh`, `ok`,
+`base-backfill`, `cut-missing`, or a named `halt:`) and one per work item
+(`skip`, `spawn`, `adopt`, `redispatch`, `close-finished`, `finish-merge`,
+`finish-status`, `reattach`, or a named halt); any halt row stops the lane
+having changed nothing, and the repairable rows are repaired before the resume
+round runs. Two optional state fields carry what a respawned session cannot
+recover from context, and both read as absent on a journal an earlier 1.x
+wrote, so there is no schema bump: `spines[].bases`, recorded by the fresh arm
+at cut time with `oss spine_base_set` and read back with `oss spine_base_get`
+(a recorded base is evidence — a different value refuses rc 7 — and it is never
+re-derived from HEAD, which is the spine branch by then), and
+`work_items[].dispatches`, counted with `oss work_item_dispatched` before every
+dispatch, so the 3-dispatch cap survives a session loss. `oss worktree_reattach`
+re-attaches a work item's worktree whose directory was deleted but whose branch
+survives, refusing a branch that is live elsewhere, a locked registration, or a
+missing branch — and pruning nothing. On the external seam,
+`external-executor.md` §2a binds the caller: it counts every further execution
+it runs (a correction, a replacement) with `work_item_dispatched` and stops
+offering anything but halt at 3, and a request whose worktree already holds a
+staged result with `report.md` at request time is verified and returned without
+executing — no implementer launched, no dispatch counted. The 1.13 claims that
+an existing spine branch halts rather than resumes, and that the base is taken
+from HEAD, are retired.
 
 Since 1.9.0, the deterministic gates close the vacuous-green family: the
 zero-tests guard no longer inverts a true match past the pipe buffer, flags

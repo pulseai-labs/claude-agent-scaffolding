@@ -1,7 +1,7 @@
 {
   "name": "ossify",
-  "version": "1.13.4",
-  "description": "Skeleton-first lifecycle from Release 0 through MVP and v1. An alternate replacement for scaffold-onboard + scaffold-dev, not a stage alongside them. workspace-init is optional - /ossify:start and /ossify:adopt author the topology declaration themselves. Since 1.8.0 /ossify:run-spine accepts an optional --external-executor flag handing the work items of a round to a caller-supplied, provider-neutral in-session procedure; the no-flag command is unchanged.",
+  "version": "1.14.0",
+  "description": "Skeleton-first lifecycle from Release 0 through MVP and v1. An alternate replacement for scaffold-onboard + scaffold-dev, not a stage alongside them. workspace-init is optional - /ossify:start and /ossify:adopt author the topology declaration themselves. Since 1.8.0 /ossify:run-spine accepts an optional --external-executor flag handing the work items of a round to a caller-supplied, provider-neutral in-session procedure; the no-flag command is unchanged. Since 1.14.0 /ossify:run-spine re-enters a started spine on its own, at a round barrier or mid-round, printing a reconcile read-out and halting before any mutation on state it cannot reconcile.",
   "author": {
     "name": "Pras"
   },
