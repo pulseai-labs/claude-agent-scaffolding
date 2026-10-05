@@ -206,10 +206,18 @@ _oss_worktree_reattach_locked() { # $1=root $2=wi-id $3=branch ; echoes abs path
   [ -e "$path" ] && { echo "oss: $path exists - there is nothing to reattach" >&2; return 8; }
   git -C "$root" show-ref --verify --quiet "refs/heads/$branch" \
     || { echo "oss: branch '$branch' does not exist in $root - reattach cannot recover this item's work" >&2; return 8; }
-  # Every registered worktree holding this branch, with whether git marks it locked.
+  # Every registered worktree holding this branch, with whether git marks it
+  # locked. The lock flag is read at the END of the entry, not when the branch
+  # line goes by: `locked` FOLLOWS `branch` in the porcelain, so the obvious
+  # read-at-branch form always sees lk=0 and leaves the locked arm below
+  # unreachable - measured on git 2.53.0 (worktree, HEAD, branch, locked). A
+  # locked registration then falls through to git's own refusal, whose message
+  # advertises `add -f -f` - the one hint this function exists to avoid.
   holders="$(git -C "$root" worktree list --porcelain | awk -v b="refs/heads/$branch" '
-    /^worktree /{p=substr($0,10); lk=0} /^locked/{lk=1}
-    $0=="branch " b {print p "\t" lk}')"
+    /^worktree /{if (hit) print p "\t" lk; p=substr($0,10); lk=0; hit=0; next}
+    /^locked/{lk=1; next}
+    $0=="branch " b {hit=1}
+    END{if (hit) print p "\t" lk}')"
   n="$(printf '%s' "$holders" | awk 'END{print NR}')"
   if [ "$n" -eq 0 ]; then
     git -C "$root" worktree add -q "$path" "$branch" \

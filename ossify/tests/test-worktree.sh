@@ -1042,7 +1042,17 @@ OTHER="$TMP/other-wt"; git -C "$TMP/canon" worktree prune
 git -C "$TMP/canon" worktree add -q "$OTHER" work/r9.s1.w1-ra
 t_capture bash "$OSS" worktree_reattach canonical r9.s1.w1 work/r9.s1.w1-ra
 t_assert_rc 8 "reattach: refuses when the branch is checked out in a different, live worktree"
+# "Untouched" is FOUR facts, and the branch name alone is the weakest of them:
+# a stolen branch still resolves its ref name in the victim worktree, so the
+# original assertion stayed green under an implementation that overrode with
+# -f and checked the same branch out a second time. Pin the worktree itself
+# (.git file present), its registration incl. its branch ref, and the absence
+# of any registration at the item's own path - the last is what the steal
+# creates, and the one that can only pass if the refusal really refused.
 t_assert_eq "work/r9.s1.w1-ra" "$(git -C "$OTHER" rev-parse --abbrev-ref HEAD)" "reattach: ...and leaves that worktree untouched"
+[ -e "$OTHER/.git" ] && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: reattach: the refused reattach destroyed the live holder's .git"; }
+t_assert_eq "1" "$(git -C "$TMP/canon" worktree list --porcelain | awk '/^worktree /{w=substr($0,10)} w ~ /\/other-wt$/ && $0=="branch refs/heads/work/r9.s1.w1-ra" {c++} END{print c+0}')" "reattach: ...still registered, on its branch"
+t_assert_eq "0" "$(git -C "$TMP/canon" worktree list --porcelain | grep -c "^worktree .*/\.worktrees/r9\.s1\.w1\$")" "reattach: ...and no registration for this item's path was created by the refusal"
 git -C "$TMP/canon" worktree remove --force "$OTHER"
 
 # A stale registration of ANOTHER item must survive (never prune globally).
@@ -1050,6 +1060,51 @@ SIB="$(oss_worktree_add canonical r9.s1.w2 "sib" HEAD)"; rm -rf "$SIB"
 t_capture bash "$OSS" worktree_reattach canonical r9.s1.w1 work/r9.s1.w1-ra
 t_assert_rc 0 "reattach: works after the stale entry was already pruned (plain add path)"
 t_assert_contains "$(git -C "$TMP/canon" worktree list --porcelain)" "r9.s1.w2" "reattach: a sibling's stale registration is NOT pruned"
+
+# A LOCKED stale registration is refused by OUR check, not by git's accident.
+# git's own `worktree add -f` over a locked missing registration fails too, but
+# with its own wording ("is a missing but locked worktree; use 'add -f -f' to
+# override") - rc 8 either way, so the rc alone proves nothing. The message is
+# the discriminator: ours says what is locked and how to clear it, and never
+# advertises `-f -f`, which would force past a lock its owner set deliberately.
+LOCK_WT="$(oss_worktree_add canonical r9.s1.w3 "lk" HEAD)"
+git -C "$TMP/canon" worktree lock "$LOCK_WT"
+rm -rf "$LOCK_WT"
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w3 work/r9.s1.w3-lk
+t_assert_rc 8 "reattach: refuses a LOCKED stale registration of this item's own path"
+t_assert_contains "$T_OUT" "is locked" "reattach: ...and the refusal names the lock"
+t_assert_contains "$T_OUT" "git worktree unlock" "reattach: ...and prints the remedy that clears it"
+git -C "$TMP/canon" worktree unlock "$LOCK_WT" 2>/dev/null || true
+git -C "$TMP/canon" worktree prune
+
+# The two shapes that separate the holder guard's arms. The live-holder case
+# above fails BOTH arms at once - its path exists AND it does not carry this
+# item's suffix - so it cannot say which arm refuses. These two fail exactly
+# ONE arm each; deleting either arm alone turns exactly its row red.
+#
+# (i) LIVE holder whose path DOES carry this item's suffix (it is another
+# root's conventional path). The suffix arm alone overrides this with -f; only
+# the existence arm refuses it.
+ALT_WT="$TMP/alt-root/.worktrees/r9.s1.w4"
+mkdir -p "$(dirname "$ALT_WT")"
+git -C "$TMP/canon" worktree add -q -b work/r9.s1.w4-alt "$ALT_WT" HEAD
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w4 work/r9.s1.w4-alt
+t_assert_rc 8 "reattach control: a LIVE holder carrying this item's suffix (another root) is refused"
+t_assert_contains "$T_OUT" "not this item's missing worktree" "reattach control: ...naming it"
+git -C "$TMP/canon" worktree remove --force "$ALT_WT" >/dev/null 2>&1
+git -C "$TMP/canon" branch -D work/r9.s1.w4-alt >/dev/null 2>&1
+
+# (ii) MISSING holder at a path WITHOUT this item's suffix. The existence arm
+# alone lets this through and overrides the foreign registration with -f; only
+# the suffix arm refuses it.
+ELSE_WT="$TMP/elsewhere-wt"
+git -C "$TMP/canon" worktree add -q -b work/r9.s1.w5-else "$ELSE_WT" HEAD
+rm -rf "$ELSE_WT"
+t_capture bash "$OSS" worktree_reattach canonical r9.s1.w5 work/r9.s1.w5-else
+t_assert_rc 8 "reattach control: a MISSING holder at a path that is not this item's is refused"
+t_assert_contains "$T_OUT" "not this item's missing worktree" "reattach control: ...naming it"
+git -C "$TMP/canon" worktree prune
+git -C "$TMP/canon" branch -D work/r9.s1.w5-else >/dev/null 2>&1
 
 # Review Focus 1: the repo reached through a symlink.
 mkdir -p "$TMP/real"; ln -s "$TMP/real" "$TMP/link"
