@@ -80,6 +80,8 @@ Three consequences:
   with the one shell wait that bounds them (`references/dsh-driver.md` §5).
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
   and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
+  Where molt runs, its warnings replace the notice: a child hands off to its parent
+  (`herdr-mechanics.md`, "A child past molt's warnings"), and the top molts in place.
 - **Verifying a worker's claim is a verifier dispatch**, not an orchestrator read. "Tests
   pass" in a seat's report is a claim until CI on that head SHA, or a verifier, says so.
   One narrow exception: lifecycle step 6's PR gate — `gh pr view` for identity and

@@ -2,6 +2,32 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.8
+
+**Children hand off to their parent; only the top molts in place** (molt 0.2.0's child
+mode). Install with molt 0.2.0, never before it.
+
+- **Children are marked.** Step 2's one export adds `MOLT_HANDOFF=parent
+  MOLT_STATUS_PATH=<REPORT_PATH>.molt-status` for every guarded seat, coordinator seat and
+  operator-declared role; `roles.md`'s launch block carries the combined exports. The top and
+  its rotation successor stay roots. A respawned child is a launch: step 2 runs again.
+- **Parents answer** (`herdr-mechanics.md`, "A child past molt's warnings"): a `MOLT WARNING`
+  ping or a new status line means no new unit; the heartbeat reads each child's status file; a
+  `handoff:` report or a `handed-off` status line respawns the seat with a fresh `REPORT_PATH`
+  in the same report directory, its scratch directory reused, its brief plus `RESUME FROM:`.
+  A spine cut mid-round and a close, work-item, lane-driver or doctor seat cut mid-ceremony
+  go to the operator.
+- **Templates.** The 13 leaf templates carry one `MOLT:` line (ping, finish the unit; on
+  molt's command mid-unit, a hand-written handoff at `<REPORT_PATH>.molt.md`). A molt warning
+  moves the spine's `ROTATE` and the work-PR's `open:` as the ceiling notice does; the spine
+  still never stops mid-round. The spine brief gains the staged-result caller rule.
+- **The top molts in place** (`lifecycle.md`, "Where molt runs"), carried by hand from closed
+  #669: the live task ids and any held operator question in the handoff, the
+  wake-after-handoff rule, no stand-down and nothing re-armed, the carried heartbeat tick, the
+  hash-and-identity generation check, and "A molt is not a launch".
+
+paseo-crew and orca-crew children stay unmarked until #666 and #667.
+
 ## 0.2.7
 
 **Every launch marks its session for seat-mods 0.2.0.** seat-mods 0.2.0 guards a session

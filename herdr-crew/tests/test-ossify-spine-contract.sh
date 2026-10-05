@@ -2263,6 +2263,8 @@ pin "$PRBRIEFS_MD" 'at a fix-round boundary once the context-ceiling notice or a
 pin "$PRBRIEFS_MD" 'and return `open:` at the next fix-round boundary' "work-PR brief: the MOLT line" flat
 pin "$PRBRIEFS_MD" 'End the reply that writes `open:` with `MOLT-HANDOFF: <REPORT_PATH>`' \
   "work-PR brief: the open reply names its report for molt (D5)" flat
+pin "$SKILL_MD" 'Where molt runs, its warnings replace the notice' "SKILL.md names the molt path" flat
+pin "$CHANGELOG_MD" '## 0.2.8' "CHANGELOG has 0.2.8"
 
 section "reference line budgets"
 
