@@ -118,8 +118,8 @@ sets `orchestrator`; herdr-crew launches no top but a rotation successor. A
 (`references/dsh-driver.md`).
 
 **Known limit.** `seat-mods` 0.1.0 does not know the two free roles: it reads either as an
-invalid role and denies every tool call, so herdr-crew 0.2.7 must be installed together
-with `seat-mods` 0.2.0. `paseo-crew`, `orca-crew` and `dsh-crew` do not mark sessions yet.
+invalid role and denies every tool call, so herdr-crew 0.2.7 or later must be installed
+together with `seat-mods` 0.2.0 or later. `paseo-crew`, `orca-crew` and `dsh-crew` do not mark sessions yet.
 An operator-declared role with no `replaces:` is marked a guarded `implementer` and runs
 under implementer rails.
 
@@ -178,7 +178,13 @@ unit in hand and start no new one, and a coordinator seat rotates at the next bo
 never allows, denies or asks, it is inert outside a herdr pane, and it reports the figure as
 unavailable rather than guessing when it cannot read it. The rotation itself is prose, in
 `references/lifecycle.md`. Since 0.2.6 the hook is silent in a session where the `molt` mod
-is active, because `molt` owns the context boundary there. That hook is the only deterministic code a run executes: a run
+is active, because `molt` owns the context boundary there.
+Since 0.2.8, a seat where `molt` runs molts in place past the ceiling: the top, the spine
+session and the work-PR session each hand off at their next acknowledged delivery, launch no
+successor and return no `rotate:` or `open:`; every armed wait survives the clear, and the
+resumed session arms none it already has (`references/lifecycle.md`, "Where molt runs").
+Without molt, or after `/molt off`, the rotation is unchanged. Install molt on a herdr-crew
+host only with herdr-crew 0.2.8 or later. That hook is the only deterministic code a run executes: a run
 has **no `lib/`, no state directory, no parser** — `agents.md` and `roles.md` are read as
 prose and nothing parses them. The suites and the eval harness under `tests/` are
 build-and-test tooling; the plugin never runs them on a user's path.

@@ -2,6 +2,47 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.8
+
+**Rotation past the context ceiling becomes an in-place molt where `molt` runs (#659).**
+0.2.6 silences the context-ceiling hook where `molt`'s active marker exists, so molt's
+handoff ask is the only notice such a session gets — and molt clears the session in its own
+pane, so the successor launch, the spine `rotate:` and the work-PR `open:` never fire there.
+0.2.8 adds the molt path beside each rotation path. The old rotation text is unchanged: it is
+the path for a host without molt and for `/molt off`. Probes P6/P7 (waits and the pane
+survive a mod-run `/clear`), P8 (a worker's `herdr agent prompt` ping is a `composer` prompt,
+so it resets molt's manual-mode count) and P9 (a marked seat keeps its guard and its status
+line across a molt) were measured on draco-desk before the rewrite.
+
+- **The top** (`lifecycle.md`, "Where molt runs"): takes molt's ask at its next fully
+  acknowledged delivery — past molt's hard threshold every `herdr` command is refused —
+  writes the handoff its rotation writes plus every live background task id and any held
+  operator question, and launches no successor and stands nothing down. The resumed top
+  confirms `run.orchestrator`, arms no wait or heartbeat the handoff lists, and runs the
+  generation check once per live dispatch, so a report that landed across the clear is acted
+  on once.
+- **A molt is not a launch** (`herdr-mechanics.md` step 2): the pane keeps its process and
+  exports, so every 0.2.7 marking stands across a molt; the status-line check is the launch
+  read's, and a heartbeat or later read that misses `seat: <role>` after a molt is not a
+  missing marking.
+- **The spine session** (`ossify-briefs.md` MOLT clause; `ossify-nested-run.md` §4): hands
+  off at its next acknowledged delivery, never waiting for a round barrier, tears nothing
+  down, writes its handoff by hand to `<REPORT_PATH>.molt.md` with the brief verbatim (the
+  SEATS block included) and every live wait id, and returns no `rotate:`; an in-place molt is
+  not a completion the top acts on.
+- **The work-PR session** (`ossify-pr-briefs.md` MOLT clause): the same at a fix-round step
+  boundary, returning no `open:`.
+- **Every other brief template** — the nine in `briefs.md`, the item implementer and item
+  verifier, the close session and the close-review writer — carries one identical `MOLT:`
+  line: finish any report rename and send its ping first, then write the handoff by hand
+  beside `REPORT_PATH`, never with `/ossify:handoff`, never into a repository, never
+  committed. A ping refused past the hard threshold is covered by the report-file wait and
+  the heartbeat.
+- Tests: one pin per clause, one named pin per template. The ossify reference budget rises
+  209 -> 236 and the herdr-mechanics budget 275 -> 280, each with its control kept.
+- Scope: herdr-crew only. paseo-crew is #666 and orca-crew is #667, each with its own probe
+  first. A paused molt keeps its marker and so silences this hook: #668.
+
 ## 0.2.7
 
 **Every launch marks its session for seat-mods 0.2.0.** seat-mods 0.2.0 guards a session

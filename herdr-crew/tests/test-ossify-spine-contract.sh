@@ -2284,6 +2284,10 @@ pin "$PRBRIEFS_MD" "Write nothing to your report file and return no \`open:\`." 
   "work-PR brief: the molt returns nothing" flat
 pin "$PRBRIEFS_MD" "the PR seats keep running and keep pinging this pane" \
   "work-PR brief: the molt tears nothing down" flat
+pin "$SKILL_MD" "where the \`molt\` mod runs, its handoff ask comes instead and you molt in place" \
+  "SKILL: the ceiling bullet names the molt path" flat
+pin "$PLUGIN_README_MD" "Since 0.2.8, a seat where \`molt\` runs molts in place past the ceiling" \
+  "README: the context-ceiling section names the in-place molt" flat
 
 # #514, L1: the shape, asserted rather than assumed — a counter re-copied into any
 # suite shadows the hoisted one and keeps passing. This suite's copies were the
