@@ -29,6 +29,13 @@
       "description": "How much of the last reply the turn-end fork quotes.",
       "default": 4000,
       "min": 500
+    },
+    "yieldAtPercent": {
+      "type": "number",
+      "title": "Context fill where molt owns the turn end (%)",
+      "description": "At or above this fill autonomic lets every turn end stand, so it never pushes past molt's handoff command. Keep it equal to molt's commandPercent (default 65).",
+      "default": 65,
+      "min": 1
     }
   }
 }

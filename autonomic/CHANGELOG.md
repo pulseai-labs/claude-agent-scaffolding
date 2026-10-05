@@ -12,3 +12,4 @@ All notable changes to the `autonomic` plugin.
 - **molt floor** (`floor.ts`): a `MOLT-HANDOFF:` line, a child's `handoff required`/`handed-off` status line, or a block beneath lets the turn end stand.
 - **Ledger** (`ledger.ts`): one committed line per decision, with the fork's token usage; an unwritable ledger ends autopilot.
 - **Pain**: band, toast, optional bell, optional `AUTONOMIC_PAIN_PATH` file.
+- **Hard floors** (final review): `AskUserQuestion` and `ExitPlanMode` are never approved by the permission reflex; the never-approve list reads short-flag clusters, a lone `&`, block keywords, `-o` values, and lists any command it cannot follow when that command names a danger; it applies to every tool with a `command` input; a call too long to show the fork stays an ask; past `yieldAtPercent` (65) every turn end is molt's whatever the hook order; read-only Bash is no change for the loop guard; a free-text question and a failed ledger ring.

@@ -54,4 +54,17 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   test('quoted text is not a command (control)', () => {
     expect(rules('git commit -m "do not git push -f"')).toEqual([])
   })
+
+  test('shapes the shared reader cannot read are listed when they name a danger (final review I1)', () => {
+    const cases = ['git push -uf origin feat/x', 'git commit -nm wip', 'git branch -df old', 'sleep 1 & git push -f',
+      'if true; then git push -f; fi', '{ git push -f; }', '! git push -f', 'for b in a; do git push -f; done',
+      'echo `git push -f`', 'bash -c "git push -f"', "sh -c 'rm -rf /etc/x'", 'xargs rm -rf', 'timeout 60 git push -f',
+      'nice git push -f', 'env -i git push -f', 'sudo -u root rm -rf /etc/x']
+    for (const c of cases) expect([c, rules(c).length > 0]).toEqual([c, true])
+    expect(rules('git push -o ci.skip origin', { ...W, branch: 'main' })).toContain('default-branch-push')
+  })
+  test('the same shapes with no danger stay off the list (control)', () => {
+    for (const c of ['bash run-tests.sh', 'timeout 60 make test', 'xargs ls', 'if true; then echo hi; fi'])
+      expect([c, rules(c)]).toEqual([c, []])
+  })
 })

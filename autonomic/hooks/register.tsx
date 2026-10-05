@@ -15,7 +15,7 @@ import { neverRules } from './never'
 import type { Where } from './never'
 import { permissionPrompt } from './prompts'
 import { parsePermission } from './verdict'
-import { askPrompt } from './prompts'
+import { MAX_INPUT, askPrompt } from './prompts'
 import { parseAsk } from './verdict'
 import type { Question } from './verdict'
 import { hasMoltMarker, statusYields } from './floor'
@@ -144,6 +144,7 @@ async function record($: Engine, id: string, kase: LedgerCase, q: string, a: str
   if (rec !== undefined) await save($, id, { ...rec, mode: 'manual', problem: 'ledger not writable' })
   $.ui.toast('autonomic: the ledger is not writable; this session is manual now.')
   await log($, `ledger append failed session=${id}`)
+  await pain($, id, 'ledger not writable', `${await ledgerPath($)}: autopilot is off for this session`)
   return false
 }
 
@@ -215,6 +216,11 @@ async function statusReport($: Engine, id: string): Promise<string> {
 // Tools that change nothing: a turn of these alone is no progress for the loop guard.
 const READ_ONLY = new Set(['Read', 'Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch', 'ToolSearch', 'AskUserQuestion', 'TaskOutput', 'TodoWrite'])
 
+function fillPercent(c: { tokens?: number; window: number; percent?: number }): number | undefined {
+  if (typeof c.percent === 'number') return c.percent
+  return typeof c.tokens === 'number' && c.window > 0 ? (c.tokens / c.window) * 100 : undefined
+}
+
 async function readStatus($: Engine): Promise<string | undefined> {
   const path = ((await $.env.get('MOLT_STATUS_PATH')) ?? '').trim()
   return path === '' ? undefined : readText($, path)
@@ -222,20 +228,26 @@ async function readStatus($: Engine): Promise<string | undefined> {
 
 // The ask reflex (spec §3.2): answer from the policy and scope, or let the operator see
 // the question and ring. A decision that cannot be recorded is not taken.
-async function askReflex($: Engine, questions: readonly Question[]): Promise<{ questions: readonly Question[]; answers: Record<string, string> } | undefined> {
+async function askReflex($: Engine, questions: readonly Question[]): Promise<{ questions: readonly Question[]; answers: Record<string, string>; note: string } | undefined> {
   if ((await modeOf($)).mode !== 'autopilot' || questions.length === 0) return undefined
   const id = await $.session.id()
+  // A question with no options takes free text: only the operator can answer it (final review M1).
+  if (questions.some(q => !Array.isArray(q.options) || q.options.length === 0)) {
+    await pain($, id, 'question for you', `${questions[0]?.question ?? 'a question'} (free text)`)
+    return undefined
+  }
   const j = await judge($, askPrompt(questions, (await policyText($)) ?? ''), t => parseAsk(t, questions))
   if ('v' in j && j.v.covered) {
     const { answers, reason } = j.v
     for (const q of questions) if (!(await record($, id, 'ask', q.question, answers[q.question] ?? '', reason, j.usage))) return undefined
-    return { questions, answers }
+    return { questions, answers, note: `autonomic answered in the operator's place, from the autopilot policy and scope: ${reason}` }
   }
   const why = 'v' in j ? j.v.reason : 'fail' in j ? j.fail : 'nothing to judge yet'
   await pain($, id, 'question for you', `${questions[0]?.question ?? 'a question'} (${why})`)
   return undefined
 }
 
+const USER_DIALOG = new Set(['AskUserQuestion', 'ExitPlanMode'])   // their permission prompt is the operator's dialog
 const painedDeny = new Set<string>()   // session, tool and reason of each hard deny already rung
 
 async function where($: Engine): Promise<Where> {
@@ -343,7 +355,7 @@ export const register: Register = (on, options) => {
       try {
         const questions = (e as unknown as { questions?: Question[] }).questions ?? []
         const result = await askReflex($, questions)
-        if (result !== undefined) return { result } as never
+        if (result !== undefined) return { result: { questions: result.questions, answers: result.answers }, context: [result.note] } as never
       } catch (err) {
         await log($, `ask reflex error ${String(err)}`)
       }
@@ -351,7 +363,7 @@ export const register: Register = (on, options) => {
     }
     const r = await next(e)
     try {
-      if (r.deny === undefined && r.isError === undefined && !READ_ONLY.has(e.tool)) changed.add(await $.session.id())
+      if (r.deny === undefined && r.isError === undefined && r.isReadOnly !== true && !READ_ONLY.has(e.tool)) changed.add(await $.session.id())
     } catch {}
     return r
   })
@@ -364,7 +376,9 @@ export const register: Register = (on, options) => {
       // Another plugin continues this turn already (molt's command, plan decision 4).
       if (r.block !== undefined) { await log($, `stop: a block beneath stands session=${id}`); return r }
       const answer = e.last_assistant_message ?? ''
-      if (hasMoltMarker(answer) || statusYields(await readStatus($))) {
+      // Past molt's handoff command the turn end is molt's, whichever Stop hook runs first (final review I2).
+      const fill = fillPercent((await $.session.usage()).context)
+      if (hasMoltMarker(answer) || statusYields(await readStatus($)) || (fill !== undefined && fill >= cfg.yieldAtPercent)) {
         pushes.delete(id)
         changed.delete(id)
         await record($, id, 'molt', 'turn end in a molt handoff', 'let it stop', 'molt owns this turn end (amendment A2)')
@@ -413,7 +427,8 @@ export const register: Register = (on, options) => {
   on('tool.check', async ($, e, next) => {
     const r = await next(e)
     try {
-      if (r.decision === 'allow') return r
+      // A tool whose permission prompt is the operator's own dialog is never approved (final review C1).
+      if (r.decision === 'allow' || USER_DIALOG.has(e.tool)) return r
       if ((await modeOf($)).mode !== 'autopilot') return r
       const id = await $.session.id()
       if (r.decision === 'deny') {
@@ -424,19 +439,25 @@ export const register: Register = (on, options) => {
         }
         return r
       }
-      if (e.tool === 'Bash') {
-        const command = String((e.input as { command?: unknown } | undefined)?.command ?? '')
+      const raw = (e.input as { command?: unknown } | undefined)?.command
+      if (typeof raw === 'string') {
+        const command = raw
         const rules = neverRules(command, await where($))
         if (rules.length > 0) {
-          await record($, id, 'permission', `Bash: ${command}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
+          await record($, id, 'permission', `${e.tool}: ${command}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
           await pain($, id, 'never-approve', `${rules.join(', ')} — ${command}`)
           return r
         }
       }
+      let shown = ''
+      try { shown = JSON.stringify(e.input) ?? '' } catch {}
+      // The fork sees at most MAX_INPUT characters: a longer call stays with the operator (final review I6).
+      if (shown.length > MAX_INPUT) {
+        await pain($, id, 'permission for you', `${e.tool} (input too long to judge)`)
+        return r
+      }
       const j = await judge($, permissionPrompt(e.tool, e.input, (await policyText($)) ?? ''), parsePermission)
       if ('v' in j && j.v.decision === 'allow') {
-        let shown = ''
-        try { shown = JSON.stringify(e.input) ?? '' } catch {}
         if (await record($, id, 'permission', `${e.tool}: ${shown}`, 'allow', j.v.reason, j.usage))
           return { ...r, decision: 'allow', reason: `autonomic: ${j.v.reason}` }
         return r

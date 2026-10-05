@@ -81,12 +81,12 @@ Leave everything else to the operator.
 
 The host shows a block as `Stop hook error: <reason>`; the model reads it as an instruction.
 After `loopMax` (3) blocks in a row with no change made — no tool call other than a read that
-ran and was not denied — the next turn end is pain ("autopilot loop"). A prompt from you resets
+ran, was not denied and was not read-only (`ls`, `git status`) — the next turn end is pain ("autopilot loop"). A prompt from you resets
 the count.
 
 **`AskUserQuestion`.** The fork judges the questions. When every one has an answer that is
-exactly one of its option labels, autonomic answers in your place and writes one ledger line per
-question. Anything else — not covered, a label that is not an option, a fork that fails — goes to
+exactly one of its option labels, autonomic answers in your place, tells the model it did and why,
+and writes one ledger line per question. A question with no options (free text) always goes to you. Anything else — not covered, a label that is not an option, a fork that fails — goes to
 you, and the bell rings.
 
 **Permission asks.** autonomic acts only on an `ask` verdict; an `allow` is left alone and a
@@ -100,11 +100,12 @@ the **never-approve list** keeps the ask with you and rings:
   a plain `git branch -d` is not on the list;
 - `rm -r` of a path outside the worktree, or of a path autonomic cannot read (a variable, a
   quoted path, anything after a `cd`);
-- `--no-verify`, or `git commit -n`.
+- `--no-verify`, or `git commit -n` (a cluster such as `-nm` or `-uf` is read flag by flag);
+- a command the reader cannot follow — led by `bash`/`sh -c`, `eval`, `xargs`, `timeout`, `nice`, `find`, `ssh` and the like, a wrapper with options (`sudo -u`, `env -i`), or a backtick or `$(` outside quotes — when it names `push`, `rm`, `branch`, `commit` or `--no-verify` at all.
 
 The list reads each command segment with seat-mods' shell reader (copied, and held identical by
 `tests/test-mod-shell-parity.sh`). Otherwise the fork judges the call against the policy's
-permission scope: `allow` is recorded and the tool runs; anything else leaves the ask and rings.
+permission scope: `allow` is recorded and the tool runs; anything else leaves the ask and rings. The list applies to any tool whose input has a `command` (Bash, Monitor). A call whose input is longer than the fork is shown (4000 characters) stays an ask and rings. `AskUserQuestion` and `ExitPlanMode` are never approved here: their permission prompt is your own dialog.
 
 ## The ledger
 
@@ -142,7 +143,8 @@ A pain signal never resumes the run by itself. Your next prompt does.
 - **A child's scope is its brief.** A crew child (`MOLT_HANDOFF=parent`) never molts; its
   replacement is a fresh session that takes its mode from `AUTONOMIC_MODE` and its scope from its
   brief and handoff.
-- **molt keeps the turn end.** autonomic neither blocks nor forks when the reply carries a
+- **molt keeps the turn end.** autonomic neither blocks nor forks when the context fill is at or
+  above `yieldAtPercent` (65, molt's handoff command — keep the two equal), when the reply carries a
   `MOLT-HANDOFF:` line, when `MOLT_STATUS_PATH`'s last line is `handoff required` or
   `handed-off …`, or when a plugin beneath it has already blocked the stop (molt's command).
 - **molt rings its own pause.** molt reads `mode` and `bell` from autonomic's record and rings the
@@ -166,6 +168,7 @@ A pain signal never resumes the run by itself. Your next prompt does.
 | `bell` | unset | the bell command |
 | `loopMax` | 3 | blocks in a row with no change before the loop guard |
 | `tailChars` | 4000 | how much of the last reply the turn-end fork quotes |
+| `yieldAtPercent` | 65 | context fill at or above which every turn end is molt's |
 
 A bad number falls back to its default; `/autopilot status` and a toast name it.
 
@@ -175,7 +178,7 @@ A bad number falls back to its default; `/autopilot status` and a toast name it.
 |---|---|
 | autonomic does not load, or a hook throws | the event passes through unchanged: the session behaves as manual |
 | policy missing or empty | autopilot refuses: `autopilot: no policy` |
-| ledger not writable | autopilot refuses, or drops to manual mid-run, with a toast |
+| ledger not writable | autopilot refuses, or drops to manual mid-run with a pain signal |
 | fork fails or its reply does not parse | one retry, then pain |
 | nothing to fork yet (a session's first response, just after a clear) | the event passes through; an `AskUserQuestion` goes to you |
 
@@ -193,7 +196,9 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
   other is still in the toast and the log.
 - A herdr worker ping arrives as a typed prompt, so it resets the loop count, as it resets molt's
   manual pause count.
-- The loop guard counts any tool but a read as a change, so a loop of Bash reads is not caught.
+- With `AUTONOMIC_LEDGER` unset, the ledger is created at `<repo root>/.autonomic/ledger.md`. In a dual-repo
+  project's public canonical, set `AUTONOMIC_LEDGER` to the AI workspace, or ignore `.autonomic/` there; a
+  launcher patch (herdr-crew) is to set it per seat.
 - The permission fork judges a subagent's call against the main session's transcript.
 - Claude Code only: Codex, OpenCode and Devin have no mod runtime.
 

@@ -3,7 +3,7 @@ import type { Question } from './verdict'
 // The fork's questions. Each carries the policy text, so a fork that does not see the
 // system prompt's policy section still judges against it (probe P13).
 
-const MAX_INPUT = 4000
+export const MAX_INPUT = 4000
 
 export function turnEndPrompt(tail: string, policy: string): string {
   return `autonomic turn-end check. You are not continuing the work now. Classify how your last reply ended, judged against the autopilot policy below and the scope this session has read (its spec, plan, grill record or brief). Reply with one JSON object and nothing else.
@@ -32,7 +32,7 @@ ${tail}
 }
 
 export function askPrompt(questions: readonly Question[], policy: string): string {
-  const listed = questions.map(q => ({ question: q.question, options: q.options.map(o => o.label), multiSelect: q.multiSelect === true }))
+  const listed = questions.map(q => ({ question: q.question, options: (q.options ?? []).map(o => o.label), multiSelect: q.multiSelect === true }))
   return `autonomic question check. You are about to ask the operator the questions below. Decide whether the autopilot policy or this session's scope (its spec, plan, grill record or brief) already answers every one of them. Reply with one JSON object and nothing else.
 
 - Covered: {"covered": true, "answers": {"<question text, exactly>": "<one option label, exactly>"}, "reason": "<one line naming the policy line or scope document>"}. For a multi-select question, join the labels with ", ".

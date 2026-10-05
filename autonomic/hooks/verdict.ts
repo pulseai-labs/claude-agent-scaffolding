@@ -5,7 +5,7 @@ export const TURN_CASES = ['covered', 'stalled', 'waiting', 'done', 'pain'] as c
 export type TurnCase = (typeof TURN_CASES)[number]
 export type TurnVerdict = { case: TurnCase; question?: string; answer?: string; next_step?: string; reason: string }
 
-export type Question = { question: string; header?: string; options: ReadonlyArray<{ label: string }>; multiSelect?: boolean }
+export type Question = { question: string; header?: string; options?: ReadonlyArray<{ label: string }>; multiSelect?: boolean }
 export type AskVerdict = { covered: true; answers: Record<string, string>; reason: string } | { covered: false; reason: string }
 export type PermissionVerdict = { decision: 'allow' | 'ask'; reason: string }
 
@@ -54,7 +54,7 @@ export function parseAsk(text: string, questions: readonly Question[]): AskVerdi
     const a = v.answers[q.question]
     if (typeof a !== 'string') return { covered: false, reason: `no answer named for "${q.question}"` }
     const labels = q.multiSelect ? a.split(',').map(s => s.trim()) : [a]
-    const allowed = new Set(q.options.map(o => o.label))
+    const allowed = new Set((q.options ?? []).map(o => o.label))
     if (labels.length === 0 || labels.some(l => !allowed.has(l)))
       return { covered: false, reason: `"${a}" is not an option of "${q.question}"` }
     answers[q.question] = labels.join(', ')

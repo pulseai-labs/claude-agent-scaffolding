@@ -26,6 +26,8 @@ export type World = {
   failAppend?: RegExp          // an append to a matching path fails
   failTouch?: RegExp           // a touch of a matching path fails
   stopBlock?: string           // a block a plugin beneath autonomic returns at Stop
+  usage: { tokens?: number; window: number; percent?: number }   // the context figure
+  readOnly?: boolean           // core marks every tool call read-only
 }
 
 const USAGE = { input_tokens: 900, output_tokens: 40, cache_read_input_tokens: 50_000, cache_creation_input_tokens: 100 }
@@ -45,6 +47,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     verdict: { decision: 'ask', reason: 'needs approval' },
     sections: [{ id: 'intro', text: 'engine intro', scope: 'shared' }],
     asked: 0,
+    usage: { tokens: 100_000, window: 1_000_000 },
   }
   mock.env(on, { HOME: '/home/u', ...(opts.env ?? {}) })
   mock.store(on)
@@ -55,6 +58,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   })
   on('session.id', () => ({ value: w.session.id }) as never)
   on('session.cwd', () => ({ value: w.session.cwd }) as never)
+  on('session.usage', () => ({ value: { startedAt: 0, context: { ...w.usage }, rateLimits: [] } }) as never)
   on('fs.read', (_$, e) => {
     const text = w.files.get(e.path)
     return (text === undefined ? { deny: `ENOENT: ${e.path}` } : { value: text }) as never
@@ -103,7 +107,8 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
   on('tool.call', (_$, e) => {
     if (e.tool === 'AskUserQuestion') { w.asked += 1; return { result: 'the operator answered', text: 'the operator answered' } as never }
-    return (w.toolDeny === undefined ? { result: 'ran', text: 'ok' } : { deny: w.toolDeny }) as never
+    if (w.toolDeny !== undefined) return { deny: w.toolDeny } as never
+    return (w.readOnly ? { result: 'ran', text: 'ok', isReadOnly: true } : { result: 'ran', text: 'ok' }) as never
   })
   on('ui.toast', (_$, e) => { w.toasts.push(e.text); return { value: undefined } as never })
   on('ui.status', (_$, e) => { w.statuses.push(e.text); return { value: undefined } as never })

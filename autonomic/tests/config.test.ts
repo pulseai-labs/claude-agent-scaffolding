@@ -4,7 +4,7 @@ import { DEFAULTS, parseConfig } from '../hooks/config'
 describe('settings', () => {
   test('defaults', () => {
     expect(parseConfig(undefined)).toEqual(DEFAULTS)
-    expect(DEFAULTS).toEqual({ policyPath: '~/.claude/autonomic/policy.md', loopMax: 3, tailChars: 4000, problems: [] })
+    expect(DEFAULTS).toEqual({ policyPath: '~/.claude/autonomic/policy.md', loopMax: 3, tailChars: 4000, yieldAtPercent: 65, problems: [] })
   })
   test('values are read', () => {
     const c = parseConfig({ policyPath: '/p.md', bell: 'ntfy', loopMax: 5, tailChars: 800 })
