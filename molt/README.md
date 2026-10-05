@@ -42,8 +42,8 @@ chose. molt checks that it names a readable file, then:
 - **Root:** runs `/clear`, writes the lineage record, and submits one seed prompt: continue from
   the handoff at `<path>` (with `ossify:handoff-resume` where it is installed).
 - **Child:** appends `handed-off <path>` to the status file and stops pushing — no more
-  warnings, no Stop block. The block stays in force, so the child does no more work; its parent
-  replaces it.
+  warnings, no Stop block. Past the block threshold the gate stays in force; below it, only the
+  child's own instructions stop further work. Its parent replaces it.
 
 A relative path resolves against the session's working directory; `~/` resolves against `$HOME`.
 Below the first warning (and without `/molt now`) a `MOLT-HANDOFF:` line is ignored, so a quoted
@@ -74,8 +74,9 @@ export MOLT_HANDOFF=parent MOLT_STATUS_PATH=<a file beside the child's report>
 
 `MOLT_HANDOFF` must be exactly `parent` (surrounding spaces trimmed); any other value, or none,
 is a root. molt appends one line per event to `MOLT_STATUS_PATH`, as `<ISO time> <event>`:
-`warned <n>`, `handoff required`, `handed-off <path>`. It never reads the file back or truncates
-it, and writes nothing there for a root. A file it cannot write is logged once to `molt.log`; the
+`warned <n>`, `handoff required`, `handed-off <path>`. Each event rewrites the file with the new
+line added, so a file molt can write but not read would lose its earlier lines. molt writes
+nothing there for a root. A file it cannot write is logged once to `molt.log`; the
 warning or the handoff goes ahead regardless. The child itself never writes this file — molt's
 appends are its own file writes, not tool calls. Who the parent is, how the child tells it, and
 how it is replaced are the launcher's and the crew's business, never molt's.
@@ -113,7 +114,10 @@ its warnings add "tell your parent".
   breaks the order (0.1.0's default soft of 50 equals the new second warning) sends the whole
   ladder to its defaults, and both problems are named.
 - A `~/.claude/molt/instructions.md` that is 0.1.0's default text, byte for byte, is replaced
-  with 0.2.0's on first start. An edited one is never touched.
+  with 0.2.0's on first start. An edited one is never touched, so its own closing line ("molt
+  then clears this session…") stays, and molt adds its closing line after it: a root reads the
+  line twice, and a child reads both "molt then clears" and "return the handoff to your parent".
+  Delete that line from an edited file.
 
 ## Files
 

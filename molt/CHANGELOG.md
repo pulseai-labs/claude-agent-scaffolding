@@ -20,7 +20,7 @@ warns first and clears only a root.
   hands off at the point it chose.
 - **Child sessions**: `MOLT_HANDOFF=parent` (exactly) marks a child. molt never clears it,
   appends `warned <n>`, `handoff required` and `handed-off <path>` to `MOLT_STATUS_PATH`, and
-  stops pushing once the handoff is named; the block stays. A status-file failure is logged once
+  stops pushing once the handoff is named; past the block threshold the gate stays. A status-file failure is logged once
   and never stops a warning or a handoff. A root writes no status file.
 - **Closing lines by kind**: after the template text a root is told molt clears it; a child is
   told to return the handoff to its parent, and its warnings add "tell your parent".
@@ -28,7 +28,9 @@ warns first and clears only a root.
   hook speaks again; a message from you brings it back.
 - **Upgrading**: `softPercent` and `hardPercent` are read once as `commandPercent` and
   `blockPercent` and the rename is reported; both stay declared in `userConfig` with no default
-  so a saved value still arrives. A `~/.claude/molt/instructions.md` that is 0.1.0's default
+  so a saved value still arrives. `commandPercent` and `blockPercent` declare no default either
+  (unset means 65 and 75): the host fills every declared default before molt reads its settings,
+  so a default there would hide a saved 0.1.0 value. `run-tests.sh` checks the manifest for it. A `~/.claude/molt/instructions.md` that is 0.1.0's default
   byte for byte is replaced on first start; an edited one is kept, and its `{{soft}}` and
   `{{hard}}` still fill.
 - **Autopilot progress** counts below the first warning only: past it the session may write and

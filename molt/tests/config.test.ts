@@ -1,7 +1,18 @@
 import { describe, test, expect } from 'claude-code/testing'
 import { DEFAULTS, parseConfig } from '../hooks/config'
 
+// What register() receives on Claude Code 2.1.289: every declared key at its manifest
+// default, or '' where it declares none, then the saved values over it. The ladder keys
+// and the 0.1.0 names declare none, or a saved 0.1.0 value never reaches the rename;
+// run-tests.sh checks that against plugin.json.
+const HOST: Record<string, unknown> = {
+  warnPercent: 40, warnAgainPercent: 50, commandPercent: '', blockPercent: '', fallbackMargin: 5,
+  minRoomPercent: 15, manualMaxMolts: 2, softPercent: '', hardPercent: '',
+  instructionsTemplate: '~/.claude/molt/instructions.md', warningTemplate: '~/.claude/molt/warning.md',
+  seedTemplate: '~/.claude/molt/seed.md',
+}
 const ladder = (c: ReturnType<typeof parseConfig>) => [c.warn, c.warnAgain, c.command, c.block, c.fallback]
+const hostOptions = (saved: Record<string, unknown>): Record<string, unknown> => ({ ...HOST, ...saved })
 
 describe('parseConfig', () => {
   test('no options: the 0.2.0 defaults, no problems', () => {
@@ -37,6 +48,16 @@ describe('parseConfig', () => {
     expect([c.command, c.block]).toEqual([60, 70])
     expect(c.problems.join(' ')).toContain('softPercent is now commandPercent (60)')
     expect(c.problems.join(' ')).toContain('hardPercent is now blockPercent (70)')
+  })
+  test('0.1.0 keys reach the ladder through the host-filled defaults (final review 1)', () => {
+    const c = parseConfig(hostOptions({ softPercent: 60, hardPercent: 70 }))
+    expect([c.command, c.block]).toEqual([60, 70])
+    expect(c.problems.join(' ')).toContain('softPercent is now commandPercent (60)')
+  })
+  test('no saved values through the host: the defaults, no problems (control)', () => {
+    const c = parseConfig(hostOptions({}))
+    expect([...ladder(c), c.minRoom, c.manualMaxMolts]).toEqual([40, 50, 65, 75, 5, 15, 2])
+    expect(c.problems).toEqual([])
   })
   test('a new key wins over its 0.1.0 name, with no rename reported (control)', () => {
     const c = parseConfig({ softPercent: 60, commandPercent: 66 })

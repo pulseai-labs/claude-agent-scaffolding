@@ -24,20 +24,18 @@
     "commandPercent": {
       "type": "number",
       "title": "Handoff command (% of the context window)",
-      "description": "Past this fill the session is told to write its handoff now.",
-      "default": 65,
+      "description": "Past this fill the session is told to write its handoff now. Unset: 65.",
       "min": 1
     },
     "blockPercent": {
       "type": "number",
       "title": "Block (% of the context window)",
-      "description": "Past this fill only Write, Edit, Skill, git add and git commit run until the session hands off.",
-      "default": 75,
+      "description": "Past this fill only Write, Edit, Skill, git add and git commit run until the session hands off. Unset: 75.",
       "min": 1
     },
     "fallbackMargin": {
       "type": "number",
-      "title": "Fallback margin (points above hard)",
+      "title": "Fallback margin (points above block)",
       "description": "With no handoff by block + this margin, molt writes a fallback brief from the transcript.",
       "default": 5,
       "min": 1
