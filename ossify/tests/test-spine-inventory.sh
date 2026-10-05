@@ -248,4 +248,44 @@ BEFORE="$(snap "$F")"; inv "$F"
 t_assert_rc 3 "S17 setup: this run has a halt row (dirty worktree)"
 t_assert_eq "$BEFORE" "$(snap "$F")" "S17: state, refs, worktrees, index and status are byte-identical after inventory"
 
+# ---- the shipped §2 re-entry blocks, extracted and RUN (block-ledger O rows) ----
+SKILLS="$HERE/../skills"
+ROUND="$SKILLS/work-item/references/round-orchestration.md"
+B_INV="$TMP/b-inv.sh"; oss_block_extract "$ROUND" 'spine_inventory "<spine-id>" >' "$B_INV"
+# Anchored on `awk -F`, the brief's fallback: the literal `cut-missing` also
+# occurs inside §2a's RECORD comment, so that anchor matches two blocks and is
+# rightly refused as ambiguous.
+B_CUT="$TMP/b-cut.sh"; oss_block_extract "$ROUND" 'awk -F' "$B_CUT"
+for b in "$B_INV" "$B_CUT"; do [ -s "$b" ] && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: could not extract $b - the block tests below are vacuous"; }; done
+# shim: answer the literal placeholders, forward everything else to the real oss.
+mkshim() { # $1=shim dir
+  mkdir -p "$1"
+  printf '#!/usr/bin/env bash\ncase "$1" in\n  spine_inventory) shift; exec bash "%s" spine_inventory r0.s1 ;;\n  spine_base_get) exec bash "%s" spine_base_get r0.s1 "$3" ;;\n  branch_name) echo spine/r0.s1-demo ;;\n  *) exec bash "%s" "$@" ;;\nesac\n' "$OSS" "$OSS" "$OSS" > "$1/oss"
+  chmod +x "$1/oss"
+}
+F="$TMP/b1"; fx "$F" 1; mkshim "$TMP/shim-b"
+T_OUT="$(cd "$F/ws" && env "oss_bin=$TMP/shim-b/oss" bash -c "set -euo pipefail; . '$B_INV'" 2>&1)"; T_RC=$?
+t_assert_rc 0 "B1: the read-out block passes a healthy spine"
+t_assert_contains "$T_OUT" "$(printf 'item\tr0.s1.w1\tplanned\tspawn')" "B1: ...and PRINTS the inventory before anything else"
+echo dirt > "$F/core/f"
+T_OUT="$(cd "$F/ws" && env "oss_bin=$TMP/shim-b/oss" bash -c "set -euo pipefail; . '$B_INV'" 2>&1)"; T_RC=$?
+t_assert_rc 1 "B1: a halt row halts the lane"
+t_assert_contains "$T_OUT" "nothing was changed" "B1: ...saying nothing was mutated"
+F="$TMP/b2"; mkfix "$F"; oss_in "$F" work_item_add r0.s1 One core >/dev/null; oss_in "$F" work_item_add r0.s1 Two ui >/dev/null
+git -C "$F/core" checkout -q -b spine/r0.s1-demo
+oss_in "$F" spine_base_set r0.s1 core main >/dev/null
+# `ui` parks AHEAD of its recorded base (main) instead of on it: with HEAD ==
+# main the "from the RECORDED base" assertion could not tell `checkout -b
+# <branch>` from `checkout -b <branch> <base>` - dropping the `"$base"`
+# argument would still cut at main's tip and stay green. Parking it elsewhere
+# is what makes the assertion a measurement.
+git -C "$F/ui" checkout -q -b ui-parked
+echo p > "$F/ui/p"; git -C "$F/ui" add p; git -C "$F/ui" commit -qm parked
+oss_in "$F" spine_base_set r0.s1 ui main >/dev/null
+T_OUT="$(cd "$F/ws" && env "oss_bin=$TMP/shim-b/oss" bash -c "set -euo pipefail; . '$B_CUT'" 2>&1)"; T_RC=$?
+t_assert_rc 0 "B2: the cut-missing repair runs"
+t_assert_eq "spine/r0.s1-demo" "$(git -C "$F/ui" rev-parse --abbrev-ref HEAD)" "B2: ...cuts AND checks out the spine branch in the missing repo"
+t_assert_eq "$(git -C "$F/ui" rev-parse main)" "$(git -C "$F/ui" rev-parse spine/r0.s1-demo)" "B2: ...from the RECORDED base"
+t_assert_eq "spine/r0.s1-demo" "$(git -C "$F/core" rev-parse --abbrev-ref HEAD)" "B2: ...and leaves the already-cut repo alone"
+
 t_summary

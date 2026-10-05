@@ -831,8 +831,13 @@ WIC="$SKILLS/close/references/work-item-close.md"
 ROUND="$SKILLS/work-item/references/round-orchestration.md"
 
 W_GUARD="$TMP/wi-guard.sh"; _extract_block "$WIC" 'abbrev-ref' "$W_GUARD"
-W_CUT="$TMP/spine-cut.sh";  _extract_block "$ROUND" 'checkout -q -b' "$W_CUT"
-for _pair in "$W_GUARD:rev-parse --abbrev-ref" "$W_CUT:checkout -q -b"; do
+# Anchored on `repo_bases` (the block's mktemp mapping), not on `checkout -q -b`
+# as before: the re-entry arm's cut-missing repair also runs `checkout -q -b`,
+# so that anchor now matches two blocks and oss_block_extract correctly refuses
+# it as ambiguous (rc 2). `repo_bases` is scaffolding: it is created before the
+# checks and consumed after them, so it survives the guards this test removes.
+W_CUT="$TMP/spine-cut.sh";  _extract_block "$ROUND" 'repo_bases' "$W_CUT"
+for _pair in "$W_GUARD:rev-parse --abbrev-ref" "$W_CUT:repo_bases"; do
   _bf="${_pair%%:*}"; _bn="${_pair#*:}"
   if [ -s "$_bf" ] && grep -Fq "$_bn" "$_bf"; then
     T_PASS=$((T_PASS+1))
@@ -861,6 +866,7 @@ _wshim() { # $1=dir-to-return $2=spine-branch $3=wi-branch-or-repo $4=shim-dir
     printf '  "repo_root canonical") echo %s ;;\n' "$1"
     printf '  "branch_name "*)       echo %s ;;\n' "$2"
     printf '  *"target_repo"*)       echo canonical ;;\n'
+    printf '  "spine_base_set "*)    : ;;\n'
     printf '  "get "*)               echo %s ;;\n' "$3"
     printf '  *) exec bash "%s" "$@" ;;\nesac\n' "$OSS"
   } > "$4/oss"; chmod +x "$4/oss"
@@ -898,14 +904,12 @@ t_assert_eq "" "$(git -C "$W1" log --oneline "$W1_BASE" --grep='merge r0.s1.w1' 
   "W1: ...and no work-item merge commit exists on it"
 
 # W2 — the spine cut must (a) CHECK OUT the branch rather than merely
-# creating it, and (b) cut from wherever the repo is CURRENTLY parked
-# (HEAD) - NOT from a planned base recorded in the spine plan. `git branch`
+# creating it, (b) cut from wherever the repo is CURRENTLY parked (HEAD), and
+# (c) RECORD that observed base in state (#133) BEFORE the cut, so the re-entry
+# arm's `cut-missing` repair has a recorded base to re-cut from. `git branch`
 # leaves the repo on its previous branch and every downstream step still
 # returns rc 0, which is precisely how the spine silently never receives the
-# work. Reading the PLANNED base out of SPINE.md instead of HEAD is a known,
-# disclosed limitation deferred to #133 - 07a0bd8 reverted an attempt at
-# doing that here - and this block deliberately does NOT have that coverage
-# (see this file's block-ledger.tsv row for the same disclaimer).
+# work.
 W2="$TMP/w2"; mkdir -p "$W2"; git -C "$W2" init -q
 git -C "$W2" config user.email t@t; git -C "$W2" config user.name t
 echo seed > "$W2/f"; git -C "$W2" add .; git -C "$W2" commit -qm seed
@@ -931,15 +935,17 @@ t_assert_rc 0 "W2: the shipped spine cut runs clean on a clean canonical with NO
 t_assert_eq "spine/r0.s9-demo" "$(git -C "$W2" rev-parse --abbrev-ref HEAD)" \
   "W2: ...and leaves canonical CHECKED OUT on the spine branch - 'git branch' alone would leave it on w2-parked"
 t_assert_eq "$W2_PARKED_SHA" "$(git -C "$W2" rev-parse spine/r0.s9-demo)" \
-  "W2: ...cut from the branch canonical was parked on (v0.2 limitation; issue 133 moves this to SPINE.md)"
+  "W2: ...cut from the branch canonical was parked on (the fresh arm cuts from HEAD and records it as the base)"
+t_assert_contains "$(cat "$TMP/shim-w2/args.log")" "spine_base_set <spine-id> canonical w2-parked" \
+  "W2: the fresh arm RECORDS each repo's base (#133) - the branch it was parked on"
 
-# W2b — resuming is NOT supported in this release. An existing spine branch halts
-# rather than being re-cut or half-reused: branch reuse alone gets one step
-# further and then dies at `worktree_add` rc 8 for every already-spawned item.
+# W2b — the fresh-arm block still refuses an existing spine branch: re-entry is
+# a DIFFERENT block (§2's re-entry arm), chosen by the arm selector, never a
+# half-reuse here. The message routes to that arm instead of an open issue.
 t_capture env "PATH=$TMP/shim-w2:$PATH" "oss_bin=$TMP/shim-w2/oss" bash -c "set -euo pipefail; . '$W_CUT'"
-t_assert_rc 1 "W2b: a second run HALTS because the spine branch already exists"
+t_assert_rc 1 "W2b: a second fresh-arm run HALTS because the spine branch already exists"
 t_assert_contains "$T_OUT" "already exists" "W2b: ...naming the collision"
-t_assert_contains "$T_OUT" "133" "W2b: ...and pointing at the resume issue"
+t_assert_contains "$T_OUT" "re-entry arm" "W2b: ...and routing to the re-entry arm"
 
 # W2c — a DETACHED HEAD has no branch name to record, so the lane must halt
 # rather than cut a spine whose base_branch would be the literal string "HEAD".
@@ -953,6 +959,21 @@ t_assert_rc 1 "W2c: a DETACHED HEAD halts - there is no branch name to record as
 t_assert_contains "$T_OUT" "DETACHED HEAD" "W2c: ...naming the condition"
 t_assert_eq "" "$(git -C "$W2C" branch --list 'spine/*')" \
   "W2c: ...and cut no spine branch on the way out"
+
+# W5 — the ARM SELECTOR (#362): an existing spine branch in any hosting repo
+# selects re-entry; none selects fresh. Extracted from the shipped prose.
+W_ARM="$TMP/arm.sh"; _extract_block "$ROUND" 'arm=' "$W_ARM"
+[ -s "$W_ARM" ] && grep -Fq 'arm=' "$W_ARM" && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: could not extract the arm selector - W5 is vacuous"; }
+W5="$TMP/w5"; mkdir -p "$W5"; git -C "$W5" init -q; git -C "$W5" config user.email t@t; git -C "$W5" config user.name t
+echo s > "$W5/f"; git -C "$W5" add .; git -C "$W5" commit -qm s
+_wshim "$W5" "spine/r0.s9-demo" "canonical" "$TMP/shim-w5"
+t_capture env "PATH=$TMP/shim-w5:$PATH" "oss_bin=$TMP/shim-w5/oss" bash -c "set -euo pipefail; . '$W_ARM'"
+t_assert_rc 0 "W5: the selector runs clean with nothing injected"
+t_assert_contains "$T_OUT" "arm=fresh" "W5: no spine branch -> fresh"
+git -C "$W5" branch spine/r0.s9-demo
+t_capture env "PATH=$TMP/shim-w5:$PATH" "oss_bin=$TMP/shim-w5/oss" bash -c "set -euo pipefail; . '$W_ARM'"
+t_assert_contains "$T_OUT" "arm=re-entry" "W5: an existing spine branch -> re-entry (the #362 per-round case)"
+t_assert_eq "" "$(git -C "$W5" status --porcelain)" "W5: the selector mutates nothing"
 
 # ---------------------------------------------------------------------------
 # D1-D4: the cumulative-demo MEASUREMENT block. Timing is advisory; the demo
