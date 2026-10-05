@@ -98,7 +98,7 @@
     },
     {
       "name": "molt",
-      "description": "Context handoff as a Claude Code mod: past a share of the context window the session writes a handoff, then molt clears it in place and resumes it from that handoff.",
+      "description": "Context handoff as a Claude Code mod: warnings at 40% and 50% of the context window, a handoff command at 65% and a block at 75%; a root session is cleared in place and resumed from its handoff, a child session hands off to its parent.",
       "category": "workflow",
       "source": "./molt"
     }

@@ -12,7 +12,7 @@ import { fallbackPath, lineagePath, parseLineage } from './records'
 import type { Lineage } from './records'
 import type { Stage, Thresholds } from './measure'
 import { activePath, autonomicPath, logPath, parseAutonomic, safeSessionId } from './records'
-import { DEFAULT_INSTRUCTIONS, DEFAULT_SEED, HARD_NOTE, expandHome, fill } from './templates'
+import { BLOCK_NOTE, CHILD_NOTE, CHILD_WARNING, DEFAULT_INSTRUCTIONS, DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome, fill } from './templates'
 
 // molt: in-place context handoff (spec §2). Module variables survive /clear, which is
 // what a molt needs to carry across; $.state does not, and holds only the band.
@@ -34,10 +34,14 @@ let inFlight = false                      // a molt between /clear and its seed
 let progress = 0                          // Write, Edit or commit since the last molt
 const nudged = new Set<string>()          // sessions told once at a tool result
 const stopBlocks = new Map<string, number>()
-const lastMd = new Map<string, string>()  // the last .md a session wrote past soft
-const forced = new Set<string>()          // /molt now: soft whatever the fill
+const lastMd = new Map<string, string>()  // the last .md a session wrote past the command
+const forced = new Set<string>()          // /molt now: the command stage whatever the fill
 let unattended = 0                        // molts since the operator last sent a prompt
 let pending: { oldSession: string; handoff: string; chain: string; depth: number } | undefined
+const warned = new Map<string, number>()   // warnings delivered per session: 0, 1 or 2
+const handedOff = new Set<string>()        // child sessions that have named their handoff
+const commandNoted = new Set<string>()     // child sessions whose status file says 'handoff required'
+let statusFailed = false                   // the status-file failure is logged once per process
 
 const USAGE = 'usage: /molt now | off | on | status'
 
@@ -67,7 +71,7 @@ async function log($: Engine, line: string): Promise<void> {
 }
 
 async function touchActive($: Engine, sessionId: string): Promise<void> {
-  if (!safeSessionId(sessionId) || off.has(sessionId)) return
+  if (!safeSessionId(sessionId) || off.has(sessionId) || paused === sessionId) return
   try { await $.fs.write(activePath(await home($), sessionId), `${new Date().toISOString()}\n`) } catch {}
 }
 
@@ -90,15 +94,80 @@ async function measure($: Engine, sessionId: string): Promise<number | undefined
     lastPercent = percent
     stage = stageOf(percent, currentThresholds(sessionId))
   }
-  if (forced.has(sessionId) && stage === 'below') stage = 'soft'
+  if (forced.has(sessionId) && !atLeast(stage, 'command')) stage = 'command'
   return percent
 }
 
 async function instruction($: Engine, sessionId: string): Promise<string> {
   const t = currentThresholds(sessionId)
-  const values = { percent: Math.round(lastPercent ?? t.soft), soft: Math.round(t.soft), hard: Math.round(t.hard) }
-  const text = fill(await template($, cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS), values)
-  return atLeast(stage, 'hard') ? `${text}\n\n${fill(HARD_NOTE, values)}` : text
+  const values = {
+    percent: Math.round(lastPercent ?? t.command), command: Math.round(t.command), block: Math.round(t.block),
+    soft: Math.round(t.command), hard: Math.round(t.block),   // 0.1.0 template names (plan decision 5)
+  }
+  const text = `${fill(await template($, cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS), values)}\n\n${noteFor(await isChild($))}`
+  return atLeast(stage, 'block') ? `${text}\n\n${fill(BLOCK_NOTE, values)}` : text
+}
+
+async function isChild($: Engine): Promise<boolean> {
+  return ((await $.env.get('MOLT_HANDOFF')) ?? '').trim() === 'parent'
+}
+
+function noteFor(child: boolean): string {
+  return child ? CHILD_NOTE : ROOT_NOTE
+}
+
+// The warning this session is owed at its current stage, if any. Past the command the
+// command text stands in for both, so no warning is delivered after it.
+function dueWarning(sessionId: string): 1 | 2 | undefined {
+  if (atLeast(stage, 'command') || !atLeast(stage, 'warn')) return undefined
+  const done = warned.get(sessionId) ?? 0
+  if (stage === 'warnAgain') return done < 2 ? 2 : undefined
+  return done < 1 ? 1 : undefined
+}
+
+// A child's events, one line each, appended for its parent to read (spec §1.4). Never
+// for a root; a failure here never stops a warning or a handoff.
+async function appendStatus($: Engine, event: string): Promise<void> {
+  if (!(await isChild($))) return
+  const path = ((await $.env.get('MOLT_STATUS_PATH')) ?? '').trim()
+  if (path === '') return
+  try {
+    // The host has no append, so each event rewrites the file. A file that exists but
+    // cannot be read is left alone: rewriting it would drop the parent's earlier lines.
+    const old = await readText($, path)
+    if (old === undefined && await $.fs.exists(path)) throw new Error('exists but cannot be read')
+    await $.fs.write(path, `${old ?? ''}${new Date().toISOString()} ${event}\n`)
+  } catch (err) {
+    if (statusFailed) return
+    statusFailed = true
+    await log($, `status write failed ${path} ${String(err)}`)
+  }
+}
+
+async function noteCommand($: Engine, sessionId: string): Promise<void> {
+  if (commandNoted.has(sessionId)) return
+  commandNoted.add(sessionId)
+  await appendStatus($, 'handoff required')
+}
+
+function warnedAt(sessionId: string, which: 1 | 2): number {
+  const t = currentThresholds(sessionId)
+  return Math.round(which === 1 ? t.warn : t.warnAgain)
+}
+
+// A child is never cleared: its parent replaces it (spec §1.3).
+async function handOff($: Engine, sessionId: string, handoff: Handoff): Promise<void> {
+  handedOff.add(sessionId)
+  await appendStatus($, `handed-off ${handoff.path}`)
+  try { await setNotice($, { text: `molt: handed off to the parent — ${handoff.path}`, tone: 'info' }) } catch {}
+  await log($, `handed off session=${sessionId} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent}`)
+}
+
+async function warningText($: Engine, sessionId: string, which: 1 | 2): Promise<string> {
+  const t = currentThresholds(sessionId)
+  const values = { percent: Math.round(lastPercent ?? t.warn), stage: which === 1 ? 'first' : 'second', command: Math.round(t.command) }
+  const text = fill(await template($, cfg.warningTemplate, DEFAULT_WARNING), values)
+  return (await isChild($)) ? `${text}\n\n${CHILD_WARNING}` : text
 }
 
 async function ring($: Engine, bell: string, message: string): Promise<void> {
@@ -111,6 +180,7 @@ async function ring($: Engine, bell: string, message: string): Promise<void> {
 
 async function pause($: Engine, sessionId: string, text: string, bell: string | undefined): Promise<void> {
   paused = sessionId
+  await dropActive($, sessionId)
   await setNotice($, { text, tone: 'warn' })
   $.ui.toast(text)
   showStatus($, sessionId)
@@ -214,7 +284,7 @@ function showStatus($: Engine, sessionId: string): void {
   if (off.has(sessionId)) return $.ui.status('molt: off')
   if (paused === sessionId) return $.ui.status('molt: paused')
   const t = currentThresholds(sessionId)
-  $.ui.status(lastPercent === undefined ? 'molt' : `molt ${Math.round(lastPercent)}%/${Math.round(t.soft)}%`)
+  $.ui.status(lastPercent === undefined ? 'molt' : `molt ${Math.round(lastPercent)}%/${Math.round(t.command)}%`)
 }
 
 async function template($: Engine, path: string, fallback: string): Promise<string> {
@@ -223,11 +293,16 @@ async function template($: Engine, path: string, fallback: string): Promise<stri
 
 async function writeMissingTemplates($: Engine): Promise<void> {
   const h = await home($)
-  const pairs: Array<[string, string]> = [[cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS], [cfg.seedTemplate, DEFAULT_SEED]]
+  const pairs: Array<[string, string]> = [
+    [cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS], [cfg.warningTemplate, DEFAULT_WARNING], [cfg.seedTemplate, DEFAULT_SEED],
+  ]
   for (const [path, text] of pairs) {
     const full = expandHome(path, h)
     try {
-      if (await $.fs.exists(full)) continue
+      if (await $.fs.exists(full)) {
+        // 0.1.0 wrote its own default here; only that exact text is replaced (plan decision 4).
+        if (text !== DEFAULT_INSTRUCTIONS || (await readText($, full))?.trim() !== OLD_DEFAULT_INSTRUCTIONS.trim()) continue
+      }
       await $.fs.write(full, `${text}\n`)
     } catch (err) {
       await log($, `template write failed ${full} ${String(err)}`)
@@ -241,7 +316,7 @@ async function status($: Engine, sessionId: string): Promise<string> {
   const record = parseAutonomic(await readText($, autonomicPath(await home($), sessionId)))
   const lines = [
     `molt is ${off.has(sessionId) ? 'off' : paused === sessionId ? 'paused' : 'on'} for this session.`,
-    `fill: ${lastPercent === undefined ? 'not measured yet' : `${Math.round(lastPercent)}%`} — soft ${Math.round(t.soft)}%, hard ${Math.round(t.hard)}%, fallback ${Math.round(t.fallback)}%`,
+    `fill: ${lastPercent === undefined ? 'not measured yet' : `${Math.round(lastPercent)}%`} — warnings ${Math.round(t.warn)}% and ${Math.round(t.warnAgain)}%, handoff ${Math.round(t.command)}%, block ${Math.round(t.block)}%, fallback ${Math.round(t.fallback)}%`,
     `mode (autonomic's record): ${record.mode}`,
   ]
   const b = usage.context.breakdown
@@ -249,9 +324,9 @@ async function status($: Engine, sessionId: string): Promise<string> {
   else if (!b.isAutoCompactEnabled || b.autoCompactThreshold === undefined) lines.push('auto-compact is off.')
   else {
     const at = (b.autoCompactThreshold / b.rawMaxTokens) * 100
-    lines.push(at <= t.hard
-      ? `WARNING: auto-compact runs at ${Math.round(at)}%, at or below molt's hard threshold (${Math.round(t.hard)}%). Raise auto-compact or lower molt's thresholds, or auto-compact acts first.`
-      : `auto-compact at ${Math.round(at)}%: above molt's hard threshold.`)
+    lines.push(at <= t.block
+      ? `WARNING: auto-compact runs at ${Math.round(at)}%, at or below molt's block threshold (${Math.round(t.block)}%). Raise auto-compact or lower molt's thresholds, or auto-compact acts first.`
+      : `auto-compact at ${Math.round(at)}%: above molt's block threshold.`)
   }
   if (cfg.problems.length) lines.push(`settings: ${cfg.problems.join('; ')}`)
   return lines.join('\n')
@@ -290,6 +365,8 @@ export const register: Register = (on, options) => {
       unmeasured = 0
       // A compact keeps the session id: the new window gets a whole handoff cycle again.
       nudged.delete(e.session_id)
+      warned.delete(e.session_id)
+      commandNoted.delete(e.session_id)
       stopBlocks.delete(e.session_id)
       lastMd.delete(e.session_id)
     }
@@ -310,17 +387,43 @@ export const register: Register = (on, options) => {
   on('prompt.submit', async ($, e, next) => {
     try {
       const sessionId = await $.session.id()
-      await touchActive($, sessionId)
       if (e.origin.kind === 'composer' || e.origin.kind === 'bridge') {
         unattended = 0
         if (paused === sessionId) paused = undefined
-        const value = await read($, notice)
-        if (value !== null && (value.tone === 'info' || paused === undefined)) await setNotice($, null)
+        try {
+          const value = await read($, notice)
+          if (value !== null && (value.tone === 'info' || paused === undefined)) await setNotice($, null)
+        } catch (err) {
+          await log($, `prompt.submit notice error ${String(err)}`)
+        }
       }
+      // After the pause check, so a lifted pause brings the marker back in this hook (#668).
+      await touchActive($, sessionId)
     } catch (err) {
       await log($, `prompt.submit error ${String(err)}`)
     }
-    return next(e)
+    let warning: { sessionId: string; due: 1 | 2; text: string } | undefined
+    try {
+      const sessionId = await $.session.id()
+      // A seeded session's ladder sits above its starting fill, unknown until a response
+      // measures it: its seed carries no warning.
+      const unshifted = seeded?.session === sessionId && seeded.startPercent === undefined
+      if (!off.has(sessionId) && !inFlight && paused !== sessionId && !unshifted) {
+        await measure($, sessionId)
+        const due = dueWarning(sessionId)
+        if (due !== undefined && !handedOff.has(sessionId)) warning = { sessionId, due, text: await warningText($, sessionId, due) }
+      }
+    } catch (err) {
+      await log($, `prompt.submit warning error ${String(err)}`)
+    }
+    if (warning === undefined) return next(e)
+    const r = await next({ ...e, context: [...(e.context ?? []), warning.text] })
+    // A prompt refused beneath molt carried no warning: the next prompt that enters does.
+    if (r.drop === undefined) {
+      warned.set(warning.sessionId, warning.due)
+      await appendStatus($, `warned ${warnedAt(warning.sessionId, warning.due)}`)
+    }
+    return r
   })
 
   on('tool.call', async ($, e, next) => {
@@ -331,7 +434,7 @@ export const register: Register = (on, options) => {
       sessionId = await $.session.id()
       if (!off.has(sessionId) && !inFlight) {
         await measure($, sessionId)
-        if (atLeast(stage, 'hard') && !gateAllows(e.tool, args)) {
+        if (atLeast(stage, 'block') && !gateAllows(e.tool, args)) {
           await log($, `gate denied session=${sessionId} tool=${e.tool} percent=${lastPercent}`)
           return { deny: await instruction($, sessionId) }
         }
@@ -344,12 +447,12 @@ export const register: Register = (on, options) => {
     // A staged Write or Edit is held for review and leaves the file unchanged.
     const staged = (r.result as { staged?: unknown } | undefined)?.staged === true
     if (r.deny === undefined && r.isError === undefined && !staged) {
-      // Below soft only: past it the session writes and commits the handoff itself, which
+      // Below the first warning only: past it the session may write and commit its handoff, which
       // would make every molt look like progress to the autopilot loop guard.
-      if (isProgress(e.tool, args) && !atLeast(stage, 'soft')) progress += 1
+      if (isProgress(e.tool, args) && !atLeast(stage, 'warn')) progress += 1
       const path = args.file_path
       if ((e.tool === 'Write' || e.tool === 'Edit') && typeof path === 'string' && path.endsWith('.md')
-        && sessionId !== '' && atLeast(stage, 'soft')) lastMd.set(sessionId, path)
+        && sessionId !== '' && atLeast(stage, 'command')) lastMd.set(sessionId, path)
     }
     return r
   })
@@ -359,11 +462,20 @@ export const register: Register = (on, options) => {
     try {
       if ((e as { agent_id?: string }).agent_id !== undefined) return r
       const sessionId = e.session_id
-      if (off.has(sessionId) || inFlight || nudged.has(sessionId)) return r
+      if (off.has(sessionId) || inFlight || handedOff.has(sessionId)) return r
       await measure($, sessionId)
-      if (!atLeast(stage, 'soft')) return r
-      nudged.add(sessionId)
-      return { ...r, additionalContext: [...(r.additionalContext ?? []), await instruction($, sessionId)] }
+      if (atLeast(stage, 'command')) {
+        if (nudged.has(sessionId)) return r
+        warned.set(sessionId, 2)
+        nudged.add(sessionId)
+        await noteCommand($, sessionId)
+        return { ...r, additionalContext: [...(r.additionalContext ?? []), await instruction($, sessionId)] }
+      }
+      const due = dueWarning(sessionId)
+      if (due === undefined) return r
+      warned.set(sessionId, due)
+      await appendStatus($, `warned ${warnedAt(sessionId, due)}`)
+      return { ...r, additionalContext: [...(r.additionalContext ?? []), await warningText($, sessionId, due)] }
     } catch (err) {
       await log($, `PostToolUse error ${String(err)}`)
       return r
@@ -374,9 +486,9 @@ export const register: Register = (on, options) => {
     const r = await next(e)
     try {
       const sessionId = e.session_id
-      if (off.has(sessionId) || inFlight || paused === sessionId) return r
+      if (off.has(sessionId) || inFlight || paused === sessionId || handedOff.has(sessionId)) return r
       await measure($, sessionId)
-      if (!atLeast(stage, 'soft')) return r
+      if (!atLeast(stage, 'command')) return r
       const marker = markerPath(e.last_assistant_message ?? '')
       let missing: string | undefined
       if (marker !== undefined) {
@@ -387,6 +499,7 @@ export const register: Register = (on, options) => {
       const n = stopBlocks.get(sessionId) ?? 0
       if (n >= MAX_STOP_BLOCKS) return r
       stopBlocks.set(sessionId, n + 1)
+      await noteCommand($, sessionId)
       const text = missing === undefined
         ? await instruction($, sessionId)
         : `molt: the MOLT-HANDOFF line names ${missing}, but ${missing} does not exist or is not a readable file. Write the handoff file, then end your reply with MOLT-HANDOFF: <its absolute path>.`
@@ -425,12 +538,12 @@ export const register: Register = (on, options) => {
     try {
       const sessionId = await $.session.id()
       await touchActive($, sessionId)
-      if (off.has(sessionId) || inFlight || paused === sessionId) { showStatus($, sessionId); return r }
+      if (off.has(sessionId) || inFlight || paused === sessionId || handedOff.has(sessionId)) { showStatus($, sessionId); return r }
       await measure($, sessionId)
       showStatus($, sessionId)
       // Below soft a marker is not a molt: a seeded session keeps its minimum room, and a
       // quoted or example marker line does not clear the session. /molt now sets soft.
-      if (!atLeast(stage, 'soft')) return r
+      if (!atLeast(stage, 'warn')) return r
       const marker = markerPath(e.answer)
       const resolved = marker === undefined ? undefined : resolvePath(marker, await $.session.cwd(), await home($))
       let handoff = pickHandoff(resolved, lastMd.get(sessionId))
@@ -439,11 +552,14 @@ export const register: Register = (on, options) => {
         handoff = undefined
       }
       if (handoff === undefined) {
+        // A warned session may hand off at a point it chose; nothing is asked of it yet.
+        if (!atLeast(stage, 'command')) return r
         // The session still has room to write it: the Stop reflex asks again, up to its cap.
         if (!atLeast(stage, 'fallback') && (stopBlocks.get(sessionId) ?? 0) < MAX_STOP_BLOCKS) return r
         handoff = { path: await fallbackBrief($, sessionId), source: 'fallback' }
       }
-      await molt($, sessionId, handoff)
+      if (await isChild($)) await handOff($, sessionId, handoff)
+      else await molt($, sessionId, handoff)
     } catch (err) {
       await log($, `turn.complete error ${String(err)}`)
     }

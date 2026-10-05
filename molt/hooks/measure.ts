@@ -5,10 +5,10 @@ import type { MoltConfig } from './config'
 // against 72.5k real), so a gate fires early rather than late.
 export const CHARS_PER_TOKEN = 4
 
-export type Stage = 'below' | 'soft' | 'hard' | 'fallback'
-export type Thresholds = { soft: number; hard: number; fallback: number }
+export type Stage = 'below' | 'warn' | 'warnAgain' | 'command' | 'block' | 'fallback'
+export type Thresholds = { warn: number; warnAgain: number; command: number; block: number; fallback: number }
 
-const ORDER: readonly Stage[] = ['below', 'soft', 'hard', 'fallback']
+const ORDER: readonly Stage[] = ['below', 'warn', 'warnAgain', 'command', 'block', 'fallback']
 
 export function projectedPercent(
   context: { tokens?: number; window: number; percent?: number },
@@ -21,24 +21,25 @@ export function projectedPercent(
 }
 
 // A seeded session starts with its handoff and the resume already in context. It gets
-// minRoom points of room above that start before soft applies, and the soft-to-hard
-// and hard-to-fallback gaps are kept — but the set moves up only as far as keeps
-// fallback at 99% or below, so the hard gate and the fallback stay reachable.
+// minRoom points of room above that start before its first warning, and the gaps between
+// the steps are kept — but the ladder moves up only as far as keeps fallback at 99% or
+// below, so the block and the fallback stay reachable.
 export function thresholdsFor(
-  cfg: Pick<MoltConfig, 'soft' | 'hard' | 'fallback' | 'minRoom'>,
+  cfg: Pick<MoltConfig, 'warn' | 'warnAgain' | 'command' | 'block' | 'fallback' | 'minRoom'>,
   startPercent?: number,
 ): Thresholds {
-  const wanted = startPercent === undefined ? 0 : Math.max(0, startPercent + cfg.minRoom - cfg.soft)
-  const shift = Math.min(wanted, Math.max(0, 99 - (cfg.hard + cfg.fallback)))
-  const soft = cfg.soft + shift
-  const hard = cfg.hard + shift
-  return { soft, hard, fallback: hard + cfg.fallback }
+  const wanted = startPercent === undefined ? 0 : Math.max(0, startPercent + cfg.minRoom - cfg.warn)
+  const shift = Math.min(wanted, Math.max(0, 99 - (cfg.block + cfg.fallback)))
+  const block = cfg.block + shift
+  return { warn: cfg.warn + shift, warnAgain: cfg.warnAgain + shift, command: cfg.command + shift, block, fallback: block + cfg.fallback }
 }
 
 export function stageOf(percent: number, t: Thresholds): Stage {
   if (percent >= t.fallback) return 'fallback'
-  if (percent >= t.hard) return 'hard'
-  if (percent >= t.soft) return 'soft'
+  if (percent >= t.block) return 'block'
+  if (percent >= t.command) return 'command'
+  if (percent >= t.warnAgain) return 'warnAgain'
+  if (percent >= t.warn) return 'warn'
   return 'below'
 }
 

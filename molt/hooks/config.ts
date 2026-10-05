@@ -1,25 +1,32 @@
-// molt's settings: the manifest's userConfig values, checked as a set. A threshold set
-// that breaks soft < hard and hard + fallback <= 99 falls back to the defaults as a
-// whole, and the problem is reported; it is never silently clamped.
+// molt's settings: the manifest's userConfig values, checked as a set. A ladder that
+// breaks warn < warnAgain < command < block and block + fallback <= 99 falls back to the
+// defaults as a whole, and the problem is reported; it is never silently clamped.
+// 0.1.0's softPercent and hardPercent are read once as commandPercent and blockPercent.
 
 export type MoltConfig = {
-  soft: number
-  hard: number
+  warn: number
+  warnAgain: number
+  command: number
+  block: number
   fallback: number
   minRoom: number
   manualMaxMolts: number
   instructionsTemplate: string
+  warningTemplate: string
   seedTemplate: string
   problems: string[]
 }
 
 export const DEFAULTS: MoltConfig = {
-  soft: 50,
-  hard: 65,
+  warn: 40,
+  warnAgain: 50,
+  command: 65,
+  block: 75,
   fallback: 5,
   minRoom: 15,
   manualMaxMolts: 2,
   instructionsTemplate: '~/.claude/molt/instructions.md',
+  warningTemplate: '~/.claude/molt/warning.md',
   seedTemplate: '~/.claude/molt/seed.md',
   problems: [],
 }
@@ -30,25 +37,43 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim
 export function parseConfig(options: Readonly<Record<string, unknown>> | undefined): MoltConfig {
   const o = options ?? {}
   const problems: string[] = []
-  let soft = num(o.softPercent) ?? DEFAULTS.soft
-  let hard = num(o.hardPercent) ?? DEFAULTS.hard
+  let command = num(o.commandPercent)
+  if (command === undefined && num(o.softPercent) !== undefined) {
+    command = num(o.softPercent)
+    problems.push(`softPercent is now commandPercent (${command})`)
+  }
+  let block = num(o.blockPercent)
+  if (block === undefined && num(o.hardPercent) !== undefined) {
+    block = num(o.hardPercent)
+    problems.push(`hardPercent is now blockPercent (${block})`)
+  }
+  let warn = num(o.warnPercent) ?? DEFAULTS.warn
+  let warnAgain = num(o.warnAgainPercent) ?? DEFAULTS.warnAgain
+  command = command ?? DEFAULTS.command
+  block = block ?? DEFAULTS.block
   let fallback = num(o.fallbackMargin) ?? DEFAULTS.fallback
-  if (!(soft > 0 && soft < hard && fallback > 0 && hard + fallback <= 99)) {
-    problems.push(`thresholds soft=${soft} hard=${hard} fallback=+${fallback} break soft < hard and hard + fallback <= 99; ` +
-      `using ${DEFAULTS.soft}/${DEFAULTS.hard}/+${DEFAULTS.fallback}`)
-    soft = DEFAULTS.soft
-    hard = DEFAULTS.hard
+  if (!(warn > 0 && warn < warnAgain && warnAgain < command && command < block && fallback > 0 && block + fallback <= 99)) {
+    problems.push(`thresholds warn=${warn} warnAgain=${warnAgain} command=${command} block=${block} fallback=+${fallback} ` +
+      `break warn < warnAgain < command < block and block + fallback <= 99; ` +
+      `using ${DEFAULTS.warn}/${DEFAULTS.warnAgain}/${DEFAULTS.command}/${DEFAULTS.block}/+${DEFAULTS.fallback}`)
+    warn = DEFAULTS.warn
+    warnAgain = DEFAULTS.warnAgain
+    command = DEFAULTS.command
+    block = DEFAULTS.block
     fallback = DEFAULTS.fallback
   }
   const minRoom = num(o.minRoomPercent)
   const manualMaxMolts = num(o.manualMaxMolts)
   return {
-    soft,
-    hard,
+    warn,
+    warnAgain,
+    command,
+    block,
     fallback,
     minRoom: minRoom !== undefined && minRoom > 0 && minRoom < 100 ? minRoom : DEFAULTS.minRoom,
     manualMaxMolts: manualMaxMolts !== undefined && manualMaxMolts >= 1 ? Math.floor(manualMaxMolts) : DEFAULTS.manualMaxMolts,
     instructionsTemplate: str(o.instructionsTemplate) ?? DEFAULTS.instructionsTemplate,
+    warningTemplate: str(o.warningTemplate) ?? DEFAULTS.warningTemplate,
     seedTemplate: str(o.seedTemplate) ?? DEFAULTS.seedTemplate,
     problems,
   }
