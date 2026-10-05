@@ -1,0 +1,34 @@
+{
+  "name": "autonomic",
+  "version": "0.1.0",
+  "description": "Autopilot as a Claude Code mod. In autopilot (AUTONOMIC_MODE=autopilot per spawn, or /autopilot on) a global policy joins the system prompt; at each turn end, each AskUserQuestion and each permission ask a cached fork judges the stop against the policy and the session's scope; covered asks and stalls continue, every decision is appended to a ledger, and the closed pain list reaches you by toast, band and an optional bell. Fails toward manual. Requires Claude Code 2.1.289 or later.",
+  "author": { "name": "Pras" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "policyPath": {
+      "type": "string",
+      "title": "Policy file",
+      "description": "The autopilot standing orders. Written with the default on first start; edit it freely.",
+      "default": "~/.claude/autonomic/policy.md"
+    },
+    "bell": {
+      "type": "string",
+      "title": "Bell command",
+      "description": "A shell command run on each pain signal, with AUTONOMIC_MESSAGE set to one line, for example: curl -d \"$AUTONOMIC_MESSAGE\" ntfy.sh/<topic>. AUTONOMIC_BELL on a spawn overrides it. Unset: toast and band only."
+    },
+    "loopMax": {
+      "type": "number",
+      "title": "Pushes in a row with no change",
+      "description": "After this many covered or stalled turn ends with no change made, the next turn end is a pain signal.",
+      "default": 3,
+      "min": 1
+    },
+    "tailChars": {
+      "type": "number",
+      "title": "Reply tail for the turn-end check (characters)",
+      "description": "How much of the last reply the turn-end fork quotes.",
+      "default": 4000,
+      "min": 500
+    }
+  }
+}
