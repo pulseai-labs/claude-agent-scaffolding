@@ -54,8 +54,10 @@ export function parseAsk(text: string, questions: readonly Question[]): AskVerdi
     const a = v.answers[q.question]
     if (typeof a !== 'string') return { covered: false, reason: `no answer named for "${q.question}"` }
     const allowed = new Set((q.options ?? []).map(o => o.label))
-    // A whole answer that is one label stays one label, comma or not.
-    const labels = q.multiSelect && !allowed.has(a.trim()) ? a.split(',').map(s => s.trim()) : [q.multiSelect ? a.trim() : a]
+    // A multi-select answer is labels joined by commas: a label holding a comma cannot be read back.
+    if (q.multiSelect && [...allowed].some(l => l.includes(',')))
+      return { covered: false, reason: `a label of "${q.question}" holds a comma: the operator answers` }
+    const labels = q.multiSelect ? a.split(',').map(s => s.trim()) : [a]
     if (labels.length === 0 || labels.some(l => !allowed.has(l)))
       return { covered: false, reason: `"${a}" is not an option of "${q.question}"` }
     answers[q.question] = labels.join(', ')
