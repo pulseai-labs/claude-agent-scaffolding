@@ -84,4 +84,16 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
       'git log --format="%h" 2>/dev/null', 'make test >log 2>&1 &', 'echo a&echo b', 'git push origin -- feat/x'])
       expect([c, rules(c)]).toEqual([c, []])
   })
+  test('round 2: --branches, another repo, and variable options (PR #672 round 2)', () => {
+    expect(rules('git push --branches')).toContain('default-branch-push')
+    for (const c of ['git -C /other push', 'cd /other && git push', 'cd .. && cd .. && git push origin HEAD', 'git --git-dir=/o/.git push'])
+      expect([c, rules(c)]).toEqual([c, ['default-branch-push']])
+    for (const c of ['FLAGS=-rf; rm $FLAGS /tmp', 'rm "$X" /tmp', 'NV=-n; git commit $NV -m x', 'git branch "$OPT" x'])
+      expect([c, rules(c)]).toEqual([c, ['unreadable']])
+  })
+  test('round 2 controls: the same repo, an explicit refspec, commit message values', () => {
+    for (const c of ['git -C /other push origin feat/x', 'cd /repo && git push', 'cd /repo/sub && git push', 'git -C sub push', 'cd /other && git push origin feat/x',
+      'git commit -m "msg"', 'git commit -am "msg"', 'git commit -F "$f"', 'git commit --message "x" --author "A <a@b>"', 'rm -f x.txt'])
+      expect([c, rules(c)]).toEqual([c, []])
+  })
 })

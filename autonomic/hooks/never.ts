@@ -31,6 +31,9 @@ const RUNNERS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish', 'eval', 'xa
 const OPENERS = new Set(['if', 'then', 'do', 'else', 'elif', 'while', 'until', '{', '}', '!'])
 const DANGER = /\bpush\b|\brm\b|\bbranch\b|\bcommit\b|--no-verify/
 const OPTION_VALUES = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec'])
+// Commit options whose next word is a message, a path or a name, never a flag.
+const COMMIT_VALUES = new Set(['-m', '--message', '-F', '--file', '-C', '-c', '--reuse-message', '--reedit-message',
+  '--author', '--date', '--fixup', '--squash', '-t', '--template', '--trailer', '--cleanup'])
 
 // -uf is -u -f: a cluster of short flags is read flag by flag.
 const flags = (args: readonly string[]) =>
@@ -88,7 +91,7 @@ function positionalOf(args: readonly string[]): string[] {
 
 function pushesDefault(args: readonly string[], refspecsAfter: readonly string[], where: Where): boolean {
   const defaults = where.defaultBranch !== undefined ? [where.defaultBranch] : ['main', 'master']
-  if (args.includes('--all') || args.includes('--mirror')) return true
+  if (args.includes('--all') || args.includes('--branches') || args.includes('--mirror')) return true
   const positional = positionalOf(args)
   const refspecs = [...positional.slice(1), ...refspecsAfter]   // the first is the remote
   const current = (ref: string) => (ref === 'HEAD' ? where.branch : ref)
@@ -101,16 +104,41 @@ function pushesDefault(args: readonly string[], refspecsAfter: readonly string[]
   })
 }
 
+// The session's branch holds only inside the session's repo; elsewhere, or anywhere
+// unknown, the branch is unknown and the default is main or master.
+const inRepo = (dir: string | undefined, root: string) =>
+  dir !== undefined && (dir === root.replace(/\/+$/, '') || below(dir, root))
+
+// The directory a git call runs in: -C moves it; --git-dir and --work-tree make it unknown.
+function gitDirOf(tokens: readonly string[], dir: string | undefined, home: string): string | undefined {
+  const g = commandOf(tokens)?.args ?? []
+  let at = dir
+  for (let i = 0; g[i]?.startsWith('-'); i += g[i] === '-C' || g[i] === '-c' ? 2 : 1) {
+    const v = g[i + 1]
+    if (g[i] === '-C') at = v === undefined || (at === undefined && !v.startsWith('/')) ? undefined : resolve(v, at ?? '/', home)
+    else if (/^--(git-dir|work-tree)\b/.test(g[i]!)) at = undefined
+  }
+  return at
+}
+
 export function neverRules(command: string, where: Where): NeverRule[] {
   const found = new Set<NeverRule>()
   let cwd: string | undefined = where.cwd
+  let dir: string | undefined = where.cwd   // followed through cd, for the repo check only
   for (const tokens of segments(command).flatMap(pieces)) {
     const head = commandOf(tokens)
     if (head === undefined) continue
     if (head.name.startsWith('-') || opaque(head.name) || RUNNERS.has(head.name) || tokens.some(t => t.includes('`') || t.includes('$('))) {
       if (DANGER.test(command)) found.add('unreadable')
     }
-    if (head?.name === 'cd' || head?.name === 'pushd' || head?.name === 'popd') { cwd = undefined; continue }
+    if (head?.name === 'cd' || head?.name === 'pushd' || head?.name === 'popd') {
+      const t = head.name === 'popd' ? undefined : (head.args.find(a => !a.startsWith('-')) ?? (head.name === 'cd' ? '~' : undefined))
+      dir = t === undefined || t === '-' || (dir === undefined && !t.startsWith('/') && !t.startsWith('~')) ? undefined : resolve(t, dir ?? '/', where.home)
+      cwd = undefined
+      continue
+    }
+    // A variable or quoted word may be -r: an rm that does not read as recursive is unreadable.
+    if (head?.name === 'rm' && !recursive(head.args) && head.args.some(opaque)) found.add('unreadable')
     if (head?.name === 'rm' && recursive(head.args)) {
       const targets = head.args.filter(a => !a.startsWith('-'))
       if (targets.some(t => { const p = cwd === undefined ? undefined : resolve(t, cwd, where.home); return p === undefined || !below(p, where.root) }))
@@ -125,6 +153,10 @@ export function neverRules(command: string, where: Where): NeverRule[] {
     const dashes = tokens.indexOf('--')
     const after = sub === 'push' && dashes >= 0 ? tokens.slice(dashes + 1) : []
     if (args.includes('--no-verify') || (sub === 'commit' && args.includes('-n'))) found.add('no-verify')
+    // A quoted or variable word may be -n, -D or -f, except as the value of a commit option.
+    if (sub === 'branch' && args.some(opaque)) found.add('unreadable')
+    if (sub === 'commit')
+      for (let i = 0; i < args.length; i++) { if (COMMIT_VALUES.has(args[i]!)) i += 1; else if (opaque(args[i]!)) found.add('unreadable') }
     if (sub === 'branch' && (args.includes('-D') ||
       ((args.includes('--delete') || args.includes('-d')) && (args.includes('--force') || args.includes('-f')))))
       found.add('branch-delete')
@@ -135,7 +167,8 @@ export function neverRules(command: string, where: Where): NeverRule[] {
         found.add('branch-delete')
       // A quoted or variable remote, refspec or flag may name the default branch or --force.
       if ([...positionalOf(args), ...after].some(opaque)) found.add('unreadable')
-      else if (pushesDefault(args, after, where)) found.add('default-branch-push')
+      else if (pushesDefault(args, after, inRepo(gitDirOf(tokens, dir, where.home), where.root)
+        ? where : { ...where, branch: undefined, defaultBranch: undefined })) found.add('default-branch-push')
     }
   }
   return [...found]
