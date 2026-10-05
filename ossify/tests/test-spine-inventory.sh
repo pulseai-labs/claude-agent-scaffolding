@@ -497,6 +497,40 @@ inv "$F"
 t_assert_eq "halt:dirty-worktree" "$(route r0.s1.w1)" "S33b: complete + unmerged + dirty halts before the merge"
 t_assert_rc 3 "S33b: ...rc 3"
 
+# S34 (#673 J1): the durable [fidelity] rejection record gates every arm that
+# can MERGE, not just close-finished. An active item one merge away from
+# landing (S9b's shape) whose verify.md records a rejection must halt -
+# merging would land gate-rejected work the correction never cleared - and an
+# unreadable record halts too, never reading as clear. Controls: S9b (no
+# record) and the advisory-only file below both stay finish-merge.
+F="$TMP/s34"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm "close r0.s1.w1"
+D34="$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1"; mkdir -p "$D34"
+echo r > "$D34/report.md"
+inv "$F"
+t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S34 control: no rejection record -> finish-merge (S9b shape)"
+printf '[pattern] advisory only\n' > "$D34/verify.md"
+inv "$F"
+t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S34 control: a record WITHOUT [fidelity] stays finish-merge"
+printf '[fidelity] src/x.ts:3 - rejected\n' >> "$D34/verify.md"
+inv "$F"
+t_assert_eq "halt:close-rejected" "$(route r0.s1.w1)" "S34: an active finish-merge shape with a recorded rejection halts"
+t_assert_rc 3 "S34: ...rc 3"
+rm "$D34/verify.md"; mkdir "$D34/verify.md"
+inv "$F"
+t_assert_eq "halt:unreadable" "$(route r0.s1.w1)" "S34: an unreadable record on this arm halts, never finish-merge"
+# S34b: the complete+unmerged arm (S12's shape) consults the same record.
+F="$TMP/s34b"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm c
+oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null
+inv "$F"
+t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S34b control: no rejection record -> finish-merge (S12 shape)"
+mkdir -p "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1"
+printf '[fidelity] rejected earlier\n' > "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1/verify.md"
+inv "$F"
+t_assert_eq "halt:close-rejected" "$(route r0.s1.w1)" "S34b: a complete+unmerged item with a recorded rejection halts"
+t_assert_rc 3 "S34b: ...rc 3"
+
 # ---- the shipped §2 re-entry blocks, extracted and RUN (block-ledger O rows) ----
 SKILLS="$HERE/../skills"
 ROUND="$SKILLS/work-item/references/round-orchestration.md"

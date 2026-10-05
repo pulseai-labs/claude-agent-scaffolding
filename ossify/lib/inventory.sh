@@ -276,8 +276,19 @@ HOLD
           elif [ "$descends" != yes ]; then route=halt:unclassified
           # The branch still holds the item's commits but the spine branch does
           # not contain them: the merge the state claims is missing. Re-land it
-          # through close's §4 merge-onward (the owning repair for this shape).
-          else route=finish-merge; fi ;;
+          # through close's §4 merge-onward (the owning repair for this shape)
+          # - but only when the durable rejection record does not bar it
+          # (#673 J1): a recorded [fidelity] rejection means the correction
+          # must complete first, and an unreadable record halts rather than
+          # reading as clear.
+          else
+            gr=0; _oss_inv_rejection "$spine_dir/work-$wi/verify.md" || gr=$?
+            case "$gr" in
+              0) route=halt:close-rejected ;;
+              1) route=finish-merge ;;
+              *) route=halt:unreadable ;;
+            esac
+          fi ;;
         planned)
           if [ "$wt" = present ]; then
             adopt_br="$(_oss_inv_git -C "$wtp" rev-parse --abbrev-ref HEAD)"
@@ -340,8 +351,21 @@ HOLD
               # to run inline: halt unless the branch is verifiably descended
               # from its recorded base - a rewrite is never merge-repairable.
               elif [ "$descends" != yes ]; then route=halt:unclassified
-              elif [ "$report" = yes ]; then route=finish-merge
-              else route=halt:unverified-merge; fi
+              elif [ "$report" != yes ]; then route=halt:unverified-merge
+              else
+                # #673 J1: the durable [fidelity] rejection record gates THIS
+                # merge arm too, not just close-finished (C2). A stage-never-
+                # commit violation after a recorded rejection leaves exactly
+                # this shape, and merging it would land gate-rejected work on
+                # the spine branch - the harm the record exists to prevent.
+                # Same tri-state read as the close-finished arm (G2).
+                gr=0; _oss_inv_rejection "$spine_dir/work-$wi/verify.md" || gr=$?
+                case "$gr" in
+                  0) route=halt:close-rejected ;;
+                  1) route=finish-merge ;;
+                  *) route=halt:unreadable ;;
+                esac
+              fi
             elif [ "$hab" = yes ] && [ "$report" = yes ] \
                  && printf '%s\n' "$por" | awk 'substr($0,1,2)=="??" || substr($0,1,1)==" " || substr($0,2,1)!=" " {bad=1} END{exit bad}'; then
               # #673 C2: a staged result whose LAST COMPLETED gate run recorded
