@@ -1408,6 +1408,16 @@ _pin "$_r" "spine-close.md §3 does not read the recorded base (spine_base_get),
 _r=1; grep -Fq 'a `dispatches` count above zero' "$_WC" \
   && grep -Fq 'positive `dispatches` count' "$_SI" && _r=0
 _pin "$_r" "the abandoned-item drift enumerations (close §1, doctor §5) omit the dispatches count again (F3)"
+# Fix round 2 (G2/G3/H1/I1/I2/J1): one pin per new fail-closed claim the
+# round's findings named. Each literal is a distinct row or clause a reader
+# acts on; drop any one and the corresponding behavior loses its contract.
+_r=1; grep -Fq 'halt:base-unresolved' "$_RO" \
+  && grep -Fq 'a `verify.md` rejection record' "$_RO" \
+  && grep -Fq 'a completed item'"'"'s dirty worktree halts here too' "$_RO" \
+  && grep -Fq 'a history rewrite, never a landing' "$_RO" \
+  && grep -Fq 'validation precedes every removal' "$_RO" \
+  && grep -Fq 'a recorded rejection is never re-landed by a merge' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md drops a fix-round-2 fail-closed claim (base-unresolved row; the verify.md read; the dirty complete-item halt; the rewrite-is-no-landing clause; reattach's validate-before-remove; the merge-arm rejection gate) (G2/G3/H1/I1/I2/J1)"
 
 rm -rf "$_PC_TMP"
 t_summary
