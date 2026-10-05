@@ -56,6 +56,19 @@ describe('a child session', () => {
     at(w, 42); await $.classic.PostToolUse(POST)
     expect(events(w)).toEqual(['earlier', 'warned 40'])
   })
+  test('a refused prompt writes no warned line (PR #670 review)', async ($, on) => {
+    const w = world(on, { env: CHILD }); at(w, 42)
+    await $.turn.complete(TURN('done'))
+    w.dropPrompts = true
+    await $.prompt.submit({ text: 'go', wait: false, origin: { kind: 'composer' } } as never)
+    expect(events(w)).toEqual([])
+  })
+  test('a command-stage Stop on a marker naming a missing file still records handoff required (PR #670 review)', async ($, on) => {
+    const w = world(on, { env: CHILD }); at(w, 70)
+    const r = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'MOLT-HANDOFF: /run/missing.md', session_id: 's1' } as never)
+    expect(r.block).toContain('/run/missing.md')
+    expect(events(w)).toContain('handoff required')
+  })
   test('MOLT_HANDOFF=Parent is a root: it clears (review focus 4)', async ($, on) => {
     const w = world(on, { env: { MOLT_HANDOFF: 'Parent', MOLT_STATUS_PATH: S }, files: { [H]: '#' } })
     w.clearTo.push('s2'); at(w, 67)

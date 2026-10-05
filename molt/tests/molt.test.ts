@@ -308,6 +308,12 @@ describe('/molt now', () => {
     const r = await $.command.run(NOW)
     expect(r.context?.at(-1)).toContain('MOLT-HANDOFF:')
   })
+  test('arms the Stop reflex between the warnings and the command (PR #670 review)', async ($, on) => {
+    const w = world(on)
+    at(w, 45)
+    await $.command.run(NOW)
+    expect((await $.classic.Stop(STOP)).block).toContain('MOLT-HANDOFF:')
+  })
   test('arms the Stop reflex below soft', async ($, on) => {
     const w = world(on)
     at(w, 10)

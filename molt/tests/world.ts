@@ -26,6 +26,7 @@ export type World = {
   failWrites?: RegExp          // fs.write to a matching path is refused (a read-only or full disk)
   failReads?: RegExp           // fs.read of a matching path is refused though the file exists (no read permission)
   rejectSeeds?: boolean        // a plugin's prompt.submit is refused
+  dropPrompts?: boolean        // a hook beneath molt refuses every prompt (the result's drop arm)
   slowWrites?: RegExp          // fs.write to a matching path takes 20 ms
   staged?: boolean             // Write/Edit results come back staged: held for review, file unchanged
   notices: unknown[]           // every value molt wrote to its notice, in order
@@ -106,6 +107,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   })
   on('prompt.submit', (_$, e) => {
     if (w.rejectSeeds && e.origin.kind === 'plugin') throw new Error('prompt refused')
+    if (w.dropPrompts) return { drop: 'refused by a hook beneath molt' } as never
     w.prompts.push(e.text)
     w.contexts.push(...(e.context ?? []))
     return { text: e.text } as never

@@ -48,6 +48,15 @@ describe('the two warnings', () => {
     expect(w.contexts.join('\n')).toContain("molt's first warning")
     expect((await $.classic.PostToolUse(POST)).additionalContext).toBeUndefined()
   })
+  test('a prompt refused beneath molt: the warning rides the next prompt that enters (PR #670 review)', async ($, on) => {
+    const w = world(on); at(w, 42)
+    await $.turn.complete(TURN('done'))
+    w.dropPrompts = true
+    await $.prompt.submit(PROMPT)
+    w.dropPrompts = false
+    await $.prompt.submit(PROMPT)
+    expect(w.contexts.join('\n')).toContain("molt's first warning")
+  })
   test('past 65% with no tool result: the next prompt carries no stale warning', async ($, on) => {
     const w = world(on); at(w, 67)
     await $.turn.complete(TURN('done'))

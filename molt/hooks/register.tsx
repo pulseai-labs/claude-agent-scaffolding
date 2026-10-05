@@ -94,7 +94,7 @@ async function measure($: Engine, sessionId: string): Promise<number | undefined
     lastPercent = percent
     stage = stageOf(percent, currentThresholds(sessionId))
   }
-  if (forced.has(sessionId) && stage === 'below') stage = 'command'
+  if (forced.has(sessionId) && !atLeast(stage, 'command')) stage = 'command'
   return percent
 }
 
@@ -398,21 +398,25 @@ export const register: Register = (on, options) => {
     } catch (err) {
       await log($, `prompt.submit error ${String(err)}`)
     }
+    let warning: { sessionId: string; due: 1 | 2; text: string } | undefined
     try {
       const sessionId = await $.session.id()
       if (!off.has(sessionId) && !inFlight && paused !== sessionId) {
         await measure($, sessionId)
         const due = dueWarning(sessionId)
-        if (due !== undefined && !handedOff.has(sessionId)) {
-          warned.set(sessionId, due)
-          await appendStatus($, `warned ${warnedAt(sessionId, due)}`)
-          return next({ ...e, context: [...(e.context ?? []), await warningText($, sessionId, due)] })
-        }
+        if (due !== undefined && !handedOff.has(sessionId)) warning = { sessionId, due, text: await warningText($, sessionId, due) }
       }
     } catch (err) {
       await log($, `prompt.submit warning error ${String(err)}`)
     }
-    return next(e)
+    if (warning === undefined) return next(e)
+    const r = await next({ ...e, context: [...(e.context ?? []), warning.text] })
+    // A prompt refused beneath molt carried no warning: the next prompt that enters does.
+    if (r.drop === undefined) {
+      warned.set(warning.sessionId, warning.due)
+      await appendStatus($, `warned ${warnedAt(warning.sessionId, warning.due)}`)
+    }
+    return r
   })
 
   on('tool.call', async ($, e, next) => {
@@ -488,7 +492,7 @@ export const register: Register = (on, options) => {
       const n = stopBlocks.get(sessionId) ?? 0
       if (n >= MAX_STOP_BLOCKS) return r
       stopBlocks.set(sessionId, n + 1)
-      if (missing === undefined) await noteCommand($, sessionId)
+      await noteCommand($, sessionId)
       const text = missing === undefined
         ? await instruction($, sessionId)
         : `molt: the MOLT-HANDOFF line names ${missing}, but ${missing} does not exist or is not a readable file. Write the handoff file, then end your reply with MOLT-HANDOFF: <its absolute path>.`
