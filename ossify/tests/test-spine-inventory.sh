@@ -152,10 +152,17 @@ t_assert_eq "reattach" "$(route r0.s1.w1)" "S7: worktree gone, branch ahead -> r
 git -C "$F/core" worktree prune; git -C "$F/core" branch -D work/r0.s1.w1-one -q; inv "$F"
 t_assert_eq "halt:work-lost" "$(route r0.s1.w1)" "S8: worktree and branch both gone -> halt:work-lost"
 
-# S9: committed, not merged -> finish-merge.
+# S9 (#673 C1): a commit past base is NOT self-evidently gated - an
+# implementer's stage-never-commit violation leaves this exact shape, and the
+# pre-fix route merged it with no gate ever run. Without report.md evidence
+# the route refuses; with it (S9b) the post-gate close-crash shape merges.
 F="$TMP/s9"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
 echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm "close r0.s1.w1"; inv "$F"
-t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S9: a commit past base, unmerged -> finish-merge"
+t_assert_eq "halt:unverified-merge" "$(route r0.s1.w1)" "S9: a commit past base with NO report.md -> halt:unverified-merge"
+t_assert_rc 3 "S9: ...rc 3"
+mkdir -p "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1"
+echo r > "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1/report.md"; inv "$F"
+t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S9b: the same shape WITH report.md -> finish-merge"
 
 # S10: merged, status still active -> finish-status.
 git -C "$F/core" merge -q --no-ff work/r0.s1.w1-one -m "merge r0.s1.w1"; inv "$F"
@@ -210,12 +217,20 @@ rm -rf "$WT"; mkdir -p "$WT"; inv "$F"
 t_assert_eq "finish-status" "$(route r0.s1.w1)" "S21: merged + a plain dir at the recorded path is finish-status"
 t_assert_rc 0 "S21: ...rc 0 - not a halt"
 
-# S12: complete but not merged -> halt:state-claims-merge (control: S1's merged item is skip).
+# S12 (#673 A5): state says complete and the branch still holds unmerged
+# commits - the merge the state claims is missing, so the row ROUTES the repair
+# (close's merge-onward) rather than halting with no owning repair. S12b keeps
+# the one shape no repair can make true: a branch sitting at its base.
 F="$TMP/s12"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
 echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm c
 oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null; inv "$F"
-t_assert_eq "halt:state-claims-merge" "$(route r0.s1.w1)" "S12: complete but unmerged halts"
-t_assert_rc 3 "S12: ...rc 3"
+t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S12: complete + unmerged commits -> finish-merge (re-land the claim)"
+t_assert_rc 0 "S12: ...rc 0 - a repairable shape, not a halt"
+# Resetting the CHECKED-OUT branch back to its cut point (branch -f refuses a
+# checked-out branch; the worktree owns it here).
+git -C "$WT" reset -q --hard "$(git -C "$F/core" rev-parse spine/r0.s1-demo)"; inv "$F"
+t_assert_eq "halt:state-claims-merge" "$(route r0.s1.w1)" "S12b: complete but the branch sits at its base -> halt:state-claims-merge"
+t_assert_rc 3 "S12b: ...rc 3"
 
 # S13 (Review Focus 2): a decoy branch whose name only differs by the dots.
 F="$TMP/s13"; fx "$F" 1; git -C "$F/core" branch work/r0s1w1-decoy; inv "$F"
@@ -238,6 +253,10 @@ t_assert_eq "skip" "$(route r0.s1.w2)" "S16: abandoned is skip"
 snap() { # $1=dir ; everything inventory could disturb
   { cksum < "$1/ws/.ossify/project-state.json"
     for r in core ui; do
+      # #673 A4/A6 added a `git worktree list` to the classifier; its admin
+      # files are part of what "read-only" means, so snapshot them FIRST
+      # (before the list calls below, which are themselves under test).
+      find "$1/$r/.git/worktrees" -type f -exec cksum {} + 2>/dev/null | sort
       git -C "$1/$r" for-each-ref; git -C "$1/$r" worktree list --porcelain
       cksum < "$1/$r/.git/index"; git -C "$1/$r" --no-optional-locks status --porcelain
     done; } 2>/dev/null
@@ -247,6 +266,118 @@ sleep 1; touch "$F/core/f"    # stale stat info: plain `git status` would rewrit
 BEFORE="$(snap "$F")"; inv "$F"
 t_assert_rc 3 "S17 setup: this run has a halt row (dirty worktree)"
 t_assert_eq "$BEFORE" "$(snap "$F")" "S17: state, refs, worktrees, index and status are byte-identical after inventory"
+
+# ---- fix-round scenarios (#673 A1-A5, B1, C2) ---------------------------------
+
+# S22 (#673 A1): merged-ness REQUIRES a recorded base. An empty base_sha made
+# `tip != bs` trivially true, so a branch AT its cut point - an ancestor of the
+# spine branch - read as merged and a `complete` item routed skip, marked done
+# with nothing merged. The row must stay non-benign instead.
+F="$TMP/s22"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+oss_in "$F" work_item_exec r0.s1.w1 "work/r0.s1.w1-one" "$WT" "" >/dev/null
+oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null; inv "$F"
+t_assert_eq "halt:base-unknown" "$(route r0.s1.w1)" "S22: an unrecorded base_sha must never read as merged - the row halts"
+t_assert_rc 3 "S22: ...rc 3"
+# S22b: the ACTIVE variant, worktree gone - the old inversion's finish-status.
+F="$TMP/s22b"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+oss_in "$F" work_item_exec r0.s1.w1 "work/r0.s1.w1-one" "$WT" "" >/dev/null
+rm -rf "$WT"; inv "$F"
+t_assert_eq "halt:base-unknown" "$(route r0.s1.w1)" "S22b: active + unrecorded base_sha halts before any reattach"
+# S22c (control): with the base recorded, the same at-base branch is still a
+# non-benign halt - never skip - and S1 (merged, recorded base) stays skip.
+F="$TMP/s22c"; fx "$F" 1; spawn "$F" r0.s1.w1 one >/dev/null
+oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null; inv "$F"
+t_assert_eq "halt:state-claims-merge" "$(route r0.s1.w1)" "S22c control: recorded base, branch at it -> halt, not skip"
+
+# S23 (#673 A2): one unrenderable field must not collapse the feed. A status
+# that is an object used to kill the whole jq stream - the corrupt item AND
+# its successor silently vanished, at rc 0. Now: a halt row naming the item,
+# the sibling rows still printed, rc 3.
+F="$TMP/s23"; fx "$F" 2
+SF23="$F/ws/.ossify/project-state.json"
+jq '.work_items[0].status = {"oops":true}' "$SF23" > "$SF23.tmp" && mv "$SF23.tmp" "$SF23"
+inv "$F"
+t_assert_eq "halt:unreadable" "$(route r0.s1.w1)" "S23: an unrenderable item fails closed, naming the item"
+t_assert_rc 3 "S23: ...rc 3, not rc 0 on a partial stream"
+t_assert_eq "spawn" "$(route r0.s1.w2)" "S23: ...and the successor still prints"
+
+# S24 (#673 A3): a failed `git status` must halt, never degrade to clean=yes.
+F="$TMP/s24"; fx "$F" 1
+printf 'garbage' > "$F/core/.git/index"
+inv "$F"
+t_assert_eq "halt:unreadable" "$(field repo core 3)" "S24: an unreadable repo index halts the repo row"
+t_assert_rc 3 "S24: ...rc 3"
+# S24b: a configured root that does not exist is not `fresh`/`cut-missing`.
+F="$TMP/s24b"; fx "$F" 1
+jq --arg r "$F/gone" '.repos.core.root = $r' "$F/ws/.ossify/topology.json" > "$F/ws/.ossify/topology.json.tmp" && mv "$F/ws/.ossify/topology.json.tmp" "$F/ws/.ossify/topology.json"
+inv "$F"
+t_assert_eq "halt:unreadable" "$(field repo core 3)" "S24b: a missing hosting-repo root halts, not a benign verdict"
+# The two unreadable arms write different facts; pin the ROOT arm's row (all
+# facts `-`, nothing read) so this assertion cannot silently pass off the
+# status guard catching the same fixture (which reports branch=absent).
+t_assert_eq "branch=-" "$(field repo core 4)" "S24b: ...the root itself was found missing (the row read nothing)"
+# S24c: the item-side unchecked status - corrupt the WORKTREE's index.
+F="$TMP/s24c"; fx "$F" 1; spawn "$F" r0.s1.w1 one >/dev/null
+printf 'garbage' > "$F/core/.git/worktrees/r0.s1.w1/index"
+inv "$F"
+t_assert_eq "halt:unreadable" "$(route r0.s1.w1)" "S24c: an unreadable worktree index halts the item row"
+
+# S25 (#673 A4): an active item whose recorded dir is gone but whose branch is
+# LIVE in another worktree must halt in the READ-OUT - §2b mutates repos before
+# item repairs, so meeting the refusal at reattach would be too late. The
+# pre-fix suffix guard would have re-added here, leaving two holders.
+F="$TMP/s25"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+mkdir -p "$F/elsewhere/.worktrees"
+git -C "$F/core" worktree move "$WT" "$F/elsewhere/.worktrees/r0.s1.w1"
+inv "$F"
+t_assert_eq "halt:worktree-held" "$(route r0.s1.w1)" "S25: the branch is held elsewhere - halt before any repair"
+t_assert_rc 3 "S25: ...rc 3"
+
+# S26 (#673 A5): a complete item whose branch was deleted - spine-close step
+# 10's `git branch -d`, which refuses an unmerged branch, so the deletion is
+# the post-merge cleanup shape. merged-ness cannot be recomputed from what is
+# gone; halting here made the hand-over-to-close arm unreachable. skip, and
+# the close cleanup tolerates the missing branch (test-worktree.sh).
+F="$TMP/s26"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm "close r0.s1.w1"
+git -C "$F/core" merge -q --no-ff work/r0.s1.w1-one -m "merge r0.s1.w1"
+oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null
+git -C "$F/core" worktree remove --force "$WT" >/dev/null 2>&1 || true
+rm -rf "$WT"
+git -C "$F/core" branch -d work/r0.s1.w1-one >/dev/null 2>&1
+inv "$F"
+t_assert_eq "skip" "$(route r0.s1.w1)" "S26: complete + branch deleted -> skip (the cleanup-finished shape)"
+t_assert_rc 0 "S26: ...rc 0 - the hand-over-to-close arm stays reachable"
+
+# S27 (#673 B1): adopt must take only a branch this item OWNS. A clean
+# worktree at the derived path on `main` - whose HEAD is trivially an ancestor
+# of the spine branch - used to be journaled as the item's branch: dispatch
+# would commit onto main, and spine-close's worktree_remove would try
+# `git branch -d main`. S11 above is the same-shape control (an item's OWN
+# work/ branch) that still adopts.
+F="$TMP/s27"; fx "$F" 2
+git -C "$F/core" worktree add -q "$F/core/.worktrees/r0.s1.w2" main
+inv "$F"
+t_assert_eq "halt:planned-with-worktree" "$(route r0.s1.w2)" "S27: a worktree on main at the derived path halts, never adopts"
+t_assert_rc 3 "S27: ...rc 3"
+
+# S28 (#673 C2): a close-REJECTED staged result is durably distinguishable
+# from a close-finished one. The rejection record is the `[fidelity]` finding
+# the halting gate run wrote to verify.md; the sibling control proves the
+# check keys on that finding, not on the file's mere existence (advisory
+# findings are written there by passing runs too, and those must stay
+# close-finished).
+F="$TMP/s28"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a
+mkdir -p "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1"
+echo r > "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1/report.md"
+printf '[pattern] advisory only\n' > "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1/verify.md"
+inv "$F"
+t_assert_eq "close-finished" "$(route r0.s1.w1)" "S28 control: verify.md without a [fidelity] line stays close-finished"
+printf '[fidelity] src/x.ts:3 - the diff deviates from spec.md; report 7 does not declare it\n' >> "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1/verify.md"
+inv "$F"
+t_assert_eq "halt:close-rejected" "$(route r0.s1.w1)" "S28: a recorded [fidelity] rejection halts re-entry"
+t_assert_rc 3 "S28: ...rc 3"
 
 # ---- the shipped §2 re-entry blocks, extracted and RUN (block-ledger O rows) ----
 SKILLS="$HERE/../skills"
