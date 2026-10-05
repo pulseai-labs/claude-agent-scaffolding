@@ -65,4 +65,30 @@ t_capture bash "$OSS" doctor
 t_assert_contains "$T_OUT" "replay" "doctor runs its replay check over the new op"
 case "$T_OUT" in *"fail: replay"*) t_assert_eq "no replay failure" "replay failed" "replay over set_spine_base";; *) T_PASS=$((T_PASS+1));; esac
 
+# --- work_item_dispatched ------------------------------------------------------
+bash "$OSS" work_item_add r0.s1 "Item one" core >/dev/null
+t_capture bash "$OSS" get '.work_items[0].dispatches // "absent"'
+t_assert_eq "absent" "$T_OUT" "setup: a new item carries no dispatches field (legacy shape)"
+t_capture bash "$OSS" work_item_dispatched r0.s1.w1
+t_assert_rc 0 "dispatched: rc 0"
+t_assert_eq "1" "$T_OUT" "dispatched: a missing field counts from 0, echoes 1"
+t_capture bash "$OSS" work_item_dispatched r0.s1.w1
+t_assert_eq "2" "$T_OUT" "dispatched: increments"
+t_capture bash "$OSS" get '.work_items[0].dispatches'
+t_assert_eq "2" "$T_OUT" "state shape: .work_items[].dispatches is the count"
+t_capture bash "$OSS" work_item_dispatched r0.s1.w9
+t_assert_rc 7 "dispatched: an unknown item is rc 7"
+t_capture bash "$OSS" work_item_dispatched
+t_assert_rc 2 "dispatched: no args is the usage rc 2"
+
+# Review Focus 5: a non-integer field fails closed - never a silent reset.
+SF="$(bash "$OSS" state_path 2>/dev/null || echo "$TMP/ws/.ossify/state.json")"
+jq '.work_items[0].dispatches = "x"' "$SF" > "$SF.tmp" && mv "$SF.tmp" "$SF"
+N_BEFORE="$(jq '.mutations | length' "$SF")"
+t_capture bash "$OSS" work_item_dispatched r0.s1.w1
+t_assert_rc 4 "dispatched: a non-integer field is an apply failure (rc 4)"
+t_assert_eq '"x"' "$(jq -c '.work_items[0].dispatches' "$SF")" "dispatched: ...and the field is untouched"
+t_assert_eq "$N_BEFORE" "$(jq '.mutations | length' "$SF")" "dispatched: ...and nothing is journaled"
+jq '.work_items[0].dispatches = 2' "$SF" > "$SF.tmp" && mv "$SF.tmp" "$SF"
+
 t_summary

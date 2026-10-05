@@ -221,6 +221,13 @@ _oss_apply_op() { # $1=op $2=payload-json
       jq --argjson p "$payload" '
         (.spines[] | select(.id == $p.spine)) |=
           (.bases = ((.bases // {}) + {($p.repo): $p.base_branch}))' ;;
+    # #133: the 3-dispatch cap survives a respawned session. `// 0` reads a
+    # legacy item as never dispatched; a non-number makes jq fail, which is the
+    # rc-4 apply failure - never a silent reset.
+    incr_work_item_dispatches)
+      jq --argjson p "$payload" '
+        (.work_items[] | select(.id == $p.work_item)) |=
+          (.dispatches = ((.dispatches // 0) + 1))' ;;
     # §9.2's migration registry, realized. Pure, TOTAL and VERSION-AGNOSTIC:
     # replay re-applies it from the base snapshot (v1 or v2, whichever the
     # project started from) so base+journal still rebuilds live exactly and

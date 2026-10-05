@@ -368,3 +368,15 @@ oss_entity_get_spine_base() { # $1=state $2=spine-id $3=repo-key ; rc 1 unrecord
   [ -n "$b" ] || { echo "oss: no base_branch recorded for spine '$spine' in repo '$repo'" >&2; return 1; }
   printf '%s\n' "$b"
 }
+
+# #133: one count per dispatch of a work item, in every mode and of every kind
+# (first run, clarification re-dispatch, broken-envelope retry, an external
+# caller's correction or replacement). The CAP is enforced by the lane, not here
+# - round-orchestration.md §6 owns the escalation.
+oss_entity_work_item_dispatched() { # $1=state $2=wi-id ; echoes the new count
+  local sf="$1" wi="$2"
+  _oss_entity_require_single "$sf" '.work_items[] | select(.id == $v)' "work item" "$wi" || return $?
+  oss_state_mutate "$sf" incr_work_item_dispatches \
+    "$(jq -n --arg w "$wi" --arg ts "$(_oss_now)" '{work_item:$w,at:$ts}')" || return $?
+  jq -r --arg w "$wi" '.work_items[] | select(.id == $w) | .dispatches' "$sf"
+}
