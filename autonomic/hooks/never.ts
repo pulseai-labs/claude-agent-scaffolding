@@ -28,7 +28,9 @@ const below = (path: string, root: string) => path.startsWith(`${root.replace(/\
 // Shapes the shared reader does not follow (final review I1). A segment led by one of these,
 // or holding a backtick or $( outside quotes, is unreadable; it is listed when the command
 // names a danger at all. Keywords that only open a block are stripped and the rest is read.
-const RUNNERS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish', 'eval', 'xargs', 'timeout', 'nice', 'ionice', 'watch', 'parallel', 'find', 'su', 'doas', 'ssh'])
+const RUNNERS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish', 'eval', 'xargs', 'timeout', 'nice', 'ionice', 'watch', 'parallel', 'find', 'su', 'doas', 'ssh',
+  // Wrappers that run the program they are given (PR #681 round 4).
+  'setsid', 'stdbuf', 'taskset', 'flock', 'chroot', 'chrt', 'systemd-run', 'nsenter', 'unshare', 'numactl', 'runuser', 'setpriv', 'sg', 'firejail', 'unbuffer', 'caffeinate', 'script', 'strace', 'ltrace'])
 // An interpreter runs a program the reader never sees (its quoted text is blanked), so it is
 // a runner too (PR #681): `python3 -c '…git push -f…'`.
 const INTERPRETER = /^(?:python[\d.]*|pypy[\d.]*|node|nodejs|deno|bun|perl[\d.]*|ruby[\d.]*|php[\d.]*|lua(?:jit)?[\d.]*|Rscript|pwsh|powershell|osascript|tclsh|expect|[gmn]?awk)$/
@@ -41,7 +43,7 @@ const GIT_FLAGS = new Set(['-p', '-P', '--paginate', '--no-pager', '--bare', '--
 const LONGS = ['--force', '--force-with-lease', '--mirror', '--delete', '--prune', '--all', '--branches', '--no-verify', '--recursive']
 const expand = (a: string): string => (/^--[a-z][a-z-]*$/.test(a) && !LONGS.includes(a) ? (LONGS.find(l => l.startsWith(a)) ?? a) : a)
 const OPENERS = new Set(['if', 'then', 'do', 'else', 'elif', 'while', 'until', '{', '}', '!'])
-const DANGER = /\bpush\b|\brm\b|\bbranch\b|\bcommit\b|--no-verify/
+const DANGER = /\bpush\b|\brm\b|\bbranch\b|\bcommit\b|--no-verify|\bsend-pack\b|\bhttp-push\b/
 // The cheap pre-check: every rule neverRules finds needs one of these words, so a command
 // without one runs no git (the bypass floor, 0.1.1 §3.1).
 // Bash drops a backslash and joins quoted pieces, so `pu\sh` and `pu""sh` are push (PR #681).
@@ -52,8 +54,21 @@ const COMMIT_VALUES = new Set(['-m', '--message', '-F', '--file', '-C', '-c', '-
   '--author', '--date', '--fixup', '--squash', '-t', '--template', '--trailer', '--cleanup'])
 
 // -uf is -u -f: a cluster of short flags is read flag by flag.
-const flags = (args: readonly string[]) =>
-  args.flatMap(a => (/^-[A-Za-z]{2,}$/.test(a) ? [...a.slice(1)].map(c => `-${c}`) : [expand(a)]))
+// -nF/tmp/m is -n -F /tmp/m: a cluster is split up to the first option that takes a value,
+// and the rest is that value (PR #681 round 4).
+const SHORT_VALUES = new Set(['m', 'F', 'C', 'c', 't', 'o', 'S'])
+function cluster(a: string): string[] {
+  if (!/^-[A-Za-z]./.test(a)) return [expand(a)]
+  const out: string[] = []
+  for (let i = 1; i < a.length; i++) {
+    const c = a[i]!
+    if (!/[A-Za-z]/.test(c)) { out.push(a.slice(i)); break }
+    out.push(`-${c}`)
+    if (SHORT_VALUES.has(c)) { if (i + 1 < a.length) out.push(a.slice(i + 1)); break }
+  }
+  return out
+}
+const flags = (args: readonly string[]) => args.flatMap(cluster)
 
 // A lone & ends a command as ; does, spaced or not (`sleep 1&git push`); the shared reader
 // splits only on &&. The & of a redirect (2>&1, &>log) is not one.
@@ -138,11 +153,6 @@ function pushesDefault(args: readonly string[], refspecsAfter: readonly string[]
   })
 }
 
-// The session's branch holds only inside the session's repo; elsewhere, or anywhere
-// unknown, the branch is unknown and the default is main or master.
-const inRepo = (dir: string | undefined, root: string) =>
-  dir !== undefined && (dir === root.replace(/\/+$/, '') || below(dir, root))
-
 // The directory a git call runs in: -C moves it; --git-dir and --work-tree make it unknown.
 function gitDirOf(tokens: readonly string[], dir: string | undefined, home: string): string | undefined {
   const g = commandOf(tokens)?.args ?? []
@@ -215,7 +225,7 @@ export function neverRules(command: string, where: Where): NeverRule[] {
     const git = gitOf(tokens)
     if (git === undefined) continue
     const { sub } = git
-    if ((opaque(sub) || !readableGlobals(tokens)) && namesDanger(command)) found.add('unreadable')
+    if ((opaque(sub) || !readableGlobals(tokens) || sub === 'send-pack' || sub === 'http-push') && namesDanger(command)) found.add('unreadable')
     const args = flags(git.args)
     // The shared reader drops what follows `--`; for push those words are refspecs.
     const dashes = tokens.indexOf('--')
@@ -240,7 +250,8 @@ export function neverRules(command: string, where: Where): NeverRule[] {
         // -C into a directory other than the repo root may enter a nested repo or submodule,
         // whose branch is not the session's: unknown (PR #681 round 3).
         const at = gitDirOf(tokens, dir, where.home)
-        const same = inRepo(at, where.root) && (at === dir || at === where.root.replace(/\/+$/, ''))
+        // So may a cd below the root: only the session's own directory and the root are known (round 4).
+        const same = at !== undefined && (at === where.cwd || at === where.root.replace(/\/+$/, ''))
         if (pushesDefault(args, after, same ? where : { ...where, branch: undefined, defaultBranch: undefined })) found.add('default-branch-push')
       }
     }

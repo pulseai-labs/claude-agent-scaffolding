@@ -6,6 +6,25 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('a wrapper that runs a program is a runner (PR #681 round 4)', () => {
+    for (const c of ['setsid git push -f origin feat/x', 'stdbuf -oL git push -f', 'flock /tmp/l git push -f', 'taskset 1 git push -f'])
+      expect(rules(c)).not.toEqual([])
+  })
+  test('a short-flag cluster with an attached value is split up to the value (PR #681 round 4)', () => {
+    expect(rules('git commit -nF/tmp/message')).toContain('no-verify')
+    expect(rules('git commit -am"x"')).toEqual([])
+    expect(rules('git push -ofoo origin feat/x')).toEqual([])
+  })
+  test('git send-pack and http-push are pushes the reader cannot follow (PR #681 round 4)', () => {
+    expect(rules('git send-pack --force origin refs/heads/feat/x:refs/heads/main')).toContain('unreadable')
+    expect(rules('git http-push -v https://x/r.git main')).toContain('unreadable')
+  })
+  test('cd into a directory below the root reads the branch as unknown (PR #681 round 4)', () => {
+    expect(rules('cd /repo/other && git push')).toContain('default-branch-push')
+    expect(rules('cd /repo/other && git push origin feat/x')).toEqual([])
+    expect(rules('cd /repo/sub && git push')).toEqual([])
+    expect(rules('cd /repo && git push')).toEqual([])
+  })
   test('a wildcard refspec may push the default branch (PR #681 round 3)', () => {
     expect(rules('git push origin refs/heads/*:refs/heads/*')).toContain('default-branch-push')
     expect(rules('git push origin feat/*')).toContain('default-branch-push')
@@ -154,7 +173,7 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
       expect([c, rules(c)]).toEqual([c, ['unreadable']])
   })
   test('round 2 controls: the same repo, an explicit refspec, commit message values', () => {
-    for (const c of ['git -C /other push origin feat/x', 'cd /repo && git push', 'cd /repo/sub && git push', 'cd /other && git push origin feat/x',
+    for (const c of ['git -C /other push origin feat/x', 'cd /repo && git push', 'cd /other && git push origin feat/x',
       'git commit -m "msg"', 'git commit -am "msg"', 'git commit -F "$f"', 'git commit --message "x" --author "A <a@b>"', 'rm -f x.txt'])
       expect([c, rules(c)]).toEqual([c, []])
   })

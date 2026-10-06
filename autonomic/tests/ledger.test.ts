@@ -23,3 +23,12 @@ describe('the decision ledger (spec §1, D6)', () => {
     expect(ledgerLine({ time: 'T', session: 's', kase: 'pain', q: 'a\nb', a: 'c', why: 'd' }).includes('\n')).toBe(false)
   })
 })
+
+describe('redaction (PR #681 round 4, condition 4)', () => {
+  test('a credential never reaches a ledger line or a pain text', () => {
+    const line = oneLine('Bash: git push -f https://user:ghp_SECRET@github.com/o/r.git feat/x && GH_TOKEN=abc123 gh pr list --token=xyz -H "Authorization: Bearer tok9"')
+    for (const secret of ['ghp_SECRET', 'abc123', 'xyz', 'tok9']) expect(line).not.toContain(secret)
+    expect(line).toContain('https://***@github.com/o/r.git')
+  })
+})
+

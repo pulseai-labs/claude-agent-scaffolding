@@ -19,8 +19,10 @@ All notable changes to the `autonomic` plugin.
   an escaped, quote-split or brace word is unreadable, an `rm -r` path with a brace or a dot
   glob is outside, `--repo` names the remote, and `@` is `HEAD`; a wildcard destination may be
   the default branch, refspecs after `--` are checked, and `git -C` into another directory
-  reads the branch as unknown. A session that leaves autopilot through a failure keeps the
-  floor until `/autopilot off`.
+  reads the branch as unknown, as does a `cd` below the root; wrappers such as `setsid` are
+  runners, a short-flag cluster splits up to its value, and `send-pack`/`http-push` are
+  unreadable. A session that leaves autopilot through a failure keeps the floor until
+  `/autopilot off`. Credentials are redacted from the ledger and every pain signal.
 - **`neverApprove`** (`config.ts`, `enforce.ts`): a `/config` setting naming the enforced rules,
   all six by default; empty means none; an unknown name is reported and ignored.
 - **A deny beneath rings** (F7): a deny from a plugin beneath autonomic's `tool.call` hook rings

@@ -181,4 +181,12 @@ describe('the bypass floor after a failure (PR #681: never toward fewer asks)', 
     w.verdict = { decision: 'allow' }
     expect((await $.tool.check(BASH('git push -f'))).decision).toBe('allow')
   })
+  test('the floor records no credential (PR #681 round 4)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    await $.tool.check(BASH('git push -f https://user:ghp_SECRET@github.com/o/r.git feat/x'))
+    expect(ledgerLines(w).join('\n')).not.toContain('ghp_SECRET')
+    expect(JSON.stringify(w.notices)).not.toContain('ghp_SECRET')
+    expect(w.toasts.join('\n')).not.toContain('ghp_SECRET')
+  })
 })

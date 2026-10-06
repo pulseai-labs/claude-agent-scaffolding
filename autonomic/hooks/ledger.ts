@@ -16,8 +16,18 @@ export function ledgerPathFor(env: string | undefined, root: string): string {
   return v.startsWith('/') ? v : `${base}/${v}`
 }
 
+// A credential never reaches the committed ledger, a notice or a pain file (PR #681):
+// URL user info, NAME_TOKEN=… style assignments, --token/--password values, a Bearer value.
+const SECRETS: ReadonlyArray<[RegExp, string]> = [
+  [/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, '$1***@'],
+  [/\b([A-Za-z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|AUTH)[A-Za-z0-9_]*)=[^\s"']+/gi, '$1=***'],
+  [/(--?(?:token|password|passwd|secret|api-?key|auth))(=|\s+)[^\s"']+/gi, '$1$2***'],
+  [/\b(Bearer)\s+[^\s"']+/gi, '$1 ***'],
+]
+export const redact = (s: string): string => SECRETS.reduce((t, [re, to]) => t.replace(re, to), s)
+
 export function oneLine(s: string, max = 300): string {
-  const t = s.replace(/\s+/g, ' ').trim()
+  const t = redact(s).replace(/\s+/g, ' ').trim()
   return t.length > max ? `${t.slice(0, max - 1)}…` : t
 }
 
