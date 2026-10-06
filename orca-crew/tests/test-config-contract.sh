@@ -207,7 +207,7 @@ section "the dsh driver's requirement sentences"
 # Each is a rule the top's path depends on and no deterministic test can exercise;
 # pinned so a rewording cannot drop it (the whole-branch review's six findings).
 if [ -f "$DSH_MD" ]; then
-  for needle in 'continue <spine-id> from its recorded state' \
+  for needle in 'a steered re-run of the spine command, `<spine-id> --external-executor`' \
     'together or not at all' \
     'the pre-brief gate' \
     '`ASK_CANCELLED` counts' \
