@@ -11,7 +11,7 @@ import type { Handoff, Message } from './handoff'
 import { fallbackPath, lineagePath, parseLineage } from './records'
 import type { Lineage } from './records'
 import type { Stage, Thresholds } from './measure'
-import { activePath, autonomicPath, logPath, parseAutonomic, safeSessionId } from './records'
+import { activePath, autonomicPath, logPath, parseAutonomic, safeSessionId, stagePath } from './records'
 import { BLOCK_NOTE, CHILD_NOTE, CHILD_WARNING, DEFAULT_INSTRUCTIONS, DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome, fill } from './templates'
 
 // molt: in-place context handoff (spec §2). Module variables survive /clear, which is
@@ -80,6 +80,27 @@ async function dropActive($: Engine, sessionId: string): Promise<void> {
   try { await $.process.run(['rm', '-f', activePath(await home($), sessionId)]) } catch {}
 }
 
+// The stage file (0.2.1): molt's stage and effective thresholds, for autonomic's turn-end
+// floor. Rewritten only when the stage or a threshold changes; best-effort, logged once.
+const published = new Map<string, string>()
+let stageFailed = false
+async function publishStage($: Engine, sessionId: string): Promise<void> {
+  if (!safeSessionId(sessionId)) return
+  const t = currentThresholds(sessionId)
+  const s = off.has(sessionId) ? 'off' : stage
+  const key = `${s} ${t.command} ${t.block} ${t.fallback}`
+  if (published.get(sessionId) === key) return
+  try {
+    const body = { stage: s, ...(lastPercent === undefined ? {} : { percent: lastPercent }), command: t.command, block: t.block, fallback: t.fallback, at: new Date().toISOString() }
+    await $.fs.write(stagePath(await home($), sessionId), `${JSON.stringify(body)}\n`)
+    published.set(sessionId, key)
+  } catch (err) {
+    if (stageFailed) return
+    stageFailed = true
+    await log($, `stage write failed session=${sessionId} ${String(err)}`)
+  }
+}
+
 async function setNotice($: Engine, value: Notice): Promise<void> {
   await update($, notice, () => value)
 }
@@ -95,6 +116,7 @@ async function measure($: Engine, sessionId: string): Promise<number | undefined
     stage = stageOf(percent, currentThresholds(sessionId))
   }
   if (forced.has(sessionId) && !atLeast(stage, 'command')) stage = 'command'
+  await publishStage($, sessionId)
   return percent
 }
 
@@ -369,6 +391,8 @@ export const register: Register = (on, options) => {
       commandNoted.delete(e.session_id)
       stopBlocks.delete(e.session_id)
       lastMd.delete(e.session_id)
+      published.delete(e.session_id)
+      try { await publishStage($, e.session_id) } catch {}
     }
     if (p !== undefined) {
       try { await seed($, e.session_id, p) } catch (err) { await log($, `seed error ${String(err)}`) }
@@ -572,12 +596,14 @@ export const register: Register = (on, options) => {
     if (arg === 'off') {
       off.add(sessionId)
       await dropActive($, sessionId)
+      await publishStage($, sessionId)
       showStatus($, sessionId)
       return { text: 'molt is off for this session. The crew context-ceiling hooks speak again here.' }
     }
     if (arg === 'on') {
       off.delete(sessionId)
       await touchActive($, sessionId)
+      await publishStage($, sessionId)
       showStatus($, sessionId)
       return { text: 'molt is on for this session.' }
     }
