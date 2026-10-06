@@ -579,6 +579,86 @@ git -C "$F/core" worktree lock "$WT"; rm -rf "$WT"; inv "$F"
 t_assert_eq "halt:worktree-held" "$(route r0.s1.w1)" "S37: a locked own-path dead registration is held, not reattachable"
 t_assert_rc 3 "S37: ...rc 3"
 
+# S39 (#673 round 4, U-16B): `wt=present` requires the worktree's COMMON git
+# dir to be THIS repo's. A linked worktree of ANOTHER repository carrying the
+# same work/<wi-id>-* branch name passed every check (top-level ok, git-dir !=
+# common-dir ok) while hab/merged came from a different repo's branch; the
+# active arm then routed redispatch into the foreign repo (and the planned arm
+# adopted it). Now the path is present-but-not-ours and both arms halt.
+F="$TMP/s39"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+rm -rf "$WT"; git -C "$F/core" worktree prune
+git clone -q "$F/core" "$F/other"
+git -C "$F/other" worktree add -q -b "work/r0.s1.w1-one" "$WT"    # foreign repo, same branch name, at OUR recorded path
+inv "$F"
+t_assert_eq "halt:unclassified" "$(route r0.s1.w1)" "S39: a foreign repo's linked worktree at the item's path never routes redispatch"
+t_assert_rc 3 "S39: ...rc 3"
+
+# S39b: the SAME foreign shape on the planned arm - pre-fix it adopted the
+# foreign worktree (slug and ancestry both checked out); now it halts.
+F="$TMP/s39b"; fx "$F" 1
+printf '.worktrees/\n' >> "$F/core/.git/info/exclude"   # keep the repo row clean: the ITEM row is the subject
+git clone -q "$F/core" "$F/other"
+git -C "$F/other" worktree add -q -b "work/r0.s1.w1-one" "$F/core/.worktrees/r0.s1.w1"
+inv "$F"
+t_assert_eq "halt:planned-with-worktree" "$(route r0.s1.w1)" "S39b: ...and the planned arm never adopts it"
+t_assert_rc 3 "S39b: ...rc 3"
+
+# S40 (#673 round 4, U-151): a complete + merged item whose worktree directory
+# is gone but whose branch is held LIVE elsewhere used to `skip`; close's
+# cleanup would then fail `git branch -d` after landing/review/demo had all
+# mutated. The live holder now halts the read-out.
+F="$TMP/s40"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; close_item "$F" r0.s1.w1 "$WT"
+rm -rf "$WT"; git -C "$F/core" worktree prune
+git -C "$F/core" worktree add -q "$F/holder" work/r0.s1.w1-one
+inv "$F"
+t_assert_eq "halt:worktree-held" "$(route r0.s1.w1)" "S40: a merged complete item whose branch is held live halts, never skips"
+t_assert_rc 3 "S40: ...rc 3"
+# control: with the holder gone the same shape is the hand-over-to-close skip.
+git -C "$F/core" worktree remove "$F/holder"; inv "$F"
+t_assert_eq "skip" "$(route r0.s1.w1)" "S40 control: no holder -> the cleanup-finished shape still skips"
+# S40b: the same item with a BROKEN SYMLINK at its own path and its git
+# registration left INTACT (no prune): git still holds the registration, so
+# it is held - present, never read as absent - and the read-out halts.
+F="$TMP/s40b"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; close_item "$F" r0.s1.w1 "$WT"
+rm -rf "$WT"; ln -s /nonexistent-target "$WT"
+inv "$F"
+t_assert_eq "halt:worktree-held" "$(route r0.s1.w1)" "S40b: a broken symlink at the item's own path is present-not-absent"
+t_assert_rc 3 "S40b: ...rc 3"
+
+# S41 (#673 round 4, U-15p): a complete + merged item whose clean worktree
+# sits on ANOTHER HEAD used to `skip`; cleanup (which now reads the branch
+# from state) would remove the worktree but the drift itself is the halt -
+# close would otherwise proceed against a worktree nobody can account for.
+F="$TMP/s41"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; close_item "$F" r0.s1.w1 "$WT"
+git -C "$WT" checkout -q -B moved-head
+inv "$F"
+t_assert_eq "halt:unclassified" "$(route r0.s1.w1)" "S41: a merged complete item's clean worktree on another HEAD halts, never skips"
+t_assert_rc 3 "S41: ...rc 3"
+# control: back on its recorded branch, the merged item is the skip shape.
+git -C "$WT" checkout -q "work/r0.s1.w1-one"; inv "$F"
+t_assert_eq "skip" "$(route r0.s1.w1)" "S41 control: on its own branch the merged item still skips"
+
+# S42 (#673 round 4, U-157): a SYMLINK at a worktree path - broken ones
+# included - is present-not-a-worktree. `-e` alone reads it as absent, so the
+# item routed spawn (or reattach) into a path git itself refuses; `-L` halts
+# it in the read-out instead.
+F="$TMP/s42"; fx "$F" 1
+printf '.worktrees/\n' >> "$F/core/.git/info/exclude"   # keep the repo row clean: the ITEM row is the subject
+mkdir -p "$F/core/.worktrees"
+ln -s /nonexistent-target "$F/core/.worktrees/r0.s1.w1"
+inv "$F"
+t_assert_eq "halt:planned-with-worktree" "$(route r0.s1.w1)" "S42: a broken symlink at the derived path never routes spawn"
+t_assert_rc 3 "S42: ...rc 3"
+# S42b: the reattach-candidate shape (exec recorded) with the same symlink.
+F2="$TMP/s42b"; fx "$F2" 1; WT2="$(spawn "$F2" r0.s1.w1 one)"
+rm -rf "$WT2"; ln -s /nonexistent-target "$WT2"
+inv "$F2"
+t_assert_eq "halt:unclassified" "$(route r0.s1.w1)" "S42b: ...nor reattach on the active arm"
+t_assert_rc 3 "S42b: ...rc 3"
+
 # ---- the shipped §2 re-entry blocks, extracted and RUN (block-ledger O rows) ----
 SKILLS="$HERE/../skills"
 ROUND="$SKILLS/work-item/references/round-orchestration.md"

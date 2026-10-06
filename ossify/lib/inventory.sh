@@ -116,7 +116,7 @@ EOF
 # still AT base_sha is trivially an ancestor and has merged nothing.
 _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if any halt
   local sf="$1" spine="$2" spine_dir="$3" sb="$4" halt=0
-  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys held holders hp hl adopt_br brx feed feed_rc=0 gr descends foreign
+  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys wt_common root_common held holders hp hl adopt_br brx feed feed_rc=0 gr descends foreign
   # The feed's own rc is caught, and each item renders inside a `try`/`catch`
   # (#673 A2): one unrenderable field used to collapse the WHOLE stream - the
   # shell read a partial feed with no error channel, the empty-field skip
@@ -189,7 +189,17 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
         wtp_phys="$(cd -P "$wtp" 2>/dev/null && pwd)" || wtp_phys=""
         top_phys="$(_oss_inv_git -C "$wtp" rev-parse --show-toplevel 2>/dev/null || true)"
         if [ -n "$top_phys" ]; then top_phys="$(cd -P "$top_phys" 2>/dev/null && pwd || true)"; fi
+        # #673 round 4 (U-16B): "the top level of SOME linked worktree" is not
+        # "THIS item's worktree". A linked worktree of ANOTHER repository that
+        # happens to carry the same work/<wi-id>-* branch name passed every
+        # check here while hab/merged were computed from $root's branch: the
+        # lane then edited and staged the foreign repository and close merged
+        # the unchanged target branch. The worktree's COMMON git dir must be
+        # $root's own, compared physically (symlinked spellings of either).
+        wt_common="$(cd -P "$(_oss_inv_git -C "$wtp" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" 2>/dev/null && pwd || true)"
+        root_common="$(cd -P "$(_oss_inv_git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" 2>/dev/null && pwd || true)"
         if [ -n "$wtp_phys" ] && [ "$wtp_phys" = "$top_phys" ] \
+           && [ -n "$wt_common" ] && [ "$wt_common" = "$root_common" ] \
            && [ "$(_oss_inv_git -C "$wtp" rev-parse --path-format=absolute --git-dir 2>/dev/null)" \
                 != "$(_oss_inv_git -C "$wtp" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" ]; then
           wt=present
@@ -214,8 +224,9 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
         # branch, so the A1 predicate alone read it as merged although no
         # item work sits past the cut point - an active item then routed
         # finish-status and a complete one skip, marking lost work landed.
-        # `descends` is the shared ancestry fact: merged needs it, and every
-        # arm that could otherwise act on the branch halts without it.
+        # `descends` is the shared ancestry fact: `merged` needs it, and the
+        # merge/status arms halt without it; the two `reattach` arms do not yet
+        # read it - tracked as the wider arm fix in #675, not fixed here.
         if [ -n "$bs" ] && _oss_inv_git -C "$root" merge-base --is-ancestor "$bs" "refs/heads/$br" 2>/dev/null; then descends=yes; else descends=no; fi
         # "merged" REQUIRES a recorded base (#673 A1). With base_sha unrecorded
         # ("-" unwrapped to ""), `tip != bs` is trivially true and a branch still
@@ -250,7 +261,12 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
           [ -n "$hp" ] || continue
           case "$hp" in
             */.worktrees/"$wi")
-              if [ -e "$hp" ]; then held=1; fi
+              # #673 round 4 (U-157): `-e` is false for a BROKEN symlink, but
+              # git still sees the directory entry - `worktree add` refuses it
+              # and removing the stale registration through it can fail, after
+              # §2b has mutated. `-L` makes a symlink, broken included, count
+              # as present-not-absent at every path-presence decision here.
+              if [ -e "$hp" ] || [ -L "$hp" ]; then held=1; fi
               # #673 L4: git prints a `locked` line AFTER the branch line
               # (measured on git 2.53.0). A locked dead registration is not a
               # reattachable one - worktree_reattach would refuse rc 8 only
@@ -289,7 +305,19 @@ HOLD
           # state, not the repos, is the record to repair.
           elif [ -z "$br" ]; then route=halt:branch-unknown
           elif [ "$brx" = no ]; then route=skip
-          elif [ "$merged" = yes ]; then route=skip
+          # #673 round 4 (U-15p/U-151): a merge that landed is `skip` only when
+          # nothing about the repos contradicts the record. Two shapes do, and
+          # both would hand close a cleanup that fails AFTER its landing,
+          # review, demo and harvest mutations - or that silently leaves the
+          # recorded branch behind while the spine is marked closed: a clean
+          # worktree switched off its recorded branch (cleanup reads the
+          # branch from state now, but the drift itself is the halt here), and
+          # a recorded branch held live by a worktree this item does not own
+          # (cleanup's `git branch -d` would refuse: "used by worktree").
+          elif [ "$merged" = yes ]; then
+            if [ "$wt" = present ] && [ "$(_oss_inv_git -C "$wtp" rev-parse --abbrev-ref HEAD 2>/dev/null)" != "$br" ]; then route=halt:unclassified
+            elif [ "$wt" = gone ] && [ "$held" = 1 ]; then route=halt:worktree-held
+            else route=skip; fi
           # A recorded-branch/absent-base half-write cannot be classified: the
           # row stays non-benign (#673 A1).
           elif [ -z "$bs" ]; then route=halt:base-unknown
@@ -336,7 +364,7 @@ HOLD
             # `reattach` - worktree_reattach would refuse rc 8 after earlier
             # repairs had mutated state. A planned item's stray path at the
             # recorded location is the planned-with-worktree shape.
-            if [ -e "$wtp" ]; then route=halt:planned-with-worktree
+            if [ -e "$wtp" ] || [ -L "$wtp" ]; then route=halt:planned-with-worktree   # -L: a symlink is present-not-absent (U-157)
             elif [ "$hab" != - ] && [ "$wtp" = "$conv" ]; then
               if [ "$held" = 1 ]; then route=halt:worktree-held; else route=reattach; fi
             else route=halt:unclassified; fi
@@ -346,7 +374,7 @@ HOLD
             # `spawn` would stop the lane one step later, with a worse message.
             # It is not a worktree (the presence check above proved that) and
             # not nothing - halt:planned-with-worktree names the real shape.
-            if [ -e "$conv" ]; then route=halt:planned-with-worktree
+            if [ -e "$conv" ] || [ -L "$conv" ]; then route=halt:planned-with-worktree   # -L: a symlink is present-not-absent (U-157)
             else
               # Exact prefix `work/<wi-id>-`: for-each-ref patterns are path globs, and
               # the awk index() check rejects a decoy like work/r0s1w1-x outright.
@@ -421,7 +449,7 @@ HOLD
           # A branch held elsewhere (#673 A4) is the same class: reattach can
           # only clear THIS item's own stale registration, so a live holder (or
           # a holder at any other path) halts now rather than mid-repair.
-          elif [ -e "$wtp" ]; then route=halt:unclassified
+          elif [ -e "$wtp" ] || [ -L "$wtp" ]; then route=halt:unclassified   # -L: a symlink is present-not-absent (U-157)
           elif [ "$wtp" = "$conv" ]; then
             if [ "$held" = 1 ]; then route=halt:worktree-held; else route=reattach; fi
           else route=halt:unclassified; fi ;;

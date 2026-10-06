@@ -554,10 +554,11 @@ oss_worktree_remove() { # $1=repo-key $2=work-item-id
   root="$(_oss_repo_root "$key")" || return $?
   path="$root/.worktrees/$wi"
   branch=""
+  # #673 L6 (class): a failed status read must not fold into the benign
+  # empty value - an unreadable status left the branch silently undeleted
+  # while close proceeded. The dirty check runs FIRST, before any state read:
+  # nothing is ever removed, and no state is consulted, for a dirty worktree.
   if [ -d "$path" ]; then
-    # #673 L6 (class): a failed read must not fold into the benign empty
-    # value here either - an unreadable status or HEAD left the branch
-    # silently undeleted while close proceeded.
     dirty="$(git -C "$path" status --porcelain 2>/dev/null)" || {
       echo "oss: cannot read the worktree status at $path - refusing to remove it" >&2; return 8; }
     if [ -n "$dirty" ]; then
@@ -565,23 +566,25 @@ oss_worktree_remove() { # $1=repo-key $2=work-item-id
       printf '%s\n' "$dirty" >&2
       return 8
     fi
-    branch="$(git -C "$path" rev-parse --abbrev-ref HEAD 2>/dev/null)" || {
-      echo "oss: cannot read the worktree HEAD at $path - refusing to remove it" >&2; return 8; }
+  fi
+  # #673 round 4 (U-15p): the branch this verb deletes is NEVER the live
+  # worktree HEAD's. Deriving it from the HEAD made a worktree switched off its
+  # recorded branch delete a branch this item does not own - or, detached,
+  # delete nothing while the recorded work branch silently survived and close
+  # proceeded to mark the spine closed. The RECORDED branch is the only one
+  # cleanup owns; the state read is hoisted above BOTH arms and fails closed
+  # (#673 L6): an unresolvable, unreadable or recordless state refuses before
+  # anything - worktree or registration - is touched.
+  sf="$(_oss_resolve_state 2>/dev/null)" || {
+    echo "oss: cannot resolve the state file for work item $wi - refusing to clean up $path" >&2; return 8; }
+  [ -f "$sf" ] || { echo "oss: no state file at $sf - refusing to clean up $path" >&2; return 8; }
+  branch="$(jq -r --arg w "$wi" 'first(.work_items[] | select(.id == $w) | .branch // empty) // ""' "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read work item $wi from $sf - refusing to clean up $path" >&2; return 8; }
+  [ -n "$branch" ] || {
+    echo "oss: work item $wi records no branch in $sf - refusing to clean up $path (a cleanup with no branch record cannot know what it is cleaning)" >&2; return 8; }
+  if [ -d "$path" ]; then
     git -C "$root" worktree remove "$path" || { echo "oss: git worktree remove failed for $path" >&2; return 8; }
   else
-    # #673 L6: the state read FAILS CLOSED. Folding a resolve/parse failure -
-    # or a missing record - into an empty branch let this arm clear the
-    # registrations and return success while the work branch silently
-    # survived and close proceeded to mark the spine closed. Nothing below
-    # is mutated until the branch AND the recorded worktree_path are read.
-    # The branch comes from state instead of a worktree HEAD.
-    sf="$(_oss_resolve_state 2>/dev/null)" || {
-      echo "oss: cannot resolve the state file for work item $wi - refusing to clean up $path" >&2; return 8; }
-    [ -f "$sf" ] || { echo "oss: no state file at $sf - refusing to clean up $path" >&2; return 8; }
-    branch="$(jq -r --arg w "$wi" 'first(.work_items[] | select(.id == $w) | .branch // empty) // ""' "$sf" 2>/dev/null)" || {
-      echo "oss: cannot read work item $wi from $sf - refusing to clean up $path" >&2; return 8; }
-    [ -n "$branch" ] || {
-      echo "oss: work item $wi records no branch in $sf - refusing to clean up $path (a cleanup with no branch record cannot know what it is cleaning)" >&2; return 8; }
     recpath="$(jq -r --arg w "$wi" 'first(.work_items[] | select(.id == $w) | .worktree_path // empty) // ""' "$sf" 2>/dev/null)" || {
       echo "oss: cannot read work item $wi's worktree_path from $sf - refusing to clean up $path" >&2; return 8; }
     # The registration paths AS GIT PRINTS THEM (symlink-resolved on macOS

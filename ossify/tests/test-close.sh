@@ -310,6 +310,10 @@ fi
 WI2="$(bash "$OSS" work_item_add "$SP" "second item")"
 WT2="$(bash "$OSS" worktree_add canonical "$WI2" "second-item" "$SPINE_BRANCH")"
 echo two > "$WT2/two.txt"; git -C "$WT2" add two.txt; git -C "$WT2" commit -qm "unmerged work"
+# Round 4 (U-15p): cleanup now takes the branch from state, so record the
+# exec first - without it the refusal below would come from the missing
+# record, and this test would stop exercising the UNMERGED-branch refusal.
+bash "$OSS" work_item_exec "$WI2" "$(git -C "$WT2" rev-parse --abbrev-ref HEAD)" "$WT2" "$(git -C "$WT2" rev-parse HEAD)" >/dev/null
 t_capture bash "$OSS" worktree_remove canonical "$WI2"
 t_assert_rc 8 "an UNMERGED work-item branch refuses cleanup rc 8 - which is why cleanup runs after the merge, not before"
 

@@ -55,6 +55,22 @@ EOF
 t_capture _oss_repo_root canonical
 t_assert_eq "$TMP/canon" "$T_OUT" "fixture restored: canonical resolves again for the rest of the file"
 
+# #673 round 4 (U-15p): worktree_remove's branch now comes from STATE, never
+# the live worktree HEAD, so the clean-removal fixtures below need records for
+# the ids they clean up. Ids and slugs are fixed by this file; the records are
+# read (branch only) by the cleanup calls that name OSS_STATE_FILE="$MSTATE".
+MSTATE="$TMP/main-state.json"
+cat > "$MSTATE" <<EOF
+{"schema_version":"1.0","work_items":[
+ {"id":"r0.s1.w1","status":"active","target_repo":"canonical","branch":"work/r0.s1.w1-add-ticket","worktree_path":"$TMP/canon/.worktrees/r0.s1.w1","base_sha":""},
+ {"id":"r0.s1.w2","status":"active","target_repo":"canonical","branch":"work/r0.s1.w2-hook-check","worktree_path":"$TMP/canon/.worktrees/r0.s1.w2","base_sha":""},
+ {"id":"r0.s1.w3","status":"active","target_repo":"canonical","branch":"work/r0.s1.w3-second-ticket","worktree_path":"$TMP/canon/.worktrees/r0.s1.w3","base_sha":""},
+ {"id":"r0.s2.w1","status":"active","target_repo":"canonical","branch":"work/r0.s2.w1-dispatch-ticket","worktree_path":"$TMP/canon/.worktrees/r0.s2.w1","base_sha":""},
+ {"id":"r0.s3.w1","status":"active","target_repo":"canonical","branch":"work/r0.s3.w1-hook-fails","worktree_path":"$TMP/canon/.worktrees/r0.s3.w1","base_sha":""},
+ {"id":"r0.s3.w4","status":"active","target_repo":"canonical","branch":"work/r0.s3.w4-locked","worktree_path":"$TMP/canon/.worktrees/r0.s3.w4","base_sha":""},
+ {"id":"r0.s3.w5","status":"active","target_repo":"canonical","branch":"work/r0.s3.w5-unlocked","worktree_path":"$TMP/canon/.worktrees/r0.s3.w5","base_sha":""}]}
+EOF
+
 # spawn
 t_capture oss_worktree_add canonical r0.s1.w1 "add-ticket" "HEAD"
 t_assert_rc 0 "worktree_add ok"
@@ -108,7 +124,7 @@ if [ "$_hook_rc" -eq 0 ] && [ "$_hook_out" = "$TMP/canon/.worktrees/r0.s1.w2" ];
 else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: a chatty post-checkout hook corrupted worktree_add's stdout (got '$_hook_out', rc=$_hook_rc)"
 fi
-oss_worktree_remove canonical r0.s1.w2 >/dev/null 2>&1 || true
+OSS_STATE_FILE="$MSTATE" oss_worktree_remove canonical r0.s1.w2 >/dev/null 2>&1 || true
 
 # D9: a DIRTY worktree must halt, never be force-discarded.
 #
@@ -122,6 +138,10 @@ oss_worktree_remove canonical r0.s1.w2 >/dev/null 2>&1 || true
 # coverage (a neutered guard is observably worse - it no longer tells the user
 # why, and its generic git fallback text mentions --force, which D9 exists to
 # keep users away from) even though it is not a data-loss signal.
+# The dirty refusal needs NO state record (round 4 keeps the dirty check above
+# the state read), so this call deliberately runs WITHOUT one: a state-first
+# order would surface here as a "cannot resolve the state file" refusal and
+# this test would catch the reordering.
 echo scratch > "$WT/uncommitted.txt"
 t_capture oss_worktree_remove canonical r0.s1.w1
 t_assert_rc 8 "removing a dirty worktree is refused rc 8"
@@ -141,7 +161,7 @@ WT2="$T_OUT"
 echo work > "$WT2/newfile.txt"
 git -C "$WT2" add newfile.txt
 git -C "$WT2" commit -qm "unmerged work" >/dev/null
-t_capture oss_worktree_remove canonical r0.s1.w3
+OSS_STATE_FILE="$MSTATE" t_capture oss_worktree_remove canonical r0.s1.w3
 t_assert_rc 8 "removing a worktree with an unmerged branch is refused rc 8"
 t_assert_contains "$T_OUT" "not merged" "the refusal names the unmerged branch"
 [ -d "$WT2" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: worktree dir survived an unmerged-branch removal"; } || T_PASS=$((T_PASS+1))
@@ -153,7 +173,7 @@ fi
 
 # clean removal takes the branch with it (the close ceremony asserts no work-* branch remains).
 rm "$WT/uncommitted.txt"
-t_capture oss_worktree_remove canonical r0.s1.w1
+OSS_STATE_FILE="$MSTATE" t_capture oss_worktree_remove canonical r0.s1.w1
 t_assert_rc 0 "clean worktree removes"
 [ -d "$WT" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: worktree dir survived removal"; } || T_PASS=$((T_PASS+1))
 git -C "$TMP/canon" show-ref --verify --quiet refs/heads/work/r0.s1.w1-add-ticket \
@@ -188,7 +208,7 @@ case "$T_OUT" in
 esac
 t_capture "$OSS" release_dir
 t_assert_rc 2 "dispatcher: release_dir with no release id is the usage error, not an unbound-variable crash"
-t_capture "$OSS" worktree_remove canonical r0.s2.w1
+t_capture env OSS_STATE_FILE="$MSTATE" "$OSS" worktree_remove canonical r0.s2.w1
 t_assert_rc 0 "dispatcher: clean worktree removes"
 [ -d "$WT3" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: dispatcher worktree dir survived removal"; } || T_PASS=$((T_PASS+1))
 
@@ -240,7 +260,7 @@ rm -f "$TMP/canon/.git/hooks/post-checkout"
 t_capture "$OSS" worktree_add canonical r0.s3.w1 "hook-fails" HEAD
 t_assert_rc 0 "#122: once the cause is fixed, the retry succeeds"
 t_assert_eq "$TMP/canon/.worktrees/r0.s3.w1" "$T_OUT" "#122: ...at the conventional path"
-oss_worktree_remove canonical r0.s3.w1 >/dev/null 2>&1
+OSS_STATE_FILE="$MSTATE" oss_worktree_remove canonical r0.s3.w1 >/dev/null 2>&1
 
 # #122 CONTROL, the before-state half: a branch that EXISTED before the call is
 # never the rollback's to delete. git refuses `-b` for an existing branch before
@@ -285,12 +305,12 @@ t_assert_contains "$T_OUT" "another worktree_add for r0.s3.w4" "#122: ...and say
 # ADJACENT CONTROL: another id is not blocked by that lock.
 t_capture "$OSS" worktree_add canonical r0.s3.w5 "unlocked" HEAD
 t_assert_rc 0 "#122 control: an add for a DIFFERENT id proceeds while that lock is held"
-oss_worktree_remove canonical r0.s3.w5 >/dev/null 2>&1
+OSS_STATE_FILE="$MSTATE" oss_worktree_remove canonical r0.s3.w5 >/dev/null 2>&1
 rmdir "$WTLOCK"
 t_capture "$OSS" worktree_add canonical r0.s3.w4 "locked" HEAD
 t_assert_rc 0 "#122 control: once released, the add proceeds"
 [ -d "$WTLOCK" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: #122: a finished add left its lock behind"; } || T_PASS=$((T_PASS+1))
-oss_worktree_remove canonical r0.s3.w4 >/dev/null 2>&1
+OSS_STATE_FILE="$MSTATE" oss_worktree_remove canonical r0.s3.w4 >/dev/null 2>&1
 
 # The repair commands the rollback prints are for copying, so every value in
 # them is shell-quoted (PR #601 review): a path with an apostrophe must come out
@@ -1294,6 +1314,35 @@ A5W5="$(oss_worktree_add canonical "$A5WI5" "a5d" HEAD)"; rm -rf "$A5W5"
 t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI5"
 t_assert_rc 8 "L6b: a missing branch record refuses the cleanup"
 t_assert_contains "$T_OUT" "records no branch" "L6b: ...naming it"
+
+# --- #673 round 4 (U-15p): cleanup deletes the RECORDED branch, never the ---
+# live HEAD's. A worktree switched off its branch made the old live-HEAD read
+# delete a branch this item does not own - or, detached, delete NOTHING while
+# the recorded branch survived and close marked the spine closed. Both shapes
+# run through the DISPATCHER, so the strict-mode path is exercised too.
+A5WI6="$(oss_entity_add_work_item "$A5S" "$A5SP" "t6" canonical)"
+A5W6="$(oss_worktree_add canonical "$A5WI6" "r4-switch" HEAD)"
+echo s > "$A5W6/s"; git -C "$A5W6" add s; git -C "$A5W6" commit -qm r4s
+oss_entity_set_work_item_exec "$A5S" "$A5WI6" "work/$A5WI6-r4-switch" "$A5W6" "$(git -C "$A5W6" rev-parse HEAD)" >/dev/null
+git -C "$A5CAN" merge -q "work/$A5WI6-r4-switch" -m "merge $A5WI6"
+git -C "$A5W6" checkout -q -B r4-foreign     # switched OFF its recorded branch
+t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI6"
+t_assert_rc 0 "R4-1: a worktree switched off its branch still cleans up (rc 0)"
+[ -d "$A5W6" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: R4-1: the worktree survived the cleanup"; } || T_PASS=$((T_PASS+1))
+t_assert_eq "gone" "$(git -C "$A5CAN" show-ref --verify --quiet "refs/heads/work/$A5WI6-r4-switch" && echo present || echo gone)" "R4-1: ...the RECORDED branch is deleted"
+t_assert_eq "present" "$(git -C "$A5CAN" show-ref --verify --quiet "refs/heads/r4-foreign" && echo present || echo gone)" "R4-1: ...and the branch the live HEAD named survives untouched"
+# Detached variant: HEAD names no branch at all; the recorded branch must
+# still be the one deleted (the old read returned the literal `HEAD` and
+# deleted nothing, silently).
+A5WI7="$(oss_entity_add_work_item "$A5S" "$A5SP" "t7" canonical)"
+A5W7="$(oss_worktree_add canonical "$A5WI7" "r4-detach" HEAD)"
+echo d > "$A5W7/d"; git -C "$A5W7" add d; git -C "$A5W7" commit -qm r4d
+oss_entity_set_work_item_exec "$A5S" "$A5WI7" "work/$A5WI7-r4-detach" "$A5W7" "$(git -C "$A5W7" rev-parse HEAD)" >/dev/null
+git -C "$A5CAN" merge -q "work/$A5WI7-r4-detach" -m "merge $A5WI7"
+git -C "$A5W7" checkout -q --detach
+t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI7"
+t_assert_rc 0 "R4-2 (detached HEAD): the cleanup still runs rc 0"
+t_assert_eq "gone" "$(git -C "$A5CAN" show-ref --verify --quiet "refs/heads/work/$A5WI7-r4-detach" && echo present || echo gone)" "R4-2: ...and the RECORDED branch is deleted, not silently kept"
 
 
 # `main`) must never be deleted by cleanup - the base branch is not ours.
