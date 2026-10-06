@@ -157,6 +157,19 @@ describe('/autopilot (spec §1)', () => {
     const r = await $.command.run(RUN('status'))
     for (const s of ['autopilot', 'env', LEDGER, POLICY]) expect(r.text).toContain(s)
   })
+  test('status: no doubled prefix; policy default/edited; settings and stage listed (#677 F2 F5 F13)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    w.files.set(POLICY, DEFAULT_POLICY)
+    await $.session.start(START)
+    let t = (await $.command.run(RUN('status'))).text
+    expect(t.startsWith('autopilot (source: env)')).toBe(true)
+    for (const s of ['policy: default', 'yieldAtPercent: 65', 'loopMax: 3', 'tailChars: 4000', 'never-approve: force-push default-branch-push', 'molt stage: none']) expect(t).toContain(s)
+    w.files.set(POLICY, 'mine')
+    w.files.set('/home/u/.claude/state/molt/stage/s1', '{"stage":"warn","command":65}')
+    t = (await $.command.run(RUN('status'))).text
+    expect(t).toContain('policy: edited')
+    expect(t).toContain('molt stage: warn')
+  })
   test('anything else prints the usage', async ($, on) => {
     world(on)
     expect((await $.command.run(RUN('please'))).text).toContain('usage:')

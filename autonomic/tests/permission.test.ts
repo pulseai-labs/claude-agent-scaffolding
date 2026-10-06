@@ -6,6 +6,11 @@ const BASH = (command: string) => ({ tool: 'Bash', input: { command } }) as neve
 const fork = (o: object) => ({ isAnswered: true as const, text: JSON.stringify(o) })
 
 describe('the permission reflex (spec §3.3)', () => {
+  test('pain text leads with the line that names the danger (#677 F9)', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.tool.check(BASH('cd /repo\nnpm test\ngit push -f origin feat/x'))
+    expect(JSON.stringify(w.notices.at(-1))).toContain('force-push — git push -f (+2 args)')
+  })
   test('an ask the scope covers is allowed and recorded', async ($, on) => {
     const w = world(on, { env: AP })
     w.forks.push(fork({ decision: 'allow', reason: 'own branch push' }))
@@ -90,5 +95,108 @@ describe('the permission reflex (spec §3.3)', () => {
     w.git.branch = 'main'
     expect((await $.tool.check(BASH('git push'))).decision).toBe('ask')
     expect(w.forkPrompts).toEqual([])
+  })
+})
+
+describe('the bypass floor (0.1.1 §3.1)', () => {
+  test('autopilot: an allowed force push becomes an ask, recorded and rung', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    const r = await $.tool.check(BASH('git push -f'))
+    expect(r.decision).toBe('ask')
+    expect(r.reason).toContain('never-approve — force-push')
+    expect(ledgerLines(w).at(-1)).toContain(' · permission · ')
+    expect(JSON.stringify(w.notices.at(-1))).toContain('never-approve')
+  })
+  test('manual: an allow is never touched', async ($, on) => {
+    const w = world(on)
+    w.verdict = { decision: 'allow' }
+    expect((await $.tool.check(BASH('git push -f'))).decision).toBe('allow')
+  })
+  test('autopilot: an allowed command with no danger word runs no git (Review Focus 2)', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
+    w.verdict = { decision: 'allow' }
+    const before = w.runs.filter(r => r[0] === 'git').length
+    expect((await $.tool.check(BASH('ls -la'))).decision).toBe('allow')
+    expect(w.runs.filter(r => r[0] === 'git').length).toBe(before)
+  })
+  test('autopilot: an allowed own-branch push stays allowed', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    expect((await $.tool.check(BASH('git push -u origin feat/x'))).decision).toBe('allow')
+  })
+  test('autopilot: a deny is never changed', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'deny', reason: 'settings deny' }
+    expect((await $.tool.check(BASH('git push -f'))).decision).toBe('deny')
+  })
+  test('autopilot: a deny from a plugin beneath tool.call rings hard deny once (#677 F7)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.toolDeny = 'no force-push — this seat may not run this command'
+    await $.tool.call({ tool: 'Edit', file_path: '/repo/a' } as never)
+    await $.tool.call({ tool: 'Edit', file_path: '/repo/a' } as never)
+    expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(1)
+  })
+  test('manual: a deny beneath tool.call rings nothing (#677 F7)', async ($, on) => {
+    const w = world(on)
+    w.toolDeny = 'no force-push — this seat may not run this command'
+    await $.tool.call({ tool: 'Edit', file_path: '/repo/a' } as never)
+    expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(0)
+  })
+  test('autopilot: the floor asks when its own check throws (final review I1)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    w.failCwd = true
+    expect((await $.tool.check(BASH('git push -f'))).decision).toBe('ask')
+  })
+  test("autopilot: molt's own gate past the block stage rings no hard deny (final review I3)", async ($, on) => {
+    const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":"block","command":65}' } })
+    w.toolDeny = "Context is at 76% of the window.\n\nContext is past molt's block threshold (75%). Only Write, Edit, Skill, git add and git commit run now."
+    await $.tool.call({ tool: 'Edit', file_path: '/repo/a' } as never)
+    expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(0)
+  })
+  test('autopilot: past the block stage a seat guard deny still rings (PR #681)', async ($, on) => {
+    const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":"block","command":65}' } })
+    w.toolDeny = 'no force-push — this seat may not run this command'
+    await $.tool.call({ tool: 'Edit', file_path: '/repo/a' } as never)
+    expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(1)
+  })
+})
+
+describe('the bypass floor after a failure (PR #681: never toward fewer asks)', () => {
+  test('a session that left autopilot because its ledger failed keeps the floor', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
+    w.verdict = { decision: 'allow' }
+    w.failAppend = /ledger\.md$/
+    expect((await $.tool.check(BASH('git push -f'))).decision).toBe('ask')
+    expect(w.statuses.at(-1)).toContain('ledger not writable')
+    expect((await $.tool.check(BASH('git push -f origin main'))).decision).toBe('ask')
+  })
+  test('/autopilot off turns the floor off', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
+    await $.command.run({ command: 'autopilot', args: 'off', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } } as never)
+    w.verdict = { decision: 'allow' }
+    expect((await $.tool.check(BASH('git push -f'))).decision).toBe('allow')
+  })
+  test('the floor records no credential (PR #681 round 4)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    await $.tool.check(BASH('git push -f https://user:ghp_SECRET@github.com/o/r.git feat/x'))
+    expect(ledgerLines(w).join('\n')).not.toContain('ghp_SECRET')
+    expect(JSON.stringify(w.notices)).not.toContain('ghp_SECRET')
+    expect(w.toasts.join('\n')).not.toContain('ghp_SECRET')
+  })
+  test('both never-approve paths record the shape, not the command (PR #681 round 8)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    await $.tool.check(BASH('SERVICE_TOKEN=alpha\\ beta git push -f origin feat/x'))
+    w.verdict = { decision: 'ask' }
+    await $.tool.check(BASH('git push -f https://u:t0k@x.test/r.git feat/x'))
+    const all = [...ledgerLines(w), JSON.stringify(w.notices), ...w.toasts].join('\n')
+    for (const secret of ['alpha', 'beta', 't0k']) expect(all).not.toContain(secret)
+    expect(ledgerLines(w).at(-1)).toContain('Bash: git push -f (+2 args)')
   })
 })

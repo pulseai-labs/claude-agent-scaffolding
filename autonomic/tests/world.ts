@@ -23,6 +23,7 @@ export type World = {
   sections: Array<{ id: string; text: string; scope: 'shared' | 'session' }>
   asked: number                // AskUserQuestion calls that reached the bottom: the operator
   toolDeny?: string            // tool.call beneath autonomic denies with this text
+  failCwd?: boolean            // session.cwd throws (the host cannot answer)
   failAppend?: RegExp          // an append to a matching path fails
   appendsLeft?: number         // appends that still succeed; the next ones fail
   failTouch?: RegExp           // a touch of a matching path fails
@@ -60,7 +61,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     return next(e)
   })
   on('session.id', () => ({ value: w.session.id }) as never)
-  on('session.cwd', () => ({ value: w.session.cwd }) as never)
+  on('session.cwd', () => { if (w.failCwd) throw new Error('no cwd'); return ({ value: w.session.cwd }) as never })
   on('session.usage', () => ({ value: { startedAt: 0, context: { ...w.usage }, rateLimits: [] } }) as never)
   on('fs.read', (_$, e) => {
     const text = w.files.get(e.path)

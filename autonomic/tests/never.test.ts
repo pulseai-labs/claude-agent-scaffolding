@@ -1,11 +1,174 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { neverRules } from '../hooks/never'
+import { namesDanger, neverRules } from '../hooks/never'
 import type { Where } from '../hooks/never'
 
 const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x', defaultBranch: 'main' }
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('a quote-split option is unreadable; a quoted value is not (PR #681 round 18)', () => {
+    expect(rules('git merge --no-""verify feat/x')).toContain('unreadable')
+    expect(rules('git commit -m "msg"')).toEqual([])
+  })
+  test('~name is another home: outside (PR #681 round 18)', () => {
+    expect(rules('rm -rf ~root')).toContain('rm-outside')
+  })
+  test('GIT_DIR or GIT_WORK_TREE makes the repository unknown (PR #681 round 17)', () => {
+    expect(rules('GIT_DIR=/other/.git git push')).toContain('default-branch-push')
+    expect(rules('GIT_WORK_TREE=/other git push')).toContain('default-branch-push')
+  })
+  test('heads/main is main (PR #681 round 17)', () => {
+    expect(rules('git push origin heads/main')).toContain('default-branch-push')
+  })
+  test('nothing is below a worktree at / (PR #681 round 16)', () => {
+    expect(rules('rm -rf --no-preserve-root /', { ...W, root: '/', cwd: '/' })).toContain('rm-outside')
+  })
+  test('with --repo, a positional may be the remote or a refspec: both readings are checked (PR #681 round 16)', () => {
+    expect(rules('git push --repo x origin', { ...W, branch: 'main' })).toContain('default-branch-push')
+    expect(rules('git push --repo origin main')).toContain('default-branch-push')
+  })
+  test('a quoted command word after a wrapper is unreadable (PR #681 round 15)', () => {
+    expect(rules('prlimit "git" push -f origin feat/x')).toContain('unreadable')
+    expect(rules("prlimit 'rm' -rf /tmp/x")).toContain('unreadable')
+    expect(rules('echo "done" && git push origin feat/x')).toEqual([])
+  })
+  test('an abbreviated option keeps its attached value (PR #681 round 15)', () => {
+    expect(rules('git push --force-w=feat/x origin feat/x')).toContain('force-push')
+  })
+  test('any unlisted wrapper before git or rm is unreadable (PR #681 round 14)', () => {
+    for (const c of ['prlimit git push -f origin feat/x', 'mywrap --x /usr/bin/git push -f', 'cgexec -g cpu:x rm -rf /tmp/x'])
+      expect([c, rules(c).length > 0]).toEqual([c, true])
+    expect(rules('npm test && git push origin feat/x')).toEqual([])
+  })
+  test('a quoted -c value may be an alias (PR #681 round 14)', () => {
+    expect(rules('git -c "alias.p=push" p -f origin feat/x')).toContain('unreadable')
+  })
+  test('an abbreviated value-taking push option skips its value (PR #681 round 14)', () => {
+    expect(rules('git push --recurse-submodule check origin', { ...W, branch: 'main' })).toContain('default-branch-push')
+  })
+  test('--recurse-submodules takes a value (PR #681 round 13)', () => {
+    expect(rules('git push --recurse-submodules check origin', { ...W, branch: 'main' })).toContain('default-branch-push')
+  })
+  test('a cluster that starts with a numeric flag is split (PR #681 round 12)', () => {
+    expect(rules('git push -4f origin feat/x')).toContain('force-push')
+    expect(rules('git push -4d origin feat/x')).toContain('branch-delete')
+  })
+  test('a mirror push deletes refs too (PR #681 round 11)', () => {
+    expect(rules('git push --mirror origin')).toContain('branch-delete')
+  })
+  test('an inline alias key is matched whatever its case (PR #681 round 10)', () => {
+    expect(rules('git -c Alias.p=push p -f origin feat/x')).toContain('unreadable')
+  })
+  test('an opaque push still reports what it shows (PR #681 round 10)', () => {
+    expect(rules('git push "$REMOTE" feat/x:main')).toEqual(expect.arrayContaining(['unreadable', 'default-branch-push']))
+  })
+  test('an abbreviated --no-verify passes the pre-check (PR #681 round 10)', () => {
+    expect(namesDanger('git am --no-verif patch.mbox')).toBe(true)
+    expect(rules('git am --no-verif patch.mbox')).toContain('no-verify')
+  })
+  test('a push flag that is a variable is unreadable (PR #681 round 9)', () => {
+    expect(rules('git push --force$EMPTY origin feat/x')).toContain('unreadable')
+  })
+  test('a Bash builtin that runs a command is a runner (PR #681 round 7)', () => {
+    for (const c of ['coproc git push -f origin feat/x', 'builtin command git push -f', "trap 'git push -f' EXIT"])
+      expect(rules(c)).not.toEqual([])
+  })
+  test('a substitution in an unquoted heredoc is unreadable (PR #681 round 6)', () => {
+    expect(rules('cat <<EOF\n$(git push -f origin feat/x)\nEOF')).toContain('unreadable')
+    expect(rules("git commit -m \"$(cat <<'EOF'\nfix: push the branch $(not run)\nEOF\n)\"")).toEqual([])
+  })
+  test('a path-qualified wrapper is a runner (PR #681 round 6)', () => {
+    for (const c of ['/usr/bin/env git push -f origin feat/x', '/usr/bin/sudo git push -f', '/usr/bin/nohup git push -f'])
+      expect(rules(c)).not.toEqual([])
+  })
+  test('rm operands after -- are paths whatever their first character (PR #681 round 6)', () => {
+    expect(rules('rm -rf -- -/../../../tmp/victim')).toContain('rm-outside')
+  })
+  test('the matching refspec : may update the default branch (PR #681 round 6)', () => {
+    expect(rules('git push origin :')).toContain('default-branch-push')
+    expect(rules('git push origin +:')).toContain('default-branch-push')
+  })
+  test('a wrapper that runs a program is a runner (PR #681 round 4)', () => {
+    for (const c of ['setsid git push -f origin feat/x', 'stdbuf -oL git push -f', 'flock /tmp/l git push -f', 'taskset 1 git push -f'])
+      expect(rules(c)).not.toEqual([])
+  })
+  test('a short-flag cluster with an attached value is split up to the value (PR #681 round 4)', () => {
+    expect(rules('git commit -nF/tmp/message')).toContain('no-verify')
+    expect(rules('git commit -am"x"')).toEqual([])
+    expect(rules('git push -ofoo origin feat/x')).toEqual([])
+  })
+  test('git send-pack and http-push are pushes the reader cannot follow (PR #681 round 4)', () => {
+    expect(rules('git send-pack --force origin refs/heads/feat/x:refs/heads/main')).toContain('unreadable')
+    expect(rules('git http-push -v https://x/r.git main')).toContain('unreadable')
+  })
+  test('cd into a directory below the root reads the branch as unknown (PR #681 round 4)', () => {
+    expect(rules('cd /repo/other && git push')).toContain('default-branch-push')
+    expect(rules('cd /repo/other && git push origin feat/x')).toEqual([])
+    expect(rules('cd /repo/sub && git push')).toEqual([])
+    expect(rules('cd /repo && git push')).toEqual([])
+  })
+  test('a wildcard refspec may push the default branch (PR #681 round 3)', () => {
+    expect(rules('git push origin refs/heads/*:refs/heads/*')).toContain('default-branch-push')
+    expect(rules('git push origin feat/*')).toContain('default-branch-push')
+  })
+  test('git -C into another directory reads the branch as unknown (PR #681 round 3)', () => {
+    expect(rules('git -C /repo/sub/mod push')).toContain('default-branch-push')
+    expect(rules('git -C /repo/sub/mod push origin feat/x')).toEqual([])
+    expect(rules('git -C /repo push')).toEqual([])
+    expect(rules('git -C sub push')).toContain('default-branch-push')
+  })
+  test('refspecs after -- are checked for force and delete (PR #681 round 3)', () => {
+    expect(rules('git push origin -- +feat/x')).toContain('force-push')
+    expect(rules('git push origin -- :feat/x')).toContain('branch-delete')
+  })
+  test('an escaped or quote-split word is unreadable when it may spell a danger (PR #681 round 2)', () => {
+    for (const c of ['git pu\\sh -f origin feat/x', 'git pu""sh -f', "git p'u'sh -f", 'r\\m -rf /tmp/x', 'git push origin ma\\in'])
+      expect(rules(c)).not.toEqual([])
+  })
+  test('--repo names the remote, so every positional is a refspec (PR #681 round 2)', () => {
+    expect(rules('git push --repo origin main')).toContain('default-branch-push')
+    expect(rules('git push --repo=origin main')).toContain('default-branch-push')
+    expect(rules('git push --repo origin feat/x')).toEqual([])
+  })
+  test('@ is HEAD (PR #681 round 2)', () => {
+    expect(rules('git push origin @', { ...W, branch: 'main' })).toContain('default-branch-push')
+  })
+  test('a brace or a dot-glob in an rm path may leave the root (PR #681 round 2)', () => {
+    expect(rules('rm -rf /repo/{.,x}./victim')).toContain('rm-outside')
+    expect(rules('rm -rf /repo/sub/.?')).toContain('rm-outside')
+    expect(rules('rm -rf /repo/dist/*')).toEqual([])
+    expect(rules('git push origin {main,x}')).not.toEqual([])
+  })
+  test('an interpreter running a program that names a danger is unreadable (PR #681)', () => {
+    for (const c of [`python3 -c 'import os; os.system("git push -f")'`, `node -e "require('child_process').execSync('git push -f')"`,
+      `perl -e 'system("rm -rf /")'`, `/usr/bin/python3.12 -c 'x' && git push origin feat/x`, `ruby -e 'system("git push -f")'`])
+      expect(rules(c)).toContain('unreadable')
+    expect(rules('python3 tools/build.py')).toEqual([])
+  })
+  test('a git global the reader cannot skip, or an alias defined inline, is unreadable (PR #681)', () => {
+    for (const c of ['git --git-dir .git push -f origin main', 'git --work-tree /x push origin main', 'git --namespace n push -f',
+      'git -c alias.p=push p -f', 'git --config-env alias.p=E push -f'])
+      expect(rules(c)).toContain('unreadable')
+    expect(rules('git --no-pager commit -m x')).toEqual([])
+    expect(rules('git -C /repo push origin feat/x')).toEqual([])
+    expect(rules('git --git-dir=/repo/.git push -f')).toContain('force-push')
+  })
+  test('an abbreviated long option is read as the option it abbreviates (PR #681)', () => {
+    expect(rules('rm --recurs /tmp/x')).toContain('rm-outside')
+    expect(rules('git push --forc origin feat/x')).toContain('force-push')
+    expect(rules('git push --mir')).toContain('force-push')
+    expect(rules('git push --force-w origin feat/x')).toContain('force-push')
+    expect(rules('git commit --no-verif -m x')).toContain('no-verify')
+    expect(rules('git push --del origin x')).toContain('branch-delete')
+    expect(rules('git branch --del --forc x')).toContain('branch-delete')
+    expect(rules('git push --dry-run origin feat/x')).toEqual([])
+    expect(rules('git push --follow-tags origin feat/x')).toEqual([])
+  })
+  test('namesDanger is the cheap pre-check (Review Focus 2)', () => {
+    for (const c of ['git push', 'rm -rf x', 'git commit -m x', 'x --no-verify', 'git branch -D y']) expect(namesDanger(c)).toBe(true)
+    for (const c of ['ls -la', 'npm test', 'git status', 'cat README.md']) expect(namesDanger(c)).toBe(false)
+    for (const c of ['git pu\\sh', 'git pu""sh', "r'm' -rf x"]) expect(namesDanger(c)).toBe(true)
+  })
   test('force push, in every spelling', () => {
     for (const c of ['git push -f', 'git push --force origin feat/x', 'git push --force-with-lease', 'git push origin +feat/x', 'git push --mirror'])
       expect(rules(c)).toContain('force-push')
@@ -92,7 +255,7 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
       expect([c, rules(c)]).toEqual([c, ['unreadable']])
   })
   test('round 2 controls: the same repo, an explicit refspec, commit message values', () => {
-    for (const c of ['git -C /other push origin feat/x', 'cd /repo && git push', 'cd /repo/sub && git push', 'git -C sub push', 'cd /other && git push origin feat/x',
+    for (const c of ['git -C /other push origin feat/x', 'cd /repo && git push', 'cd /other && git push origin feat/x',
       'git commit -m "msg"', 'git commit -am "msg"', 'git commit -F "$f"', 'git commit --message "x" --author "A <a@b>"', 'rm -f x.txt'])
       expect([c, rules(c)]).toEqual([c, []])
   })

@@ -9,16 +9,18 @@ import type { LedgerCase, Usage } from './ledger'
 import { parseCommand, parseEnvMode, resolveDoc, statusText } from './mode'
 import { DEFAULT_POLICY, POLICY_ID, expandHome } from './policy'
 import { scopeMessage } from './prompts'
-import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath } from './records'
+import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from './records'
 import type { SessionRecord } from './records'
-import { neverRules } from './never'
-import type { Where } from './never'
+import { namesDanger, neverRules } from './never'
+import { enforced } from './enforce'
+import { shape } from './shape'
+import type { NeverRule, Where } from './never'
 import { permissionPrompt } from './prompts'
 import { parsePermission } from './verdict'
 import { MAX_INPUT, askPrompt, shownInput } from './prompts'
 import { parseAsk } from './verdict'
 import type { Question } from './verdict'
-import { hasMoltMarker, statusYields } from './floor'
+import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields } from './floor'
 import { turnEndPrompt } from './prompts'
 import { parseTurn } from './verdict'
 
@@ -191,10 +193,11 @@ async function pain($: Engine, id: string, reason: string, detail: string): Prom
 type Judged<T> = { v: T; usage?: Usage } | { skip: true } | { fail: string }
 
 // One fork, one retry (spec §4). Nothing to fork, or an aborted turn, lets the event pass.
-async function judge<T>($: Engine, prompt: string, parse: (text: string) => T | undefined): Promise<Judged<T>> {
+async function judge<T>($: Engine, kind: 'turn-end' | 'ask' | 'permission', prompt: string, parse: (text: string) => T | undefined): Promise<Judged<T>> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const r = await $.model.fork({ prompt })
     if (r.isAnswered) {
+      await log($, `fork ${kind} session=${await $.session.id()}`)
       const v = parse(r.text)
       if (v !== undefined) return { v, usage: r.usage }
       await log($, `fork reply did not parse attempt=${attempt + 1}`)
@@ -219,10 +222,15 @@ async function statusReport($: Engine, id: string): Promise<string> {
   const rec = await modeOf($)
   const policyPath = expandHome(cfg.policyPath, await home($))
   const painPath = ((await $.env.get('AUTONOMIC_PAIN_PATH')) ?? '').trim()
+  const pol = await policyText($)
+  const stageNow = safeSessionId(id) ? parseStage(await readText($, stagePath(await home($), id))) : undefined
   const lines = [
-    `autonomic: ${rec.mode} (source: ${rec.source})${rec.problem === undefined ? '' : ` — autopilot refused: ${rec.problem}`}`,
+    `${rec.mode} (source: ${rec.source})${rec.problem === undefined ? '' : ` — autopilot refused: ${rec.problem}`}`,
     `scope: ${rec.scope.length === 0 ? 'none named (what the session has read)' : rec.scope.join(', ')}`,
-    `policy: ${policyPath} (${(await policyText($)) === undefined ? 'missing or empty' : 'readable'})`,
+    `policy: ${pol === undefined ? 'missing or empty' : pol === DEFAULT_POLICY.trim() ? 'default' : 'edited'} (${policyPath})`,
+    `yieldAtPercent: ${cfg.yieldAtPercent} (used only without a molt stage file) · loopMax: ${cfg.loopMax} · tailChars: ${cfg.tailChars}`,
+    `never-approve: ${cfg.neverApprove.length === 0 ? "none (every command is the fork's to judge)" : cfg.neverApprove.join(' ')}`,
+    `molt stage: ${stageNow ?? 'none'}`,
     `ledger: ${await ledgerPath($)}`,
     `bell: ${rec.bell === undefined ? 'not set' : 'set'}; pain file: ${painPath === '' ? 'not set' : painPath}`,
     `pushes in a row with no change: ${pushes.get(id) ?? 0} of ${cfg.loopMax}`,
@@ -230,6 +238,14 @@ async function statusReport($: Engine, id: string): Promise<string> {
   if (rec.invalid !== undefined) lines.push(`AUTONOMIC_MODE="${rec.invalid}" is not a mode`)
   if (cfg.problems.length > 0) lines.push(`settings: ${cfg.problems.join('; ')}`)
   return lines.join('\n')
+}
+
+// The pain text leads with the line that names a danger, so the band shows what tripped (#677 F9).
+function painFocus(rules: readonly string[], command: string): string {
+  const lines = command.split('\n').map(l => l.trim()).filter(Boolean)
+  const hit = lines.find(l => namesDanger(l)) ?? lines[0] ?? command
+  // The shape, never the text: no credential reaches a pain signal (PR #681 round 8).
+  return `${rules.join(', ')} — ${shape(hit)}${lines.length > 1 ? ` (+${lines.length - 1} more lines)` : ''}`
 }
 
 // Tools that change nothing: a turn of these alone is no progress for the loop guard.
@@ -255,7 +271,7 @@ async function askReflex($: Engine, questions: readonly Question[]): Promise<{ q
     await pain($, id, 'question for you', `${questions[0]?.question ?? 'a question'} (free text)`)
     return undefined
   }
-  const j = await judge($, askPrompt(questions, (await policyText($)) ?? ''), t => parseAsk(t, questions))
+  const j = await judge($, 'ask', askPrompt(questions, (await policyText($)) ?? ''), t => parseAsk(t, questions))
   if ('v' in j && j.v.covered) {
     const { answers, reason } = j.v
     const time = new Date().toISOString()
@@ -393,6 +409,18 @@ export const register: Register = (on, options) => {
     try {
       if (r.deny === undefined && r.isError === undefined && r.isReadOnly !== true && !READ_ONLY.has(e.tool)) changed.add(await $.session.id())
     } catch {}
+    // A deny from a plugin beneath (a seat guard) rings once, keyed as tool.check's deny ring
+    // is (#677 F7). A deny from a plugin above autonomic never reaches this hook.
+    try {
+      if (r.deny !== undefined && (await modeOf($)).mode === 'autopilot') {
+        const id = await $.session.id()
+        // Past molt's block stage the deny is molt's own handoff gate, not a seat guard (final review I3).
+        const stage = safeSessionId(id) ? parseStage(await readText($, stagePath(await home($), id))) : undefined
+        if ((stage === 'block' || stage === 'fallback') && String(r.deny).includes("molt's block threshold")) return r
+        const key = `${id}\u0000${e.tool}\u0000${String(r.deny)}`
+        if (!painedDeny.has(key)) { painedDeny.add(key); await pain($, id, 'hard deny', `${e.tool}: ${String(r.deny)}`) }
+      }
+    } catch {}
     return r
   })
 
@@ -404,12 +432,18 @@ export const register: Register = (on, options) => {
       // Another plugin continues this turn already (molt's command, plan decision 4).
       if (r.block !== undefined) { await log($, `stop: a block beneath stands session=${id}`); return r }
       const answer = e.last_assistant_message ?? ''
-      // Past molt's handoff command the turn end is molt's, whichever Stop hook runs first (final review I2).
-      const fill = fillPercent((await $.session.usage()).context)
-      if (hasMoltMarker(answer) || statusYields(await readStatus($)) || (fill !== undefined && fill >= cfg.yieldAtPercent)) {
+      // The turn end is molt's at its handoff command (spec 0.1.1 §2): molt's stage file when
+      // it exists, else the yieldAtPercent fill fallback (molt absent or older).
+      // molt writes the file after its own Stop hook, so the live fill is checked against the
+      // file's effective command too: hook order cannot hide a handoff that is due (final review I2).
+      const stageText = safeSessionId(id) ? await readText($, stagePath(await home($), id)) : undefined
+      const stage = parseStage(stageText)
+      const at = stage === undefined ? cfg.yieldAtPercent : stage === 'off' ? undefined : parseStageCommand(stageText)
+      const fill = at === undefined ? undefined : fillPercent((await $.session.usage()).context)
+      if (hasMoltMarker(answer) || statusYields(await readStatus($)) || stageYields(stage) || (fill !== undefined && at !== undefined && fill >= at)) {
         pushes.delete(id)
         changed.delete(id)
-        await record($, id, 'molt', 'turn end in a molt handoff', 'let it stop', 'molt owns this turn end (amendment A2)')
+        await record($, id, 'molt', 'turn end in a molt handoff', 'let it stop', 'molt owns this turn end')
         return r
       }
       const n = changed.has(id) ? 0 : (pushes.get(id) ?? 0)
@@ -420,7 +454,7 @@ export const register: Register = (on, options) => {
         await pain($, id, 'autopilot loop', `${n} turn ends pushed on with no change made`)
         return r
       }
-      const j = await judge($, turnEndPrompt(answer.slice(-cfg.tailChars), (await policyText($)) ?? ''), parseTurn)
+      const j = await judge($, 'turn-end', turnEndPrompt(answer.slice(-cfg.tailChars), (await policyText($)) ?? ''), parseTurn)
       if ('skip' in j) return r
       if ('fail' in j) {
         pushes.delete(id)
@@ -433,7 +467,8 @@ export const register: Register = (on, options) => {
         const a = v.case === 'covered' ? (v.answer ?? '') : (v.next_step ?? '')
         if (!(await record($, id, v.case, v.question ?? 'turn end', a, v.reason, j.usage))) return r
         pushes.set(id, n + 1)
-        const text = v.case === 'covered' ? `Autopilot: ${a}. Proceed.` : `Autopilot: continue — ${a}.`
+        const bare = a.replace(/[.!]\s*$/, '')
+        const text = v.case === 'covered' ? `Autopilot: ${bare}. Proceed.` : `Autopilot: continue — ${bare}.`
         return { ...r, block: text }
       }
       pushes.delete(id)
@@ -455,7 +490,34 @@ export const register: Register = (on, options) => {
   on('tool.check', async ($, e, next) => {
     const r = await next(e)
     try {
-      if (r.decision === 'allow') return r
+      if (r.decision === 'allow') {
+        // The bypass floor (0.1.1 §3.1): in autopilot a never-approve match reaches the
+        // operator whatever allowed it. Manual mode never touches an allow.
+        const raw = (e.input as { command?: unknown } | undefined)?.command
+        if (typeof raw !== 'string' || !namesDanger(raw)) return r
+        // From here every failure keeps the call with the operator (final review I1): an
+        // unneeded ask costs one dialog, a missed one a force push.
+        let rules: NeverRule[]
+        try {
+          // A session that left autopilot through a failure (ledger, record, policy) keeps the
+          // floor: under bypass, manual means no asks at all (PR #681). /autopilot off clears it.
+          const m = await modeOf($)
+          if (m.mode !== 'autopilot' && m.problem === undefined) return r
+          rules = enforced(neverRules(raw, await where($)), cfg.neverApprove)
+        } catch (err) {
+          await log($, `floor error ${String(err)}`)
+          return { ...r, decision: 'ask', reason: 'autonomic: the never-approve check failed; this call stays with you' }
+        }
+        if (rules.length === 0) return r
+        try {
+          const id = await $.session.id()
+          await record($, id, 'permission', `${e.tool}: ${shape(raw)}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
+          await pain($, id, 'never-approve', painFocus(rules, raw))
+        } catch (err) {
+          await log($, `floor signal error ${String(err)}`)
+        }
+        return { ...r, decision: 'ask', reason: `autonomic: never-approve — ${rules.join(', ')}` }
+      }
       if ((await modeOf($)).mode !== 'autopilot') return r
       const id = await $.session.id()
       if (r.decision === 'deny') {
@@ -471,10 +533,10 @@ export const register: Register = (on, options) => {
       const raw = (e.input as { command?: unknown } | undefined)?.command
       if (typeof raw === 'string') {
         const command = raw
-        const rules = neverRules(command, await where($))
+        const rules = enforced(neverRules(command, await where($)), cfg.neverApprove)
         if (rules.length > 0) {
-          await record($, id, 'permission', `${e.tool}: ${command}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
-          await pain($, id, 'never-approve', `${rules.join(', ')} — ${command}`)
+          await record($, id, 'permission', `${e.tool}: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
+          await pain($, id, 'never-approve', painFocus(rules, command))
           return r
         }
       }
@@ -485,7 +547,7 @@ export const register: Register = (on, options) => {
         await pain($, id, 'permission for you', `${e.tool} (input too long to judge)`)
         return r
       }
-      const j = await judge($, permissionPrompt(e.tool, e.input, (await policyText($)) ?? ''), parsePermission)
+      const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? ''), parsePermission)
       if ('v' in j && j.v.decision === 'allow') {
         if (await record($, id, 'permission', `${e.tool}: ${shown}`, 'allow', j.v.reason, j.usage))
           return { ...r, decision: 'allow', reason: `autonomic: ${j.v.reason}` }

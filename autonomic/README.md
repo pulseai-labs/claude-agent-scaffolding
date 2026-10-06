@@ -20,7 +20,7 @@ set, and two files `molt` writes.
 | `AUTONOMIC_MODE=autopilot` on a spawn | autopilot from session start |
 | `/autopilot on [doc …]` | autopilot from now; the docs become the scope, and their paths go into the prompt box for one Enter |
 | `/autopilot off` | manual from now |
-| `/autopilot status` | mode, source, scope, policy, ledger, bell, pain file, loop count |
+| `/autopilot status` | mode, source, scope, policy (`default`, `edited`, or missing), `yieldAtPercent`, `loopMax`, `tailChars`, the enabled never-approve rules, molt's stage for this session (or `none`), ledger, bell, pain file, loop count |
 | unset, empty, `manual` | manual |
 | any other value | manual; the status line names the value |
 
@@ -89,9 +89,12 @@ exactly one of its option labels, autonomic answers in your place, tells the mod
 and writes one ledger line per question. A question with no options (free text) always goes to you. Anything else — not covered, a label that is not an option, a fork that fails — goes to
 you, and the bell rings.
 
-**Permission asks.** autonomic acts only on an `ask` verdict; an `allow` is left alone and a
-`deny` is never changed (a deny rings once per tool and reason, as "hard deny"). First, in code,
-the **never-approve list** keeps the ask with you and rings:
+**Permission asks.** A `deny` is never changed (a deny rings once per tool and reason, as "hard
+deny"; a deny from a plugin beneath autonomic's `tool.call` hook, such as a seat guard, rings the
+same way). On an `ask` verdict, first, in code, the **never-approve list** keeps the ask with you
+and rings. On an `allow` verdict — bypass permissions, or a settings allow rule — a command that
+matches the list becomes an `ask`, so you get the normal permission dialog, and it rings (the
+**bypass floor**; see "Permission modes"). The list:
 
 - a force push (`-f`, `--force`, `--force-with-lease`, `--mirror`, a `+` refspec);
 - a push to the default branch (`origin/HEAD`, or `main`/`master` when unknown) — an explicit
@@ -104,11 +107,47 @@ the **never-approve list** keeps the ask with you and rings:
 - a push whose remote, refspec or flag is quoted or a variable — `git push origin "$BRANCH"` and
   `git push -u origin "$(git branch --show-current)"` included, even to a feature branch: autonomic
   cannot see what the shell will expand, so it does not guess;
-- a command the reader cannot follow — led by `bash`/`sh -c`, `eval`, `xargs`, `timeout`, `nice`, `find`, `ssh` and the like, a wrapper with options (`sudo -u`, `env -i`), or a backtick or `$(` outside quotes — when it names `push`, `rm`, `branch`, `commit` or `--no-verify` at all. A `$(…)` or backtick inside double quotes is read as a command of its own.
+- a command the reader cannot follow — led by `bash`/`sh -c`, `eval`, `xargs`, `timeout`, `nice`, `find`, `ssh` and the like, an interpreter (`python3`, `node`, `perl`, `ruby`, `php`, `awk` …), a git global it cannot skip (`--git-dir .git` spelled without `=`, `-c alias.…`), a wrapper with options (`sudo -u`, `env -i`), or a backtick or `$(` outside quotes — when it names `push`, `rm`, `branch`, `commit` or `--no-verify` at all. A `$(…)` or backtick inside double quotes is read as a command of its own.
+
+Each item on the list is a rule you can turn off: `neverApprove` (below) names the enforced
+rules — `force-push`, `default-branch-push`, `branch-delete`, `rm-outside`, `no-verify`,
+`unreadable` (the last three items above). A rule you remove is the fork's to judge on an ask, and
+is left alone on an allow. A repo whose default branch takes direct pushes by design removes
+`default-branch-push`.
+
+A unique prefix of a long option is read as that option (`--forc` is `--force`, `rm --recurs` is `--recursive`), as git and GNU tools accept it. A word with a backslash, a quote inside it or a brace (`pu\sh`, `pu""sh`, `{main,x}`) is unreadable when the command may name a danger, and an `rm -r` path with a brace or a glob on a dot name (`.?`, `.*`) counts as outside the worktree. `--repo` names the remote, and `@` is `HEAD`. A wildcard destination (`refs/heads/*`) may be the default branch, refspecs after `--` are checked for `+` and `:`, and a bare push through `git -C` or `cd` into a directory other than the session's own or the repo root reads the branch as unknown (a nested repo or submodule). A wrapper that runs a program (`setsid`, `stdbuf`, `flock`, `taskset`, `chroot` …) is a runner, a short-flag cluster is split up to the option that takes a value (`-nF/tmp/m` is `-n -F`), and `git send-pack` and `git http-push` are unreadable pushes. A path-qualified wrapper (`/usr/bin/env`), the builtins `coproc`, `builtin` and `trap`, and any command that has `git` or `rm` as a later word (an unlisted wrapper such as `prlimit git push`) are runners, a quoted `-c` value may be an alias, an unquoted heredoc holding `$(` or a backtick is unreadable, `rm` operands after `--` are paths whatever they start with, and the matching refspec `:` may update the default branch. A danger the command text does not show — a git alias defined in config, a script file — is not seen.
 
 The list reads each command segment with seat-mods' shell reader (copied, and held identical by
 `tests/test-mod-shell-parity.sh`). Otherwise the fork judges the call against the policy's
 permission scope: `allow` is recorded and the tool runs; anything else leaves the ask and rings. The list applies to any tool whose input has a `command` (Bash, Monitor). A call whose input is longer than the fork is shown (4000 characters) stays an ask and rings. `AskUserQuestion` and `ExitPlanMode` are never approved here: their permission prompt is your own dialog.
+
+## Permission modes
+
+- **Bypass permissions** (`--dangerously-skip-permissions`). Claude Code never asks, so the
+  permission fork never runs and no "nothing to judge yet" ring occurs. In autopilot, a command
+  that matches an enabled `neverApprove` rule still reaches you as a permission dialog with the
+  reason `autonomic: never-approve — <rules>`, and the pain signal names the line that matched.
+  This is the floor that makes autopilot safe under bypass.
+- **Auto or default.** Claude Code asks, and the ask path above applies. The first ask after a
+  clear rings "nothing to judge yet": the fork has no request to copy until the session's first
+  response.
+- **Manual mode**, in any permission mode: autonomic never touches an `allow` — except in a
+  session that left autopilot through a failure (an unwritable ledger or record, a removed
+  policy). That session keeps the floor, because under bypass, manual means no asks at all.
+  `/autopilot off` turns it off.
+- **What the floor guards against:** a cooperative model writing a dangerous command in a plain
+  form, judged from the command text alone. A deliberately disguised spelling (`git pu{s..s}h`, a
+  `-c remote.<name>.push=` setting, a git alias in config) can pass it, and so can a danger only
+  the filesystem shows (`rm -rf /repo/link/x` where `link` points outside the worktree).
+- **What a never-approve match records.** The ledger line and every pain signal carry the
+  command's *shape* — verbs, a git subcommand and flag names, with every value only counted
+  (`git push -f https://u:TOKEN@… feat/x` is `git push -f (+2 args)`, an assignment is `NAME=`) — so no credential is
+  written, however it is spelled; a command name outside a known list shows as `?`, and a flag
+  outside a known list as `-?`. The
+  permission dialog shows you the whole command.
+- **Credentials** in other ledger lines (URL user info, `*_TOKEN=…`, `--token …`, Authorization,
+  Bearer and other key, token, secret or cookie header values, bare or quoted, and known token
+  shapes) are redacted before any ledger line, notice, toast, bell or pain file.
 
 ## The ledger
 
@@ -120,7 +159,10 @@ One line per decision:
 
 Path: `AUTONOMIC_LEDGER` when set (relative to the repo root when relative), else
 `<repo root>/.autonomic/ledger.md`, else `<cwd>/.autonomic/ledger.md` outside git. autonomic only
-appends; the session's own commits carry the file. In a dual-repo project, point
+appends; the session's own commits carry the file. The cases are `covered`, `stalled`, `done`,
+`pain` (the turn end), `ask` (an `AskUserQuestion` answered), `permission` (an ask allowed, or a
+never-approve match kept with you), and `molt` — the turn end is molt's handoff, and autonomic let
+it stop (`why: molt owns this turn end`). In a dual-repo project, point
 `AUTONOMIC_LEDGER` at the AI workspace. A ledger that cannot be written ends autopilot, and the
 decision that could not be recorded is not taken.
 
@@ -142,14 +184,20 @@ A pain signal never resumes the run by itself. Your next prompt does.
 - **Mode across a molt.** molt clears a root session and writes
   `~/.claude/state/molt/lineage/<new id>.json`. autonomic copies the previous session's record
   (`~/.claude/state/autonomic/sessions/<id>.json`, `{ mode, bell?, scope, source }`), and
-  announces the scope once with the first prompt.
+  announces the scope once with the first prompt. `source` is `env` (read from `AUTONOMIC_MODE`;
+  unset means manual), `command` (`/autopilot on|off`), or `lineage` (carried across a molt).
 - **A child's scope is its brief.** A crew child (`MOLT_HANDOFF=parent`) never molts; its
   replacement is a fresh session that takes its mode from `AUTONOMIC_MODE` and its scope from its
   brief and handoff.
-- **molt keeps the turn end.** autonomic neither blocks nor forks when the context fill is at or
-  above `yieldAtPercent` (65, molt's handoff command — keep the two equal), when the reply carries a
-  `MOLT-HANDOFF:` line, when `MOLT_STATUS_PATH`'s last line is `handoff required` or
-  `handed-off …`, or when a plugin beneath it has already blocked the stop (molt's command).
+- **molt keeps the turn end.** autonomic neither blocks nor forks when molt's stage file for this
+  session (`~/.claude/state/molt/stage/<id>`, molt 0.2.1+) says `command`, `block` or `fallback`
+  or the live fill has reached the file's `command` (molt may rewrite the file after this hook),
+  when the reply carries a `MOLT-HANDOFF:` line, when `MOLT_STATUS_PATH`'s last line is
+  `handoff required` or `handed-off …`, or when a plugin beneath it has already blocked the stop
+  (molt's command). autonomic follows molt's stage file, so a seeded session whose ladder moved
+  yields at its own handoff command. `yieldAtPercent` applies only without a stage file (molt
+  absent or older, or a file that does not parse): at or above that fill every turn end is molt's.
+  A stage file that says `off` (`/molt off`) turns that fallback off too.
 - **molt rings its own pause.** molt reads `mode` and `bell` from autonomic's record and rings the
   bell when it pauses an autopilot root; autonomic does not ring again.
 
@@ -171,9 +219,12 @@ A pain signal never resumes the run by itself. Your next prompt does.
 | `bell` | unset | the bell command |
 | `loopMax` | 3 | blocks in a row with no change before the loop guard |
 | `tailChars` | 4000 | how much of the last reply the turn-end fork quotes |
-| `yieldAtPercent` | 65 | context fill at or above which every turn end is molt's |
+| `yieldAtPercent` | 65 | used only without a molt stage file: context fill at or above which every turn end is molt's |
+| `neverApprove` | all six rules | the never-approve rules enforced, separated by spaces or commas: `force-push default-branch-push branch-delete rm-outside no-verify unreadable`. Empty means none (`/autopilot status` says so). Only these names exist. |
 
-A bad number falls back to its default; `/autopilot status` and a toast name it.
+No `/plugin configure` step is needed: every setting has a default except the optional `bell`.
+A bad number falls back to its default, and an unknown `neverApprove` name is ignored;
+`/autopilot status` and a toast name either.
 
 ## Failure behaviour
 
@@ -185,7 +236,9 @@ A bad number falls back to its default; `/autopilot status` and a toast name it.
 | fork fails or its reply does not parse | one retry, then pain |
 | nothing to fork yet (a session's first response, just after a clear) | the event passes through; an `AskUserQuestion` goes to you |
 
-Log: `~/.claude/state/autonomic/autonomic.log`.
+Log: `~/.claude/state/autonomic/autonomic.log`. It holds one line per fork
+(`fork <turn-end|ask|permission> session=<id>`), each failure, each pain signal and each block
+beneath that stood.
 
 ## Cost
 
@@ -203,6 +256,7 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
   project's public canonical, set `AUTONOMIC_LEDGER` to the AI workspace, or ignore `.autonomic/` there; a
   launcher patch (herdr-crew) is to set it per seat.
 - The permission fork judges a subagent's call against the main session's transcript.
+- A deny from a plugin that runs above autonomic is not seen; the turn-end check reports it.
 - Claude Code only: Codex, OpenCode and Devin have no mod runtime.
 
 ## Tests

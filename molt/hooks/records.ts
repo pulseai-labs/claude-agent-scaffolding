@@ -5,6 +5,7 @@ const STATE = '.claude/state'
 
 export const lineagePath = (home: string, id: string) => `${home}/${STATE}/molt/lineage/${id}.json`
 export const activePath = (home: string, id: string) => `${home}/${STATE}/molt/active/${id}`
+export const stagePath = (home: string, id: string) => `${home}/${STATE}/molt/stage/${id}`
 export const fallbackPath = (home: string, id: string) => `${home}/${STATE}/molt/briefs/${id}.md`
 export const logPath = (home: string) => `${home}/${STATE}/molt/molt.log`
 export const autonomicPath = (home: string, id: string) => `${home}/${STATE}/autonomic/sessions/${id}.json`

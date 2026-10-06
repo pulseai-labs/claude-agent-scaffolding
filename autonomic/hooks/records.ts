@@ -5,6 +5,8 @@ const STATE = '.claude/state'
 
 export const sessionPath = (home: string, id: string) => `${home}/${STATE}/autonomic/sessions/${id}.json`
 export const lineagePath = (home: string, id: string) => `${home}/${STATE}/molt/lineage/${id}.json`
+// molt's stage file (molt 0.2.1). The path must match molt/hooks/records.ts stagePath.
+export const stagePath = (home: string, id: string) => `${home}/${STATE}/molt/stage/${id}`
 export const logPath = (home: string) => `${home}/${STATE}/autonomic/autonomic.log`
 
 export const safeSessionId = (id: string): boolean => /^[A-Za-z0-9_-]+$/.test(id)

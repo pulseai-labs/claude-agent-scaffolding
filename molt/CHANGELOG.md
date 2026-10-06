@@ -2,6 +2,16 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.2.1
+
+**The stage file** (#677 F12; `records.ts`, `register.tsx`). molt writes
+`~/.claude/state/molt/stage/<id>` — `{ stage, percent?, command, block, fallback, at }`, with the
+session's effective thresholds — whenever the stage or a threshold changes, at `/molt off`,
+`/molt on` and `/molt now`, and when a clear, compact or resume resets the stage. `autonomic`
+0.1.1 reads it to leave the turn end to molt at the command stage, in place of a fill figure kept
+equal by hand. A seeded session's file carries no thresholds until its starting fill is
+measured. The write is best-effort and logged once on failure.
+
 ## 0.2.0
 
 **A warning ladder, and child sessions that hand off to their parent.** 0.1.0 asked for a

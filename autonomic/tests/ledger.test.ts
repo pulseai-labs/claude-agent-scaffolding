@@ -23,3 +23,27 @@ describe('the decision ledger (spec §1, D6)', () => {
     expect(ledgerLine({ time: 'T', session: 's', kase: 'pain', q: 'a\nb', a: 'c', why: 'd' }).includes('\n')).toBe(false)
   })
 })
+
+describe('redaction (PR #681 round 4, condition 4)', () => {
+  test('a credential never reaches a ledger line or a pain text', () => {
+    const line = oneLine('Bash: git push -f https://user:ghp_SECRET@github.com/o/r.git feat/x && GH_TOKEN=abc123 gh pr list --token=xyz -H "Authorization: Bearer tok9"')
+    for (const secret of ['ghp_SECRET', 'abc123', 'xyz', 'tok9']) expect(line).not.toContain(secret)
+    expect(line).toContain('https://***@github.com/o/r.git')
+  })
+  test('quoted values, auth headers and known token shapes are redacted too (PR #681 round 5)', () => {
+    const line = oneLine(`GITHUB_TOKEN="ghp_Q1" git push -f && X='y' API_KEY='k2' cmd --token "t3" --password 'p4' -H "Authorization: Bearer b5" -H 'Authorization: token a6' && curl -d github_pat_Z7abc && echo sk-ant-api03-Q8 xoxb-9-9 AKIAABCDEFGHIJKLMNOP`)
+    for (const secret of ['ghp_Q1', 'k2', 't3', 'p4', 'b5', 'a6', 'github_pat_Z7abc', 'sk-ant-api03-Q8', 'xoxb-9-9', 'AKIAABCDEFGHIJKLMNOP']) expect(line).not.toContain(secret)
+    expect(line).toContain('git push -f')
+  })
+  test('credential-bearing headers are redacted (PR #681 round 6)', () => {
+    const line = oneLine(`curl -H 'X-API-Key: v1secret' -H "Cookie: sid=v2secret" -H 'Private-Token: v3secret' https://x && git push -f`)
+    for (const secret of ['v1secret', 'v2secret', 'v3secret']) expect(line).not.toContain(secret)
+    expect(line).toContain('git push -f')
+  })
+  test('a quoted credential header is redacted to its closing quote (PR #681 round 7)', () => {
+    const line = oneLine(`curl -H 'X-API-Key: very secret value' -H "Cookie: locale=en; session=productionSecret" -H 'Authorization: Basic dXNlcjpwYXNz extra' https://x && git push -f origin main`)
+    for (const secret of ['secret value', 'productionSecret', 'dXNlcjpwYXNz', 'extra']) expect(line).not.toContain(secret)
+    expect(line).toContain('git push -f origin main')
+  })
+})
+

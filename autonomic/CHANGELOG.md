@@ -2,6 +2,43 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.1.1
+
+**The pilot patch** (#677). Built on the live pilot of 0.1.0, run under bypass permissions.
+
+- **molt's stage file** (F12; `floor.ts`, `records.ts`): the turn end is molt's when
+  `~/.claude/state/molt/stage/<id>` says `command`, `block` or `fallback`; `yieldAtPercent` is
+  only the fallback when no stage file exists, and a stage of `off` turns the fallback off. A
+  live fill at or above the file's `command` yields too, whatever the hook order.
+- **The bypass floor** (`register.tsx`): in autopilot, an `allow` for a command that matches an
+  enabled never-approve rule becomes an `ask`, so the operator gets the dialog under bypass
+  permissions too (probe P14). Manual mode never touches an allow; a deny is never changed.
+  A failure inside the floor keeps the call with the operator. The reader now lists an
+  interpreter, a git global it cannot skip, or an inline git alias as unreadable when the
+  command names a danger, and reads an abbreviated long option as the option it abbreviates;
+  an escaped, quote-split or brace word is unreadable, an `rm -r` path with a brace or a dot
+  glob is outside, `--repo` names the remote, and `@` is `HEAD`; a wildcard destination may be
+  the default branch, refspecs after `--` are checked, and `git -C` into another directory
+  reads the branch as unknown, as does a `cd` below the root; wrappers such as `setsid` are
+  runners, a short-flag cluster splits up to its value, and `send-pack`/`http-push` are
+  unreadable. A session that leaves autopilot through a failure keeps the floor until
+  `/autopilot off`. Path-qualified wrappers, unquoted heredoc substitutions, `rm` operands after
+  `--` and the matching refspec `:` are read too. Credentials — bare or quoted values, credential
+  headers and known token shapes — are redacted from the ledger and every pain signal, and a
+  never-approve match records only the command's shape (`shape.ts`): verbs, a git subcommand and
+  flag names, never a value.
+- **`neverApprove`** (`config.ts`, `enforce.ts`): a `/config` setting naming the enforced rules,
+  all six by default; empty means none; an unknown name is reported and ignored.
+- **A deny beneath rings** (F7): a deny from a plugin beneath autonomic's `tool.call` hook rings
+  "hard deny" once per session, tool and reason — except molt's own gate deny past its block
+  stage.
+- **Texts** (F2, F4, F5, F8, F9, F10, F13): `/autopilot status` drops the doubled prefix and lists
+  policy `default`/`edited`, the settings, the enabled rules and molt's stage; one log line per
+  fork; no doubled period before "Proceed."; the pain text leads with the line that matched; the
+  `molt` ledger reason reads `molt owns this turn end`.
+- **Docs** (F1, F3, F6, F11): no `/plugin configure` step is needed; the record's `source`
+  values; a "Permission modes" section, bypass first.
+
 ## 0.1.0
 
 **Autopilot as a mod** (#660). A session in autopilot keeps going without asks the planning already answered.
