@@ -63,11 +63,12 @@ const COMMIT_VALUES = new Set(['-m', '--message', '-F', '--file', '-C', '-c', '-
 // and the rest is that value (PR #681 round 4).
 const SHORT_VALUES = new Set(['m', 'F', 'C', 'c', 't', 'o', 'S'])
 function cluster(a: string): string[] {
-  if (!/^-[A-Za-z]./.test(a)) return [expand(a)]
+  if (!/^-[A-Za-z0-9]./.test(a)) return [expand(a)]
   const out: string[] = []
   for (let i = 1; i < a.length; i++) {
     const c = a[i]!
-    if (!/[A-Za-z]/.test(c)) { out.push(a.slice(i)); break }
+    // -4f is -4 -f: git's -4/-6 cluster like letters (round 12).
+    if (!/[A-Za-z0-9]/.test(c)) { out.push(a.slice(i)); break }
     out.push(`-${c}`)
     if (SHORT_VALUES.has(c)) { if (i + 1 < a.length) out.push(a.slice(i + 1)); break }
   }

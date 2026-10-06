@@ -26,7 +26,8 @@ function flag(t: string): string {
 function segment(tokens: readonly string[]): string {
   const out: string[] = []
   let i = 0
-  for (; i < tokens.length && ASSIGN.test(tokens[i]!); i++) out.push(`${tokens[i]!.split('=')[0]}=`)
+  // An assignment's name can be the credential too: a fixed placeholder (round 12).
+  for (; i < tokens.length && ASSIGN.test(tokens[i]!); i++) out.push('NAME=')
   const head = tokens[i]
   if (head === undefined) return out.join(' ')
   const name = head.replace(/^.*\//, '')

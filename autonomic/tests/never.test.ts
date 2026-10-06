@@ -6,6 +6,10 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('a cluster that starts with a numeric flag is split (PR #681 round 12)', () => {
+    expect(rules('git push -4f origin feat/x')).toContain('force-push')
+    expect(rules('git push -4d origin feat/x')).toContain('branch-delete')
+  })
   test('a mirror push deletes refs too (PR #681 round 11)', () => {
     expect(rules('git push --mirror origin')).toContain('branch-delete')
   })

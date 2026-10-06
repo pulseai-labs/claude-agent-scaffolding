@@ -24,8 +24,8 @@ describe('the command shape', () => {
     ]
     for (const c of cases) for (const secret of ['alpha', 'beta', 'ghp_', 'very', 'secret', 's3cr3t', 'S3CR3T', 'b5', 'TOKENISH']) expect([c, shape(c).includes(secret)]).toEqual([c, false])
   })
-  test('an assignment keeps its name only; a long short-flag cluster is hidden', () => {
-    expect(shape('GH_TOKEN=abc gh pr list')).toBe('GH_TOKEN= gh (+2 args)')
+  test('an assignment shows a placeholder; a long short-flag cluster is hidden', () => {
+    expect(shape('GH_TOKEN=abc gh pr list')).toBe('NAME= gh (+2 args)')
     expect(shape('mysql -pS3CR3TPASS')).toBe('mysql -? (+0 args)'.replace(' (+0 args)', ''))
   })
   test('a line continuation never splits a value into a shown command name (PR #681 round 9)', () => {
@@ -36,6 +36,9 @@ describe('the command shape', () => {
   })
   test('only known flag names are shown (PR #681 round 11)', () => {
     expect(shape('curl --cookie --very-private-credential file:///dev/null && git push -f origin feat/x')).toBe('curl -? -? (+1 args) && git push -f (+2 args)')
+  })
+  test('an assignment name is never shown (PR #681 round 12)', () => {
+    expect(shape('github_pat_TOPSECRET=github_pat_TOPSECRET git push -f origin feat/x')).toBe('NAME= git push -f (+2 args)')
   })
 })
 

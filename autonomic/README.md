@@ -141,7 +141,7 @@ permission scope: `allow` is recorded and the tool runs; anything else leaves th
   the filesystem shows (`rm -rf /repo/link/x` where `link` points outside the worktree).
 - **What a never-approve match records.** The ledger line and every pain signal carry the
   command's *shape* — verbs, a git subcommand and flag names, with every value only counted
-  (`git push -f https://u:TOKEN@… feat/x` is `git push -f (+2 args)`) — so no credential is
+  (`git push -f https://u:TOKEN@… feat/x` is `git push -f (+2 args)`, an assignment is `NAME=`) — so no credential is
   written, however it is spelled; a command name outside a known list shows as `?`, and a flag
   outside a known list as `-?`. The
   permission dialog shows you the whole command.
