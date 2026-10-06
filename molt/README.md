@@ -128,7 +128,16 @@ All under `~/.claude/state/molt/`, keyed by session id:
 | `active/<id>` | The active marker: written at start, after a clear, on every prompt and every turn end; removed at session end, by `/molt off`, and while the session is paused. The crew hooks read it. |
 | `lineage/<id>.json` | Written for each seeded session: `{ from, chain, depth, handoff }` — the session it came from, the first session of the chain, how many molts deep it is, and the handoff it resumed from. `autonomic` reads it to carry its mode across a molt. |
 | `briefs/<id>.md` | A fallback brief, when molt wrote one. |
+| `stage/<id>` | The stage file (0.2.1): `{ stage, percent?, command, block, fallback, at }` — see below. |
 | `molt.log` | One line per molt, handoff, pause, refusal and error. |
+
+**The stage file.** `stage` is one of `below`, `warn`, `warnAgain`, `command`, `block`,
+`fallback`, or `off` (`/molt off` in this session); `/molt now` publishes `command`. `command`,
+`block` and `fallback` are the session's effective thresholds, after a seed raised them. molt
+rewrites the file whenever the stage or a threshold changes, at `/molt off`, `/molt on` and
+`/molt now`, and when a clear, compact or resume resets the stage. A child writes it too. The
+write is best-effort: a failure is logged once and never stops a warning, a handoff or a molt.
+`autonomic` 0.1.1+ reads it to leave the turn end to molt from the command stage on.
 
 The three templates are written with their defaults on first start, only where no file exists
 (and the one 0.1.0 default above). Edit them freely; an empty or unreadable template falls back

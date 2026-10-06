@@ -2,6 +2,27 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.1.1
+
+**The pilot patch** (#677). Built on the live pilot of 0.1.0, run under bypass permissions.
+
+- **molt's stage file** (F12; `floor.ts`, `records.ts`): the turn end is molt's when
+  `~/.claude/state/molt/stage/<id>` says `command`, `block` or `fallback`; `yieldAtPercent` is
+  only the fallback when no stage file exists, and a stage of `off` turns the fallback off.
+- **The bypass floor** (`register.tsx`): in autopilot, an `allow` for a command that matches an
+  enabled never-approve rule becomes an `ask`, so the operator gets the dialog under bypass
+  permissions too (probe P14). Manual mode never touches an allow; a deny is never changed.
+- **`neverApprove`** (`config.ts`, `enforce.ts`): a `/config` setting naming the enforced rules,
+  all six by default; empty means none; an unknown name is reported and ignored.
+- **A deny beneath rings** (F7): a deny from a plugin beneath autonomic's `tool.call` hook rings
+  "hard deny" once per session, tool and reason.
+- **Texts** (F2, F4, F5, F8, F9, F10, F13): `/autopilot status` drops the doubled prefix and lists
+  policy `default`/`edited`, the settings, the enabled rules and molt's stage; one log line per
+  fork; no doubled period before "Proceed."; the pain text leads with the line that matched; the
+  `molt` ledger reason reads `molt owns this turn end`.
+- **Docs** (F1, F3, F6, F11): no `/plugin configure` step is needed; the record's `source`
+  values; a "Permission modes" section, bypass first.
+
 ## 0.1.0
 
 **Autopilot as a mod** (#660). A session in autopilot keeps going without asks the planning already answered.
