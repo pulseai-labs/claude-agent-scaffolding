@@ -2263,10 +2263,12 @@ pin "$BRIEFS_MD" 'A request the lane issues on re-entry for an item this session
   "spine brief: the staged-result rule is scoped to close-finished re-entry (a)" flat
 pin "$BRIEFS_MD" 'A worktree staged by a result you rejected in this session is step 5'"'"'s correction or replacement' \
   "spine brief: a rejected result's worktree is never read as close-finished (a)" flat
-pin "$BRIEFS_MD" 'you count only a correction' "spine brief: the caller counts only a correction (a2)" flat
-pin "$BRIEFS_MD" 'run `oss work_item_dispatched <wi-id>`, then send the correction' \
+pin "$BRIEFS_MD" 'you count each execution the lane did not request — a correction, or a replacement'"'"'s fresh pair' \
+  "spine brief: the caller counts a correction and a caller-driven replacement (a2, PR #679 r2)" flat
+absent "$BRIEFS_MD" 'you count only a correction' "spine brief: a replacement is never left uncounted (PR #679 r2)" flat
+pin "$BRIEFS_MD" 'run `oss work_item_dispatched <wi-id>`, then send the correction or launch the fresh pair' \
   "spine brief: the caller counts before it sends (a2)" flat
-pin "$BRIEFS_MD" 'Never count a request, or it is counted twice' "spine brief: no double count (a2)" flat
+pin "$BRIEFS_MD" 'Never count a request the lane issued, or it is counted twice' "spine brief: no double count (a2)" flat
 pin "$BRIEFS_MD" 'an `adopt` item reaches you as an ordinary request' "spine brief: adopt is a redispatch (a3)" flat
 pin "$BRIEFS_MD" '(`finish-merge`, `finish-status`) or one already `complete` gets none' \
   "spine brief: ossify-finished items get no request (a3)" flat

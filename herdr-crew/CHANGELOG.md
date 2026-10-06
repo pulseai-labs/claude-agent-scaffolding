@@ -28,7 +28,7 @@ mode.
   session to prove the re-entry.
 - **Spine-brief caller rules** (ossify `external-executor.md` §2a). The staged-result rule is
   scoped to a re-entry request for an item this session has not executed; a rejected
-  result's worktree is the correction path. The caller counts only a correction, reading
+  result's worktree is the correction path. The caller counts each execution the lane did not request — a correction or a replacement — reading
   `dispatches` first. An `adopt` item arrives as an ordinary request; `finish-merge`,
   `finish-status` and `complete` items get none.
 - **`dsh-driver.md`** (#678). A dsh spine session is resumed by a steered re-run of the

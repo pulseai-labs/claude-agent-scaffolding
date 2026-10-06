@@ -91,11 +91,11 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      initial pair's were; a second failure asks again. Every execution of
      an item — the initial run, each correction, each replacement — counts against
      ossify's three-dispatch cap, and once it is spent the ask offers halt only. The
-     lane counts each request it issues, a replacement's re-request and a gaps
-     replacement included; you count only a correction. Before one, read the item's
-     `dispatches` in ossify's state: at 3 or more, offer halt only; otherwise
-     run `oss work_item_dispatched <wi-id>`, then send the correction. Never count a
-     request, or it is counted twice.
+     lane counts each request it issues, a gaps replacement included; you count each
+     execution the lane did not request — a correction, or a replacement's fresh pair.
+     Before one, read the item's `dispatches` in ossify's state: at 3 or more, offer halt
+     only; otherwise run `oss work_item_dispatched <wi-id>`, then send the correction or
+     launch the fresh pair. Never count a request the lane issued, or it is counted twice.
      On halt, release that item's pair, mark it halted in your own state, and if no
      other item can proceed write a halt-shaped report to your report file, with the
      item and reason; the spine stays at its barrier.
