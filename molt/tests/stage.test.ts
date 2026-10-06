@@ -41,4 +41,17 @@ describe('the stage file (molt 0.2.1, autonomic #677 F12)', () => {
     const r = await $.classic.PostToolUse(POST)
     expect((r.additionalContext ?? []).join('\n')).toContain("molt's first warning")
   })
+  test("a seeded session publishes no thresholds until its ladder is known (PR #681)", async ($, on) => {
+    const H = '/repo/docs/handoff.md'
+    const w = world(on, { files: { [H]: '# handoff' } })
+    w.clearTo.push('s2')
+    at(w, 67)
+    await $.turn.complete({ answer: `MOLT-HANDOFF: ${H}`, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+    w.session.id = 's2'
+    at(w, 45)
+    await $.classic.SessionStart({ source: 'clear', session_id: 's2' } as never)
+    const s = stage(w, 's2')
+    expect(s.stage).toBe('below')
+    expect(s.command).toBeUndefined()
+  })
 })

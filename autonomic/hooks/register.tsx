@@ -414,7 +414,7 @@ export const register: Register = (on, options) => {
         const id = await $.session.id()
         // Past molt's block stage the deny is molt's own handoff gate, not a seat guard (final review I3).
         const stage = safeSessionId(id) ? parseStage(await readText($, stagePath(await home($), id))) : undefined
-        if (stage === 'block' || stage === 'fallback') return r
+        if ((stage === 'block' || stage === 'fallback') && String(r.deny).includes("molt's block threshold")) return r
         const key = `${id}\u0000${e.tool}\u0000${String(r.deny)}`
         if (!painedDeny.has(key)) { painedDeny.add(key); await pain($, id, 'hard deny', `${e.tool}: ${String(r.deny)}`) }
       }

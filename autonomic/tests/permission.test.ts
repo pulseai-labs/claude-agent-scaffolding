@@ -152,8 +152,14 @@ describe('the bypass floor (0.1.1 §3.1)', () => {
   })
   test("autopilot: molt's own gate past the block stage rings no hard deny (final review I3)", async ($, on) => {
     const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":"block","command":65}' } })
-    w.toolDeny = 'Context is at 76% of the window. Hand off now.'
+    w.toolDeny = "Context is at 76% of the window.\n\nContext is past molt's block threshold (75%). Only Write, Edit, Skill, git add and git commit run now."
     await $.tool.call({ tool: 'Edit', file_path: '/repo/a' } as never)
     expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(0)
+  })
+  test('autopilot: past the block stage a seat guard deny still rings (PR #681)', async ($, on) => {
+    const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":"block","command":65}' } })
+    w.toolDeny = 'no force-push — this seat may not run this command'
+    await $.tool.call({ tool: 'Edit', file_path: '/repo/a' } as never)
+    expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(1)
   })
 })

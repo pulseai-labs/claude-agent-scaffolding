@@ -9,7 +9,8 @@ All notable changes to the `molt` plugin.
 session's effective thresholds — whenever the stage or a threshold changes, at `/molt off`,
 `/molt on` and `/molt now`, and when a clear, compact or resume resets the stage. `autonomic`
 0.1.1 reads it to leave the turn end to molt at the command stage, in place of a fill figure kept
-equal by hand. The write is best-effort and logged once on failure.
+equal by hand. A seeded session's file carries no thresholds until its starting fill is
+measured. The write is best-effort and logged once on failure.
 
 ## 0.2.0
 

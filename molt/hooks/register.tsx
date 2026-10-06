@@ -88,10 +88,13 @@ async function publishStage($: Engine, sessionId: string): Promise<void> {
   if (!safeSessionId(sessionId)) return
   const t = currentThresholds(sessionId)
   const s = off.has(sessionId) ? 'off' : stage
-  const key = `${s} ${t.command} ${t.block} ${t.fallback}`
+  // A seeded session's ladder is unknown until a response measures its start: no thresholds yet (PR #681).
+  const known = !(seeded?.session === sessionId && seeded.startPercent === undefined)
+  const key = known ? `${s} ${t.command} ${t.block} ${t.fallback}` : `${s} unknown`
   if (published.get(sessionId) === key) return
   try {
-    const body = { stage: s, ...(lastPercent === undefined ? {} : { percent: lastPercent }), command: t.command, block: t.block, fallback: t.fallback, at: new Date().toISOString() }
+    const ladder = known ? { command: t.command, block: t.block, fallback: t.fallback } : {}
+    const body = { stage: s, ...(lastPercent === undefined ? {} : { percent: lastPercent }), ...ladder, at: new Date().toISOString() }
     await $.fs.write(stagePath(await home($), sessionId), `${JSON.stringify(body)}\n`)
     published.set(sessionId, key)
   } catch (err) {
@@ -392,10 +395,11 @@ export const register: Register = (on, options) => {
       stopBlocks.delete(e.session_id)
       lastMd.delete(e.session_id)
       published.delete(e.session_id)
-      try { await publishStage($, e.session_id) } catch {}
+      if (p === undefined) try { await publishStage($, e.session_id) } catch {}
     }
     if (p !== undefined) {
       try { await seed($, e.session_id, p) } catch (err) { await log($, `seed error ${String(err)}`) }
+      try { await publishStage($, e.session_id) } catch {}
     }
     inFlight = false
     const r = await next(e)
@@ -547,7 +551,7 @@ export const register: Register = (on, options) => {
         if (seeded?.session === sessionId && seeded.startPercent === undefined) {
           const window = (await $.session.usage()).context.window
           const input = (r.usage.input_tokens ?? 0) + (r.usage.cache_read_input_tokens ?? 0) + (r.usage.cache_creation_input_tokens ?? 0)
-          if (window > 0) seeded.startPercent = (input / window) * 100
+          if (window > 0) { seeded.startPercent = (input / window) * 100; await publishStage($, sessionId) }
         }
       }
     } catch (err) {

@@ -13,11 +13,14 @@ All notable changes to the `autonomic` plugin.
 - **The bypass floor** (`register.tsx`): in autopilot, an `allow` for a command that matches an
   enabled never-approve rule becomes an `ask`, so the operator gets the dialog under bypass
   permissions too (probe P14). Manual mode never touches an allow; a deny is never changed.
-  A failure inside the floor keeps the call with the operator.
+  A failure inside the floor keeps the call with the operator. The reader now lists an
+  interpreter, a git global it cannot skip, or an inline git alias as unreadable when the
+  command names a danger, and reads an abbreviated long option as the option it abbreviates.
 - **`neverApprove`** (`config.ts`, `enforce.ts`): a `/config` setting naming the enforced rules,
   all six by default; empty means none; an unknown name is reported and ignored.
 - **A deny beneath rings** (F7): a deny from a plugin beneath autonomic's `tool.call` hook rings
-  "hard deny" once per session, tool and reason — except molt's own gate past its block stage.
+  "hard deny" once per session, tool and reason — except molt's own gate deny past its block
+  stage.
 - **Texts** (F2, F4, F5, F8, F9, F10, F13): `/autopilot status` drops the doubled prefix and lists
   policy `default`/`edited`, the settings, the enabled rules and molt's stage; one log line per
   fork; no doubled period before "Proceed."; the pain text leads with the line that matched; the

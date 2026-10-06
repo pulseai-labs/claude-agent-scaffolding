@@ -133,7 +133,8 @@ All under `~/.claude/state/molt/`, keyed by session id:
 
 **The stage file.** `stage` is one of `below`, `warn`, `warnAgain`, `command`, `block`,
 `fallback`, or `off` (`/molt off` in this session); `/molt now` publishes `command`. `command`,
-`block` and `fallback` are the session's effective thresholds, after a seed raised them. molt
+`block` and `fallback` are the session's effective thresholds, after a seed raised them; a seeded
+session's file carries none until its first response measures where it started. molt
 rewrites the file whenever the stage or a threshold changes, at `/molt off`, `/molt on` and
 `/molt now`, and when a clear, compact or resume resets the stage. A child writes it too. The
 write is best-effort: a failure is logged once and never stops a warning, a handoff or a molt.
