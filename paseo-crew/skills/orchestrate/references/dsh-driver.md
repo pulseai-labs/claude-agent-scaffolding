@@ -41,7 +41,7 @@ Its resolved profile, wherever one travels:
 | role | started by | needs |
 |---|---|---|
 | spine session, external-executor lane | a steered `<spine-id> --external-executor`, first spawn only | — |
-| spine session, after a stop (same session) or a hand-off (a successor) | a steered re-run, `/ossify:run-spine <spine-id> --external-executor` | — |
+| spine session, after a stop (same session) or a hand-off (a successor) | a steered re-run of the spine command, `<spine-id> --external-executor` | — |
 | close session | a steered `/close <spine-id>`, in a fresh session | — |
 
 A spine's `spine session` and `close session` seats name a `kind: dsh-spine-driver` agent
@@ -101,9 +101,10 @@ contract is the same on both paths.
   root with it (dsh-crew's `references/presets.md` §0).
 - **Brief** it with one steered message (`dsh-session` §5), and confirm delivery by your
   request id. The first spine session gets `<spine-id> --external-executor`. A successor
-  gets `Resume from <handoff path>, then re-run /ossify:run-spine <spine-id> --external-executor.
-  Decisions still go to the operator through ask_user_question.` — the same command, which
-  ossify 1.14.0 re-enters a started spine with. A close gets §6's text.
+  gets `Resume from <handoff path>, then re-run the spine command, <spine-id> --external-executor.
+  Decisions still go to the operator through ask_user_question.` — the first spine session's
+  own shape, the one the persona accepts, which ossify 1.14.0 re-enters a started spine with.
+  A close gets §6's text.
 - **The operator's questions.** The driver asks the operator in the browser itself, and
   nothing you send can answer those questions. When the transcript shows one pending, tell the
   operator its text (`dsh-session` §7, §8). This is the one place where a seat other
@@ -130,7 +131,7 @@ contract is the same on both paths.
     to a fresh session, since the stopped one keeps its tools. A stop-rule halt is
     mid-round: no record was written and the round was not handed back, so only the
     session that holds it can recover it. Once the operator has remediated, steer
-    a re-run, `/ossify:run-spine <spine-id> --external-executor`, to that same session, where it starts
+    a re-run of the spine command, `<spine-id> --external-executor`, to that same session, where it starts
     a new turn, never to a successor, which can reconcile only persisted state;
   - the handoff path of a hand-off you steered: the rotation below;
   - anything you cannot place among these three is a stop.

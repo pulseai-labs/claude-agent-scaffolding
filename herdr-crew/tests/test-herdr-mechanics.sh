@@ -65,7 +65,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=355  # 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
+REF_BUDGET=358  # 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -212,7 +212,7 @@ pin "$REF" 'SEAT_MODS_ALLOW=<REPORT_PATH'"'"'s directory>:<its scratch directory
 
 section "autonomic marking (0.2.9, #676)"
 pin "$REF" '**autonomic marking.**' "step 2 has the autonomic marking clause" flat
-pin "$REF" 'MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain' \
+pin "$REF" 'MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER='"'"'<ledger>'"'"' AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain' \
   "step 2's quoted guarded export carries the autonomic variables" flat
 pin "$REF" '`AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot' \
   "autopilot is passed down, never set on a manual launcher's child" flat
@@ -223,6 +223,9 @@ pin "$REF" 'a missing record included' "a missing record reads as manual" flat
 pin "$REF" 'an **absolute** path outside every worktree' "the ledger is absolute and outside every worktree" flat
 pin "$REF" 'the launcher'"'"'s own `$AUTONOMIC_LEDGER` when set, else `<run dir>/autonomic-ledger.md`' \
   "one ledger per run, inherited down the tree" flat
+pin "$REF" 'A relative launcher value is first resolved against the launcher'"'"'s own repo root' \
+  "an inherited relative ledger is made absolute before it is passed on (PR #679 r1)" flat
+pin "$REF" '`<ledger>` is single-quoted in the export' "an inherited ledger path with a space survives the export (PR #679 r1)" flat
 pin "$REF" '`AUTONOMIC_BELL` is never set' "no per-seat bell" flat
 pin "$REF" 'and `AUTONOMIC_LEDGER` by the same rule and no pain path' "the top's successor keeps autopilot, has no parent" flat
 pin "$REF" '**A child'"'"'s pain.**' "Completion has the child-pain paragraph" flat

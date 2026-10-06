@@ -36,8 +36,8 @@ sequence (take exact flag syntax from `herdr --skill`):
 ```bash
 herdr workspace create --cwd <path> --label "run: <objective>"   # once per run, not per seat
 herdr tab create --workspace <id> --cwd <path> --label "seat: <role> (<agent>)"
-herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"   # implementer, verifier or reviewer seat only, before its command; herdr-mechanics.md step 2
-herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"   # a coordinator seat only — the spine, close or work-PR session, a `/ossify:doctor` session, the lane driver — before its command, with no SEAT_MODS_ALLOW; herdr-mechanics.md step 2
+herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER='<ledger>' AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"   # implementer, verifier or reviewer seat only, before its command; herdr-mechanics.md step 2
+herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER='<ledger>' AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"   # a coordinator seat only — the spine, close or work-PR session, a `/ossify:doctor` session, the lane driver — before its command, with no SEAT_MODS_ALLOW; herdr-mechanics.md step 2
 # both exports add AUTONOMIC_MODE=autopilot only when the launcher is in autopilot; <ledger> absolute, one per run — herdr-mechanics.md step 2
 herdr pane run <pane> "<command:>"
 herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>

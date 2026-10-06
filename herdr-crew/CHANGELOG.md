@@ -10,12 +10,12 @@ ossify 1.14.0 or later and autonomic 0.1.0; molt 0.2.0 stays the pairing for 0.2
 mode.
 
 - **autonomic marking** (`herdr-mechanics.md` step 2). The per-pane export every child
-  already takes adds `AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain`,
+  already takes adds `AUTONOMIC_LEDGER='<ledger>' AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain`,
   and `AUTONOMIC_MODE=autopilot` only when the launcher's own autonomic record reads
   `autopilot` — never `$AUTONOMIC_MODE`, which misses `/autopilot on` and a molt's lineage and
   can say autopilot where autonomic refused it; a missing record reads as manual. `<ledger>` is
-  the launcher's own `$AUTONOMIC_LEDGER`, else `<run dir>/autonomic-ledger.md`: one absolute
-  ledger per run, outside every worktree. The top's rotation successor takes the mode and the
+  the launcher's own `$AUTONOMIC_LEDGER` (resolved to absolute first, and single-quoted), else
+  `<run dir>/autonomic-ledger.md`: one absolute ledger per run, outside every worktree. The top's rotation successor takes the mode and the
   ledger, no pain path. `AUTONOMIC_BELL` is never set.
 - **A child's pain** (`herdr-mechanics.md`, Completion). The heartbeat and the read before a
   retained seat's next unit read each child's pain file beside its molt status file; a new
@@ -31,9 +31,9 @@ mode.
   result's worktree is the correction path. The caller counts only a correction, reading
   `dispatches` first. An `adopt` item arrives as an ordinary request; `finish-merge`,
   `finish-status` and `complete` items get none.
-- **`dsh-driver.md`** (#678). A dsh spine session is resumed by a steered re-run of
-  `/ossify:run-spine <spine-id> --external-executor`, never "continue from its recorded
-  state". paseo-crew's and orca-crew's copies carry the same text, to keep their parity
+- **`dsh-driver.md`** (#678). A dsh spine session is resumed by a steered re-run of the
+  spine command, `<spine-id> --external-executor` — the shape the `crew-spine` persona
+  accepts — never "continue from its recorded state". paseo-crew's and orca-crew's copies carry the same text, to keep their parity
   gates; neither is re-versioned.
 
 ## 0.2.8
