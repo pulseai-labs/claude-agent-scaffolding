@@ -5,7 +5,12 @@
 
 const TOKEN = /(&&|\|\||;|\||\n)|((?:"[^"]*"|'[^']*'|\\.|[^\s"'\;&|])+)/g
 const ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*=/
-const WORD = /^[A-Za-z][A-Za-z0-9._+-]*$/
+// A command name is shown only when it is a known one: a value split off by a continuation or
+// a newline can sit where a command name goes (round 9).
+const NAMES = new Set(['git', 'gh', 'rm', 'cd', 'ls', 'cat', 'echo', 'printf', 'npm', 'npx', 'pnpm', 'yarn', 'bun', 'deno', 'node',
+  'python', 'python3', 'pytest', 'uv', 'pip', 'make', 'cargo', 'go', 'curl', 'wget', 'mysql', 'psql', 'docker', 'kubectl',
+  'bash', 'sh', 'zsh', 'find', 'xargs', 'sudo', 'env', 'grep', 'rg', 'sed', 'awk', 'cp', 'mv', 'mkdir', 'touch', 'chmod',
+  'chown', 'tar', 'ssh', 'scp', 'rsync', 'jq', 'test', 'true', 'false', 'sleep', 'timeout', 'claude'])
 const GIT_SUBS = new Set(['push', 'commit', 'branch', 'reset', 'clean', 'checkout', 'switch', 'restore', 'rebase', 'merge',
   'tag', 'fetch', 'pull', 'rm', 'stash', 'send-pack', 'http-push', 'add', 'status', 'log', 'diff'])
 
@@ -21,7 +26,7 @@ function segment(tokens: readonly string[]): string {
   const head = tokens[i]
   if (head === undefined) return out.join(' ')
   const name = head.replace(/^.*\//, '')
-  out.push(WORD.test(name) ? name : '?')
+  out.push(NAMES.has(name) ? name : '?')
   const rest = tokens.slice(i + 1)
   const sub = name === 'git' ? rest.findIndex(t => GIT_SUBS.has(t)) : -1
   if (sub >= 0) out.push(rest[sub]!)
@@ -37,7 +42,7 @@ function segment(tokens: readonly string[]): string {
 export function shape(command: string): string {
   const parts: string[] = []
   let tokens: string[] = []
-  for (const m of command.matchAll(TOKEN)) {
+  for (const m of command.replace(/\\\n/g, '').matchAll(TOKEN)) {
     if (m[1] !== undefined) {
       parts.push(segment(tokens), m[1] === '\n' ? ';' : m[1])
       tokens = []

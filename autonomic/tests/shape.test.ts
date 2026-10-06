@@ -28,4 +28,11 @@ describe('the command shape', () => {
     expect(shape('GH_TOKEN=abc gh pr list')).toBe('GH_TOKEN= gh (+2 args)')
     expect(shape('mysql -pS3CR3TPASS')).toBe('mysql -? (+0 args)'.replace(' (+0 args)', ''))
   })
+  test('a line continuation never splits a value into a shown command name (PR #681 round 9)', () => {
+    const c = 'SERVICE_TOKEN=\\\nghp_SECRET git push -f origin main'
+    expect(shape(c)).not.toContain('ghp_SECRET')
+    expect(shape('ls\nghp_SECRET2 x')).not.toContain('ghp_SECRET2')
+    expect(shape('npm test && git push -f origin main')).toBe('npm (+1 args) && git push -f (+2 args)')
+  })
 })
+

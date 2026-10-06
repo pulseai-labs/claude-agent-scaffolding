@@ -254,7 +254,7 @@ export function neverRules(command: string, where: Where): NeverRule[] {
       if (args.includes('--delete') || args.includes('--prune') || args.includes('-d') || [...args, ...after].some(a => a.startsWith(':')))
         found.add('branch-delete')
       // A quoted or variable remote, refspec or flag may name the default branch or --force.
-      if ([...positionalOf(args), ...after].some(opaque)) found.add('unreadable')
+      if ([...args, ...after].some(opaque)) found.add('unreadable')
       else {
         // -C into a directory other than the repo root may enter a nested repo or submodule,
         // whose branch is not the session's: unknown (PR #681 round 3).
