@@ -34,5 +34,8 @@ describe('the command shape', () => {
     expect(shape('ls\nghp_SECRET2 x')).not.toContain('ghp_SECRET2')
     expect(shape('npm test && git push -f origin main')).toBe('npm (+1 args) && git push -f (+2 args)')
   })
+  test('only known flag names are shown (PR #681 round 11)', () => {
+    expect(shape('curl --cookie --very-private-credential file:///dev/null && git push -f origin feat/x')).toBe('curl -? -? (+1 args) && git push -f (+2 args)')
+  })
 })
 

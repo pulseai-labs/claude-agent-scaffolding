@@ -14,9 +14,13 @@ const NAMES = new Set(['git', 'gh', 'rm', 'cd', 'ls', 'cat', 'echo', 'printf', '
 const GIT_SUBS = new Set(['push', 'commit', 'branch', 'reset', 'clean', 'checkout', 'switch', 'restore', 'rebase', 'merge',
   'tag', 'fetch', 'pull', 'rm', 'stash', 'send-pack', 'http-push', 'add', 'status', 'log', 'diff'])
 
+// A flag name is shown only when it is a known one: an option's value can start with - too (round 11).
+const FLAGS = new Set(['-f', '-F', '-r', '-R', '-rf', '-fr', '-Rf', '-fR', '-rv', '-d', '-D', '-n', '-u', '-m', '-a', '-am', '-v', '-q',
+  '-o', '-c', '-C', '-x', '-h', '--force', '--force-with-lease', '--force-if-includes', '--mirror', '--delete', '--prune', '--all',
+  '--branches', '--tags', '--no-verify', '--dry-run', '--set-upstream', '--amend', '--recursive', '--verbose', '--quiet', '--message'])
 function flag(t: string): string {
   const name = t.split('=')[0]!
-  return /^--[A-Za-z][A-Za-z0-9-]*$/.test(name) || /^-[A-Za-z]{1,3}$/.test(name) ? name : '-?'
+  return FLAGS.has(name) ? name : '-?'
 }
 
 function segment(tokens: readonly string[]): string {

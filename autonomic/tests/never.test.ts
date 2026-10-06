@@ -6,6 +6,9 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('a mirror push deletes refs too (PR #681 round 11)', () => {
+    expect(rules('git push --mirror origin')).toContain('branch-delete')
+  })
   test('an inline alias key is matched whatever its case (PR #681 round 10)', () => {
     expect(rules('git -c Alias.p=push p -f origin feat/x')).toContain('unreadable')
   })

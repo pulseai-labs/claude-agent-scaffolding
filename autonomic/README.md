@@ -142,7 +142,8 @@ permission scope: `allow` is recorded and the tool runs; anything else leaves th
 - **What a never-approve match records.** The ledger line and every pain signal carry the
   command's *shape* — verbs, a git subcommand and flag names, with every value only counted
   (`git push -f https://u:TOKEN@… feat/x` is `git push -f (+2 args)`) — so no credential is
-  written, however it is spelled; a command name outside a known list shows as `?`. The
+  written, however it is spelled; a command name outside a known list shows as `?`, and a flag
+  outside a known list as `-?`. The
   permission dialog shows you the whole command.
 - **Credentials** in other ledger lines (URL user info, `*_TOKEN=…`, `--token …`, Authorization,
   Bearer and other key, token, secret or cookie header values, bare or quoted, and known token

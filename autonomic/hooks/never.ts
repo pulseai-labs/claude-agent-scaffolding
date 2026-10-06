@@ -252,7 +252,8 @@ export function neverRules(command: string, where: Where): NeverRule[] {
       // Refspecs after `--` carry + and : too (PR #681 round 3).
       if (args.includes('-f') || args.some(a => a === '--force' || a === '--mirror' || a.startsWith('--force-with-lease') || a.startsWith('+')) || after.some(a => a.startsWith('+')))
         found.add('force-push')
-      if (args.includes('--delete') || args.includes('--prune') || args.includes('-d') || [...args, ...after].some(a => a.startsWith(':')))
+      // --mirror deletes remote refs absent locally (round 11).
+      if (args.includes('--delete') || args.includes('--prune') || args.includes('--mirror') || args.includes('-d') || [...args, ...after].some(a => a.startsWith(':')))
         found.add('branch-delete')
       // A quoted or variable remote, refspec or flag may name the default branch or --force.
       // An opaque word adds unreadable; it never hides a destination the text shows (round 10).
