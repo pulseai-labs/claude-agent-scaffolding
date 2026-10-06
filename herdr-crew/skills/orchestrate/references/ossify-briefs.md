@@ -42,7 +42,9 @@ seats is you: every seat you launch, send to, wait on or release follows it, exc
 where it says the operator, you mean the top, through your report file.
 
 TASK: drive spine SPINE_ID to its final round barrier. With HANDOFF_PATH set, read that
-handoff first; ossify's own state says which round runs next. A first reply whose model
+handoff first; ossify's own state says which round runs next. Step 3's same command
+re-enters a started spine, mid-round included (ossify 1.14.0): it prints a reconcile
+read-out before any mutation, and a halt row in it is a halt to report, never repaired by hand. A first reply whose model
 is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
   1. Check the SEATS block against SPINE.md before anything else: every planned
      item has exactly one implementer row and one verifier row, and no row names
@@ -59,12 +61,16 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      again first if `herdr workspace list` no longer shows it: closing its last pane may take
      it), its `--cwd` the worktree ossify prepared. Guard it before its command as
      `MECHANICS` step 2 says — role `implementer`, its scratch directory created
-     first under your own run directory. A request whose worktree already holds a staged result
-     with its `report.md` (ossify's close-finished route) launches no implementer and counts no
-     dispatch: go straight to step 5's verifier, then return the result record as usual; a
-     `correct` decision on it first launches the item's implementer in that worktree from its
-     SEATS row, guarded as above, and sends it the item-implementer brief with the correction as
-     its task.
+     first under your own run directory. A request the lane issues on re-entry for an item this
+     session has not executed, whose worktree already holds a staged result with its `report.md`
+     (ossify's close-finished route), launches no implementer and counts no dispatch: go straight
+     to step 5's verifier, then return the result record as usual; a `correct` decision on it
+     first launches the item's implementer in that worktree from its SEATS row, guarded as
+     above, and sends it the item-implementer brief with the correction as its task. A worktree
+     staged by a result you rejected in this session is step 5's correction or replacement,
+     never this rule. Launch only for a request the lane issues: an `adopt` item reaches you as
+     an ordinary request, and an item ossify finishes itself (`finish-merge`, `finish-status`)
+     or one already `complete` gets none.
      Confirm each model as its row's
      `model_shows` says and by
      the worker's own check; the effort is the given launch argument. A row that is missing or
@@ -84,7 +90,12 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      work-item entry from clean, its two fresh seats guarded exactly as the
      initial pair's were; a second failure asks again. Every execution of
      an item — the initial run, each correction, each replacement — counts against
-     ossify's three-iteration cap, and once it is spent the ask offers halt only.
+     ossify's three-dispatch cap, and once it is spent the ask offers halt only. The
+     lane counts each request it issues, a replacement's re-request and a gaps
+     replacement included; you count only a correction. Before one, read the item's
+     `dispatches` in ossify's state: at 3 or more, offer halt only; otherwise
+     run `oss work_item_dispatched <wi-id>`, then send the correction. Never count a
+     request, or it is counted twice.
      On halt, release that item's pair, mark it halted in your own state, and if no
      other item can proceed write a halt-shaped report to your report file, with the
      item and reason; the spine stays at its barrier.
@@ -106,7 +117,7 @@ do the same teardown, write `/ossify:handoff`, and write `rotate: <handoff path>
 report file with the path of RUN_JSON and the pane `run.orchestrator` names at writing,
 then stand down your own armed waits before you return — one report must wake one session.
 Never stop mid-round.
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <SPINE_ID>'` (never to `none`), and ROTATE at the next round barrier; molt never clears this session. End the reply that writes `rotate:` with `MOLT-HANDOFF: <handoff path>`. If molt's handoff command arrives mid-round, still finish the round: a round molt's block cuts short is relayed to the operator by your parent. A wake or message after the handoff is written is added to it verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <SPINE_ID>'` (never to `none`), and ROTATE at the next round barrier; molt never clears this session. End the reply that writes `rotate:` with `MOLT-HANDOFF: <handoff path>`. If molt's handoff command arrives mid-round, still finish the round: a round molt's block cuts short is re-entered by a fresh spine session's re-run of step 3's command, never finished by hand. A wake or message after the handoff is written is added to it verbatim, never acted on.
 
 NEVER: record an item task in the top's run.json; run a Claude subagent for a work item;
 fall back to the default lane when an item launch fails; restart the lane; select the

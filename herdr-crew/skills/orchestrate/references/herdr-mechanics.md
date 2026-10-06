@@ -33,7 +33,7 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    command — one `herdr pane run <pane> "export …"` (`worktree create` takes no `--env`); a
    `kind: dsh-spine-driver` seat is a dsh session, not a pane, and is never marked (`dsh-driver.md`).
    A guarded seat — implementer, verifier or reviewer — is marked by its launcher, before its command, with `herdr pane run <pane> "export SEAT_MODS_ROLE=<role>
-   SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status"`. A project-file role whose `replaces:` names one of those roles is guarded as that role.
+   SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"`, plus `AUTONOMIC_MODE=autopilot` where the autonomic marking below says. A project-file role whose `replaces:` names one of those roles is guarded as that role.
    A project-file role with no `replaces:` is marked a guarded `implementer` — its own
    report directory and its scratch directory in its `SEAT_MODS_ALLOW`. A coordinator seat —
    the spine, close or work-PR session, the doctor session, the lane driver — exports
@@ -57,6 +57,25 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    hands off to its parent (Completion, "A child past molt's warnings"). The operator's first
    top and the top's rotation successor are roots and take neither; a dsh seat is not a pane
    and takes neither.
+   **autonomic marking.** The same export adds `AUTONOMIC_LEDGER=<ledger>
+   AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain` for every child the molt marking reaches,
+   and `AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot. `<ledger>` is
+   the launcher's own `$AUTONOMIC_LEDGER` when set, else `<run dir>/autonomic-ledger.md`: one
+   ledger per run, an **absolute** path outside every worktree. A relative path resolves inside
+   the seat's worktree and dies with it, and with none the ledger lands in the worktree and
+   rides the seat's commits. The launcher's mode is its own autonomic record, read at each
+   launch — `jq -r .mode ~/.claude/state/autonomic/sessions/$CLAUDE_CODE_SESSION_ID.json` —
+   never `$AUTONOMIC_MODE`: the top may be in autopilot by `/autopilot on` or a molt's lineage,
+   which the environment never shows, and a session whose environment says autopilot may have
+   been refused it. `autopilot` marks the child; anything else, a missing record included,
+   leaves `AUTONOMIC_MODE` unset. A manual seat writes neither file, so the two paths cost
+   nothing. An autopilot seat's scope is its brief; it gets no `/autopilot on`. Its first
+   permission ask, and the first after a clear, has nothing to judge and waits for a human, so
+   a seat meant to run unattended needs a `command:` whose permission mode does not ask first —
+   the operator's file, never a launch-time edit. `AUTONOMIC_BELL` is never set: the pain file
+   reaches the parent. The top's rotation successor takes `AUTONOMIC_MODE` and
+   `AUTONOMIC_LEDGER` by the same rule and no pain path, since it has no parent; the operator's
+   first top and a dsh seat take none. A respawn reads the launcher's mode again.
    **A molt is not a launch.** The top's in-place molt (`lifecycle.md`, "Where molt runs")
    keeps the pane's process and its exports, so its `orchestrator` marking stands across the
    clear, and seat-mods reads the role from the environment on every tool call. The
@@ -260,13 +279,27 @@ of its predecessor's worktree workspace, never a new `worktree create`, so it ca
 tree its predecessor left. Its brief is re-sent whole, plus one line, `RESUME FROM: <handoff path>` —
 the predecessor's handoff, or for a warned seat that handed off nothing, its last report. Close
 the predecessor's pane only after the new tab exists; a worktree is released only as Teardown
-says, once its branch's work is safe. These cuts cannot be resumed by a fresh session, so for
-each, relay it to the operator with its handoff path: a spine session that hands off with no
-`rotate:` was cut mid-round (ossify issue 133); a work-PR session that hands off with no
-`open:`, cut inside a fix round; a close, work-item, lane-driver or doctor
+says, once its branch's work is safe. A spine session that hands off with no `rotate:` was cut
+mid-round (ossify issue 133); ossify 1.14.0's run-spine re-enters a started spine, mid-round
+included, so respawn it as a `rotate:` is (`ossify-nested-run.md` §4), its `HANDOFF_PATH` that
+handoff. Its re-run prints a reconcile read-out and halts before any mutation on what it cannot
+reconcile; only that halt goes to the operator. These cuts cannot be resumed by a fresh
+session, so for each, relay it to the operator with its handoff path: a work-PR session that
+hands off with no `open:`, cut inside a fix round; a close, work-item, lane-driver or doctor
 seat that hands off mid-ceremony; and a reviewer that hands off before its report validates,
 since a fresh one would run the PR's one review a second time. Without molt none of this fires, and the ceiling hook's
 rotation applies.
+
+**A child's pain.** Record each child's `AUTONOMIC_PAIN_PATH` at launch, beside its status
+file. The heartbeat, per tick, per live seat, reads it too, and so does the read before a
+retained seat's next unit. A non-empty file holding a line not yet noted is the seat asking
+upward: autonomic stopped it on its pain list, never resumes it and never pings `NOTIFY_PANE`,
+so that line is the only signal that reaches you. Its herdr state is `blocked` — an ask left
+at its dialog, which the dialog procedure above takes — or idle or done with no new report, a
+turn-end pain. Read the line and the seat's last report, then answer the seat or take it to
+the operator as any escalation; it is never a failed task. A seat-mods deny on a guarded seat
+rings nothing of its own: seat-mods refuses the call before autonomic sees it, so it reaches
+you only as a turn-end pain line.
 
 ## Placement
 

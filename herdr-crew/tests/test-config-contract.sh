@@ -393,7 +393,7 @@ section "the dsh driver's requirement sentences"
 # Each is a rule the top's path depends on and no deterministic test can exercise;
 # pinned so a rewording cannot drop it (the whole-branch review's six findings).
 if [ -f "$DSH_MD" ]; then
-  for needle in 'continue <spine-id> from its recorded state' \
+  for needle in 'a steered re-run, `/ossify:run-spine <spine-id> --external-executor`' \
     'together or not at all' \
     'the pre-brief gate' \
     '`ASK_CANCELLED` counts' \
@@ -402,6 +402,10 @@ if [ -f "$DSH_MD" ]; then
     c="$(occurrences "$DSH_MD" "$needle")"
     if [ "$c" -ge 1 ]; then pass "dsh-driver.md keeps: $needle"; else fail "dsh-driver.md keeps: $needle" "not found"; fi
   done
+  # #678: the pre-1.14.0 continuation phrase is gone from every site.
+  c="$(occurrences "$DSH_MD" 'from its recorded state')"
+  if [ "$c" -eq 0 ]; then pass "dsh-driver.md drops 'continue … from its recorded state' (#678)"
+  else fail "dsh-driver.md drops 'continue … from its recorded state' (#678)" "$c left"; fi
 fi
 c="$(occurrences "$EXEC_MD" 'before recommending item rows')"
 if [ "$c" -ge 1 ]; then pass "ossify-execution.md routes a dsh spine seat before item rows are recommended"

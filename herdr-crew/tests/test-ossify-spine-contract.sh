@@ -66,7 +66,7 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=214          # A3: each ossify reference stays under 209 lines.
+REF_BUDGET=225          # A3: each ossify reference stays under 209 lines; 0.2.9 raised it from 214 for the spine brief's 1.14.0 caller rules.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
                         # each launch site gained; the files' own maximum is 209
                         # (`ossify-nested-run.md`), and the budget section's adjacent
@@ -1981,7 +1981,7 @@ pin "$MECHANICS_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role>' \
 pin "$MECHANICS_MD" 'A project-file role whose `replaces:` names one of those roles is guarded as that role' \
   "a replacing project-file role is guarded as the role it replaces"
 
-pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status"' \
+pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"' \
   "roles.md's launch block shows the guard export, molt marking included, as the send into the seat's pane"
 pin "$ROLES_MD" 'implementer, verifier or reviewer seat only, before its command' \
   "roles.md scopes the export to the guarded roles"
@@ -2061,7 +2061,7 @@ pin "$ROLES_MD" '`work-PR session`), marked `coordinator` before its command' \
   "roles.md's budget marks the close and work-PR launches" flat
 pin "$ROLES_MD" 'seat of the same name, marked `coordinator`' \
   "roles.md marks the doctor session's launch" flat
-pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status"' \
+pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"' \
   "roles.md's launch block shows the coordinator export, molt marking included"
 absent "$MECHANICS_MD" 'SEAT_MODS_ROLE=orchestrator MOLT_HANDOFF' "the top's successor export carries no molt marking"
 absent "$ROLES_MD" 'SEAT_MODS_ROLE=orchestrator MOLT_HANDOFF' "roles.md carries no marked orchestrator export"
@@ -2220,8 +2220,9 @@ pin "$LIFECYCLE_MD" 'With `/molt off` the marker goes, the hook speaks again, an
   "lifecycle: /molt off falls back to the rotation (#669)" flat
 pin "$NESTED_MD" 'A spine session that rotated on a molt warning returns the same `rotate:`' \
   "nested-run §4: a molt-triggered rotate is the same rotate" flat
-pin "$NESTED_MD" 'one cut mid-round returns none and goes to the operator' \
-  "nested-run §4: a mid-round cut goes to the operator (Review Focus 4)" flat
+pin "$NESTED_MD" 'one cut mid-round returns none and is respawned the same way' \
+  "nested-run §4: a mid-round cut is respawned under ossify 1.14.0 (#674)" flat
+absent "$NESTED_MD" 'returns none and goes to the operator' "nested-run §4: the pre-1.14.0 relay is gone (#674)"
 MOLT_LINE='MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> '"'"'MOLT WARNING <pct> <task id>'"'"'` (never to `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
 # One pin per template, labelled by name, so a miss names its site (0.2.5 and 0.2.7 were
 # both caught on unnamed launch sites). The span is the Nth ```text fence of the file.
@@ -2258,6 +2259,21 @@ pin "$BRIEFS_MD" 'If molt'"'"'s handoff command arrives mid-round, still finish 
   "spine brief: never stop mid-round, molt included (D3)" flat
 pin "$BRIEFS_MD" 'already holds a staged result with its `report.md`' \
   "spine brief: the staged-result caller rule (D6)" flat
+pin "$BRIEFS_MD" 'A request the lane issues on re-entry for an item this session has not executed' \
+  "spine brief: the staged-result rule is scoped to close-finished re-entry (a)" flat
+pin "$BRIEFS_MD" 'A worktree staged by a result you rejected in this session is step 5'"'"'s correction or replacement' \
+  "spine brief: a rejected result's worktree is never read as close-finished (a)" flat
+pin "$BRIEFS_MD" 'you count only a correction' "spine brief: the caller counts only a correction (a2)" flat
+pin "$BRIEFS_MD" 'run `oss work_item_dispatched <wi-id>`, then send the correction' \
+  "spine brief: the caller counts before it sends (a2)" flat
+pin "$BRIEFS_MD" 'Never count a request, or it is counted twice' "spine brief: no double count (a2)" flat
+pin "$BRIEFS_MD" 'an `adopt` item reaches you as an ordinary request' "spine brief: adopt is a redispatch (a3)" flat
+pin "$BRIEFS_MD" '(`finish-merge`, `finish-status`) or one already `complete` gets none' \
+  "spine brief: ossify-finished items get no request (a3)" flat
+pin "$BRIEFS_MD" 'a halt row in it is a halt to report, never repaired by hand' \
+  "spine brief: a re-entry halt is reported" flat
+pin "$BRIEFS_MD" 'Never stop mid-round.' "spine brief: ROTATE stays strict until a restarted session proves re-entry" flat
+absent "$BRIEFS_MD" 'relayed to the operator by your parent' "spine brief: a molt-cut round is re-entered, not relayed (#674)"
 pin "$PRBRIEFS_MD" 'at a fix-round boundary once the context-ceiling notice or a molt warning has fired' \
   "work-PR brief: a molt warning triggers the existing open:" flat
 pin "$PRBRIEFS_MD" 'and return `open:` at the next fix-round boundary' "work-PR brief: the MOLT line" flat
@@ -2283,6 +2299,10 @@ pin "$PRBRIEFS_MD" 'with no fix round in hand, return `open:` at once' "work-PR 
 pin "$PRBRIEFS_MD" 'If molt'"'"'s handoff command arrives mid-round, still finish the round' \
   "work-PR MOLT line: never stop mid-round, as the spine" flat
 pin "$CHANGELOG_MD" '## 0.2.8' "CHANGELOG has 0.2.8"
+pin "$CHANGELOG_MD" '## 0.2.9' "CHANGELOG has 0.2.9"
+pin "$LIFECYCLE_MD" 'and its autonomic pain path' "lifecycle step 13: the top's handoff carries each seat's pain path" flat
+pin "$LIFECYCLE_MD" 'its autonomic pain path and the last pain line noted, and your own resolved profile' \
+  "lifecycle: the top's own rotation handoff carries each seat's pain path" flat
 
 section "reference line budgets"
 

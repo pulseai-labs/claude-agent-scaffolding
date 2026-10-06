@@ -232,7 +232,8 @@ Every command's syntax comes from `herdr --skill`.
     its machine label where the seat is not on this machine, and,
     per live dispatch, its `REPORT_PATH`, the hash last noted, and the file's identity
     noted beside that hash — inode or mtime, and, per live seat, the molt status path
-    recorded at its launch and the last status line noted; on an activated
+    recorded at its launch and the last status line noted, and its autonomic pain path
+    and the last pain line noted; on an activated
     ossify spine, also the spine's approved `SEATS` block, the resolved coordinator
     profiles and the accumulated close-review ledger (oldest first). With ossify
     installed, that is `/ossify:handoff`.
@@ -286,7 +287,7 @@ machine label where the seat is not on this machine, the pane `run.orchestrator`
 writing, and, per live dispatch, its
 `REPORT_PATH`, the hash last noted, and the file's identity noted beside that hash — inode
 or mtime — and, per live seat, its molt status path recorded at launch and the last status
-line noted, and your own resolved profile
+line noted, its autonomic pain path and the last pain line noted, and your own resolved profile
 — `/ossify:handoff` with ossify installed, the same file by hand without it. Open a new tab
 and pane with the launch command the handoff recorded — ask the operator once when none
 did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`,
