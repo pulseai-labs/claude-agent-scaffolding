@@ -53,7 +53,7 @@ const DANGER = /\bpush\b|\brm\b|\bbranch\b|\bcommit\b|--no-v[a-z]*|\bsend-pack\b
 // without one runs no git (the bypass floor, 0.1.1 §3.1).
 // Bash drops a backslash and joins quoted pieces, so `pu\sh` and `pu""sh` are push (PR #681).
 export const namesDanger = (command: string): boolean => DANGER.test(command.replace(/[\\'"]/g, ''))
-const OPTION_VALUES = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec'])
+const OPTION_VALUES = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec', '--recurse-submodules'])
 // Commit options whose next word is a message, a path or a name, never a flag.
 const COMMIT_VALUES = new Set(['-m', '--message', '-F', '--file', '-C', '-c', '--reuse-message', '--reedit-message',
   '--author', '--date', '--fixup', '--squash', '-t', '--template', '--trailer', '--cleanup'])
