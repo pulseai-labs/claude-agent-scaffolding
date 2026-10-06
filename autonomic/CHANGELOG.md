@@ -22,7 +22,9 @@ All notable changes to the `autonomic` plugin.
   reads the branch as unknown, as does a `cd` below the root; wrappers such as `setsid` are
   runners, a short-flag cluster splits up to its value, and `send-pack`/`http-push` are
   unreadable. A session that leaves autopilot through a failure keeps the floor until
-  `/autopilot off`. Credentials are redacted from the ledger and every pain signal.
+  `/autopilot off`. Path-qualified wrappers, unquoted heredoc substitutions, `rm` operands after
+  `--` and the matching refspec `:` are read too. Credentials — bare or quoted values, credential
+  headers and known token shapes — are redacted from the ledger and every pain signal.
 - **`neverApprove`** (`config.ts`, `enforce.ts`): a `/config` setting naming the enforced rules,
   all six by default; empty means none; an unknown name is reported and ignored.
 - **A deny beneath rings** (F7): a deny from a plugin beneath autonomic's `tool.call` hook rings

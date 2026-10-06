@@ -26,6 +26,7 @@ const SECRETS: ReadonlyArray<[RegExp, string]> = [
   [new RegExp(`(--?(?:token|password|passwd|secret|api-?key|auth))(=|\\s+)${VALUE}`, 'gi'), '$1$2***'],
   [/\b(Authorization:\s*)(?:\w+\s+)?[^\s"']+/gi, '$1***'],
   [/\b(Bearer)\s+[^\s"']+/gi, '$1 ***'],
+  [/\b([A-Za-z0-9-]*(?:key|token|secret|cookie|password|session)[A-Za-z0-9-]*:\s*)[^\s"']+/gi, '$1***'],
   [/\b(?:gh[pousr]_|github_pat_|sk-|xox[abprs]-|glpat-)[A-Za-z0-9_-]+|\bAKIA[A-Z0-9]{16}\b/g, '***'],
 ]
 export const redact = (s: string): string => SECRETS.reduce((t, [re, to]) => t.replace(re, to), s)

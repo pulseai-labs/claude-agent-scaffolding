@@ -35,5 +35,10 @@ describe('redaction (PR #681 round 4, condition 4)', () => {
     for (const secret of ['ghp_Q1', 'k2', 't3', 'p4', 'b5', 'a6', 'github_pat_Z7abc', 'sk-ant-api03-Q8', 'xoxb-9-9', 'AKIAABCDEFGHIJKLMNOP']) expect(line).not.toContain(secret)
     expect(line).toContain('git push -f')
   })
+  test('credential-bearing headers are redacted (PR #681 round 6)', () => {
+    const line = oneLine(`curl -H 'X-API-Key: v1secret' -H "Cookie: sid=v2secret" -H 'Private-Token: v3secret' https://x && git push -f`)
+    for (const secret of ['v1secret', 'v2secret', 'v3secret']) expect(line).not.toContain(secret)
+    expect(line).toContain('git push -f')
+  })
 })
 

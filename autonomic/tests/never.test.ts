@@ -6,6 +6,21 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('a substitution in an unquoted heredoc is unreadable (PR #681 round 6)', () => {
+    expect(rules('cat <<EOF\n$(git push -f origin feat/x)\nEOF')).toContain('unreadable')
+    expect(rules("git commit -m \"$(cat <<'EOF'\nfix: push the branch $(not run)\nEOF\n)\"")).toEqual([])
+  })
+  test('a path-qualified wrapper is a runner (PR #681 round 6)', () => {
+    for (const c of ['/usr/bin/env git push -f origin feat/x', '/usr/bin/sudo git push -f', '/usr/bin/nohup git push -f'])
+      expect(rules(c)).not.toEqual([])
+  })
+  test('rm operands after -- are paths whatever their first character (PR #681 round 6)', () => {
+    expect(rules('rm -rf -- -/../../../tmp/victim')).toContain('rm-outside')
+  })
+  test('the matching refspec : may update the default branch (PR #681 round 6)', () => {
+    expect(rules('git push origin :')).toContain('default-branch-push')
+    expect(rules('git push origin +:')).toContain('default-branch-push')
+  })
   test('a wrapper that runs a program is a runner (PR #681 round 4)', () => {
     for (const c of ['setsid git push -f origin feat/x', 'stdbuf -oL git push -f', 'flock /tmp/l git push -f', 'taskset 1 git push -f'])
       expect(rules(c)).not.toEqual([])

@@ -30,6 +30,8 @@ const below = (path: string, root: string) => path.startsWith(`${root.replace(/\
 // names a danger at all. Keywords that only open a block are stripped and the rest is read.
 const RUNNERS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish', 'eval', 'xargs', 'timeout', 'nice', 'ionice', 'watch', 'parallel', 'find', 'su', 'doas', 'ssh',
   // Wrappers that run the program they are given (PR #681 round 4).
+  // A path-qualified wrapper (/usr/bin/env) is not skipped by the shared reader (round 6).
+  'env', 'sudo', 'command', 'exec', 'nohup', 'time',
   'setsid', 'stdbuf', 'taskset', 'flock', 'chroot', 'chrt', 'systemd-run', 'nsenter', 'unshare', 'numactl', 'runuser', 'setpriv', 'sg', 'firejail', 'unbuffer', 'caffeinate', 'script', 'strace', 'ltrace'])
 // An interpreter runs a program the reader never sees (its quoted text is blanked), so it is
 // a runner too (PR #681): `python3 -c '…git push -f…'`.
@@ -148,7 +150,8 @@ function pushesDefault(args: readonly string[], refspecsAfter: readonly string[]
     const raw = spec.replace(/^\+/, '')
     const dst = raw.includes(':') ? raw.slice(raw.indexOf(':') + 1) : current(raw)
     // A wildcard destination may match the default branch (PR #681 round 3).
-    if (dst === undefined || dst.includes('*')) return true
+    // ':' alone is the matching refspec: every matching branch, the default included (round 6).
+    if (dst === undefined || dst === '' || dst.includes('*')) return true
     return defaults.includes(dst.replace(/^refs\/heads\//, ''))
   })
 }
@@ -200,6 +203,8 @@ function quotedSubstitutions(command: string): string[] {
 
 export function neverRules(command: string, where: Where): NeverRule[] {
   const found = new Set<NeverRule>()
+  // An unquoted heredoc runs its $( ) and backticks; the shared reader blanks the body (round 6).
+  if (/<<-?[ \t]*(?!['"])[^\s;&|<>()]/.test(command) && /\$\(|`/.test(command) && namesDanger(command)) found.add('unreadable')
   for (const body of quotedSubstitutions(command)) for (const r of neverRules(body, where)) found.add(r)
   let cwd: string | undefined = where.cwd
   let dir: string | undefined = where.cwd   // followed through cd, for the repo check only
@@ -218,7 +223,9 @@ export function neverRules(command: string, where: Where): NeverRule[] {
     // A variable or quoted word may be -r: an rm that does not read as recursive is unreadable.
     if (head?.name === 'rm' && !recursive(head.args) && head.args.some(opaque)) found.add('unreadable')
     if (head?.name === 'rm' && recursive(head.args)) {
-      const targets = head.args.filter(a => !a.startsWith('-'))
+      // After `--` every operand is a path, even one that starts with - (round 6).
+      const dd = head.args.indexOf('--')
+      const targets = [...(dd < 0 ? head.args : head.args.slice(0, dd)).filter(a => !a.startsWith('-')), ...(dd < 0 ? [] : head.args.slice(dd + 1))]
       if (targets.some(t => { const p = cwd === undefined ? undefined : resolve(t, cwd, where.home); return p === undefined || !below(p, where.root) }))
         found.add('rm-outside')
     }
