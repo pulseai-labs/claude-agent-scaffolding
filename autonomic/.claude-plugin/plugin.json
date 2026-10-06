@@ -33,9 +33,15 @@
     "yieldAtPercent": {
       "type": "number",
       "title": "Context fill where molt owns the turn end (%)",
-      "description": "At or above this fill autonomic lets every turn end stand, so it never pushes past molt's handoff command. Keep it equal to molt's commandPercent (default 65).",
+      "description": "Used only when molt publishes no stage file (molt absent or older than 0.2.1): at or above this fill autonomic lets every turn end stand.",
       "default": 65,
       "min": 1
+    },
+    "neverApprove": {
+      "type": "string",
+      "title": "Never-approve rules",
+      "description": "In autopilot, a command matching one of these always reaches you, even under bypass permissions. Remove a name to let the fork judge it. Known: force-push default-branch-push branch-delete rm-outside no-verify unreadable. Empty: none.",
+      "default": "force-push default-branch-push branch-delete rm-outside no-verify unreadable"
     }
   }
 }

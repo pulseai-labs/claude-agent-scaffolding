@@ -1,12 +1,18 @@
 // autonomic's settings: the manifest's userConfig values. A bad number falls back to
 // its default and the problem is reported, never silently clamped.
 
+import type { NeverRule } from './never'
+
+// The coded never-approve rules (never.ts) the operator can toggle with neverApprove.
+export const NEVER_RULES: readonly NeverRule[] = ['force-push', 'default-branch-push', 'branch-delete', 'rm-outside', 'no-verify', 'unreadable']
+
 export type AutonomicConfig = {
   policyPath: string
   bell?: string
   loopMax: number
   tailChars: number
   yieldAtPercent: number
+  neverApprove: NeverRule[]
   problems: string[]
 }
 
@@ -15,6 +21,7 @@ export const DEFAULTS: AutonomicConfig = {
   loopMax: 3,
   tailChars: 4000,
   yieldAtPercent: 65,
+  neverApprove: [...NEVER_RULES],
   problems: [],
 }
 
@@ -30,7 +37,16 @@ export function parseConfig(options: Readonly<Record<string, unknown>> | undefin
   if (tailChars < 500) { problems.push(`tailChars=${tailChars} is below 500; using ${DEFAULTS.tailChars}`); tailChars = DEFAULTS.tailChars }
   let yieldAtPercent = num(o.yieldAtPercent) ?? DEFAULTS.yieldAtPercent
   if (yieldAtPercent < 1 || yieldAtPercent > 99) { problems.push(`yieldAtPercent=${yieldAtPercent} is outside 1-99; using ${DEFAULTS.yieldAtPercent}`); yieldAtPercent = DEFAULTS.yieldAtPercent }
+  // An empty string is none; an absent value is all six; an unknown name is reported.
+  let neverApprove: NeverRule[] = [...NEVER_RULES]
+  if (typeof o.neverApprove === 'string') {
+    neverApprove = []
+    for (const name of o.neverApprove.split(/[\s,]+/).filter(Boolean)) {
+      if ((NEVER_RULES as readonly string[]).includes(name)) { if (!neverApprove.includes(name as NeverRule)) neverApprove.push(name as NeverRule) }
+      else problems.push(`neverApprove: unknown rule "${name}" (known: ${NEVER_RULES.join(' ')})`)
+    }
+  }
   const bell = str(o.bell)
-  const base = { policyPath: str(o.policyPath) ?? DEFAULTS.policyPath, loopMax: Math.floor(loopMax), tailChars: Math.floor(tailChars), yieldAtPercent, problems }
+  const base = { policyPath: str(o.policyPath) ?? DEFAULTS.policyPath, loopMax: Math.floor(loopMax), tailChars: Math.floor(tailChars), yieldAtPercent, neverApprove, problems }
   return bell === undefined ? base : { ...base, bell }
 }

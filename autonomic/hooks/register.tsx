@@ -12,6 +12,7 @@ import { scopeMessage } from './prompts'
 import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from './records'
 import type { SessionRecord } from './records'
 import { neverRules } from './never'
+import { enforced } from './enforce'
 import type { Where } from './never'
 import { permissionPrompt } from './prompts'
 import { parsePermission } from './verdict'
@@ -473,7 +474,7 @@ export const register: Register = (on, options) => {
       const raw = (e.input as { command?: unknown } | undefined)?.command
       if (typeof raw === 'string') {
         const command = raw
-        const rules = neverRules(command, await where($))
+        const rules = enforced(neverRules(command, await where($)), cfg.neverApprove)
         if (rules.length > 0) {
           await record($, id, 'permission', `${e.tool}: ${command}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
           await pain($, id, 'never-approve', `${rules.join(', ')} — ${command}`)
