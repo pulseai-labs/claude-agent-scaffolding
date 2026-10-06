@@ -134,8 +134,10 @@ before its command as `herdr-mechanics.md` step 2 says — the same approved SEA
 block injected again — with `HANDOFF_PATH` set and the same `RUN_JSON`, which it continues,
 rebinding `run.orchestrator` to its own pane (its brief's step 2 says). The close waits for a
 completion at the final barrier. A spine session that rotated on a molt warning returns the same
-`rotate:`; one cut mid-round returns none and goes to the operator (`herdr-mechanics.md`, "A
-child past molt's warnings").
+`rotate:`; one cut mid-round returns none and is respawned the same way, its handoff as
+`HANDOFF_PATH`: ossify 1.14.0's run-spine re-enters the round from recorded state, and only a
+halt in its reconcile read-out goes to the operator (`herdr-mechanics.md`, "A child past
+molt's warnings").
 
 When its final report lands, **you dispatch** `/ossify:close <spine-id>` to a close
 session that is **always a fresh seat** you create, never the spine driver's — marked

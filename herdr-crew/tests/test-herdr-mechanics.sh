@@ -65,7 +65,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=322  # 0.2.8: raised from 275 for step 2's molt marking clauses and Completion's molt-child paragraph.
+REF_BUDGET=360  # 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -182,8 +182,12 @@ pin "$REF" 'launched from the same row, marked the same, with a fresh `REPORT_PA
 pin "$REF" 'RESUME FROM: <handoff path>' "the respawned brief names the handoff" flat
 pin "$REF" 'it reuses its predecessor'"'"'s scratch directory' \
   "a respawn keeps the report and scratch directories writable (Review Focus 6)" flat
-pin "$REF" 'a spine session that hands off with no `rotate:` was cut mid-round' \
-  "a spine cut mid-round goes to the operator (Review Focus 4)" flat
+pin "$REF" 'run-spine re-enters a started spine, mid-round included, so respawn it as a `rotate:` is' \
+  "a spine cut mid-round is respawned under ossify 1.14.0, not relayed (#674)" flat
+pin "$REF" 'only that halt goes to the operator' "a re-entry halt still goes to the operator (#674)" flat
+c="$(count_of "$REF" 'relay it to the operator with its handoff path: a spine session' flat)"
+if [ "$c" -eq 0 ]; then pass "the relayed-cut list no longer names the spine session (#674)"
+else fail "the relayed-cut list no longer names the spine session (#674)" "$c left"; fi
 pin "$REF" 'relay it to the operator with its handoff path' "a skill-run cut is relayed" flat
 # Final review (0.2.8) — each pin is one finding.
 pin "$REF" 'not a report ping: it names no path' "the MOLT WARNING ping gets no correction request" flat
@@ -205,6 +209,40 @@ pin "$REF" 'settle the predecessor'"'"'s dispatch first' "a status-only handoff 
 pin "$REF" 'a work-PR session that hands off with no `open:`' "a work-PR cut mid-round goes to the operator" flat
 pin "$REF" 'SEAT_MODS_ALLOW=<REPORT_PATH'"'"'s directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status' \
   "step 2's quoted guarded export carries the molt marking" flat
+
+section "autonomic marking (0.2.9, #676)"
+pin "$REF" '**autonomic marking.**' "step 2 has the autonomic marking clause" flat
+pin "$REF" 'MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain' \
+  "step 2's quoted guarded export carries the autonomic variables" flat
+pin "$REF" '`AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot' \
+  "autopilot is passed down, never set on a manual launcher's child" flat
+pin "$REF" 'jq -r .mode ~/.claude/state/autonomic/sessions/$CLAUDE_CODE_SESSION_ID.json' \
+  "the launcher's mode is read from its own record" flat
+pin "$REF" 'never `$AUTONOMIC_MODE`' "the mode is never read from the environment" flat
+pin "$REF" 'a missing record included' "a missing record reads as manual" flat
+pin "$REF" 'an **absolute** path outside every worktree' "the ledger is absolute and outside every worktree" flat
+pin "$REF" 'the launcher'"'"'s own `$AUTONOMIC_LEDGER` when set, else `<run dir>/autonomic-ledger.md`' \
+  "one ledger per run, inherited down the tree" flat
+pin "$REF" 'A relative launcher value is first resolved against the launcher'"'"'s own repo root' \
+  "an inherited relative ledger is made absolute before it is passed on (PR #679 r1)" flat
+pin "$REF" 'is not passed on: the child gets `<run dir>/autonomic-ledger.md` instead' \
+  "an unsafe inherited ledger path falls back to the run ledger, never into the export (PR #679 r3)" flat
+pin "$REF" 'passed on only when every character is a letter, a digit, `.`, `_`, `/` or `-`' \
+  "the inherited ledger is an allowlist, never a denylist (PR #679 r4)" flat
+pin "$REF" '`<run dir>` and `REPORT_PATH` are herdr-crew'"'"'s own choice and keep to the same characters' \
+  "the paths herdr-crew picks keep the same characters (PR #679 r4)" flat
+c="$(count_of "$REF" 'a backtick or a backslash is not passed on' flat)"
+if [ "$c" -eq 0 ]; then pass "the r3 denylist is gone (PR #679 r4)"
+else fail "the r3 denylist is gone (PR #679 r4)" "$c left"; fi
+c="$(count_of "$REF" 'single-quoted in the export' flat)"
+if [ "$c" -eq 0 ]; then pass "no quoting rule for the ledger remains (PR #679 r3)"
+else fail "no quoting rule for the ledger remains (PR #679 r3)" "$c left"; fi
+pin "$REF" '`AUTONOMIC_BELL` is never set' "no per-seat bell" flat
+pin "$REF" 'and `AUTONOMIC_LEDGER` by the same rule and no pain path' "the top's successor keeps autopilot, has no parent" flat
+pin "$REF" '**A child'"'"'s pain.**' "Completion has the child-pain paragraph" flat
+pin "$REF" 'The heartbeat, per tick, per live seat, reads it too' "the heartbeat reads each child's pain file" flat
+pin "$REF" 'it is never a failed task' "a pain line is an ask, not a failure" flat
+pin "$REF" 'seat-mods refuses the call before autonomic sees it' "a seat-mods deny rings no pain of its own (F7)" flat
 
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"

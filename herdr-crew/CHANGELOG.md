@@ -2,6 +2,41 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.9
+
+**Seats carry autonomic's variables, and a spine cut mid-round is resumed** (autonomic
+0.1.0's Task 16, #676; ossify 1.14.0's run-spine re-entry, #674, #678). Install with
+ossify 1.14.0 or later and autonomic 0.1.0; molt 0.2.0 stays the pairing for 0.2.8's child
+mode.
+
+- **autonomic marking** (`herdr-mechanics.md` step 2). The per-pane export every child
+  already takes adds `AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain`,
+  and `AUTONOMIC_MODE=autopilot` only when the launcher's own autonomic record reads
+  `autopilot` — never `$AUTONOMIC_MODE`, which misses `/autopilot on` and a molt's lineage and
+  can say autopilot where autonomic refused it; a missing record reads as manual. `<ledger>` is
+  the launcher's own `$AUTONOMIC_LEDGER` (resolved to absolute first, and passed on only when every character is a letter, digit, `.`, `_`, `/` or `-`), else
+  `<run dir>/autonomic-ledger.md`: one absolute ledger per run, outside every worktree. The top's rotation successor takes the mode and the
+  ledger, no pain path. `AUTONOMIC_BELL` is never set.
+- **A child's pain** (`herdr-mechanics.md`, Completion). The heartbeat and the read before a
+  retained seat's next unit read each child's pain file beside its molt status file; a new
+  line is the seat asking upward, never a failed task. A seat-mods deny rings nothing of its
+  own. The top's handoffs carry each seat's pain path.
+- **A spine cut mid-round is respawned, not relayed** (#674). ossify 1.14.0's run-spine
+  re-enters a started spine, so a spine session that hands off with no `rotate:` is respawned
+  as a `rotate:` is; only a halt in its reconcile read-out goes to the operator. Before
+  its re-run the successor closes every item pane its predecessor left live, or halts. The spine
+  brief still never stops mid-round on its own: relaxing ROTATE waits for a restarted spine
+  session to prove the re-entry.
+- **Spine-brief caller rules** (ossify `external-executor.md` §2a). The staged-result rule is
+  scoped to a re-entry request for an item this session has not executed; a rejected
+  result's worktree is the correction path. The caller counts each execution the lane did not request — a correction or a replacement — reading
+  `dispatches` first. An `adopt` item arrives as an ordinary request; `finish-merge`,
+  `finish-status` and `complete` items get none.
+- **`dsh-driver.md`** (#678). A dsh spine session is resumed by a steered re-run of the
+  spine command, `<spine-id> --external-executor` — the shape the `crew-spine` persona
+  accepts — never "continue from its recorded state". paseo-crew's and orca-crew's copies carry the same text, to keep their parity
+  gates; neither is re-versioned.
+
 ## 0.2.8
 
 **Children hand off to their parent; only the top molts in place** (molt 0.2.0's child

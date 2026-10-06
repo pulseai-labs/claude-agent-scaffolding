@@ -182,7 +182,9 @@ is active, because `molt` owns the context boundary there. Since 0.2.8, every ch
 launched as a molt child (`MOLT_HANDOFF=parent`): at molt's warnings it pings its parent and
 hands off at its next boundary, and molt never clears it; only the top molts in place
 (`references/lifecycle.md`, "Where molt runs"). Install molt 0.2.0 and herdr-crew 0.2.8
-together. That hook is the only deterministic code a run executes: a run
+together. Since 0.2.9, the same launch export carries `autonomic`'s three variables: every
+Claude Code child (autonomic is a Claude Code mod) writes the run's one ledger and its own pain file beside its report, and runs in
+autopilot only when its launcher does (`references/herdr-mechanics.md` step 2). That hook is the only deterministic code a run executes: a run
 has **no `lib/`, no state directory, no parser** — `agents.md` and `roles.md` are read as
 prose and nothing parses them. The suites and the eval harness under `tests/` are
 build-and-test tooling; the plugin never runs them on a user's path.
