@@ -9,7 +9,8 @@ export type Where = { cwd: string; root: string; home: string; branch?: string; 
 
 // Blanked text (a \u0000 marker), a variable, a substitution or a glob home is unreadable.
 function resolve(path: string, cwd: string, home: string): string | undefined {
-  if (/[\u0000$`]/.test(path)) return undefined
+  // A brace or a backslash may expand to `..`, and a glob on a dot name may match it (bash 3.2) (PR #681).
+  if (/[\u0000$`{\\]/.test(path) || /(?:^|\/)\.[^/]*[*?[]/.test(path)) return undefined
   const abs = path === '~' ? home : path.startsWith('~/') ? `${home}/${path.slice(2)}` : path.startsWith('/') ? path : `${cwd}/${path}`
   if (abs.startsWith('~')) return undefined
   const out: string[] = []
@@ -43,7 +44,8 @@ const OPENERS = new Set(['if', 'then', 'do', 'else', 'elif', 'while', 'until', '
 const DANGER = /\bpush\b|\brm\b|\bbranch\b|\bcommit\b|--no-verify/
 // The cheap pre-check: every rule neverRules finds needs one of these words, so a command
 // without one runs no git (the bypass floor, 0.1.1 §3.1).
-export const namesDanger = (command: string): boolean => DANGER.test(command)
+// Bash drops a backslash and joins quoted pieces, so `pu\sh` and `pu""sh` are push (PR #681).
+export const namesDanger = (command: string): boolean => DANGER.test(command.replace(/[\\'"]/g, ''))
 const OPTION_VALUES = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec'])
 // Commit options whose next word is a message, a path or a name, never a flag.
 const COMMIT_VALUES = new Set(['-m', '--message', '-F', '--file', '-C', '-c', '--reuse-message', '--reedit-message',
@@ -88,7 +90,7 @@ function pieces(tokens: readonly string[]): string[][] {
 }
 
 // Quoted text (a \u0000 marker) or a variable: a word autonomic cannot read.
-const opaque = (t: string) => /[\u0000$]/.test(t)
+const opaque = (t: string) => /[\u0000$\\{]/.test(t)
 
 const recursive = (args: readonly string[]) =>
   args.some(a => expand(a) === '--recursive' || /^-[A-Za-z]*[rR][A-Za-z]*$/.test(a))
@@ -122,8 +124,10 @@ function pushesDefault(args: readonly string[], refspecsAfter: readonly string[]
   const defaults = where.defaultBranch !== undefined ? [where.defaultBranch] : ['main', 'master']
   if (args.includes('--all') || args.includes('--branches') || args.includes('--mirror')) return true
   const positional = positionalOf(args)
-  const refspecs = [...positional.slice(1), ...refspecsAfter]   // the first is the remote
-  const current = (ref: string) => (ref === 'HEAD' ? where.branch : ref)
+  // The first positional is the remote, unless --repo named it (PR #681).
+  const repo = args.some(a => a === '--repo' || a.startsWith('--repo='))
+  const refspecs = [...(repo ? positional : positional.slice(1)), ...refspecsAfter]
+  const current = (ref: string) => (ref === 'HEAD' || ref === '@' ? where.branch : ref)
   if (refspecs.length === 0) return where.branch === undefined || defaults.includes(where.branch)
   return refspecs.some(spec => {
     const raw = spec.replace(/^\+/, '')
@@ -192,7 +196,7 @@ export function neverRules(command: string, where: Where): NeverRule[] {
     const head = commandOf(tokens)
     if (head === undefined) continue
     if (head.name.startsWith('-') || opaque(head.name) || RUNNERS.has(head.name) || INTERPRETER.test(head.name) || tokens.some(t => t.includes('`') || t.includes('$('))) {
-      if (DANGER.test(command)) found.add('unreadable')
+      if (namesDanger(command)) found.add('unreadable')
     }
     if (head?.name === 'cd' || head?.name === 'pushd' || head?.name === 'popd') {
       const t = head.name === 'popd' ? undefined : (head.args.find(a => !a.startsWith('-')) ?? (head.name === 'cd' ? '~' : undefined))
@@ -210,7 +214,7 @@ export function neverRules(command: string, where: Where): NeverRule[] {
     const git = gitOf(tokens)
     if (git === undefined) continue
     const { sub } = git
-    if ((opaque(sub) || !readableGlobals(tokens)) && DANGER.test(command)) found.add('unreadable')
+    if ((opaque(sub) || !readableGlobals(tokens)) && namesDanger(command)) found.add('unreadable')
     const args = flags(git.args)
     // The shared reader drops what follows `--`; for push those words are refspecs.
     const dashes = tokens.indexOf('--')

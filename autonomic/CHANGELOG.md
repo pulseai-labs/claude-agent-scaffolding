@@ -15,7 +15,9 @@ All notable changes to the `autonomic` plugin.
   permissions too (probe P14). Manual mode never touches an allow; a deny is never changed.
   A failure inside the floor keeps the call with the operator. The reader now lists an
   interpreter, a git global it cannot skip, or an inline git alias as unreadable when the
-  command names a danger, and reads an abbreviated long option as the option it abbreviates.
+  command names a danger, and reads an abbreviated long option as the option it abbreviates;
+  an escaped, quote-split or brace word is unreadable, an `rm -r` path with a brace or a dot
+  glob is outside, `--repo` names the remote, and `@` is `HEAD`.
 - **`neverApprove`** (`config.ts`, `enforce.ts`): a `/config` setting naming the enforced rules,
   all six by default; empty means none; an unknown name is reported and ignored.
 - **A deny beneath rings** (F7): a deny from a plugin beneath autonomic's `tool.call` hook rings

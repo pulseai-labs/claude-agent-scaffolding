@@ -115,7 +115,7 @@ rules — `force-push`, `default-branch-push`, `branch-delete`, `rm-outside`, `n
 is left alone on an allow. A repo whose default branch takes direct pushes by design removes
 `default-branch-push`.
 
-A unique prefix of a long option is read as that option (`--forc` is `--force`, `rm --recurs` is `--recursive`), as git and GNU tools accept it. A danger the command text does not show — a git alias defined in config, a script file — is not seen.
+A unique prefix of a long option is read as that option (`--forc` is `--force`, `rm --recurs` is `--recursive`), as git and GNU tools accept it. A word with a backslash, a quote inside it or a brace (`pu\sh`, `pu""sh`, `{main,x}`) is unreadable when the command may name a danger, and an `rm -r` path with a brace or a glob on a dot name (`.?`, `.*`) counts as outside the worktree. `--repo` names the remote, and `@` is `HEAD`. A danger the command text does not show — a git alias defined in config, a script file — is not seen.
 
 The list reads each command segment with seat-mods' shell reader (copied, and held identical by
 `tests/test-mod-shell-parity.sh`). Otherwise the fork judges the call against the policy's

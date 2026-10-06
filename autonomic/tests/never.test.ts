@@ -6,6 +6,24 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('an escaped or quote-split word is unreadable when it may spell a danger (PR #681 round 2)', () => {
+    for (const c of ['git pu\\sh -f origin feat/x', 'git pu""sh -f', "git p'u'sh -f", 'r\\m -rf /tmp/x', 'git push origin ma\\in'])
+      expect(rules(c)).not.toEqual([])
+  })
+  test('--repo names the remote, so every positional is a refspec (PR #681 round 2)', () => {
+    expect(rules('git push --repo origin main')).toContain('default-branch-push')
+    expect(rules('git push --repo=origin main')).toContain('default-branch-push')
+    expect(rules('git push --repo origin feat/x')).toEqual([])
+  })
+  test('@ is HEAD (PR #681 round 2)', () => {
+    expect(rules('git push origin @', { ...W, branch: 'main' })).toContain('default-branch-push')
+  })
+  test('a brace or a dot-glob in an rm path may leave the root (PR #681 round 2)', () => {
+    expect(rules('rm -rf /repo/{.,x}./victim')).toContain('rm-outside')
+    expect(rules('rm -rf /repo/sub/.?')).toContain('rm-outside')
+    expect(rules('rm -rf /repo/dist/*')).toEqual([])
+    expect(rules('git push origin {main,x}')).not.toEqual([])
+  })
   test('an interpreter running a program that names a danger is unreadable (PR #681)', () => {
     for (const c of [`python3 -c 'import os; os.system("git push -f")'`, `node -e "require('child_process').execSync('git push -f')"`,
       `perl -e 'system("rm -rf /")'`, `/usr/bin/python3.12 -c 'x' && git push origin feat/x`, `ruby -e 'system("git push -f")'`])
@@ -34,6 +52,7 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   test('namesDanger is the cheap pre-check (Review Focus 2)', () => {
     for (const c of ['git push', 'rm -rf x', 'git commit -m x', 'x --no-verify', 'git branch -D y']) expect(namesDanger(c)).toBe(true)
     for (const c of ['ls -la', 'npm test', 'git status', 'cat README.md']) expect(namesDanger(c)).toBe(false)
+    for (const c of ['git pu\\sh', 'git pu""sh', "r'm' -rf x"]) expect(namesDanger(c)).toBe(true)
   })
   test('force push, in every spelling', () => {
     for (const c of ['git push -f', 'git push --force origin feat/x', 'git push --force-with-lease', 'git push origin +feat/x', 'git push --mirror'])
