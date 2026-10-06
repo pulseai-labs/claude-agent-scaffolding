@@ -33,7 +33,7 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    command — one `herdr pane run <pane> "export …"` (`worktree create` takes no `--env`); a
    `kind: dsh-spine-driver` seat is a dsh session, not a pane, and is never marked (`dsh-driver.md`).
    A guarded seat — implementer, verifier or reviewer — is marked by its launcher, before its command, with `herdr pane run <pane> "export SEAT_MODS_ROLE=<role>
-   SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER='<ledger>' AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"`, plus `AUTONOMIC_MODE=autopilot` where the autonomic marking below says. A project-file role whose `replaces:` names one of those roles is guarded as that role.
+   SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"`, plus `AUTONOMIC_MODE=autopilot` where the autonomic marking below says. A project-file role whose `replaces:` names one of those roles is guarded as that role.
    A project-file role with no `replaces:` is marked a guarded `implementer` — its own
    report directory and its scratch directory in its `SEAT_MODS_ALLOW`. A coordinator seat —
    the spine, close or work-PR session, the doctor session, the lane driver — exports
@@ -57,16 +57,16 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    hands off to its parent (Completion, "A child past molt's warnings"). The operator's first
    top and the top's rotation successor are roots and take neither; a dsh seat is not a pane
    and takes neither.
-   **autonomic marking.** The same export adds `AUTONOMIC_LEDGER='<ledger>'
+   **autonomic marking.** The same export adds `AUTONOMIC_LEDGER=<ledger>
    AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain` for every child the molt marking reaches,
    and `AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot. `<ledger>` is
    the launcher's own `$AUTONOMIC_LEDGER` when set, else `<run dir>/autonomic-ledger.md`: one
    ledger per run, an **absolute** path outside every worktree. A relative launcher value is
    first resolved against the launcher's own repo root, as autonomic resolves it, never passed
    on as written: a relative path resolves inside each seat's worktree and dies with it, and
-   with none the ledger lands in the worktree and rides the seat's commits. `<ledger>` is
-   single-quoted in the export, a single quote in it written `'\''`, since an inherited path
-   may hold a space. The launcher's mode is its own autonomic record, read at each
+   with none the ledger lands in the worktree and rides the seat's commits. The export
+   quotes nothing, so an inherited path holding a space, a quote, `$`, a backtick or a
+   backslash is not passed on: the child gets `<run dir>/autonomic-ledger.md` instead. The launcher's mode is its own autonomic record, read at each
    launch — `jq -r .mode ~/.claude/state/autonomic/sessions/$CLAUDE_CODE_SESSION_ID.json` —
    never `$AUTONOMIC_MODE`: the top may be in autopilot by `/autopilot on` or a molt's lineage,
    which the environment never shows, and a session whose environment says autopilot may have

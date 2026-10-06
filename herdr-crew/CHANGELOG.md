@@ -10,11 +10,11 @@ ossify 1.14.0 or later and autonomic 0.1.0; molt 0.2.0 stays the pairing for 0.2
 mode.
 
 - **autonomic marking** (`herdr-mechanics.md` step 2). The per-pane export every child
-  already takes adds `AUTONOMIC_LEDGER='<ledger>' AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain`,
+  already takes adds `AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain`,
   and `AUTONOMIC_MODE=autopilot` only when the launcher's own autonomic record reads
   `autopilot` — never `$AUTONOMIC_MODE`, which misses `/autopilot on` and a molt's lineage and
   can say autopilot where autonomic refused it; a missing record reads as manual. `<ledger>` is
-  the launcher's own `$AUTONOMIC_LEDGER` (resolved to absolute first, and single-quoted), else
+  the launcher's own `$AUTONOMIC_LEDGER` (resolved to absolute first; one holding a space, quote, `$`, backtick or backslash is not passed on), else
   `<run dir>/autonomic-ledger.md`: one absolute ledger per run, outside every worktree. The top's rotation successor takes the mode and the
   ledger, no pain path. `AUTONOMIC_BELL` is never set.
 - **A child's pain** (`herdr-mechanics.md`, Completion). The heartbeat and the read before a

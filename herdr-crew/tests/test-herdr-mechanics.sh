@@ -212,7 +212,7 @@ pin "$REF" 'SEAT_MODS_ALLOW=<REPORT_PATH'"'"'s directory>:<its scratch directory
 
 section "autonomic marking (0.2.9, #676)"
 pin "$REF" '**autonomic marking.**' "step 2 has the autonomic marking clause" flat
-pin "$REF" 'MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER='"'"'<ledger>'"'"' AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain' \
+pin "$REF" 'MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain' \
   "step 2's quoted guarded export carries the autonomic variables" flat
 pin "$REF" '`AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot' \
   "autopilot is passed down, never set on a manual launcher's child" flat
@@ -225,7 +225,11 @@ pin "$REF" 'the launcher'"'"'s own `$AUTONOMIC_LEDGER` when set, else `<run dir>
   "one ledger per run, inherited down the tree" flat
 pin "$REF" 'A relative launcher value is first resolved against the launcher'"'"'s own repo root' \
   "an inherited relative ledger is made absolute before it is passed on (PR #679 r1)" flat
-pin "$REF" '`<ledger>` is single-quoted in the export' "an inherited ledger path with a space survives the export (PR #679 r1)" flat
+pin "$REF" 'is not passed on: the child gets `<run dir>/autonomic-ledger.md` instead' \
+  "an unsafe inherited ledger path falls back to the run ledger, never into the export (PR #679 r3)" flat
+c="$(count_of "$REF" 'single-quoted in the export' flat)"
+if [ "$c" -eq 0 ]; then pass "no quoting rule for the ledger remains (PR #679 r3)"
+else fail "no quoting rule for the ledger remains (PR #679 r3)" "$c left"; fi
 pin "$REF" '`AUTONOMIC_BELL` is never set' "no per-seat bell" flat
 pin "$REF" 'and `AUTONOMIC_LEDGER` by the same rule and no pain path' "the top's successor keeps autopilot, has no parent" flat
 pin "$REF" '**A child'"'"'s pain.**' "Completion has the child-pain paragraph" flat
