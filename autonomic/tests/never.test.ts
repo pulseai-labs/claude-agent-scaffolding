@@ -6,6 +6,13 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('GIT_DIR or GIT_WORK_TREE makes the repository unknown (PR #681 round 17)', () => {
+    expect(rules('GIT_DIR=/other/.git git push')).toContain('default-branch-push')
+    expect(rules('GIT_WORK_TREE=/other git push')).toContain('default-branch-push')
+  })
+  test('heads/main is main (PR #681 round 17)', () => {
+    expect(rules('git push origin heads/main')).toContain('default-branch-push')
+  })
   test('nothing is below a worktree at / (PR #681 round 16)', () => {
     expect(rules('rm -rf --no-preserve-root /', { ...W, root: '/', cwd: '/' })).toContain('rm-outside')
   })

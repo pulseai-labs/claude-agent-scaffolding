@@ -164,7 +164,8 @@ function pushesDefault(args: readonly string[], refspecsAfter: readonly string[]
     // A wildcard destination may match the default branch (PR #681 round 3).
     // ':' alone is the matching refspec: every matching branch, the default included (round 6).
     if (dst === undefined || dst === '' || dst.includes('*')) return true
-    return defaults.includes(dst.replace(/^refs\/heads\//, ''))
+    // heads/main is refs/heads/main (round 17).
+    return defaults.includes(dst.replace(/^(?:refs\/)?heads\//, ''))
   }
   return reading([...positional.slice(1), ...refspecsAfter]) || (repo && reading([...positional, ...refspecsAfter]))
 }
@@ -172,6 +173,8 @@ function pushesDefault(args: readonly string[], refspecsAfter: readonly string[]
 // The directory a git call runs in: -C moves it; --git-dir and --work-tree make it unknown.
 function gitDirOf(tokens: readonly string[], dir: string | undefined, home: string): string | undefined {
   const g = commandOf(tokens)?.args ?? []
+  // GIT_DIR or GIT_WORK_TREE before git selects another repository, as --git-dir does (round 17).
+  if (tokens.some(t => /^GIT_(?:DIR|WORK_TREE)=/.test(t))) return undefined
   let at = dir
   for (let i = 0; g[i]?.startsWith('-'); i += g[i] === '-C' || g[i] === '-c' ? 2 : 1) {
     const v = g[i + 1]
