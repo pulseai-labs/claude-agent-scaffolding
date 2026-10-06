@@ -40,5 +40,10 @@ describe('redaction (PR #681 round 4, condition 4)', () => {
     for (const secret of ['v1secret', 'v2secret', 'v3secret']) expect(line).not.toContain(secret)
     expect(line).toContain('git push -f')
   })
+  test('a quoted credential header is redacted to its closing quote (PR #681 round 7)', () => {
+    const line = oneLine(`curl -H 'X-API-Key: very secret value' -H "Cookie: locale=en; session=productionSecret" -H 'Authorization: Basic dXNlcjpwYXNz extra' https://x && git push -f origin main`)
+    for (const secret of ['secret value', 'productionSecret', 'dXNlcjpwYXNz', 'extra']) expect(line).not.toContain(secret)
+    expect(line).toContain('git push -f origin main')
+  })
 })
 

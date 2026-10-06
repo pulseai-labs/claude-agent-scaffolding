@@ -32,6 +32,8 @@ const RUNNERS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish', 'eval', 'xa
   // Wrappers that run the program they are given (PR #681 round 4).
   // A path-qualified wrapper (/usr/bin/env) is not skipped by the shared reader (round 6).
   'env', 'sudo', 'command', 'exec', 'nohup', 'time',
+  // Bash builtins that run a command (round 7).
+  'coproc', 'builtin', 'trap',
   'setsid', 'stdbuf', 'taskset', 'flock', 'chroot', 'chrt', 'systemd-run', 'nsenter', 'unshare', 'numactl', 'runuser', 'setpriv', 'sg', 'firejail', 'unbuffer', 'caffeinate', 'script', 'strace', 'ltrace'])
 // An interpreter runs a program the reader never sees (its quoted text is blanked), so it is
 // a runner too (PR #681): `python3 -c '…git push -f…'`.

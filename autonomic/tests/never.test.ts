@@ -6,6 +6,10 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('a Bash builtin that runs a command is a runner (PR #681 round 7)', () => {
+    for (const c of ['coproc git push -f origin feat/x', 'builtin command git push -f', "trap 'git push -f' EXIT"])
+      expect(rules(c)).not.toEqual([])
+  })
   test('a substitution in an unquoted heredoc is unreadable (PR #681 round 6)', () => {
     expect(rules('cat <<EOF\n$(git push -f origin feat/x)\nEOF')).toContain('unreadable')
     expect(rules("git commit -m \"$(cat <<'EOF'\nfix: push the branch $(not run)\nEOF\n)\"")).toEqual([])

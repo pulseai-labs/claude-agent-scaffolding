@@ -20,7 +20,10 @@ export function ledgerPathFor(env: string | undefined, root: string): string {
 // URL user info, NAME_TOKEN=… style assignments, --token/--password values, an
 // Authorization or Bearer value — bare or quoted — and known token shapes anywhere.
 const VALUE = `(?:"[^"]*"|'[^']*'|[^\\s"']+)`
+const HEADER = '[A-Za-z0-9-]*(?:authorization|key|token|secret|cookie|password|session)[A-Za-z0-9-]*'
 const SECRETS: ReadonlyArray<[RegExp, string]> = [
+  // A quoted header loses everything up to its closing quote: spaces and ; included (round 7).
+  [new RegExp(`(["'])(${HEADER}:\\s*)[^"'\\n]*`, 'gi'), '$1$2***'],
   [/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, '$1***@'],
   [new RegExp(`\\b([A-Za-z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|AUTH)[A-Za-z0-9_]*)=${VALUE}`, 'gi'), '$1=***'],
   [new RegExp(`(--?(?:token|password|passwd|secret|api-?key|auth))(=|\\s+)${VALUE}`, 'gi'), '$1$2***'],
