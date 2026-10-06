@@ -7,6 +7,42 @@ const fork = (o: object) => ({ isAnswered: true as const, text: JSON.stringify(o
 const tool = (name = 'Edit') => ({ tool: name, file_path: '/repo/a.ts' }) as never
 
 describe('the turn-end reflex (spec §3.1)', () => {
+  test('molt says command: stand aside below yieldAtPercent (#677 F12)', async ($, on) => {
+    const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":"command","command":20}' } })
+    w.usage = { tokens: 150_000, window: 1_000_000 }
+    expect((await $.classic.Stop(STOP())).block).toBeUndefined()
+    expect(w.forkPrompts).toEqual([])
+    expect(ledgerLines(w).at(-1)).toContain(' · molt · ')
+  })
+  test('molt says warn: judge the turn end even above yieldAtPercent (#677 F12)', async ($, on) => {
+    const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":"warn","command":80}' } })
+    w.usage = { tokens: 700_000, window: 1_000_000 }
+    w.forks.push(fork({ case: 'covered', question: 'Proceed?', answer: 'yes', reason: 'plan' }))
+    expect((await $.classic.Stop(STOP())).block).toBe('Autopilot: yes. Proceed.')
+  })
+  test('molt off: no fill fallback (#677 F12)', async ($, on) => {
+    const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":"off"}' } })
+    w.usage = { tokens: 700_000, window: 1_000_000 }
+    w.forks.push(fork({ case: 'covered', question: 'Proceed?', answer: 'yes', reason: 'plan' }))
+    expect((await $.classic.Stop(STOP())).block).toBe('Autopilot: yes. Proceed.')
+  })
+  test('no stage file: the yieldAtPercent fallback stands (#677 F12)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.usage = { tokens: 700_000, window: 1_000_000 }
+    expect((await $.classic.Stop(STOP())).block).toBeUndefined()
+    expect(w.forkPrompts).toEqual([])
+  })
+  test('an unreadable stage file is no file: the yieldAtPercent fallback stands (#677 F12)', async ($, on) => {
+    const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":' } })
+    w.usage = { tokens: 700_000, window: 1_000_000 }
+    expect((await $.classic.Stop(STOP())).block).toBeUndefined()
+    expect(w.forkPrompts).toEqual([])
+  })
+  test("another session's stage file never yields this one (Review Focus 1)", async ($, on) => {
+    const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s0': '{"stage":"command"}' } })
+    w.forks.push(fork({ case: 'covered', question: 'Proceed?', answer: 'yes', reason: 'plan' }))
+    expect((await $.classic.Stop(STOP())).block).toBe('Autopilot: yes. Proceed.')
+  })
   test('covered: block with the answer; ledger line with usage', async ($, on) => {
     const w = world(on, { env: AP })
     w.forks.push(fork({ case: 'covered', question: 'Proceed with step 3?', answer: 'yes, run step 3', reason: 'plan step 3' }))

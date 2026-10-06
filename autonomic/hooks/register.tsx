@@ -9,7 +9,7 @@ import type { LedgerCase, Usage } from './ledger'
 import { parseCommand, parseEnvMode, resolveDoc, statusText } from './mode'
 import { DEFAULT_POLICY, POLICY_ID, expandHome } from './policy'
 import { scopeMessage } from './prompts'
-import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath } from './records'
+import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from './records'
 import type { SessionRecord } from './records'
 import { neverRules } from './never'
 import type { Where } from './never'
@@ -18,7 +18,7 @@ import { parsePermission } from './verdict'
 import { MAX_INPUT, askPrompt, shownInput } from './prompts'
 import { parseAsk } from './verdict'
 import type { Question } from './verdict'
-import { hasMoltMarker, statusYields } from './floor'
+import { hasMoltMarker, parseStage, stageYields, statusYields } from './floor'
 import { turnEndPrompt } from './prompts'
 import { parseTurn } from './verdict'
 
@@ -404,12 +404,14 @@ export const register: Register = (on, options) => {
       // Another plugin continues this turn already (molt's command, plan decision 4).
       if (r.block !== undefined) { await log($, `stop: a block beneath stands session=${id}`); return r }
       const answer = e.last_assistant_message ?? ''
-      // Past molt's handoff command the turn end is molt's, whichever Stop hook runs first (final review I2).
-      const fill = fillPercent((await $.session.usage()).context)
-      if (hasMoltMarker(answer) || statusYields(await readStatus($)) || (fill !== undefined && fill >= cfg.yieldAtPercent)) {
+      // The turn end is molt's at its handoff command (spec 0.1.1 §2): molt's stage file when
+      // it exists, else the yieldAtPercent fill fallback (molt absent or older).
+      const stage = safeSessionId(id) ? parseStage(await readText($, stagePath(await home($), id))) : undefined
+      const fill = stage === undefined ? fillPercent((await $.session.usage()).context) : undefined
+      if (hasMoltMarker(answer) || statusYields(await readStatus($)) || stageYields(stage) || (fill !== undefined && fill >= cfg.yieldAtPercent)) {
         pushes.delete(id)
         changed.delete(id)
-        await record($, id, 'molt', 'turn end in a molt handoff', 'let it stop', 'molt owns this turn end (amendment A2)')
+        await record($, id, 'molt', 'turn end in a molt handoff', 'let it stop', 'molt owns this turn end')
         return r
       }
       const n = changed.has(id) ? 0 : (pushes.get(id) ?? 0)
