@@ -6,6 +6,17 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('any unlisted wrapper before git or rm is unreadable (PR #681 round 14)', () => {
+    for (const c of ['prlimit git push -f origin feat/x', 'mywrap --x /usr/bin/git push -f', 'cgexec -g cpu:x rm -rf /tmp/x'])
+      expect([c, rules(c).length > 0]).toEqual([c, true])
+    expect(rules('npm test && git push origin feat/x')).toEqual([])
+  })
+  test('a quoted -c value may be an alias (PR #681 round 14)', () => {
+    expect(rules('git -c "alias.p=push" p -f origin feat/x')).toContain('unreadable')
+  })
+  test('an abbreviated value-taking push option skips its value (PR #681 round 14)', () => {
+    expect(rules('git push --recurse-submodule check origin', { ...W, branch: 'main' })).toContain('default-branch-push')
+  })
   test('--recurse-submodules takes a value (PR #681 round 13)', () => {
     expect(rules('git push --recurse-submodules check origin', { ...W, branch: 'main' })).toContain('default-branch-push')
   })

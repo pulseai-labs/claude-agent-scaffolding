@@ -123,7 +123,8 @@ function readableGlobals(tokens: readonly string[]): boolean {
   for (let i = 0; g[i]?.startsWith('-'); i += 1) {
     const a = g[i]!
     if (a === '-C') { i += 1; continue }
-    if (a === '-c') { if ((g[i + 1] ?? '').toLowerCase().startsWith('alias.')) return false; i += 1; continue }
+    // A quoted -c value may be an alias too (round 14).
+    if (a === '-c') { const v = g[i + 1] ?? ''; if (opaque(v) || v.toLowerCase().startsWith('alias.')) return false; i += 1; continue }
     if (a.startsWith('--config-env')) return false
     if (/^--[a-z-]+=/.test(a) || GIT_FLAGS.has(a)) continue
     return false
@@ -135,7 +136,8 @@ function positionalOf(args: readonly string[]): string[] {
   const positional: string[] = []
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!
-    if (OPTION_VALUES.has(a)) { i += 1; continue }
+    // A unique prefix of a value-taking long option takes its value too (round 14).
+    if (OPTION_VALUES.has(a) || (/^--[a-z-]{3,}$/.test(a) && [...OPTION_VALUES].some(o => o.startsWith('--') && o.startsWith(a)))) { i += 1; continue }
     if (!a.startsWith('-')) positional.push(a)
   }
   return positional
@@ -215,7 +217,10 @@ export function neverRules(command: string, where: Where): NeverRule[] {
   for (const tokens of segments(command).flatMap(pieces)) {
     const head = commandOf(tokens)
     if (head === undefined) continue
-    if (head.name.startsWith('-') || opaque(head.name) || RUNNERS.has(head.name) || INTERPRETER.test(head.name) || tokens.some(t => t.includes('`') || t.includes('$('))) {
+    // Any wrapper, listed or not: git or rm as a later bare word runs under a head the reader
+    // does not follow (round 14).
+    const wrapped = head.name !== 'git' && head.name !== 'rm' && head.args.some(a => /^(?:.*\/)?(?:git|rm)$/.test(a))
+    if (wrapped || head.name.startsWith('-') || opaque(head.name) || RUNNERS.has(head.name) || INTERPRETER.test(head.name) || tokens.some(t => t.includes('`') || t.includes('$('))) {
       if (namesDanger(command)) found.add('unreadable')
     }
     if (head?.name === 'cd' || head?.name === 'pushd' || head?.name === 'popd') {
