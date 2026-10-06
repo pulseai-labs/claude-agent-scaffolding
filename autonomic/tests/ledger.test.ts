@@ -30,5 +30,10 @@ describe('redaction (PR #681 round 4, condition 4)', () => {
     for (const secret of ['ghp_SECRET', 'abc123', 'xyz', 'tok9']) expect(line).not.toContain(secret)
     expect(line).toContain('https://***@github.com/o/r.git')
   })
+  test('quoted values, auth headers and known token shapes are redacted too (PR #681 round 5)', () => {
+    const line = oneLine(`GITHUB_TOKEN="ghp_Q1" git push -f && X='y' API_KEY='k2' cmd --token "t3" --password 'p4' -H "Authorization: Bearer b5" -H 'Authorization: token a6' && curl -d github_pat_Z7abc && echo sk-ant-api03-Q8 xoxb-9-9 AKIAABCDEFGHIJKLMNOP`)
+    for (const secret of ['ghp_Q1', 'k2', 't3', 'p4', 'b5', 'a6', 'github_pat_Z7abc', 'sk-ant-api03-Q8', 'xoxb-9-9', 'AKIAABCDEFGHIJKLMNOP']) expect(line).not.toContain(secret)
+    expect(line).toContain('git push -f')
+  })
 })
 

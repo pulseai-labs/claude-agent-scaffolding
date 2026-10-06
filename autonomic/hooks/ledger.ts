@@ -17,12 +17,16 @@ export function ledgerPathFor(env: string | undefined, root: string): string {
 }
 
 // A credential never reaches the committed ledger, a notice or a pain file (PR #681):
-// URL user info, NAME_TOKEN=… style assignments, --token/--password values, a Bearer value.
+// URL user info, NAME_TOKEN=… style assignments, --token/--password values, an
+// Authorization or Bearer value — bare or quoted — and known token shapes anywhere.
+const VALUE = `(?:"[^"]*"|'[^']*'|[^\\s"']+)`
 const SECRETS: ReadonlyArray<[RegExp, string]> = [
   [/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, '$1***@'],
-  [/\b([A-Za-z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|AUTH)[A-Za-z0-9_]*)=[^\s"']+/gi, '$1=***'],
-  [/(--?(?:token|password|passwd|secret|api-?key|auth))(=|\s+)[^\s"']+/gi, '$1$2***'],
+  [new RegExp(`\\b([A-Za-z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|AUTH)[A-Za-z0-9_]*)=${VALUE}`, 'gi'), '$1=***'],
+  [new RegExp(`(--?(?:token|password|passwd|secret|api-?key|auth))(=|\\s+)${VALUE}`, 'gi'), '$1$2***'],
+  [/\b(Authorization:\s*)(?:\w+\s+)?[^\s"']+/gi, '$1***'],
   [/\b(Bearer)\s+[^\s"']+/gi, '$1 ***'],
+  [/\b(?:gh[pousr]_|github_pat_|sk-|xox[abprs]-|glpat-)[A-Za-z0-9_-]+|\bAKIA[A-Z0-9]{16}\b/g, '***'],
 ]
 export const redact = (s: string): string => SECRETS.reduce((t, [re, to]) => t.replace(re, to), s)
 
