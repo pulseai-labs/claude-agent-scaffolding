@@ -126,4 +126,17 @@ describe('the bypass floor (0.1.1 §3.1)', () => {
     w.verdict = { decision: 'deny', reason: 'settings deny' }
     expect((await $.tool.check(BASH('git push -f'))).decision).toBe('deny')
   })
+  test('autopilot: a deny from a plugin beneath tool.call rings hard deny once (#677 F7)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.toolDeny = 'no force-push — this seat may not run this command'
+    await $.tool.call({ tool: 'Edit', file_path: '/repo/a' } as never)
+    await $.tool.call({ tool: 'Edit', file_path: '/repo/a' } as never)
+    expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(1)
+  })
+  test('manual: a deny beneath tool.call rings nothing (#677 F7)', async ($, on) => {
+    const w = world(on)
+    w.toolDeny = 'no force-push — this seat may not run this command'
+    await $.tool.call({ tool: 'Edit', file_path: '/repo/a' } as never)
+    expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(0)
+  })
 })

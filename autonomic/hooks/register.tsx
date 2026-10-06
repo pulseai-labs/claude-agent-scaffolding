@@ -394,6 +394,15 @@ export const register: Register = (on, options) => {
     try {
       if (r.deny === undefined && r.isError === undefined && r.isReadOnly !== true && !READ_ONLY.has(e.tool)) changed.add(await $.session.id())
     } catch {}
+    // A deny from a plugin beneath (a seat guard) rings once, keyed as tool.check's deny ring
+    // is (#677 F7). A deny from a plugin above autonomic never reaches this hook.
+    try {
+      if (r.deny !== undefined && (await modeOf($)).mode === 'autopilot') {
+        const id = await $.session.id()
+        const key = `${id}\u0000${e.tool}\u0000${String(r.deny)}`
+        if (!painedDeny.has(key)) { painedDeny.add(key); await pain($, id, 'hard deny', `${e.tool}: ${String(r.deny)}`) }
+      }
+    } catch {}
     return r
   })
 
