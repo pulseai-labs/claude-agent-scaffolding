@@ -9,7 +9,7 @@ describe('the permission reflex (spec §3.3)', () => {
   test('pain text leads with the line that names the danger (#677 F9)', async ($, on) => {
     const w = world(on, { env: AP })
     await $.tool.check(BASH('cd /repo\nnpm test\ngit push -f origin feat/x'))
-    expect(JSON.stringify(w.notices.at(-1))).toContain('force-push — git push -f origin feat/x')
+    expect(JSON.stringify(w.notices.at(-1))).toContain('force-push — git push -f (+2 args)')
   })
   test('an ask the scope covers is allowed and recorded', async ($, on) => {
     const w = world(on, { env: AP })
@@ -188,5 +188,15 @@ describe('the bypass floor after a failure (PR #681: never toward fewer asks)', 
     expect(ledgerLines(w).join('\n')).not.toContain('ghp_SECRET')
     expect(JSON.stringify(w.notices)).not.toContain('ghp_SECRET')
     expect(w.toasts.join('\n')).not.toContain('ghp_SECRET')
+  })
+  test('both never-approve paths record the shape, not the command (PR #681 round 8)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    await $.tool.check(BASH('SERVICE_TOKEN=alpha\\ beta git push -f origin feat/x'))
+    w.verdict = { decision: 'ask' }
+    await $.tool.check(BASH('git push -f https://u:t0k@x.test/r.git feat/x'))
+    const all = [...ledgerLines(w), JSON.stringify(w.notices), ...w.toasts].join('\n')
+    for (const secret of ['alpha', 'beta', 't0k']) expect(all).not.toContain(secret)
+    expect(ledgerLines(w).at(-1)).toContain('Bash: git push -f (+2 args)')
   })
 })

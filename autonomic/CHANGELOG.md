@@ -24,7 +24,9 @@ All notable changes to the `autonomic` plugin.
   unreadable. A session that leaves autopilot through a failure keeps the floor until
   `/autopilot off`. Path-qualified wrappers, unquoted heredoc substitutions, `rm` operands after
   `--` and the matching refspec `:` are read too. Credentials — bare or quoted values, credential
-  headers and known token shapes — are redacted from the ledger and every pain signal.
+  headers and known token shapes — are redacted from the ledger and every pain signal, and a
+  never-approve match records only the command's shape (`shape.ts`): verbs, a git subcommand and
+  flag names, never a value.
 - **`neverApprove`** (`config.ts`, `enforce.ts`): a `/config` setting naming the enforced rules,
   all six by default; empty means none; an unknown name is reported and ignored.
 - **A deny beneath rings** (F7): a deny from a plugin beneath autonomic's `tool.call` hook rings

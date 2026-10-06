@@ -139,9 +139,13 @@ permission scope: `allow` is recorded and the tool runs; anything else leaves th
   form, judged from the command text alone. A deliberately disguised spelling (`git pu{s..s}h`, a
   `-c remote.<name>.push=` setting, a git alias in config) can pass it, and so can a danger only
   the filesystem shows (`rm -rf /repo/link/x` where `link` points outside the worktree).
-- **Credentials** in a command (URL user info, `*_TOKEN=…`, `--token …`, Authorization, Bearer
-  and other key, token, secret or cookie header values, bare or quoted, and known token shapes) are
-  redacted before any ledger line, notice, toast, bell or pain file.
+- **What a never-approve match records.** The ledger line and every pain signal carry the
+  command's *shape* — verbs, a git subcommand and flag names, with every value only counted
+  (`git push -f https://u:TOKEN@… feat/x` is `git push -f (+2 args)`) — so no credential is
+  written, however it is spelled. The permission dialog shows you the whole command.
+- **Credentials** in other ledger lines (URL user info, `*_TOKEN=…`, `--token …`, Authorization,
+  Bearer and other key, token, secret or cookie header values, bare or quoted, and known token
+  shapes) are redacted before any ledger line, notice, toast, bell or pain file.
 
 ## The ledger
 

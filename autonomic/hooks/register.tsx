@@ -13,6 +13,7 @@ import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, ser
 import type { SessionRecord } from './records'
 import { namesDanger, neverRules } from './never'
 import { enforced } from './enforce'
+import { shape } from './shape'
 import type { NeverRule, Where } from './never'
 import { permissionPrompt } from './prompts'
 import { parsePermission } from './verdict'
@@ -243,7 +244,8 @@ async function statusReport($: Engine, id: string): Promise<string> {
 function painFocus(rules: readonly string[], command: string): string {
   const lines = command.split('\n').map(l => l.trim()).filter(Boolean)
   const hit = lines.find(l => namesDanger(l)) ?? lines[0] ?? command
-  return `${rules.join(', ')} — ${hit}${lines.length > 1 ? ` (+${lines.length - 1} more lines)` : ''}`
+  // The shape, never the text: no credential reaches a pain signal (PR #681 round 8).
+  return `${rules.join(', ')} — ${shape(hit)}${lines.length > 1 ? ` (+${lines.length - 1} more lines)` : ''}`
 }
 
 // Tools that change nothing: a turn of these alone is no progress for the loop guard.
@@ -509,7 +511,7 @@ export const register: Register = (on, options) => {
         if (rules.length === 0) return r
         try {
           const id = await $.session.id()
-          await record($, id, 'permission', `${e.tool}: ${raw}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
+          await record($, id, 'permission', `${e.tool}: ${shape(raw)}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
           await pain($, id, 'never-approve', painFocus(rules, raw))
         } catch (err) {
           await log($, `floor signal error ${String(err)}`)
@@ -533,7 +535,7 @@ export const register: Register = (on, options) => {
         const command = raw
         const rules = enforced(neverRules(command, await where($)), cfg.neverApprove)
         if (rules.length > 0) {
-          await record($, id, 'permission', `${e.tool}: ${command}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
+          await record($, id, 'permission', `${e.tool}: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
           await pain($, id, 'never-approve', painFocus(rules, command))
           return r
         }
