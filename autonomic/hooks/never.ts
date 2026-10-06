@@ -11,6 +11,8 @@ export type Where = { cwd: string; root: string; home: string; branch?: string; 
 function resolve(path: string, cwd: string, home: string): string | undefined {
   // A brace or a backslash may expand to `..`, and a glob on a dot name may match it (bash 3.2) (PR #681).
   if (/[\u0000$`{\\]/.test(path) || /(?:^|\/)\.[^/]*[*?[]/.test(path)) return undefined
+  // ~name is another user's home (round 18).
+  if (path.startsWith('~') && path !== '~' && !path.startsWith('~/')) return undefined
   const abs = path === '~' ? home : path.startsWith('~/') ? `${home}/${path.slice(2)}` : path.startsWith('/') ? path : `${cwd}/${path}`
   if (abs.startsWith('~')) return undefined
   const out: string[] = []
@@ -253,7 +255,8 @@ export function neverRules(command: string, where: Where): NeverRule[] {
     const git = gitOf(tokens)
     if (git === undefined) continue
     const { sub } = git
-    if ((opaque(sub) || !readableGlobals(tokens) || sub === 'send-pack' || sub === 'http-push') && namesDanger(command)) found.add('unreadable')
+    // An option word with a quote or a variable in it (--no-""verify) may be any option (round 18).
+    if ((opaque(sub) || !readableGlobals(tokens) || sub === 'send-pack' || sub === 'http-push' || git.args.some(a => (a.startsWith('--') && opaque(a)) || /^-[\u0000$\\]/.test(a))) && namesDanger(command)) found.add('unreadable')
     const args = flags(git.args)
     // The shared reader drops what follows `--`; for push those words are refspecs.
     const dashes = tokens.indexOf('--')

@@ -6,6 +6,13 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('a quote-split option is unreadable; a quoted value is not (PR #681 round 18)', () => {
+    expect(rules('git merge --no-""verify feat/x')).toContain('unreadable')
+    expect(rules('git commit -m "msg"')).toEqual([])
+  })
+  test('~name is another home: outside (PR #681 round 18)', () => {
+    expect(rules('rm -rf ~root')).toContain('rm-outside')
+  })
   test('GIT_DIR or GIT_WORK_TREE makes the repository unknown (PR #681 round 17)', () => {
     expect(rules('GIT_DIR=/other/.git git push')).toContain('default-branch-push')
     expect(rules('GIT_WORK_TREE=/other git push')).toContain('default-branch-push')
