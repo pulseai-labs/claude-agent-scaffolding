@@ -23,7 +23,8 @@ function resolve(path: string, cwd: string, home: string): string | undefined {
 }
 
 // Strictly below the root: removing the worktree itself is outside.
-const below = (path: string, root: string) => path.startsWith(`${root.replace(/\/+$/, '')}/`)
+// Nothing is below a worktree at / (round 16).
+const below = (path: string, root: string) => { const r = root.replace(/\/+$/, ''); return r !== '' && path.startsWith(`${r}/`) }
 
 // Shapes the shared reader does not follow (final review I1). A segment led by one of these,
 // or holding a backtick or $( outside quotes, is unreadable; it is listed when the command
@@ -149,19 +150,23 @@ function pushesDefault(args: readonly string[], refspecsAfter: readonly string[]
   const defaults = where.defaultBranch !== undefined ? [where.defaultBranch] : ['main', 'master']
   if (args.includes('--all') || args.includes('--branches') || args.includes('--mirror')) return true
   const positional = positionalOf(args)
-  // The first positional is the remote, unless --repo named it (PR #681).
+  // The first positional is the remote. With --repo it may be a refspec instead (a positional
+  // remote wins over --repo), so both readings are checked (PR #681 rounds 2, 16).
   const repo = args.some(a => a === '--repo' || a.startsWith('--repo='))
-  const refspecs = [...(repo ? positional : positional.slice(1)), ...refspecsAfter]
   const current = (ref: string) => (ref === 'HEAD' || ref === '@' ? where.branch : ref)
-  if (refspecs.length === 0) return where.branch === undefined || defaults.includes(where.branch)
-  return refspecs.some(spec => {
+  const reading = (refspecs: readonly string[]): boolean => {
+    if (refspecs.length === 0) return where.branch === undefined || defaults.includes(where.branch)
+    return refspecs.some(isDefault)
+  }
+  const isDefault = (spec: string): boolean => {
     const raw = spec.replace(/^\+/, '')
     const dst = raw.includes(':') ? raw.slice(raw.indexOf(':') + 1) : current(raw)
     // A wildcard destination may match the default branch (PR #681 round 3).
     // ':' alone is the matching refspec: every matching branch, the default included (round 6).
     if (dst === undefined || dst === '' || dst.includes('*')) return true
     return defaults.includes(dst.replace(/^refs\/heads\//, ''))
-  })
+  }
+  return reading([...positional.slice(1), ...refspecsAfter]) || (repo && reading([...positional, ...refspecsAfter]))
 }
 
 // The directory a git call runs in: -C moves it; --git-dir and --work-tree make it unknown.

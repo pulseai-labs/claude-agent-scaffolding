@@ -6,6 +6,13 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('nothing is below a worktree at / (PR #681 round 16)', () => {
+    expect(rules('rm -rf --no-preserve-root /', { ...W, root: '/', cwd: '/' })).toContain('rm-outside')
+  })
+  test('with --repo, a positional may be the remote or a refspec: both readings are checked (PR #681 round 16)', () => {
+    expect(rules('git push --repo x origin', { ...W, branch: 'main' })).toContain('default-branch-push')
+    expect(rules('git push --repo origin main')).toContain('default-branch-push')
+  })
   test('a quoted command word after a wrapper is unreadable (PR #681 round 15)', () => {
     expect(rules('prlimit "git" push -f origin feat/x')).toContain('unreadable')
     expect(rules("prlimit 'rm' -rf /tmp/x")).toContain('unreadable')
