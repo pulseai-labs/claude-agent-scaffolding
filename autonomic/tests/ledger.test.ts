@@ -1,0 +1,25 @@
+import { describe, test, expect } from 'claude-code/testing'
+import { ledgerLine, ledgerPathFor, oneLine } from '../hooks/ledger'
+
+describe('the decision ledger (spec §1, D6)', () => {
+  test('path: env wins; relative env resolves against the root; else the repo default', () => {
+    expect(ledgerPathFor('/ai/.autonomic/l.md', '/repo')).toBe('/ai/.autonomic/l.md')
+    expect(ledgerPathFor('notes/l.md', '/repo/')).toBe('/repo/notes/l.md')
+    expect(ledgerPathFor('  ', '/repo')).toBe('/repo/.autonomic/ledger.md')
+    expect(ledgerPathFor(undefined, '/repo')).toBe('/repo/.autonomic/ledger.md')
+  })
+  test('the line format, exactly', () => {
+    expect(ledgerLine({ time: 'T', session: 's1', kase: 'covered', q: 'Proceed?', a: 'yes', why: 'plan step 3' }))
+      .toBe('- T · s1 · covered · Q: Proceed? · A: yes · why: plan step 3')
+  })
+  test('usage is appended as fork cost', () => {
+    const line = ledgerLine({ time: 'T', session: 's1', kase: 'stalled', q: 'q', a: 'a', why: 'w',
+      usage: { input_tokens: 900, cache_creation_input_tokens: 100, cache_read_input_tokens: 50_000, output_tokens: 40 } })
+    expect(line.endsWith(' · usage: in=1000 cached=50000 out=40')).toBe(true)
+  })
+  test('one line, always', () => {
+    expect(oneLine('a\n  b\tc')).toBe('a b c')
+    expect(oneLine('x'.repeat(400), 10)).toBe(`${'x'.repeat(9)}…`)
+    expect(ledgerLine({ time: 'T', session: 's', kase: 'pain', q: 'a\nb', a: 'c', why: 'd' }).includes('\n')).toBe(false)
+  })
+})

@@ -76,3 +76,6 @@ scaffold-onboard/tests/fixtures/
 
 # Types the Claude Code engine writes beside a loaded mod (rewritten on every load).
 */.claude-plugin/types/
+
+# autonomic decision ledger: AI trace, which lives in the AI workspace (spec D6); never commit it here
+.autonomic/
