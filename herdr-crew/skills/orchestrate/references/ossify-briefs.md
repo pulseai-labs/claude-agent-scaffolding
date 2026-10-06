@@ -44,7 +44,11 @@ where it says the operator, you mean the top, through your report file.
 TASK: drive spine SPINE_ID to its final round barrier. With HANDOFF_PATH set, read that
 handoff first; ossify's own state says which round runs next. Step 3's same command
 re-enters a started spine, mid-round included (ossify 1.14.0): it prints a reconcile
-read-out before any mutation, and a halt row in it is a halt to report, never repaired by hand. A first reply whose model
+read-out before any mutation, and a halt row in it is a halt to report, never repaired by hand.
+Before that re-run, close every item pane a predecessor left live — found through the
+handoff, RUN_JSON or `herdr workspace list` — the way MECHANICS's Teardown closes one, panes only, never
+a worktree: an old implementer must not write a tree the re-entry redispatches. A predecessor
+pane you cannot find or close is a halt to report. A first reply whose model
 is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
   1. Check the SEATS block against SPINE.md before anything else: every planned
      item has exactly one implementer row and one verifier row, and no row names
@@ -94,7 +98,8 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      lane counts each request it issues, a gaps replacement included; you count each
      execution the lane did not request — a correction, or a replacement's fresh pair.
      Before one, read the item's `dispatches` in ossify's state: at 3 or more, offer halt
-     only; otherwise run `oss work_item_dispatched <wi-id>`, then send the correction or
+     only; otherwise run `"$oss_bin" work_item_dispatched <wi-id>` (run-spine's resolved
+     dispatcher), then send the correction or
      launch the fresh pair. Never count a request the lane issued, or it is counted twice.
      On halt, release that item's pair, mark it halted in your own state, and if no
      other item can proceed write a halt-shaped report to your report file, with the

@@ -14,7 +14,7 @@ mode.
   and `AUTONOMIC_MODE=autopilot` only when the launcher's own autonomic record reads
   `autopilot` — never `$AUTONOMIC_MODE`, which misses `/autopilot on` and a molt's lineage and
   can say autopilot where autonomic refused it; a missing record reads as manual. `<ledger>` is
-  the launcher's own `$AUTONOMIC_LEDGER` (resolved to absolute first; one holding a space, quote, `$`, backtick or backslash is not passed on), else
+  the launcher's own `$AUTONOMIC_LEDGER` (resolved to absolute first, and passed on only when every character is a letter, digit, `.`, `_`, `/` or `-`), else
   `<run dir>/autonomic-ledger.md`: one absolute ledger per run, outside every worktree. The top's rotation successor takes the mode and the
   ledger, no pain path. `AUTONOMIC_BELL` is never set.
 - **A child's pain** (`herdr-mechanics.md`, Completion). The heartbeat and the read before a
@@ -23,7 +23,8 @@ mode.
   own. The top's handoffs carry each seat's pain path.
 - **A spine cut mid-round is respawned, not relayed** (#674). ossify 1.14.0's run-spine
   re-enters a started spine, so a spine session that hands off with no `rotate:` is respawned
-  as a `rotate:` is; only a halt in its reconcile read-out goes to the operator. The spine
+  as a `rotate:` is; only a halt in its reconcile read-out goes to the operator. Before
+  its re-run the successor closes every item pane its predecessor left live, or halts. The spine
   brief still never stops mid-round on its own: relaxing ROTATE waits for a restarted spine
   session to prove the re-entry.
 - **Spine-brief caller rules** (ossify `external-executor.md` §2a). The staged-result rule is

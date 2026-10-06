@@ -66,7 +66,7 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=225          # A3: each ossify reference stays under 209 lines; 0.2.9 raised it from 214 for the spine brief's 1.14.0 caller rules.
+REF_BUDGET=230          # A3: each ossify reference stays under 209 lines; 0.2.9 raised it from 214 for the spine brief's 1.14.0 caller rules and re-entry seat rule.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
                         # each launch site gained; the files' own maximum is 209
                         # (`ossify-nested-run.md`), and the budget section's adjacent
@@ -2266,7 +2266,7 @@ pin "$BRIEFS_MD" 'A worktree staged by a result you rejected in this session is 
 pin "$BRIEFS_MD" 'you count each execution the lane did not request — a correction, or a replacement'"'"'s fresh pair' \
   "spine brief: the caller counts a correction and a caller-driven replacement (a2, PR #679 r2)" flat
 absent "$BRIEFS_MD" 'you count only a correction' "spine brief: a replacement is never left uncounted (PR #679 r2)" flat
-pin "$BRIEFS_MD" 'run `oss work_item_dispatched <wi-id>`, then send the correction or launch the fresh pair' \
+pin "$BRIEFS_MD" 'run `"$oss_bin" work_item_dispatched <wi-id>` (run-spine'"'"'s resolved dispatcher), then send the correction or launch the fresh pair' \
   "spine brief: the caller counts before it sends (a2)" flat
 pin "$BRIEFS_MD" 'Never count a request the lane issued, or it is counted twice' "spine brief: no double count (a2)" flat
 pin "$BRIEFS_MD" 'an `adopt` item reaches you as an ordinary request' "spine brief: adopt is a redispatch (a3)" flat
@@ -2274,6 +2274,10 @@ pin "$BRIEFS_MD" '(`finish-merge`, `finish-status`) or one already `complete` ge
   "spine brief: ossify-finished items get no request (a3)" flat
 pin "$BRIEFS_MD" 'a halt row in it is a halt to report, never repaired by hand' \
   "spine brief: a re-entry halt is reported" flat
+pin "$BRIEFS_MD" 'Before that re-run, close every item pane a predecessor left live' \
+  "spine brief: a re-entry never runs beside a predecessor's live item seat (PR #679 r4)" flat
+pin "$BRIEFS_MD" 'A predecessor pane you cannot find or close is a halt to report' \
+  "spine brief: an unclosable predecessor seat halts, never co-writes (PR #679 r4)" flat
 pin "$BRIEFS_MD" 'Never stop mid-round.' "spine brief: ROTATE stays strict until a restarted session proves re-entry" flat
 absent "$BRIEFS_MD" 'relayed to the operator by your parent' "spine brief: a molt-cut round is re-entered, not relayed (#674)"
 pin "$PRBRIEFS_MD" 'at a fix-round boundary once the context-ceiling notice or a molt warning has fired' \

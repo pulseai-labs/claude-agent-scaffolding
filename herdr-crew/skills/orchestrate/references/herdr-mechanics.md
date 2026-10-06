@@ -65,8 +65,10 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    first resolved against the launcher's own repo root, as autonomic resolves it, never passed
    on as written: a relative path resolves inside each seat's worktree and dies with it, and
    with none the ledger lands in the worktree and rides the seat's commits. The export
-   quotes nothing, so an inherited path holding a space, a quote, `$`, a backtick or a
-   backslash is not passed on: the child gets `<run dir>/autonomic-ledger.md` instead. The launcher's mode is its own autonomic record, read at each
+   quotes nothing, so an inherited path is passed on only when every character is a letter,
+   a digit, `.`, `_`, `/` or `-`; any other is not passed on: the child gets
+   `<run dir>/autonomic-ledger.md` instead. `<run dir>` and `REPORT_PATH` are herdr-crew's own
+   choice and keep to the same characters. The launcher's mode is its own autonomic record, read at each
    launch — `jq -r .mode ~/.claude/state/autonomic/sessions/$CLAUDE_CODE_SESSION_ID.json` —
    never `$AUTONOMIC_MODE`: the top may be in autopilot by `/autopilot on` or a molt's lineage,
    which the environment never shows, and a session whose environment says autopilot may have

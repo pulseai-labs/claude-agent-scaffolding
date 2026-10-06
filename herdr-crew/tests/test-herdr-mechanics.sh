@@ -65,7 +65,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=358  # 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
+REF_BUDGET=360  # 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -227,6 +227,13 @@ pin "$REF" 'A relative launcher value is first resolved against the launcher'"'"
   "an inherited relative ledger is made absolute before it is passed on (PR #679 r1)" flat
 pin "$REF" 'is not passed on: the child gets `<run dir>/autonomic-ledger.md` instead' \
   "an unsafe inherited ledger path falls back to the run ledger, never into the export (PR #679 r3)" flat
+pin "$REF" 'passed on only when every character is a letter, a digit, `.`, `_`, `/` or `-`' \
+  "the inherited ledger is an allowlist, never a denylist (PR #679 r4)" flat
+pin "$REF" '`<run dir>` and `REPORT_PATH` are herdr-crew'"'"'s own choice and keep to the same characters' \
+  "the paths herdr-crew picks keep the same characters (PR #679 r4)" flat
+c="$(count_of "$REF" 'a backtick or a backslash is not passed on' flat)"
+if [ "$c" -eq 0 ]; then pass "the r3 denylist is gone (PR #679 r4)"
+else fail "the r3 denylist is gone (PR #679 r4)" "$c left"; fi
 c="$(count_of "$REF" 'single-quoted in the export' flat)"
 if [ "$c" -eq 0 ]; then pass "no quoting rule for the ledger remains (PR #679 r3)"
 else fail "no quoting rule for the ledger remains (PR #679 r3)" "$c left"; fi
