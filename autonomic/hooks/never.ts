@@ -47,7 +47,8 @@ const GIT_FLAGS = new Set(['-p', '-P', '--paginate', '--no-pager', '--bare', '--
 const LONGS = ['--force', '--force-with-lease', '--mirror', '--delete', '--prune', '--all', '--branches', '--no-verify', '--recursive']
 const expand = (a: string): string => (/^--[a-z][a-z-]*$/.test(a) && !LONGS.includes(a) ? (LONGS.find(l => l.startsWith(a)) ?? a) : a)
 const OPENERS = new Set(['if', 'then', 'do', 'else', 'elif', 'while', 'until', '{', '}', '!'])
-const DANGER = /\bpush\b|\brm\b|\bbranch\b|\bcommit\b|--no-verify|\bsend-pack\b|\bhttp-push\b/
+// --no-v… is any abbreviation of --no-verify (round 10).
+const DANGER = /\bpush\b|\brm\b|\bbranch\b|\bcommit\b|--no-v[a-z]*|\bsend-pack\b|\bhttp-push\b/
 // The cheap pre-check: every rule neverRules finds needs one of these words, so a command
 // without one runs no git (the bypass floor, 0.1.1 §3.1).
 // Bash drops a backslash and joins quoted pieces, so `pu\sh` and `pu""sh` are push (PR #681).
@@ -121,7 +122,7 @@ function readableGlobals(tokens: readonly string[]): boolean {
   for (let i = 0; g[i]?.startsWith('-'); i += 1) {
     const a = g[i]!
     if (a === '-C') { i += 1; continue }
-    if (a === '-c') { if ((g[i + 1] ?? '').startsWith('alias.')) return false; i += 1; continue }
+    if (a === '-c') { if ((g[i + 1] ?? '').toLowerCase().startsWith('alias.')) return false; i += 1; continue }
     if (a.startsWith('--config-env')) return false
     if (/^--[a-z-]+=/.test(a) || GIT_FLAGS.has(a)) continue
     return false
@@ -254,8 +255,9 @@ export function neverRules(command: string, where: Where): NeverRule[] {
       if (args.includes('--delete') || args.includes('--prune') || args.includes('-d') || [...args, ...after].some(a => a.startsWith(':')))
         found.add('branch-delete')
       // A quoted or variable remote, refspec or flag may name the default branch or --force.
+      // An opaque word adds unreadable; it never hides a destination the text shows (round 10).
       if ([...args, ...after].some(opaque)) found.add('unreadable')
-      else {
+      {
         // -C into a directory other than the repo root may enter a nested repo or submodule,
         // whose branch is not the session's: unknown (PR #681 round 3).
         const at = gitDirOf(tokens, dir, where.home)

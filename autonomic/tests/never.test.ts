@@ -6,6 +6,16 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('an inline alias key is matched whatever its case (PR #681 round 10)', () => {
+    expect(rules('git -c Alias.p=push p -f origin feat/x')).toContain('unreadable')
+  })
+  test('an opaque push still reports what it shows (PR #681 round 10)', () => {
+    expect(rules('git push "$REMOTE" feat/x:main')).toEqual(expect.arrayContaining(['unreadable', 'default-branch-push']))
+  })
+  test('an abbreviated --no-verify passes the pre-check (PR #681 round 10)', () => {
+    expect(namesDanger('git am --no-verif patch.mbox')).toBe(true)
+    expect(rules('git am --no-verif patch.mbox')).toContain('no-verify')
+  })
   test('a push flag that is a variable is unreadable (PR #681 round 9)', () => {
     expect(rules('git push --force$EMPTY origin feat/x')).toContain('unreadable')
   })
