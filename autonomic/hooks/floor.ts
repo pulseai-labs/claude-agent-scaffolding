@@ -25,4 +25,14 @@ export function parseStage(text: string | undefined): string | undefined {
     return undefined
   }
 }
+// The stage file's effective handoff command, so a live fill past it yields though molt has
+// not yet rewritten the file this turn (final review I2).
+export function parseStageCommand(text: string | undefined): number | undefined {
+  try {
+    const v = JSON.parse(text ?? '') as { command?: unknown } | null
+    return typeof v?.command === 'number' && Number.isFinite(v.command) ? v.command : undefined
+  } catch {
+    return undefined
+  }
+}
 export const stageYields = (stage: string | undefined): boolean => stage === 'command' || stage === 'block' || stage === 'fallback'

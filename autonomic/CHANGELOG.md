@@ -8,14 +8,16 @@ All notable changes to the `autonomic` plugin.
 
 - **molt's stage file** (F12; `floor.ts`, `records.ts`): the turn end is molt's when
   `~/.claude/state/molt/stage/<id>` says `command`, `block` or `fallback`; `yieldAtPercent` is
-  only the fallback when no stage file exists, and a stage of `off` turns the fallback off.
+  only the fallback when no stage file exists, and a stage of `off` turns the fallback off. A
+  live fill at or above the file's `command` yields too, whatever the hook order.
 - **The bypass floor** (`register.tsx`): in autopilot, an `allow` for a command that matches an
   enabled never-approve rule becomes an `ask`, so the operator gets the dialog under bypass
   permissions too (probe P14). Manual mode never touches an allow; a deny is never changed.
+  A failure inside the floor keeps the call with the operator.
 - **`neverApprove`** (`config.ts`, `enforce.ts`): a `/config` setting naming the enforced rules,
   all six by default; empty means none; an unknown name is reported and ignored.
 - **A deny beneath rings** (F7): a deny from a plugin beneath autonomic's `tool.call` hook rings
-  "hard deny" once per session, tool and reason.
+  "hard deny" once per session, tool and reason — except molt's own gate past its block stage.
 - **Texts** (F2, F4, F5, F8, F9, F10, F13): `/autopilot status` drops the doubled prefix and lists
   policy `default`/`edited`, the settings, the enabled rules and molt's stage; one log line per
   fork; no doubled period before "Proceed."; the pain text leads with the line that matched; the

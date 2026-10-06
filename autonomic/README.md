@@ -172,7 +172,8 @@ A pain signal never resumes the run by itself. Your next prompt does.
   replacement is a fresh session that takes its mode from `AUTONOMIC_MODE` and its scope from its
   brief and handoff.
 - **molt keeps the turn end.** autonomic neither blocks nor forks when molt's stage file for this
-  session (`~/.claude/state/molt/stage/<id>`, molt 0.2.1+) says `command`, `block` or `fallback`,
+  session (`~/.claude/state/molt/stage/<id>`, molt 0.2.1+) says `command`, `block` or `fallback`
+  or the live fill has reached the file's `command` (molt may rewrite the file after this hook),
   when the reply carries a `MOLT-HANDOFF:` line, when `MOLT_STATUS_PATH`'s last line is
   `handoff required` or `handed-off …`, or when a plugin beneath it has already blocked the stop
   (molt's command). autonomic follows molt's stage file, so a seeded session whose ladder moved

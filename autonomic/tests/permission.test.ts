@@ -144,4 +144,16 @@ describe('the bypass floor (0.1.1 §3.1)', () => {
     await $.tool.call({ tool: 'Edit', file_path: '/repo/a' } as never)
     expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(0)
   })
+  test('autopilot: the floor asks when its own check throws (final review I1)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    w.failCwd = true
+    expect((await $.tool.check(BASH('git push -f'))).decision).toBe('ask')
+  })
+  test("autopilot: molt's own gate past the block stage rings no hard deny (final review I3)", async ($, on) => {
+    const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":"block","command":65}' } })
+    w.toolDeny = 'Context is at 76% of the window. Hand off now.'
+    await $.tool.call({ tool: 'Edit', file_path: '/repo/a' } as never)
+    expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(0)
+  })
 })

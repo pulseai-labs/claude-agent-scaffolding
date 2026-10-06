@@ -7,6 +7,18 @@ const fork = (o: object) => ({ isAnswered: true as const, text: JSON.stringify(o
 const tool = (name = 'Edit') => ({ tool: name, file_path: '/repo/a.ts' }) as never
 
 describe('the turn-end reflex (spec §3.1)', () => {
+  test("the live fill past the stage file's command yields, though the file lags (final review I2)", async ($, on) => {
+    const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":"warnAgain","command":70}' } })
+    w.usage = { tokens: 710_000, window: 1_000_000 }
+    expect((await $.classic.Stop(STOP())).block).toBeUndefined()
+    expect(w.forkPrompts).toEqual([])
+  })
+  test("the live fill below the stage file's command is judged (final review I2)", async ($, on) => {
+    const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":"warnAgain","command":70}' } })
+    w.usage = { tokens: 690_000, window: 1_000_000 }
+    w.forks.push(fork({ case: 'covered', question: 'Proceed?', answer: 'yes', reason: 'plan' }))
+    expect((await $.classic.Stop(STOP())).block).toBe('Autopilot: yes. Proceed.')
+  })
   test('an answer ending in a period gets one period before Proceed (#677 F8)', async ($, on) => {
     const w = world(on, { env: AP })
     w.forks.push(fork({ case: 'covered', question: 'Proceed?', answer: 'use ciao.', reason: 'plan' }))
