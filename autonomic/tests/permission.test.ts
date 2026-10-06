@@ -6,6 +6,11 @@ const BASH = (command: string) => ({ tool: 'Bash', input: { command } }) as neve
 const fork = (o: object) => ({ isAnswered: true as const, text: JSON.stringify(o) })
 
 describe('the permission reflex (spec §3.3)', () => {
+  test('pain text leads with the line that names the danger (#677 F9)', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.tool.check(BASH('cd /repo\nnpm test\ngit push -f origin feat/x'))
+    expect(JSON.stringify(w.notices.at(-1))).toContain('force-push — git push -f origin feat/x')
+  })
   test('an ask the scope covers is allowed and recorded', async ($, on) => {
     const w = world(on, { env: AP })
     w.forks.push(fork({ decision: 'allow', reason: 'own branch push' }))

@@ -192,10 +192,11 @@ async function pain($: Engine, id: string, reason: string, detail: string): Prom
 type Judged<T> = { v: T; usage?: Usage } | { skip: true } | { fail: string }
 
 // One fork, one retry (spec §4). Nothing to fork, or an aborted turn, lets the event pass.
-async function judge<T>($: Engine, prompt: string, parse: (text: string) => T | undefined): Promise<Judged<T>> {
+async function judge<T>($: Engine, kind: 'turn-end' | 'ask' | 'permission', prompt: string, parse: (text: string) => T | undefined): Promise<Judged<T>> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const r = await $.model.fork({ prompt })
     if (r.isAnswered) {
+      await log($, `fork ${kind} session=${await $.session.id()}`)
       const v = parse(r.text)
       if (v !== undefined) return { v, usage: r.usage }
       await log($, `fork reply did not parse attempt=${attempt + 1}`)
@@ -220,10 +221,15 @@ async function statusReport($: Engine, id: string): Promise<string> {
   const rec = await modeOf($)
   const policyPath = expandHome(cfg.policyPath, await home($))
   const painPath = ((await $.env.get('AUTONOMIC_PAIN_PATH')) ?? '').trim()
+  const pol = await policyText($)
+  const stageNow = safeSessionId(id) ? parseStage(await readText($, stagePath(await home($), id))) : undefined
   const lines = [
-    `autonomic: ${rec.mode} (source: ${rec.source})${rec.problem === undefined ? '' : ` — autopilot refused: ${rec.problem}`}`,
+    `${rec.mode} (source: ${rec.source})${rec.problem === undefined ? '' : ` — autopilot refused: ${rec.problem}`}`,
     `scope: ${rec.scope.length === 0 ? 'none named (what the session has read)' : rec.scope.join(', ')}`,
-    `policy: ${policyPath} (${(await policyText($)) === undefined ? 'missing or empty' : 'readable'})`,
+    `policy: ${pol === undefined ? 'missing or empty' : pol === DEFAULT_POLICY.trim() ? 'default' : 'edited'} (${policyPath})`,
+    `yieldAtPercent: ${cfg.yieldAtPercent} (used only without a molt stage file) · loopMax: ${cfg.loopMax} · tailChars: ${cfg.tailChars}`,
+    `never-approve: ${cfg.neverApprove.length === 0 ? "none (every command is the fork's to judge)" : cfg.neverApprove.join(' ')}`,
+    `molt stage: ${stageNow ?? 'none'}`,
     `ledger: ${await ledgerPath($)}`,
     `bell: ${rec.bell === undefined ? 'not set' : 'set'}; pain file: ${painPath === '' ? 'not set' : painPath}`,
     `pushes in a row with no change: ${pushes.get(id) ?? 0} of ${cfg.loopMax}`,
@@ -231,6 +237,13 @@ async function statusReport($: Engine, id: string): Promise<string> {
   if (rec.invalid !== undefined) lines.push(`AUTONOMIC_MODE="${rec.invalid}" is not a mode`)
   if (cfg.problems.length > 0) lines.push(`settings: ${cfg.problems.join('; ')}`)
   return lines.join('\n')
+}
+
+// The pain text leads with the line that names a danger, so the band shows what tripped (#677 F9).
+function painFocus(rules: readonly string[], command: string): string {
+  const lines = command.split('\n').map(l => l.trim()).filter(Boolean)
+  const hit = lines.find(l => namesDanger(l)) ?? lines[0] ?? command
+  return `${rules.join(', ')} — ${hit}${lines.length > 1 ? ` (+${lines.length - 1} more lines)` : ''}`
 }
 
 // Tools that change nothing: a turn of these alone is no progress for the loop guard.
@@ -256,7 +269,7 @@ async function askReflex($: Engine, questions: readonly Question[]): Promise<{ q
     await pain($, id, 'question for you', `${questions[0]?.question ?? 'a question'} (free text)`)
     return undefined
   }
-  const j = await judge($, askPrompt(questions, (await policyText($)) ?? ''), t => parseAsk(t, questions))
+  const j = await judge($, 'ask', askPrompt(questions, (await policyText($)) ?? ''), t => parseAsk(t, questions))
   if ('v' in j && j.v.covered) {
     const { answers, reason } = j.v
     const time = new Date().toISOString()
@@ -432,7 +445,7 @@ export const register: Register = (on, options) => {
         await pain($, id, 'autopilot loop', `${n} turn ends pushed on with no change made`)
         return r
       }
-      const j = await judge($, turnEndPrompt(answer.slice(-cfg.tailChars), (await policyText($)) ?? ''), parseTurn)
+      const j = await judge($, 'turn-end', turnEndPrompt(answer.slice(-cfg.tailChars), (await policyText($)) ?? ''), parseTurn)
       if ('skip' in j) return r
       if ('fail' in j) {
         pushes.delete(id)
@@ -445,7 +458,8 @@ export const register: Register = (on, options) => {
         const a = v.case === 'covered' ? (v.answer ?? '') : (v.next_step ?? '')
         if (!(await record($, id, v.case, v.question ?? 'turn end', a, v.reason, j.usage))) return r
         pushes.set(id, n + 1)
-        const text = v.case === 'covered' ? `Autopilot: ${a}. Proceed.` : `Autopilot: continue — ${a}.`
+        const bare = a.replace(/[.!]\s*$/, '')
+        const text = v.case === 'covered' ? `Autopilot: ${bare}. Proceed.` : `Autopilot: continue — ${bare}.`
         return { ...r, block: text }
       }
       pushes.delete(id)
@@ -477,7 +491,7 @@ export const register: Register = (on, options) => {
         if (rules.length === 0) return r
         const id = await $.session.id()
         await record($, id, 'permission', `${e.tool}: ${raw}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
-        await pain($, id, 'never-approve', `${rules.join(', ')} — ${raw}`)
+        await pain($, id, 'never-approve', painFocus(rules, raw))
         return { ...r, decision: 'ask', reason: `autonomic: never-approve — ${rules.join(', ')}` }
       }
       if ((await modeOf($)).mode !== 'autopilot') return r
@@ -498,7 +512,7 @@ export const register: Register = (on, options) => {
         const rules = enforced(neverRules(command, await where($)), cfg.neverApprove)
         if (rules.length > 0) {
           await record($, id, 'permission', `${e.tool}: ${command}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
-          await pain($, id, 'never-approve', `${rules.join(', ')} — ${command}`)
+          await pain($, id, 'never-approve', painFocus(rules, command))
           return r
         }
       }
@@ -509,7 +523,7 @@ export const register: Register = (on, options) => {
         await pain($, id, 'permission for you', `${e.tool} (input too long to judge)`)
         return r
       }
-      const j = await judge($, permissionPrompt(e.tool, e.input, (await policyText($)) ?? ''), parsePermission)
+      const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? ''), parsePermission)
       if ('v' in j && j.v.decision === 'allow') {
         if (await record($, id, 'permission', `${e.tool}: ${shown}`, 'allow', j.v.reason, j.usage))
           return { ...r, decision: 'allow', reason: `autonomic: ${j.v.reason}` }

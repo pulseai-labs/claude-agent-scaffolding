@@ -58,7 +58,8 @@ describe('the ask reflex (spec §3.2)', () => {
     const Q2 = [...QS, { question: 'Which size?', header: 'Size', options: [{ label: 'S', description: '' }, { label: 'L', description: '' }], multiSelect: false }]
     w.forks.push(fork({ covered: true, answers: { 'Which colour?': 'Blue', 'Which size?': 'L' }, reason: 'spec' }))
     await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
-    w.appendsLeft = 1
+    // One append for the fork's log line (#677 F4), one for the two ledger lines.
+    w.appendsLeft = 2
     await $.tool.call({ tool: 'AskUserQuestion', questions: Q2 } as never)
     expect(w.asked).toBe(0)
     expect(ledgerLines(w).filter(l => l.includes(' · ask · '))).toHaveLength(2)

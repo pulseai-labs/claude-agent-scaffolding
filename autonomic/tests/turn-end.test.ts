@@ -7,6 +7,22 @@ const fork = (o: object) => ({ isAnswered: true as const, text: JSON.stringify(o
 const tool = (name = 'Edit') => ({ tool: name, file_path: '/repo/a.ts' }) as never
 
 describe('the turn-end reflex (spec §3.1)', () => {
+  test('an answer ending in a period gets one period before Proceed (#677 F8)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(fork({ case: 'covered', question: 'Proceed?', answer: 'use ciao.', reason: 'plan' }))
+    expect((await $.classic.Stop(STOP())).block).toBe('Autopilot: use ciao. Proceed.')
+  })
+  test('a stalled next step ending in a period gets one period (#677 F8)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(fork({ case: 'stalled', next_step: 'run the suite.', reason: 'plan' }))
+    expect((await $.classic.Stop(STOP('I wrote the file.'))).block).toBe('Autopilot: continue — run the suite.')
+  })
+  test('each fork is logged (#677 F4)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(fork({ case: 'waiting', reason: 'bg' }))
+    await $.classic.Stop(STOP())
+    expect(w.files.get('/home/u/.claude/state/autonomic/autonomic.log') ?? '').toContain('fork turn-end session=s1')
+  })
   test('molt says command: stand aside below yieldAtPercent (#677 F12)', async ($, on) => {
     const w = world(on, { env: AP, files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":"command","command":20}' } })
     w.usage = { tokens: 150_000, window: 1_000_000 }
