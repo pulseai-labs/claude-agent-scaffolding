@@ -107,13 +107,15 @@ matches the list becomes an `ask`, so you get the normal permission dialog, and 
 - a push whose remote, refspec or flag is quoted or a variable — `git push origin "$BRANCH"` and
   `git push -u origin "$(git branch --show-current)"` included, even to a feature branch: autonomic
   cannot see what the shell will expand, so it does not guess;
-- a command the reader cannot follow — led by `bash`/`sh -c`, `eval`, `xargs`, `timeout`, `nice`, `find`, `ssh` and the like, a wrapper with options (`sudo -u`, `env -i`), or a backtick or `$(` outside quotes — when it names `push`, `rm`, `branch`, `commit` or `--no-verify` at all. A `$(…)` or backtick inside double quotes is read as a command of its own.
+- a command the reader cannot follow — led by `bash`/`sh -c`, `eval`, `xargs`, `timeout`, `nice`, `find`, `ssh` and the like, an interpreter (`python3`, `node`, `perl`, `ruby`, `php`, `awk` …), a git global it cannot skip (`--git-dir .git` spelled without `=`, `-c alias.…`), a wrapper with options (`sudo -u`, `env -i`), or a backtick or `$(` outside quotes — when it names `push`, `rm`, `branch`, `commit` or `--no-verify` at all. A `$(…)` or backtick inside double quotes is read as a command of its own.
 
 Each item on the list is a rule you can turn off: `neverApprove` (below) names the enforced
 rules — `force-push`, `default-branch-push`, `branch-delete`, `rm-outside`, `no-verify`,
 `unreadable` (the last three items above). A rule you remove is the fork's to judge on an ask, and
 is left alone on an allow. A repo whose default branch takes direct pushes by design removes
 `default-branch-push`.
+
+A unique prefix of a long option is read as that option (`--forc` is `--force`, `rm --recurs` is `--recursive`), as git and GNU tools accept it. A danger the command text does not show — a git alias defined in config, a script file — is not seen.
 
 The list reads each command segment with seat-mods' shell reader (copied, and held identical by
 `tests/test-mod-shell-parity.sh`). Otherwise the fork judges the call against the policy's

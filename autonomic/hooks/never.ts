@@ -28,6 +28,17 @@ const below = (path: string, root: string) => path.startsWith(`${root.replace(/\
 // or holding a backtick or $( outside quotes, is unreadable; it is listed when the command
 // names a danger at all. Keywords that only open a block are stripped and the rest is read.
 const RUNNERS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish', 'eval', 'xargs', 'timeout', 'nice', 'ionice', 'watch', 'parallel', 'find', 'su', 'doas', 'ssh'])
+// An interpreter runs a program the reader never sees (its quoted text is blanked), so it is
+// a runner too (PR #681): `python3 -c '…git push -f…'`.
+const INTERPRETER = /^(?:python[\d.]*|pypy[\d.]*|node|nodejs|deno|bun|perl[\d.]*|ruby[\d.]*|php[\d.]*|lua(?:jit)?[\d.]*|Rscript|pwsh|powershell|osascript|tclsh|expect|[gmn]?awk)$/
+// git globals that take no value. Any other global the shared reader cannot skip with its
+// value, so the word after it is taken for the subcommand (PR #681).
+const GIT_FLAGS = new Set(['-p', '-P', '--paginate', '--no-pager', '--bare', '--no-replace-objects', '--no-lazy-fetch',
+  '--no-optional-locks', '--no-advice', '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs'])
+// GNU and git accept a unique prefix of a long option: `--forc` is --force, `--recurs` is
+// --recursive. A prefix of a dangerous option is read as that option (PR #681).
+const LONGS = ['--force', '--force-with-lease', '--mirror', '--delete', '--prune', '--all', '--branches', '--no-verify', '--recursive']
+const expand = (a: string): string => (/^--[a-z][a-z-]*$/.test(a) && !LONGS.includes(a) ? (LONGS.find(l => l.startsWith(a)) ?? a) : a)
 const OPENERS = new Set(['if', 'then', 'do', 'else', 'elif', 'while', 'until', '{', '}', '!'])
 const DANGER = /\bpush\b|\brm\b|\bbranch\b|\bcommit\b|--no-verify/
 // The cheap pre-check: every rule neverRules finds needs one of these words, so a command
@@ -40,7 +51,7 @@ const COMMIT_VALUES = new Set(['-m', '--message', '-F', '--file', '-C', '-c', '-
 
 // -uf is -u -f: a cluster of short flags is read flag by flag.
 const flags = (args: readonly string[]) =>
-  args.flatMap(a => (/^-[A-Za-z]{2,}$/.test(a) ? [...a.slice(1)].map(c => `-${c}`) : [a]))
+  args.flatMap(a => (/^-[A-Za-z]{2,}$/.test(a) ? [...a.slice(1)].map(c => `-${c}`) : [expand(a)]))
 
 // A lone & ends a command as ; does, spaced or not (`sleep 1&git push`); the shared reader
 // splits only on &&. The & of a redirect (2>&1, &>log) is not one.
@@ -80,7 +91,22 @@ function pieces(tokens: readonly string[]): string[][] {
 const opaque = (t: string) => /[\u0000$]/.test(t)
 
 const recursive = (args: readonly string[]) =>
-  args.some(a => a === '--recursive' || /^-[A-Za-z]*[rR][A-Za-z]*$/.test(a))
+  args.some(a => expand(a) === '--recursive' || /^-[A-Za-z]*[rR][A-Za-z]*$/.test(a))
+
+// True when every git global before the subcommand is one the reader can skip: -C or -c with
+// its value (an inline alias is not readable), --name=value, or a global that takes no value.
+function readableGlobals(tokens: readonly string[]): boolean {
+  const g = commandOf(tokens)?.args ?? []
+  for (let i = 0; g[i]?.startsWith('-'); i += 1) {
+    const a = g[i]!
+    if (a === '-C') { i += 1; continue }
+    if (a === '-c') { if ((g[i + 1] ?? '').startsWith('alias.')) return false; i += 1; continue }
+    if (a.startsWith('--config-env')) return false
+    if (/^--[a-z-]+=/.test(a) || GIT_FLAGS.has(a)) continue
+    return false
+  }
+  return true
+}
 
 function positionalOf(args: readonly string[]): string[] {
   const positional: string[] = []
@@ -165,7 +191,7 @@ export function neverRules(command: string, where: Where): NeverRule[] {
   for (const tokens of segments(command).flatMap(pieces)) {
     const head = commandOf(tokens)
     if (head === undefined) continue
-    if (head.name.startsWith('-') || opaque(head.name) || RUNNERS.has(head.name) || tokens.some(t => t.includes('`') || t.includes('$('))) {
+    if (head.name.startsWith('-') || opaque(head.name) || RUNNERS.has(head.name) || INTERPRETER.test(head.name) || tokens.some(t => t.includes('`') || t.includes('$('))) {
       if (DANGER.test(command)) found.add('unreadable')
     }
     if (head?.name === 'cd' || head?.name === 'pushd' || head?.name === 'popd') {
@@ -184,7 +210,7 @@ export function neverRules(command: string, where: Where): NeverRule[] {
     const git = gitOf(tokens)
     if (git === undefined) continue
     const { sub } = git
-    if (opaque(sub) && DANGER.test(command)) found.add('unreadable')
+    if ((opaque(sub) || !readableGlobals(tokens)) && DANGER.test(command)) found.add('unreadable')
     const args = flags(git.args)
     // The shared reader drops what follows `--`; for push those words are refspecs.
     const dashes = tokens.indexOf('--')

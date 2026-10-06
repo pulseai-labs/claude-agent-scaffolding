@@ -6,6 +6,31 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('an interpreter running a program that names a danger is unreadable (PR #681)', () => {
+    for (const c of [`python3 -c 'import os; os.system("git push -f")'`, `node -e "require('child_process').execSync('git push -f')"`,
+      `perl -e 'system("rm -rf /")'`, `/usr/bin/python3.12 -c 'x' && git push origin feat/x`, `ruby -e 'system("git push -f")'`])
+      expect(rules(c)).toContain('unreadable')
+    expect(rules('python3 tools/build.py')).toEqual([])
+  })
+  test('a git global the reader cannot skip, or an alias defined inline, is unreadable (PR #681)', () => {
+    for (const c of ['git --git-dir .git push -f origin main', 'git --work-tree /x push origin main', 'git --namespace n push -f',
+      'git -c alias.p=push p -f', 'git --config-env alias.p=E push -f'])
+      expect(rules(c)).toContain('unreadable')
+    expect(rules('git --no-pager commit -m x')).toEqual([])
+    expect(rules('git -C /repo push origin feat/x')).toEqual([])
+    expect(rules('git --git-dir=/repo/.git push -f')).toContain('force-push')
+  })
+  test('an abbreviated long option is read as the option it abbreviates (PR #681)', () => {
+    expect(rules('rm --recurs /tmp/x')).toContain('rm-outside')
+    expect(rules('git push --forc origin feat/x')).toContain('force-push')
+    expect(rules('git push --mir')).toContain('force-push')
+    expect(rules('git push --force-w origin feat/x')).toContain('force-push')
+    expect(rules('git commit --no-verif -m x')).toContain('no-verify')
+    expect(rules('git push --del origin x')).toContain('branch-delete')
+    expect(rules('git branch --del --forc x')).toContain('branch-delete')
+    expect(rules('git push --dry-run origin feat/x')).toEqual([])
+    expect(rules('git push --follow-tags origin feat/x')).toEqual([])
+  })
   test('namesDanger is the cheap pre-check (Review Focus 2)', () => {
     for (const c of ['git push', 'rm -rf x', 'git commit -m x', 'x --no-verify', 'git branch -D y']) expect(namesDanger(c)).toBe(true)
     for (const c of ['ls -la', 'npm test', 'git status', 'cat README.md']) expect(namesDanger(c)).toBe(false)
