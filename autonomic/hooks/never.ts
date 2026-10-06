@@ -132,7 +132,8 @@ function pushesDefault(args: readonly string[], refspecsAfter: readonly string[]
   return refspecs.some(spec => {
     const raw = spec.replace(/^\+/, '')
     const dst = raw.includes(':') ? raw.slice(raw.indexOf(':') + 1) : current(raw)
-    if (dst === undefined) return true
+    // A wildcard destination may match the default branch (PR #681 round 3).
+    if (dst === undefined || dst.includes('*')) return true
     return defaults.includes(dst.replace(/^refs\/heads\//, ''))
   })
 }
@@ -228,14 +229,20 @@ export function neverRules(command: string, where: Where): NeverRule[] {
       ((args.includes('--delete') || args.includes('-d')) && (args.includes('--force') || args.includes('-f')))))
       found.add('branch-delete')
     if (sub === 'push') {
-      if (args.includes('-f') || args.some(a => a === '--force' || a === '--mirror' || a.startsWith('--force-with-lease') || a.startsWith('+')))
+      // Refspecs after `--` carry + and : too (PR #681 round 3).
+      if (args.includes('-f') || args.some(a => a === '--force' || a === '--mirror' || a.startsWith('--force-with-lease') || a.startsWith('+')) || after.some(a => a.startsWith('+')))
         found.add('force-push')
-      if (args.includes('--delete') || args.includes('--prune') || args.includes('-d') || args.some(a => a.startsWith(':')))
+      if (args.includes('--delete') || args.includes('--prune') || args.includes('-d') || [...args, ...after].some(a => a.startsWith(':')))
         found.add('branch-delete')
       // A quoted or variable remote, refspec or flag may name the default branch or --force.
       if ([...positionalOf(args), ...after].some(opaque)) found.add('unreadable')
-      else if (pushesDefault(args, after, inRepo(gitDirOf(tokens, dir, where.home), where.root)
-        ? where : { ...where, branch: undefined, defaultBranch: undefined })) found.add('default-branch-push')
+      else {
+        // -C into a directory other than the repo root may enter a nested repo or submodule,
+        // whose branch is not the session's: unknown (PR #681 round 3).
+        const at = gitDirOf(tokens, dir, where.home)
+        const same = inRepo(at, where.root) && (at === dir || at === where.root.replace(/\/+$/, ''))
+        if (pushesDefault(args, after, same ? where : { ...where, branch: undefined, defaultBranch: undefined })) found.add('default-branch-push')
+      }
     }
   }
   return [...found]

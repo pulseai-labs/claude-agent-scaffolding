@@ -17,7 +17,10 @@ All notable changes to the `autonomic` plugin.
   interpreter, a git global it cannot skip, or an inline git alias as unreadable when the
   command names a danger, and reads an abbreviated long option as the option it abbreviates;
   an escaped, quote-split or brace word is unreadable, an `rm -r` path with a brace or a dot
-  glob is outside, `--repo` names the remote, and `@` is `HEAD`.
+  glob is outside, `--repo` names the remote, and `@` is `HEAD`; a wildcard destination may be
+  the default branch, refspecs after `--` are checked, and `git -C` into another directory
+  reads the branch as unknown. A session that leaves autopilot through a failure keeps the
+  floor until `/autopilot off`.
 - **`neverApprove`** (`config.ts`, `enforce.ts`): a `/config` setting naming the enforced rules,
   all six by default; empty means none; an unknown name is reported and ignored.
 - **A deny beneath rings** (F7): a deny from a plugin beneath autonomic's `tool.call` hook rings

@@ -163,3 +163,22 @@ describe('the bypass floor (0.1.1 §3.1)', () => {
     expect(w.toasts.filter(t => t.includes('hard deny'))).toHaveLength(1)
   })
 })
+
+describe('the bypass floor after a failure (PR #681: never toward fewer asks)', () => {
+  test('a session that left autopilot because its ledger failed keeps the floor', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
+    w.verdict = { decision: 'allow' }
+    w.failAppend = /ledger\.md$/
+    expect((await $.tool.check(BASH('git push -f'))).decision).toBe('ask')
+    expect(w.statuses.at(-1)).toContain('ledger not writable')
+    expect((await $.tool.check(BASH('git push -f origin main'))).decision).toBe('ask')
+  })
+  test('/autopilot off turns the floor off', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
+    await $.command.run({ command: 'autopilot', args: 'off', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } } as never)
+    w.verdict = { decision: 'allow' }
+    expect((await $.tool.check(BASH('git push -f'))).decision).toBe('allow')
+  })
+})

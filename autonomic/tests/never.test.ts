@@ -6,6 +6,20 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('a wildcard refspec may push the default branch (PR #681 round 3)', () => {
+    expect(rules('git push origin refs/heads/*:refs/heads/*')).toContain('default-branch-push')
+    expect(rules('git push origin feat/*')).toContain('default-branch-push')
+  })
+  test('git -C into another directory reads the branch as unknown (PR #681 round 3)', () => {
+    expect(rules('git -C /repo/sub/mod push')).toContain('default-branch-push')
+    expect(rules('git -C /repo/sub/mod push origin feat/x')).toEqual([])
+    expect(rules('git -C /repo push')).toEqual([])
+    expect(rules('git -C sub push')).toContain('default-branch-push')
+  })
+  test('refspecs after -- are checked for force and delete (PR #681 round 3)', () => {
+    expect(rules('git push origin -- +feat/x')).toContain('force-push')
+    expect(rules('git push origin -- :feat/x')).toContain('branch-delete')
+  })
   test('an escaped or quote-split word is unreadable when it may spell a danger (PR #681 round 2)', () => {
     for (const c of ['git pu\\sh -f origin feat/x', 'git pu""sh -f', "git p'u'sh -f", 'r\\m -rf /tmp/x', 'git push origin ma\\in'])
       expect(rules(c)).not.toEqual([])
@@ -140,7 +154,7 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
       expect([c, rules(c)]).toEqual([c, ['unreadable']])
   })
   test('round 2 controls: the same repo, an explicit refspec, commit message values', () => {
-    for (const c of ['git -C /other push origin feat/x', 'cd /repo && git push', 'cd /repo/sub && git push', 'git -C sub push', 'cd /other && git push origin feat/x',
+    for (const c of ['git -C /other push origin feat/x', 'cd /repo && git push', 'cd /repo/sub && git push', 'cd /other && git push origin feat/x',
       'git commit -m "msg"', 'git commit -am "msg"', 'git commit -F "$f"', 'git commit --message "x" --author "A <a@b>"', 'rm -f x.txt'])
       expect([c, rules(c)]).toEqual([c, []])
   })

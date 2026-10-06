@@ -497,7 +497,10 @@ export const register: Register = (on, options) => {
         // unneeded ask costs one dialog, a missed one a force push.
         let rules: NeverRule[]
         try {
-          if ((await modeOf($)).mode !== 'autopilot') return r
+          // A session that left autopilot through a failure (ledger, record, policy) keeps the
+          // floor: under bypass, manual means no asks at all (PR #681). /autopilot off clears it.
+          const m = await modeOf($)
+          if (m.mode !== 'autopilot' && m.problem === undefined) return r
           rules = enforced(neverRules(raw, await where($)), cfg.neverApprove)
         } catch (err) {
           await log($, `floor error ${String(err)}`)

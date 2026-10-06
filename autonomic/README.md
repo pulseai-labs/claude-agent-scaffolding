@@ -115,7 +115,7 @@ rules — `force-push`, `default-branch-push`, `branch-delete`, `rm-outside`, `n
 is left alone on an allow. A repo whose default branch takes direct pushes by design removes
 `default-branch-push`.
 
-A unique prefix of a long option is read as that option (`--forc` is `--force`, `rm --recurs` is `--recursive`), as git and GNU tools accept it. A word with a backslash, a quote inside it or a brace (`pu\sh`, `pu""sh`, `{main,x}`) is unreadable when the command may name a danger, and an `rm -r` path with a brace or a glob on a dot name (`.?`, `.*`) counts as outside the worktree. `--repo` names the remote, and `@` is `HEAD`. A danger the command text does not show — a git alias defined in config, a script file — is not seen.
+A unique prefix of a long option is read as that option (`--forc` is `--force`, `rm --recurs` is `--recursive`), as git and GNU tools accept it. A word with a backslash, a quote inside it or a brace (`pu\sh`, `pu""sh`, `{main,x}`) is unreadable when the command may name a danger, and an `rm -r` path with a brace or a glob on a dot name (`.?`, `.*`) counts as outside the worktree. `--repo` names the remote, and `@` is `HEAD`. A wildcard destination (`refs/heads/*`) may be the default branch, refspecs after `--` are checked for `+` and `:`, and a bare push through `git -C` into a directory other than the repo root reads the branch as unknown (a nested repo or submodule). A danger the command text does not show — a git alias defined in config, a script file — is not seen.
 
 The list reads each command segment with seat-mods' shell reader (copied, and held identical by
 `tests/test-mod-shell-parity.sh`). Otherwise the fork judges the call against the policy's
@@ -131,7 +131,13 @@ permission scope: `allow` is recorded and the tool runs; anything else leaves th
 - **Auto or default.** Claude Code asks, and the ask path above applies. The first ask after a
   clear rings "nothing to judge yet": the fork has no request to copy until the session's first
   response.
-- **Manual mode**, in any permission mode: autonomic never touches an `allow`.
+- **Manual mode**, in any permission mode: autonomic never touches an `allow` — except in a
+  session that left autopilot through a failure (an unwritable ledger or record, a removed
+  policy). That session keeps the floor, because under bypass, manual means no asks at all.
+  `/autopilot off` turns it off.
+- **What the floor guards against:** a cooperative model writing a dangerous command in a plain
+  form. A deliberately disguised spelling (`git pu{s..s}h`, a `-c remote.<name>.push=` setting, a
+  git alias in config) can pass it.
 
 ## The ledger
 
