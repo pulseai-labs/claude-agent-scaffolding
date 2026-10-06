@@ -30,6 +30,9 @@ const below = (path: string, root: string) => path.startsWith(`${root.replace(/\
 const RUNNERS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish', 'eval', 'xargs', 'timeout', 'nice', 'ionice', 'watch', 'parallel', 'find', 'su', 'doas', 'ssh'])
 const OPENERS = new Set(['if', 'then', 'do', 'else', 'elif', 'while', 'until', '{', '}', '!'])
 const DANGER = /\bpush\b|\brm\b|\bbranch\b|\bcommit\b|--no-verify/
+// The cheap pre-check: every rule neverRules finds needs one of these words, so a command
+// without one runs no git (the bypass floor, 0.1.1 §3.1).
+export const namesDanger = (command: string): boolean => DANGER.test(command)
 const OPTION_VALUES = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec'])
 // Commit options whose next word is a message, a path or a name, never a flag.
 const COMMIT_VALUES = new Set(['-m', '--message', '-F', '--file', '-C', '-c', '--reuse-message', '--reedit-message',

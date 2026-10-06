@@ -1,11 +1,15 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { neverRules } from '../hooks/never'
+import { namesDanger, neverRules } from '../hooks/never'
 import type { Where } from '../hooks/never'
 
 const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x', defaultBranch: 'main' }
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('namesDanger is the cheap pre-check (Review Focus 2)', () => {
+    for (const c of ['git push', 'rm -rf x', 'git commit -m x', 'x --no-verify', 'git branch -D y']) expect(namesDanger(c)).toBe(true)
+    for (const c of ['ls -la', 'npm test', 'git status', 'cat README.md']) expect(namesDanger(c)).toBe(false)
+  })
   test('force push, in every spelling', () => {
     for (const c of ['git push -f', 'git push --force origin feat/x', 'git push --force-with-lease', 'git push origin +feat/x', 'git push --mirror'])
       expect(rules(c)).toContain('force-push')
