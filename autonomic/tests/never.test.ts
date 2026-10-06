@@ -6,6 +6,14 @@ const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x'
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 describe('the never-approve list (spec §3.3, plan decision 3)', () => {
+  test('a quoted command word after a wrapper is unreadable (PR #681 round 15)', () => {
+    expect(rules('prlimit "git" push -f origin feat/x')).toContain('unreadable')
+    expect(rules("prlimit 'rm' -rf /tmp/x")).toContain('unreadable')
+    expect(rules('echo "done" && git push origin feat/x')).toEqual([])
+  })
+  test('an abbreviated option keeps its attached value (PR #681 round 15)', () => {
+    expect(rules('git push --force-w=feat/x origin feat/x')).toContain('force-push')
+  })
   test('any unlisted wrapper before git or rm is unreadable (PR #681 round 14)', () => {
     for (const c of ['prlimit git push -f origin feat/x', 'mywrap --x /usr/bin/git push -f', 'cgexec -g cpu:x rm -rf /tmp/x'])
       expect([c, rules(c).length > 0]).toEqual([c, true])

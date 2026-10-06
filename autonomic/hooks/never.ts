@@ -45,7 +45,9 @@ const GIT_FLAGS = new Set(['-p', '-P', '--paginate', '--no-pager', '--bare', '--
 // GNU and git accept a unique prefix of a long option: `--forc` is --force, `--recurs` is
 // --recursive. A prefix of a dangerous option is read as that option (PR #681).
 const LONGS = ['--force', '--force-with-lease', '--mirror', '--delete', '--prune', '--all', '--branches', '--no-verify', '--recursive']
-const expand = (a: string): string => (/^--[a-z][a-z-]*$/.test(a) && !LONGS.includes(a) ? (LONGS.find(l => l.startsWith(a)) ?? a) : a)
+// The name is expanded before an attached value: --force-w=x is --force-with-lease=x (round 15).
+const expandName = (n: string): string => (/^--[a-z][a-z-]*$/.test(n) && !LONGS.includes(n) ? (LONGS.find(l => l.startsWith(n)) ?? n) : n)
+const expand = (a: string): string => { const at = a.indexOf('='); return at < 0 ? expandName(a) : `${expandName(a.slice(0, at))}${a.slice(at)}` }
 const OPENERS = new Set(['if', 'then', 'do', 'else', 'elif', 'while', 'until', '{', '}', '!'])
 // --no-v… is any abbreviation of --no-verify (round 10).
 const DANGER = /\bpush\b|\brm\b|\bbranch\b|\bcommit\b|--no-v[a-z]*|\bsend-pack\b|\bhttp-push\b/
@@ -219,7 +221,9 @@ export function neverRules(command: string, where: Where): NeverRule[] {
     if (head === undefined) continue
     // Any wrapper, listed or not: git or rm as a later bare word runs under a head the reader
     // does not follow (round 14).
-    const wrapped = head.name !== 'git' && head.name !== 'rm' && head.args.some(a => /^(?:.*\/)?(?:git|rm)$/.test(a))
+    const wrapped = head.name !== 'git' && head.name !== 'rm' && (head.args.some(a => /^(?:.*\/)?(?:git|rm)$/.test(a)) ||
+      // …or a quoted word followed by a danger word or a recursive flag: `prlimit "git" push` (round 15).
+      head.args.some((a, k) => opaque(a) && head.args.slice(k + 1).some(b => DANGER.test(b) || /^-[A-Za-z]*[rR]/.test(b))))
     if (wrapped || head.name.startsWith('-') || opaque(head.name) || RUNNERS.has(head.name) || INTERPRETER.test(head.name) || tokens.some(t => t.includes('`') || t.includes('$('))) {
       if (namesDanger(command)) found.add('unreadable')
     }
