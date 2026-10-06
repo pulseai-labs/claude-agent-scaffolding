@@ -92,3 +92,38 @@ describe('the permission reflex (spec §3.3)', () => {
     expect(w.forkPrompts).toEqual([])
   })
 })
+
+describe('the bypass floor (0.1.1 §3.1)', () => {
+  test('autopilot: an allowed force push becomes an ask, recorded and rung', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    const r = await $.tool.check(BASH('git push -f'))
+    expect(r.decision).toBe('ask')
+    expect(r.reason).toContain('never-approve — force-push')
+    expect(ledgerLines(w).at(-1)).toContain(' · permission · ')
+    expect(JSON.stringify(w.notices.at(-1))).toContain('never-approve')
+  })
+  test('manual: an allow is never touched', async ($, on) => {
+    const w = world(on)
+    w.verdict = { decision: 'allow' }
+    expect((await $.tool.check(BASH('git push -f'))).decision).toBe('allow')
+  })
+  test('autopilot: an allowed command with no danger word runs no git (Review Focus 2)', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
+    w.verdict = { decision: 'allow' }
+    const before = w.runs.filter(r => r[0] === 'git').length
+    expect((await $.tool.check(BASH('ls -la'))).decision).toBe('allow')
+    expect(w.runs.filter(r => r[0] === 'git').length).toBe(before)
+  })
+  test('autopilot: an allowed own-branch push stays allowed', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    expect((await $.tool.check(BASH('git push -u origin feat/x'))).decision).toBe('allow')
+  })
+  test('autopilot: a deny is never changed', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'deny', reason: 'settings deny' }
+    expect((await $.tool.check(BASH('git push -f'))).decision).toBe('deny')
+  })
+})

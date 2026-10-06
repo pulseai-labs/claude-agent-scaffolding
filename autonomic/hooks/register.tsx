@@ -11,7 +11,7 @@ import { DEFAULT_POLICY, POLICY_ID, expandHome } from './policy'
 import { scopeMessage } from './prompts'
 import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from './records'
 import type { SessionRecord } from './records'
-import { neverRules } from './never'
+import { namesDanger, neverRules } from './never'
 import { enforced } from './enforce'
 import type { Where } from './never'
 import { permissionPrompt } from './prompts'
@@ -458,7 +458,19 @@ export const register: Register = (on, options) => {
   on('tool.check', async ($, e, next) => {
     const r = await next(e)
     try {
-      if (r.decision === 'allow') return r
+      if (r.decision === 'allow') {
+        // The bypass floor (0.1.1 §3.1): in autopilot a never-approve match reaches the
+        // operator whatever allowed it. Manual mode never touches an allow.
+        const raw = (e.input as { command?: unknown } | undefined)?.command
+        if (typeof raw !== 'string' || !namesDanger(raw)) return r
+        if ((await modeOf($)).mode !== 'autopilot') return r
+        const rules = enforced(neverRules(raw, await where($)), cfg.neverApprove)
+        if (rules.length === 0) return r
+        const id = await $.session.id()
+        await record($, id, 'permission', `${e.tool}: ${raw}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
+        await pain($, id, 'never-approve', `${rules.join(', ')} — ${raw}`)
+        return { ...r, decision: 'ask', reason: `autonomic: never-approve — ${rules.join(', ')}` }
+      }
       if ((await modeOf($)).mode !== 'autopilot') return r
       const id = await $.session.id()
       if (r.decision === 'deny') {
