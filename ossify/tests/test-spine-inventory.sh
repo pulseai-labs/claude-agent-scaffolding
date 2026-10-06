@@ -152,17 +152,22 @@ t_assert_eq "reattach" "$(route r0.s1.w1)" "S7: worktree gone, branch ahead -> r
 git -C "$F/core" worktree prune; git -C "$F/core" branch -D work/r0.s1.w1-one -q; inv "$F"
 t_assert_eq "halt:work-lost" "$(route r0.s1.w1)" "S8: worktree and branch both gone -> halt:work-lost"
 
-# S9 (#673 C1): a commit past base is NOT self-evidently gated - an
-# implementer's stage-never-commit violation leaves this exact shape, and the
-# pre-fix route merged it with no gate ever run. Without report.md evidence
-# the route refuses; with it (S9b) the post-gate close-crash shape merges.
+# S9 (#673 K1, superseding C1): neither a commit on the work branch nor a
+# present report.md is proof the close gate ran - the item skill authors the
+# report BEFORE staging - so the classifier infers nothing from either: the
+# finish-merge row re-runs close §2's gate on the committed tree before
+# merging, and a red re-run halts there. Both shapes route finish-merge; the
+# report fact still renders for the close-finished arm, which needs a report
+# to hand to close.
 F="$TMP/s9"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
 echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm "close r0.s1.w1"; inv "$F"
-t_assert_eq "halt:unverified-merge" "$(route r0.s1.w1)" "S9: a commit past base with NO report.md -> halt:unverified-merge"
-t_assert_rc 3 "S9: ...rc 3"
+t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S9: a commit past base with NO report.md routes finish-merge (the gate re-runs at the merge)"
+t_assert_contains "$(row item r0.s1.w1)" "report=no" "S9: ...while the report fact still renders for the close-finished arm"
+t_assert_rc 0 "S9: ...rc 0"
 mkdir -p "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1"
 echo r > "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1/report.md"; inv "$F"
-t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S9b: the same shape WITH report.md -> finish-merge"
+t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S9b: ...and with report.md the route is unchanged"
+t_assert_contains "$(row item r0.s1.w1)" "report=yes" "S9b: ...and the fact flips to yes"
 
 # S10: merged, status still active -> finish-status.
 git -C "$F/core" merge -q --no-ff work/r0.s1.w1-one -m "merge r0.s1.w1"; inv "$F"
@@ -530,6 +535,49 @@ printf '[fidelity] rejected earlier\n' > "$F/ws/docs/specs/r0/r0.s1-demo/work-r0
 inv "$F"
 t_assert_eq "halt:close-rejected" "$(route r0.s1.w1)" "S34b: a complete+unmerged item with a recorded rejection halts"
 t_assert_rc 3 "S34b: ...rc 3"
+
+# S35 (#673 L2): a recorded branch must be one this item OWNS. A record naming
+# a foreign branch (a pre-fix adopt, or a hand-edited record) used to reattach
+# here, after which the next inventory would redispatch it - commits landing
+# on a branch that is not this item's. The prefix predicate B1 applied to the
+# adopt arm now guards every arm; S6 remains the control (this item's own
+# work/ branch with a missing dir still reattaches).
+F="$TMP/s35"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+git -C "$F/core" branch elsewhere
+oss_in "$F" work_item_exec r0.s1.w1 elsewhere "$WT" "$(git -C "$F/core" rev-parse spine/r0.s1-demo)" >/dev/null
+rm -rf "$WT"; inv "$F"
+t_assert_eq "halt:unclassified" "$(route r0.s1.w1)" "S35: an active item recording a foreign branch halts, never reattaches"
+t_assert_rc 3 "S35: ...rc 3"
+
+# S36 (#673 L3): a `complete` item with NO branch ever recorded is not the
+# post-cleanup shape - nothing proves a branch existed - so it halts under its
+# own route instead of skipping the round done. S26 is the control (a branch
+# recorded, its ref gone: the cleanup shape, still skip).
+F="$TMP/s36"; fx "$F" 1
+oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null; inv "$F"
+t_assert_eq "halt:branch-unknown" "$(route r0.s1.w1)" "S36: complete with no branch ever recorded halts"
+t_assert_rc 3 "S36: ...rc 3"
+
+# S38 (#673 L2, the complete arm): the same ownership guard covers a complete
+# item whose record names a foreign branch carrying commits - the shape that
+# used to route finish-merge and would merge a branch this item does not own.
+F="$TMP/s38"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+git -C "$WT" checkout -q -B other
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm c
+oss_in "$F" work_item_exec r0.s1.w1 other "$WT" "$(git -C "$F/core" rev-parse spine/r0.s1-demo)" >/dev/null
+oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null; inv "$F"
+t_assert_eq "halt:unclassified" "$(route r0.s1.w1)" "S38: a complete item recording a foreign branch halts, never finish-merges"
+t_assert_rc 3 "S38: ...rc 3"
+
+# S37 (#673 L4): a LOCKED dead registration at this item's own path is not a
+# reattachable one - git prints the lock a line AFTER the branch (measured),
+# and the read-out now reads it. Routing reattach here would meet rc 8 only
+# after §2b's repo repairs had mutated. S6 is the control (unlocked -> it
+# reattaches).
+F="$TMP/s37"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+git -C "$F/core" worktree lock "$WT"; rm -rf "$WT"; inv "$F"
+t_assert_eq "halt:worktree-held" "$(route r0.s1.w1)" "S37: a locked own-path dead registration is held, not reattachable"
+t_assert_rc 3 "S37: ...rc 3"
 
 # ---- the shipped §2 re-entry blocks, extracted and RUN (block-ledger O rows) ----
 SKILLS="$HERE/../skills"

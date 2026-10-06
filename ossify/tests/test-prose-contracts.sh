@@ -1386,11 +1386,16 @@ _IC="$HERE/../skills/close/references/impl-check.md"
 _r=1; grep -Fq 'refs are gone while its state survives' "$_RO" \
   && grep -Fq 'no item records execution' "$_RO" && _r=0
 _pin "$_r" "round-orchestration.md §2's arm selector does not halt on recorded execution state with no spine branch (A6)"
-# C1/C3/B2: the finish-merge row carries its own tip recovery and report gate.
+# C3/K1/L1/B2: the finish-merge row carries its repo-root recovery, the gate
+# RE-RUN (the report-presence gate is gone - a present report proves nothing),
+# and the tip recovery.
 _r=1; grep -Fq 'refs/heads/$wi_branch' "$_RO" \
   && grep -Fq 'halt:unverified-merge' "$_RO" \
+  && grep -Fq 'RE-RUN close §2' "$_RO" \
+  && grep -Fq 'repo_root="$("$oss_bin" repo_root "$target_repo")"' "$_RO" \
+  && ! grep -Fq 'as gate evidence' "$_RO" \
   && grep -Fq 'the row reads `wt=present` but state holds no `worktree_path` yet' "$_RO" && _r=0
-_pin "$_r" "round-orchestration.md §2b's finish-merge row drops the work-branch tip recovery / report gate, or the adopt row leaves \$wt undefined again (C1/C3/B2)"
+_pin "$_r" "round-orchestration.md §2b's finish-merge row drops its repo-root recovery, the §2 gate re-run, or the tip recovery (C3/K1/L1), still claims report.md is gate evidence, or the adopt row leaves \$wt undefined again (B2)"
 # C2: the rejection is durable and its route is named.
 _r=1; grep -Fq 'halt:close-rejected' "$_RO" \
   && grep -Fq 'durable rejection record' "$_IC" \
@@ -1418,6 +1423,12 @@ _r=1; grep -Fq 'halt:base-unresolved' "$_RO" \
   && grep -Fq 'validation precedes every removal' "$_RO" \
   && grep -Fq 'a recorded rejection is never re-landed by a merge' "$_RO" && _r=0
 _pin "$_r" "round-orchestration.md drops a fix-round-2 fail-closed claim (base-unresolved row; the verify.md read; the dirty complete-item halt; the rewrite-is-no-landing clause; reattach's validate-before-remove; the merge-arm rejection gate) (G2/G3/H1/I1/I2/J1)"
+# Fix round 3 (L2/L3/L4): the guards the round added are contract claims too.
+_r=1; grep -Fq 'halt:branch-unknown' "$_RO" \
+  && grep -Fq 'no branch ever recorded' "$_RO" \
+  && grep -Fq 'the registration is LOCKED' "$_RO" \
+  && grep -Fq 'never reused for reattach, redispatch or merge' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md drops a fix-round-3 guard claim: the halt:branch-unknown row, the locked-holder clause, or the foreign-branch clause (L2/L3/L4)"
 
 rm -rf "$_PC_TMP"
 t_summary

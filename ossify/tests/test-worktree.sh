@@ -1226,20 +1226,76 @@ A5WT="$(oss_worktree_add canonical "$A5WI" "a5" HEAD)"
 echo a > "$A5WT/a"; git -C "$A5WT" add a; git -C "$A5WT" commit -qm a5
 oss_entity_set_work_item_exec "$A5S" "$A5WI" "work/$A5WI-a5" "$A5WT" "$(git -C "$A5WT" rev-parse HEAD)" >/dev/null
 git -C "$A5CAN" merge -q "work/$A5WI-a5" -m "merge $A5WI"
-# TWO dead registrations for the same item (the pre-fix dual-holder shape) -
-# the missing-dir arm must clear ALL of them, or the leftover holder blocks
-# the branch delete below ("used by worktree").
+# #673 L5 (superseding round 1's clear-ALL): a second dead registration for
+# the same item under ANOTHER root is NOT this verb's to delete - the suffix
+# match alone also names same-basename paths in other workspaces, where the
+# worktree may be live. Cleanup refuses the whole set, removing nothing.
 A5ALT="$A5CAN/../a5alt/.worktrees/$A5WI"; mkdir -p "$(dirname "$A5ALT")"
 git -C "$A5CAN" worktree add -q -f "$A5ALT" "work/$A5WI-a5"
 rm -rf "$A5WT" "$A5ALT"
 t_assert_eq "2" "$(git -C "$A5CAN" worktree list --porcelain | awk -v s="/.worktrees/$A5WI" '/^worktree /{w=substr($0,10); if (length(w)>=length(s) && substr(w,length(w)-length(s)+1)==s) c++} END{print c+0}')" "A5 setup: the dual dead-registration shape really holds two entries"
+A5_BEFORE="$(git -C "$A5CAN" worktree list --porcelain)"
 t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI"
-t_assert_rc 0 "A5: a deleted directory no longer wedges worktree_remove"
-t_assert_eq "gone" "$(git -C "$A5CAN" show-ref --verify --quiet "refs/heads/work/$A5WI-a5" && echo present || echo gone)" "A5: ...and the merged branch is deleted"
-t_assert_eq "0" "$(git -C "$A5CAN" worktree list --porcelain | awk -v s="/.worktrees/$A5WI" '/^worktree /{w=substr($0,10); if (length(w)>=length(s) && substr(w,length(w)-length(s)+1)==s) c++} END{print c+0}')" "A5: ...ALL stale registrations are cleared"
+t_assert_rc 8 "L5: a stale registration under ANOTHER root refuses the cleanup"
+t_assert_contains "$T_OUT" "not under this item's root" "L5: ...naming why; nothing was removed"
+t_assert_eq "$A5_BEFORE" "$(git -C "$A5CAN" worktree list --porcelain)" "L5: ...the whole registration set stands, byte-identical"
+t_assert_eq "present" "$(git -C "$A5CAN" show-ref --verify --quiet "refs/heads/work/$A5WI-a5" && echo present || echo gone)" "L5: ...and the branch survives"
+# Control: with the foreign registration gone (cleared by hand, as the
+# refusal's own text says to), the deleted directory at the item's OWN path
+# no longer wedges cleanup - round 1's A5 outcome, now scoped to the own root.
+git -C "$A5CAN" worktree remove "$A5ALT"
+t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI"
+t_assert_rc 0 "A5 control: a deleted directory at the item's OWN path no longer wedges worktree_remove"
+t_assert_eq "gone" "$(git -C "$A5CAN" show-ref --verify --quiet "refs/heads/work/$A5WI-a5" && echo present || echo gone)" "A5 control: ...and the merged branch is deleted"
+t_assert_eq "0" "$(git -C "$A5CAN" worktree list --porcelain | awk -v s="/.worktrees/$A5WI" '/^worktree /{w=substr($0,10); if (length(w)>=length(s) && substr(w,length(w)-length(s)+1)==s) c++} END{print c+0}')" "A5 control: ...its registration is cleared"
 t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI"
 t_assert_rc 0 "A5b: a second call (dir and branch both already gone) is clean"
-# A5c: a record naming a branch that is NOT this item's (the pre-fix adopt's
+# L5b (#673 L5): the harm itself - a LIVE worktree of this repo under ANOTHER
+# root with the same basename must survive the cleanup. The pre-fix
+# suffix-only loop passed it straight to `git worktree remove`, deleting the
+# live worktree's directory.
+A5WI3="$(oss_entity_add_work_item "$A5S" "$A5SP" "t3" canonical)"
+A5BIG="$(oss_worktree_add canonical "$A5WI3" "a5b" HEAD)"
+echo b > "$A5BIG/b"; git -C "$A5BIG" add b; git -C "$A5BIG" commit -qm a5b
+oss_entity_set_work_item_exec "$A5S" "$A5WI3" "work/$A5WI3-a5b" "$A5BIG" "$(git -C "$A5BIG" rev-parse HEAD)" >/dev/null
+git -C "$A5CAN" merge -q "work/$A5WI3-a5b" -m "merge $A5WI3"
+A5LIVE="$A5CAN/../a5live/.worktrees/$A5WI3"; mkdir -p "$(dirname "$A5LIVE")"
+git -C "$A5CAN" worktree move "$A5BIG" "$A5LIVE"    # LIVE, under another root
+t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI3"
+t_assert_rc 8 "L5b: a LIVE worktree under another root refuses the cleanup"
+[ -d "$A5LIVE" ] && [ -e "$A5LIVE/.git" ] \
+  && T_PASS=$((T_PASS+1)) \
+  || { T_FAIL=$((T_FAIL+1)); echo "FAIL: L5b: the live worktree under another root was destroyed"; }
+t_assert_contains "$T_OUT" "not under this item's root" "L5b: ...naming why it refused"
+
+# L6 (#673 L6): the deleted-worktree arm's STATE read fails closed. Folding a
+# parse failure into an empty branch used to clear the registrations, leave
+# the work branch silently alive, and return 0 while close proceeded.
+A5WI4="$(oss_entity_add_work_item "$A5S" "$A5SP" "t4" canonical)"
+A5W4="$(oss_worktree_add canonical "$A5WI4" "a5c" HEAD)"
+echo c > "$A5W4/c"; git -C "$A5W4" add c; git -C "$A5W4" commit -qm a5c
+oss_entity_set_work_item_exec "$A5S" "$A5WI4" "work/$A5WI4-a5c" "$A5W4" "$(git -C "$A5W4" rev-parse HEAD)" >/dev/null
+git -C "$A5CAN" merge -q "work/$A5WI4-a5c" -m "merge $A5WI4"
+rm -rf "$A5W4"
+cp "$A5S" "$A5S.bak"; printf 'not json' > "$A5S"
+t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI4"
+t_assert_rc 8 "L6: an unreadable state file refuses the cleanup"
+t_assert_contains "$T_OUT" "cannot read work item" "L6: ...as the READ error it is, not as an empty record"
+t_assert_eq "present" "$(git -C "$A5CAN" show-ref --verify --quiet "refs/heads/work/$A5WI4-a5c" && echo present || echo gone)" "L6: ...the branch survives - nothing was cleared"
+mv "$A5S.bak" "$A5S"
+t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI4"
+t_assert_rc 0 "L6 control: with the state readable the same cleanup succeeds"
+t_assert_eq "gone" "$(git -C "$A5CAN" show-ref --verify --quiet "refs/heads/work/$A5WI4-a5c" && echo present || echo gone)" "L6 control: ...and the merged branch is deleted"
+# L6b: a VALID state that records no branch for the item is a refusal too -
+# the record cannot say what it is cleaning, and the silent-empty branch is
+# exactly the shape this closes.
+A5WI5="$(oss_entity_add_work_item "$A5S" "$A5SP" "t5" canonical)"
+A5W5="$(oss_worktree_add canonical "$A5WI5" "a5d" HEAD)"; rm -rf "$A5W5"
+t_capture env OSS_STATE_FILE="$A5S" bash "$OSS" worktree_remove canonical "$A5WI5"
+t_assert_rc 8 "L6b: a missing branch record refuses the cleanup"
+t_assert_contains "$T_OUT" "records no branch" "L6b: ...naming it"
+
+
 # `main`) must never be deleted by cleanup - the base branch is not ours.
 A5WI2="$(oss_entity_add_work_item "$A5S" "$A5SP" "t2" canonical)"
 A5DEFLT="$(git -C "$A5CAN" rev-parse --abbrev-ref HEAD)"

@@ -536,39 +536,94 @@ oss_worktree_orphans() { # $1=repo-key [$2=state-file] ; echoes one abs path per
 # `work_items[].branch` the close's merge target already trusts. A branch that
 # is already gone is not an error either: `git branch -d`, the only sanctioned
 # deleter, refuses an unmerged branch, so a deleted one WAS merged.
+# #673 L5: the physical spelling of a directory. A repo reached through a
+# symlink (`ln -s` roots; macOS /tmp) must compare equal to its resolved form,
+# or the removal guard below would refuse the item's own registration; a path
+# that no longer exists compares textually.
+_oss_worktree_phys() { # $1=dir ; echoes the physical path when resolvable
+  local p
+  if [ -d "$1" ]; then
+    p="$(cd -P "$1" 2>/dev/null && pwd)" && { printf '%s\n' "$p"; return 0; }
+  fi
+  printf '%s\n' "$1"
+}
+
 oss_worktree_remove() { # $1=repo-key $2=work-item-id
-  local key="$1" wi="$2" root path branch dirty sf holdpath holdpaths
+  local key="$1" wi="$2" root path branch dirty sf holdpath holdpaths recpath hp_root derived_root rec_root kept refused
   _oss_worktree_id_check "$wi" || return $?
   root="$(_oss_repo_root "$key")" || return $?
   path="$root/.worktrees/$wi"
   branch=""
   if [ -d "$path" ]; then
-    dirty="$(git -C "$path" status --porcelain 2>/dev/null)" || dirty=""
+    # #673 L6 (class): a failed read must not fold into the benign empty
+    # value here either - an unreadable status or HEAD left the branch
+    # silently undeleted while close proceeded.
+    dirty="$(git -C "$path" status --porcelain 2>/dev/null)" || {
+      echo "oss: cannot read the worktree status at $path - refusing to remove it" >&2; return 8; }
     if [ -n "$dirty" ]; then
       echo "oss: worktree $path has uncommitted changes - refusing to remove it" >&2
       printf '%s\n' "$dirty" >&2
       return 8
     fi
-    branch="$(git -C "$path" rev-parse --abbrev-ref HEAD 2>/dev/null)" || branch=""
+    branch="$(git -C "$path" rev-parse --abbrev-ref HEAD 2>/dev/null)" || {
+      echo "oss: cannot read the worktree HEAD at $path - refusing to remove it" >&2; return 8; }
     git -C "$root" worktree remove "$path" || { echo "oss: git worktree remove failed for $path" >&2; return 8; }
   else
+    # #673 L6: the state read FAILS CLOSED. Folding a resolve/parse failure -
+    # or a missing record - into an empty branch let this arm clear the
+    # registrations and return success while the work branch silently
+    # survived and close proceeded to mark the spine closed. Nothing below
+    # is mutated until the branch AND the recorded worktree_path are read.
+    # The branch comes from state instead of a worktree HEAD.
+    sf="$(_oss_resolve_state 2>/dev/null)" || {
+      echo "oss: cannot resolve the state file for work item $wi - refusing to clean up $path" >&2; return 8; }
+    [ -f "$sf" ] || { echo "oss: no state file at $sf - refusing to clean up $path" >&2; return 8; }
+    branch="$(jq -r --arg w "$wi" 'first(.work_items[] | select(.id == $w) | .branch // empty) // ""' "$sf" 2>/dev/null)" || {
+      echo "oss: cannot read work item $wi from $sf - refusing to clean up $path" >&2; return 8; }
+    [ -n "$branch" ] || {
+      echo "oss: work item $wi records no branch in $sf - refusing to clean up $path (a cleanup with no branch record cannot know what it is cleaning)" >&2; return 8; }
+    recpath="$(jq -r --arg w "$wi" 'first(.work_items[] | select(.id == $w) | .worktree_path // empty) // ""' "$sf" 2>/dev/null)" || {
+      echo "oss: cannot read work item $wi's worktree_path from $sf - refusing to clean up $path" >&2; return 8; }
     # The registration paths AS GIT PRINTS THEM (symlink-resolved on macOS
     # /tmp), matched on the `/.worktrees/<wi>` suffix - a whole-string compare
-    # against `$path` would miss that spelling. ALL matches are cleared (#673
-    # E1's shape: a dead holder left by a pre-fix reattach would otherwise
-    # block the branch delete below - git refuses a branch "used by worktree").
-    # The branch comes from state instead of a worktree HEAD.
+    # against `$path` would miss that spelling.
     holdpaths="$(git -C "$root" worktree list --porcelain | awk -v s="/.worktrees/$wi" '
-      /^worktree /{p=substr($0,10); if (length(p)>=length(s) && substr(p, length(p)-length(s)+1)==s) print p}')" || holdpaths=""
-    sf="$(_oss_resolve_state 2>/dev/null)" || sf=""
-    if [ -n "$sf" ] && [ -f "$sf" ]; then
-      branch="$(jq -r --arg w "$wi" 'first(.work_items[] | select(.id == $w) | .branch // empty) // ""' "$sf" 2>/dev/null)" || branch=""
+      /^worktree /{p=substr($0,10); if (length(p)>=length(s) && substr(p, length(p)-length(s)+1)==s) print p}')" || {
+      echo "oss: cannot read the worktree list for $root - refusing to clean up $path" >&2; return 8; }
+    # #673 L5: only registrations under THIS item's own root are this verb's
+    # to clear - its RECORDED worktree_path's root or the derived one, compared
+    # physically so a symlinked spelling still matches. The pre-fix suffix-only
+    # match also caught a worktree of a same-named path under a DIFFERENT root
+    # (work-item ids repeat across workspaces) and `git worktree remove` would
+    # have deleted it - live or dead. Validate the WHOLE set first; a match at
+    # any other root refuses with nothing removed.
+    derived_root="$(_oss_worktree_phys "$root")"
+    rec_root=""
+    case "$recpath" in
+      */.worktrees/"$wi") rec_root="$(_oss_worktree_phys "${recpath%/.worktrees/$wi}")" ;;
+    esac
+    kept=""; refused=""
+    while IFS= read -r holdpath; do
+      [ -n "$holdpath" ] || continue
+      hp_root="${holdpath%/.worktrees/$wi}"
+      hp_root="$(_oss_worktree_phys "$hp_root")"
+      if [ "$hp_root" = "$derived_root" ] || { [ -n "$rec_root" ] && [ "$hp_root" = "$rec_root" ]; }; then
+        kept="$kept$holdpath"$'\n'
+      else
+        refused="$holdpath"; break
+      fi
+    done <<HOLD
+$holdpaths
+HOLD
+    if [ -n "$refused" ]; then
+      echo "oss: work item $wi has a registration at $refused, which is not under this item's root - refusing; nothing was removed (inspect with: git -C $(printf '%q' "$root") worktree list)" >&2
+      return 8
     fi
     while IFS= read -r holdpath; do
       [ -n "$holdpath" ] || continue
       git -C "$root" worktree remove "$holdpath" || { echo "oss: git worktree remove failed for the stale registration at $holdpath" >&2; return 8; }
     done <<HOLD
-$holdpaths
+$kept
 HOLD
   fi
   if [ -n "$branch" ] && [ "$branch" != "HEAD" ]; then

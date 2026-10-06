@@ -116,7 +116,7 @@ EOF
 # still AT base_sha is trivially an ancestor and has merged nothing.
 _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if any halt
   local sf="$1" spine="$2" spine_dir="$3" sb="$4" halt=0
-  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys held holders hp adopt_br brx feed feed_rc=0 gr descends
+  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys held holders hp hl adopt_br brx feed feed_rc=0 gr descends foreign
   # The feed's own rc is caught, and each item renders inside a `try`/`catch`
   # (#673 A2): one unrenderable field used to collapse the WHOLE stream - the
   # shell read a partial feed with no error channel, the empty-field skip
@@ -165,6 +165,17 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
       conv="$root/.worktrees/$wi"
       has_exec=0; { [ -n "$br" ] || [ -n "$wtp" ] || [ -n "$bs" ]; } && has_exec=1
       [ -n "$wtp" ] || wtp="$conv"
+      # #673 L2: a recorded branch must be one this item OWNS - the exact
+      # `work/<wi-id>-` prefix, the same predicate the planned arm's adopt
+      # checks (#673 B1, which closed adopt only). The active and complete
+      # arms reuse the recorded branch for reattach, redispatch and the
+      # merge, so a record naming `main` (a pre-fix adopt, or a hand-edited
+      # record) would re-dispatch or commit onto the base branch itself.
+      # `foreign` overrides every route below.
+      foreign=no
+      if [ -n "$br" ]; then
+        printf '%s\n' "$br" | awk -v p="work/$wi-" 'index($0, p) == 1 {ok=1} END{exit !ok}' || foreign=yes
+      fi
       # A worktree counts as present only as the TOP LEVEL of a LINKED worktree.
       # `-d` plus `--is-inside-work-tree` alone is true for a PLAIN directory at
       # the derived path, because that path sits inside the hosting repo's own
@@ -229,15 +240,24 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
         # means the branch is treated as HELD, and the route that consults
         # `held` halts with a repair the operator can run (`git worktree list`).
         if ! holders="$(_oss_inv_git -C "$root" worktree list --porcelain | awk -v b="refs/heads/$br" '
-          /^worktree /{if (hit) print p; p=substr($0,10); hit=0; next}
+          /^worktree /{if (hit) print p "\t" lk; p=substr($0,10); lk=0; hit=0; next}
+          /^locked/{lk=1; next}
           $0=="branch " b {hit=1}
-          END{if (hit) print p}')"; then
+          END{if (hit) print p "\t" lk}')"; then
           held=1; holders=""
         fi
-        while IFS= read -r hp; do
+        while IFS="$(printf '\t')" read -r hp hl; do
           [ -n "$hp" ] || continue
           case "$hp" in
-            */.worktrees/"$wi") if [ -e "$hp" ]; then held=1; fi ;;
+            */.worktrees/"$wi")
+              if [ -e "$hp" ]; then held=1; fi
+              # #673 L4: git prints a `locked` line AFTER the branch line
+              # (measured on git 2.53.0). A locked dead registration is not a
+              # reattachable one - worktree_reattach would refuse rc 8 only
+              # after §2b's repo repairs had already mutated - so it is HELD
+              # here, in the read-out.
+              [ "$hl" = 0 ] || held=1
+              ;;
             *) held=1 ;;
           esac
         done <<HOLD
@@ -262,6 +282,12 @@ HOLD
           # owning repair and made the hand-over-to-close arm unreachable for
           # exactly the cleanup-finished spine it describes. `skip`; the close
           # cleanup now tolerates the missing branch and a stale registration.
+          # #673 L3: a `complete` item with NO branch recorded is not the
+          # post-cleanup shape - nothing proves a branch ever existed, so the
+          # `skip` (cleanup-finished) reading is unearned and would let
+          # re-entry declare the round done. Halt under its own route: the
+          # state, not the repos, is the record to repair.
+          elif [ -z "$br" ]; then route=halt:branch-unknown
           elif [ "$brx" = no ]; then route=skip
           elif [ "$merged" = yes ]; then route=skip
           # A recorded-branch/absent-base half-write cannot be classified: the
@@ -280,7 +306,8 @@ HOLD
           # - but only when the durable rejection record does not bar it
           # (#673 J1): a recorded [fidelity] rejection means the correction
           # must complete first, and an unreadable record halts rather than
-          # reading as clear.
+          # reading as clear. The row itself re-runs close §2's gate on the
+          # committed tree before it merges (#673 K1).
           else
             gr=0; _oss_inv_rejection "$spine_dir/work-$wi/verify.md" || gr=$?
             case "$gr" in
@@ -340,18 +367,16 @@ HOLD
               if [ "$clean" = yes ]; then route=finish-status; else route=halt:unclassified; fi
             elif [ "$clean" = yes ]; then
               if [ "$hab" = yes ]; then route=redispatch
-              # A commit on the work branch is NOT self-evidently gated (#673
-              # C1): an implementer that violates stage-never-commit leaves the
-              # same shape as a close that crashed after its post-gate commit,
-              # and the pre-fix route merged it with no gate ever run. The
-              # sibling close-finished route's evidence - report.md - is
-              # required here too; without it the route is REFUSED, never
-              # guessed: a human decides whether the commit is gated work.
+              # #673 K1 (superseding C1): neither a commit on the work branch
+              # nor a present report.md proves the close gate ran - the item
+              # skill authors the report BEFORE staging - so the classifier
+              # infers nothing from either. The finish-merge ROW re-runs close
+              # §2's gate on the item's committed tree before merging; a red
+              # re-run halts there (halt:unverified-merge), naming the item.
               # `descends` (#673 H1) folds in the ancestry test this arm used
               # to run inline: halt unless the branch is verifiably descended
               # from its recorded base - a rewrite is never merge-repairable.
               elif [ "$descends" != yes ]; then route=halt:unclassified
-              elif [ "$report" != yes ]; then route=halt:unverified-merge
               else
                 # #673 J1: the durable [fidelity] rejection record gates THIS
                 # merge arm too, not just close-finished (C2). A stage-never-
@@ -402,6 +427,10 @@ HOLD
           else route=halt:unclassified; fi ;;
         *) route=halt:unclassified ;;
       esac
+      # #673 L2: an unrelated recorded branch is never this item's - halt it
+      # over whatever route the arm computed (skip included: a foreign branch
+      # proves nothing landed for THIS item).
+      [ "$foreign" = no ] || route=halt:unclassified
     fi
     case "$route" in halt:*) halt=1 ;; esac
     printf 'item\t%s\t%s\t%s\trepo=%s wt=%s clean=%s head_at_base=%s merged=%s report=%s dispatches=%s\n' \
