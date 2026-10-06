@@ -48,19 +48,55 @@ default.
 
 ## 2. Round sequencing
 
-Do all of §3 and §4 for **every item in the round, in declared decomposition
-order, before building any request.** An `abandoned` item is skipped at the top
-of `round-orchestration.md` §3 and gets no request. Worktrees created and
-journaled, handoffs
+Take **every item in the round** through `round-orchestration.md` §3 in
+declared decomposition order, before building any request — its route decides
+what §3 and §4 actually do for it. An `abandoned` item is skipped at the top of
+§3, and an item whose route is already `complete` — a `skip` row for a merged
+item, or a `finish-status` / `finish-merge` row §2b step 4 repaired on
+re-entry — gets no step there either; neither gets a request. Worktrees created
+and journaled, handoffs
 authored, specs confirmed to parse — the whole round's preparation lands first.
 
-Then build one request per item, still in declared order, and invoke the
-caller-supplied procedure **once for the round**, handing it the whole set.
+Then build the round's requests, one per item that needs one, still in declared
+order, and invoke the caller-supplied procedure **once for the round**, handing
+it the whole set.
 
 The caller may execute the round's requests concurrently; nothing here requires
 otherwise, and §7's note that items within a round are parallel by construction
 is exactly as true through this seam as through the default one. What stays
 serial is everything after the returns — see §5a.
+
+---
+
+## 2a. Re-entry — counting, and a staged result at request time
+
+**The lane counts each request it issues** (`"$oss_bin" work_item_dispatched
+<wi-id>`, `round-orchestration.md` §5), except a `close-finished` item's; the
+§5b gaps replacement is one of those requests, so the lane counts it too. **The
+caller counts each execution the lane did not request** — a correction — with
+the same verb, and checks the way the lane does: read `dispatches` first; at 3
+or more, offer halt only, never a fourth execution; otherwise call
+`work_item_dispatched`, then run the correction. The count lives in state, so a
+caller session that hands off mid-round does not reset it.
+
+**A staged result at request time.** On re-entry a request can name a worktree
+that already holds a staged result with its `report.md` at the handoff's report
+path: the worker finished, and its return died with the session that dispatched
+it (`round-orchestration.md` §2b, route `close-finished`). The request record is
+unchanged — no field is added. **The rule is scoped to `close-finished` items:
+when the request the lane issues on re-entry is for an item whose route is
+`close-finished` — one the caller has not executed in this session — and the
+worktree already holds a staged result with `report.md` at request time, verify
+it and return a result record without executing.** A worktree staged by a
+close-rejected result is a different case and is §7's, never this rule
+(`references/correction-continuation.md`): the item HAS been executed in this
+session, and its correction or replacement must run rather than be handed the
+rejected result back. Launch no implementer, and do not count it as a dispatch.
+§5a then validates the record's identity against the live tree, exactly as for
+any other result. A caller that predates this rule launches an implementer into
+a staged worktree, and the implementer's Gate 3 returns a well-formed
+`gaps-surfaced` naming the dirty tree. That costs one dispatch, never a wrong
+merge.
 
 ---
 

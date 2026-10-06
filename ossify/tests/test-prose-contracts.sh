@@ -339,10 +339,13 @@ fi
 # item's spine is already closed, un-withdrawing it puts a planned item inside a
 # closed spine, which release close's tag selector then accepts. And the arm may
 # not prescribe reopening it either: close leaves the spine's integration branch
-# in place, the lane halts on an existing branch (round-orchestration.md section
-# 2), so the arm has to name THAT obstruction and the route that can run - a new
-# spine. The first form of this assertion pinned `spine_status`, i.e. the reopen
-# that does not work; it was replaced when the round-3 review proved it out.
+# landed in every hosting repo, and the lane's re-entry arm
+# (round-orchestration.md section 2b) would route the un-withdrawn item onto a
+# branch nothing merges again, so the arm has to name THAT obstruction and the
+# route that can run - a new spine. The first form of this assertion pinned
+# `spine_status`, i.e. the reopen that does not work; it was replaced when the
+# round-3 review proved it out, and updated again when 1.14.0's re-entry arm
+# replaced the halt.
 for _lit in 'work_item_status' 'spine_add' 'round-orchestration.md' 'decomposition.md'; do
   if grep -Fq "$_lit" "$_F"; then
     T_PASS=$((T_PASS+1))
@@ -1308,6 +1311,124 @@ _pin "$_r" "the harvest-apply-integrity rubric still grades a legal adoption set
 _SP4="$_OSSR/skills/start/references/spike-contract.md"
 _r=1; ! grep -Fq 'docs/adr/adr-NNNN-*.md' "$_SP4" && grep -Fq "whatever form that repo's series already uses" "$_SP4" && _r=0
 _pin "$_r" "spike-contract still points at the fixed adr-NNNN-*.md form - an actor on an adopted series writes a second form into one directory"
+
+# --- 1.14.0 (#133, #362): run-spine re-entry -------------------------------------
+_RO="$HERE/../skills/work-item/references/round-orchestration.md"
+_EX="$HERE/../skills/work-item/references/external-executor.md"
+_HC="$HERE/../skills/work-item/references/handoff-contract.md"
+_WC="$HERE/../skills/close/references/work-item-close.md"
+_SA="$HERE/../skills/plan-spine/references/spec-authoring.md"
+_RS="$HERE/../commands/run-spine.md"
+for _pair in "$_RO|spine_inventory" "$_RO|The count lives in state" "$_RO|halt:out-of-order" \
+             "$_EX|staged result" "$_EX|work_item_dispatched" "$_HC|spine_base_get" \
+             "$_SA|re-entering" "$_RS|resumes"; do
+  _f="${_pair%%|*}"; _lit="${_pair#*|}"
+  _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
+  _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.14.0 re-entry)"
+done
+# Fix round 1: the staged-result rule is SCOPED to a `close-finished` item -
+# one the caller has not executed in this session. A close-rejected result also
+# leaves a staged worktree, and a literal reading would hand that rejected
+# result back instead of running §7's correction. `close-finished` alone cannot
+# pin the scope (the pre-fix paragraph already named the route in its
+# parenthetical), so the pin is the scoping clause's own gloss.
+for _pair in "$_EX|without executing" "$_EX|one the caller has not executed in this session"; do
+  _f="${_pair%%|*}"; _lit="${_pair#*|}"
+  _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
+  _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.14.0 re-entry, fix round 1)"
+done
+# The old claims must be GONE - each was true of 1.13 and is false now.
+for _pair in "$_RO|does not resume it" "$_RO|here or nowhere" "$_RO|is taken from HEAD in this release" \
+             "$_HC|the lane takes HEAD, not the plan" "$_WC|is the open reconciliation"; do
+  _f="${_pair%%|*}"; _lit="${_pair#*|}"
+  _r=0; grep -Fq -- "$_lit" "$_f" && _r=1
+  _pin "$_r" "$(basename "$_f") still claims '$_lit' - false since 1.14.0"
+done
+# Final fix wave (I1, I2, M6, M2, M1, m1). §3 must route the items §2b step 4
+# repaired: an adopt item is active/clean/at-base and takes the redispatch path,
+# a reattached item follows its re-run route, and an item now complete (skip,
+# finish-merge, finish-status) gets no step and no second wait at §7. A literal
+# reader without this sends a repaired item down the spawn path, where
+# worktree_add returns rc 8. §2 of external-executor agrees: complete items get
+# no request. Separately: a failed reattach halts; the §1 field list carries
+# dispatches; the cut-missing repair completes a cut rather than unwinding one;
+# and the external caller counts only what the lane did not request, reading
+# the count before it checks it.
+_r=1; grep -Fq 'takes the `redispatch` path too' "$_RO" \
+  && grep -Fq 'no handoff, no request, no dispatch' "$_RO" \
+  && grep -Fq 'does not wait on it again' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §3 leaves the items §2b step 4 repaired unrouted - adopt gets no redispatch path, complete gets no skip (I1)"
+_r=1; grep -Fq 'takes whatever route the re-run' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §3 drops a reattached item's re-run route (I1)"
+_r=1; grep -Fq 'halts naming the git error' "$_RO" \
+  && grep -Fq 'never `git worktree prune`, never `-f -f`' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §2b step 4 no longer halts a failed reattach naming the git error, or reopens prune/-f -f (M6)"
+_r=1; grep -Fq -- '{branch, worktree_path, base_sha, dispatches}' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §1's work_items[] field list omits dispatches while §5 reads it (M2)"
+_r=1; grep -Fq 'completes now: it cuts the branch in the repos the halt never reached' "$_RO" \
+  && ! grep -Fq 'unwinds now' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §2 still says the cut-missing repair unwinds the earlier cut - it completes it, from the recorded base (M1)"
+_r=1; grep -Fq 'each execution the lane did not request' "$_EX" \
+  && grep -Fq 'read `dispatches` first' "$_EX" \
+  && ! grep -Fq 'a correction, a replacement' "$_EX" && _r=0
+_pin "$_r" "external-executor.md §2a still leaves the gaps replacement on the caller's count list, or checks the count after incrementing (I2)"
+_r=1; grep -Fq 'neither gets a request' "$_EX" && _r=0
+_pin "$_r" "external-executor.md §2 no longer says a complete item gets no request (I1)"
+_r=1; grep -Fq 'on re-entry a request for a' "$_OSSR/README.md" \
+  && grep -Fq 'one this session has not executed' "$_OSSR/README.md" && _r=0
+_pin "$_r" "ossify/README.md's 1.14.0 note states the staged-result rule without its close-finished, not-executed-this-session scope (m1)"
+
+# Fix round (#673), one pin per class of claim the round's findings named.
+_SC="$HERE/../skills/close/references/spine-close.md"
+_SI="$HERE/../skills/doctor/references/state-inspection.md"
+_IC="$HERE/../skills/close/references/impl-check.md"
+# A6: recorded execution state with no spine branch is a halt, not a re-cut.
+_r=1; grep -Fq 'refs are gone while its state survives' "$_RO" \
+  && grep -Fq 'no item records execution' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §2's arm selector does not halt on recorded execution state with no spine branch (A6)"
+# C3/K1/L1/B2: the finish-merge row carries its repo-root recovery, the gate
+# RE-RUN (the report-presence gate is gone - a present report proves nothing),
+# and the tip recovery.
+_r=1; grep -Fq 'refs/heads/$wi_branch' "$_RO" \
+  && grep -Fq 'halt:unverified-merge' "$_RO" \
+  && grep -Fq 'RE-RUN close §2' "$_RO" \
+  && grep -Fq 'repo_root="$("$oss_bin" repo_root "$target_repo")"' "$_RO" \
+  && ! grep -Fq 'as gate evidence' "$_RO" \
+  && grep -Fq 'the row reads `wt=present` but state holds no `worktree_path` yet' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md §2b's finish-merge row drops its repo-root recovery, the §2 gate re-run, or the tip recovery (C3/K1/L1), still claims report.md is gate evidence, or the adopt row leaves \$wt undefined again (B2)"
+# C2: the rejection is durable and its route is named.
+_r=1; grep -Fq 'halt:close-rejected' "$_RO" \
+  && grep -Fq 'durable rejection record' "$_IC" \
+  && grep -Fq 'is recorded durably' "$_WC" && _r=0
+_pin "$_r" "the C2 rejection record is not named where it is written (impl-check/work-item-close) or where it routes (round-orchestration)"
+# D1: the correction route is named in the lane, and the setter validates.
+_r=1; grep -Fq 'spine_base_reset' "$_RO" \
+  && grep -Fq 'must EXIST locally' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md no longer names spine_base_reset for a wrong recorded base, or drops the setter's branch-exists validation note (D1)"
+# F2: close §3 reads the RECORDED base; the old false claim is gone.
+_r=1; grep -Fq 'spine_base_get' "$_SC" \
+  && ! grep -Fq 'The two facts this step needs are not in state' "$_SC" && _r=0
+_pin "$_r" "spine-close.md §3 does not read the recorded base (spine_base_get), or still claims both facts are absent from state (F2)"
+# F3: both 'was this item dispatched' enumerations carry the count.
+_r=1; grep -Fq 'a `dispatches` count above zero' "$_WC" \
+  && grep -Fq 'positive `dispatches` count' "$_SI" && _r=0
+_pin "$_r" "the abandoned-item drift enumerations (close §1, doctor §5) omit the dispatches count again (F3)"
+# Fix round 2 (G2/G3/H1/I1/I2/J1): one pin per new fail-closed claim the
+# round's findings named. Each literal is a distinct row or clause a reader
+# acts on; drop any one and the corresponding behavior loses its contract.
+_r=1; grep -Fq 'halt:base-unresolved' "$_RO" \
+  && grep -Fq 'a `verify.md` rejection record' "$_RO" \
+  && grep -Fq 'a completed item'"'"'s dirty worktree halts here too' "$_RO" \
+  && grep -Fq 'a history rewrite, never a landing' "$_RO" \
+  && grep -Fq 'validation precedes every removal' "$_RO" \
+  && grep -Fq 'a recorded rejection is never re-landed by a merge' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md drops a fix-round-2 fail-closed claim (base-unresolved row; the verify.md read; the dirty complete-item halt; the rewrite-is-no-landing clause; reattach's validate-before-remove; the merge-arm rejection gate) (G2/G3/H1/I1/I2/J1)"
+# Fix round 3 (L2/L3/L4): the guards the round added are contract claims too.
+_r=1; grep -Fq 'halt:branch-unknown' "$_RO" \
+  && grep -Fq 'no branch ever recorded' "$_RO" \
+  && grep -Fq 'the registration is LOCKED' "$_RO" \
+  && grep -Fq 'never reused for reattach, redispatch or merge' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md drops a fix-round-3 guard claim: the halt:branch-unknown row, the locked-holder clause, or the foreign-branch clause (L2/L3/L4)"
 
 rm -rf "$_PC_TMP"
 t_summary

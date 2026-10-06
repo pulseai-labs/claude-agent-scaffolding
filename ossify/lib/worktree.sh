@@ -177,6 +177,101 @@ _oss_worktree_add_rollback() { # $1=root $2=path $3=branch $4=had-branch(0|1) $5
   [ -z "$undone" ] || echo "oss: rolled back the partial add (removed:$undone) - fix the cause above and retry" >&2
 }
 
+# #133: re-attach a work item's worktree whose DIRECTORY is gone but whose
+# branch still holds the item's work. `git worktree add -b` cannot (the branch
+# exists), and a plain add refuses while git still registers the deleted path -
+# so the registrations of THIS branch are inspected first:
+#   - a LIVE holder (its directory exists) is the branch in use somewhere else:
+#     refuse rc 8, never touch it;
+#   - a dead registration for THIS item's own path (`…/.worktrees/<wi>`, under
+#     whatever root spelling recorded it) is a stale entry, cleared with `git
+#     worktree remove` - rc 0 on a missing directory, measured; nothing is
+#     pruned, because a sibling's stale registration is another item's evidence;
+#   - a dead registration at any OTHER path belongs to something else: refuse.
+# Then the add is PLAIN - no `-f`. `-f` is what used to leave a second holder
+# behind (#673 E1): a pre-existing dead registration was overridden rather than
+# cleared, the old holder stayed registered, and every later reattach refused
+# rc 8 with no sanctioned recovery. A failed add is rolled back with the same
+# helper `_oss_worktree_add` uses, preserving the pre-existing branch (#673 E2):
+# a checkout hook that exits nonzero after registering the path must not leave
+# a live-looking worktree that wedges the retry.
+oss_worktree_reattach() { # $1=repo-key $2=wi-id $3=branch ; echoes abs path
+  local key="$1" wi="$2" branch="$3" root cd lock rc=0
+  _oss_worktree_id_check "$wi" || return $?
+  root="$(_oss_repo_root "$key")" || return $?
+  cd="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
+    || { echo "oss: cannot resolve git common dir for $root" >&2; return 8; }
+  lock="$cd/ossify-worktree-add.$wi.lock"
+  mkdir "$lock" 2>/dev/null || {
+    echo "oss: another worktree operation for $wi is running (lock $lock) - if none is, remove the lock with: rmdir $(printf '%q' "$lock")" >&2
+    return 8; }
+  _oss_worktree_reattach_locked "$root" "$wi" "$branch" || rc=$?
+  rmdir "$lock" 2>/dev/null || true
+  return "$rc"
+}
+
+_oss_worktree_reattach_locked() { # $1=root $2=wi-id $3=branch ; echoes abs path
+  local root="$1" wi="$2" branch="$3" path holders n hp hl
+  path="$root/.worktrees/$wi"
+  [ -e "$path" ] && { echo "oss: $path exists - there is nothing to reattach" >&2; return 8; }
+  git -C "$root" show-ref --verify --quiet "refs/heads/$branch" \
+    || { echo "oss: branch '$branch' does not exist in $root - reattach cannot recover this item's work" >&2; return 8; }
+  # Every registered worktree holding this branch, with whether git marks it
+  # locked. The lock flag is read at the END of the entry, not when the branch
+  # line goes by: `locked` FOLLOWS `branch` in the porcelain, so the obvious
+  # read-at-branch form always sees lk=0 and leaves the locked arm below
+  # unreachable - measured on git 2.53.0 (worktree, HEAD, branch, locked). A
+  # locked registration then falls through to git's own refusal, whose message
+  # advertises `add -f -f` - the one hint this function exists to avoid.
+  holders="$(git -C "$root" worktree list --porcelain | awk -v b="refs/heads/$branch" '
+    /^worktree /{if (hit) print p "\t" lk; p=substr($0,10); lk=0; hit=0; next}
+    /^locked/{lk=1; next}
+    $0=="branch " b {hit=1}
+    END{if (hit) print p "\t" lk}')" || {
+      # #673 G1's old form (`|| holders=""`), closed here too: an unreadable
+      # list is not an empty one. A hidden live or locked holder would only
+      # be re-discovered by git's own refusal one step later - or, worse,
+      # overridden by the plain add below.
+      echo "oss: cannot read the worktree list for $root - refusing to reattach $wi" >&2
+      return 8; }
+  n="$(printf '%s' "$holders" | awk 'END{print NR}')"
+  if [ "$n" -gt 0 ]; then
+    # PASS 1 - inspect and validate EVERY holder; mutate nothing (#673 I1).
+    # The pre-fix loop removed each dead entry as it validated it, so with an
+    # unlocked registration ahead of a locked one it cleared the unlocked
+    # entry and THEN refused rc 8 on the lock - mutating Git metadata while
+    # promising to leave the stale entries as found.
+    while IFS="$(printf '\t')" read -r hp hl; do
+      [ -n "$hp" ] || continue
+      if [ -e "$hp" ]; then
+        echo "oss: branch '$branch' is checked out at $hp - not this item's missing worktree; refusing" >&2
+        return 8
+      fi
+      [ "$hl" = 0 ] || { echo "oss: the stale registration at $hp is locked - unlock it with git worktree unlock first" >&2; return 8; }
+      case "$hp" in
+        */.worktrees/"$wi") ;;
+        *) echo "oss: branch '$branch' is held by a stale registration at $hp - not this item's missing worktree (…/.worktrees/$wi); refusing" >&2; return 8 ;;
+      esac
+    done <<HOLD
+$holders
+HOLD
+    # PASS 2 - the whole set is acceptable; only now clear the dead entries,
+    # so the add below can be plain and cannot mint a second holder.
+    while IFS="$(printf '\t')" read -r hp hl; do
+      [ -n "$hp" ] || continue
+      git -C "$root" worktree remove "$hp" \
+        || { echo "oss: cannot clear the stale registration at $hp - git worktree remove failed" >&2; return 8; }
+    done <<HOLD
+$holders
+HOLD
+  fi
+  git -C "$root" worktree add -q "$path" "$branch" \
+    || { echo "oss: git worktree add failed reattaching $wi on $branch" >&2
+         _oss_worktree_add_rollback "$root" "$path" "$branch" 1 "" || true
+         return 8; }
+  printf '%s\n' "$path"
+}
+
 # The worktree root lives INSIDE the repo, so without this every spawn leaves
 # `?? .worktrees/` in that repo's status - a dirty tree ossify itself
 # created, in the very repo whose cleanliness the close ceremony checks. The
@@ -429,19 +524,125 @@ oss_worktree_orphans() { # $1=repo-key [$2=state-file] ; echoes one abs path per
 # (discarding uncommitted work) and swallows the branch delete with `|| true`,
 # while its own skill prose promises a halt and the close ceremony asserts no
 # work-* branch survives. Both halves are fixed here.
-oss_worktree_remove() { # $1=repo-key $2=work-item-id
-  local key="$1" wi="$2" root path branch dirty
-  root="$(_oss_repo_root "$key")" || return $?
-  path="$(oss_worktree_resolve "$key" "$wi")" || return $?
-  dirty="$(git -C "$path" status --porcelain 2>/dev/null)" || dirty=""
-  if [ -n "$dirty" ]; then
-    echo "oss: worktree $path has uncommitted changes - refusing to remove it" >&2
-    printf '%s\n' "$dirty" >&2
-    return 8
+#
+# #673 A5: the worktree DIRECTORY may already be gone - a crash after a delete,
+# or a close that halted after this loop cleaned an earlier item. The pre-fix
+# form resolved through `worktree_resolve` (which requires `-d`) and refused
+# rc 1, wedging cleanup at its LAST step for exactly the shapes the re-entry
+# inventory routes `skip` / `finish-status` (a merged item whose worktree was
+# deleted). Tolerate it: the registration, if one survives, is a stale entry
+# (`git worktree remove` clears it; measured rc 0 on a missing directory - no
+# prune, no --force needed), and the branch is recovered from STATE, the same
+# `work_items[].branch` the close's merge target already trusts. A branch that
+# is already gone is not an error either: `git branch -d`, the only sanctioned
+# deleter, refuses an unmerged branch, so a deleted one WAS merged.
+# #673 L5: the physical spelling of a directory. A repo reached through a
+# symlink (`ln -s` roots; macOS /tmp) must compare equal to its resolved form,
+# or the removal guard below would refuse the item's own registration; a path
+# that no longer exists compares textually.
+_oss_worktree_phys() { # $1=dir ; echoes the physical path when resolvable
+  local p
+  if [ -d "$1" ]; then
+    p="$(cd -P "$1" 2>/dev/null && pwd)" && { printf '%s\n' "$p"; return 0; }
   fi
-  branch="$(git -C "$path" rev-parse --abbrev-ref HEAD 2>/dev/null)" || branch=""
-  git -C "$root" worktree remove "$path" || { echo "oss: git worktree remove failed for $path" >&2; return 8; }
+  printf '%s\n' "$1"
+}
+
+oss_worktree_remove() { # $1=repo-key $2=work-item-id
+  local key="$1" wi="$2" root path branch dirty sf holdpath holdpaths recpath hp_root derived_root rec_root kept refused
+  _oss_worktree_id_check "$wi" || return $?
+  root="$(_oss_repo_root "$key")" || return $?
+  path="$root/.worktrees/$wi"
+  branch=""
+  # #673 L6 (class): a failed status read must not fold into the benign
+  # empty value - an unreadable status left the branch silently undeleted
+  # while close proceeded. The dirty check runs FIRST, before any state read:
+  # nothing is ever removed, and no state is consulted, for a dirty worktree.
+  if [ -d "$path" ]; then
+    dirty="$(git -C "$path" status --porcelain 2>/dev/null)" || {
+      echo "oss: cannot read the worktree status at $path - refusing to remove it" >&2; return 8; }
+    if [ -n "$dirty" ]; then
+      echo "oss: worktree $path has uncommitted changes - refusing to remove it" >&2
+      printf '%s\n' "$dirty" >&2
+      return 8
+    fi
+  fi
+  # #673 round 4 (U-15p): the branch this verb deletes is NEVER the live
+  # worktree HEAD's. Deriving it from the HEAD made a worktree switched off its
+  # recorded branch delete a branch this item does not own - or, detached,
+  # delete nothing while the recorded work branch silently survived and close
+  # proceeded to mark the spine closed. The RECORDED branch is the only one
+  # cleanup owns; the state read is hoisted above BOTH arms and fails closed
+  # (#673 L6): an unresolvable, unreadable or recordless state refuses before
+  # anything - worktree or registration - is touched.
+  sf="$(_oss_resolve_state 2>/dev/null)" || {
+    echo "oss: cannot resolve the state file for work item $wi - refusing to clean up $path" >&2; return 8; }
+  [ -f "$sf" ] || { echo "oss: no state file at $sf - refusing to clean up $path" >&2; return 8; }
+  branch="$(jq -r --arg w "$wi" 'first(.work_items[] | select(.id == $w) | .branch // empty) // ""' "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read work item $wi from $sf - refusing to clean up $path" >&2; return 8; }
+  [ -n "$branch" ] || {
+    echo "oss: work item $wi records no branch in $sf - refusing to clean up $path (a cleanup with no branch record cannot know what it is cleaning)" >&2; return 8; }
+  if [ -d "$path" ]; then
+    git -C "$root" worktree remove "$path" || { echo "oss: git worktree remove failed for $path" >&2; return 8; }
+  else
+    recpath="$(jq -r --arg w "$wi" 'first(.work_items[] | select(.id == $w) | .worktree_path // empty) // ""' "$sf" 2>/dev/null)" || {
+      echo "oss: cannot read work item $wi's worktree_path from $sf - refusing to clean up $path" >&2; return 8; }
+    # The registration paths AS GIT PRINTS THEM (symlink-resolved on macOS
+    # /tmp), matched on the `/.worktrees/<wi>` suffix - a whole-string compare
+    # against `$path` would miss that spelling.
+    holdpaths="$(git -C "$root" worktree list --porcelain | awk -v s="/.worktrees/$wi" '
+      /^worktree /{p=substr($0,10); if (length(p)>=length(s) && substr(p, length(p)-length(s)+1)==s) print p}')" || {
+      echo "oss: cannot read the worktree list for $root - refusing to clean up $path" >&2; return 8; }
+    # #673 L5: only registrations under THIS item's own root are this verb's
+    # to clear - its RECORDED worktree_path's root or the derived one, compared
+    # physically so a symlinked spelling still matches. The pre-fix suffix-only
+    # match also caught a worktree of a same-named path under a DIFFERENT root
+    # (work-item ids repeat across workspaces) and `git worktree remove` would
+    # have deleted it - live or dead. Validate the WHOLE set first; a match at
+    # any other root refuses with nothing removed.
+    derived_root="$(_oss_worktree_phys "$root")"
+    rec_root=""
+    case "$recpath" in
+      */.worktrees/"$wi") rec_root="$(_oss_worktree_phys "${recpath%/.worktrees/$wi}")" ;;
+    esac
+    kept=""; refused=""
+    while IFS= read -r holdpath; do
+      [ -n "$holdpath" ] || continue
+      hp_root="${holdpath%/.worktrees/$wi}"
+      hp_root="$(_oss_worktree_phys "$hp_root")"
+      if [ "$hp_root" = "$derived_root" ] || { [ -n "$rec_root" ] && [ "$hp_root" = "$rec_root" ]; }; then
+        kept="$kept$holdpath"$'\n'
+      else
+        refused="$holdpath"; break
+      fi
+    done <<HOLD
+$holdpaths
+HOLD
+    if [ -n "$refused" ]; then
+      echo "oss: work item $wi has a registration at $refused, which is not under this item's root - refusing; nothing was removed (inspect with: git -C $(printf '%q' "$root") worktree list)" >&2
+      return 8
+    fi
+    while IFS= read -r holdpath; do
+      [ -n "$holdpath" ] || continue
+      git -C "$root" worktree remove "$holdpath" || { echo "oss: git worktree remove failed for the stale registration at $holdpath" >&2; return 8; }
+    done <<HOLD
+$kept
+HOLD
+  fi
   if [ -n "$branch" ] && [ "$branch" != "HEAD" ]; then
+    # Only the item's OWN branch is this verb's to delete (#673 B-class
+    # defence): `work/<wi-id>-*`, the name worktree_add cuts and the lane
+    # journals from the worktree it created. A record naming anything else
+    # (`main` above all, from a pre-fix adopt) is left alone with a note -
+    # deleting the base branch is not cleanup.
+    if ! printf '%s\n' "$branch" | awk -v p="work/$wi-" 'index($0, p) == 1 {ok=1} END{exit !ok}'; then
+      echo "oss: work item $wi records branch '$branch', not a work/$wi-* branch - leaving it in place; nothing was deleted" >&2
+      branch=""
+    elif ! git -C "$root" show-ref --verify --quiet "refs/heads/$branch"; then
+      branch=""
+    fi
+  fi
+  if [ -n "$branch" ]; then
     # `-d`, NOT `-D`. -D force-deletes an UNMERGED branch, destroying every
     # commit the implementer made. The close ceremony merges work/<wi> back into
     # the spine branch first (T9), so by the time remove runs the branch IS

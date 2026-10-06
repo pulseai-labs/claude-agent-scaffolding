@@ -83,6 +83,21 @@ t_assert_rc 7 "dispatcher: work_item_add against unknown spine is rc 7"
 t_capture "$OSS" get '.work_items | length'
 t_assert_eq "$WI_BEFORE" "$T_OUT" "no phantom work item after unknown-spine rejection"
 
+# The target-repo guard the dispatcher already carries (manifest.sh's
+# `_oss_repo_key_for_write`, called from oss_cmd_work_item_add): `ai_workspace`
+# RESOLVES as a key, so a resolution check alone admits it; the wrapper refuses
+# it and an undeclared key before the entity layer. Pinned here (#673 D2
+# walked this and found it closed) so a refactor of that wrapper cannot reopen
+# a path where a work item targets `ai_workspace` and a close commit then
+# routes into the process workspace. Both refusals leave state untouched.
+t_capture "$OSS" work_item_add r0.s1 "wanders off" ai_workspace
+t_assert_rc 2 "dispatcher: an ai_workspace work item is refused rc 2 (it hosts no spine)"
+t_assert_contains "$T_OUT" "reserved process workspace" "dispatcher: ...naming ai_workspace's role"
+t_capture "$OSS" work_item_add r0.s1 "elsewhere" private_core
+t_assert_rc 2 "dispatcher: an undeclared repo is refused rc 2"
+t_capture "$OSS" get '.work_items | length'
+t_assert_eq "$WI_BEFORE" "$T_OUT" "no phantom work item after either target-repo rejection"
+
 # --- §8d / demo-authoring.md §6: auto: lines bind command + expected, and the
 # expected grammar is exactly exit:<n> | contains:<str>.
 t_capture "$OSS" ledger_add_auto r0.s1 "paper order round-trips" "true" "exit:0"

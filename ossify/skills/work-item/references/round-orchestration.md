@@ -62,21 +62,66 @@ Read them from there. Two ways to get this wrong, both silent:
 
 **No state field holds the work-item rounds.** `work_items[]` carries
 `{spine, title, target_repo, status, created_at}`, plus the
-`{branch, worktree_path, base_sha}` this lane writes — no dependency key, no
-round key. Persisting the round structure as state is **deferred**; until it
-lands the plan document is the only record. Say so if a user asks where the
-rounds are stored; do not imply the read is machine-backed.
+`{branch, worktree_path, base_sha, dispatches}` this lane writes — no dependency
+key, no round key. Persisting the round structure as state is **deferred**;
+until it lands the plan document is the only record. Say so if a user asks where
+the rounds are stored; do not imply the read is machine-backed.
 
 ---
 
-## 2. Before round 1 — cut **and check out** the spine integration branch in every hosting repo
+## 2. Enter the spine — fresh cut, or re-entry
 
-Once per spine, per hosting repo — the distinct `target_repo` values across the
-spine's work items **other than `abandoned` ones**, read from state. An item
-withdrawn before dispatch runs nowhere, so a repo only it names gets no branch.
-This block runs on **every** `/run-spine`,
-so an already-existing spine branch in any hosting repo means an earlier
-invocation got here first — halt rather than re-cutting it or half-reusing it:
+This section runs on **every** `/run-spine`. The hosting repos are the distinct
+`target_repo` values across the spine's work items **other than `abandoned`
+ones**, read from state — an item withdrawn before dispatch runs nowhere, so a
+repo only it names gets no branch. **One observable picks the arm: does the spine
+branch exist in any hosting repo?** — with a second, fail-closed probe behind it:
+recorded execution state with no spine branch anywhere is a **halt**, never a
+fresh re-cut (below).
+
+```bash
+spine_branch="$("$oss_bin" branch_name "<spine-id>" "<spine-slug>")"
+# Read the hosting-repo list in its OWN assignment, never inside the here-doc
+# below: a command substitution there cannot carry its rc, so a failed state
+# read would fall through to arm=fresh off an empty list. `unique[]` does the
+# dedup jq-side, so no pipe stands between `get` and the `||` either.
+repos="$("$oss_bin" get '[.work_items[] | select(.spine=="<spine-id>" and .status != "abandoned") | .target_repo] | unique[]')" \
+  || { echo "halt: cannot read the spine's work items from state"; exit 1; }
+arm=fresh
+while IFS= read -r repo; do
+  [ -n "$repo" ] || continue
+  root="$("$oss_bin" repo_root "$repo")" || exit 1     # undeclared repo halts HERE
+  if git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch"; then arm=re-entry; fi
+done <<EOF
+$repos
+EOF
+# THE SECOND PROBE (#673 A6). The spine refs can be GONE while durable
+# execution state survives - a deleted branch, a cleaned checkout - and the ref
+# test alone then selected the fresh arm: it records bases and CUTS new spine
+# branches before §3's worktree_add collides with the surviving work, mutation
+# before the promised halt. Recorded execution evidence - any item's branch,
+# worktree_path or base_sha, a status past `planned`, or a dispatch count -
+# means the spine started. With no spine branch anywhere, that is a halt.
+started="$("$oss_bin" get '[.work_items[] | select(.spine=="<spine-id>")  # abandoned items are DELIBERATELY included: the conjunct is for reads that must skip a withdrawn item; here a withdrawn item still proves the spine started
+  | select(((.branch // "") != "") or ((.worktree_path // "") != "") or ((.base_sha // "") != "")
+           or .status == "active" or .status == "complete" or ((.dispatches // 0) > 0))] | length')" \
+  || { echo "halt: cannot read the spine's work items from state"; exit 1; }
+if [ "$arm" = fresh ] && [ "$started" != "0" ]; then
+  echo "halt: no hosting repo has $spine_branch, but state records execution for this spine (an item records a branch, a worktree_path, a base_sha, a status past planned, or a dispatch count) - the spine's refs are gone while its state survives, and re-cutting would collide with that work. Nothing was changed; a human decides which record is right"
+  exit 1
+fi
+echo "arm=$arm"
+```
+
+- `arm=fresh` — no hosting repo has the branch **and no item records execution
+  state**: this is the spine's first run. Take **§2a**.
+- `arm=re-entry` — some hosting repo has it: an earlier run got here first. That
+  is the **normal** state at the top of every round after the first (a later
+  round's spec may be authored when its round starts — `plan-spine`'s
+  `spec-authoring.md` §3), and it is also the state a halted or interrupted run
+  leaves. Take **§2b**. Never re-cut, never half-reuse.
+
+### 2a. Fresh arm — check, record, cut, check out
 
 ```bash
 spine_branch="$("$oss_bin" branch_name "<spine-id>" "<spine-slug>")"
@@ -90,14 +135,22 @@ while IFS= read -r repo; do
   root="$("$oss_bin" repo_root "$repo")" || exit 1     # undeclared repo halts HERE
   [ -z "$(git -C "$root" status --porcelain)" ] || { echo "halt: $repo is dirty"; exit 1; }
   if git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch"; then
-    echo "halt: $spine_branch already exists in $repo - an earlier run cut it (issue 133)."; exit 1
+    echo "halt: $spine_branch already exists in $repo - this spine has started; take the re-entry arm (§2b), not this block."; exit 1
   fi
   base_branch="$(git -C "$root" rev-parse --abbrev-ref HEAD)"
   [ "$base_branch" != "HEAD" ] || { echo "halt: $repo is in DETACHED HEAD"; exit 1; }
   printf '%s\t%s\n' "$repo" "$base_branch" >> "$repo_bases"
 done < "$repo_list"
 
-# PASS 2 - every repo passed; now cut, in the same order.
+# RECORD - every repo passed; record each base in state BEFORE any cut, so a
+# crash inside PASS 2 always leaves the base the re-entry arm's `cut-missing`
+# repair needs.
+while IFS="$(printf '\t')" read -r repo base_branch; do
+  [ -n "$repo" ] || continue
+  "$oss_bin" spine_base_set "<spine-id>" "$repo" "$base_branch" || exit 1
+done < "$repo_bases"
+
+# PASS 2 - cut, in the same order.
 while IFS="$(printf '\t')" read -r repo base_branch; do
   [ -n "$repo" ] || continue
   git -C "$("$oss_bin" repo_root "$repo")" checkout -q -b "$spine_branch" || exit 1
@@ -105,6 +158,16 @@ done < "$repo_bases"
 ```
 
 Each of these is load-bearing:
+
+**A RECORD pass can legitimately refuse (rc 7), and the refusal names the one
+correction route.** `spine_base_set` refuses when a base is already recorded and
+the observed one differs — a crash inside this pass, or a hosting repo re-parked
+since — because a recorded base is evidence of what the lane was about to cut
+from. It validates the value before recording too: the branch must EXIST locally
+in that repo, so a typo can no longer be journaled as evidence. The correction
+is `oss spine_base_reset <spine-id> <repo> <branch>` (a validation-checked
+replacement, journaled as `reset_spine_base`) — an OPERATOR decision about which
+value is right, which the lane never makes or calls on its own.
 
 **A spine branch cut here is local until spine close pushes it.** The branch is
 created, never pushed — rounds land work items onto it locally, and only spine
@@ -117,19 +180,22 @@ resume probe would then find and have to reason about.
 that checked and mutated per repo. With an earlier-sorted repo clean and a later
 one dirty, detached, or already carrying the spine branch, the first repo's
 branch was already cut when the halt fired — and re-running then failed that
-repo's own already-exists guard, which this document says is not resumable. A
-condition that should merely block dispatch instead wedged the spine until
-someone repaired the repos by hand. The checks are cheap and read-only; the
-`checkout -b` only runs once all of them have passed.
+repo's own already-exists guard, which the re-entry arm's `cut-missing` repair
+(§2b) completes now: it cuts the branch in the repos the halt never reached,
+from each repo's recorded base. A condition that should merely block dispatch
+instead wedged the spine until someone repaired the repos by hand. The checks
+are cheap and read-only; the `checkout -b` only runs once all of them have
+passed.
 
 **`$repo_bases` is a per-repo MAPPING, not a variable.** `base_branch` was a
 single name overwritten on every iteration, so only the last repo's value
-survived the loop — and the handoff authored afterwards has to record *each*
-target repo's observed base branch (`handoff-contract.md` §2), which spine close
-then treats as its primary merge destination. Writing one repo's base into
-another repo's handoff either halts the close or merges into a same-named branch
-that happens to exist there. Read this file when authoring each handoff; never
-carry a surviving `$base_branch`.
+survived the loop — and §2a's RECORD pass must write *each* target repo's
+observed base into state (`spine_base_set`), the value every handoff copies
+and spine close treats as its primary merge destination. Writing one repo's
+base into another repo's handoff either halts the close or merges into a
+same-named branch that happens to exist there. **Handoffs read the base from
+state, in both arms** — copy `base_branch:` from `"$oss_bin" spine_base_get
+<spine-id> <repo>`; never carry a surviving `$base_branch`.
 
 **`"$oss_bin" repo_root "$repo"`, never a bare `<repo-root>` placeholder.** The verb
 resolves the declared repo's root from the topology declaration
@@ -154,40 +220,116 @@ Nothing in that column reports a failure. **Each hosting repo stays parked on
 `$spine_branch` for the duration of the spine**, and spine close is what moves
 it off, in that repo.
 
-**An existing spine branch halts the run; it does not resume it.** A first
-invocation that stopped — a gap returned, a round deferred, a session
-interrupted, or the loop halting on one hosting repo before it reaches the next
-— leaves the branch cut in every repo the loop already reached, per-item
-worktrees on disk, and item status journaled. Reusing the branch alone buys
-exactly one step per repo: `"$oss_bin" worktree_add` returns **rc 8** for every item
-already spawned (`oss_worktree_add`'s already-exists guard in
-`lib/worktree.sh`), and nothing routes completed or active items to close or to
-redispatch from their recorded state. Resuming means reconciling all of that at
-once, across every hosting repo — that is issue 133, not this block. Until it
-lands, halting with the branch named beats a lane that half-restarts.
-
-**`base_branch` is taken from HEAD in this release, and that is a known
-limitation — park each hosting repo on its intended base before you run the
-lane.** `plan-spine` authors the planned base into `SPINE.md`'s spine-context
-section at planning time (`plan-spine/references/spec-authoring.md` §1).
-**Close reads both** — `close/references/spine-close.md` §3 takes the
-handoffs' recorded `base_branch:` lines (what the lane ACTUALLY cut from) as
-primary with `SPINE.md`'s planned base as the cross-check, halting on
-disagreement, and `close/references/code-review.md` reuses the ceremony's
-resolved value. This lane does not read either source: it takes HEAD (issue
-133). **That asymmetry is the hazard.** If a hosting repo was parked anywhere
-but the planned base when you ran, the spine in that repo is cut from one
-branch and merged into another, and every guard downstream passes. Park each
-hosting repo on the intended base before you run the lane, and cross-check the
-handoff's recorded `repo` and `base_branch` (`handoff-contract.md` §2) against
-`SPINE.md`'s before the first dispatch — a mismatch is a halt, not a note.
-
 **The slug is not in state.** Spines store `name`, work items store `title`;
 neither is a kebab slug, and nothing persists one. `plan-spine` minted the spine
 slug when it created the spine directory — **recover it from that directory
 name** rather than re-kebabing `name`, so the branch and the directory cannot
 drift apart. For work items there is no such anchor, which is exactly why §3
 writes the branch it actually created into state.
+
+### 2b. Re-entry arm — read out, then reconcile, then continue
+
+**1. The read-out, before any mutation.** Print the inventory. A halt row stops
+the lane here, having changed nothing:
+
+```bash
+inv="$(mktemp)"; inv_rc=0
+"$oss_bin" spine_inventory "<spine-id>" > "$inv" || inv_rc=$?
+cat "$inv"; rm -f "$inv"
+case "$inv_rc" in
+  0) ;;
+  3) echo "halt: the inventory above has halt rows - repair each one, then re-run /run-spine (it re-inventories); nothing was changed"; exit 1 ;;
+  *) echo "halt: spine_inventory could not read the spine (rc $inv_rc) - state or usage is broken, not the spine; nothing was changed"; exit 1 ;;
+esac
+```
+
+Show the user every row. Say for any item whose facts show no `dispatches`
+field that its prior dispatches are unknown and count from zero.
+
+**2. Map the routes onto the rounds** — still before any mutation. The rounds
+come from the spine plan document (§1). The **resume round *R*** is the first
+round holding an item whose route is not `skip`. Every item in a round after
+*R* must route `spawn` (or `skip` for an `abandoned` item); anything else is
+**`halt:out-of-order`** — work exists beyond an unfinished barrier. Name it and
+stop. If no round holds a non-`skip` item, the rounds are done: say so and hand
+over to `/close <spine-id>`, as §7 does.
+
+**3. Repair the repos.**
+
+- `base-backfill` (a spine cut before ossify 1.14.0 recorded no base): read
+  this repo's `base_branch:` lines from the spine's existing handoffs. If they
+  agree, `"$oss_bin" spine_base_set <spine-id> <repo> <that branch>`. If they
+  disagree, halt and name the handoffs. If none exist, ask the operator once for
+  the branch the spine branch was cut from, then record it the same way.
+  **Never** take it from HEAD, which is the spine branch by now.
+- `cut-missing` (a crash inside §2a's PASS 2). **The recorded base is validated before this loop runs**: the inventory emits `halt:base-unresolved` for a repo whose base no longer resolves, so a rename or deletion halts the read-out instead of failing here after the earlier repos were already cut (#673 G3):
+
+```bash
+spine_branch="$("$oss_bin" branch_name "<spine-id>" "<spine-slug>")"
+cut="$(mktemp)"
+"$oss_bin" spine_inventory "<spine-id>" | awk -F'\t' '$1=="repo" && $3=="cut-missing" {print $2}' > "$cut"
+while IFS= read -r repo; do
+  [ -n "$repo" ] || continue
+  root="$("$oss_bin" repo_root "$repo")" || exit 1
+  base="$("$oss_bin" spine_base_get "<spine-id>" "$repo")" || exit 1
+  git -C "$root" checkout -q -b "$spine_branch" "$base" || exit 1
+done < "$cut"
+rm -f "$cut"
+```
+
+**4. Repair round *R*'s items, in declared decomposition order** — each through
+the verb that already owns the step:
+
+| Route | Do |
+|---|---|
+| `reattach` | `"$oss_bin" worktree_reattach <repo> <wi-id> <recorded branch>`; a non-zero result **halts naming the git error**, leaving the stale entry and the branch as found — never `git worktree prune`, never `-f -f`. It clears only this item's OWN dead registration (`…/.worktrees/<wi-id>` whose directory is gone, via `git worktree remove`); a live holder or a stale entry at any other path refuses rc 8 (#673 E1/E2), and validation precedes every removal, so a locked or foreign entry anywhere in the set refuses with ALL of them left as found (#673 I1). On success, re-run the inventory and act on that item's new route |
+| `adopt` | the row reads `wt=present` but state holds no `worktree_path` yet and §2b defines no `$wt` for you (#673 B2): set `root="$("$oss_bin" repo_root "<the item's target_repo>")"` and `wt="$root/.worktrees/<wi-id>"` (the derived path, exactly as `worktree_add` builds it) — then `"$oss_bin" work_item_exec <wi-id> "$(git -C "$wt" rev-parse --abbrev-ref HEAD)" "$wt" "$(git -C "$wt" rev-parse HEAD)"`, then `"$oss_bin" work_item_status <wi-id> active` — the crash came between §3's spawn and its journal |
+| `finish-merge` | Re-land the claim the state makes: the branch holds the item's commits and the spine branch does not. Recover, in this order, BEFORE anything merges (#673 C3/L1): `target_repo` from state (`.work_items[].target_repo`), then `repo_root="$("$oss_bin" repo_root "$target_repo")"` — `$repo_root` is not otherwise in this arm's scope — then `wi_branch` from state (`work_items[].branch`) and `wi_sha="$(git -C "$repo_root" rev-parse "refs/heads/$wi_branch")"`, the work-branch tip the reachability check compares. **Then RE-RUN close §2's gate on the item's committed tree before the merge (#673 K1)**: neither a commit on the branch nor a present `report.md` proves the gate ran — the item skill authors the report BEFORE staging — so §2's four layers (`work-item-close.md` §2, `references/impl-check.md`) run again over the branch's committed diff (read the committed tree, not a staged worktree, when the worktree is gone), against the item's `spec.md`, `handoff.md` and `report.md`. Green → close §4 from its merge onward: `git -C "$repo_root" merge --no-ff "$wi_branch"`, then `merge-base --is-ancestor "$wi_sha" HEAD`, then `work_item_status "$wi" complete`. Red → `halt:unverified-merge`, naming the item; **nothing is merged**. The gate is repeatable and records only what §2 already writes. **The durable `[fidelity]` rejection record gates this route in the read-out too (#673 J1)**: the same `verify.md` read that routes `close-finished` to `halt:close-rejected` runs here and on the complete-item arm — a recorded rejection is never re-landed by a merge, and an unreadable record halts (`halt:unreadable`) rather than reading as clear |
+| `finish-status` | `"$oss_bin" work_item_status <wi-id> complete` — the merge landed and the status write did not |
+| `redispatch`, `close-finished`, `spawn` | nothing here — §3 handles them |
+| `skip` | nothing |
+
+**Every `halt:` row owns a repair; the read-out stops the lane and the repair
+runs outside it, then `/run-spine` re-inventories.** The item-level rows this
+arm's own repairs can hand back, and their routes out:
+
+| Halt row | The repair it names |
+|---|---|
+| `halt:state-claims-merge` — a `complete` item whose branch still sits at its recorded base | the branch holds no commits past its base, so no merge can be reconstructed from repo state: if the item's work exists elsewhere, return it to `planned` (`"$oss_bin" work_item_status <wi-id> planned`) and re-run its round; if it truly landed nothing, the state is the record to repair. (`complete` items whose branch holds unmerged commits now route `finish-merge` instead; a branch that is gone is the cleanup arm and routes `skip` — #673 A5) |
+| `halt:base-unknown` — an ITEM row: a branch is recorded with no `base_sha` | a half-written `work_item_exec` record; repair it with a full re-dispatch — `"$oss_bin" work_item_exec <wi-id> <branch> <worktree_path> <the base the branch was cut at>` — which replaces all three fields (#673 A1) |
+| `halt:base-unresolved` — a repo row: the recorded base branch no longer resolves locally (renamed or deleted since it was recorded) | the `cut-missing` repair cuts from that ref, so re-entry would create the spine branch in the earlier repos and only then fail here — a partial mutation. Restore the branch, or, if it was renamed, record the new name with `"$oss_bin" spine_base_reset <spine-id> <repo> <new-branch>` (an operator decision, §2a); the lane never guesses a replacement (#673 G3) |
+| `halt:branch-unknown` — a `complete` item with no branch ever recorded | nothing proves a branch existed, so the cleanup-finished `skip` reading is unearned: state, not the repos, is the record to repair. If the item truly ran, restore the full execution record (a full re-dispatch replaces all three fields, as `halt:base-unknown` says) or return it to `planned`; if it was withdrawn, mark it `abandoned` (#673 L3) |
+| `halt:worktree-held` | the branch is checked out somewhere that is not this item's own missing registration (`git -C <repo-root> worktree list`) — or that list itself could not be read, which reads the same way (#673 A4/G1), or the registration is LOCKED, which reattach refuses too (#673 L4); reconcile with the holder — the lane touches nothing on the holder's behalf (#673 A4) |
+| `halt:unverified-merge` | the row's RE-RUN of close §2's gate came back RED on the item's committed tree (#673 K1): run the item's correction — the recovery menu's path, or the external seam's continuation — before anything merges; nothing was merged, and a `[fidelity]` finding the red run wrote routes the next read-out `halt:close-rejected` |
+| `halt:close-rejected` | the result's last completed gate run recorded a `[fidelity]` finding (durable in `verify.md`); the correction must complete — the external seam's continuation or the close's recovery menu — before anything re-verifies or RE-LANDS the result. Gates `close-finished` AND every `finish-merge` arm (#673 C2/J1) |
+| `halt:unreadable` | a repo root, a `git status`, a `verify.md` rejection record, or the state feed could not be read; fix that and re-run — nothing here is in the lane's hands (#673 A2/A3/G2) |
+| `halt:work-lost`, `halt:unclassified`, `halt:planned-with-worktree`, `halt:dirty-worktree` | state and repos disagree, or the shape is outside this table; surface both and decide — a branch no longer descended from its recorded `base_sha` is a history rewrite, never a landing: restore the expected history or re-dispatch the item (#673 H1); a completed item's dirty worktree halts here too, since cleanup's `worktree_remove` would refuse it at close (#673 I2); a recorded branch that is not this item's own `work/<wi-id>-*` is never reused for reattach, redispatch or merge (#673 L2) |
+
+**5. Continue into §3 for round *R*.**
+
+**#362's per-round re-entry is the plain case of this arm.** At the top of round
+*K+1* every row is `skip` or `spawn`, so the read-out is short, steps 3–4 do
+nothing, and §3 runs the round exactly as a fresh round. Every protection still
+halts: a dirty or detached repo, a repo parked off the spine branch, an item
+stuck `active` behind the barrier.
+
+**`base_branch` comes from state, in both arms.** §2a records what each repo
+was parked on at the cut (`spine_base_set`); every handoff copies `base_branch:`
+from `"$oss_bin" spine_base_get <spine-id> <repo>`, never from HEAD. Park each
+hosting repo on its intended base before the first run: the recorded base is
+whatever it was parked on.
+
+**Cross-check the base against the plan BEFORE the first dispatch — a mismatch
+is a halt, not a note.** `plan-spine` authors a *planned* base per hosting repo
+into `SPINE.md`'s base-branch table (`plan-spine/references/spec-authoring.md`
+§1). Compare that repo's row against the value state holds — the base about to
+be recorded in the fresh arm (§2a's RECORD, checked as PASS 1 observes it), or
+the recorded base in the re-entry arm before §3 dispatches anything in that
+repo. A wrong-base cut caught here costs one parked repo to re-park; caught
+only at spine close §3, where the same cross-check runs, it costs the whole
+spine, every round already merged onto the branch. Where `SPINE.md` carries no
+row for a repo (a legacy spine), say so in the run's summary rather than
+inventing one — the close still cross-checks at landing time.
 
 ---
 
@@ -203,6 +345,22 @@ this section for every item in the round, so an abandoned item gets no request
 either. Never dispatch it to "see whether it still applies": un-withdrawing is a
 planning decision (`"$oss_bin" work_item_status <wi-id> planned`), made in
 `plan-spine`, not here.
+
+**On re-entry, follow the item's route.** `spawn` takes the path below
+unchanged. `redispatch` reuses the recorded worktree and its existing handoff
+(author it now if it is missing) and goes straight to §5. An `adopt` item that
+§2b step 4 just repaired is in exactly that shape — active, clean, at its
+recorded base — so it takes the `redispatch` path too, authoring the handoff
+first when it is missing. A `reattach` item takes whatever route the re-run
+inventory gave it. `close-finished` skips dispatch entirely — default mode
+hands it to close Route A as a complete return with the recorded `report_path`,
+summary `recovered on resume: return lost with the prior session`, and
+`stage_status all_staged` (close's gate runs in full); external mode sends it
+in the round's request set (`external-executor.md` §2a). An item already
+`complete` — a `skip` row for a merged item, or a `finish-status` /
+`finish-merge` row §2b step 4 just repaired — gets nothing here: no worktree,
+no handoff, no request, no dispatch. §7 does not wait on it again (it is
+complete).
 
 **Before spawning anything: confirm the round's specs exist and parse.**
 `plan-spine` may legitimately defer a later round's specs until that round starts
@@ -314,6 +472,12 @@ decided by the command that started you and never changes mid-spine:
   validation and the halts. Come back here for §6 and §7, which it does not
   change. That mode calls no subagent and never falls back to one.
 
+**Before every dispatch, count it.** Read `"$oss_bin" get
+'.work_items[] | select(.id=="<wi-id>") | .dispatches // 0'`. At 3 or more, do
+not dispatch — escalate as §6's cap says. Otherwise run `"$oss_bin"
+work_item_dispatched <wi-id>`, then dispatch. This holds for the first run,
+every clarification re-dispatch and every broken-envelope retry.
+
 ### The default dispatch
 
 ```text
@@ -361,7 +525,8 @@ total dispatches of one work item with no `complete` return, **stop**. Surface t
 accumulated gap list and escalate to the user — the item is under-specified and
 another round-trip will not fix it. **The worker never counts iterations**; it
 cannot, because each dispatch is a fresh context that has no idea it is the third.
-The count lives here or nowhere.
+The count lives in state (`work_items[].dispatches`, §5), so it survives a
+respawned session — a molt handoff mid-round does not reset an item's cap.
 
 **`complete`** — the execution loop ran to the end. Hand the item to the work-item
 close layer (`close`), which runs the gate, commits in the worktree, and merges
@@ -482,6 +647,11 @@ the assertion fails when it is parked anywhere else).
 A bash test asserting agent behaviour here would be testing a fixture, not the
 contract. The honest statement is that the judgment half is uncovered.
 
+The re-entry classification is covered: `tests/test-spine-inventory.sh` builds
+each state in real git repos and asserts its route, and runs the §2b read-out
+and cut-missing blocks. The round mapping (§2b step 2) and the per-route repairs
+(step 4) are prose with no executable surface.
+
 ---
 
 ## 9. Anti-patterns
@@ -500,3 +670,6 @@ contract. The honest statement is that the judgment half is uncovered.
 - **Committing inside the worktree yourself.** The implementer stages; the
   work-item close layer commits, after its gate. A commit here is a commit that
   skipped the gate.
+- **Re-cutting or half-reusing an existing spine branch** instead of taking
+  §2b (§2).
+- **Dispatching without counting it** (§5).

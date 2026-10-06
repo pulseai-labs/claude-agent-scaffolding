@@ -26,12 +26,17 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 wi="<work-item id>"
 st="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .status")"
 if [ "$st" = "abandoned" ]; then
-  rec="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | [.branch, .worktree_path, .base_sha] | map(select(. != null) | tostring) | join(\", \")")"
+  # The dispatched-item evidence is FOUR fields, not three (#673 F3): branch,
+  # worktree_path, base_sha - AND the dispatches count. An item whose dispatch
+  # was counted and then died before work_item_exec records no exec field at
+  # all, so a three-field read called it a clean withdrawal; the count is the
+  # surviving proof it was dispatched.
+  rec="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | [.branch, .worktree_path, .base_sha, (if ((.dispatches // 0) > 0) then (\"dispatches=\" + (.dispatches | tostring)) else null end)] | map(select(. != null) | tostring) | join(\", \")")"
   if [ -n "$rec" ]; then
     echo "close: $wi is abandoned AND records a dispatch field ($rec) - that pair is the drift doctor's §5 bullet reports, not a clean withdrawal, and it is NOT the skipped-work_item_exec case below: the worktree the record names may hold real work, so nothing here may skip the item as 'nothing to close'. The withdrawal is the half that is wrong, so repair the RECORD and let the work land: \"$oss_bin\" work_item_status $wi planned, then resume the round the record describes (work-item/references/round-orchestration.md §2/§3) so it lands or reports its own halt - and where it cannot run, carry the work into a NEW spine: \"$oss_bin\" spine_add <release> <name> <class> <target-repo>, then \"$oss_bin\" work_item_add it there (plan-spine/references/decomposition.md §1's whole-spine arm) - halt"
     exit 1
   fi
-  echo "close: $wi is abandoned and records no dispatch field at all, which is what 'withdrawn before any dispatch' means in state - there is nothing to close. This is NOT the skipped-work_item_exec case below, and nothing should be reconstructed for it: spine close skips an abandoned item, and the withdrawal's own two obligations live in DIFFERENT owners: the demo-ledger amendment it owes is plan-spine/references/decomposition.md §1, and the repo armed for its spine - restore its checkout, or record it as parked - is spine-close.md §3, which this standalone route never reaches. To reverse the withdrawal: \"$oss_bin\" work_item_status $wi planned - but if this item's spine is ALREADY closed, that alone is not the recovery: un-withdrawing leaves a planned item inside a closed spine, and release close's tag selector takes any non-abandoned item whose spine is closed, so a later release close would tag a repo whose work was never dispatched or landed. Reopening the spine does NOT re-enable it: work-item/references/round-orchestration.md §2 halts on an existing spine branch, which close leaves behind in every hosting repo (issue #133 is the open reconciliation). Carry the work into a NEW spine instead - \"$oss_bin\" spine_add <release> <name> <class> <target-repo>, then \"$oss_bin\" work_item_add it there (plan-spine/references/decomposition.md §1's whole-spine arm) - halt"
+  echo "close: $wi is abandoned and records no dispatch field at all, which is what 'withdrawn before any dispatch' means in state - there is nothing to close. This is NOT the skipped-work_item_exec case below, and nothing should be reconstructed for it: spine close skips an abandoned item, and the withdrawal's own two obligations live in DIFFERENT owners: the demo-ledger amendment it owes is plan-spine/references/decomposition.md §1, and the repo armed for its spine - restore its checkout, or record it as parked - is spine-close.md §3, which this standalone route never reaches. To reverse the withdrawal: \"$oss_bin\" work_item_status $wi planned - but if this item's spine is ALREADY closed, that alone is not the recovery: un-withdrawing leaves a planned item inside a closed spine, and release close's tag selector takes any non-abandoned item whose spine is closed, so a later release close would tag a repo whose work was never dispatched or landed. Reopening the spine does NOT re-enable it: spine close has already landed that spine's branch in every hosting repo, and round-orchestration.md §2's re-entry arm would route the un-withdrawn item onto a branch nothing merges again. Carry the work into a NEW spine instead - \"$oss_bin\" spine_add <release> <name> <class> <target-repo>, then \"$oss_bin\" work_item_add it there (plan-spine/references/decomposition.md §1's whole-spine arm) - halt"
   exit 1
 fi
 wt="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .worktree_path")"
@@ -54,7 +59,8 @@ built in. **The block tests one other cause first**: an item withdrawn before an
 dispatch is `abandoned`, and *that* is why it has no worktree — it was never
 dispatched, so there is nothing to reconstruct and nothing to close. That is
 three cases, not two: **an `abandoned` item that still records a dispatch field** —
-`branch`, `worktree_path` or `base_sha` — was dispatched and *then* withdrawn (the
+`branch`, `worktree_path`, `base_sha`, or a `dispatches` count above zero —
+was dispatched and *then* withdrawn (the
 pair `references/state-inspection.md` §5 reports as drift, and the state a
 pre-1.12 journal can hold), so its worktree may be real work that no close path
 skips for it: the block reads those fields and names them, sends the operator to
@@ -168,12 +174,19 @@ the §4b schema. There is no selection step and no second engine: this pass is
 Layer 4, on every close that reaches it.
 
 Apply the §4b verdict rule to the findings: an undeclared `fidelity` finding
-fires the `[fidelity]` halt. The advisory findings are written
-to `<work-item-dir>/verify.md` — `$(dirname "$report")` on Route A, `$wi_dir` on
-Route B — and echoed in the close summary.
+fires the `[fidelity]` halt. **Every completed Layer 4 run writes its finding
+set to `<work-item-dir>/verify.md`** — `$(dirname "$report")` on Route A,
+`$wi_dir` on Route B — and echoes it in the close summary. When the run halts
+on `[fidelity]`, the set written INCLUDES that halting finding: **the rejection
+is recorded durably (#673 C2)**, because a staged worktree after a rejection is
+byte-identical to a `close-finished` result otherwise — a fresh session's
+re-entry would hand the rejected result back to the gate, and a stochastic
+Layer 4 pass could accept it without the correction ever running. The re-entry
+inventory reads a `[fidelity]` line in `verify.md` as exactly that record
+(route `halt:close-rejected`).
 
 **Every completed Layer 4 run overwrites `verify.md`, even when there are zero
-advisory findings — delete the file rather than leave a stale one.** A work
+findings — delete the file rather than leave a stale one.** A work
 item can reach this step more than once: a `[fidelity]` halt sends it back to
 the recovery menu (§5), and Layer 4 runs again on the next attempt. If that
 retry is clean, an old `verify.md` from the halted attempt is still sitting
@@ -181,7 +194,8 @@ there — code-review.md treats an existing file as current evidence and does
 not re-judge it (its own text says so), so a stale file would carry forward
 findings the retry already resolved. There is no "no run happened" state to
 distinguish from "this run found nothing": every completed Layer 4 run writes
-the current truth.
+the current truth — which is also what clears the rejection record, so only a
+re-verified result can read as recovered.
 
 Green → step 3. Anything else → step 5.
 

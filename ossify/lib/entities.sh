@@ -240,6 +240,11 @@ oss_entity_add_work_item() { # $1=state $2=spine-id $3=title $4=target_repo
   # Callers (commands.sh) now always pass an explicit key; this default is kept
   # so a direct lib call is honest about the same sole-repo rule (#272/#310
   # Task 4 - was a literal `canonical`).
+  # The key's DECLARATION and the ai_workspace refusal belong to the dispatcher
+  # wrapper (`oss_cmd_work_item_add` -> manifest.sh's `_oss_repo_key_for_write`),
+  # NOT to this function, deliberately: manifest.sh's own comment says a
+  # lib-level guard "would force a discoverable declaration on internal
+  # composition and on unit fixtures that legitimately have none".
   if [ -z "${4:-}" ]; then tr="$(_oss_default_repo_key)" || return $?; else tr="$4"; fi
   ts="$(_oss_now)"
   oss_state_mutate "$sf" add_work_item \
@@ -332,4 +337,79 @@ oss_entity_set_work_item_exec() { # $1=state $2=wi-id $3=branch $4=worktree-path
     "$(jq -n --arg w "$wi" --arg b "$3" --arg p "$4" --arg s "$5" \
       '{work_item:$w,branch:$b,worktree_path:$p,base_sha:$s}')" \
     "" _oss_entity_guard_wi_exec
+}
+
+# #133: spines[].bases. The guard runs INSIDE oss_state_mutate's lock (the `$5`
+# slot), so two sessions recording different bases for one repo cannot both win.
+# A recorded base is evidence of what the lane actually cut from - overwriting it
+# with a different value is refused (rc 7); the same value is a no-op retry.
+_oss_entity_guard_spine_base() { # $1=state $2=payload ; 0 let through, 7 refuse
+  local cur want
+  cur="$(jq -r --argjson p "$2" '.spines[] | select(.id == $p.spine) | ((.bases // {})[$p.repo] // "")' "$1")" || return 2
+  want="$(jq -r '.base_branch' <<<"$2")" || return 2
+  if [ -z "$cur" ] || [ "$cur" = "$want" ]; then return 0; fi
+  echo "oss: spine '$(jq -r '.spine' <<<"$2")' already records base '$cur' for repo '$(jq -r '.repo' <<<"$2")' - a recorded base is evidence of what the lane cut from, so it is never overwritten with '$want'; to replace a base recorded in error, the sanctioned correction is \"oss spine_base_reset $(jq -r '.spine' <<<"$2") $(jq -r '.repo' <<<"$2") <branch>\" (an operator decision, never automatic)" >&2
+  return 7
+}
+
+# #673 D1: the sanctioned correction for a recorded base. `spine_base_set`
+# refuses to overwrite (a base is evidence); this verb is the one route that
+# replaces it, and it validates exactly as the setter does - declared repo,
+# non-empty non-HEAD branch name, and the branch must exist locally - so a
+# correction can never journal the same class of typo the guard exists to
+# protect. Nothing in the lane calls it automatically.
+oss_entity_set_spine_base_reset() { # $1=state $2=spine-id $3=repo-key $4=base-branch
+  local sf="$1" spine="$2" repo="$3" br="$4" root
+  case "$repo" in ''|ai_workspace)
+    echo "oss: spine_base_reset needs a declared hosting repo, not '${repo:-<empty>}' (ai_workspace hosts no spine branch)" >&2; return 2 ;; esac
+  root="$(_oss_repo_root "$repo")" || return 2
+  case "$br" in ''|HEAD)
+    echo "oss: spine_base_reset needs a branch name, not '${br:-<empty>}' - a detached HEAD has no base to record" >&2; return 2 ;; esac
+  git -C "$root" show-ref --verify --quiet "refs/heads/$br" \
+    || { echo "oss: spine_base_reset: no local branch '$br' in repo '$repo' at $root - a base must be a branch that exists there" >&2; return 2; }
+  _oss_entity_require_single "$sf" '.spines[] | select(.id == $v)' "spine" "$spine" || return $?
+  oss_state_mutate "$sf" reset_spine_base \
+    "$(jq -n --arg s "$spine" --arg r "$repo" --arg b "$br" --arg ts "$(_oss_now)" \
+      '{spine:$s,repo:$r,base_branch:$b,at:$ts}')"
+}
+
+oss_entity_set_spine_base() { # $1=state $2=spine-id $3=repo-key $4=base-branch
+  local sf="$1" spine="$2" repo="$3" br="$4" root
+  case "$repo" in ''|ai_workspace)
+    echo "oss: spine_base_set needs a declared hosting repo, not '${repo:-<empty>}' (ai_workspace hosts no spine branch)" >&2; return 2 ;; esac
+  root="$(_oss_repo_root "$repo")" || return 2
+  case "$br" in ''|HEAD)
+    echo "oss: spine_base_set needs a branch name, not '${br:-<empty>}' - a detached HEAD has no base to record" >&2; return 2 ;; esac
+  # #673 D1: the base must EXIST as a local branch in this repo, checked before
+  # anything is journaled. A typo ('mian'), an invalid ref name, or a branch
+  # absent from the repo used to be accepted and recorded as immutable
+  # evidence: every later repair failed to resolve it, and re-setting the
+  # correct value was refused as an overwrite - a permanent wedge.
+  git -C "$root" show-ref --verify --quiet "refs/heads/$br" \
+    || { echo "oss: spine_base_set: no local branch '$br' in repo '$repo' at $root - a base must be a branch that exists there; if a WRONG base is already recorded, the sanctioned correction is 'oss spine_base_reset $spine $repo <branch>'" >&2; return 2; }
+  _oss_entity_require_single "$sf" '.spines[] | select(.id == $v)' "spine" "$spine" || return $?
+  oss_state_mutate "$sf" set_spine_base \
+    "$(jq -n --arg s "$spine" --arg r "$repo" --arg b "$br" --arg ts "$(_oss_now)" \
+      '{spine:$s,repo:$r,base_branch:$b,at:$ts}')" \
+    "" _oss_entity_guard_spine_base
+}
+
+oss_entity_get_spine_base() { # $1=state $2=spine-id $3=repo-key ; rc 1 unrecorded
+  local sf="$1" spine="$2" repo="$3" b
+  _oss_entity_require_single "$sf" '.spines[] | select(.id == $v)' "spine" "$spine" || return $?
+  b="$(jq -r --arg s "$spine" --arg r "$repo" '.spines[] | select(.id == $s) | ((.bases // {})[$r] // "")' "$sf")" || return 2
+  [ -n "$b" ] || { echo "oss: no base_branch recorded for spine '$spine' in repo '$repo'" >&2; return 1; }
+  printf '%s\n' "$b"
+}
+
+# #133: one count per dispatch of a work item, in every mode and of every kind
+# (first run, clarification re-dispatch, broken-envelope retry, an external
+# caller's correction or replacement). The CAP is enforced by the lane, not here
+# - round-orchestration.md §6 owns the escalation.
+oss_entity_work_item_dispatched() { # $1=state $2=wi-id ; echoes the new count
+  local sf="$1" wi="$2"
+  _oss_entity_require_single "$sf" '.work_items[] | select(.id == $v)' "work item" "$wi" || return $?
+  oss_state_mutate "$sf" incr_work_item_dispatches \
+    "$(jq -n --arg w "$wi" --arg ts "$(_oss_now)" '{work_item:$w,at:$ts}')" || return $?
+  jq -r --arg w "$wi" '.work_items[] | select(.id == $w) | .dispatches' "$sf"
 }

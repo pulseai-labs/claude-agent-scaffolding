@@ -242,7 +242,7 @@ ledger keys all derive from it without transformation.
 round's spec may wait for its round to start, because the rounds ahead of it will
 have taught you something. What is **not** deferred is the **plan**: the critic
 and the user see the full spine plan (all items, all rounds, all demo lines) even
-when only round 1's spec text exists.
+when only round 1's spec text exists. Re-entering `/run-spine` once per round is supported: the lane's re-entry arm (`work-item/references/round-orchestration.md` §2b) picks up at the next round without a flag.
 
 **Citation fold-in is a mechanical step, not a ceremony.** Every citation resolves
 against the current target set — lean MASTER-SPEC sections, bones registry ADRs,

@@ -43,6 +43,11 @@ Returns are processed in declared decomposition order regardless of arrival orde
 This is the entry point `plan-spine` hands the baton to. `plan-spine` plans and
 stops; `/close <spine-id>` takes over once the final round clears its barrier.
 
+Re-running it on a spine that has already started resumes it: the lane prints a
+reconcile read-out and continues from the first unfinished round, or halts before
+changing anything and names what it cannot reconcile (`round-orchestration.md`
+§2b). The grammar does not change — there is no resume flag.
+
 **Not this command:** one work item from a known handoff path is `/work-item
 <handoff-path>`. The work-item gate, the cumulative demo, the harvest and the
 retro are `/close`.
