@@ -2,6 +2,34 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.2.0
+
+**A token floor in place of the bash reader** (#684, direction 2′).
+
+- **The never-approve list reads the command text as one bag of words** (`never.ts`). It joins
+  a backslash-newline, drops `\`, `'` and `"`, splits at spaces, operators, backticks and `$(`,
+  and shows each `NAME=VALUE` word's value. A rule fires when a verb and a danger word
+  appear anywhere in the text; the list never decides which command a word belongs to. Quotes,
+  wrappers, interpreters and substitutions no longer hide a push (`python3 -c 'git push -f'`).
+- **Caught now** (the #684 gaps): a quoted `)` inside `$( )`, dashed executables (`git-push`),
+  a glob or brace that builds a flag (`--forc*`), a backslash-newline in a word, `git push --
+  <remote>` on the default branch, `-c remote.<name>.push=`, `+:dst` (also `branch-delete`), and
+  `git send-pack` with no refspec (`default-branch-push`).
+- **`unreadable` matches nothing.** No rule depends on following a command's shape, so the
+  live check's stalls on valid bash (`python3 -c … && git commit`, a heredoc, a `for` loop) are
+  gone. The name stays valid in `neverApprove`.
+- **Extra asks, accepted:** a danger word beside a harmless command (`git commit -m "do not git
+  push -f"`), any push after a `cd` or `git -C` to another directory whatever its refspec, `rm -r`
+  of a path with a `..` segment, and a short cluster that holds the letter (`git push -ofoo`). Two
+  quoted heredoc shapes are text and skipped — a `-m "$(cat <<'EOF' … EOF)"` commit message and
+  `cat > file <<'EOF'` whose file is not named again — unless the rest of the text names a
+  program that may run text (a shell, an interpreter, `ssh`, `sed`, `awk` …).
+- **Known limits:** a script or program that runs git itself, a git alias from config, `sed`'s
+  `e` command, a brace or glob that builds the verb, a bare variable beside `branch` or `commit`,
+  and a danger only the filesystem shows.
+- **Removed:** the per-command reader, and autonomic's copy of seat-mods' shell reader
+  (`hooks/shell.ts`) with its arm in `tests/test-mod-shell-parity.sh`. seat-mods is unchanged.
+
 ## 0.1.1
 
 **The pilot patch** (#677). Built on the live pilot of 0.1.0, run under bypass permissions.

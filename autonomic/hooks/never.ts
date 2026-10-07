@@ -1,293 +1,123 @@
-import { commandOf, gitOf, segments } from './shell'
+// The never-approve list (spec §3.3; autonomic 0.2.0, #684 direction 2′): checked in code
+// before any fork. A match leaves the ask in place.
+//
+// The floor reads the whole command text as one bag of words. It never decides which
+// command a word belongs to, so quoting, nesting, wrappers and interpreters cannot hide a
+// word: `python3 -c 'git push -f'` shows `push` and `-f`. A danger word beside a harmless
+// command is an extra ask, and that is the accepted cost.
 
-// The never-approve list (spec §3.3): checked in code before any fork. A match leaves the
-// ask in place. Unknown means listed: a path or a branch autonomic cannot read is
-// treated as the dangerous one.
-
+// 'unreadable' matches nothing since 0.2.0; the name stays valid so an existing setting parses.
 export type NeverRule = 'force-push' | 'default-branch-push' | 'branch-delete' | 'rm-outside' | 'no-verify' | 'unreadable'
 export type Where = { cwd: string; root: string; home: string; branch?: string; defaultBranch?: string }
 
-// Blanked text (a \u0000 marker), a variable, a substitution or a glob home is unreadable.
-function resolve(path: string, cwd: string, home: string): string | undefined {
-  // A brace or a backslash may expand to `..`, and a glob on a dot name may match it (bash 3.2) (PR #681).
-  if (/[\u0000$`{\\]/.test(path) || /(?:^|\/)\.[^/]*[*?[]/.test(path)) return undefined
-  // ~name is another user's home (round 18).
-  if (path.startsWith('~') && path !== '~' && !path.startsWith('~/')) return undefined
-  const abs = path === '~' ? home : path.startsWith('~/') ? `${home}/${path.slice(2)}` : path.startsWith('/') ? path : `${cwd}/${path}`
-  if (abs.startsWith('~')) return undefined
-  const out: string[] = []
-  for (const part of abs.split('/')) {
-    if (part === '' || part === '.') continue
-    if (part === '..') out.pop()
-    else out.push(part)
-  }
-  return `/${out.join('/')}`
+// Bash joins a backslash-newline, drops a backslash and joins quoted pieces, so `pu\sh`,
+// `pu""sh` and `'git' push` are push. A substitution or a backtick opens new words; `${`
+// does not, so `${OPTS}` stays a word that starts with `$`.
+const SPLIT = /\$\(|[\s;&|()<>`]+/
+// Two literal heredoc shapes are text Bash never runs, so their bodies are dropped:
+// - a commit message: `-m "$(cat <<'X'` … `X` `)"` (or `--message`), the usual commit;
+// - `cat > file <<'X'` (or `cat <<'X' > file`) at a command's start, when the file is not
+//   named again later in the text (a script written then run keeps its words).
+// The delimiter must be quoted, so the body holds no expansion.
+const MESSAGE = /(?:-m|--message)(?:=|[ \t]*)"\$\(cat[ \t]+<<-?[ \t]*(['"])([A-Za-z_]\w*)\1[ \t]*\n[\s\S]*?\n[ \t]*\2[ \t]*\n?[ \t]*\)"/g
+const WRITE = /(?<=^|[\n;&|(])[ \t]*cat[ \t]+(?:>>?[ \t]*([^\s;&|<>]+)[ \t]+)?<<-?[ \t]*(['"])([A-Za-z_]\w*)\2(?:[ \t]*>>?[ \t]*([^\s;&|<>]+))?[ \t]*\n[\s\S]*?\n[ \t]*\3[ \t]*(?=\n|$)/g
+// A program that may run text it is given keeps every word, the dropped bodies included:
+// a shell, an interpreter, a remote or wrapping runner, sed, awk. `.` counts only where a
+// command starts (`git add .` is a path).
+const RUNNER = /^(?:bash|sh|zsh|dash|ksh|fish|eval|source|xargs|ssh|su|watch|parallel|sed|python[\d.]*|pypy[\d.]*|node|nodejs|deno|bun|perl[\d.]*|ruby[\d.]*|php[\d.]*|lua(?:jit)?[\d.]*|Rscript|pwsh|powershell|osascript|tclsh|expect|[gmn]?awk)$/
+const DOT_SOURCE = /(?:^|[\n;&|(`]|\$\()[ \t]*\.[ \t]/
+function split(command: string): string[] {
+  const text = command.replace(/\\\r?\n/g, '').replace(/[\\'"]/g, '')
+  // NAME=VALUE also shows its value: FLAGS=-rf, alias.p=push, remote.x.push=refs/heads/main.
+  return text.split(SPLIT).flatMap(w => (w.indexOf('=') > 0 ? [w, w.slice(w.indexOf('=') + 1)] : [w])).filter(w => w !== '')
+}
+function wordsOf(command: string): string[] {
+  const message = command.replace(MESSAGE, m => m.slice(0, m.indexOf('\n')))
+  const text = message.replace(WRITE, (m, before: string | undefined, _q, _d, after: string | undefined, at: number) => {
+    const file = before ?? after
+    if (file === undefined || message.slice(at + m.length).includes(file)) return m
+    return m.slice(0, m.indexOf('\n'))
+  })
+  if (text === command) return split(command)
+  // Runners are looked for outside the dropped bodies: a message that says "bash" runs nothing.
+  if (DOT_SOURCE.test(text) || split(text).some(w => RUNNER.test(w.replace(/^.*\//, '')))) return split(command)
+  return split(text)
 }
 
-// Strictly below the root: removing the worktree itself is outside.
-// Nothing is below a worktree at / (round 16).
-const below = (path: string, root: string) => { const r = root.replace(/\/+$/, ''); return r !== '' && path.startsWith(`${r}/`) }
+// A verb is the word itself, or a path or dashed executable ending in it (git-push, /bin/rm).
+const isVerb = (w: string, verb: string) => !w.startsWith('-') && (w === verb || w.endsWith(`-${verb}`) || w.endsWith(`/${verb}`))
+const PUSH = ['push', 'send-pack', 'http-push']
+const isPush = (w: string) => PUSH.some(v => isVerb(w, v)) || w.includes('.push=')
 
-// Shapes the shared reader does not follow (final review I1). A segment led by one of these,
-// or holding a backtick or $( outside quotes, is unreadable; it is listed when the command
-// names a danger at all. Keywords that only open a block are stripped and the rest is read.
-const RUNNERS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish', 'eval', 'xargs', 'timeout', 'nice', 'ionice', 'watch', 'parallel', 'find', 'su', 'doas', 'ssh',
-  // Wrappers that run the program they are given (PR #681 round 4).
-  // A path-qualified wrapper (/usr/bin/env) is not skipped by the shared reader (round 6).
-  'env', 'sudo', 'command', 'exec', 'nohup', 'time',
-  // Bash builtins that run a command (round 7).
-  'coproc', 'builtin', 'trap',
-  'setsid', 'stdbuf', 'taskset', 'flock', 'chroot', 'chrt', 'systemd-run', 'nsenter', 'unshare', 'numactl', 'runuser', 'setpriv', 'sg', 'firejail', 'unbuffer', 'caffeinate', 'script', 'strace', 'ltrace'])
-// An interpreter runs a program the reader never sees (its quoted text is blanked), so it is
-// a runner too (PR #681): `python3 -c '…git push -f…'`.
-const INTERPRETER = /^(?:python[\d.]*|pypy[\d.]*|node|nodejs|deno|bun|perl[\d.]*|ruby[\d.]*|php[\d.]*|lua(?:jit)?[\d.]*|Rscript|pwsh|powershell|osascript|tclsh|expect|[gmn]?awk)$/
-// git globals that take no value. Any other global the shared reader cannot skip with its
-// value, so the word after it is taken for the subcommand (PR #681).
-const GIT_FLAGS = new Set(['-p', '-P', '--paginate', '--no-pager', '--bare', '--no-replace-objects', '--no-lazy-fetch',
-  '--no-optional-locks', '--no-advice', '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs'])
-// GNU and git accept a unique prefix of a long option: `--forc` is --force, `--recurs` is
-// --recursive. A prefix of a dangerous option is read as that option (PR #681).
-const LONGS = ['--force', '--force-with-lease', '--mirror', '--delete', '--prune', '--all', '--branches', '--no-verify', '--recursive']
-// The name is expanded before an attached value: --force-w=x is --force-with-lease=x (round 15).
-const expandName = (n: string): string => (/^--[a-z][a-z-]*$/.test(n) && !LONGS.includes(n) ? (LONGS.find(l => l.startsWith(n)) ?? n) : n)
-const expand = (a: string): string => { const at = a.indexOf('='); return at < 0 ? expandName(a) : `${expandName(a.slice(0, at))}${a.slice(at)}` }
-const OPENERS = new Set(['if', 'then', 'do', 'else', 'elif', 'while', 'until', '{', '}', '!'])
-// --no-v… is any abbreviation of --no-verify (round 10).
-const DANGER = /\bpush\b|\brm\b|\bbranch\b|\bcommit\b|--no-v[a-z]*|\bsend-pack\b|\bhttp-push\b/
-// The cheap pre-check: every rule neverRules finds needs one of these words, so a command
-// without one runs no git (the bypass floor, 0.1.1 §3.1).
-// Bash drops a backslash and joins quoted pieces, so `pu\sh` and `pu""sh` are push (PR #681).
-export const namesDanger = (command: string): boolean => DANGER.test(command.replace(/[\\'"]/g, ''))
-const OPTION_VALUES = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec', '--recurse-submodules'])
-// Commit options whose next word is a message, a path or a name, never a flag.
-const COMMIT_VALUES = new Set(['-m', '--message', '-F', '--file', '-C', '-c', '--reuse-message', '--reedit-message',
-  '--author', '--date', '--fixup', '--squash', '-t', '--template', '--trailer', '--cleanup'])
+// The letters of a short-flag cluster: -uf, -4f, -nF/tmp/m (letters up to the value).
+const letters = (w: string): string => (/^-[A-Za-z0-9]/.test(w) ? /^-([A-Za-z0-9]+)/.exec(w)![1]! : '')
+// git and GNU accept a unique prefix of a long option. min is the shortest prefix read: 3
+// (`--r`, `--de`, `--mi`) reads every prefix the tools accept, and an ambiguous one the
+// tools refuse is only an extra ask; --no-verify keeps 6 (`--no-` would match --no-edit).
+const abbrev = (w: string, long: string, min: number) => { const n = w.split('=')[0]!; return n.length >= min && long.startsWith(n) }
+// A flag word with a glob, a brace or a variable may be any flag (`--forc*`, `-$X`). For push
+// and rm a bare variable may be one too (`git push $OPTS`); for branch and commit it is a
+// Known limit, since a variable beside them is mostly a message or a path.
+const flagLike = (w: string) => w.startsWith('-') && /[$*?[{]/.test(w)
+const anyFlag = (w: string) => w.startsWith('$') || flagLike(w)
+const opaque = (w: string) => /[$*?[{]/.test(w)
 
-// -uf is -u -f: a cluster of short flags is read flag by flag.
-// -nF/tmp/m is -n -F /tmp/m: a cluster is split up to the first option that takes a value,
-// and the rest is that value (PR #681 round 4).
-const SHORT_VALUES = new Set(['m', 'F', 'C', 'c', 't', 'o', 'S'])
-function cluster(a: string): string[] {
-  if (!/^-[A-Za-z0-9]./.test(a)) return [expand(a)]
-  const out: string[] = []
-  for (let i = 1; i < a.length; i++) {
-    const c = a[i]!
-    // -4f is -4 -f: git's -4/-6 cluster like letters (round 12).
-    if (!/[A-Za-z0-9]/.test(c)) { out.push(a.slice(i)); break }
-    out.push(`-${c}`)
-    if (SHORT_VALUES.has(c)) { if (i + 1 < a.length) out.push(a.slice(i + 1)); break }
+// cd, pushd, popd and git -C move to another directory unless the target is the session's
+// own directory or the repo root. --git-dir, --work-tree and their variables always move.
+function moves(words: readonly string[], where: Where): boolean {
+  const same = (t: string | undefined) => {
+    if (t === undefined) return false
+    const p = t.replace(/(.)\/+$/, '$1')
+    return p === '.' || p === where.cwd.replace(/(.)\/+$/, '$1') || p === where.root.replace(/(.)\/+$/, '$1')
   }
-  return out
-}
-const flags = (args: readonly string[]) => args.flatMap(cluster)
-
-// A lone & ends a command as ; does, spaced or not (`sleep 1&git push`); the shared reader
-// splits only on &&. The & of a redirect (2>&1, &>log) is not one.
-const AMP = /(?<![<>&])&(?![>&])/
-
-// A redirect and its target are not arguments: `git push >/dev/null` names no remote,
-// and `-f>/dev/null` is -f.
-const REDIRECT = /^(?:\d+|&)?(?:>>|>&|>\||<<<|<&|<>|>|<)/
-function unredirect(tokens: readonly string[]): string[] {
-  const out: string[] = []
-  for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i]!
-    const op = REDIRECT.exec(t)
-    if (op !== null) { if (t.length === op[0].length) i += 1; continue }
-    const at = t.search(/[<>]/)
-    if (at < 0) { out.push(t); continue }
-    out.push(t.slice(0, at))
-    const rest = REDIRECT.exec(t.slice(at))
-    if (rest !== null && t.length - at === rest[0].length) i += 1
-  }
-  return out
+  return words.some((w, i) => ((w === 'cd' || w === 'pushd' || w === '-C') && !same(words[i + 1])) || w === 'popd' ||
+    /^--(?:git-dir|work-tree)/.test(w) || /^GIT_(?:DIR|WORK_TREE)=/.test(w))
 }
 
-function pieces(tokens: readonly string[]): string[][] {
-  const out: string[][] = [[]]
-  for (const t of tokens) {
-    t.split(AMP).forEach((part, k) => {
-      if (k > 0) out.push([])
-      if (part !== '') out[out.length - 1]!.push(part)
-    })
-  }
-  return out.map(unredirect)
-    .map(p => { let i = 0; while (p[i] !== undefined && OPENERS.has(p[i]!)) i += 1; return p.slice(i) }).filter(p => p.length > 0)
-}
-
-// Quoted text (a \u0000 marker) or a variable: a word autonomic cannot read.
-const opaque = (t: string) => /[\u0000$\\{]/.test(t)
-
-const recursive = (args: readonly string[]) =>
-  args.some(a => expand(a) === '--recursive' || /^-[A-Za-z]*[rR][A-Za-z]*$/.test(a))
-
-// True when every git global before the subcommand is one the reader can skip: -C or -c with
-// its value (an inline alias is not readable), --name=value, or a global that takes no value.
-function readableGlobals(tokens: readonly string[]): boolean {
-  const g = commandOf(tokens)?.args ?? []
-  for (let i = 0; g[i]?.startsWith('-'); i += 1) {
-    const a = g[i]!
-    if (a === '-C') { i += 1; continue }
-    // A quoted -c value may be an alias too (round 14).
-    if (a === '-c') { const v = g[i + 1] ?? ''; if (opaque(v) || v.toLowerCase().startsWith('alias.')) return false; i += 1; continue }
-    if (a.startsWith('--config-env')) return false
-    if (/^--[a-z-]+=/.test(a) || GIT_FLAGS.has(a)) continue
-    return false
-  }
-  return true
-}
-
-function positionalOf(args: readonly string[]): string[] {
-  const positional: string[] = []
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i]!
-    // A unique prefix of a value-taking long option takes its value too (round 14).
-    if (OPTION_VALUES.has(a) || (/^--[a-z-]{3,}$/.test(a) && [...OPTION_VALUES].some(o => o.startsWith('--') && o.startsWith(a)))) { i += 1; continue }
-    if (!a.startsWith('-')) positional.push(a)
-  }
-  return positional
-}
-
-function pushesDefault(args: readonly string[], refspecsAfter: readonly string[], where: Where): boolean {
-  const defaults = where.defaultBranch !== undefined ? [where.defaultBranch] : ['main', 'master']
-  if (args.includes('--all') || args.includes('--branches') || args.includes('--mirror')) return true
-  const positional = positionalOf(args)
-  // The first positional is the remote. With --repo it may be a refspec instead (a positional
-  // remote wins over --repo), so both readings are checked (PR #681 rounds 2, 16).
-  const repo = args.some(a => a === '--repo' || a.startsWith('--repo='))
-  const current = (ref: string) => (ref === 'HEAD' || ref === '@' ? where.branch : ref)
-  const reading = (refspecs: readonly string[]): boolean => {
-    if (refspecs.length === 0) return where.branch === undefined || defaults.includes(where.branch)
-    return refspecs.some(isDefault)
-  }
-  const isDefault = (spec: string): boolean => {
-    const raw = spec.replace(/^\+/, '')
-    const dst = raw.includes(':') ? raw.slice(raw.indexOf(':') + 1) : current(raw)
-    // A wildcard destination may match the default branch (PR #681 round 3).
-    // ':' alone is the matching refspec: every matching branch, the default included (round 6).
-    if (dst === undefined || dst === '' || dst.includes('*')) return true
-    // heads/main is refs/heads/main (round 17).
-    return defaults.includes(dst.replace(/^(?:refs\/)?heads\//, ''))
-  }
-  return reading([...positional.slice(1), ...refspecsAfter]) || (repo && reading([...positional, ...refspecsAfter]))
-}
-
-// The directory a git call runs in: -C moves it; --git-dir and --work-tree make it unknown.
-function gitDirOf(tokens: readonly string[], dir: string | undefined, home: string): string | undefined {
-  const g = commandOf(tokens)?.args ?? []
-  // GIT_DIR or GIT_WORK_TREE before git selects another repository, as --git-dir does (round 17).
-  if (tokens.some(t => /^GIT_(?:DIR|WORK_TREE)=/.test(t))) return undefined
-  let at = dir
-  for (let i = 0; g[i]?.startsWith('-'); i += g[i] === '-C' || g[i] === '-c' ? 2 : 1) {
-    const v = g[i + 1]
-    if (g[i] === '-C') at = v === undefined || (at === undefined && !v.startsWith('/')) ? undefined : resolve(v, at ?? '/', home)
-    else if (/^--(git-dir|work-tree)\b/.test(g[i]!)) at = undefined
-  }
-  return at
-}
-
-// The bodies of $(…) and `…` inside double quotes: Bash runs them, though the shared reader
-// blanks the quoted text around them. Each body is read as a command of its own.
-function quotedSubstitutions(command: string): string[] {
-  const out: string[] = []
-  let inDouble = false
-  for (let i = 0; i < command.length; ) {
-    const c = command[i]
-    if (c === '\\') { i += 2; continue }
-    if (!inDouble && c === "'") { const j = command.indexOf("'", i + 1); i = j < 0 ? command.length : j + 1; continue }
-    if (c === '"') { inDouble = !inDouble; i += 1; continue }
-    if (inDouble && c === '$' && command[i + 1] === '(') {
-      let depth = 1
-      let j = i + 2
-      for (; j < command.length && depth > 0; j++) {
-        if (command[j] === '\\') j += 1
-        else if (command[j] === '(') depth += 1
-        else if (command[j] === ')') depth -= 1
-      }
-      out.push(command.slice(i + 2, depth === 0 ? j - 1 : j))
-      i = j
-      continue
-    }
-    if (inDouble && c === '`') {
-      const j = command.indexOf('`', i + 1)
-      out.push(command.slice(i + 1, j < 0 ? command.length : j))
-      i = j < 0 ? command.length : j + 1
-      continue
-    }
-    i += 1
-  }
-  return out
-}
+// The cheap pre-check: every rule needs one of these words, so a command without one runs no git.
+export const namesDanger = (command: string): boolean =>
+  wordsOf(command).some(w => isPush(w) || isVerb(w, 'branch') || isVerb(w, 'commit') || isVerb(w, 'rm') || abbrev(w, '--no-verify', 6))
 
 export function neverRules(command: string, where: Where): NeverRule[] {
+  const words = wordsOf(command)
   const found = new Set<NeverRule>()
-  // An unquoted heredoc runs its $( ) and backticks; the shared reader blanks the body (round 6).
-  if (/<<-?[ \t]*(?!['"])[^\s;&|<>()]/.test(command) && /\$\(|`/.test(command) && namesDanger(command)) found.add('unreadable')
-  for (const body of quotedSubstitutions(command)) for (const r of neverRules(body, where)) found.add(r)
-  let cwd: string | undefined = where.cwd
-  let dir: string | undefined = where.cwd   // followed through cd, for the repo check only
-  for (const tokens of segments(command).flatMap(pieces)) {
-    const head = commandOf(tokens)
-    if (head === undefined) continue
-    // Any wrapper, listed or not: git or rm as a later bare word runs under a head the reader
-    // does not follow (round 14).
-    const wrapped = head.name !== 'git' && head.name !== 'rm' && (head.args.some(a => /^(?:.*\/)?(?:git|rm)$/.test(a)) ||
-      // …or a quoted word followed by a danger word or a recursive flag: `prlimit "git" push` (round 15).
-      head.args.some((a, k) => opaque(a) && head.args.slice(k + 1).some(b => DANGER.test(b) || /^-[A-Za-z]*[rR]/.test(b))))
-    if (wrapped || head.name.startsWith('-') || opaque(head.name) || RUNNERS.has(head.name) || INTERPRETER.test(head.name) || tokens.some(t => t.includes('`') || t.includes('$('))) {
-      if (namesDanger(command)) found.add('unreadable')
-    }
-    if (head?.name === 'cd' || head?.name === 'pushd' || head?.name === 'popd') {
-      const t = head.name === 'popd' ? undefined : (head.args.find(a => !a.startsWith('-')) ?? (head.name === 'cd' ? '~' : undefined))
-      dir = t === undefined || t === '-' || (dir === undefined && !t.startsWith('/') && !t.startsWith('~')) ? undefined : resolve(t, dir ?? '/', where.home)
-      cwd = undefined
-      continue
-    }
-    // A variable or quoted word may be -r: an rm that does not read as recursive is unreadable.
-    if (head?.name === 'rm' && !recursive(head.args) && head.args.some(opaque)) found.add('unreadable')
-    if (head?.name === 'rm' && recursive(head.args)) {
-      // After `--` every operand is a path, even one that starts with - (round 6).
-      const dd = head.args.indexOf('--')
-      const targets = [...(dd < 0 ? head.args : head.args.slice(0, dd)).filter(a => !a.startsWith('-')), ...(dd < 0 ? [] : head.args.slice(dd + 1))]
-      if (targets.some(t => { const p = cwd === undefined ? undefined : resolve(t, cwd, where.home); return p === undefined || !below(p, where.root) }))
-        found.add('rm-outside')
-    }
-    const git = gitOf(tokens)
-    if (git === undefined) continue
-    const { sub } = git
-    // An option word with a quote or a variable in it (--no-""verify) may be any option (round 18).
-    if ((opaque(sub) || !readableGlobals(tokens) || sub === 'send-pack' || sub === 'http-push' || git.args.some(a => (a.startsWith('--') && opaque(a)) || /^-[\u0000$\\]/.test(a))) && namesDanger(command)) found.add('unreadable')
-    const args = flags(git.args)
-    // The shared reader drops what follows `--`; for push those words are refspecs.
-    const dashes = tokens.indexOf('--')
-    const after = sub === 'push' && dashes >= 0 ? tokens.slice(dashes + 1) : []
-    if (args.includes('--no-verify') || (sub === 'commit' && args.includes('-n'))) found.add('no-verify')
-    // A quoted or variable word may be -n, -D or -f, except as the value of a commit option.
-    if (sub === 'branch' && args.some(opaque)) found.add('unreadable')
-    if (sub === 'commit')
-      for (let i = 0; i < args.length; i++) { if (COMMIT_VALUES.has(args[i]!)) i += 1; else if (opaque(args[i]!)) found.add('unreadable') }
-    if (sub === 'branch' && (args.includes('-D') ||
-      ((args.includes('--delete') || args.includes('-d')) && (args.includes('--force') || args.includes('-f')))))
-      found.add('branch-delete')
-    if (sub === 'push') {
-      // Refspecs after `--` carry + and : too (PR #681 round 3).
-      if (args.includes('-f') || args.some(a => a === '--force' || a === '--mirror' || a.startsWith('--force-with-lease') || a.startsWith('+')) || after.some(a => a.startsWith('+')))
-        found.add('force-push')
-      // --mirror deletes remote refs absent locally (round 11).
-      if (args.includes('--delete') || args.includes('--prune') || args.includes('--mirror') || args.includes('-d') || [...args, ...after].some(a => a.startsWith(':')))
-        found.add('branch-delete')
-      // A quoted or variable remote, refspec or flag may name the default branch or --force.
-      // An opaque word adds unreadable; it never hides a destination the text shows (round 10).
-      if ([...args, ...after].some(opaque)) found.add('unreadable')
-      {
-        // -C into a directory other than the repo root may enter a nested repo or submodule,
-        // whose branch is not the session's: unknown (PR #681 round 3).
-        const at = gitDirOf(tokens, dir, where.home)
-        // So may a cd below the root: only the session's own directory and the root are known (round 4).
-        const same = at !== undefined && (at === where.cwd || at === where.root.replace(/\/+$/, ''))
-        if (pushesDefault(args, after, same ? where : { ...where, branch: undefined, defaultBranch: undefined })) found.add('default-branch-push')
-      }
-    }
+  const any = (f: (w: string) => boolean) => words.some(w => f(w) || anyFlag(w))
+  const anyNamed = (f: (w: string) => boolean) => words.some(w => f(w) || flagLike(w))
+  const short = (c: string) => (w: string) => letters(w).includes(c)
+
+  if (words.some(isPush)) {
+    if (any(w => short('f')(w) || abbrev(w, '--force-with-lease', 3) || abbrev(w, '--force-if-includes', 3) ||
+      abbrev(w, '--mirror', 3) || w.startsWith('+'))) found.add('force-push')
+    if (any(w => short('d')(w) || abbrev(w, '--delete', 3) || abbrev(w, '--prune', 3) || abbrev(w, '--mirror', 3) ||
+      w.startsWith(':') || w.startsWith('+:'))) found.add('branch-delete')
+    const names = where.defaultBranch !== undefined ? [where.defaultBranch] : ['main', 'master']
+    // A leading + forces the update; the ref after it is still the destination (+main).
+    const isDefault = (r: string) => { const w = r.replace(/^\+/, ''); return names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))) }
+    // send-pack and http-push with no refspec update the matching refs, the default one included.
+    const plumbing = words.some(w => isVerb(w, 'send-pack') || isVerb(w, 'http-push'))
+    if (plumbing || where.branch === undefined || names.includes(where.branch) || moves(words, where) ||
+      any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))
+      found.add('default-branch-push')
+  }
+  // -D, or -d with a force flag; a plain -d refuses an unmerged branch (as seat-mods reads it).
+  if (words.some(w => isVerb(w, 'branch'))) {
+    const del = anyNamed(w => short('d')(w) || abbrev(w, '--delete', 3))
+    if (anyNamed(short('D')) || (del && anyNamed(w => short('f')(w) || abbrev(w, '--force', 3)))) found.add('branch-delete')
+  }
+  if (words.some(w => abbrev(w, '--no-verify', 6)) || (words.some(w => isVerb(w, 'commit')) && anyNamed(short('n')))) found.add('no-verify')
+
+  const rm = words.findIndex(w => isVerb(w, 'rm'))
+  if (rm >= 0) {
+    const after = words.slice(rm + 1)
+    const recursive = after.some(w => /[rR]/.test(letters(w)) || abbrev(w, '--recursive', 3) || anyFlag(w))
+    // Strictly below the root: nothing is below a worktree at /.
+    const root = where.root.replace(/\/+$/, '')
+    const below = (w: string) => root !== '' && w.startsWith(`${root}/`)
+    // A variable, a brace or a glob on a dot name may reach `..`; a plain glob stays where it is.
+    const unknown = (w: string) => /[${]/.test(w) || /(?:^|\/)\.[^/]*[*?[]/.test(w)
+    const outside = (w: string) => (!w.startsWith('-') || w.includes('/')) &&
+      (w.startsWith('~') || w.split('/').includes('..') || unknown(w) || (w.startsWith('/') && !below(w)))
+    if (recursive && (moves(words, where) || words.includes('xargs') || after.some(outside))) found.add('rm-outside')
   }
   return [...found]
 }

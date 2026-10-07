@@ -94,31 +94,53 @@ deny"; a deny from a plugin beneath autonomic's `tool.call` hook, such as a seat
 same way). On an `ask` verdict, first, in code, the **never-approve list** keeps the ask with you
 and rings. On an `allow` verdict — bypass permissions, or a settings allow rule — a command that
 matches the list becomes an `ask`, so you get the normal permission dialog, and it rings (the
-**bypass floor**; see "Permission modes"). The list:
+**bypass floor**; see "Permission modes").
 
-- a force push (`-f`, `--force`, `--force-with-lease`, `--mirror`, a `+` refspec);
-- a push to the default branch (`origin/HEAD`, or `main`/`master` when unknown) — an explicit
-  refspec, `HEAD`, `--all`, or a bare `git push` from the default branch or an unknown branch;
-- branch deletion as seat-mods reads it (`branch -D`, `-d` with force, `push --delete`, `:ref`) —
-  a plain `git branch -d` is not on the list;
-- `rm -r` of a path outside the worktree, or of a path autonomic cannot read (a variable, a
-  quoted path, anything after a `cd`);
-- `--no-verify`, or `git commit -n` (a cluster such as `-nm` or `-uf` is read flag by flag);
-- a push whose remote, refspec or flag is quoted or a variable — `git push origin "$BRANCH"` and
-  `git push -u origin "$(git branch --show-current)"` included, even to a feature branch: autonomic
-  cannot see what the shell will expand, so it does not guess;
-- a command the reader cannot follow — led by `bash`/`sh -c`, `eval`, `xargs`, `timeout`, `nice`, `find`, `ssh` and the like, an interpreter (`python3`, `node`, `perl`, `ruby`, `php`, `awk` …), a git global it cannot skip (`--git-dir .git` spelled without `=`, `-c alias.…`), a wrapper with options (`sudo -u`, `env -i`), or a backtick or `$(` outside quotes — when it names `push`, `rm`, `branch`, `commit` or `--no-verify` at all. A `$(…)` or backtick inside double quotes is read as a command of its own.
+The list reads the whole command text as **one bag of words**. First it joins a backslash-newline
+and drops every `\`, `'` and `"`. Then it splits the text at spaces, `; & | ( ) < >`, backticks and `$(`
+(`${OPTS}` stays one word that starts with `$`). A `NAME=VALUE` word also shows its value. The list never decides which command a word
+belongs to, so a quote, a wrapper, an interpreter or a substitution cannot hide a word:
+`python3 -c 'git push -f'`, `bash -c "…"` and `$(git push -f)` all show `push` and `-f`. A danger
+word beside a harmless command is an extra ask; that is the cost of this reading. The rules:
 
-Each item on the list is a rule you can turn off: `neverApprove` (below) names the enforced
-rules — `force-push`, `default-branch-push`, `branch-delete`, `rm-outside`, `no-verify`,
-`unreadable` (the last three items above). A rule you remove is the fork's to judge on an ask, and
-is left alone on an allow. A repo whose default branch takes direct pushes by design removes
-`default-branch-push`.
+- `force-push` — a push verb (`push`, `send-pack`, `http-push`, `git-push`, a word holding
+  `.push=`) and anywhere in the text a short-flag cluster with `f` (`-f`, `-uf`), an abbreviation
+  of `--force`, `--force-with-lease`, `--force-if-includes` or `--mirror`, or a word starting `+`;
+- `branch-delete` — a push verb and a cluster with `d`, `--delete`, `--prune`, `--mirror`, or a
+  word starting `:`; or `branch` and a cluster with `D`, or `-d`/`--delete` with a force flag (a
+  plain `git branch -d` is not on the list);
+- `default-branch-push` — a push verb and the default branch's name (`origin/HEAD`, or
+  `main`/`master` when unknown) as a word or after `:`, `/` or `=`, `--all`, `--branches`,
+  `--mirror`, the matching refspec `:`, or a word holding `$`, `*`, `?`, `[` or `{`; or any push
+  while the session's branch is the default branch or unknown; or any push after a move (`cd`,
+  `pushd`, `git -C` to a directory other than the session's own or the repo root, `popd`,
+  `--git-dir`, `--work-tree`, `GIT_DIR=`, `GIT_WORK_TREE=`); or any `send-pack` or `http-push`;
+- `rm-outside` — `rm` with a recursive flag, and a move, `xargs`, or a later word that starts
+  with `/` outside the worktree or with `~`, holds a `..` segment, a `$` or a `{`, or a glob on a
+  dot name (`.?`); a plain glob (`build/*`) stays where it is;
+- `no-verify` — an abbreviation of `--no-verify`, or `commit` and a cluster with `n`.
 
-A unique prefix of a long option is read as that option (`--forc` is `--force`, `rm --recurs` is `--recursive`), as git and GNU tools accept it. A word with a backslash, a quote inside it or a brace (`pu\sh`, `pu""sh`, `{main,x}`) is unreadable when the command may name a danger, and an `rm -r` path with a brace or a glob on a dot name (`.?`, `.*`) counts as outside the worktree. `--repo` names the remote, and `@` is `HEAD`. A wildcard destination (`refs/heads/*`) may be the default branch, refspecs after `--` are checked for `+` and `:`, and a bare push through `git -C` or `cd` into a directory other than the session's own or the repo root reads the branch as unknown (a nested repo or submodule). A wrapper that runs a program (`setsid`, `stdbuf`, `flock`, `taskset`, `chroot` …) is a runner, a short-flag cluster is split up to the option that takes a value (`-nF/tmp/m` is `-n -F`), and `git send-pack` and `git http-push` are unreadable pushes. A path-qualified wrapper (`/usr/bin/env`), the builtins `coproc`, `builtin` and `trap`, and any command that has `git` or `rm` as a later word (an unlisted wrapper such as `prlimit git push`) are runners, a quoted `-c` value may be an alias, an unquoted heredoc holding `$(` or a backtick is unreadable, `rm` operands after `--` are paths whatever they start with, and the matching refspec `:` may update the default branch. A danger the command text does not show — a git alias defined in config, a script file — is not seen.
+A flag word that holds `$`, `*`, `?`, `[` or `{` (`--forc*`, `-$X`) counts as every flag. Beside a
+push or an `rm`, so does a bare variable (`git push $OPTS`). Beside `branch` or `commit`, a bare
+variable is not read as a flag: it is mostly a message or a path.
 
-The list reads each command segment with seat-mods' shell reader (copied, and held identical by
-`tests/test-mod-shell-parity.sh`). Otherwise the fork judges the call against the policy's
+Two heredoc shapes with a quoted delimiter are literal text, and their bodies are skipped: a
+commit message, `-m "$(cat <<'EOF'` … `EOF` `)"`, and `cat > file <<'EOF'` at a command's start
+when the file is not named again later in the text. Every other heredoc keeps its words, and so
+do these two when the rest of the text names a program that may run text: a shell, `eval`,
+`source`, `.` at a command's start, `xargs`, `ssh`, `su`, `watch`, `parallel`, `sed`, `awk` or an
+interpreter (`python3`, `node`, `perl`, `ruby` …). A unique prefix of a long option is read as
+that option (`--r` is `--recursive`, `git push --de` is `--delete`), as git and GNU tools accept
+it; an ambiguous prefix the tools refuse is only an extra ask.
+
+`unreadable` matches nothing since 0.2.0: no rule depends on following a command's shape. The
+name stays valid, so an existing `neverApprove` value still parses.
+
+Each rule can be turned off: `neverApprove` (below) names the enforced rules. A rule you remove
+is the fork's to judge on an ask, and is left alone on an allow. A repo whose default branch takes
+direct pushes by design removes `default-branch-push`.
+
+When no rule matches, the fork judges the call against the policy's
 permission scope: `allow` is recorded and the tool runs; anything else leaves the ask and rings. The list applies to any tool whose input has a `command` (Bash, Monitor). A call whose input is longer than the fork is shown (4000 characters) stays an ask and rings. `AskUserQuestion` and `ExitPlanMode` are never approved here: their permission prompt is your own dialog.
 
 ## Permission modes
@@ -135,10 +157,12 @@ permission scope: `allow` is recorded and the tool runs; anything else leaves th
   session that left autopilot through a failure (an unwritable ledger or record, a removed
   policy). That session keeps the floor, because under bypass, manual means no asks at all.
   `/autopilot off` turns it off.
-- **What the floor guards against:** a cooperative model writing a dangerous command in a plain
-  form, judged from the command text alone. A deliberately disguised spelling (`git pu{s..s}h`, a
-  `-c remote.<name>.push=` setting, a git alias in config) can pass it, and so can a danger only
-  the filesystem shows (`rm -rf /repo/link/x` where `link` points outside the worktree).
+- **What the floor guards against:** a cooperative model writing a dangerous command, judged
+  from the command text alone. These pass it: a script or program that runs git itself
+  (`./deploy.sh`, `make release`); a git alias defined in config or an earlier command; `sed`'s
+  `e` command or any program that builds the command at run time; a brace or glob that builds
+  the verb (`git pu{s..s}h`); a bare variable beside `branch` or `commit`; and a danger only the
+  filesystem shows (`rm -rf /repo/link/x` where `link` points outside the worktree).
 - **What a never-approve match records.** The ledger line and every pain signal carry the
   command's *shape* — verbs, a git subcommand and flag names, with every value only counted
   (`git push -f https://u:TOKEN@… feat/x` is `git push -f (+2 args)`, an assignment is `NAME=`) — so no credential is
@@ -220,7 +244,7 @@ A pain signal never resumes the run by itself. Your next prompt does.
 | `loopMax` | 3 | blocks in a row with no change before the loop guard |
 | `tailChars` | 4000 | how much of the last reply the turn-end fork quotes |
 | `yieldAtPercent` | 65 | used only without a molt stage file: context fill at or above which every turn end is molt's |
-| `neverApprove` | all six rules | the never-approve rules enforced, separated by spaces or commas: `force-push default-branch-push branch-delete rm-outside no-verify unreadable`. Empty means none (`/autopilot status` says so). Only these names exist. |
+| `neverApprove` | all six rules | the never-approve rules enforced, separated by spaces or commas: `force-push default-branch-push branch-delete rm-outside no-verify unreadable` (`unreadable` matches nothing since 0.2.0). Empty means none (`/autopilot status` says so). Only these names exist. |
 
 No `/plugin configure` step is needed: every setting has a default except the optional `bell`.
 A bad number falls back to its default, and an unknown `neverApprove` name is ignored;
