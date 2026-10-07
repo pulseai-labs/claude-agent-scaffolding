@@ -2,6 +2,49 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.3.1
+
+**The pain band reads in one pass** (live check of 0.3.0, finding F1).
+
+- **Column layout** (`register.tsx`): the question on its own line, in bold; then one row per
+  option. The buttons share one column, as wide as the longest label with its chrome and at most
+  40% of the band's width, and each option's whole text wraps in the space to its right. Dismiss
+  is on the last row, with "or type your own reply". In 0.3.0 the question, the buttons and the
+  texts shared one row, so every text wrapped into a narrow column.
+- **The recommended option is the primary button** (accent style). No option has a hotkey: a bare
+  digit in an empty prompt presses a band button, and a reply you type may start with one.
+- A pain with no options keeps its one line: the question and Dismiss.
+- **Known limit:** the button column is capped at 40% of the band, so a long label wraps inside
+  its button: a 40-character recommended label (54 with its suffix) wraps in a band under about
+  155 columns. Its text still wraps beside it, whole. Width counts characters, not terminal
+  cells, so a label in wide characters (CJK) can wrap in its button sooner.
+
+## 0.3.0
+
+**Pain options: one press resumes autopilot.**
+
+- **The turn-end fork offers options** (`prompts.ts`, `verdict.ts`): a `pain` verdict may carry
+  `options`, up to three `{ label, text, recommended }`, with three rules in the fork prompt (at
+  most one recommended; never the irreversible side of a one-way door; none for credentials).
+  `parseTurn` drops every option on any invalid shape — not a list, more than three, an empty
+  label or text, a text over 300 characters, a non-boolean `recommended`, two recommended — and the
+  pain stands without them.
+- **The band shows them** (`register.tsx`): one button per option, the recommended one first as
+  `<label> (Recommended)`, each beside the whole text it submits, then Dismiss. A press clears the
+  band, appends an `operator` ledger line (`why: chosen on the pain band`), and only then submits
+  the option's text, never cut, with `$.prompt.submit({ asUser: true })`. A ledger that cannot be
+  written submits nothing; a prompt that does not enter is an `option not sent` pain signal; one
+  band takes one press. Labels and texts pass through the redactor first.
+- **The bell and the pain file list the options** as `· options: 1) <label> (Recommended) 2) …`
+  on the pain line. They stay text there.
+- **The default policy gains a standing order**: stop for a pain item with `AskUserQuestion` and
+  two or three options. An existing policy file is never rewritten: paste the line in (README,
+  "The policy").
+- **Known limit:** a policy file left at the 0.2.x default now reads `edited` in
+  `/autopilot status`, and lacks the new order until the operator adds it.
+- **Known limit:** the options are the fork's prose. A wrong or weak option is a wording issue the
+  operator sees before pressing; nothing runs without the press.
+
 ## 0.2.1
 
 **An allowed ask records no input value** (#683).

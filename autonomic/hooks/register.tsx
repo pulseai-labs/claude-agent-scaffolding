@@ -1,6 +1,6 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
-import type { Pain } from '../types'
+import type { Pain, PainOption } from '../types'
 import { DEFAULTS, parseConfig } from './config'
 import type { AutonomicConfig } from './config'
 import { APPEND, TOUCH } from './io'
@@ -177,17 +177,49 @@ async function ring($: Engine, bell: string, message: string): Promise<void> {
   }
 }
 
+let painSeq = 0   // each notice's seq: rises across a reload too, as it starts from the clock
+
 // A pain signal (spec §3.4): band, toast, bell, and the pain file a launcher may name.
-// It never resumes the run by itself.
-async function pain($: Engine, id: string, reason: string, detail: string): Promise<void> {
+// It never resumes the run by itself. Options (0.3.0) come only from a turn-end pain: the
+// band shows them as buttons, the bell and the pain file as a numbered list.
+async function pain($: Engine, id: string, reason: string, detail: string, options?: readonly PainOption[]): Promise<void> {
   const text = `autopilot: ${reason} — ${oneLine(detail, 200)}`
-  try { await update($, notice, () => ({ text })) } catch {}
+  const shown = (options ?? []).map(o => ({ label: oneLine(o.label, 40), text: oneLine(o.text, Number.MAX_SAFE_INTEGER), recommended: o.recommended }))
+  shown.sort((a, b) => Number(b.recommended) - Number(a.recommended))
+  const listed = shown.length === 0 ? text
+    : `${text} · options: ${shown.map((o, i) => `${i + 1}) ${o.label}${o.recommended ? ' (Recommended)' : ''}`).join(' ')}`
+  painSeq = Math.max(painSeq + 1, Date.now())
+  const value: Pain = shown.length === 0 ? { text, seq: painSeq } : { text, question: oneLine(detail), options: shown, seq: painSeq }
+  try { await update($, notice, () => value) } catch {}
   $.ui.toast(text)
   const bell = live.get(id)?.bell
-  if (bell !== undefined) await ring($, bell, text)
+  if (bell !== undefined) await ring($, bell, listed)
   const path = ((await $.env.get('AUTONOMIC_PAIN_PATH')) ?? '').trim()
-  if (path !== '' && !(await appendLine($, path, `${new Date().toISOString()} pain ${text}`))) await log($, `pain file append failed ${path}`)
-  await log($, `pain session=${id} ${text}`)
+  if (path !== '' && !(await appendLine($, path, `${new Date().toISOString()} pain ${listed}`))) await log($, `pain file append failed ${path}`)
+  await log($, `pain session=${id} ${listed}`)
+}
+
+const claimed = new Set<number>()   // notices whose band took a press
+
+// A press on a pain band's option (0.3.0 spec §3.2.3): the operator's decision. The band
+// clears, the ledger records it, and only then does the option's text enter as the
+// operator's prompt. No ledger line, no prompt. One band takes one press. A prompt that does
+// not enter is a pain signal, so the choice is never lost unseen.
+async function choose($: Engine, value: NonNullable<Pain>, o: PainOption): Promise<void> {
+  const seq = value.seq ?? 0
+  if (claimed.has(seq)) return
+  claimed.add(seq)
+  let id = ''
+  try {
+    id = await $.session.id()
+    try { await update($, notice, cur => (cur?.seq === seq ? null : cur)) } catch {}
+    if (!(await record($, id, 'operator', value.question ?? value.text, o.label, 'chosen on the pain band'))) return
+    const r = await $.prompt.submit({ text: o.text, asUser: true })
+    if (r.drop !== undefined) await pain($, id, 'option not sent', `${o.label} (${String(r.drop)}): type the reply instead`)
+  } catch (err) {
+    await log($, `band press error ${String(err)}`)
+    await pain($, id, 'option not sent', `${o.label} (${String(err)}): type the reply instead`)
+  }
 }
 
 type Judged<T> = { v: T; usage?: Usage } | { skip: true } | { fail: string }
@@ -479,7 +511,7 @@ export const register: Register = (on, options) => {
         return r
       }
       await record($, id, 'pain', v.question ?? 'turn end', 'ask the operator', v.reason, j.usage)
-      await pain($, id, 'pain', v.question ?? v.reason)
+      await pain($, id, 'pain', v.question ?? v.reason, v.options)
       return r
     } catch (err) {
       await log($, `Stop error ${String(err)}`)
@@ -564,10 +596,38 @@ export const register: Register = (on, options) => {
     const value = await read($, notice)
     if (value === null || e.props.hasSurvey) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
+    const options = value.options ?? []
+    if (options.length === 0) {
+      return (
+        <Box>
+          <Text>{value.text} </Text>
+          <Button key="dismiss" label="Dismiss" onPress={() => update($, notice, () => null)} />
+        </Box>
+      )
+    }
+    // 0.3.1: the question on its own line, then one row per option. The buttons share one
+    // column, as wide as the longest (its chrome and a gap included) and at most 40% of the
+    // band, so every text wraps in the space to its right. No hotkeys: a bare digit in an empty
+    // prompt presses a band Button, and a typed reply may start with one (PR #689).
+    const labels = options.map(o => (o.recommended ? `${o.label} (Recommended)` : o.label))
+    const width = Math.min(Math.max(...labels.map(l => l.length)) + 8, Math.floor(e.props.bodyColumns * 0.4))
     return (
-      <Box>
-        <Text>{value.text} </Text>
-        <Button key="dismiss" label="Dismiss" onPress={() => update($, notice, () => null)} />
+      <Box flexDirection="column">
+        <Text bold>{value.text}</Text>
+        {options.map((o, i) => (
+          <Box key={`option-row-${i}`} flexDirection="row">
+            <Box width={width} flexShrink={0}>
+              <Button key={`option-${i}`} label={labels[i]} {...(o.recommended ? { variant: 'primary' as const } : {})} onPress={() => choose($, value, o)} />
+            </Box>
+            <Box flexGrow={1}>
+              <Text wrap="wrap">{o.text}</Text>
+            </Box>
+          </Box>
+        ))}
+        <Box flexDirection="row">
+          <Button key="dismiss" label="Dismiss" role="dismiss" onPress={() => update($, notice, () => null)} />
+          <Text dimColor> or type your own reply</Text>
+        </Box>
       </Box>
     )
   })

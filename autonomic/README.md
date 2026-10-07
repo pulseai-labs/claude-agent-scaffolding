@@ -34,6 +34,13 @@ mode: `autopilot`, `manual`, `manual (AUTONOMIC_MODE="x" is not a mode)`, or
 never overwrites the file. In autopilot it joins the system prompt as a `session` section, and
 every fork prompt quotes it too.
 
+Because autonomic never rewrites the file, a new standing order in a release reaches only a fresh
+default. To take one into an existing file — edited or not — paste its line under **Standing
+orders**; or, if you never edited the file, delete it and the next session start writes the new
+default. Since 0.3.0 that line is the pain-options order (*When you stop for a pain item, ask with
+`AskUserQuestion`: …*, in the block below). `/autopilot status` reads `edited` for any file that
+differs from this release's default, an unchanged older default included.
+
 ```markdown
 # Autopilot policy (autonomic)
 
@@ -44,6 +51,7 @@ You are in autopilot. The operator planned this work and is not watching. Keep t
 - When the spec, the plan, the grill record or your brief already decides a choice, take that option and state it in one line. Do not end a turn on "Shall I proceed?" or "Which first?" in that case.
 - Merge authority: once a pull request has passed its work-pr or merge-bar loop, the orchestrator merges it without asking.
 - When a step is done, start the next step of the plan.
+- When you stop for a pain item, ask with `AskUserQuestion`: two or three options, the recommended one first and marked "(Recommended)", each worded as the instruction you will follow. For a one-way door, offer doing it and not doing it as separate options, and never mark the irreversible one recommended. For credentials, ask in plain text with no options.
 
 ## Permission scope
 
@@ -77,7 +85,7 @@ Leave everything else to the operator.
 | `stalled` | It stopped short with no ask and no reason | blocks with `Autopilot: continue — <next step>.`; ledger line |
 | `waiting` | It waits on a background task, agent, monitor or report | lets it stop |
 | `done` | The scope's objective is met | lets it stop; ledger line, toast |
-| `pain` | A reason on the pain list | lets it stop; pain signal, ledger line |
+| `pain` | A reason on the pain list | lets it stop; pain signal with up to three options, ledger line |
 
 The host shows a block as `Stop hook error: <reason>`; the model reads it as an instruction.
 After `loopMax` (3) blocks in a row with no change made — no tool call other than a read that
@@ -190,7 +198,8 @@ Path: `AUTONOMIC_LEDGER` when set (relative to the repo root when relative), els
 `<repo root>/.autonomic/ledger.md`, else `<cwd>/.autonomic/ledger.md` outside git. autonomic only
 appends; the session's own commits carry the file. The cases are `covered`, `stalled`, `done`,
 `pain` (the turn end), `ask` (an `AskUserQuestion` answered), `permission` (an ask allowed, or a
-never-approve match kept with you), and `molt` — the turn end is molt's handoff, and autonomic let
+never-approve match kept with you), `operator` (you pressed an option on the pain band:
+`why: chosen on the pain band`), and `molt` — the turn end is molt's handoff, and autonomic let
 it stop (`why: molt owns this turn end`). In a dual-repo project, point
 `AUTONOMIC_LEDGER` at the AI workspace. A ledger that cannot be written ends autopilot, and the
 decision that could not be recorded is not taken.
@@ -199,7 +208,8 @@ decision that could not be recorded is not taken.
 
 The list lives in the policy file (default above). A pain signal is:
 
-- a band above the prompt, with a Dismiss button;
+- a band above the prompt, with a Dismiss button — and, for a turn-end pain, one button per option
+  (see below);
 - a toast;
 - the bell: `bell` in `/config`, or `AUTONOMIC_BELL` on a spawn, run as a shell command with
   `AUTONOMIC_MESSAGE` set to one line — for example `curl -d "$AUTONOMIC_MESSAGE" ntfy.sh/<topic>`;
@@ -207,6 +217,26 @@ The list lives in the policy file (default above). A pain signal is:
   worker's pain reaches its parent.
 
 A pain signal never resumes the run by itself. Your next prompt does.
+
+**Options (since 0.3.0).** For a turn-end pain the fork also offers up to three answers, each a
+label and the instruction the session will follow: at most one recommended, never the
+irreversible side of a one-way door, and none at all for credentials. The band shows the
+question on its own line, then one row per option, the recommended one first as
+`<label> (Recommended)` in the accent style. The buttons share one column (as wide as the longest,
+at most 40% of the band), and each option's whole text wraps beside its button. A last row holds
+Dismiss. No option has a hotkey, so a reply you type that starts with a digit stays yours (this
+layout since 0.3.1). A
+pain with no options keeps its one line. A press is your decision and nothing runs without it: the band clears, the ledger gets an `operator` line, and
+only then does the option's text enter as your own prompt (`asUser`). A ledger that cannot be
+written submits nothing. A prompt that does not enter (a plugin beneath refused it, or the host
+failed) is a new pain signal, `option not sent`, so you can type the reply. One band takes one press. Typing a reply still works, and clears the
+band as before. An option set the fork got wrong in shape (not a list, more than three, an empty
+label or text, a text over 300 characters, two recommended) is dropped whole, and the pain stands with no buttons. The bell
+and the pain file list the options as text — `… · options: 1) <label> (Recommended) 2) <label>` —
+so a remote operator or a herdr parent sees the choices; answering there stays a typed reply.
+Labels and texts are redacted like every pain text. Every other pain signal (never-approve, hard
+deny, loop guard, ledger failure, fork failure, a question or permission left with you) carries no
+options.
 
 ## With molt
 
