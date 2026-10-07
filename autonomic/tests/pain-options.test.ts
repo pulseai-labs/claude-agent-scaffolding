@@ -208,7 +208,8 @@ describe('the band layout (0.3.1)', () => {
         expect(cell?.props.flexShrink).toBe(0)
         const button = kids(cell as El)[0]
         expect(button?.type).toBe('Button')
-        expect(button?.props.hotkey).toBe(String(i + 1))
+        // No hotkey: a reply typed into an empty prompt may start with a digit (PR #689 round 1).
+        expect(button?.props.hotkey).toBeUndefined()
         expect(text?.props.flexGrow).toBe(1)
         expect(all(text as El).some(e => e.type === 'Text' && e.props.wrap === 'wrap')).toBe(true)
       })

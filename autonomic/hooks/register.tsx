@@ -606,8 +606,9 @@ export const register: Register = (on, options) => {
       )
     }
     // 0.3.1: the question on its own line, then one row per option. The buttons share one
-    // column, as wide as the longest (its chrome and hotkey included) and at most 40% of the
-    // band, so every text wraps in the space to its right.
+    // column, as wide as the longest (its chrome and a gap included) and at most 40% of the
+    // band, so every text wraps in the space to its right. No hotkeys: a bare digit in an empty
+    // prompt presses a band Button, and a typed reply may start with one (PR #689).
     const labels = options.map(o => (o.recommended ? `${o.label} (Recommended)` : o.label))
     const width = Math.min(Math.max(...labels.map(l => l.length)) + 8, Math.floor(e.props.bodyColumns * 0.4))
     return (
@@ -616,7 +617,7 @@ export const register: Register = (on, options) => {
         {options.map((o, i) => (
           <Box key={`option-row-${i}`} flexDirection="row">
             <Box width={width} flexShrink={0}>
-              <Button key={`option-${i}`} label={labels[i]} hotkey={String(i + 1)} {...(o.recommended ? { variant: 'primary' as const } : {})} onPress={() => choose($, value, o)} />
+              <Button key={`option-${i}`} label={labels[i]} {...(o.recommended ? { variant: 'primary' as const } : {})} onPress={() => choose($, value, o)} />
             </Box>
             <Box flexGrow={1}>
               <Text wrap="wrap">{o.text}</Text>
