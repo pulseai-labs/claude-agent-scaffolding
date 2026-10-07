@@ -2,6 +2,32 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.3.0
+
+**Pain options: one press resumes autopilot.**
+
+- **The turn-end fork offers options** (`prompts.ts`, `verdict.ts`): a `pain` verdict may carry
+  `options`, up to three `{ label, text, recommended }`, with three rules in the fork prompt (at
+  most one recommended; never the irreversible side of a one-way door; none for credentials).
+  `parseTurn` drops every option on any invalid shape — not a list, more than three, an empty
+  label or text, a text over 300 characters, a non-boolean `recommended`, two recommended — and the
+  pain stands without them.
+- **The band shows them** (`register.tsx`): one button per option, the recommended one first as
+  `<label> (Recommended)`, each beside the whole text it submits, then Dismiss. A press clears the
+  band, appends an `operator` ledger line (`why: chosen on the pain band`), and only then submits
+  the option's text, never cut, with `$.prompt.submit({ asUser: true })`. A ledger that cannot be
+  written submits nothing; a prompt that does not enter is an `option not sent` pain signal; one
+  band takes one press. Labels and texts pass through the redactor first.
+- **The bell and the pain file list the options** as `· options: 1) <label> (Recommended) 2) …`
+  on the pain line. They stay text there.
+- **The default policy gains a standing order**: stop for a pain item with `AskUserQuestion` and
+  two or three options. An existing policy file is never rewritten: paste the line in (README,
+  "The policy").
+- **Known limit:** a policy file left at the 0.2.x default now reads `edited` in
+  `/autopilot status`, and lacks the new order until the operator adds it.
+- **Known limit:** the options are the fork's prose. A wrong or weak option is a wording issue the
+  operator sees before pressing; nothing runs without the press.
+
 ## 0.2.1
 
 **An allowed ask records no input value** (#683).

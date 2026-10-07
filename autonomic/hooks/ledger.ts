@@ -1,7 +1,7 @@
 // The decision ledger (spec §1, D6): one line per decision autonomic takes in place of
 // the operator. autonomic only appends; the session's own commits carry the file.
 
-export type LedgerCase = 'covered' | 'stalled' | 'done' | 'pain' | 'molt' | 'ask' | 'permission'
+export type LedgerCase = 'covered' | 'stalled' | 'done' | 'pain' | 'molt' | 'ask' | 'permission' | 'operator'
 export type Usage = {
   input_tokens?: number
   output_tokens?: number

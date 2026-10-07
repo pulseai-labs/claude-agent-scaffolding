@@ -14,6 +14,7 @@ export type World = {
   statuses: Array<string | undefined>
   notices: unknown[]
   fills: string[]
+  submits: Array<{ text: string; origin: unknown }>   // prompts that reached the bottom
   hasBox: boolean
   session: { id: string; cwd: string }
   git: { top?: string; branch?: string; originHead?: string }
@@ -32,6 +33,7 @@ export type World = {
   usage: { tokens?: number; window: number; percent?: number }   // the context figure
   readOnly?: boolean           // core marks every tool call read-only
   dropPrompts?: boolean        // a hook beneath autonomic refuses every prompt (the result's drop arm)
+  throwPrompts?: boolean       // the engine throws on every prompt
 }
 
 const USAGE = { input_tokens: 900, output_tokens: 40, cache_read_input_tokens: 50_000, cache_creation_input_tokens: 100 }
@@ -44,7 +46,7 @@ export const POLICY = '/home/u/.claude/autonomic/policy.md'
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string>; noPolicy?: boolean } = {}): World {
   const w: World = {
     files: new Map([...(opts.noPolicy ? [] : [[POLICY, 'TEST POLICY\n'] as [string, string]]), ...Object.entries(opts.files ?? {})]),
-    runs: [], toasts: [], statuses: [], notices: [], fills: [], hasBox: true,
+    runs: [], toasts: [], statuses: [], notices: [], fills: [], submits: [], hasBox: true,
     session: { id: 's1', cwd: '/repo' },
     git: { top: '/repo', branch: 'feat/x', originHead: 'origin/main' },
     forks: [], forkPrompts: [],
@@ -113,7 +115,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     w.fills.push(e.text)
     return { isFilled: true } as never
   })
-  on('prompt.submit', (_$, e) => (w.dropPrompts ? { drop: 'refused beneath autonomic' } : { text: e.text, context: e.context }) as never)
+  on('prompt.submit', (_$, e) => { if (w.throwPrompts) throw new Error('no prompt'); w.submits.push({ text: e.text, origin: e.origin }); return (w.dropPrompts ? { drop: 'refused beneath autonomic' } : { text: e.text, context: e.context }) as never })
   on('tool.call', (_$, e) => {
     if (e.tool === 'AskUserQuestion') { w.asked += 1; return { result: 'the operator answered', text: 'the operator answered' } as never }
     if (w.toolDeny !== undefined) return { deny: w.toolDeny } as never

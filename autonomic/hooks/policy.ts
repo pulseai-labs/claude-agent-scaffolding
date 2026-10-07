@@ -12,6 +12,7 @@ You are in autopilot. The operator planned this work and is not watching. Keep t
 - When the spec, the plan, the grill record or your brief already decides a choice, take that option and state it in one line. Do not end a turn on "Shall I proceed?" or "Which first?" in that case.
 - Merge authority: once a pull request has passed its work-pr or merge-bar loop, the orchestrator merges it without asking.
 - When a step is done, start the next step of the plan.
+- When you stop for a pain item, ask with \`AskUserQuestion\`: two or three options, the recommended one first and marked "(Recommended)", each worded as the instruction you will follow. For a one-way door, offer doing it and not doing it as separate options, and never mark the irreversible one recommended. For credentials, ask in plain text with no options.
 
 ## Permission scope
 
