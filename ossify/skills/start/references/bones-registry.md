@@ -155,6 +155,11 @@ live in the repo they concern is that the decision belongs with the code it
 governs — **the file joins that repo's series rather than starting a rival one**
 elsewhere. The NUMBER, though, comes from the project-wide sequence below.
 
+**The destination must be one of the scanned repos.** An unset `dest_repo`
+or a value that matches no name in `repos` refuses, naming that value. The
+four-digit default is only for a scanned destination with no existing series;
+it never substitutes for an unknown destination.
+
 **Numbering is project-wide, across every declared repo:** the next number is
 the highest existing plus one **anywhere in the project**, **counting both
 forms**. The *file* still lands in the repo the decision concerns — only the
@@ -169,6 +174,17 @@ own directory. Read it, do not guess:
 # LANDS in, the one the decision concerns (§3, "Where"). The NUMBER is
 # project-wide; the minted WIDTH is the destination's own, because two repos may
 # pad differently (round 1, C2).
+# Validate the destination against the scanned set BEFORE creating temp files.
+# An absent match is not an empty destination series and must never pick %04d.
+dest_scanned=0
+while IFS= read -r name; do
+  [ -n "$name" ] || continue
+  if [ "$name" = "${dest_repo:-}" ]; then dest_scanned=1; fi
+done <<< "${repos:-}"
+if [ "$dest_scanned" = 0 ]; then
+  echo "the numbering scan refuses dest_repo '${dest_repo:-[unset]}': it is not a scanned repo" >&2
+  exit 1
+fi
 scan="$(mktemp)"; dest="$(mktemp)"
 while IFS= read -r name; do
   [ -n "$name" ] || continue

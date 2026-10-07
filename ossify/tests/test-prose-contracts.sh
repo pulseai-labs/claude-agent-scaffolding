@@ -544,7 +544,7 @@ printf '%s\n' '{"schema_version":2}' > "$SWBRK/broken-state.json"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"project_state":"%s/broken-state.json"}}\n' \
   "$SWBRK" "$SWBRK" > "$SWBRK/.ossify/topology.json"
 cd "$SWBRK"
-t_capture env oss_bin="$OSS" sf="$SWBRK/broken-state.json" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_capture env -u OSS_STATE_FILE oss_bin="$OSS" sf="$SWBRK/broken-state.json" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 cd "$HERE"
 t_assert_rc 0 "(d) an unreadable registry does not abort the sweep"
 t_assert_contains "$T_OUT" "registry could not be read" "(d) ... it reports the registry failure, so an empty \$hits is not read as every surface matching nothing"
@@ -555,7 +555,7 @@ SWBR="$_PC_TMP/badroute"; mkdir -p "$SWBR/.ossify"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"}},"well_known_paths":{"project_state":"${repos.nosuch.root}/ps.json"}}\n' \
   "$SWBR/canon" > "$SWBR/.ossify/topology.json"
 cd "$SWBR"
-t_capture env oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_capture env -u OSS_STATE_FILE oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 cd "$HERE"
 t_assert_rc 0 "(d) an unresolvable state route does not abort the sweep"
 t_assert_contains "$T_OUT" "state could not be resolved or read" "(d) ... it reports that instead of an absence, even though touch_check's rc 1 there looks exactly like clean"
@@ -568,7 +568,7 @@ t_assert_contains "$T_OUT" "state could not be resolved or read" "(d) ... it rep
 SWF="$_PC_TMP/foreignws"; mkdir -p "$SWF/.ossify" "$SWF/canon"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"project_state":"%s/state.json"}}\n' \
   "$SWF" "$SWF" > "$SWF/.ossify/topology.json"
-( cd "$SWF" && bash "$OSS" init foreign >/dev/null && bash "$OSS" bone_add ADR-7777 "a foreign-only surface" "foreign/only/**" ) >/dev/null 2>&1
+( cd "$SWF" && env -u OSS_STATE_FILE bash "$OSS" init foreign >/dev/null && env -u OSS_STATE_FILE bash "$OSS" bone_add ADR-7777 "a foreign-only surface" "foreign/only/**" ) >/dev/null 2>&1
 cd "$SWWS"
 t_capture env OSS_STATE_FILE="$SWF/state.json" oss_bin="$OSS" sf="$SWF/state.json" repos="canonical" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS[%s]\n' \"\${hits:-unset}\"; printf 'ROSTER[%s]\n' \"\${roster:-unset}\""
@@ -596,7 +596,7 @@ t_assert_contains "$T_OUT" "HITS[unset]" "#561 R1 ... and nothing was swept agai
 # CONTROL: with NO override the same fixture still sweeps - the gate refuses a
 # foreign state, not every run, and the routed state's roster still fills.
 cd "$SWWS"
-t_capture env oss_bin="$OSS" sf="$SWS" repos="canonical" bash -c \
+t_capture env -u OSS_STATE_FILE oss_bin="$OSS" sf="$SWS" repos="canonical" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'KINDS%s\n' \"\$(printf '%s' \"\$roster\" | jq -r '[.[].kind]|join(\",\")')\""
 cd "$HERE"
 t_assert_contains "$T_OUT" "bone ADR-9091" "#561 control: no override, so the routed state sweeps its corpus"
@@ -651,7 +651,7 @@ fi
 _E_WS="$_PC_TMP/driftws"; mkdir -p "$_E_WS/.ossify" "$_E_WS/canon" "$_E_WS/docs"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
   "$_E_WS" "$_E_WS" "$_E_WS" > "$_E_WS/.ossify/topology.json"
-( cd "$_E_WS" && bash "$OSS" init drift >/dev/null && bash "$OSS" bone_add ADR-0002 "the registered bone" "packages/core/**" >/dev/null ) >/dev/null 2>&1
+( cd "$_E_WS" && env -u OSS_STATE_FILE bash "$OSS" init drift >/dev/null && env -u OSS_STATE_FILE bash "$OSS" bone_add ADR-0002 "the registered bone" "packages/core/**" >/dev/null ) >/dev/null 2>&1
 _e_spec() { # $1=ws ; remaining args = section-4 table rows
   local ws="$1"; shift
   {
@@ -701,7 +701,7 @@ fi
 _E_WS4="$_PC_TMP/driftws4"; mkdir -p "$_E_WS4/.ossify" "$_E_WS4/canon" "$_E_WS4/docs"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
   "$_E_WS4" "$_E_WS4" "$_E_WS4" > "$_E_WS4/.ossify/topology.json"
-( cd "$_E_WS4" && bash "$OSS" init lower >/dev/null && bash "$OSS" bone_add adr-0002 "a lowercase registry id" "packages/core/**" ) >/dev/null 2>&1
+( cd "$_E_WS4" && env -u OSS_STATE_FILE bash "$OSS" init lower >/dev/null && env -u OSS_STATE_FILE bash "$OSS" bone_add adr-0002 "a lowercase registry id" "packages/core/**" ) >/dev/null 2>&1
 _e_spec "$_E_WS4" '| adr-0002 | the same id, lowercase |'
 t_capture _e_run "$_E_WS4"
 t_assert_rc 0 "(e) R2: a lowercase pair runs clean"
@@ -772,7 +772,7 @@ fi
 _E_WS5="$_PC_TMP/driftws5"; mkdir -p "$_E_WS5/.ossify" "$_E_WS5/canon" "$_E_WS5/docs"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
   "$_E_WS5" "$_E_WS5" "$_E_WS5" > "$_E_WS5/.ossify/topology.json"
-( cd "$_E_WS5" && bash "$OSS" init c4 >/dev/null && bash "$OSS" bone_add ADR-C2 "a permitted non-numeric ref" "packages/core/**" ) >/dev/null 2>&1
+( cd "$_E_WS5" && env -u OSS_STATE_FILE bash "$OSS" init c4 >/dev/null && env -u OSS_STATE_FILE bash "$OSS" bone_add ADR-C2 "a permitted non-numeric ref" "packages/core/**" ) >/dev/null 2>&1
 _e_spec "$_E_WS5"
 t_capture _e_run "$_E_WS5"
 t_assert_rc 0 "(e) C4: a non-numeric registry ref does not abort the check"
@@ -787,13 +787,13 @@ fi
 _e_spec "$_E_WS5" '| ADR-C2 | the non-numeric ref |'
 t_capture _e_run "$_E_WS5"
 t_assert_contains "$T_OUT" "matches the registry: 1 entries, 1 rows" "(e) C4 control: the non-numeric id compares equal when its row is present"
-( cd "$_E_WS5" && bash "$OSS" bone_add ADR-0002 "a numeric ref" "packages/core/**" ) >/dev/null 2>&1
+( cd "$_E_WS5" && env -u OSS_STATE_FILE bash "$OSS" bone_add ADR-0002 "a numeric ref" "packages/core/**" ) >/dev/null 2>&1
 _e_spec "$_E_WS5" '| ADR-C2 | the non-numeric ref |' '| ADR-0002 | the numeric ref |'
 t_capture _e_run "$_E_WS5"
 t_assert_contains "$T_OUT" "matches the registry: 2 entries, 2 rows" "(e) C4 control: the numeric series still reads clean beside it"
 # (e8) C4's refusal arm: a value that is not an ADR reference at all refuses the
 # comparison instead of being filtered out of it.
-( cd "$_E_WS5" && bash "$OSS" bone_add "RFC-2119" "not an adr ref" "packages/core/**" ) >/dev/null 2>&1
+( cd "$_E_WS5" && env -u OSS_STATE_FILE bash "$OSS" bone_add "RFC-2119" "not an adr ref" "packages/core/**" ) >/dev/null 2>&1
 t_capture _e_run "$_E_WS5"
 t_assert_rc 0 "(e) C4: a non-ADR registry value does not abort the check"
 t_assert_contains "$T_OUT" "not an ADR reference ('RFC-2119')" "(e) C4 ... it REFUSES and names the value, instead of dropping it from the comparison"
@@ -805,7 +805,7 @@ t_assert_contains "$T_OUT" "not an ADR reference ('RFC-2119')" "(e) C4 ... it RE
 _E_WS6="$_PC_TMP/driftws6"; mkdir -p "$_E_WS6/.ossify" "$_E_WS6/canon" "$_E_WS6/docs"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/.ossify/project-state.json"}}\n' \
   "$_E_WS6" "$_E_WS6" "$_E_WS6" > "$_E_WS6/.ossify/topology.json"
-( cd "$_E_WS6" && bash "$OSS" init r2 >/dev/null && bash "$OSS" bone_add ADR-0002 "the record" "packages/core/**" ) >/dev/null 2>&1
+( cd "$_E_WS6" && env -u OSS_STATE_FILE bash "$OSS" init r2 >/dev/null && env -u OSS_STATE_FILE bash "$OSS" bone_add ADR-0002 "the record" "packages/core/**" ) >/dev/null 2>&1
 jq '.bones += [.bones[0]]' "$_E_WS6/.ossify/project-state.json" > "$_E_WS6/dup.json" && mv "$_E_WS6/dup.json" "$_E_WS6/.ossify/project-state.json"
 _e_spec "$_E_WS6" '| ADR-0002 | the row |'
 t_capture _e_run "$_E_WS6"
@@ -840,6 +840,51 @@ t_assert_contains "$T_OUT" "ok: spec - bones index matches the registry: 1 entri
 printf '# MASTER-SPEC\n\n## 4. Bones-registry index\n\n| adr | title |\n| :--- | ---: |\n| ADR-0002 | the row |\n\n## 5. Journeys\nx\n' > "$_E_WS6/docs/MASTER-SPEC.md"
 t_capture _e_run "$_E_WS6"
 t_assert_contains "$T_OUT" "ok: spec - bones index matches the registry: 1 entries, 1 rows" "(e) C6/C7 control: a lowercase header and a colon-dash separator are passed over, not reported as unnameable rows"
+
+# 1.14.1 (#648): one row-shape table owns the complete input grammar.
+# Expected output is independent of the parser, including source case in every
+# finding. Each case resets the state and spec, so duplicates cannot leak.
+_G_WS="$_PC_TMP/grammar"; mkdir -p "$_G_WS/.ossify" "$_G_WS/docs" "$_G_WS/canon"
+printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"master_spec":"%s/docs/MASTER-SPEC.md","project_state":"%s/state.json"}}\n' \
+  "$_G_WS" "$_G_WS" "$_G_WS" > "$_G_WS/.ossify/topology.json"
+( cd "$_G_WS" && env -u OSS_STATE_FILE bash "$OSS" init grammar ) >/dev/null 2>&1
+cp "$_G_WS/state.json" "$_G_WS/base.json"
+while IFS=';' read -r shape registry cells expected; do
+  jq --arg refs "$registry" '.bones = (if $refs == "" then [] else
+    $refs | split(",") | map({adr:., title:"grammar fixture", touch:["core/**"]}) end)' \
+    "$_G_WS/base.json" > "$_G_WS/state.json"
+  _e_spec "$_G_WS"
+  # Insert data before section 5; an empty first cell is still a DATA row.
+  awk -v cells="$cells" -v shape="$shape" '
+    /^\| ADR \|/ && shape == "numeric-header" {print "| ADR 2026 | Title |"; next}
+    /^## 5/ {n=split(cells,a,","); for(i=1;i<=n;i++) {
+      c=a[i]; if(c=="<empty>") c=""; print "| " c " | fixture |"
+    }} {print}
+  ' "$_G_WS/docs/MASTER-SPEC.md" > "$_G_WS/spec.tmp"
+  mv "$_G_WS/spec.tmp" "$_G_WS/docs/MASTER-SPEC.md"
+  t_capture _e_run "$_G_WS"
+  printf 'GRAMMAR %s rc=%s: %s\n' "$shape" "$T_RC" "$T_OUT"
+  t_assert_rc 0 "#648 $shape completes under strict Bash"
+  t_assert_eq "$expected" "$T_OUT" "#648 $shape follows the row grammar"
+done <<'ROWS'
+numeric;ADR-0002;ADR-0002;ok: spec - bones index matches the registry: 1 entries, 1 rows
+digit-free;ADR-C;ADR-C;ok: spec - bones index matches the registry: 1 entries, 1 rows
+malformed-digit-free;;RFC-FOO;fail: spec - section 4 carries a row whose first cell is not an ADR reference: RFC-FOO
+malformed-digits;;RFC-2119;fail: spec - section 4 carries a row whose first cell is not an ADR reference: RFC-2119
+duplicate-index;ADR-C;ADR-C,ADR-C;fail: spec - section 4 carries more than one row for: ADR-C
+duplicate-registry;ADR-C,ADR-C;ADR-C;fail: spec - the registry carries more than one bone record for: ADR-C
+lowercase;adr-c;adr-c;ok: spec - bones index matches the registry: 1 entries, 1 rows
+mixed-case;aDr-C;AdR-c;ok: spec - bones index matches the registry: 1 entries, 1 rows
+header-only;;;ok: spec - bones index matches the registry: 0 entries, 0 rows
+clean-pair;ADR-C,ADR-0002;ADR-C,ADR-0002;ok: spec - bones index matches the registry: 2 entries, 2 rows
+numeric-header;;;ok: spec - bones index matches the registry: 0 entries, 0 rows
+empty-cell;;<empty>;fail: spec - section 4 carries a row whose first cell is not an ADR reference: [empty]
+embedded-whitespace;;ADR- C;fail: spec - section 4 carries a row whose first cell is not an ADR reference: ADR- C
+mixed-duplicate-index;aDr-C;AdR-c,aDR-C;fail: spec - section 4 carries more than one row for: AdR-c aDR-C
+mixed-duplicate-registry;aDr-C,ADR-c;AdR-c;fail: spec - the registry carries more than one bone record for: aDr-C ADR-c
+mixed-registry-only;aDr-C;;fail: spec - registry entry with no index row: aDr-C
+mixed-index-only;;AdR-c;fail: spec - index row with no registry entry: AdR-c
+ROWS
 
 # (e6) ROUND 1, R3: an unresolvable route must REFUSE, not abort. Both resolver
 # calls in the block are guarded, so under `set -euo pipefail` it reaches its own
@@ -877,11 +922,11 @@ _o_ws() { # $1=name ; echoes a workspace whose canonical repo has an empty docs/
   printf '%s\n' "$d"
 }
 _o_next2() { # $1=dir $2=repos $3=destination repo (the block consumes both)
-  ( cd "$1" && env oss_bin="$OSS" dest_repo="$3" repos="$2" bash -c "set -euo pipefail; . '$_SC'" )
+  ( cd "$1" && env -u OSS_STATE_FILE oss_bin="$OSS" dest_repo="$3" repos="$2" bash -c "set -euo pipefail; . '$_SC'" )
 }
 _o_next() { _o_next2 "$1" canonical canonical; }
 _o_next_keep() { # $1=dir ; prints the mint, then the temp paths the block used
-  ( cd "$1" && env oss_bin="$OSS" dest_repo=canonical repos=canonical bash -c "set -euo pipefail; . '$_SC'; printf 'SCAN[%s] DEST[%s]\n' \"\$scan\" \"\$dest\"" )
+  ( cd "$1" && env -u OSS_STATE_FILE oss_bin="$OSS" dest_repo=canonical repos=canonical bash -c "set -euo pipefail; . '$_SC'; printf 'SCAN[%s] DEST[%s]\n' \"\$scan\" \"\$dest\"" )
 }
 # THE DEFECT: an uppercase three-digit series is read, and the mint continues it.
 _O_U="$(_o_ws upper)"; : > "$_O_U/canon/docs/adr/ADR-001-redb-for-storage.md"; : > "$_O_U/canon/docs/adr/ADR-002-single-writer.md"
@@ -893,6 +938,24 @@ if printf '%s' "$T_OUT" | grep -Fq 'ADR-001'; then
 else
   T_PASS=$((T_PASS+1))
 fi
+# 1.14.1 (#647): missing/unscanned destinations refuse, never mint at a
+# guessed width. The unset case clears the variable rather than setting it empty.
+while IFS=';' read -r destination expected_rc expected; do
+  if [ "$destination" = '[unset]' ]; then
+    t_capture env -u OSS_STATE_FILE -u dest_repo oss_bin="$OSS" repos=canonical bash -c \
+      "cd '$_O_U'; set -euo pipefail; . '$_SC'"
+  else
+    t_capture _o_next2 "$_O_U" canonical "$destination"
+  fi
+  printf 'MINT %s rc=%s: %s\n' "$destination" "$T_RC" "$T_OUT"
+  t_assert_rc "$expected_rc" "#647 destination $destination has the required status"
+  t_assert_eq "$expected" "$T_OUT" "#647 destination $destination refuses or joins the scanned series"
+done <<'DESTINATIONS'
+canonicl;1;the numbering scan refuses dest_repo 'canonicl': it is not a scanned repo
+[unset];1;the numbering scan refuses dest_repo '[unset]': it is not a scanned repo
+canonical;0;ADR-003
+DESTINATIONS
+
 # CONTROLS: every other form keeps working, and a non-series mints nothing from.
 _O_B="$(_o_ws bare)"; : > "$_O_B/canon/docs/adr/0003-record-architecture-decisions.md"
 t_capture _o_next "$_O_B"
