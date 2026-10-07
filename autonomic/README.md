@@ -221,12 +221,14 @@ A pain signal never resumes the run by itself. Your next prompt does.
 **Options (since 0.3.0).** For a turn-end pain the fork also offers up to three answers, each a
 label and the instruction the session will follow: at most one recommended, never the
 irreversible side of a one-way door, and none at all for credentials. The band shows one button
-per option, the recommended one first as `<label> (Recommended)`, then Dismiss. A press is your
+per option, the recommended one first as `<label> (Recommended)`, each beside the whole text it
+submits, then Dismiss. A press is your
 decision and nothing runs without it: the band clears, the ledger gets an `operator` line, and
 only then does the option's text enter as your own prompt (`asUser`). A ledger that cannot be
-written submits nothing. One band takes one press. Typing a reply still works, and clears the
+written submits nothing. A prompt that does not enter (a plugin beneath refused it, or the host
+failed) is a new pain signal, `option not sent`, so you can type the reply. One band takes one press. Typing a reply still works, and clears the
 band as before. An option set the fork got wrong in shape (not a list, more than three, an empty
-label or text, two recommended) is dropped whole, and the pain stands with no buttons. The bell
+label or text, a text over 300 characters, two recommended) is dropped whole, and the pain stands with no buttons. The bell
 and the pain file list the options as text — `… · options: 1) <label> (Recommended) 2) <label>` —
 so a remote operator or a herdr parent sees the choices; answering there stays a typed reply.
 Labels and texts are redacted like every pain text. Every other pain signal (never-approve, hard

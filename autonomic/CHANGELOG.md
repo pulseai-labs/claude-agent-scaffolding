@@ -10,12 +10,14 @@ All notable changes to the `autonomic` plugin.
   `options`, up to three `{ label, text, recommended }`, with three rules in the fork prompt (at
   most one recommended; never the irreversible side of a one-way door; none for credentials).
   `parseTurn` drops every option on any invalid shape — not a list, more than three, an empty
-  label or text, a non-boolean `recommended`, two recommended — and the pain stands without them.
+  label or text, a text over 300 characters, a non-boolean `recommended`, two recommended — and the
+  pain stands without them.
 - **The band shows them** (`register.tsx`): one button per option, the recommended one first as
-  `<label> (Recommended)`, then Dismiss. A press clears the band, appends an `operator` ledger line
-  (`why: chosen on the pain band`), and only then submits the option's text with
-  `$.prompt.submit({ asUser: true })`. A ledger that cannot be written submits nothing; one band
-  takes one press. Labels and texts pass through the redactor first.
+  `<label> (Recommended)`, each beside the whole text it submits, then Dismiss. A press clears the
+  band, appends an `operator` ledger line (`why: chosen on the pain band`), and only then submits
+  the option's text, never cut, with `$.prompt.submit({ asUser: true })`. A ledger that cannot be
+  written submits nothing; a prompt that does not enter is an `option not sent` pain signal; one
+  band takes one press. Labels and texts pass through the redactor first.
 - **The bell and the pain file list the options** as `· options: 1) <label> (Recommended) 2) …`
   on the pain line. They stay text there.
 - **The default policy gains a standing order**: stop for a pain item with `AskUserQuestion` and

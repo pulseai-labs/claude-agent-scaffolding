@@ -49,7 +49,9 @@ export function parseTurn(text: string): TurnVerdict | undefined {
 }
 
 // A pain's options (0.3.0 spec §3.2.1): 1–3 of them, each with a label and a text, at most
-// one recommended. Any other shape drops them all, and the pain stands without them.
+// one recommended. Any other shape drops them all, and the pain stands without them. A text
+// is never cut: the band shows whole what a press submits, so an overlong one is a bad shape.
+export const MAX_OPTION_TEXT = 300
 export function painOptions(v: unknown): PainOption[] | undefined {
   if (!Array.isArray(v) || v.length === 0 || v.length > 3) return undefined
   const out: PainOption[] = []
@@ -57,7 +59,7 @@ export function painOptions(v: unknown): PainOption[] | undefined {
     if (!isObj(o)) return undefined
     const label = str(o.label)
     const text = str(o.text)
-    if (label === undefined || text === undefined) return undefined
+    if (label === undefined || text === undefined || text.length > MAX_OPTION_TEXT) return undefined
     if (o.recommended !== undefined && typeof o.recommended !== 'boolean') return undefined
     out.push({ label, text, recommended: o.recommended === true })
   }

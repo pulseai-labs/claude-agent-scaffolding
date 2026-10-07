@@ -184,7 +184,7 @@ let painSeq = 0   // each notice's seq: rises across a reload too, as it starts 
 // band shows them as buttons, the bell and the pain file as a numbered list.
 async function pain($: Engine, id: string, reason: string, detail: string, options?: readonly PainOption[]): Promise<void> {
   const text = `autopilot: ${reason} — ${oneLine(detail, 200)}`
-  const shown = (options ?? []).map(o => ({ label: oneLine(o.label, 40), text: oneLine(o.text), recommended: o.recommended }))
+  const shown = (options ?? []).map(o => ({ label: oneLine(o.label, 40), text: oneLine(o.text, Number.MAX_SAFE_INTEGER), recommended: o.recommended }))
   shown.sort((a, b) => Number(b.recommended) - Number(a.recommended))
   const listed = shown.length === 0 ? text
     : `${text} · options: ${shown.map((o, i) => `${i + 1}) ${o.label}${o.recommended ? ' (Recommended)' : ''}`).join(' ')}`
@@ -203,19 +203,22 @@ const claimed = new Set<number>()   // notices whose band took a press
 
 // A press on a pain band's option (0.3.0 spec §3.2.3): the operator's decision. The band
 // clears, the ledger records it, and only then does the option's text enter as the
-// operator's prompt. No ledger line, no prompt. One band takes one press.
+// operator's prompt. No ledger line, no prompt. One band takes one press. A prompt that does
+// not enter is a pain signal, so the choice is never lost unseen.
 async function choose($: Engine, value: NonNullable<Pain>, o: PainOption): Promise<void> {
   const seq = value.seq ?? 0
   if (claimed.has(seq)) return
   claimed.add(seq)
+  let id = ''
   try {
-    const id = await $.session.id()
+    id = await $.session.id()
     try { await update($, notice, cur => (cur?.seq === seq ? null : cur)) } catch {}
     if (!(await record($, id, 'operator', value.question ?? value.text, o.label, 'chosen on the pain band'))) return
     const r = await $.prompt.submit({ text: o.text, asUser: true })
-    if (r.drop !== undefined) await log($, `band prompt dropped session=${id} ${String(r.drop)}`)
+    if (r.drop !== undefined) await pain($, id, 'option not sent', `${o.label} (${String(r.drop)}): type the reply instead`)
   } catch (err) {
     await log($, `band press error ${String(err)}`)
+    await pain($, id, 'option not sent', `${o.label} (${String(err)}): type the reply instead`)
   }
 }
 
@@ -597,7 +600,10 @@ export const register: Register = (on, options) => {
       <Box>
         <Text>{value.text} </Text>
         {(value.options ?? []).map((o, i) => (
-          <Button key={`option-${i}`} label={o.recommended ? `${o.label} (Recommended)` : o.label} onPress={() => choose($, value, o)} />
+          <Box key={`option-row-${i}`}>
+            <Button key={`option-${i}`} label={o.recommended ? `${o.label} (Recommended)` : o.label} onPress={() => choose($, value, o)} />
+            <Text key={`option-text-${i}`}> {o.text}</Text>
+          </Box>
         ))}
         <Button key="dismiss" label="Dismiss" onPress={() => update($, notice, () => null)} />
       </Box>

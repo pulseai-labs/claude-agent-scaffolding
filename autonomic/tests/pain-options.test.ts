@@ -31,6 +31,7 @@ describe('pain options in the turn-end verdict (0.3.0 spec §3.2.1)', () => {
       [{ label: 'A' }],
       [{ label: 'A', text: 'do A', recommended: true }, { label: 'B', text: 'do B', recommended: true }],
       [{ label: 'A', text: 'do A', recommended: 'yes' }],
+      [{ label: 'A', text: 'x'.repeat(301) }],
       ['A'],
     ]
     for (const options of bad) {
@@ -39,6 +40,9 @@ describe('pain options in the turn-end verdict (0.3.0 spec §3.2.1)', () => {
       expect(v?.question).toBe('Which pricing model?')
       expect(v?.options).toBeUndefined()
     }
+  })
+  test('a text of 300 characters is kept whole, to the band and the prompt (PR #687 round 1)', () => {
+    expect(parseTurn(PAIN([{ label: 'A', text: 'x'.repeat(300) }]).text)?.options?.[0]?.text).toBe('x'.repeat(300))
   })
   test('an empty array is no options', () => {
     expect(parseTurn(PAIN([]).text)?.options).toBeUndefined()
@@ -63,6 +67,9 @@ describe('the pain band with options (0.3.0 spec §3.2.2–3)', () => {
       const labels = (await ui.findAll({ type: 'Button' })).map(b => b.props.label)
       expect(labels).toEqual(['Per seat (Recommended)', 'Flat fee', 'Dismiss'])
       expect(await ui.find({ type: 'Text', text: /Which pricing model\?/ })).toBeDefined()
+      // A press submits only what the band shows (PR #687 round 1).
+      const texts = (await ui.findAll({ type: 'Text' })).map(t => t.text.trim())
+      expect(texts.filter(t => t.startsWith('Build the'))).toEqual(['Build the per-seat pricing model.', 'Build the flat-fee pricing model.'])
       await ui.unmount()
     }
   })
@@ -86,6 +93,42 @@ describe('the pain band with options (0.3.0 spec §3.2.2–3)', () => {
     expect(w.notices.at(-1)).toBeNull()
     expect(ledgerLines(w).at(-1)).toMatch(/ · s1 · operator · Q: Which pricing model\? · A: Per seat · why: chosen on the pain band$/)
     expect(w.submits).toEqual([{ text: 'Build the per-seat pricing model.', origin: { kind: 'plugin', name: 'autonomic', asUser: true } }])
+  })
+  test('a long option text is submitted whole (PR #687 round 1)', async ($, on) => {
+    const w = world(on, { env: AP })
+    const long = `Build it ${'y'.repeat(280)} safely.`
+    w.forks.push(PAIN([{ label: 'Long', text: long, recommended: true }]))
+    await $.classic.Stop(STOP())
+    const ui = await $.ui.mount({ plugin: 'autonomic', surface: 'terminal', ...BAND })
+    await ui.press({ key: 'option-0' })
+    expect(w.submits[0]?.text).toBe(long)
+  })
+  test('a prompt refused beneath autonomic is a pain signal, not a silent loss (PR #687 round 1)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(PAIN())
+    await $.classic.Stop(STOP())
+    w.dropPrompts = true
+    const ui = await $.ui.mount({ plugin: 'autonomic', surface: 'terminal', ...BAND })
+    await ui.press({ key: 'option-0' })
+    expect(JSON.stringify(w.notices.at(-1))).toContain('autopilot: option not sent — Per seat (refused beneath autonomic)')
+  })
+  test('a text the redactor lengthens is still submitted whole (PR #687 round 1)', async ($, on) => {
+    const w = world(on, { env: AP })
+    const text = `${'z'.repeat(289)} TOKEN=x go`
+    w.forks.push(PAIN([{ label: 'Go', text, recommended: true }]))
+    await $.classic.Stop(STOP())
+    const ui = await $.ui.mount({ plugin: 'autonomic', surface: 'terminal', ...BAND })
+    await ui.press({ key: 'option-0' })
+    expect(w.submits[0]?.text).toBe(`${'z'.repeat(289)} TOKEN=*** go`)
+  })
+  test('a submit that throws is a pain signal (PR #687 round 1)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(PAIN())
+    await $.classic.Stop(STOP())
+    w.throwPrompts = true
+    const ui = await $.ui.mount({ plugin: 'autonomic', surface: 'terminal', ...BAND })
+    await ui.press({ key: 'option-0' })
+    expect(JSON.stringify(w.notices.at(-1))).toContain('autopilot: option not sent — Per seat')
   })
   test('nothing runs without a press', async ($, on) => {
     const w = world(on, { env: AP })
