@@ -3,7 +3,8 @@
 
 export const TURN_CASES = ['covered', 'stalled', 'waiting', 'done', 'pain'] as const
 export type TurnCase = (typeof TURN_CASES)[number]
-export type TurnVerdict = { case: TurnCase; question?: string; answer?: string; next_step?: string; reason: string }
+export type PainOption = { label: string; text: string; recommended: boolean }
+export type TurnVerdict = { case: TurnCase; question?: string; answer?: string; next_step?: string; reason: string; options?: PainOption[] }
 
 export type Question = { question: string; header?: string; options?: ReadonlyArray<{ label: string }>; multiSelect?: boolean }
 export type AskVerdict = { covered: true; answers: Record<string, string>; reason: string } | { covered: false; reason: string }
@@ -40,7 +41,27 @@ export function parseTurn(text: string): TurnVerdict | undefined {
   if (nextStep !== undefined) out.next_step = nextStep
   if (kase === 'covered' && answer === undefined) return undefined
   if (kase === 'stalled' && nextStep === undefined) return undefined
+  if (kase === 'pain') {
+    const options = painOptions(v.options)
+    if (options !== undefined) out.options = options
+  }
   return out
+}
+
+// A pain's options (0.3.0 spec §3.2.1): 1–3 of them, each with a label and a text, at most
+// one recommended. Any other shape drops them all, and the pain stands without them.
+export function painOptions(v: unknown): PainOption[] | undefined {
+  if (!Array.isArray(v) || v.length === 0 || v.length > 3) return undefined
+  const out: PainOption[] = []
+  for (const o of v) {
+    if (!isObj(o)) return undefined
+    const label = str(o.label)
+    const text = str(o.text)
+    if (label === undefined || text === undefined) return undefined
+    if (o.recommended !== undefined && typeof o.recommended !== 'boolean') return undefined
+    out.push({ label, text, recommended: o.recommended === true })
+  }
+  return out.filter(o => o.recommended).length > 1 ? undefined : out
 }
 
 export function parseAsk(text: string, questions: readonly Question[]): AskVerdict | undefined {
