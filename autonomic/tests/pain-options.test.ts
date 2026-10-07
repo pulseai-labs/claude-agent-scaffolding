@@ -174,6 +174,82 @@ describe('the pain band with options (0.3.0 spec §3.2.2–3)', () => {
   })
 })
 
+// The drawn tree as plain data: each element's type, props and children (0.3.1).
+type El = { type: string; props: Record<string, unknown>; children?: unknown[] }
+// An element with no props has no props key: give every element one.
+const norm = (v: unknown): El => {
+  const el = v as El
+  return { ...el, props: el.props ?? {}, children: (el.children ?? []).map(c => (typeof c === 'object' && c !== null ? norm(c) : c)) }
+}
+const kids = (el: El): El[] => (el.children ?? []).filter((c): c is El => typeof c === 'object' && c !== null)
+const all = (el: El): El[] => [el, ...kids(el).flatMap(all)]
+const shown = (el: El): string => all(el).flatMap(e => (e.children ?? []).filter(c => typeof c === 'string')).join('')
+
+describe('the band layout (0.3.1)', () => {
+  test('the question on its own line, then one row per option with the buttons in one column', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(PAIN([...OPTS, { label: 'Neither, stop here', text: 'Stop the session here.', recommended: false }]))
+    await $.classic.Stop(STOP())
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ plugin: 'autonomic', surface, ...BAND })
+      const root = norm(await ui.drawn())
+      expect(root.props.flexDirection).toBe('column')
+      const [head, ...rows] = kids(root)
+      expect(head?.type).toBe('Text')
+      expect(head?.props.bold).toBe(true)
+      expect(shown(head as El)).toContain('Which pricing model?')
+      expect(rows.length).toBe(4)
+      const options = rows.slice(0, 3)
+      const widths = new Set<unknown>()
+      options.forEach((row, i) => {
+        expect(row.props.flexDirection).toBe('row')
+        const [cell, text] = kids(row)
+        widths.add(cell?.props.width)
+        expect(cell?.props.flexShrink).toBe(0)
+        const button = kids(cell as El)[0]
+        expect(button?.type).toBe('Button')
+        // No hotkey: a reply typed into an empty prompt may start with a digit (PR #689 round 1).
+        expect(button?.props.hotkey).toBeUndefined()
+        expect(text?.props.flexGrow).toBe(1)
+        expect(all(text as El).some(e => e.type === 'Text' && e.props.wrap === 'wrap')).toBe(true)
+      })
+      expect(widths.size).toBe(1)
+      const width = [...widths][0] as number
+      // Wide enough for the longest button ("Per seat (Recommended)" and its chrome), never past 40%.
+      expect(width).toBeGreaterThanOrEqual('1 Per seat (Recommended)'.length + 4)
+      expect(width).toBeLessThanOrEqual(Math.floor(80 * 0.4))
+      expect(shown(options[0] as El)).toContain('Build the per-seat pricing model.')
+      expect(kids(kids(options[0] as El)[0] as El)[0]?.props.variant).toBe('primary')
+      expect(kids(kids(options[1] as El)[0] as El)[0]?.props.variant).toBeUndefined()
+      const last = rows[3] as El
+      const dismiss = all(last).find(e => e.type === 'Button')
+      expect(dismiss?.props.label).toBe('Dismiss')
+      expect(dismiss?.props.role).toBe('dismiss')
+      await ui.unmount()
+    }
+  })
+  test('a narrow band caps the button column at 40% of its width', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(PAIN())
+    await $.classic.Stop(STOP())
+    const ui = await $.ui.mount({ plugin: 'autonomic', surface: 'terminal', component: 'AbovePrompt', props: { ...BAND.props, bodyColumns: 40 } })
+    const root = norm(await ui.drawn())
+    expect(kids(kids(root)[1] as El)[0]?.props.width).toBe(16)
+  })
+  test('a pain with no options keeps its one line', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(PAIN([]))
+    await $.classic.Stop(STOP())
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ plugin: 'autonomic', surface, ...BAND })
+      const root = norm(await ui.drawn())
+      expect(root.props.flexDirection).toBeUndefined()
+      expect(kids(root).map(e => e.type)).toEqual(['Text', 'Button'])
+      await ui.unmount()
+    }
+  })
+})
+
 describe('the default policy (0.3.0 spec §3.1)', () => {
   test('carries the pain-options standing order', () => {
     expect(DEFAULT_POLICY).toContain('- When you stop for a pain item, ask with `AskUserQuestion`: two or three options, the recommended one first and marked "(Recommended)"')
