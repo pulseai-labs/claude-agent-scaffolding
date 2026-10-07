@@ -133,7 +133,7 @@ else
   # a registry that has entries (round 1, C4).
   adr_re='^[Aa][Dd][Rr]-[A-Za-z0-9]+$'
   bad="$(printf '%s\n' "$reg_raw" | awk -v ref="$adr_re" -v count="$reg_count" '
-    NR <= count {sub(/^[[:space:]]+/,""); sub(/[[:space:]]+$/,""); if($0 !~ ref) print (length ? $0 : "[empty]")}
+    count > 0 {sub(/^[[:space:]]+/,""); sub(/[[:space:]]+$/,""); if($0 !~ ref) print (length ? $0 : "[empty]")}
     END {for(i=NR;i<count;i++) print "[empty]"}')"
   if [ -n "$bad" ]; then
     echo "skip: spec - the registry holds a value that is not an ADR reference ('$(printf '%s' "$bad" | tr '\n' ' ')'), and a value this check cannot name is not one it may drop"

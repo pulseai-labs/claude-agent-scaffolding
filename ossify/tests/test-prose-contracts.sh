@@ -851,7 +851,7 @@ printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_know
 cp "$_G_WS/state.json" "$_G_WS/base.json"
 while IFS=';' read -r shape registry cells expected; do
   jq --arg refs "$registry" '.bones = (if $refs == "" then [] else
-    $refs | split(",") | map({adr:(if . == "<empty>" then "" else . end), title:"grammar fixture", touch:["core/**"]}) end)' \
+    $refs | split(",") | map({adr:(if . == "<empty>" then "" else gsub("<newline>";"\n") end), title:"grammar fixture", touch:["core/**"]}) end)' \
     "$_G_WS/base.json" > "$_G_WS/state.json"
   _e_spec "$_G_WS"
   cp "$_G_WS/docs/MASTER-SPEC.md" "$_G_WS/header-only.md"
@@ -915,6 +915,7 @@ adr-header-empty;;AdR-c;fail: spec - section 4 carries a header whose first cell
 adr-header-matching;ADR-C;ADR-C;fail: spec - registry entry with no index row: ADR-C\nfail: spec - section 4 carries a header whose first cell is an ADR reference: ADR-C
 blank-registry;<empty>;;skip: spec - the registry holds a value that is not an ADR reference ('[empty]'), and a value this check cannot name is not one it may drop
 whitespace-registry;   ;;skip: spec - the registry holds a value that is not an ADR reference ('[empty]'), and a value this check cannot name is not one it may drop
+invalid-suffix-registry;ADR-C<newline>RFC-2119;ADR-C;skip: spec - the registry holds a value that is not an ADR reference ('RFC-2119'), and a value this check cannot name is not one it may drop
 two-blank-registry;<empty>,<empty>;;skip: spec - the registry holds a value that is not an ADR reference ('[empty] [empty]'), and a value this check cannot name is not one it may drop
 blank-with-valid-registry;ADR-C,<empty>;ADR-C;skip: spec - the registry holds a value that is not an ADR reference ('[empty]'), and a value this check cannot name is not one it may drop
 ROWS
