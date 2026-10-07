@@ -7,8 +7,8 @@ All notable changes to the `autonomic` plugin.
 **A token floor in place of the bash reader** (#684, direction 2′).
 
 - **The never-approve list reads the command text as one bag of words** (`never.ts`). It joins
-  a backslash-newline, drops `\`, `'` and `"`, splits at spaces, operators, backticks, `$(` and
-  `${`, and shows each `NAME=VALUE` word's value. A rule fires when a verb and a danger word
+  a backslash-newline, drops `\`, `'` and `"`, splits at spaces, operators, backticks and `$(`,
+  and shows each `NAME=VALUE` word's value. A rule fires when a verb and a danger word
   appear anywhere in the text; the list never decides which command a word belongs to. Quotes,
   wrappers, interpreters and substitutions no longer hide a push (`python3 -c 'git push -f'`).
 - **Caught now** (the #684 gaps): a quoted `)` inside `$( )`, dashed executables (`git-push`),
@@ -20,9 +20,10 @@ All notable changes to the `autonomic` plugin.
   gone. The name stays valid in `neverApprove`.
 - **Extra asks, accepted:** a danger word beside a harmless command (`git commit -m "do not git
   push -f"`), any push after a `cd` or `git -C` to another directory whatever its refspec, `rm -r`
-  of a path with a `..` segment, and a short cluster that holds the letter (`git push -ofoo`). A
-  `cat` heredoc with a quoted delimiter is text and is skipped, unless the text names a program
-  that may run text (`bash`, `sh`, `eval` …).
+  of a path with a `..` segment, and a short cluster that holds the letter (`git push -ofoo`). Two
+  quoted heredoc shapes are text and skipped — a `-m "$(cat <<'EOF' … EOF)"` commit message and
+  `cat > file <<'EOF'` whose file is not named again — unless the rest of the text names a
+  program that may run text (a shell, an interpreter, `ssh`, `sed`, `awk` …).
 - **Known limits:** a script or program that runs git itself, a git alias from config, `sed`'s
   `e` command, a brace or glob that builds the verb, a bare variable beside `branch` or `commit`,
   and a danger only the filesystem shows.

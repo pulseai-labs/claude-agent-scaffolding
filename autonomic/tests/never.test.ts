@@ -324,4 +324,35 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     for (const c of ['eval "$X"', 'bash -c "$CMD"', 'git push $(cat refs)', 'x=`git rev-parse HEAD`'])
       expect([c, rules(c).includes('unreadable')]).toEqual([c, false])
   })
+
+  test('a heredoc another program runs keeps its words (PR #685 round 1)', () => {
+    const run = ["cat setup.cfg; python3 - <<'EOF'\nimport os; os.system(\"git push -f origin main\")\nEOF",
+      "python3 cat.py <<'EOF'\ngit push -f\nEOF", "python3 -c \"$(cat <<'EOF'\nimport os; os.system('git push -f')\nEOF\n)\"",
+      "ssh host \"$(cat <<'EOF'\ngit push -f\nEOF\n)\"", "cat > x.sh <<'EOF'\ngit push -f origin main\nEOF\nchmod +x x.sh && ./x.sh",
+      "$(cat <<'EOF'\ngit push -f\nEOF\n)", ". ./env.sh && git commit -m \"$(cat <<'EOF'\npush -f\nEOF\n)\"",
+      "echo -m \"$(cat <<'EOF'\ngit push -f origin main\nEOF\n)\" | sh"]
+    for (const c of run) expect([c, rules(c)]).toEqual([c, expect.arrayContaining(['force-push'])])
+  })
+  test('the usual commit message stays text, whatever it says (PR #685 round 1)', () => {
+    const footer = "git add . && git commit -m \"$(cat <<'EOF'\nfeat: x\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\nEOF\n)\" && git push"
+    const bash = "git commit -m \"$(cat <<'EOF'\nfix: the bash reader; never git push -f to main\nEOF\n)\" && git push"
+    const written = "cat > /tmp/brief.md <<'EOF'\nrun git push -f origin main\nEOF"
+    for (const c of [footer, bash, written]) expect([c, rules(c)]).toEqual([c, []])
+  })
+  test('a braced variable may be any flag or ref (PR #685 round 1)', () => {
+    for (const c of ['git push ${OPTS}', 'git push origin ${BRANCH}', 'git push origin "${BRANCH:-x}"'])
+      expect([c, rules(c)]).toEqual([c, ['branch-delete', 'default-branch-push', 'force-push']])
+    expect(rules('rm ${OPTS} /tmp/x')).toEqual(['rm-outside'])
+  })
+  test('every unique prefix the tools accept is read (PR #685 round 1)', () => {
+    expect(rules('rm --r /tmp/victim')).toEqual(['rm-outside'])
+    expect(rules('git push --de origin x')).toEqual(['branch-delete'])
+    expect(rules('git push --mi')).toEqual(['branch-delete', 'default-branch-push', 'force-push'])
+    expect(rules('git push --f origin feat/x')).toEqual(['force-push'])
+    expect(rules('git push --a')).toEqual(['default-branch-push'])
+    expect(rules('git branch --de --f x')).toEqual(['branch-delete'])
+  })
+  test('a forced default ref is a default push too (PR #685 round 1)', () => {
+    expect(rules('git push origin +main')).toEqual(['default-branch-push', 'force-push'])
+  })
 })

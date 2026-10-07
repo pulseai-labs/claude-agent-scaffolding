@@ -11,22 +11,37 @@ export type NeverRule = 'force-push' | 'default-branch-push' | 'branch-delete' |
 export type Where = { cwd: string; root: string; home: string; branch?: string; defaultBranch?: string }
 
 // Bash joins a backslash-newline, drops a backslash and joins quoted pieces, so `pu\sh`,
-// `pu""sh` and `'git' push` are push. A substitution or a backtick opens new words.
-const SPLIT = /\$\(|\$\{|[\s;&|()<>`]+/
-// A `cat` heredoc with a quoted delimiter, not piped on, is literal text that Bash never runs:
-// the usual commit message, `-m "$(cat <<'EOF' … EOF)"`. Its body is dropped, unless the text
-// names a program that may run text (`… | bash`), which keeps every word.
-const RUNS_TEXT = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish', 'eval', 'source', '.', 'xargs'])
-const CAT_HEREDOC = /\bcat\b[^\n|]*<<-?[ \t]*(['"])([A-Za-z_][A-Za-z0-9_]*)\1[^\n|]*\n[\s\S]*?\n[ \t]*\2[ \t]*(?=\n|\)|$)/g
+// `pu""sh` and `'git' push` are push. A substitution or a backtick opens new words; `${`
+// does not, so `${OPTS}` stays a word that starts with `$`.
+const SPLIT = /\$\(|[\s;&|()<>`]+/
+// Two literal heredoc shapes are text Bash never runs, so their bodies are dropped:
+// - a commit message: `-m "$(cat <<'X'` … `X` `)"` (or `--message`), the usual commit;
+// - `cat > file <<'X'` (or `cat <<'X' > file`) at a command's start, when the file is not
+//   named again later in the text (a script written then run keeps its words).
+// The delimiter must be quoted, so the body holds no expansion.
+const MESSAGE = /(?:-m|--message)(?:=|[ \t]*)"\$\(cat[ \t]+<<-?[ \t]*(['"])([A-Za-z_]\w*)\1[ \t]*\n[\s\S]*?\n[ \t]*\2[ \t]*\n?[ \t]*\)"/g
+const WRITE = /(?<=^|[\n;&|(])[ \t]*cat[ \t]+(?:>>?[ \t]*([^\s;&|<>]+)[ \t]+)?<<-?[ \t]*(['"])([A-Za-z_]\w*)\2(?:[ \t]*>>?[ \t]*([^\s;&|<>]+))?[ \t]*\n[\s\S]*?\n[ \t]*\3[ \t]*(?=\n|$)/g
+// A program that may run text it is given keeps every word, the dropped bodies included:
+// a shell, an interpreter, a remote or wrapping runner, sed, awk. `.` counts only where a
+// command starts (`git add .` is a path).
+const RUNNER = /^(?:bash|sh|zsh|dash|ksh|fish|eval|source|xargs|ssh|su|watch|parallel|sed|python[\d.]*|pypy[\d.]*|node|nodejs|deno|bun|perl[\d.]*|ruby[\d.]*|php[\d.]*|lua(?:jit)?[\d.]*|Rscript|pwsh|powershell|osascript|tclsh|expect|[gmn]?awk)$/
+const DOT_SOURCE = /(?:^|[\n;&|(`]|\$\()[ \t]*\.[ \t]/
 function split(command: string): string[] {
   const text = command.replace(/\\\r?\n/g, '').replace(/[\\'"]/g, '')
   // NAME=VALUE also shows its value: FLAGS=-rf, alias.p=push, remote.x.push=refs/heads/main.
   return text.split(SPLIT).flatMap(w => (w.indexOf('=') > 0 ? [w, w.slice(w.indexOf('=') + 1)] : [w])).filter(w => w !== '')
 }
 function wordsOf(command: string): string[] {
-  const all = split(command)
-  if (all.some(w => RUNS_TEXT.has(w) || [...RUNS_TEXT].some(r => r.length > 1 && w.endsWith(`/${r}`)))) return all
-  return split(command.replace(CAT_HEREDOC, m => m.slice(0, m.indexOf('\n'))))
+  const message = command.replace(MESSAGE, m => m.slice(0, m.indexOf('\n')))
+  const text = message.replace(WRITE, (m, before: string | undefined, _q, _d, after: string | undefined, at: number) => {
+    const file = before ?? after
+    if (file === undefined || message.slice(at + m.length).includes(file)) return m
+    return m.slice(0, m.indexOf('\n'))
+  })
+  if (text === command) return split(command)
+  // Runners are looked for outside the dropped bodies: a message that says "bash" runs nothing.
+  if (DOT_SOURCE.test(text) || split(text).some(w => RUNNER.test(w.replace(/^.*\//, '')))) return split(command)
+  return split(text)
 }
 
 // A verb is the word itself, or a path or dashed executable ending in it (git-push, /bin/rm).
@@ -36,7 +51,9 @@ const isPush = (w: string) => PUSH.some(v => isVerb(w, v)) || w.includes('.push=
 
 // The letters of a short-flag cluster: -uf, -4f, -nF/tmp/m (letters up to the value).
 const letters = (w: string): string => (/^-[A-Za-z0-9]/.test(w) ? /^-([A-Za-z0-9]+)/.exec(w)![1]! : '')
-// git and GNU accept a unique prefix of a long option; min is the shortest prefix read.
+// git and GNU accept a unique prefix of a long option. min is the shortest prefix read: 3
+// (`--r`, `--de`, `--mi`) reads every prefix the tools accept, and an ambiguous one the
+// tools refuse is only an extra ask; --no-verify keeps 6 (`--no-` would match --no-edit).
 const abbrev = (w: string, long: string, min: number) => { const n = w.split('=')[0]!; return n.length >= min && long.startsWith(n) }
 // A flag word with a glob, a brace or a variable may be any flag (`--forc*`, `-$X`). For push
 // and rm a bare variable may be one too (`git push $OPTS`); for branch and commit it is a
@@ -69,29 +86,30 @@ export function neverRules(command: string, where: Where): NeverRule[] {
   const short = (c: string) => (w: string) => letters(w).includes(c)
 
   if (words.some(isPush)) {
-    if (any(w => short('f')(w) || abbrev(w, '--force-with-lease', 5) || abbrev(w, '--force-if-includes', 5) ||
-      abbrev(w, '--mirror', 5) || w.startsWith('+'))) found.add('force-push')
-    if (any(w => short('d')(w) || abbrev(w, '--delete', 5) || abbrev(w, '--prune', 5) || abbrev(w, '--mirror', 5) ||
+    if (any(w => short('f')(w) || abbrev(w, '--force-with-lease', 3) || abbrev(w, '--force-if-includes', 3) ||
+      abbrev(w, '--mirror', 3) || w.startsWith('+'))) found.add('force-push')
+    if (any(w => short('d')(w) || abbrev(w, '--delete', 3) || abbrev(w, '--prune', 3) || abbrev(w, '--mirror', 3) ||
       w.startsWith(':') || w.startsWith('+:'))) found.add('branch-delete')
     const names = where.defaultBranch !== undefined ? [where.defaultBranch] : ['main', 'master']
-    const isDefault = (w: string) => names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`)))
+    // A leading + forces the update; the ref after it is still the destination (+main).
+    const isDefault = (r: string) => { const w = r.replace(/^\+/, ''); return names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))) }
     // send-pack and http-push with no refspec update the matching refs, the default one included.
     const plumbing = words.some(w => isVerb(w, 'send-pack') || isVerb(w, 'http-push'))
     if (plumbing || where.branch === undefined || names.includes(where.branch) || moves(words, where) ||
-      any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 4) || abbrev(w, '--branches', 4) || abbrev(w, '--mirror', 5)))
+      any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))
       found.add('default-branch-push')
   }
   // -D, or -d with a force flag; a plain -d refuses an unmerged branch (as seat-mods reads it).
   if (words.some(w => isVerb(w, 'branch'))) {
-    const del = anyNamed(w => short('d')(w) || abbrev(w, '--delete', 5))
-    if (anyNamed(short('D')) || (del && anyNamed(w => short('f')(w) || abbrev(w, '--force', 5)))) found.add('branch-delete')
+    const del = anyNamed(w => short('d')(w) || abbrev(w, '--delete', 3))
+    if (anyNamed(short('D')) || (del && anyNamed(w => short('f')(w) || abbrev(w, '--force', 3)))) found.add('branch-delete')
   }
   if (words.some(w => abbrev(w, '--no-verify', 6)) || (words.some(w => isVerb(w, 'commit')) && anyNamed(short('n')))) found.add('no-verify')
 
   const rm = words.findIndex(w => isVerb(w, 'rm'))
   if (rm >= 0) {
     const after = words.slice(rm + 1)
-    const recursive = after.some(w => /[rR]/.test(letters(w)) || abbrev(w, '--recursive', 5) || anyFlag(w))
+    const recursive = after.some(w => /[rR]/.test(letters(w)) || abbrev(w, '--recursive', 3) || anyFlag(w))
     // Strictly below the root: nothing is below a worktree at /.
     const root = where.root.replace(/\/+$/, '')
     const below = (w: string) => root !== '' && w.startsWith(`${root}/`)

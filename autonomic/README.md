@@ -97,8 +97,8 @@ matches the list becomes an `ask`, so you get the normal permission dialog, and 
 **bypass floor**; see "Permission modes").
 
 The list reads the whole command text as **one bag of words**. First it joins a backslash-newline
-and drops every `\`, `'` and `"`. Then it splits the text at spaces, `; & | ( ) < >`, backticks, `$(`
-and `${`. A `NAME=VALUE` word also shows its value. The list never decides which command a word
+and drops every `\`, `'` and `"`. Then it splits the text at spaces, `; & | ( ) < >`, backticks and `$(`
+(`${OPTS}` stays one word that starts with `$`). A `NAME=VALUE` word also shows its value. The list never decides which command a word
 belongs to, so a quote, a wrapper, an interpreter or a substitution cannot hide a word:
 `python3 -c 'git push -f'`, `bash -c "…"` and `$(git push -f)` all show `push` and `-f`. A danger
 word beside a harmless command is an extra ask; that is the cost of this reading. The rules:
@@ -122,11 +122,16 @@ word beside a harmless command is an extra ask; that is the cost of this reading
 
 A flag word that holds `$`, `*`, `?`, `[` or `{` (`--forc*`, `-$X`) counts as every flag. Beside a
 push or an `rm`, so does a bare variable (`git push $OPTS`). Beside `branch` or `commit`, a bare
-variable is not read as a flag: it is mostly a message or a path. A `cat` heredoc with a quoted
-delimiter (`-m "$(cat <<'EOF' … EOF)"`, the usual commit message) is literal text and its body is
-skipped, unless the text names a program that may run text (`bash`, `sh`, `eval`, `source`,
-`xargs` …). A unique prefix of a long option is read as that option (`--forc` is `--force`),
-as git and GNU tools accept it.
+variable is not read as a flag: it is mostly a message or a path.
+
+Two heredoc shapes with a quoted delimiter are literal text, and their bodies are skipped: a
+commit message, `-m "$(cat <<'EOF'` … `EOF` `)"`, and `cat > file <<'EOF'` at a command's start
+when the file is not named again later in the text. Every other heredoc keeps its words, and so
+do these two when the rest of the text names a program that may run text: a shell, `eval`,
+`source`, `.` at a command's start, `xargs`, `ssh`, `su`, `watch`, `parallel`, `sed`, `awk` or an
+interpreter (`python3`, `node`, `perl`, `ruby` …). A unique prefix of a long option is read as
+that option (`--r` is `--recursive`, `git push --de` is `--delete`), as git and GNU tools accept
+it; an ambiguous prefix the tools refuse is only an extra ask.
 
 `unreadable` matches nothing since 0.2.0: no rule depends on following a command's shape. The
 name stays valid, so an existing `neverApprove` value still parses.
