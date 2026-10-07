@@ -84,12 +84,12 @@ The complete input grammar is shared by both halves:
 | Input | Interpretation |
 |---|---|
 | registry value or data-row first cell | trim surrounding whitespace; the complete value must match case-insensitive `ADR-[A-Za-z0-9]+` (including `ADR-C`); embedded whitespace is invalid |
-| section-4 table delimiter row | every cell has at least three hyphens, optional alignment colons, and surrounding whitespace |
-| table row immediately before that delimiter | header, regardless of its first cell's content |
+| section-4 table delimiter row | every cell has one or more hyphens, optional alignment colons, and surrounding whitespace |
+| table row immediately before that delimiter | header; a valid ADR reference in its first cell is reported as a misplaced reference |
 | every other section-4 table row | data; an invalid first cell, including an empty one, is reported, never discarded |
 | repeated identifier on either half | duplicate finding; compare case-insensitively, preserve source spellings in findings |
 
-Only headers and delimiter rows are omitted. Compare valid identifiers as
+Headers are excluded from the identifier sets, but a header whose first cell is a valid ADR reference is a finding. Delimiter rows are omitted. Compare valid identifiers as
 complete upper-cased sets; retain the original values and multiplicity to name
 mismatches and duplicates. An invalid registry value refuses the comparison;
 an invalid index cell is a finding. An empty registry and header-only table
@@ -110,6 +110,7 @@ sv_state="$("$oss_bin" state_path 2>/dev/null)" || sv_state=""
 spec="$("$oss_bin" spec_path 2>/dev/null)" || spec=""
 state_rc=0
 if [ -n "$sv_state" ]; then
+  reg_count="$("$oss_bin" get '.bones | length' "$sv_state" 2>/dev/null)" || state_rc=$?
   reg_raw="$("$oss_bin" get '.bones[].adr' "$sv_state" 2>/dev/null)" || state_rc=$?
 else
   state_rc=1
@@ -131,7 +132,9 @@ else
   # registry suite's own fixtures), and dropping one would print "0 entries" over
   # a registry that has entries (round 1, C4).
   adr_re='^[Aa][Dd][Rr]-[A-Za-z0-9]+$'
-  bad="$(printf '%s\n' "$reg_raw" | awk -v ref="$adr_re" '{sub(/^[[:space:]]+/,""); sub(/[[:space:]]+$/,""); if(length && $0 !~ ref) print}')"
+  bad="$(printf '%s\n' "$reg_raw" | awk -v ref="$adr_re" -v count="$reg_count" '
+    NR <= count {sub(/^[[:space:]]+/,""); sub(/[[:space:]]+$/,""); if($0 !~ ref) print (length ? $0 : "[empty]")}
+    END {for(i=NR;i<count;i++) print "[empty]"}')"
   if [ -n "$bad" ]; then
     echo "skip: spec - the registry holds a value that is not an ADR reference ('$(printf '%s' "$bad" | tr '\n' ' ')'), and a value this check cannot name is not one it may drop"
   else
@@ -142,7 +145,7 @@ else
     reg="$(printf '%s\n' "$reg_all" | sort -u)"
     reg_dupes="$(printf '%s\n' "$reg_all" | grep -v '^$' | uniq -d)" || reg_dupes=""
     # Buffer one row: ONLY the row immediately before a full delimiter row is
-    # the header. Every other table row is validated, even an empty first cell.
+    # the header. Report an ADR-shaped header; validate every other table row.
     idx_all="$(awk '/^##[[:space:]]*4[.:[:space:]]/ {f=1; next} /^##[[:space:]]/ {f=0} f' "$spec" \
       | awk -v ref="$adr_re" '
         function cell(row, a) {
@@ -152,7 +155,7 @@ else
         function delimiter(row, a,n,i) {
           sub(/^[[:space:]]*\|/,"",row); sub(/\|[[:space:]]*$/,"",row)
           n=split(row,a,"|"); if(!n) return 0
-          for(i=1;i<=n;i++) if(a[i] !~ /^[[:space:]]*:?---[-]*:?[[:space:]]*$/) return 0
+          for(i=1;i<=n;i++) if(a[i] !~ /^[[:space:]]*:?-+:?[[:space:]]*$/) return 0
           return 1
         }
         function emit(row, c) {
@@ -160,7 +163,10 @@ else
           else print "BAD " (c=="" ? "[empty]" : c)
         }
         /^[[:space:]]*\|/ {
-          if(delimiter($0)) {pending=""; next}
+          if(delimiter($0)) {
+            if(pending!="" && cell(pending) ~ ref) print "HEADER " cell(pending)
+            pending=""; next
+          }
           if(pending!="") emit(pending)
           pending=$0; next
         }
@@ -168,6 +174,7 @@ else
         END {if(pending!="") emit(pending)}')" || idx_all=""
     idx_rows="$(printf '%s\n' "$idx_all" | sed -n 's/^OK //p')" || idx_rows=""
     bad_rows="$(printf '%s\n' "$idx_all" | sed -n 's/^BAD //p')" || bad_rows=""
+    adr_headers="$(printf '%s\n' "$idx_all" | sed -n 's/^HEADER //p')" || adr_headers=""
     idx="$(printf '%s\n' "$idx_rows" | tr '[:lower:]' '[:upper:]' | sort -u)" || idx=""
     dupes="$(printf '%s\n' "$idx_rows" | tr '[:lower:]' '[:upper:]' | grep -v '^$' | sort | uniq -d)" || dupes=""
     # comm over the two variables - no temp files to create, leak or clean. An
@@ -186,12 +193,13 @@ else
         BEGIN {n=split(keys,a,"\n"); for(i=1;i<=n;i++) wanted[a[i]]=1}
         wanted[toupper($0)] && !seen[$0]++ {print}' | tr '\n' ' ' | sed 's/ $//'
     }
-    if [ -n "$only_reg" ] || [ -n "$only_idx" ] || [ -n "$dupes" ] || [ -n "$reg_dupes" ] || [ -n "$bad_rows" ]; then
+    if [ -n "$only_reg" ] || [ -n "$only_idx" ] || [ -n "$dupes" ] || [ -n "$reg_dupes" ] || [ -n "$bad_rows" ] || [ -n "$adr_headers" ]; then
       [ -z "$only_reg" ] || echo "fail: spec - registry entry with no index row: $(sv_names "$only_reg" "$reg_values")"
       [ -z "$only_idx" ] || echo "fail: spec - index row with no registry entry: $(sv_names "$only_idx" "$idx_rows")"
       [ -z "$dupes" ] || echo "fail: spec - section 4 carries more than one row for: $(sv_names "$dupes" "$idx_rows")"
       [ -z "$reg_dupes" ] || echo "fail: spec - the registry carries more than one bone record for: $(sv_names "$reg_dupes" "$reg_values")"
       [ -z "$bad_rows" ] || echo "fail: spec - section 4 carries a row whose first cell is not an ADR reference: $(printf '%s' "$bad_rows" | tr '\n' ' ')"
+      [ -z "$adr_headers" ] || echo "fail: spec - section 4 carries a header whose first cell is an ADR reference: $(printf '%s' "$adr_headers" | tr '\n' ' ')"
     else
       echo "ok: spec - bones index matches the registry: $(printf '%s' "$reg" | grep -c '[^[:space:]]') entries, $(printf '%s' "$idx_rows" | grep -c '[^[:space:]]') rows"
     fi

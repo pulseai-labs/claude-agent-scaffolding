@@ -167,13 +167,42 @@ SEQUENCE is shared — so the scan takes that repo as `$dest_repo` and takes the
 minted **width** from *its* series: the file must not be the odd one out in its
 own directory. Read it, do not guess:
 
+The inventory block below defines `scan_adrs`. Execute it before the mint
+block. It creates `$scan` with filenames from every declared repo and `$dest`
+with the destination's filenames, when a destination is supplied. Adoption C3
+calls `scan_adrs` without a destination and reads `$scan`; it does not mint.
+Both temp files belong to the caller and must be removed after use.
+
 ```bash
-# $repos and $dest_repo are NOT ambient: $repos is one declared repo name per
-# line (the set the topology declares - the same convention
-# spine-close.md's $repo_base_branches uses), and $dest_repo is the repo the ADR
-# LANDS in, the one the decision concerns (§3, "Where"). The NUMBER is
-# project-wide; the minted WIDTH is the destination's own, because two repos may
-# pad differently (round 1, C2).
+# $repos is one declared repo name per line; resolve each with $oss_bin.
+scan_adrs() {
+  scan="$(mktemp)"; dest="$(mktemp)"
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    root="$("$oss_bin" repo_root "$name")" || { echo "the numbering scan could not resolve a root for repo '$name'" >&2; rm -f "$scan" "$dest"; exit 1; }
+    # A refusal names its path (R9), and every exit path takes both temp files
+    # with it - one populated mktemp per mint is the leak this round closed (R6).
+    if ! mkdir -p "$root/docs/adr"; then
+      echo "the numbering scan could not create $root/docs/adr - reading it as an empty series would mint an id that may already exist" >&2
+      rm -f "$scan" "$dest"; exit 1
+    fi
+    # An unreadable directory is NOT an empty one: minting from a series that
+    # could not be read is how a duplicate id gets made, so this refuses instead.
+    if ! listing="$(ls -1 "$root/docs/adr" 2>/dev/null)"; then
+      echo "the numbering scan could not read $root/docs/adr - reading it as an empty series would mint an id that may already exist" >&2
+      rm -f "$scan" "$dest"; exit 1
+    fi
+    printf '%s\n' "$listing" >> "$scan"
+    if [ "$name" = "${dest_repo:-}" ]; then printf '%s\n' "$listing" > "$dest"; fi
+  done <<< "$repos"
+}
+```
+
+The mint block requires `$dest_repo`, the declared repo the ADR lands in.
+It validates that name before calling `scan_adrs` or allocating temp files.
+The NUMBER is project-wide; the WIDTH follows that destination's series.
+
+```bash
 # Validate the destination against the scanned set BEFORE creating temp files.
 # An absent match is not an empty destination series and must never pick %04d.
 dest_scanned=0
@@ -185,27 +214,7 @@ if [ "$dest_scanned" = 0 ]; then
   echo "the numbering scan refuses dest_repo '${dest_repo:-[unset]}': it is not a scanned repo" >&2
   exit 1
 fi
-scan="$(mktemp)"; dest="$(mktemp)"
-while IFS= read -r name; do
-  [ -n "$name" ] || continue
-  root="$("$oss_bin" repo_root "$name")" || { echo "the numbering scan could not resolve a root for repo '$name'" >&2; rm -f "$scan" "$dest"; exit 1; }
-  # A refusal names its path (R9), and every exit path takes both temp files
-  # with it - one populated mktemp per mint is the leak this round closed (R6).
-  if ! mkdir -p "$root/docs/adr"; then
-    echo "the numbering scan could not create $root/docs/adr - reading it as an empty series would mint an id that may already exist" >&2
-    rm -f "$scan" "$dest"; exit 1
-  fi
-  # An unreadable directory is NOT an empty one: minting from a series that
-  # could not be read is how a duplicate id gets made, so this refuses instead.
-  if ! listing="$(ls -1 "$root/docs/adr" 2>/dev/null)"; then
-    echo "the numbering scan could not read $root/docs/adr - reading it as an empty series would mint an id that may already exist" >&2
-    rm -f "$scan" "$dest"; exit 1
-  fi
-  printf '%s\n' "$listing" >> "$scan"
-  if [ "$name" = "${dest_repo:-}" ]; then printf '%s\n' "$listing" > "$dest"; fi
-done <<EOF
-$repos
-EOF
+scan_adrs
 # Every form an adopter's series can already be in: the prefixed form in EITHER
 # case (scaffold-dev writes `adr-`, PulseDB's series is `ADR-`) and the bare
 # form (scaffold-onboard's seed). Matching one case only returns NOTHING on the

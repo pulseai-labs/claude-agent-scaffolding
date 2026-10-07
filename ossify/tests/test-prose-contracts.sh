@@ -851,20 +851,40 @@ printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_know
 cp "$_G_WS/state.json" "$_G_WS/base.json"
 while IFS=';' read -r shape registry cells expected; do
   jq --arg refs "$registry" '.bones = (if $refs == "" then [] else
-    $refs | split(",") | map({adr:., title:"grammar fixture", touch:["core/**"]}) end)' \
+    $refs | split(",") | map({adr:(if . == "<empty>" then "" else . end), title:"grammar fixture", touch:["core/**"]}) end)' \
     "$_G_WS/base.json" > "$_G_WS/state.json"
   _e_spec "$_G_WS"
+  cp "$_G_WS/docs/MASTER-SPEC.md" "$_G_WS/header-only.md"
   # Insert data before section 5; an empty first cell is still a DATA row.
   awk -v cells="$cells" -v shape="$shape" '
     /^\| ADR \|/ && shape == "numeric-header" {print "| ADR 2026 | Title |"; next}
+    /^\| ADR \|/ && shape == "non-adr-header" {print "| RFC-2119 | Title |"; next}
+    /^\|---\|---\|$/ && shape ~ /^delimiter-/ {
+      if(shape=="delimiter-one") print "|-|-|"
+      if(shape=="delimiter-two") print "|--|--|"
+      if(shape=="delimiter-colons") print "|:-|-:|"
+      if(shape=="delimiter-aligned") print "| :-: |"
+      if(shape=="delimiter-single-two") print "|--|"
+      if(shape=="delimiter-invalid") print "| : | : |"
+      next
+    }
     /^## 5/ {n=split(cells,a,","); for(i=1;i<=n;i++) {
       c=a[i]; if(c=="<empty>") c=""; print "| " c " | fixture |"
+      if(shape ~ /^adr-header/) print "|---|---|"
     }} {print}
   ' "$_G_WS/docs/MASTER-SPEC.md" > "$_G_WS/spec.tmp"
   mv "$_G_WS/spec.tmp" "$_G_WS/docs/MASTER-SPEC.md"
+  if [ "$shape" = numeric-header ]; then
+    if cmp -s "$_G_WS/header-only.md" "$_G_WS/docs/MASTER-SPEC.md"; then
+      T_FAIL=$((T_FAIL+1)); echo "FAIL: R6 numeric-header rewrite did not change the header-only fixture"
+    else
+      T_PASS=$((T_PASS+1))
+    fi
+  fi
   t_capture _e_run "$_G_WS"
   printf 'GRAMMAR %s rc=%s: %s\n' "$shape" "$T_RC" "$T_OUT"
   t_assert_rc 0 "#648 $shape completes under strict Bash"
+  expected="$(printf '%b' "$expected")"
   t_assert_eq "$expected" "$T_OUT" "#648 $shape follows the row grammar"
 done <<'ROWS'
 numeric;ADR-0002;ADR-0002;ok: spec - bones index matches the registry: 1 entries, 1 rows
@@ -884,6 +904,19 @@ mixed-duplicate-index;aDr-C;AdR-c,aDR-C;fail: spec - section 4 carries more than
 mixed-duplicate-registry;aDr-C,ADR-c;AdR-c;fail: spec - the registry carries more than one bone record for: aDr-C ADR-c
 mixed-registry-only;aDr-C;;fail: spec - registry entry with no index row: aDr-C
 mixed-index-only;;AdR-c;fail: spec - index row with no registry entry: AdR-c
+delimiter-one;ADR-C;ADR-C;ok: spec - bones index matches the registry: 1 entries, 1 rows
+delimiter-single-two;ADR-C;ADR-C;ok: spec - bones index matches the registry: 1 entries, 1 rows
+delimiter-two;ADR-C;ADR-C;ok: spec - bones index matches the registry: 1 entries, 1 rows
+delimiter-colons;ADR-C;ADR-C;ok: spec - bones index matches the registry: 1 entries, 1 rows
+delimiter-aligned;ADR-C;ADR-C;ok: spec - bones index matches the registry: 1 entries, 1 rows
+delimiter-invalid;ADR-C;ADR-C;fail: spec - section 4 carries a row whose first cell is not an ADR reference: ADR :
+non-adr-header;;;ok: spec - bones index matches the registry: 0 entries, 0 rows
+adr-header-empty;;AdR-c;fail: spec - section 4 carries a header whose first cell is an ADR reference: AdR-c
+adr-header-matching;ADR-C;ADR-C;fail: spec - registry entry with no index row: ADR-C\nfail: spec - section 4 carries a header whose first cell is an ADR reference: ADR-C
+blank-registry;<empty>;;skip: spec - the registry holds a value that is not an ADR reference ('[empty]'), and a value this check cannot name is not one it may drop
+whitespace-registry;   ;;skip: spec - the registry holds a value that is not an ADR reference ('[empty]'), and a value this check cannot name is not one it may drop
+two-blank-registry;<empty>,<empty>;;skip: spec - the registry holds a value that is not an ADR reference ('[empty] [empty]'), and a value this check cannot name is not one it may drop
+blank-with-valid-registry;ADR-C,<empty>;ADR-C;skip: spec - the registry holds a value that is not an ADR reference ('[empty]'), and a value this check cannot name is not one it may drop
 ROWS
 
 # (e6) ROUND 1, R3: an unresolvable route must REFUSE, not abort. Both resolver
@@ -914,6 +947,14 @@ if oss_block_extract "$_AD" 'narrow=' "$_SC" 2>/dev/null && [ -s "$_SC" ]; then
   T_PASS=$((T_PASS+1))
 else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: bones-registry.md §3's numbering scan no longer extracts - the checks below are vacuous"
+fi
+_SI="$_PC_TMP/adr-inventory.sh"
+oss_block_extract "$_AD" 'scan=' "$_SI"
+# On the pre-split block this is already included; on the new boundary load
+# the definition before the mint. This keeps the red run on the original head real.
+if ! grep -Fq 'scan=' "$_SC"; then
+  cat "$_SI" "$_SC" > "$_SC.combined"
+  mv "$_SC.combined" "$_SC"
 fi
 _o_ws() { # $1=name ; echoes a workspace whose canonical repo has an empty docs/adr
   local d="$_PC_TMP/ni/$1"
@@ -955,6 +996,18 @@ canonicl;1;the numbering scan refuses dest_repo 'canonicl': it is not a scanned 
 [unset];1;the numbering scan refuses dest_repo '[unset]': it is not a scanned repo
 canonical;0;ADR-003
 DESTINATIONS
+
+# R4: adopt C3 runs inventory with no destination and mints nothing.
+_SI="$_PC_TMP/adr-inventory.sh"
+oss_block_extract "$_AD" 'scan=' "$_SI"
+_o_adopt_scan() {
+  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo oss_bin="$OSS" repos="$2" bash -c \
+    "set -euo pipefail; . '$_SI'; scan_adrs; sort \"\$scan\"; rm -f \"\$scan\" \"\$dest\"" )
+}
+t_capture _o_adopt_scan "$_O_U" canonical
+printf 'ADOPT inventory rc=%s: %s\n' "$T_RC" "$T_OUT"
+t_assert_rc 0 "R4 adopt C3 inventory completes without dest_repo"
+t_assert_eq $'ADR-001-redb-for-storage.md\nADR-002-single-writer.md' "$T_OUT" "R4 adopt C3 inventories the existing series without minting"
 
 # CONTROLS: every other form keeps working, and a non-series mints nothing from.
 _O_B="$(_o_ws bare)"; : > "$_O_B/canon/docs/adr/0003-record-architecture-decisions.md"
@@ -1023,6 +1076,12 @@ printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"},"extra":{"r
 t_capture _o_next2 "$_O_C2" "$(printf 'canonical\nextra')" canonical
 t_assert_contains "$T_OUT" "ADR-0100" "#301 C2: the width is the destination repo's, so a four-digit series elsewhere cannot force a three-digit mint"
 t_assert_contains "$T_OUT" "ADR-0100" "#301 C2 control: the NUMBER is still project-wide (99 elsewhere -> 100)"
+
+# R4 inventory covers both declared repos and all existing filename forms.
+: > "$_O_C2/canon/docs/adr/0010-bare.md"
+t_capture _o_adopt_scan "$_O_C2" $'canonical\nextra'
+t_assert_rc 0 "R4 adopt C3 aggregates every declared repo without dest_repo"
+t_assert_eq $'0010-bare.md\nADR-099-elsewhere.md\nadr-0007-hexagonal.md' "$T_OUT" "R4 adopt C3 retains bare, uppercase and lowercase series across repos"
 
 # --- phase 3: the never-strand invariant's two surfaces must agree -----------
 #
