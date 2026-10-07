@@ -596,16 +596,37 @@ export const register: Register = (on, options) => {
     const value = await read($, notice)
     if (value === null || e.props.hasSurvey) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
+    const options = value.options ?? []
+    if (options.length === 0) {
+      return (
+        <Box>
+          <Text>{value.text} </Text>
+          <Button key="dismiss" label="Dismiss" onPress={() => update($, notice, () => null)} />
+        </Box>
+      )
+    }
+    // 0.3.1: the question on its own line, then one row per option. The buttons share one
+    // column, as wide as the longest (its chrome and hotkey included) and at most 40% of the
+    // band, so every text wraps in the space to its right.
+    const labels = options.map(o => (o.recommended ? `${o.label} (Recommended)` : o.label))
+    const width = Math.min(Math.max(...labels.map(l => l.length)) + 8, Math.floor(e.props.bodyColumns * 0.4))
     return (
-      <Box>
-        <Text>{value.text} </Text>
-        {(value.options ?? []).map((o, i) => (
-          <Box key={`option-row-${i}`}>
-            <Button key={`option-${i}`} label={o.recommended ? `${o.label} (Recommended)` : o.label} onPress={() => choose($, value, o)} />
-            <Text key={`option-text-${i}`}> {o.text}</Text>
+      <Box flexDirection="column">
+        <Text bold>{value.text}</Text>
+        {options.map((o, i) => (
+          <Box key={`option-row-${i}`} flexDirection="row">
+            <Box width={width} flexShrink={0}>
+              <Button key={`option-${i}`} label={labels[i]} hotkey={String(i + 1)} {...(o.recommended ? { variant: 'primary' as const } : {})} onPress={() => choose($, value, o)} />
+            </Box>
+            <Box flexGrow={1}>
+              <Text wrap="wrap">{o.text}</Text>
+            </Box>
           </Box>
         ))}
-        <Button key="dismiss" label="Dismiss" onPress={() => update($, notice, () => null)} />
+        <Box flexDirection="row">
+          <Button key="dismiss" label="Dismiss" role="dismiss" onPress={() => update($, notice, () => null)} />
+          <Text dimColor> or type your own reply</Text>
+        </Box>
       </Box>
     )
   })

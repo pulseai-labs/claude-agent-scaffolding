@@ -2,6 +2,22 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.3.1
+
+**The pain band reads in one pass** (live check of 0.3.0, finding F1).
+
+- **Column layout** (`register.tsx`): the question on its own line, in bold; then one row per
+  option. The buttons share one column, as wide as the longest label with its chrome and at most
+  40% of the band's width, and each option's whole text wraps in the space to its right. Dismiss
+  is on the last row, with "or type your own reply". In 0.3.0 the question, the buttons and the
+  texts shared one row, so every text wrapped into a narrow column.
+- **The recommended option is the primary button** (accent style), and keys 1–3 press an option
+  while the band has the focus.
+- A pain with no options keeps its one line: the question and Dismiss.
+- **Known limit:** the button column is capped at 40% of the band, so a long label wraps inside
+  its button: a 40-character recommended label (54 with its suffix) wraps in a band under about
+  155 columns. Its text still wraps beside it, whole.
+
 ## 0.3.0
 
 **Pain options: one press resumes autopilot.**
