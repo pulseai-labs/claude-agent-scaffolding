@@ -169,9 +169,14 @@ permission scope: `allow` is recorded and the tool runs; anything else leaves th
   written, however it is spelled; a command name outside a known list shows as `?`, and a flag
   outside a known list as `-?`. The
   permission dialog shows you the whole command.
-- **Credentials** in other ledger lines (URL user info, `*_TOKEN=…`, `--token …`, Authorization,
-  Bearer and other key, token, secret or cookie header values, bare or quoted, and known token
-  shapes) are redacted before any ledger line, notice, toast, bell or pain file.
+- **What an allowed ask records.** Since 0.2.1, an ask the fork allows records no input value
+  either: a command's shape, as above, or another tool's input key names only (`Write:
+  {file_path, content}`).
+- **Credentials** in the fork's own text — its reasons and the questions it writes (URL user
+  info, `*_TOKEN=…`, `--token …`, Authorization, Bearer and other key, token, secret or cookie
+  header values, bare or quoted, and known token shapes) — are redacted before any ledger line,
+  notice, toast, bell or pain file. This redaction is best effort: prose cannot be reduced to a
+  shape, so a value the fork quotes in an unusual form can pass.
 
 ## The ledger
 

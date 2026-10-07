@@ -1,6 +1,6 @@
 {
   "name": "autonomic",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Autopilot as a Claude Code mod. In autopilot (AUTONOMIC_MODE=autopilot per spawn, or /autopilot on) a global policy joins the system prompt; at each turn end, each AskUserQuestion and each permission ask a cached fork judges the stop against the policy and the session's scope; covered asks and stalls continue, every decision is appended to a ledger, and the closed pain list reaches you by toast, band and an optional bell. Fails toward manual. Requires Claude Code 2.1.289 or later.",
   "author": { "name": "Pras" },
   "types": "./types/index.d.ts",

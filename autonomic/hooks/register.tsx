@@ -13,7 +13,7 @@ import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, ser
 import type { SessionRecord } from './records'
 import { namesDanger, neverRules } from './never'
 import { enforced } from './enforce'
-import { shape } from './shape'
+import { inputShape, shape } from './shape'
 import type { NeverRule, Where } from './never'
 import { permissionPrompt } from './prompts'
 import { parsePermission } from './verdict'
@@ -540,8 +540,6 @@ export const register: Register = (on, options) => {
           return r
         }
       }
-      let shown = ''
-      try { shown = JSON.stringify(e.input) ?? '' } catch {}
       // The fork sees at most MAX_INPUT characters: a longer call stays with the operator (final review I6).
       if (shownInput(e.input).length > MAX_INPUT) {
         await pain($, id, 'permission for you', `${e.tool} (input too long to judge)`)
@@ -549,7 +547,7 @@ export const register: Register = (on, options) => {
       }
       const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? ''), parsePermission)
       if ('v' in j && j.v.decision === 'allow') {
-        if (await record($, id, 'permission', `${e.tool}: ${shown}`, 'allow', j.v.reason, j.usage))
+        if (await record($, id, 'permission', `${e.tool}: ${inputShape(e.input)}`, 'allow', j.v.reason, j.usage))
           return { ...r, decision: 'allow', reason: `autonomic: ${j.v.reason}` }
         return r
       }

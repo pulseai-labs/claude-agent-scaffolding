@@ -56,3 +56,12 @@ export function shape(command: string): string {
   parts.push(segment(tokens))
   return parts.filter(p => p !== '').join(' ').replace(/^[;&| ]+|[;&| ]+$/g, '').trim()
 }
+
+// What an allowed permission ask records (#683): a command's shape, or another tool's input
+// key names. No value is written, so the allowed-ask line cannot carry a credential either.
+export function inputShape(input: unknown): string {
+  const command = (input as { command?: unknown } | null | undefined)?.command
+  if (typeof command === 'string') return shape(command)
+  if (input === null || typeof input !== 'object') return ''
+  return `{${Object.keys(input).join(', ')}}`
+}

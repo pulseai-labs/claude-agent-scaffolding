@@ -199,4 +199,17 @@ describe('the bypass floor after a failure (PR #681: never toward fewer asks)', 
     for (const secret of ['alpha', 'beta', 't0k']) expect(all).not.toContain(secret)
     expect(ledgerLines(w).at(-1)).toContain('Bash: git push -f (+2 args)')
   })
+
+  test('an allowed ask records a value-free summary, not the input (#683)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(fork({ decision: 'allow', reason: 'r1' }), fork({ decision: 'allow', reason: 'r2' }), fork({ decision: 'allow', reason: 'r3' }))
+    await $.tool.check(BASH('GITHUB_TOKEN="verysecret" gh pr list'))
+    await $.tool.check(BASH('TOKEN=a\\ b gh api user'))
+    await $.tool.check({ tool: 'Write', input: { file_path: '/repo/.env', content: 'API=s3cr3tvalue' } } as never)
+    const lines = ledgerLines(w)
+    for (const secret of ['verysecret', 'a\\ b', ' b ', 's3cr3tvalue', '.env']) expect([secret, lines.join('\n').includes(secret)]).toEqual([secret, false])
+    expect(lines.at(-3)).toContain('Q: Bash: NAME= gh (+2 args) · A: allow')
+    expect(lines.at(-2)).toContain('Q: Bash: NAME= gh (+2 args) · A: allow')
+    expect(lines.at(-1)).toContain('Q: Write: {file_path, content} · A: allow')
+  })
 })
