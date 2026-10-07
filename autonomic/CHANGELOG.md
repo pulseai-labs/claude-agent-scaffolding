@@ -2,6 +2,18 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.2.1
+
+**An allowed ask records no input value** (#683).
+
+- **The allowed-ask ledger line** (`register.tsx`, `shape.ts` `inputShape`): an ask the permission
+  fork allows now records the command's shape (as the never-approve path does since 0.1.1), or,
+  for a tool with no command, its input key names only. Before, it recorded the raw input as
+  JSON behind the best-effort redactor, which missed a JSON-escaped quoted value
+  (`GITHUB_TOKEN=\"…\"`) and a backslash-escaped space (`TOKEN=a\ b`).
+- **Known limit:** the fork's own prose — its reason and a turn-end question — still passes only
+  through the redactor; it can quote a value in a form the redactor does not model.
+
 ## 0.2.0
 
 **A token floor in place of the bash reader** (#684, direction 2′).
