@@ -91,7 +91,13 @@ arm=fresh
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue
   root="$("$oss_bin" repo_root "$repo")" || exit 1     # undeclared repo halts HERE
-  if git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch"; then arm=re-entry; fi
+  ref_rc=0
+  git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" || ref_rc=$?
+  case "$ref_rc" in
+    0) arm=re-entry ;;
+    1) ;; # absent ref
+    *) echo "halt: cannot read $spine_branch in $repo (git show-ref rc $ref_rc)"; exit 1 ;;
+  esac
 done <<EOF
 $repos
 EOF
@@ -124,8 +130,11 @@ echo "arm=$arm"
 ### 2a. Fresh arm — check, record, cut, check out
 
 ```bash
+(
+repo_list=""; repo_bases=""
+trap '[ -z "$repo_list" ] || rm -f -- "$repo_list"; [ -z "$repo_bases" ] || rm -f -- "$repo_bases"' EXIT
 spine_branch="$("$oss_bin" branch_name "<spine-id>" "<spine-slug>")"
-repo_list="$(mktemp)"; repo_bases="$(mktemp)"
+repo_list="$(mktemp)" || exit 1; repo_bases="$(mktemp)" || exit 1
 "$oss_bin" get '.work_items[] | select(.spine=="<spine-id>" and .status != "abandoned") | .target_repo' | sort -u > "$repo_list"
 
 # PASS 1 - CHECK every hosting repo. Mutate nothing. A halt here leaves every
@@ -133,8 +142,12 @@ repo_list="$(mktemp)"; repo_bases="$(mktemp)"
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue
   root="$("$oss_bin" repo_root "$repo")" || exit 1     # undeclared repo halts HERE
-  [ -z "$(git -C "$root" status --porcelain)" ] || { echo "halt: $repo is dirty"; exit 1; }
-  if git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch"; then
+  porcelain="$(git -C "$root" status --porcelain)" || { echo "halt: cannot read status in $repo"; exit 1; }
+  [ -z "$porcelain" ] || { echo "halt: $repo is dirty"; exit 1; }
+  ref_rc=0
+  git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" || ref_rc=$?
+  case "$ref_rc" in 0|1) ;; *) echo "halt: cannot read $spine_branch in $repo (git show-ref rc $ref_rc)"; exit 1 ;; esac
+  if [ "$ref_rc" = 0 ]; then
     echo "halt: $spine_branch already exists in $repo - this spine has started; take the re-entry arm (§2b), not this block."; exit 1
   fi
   base_branch="$(git -C "$root" rev-parse --abbrev-ref HEAD)"
@@ -155,6 +168,7 @@ while IFS="$(printf '\t')" read -r repo base_branch; do
   [ -n "$repo" ] || continue
   git -C "$("$oss_bin" repo_root "$repo")" checkout -q -b "$spine_branch" || exit 1
 done < "$repo_bases"
+)
 ```
 
 Each of these is load-bearing:

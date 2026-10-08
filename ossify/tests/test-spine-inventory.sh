@@ -211,16 +211,13 @@ rm -rf "$WT"; mkdir -p "$WT"; inv "$F"
 t_assert_eq "halt:planned-with-worktree" "$(route r0.s1.w1)" "S20: a planned item with an exec record and a plain dir halts, not reattach"
 t_assert_rc 3 "S20: ...rc 3"
 
-# S21 (fix round 3): a MERGED active item routes finish-status even when the recorded path
-# exists as a non-worktree directory: the existence check guards ONLY the reattach decision,
-# and finish-status touches no worktree. S19 above stays the halt control (unmerged + plain
-# dir); order: work-lost -> merged -> finish-status -> path exists -> reattach.
+# S21 (#675): occupied recorded path halts even when the merge landed.
 F="$TMP/s21"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
 echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm "close r0.s1.w1"
 git -C "$F/core" merge -q --no-ff work/r0.s1.w1-one -m "merge r0.s1.w1"
 rm -rf "$WT"; mkdir -p "$WT"; inv "$F"
-t_assert_eq "finish-status" "$(route r0.s1.w1)" "S21: merged + a plain dir at the recorded path is finish-status"
-t_assert_rc 0 "S21: ...rc 0 - not a halt"
+t_assert_eq "halt:unclassified" "$(route r0.s1.w1)" "S21: merged + a plain dir at the recorded path halts before cleanup"
+t_assert_rc 3 "S21: ...rc 3 before late cleanup"
 
 # S12 (#673 A5): state says complete and the branch still holds unmerged
 # commits - the merge the state claims is missing, so the row ROUTES the repair
@@ -698,5 +695,99 @@ t_assert_rc 0 "B2: the cut-missing repair runs"
 t_assert_eq "spine/r0.s1-demo" "$(git -C "$F/ui" rev-parse --abbrev-ref HEAD)" "B2: ...cuts AND checks out the spine branch in the missing repo"
 t_assert_eq "$(git -C "$F/ui" rev-parse main)" "$(git -C "$F/ui" rev-parse spine/r0.s1-demo)" "B2: ...from the RECORDED base"
 t_assert_eq "spine/r0.s1-demo" "$(git -C "$F/core" rev-parse --abbrev-ref HEAD)" "B2: ...and leaves the already-cut repo alone"
+
+# E1: every retained dispatch field, with a clean abandoned control.
+for evidence in branch worktree_path base_sha dispatches; do
+  F="$TMP/e1-$evidence"; fx "$F" 1
+  sf="$F/ws/.ossify/project-state.json"
+  jq --arg k "$evidence" '.work_items[0].status="abandoned" | .work_items[0][$k]=(if $k=="dispatches" then 1 else "retained" end)' "$sf" > "$F/changed.json"; mv "$F/changed.json" "$sf"
+  inv "$F"; t_assert_rc 3 "E1 abandoned retaining $evidence halts"
+  t_assert_eq halt:unclassified "$(route r0.s1.w1)" "E1 abandoned $evidence never skips"
+done
+F="$TMP/e1-clean"; fx "$F" 1; oss_in "$F" work_item_status r0.s1.w1 abandoned >/dev/null; inv "$F"
+t_assert_eq skip "$(route r0.s1.w1)" 'E1 clean abandoned control skips'
+# E2: malformed bases triggers actual getter rc 2, not the absence rc 1.
+F="$TMP/e2"; fx "$F" 1; sf="$F/ws/.ossify/project-state.json"
+jq '.spines[0].bases=[]' "$sf" > "$F/changed.json"; mv "$F/changed.json" "$sf"
+inv "$F"; t_assert_rc 3 'E2 getter read failure halts dispatcher'
+t_assert_eq halt:unreadable "$(field repo core 3)" 'E2 getter rc other than 1 never backfills'
+# E3: a real branch name cannot collide with the display for absence.
+F="$TMP/e3"; fx "$F" 1; git -C "$F/core" branch unrecorded
+oss_in "$F" spine_base_reset r0.s1 core unrecorded >/dev/null
+inv "$F"; t_assert_rc 0 'E3 recorded branch unrecorded is legal'
+t_assert_eq ok "$(field repo core 3)" 'E3 recorded unrecorded branch never requests backfill'
+# E4: both reattach arms reject branches reset below recorded base.
+for status in planned active; do
+  F="$TMP/e4-$status"; fx "$F" 1
+  prior="$(git -C "$F/core" rev-parse HEAD)"
+  echo base > "$F/core/base"; git -C "$F/core" add base; git -C "$F/core" commit -qm base
+  WT="$(spawn "$F" r0.s1.w1 one)"
+  if [ "$status" = planned ]; then
+    sf="$F/ws/.ossify/project-state.json"; jq '.work_items[0].status="planned"' "$sf" > "$F/changed.json"; mv "$F/changed.json" "$sf"
+  fi
+  git -C "$F/core" worktree remove --force "$WT"
+  git -C "$F/core" update-ref refs/heads/work/r0.s1.w1-one "$prior"
+  inv "$F"; t_assert_rc 3 "E4 $status reset below base halts"
+  t_assert_eq halt:unclassified "$(route r0.s1.w1)" "E4 $status never reattaches non-descendant"
+done
+# E7/E8: occupied non-worktree paths are checked before finish-status/skip.
+for status in active complete; do
+  for branch_shape in merged absent; do
+    [ "$status/$branch_shape" != active/absent ] || continue
+    for shape in directory symlink; do
+      F="$TMP/e-path-$status-$branch_shape-$shape"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+      echo landed > "$WT/landed"; git -C "$WT" add landed; close_item "$F" r0.s1.w1 "$WT"
+      git -C "$F/core" worktree remove --force "$WT"
+      sf="$F/ws/.ossify/project-state.json"
+      jq --arg status "$status" --arg shape "$branch_shape" '.work_items[0].status=$status | if $shape=="absent" then .work_items[0].branch="work/r0.s1.w1-cleaned" else . end' "$sf" > "$F/changed.json"; mv "$F/changed.json" "$sf"
+      if [ "$shape" = directory ]; then mkdir -p "$WT"; else ln -s "$F/missing" "$WT"; fi
+      inv "$F"; t_assert_rc 3 "E7/E8 $status $branch_shape $shape halts"
+      t_assert_eq halt:unclassified "$(route r0.s1.w1)" "E7/E8 $status $branch_shape $shape never routes benignly"
+    done
+  done
+done
+# E5/E6: extract each whole fence and run alone in a fresh strict shell.
+ROUND="$HERE/../skills/work-item/references/round-orchestration.md"
+E_ENTER="$TMP/e-enter.sh"; E_FRESH="$TMP/e-fresh.sh"
+oss_block_extract "$ROUND" 'arm=' "$E_ENTER" || exit 1
+oss_block_extract "$ROUND" 'repo_bases' "$E_FRESH" || exit 1
+F="$TMP/e-fences"; mkfix "$F"; oss_in "$F" work_item_add r0.s1 One core >/dev/null
+mkdir -p "$TMP/e-bin" "$TMP/e-temporaries"
+REAL_GIT="$(command -v git)"; export REAL_GIT
+cat > "$TMP/e-bin/git" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *show-ref*) [ "${FAIL_GIT:-}" != show-ref ] || { echo 'injected show-ref read error' >&2; exit 128; } ;;
+  *'status --porcelain'*) [ "${FAIL_GIT:-}" != status ] || { echo 'injected status read error' >&2; exit 128; } ;;
+esac
+exec "$REAL_GIT" "$@"
+SH
+cat > "$TMP/e-bin/oss" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  branch_name) echo spine/r0.s1-demo ;;
+  get) case "$2" in *length*) echo 0 ;; *) echo core ;; esac ;;
+  repo_root) echo "$E_ROOT" ;;
+  spine_base_set) echo RECORD >> "$E_RECORD" ;;
+  *) exit 2 ;;
+esac
+SH
+chmod +x "$TMP/e-bin/git" "$TMP/e-bin/oss"
+_e_fence() {
+  env FAIL_GIT="$2" PATH="$TMP/e-bin:$PATH" E_ROOT="$F/core" E_RECORD="$TMP/e-record" TMPDIR="$TMP/e-temporaries" oss_bin="$TMP/e-bin/oss" bash -c 'set -euo pipefail; . "$1"' fresh "$1"
+}
+for fence in "$E_ENTER" "$E_FRESH"; do
+  mkfix "$F"; rm -f "$TMP/e-record"
+  t_capture _e_fence "$fence" show-ref
+  t_assert_rc 1 'E5 show-ref read error halts; fence runs alone in a fresh shell'
+  t_assert_contains "$T_OUT" 'halt:' 'E5 show-ref read error is named'
+  t_assert_eq no "$(if [ -e "$TMP/e-record" ]; then echo yes; else echo no; fi)" 'E5 failed ref read never reaches RECORD'
+done
+mkfix "$F"; rm -f "$TMP/e-record"
+t_capture _e_fence "$E_FRESH" status
+t_assert_rc 1 'E6 status read error halts; fence runs alone in a fresh shell'
+t_assert_contains "$T_OUT" 'halt:' 'E6 status read error is named'
+t_assert_eq no "$(if [ -e "$TMP/e-record" ]; then echo yes; else echo no; fi)" 'E6 failed status never reaches RECORD'
+t_assert_eq 0 "$(find "$TMP/e-temporaries" -type f | wc -l | tr -d ' ')" 'E5/E6 fresh fence cleans every temporary on halt'
 
 t_summary
