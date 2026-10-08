@@ -1,4 +1,4 @@
-# ossify (v1.14.0)
+# ossify (v1.14.1)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
@@ -93,6 +93,21 @@ The private boundary inventory has one address —
 "composition root" is defined as a path rather than a repo key, and the critic
 moment's non-interactive default records that no operator answered (#299). No
 `lib/` code, no state change.
+
+Since 1.14.1 (#648, #647, #649), doctor's bones drift check identifies table
+headers structurally, accepts short and aligned delimiter cells, and validates
+every data row with the same complete ADR identifier grammar as the registry.
+An ADR reference used as a header is reported. Registry records are trimmed and
+validated as complete values before line output: surrounding newlines are
+whitespace, while blank or internally multiline references refuse comparison.
+Digit-free references such as `ADR-C`
+compare correctly; malformed rows and duplicates on either half are reported,
+with case normalized only for comparison and source spellings kept in findings.
+The ADR mint refuses an unset, empty or unscanned destination repo, naming it
+rather than guessing a four-digit width. Adoption and mint use one self-contained
+scan fence that cleans its temp files on success or refusal; adoption selects
+inventory mode without requiring a destination. The prose-contract controls and their routed
+fixture setup explicitly clear inherited state overrides.
 
 Since 1.14.0 (#133, #362), `/ossify:run-spine` re-enters a started spine on its
 own — at the top of every round after the first, and mid-round after a halted
