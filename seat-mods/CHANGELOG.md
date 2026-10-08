@@ -4,9 +4,10 @@ All notable changes to the `seat-mods` plugin.
 
 ## 0.3.0 — 2026-10-08
 
-- Guarded sessions which `rm` outside their writable places are now denied. Implementers,
+- Guarded sessions are denied an `rm` the rail recognises when operands are outside their
+  writable places. Implementers,
   verifiers and the unmarked default may remove things inside their worktree and `SEAT_MODS_ALLOW`;
-  reviewers may remove things only inside `SEAT_MODS_ALLOW`. Every operand is checked, including
+  reviewers may remove things only inside `SEAT_MODS_ALLOW`. Every recognised operand is checked, including
   `-`-prefixed operands after `--`. Writable roots and their ancestors are protected.
 - Unresolvable operands are denied, including `rm -rf "$OLDPWD"`, variables, parameter and command
   substitutions, and `~user`. Single-quoted operands are literal; `~` and `~/...` use HOME. Globs
@@ -19,6 +20,17 @@ All notable changes to the `seat-mods` plugin.
   a file, and other Bash writes (`cat >`, `sed -i`) remain outside the rail. This is an `rm` matcher
   for mistakes, not precise shell parsing or an adversary boundary. Free roles remain unguarded;
   Bash tool calls from subagents meet the same rail.
+
+- Review round 1: unquoted braces, glob suffix parent traversal and globs above writable roots
+  fail closed. Redirections are excluded from operands; single `&`, reserved head words and
+  `builtin` are recognised; `builtin cd` and `\cd` affect same-call relative operands. Parsing or
+  resolution exceptions deny the Bash call, with self-reference/depth protection for markers.
+- `rm` inside command substitutions or backticks (`$(rm …)`, `` `rm …` ``, quoted `$(…)`) can escape recognition; like `bash -c`, it runs its own command.
+- One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
+- A `<<` inside double quotes can be read as a heredoc opener and hide a following command.
+- Paths changed earlier in the same call (`ln -s`, `mv`, `mkdir` before `rm`) are checked against the filesystem as it stands before the call runs.
+- Glob matches are not enumerated: a matched parent symlink can lead outside writable places, as in `rm -rf <worktree>/*/node_modules`.
+- `POSIXLY_CORRECT` operand ordering and a backslash-newline inside double quotes are not modelled.
 
 ## 0.2.1 — 2026-10-05
 

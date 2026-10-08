@@ -1,5 +1,5 @@
 import type { Register } from 'claude-code'
-import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, placeOf, decide, invalidText, statusText } from './rules'
+import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
 import type { RoleState } from './rules'
 
 async function roleOf($: any): Promise<RoleState> {
@@ -64,18 +64,23 @@ export const register: Register = on => {
     const role = state.role // 'on' or 'default'
 
     if (e.tool === 'Bash') {
-      const texts = await Promise.all(commitMessageFiles(e.command).map(file => $.fs.read(file).catch(() => '')))
-      const text = texts.join('\n')
-      const operands = rmTargets(e.command)
-      const removals = []
-      if (operands.length > 0) {
-        const [cwd, home, root, allow] = await Promise.all([$.session.cwd(), $.env.get('HOME'), worktreeOf($), allowOf($)])
-        for (const operand of operands) {
-          const target = operand.path === undefined ? undefined : await removalPath($, operand.path, cwd, home, operand.glob)
-          removals.push(removalOf(target, root, allow, operand.glob))
+      let deny: string | undefined
+      try {
+        const texts = await Promise.all(commitMessageFiles(e.command).map(file => $.fs.read(file).catch(() => '')))
+        const text = texts.join('\n')
+        const operands = rmTargets(e.command)
+        const removals = []
+        if (operands.length > 0) {
+          const [cwd, home, root, allow] = await Promise.all([$.session.cwd(), $.env.get('HOME'), worktreeOf($), allowOf($)])
+          for (const operand of operands) {
+            const target = operand.path === undefined ? undefined : await removalPath($, operand.path, cwd, home, operand.glob)
+            removals.push(removalOf(target, root, allow, operand.glob))
+          }
         }
+        deny = decide(role, { kind: 'bash', rules: bashRules(e.command, text), removals })
+      } catch {
+        return { deny: uncheckedRmText(role) }
       }
-      const deny = decide(role, { kind: 'bash', rules: bashRules(e.command, text), removals })
       return deny === undefined ? next(e) : { deny }
     }
 

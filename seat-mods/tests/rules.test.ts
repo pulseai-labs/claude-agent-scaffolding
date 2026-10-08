@@ -289,3 +289,10 @@ describe('rm operand parsing', () => {
     expect(rmTargets('rm "a b"')).toEqual([{ path: 'a b', glob: false }])
   })
 })
+
+describe('fix1 expansion guard', () => {
+  test('F6 self-reference fails explicitly, ordinary markers still expand', () => {
+    expect(() => rmTargets('rm "\u00000\u0000"')).toThrow('unresolvable shell marker')
+    expect(rmTargets('rm "/reports/x"')).toEqual([{ path: '/reports/x', glob: false }])
+  })
+})

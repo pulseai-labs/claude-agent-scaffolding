@@ -96,8 +96,11 @@ function blank(command: string): { text: string; pieces: string[] } {
 }
 
 // A segment's text with its blanked pieces put back, nested pieces included.
-function expand(text: string, pieces: readonly string[]): string {
-  return text.replace(MARKER, (_, i: string) => expand(pieces[Number(i)] ?? '', pieces))
+function expand(text: string, pieces: readonly string[], seen: readonly string[] = []): string {
+  return text.replace(MARKER, (_, i: string) => {
+    if (seen.includes(i) || seen.length >= 64) throw new Error('unresolvable shell marker')
+    return expand(pieces[Number(i)] ?? '', pieces, [...seen, i])
+  })
 }
 
 // The command word and its arguments: leading VAR=value assignments and wrapper
@@ -236,7 +239,7 @@ function rmWord(word: string): { path: string; globAt: number; home: boolean } |
       // Inside double quotes Bash only escapes these characters.
       if (quote === '"' && !['$', '`', '"', '\\', '\n'].includes(next)) path += '\\'
       path += next
-    } else if (char === '$' || char === '`') return undefined
+    } else if (char === '$' || char === '`' || (char === '{' && quote === '')) return undefined
     else {
       if (quote === '' && globAt < 0 && '*?['.includes(char)) globAt = path.length
       path += char
@@ -248,14 +251,22 @@ function rmWord(word: string): { path: string; globAt: number; home: boolean } |
   return { path, globAt, home }
 }
 
+const RM_HEAD_WORDS = new Set(['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '(', 'time', 'builtin'])
+
 export function rmTargets(command: string): RmTarget[] {
   const targets: RmTarget[] = []
   const { text, pieces } = blank(command)
   let changedDirectory = false
-  for (const segment of text.split(COMMANDS)) {
-    const head = commandOf(tokensOf(segment))
+  // Redirections belong to the shell, not rm. Blanked quotes/escapes keep
+  // literal glyphs out of this match. Remove fd prefixes before their operators,
+  // then operators with their attached or separate target words.
+  const redirects = text.replace(/(^|[\s;|&()])\d+(?=[<>])/g, '$1')
+    .replace(/(?:&>|>\||>>|>&|>|(?<!<)<(?!<))[ \t]*[^\s;&|()]+/g, ' ')
+  for (const segment of redirects.split(/;|&&|\|\||[|&]|\n|\(|\)/)) {
+    let head = commandOf(tokensOf(segment))
+    while (head !== undefined && RM_HEAD_WORDS.has(head.name)) head = commandOf(head.args)
     if (head === undefined) continue
-    if (['cd', 'pushd', 'popd'].includes(head.name)) changedDirectory = true
+    if (['cd', 'pushd', 'popd'].includes(head.name) || expand(head.name, pieces) === '\\cd') changedDirectory = true
     if (head.name !== 'rm') continue
     let options = true
     for (const arg of head.args) {
@@ -268,6 +279,10 @@ export function rmTargets(command: string): RmTarget[] {
       }
       let path = word.path
       const glob = word.globAt >= 0
+      if (glob && /(?:^|\/)\.\.(?:\/|$)/.test(path.slice(word.globAt))) {
+        targets.push({ path: undefined, glob: false })
+        continue
+      }
       if (glob) {
         const prefix = path.slice(0, word.globAt)
         const slash = prefix.lastIndexOf('/')
@@ -285,7 +300,7 @@ export function rmTargets(command: string): RmTarget[] {
 export function removalOf(target: string | undefined, root: string | undefined, allow: readonly string[], glob: boolean): Removal {
   if (target === undefined || root === undefined) return { place: 'outside', protected: false }
   const ancestor = (dir: string) => target === dir || dir.startsWith(target.replace(/\/$/, '') + '/')
-  return { place: placeOf(target, root, allow), protected: !glob && [root, ...allow].some(ancestor) }
+  return { place: placeOf(target, root, allow), protected: [root, ...allow].some(dir => ancestor(dir) && (!glob || target !== dir)) }
 }
 
 export function placeOf(target: string, root: string, allow: readonly string[]): Place {
@@ -312,6 +327,10 @@ export function decide(role: Role, facts: Facts): string | undefined {
     ? 'no edits in the worktree'
     : 'no writes outside the worktree and the SEAT_MODS_ALLOW directories'
   return denyText(role, rule, 'write here')
+}
+
+export function uncheckedRmText(role: Role): string {
+  return denyText(role, 'no rm: command could not be checked', 'run this command')
 }
 
 export function invalidText(value: string): string {

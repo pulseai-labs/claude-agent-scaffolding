@@ -31,10 +31,10 @@ function normal(path: string): string | undefined {
   return '/' + parts.join('/')
 }
 
-function world(on: On, env: Record<string, string>, gitRepo = true, cwd = '/w/seat-mods') {
+function world(on: On, env: Record<string, string>, gitRepo = true, cwd = '/w/seat-mods', cwdFailure = false) {
   mock.env(on, env)
   on('tool.call', () => ({ result: 'ran' }) as never)
-  on('session.cwd', () => ({ value: cwd }))
+  on('session.cwd', () => cwdFailure ? { deny: 'cwd unavailable' } : { value: cwd })
   on('process.run', (_$, e) =>
     ({ value: e.argv.includes('rev-parse')
       ? (gitRepo
@@ -240,7 +240,7 @@ describe('rm placement: R1-R7', () => {
     for (const [name, denied, allowed] of cases) {
       test(`${label}: ${name} denied beside safe control`, async ($, on) => {
         world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }),
-          SEAT_MODS_ALLOW: '/reports:/w/build/reports', HOME: '/home/seat' })
+          SEAT_MODS_ALLOW: name === 'ancestor inside worktree' ? '/reports:/w/build/reports' : '/reports', HOME: '/home/seat' })
         const bad = await $.tool.call({ tool: 'Bash', command: denied })
         expect(bad.deny).toContain(`seat-mods (${role || 'implementer'}): no rm`)
         const good = await $.tool.call({ tool: 'Bash', command: allowed })
@@ -329,6 +329,67 @@ describe('rm resolution controls', () => {
       expect((await $.tool.call({ tool: 'Bash', command: 'rm /w/inside/' })).deny).toBeUndefined()
       expect((await $.tool.call({ tool: 'Bash', command: 'rm /w/link' })).deny).toBeUndefined()
       expect((await $.tool.call({ tool: 'Bash', command: 'rm /w/link/' })).deny).toBeDefined()
+    })
+  }
+})
+
+// Fix round 1: each finding has a failure case and its nearest allowed control.
+describe('fix1 rm rail', () => {
+  for (const role of ['implementer', 'verifier', 'reviewer', undefined, ''] as const) {
+    const label = role || 'default'
+    test(`${label}: F1 unquoted brace denied beside quoted literal`, async ($, on) => {
+      world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm /reports/{x,../var/y}' })).deny).toBeDefined()
+      expect((await $.tool.call({ tool: 'Bash', command: "rm '/reports/{x}'" })).deny).toBeUndefined()
+    })
+    test(`${label}: F2 redirects are not operands; unsafe removal still denied`, async ($, on) => {
+      world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+      for (const redirect of ['> /dev/null 2>&1', '>> /dev/null', '< /dev/null', '2> /dev/null', '&> /dev/null', '>| /dev/null', '7> /dev/null', '7>> /dev/null', '7< /dev/null', '>/dev/null', '2>/dev/null', '7>>/dev/null', '<"/dev/null"']) {
+        expect((await $.tool.call({ tool: 'Bash', command: `rm -f /reports/x ${redirect}` })).deny).toBeUndefined()
+        expect((await $.tool.call({ tool: 'Bash', command: `rm -f /etc/x ${redirect}` })).deny).toBeDefined()
+      }
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm /reports/x & echo done' })).deny).toBeUndefined()
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm /etc/x & echo done' })).deny).toBeDefined()
+      if (role !== 'reviewer')
+        expect((await $.tool.call({ tool: 'Bash', command: 'rm -f build/x.o > /dev/null 2>&1' })).deny).toBeUndefined()
+      // A quoted redirection glyph is a real rm operand, including after cd.
+      expect((await $.tool.call({ tool: 'Bash', command: 'cd /var; rm ">"' })).deny).toBeDefined()
+      expect((await $.tool.call({ tool: 'Bash', command: "rm '/reports/>'" })).deny).toBeUndefined()
+    })
+    test(`${label}: F3 glob suffix dotdot denied beside ordinary suffix`, async ($, on) => {
+      world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+      for (const command of ['rm /reports/*/../../var/x', 'rm /reports/*/..', 'rm /reports/?/../x', 'rm /reports/[ab]/../x'])
+        expect((await $.tool.call({ tool: 'Bash', command })).deny).toBeDefined()
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /reports/*/node_modules' })).deny).toBeUndefined()
+      if (role !== 'reviewer')
+        expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /w/*/node_modules' })).deny).toBeUndefined()
+    })
+    test(`${label}: F4 reserved heads and builtin expose rm`, async ($, on) => {
+      world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+      for (const prefix of ['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '(', 'time', 'builtin']) {
+        expect((await $.tool.call({ tool: 'Bash', command: `${prefix} rm /etc/x` })).deny).toBeDefined()
+        expect((await $.tool.call({ tool: 'Bash', command: `${prefix} rm /reports/x` })).deny).toBeUndefined()
+      }
+      for (const command of ['if test -e /var/v; then rm -rf /var/v; fi', '{ rm /etc/x; }', 'for f in a; do rm /etc/x; done'])
+        expect((await $.tool.call({ tool: 'Bash', command })).deny).toBeDefined()
+      for (const change of ['builtin cd', '\\cd']) {
+        expect((await $.tool.call({ tool: 'Bash', command: `${change} /var; rm x` })).deny).toBeDefined()
+        expect((await $.tool.call({ tool: 'Bash', command: `${change} /var; rm /reports/x` })).deny).toBeUndefined()
+      }
+    })
+    test(`${label}: F5 ancestor glob denied beside glob at root`, async ($, on) => {
+      world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/w' }, false)
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /w/seat-*' })).deny).toBeDefined()
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /w/seat-mods/*.log' })).deny).toBeUndefined()
+    })
+    test(`${label}: F6 forged marker denies beside ordinary quoted target`, async ($, on) => {
+      world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm "\u00000\u0000"' })).deny).toContain('command could not be checked')
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm "/reports/x"' })).deny).toBeUndefined()
+    })
+    test(`${label}: F6 resolution exception denies`, async ($, on) => {
+      world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' }, true, undefined, true)
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm /reports/x' })).deny).toContain('command could not be checked')
     })
   }
 })
