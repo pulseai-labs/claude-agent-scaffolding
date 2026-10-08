@@ -976,22 +976,44 @@ fi
 # extracted AND executed.
 _AD="$SKILLS/start/references/bones-registry.md"
 _SC="$_PC_TMP/adr-scan.sh"
-if oss_block_extract "$_AD" 'narrow=' "$_SC" 2>/dev/null && [ -s "$_SC" ]; then
-  T_PASS=$((T_PASS+1))
-else
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: bones-registry.md §3's numbering scan no longer extracts - the checks below are vacuous"
-fi
-# S2 keeps the actual fence separate from the historical combine guard.
+_o_extract_mint() { # checked extracts; identity is fence content, never a literal
+  oss_block_extract "$1" 'narrow=' "$2" || return $?
+  oss_block_extract "$1" 'scan=.*dest=' "$2.inventory" || return $?
+  if ! cmp -s "$2.inventory" "$2"; then
+    cat "$2.inventory" "$2" > "$2.combined" || return $?
+    mv "$2.combined" "$2" || return $?
+  fi
+}
+if _o_extract_mint "$_AD" "$_SC"; then T_PASS=$((T_PASS+1)); else
+  T_FAIL=$((T_FAIL+1)); echo 'FAIL: B6 mint extraction refused'; fi
 _SF="$_PC_TMP/adr-fresh.sh"
-oss_block_extract "$_AD" 'narrow=' "$_SF"
+oss_block_extract "$_AD" 'narrow=' "$_SF" || exit 1
 _SI="$_PC_TMP/adr-inventory.sh"
-oss_block_extract "$_AD" 'scan=' "$_SI"
-# On the pre-split block this is already included; on the new boundary load
-# the definition before the mint. This keeps the red run on the original head real.
-if ! grep -Fq 'scan=' "$_SC"; then
-  cat "$_SI" "$_SC" > "$_SC.combined"
-  mv "$_SC.combined" "$_SC"
-fi
+oss_block_extract "$_AD" 'scan=' "$_SI" || exit 1
+# B6 semantic self-check: scan= in a comment cannot change fence identity.
+cat > "$_PC_TMP/split-mint.md" <<'MD'
+```bash
+scan='definition'; dest=''
+_b_mint() { echo ADR-0001; }
+```
+```bash
+# scan= is a harmless comment, not the definition fence.
+narrow=''
+_b_mint
+```
+MD
+t_capture _o_extract_mint "$_PC_TMP/split-mint.md" "$_PC_TMP/split-mint.sh"
+t_assert_rc 0 'B6 split mint extract completes'
+t_capture bash -c 'set -euo pipefail; . "$1"' fresh "$_PC_TMP/split-mint.sh"
+t_assert_eq ADR-0001 "$T_OUT" 'B6 scan= comment does not skip definition join'
+# Ambiguous/missing inventory extracts must be checked, not ignored.
+cp "$_PC_TMP/split-mint.md" "$_PC_TMP/ambiguous-mint.md"
+printf '\n```bash\nscan=second; dest=second\n```\n' >> "$_PC_TMP/ambiguous-mint.md"
+t_capture _o_extract_mint "$_PC_TMP/ambiguous-mint.md" "$_PC_TMP/ambiguous.sh"
+t_assert_rc 2 'B6 ambiguous inventory extract refuses'
+sed '/scan=/d' "$_PC_TMP/split-mint.md" > "$_PC_TMP/missing-mint.md"
+t_capture _o_extract_mint "$_PC_TMP/missing-mint.md" "$_PC_TMP/missing.sh"
+t_assert_rc 1 'B6 missing inventory extract refuses'
 _o_ws() { # $1=name ; echoes a workspace whose canonical repo has an empty docs/adr
   local d="$_PC_TMP/ni/$1"
   mkdir -p "$d/.ossify" "$d/canon/docs/adr"
@@ -999,7 +1021,11 @@ _o_ws() { # $1=name ; echoes a workspace whose canonical repo has an empty docs/
   printf '%s\n' "$d"
 }
 _o_next2() { # $1=dir $2=repos $3=destination repo (the block consumes both)
-  ( cd "$1" && env -u OSS_STATE_FILE oss_bin="$OSS" adr_scan_mode=mint dest_repo="$3" repos="$2" bash -c "set -euo pipefail; . '$_SC'" )
+  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo oss_bin="$OSS" adr_scan_mode=mint repos="$2" bash -c '
+    set -euo pipefail
+    if [ "$2" != "[unset]" ]; then dest_repo="$2"; fi
+    . "$1"
+  ' fresh "$_SC" "$3" )
 }
 _o_next() { _o_next2 "$1" canonical canonical; }
 _o_fresh() { # $1=workspace $2=mode $3=repos or [unset] $4=destination $5=invocations
@@ -1032,7 +1058,7 @@ printf 'FRESH mint: %s\n' "$T_OUT"
 t_assert_eq $'ADR-003\nSTATUS 0 TEMPS 0' "$T_OUT" "S2 mint fence works alone in a fresh shell and cleans its files"
 t_capture _o_fresh "$_O_U" inventory canonical '[unset]' 2
 printf 'FRESH inventory twice: %s\n' "$T_OUT"
-t_assert_eq $'ADR-001-redb-for-storage.md\nADR-002-single-writer.md\nADR-001-redb-for-storage.md\nADR-002-single-writer.md\nSTATUS 0 TEMPS 0' "$T_OUT" "S2 inventory fence works alone and repeated invocation leaks no files"
+t_assert_eq $'canonical\tADR-001-redb-for-storage.md\ncanonical\tADR-002-single-writer.md\ncanonical\tADR-001-redb-for-storage.md\ncanonical\tADR-002-single-writer.md\nSTATUS 0 TEMPS 0' "$T_OUT" "S2 inventory fence works alone and repeated invocation leaks no files"
 t_capture _o_fresh "$_O_U" inventory '[unset]' canonical 1
 printf 'FRESH unset repos: %s\n' "$T_OUT"
 t_assert_eq $'the numbering scan refuses repos \'[unset]\': declare the repos to scan\nSTATUS 1 TEMPS 0' "$T_OUT" "S2 unset inventory repos refuse before allocating files"
@@ -1040,12 +1066,7 @@ t_assert_eq $'the numbering scan refuses repos \'[unset]\': declare the repos to
 # 1.14.1 (#647): missing/unscanned destinations refuse, never mint at a
 # guessed width. The unset case clears the variable rather than setting it empty.
 while IFS=';' read -r destination expected_rc expected; do
-  if [ "$destination" = '[unset]' ]; then
-    t_capture env -u OSS_STATE_FILE -u dest_repo oss_bin="$OSS" repos=canonical bash -c \
-      "cd '$_O_U'; set -euo pipefail; . '$_SC'"
-  else
-    t_capture _o_next2 "$_O_U" canonical "$destination"
-  fi
+  t_capture _o_next2 "$_O_U" canonical "$destination"
   printf 'MINT %s rc=%s: %s\n' "$destination" "$T_RC" "$T_OUT"
   t_assert_rc "$expected_rc" "#647 destination $destination has the required status"
   t_assert_eq "$expected" "$T_OUT" "#647 destination $destination refuses or joins the scanned series"
@@ -1066,7 +1087,7 @@ _o_adopt_scan() {
 t_capture _o_adopt_scan "$_O_U" canonical
 printf 'ADOPT inventory rc=%s: %s\n' "$T_RC" "$T_OUT"
 t_assert_rc 0 "R4 adopt C3 inventory completes without dest_repo"
-t_assert_eq $'ADR-001-redb-for-storage.md\nADR-002-single-writer.md' "$T_OUT" "R4 adopt C3 inventories the existing series without minting"
+t_assert_eq $'canonical\tADR-001-redb-for-storage.md\ncanonical\tADR-002-single-writer.md' "$T_OUT" "R4 adopt C3 inventories the existing series without minting"
 
 # CONTROLS: every other form keeps working, and a non-series mints nothing from.
 _O_B="$(_o_ws bare)"; : > "$_O_B/canon/docs/adr/0003-record-architecture-decisions.md"
@@ -1170,7 +1191,30 @@ t_assert_contains "$T_OUT" "ADR-0100" "#301 C2 control: the NUMBER is still proj
 : > "$_O_C2/canon/docs/adr/0010-bare.md"
 t_capture _o_adopt_scan "$_O_C2" $'canonical\nextra'
 t_assert_rc 0 "R4 adopt C3 aggregates every declared repo without dest_repo"
-t_assert_eq $'0010-bare.md\nADR-099-elsewhere.md\nadr-0007-hexagonal.md' "$T_OUT" "R4 adopt C3 retains bare, uppercase and lowercase series across repos"
+t_assert_eq $'canonical\t0010-bare.md\ncanonical\tadr-0007-hexagonal.md\nextra\tADR-099-elsewhere.md' "$T_OUT" "R4 adopt C3 retains bare, uppercase and lowercase series across repos"
+
+# B1/B3: the authority table's grammar is consumed, never independently guessed.
+_b_ref="$(awk -F'`' '/^[[:space:]]*\| Accepted ADR identifier \|/ {print $2}' "$_AD")"
+_b_consumer="$(sed -n "s/^adr_re='\(.*\)'$/\1/p" "$_E_SV")"
+t_assert_eq 'ADR-[A-Za-z0-9]+' "$_b_ref" 'B1 accepted grammar lives in bones-registry anatomy'
+if [ -n "$_b_ref" ]; then
+  for ref in ADR-0 ADR-C aDr-c2 ADR- ADR_C ADR-C! 'ADR-C X' ' ADR-C'; do
+    expected=0; actual=0
+    printf '%s\n' "$ref" | LC_ALL=C awk -v re="^$_b_ref$" 'toupper($0) ~ re {ok=1} END{exit !ok}' && expected=1
+    printf '%s\n' "$ref" | LC_ALL=C awk -v re="$_b_consumer" '$0 ~ re {ok=1} END{exit !ok}' && actual=1
+    t_assert_eq "$expected" "$actual" "B3 grammar table agrees with consumer: $ref"
+  done
+fi
+t_assert_contains "$(cat "$_E_SVMD")" 'bones-registry.md §3 part 1' 'B1 doctor cites the ADR grammar authority'
+t_assert_eq 1 "$(awk '/sv_fold\(\)/ {n++} END{print n+0}' "$_E_SV")" 'B2 key fold/drop-empty program defined once'
+t_assert_eq 1 "$(awk '/is_destination\(\)/ {n++} END{print n+0}' "$_SF")" 'B4 destination predicate stated once'
+t_assert_eq 0 "$(awk '/^while IFS=.*destination/ {f=1} f {print} f && /^done/ {exit}' "$HERE/test-prose-contracts.sh" | awk '/t_capture env / {n++} END{print n+0}')" 'B5 unset destination uses _o_next2'
+t_assert_contains "$(head -7 "$HERE/test-block-ledger.sh")" 'block-ledger.tsv' 'B8 deferred coverage header points at the ledger'
+# B7 identical filenames retain both repo names (mint output remains pinned above).
+: > "$_O_C2/extra/docs/adr/adr-0007-hexagonal.md"
+t_capture _o_adopt_scan "$_O_C2" $'canonical\nextra'
+t_assert_contains "$T_OUT" $'canonical\tadr-0007-hexagonal.md' 'B7 inventory names canonical holder'
+t_assert_contains "$T_OUT" $'extra\tadr-0007-hexagonal.md' 'B7 inventory names second holder of same filename'
 
 # --- phase 3: the never-strand invariant's two surfaces must agree -----------
 #

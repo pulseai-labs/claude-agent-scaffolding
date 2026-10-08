@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # The executable-prose gate (#138), skeleton layer.
 #
-# It does NOT execute every operative block - 40 are still deferred and the
-# ledger says so by name. What it DOES guarantee is that no block can be added,
+# It does NOT execute every operative block - block-ledger.tsv names the
+# deferred blocks. What it DOES guarantee is that no block can be added,
 # removed, or re-fenced without someone classifying it, and that every anchor a
 # test extracts on is a real, unique identity.
 #

@@ -45,7 +45,15 @@ revenue intent. See `references/posture-block.md`.
 Each answered category produces one ADR (or occasionally two, when a category
 holds two genuinely separable decisions). Four required parts:
 
-1. **ADR reference** — `ADR-NNNN`, minted in the project's ADR sequence. Bones
+1. **ADR reference** — the authority for accepted and minted identifiers:
+
+   | Form | Grammar |
+   |---|---|
+   | Accepted ADR identifier | `ADR-[A-Za-z0-9]+`, case-insensitive, one complete value with no embedded whitespace |
+   | Ossify-minted identifier | numeric only, continuing the project's ADR sequence |
+
+   Adopted references may contain ASCII letters or digits after the prefix;
+   ossify itself mints only the numeric form. Bones
    default to the **proposed-then-flip** status protocol: authored `Proposed`
    here, flipped to `Accepted` (with an empirical-validation note) once a real
    release exercised them. A bone that was never exercised has not been
@@ -170,8 +178,8 @@ own directory. Read it, do not guess:
 Execute this entire fence in one fresh shell invocation. It is self-contained:
 `repos` is every declared repo name, one per line; `oss_bin` resolves their roots.
 The default `adr_scan_mode=mint` also requires `dest_repo` and prints the next
-reference. Adoption C3 sets `adr_scan_mode=inventory` and captures the filenames
-printed to stdout, with no destination and no mint. Each invocation owns its
+reference. Adoption C3 sets `adr_scan_mode=inventory` and captures `<repo-name><TAB><ADR-filename>` lines
+printed to stdout (one line per directory entry; empty directories emit none), with no destination and no mint. Each invocation owns its
 temp files and removes them before returning, including on refusal; a subshell
 keeps its cleanup trap and variables out of the caller's shell.
 
@@ -186,11 +194,12 @@ if ! printf '%s\n' "${repos:-}" | grep -q '[^[:space:]]'; then
   echo "the numbering scan refuses repos '$shown': declare the repos to scan" >&2
   exit 1
 fi
+is_destination() { [ "$1" = "${dest_repo:-}" ]; }
 if [ "$mode" = mint ]; then
   dest_scanned=0
   while IFS= read -r name; do
     [ -n "$name" ] || continue
-    if [ "$name" = "${dest_repo:-}" ]; then dest_scanned=1; fi
+    if is_destination "$name"; then dest_scanned=1; fi
   done <<< "$repos"
   if [ "$dest_scanned" = 0 ]; then
     if [ "${dest_repo+x}" != x ]; then shown='[unset]'; else shown="${dest_repo:-[empty]}"; fi
@@ -212,10 +221,19 @@ while IFS= read -r name; do
     echo "the numbering scan could not read $root/docs/adr - an incomplete inventory is not an empty series" >&2
     exit 1
   fi
-  printf '%s\n' "$listing" >> "$scan"
-  if [ "$name" = "${dest_repo:-}" ]; then printf '%s\n' "$listing" > "$dest"; fi
+  if [ "$mode" = inventory ]; then
+    while IFS= read -r filename; do
+      [ -n "$filename" ] || continue
+      printf '%s\t%s\n' "$name" "$filename" >> "$scan"
+    done <<< "$listing"
+  else
+    printf '%s\n' "$listing" >> "$scan"
+  fi
+  if is_destination "$name"; then printf '%s\n' "$listing" > "$dest"; fi
 done <<< "$repos"
 if [ "$mode" = inventory ]; then cat "$scan"; exit 0; fi
+# Numeric-only parsing is by design: mint continues numeric filenames,
+# while accepted references follow the authority in §3 part 1.
 # Project-wide NUMBER: prefixed ADRs in either case and bare seed filenames.
 highest="$(sed -n -e 's/^[Aa][Dd][Rr]-\([0-9][0-9]*\)-.*\.md$/\1/p' \
                     -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' "$scan" | sort -n | tail -1)"
