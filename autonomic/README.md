@@ -249,7 +249,8 @@ Labels and texts are redacted like every pain text.
 option. The fork asks for it in one plain-text line (where to put it, never its value), and the
 other decisions in the same pain keep their options. The band shows that line after the options,
 as `In plain text: <request>`, whole, and it has no button: you type the answer. A press on an
-option leaves that line as a band of its own until you reply or dismiss it. The bell, the pain file
+option leaves that line as a band of its own until you reply, dismiss it, or a later pain replaces
+it (notices do not stack; the pain file and the bell keep the request). The bell, the pain file
 and the ledger end the pain with `· in plain text: <request>`. A pain whose only decision is a
 credential has no options, only the question, that line and Dismiss.
 
