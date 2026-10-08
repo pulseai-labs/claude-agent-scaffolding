@@ -97,13 +97,16 @@ moment's non-interactive default records that no operator answered (#299). No
 Since 1.14.1 (#648, #647, #649), doctor's bones drift check identifies table
 headers structurally, accepts short and aligned delimiter cells, and validates
 every data row with the same complete ADR identifier grammar as the registry.
-An ADR reference used as a header is reported; blank registry references refuse
-the comparison. Digit-free references such as `ADR-C`
+An ADR reference used as a header is reported. Registry records are trimmed and
+validated as complete values before line output: surrounding newlines are
+whitespace, while blank or internally multiline references refuse comparison.
+Digit-free references such as `ADR-C`
 compare correctly; malformed rows and duplicates on either half are reported,
 with case normalized only for comparison and source spellings kept in findings.
-The ADR mint refuses an unset or unscanned destination repo, naming it rather
-than guessing a four-digit width. Adoption uses the shared inventory scan without
-running the mint or requiring a destination. The prose-contract controls and their routed
+The ADR mint refuses an unset, empty or unscanned destination repo, naming it
+rather than guessing a four-digit width. Adoption and mint use one self-contained
+scan fence that cleans its temp files on success or refusal; adoption selects
+inventory mode without requiring a destination. The prose-contract controls and their routed
 fixture setup explicitly clear inherited state overrides.
 
 Since 1.14.0 (#133, #362), `/ossify:run-spine` re-enters a started spine on its

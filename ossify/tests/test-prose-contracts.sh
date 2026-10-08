@@ -915,10 +915,18 @@ adr-header-empty;;AdR-c;fail: spec - section 4 carries a header whose first cell
 adr-header-matching;ADR-C;ADR-C;fail: spec - registry entry with no index row: ADR-C\nfail: spec - section 4 carries a header whose first cell is an ADR reference: ADR-C
 blank-registry;<empty>;;skip: spec - the registry holds a value that is not an ADR reference ('[empty]'), and a value this check cannot name is not one it may drop
 whitespace-registry;   ;;skip: spec - the registry holds a value that is not an ADR reference ('[empty]'), and a value this check cannot name is not one it may drop
-invalid-suffix-registry;ADR-C<newline>RFC-2119;ADR-C;skip: spec - the registry holds a value that is not an ADR reference ('RFC-2119'), and a value this check cannot name is not one it may drop
+invalid-suffix-registry;ADR-C<newline>RFC-2119;ADR-C;skip: spec - the registry holds a value that is not an ADR reference ('ADR-C RFC-2119'), and a value this check cannot name is not one it may drop
+embedded-newline-registry;AdR-c<newline>aDR-d;ADR-C,ADR-D;skip: spec - the registry holds a value that is not an ADR reference ('AdR-c aDR-d'), and a value this check cannot name is not one it may drop
+surrounding-newlines-registry;<newline>  ADR-C  <newline>;ADR-C;ok: spec - bones index matches the registry: 1 entries, 1 rows
+newline-only-registry;<newline>;;skip: spec - the registry holds a value that is not an ADR reference ('[empty]'), and a value this check cannot name is not one it may drop
 two-blank-registry;<empty>,<empty>;;skip: spec - the registry holds a value that is not an ADR reference ('[empty] [empty]'), and a value this check cannot name is not one it may drop
 blank-with-valid-registry;ADR-C,<empty>;ADR-C;skip: spec - the registry holds a value that is not an ADR reference ('[empty]'), and a value this check cannot name is not one it may drop
 ROWS
+
+# S4: the doctor's remediation lookup must cover both new output kinds.
+_remedies="$(awk '/^\| Mismatch \|/ {f=1} f && /^\|/ {print} f && /^None / {exit}' "$_E_SVMD")"
+t_assert_contains "$_remedies" '| an ADR reference in a section-4 header |' "S4 ADR-header finding has a remediation row"
+t_assert_contains "$_remedies" '| a blank or invalid registry ADR value |' "S4 invalid-registry refusal has a remediation row"
 
 # (e6) ROUND 1, R3: an unresolvable route must REFUSE, not abort. Both resolver
 # calls in the block are guarded, so under `set -euo pipefail` it reaches its own
@@ -949,6 +957,9 @@ if oss_block_extract "$_AD" 'narrow=' "$_SC" 2>/dev/null && [ -s "$_SC" ]; then
 else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: bones-registry.md §3's numbering scan no longer extracts - the checks below are vacuous"
 fi
+# S2 keeps the actual fence separate from the historical combine guard.
+_SF="$_PC_TMP/adr-fresh.sh"
+oss_block_extract "$_AD" 'narrow=' "$_SF"
 _SI="$_PC_TMP/adr-inventory.sh"
 oss_block_extract "$_AD" 'scan=' "$_SI"
 # On the pre-split block this is already included; on the new boundary load
@@ -964,12 +975,23 @@ _o_ws() { # $1=name ; echoes a workspace whose canonical repo has an empty docs/
   printf '%s\n' "$d"
 }
 _o_next2() { # $1=dir $2=repos $3=destination repo (the block consumes both)
-  ( cd "$1" && env -u OSS_STATE_FILE oss_bin="$OSS" dest_repo="$3" repos="$2" bash -c "set -euo pipefail; . '$_SC'" )
+  ( cd "$1" && env -u OSS_STATE_FILE oss_bin="$OSS" adr_scan_mode=mint dest_repo="$3" repos="$2" bash -c "set -euo pipefail; . '$_SC'" )
 }
 _o_next() { _o_next2 "$1" canonical canonical; }
-_o_next_keep() { # $1=dir ; prints the mint, then the temp paths the block used
-  ( cd "$1" && env -u OSS_STATE_FILE oss_bin="$OSS" dest_repo=canonical repos=canonical bash -c "set -euo pipefail; . '$_SC'; printf 'SCAN[%s] DEST[%s]\n' \"\$scan\" \"\$dest\"" )
+_o_fresh() { # $1=workspace $2=mode $3=repos or [unset] $4=destination $5=invocations
+  local temp="$_PC_TMP/fresh-$2-$5-$RANDOM" rc
+  mkdir -p "$temp"
+  ( cd "$1" && env -u OSS_STATE_FILE -u repos -u dest_repo TMPDIR="$temp" \
+    oss_bin="$OSS" adr_scan_mode="$2" bash -c '
+      set -euo pipefail
+      if [ "$2" != "[unset]" ]; then repos="$2"; fi
+      if [ "$3" != "[unset]" ]; then dest_repo="$3"; fi
+      for ((i=0;i<$4;i++)); do . "$1"; done
+    ' fresh "$_SF" "$3" "$4" "$5" )
+  rc=$?
+  printf 'STATUS %s TEMPS %s\n' "$rc" "$(find "$temp" -type f | wc -l | tr -d ' ')"
 }
+_o_next_keep() { _o_fresh "$1" mint canonical canonical 1; }
 # THE DEFECT: an uppercase three-digit series is read, and the mint continues it.
 _O_U="$(_o_ws upper)"; : > "$_O_U/canon/docs/adr/ADR-001-redb-for-storage.md"; : > "$_O_U/canon/docs/adr/ADR-002-single-writer.md"
 t_capture _o_next "$_O_U"
@@ -980,6 +1002,17 @@ if printf '%s' "$T_OUT" | grep -Fq 'ADR-001'; then
 else
   T_PASS=$((T_PASS+1))
 fi
+# 1.14.1 (#647): missing/unscanned destinations refuse, never mint at a
+t_capture _o_fresh "$_O_U" mint canonical canonical 1
+printf 'FRESH mint: %s\n' "$T_OUT"
+t_assert_eq $'ADR-003\nSTATUS 0 TEMPS 0' "$T_OUT" "S2 mint fence works alone in a fresh shell and cleans its files"
+t_capture _o_fresh "$_O_U" inventory canonical '[unset]' 2
+printf 'FRESH inventory twice: %s\n' "$T_OUT"
+t_assert_eq $'ADR-001-redb-for-storage.md\nADR-002-single-writer.md\nADR-001-redb-for-storage.md\nADR-002-single-writer.md\nSTATUS 0 TEMPS 0' "$T_OUT" "S2 inventory fence works alone and repeated invocation leaks no files"
+t_capture _o_fresh "$_O_U" inventory '[unset]' canonical 1
+printf 'FRESH unset repos: %s\n' "$T_OUT"
+t_assert_eq $'the numbering scan refuses repos \'[unset]\': declare the repos to scan\nSTATUS 1 TEMPS 0' "$T_OUT" "S2 unset inventory repos refuse before allocating files"
+
 # 1.14.1 (#647): missing/unscanned destinations refuse, never mint at a
 # guessed width. The unset case clears the variable rather than setting it empty.
 while IFS=';' read -r destination expected_rc expected; do
@@ -995,6 +1028,7 @@ while IFS=';' read -r destination expected_rc expected; do
 done <<'DESTINATIONS'
 canonicl;1;the numbering scan refuses dest_repo 'canonicl': it is not a scanned repo
 [unset];1;the numbering scan refuses dest_repo '[unset]': it is not a scanned repo
+;1;the numbering scan refuses dest_repo '[empty]': it is not a scanned repo
 canonical;0;ADR-003
 DESTINATIONS
 
@@ -1002,8 +1036,8 @@ DESTINATIONS
 _SI="$_PC_TMP/adr-inventory.sh"
 oss_block_extract "$_AD" 'scan=' "$_SI"
 _o_adopt_scan() {
-  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo oss_bin="$OSS" repos="$2" bash -c \
-    "set -euo pipefail; . '$_SI'; scan_adrs; sort \"\$scan\"; rm -f \"\$scan\" \"\$dest\"" )
+  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo oss_bin="$OSS" adr_scan_mode=inventory repos="$2" bash -c \
+    "set -euo pipefail; . '$_SI' | LC_ALL=C sort" )
 }
 t_capture _o_adopt_scan "$_O_U" canonical
 printf 'ADOPT inventory rc=%s: %s\n' "$T_RC" "$T_OUT"
@@ -1058,13 +1092,43 @@ t_assert_contains "$T_OUT" "$_O_LP/canon/docs/adr" "#301 R9 ... and the refusal 
 _O_CL="$(_o_ws clean)"; : > "$_O_CL/canon/docs/adr/adr-0001-a.md"
 t_capture _o_next_keep "$_O_CL"
 t_assert_contains "$T_OUT" "ADR-0002" "#301 R6 control: the mint still answers"
-_o_scan="$(printf '%s' "$T_OUT" | sed -n 's/.*SCAN\[\([^]]*\)\].*/\1/p')"
-_o_desc="$(printf '%s' "$T_OUT" | sed -n 's/.*DEST\[\([^]]*\)\].*/\1/p')"
-if [ -n "$_o_scan" ] && [ -n "$_o_desc" ] && [ ! -e "$_o_scan" ] && [ ! -e "$_o_desc" ]; then
-  T_PASS=$((T_PASS+1))
-else
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: #301 R6: the scan left its temp files behind (scan='${_o_scan:-unset}' dest='${_o_desc:-unset}')"
-fi
+t_assert_contains "$T_OUT" 'STATUS 0 TEMPS 0' "#301 R6 success removes every allocated temp file"
+
+for mode in mint inventory; do
+  t_capture _o_fresh "$_O_U" "$mode" missing missing 1
+  t_assert_contains "$T_OUT" "could not resolve a root for repo 'missing'" "S2 $mode root refusal names the repo"
+  t_assert_contains "$T_OUT" 'STATUS 1 TEMPS 0' "S2 $mode root refusal cleans both files"
+  t_capture _o_fresh "$_O_LP" "$mode" canonical canonical 1
+  t_assert_contains "$T_OUT" "could not create $_O_LP/canon/docs/adr" "S2 $mode create refusal names the path"
+  t_assert_contains "$T_OUT" 'STATUS 1 TEMPS 0' "S2 $mode create refusal cleans both files"
+done
+
+# S2: failures after allocation, including the SECOND mktemp, cannot orphan
+# the first file. Substitute only the failing tool; run the real fence.
+_O_REAL_MKTEMP="$(command -v mktemp)"
+for failure in mktemp ls; do
+  _O_BIN="$_PC_TMP/fail-$failure"; mkdir -p "$_O_BIN"
+  if [ "$failure" = mktemp ]; then
+    cat > "$_O_BIN/mktemp" <<'SH'
+#!/usr/bin/env bash
+if [ -e "$TMPDIR/allocated" ]; then exit 1; fi
+touch "$TMPDIR/allocated"
+exec "$real_mktemp"
+SH
+  else
+    printf '#!/usr/bin/env bash\nexit 1\n' > "$_O_BIN/ls"
+  fi
+  chmod +x "$_O_BIN/$failure"
+  for mode in mint inventory; do
+    _O_TEMP="$_PC_TMP/failure-$failure-$mode"; mkdir -p "$_O_TEMP"
+    t_capture env -u OSS_STATE_FILE TMPDIR="$_O_TEMP" PATH="$_O_BIN:$PATH" real_mktemp="$_O_REAL_MKTEMP" \
+      oss_bin="$OSS" repos=canonical dest_repo=canonical adr_scan_mode="$mode" bash -c \
+      "cd '$_O_U'; set -euo pipefail; . '$_SF'"
+    t_assert_rc 1 "S2 $mode $failure failure refuses"
+    _left="$(find "$_O_TEMP" -type f ! -name allocated | wc -l | tr -d ' ')"
+    t_assert_eq 0 "$_left" "S2 $mode $failure failure removes all allocated scan files"
+  done
+done
 # (f6) ROUND 1, C2/CR2: the minted WIDTH comes from the DESTINATION repo's
 # series, not from the project-wide highest. Destination `adr-0007-…` (four
 # digits) with `ADR-099-…` in another repo: the number is 100 (project-wide),

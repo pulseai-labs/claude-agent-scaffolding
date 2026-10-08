@@ -156,12 +156,14 @@ silent re-mark.
 
 ### C3 — Bones back-derived from every repo's ADR directory, aggregated
 
-1. Execute `bones-registry.md` §3's inventory block, then call `scan_adrs`
-   with `repos` set to every declared repo name, one per line. No `dest_repo`
-   is needed: adoption imports existing references and does not run the mint
-   block. Read `$scan`, aggregating **each declared repo's** `docs/adr/`: any
-   ADR in the product's repos owes the registry an entry. After recording the
-   inventory, remove both temp files with `rm -f "$scan" "$dest"`.
+1. Execute `bones-registry.md` §3's whole scan fence in one fresh shell, with
+   `adr_scan_mode=inventory` and `repos` set to every declared repo name, one
+   per line (already conversion-correct; **use it, do not rewrite it**).
+   Capture its stdout inventory of **each declared repo's** `docs/adr/`: any
+   ADR there owes the registry an entry. No `dest_repo` is needed and nothing
+   mints; the fence owns and removes its temp files before returning. On any
+   refusal, **halt adoption and record the named repo/path as a gap**; fix it
+   before retrying. Never silently skip a repo or call an unreadable one empty.
 1a. **Collision preflight, before minting anything.** `bones-registry.md` §3
    keeps new identifiers unique *by construction*, and that construction only
    governs numbers ossify mints. Adoption imports numbers that already exist,

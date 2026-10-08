@@ -109,9 +109,14 @@ are a clean pair with zero entries and zero rows.
 sv_state="$("$oss_bin" state_path 2>/dev/null)" || sv_state=""
 spec="$("$oss_bin" spec_path 2>/dev/null)" || spec=""
 state_rc=0
+adr_re='^[Aa][Dd][Rr]-[A-Za-z0-9]+$'
 if [ -n "$sv_state" ]; then
-  reg_count="$("$oss_bin" get '.bones | length' "$sv_state" 2>/dev/null)" || state_rc=$?
-  reg_raw="$("$oss_bin" get '.bones[].adr' "$sv_state" 2>/dev/null)" || state_rc=$?
+  # Keep each .adr structured until its WHOLE value has been trimmed and
+  # validated. Raw multiline values must not become several registry records.
+  reg_raw="$("$oss_bin" get '.bones | map(.adr)' "$sv_state" 2>/dev/null | jq -r --arg ref "$adr_re" '
+    .[] | if type == "string" then gsub("^[[:space:]]+|[[:space:]]+$"; "") else tojson end
+    | if test($ref) and (test("[[:space:]]") | not) then "OK " + .
+      else "BAD " + (if . == "" then "[empty]" else gsub("[\r\n]"; " ") end) end')" || state_rc=$?
 else
   state_rc=1
 fi
@@ -131,16 +136,13 @@ else
   # never filtered out: `bone_add` accepts any ref (`ADR-C2` is legal and in the
   # registry suite's own fixtures), and dropping one would print "0 entries" over
   # a registry that has entries (round 1, C4).
-  adr_re='^[Aa][Dd][Rr]-[A-Za-z0-9]+$'
-  bad="$(printf '%s\n' "$reg_raw" | awk -v ref="$adr_re" -v count="$reg_count" '
-    count > 0 {sub(/^[[:space:]]+/,""); sub(/[[:space:]]+$/,""); if($0 !~ ref) print (length ? $0 : "[empty]")}
-    END {for(i=NR;i<count;i++) print "[empty]"}')"
+  bad="$(printf '%s\n' "$reg_raw" | sed -n 's/^BAD //p')"
   if [ -n "$bad" ]; then
     echo "skip: spec - the registry holds a value that is not an ADR reference ('$(printf '%s' "$bad" | tr '\n' ' ')'), and a value this check cannot name is not one it may drop"
   else
     # One identifier grammar for both halves; normalization is only for the
     # comparison. Keep the source spelling for findings and retain duplicates.
-    reg_values="$(printf '%s\n' "$reg_raw" | awk '{sub(/^[[:space:]]+/,""); sub(/[[:space:]]+$/,""); if(length) print}')"
+    reg_values="$(printf '%s\n' "$reg_raw" | sed -n 's/^OK //p')"
     reg_all="$(printf '%s\n' "$reg_values" | tr '[:lower:]' '[:upper:]' | sort)"
     reg="$(printf '%s\n' "$reg_all" | sort -u)"
     reg_dupes="$(printf '%s\n' "$reg_all" | grep -v '^$' | uniq -d)" || reg_dupes=""
@@ -238,6 +240,8 @@ above reports each direction with the identifiers that do not pair:
 | more than one index row for one entry | the invariant is *one row per entry*; a copy left behind reads as agreement to a set comparison | `fail: spec` — name the duplicated ids |
 | more than one registry record for one entry | a legacy or hand-edited state carries a duplicate registration; the index cannot show which record is the extra one | `fail: spec` — name the duplicated ids, and repair the registry |
 | a section-4 row whose first cell is not an ADR reference | the row is unnameable: neither a bone nor a header label, so no comparison can pair it | `fail: spec` — name the row and say what a bone row must start with |
+| an ADR reference in a section-4 header | the row immediately before a delimiter is a header and cannot represent a bone | `fail: spec` — name the reference; move the bone into a data row below the delimiter, or remove a stray delimiter that reclassified it |
+| a blank or invalid registry ADR value | the registry holds a record whose complete trimmed value cannot be compared as an ADR reference | `skip: spec` — name the value (`[empty]` for whitespace only); repair that registry record against its source ADR, then rerun doctor; never delete it merely to clear the refusal |
 
 None is auto-repairable: which artifact is right is a judgment about what
 actually happened. Name the identifiers, name the direction each belongs to, and
