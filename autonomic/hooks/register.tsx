@@ -114,8 +114,14 @@ async function guard($: Engine, rec: Live): Promise<Live> {
 async function publish($: Engine, mode: Live['mode']): Promise<void> {
   try { await $.env.set('AUTONOMIC_EFFECTIVE_MODE', mode) } catch (err) {
     await log($, `env set failed ${String(err)}`)
-    try { await $.env.set('AUTONOMIC_EFFECTIVE_MODE', undefined) } catch {}
-    $.ui.toast(`autonomic: AUTONOMIC_EFFECTIVE_MODE could not be set to ${mode}; it is unset, so a launcher starts no child in autopilot.`)
+    try {
+      await $.env.set('AUTONOMIC_EFFECTIVE_MODE', undefined)
+      $.ui.toast(`autonomic: AUTONOMIC_EFFECTIVE_MODE could not be set to ${mode}; it is unset, so a launcher starts no child in autopilot.`)
+    } catch (err2) {
+      // The host refuses every change: say so, never claim an unset that did not happen (PR #694 R4).
+      await log($, `env unset failed ${String(err2)}`)
+      $.ui.toast(`autonomic: AUTONOMIC_EFFECTIVE_MODE could not be set to ${mode} or unset; it may still read its previous value, so do not let a launcher trust it in this session.`)
+    }
   }
 }
 

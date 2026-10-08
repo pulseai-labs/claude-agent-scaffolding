@@ -337,6 +337,8 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
 - The turn digest adds up to 4,000 characters to each permission and ask judgment. It shows a tool
   result's tail only, never its middle, and it reads a tool result as a fact, though a result can
   hold fetched text. A `/resume` to an earlier session id brings back that id's digest.
+- A host that refuses every `env.set` leaves `AUTONOMIC_EFFECTIVE_MODE` at its previous value; a toast
+  says it may be stale.
 - A deny from a plugin that runs above autonomic is not seen; the turn-end check reports it.
 - Claude Code only: Codex, OpenCode and Devin have no mod runtime.
 

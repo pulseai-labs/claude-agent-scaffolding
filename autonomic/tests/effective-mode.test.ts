@@ -71,6 +71,18 @@ describe('AUTONOMIC_EFFECTIVE_MODE (0.4.0 spec §3.4)', () => {
     expect(last(w)).toBe(undefined)
     expect(w.toasts.join('\n')).toContain('AUTONOMIC_EFFECTIVE_MODE')
   })
+  test('a host that refuses every set is reported as stale, never as unset (PR #694 R4)', async ($, on) => {
+    const w = world(on)
+    w.session.id = 'env-b'
+    await $.session.start(START)
+    await $.command.run(RUN('on'))
+    w.failEnvSet = () => true
+    await $.command.run(RUN('off'))
+    expect(last(w)).toBe('autopilot')
+    const t = w.toasts.join('\n')
+    expect(t).toContain('may still read its previous value')
+    expect(t).not.toContain('it is unset')
+  })
   test('a new session id follows its own mode', async ($, on) => {
     const w = world(on)
     await $.session.start(START)

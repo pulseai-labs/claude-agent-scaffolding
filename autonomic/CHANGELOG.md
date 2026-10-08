@@ -34,6 +34,8 @@ permission fork missing a same-turn tool result in 2 of 3 runs).
   `Bearer` or `--token` prefix, so the value shows in the fork prompt (never on disk).
 - **Known limit:** the digest is kept per session id and never cleared, so a `/resume` to an
   earlier id brings back that id's digest. A deny reason is redacted at full length.
+- **Known limit:** a host that refuses every `env.set` leaves `AUTONOMIC_EFFECTIVE_MODE` at its
+  previous value; autonomic cannot change it then, and its toast says the value may be stale.
 - **Unchanged:** `nothing-to-fork` at a session's first ask.
 
 ## 0.3.1
