@@ -110,6 +110,16 @@ if [ "$only" = all ] || [ "$only" = R3 ]; then
       t_assert_eq "$expected" "$(verdict item r0.s1.w1 4)" "R3 occupied $location $shape never skips"
     done
   done
+  # A live recorded worktree elsewhere also prevents branch deletion when
+  # the conventional path is absent: cleanup cannot remove that holder.
+  fixture r3-recorded-live; healthy; spawn; land
+  git -C "$F/core" worktree move "$WT" "$F/alternate"
+  oss work_item_exec r0.s1.w1 work/r0.s1.w1-one "$F/alternate" "$(git -C "$F/core" rev-parse main)" >/dev/null
+  inventory
+  t_assert_rc 3 'R3 live non-conventional holder halts before cleanup refuses'
+  t_assert_eq halt:worktree-held "$(verdict item r0.s1.w1 4)" 'R3 absent conventional path cannot hide a live alternate holder'
+  t_capture oss worktree_remove core r0.s1.w1
+  t_assert_rc 8 'R3 live alternate holder really makes the owning cleanup refuse'
   fixture r3-live; healthy; spawn; land; inventory
   t_assert_rc 0 'R3 live clean merged control succeeds'; t_assert_eq skip "$(verdict item r0.s1.w1 4)" 'R3 live clean merged worktree still skips'
   # Alias spelling of the SAME linked worktree remains valid.

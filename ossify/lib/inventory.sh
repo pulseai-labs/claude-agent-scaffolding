@@ -350,9 +350,11 @@ HOLD
           elif [ -z "$br" ]; then route=halt:branch-unknown
           # Close cleans the conventional path even when state records a
           # different worktree. Compare physically so aliases of the SAME
-          # live linked worktree remain valid; any other occupied path halts.
+          # live linked worktree remain valid. A live alternate holder cannot
+          # be removed at conv, even when conv is absent; branch deletion
+          # would then refuse. Other occupied cleanup paths halt too.
           elif { [ "$wt" != present ] || [ "$(cd -P "$conv" 2>/dev/null && pwd)" != "$wtp_phys" ]; } \
-               && { [ -e "$conv" ] || [ -L "$conv" ]; }; then
+               && { [ "$wt" = present ] || [ -e "$conv" ] || [ -L "$conv" ]; }; then
             if [ "$held" = 1 ]; then route=halt:worktree-held; else route=halt:unclassified; fi
           elif [ "$wt" != present ] && [ "$wtp" != "$conv" ] \
                && { [ -e "$wtp" ] || [ -L "$wtp" ]; }; then
