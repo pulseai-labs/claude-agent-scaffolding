@@ -279,7 +279,7 @@ export function rmTargets(command: string): RmTarget[] {
       }
       let path = word.path
       const glob = word.globAt >= 0
-      if (glob && (path.includes('**') || /(?:^|\/)\.\.(?:\/|$)/.test(path.slice(word.globAt)))) {
+      if (glob && (path.includes('**') || path.split('/').some(part => part.startsWith('.') && /[*?\[]/.test(part)) || /(?:^|\/)\.\.(?:\/|$)/.test(path.slice(word.globAt)))) {
         targets.push({ path: undefined, glob: false })
         continue
       }

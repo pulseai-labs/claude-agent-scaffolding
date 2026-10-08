@@ -117,7 +117,9 @@ The resolver follows links in parent directories, but keeps a terminal link lite
 its ancestor cannot be removed. A glob whose literal-prefix directory has a writable root
 strictly below it is denied, since it could match that root; a glob at the root is eligible when
 no writable root lies below it. Unquoted `{` and a glob suffix containing a `..` component are
-unresolvable and denied. Redirections and their destinations are excluded from `rm` operands,
+unresolvable and denied.
+A glob component starting with `.` and containing `*`, `?` or `[` is unresolvable and denied.
+Redirections and their destinations are excluded from `rm` operands,
 and a single `&` separates commands. The `rm` matcher also skips the head words `if`, `then`,
 `elif`, `else`, `do`, `while`, `until`, `!`, `{`, `(`, `time` and `builtin`; `builtin cd` and `\cd`
 count as directory changes. A parsing or resolution exception denies the Bash call as a command
@@ -139,6 +141,7 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   (`git "merge"`). A trailer that opens an `-m` message, comes from `--trailer`, or follows a
   backslash-newline inside single quotes, also passes.
 - Backticks and quoted `$(rm …)` can escape recognition; bare `$(rm …)` is checked by the parentheses splitter.
+- Shell options changed in the same call (`shopt`, e.g. `extglob`, `dotglob`, `nullglob`) are not modelled beyond the `**` and dot-component denials.
 - `**` in an rm glob operand is unresolvable and denies; quoted literal `**` stays literal.
 - An unexecuted shell function body (`cleanup() { rm …; }`) is checked as if it runs and may deny.
 - A heredoc given as rm's input (`rm -i x <<EOF`) is read as an extra operand and denied.

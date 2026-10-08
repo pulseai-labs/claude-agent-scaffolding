@@ -475,3 +475,21 @@ describe('globstar root protection', () => {
     expect((await $.tool.call({ tool: 'Bash', command: "rm -f '/reports/**'" })).deny).toBeUndefined()
   })
 })
+
+describe('dot-glob parent protection', () => {
+  for (const command of ['rm -f /w/.?/victim', 'rm -rf /w/.*', 'rm -rf .*']) {
+    test(`implementer denies ${command} beside literal-dot and ordinary-glob controls`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: 'implementer' }, true, '/w')
+      expect((await $.tool.call({ tool: 'Bash', command })).deny).toBeDefined()
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /w/.cache/*' })).deny).toBeUndefined()
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /w/*.tmp' })).deny).toBeUndefined()
+      expect((await $.tool.call({ tool: 'Bash', command: "rm -f '.*'" })).deny).toBeUndefined()
+    })
+  }
+  test('reviewer denies dot-component bracket glob beside safe controls', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'reviewer', SEAT_MODS_ALLOW: '/reports' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /reports/.[a-z]*' })).deny).toBeDefined()
+    expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /reports/.cache/*' })).deny).toBeUndefined()
+    expect((await $.tool.call({ tool: 'Bash', command: "rm -f '/reports/.*'" })).deny).toBeUndefined()
+  })
+})
