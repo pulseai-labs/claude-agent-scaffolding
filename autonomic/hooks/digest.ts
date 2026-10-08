@@ -10,10 +10,11 @@ export const DIGEST_ENTRY_CHARS = 400
 export const DIGEST_TOTAL_CHARS = 4000
 export const TOOL_TAIL_CHARS = 300
 
-export type Origin = { kind: string; name?: string }
+export type Origin = { kind: string; name?: string; asUser?: true }
 
 export function originLabel(o: Origin): string {
-  if (o.kind === 'composer' || o.kind === 'bridge') return 'operator'
+  // A pain-band press is submitted asUser: it is the operator's choice (PR #694 F3).
+  if (o.kind === 'composer' || o.kind === 'bridge' || o.asUser === true) return 'operator'
   if (o.kind === 'plugin') return `plugin ${o.name ?? 'unknown'}`
   return o.kind
 }

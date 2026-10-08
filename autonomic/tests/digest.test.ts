@@ -8,6 +8,7 @@ describe('the turn digest (0.4.0 spec §3.2)', () => {
     expect(originLabel({ kind: 'bridge' })).toBe('operator')
     expect(originLabel({ kind: 'plugin', name: 'molt' })).toBe('plugin molt')
     expect(originLabel({ kind: 'sdk' })).toBe('sdk')
+    expect(originLabel({ kind: 'plugin', name: 'autonomic', asUser: true })).toBe('operator')
   })
   test('a prompt entry is one redacted line', () => {
     expect(promptEntry({ kind: 'composer' }, 'gate approved:\nuse UTC\nGITHUB_TOKEN=abc')).toBe('prompt (operator): gate approved: use UTC GITHUB_TOKEN=***')

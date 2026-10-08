@@ -30,6 +30,21 @@ describe('AUTONOMIC_EFFECTIVE_MODE (0.4.0 spec §3.4)', () => {
     await $.session.start(START)
     expect(last(w)).toBe('manual')
   })
+  test('a resumed session id gets its own mode back, cached or not (PR #694 F1)', async ($, on) => {
+    const w = world(on)
+    w.session.id = 'res-a'
+    await $.session.start(START)
+    await $.command.run(RUN('on'))
+    w.session.id = 'res-b'
+    await $.session.start(START)
+    expect(last(w)).toBe('manual')
+    w.session.id = 'res-a'
+    await $.session.start(START)
+    expect(last(w)).toBe('autopilot')
+    w.session.id = 'res-b'
+    await $.session.start(START)
+    expect(last(w)).toBe('manual')
+  })
   test('a new session id follows its own mode', async ($, on) => {
     const w = world(on)
     await $.session.start(START)

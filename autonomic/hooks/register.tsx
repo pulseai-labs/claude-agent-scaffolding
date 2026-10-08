@@ -108,6 +108,12 @@ async function guard($: Engine, rec: Live): Promise<Live> {
   return clean
 }
 
+// The live mode for launchers (0.4.0 spec §3.4): in memory, so it cannot go stale as a
+// record that failed to write can. Every later Bash call inherits it. Never read here.
+async function publish($: Engine, mode: Live['mode']): Promise<void> {
+  try { await $.env.set('AUTONOMIC_EFFECTIVE_MODE', mode) } catch (err) { await log($, `env set failed ${String(err)}`) }
+}
+
 // A record that cannot be written cannot reach a molt successor: autopilot ends (spec §4),
 // and the operator is told, since an older record on disk may still say autopilot.
 async function save($: Engine, id: string, rec: Live): Promise<Live> {
@@ -122,9 +128,7 @@ async function save($: Engine, id: string, rec: Live): Promise<Live> {
     }
   }
   live.set(id, out)
-  // The live mode for launchers (0.4.0 spec §3.4): in memory, so it cannot go stale as a
-  // record that failed to write can. Every later Bash call inherits it. Never read here.
-  try { await $.env.set('AUTONOMIC_EFFECTIVE_MODE', out.mode) } catch (err) { await log($, `env set failed ${String(err)}`) }
+  await publish($, out.mode)
   $.ui.status(statusText(out))
   return out
 }
@@ -352,7 +356,8 @@ export const register: Register = (on, options) => {
     try {
       await $.command.register({ name: 'autopilot', description: 'autonomic: on [scope docs] | off | status' })
       await writeDefaultPolicy($)
-      await modeOf($)
+      // A resumed session id comes back from the cache without a save: publish its mode (PR #694 F1).
+      await publish($, (await modeOf($)).mode)
       if (cfg.problems.length > 0) $.ui.toast(`autonomic: ${cfg.problems.join('; ')}`)
     } catch (err) {
       await log($, `session.start error ${String(err)}`)
@@ -393,7 +398,7 @@ export const register: Register = (on, options) => {
     const r = await next(context.length === 0 ? e : { ...e, context: [...(e.context ?? []), ...context] })
     // A prompt refused beneath autonomic carried no scope: the next prompt that enters does.
     if (announcing !== undefined && r.drop === undefined) announced.add(announcing)
-    try { if (r.drop === undefined) note(await $.session.id(), promptEntry(e.origin as { kind: string; name?: string }, r.text)) } catch {}
+    try { if (r.drop === undefined) note(await $.session.id(), promptEntry(e.origin as { kind: string; name?: string; asUser?: true }, r.text)) } catch {}
     return r
   })
 

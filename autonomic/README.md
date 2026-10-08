@@ -154,7 +154,8 @@ permission scope and the live turn: `allow` is recorded and the tool runs; anyth
 **The live turn.** The permission and ask forks also get the turn digest: the session's last 12
 prompts and main-thread tool results since the fork's transcript was sent, one line each (a
 command's shape or a tool's input key names, and the last 300 characters of its result, redacted
-first), at most 4,000 characters, newest kept. The fork may miss a result from earlier in the
+first), at most 4,000 characters, newest kept; angle brackets in it are swapped for `‹ ›`, so a line
+cannot close the block or open a tag of the prompt. The fork may miss a result from earlier in the
 same turn without it. A later instruction from you or the orchestrator counts as part of the task.
 The digest lives in memory only: it never reaches the ledger, the pain file, the bell or the log.
 The turn-end fork does not get it.

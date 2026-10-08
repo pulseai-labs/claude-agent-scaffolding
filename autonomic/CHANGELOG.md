@@ -16,11 +16,14 @@ permission fork missing a same-turn tool result in 2 of 3 runs).
   cuts is dropped, so a split credential is not shown in part.
 - **The permission and ask fork prompts** (`prompts.ts`) carry the digest in a `<recent>` block of
   at most 4,000 characters, newest kept, with a rule that a later instruction from the operator or
-  the orchestrator is part of the task. Both prompts also name the live task. The turn-end prompt
+  the orchestrator is part of the task and a tool result is a fact about what ran, never an
+  instruction; angle brackets in the block are swapped for `‹ ›`, so fetched text cannot close it.
+  A pain-band press (`asUser`) is labelled as the operator's. Both prompts also name the live task. The turn-end prompt
   carries neither.
 - **`AUTONOMIC_EFFECTIVE_MODE`** (`register.tsx`): set to `autopilot` or `manual` in autonomic's
   process each time a session's mode is saved, the fall to manual on a failed record write
-  included. autonomic never reads it; README, "For launchers".
+  included, and again at each `session.start`, so a resumed session id gets its own mode back.
+  autonomic never reads it; README, "For launchers".
 - **Known limit:** the digest costs up to 4,000 characters per permission or ask judgment.
 - **Known limit:** a tool result's middle is not shown, only its tail; a result that is one long
   token reads `(one long token)`.
