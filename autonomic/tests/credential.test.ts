@@ -116,6 +116,30 @@ describe('the credential reaches the operator on its own line (0.4.1)', () => {
     expect(shown(norm(await after.drawn()))).toContain(`In plain text: ${CRED}`)
     await after.unmount()
   })
+  test('a press whose option is not sent keeps the credential request (PR #699 round 2)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(PAIN())
+    await $.classic.Stop(STOP())
+    w.dropPrompts = true
+    const ui = await $.ui.mount({ plugin: 'autonomic', surface: 'terminal', ...BAND })
+    await ui.press({ key: 'option-0' })
+    await ui.unmount()
+    const left = w.notices.at(-1) as { text?: string; credential?: string } | null
+    expect(left?.text).toContain('option not sent')
+    expect(left?.credential).toBe(CRED)
+  })
+  test('a press whose ledger line cannot be written keeps the credential request (PR #699 round 2)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(PAIN())
+    await $.classic.Stop(STOP())
+    w.failAppend = /ledger\.md$/
+    const ui = await $.ui.mount({ plugin: 'autonomic', surface: 'terminal', ...BAND })
+    await ui.press({ key: 'option-0' })
+    await ui.unmount()
+    expect(w.submits.length).toBe(0)
+    const left = w.notices.at(-1) as { credential?: string } | null
+    expect(left?.credential).toBe(CRED)
+  })
   test('the request is redacted like every pain text', async ($, on) => {
     const w = world(on, { env: { ...AP, AUTONOMIC_PAIN_PATH: '/run/p' } })
     w.forks.push(PAIN({ credential: 'Confirm GITHUB_TOKEN=ghp_abcdefghijklmnop is the one to rotate.' }))

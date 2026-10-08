@@ -249,6 +249,11 @@ async function choose($: Engine, value: NonNullable<Pain>, o: PainOption): Promi
   } catch (err) {
     await log($, `band press error ${String(err)}`)
     await pain($, id, 'option not sent', `${o.label} (${String(err)}): type the reply instead`)
+  } finally {
+    // A failure pain replaces the band: it carries the pending credential request on (PR #699).
+    if (value.credential !== undefined) {
+      try { await update($, notice, cur => (cur === null || cur.credential !== undefined ? cur : { ...cur, credential: value.credential })) } catch {}
+    }
   }
 }
 
