@@ -37,83 +37,112 @@ function split(command: string): string[] {
   // NAME=VALUE also shows its value: FLAGS=-rf, alias.p=push, remote.x.push=refs/heads/main.
   return text.split(SPLIT).flatMap(w => (w.indexOf('=') > 0 ? [w, w.slice(w.indexOf('=') + 1)] : [w])).filter(w => w !== '')
 }
-// Simple commands: split at ; & | and newlines outside quotes and escapes. `&` and `|` next
-// to a redirect (`2>&1`, `&>f`, `>|f`) belong to the command. An open quote returns undefined.
-type Command = { text: string; end: number }
+// Simple commands: split at ; & | && || and newlines outside quotes and escapes. `&` and `|`
+// next to a redirect (`2>&1`, `>&f`, `&>f`, `>|f`) belong to the command. A `#` that starts a
+// word comments out the rest of its line, so a quote or a backslash in a comment opens nothing.
+// `pipe` marks a command whose output goes on to the next one. An open quote returns undefined.
+type Command = { text: string; end: number; pipe: boolean }
 function commands(text: string): Command[] | undefined {
   const out: Command[] = []
   let from = 0
   let q: string | undefined
+  const cut = (i: number, next: number, pipe: boolean) => { out.push({ text: text.slice(from, i), end: i, pipe }); from = next }
   for (let i = 0; i < text.length; i++) {
     const c = text[i]!
     if (q === "'") { if (c === "'") q = undefined; continue }
     if (c === '\\') { i++; continue }
     if (q === '"') { if (c === '"') q = undefined; continue }
     if (c === "'" || c === '"') { q = c; continue }
-    const redirect = (c === '&' || c === '|') && (text[i - 1] === '>' || text[i - 1] === '<' || (c === '&' && text[i + 1] === '>'))
-    if ((c === ';' || c === '&' || c === '|' || c === '\n') && !redirect) { out.push({ text: text.slice(from, i), end: i }); from = i + 1 }
+    if (c === '#' && (i === 0 || /[\s;&|()]/.test(text[i - 1]!))) {
+      const nl = text.indexOf('\n', i)
+      i = (nl < 0 ? text.length : nl) - 1
+      continue
+    }
+    if (c === '&' || c === '|') {
+      const prev = text[i - 1]
+      const next = text[i + 1]
+      if (prev === '>' || prev === '<' || (c === '&' && next === '>')) continue
+      if (next === c) { cut(i, i + 2, false); i++; continue }
+      if (c === '|' && next === '&') { cut(i, i + 2, true); i++; continue }
+      cut(i, i + 1, c === '|')
+      continue
+    }
+    if (c === ';' || c === '\n') cut(i, i + 1, false)
   }
   if (q !== undefined) return undefined
-  out.push({ text: text.slice(from), end: text.length })
+  out.push({ text: text.slice(from), end: text.length, pipe: false })
   return out
 }
 const base = (w: string) => w.replace(/^.*\//, '')
+const clean = (w: string) => w.replace(/[\\'"]/g, '')
+// The command word. Only an absolute path is read by its base name (/bin/echo is echo); a
+// relative one (./scripts/test) is a repo program, never inert.
 function head(words: readonly string[]): string | undefined {
   const w = words.find(x => !KEYWORD.has(x))
-  return w === undefined ? undefined : base(w)
+  return w === undefined ? undefined : w.startsWith('/') ? base(w) : w
 }
-// `printf -v NAME` assigns a variable, so it is not inert.
-const isInert = (ws: readonly string[]) => { const h = head(ws); return h === undefined || (INERT.has(h) && !(h === 'printf' && ws.includes('-v'))) }
-// git runs a file moved into a hooks directory.
-const hook = (w: string) => /(?:^|\/)(?:\.git|hooks)\//.test(w)
-// Is a file run (or read by a program that may run it) after it is written? Every later
-// command that is not inert and names the file counts; an inert mv or cp passes the name on
-// to its destination. A name matches inside any word, so `./x.sh` and `bin/x.sh` name x.sh.
+// A function defined in the text may take an inert name: `echo() { … }`.
+const DEFINES = /^[\s!{]*[^\s;&|()<>]+[ \t]*\([ \t]*\)/
+// `printf -v NAME` (or a cluster such as -vV) assigns a variable, so it is not inert.
+function isInert(text: string): boolean {
+  const ws = split(text)
+  const h = head(ws)
+  if (h === undefined) return true
+  return INERT.has(h) && !DEFINES.test(text) && !(h === 'printf' && ws.some(w => /^-[A-Za-z]*v/.test(w)))
+}
+// git runs a file in .git/ (hooks, config) or a hooks directory.
+const hook = (w: string) => /(?:^|\/)(?:\.git|hooks)\//.test(clean(w))
+const REDIRECT = />>?[|&]?[ \t]*([^\s;&|<>()]+)/g
+const targets = (text: string) => [...text.matchAll(REDIRECT)].map(m => m[1]!).filter(w => !/^(?:\d+|-)$/.test(w))
+// Is a written file run (or read by a program that may run it) later? A file in .git/ or
+// hooks/ is. So is one a later command that is not inert names, and every file when that
+// command's own name is a variable or a glob (`./$T.sh`, `./x*`). An inert command that names
+// the file passes the name on to what it writes (mv, cp, a redirect), and a pipe from it counts
+// as run. A name matches inside any word, whatever its case, so `./X.SH` names x.sh.
 function usedLater(files: readonly string[], later: readonly Command[]): boolean {
-  const names = files.map(f => base(f.replace(/[\\'"]/g, ''))).filter(n => n !== '')
-  const named = (ws: readonly string[]) => ws.some(w => names.some(n => w.includes(n)))
+  if (files.some(hook)) return true
+  const names = files.map(f => base(clean(f)).toLowerCase()).filter(n => n !== '')
+  const named = (ws: readonly string[]) => ws.some(w => names.some(n => w.toLowerCase().includes(n)))
   for (const c of later) {
     const ws = split(c.text)
     const h = head(ws)
     if (h === undefined) continue
-    if (!isInert(ws)) { if (named(ws)) return true; continue }
-    if ((h === 'mv' || h === 'cp') && named(ws.slice(1, -1))) {
-      const to = ws[ws.length - 1]!
-      if (hook(to)) return true
-      names.push(base(to))
-    }
+    if (!isInert(c.text)) { if (named(ws) || /[$*?[]/.test(h)) return true; continue }
+    if (!named(ws.slice(1))) continue
+    if (c.pipe) return true
+    const to = targets(c.text)
+    if ((h === 'mv' || h === 'cp') && ws.length > 1) to.push(ws[ws.length - 1]!)
+    if (to.some(hook)) return true
+    names.push(...to.map(t => base(clean(t)).toLowerCase()).filter(n => n !== ''))
   }
   return false
 }
-const REDIRECT = />>?\|?[ \t]*([^\s;&|<>()]+)/g
 function wordsOf(command: string): string[] {
   const message = command.replace(MESSAGE, '-m MSG')
-  // Drop every body first; restore a body whose file a later command may run.
-  const writes: { at: number; full: string; stub: string; file: string }[] = []
+  // Drop every body; if a later command may run any written file, keep them all (a kept body
+  // may run another written file).
+  const writes: { end: number; file: string }[] = []
   let shift = 0
   const stubbed = message.replace(WRITE, (m, before: string | undefined, _q, _d, after: string | undefined, at: number) => {
     const file = before ?? after
     if (file === undefined) return m
     const stub = m.slice(0, m.indexOf('\n')).replace(/<<-?[ \t]*['"]\w+['"]/, '')
-    writes.push({ at: at - shift, full: m, stub, file })
+    writes.push({ end: at - shift + stub.length, file })
     shift += m.length - stub.length
     return stub
   })
   const parts = commands(stubbed)
-  let text = stubbed
-  for (const w of [...writes].reverse()) {
-    const later = parts?.filter(c => c.end > w.at + w.stub.length)
-    if (later === undefined || usedLater([w.file], later)) text = text.slice(0, w.at) + w.full + text.slice(w.at + w.stub.length)
-  }
+  const kept = parts === undefined || writes.some(w => usedLater([w.file], parts.filter(c => c.end > w.end)))
+  const text = kept ? message : stubbed
   // Runners are looked for outside the dropped bodies: a message that says "bash" runs nothing.
   if (DOT_SOURCE.test(text) || split(text).some(w => RUNNER.test(base(w)))) return split(command)
-  // A substitution, a backtick or a kept heredoc keeps the whole bag.
-  const cmds = /\$\(|`|<</.test(text) ? undefined : commands(text)
+  // A substitution, a process substitution, a backtick or a kept heredoc keeps the whole bag.
+  const cmds = /\$\(|`|<<|[<>]\(/.test(text) ? undefined : commands(text)
   if (cmds === undefined) return split(text)
   return cmds.flatMap((c, i) => {
-    if (!isInert(split(c.text))) return split(c.text)
-    const targets = [...c.text.matchAll(REDIRECT)].map(m => m[1]!)
-    return targets.length > 0 && usedLater(targets, cmds.slice(i + 1)) ? split(c.text) : []
+    if (!isInert(c.text) || c.pipe) return split(c.text)
+    const to = targets(c.text)
+    return to.length > 0 && usedLater(to, cmds.slice(i + 1)) ? split(c.text) : []
   })
 }
 

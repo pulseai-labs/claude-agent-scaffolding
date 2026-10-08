@@ -134,19 +134,23 @@ push or an `rm`, so does a bare variable (`git push $OPTS`). Beside `branch` or 
 variable is not read as a flag: it is mostly a message or a path.
 
 **Inert commands leave the bag (since 0.4.2).** When the text holds no program that may run text
-(the list below), no `$(`, no backtick, no heredoc left in place and no open quote, the list
-splits it into simple commands at `;`, `&`, `|` and newlines outside quotes. A command whose first
-word is `[`, `[[`, `test`, `echo`, `printf` (without `-v`), `exit`, `true`, `false`, `cat`, `head`,
-`tail`, `wc`, `ls`, `stat`, `grep`, `jq`, `cut`, `tr`, `mkdir`, `touch`, `mv` or `cp` then adds no
-words, unless it writes with `>` into a file that a later command outside this list names. Every
-other command keeps its words, and so a danger word beside a harmless *non-inert* command is
-still an extra ask. A dashed word is a verb only as git's own executable (`git-push`); prose such
-as `no-rm` or `force-push` is not.
+(the list below), no `$(`, `<(` or `>(`, no backtick, no heredoc left in place and no open quote,
+the list splits it into simple commands at `;`, `&`, `|`, `&&`, `||` and newlines outside quotes
+and comments. A command whose first word is `[`, `[[`, `test`, `echo`, `printf` (without `-v`),
+`exit`, `true`, `false`, `cat`, `head`, `tail`, `wc`, `ls`, `stat`, `grep`, `jq`, `cut`, `tr`,
+`mkdir`, `touch`, `mv` or `cp` (or an absolute path to one) then adds no words, unless it pipes
+onward, defines a function of that name, or writes with `>` into `.git/`, a `hooks/` directory or
+a file that a later command outside this list names. A later command whose own name holds a
+variable or a glob (`./$T.sh`, `./x*`) counts as naming every file. Every other command keeps its
+words, and so a danger word beside a harmless *non-inert* command is still an extra ask. A dashed
+word is a verb only as git's own executable (`git-push`); prose such as `no-rm` or `force-push`
+is not.
 
 Two heredoc shapes with a quoted delimiter are literal text, and their bodies are skipped: a
 commit message, `-m "$(cat <<'EOF'` … `EOF` `)"`, and `cat > file <<'EOF'` at a command's start
-unless a later command outside the inert list names the file — a `mv` or `cp` passes the check on
-to its destination, and a destination in `.git/` or `hooks/` counts as run. Every other heredoc
+unless a later command outside the inert list names the file — a `mv`, a `cp` or a redirect passes the check on
+to what it writes, a file in `.git/` or `hooks/` counts as run, and when one body is kept every
+body is. Every other heredoc
 keeps its words, and so do these two when the rest of the text names a program that may run text: a shell, `eval`,
 `source`, `.` at a command's start, `xargs`, `ssh`, `su`, `watch`, `parallel`, `sed`, `awk` or an
 interpreter (`python3`, `node`, `perl`, `ruby` …). A unique prefix of a long option is read as

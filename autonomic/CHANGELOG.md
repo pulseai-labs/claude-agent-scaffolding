@@ -9,18 +9,23 @@ across six seats in one PulseTrader run, one of which stalled a top for about 45
 
 - **Inert commands leave the bag** (`never.ts`). A simple command led by `[`, `test`, `echo`,
   `printf` (without `-v`), `exit`, `cat`, `wc`, `jq`, `mv`, `cp` and a few more adds no words, so
-  `[ -n "$staged" ] || exit 1` no longer lends `-n` to a later `git commit`. The full bag stays
-  whenever the text holds a runner, `$(`, a backtick, a heredoc left in place or an open quote.
+  `[ -n "$staged" ] || exit 1` no longer lends `-n` to a later `git commit`. It keeps them when it
+  pipes onward, when the text defines a function of its name, or when it writes into a file that
+  is run later. The full bag stays whenever the text holds a runner, `$(`, `<(`, `>(`, a backtick,
+  a heredoc left in place or an open quote. Comments are skipped, so a quote in a comment hides
+  nothing.
 - **A heredoc body stays dropped when its file is only moved or read.** A later command outside
-  the inert list that names the file keeps the body; `mv` and `cp` pass the name on; a `.git/` or
-  `hooks/` destination counts as run.
+  the inert list that names the file keeps the body, and so does one whose own name is a variable
+  or a glob; `mv`, `cp` and redirects pass the name on; a file in `.git/` or `hooks/` counts as
+  run; once one body is kept, every body is.
 - **A dashed word is a verb only as git's executable** (`git-push`, `/usr/lib/git-core/git-push`):
   `no-rm` and `force-push` in prose no longer read as `rm` and `push`.
 - **Known limits:** prose quoted in one argument of a non-inert command still pools
   (`herdr agent prompt "…"`); a non-inert reader of a written file (`dagr check run.json.tmp`)
   keeps the writer's words; an inert name shadowed by an alias or function defined in an earlier
-  call hides words; run locations other than `.git/` and `hooks/` (rc files, crontabs) are not
-  tracked.
+  call hides words; a written file run without being named (`make` reading a `Makefile`), or
+  named only through a variable passed as an argument (`nohup "$F"`), is not tracked; run
+  locations other than `.git/` and `hooks/` (rc files, crontabs) are not tracked.
 
 ## 0.4.1
 
