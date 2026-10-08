@@ -828,4 +828,62 @@ for fence in "$FV_ENTER" "$FV_FRESH"; do
   t_assert_eq 0 "$(find "$TMP/e-temporaries" -type f | wc -l | tr -d ' ')" "F-V1 $(basename "$fence") absent ref control cleans temporaries"
 done
 
+# Simulated Git < 2.43: --exists emits an unsupported-option usage error
+# (rc 129); every other operation delegates to real Git. This is not an old
+# Git binary or a macOS measurement. Each fence runs alone in a fresh shell.
+mkdir -p "$TMP/old-git-bin"
+REAL_GIT="$(command -v git)"; export REAL_GIT
+cat > "$TMP/old-git-bin/git" <<'SH'
+#!/usr/bin/env bash
+show=0; exists=0
+for arg in "$@"; do
+  [ "$arg" != show-ref ] || show=1
+  [ "$arg" != --exists ] || exists=1
+done
+if [ "$show" = 1 ] && [ "$exists" = 1 ]; then
+  printf "error: unknown option 'exists'\nusage: git show-ref [--verify] [--quiet] [<pattern>...]\n" >&2
+  exit 129
+fi
+exec "$REAL_GIT" "$@"
+SH
+chmod +x "$TMP/old-git-bin/git"
+_old_git_fence() { ( PATH="$TMP/old-git-bin:$PATH" _fv1_real_fence "$1" ); }
+t_capture "$TMP/old-git-bin/git" show-ref --exists refs/heads/spine/r0.s1-demo
+t_assert_rc 129 'simulated old Git answers --exists with usage rc 129'
+t_assert_contains "$T_OUT" "unknown option 'exists'" 'simulated old Git names unsupported option'
+for shape in absent present packed; do
+  F="$TMP/old-selector-$shape"; mkfix "$F"
+  oss_in "$F" work_item_add r0.s1 One core >/dev/null
+  expected=fresh
+  if [ "$shape" != absent ]; then
+    git -C "$F/core" branch spine/r0.s1-demo; expected=re-entry
+    [ "$shape" != packed ] || git -C "$F/core" pack-refs --all --prune
+  fi
+  before="$(cksum < "$F/ws/.ossify/project-state.json")"
+  t_capture _old_git_fence "$FV_ENTER"
+  printf 'Simulated old Git selector %s rc=%s: %s\n' "$shape" "$T_RC" "$T_OUT"
+  t_assert_rc 0 "simulated old Git selector $shape succeeds; runs alone in a fresh shell"
+  t_assert_contains "$T_OUT" "arm=$expected" "simulated old Git selector $shape routes correctly"
+  t_assert_eq "$before" "$(cksum < "$F/ws/.ossify/project-state.json")" "simulated old Git selector $shape never changes state"
+  t_assert_eq 0 "$(find "$TMP/e-temporaries" -type f | wc -l | tr -d ' ')" "simulated old Git selector $shape leaves no temporaries"
+done
+for shape in absent present; do
+  F="$TMP/old-fresh-$shape"; mkfix "$F"
+  oss_in "$F" work_item_add r0.s1 One core >/dev/null
+  [ "$shape" != present ] || git -C "$F/core" branch spine/r0.s1-demo
+  before="$(cksum < "$F/ws/.ossify/project-state.json")"
+  t_capture _old_git_fence "$FV_FRESH"
+  printf 'Simulated old Git fresh %s rc=%s: %s\n' "$shape" "$T_RC" "$T_OUT"
+  if [ "$shape" = absent ]; then
+    t_assert_rc 0 'simulated old Git fresh absent succeeds; runs alone in a fresh shell'
+    t_assert_eq main "$(oss_in "$F" spine_base_get r0.s1 core)" 'simulated old Git fresh absent RECORDs real base'
+    t_assert_eq spine/r0.s1-demo "$(git -C "$F/core" rev-parse --abbrev-ref HEAD)" 'simulated old Git fresh absent cuts real branch'
+  else
+    t_assert_rc 1 'simulated old Git fresh present refuses; runs alone in a fresh shell'
+    t_assert_contains "$T_OUT" 'already exists' 'simulated old Git fresh present names re-entry remedy'
+    t_assert_eq "$before" "$(cksum < "$F/ws/.ossify/project-state.json")" 'simulated old Git fresh present never RECORDs'
+  fi
+  t_assert_eq 0 "$(find "$TMP/e-temporaries" -type f | wc -l | tr -d ' ')" "simulated old Git fresh $shape cleans temporaries"
+done
+
 t_summary

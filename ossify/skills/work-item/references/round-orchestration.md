@@ -95,11 +95,18 @@ while IFS= read -r repo; do
   # --exists distinguishes absence (2) from a failed lookup (1).
   ref_rc=0
   git -C "$root" show-ref --exists "refs/heads/$spine_branch" 2>/dev/null || ref_rc=$?
+  # Git without --exists returns usage rc 129: retain the legacy probe only
+  # there. Known limit: legacy rc 1 conflates absence and malformed loose refs.
+  if [ "$ref_rc" = 129 ]; then
+    ref_rc=0
+    git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" || ref_rc=$?
+    [ "$ref_rc" != 1 ] || ref_rc=2
+  fi
   case "$ref_rc" in
     0) git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" \
          || { echo "halt: cannot read $spine_branch in $repo"; exit 1; }
        arm=re-entry ;;
-    2) ;; # genuinely absent ref
+    2) ;; # absent (or ambiguous legacy rc 1)
     *) echo "halt: cannot read $spine_branch in $repo (git show-ref rc $ref_rc)"; exit 1 ;;
   esac
 done <<EOF
@@ -151,10 +158,17 @@ while IFS= read -r repo; do
   # A failed lookup is not absence, even when quiet --verify would return 1.
   ref_rc=0
   git -C "$root" show-ref --exists "refs/heads/$spine_branch" 2>/dev/null || ref_rc=$?
+  # Git without --exists returns usage rc 129: retain the legacy probe only
+  # there. Known limit: legacy rc 1 conflates absence and malformed loose refs.
+  if [ "$ref_rc" = 129 ]; then
+    ref_rc=0
+    git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" || ref_rc=$?
+    [ "$ref_rc" != 1 ] || ref_rc=2
+  fi
   case "$ref_rc" in
     0) git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" \
          || { echo "halt: cannot read $spine_branch in $repo"; exit 1; } ;;
-    2) ;; # genuinely absent ref
+    2) ;; # absent (or ambiguous legacy rc 1)
     *) echo "halt: cannot read $spine_branch in $repo (git show-ref rc $ref_rc)"; exit 1 ;;
   esac
   if [ "$ref_rc" = 0 ]; then
