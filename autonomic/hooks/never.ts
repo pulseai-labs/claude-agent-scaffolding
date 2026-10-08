@@ -75,14 +75,16 @@ function commands(text: string): Command[] | undefined {
 }
 const base = (w: string) => w.replace(/^.*\//, '')
 const clean = (w: string) => w.replace(/[\\'"]/g, '')
-// The command word. Only an absolute path is read by its base name (/bin/echo is echo); a
-// relative one (./scripts/test) is a repo program, never inert.
+// The command word. Only a path in a system bin directory is read by its base name (/bin/echo
+// is echo); any other path (./scripts/test, /repo/echo) is a program of its own, never inert.
+const SYSTEM = /^\/(?:usr\/(?:local\/)?)?s?bin\/[^/]+$|^\/opt\/homebrew\/bin\/[^/]+$/
 function head(words: readonly string[]): string | undefined {
   const w = words.find(x => !KEYWORD.has(x))
-  return w === undefined ? undefined : w.startsWith('/') ? base(w) : w
+  return w === undefined ? undefined : SYSTEM.test(w) ? base(w) : w
 }
-// A function defined in the text may take an inert name: `echo() { … }`.
-const DEFINES = /^[\s!{]*[^\s;&|()<>]+[ \t]*\([ \t]*\)/
+// A function defined in the command may take an inert name: `echo() { … }`, also after a
+// keyword (`then echo() …`). Any `()` makes the command non-inert.
+const DEFINES = /\([ \t]*\)/
 // `printf -v NAME` (or a cluster such as -vV) assigns a variable, so it is not inert.
 function isInert(text: string): boolean {
   const ws = split(text)
@@ -99,8 +101,14 @@ const targets = (text: string) => [...text.matchAll(REDIRECT)].map(m => m[1]!).f
 // command's own name is a variable or a glob (`./$T.sh`, `./x*`). An inert command that names
 // the file passes the name on to what it writes (mv, cp, a redirect), and a pipe from it counts
 // as run. A name matches inside any word, whatever its case, so `./X.SH` names x.sh.
-function usedLater(files: readonly string[], later: readonly Command[]): boolean {
+// A file name holding a variable the text assigns once is read with its value; one that stays
+// opaque may be any file (.git/config included), so any later command that is not inert counts.
+type Resolve = (f: string) => string
+const opaqueName = (f: string) => /[$*?[`{]/.test(f)
+function usedLater(raw: readonly string[], later: readonly Command[], resolve: Resolve): boolean {
+  const files = raw.map(resolve)
   if (files.some(hook)) return true
+  if (files.some(opaqueName)) return later.some(c => !isInert(c.text))
   const names = files.map(f => base(clean(f)).toLowerCase()).filter(n => n !== '')
   const named = (ws: readonly string[]) => ws.some(w => names.some(n => w.toLowerCase().includes(n)))
   for (const c of later) {
@@ -112,10 +120,22 @@ function usedLater(files: readonly string[], later: readonly Command[]): boolean
     if (c.pipe) return true
     const to = targets(c.text)
     if ((h === 'mv' || h === 'cp') && ws.length > 1) to.push(ws[ws.length - 1]!)
-    if (to.some(hook)) return true
-    names.push(...to.map(t => base(clean(t)).toLowerCase()).filter(n => n !== ''))
+    const next = to.map(resolve)
+    if (next.some(hook)) return true
+    if (next.some(opaqueName)) return later.some(c => !isInert(c.text))
+    names.push(...next.map(t => base(clean(t)).toLowerCase()).filter(n => n !== ''))
   }
   return false
+}
+// Assignments that are a whole command (`T=/s/r.md.tmp`). A name assigned twice stays opaque.
+const ASSIGN = /^[ \t]*([A-Za-z_]\w*)=("[^"$`]*"|'[^']*'|[^\s;&|<>"'$`]*)[ \t]*$/
+function resolver(parts: readonly Command[]): Resolve {
+  const vars = new Map<string, string | undefined>()
+  for (const c of parts) {
+    const m = ASSIGN.exec(c.text)
+    if (m) vars.set(m[1]!, vars.has(m[1]!) ? undefined : clean(m[2]!))
+  }
+  return f => clean(f).replace(/\$\{?([A-Za-z_]\w*)\}?/g, (v, n: string) => vars.get(n) ?? v)
 }
 function wordsOf(command: string): string[] {
   const message = command.replace(MESSAGE, '-m MSG')
@@ -132,7 +152,8 @@ function wordsOf(command: string): string[] {
     return stub
   })
   const parts = commands(stubbed)
-  const kept = parts === undefined || writes.some(w => usedLater([w.file], parts.filter(c => c.end > w.end)))
+  const resolve = resolver(parts ?? [])
+  const kept = parts === undefined || writes.some(w => usedLater([w.file], parts.filter(c => c.end > w.end), resolve))
   const text = kept ? message : stubbed
   // Runners are looked for outside the dropped bodies: a message that says "bash" runs nothing.
   if (DOT_SOURCE.test(text) || split(text).some(w => RUNNER.test(base(w)))) return split(command)
@@ -142,14 +163,15 @@ function wordsOf(command: string): string[] {
   return cmds.flatMap((c, i) => {
     if (!isInert(c.text) || c.pipe) return split(c.text)
     const to = targets(c.text)
-    return to.length > 0 && usedLater(to, cmds.slice(i + 1)) ? split(c.text) : []
+    return to.length > 0 && usedLater(to, cmds.slice(i + 1), resolve) ? split(c.text) : []
   })
 }
 
-// A verb is the word itself, a path ending in it (/bin/rm), or git's dashed executable
-// (git-push, /usr/lib/git-core/git-push). Prose such as no-rm or force-push is not a verb (#693).
+// A verb is the word itself, a path ending in it (/bin/rm), git's dashed executable (git-push),
+// or a dashed path (./force-push, /usr/lib/git-core/git-push). Bare prose such as no-rm or
+// force-push is not a verb (#693).
 const isVerb = (w: string, verb: string) => !w.startsWith('-') &&
-  (w === verb || w === `git-${verb}` || w.endsWith(`/${verb}`) || w.endsWith(`/git-${verb}`))
+  (w === verb || w === `git-${verb}` || w.endsWith(`/${verb}`) || (w.includes('/') && w.endsWith(`-${verb}`)))
 const PUSH = ['push', 'send-pack', 'http-push']
 const isPush = (w: string) => PUSH.some(v => isVerb(w, v)) || w.includes('.push=')
 

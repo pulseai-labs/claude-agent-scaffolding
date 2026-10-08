@@ -489,3 +489,26 @@ describe('0.4.2 final review: no new false negative against 0.4.1', () => {
     expect(rules("echo 'git push -f origin feat/x' > x.sh; ./X.SH")).toContain('force-push')
   })
 })
+
+// PR #700 round 1 (Codex): each case was held by 0.4.1 and must still ask.
+describe('PR #700 round 1: the inert test trusts no more than it must', () => {
+  test('a redirect through a variable is resolved, or kept when it cannot be (r4220518542)', () => {
+    expect(rules("P=.git/config; printf '[alias]\\np = push -f\\n' > \"$P\"; git p origin feat/x")).toContain('force-push')
+    expect(rules("printf '[alias]\\np = push -f\\n' > \"$GITCFG\"; git p origin feat/x")).toContain('force-push')
+    // An assignment after the write names its own value, so it never lets the write's words go.
+    expect(rules("printf '[alias]\\np = push -f\\n' > \"$P\"; P=zq9; git p origin feat/x")).toContain('force-push')
+    // An assigned temp file that is only moved stays dropped (case B).
+    expect(rules("T=/s/r.md.tmp\ncat > \"$T\" <<'EOF'\nno-rm\nEOF\nmv \"$T\" /s/r.md\nherdr pane run x ok")).toEqual([])
+  })
+  test('a function defined after a keyword is not inert (r4220518555)', () => {
+    expect(rules('if true; then echo() { git push -f origin feat/x; }; echo hi; fi')).toContain('force-push')
+  })
+  test('only a system path to an inert name is inert (r4220518565)', () => {
+    expect(rules('/repo/echo git push -f origin feat/x')).toContain('force-push')
+    expect(rules('/bin/echo git push -f origin feat/x; true')).toEqual([])
+  })
+  test('a dashed executable path is a verb; bare dashed prose is not (r4220518572)', () => {
+    expect(rules('./force-push -f origin feat/x')).toContain('force-push')
+    expect(rules('bin/force-push -f origin feat/x')).toContain('force-push')
+  })
+})
