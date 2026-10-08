@@ -88,4 +88,36 @@ GIT
   git -C "$F/core" pack-refs --all --prune; PATH="$TMP/old-git:$PATH" inventory
   t_assert_rc 0 'R1 old Git packed control succeeds'; t_assert_eq ok "$(verdict repo core 3)" 'R1 rc129 fallback reads packed spine'
 fi
+if [ "$only" = all ] || [ "$only" = R3 ]; then
+  for location in conventional recorded; do
+    for shape in directory symlink; do
+      fixture "r3-$location-$shape"; healthy; spawn; land
+      if [ "$location" = conventional ]; then
+        git -C "$F/core" worktree move "$WT" "$F/alternate"
+        oss work_item_exec r0.s1.w1 work/r0.s1.w1-one "$F/alternate" "$(git -C "$F/core" rev-parse main)" >/dev/null
+        occupied="$WT"
+      else
+        git -C "$F/core" worktree remove "$WT"
+        occupied="$F/alternate"
+        oss work_item_exec r0.s1.w1 work/r0.s1.w1-one "$occupied" "$(git -C "$F/core" rev-parse main)" >/dev/null
+      fi
+      if [ "$shape" = directory ]; then mkdir -p "$occupied"; else ln -s "$F/missing" "$occupied"; fi
+      inventory
+      printf 'R3 %s %s rc=%s: %s\n' "$location" "$shape" "$T_RC" "$T_OUT"
+      t_assert_rc 3 "R3 occupied $location $shape halts dispatcher"
+      expected=halt:unclassified
+      [ "$location" != conventional ] || expected=halt:worktree-held
+      t_assert_eq "$expected" "$(verdict item r0.s1.w1 4)" "R3 occupied $location $shape never skips"
+    done
+  done
+  fixture r3-live; healthy; spawn; land; inventory
+  t_assert_rc 0 'R3 live clean merged control succeeds'; t_assert_eq skip "$(verdict item r0.s1.w1 4)" 'R3 live clean merged worktree still skips'
+  # Alias spelling of the SAME linked worktree remains valid.
+  ln -s "$F/core" "$F/core-alias"
+  oss work_item_exec r0.s1.w1 work/r0.s1.w1-one "$F/core-alias/.worktrees/r0.s1.w1" "$(git -C "$F/core" rev-parse main)" >/dev/null
+  inventory
+  t_assert_rc 0 'R3 physical-path alias control succeeds'; t_assert_eq skip "$(verdict item r0.s1.w1 4)" 'R3 same live worktree with alias spelling still skips'
+  git -C "$F/core" worktree remove "$WT"; git -C "$F/core" branch -d work/r0.s1.w1-one >/dev/null; inventory
+  t_assert_rc 0 'R3 post-cleanup control succeeds'; t_assert_eq skip "$(verdict item r0.s1.w1 4)" 'R3 truly post-cleanup item still skips'
+fi
 t_summary

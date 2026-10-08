@@ -348,7 +348,14 @@ HOLD
           # re-entry declare the round done. Halt under its own route: the
           # state, not the repos, is the record to repair.
           elif [ -z "$br" ]; then route=halt:branch-unknown
-          elif [ "$wt" != present ] && { [ -e "$conv" ] || [ -L "$conv" ]; }; then
+          # Close cleans the conventional path even when state records a
+          # different worktree. Compare physically so aliases of the SAME
+          # live linked worktree remain valid; any other occupied path halts.
+          elif { [ "$wt" != present ] || [ "$(cd -P "$conv" 2>/dev/null && pwd)" != "$wtp_phys" ]; } \
+               && { [ -e "$conv" ] || [ -L "$conv" ]; }; then
+            if [ "$held" = 1 ]; then route=halt:worktree-held; else route=halt:unclassified; fi
+          elif [ "$wt" != present ] && [ "$wtp" != "$conv" ] \
+               && { [ -e "$wtp" ] || [ -L "$wtp" ]; }; then
             if [ "$held" = 1 ]; then route=halt:worktree-held; else route=halt:unclassified; fi
           elif [ "$brx" = no ]; then route=skip
           # #673 round 4 (U-15p/U-151): a merge that landed is `skip` only when
