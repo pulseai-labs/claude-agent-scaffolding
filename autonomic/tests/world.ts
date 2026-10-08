@@ -14,6 +14,7 @@ export type World = {
   statuses: Array<string | undefined>
   notices: unknown[]
   fills: string[]
+  envSets: Array<[string, string | undefined]>   // each $.env.set, in order
   submits: Array<{ text: string; origin: unknown }>   // prompts that reached the bottom
   hasBox: boolean
   session: { id: string; cwd: string }
@@ -24,6 +25,10 @@ export type World = {
   sections: Array<{ id: string; text: string; scope: 'shared' | 'session' }>
   asked: number                // AskUserQuestion calls that reached the bottom: the operator
   toolDeny?: string            // tool.call beneath autonomic denies with this text
+  toolResultText?: string      // the text a non-Ask tool.call result carries
+  failRegister?: boolean       // $.command.register throws
+  failEnvSet?: (value: string | undefined) => boolean   // $.env.set throws for a matching value
+  failHome?: boolean           // $.env.get('HOME') throws
   failCwd?: boolean            // session.cwd throws (the host cannot answer)
   failAppend?: RegExp          // an append to a matching path fails
   appendsLeft?: number         // appends that still succeed; the next ones fail
@@ -46,7 +51,7 @@ export const POLICY = '/home/u/.claude/autonomic/policy.md'
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string>; noPolicy?: boolean } = {}): World {
   const w: World = {
     files: new Map([...(opts.noPolicy ? [] : [[POLICY, 'TEST POLICY\n'] as [string, string]]), ...Object.entries(opts.files ?? {})]),
-    runs: [], toasts: [], statuses: [], notices: [], fills: [], submits: [], hasBox: true,
+    runs: [], toasts: [], statuses: [], notices: [], fills: [], envSets: [], submits: [], hasBox: true,
     session: { id: 's1', cwd: '/repo' },
     git: { top: '/repo', branch: 'feat/x', originHead: 'origin/main' },
     forks: [], forkPrompts: [],
@@ -55,7 +60,9 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     asked: 0,
     usage: { tokens: 100_000, window: 1_000_000 },
   }
-  mock.env(on, { HOME: '/home/u', ...(opts.env ?? {}) })
+  on('env.set', (_$, e) => { if (w.failEnvSet?.(e.value)) throw new Error('env refused'); w.envSets.push([e.name, e.value]); return { value: undefined } as never })
+  const env: Record<string, string> = { HOME: '/home/u', ...(opts.env ?? {}) }
+  on('env.get', (_$, e) => { if (w.failHome && e.name === 'HOME') throw new Error('no HOME'); return { value: env[e.name] } as never })
   mock.store(on)
   on('state.set', async (_$, e, next) => {
     const s = e as unknown as { key?: string; value?: unknown }
@@ -119,11 +126,11 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   on('tool.call', (_$, e) => {
     if (e.tool === 'AskUserQuestion') { w.asked += 1; return { result: 'the operator answered', text: 'the operator answered' } as never }
     if (w.toolDeny !== undefined) return { deny: w.toolDeny } as never
-    return (w.readOnly ? { result: 'ran', text: 'ok', isReadOnly: true } : { result: 'ran', text: 'ok' }) as never
+    return (w.readOnly ? { result: 'ran', text: w.toolResultText ?? 'ok', isReadOnly: true } : { result: 'ran', text: w.toolResultText ?? 'ok' }) as never
   })
   on('ui.toast', (_$, e) => { w.toasts.push(e.text); return { value: undefined } as never })
   on('ui.status', (_$, e) => { w.statuses.push(e.text); return { value: undefined } as never })
-  on('command.register', () => ({ value: undefined }) as never)
+  on('command.register', () => { if (w.failRegister) throw new Error('no register'); return { value: undefined } as never })
   on('classic.Stop', () => (w.stopBlock === undefined ? {} : { block: w.stopBlock }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
   return w
