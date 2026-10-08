@@ -45,6 +45,32 @@ describe('AUTONOMIC_EFFECTIVE_MODE (0.4.0 spec §3.4)', () => {
     await $.session.start(START)
     expect(last(w)).toBe('manual')
   })
+  test('a resumed session id gets its mode back even when the command cannot be registered (PR #694 R3-A)', async ($, on) => {
+    const w = world(on)
+    w.session.id = 'reg-a'
+    await $.session.start(START)
+    await $.command.run(RUN('on'))
+    w.session.id = 'reg-b'
+    await $.session.start(START)
+    w.session.id = 'reg-a'
+    await $.session.start(START)
+    expect(last(w)).toBe('autopilot')
+    w.failRegister = true
+    w.session.id = 'reg-b'
+    await $.session.start(START)
+    expect(last(w)).toBe('manual')
+  })
+  test('a mode that cannot be set unsets the variable and tells the operator (PR #694 R3-C)', async ($, on) => {
+    const w = world(on)
+    w.session.id = 'env-a'
+    await $.session.start(START)
+    await $.command.run(RUN('on'))
+    expect(last(w)).toBe('autopilot')
+    w.failEnvSet = v => v === 'manual'
+    await $.command.run(RUN('off'))
+    expect(last(w)).toBe(undefined)
+    expect(w.toasts.join('\n')).toContain('AUTONOMIC_EFFECTIVE_MODE')
+  })
   test('a new session id follows its own mode', async ($, on) => {
     const w = world(on)
     await $.session.start(START)

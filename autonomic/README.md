@@ -275,7 +275,8 @@ autonomic sets `AUTONOMIC_EFFECTIVE_MODE` (`autopilot` or `manual`) in its own p
 session's mode changes, so every later Bash call the session runs sees the live mode. Read it there
 to decide whether a child starts in autopilot: `autopilot` marks the child; anything else, unset
 included, does not. It is in memory and cannot go stale the way the session record can after a
-failed write. autonomic never reads it: `AUTONOMIC_MODE` stays the spawn's input.
+failed write. When the host refuses the value, autonomic unsets the variable and shows a toast, so a
+launcher reads no stale mode. autonomic never reads it: `AUTONOMIC_MODE` stays the spawn's input.
 
 ## Environment
 

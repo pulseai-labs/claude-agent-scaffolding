@@ -110,8 +110,13 @@ async function guard($: Engine, rec: Live): Promise<Live> {
 
 // The live mode for launchers (0.4.0 spec §3.4): in memory, so it cannot go stale as a
 // record that failed to write can. Every later Bash call inherits it. Never read here.
+// A value that cannot be set is unset, so a launcher reads no stale mode (PR #694 R3-C).
 async function publish($: Engine, mode: Live['mode']): Promise<void> {
-  try { await $.env.set('AUTONOMIC_EFFECTIVE_MODE', mode) } catch (err) { await log($, `env set failed ${String(err)}`) }
+  try { await $.env.set('AUTONOMIC_EFFECTIVE_MODE', mode) } catch (err) {
+    await log($, `env set failed ${String(err)}`)
+    try { await $.env.set('AUTONOMIC_EFFECTIVE_MODE', undefined) } catch {}
+    $.ui.toast(`autonomic: AUTONOMIC_EFFECTIVE_MODE could not be set to ${mode}; it is unset, so a launcher starts no child in autopilot.`)
+  }
 }
 
 // A record that cannot be written cannot reach a molt successor: autopilot ends (spec §4),
@@ -353,11 +358,12 @@ export const register: Register = (on, options) => {
   cfg = parseConfig(options as Readonly<Record<string, unknown>> | undefined)
 
   on('session.start', async ($, e, next) => {
+    // Each step has its own try: a failed register must not skip the mode (PR #694 R3-A).
+    try { await writeDefaultPolicy($) } catch (err) { await log($, `session.start policy error ${String(err)}`) }
+    // A resumed session id comes back from the cache without a save: publish its mode (PR #694 F1).
+    try { await publish($, (await modeOf($)).mode) } catch (err) { await log($, `session.start mode error ${String(err)}`) }
     try {
       await $.command.register({ name: 'autopilot', description: 'autonomic: on [scope docs] | off | status' })
-      await writeDefaultPolicy($)
-      // A resumed session id comes back from the cache without a save: publish its mode (PR #694 F1).
-      await publish($, (await modeOf($)).mode)
       if (cfg.problems.length > 0) $.ui.toast(`autonomic: ${cfg.problems.join('; ')}`)
     } catch (err) {
       await log($, `session.start error ${String(err)}`)

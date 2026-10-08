@@ -26,6 +26,8 @@ export type World = {
   asked: number                // AskUserQuestion calls that reached the bottom: the operator
   toolDeny?: string            // tool.call beneath autonomic denies with this text
   toolResultText?: string      // the text a non-Ask tool.call result carries
+  failRegister?: boolean       // $.command.register throws
+  failEnvSet?: (value: string | undefined) => boolean   // $.env.set throws for a matching value
   failCwd?: boolean            // session.cwd throws (the host cannot answer)
   failAppend?: RegExp          // an append to a matching path fails
   appendsLeft?: number         // appends that still succeed; the next ones fail
@@ -57,7 +59,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     asked: 0,
     usage: { tokens: 100_000, window: 1_000_000 },
   }
-  on('env.set', (_$, e) => { w.envSets.push([e.name, e.value]); return { value: undefined } as never })
+  on('env.set', (_$, e) => { if (w.failEnvSet?.(e.value)) throw new Error('env refused'); w.envSets.push([e.name, e.value]); return { value: undefined } as never })
   mock.env(on, { HOME: '/home/u', ...(opts.env ?? {}) })
   mock.store(on)
   on('state.set', async (_$, e, next) => {
@@ -126,7 +128,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   })
   on('ui.toast', (_$, e) => { w.toasts.push(e.text); return { value: undefined } as never })
   on('ui.status', (_$, e) => { w.statuses.push(e.text); return { value: undefined } as never })
-  on('command.register', () => ({ value: undefined }) as never)
+  on('command.register', () => { if (w.failRegister) throw new Error('no register'); return { value: undefined } as never })
   on('classic.Stop', () => (w.stopBlock === undefined ? {} : { block: w.stopBlock }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
   return w

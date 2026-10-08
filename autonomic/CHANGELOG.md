@@ -22,7 +22,8 @@ permission fork missing a same-turn tool result in 2 of 3 runs).
   carries neither.
 - **`AUTONOMIC_EFFECTIVE_MODE`** (`register.tsx`): set to `autopilot` or `manual` in autonomic's
   process each time a session's mode is saved, the fall to manual on a failed record write
-  included, and again at each `session.start`, so a resumed session id gets its own mode back.
+  included, and again at each `session.start`, so a resumed session id gets its own mode back. A
+  value the host refuses unsets the variable, with a toast.
   autonomic never reads it; README, "For launchers".
 - **Known limit:** the digest costs up to 4,000 characters per permission or ask judgment.
 - **Known limit:** a tool result's middle is not shown, only its tail; a result that is one long
