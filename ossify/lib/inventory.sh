@@ -151,6 +151,7 @@ EOF
 _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if any halt
   local sf="$1" spine="$2" spine_dir="$3" sb="$4" halt=0
   local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys wt_common root_common held holders hp hl adopt_br brx feed feed_rc=0 gr descends foreign ref_rc
+  local cleanup_kept derived_root rec_root hp_root
   # The feed's own rc is caught, and each item renders inside a `try`/`catch`
   # (#673 A2): one unrenderable field used to collapse the WHOLE stream - the
   # shell read a partial feed with no error channel, the empty-field skip
@@ -326,6 +327,27 @@ HOLD
       fi
       case "$st" in
         complete)
+          # Mirror worktree_remove's conv-absent kept-condition (#673 L5).
+          # A live linked worktree's physical path is its registration path;
+          # only a /.worktrees/<wi> suffix under the derived or recorded root
+          # is cleanup's to remove. A suffix under any other root is refused.
+          cleanup_kept=no
+          if [ "$wt" = present ]; then
+            derived_root="$(_oss_worktree_phys "$root")"
+            rec_root=""
+            case "$wtp" in
+              */.worktrees/"$wi") rec_root="$(_oss_worktree_phys "${wtp%/.worktrees/$wi}")" ;;
+            esac
+            case "$wtp_phys" in
+              */.worktrees/"$wi")
+                hp_root="${wtp_phys%/.worktrees/$wi}"
+                hp_root="$(_oss_worktree_phys "$hp_root")"
+                if [ "$hp_root" = "$derived_root" ] || { [ -n "$rec_root" ] && [ "$hp_root" = "$rec_root" ]; }; then
+                  cleanup_kept=yes
+                fi
+                ;;
+            esac
+          fi
           # #673 I2: a dirty linked worktree is a halt for EVERY complete
           # route, `skip` included - the already-computed clean=no was
           # otherwise consulted nowhere on this arm, so re-entry ran other
@@ -350,11 +372,12 @@ HOLD
           elif [ -z "$br" ]; then route=halt:branch-unknown
           # Close cleans the conventional path even when state records a
           # different worktree. Compare physically so aliases of the SAME
-          # live linked worktree remain valid. A live alternate holder cannot
-          # be removed at conv, even when conv is absent; branch deletion
-          # would then refuse. Other occupied cleanup paths halt too.
+          # live linked worktree remain valid. With conv absent, cleanup also
+          # removes a kept suffix registration under the derived or recorded
+          # root; other live alternate holders make branch deletion refuse.
+          # An occupied conv outside the live worktree still halts.
           elif { [ "$wt" != present ] || [ "$(cd -P "$conv" 2>/dev/null && pwd)" != "$wtp_phys" ]; } \
-               && { [ "$wt" = present ] || [ -e "$conv" ] || [ -L "$conv" ]; }; then
+               && { [ -e "$conv" ] || [ -L "$conv" ] || { [ "$wt" = present ] && [ "$cleanup_kept" != yes ]; }; }; then
             if [ "$held" = 1 ]; then route=halt:worktree-held; else route=halt:unclassified; fi
           elif [ "$wt" != present ] && [ "$wtp" != "$conv" ] \
                && { [ -e "$wtp" ] || [ -L "$wtp" ]; }; then

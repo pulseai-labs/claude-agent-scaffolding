@@ -120,6 +120,44 @@ if [ "$only" = all ] || [ "$only" = R3 ]; then
   t_assert_eq halt:worktree-held "$(verdict item r0.s1.w1 4)" 'R3 absent conventional path cannot hide a live alternate holder'
   t_capture oss worktree_remove core r0.s1.w1
   t_assert_rc 8 'R3 live alternate holder really makes the owning cleanup refuse'
+  # S1: cleanup owns suffix registrations under the recorded root, including
+  # a physical alias of that root. The adjacent non-suffix holder still halts.
+  for spelling in direct alias; do
+    fixture "s1-recorded-root-$spelling"; healthy; spawn; land
+    moved="$F/recorded-root/.worktrees/r0.s1.w1"
+    mkdir -p "${moved%/*}"
+    git -C "$F/core" worktree move "$WT" "$moved"
+    recorded="$moved"
+    if [ "$spelling" = alias ]; then
+      ln -s "$F/recorded-root" "$F/root-alias"
+      recorded="$F/root-alias/.worktrees/r0.s1.w1"
+    fi
+    oss work_item_exec r0.s1.w1 work/r0.s1.w1-one "$recorded" "$(git -C "$F/core" rev-parse main)" >/dev/null
+    inventory
+    printf 'S1 recorded-root %s rc=%s: %s\n' "$spelling" "$T_RC" "$T_OUT"
+    t_assert_rc 0 "S1 recorded-root $spelling live worktree is accepted"
+    t_assert_eq skip "$(verdict item r0.s1.w1 4)" "S1 recorded-root $spelling clean merged worktree skips"
+    t_capture oss worktree_remove core r0.s1.w1
+    t_assert_rc 0 "S1 recorded-root $spelling owning cleanup accepts the same state"
+    t_assert_eq no "$(if [ -d "$moved" ]; then echo yes; else echo no; fi)" "S1 recorded-root $spelling cleanup removes the holder"
+    t_capture git -C "$F/core" show-ref --verify --quiet refs/heads/work/r0.s1.w1-one
+    t_assert_rc 1 "S1 recorded-root $spelling cleanup deletes the merged branch"
+    inventory
+    t_assert_rc 0 "S1 recorded-root $spelling post-cleanup succeeds"
+    t_assert_eq skip "$(verdict item r0.s1.w1 4)" "S1 recorded-root $spelling post-cleanup still skips"
+  done
+  # A suffix alone is insufficient: a non-suffix record cannot authorize the
+  # alternate root, even when its symlink resolves to a suffix registration.
+  fixture s1-unowned-suffix; healthy; spawn; land
+  moved="$F/other-root/.worktrees/r0.s1.w1"; mkdir -p "${moved%/*}"
+  git -C "$F/core" worktree move "$WT" "$moved"
+  ln -s "$moved" "$F/alternate"
+  oss work_item_exec r0.s1.w1 work/r0.s1.w1-one "$F/alternate" "$(git -C "$F/core" rev-parse main)" >/dev/null
+  inventory
+  t_assert_rc 3 'S1 suffix outside derived and recorded roots still halts'
+  t_assert_eq halt:worktree-held "$(verdict item r0.s1.w1 4)" 'S1 suffix alone never authorizes cleanup'
+  t_capture oss worktree_remove core r0.s1.w1
+  t_assert_rc 8 'S1 cleanup really refuses the unowned suffix registration'
   fixture r3-live; healthy; spawn; land; inventory
   t_assert_rc 0 'R3 live clean merged control succeeds'; t_assert_eq skip "$(verdict item r0.s1.w1 4)" 'R3 live clean merged worktree still skips'
   # Alias spelling of the SAME linked worktree remains valid.
