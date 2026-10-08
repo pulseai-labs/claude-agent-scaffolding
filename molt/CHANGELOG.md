@@ -2,6 +2,11 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.2.2 — 2026-10-08
+
+- A `<<<` herestring no longer opens a heredoc; mirrored from seat-mods 0.3.0 by the shared shell parity contract (PR #698).
+- A path-qualified wrapper such as `/usr/bin/env` is skipped like the bare word; mirrored from seat-mods 0.3.0 by the shared shell parity contract (PR #698).
+
 ## 0.2.1
 
 **The stage file** (#677 F12; `records.ts`, `register.tsx`). molt writes
