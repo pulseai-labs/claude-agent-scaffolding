@@ -14,6 +14,7 @@ export type World = {
   statuses: Array<string | undefined>
   notices: unknown[]
   fills: string[]
+  envSets: Array<[string, string | undefined]>   // each $.env.set, in order
   submits: Array<{ text: string; origin: unknown }>   // prompts that reached the bottom
   hasBox: boolean
   session: { id: string; cwd: string }
@@ -46,7 +47,7 @@ export const POLICY = '/home/u/.claude/autonomic/policy.md'
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string>; noPolicy?: boolean } = {}): World {
   const w: World = {
     files: new Map([...(opts.noPolicy ? [] : [[POLICY, 'TEST POLICY\n'] as [string, string]]), ...Object.entries(opts.files ?? {})]),
-    runs: [], toasts: [], statuses: [], notices: [], fills: [], submits: [], hasBox: true,
+    runs: [], toasts: [], statuses: [], notices: [], fills: [], envSets: [], submits: [], hasBox: true,
     session: { id: 's1', cwd: '/repo' },
     git: { top: '/repo', branch: 'feat/x', originHead: 'origin/main' },
     forks: [], forkPrompts: [],
@@ -55,6 +56,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     asked: 0,
     usage: { tokens: 100_000, window: 1_000_000 },
   }
+  on('env.set', (_$, e) => { w.envSets.push([e.name, e.value]); return { value: undefined } as never })
   mock.env(on, { HOME: '/home/u', ...(opts.env ?? {}) })
   mock.store(on)
   on('state.set', async (_$, e, next) => {

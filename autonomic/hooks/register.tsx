@@ -118,6 +118,9 @@ async function save($: Engine, id: string, rec: Live): Promise<Live> {
     }
   }
   live.set(id, out)
+  // The live mode for launchers (0.4.0 spec §3.4): in memory, so it cannot go stale as a
+  // record that failed to write can. Every later Bash call inherits it. Never read here.
+  try { await $.env.set('AUTONOMIC_EFFECTIVE_MODE', out.mode) } catch (err) { await log($, `env set failed ${String(err)}`) }
   $.ui.status(statusText(out))
   return out
 }
