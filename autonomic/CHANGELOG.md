@@ -2,6 +2,31 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.4.1
+
+**A credential no longer takes the options from the other decisions in a pain** (a PulseTrader
+pain on 2026-10-08 asked about a prod freeze and an agent token together, and showed no buttons).
+
+- **The turn-end fork prompt** (`prompts.ts`): a credential or secret the operator must supply or
+  issue is never an option. The fork gives `"credential"`, one line asking for it in plain text,
+  and the other decisions in the same pain keep their options. In 0.3.0–0.4.0 the rule was "for
+  credentials, give no options", which dropped the options for the whole pain.
+- **The verdict** (`verdict.ts`): a pain keeps a non-empty `credential` string; any other value is
+  dropped and the pain and its options stand. Only a pain carries one.
+- **The pain signal** (`register.tsx`): the band shows `In plain text: <request>` after the
+  options, before Dismiss, with no button, never cut. A press on an option leaves the request as
+  a band of its own, and a failed press keeps it. The bell, the pain file and the ledger end the pain with
+  `· in plain text: <request>`. The request is redacted like every pain text.
+- **Known limit:** the session's own `AskUserQuestion` still follows the policy's standing order
+  ("For credentials, ask in plain text with no options"). A question the session itself bundles
+  with a credential still has no options; the policy file is the operator's to edit.
+- **Known limit:** the band holds one notice: a later pain, or a typed reply that a plugin beneath
+  refuses, clears a pending credential request. The pain file, the bell and the log keep it.
+- **Known limit:** the ledger cuts its Q field at 300 characters, as for every question, so a long
+  request can lose its end there; the band, the bell and the pain file show it whole.
+- **Known limit:** splitting is the fork's prose. A fork that still folds a credential into the
+  question gives it no options, as in 0.4.0.
+
 ## 0.4.0
 
 **The judge sees the live turn; launchers see the live mode** (0.4.0 spec; probe P1 showed the

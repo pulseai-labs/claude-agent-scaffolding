@@ -229,7 +229,7 @@ A pain signal never resumes the run by itself. Your next prompt does.
 
 **Options (since 0.3.0).** For a turn-end pain the fork also offers up to three answers, each a
 label and the instruction the session will follow: at most one recommended, never the
-irreversible side of a one-way door, and none at all for credentials. The band shows the
+irreversible side of a one-way door, and never a credential. The band shows the
 question on its own line, then one row per option, the recommended one first as
 `<label> (Recommended)` in the accent style. The buttons share one column (as wide as the longest,
 at most 40% of the band), and each option's whole text wraps beside its button. A last row holds
@@ -243,7 +243,18 @@ band as before. An option set the fork got wrong in shape (not a list, more than
 label or text, a text over 300 characters, two recommended) is dropped whole, and the pain stands with no buttons. The bell
 and the pain file list the options as text — `… · options: 1) <label> (Recommended) 2) <label>` —
 so a remote operator or a herdr parent sees the choices; answering there stays a typed reply.
-Labels and texts are redacted like every pain text. Every other pain signal (never-approve, hard
+Labels and texts are redacted like every pain text.
+
+**A credential (since 0.4.1).** A credential or secret you must supply or issue is never an
+option. The fork asks for it in one plain-text line (where to put it, never its value), and the
+other decisions in the same pain keep their options. The band shows that line after the options,
+as `In plain text: <request>`, whole, and it has no button: you type the answer. A press on an
+option leaves that line as a band of its own until you reply, dismiss it, or a later pain replaces
+it (notices do not stack; the pain file and the bell keep the request). The bell, the pain file
+and the ledger end the pain with `· in plain text: <request>`. A pain whose only decision is a
+credential has no options, only the question, that line and Dismiss.
+
+Every other pain signal (never-approve, hard
 deny, loop guard, ledger failure, fork failure, a question or permission left with you) carries no
 options.
 

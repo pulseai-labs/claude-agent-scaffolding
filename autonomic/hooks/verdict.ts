@@ -4,7 +4,7 @@
 export const TURN_CASES = ['covered', 'stalled', 'waiting', 'done', 'pain'] as const
 export type TurnCase = (typeof TURN_CASES)[number]
 export type PainOption = { label: string; text: string; recommended: boolean }
-export type TurnVerdict = { case: TurnCase; question?: string; answer?: string; next_step?: string; reason: string; options?: PainOption[] }
+export type TurnVerdict = { case: TurnCase; question?: string; answer?: string; next_step?: string; reason: string; options?: PainOption[]; credential?: string }
 
 export type Question = { question: string; header?: string; options?: ReadonlyArray<{ label: string }>; multiSelect?: boolean }
 export type AskVerdict = { covered: true; answers: Record<string, string>; reason: string } | { covered: false; reason: string }
@@ -44,6 +44,9 @@ export function parseTurn(text: string): TurnVerdict | undefined {
   if (kase === 'pain') {
     const options = painOptions(v.options)
     if (options !== undefined) out.options = options
+    // 0.4.1: a credential is asked on its own line, in plain text, never as an option.
+    const credential = str(v.credential)
+    if (credential !== undefined) out.credential = credential
   }
   return out
 }

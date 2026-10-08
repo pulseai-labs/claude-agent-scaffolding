@@ -13,14 +13,14 @@ Cases:
 - "stalled": the reply stopped short of the task with no question and no reason to stop. Give "next_step" (one line: the next step of the plan).
 - "waiting": the session is waiting on something it armed: a background task, a subagent, a monitor, or another session's report.
 - "done": the scope's objective is met; nothing is left for this session to do.
-- "pain": the reply needs the operator for a reason on the policy's pain list. Give "question" (one line), and "options": two or three answers the operator can pick with one click, each {"label": "<at most 40 characters>", "text": "<the instruction the session will follow, one line, at most 300 characters>", "recommended": true | false}. Put the recommended option first, and mark at most one "recommended": true. For a one-way door, offer doing it and not doing it as separate options, and never mark the irreversible one recommended. For credentials or secrets, give no options: the operator answers in plain text.
+- "pain": the reply needs the operator for a reason on the policy's pain list. Give "question" (one line), and "options": two or three answers the operator can pick with one click, each {"label": "<at most 40 characters>", "text": "<the instruction the session will follow, one line, at most 300 characters>", "recommended": true | false}. Put the recommended option first, and mark at most one "recommended": true. For a one-way door, offer doing it and not doing it as separate options, and never mark the irreversible one recommended. Any credentials or secrets the operator must supply or issue are never in an option: give "credential", one line asking for them in plain text (where to put them, never a value), and the other decisions in the same pain still get their options. A pain whose only decision is a credential gives no options.
 
 molt (context handoff): molt's warnings at 40% and 50% of the context window mean work goes on; they are never a reason to stop. Once molt has told the session to write its handoff now (65%), or the session has written it, the case is "waiting".
 
 A reply that asks the operator to approve or review a spec, design, plan or release scope, or to choose between options the scope does not decide, is "pain" even when it recommends one option: a recommendation is not a decision.
 When in doubt between "pain" and any other case, answer "pain".
 Every case gives "reason": one line naming the policy line or scope document that decides it.
-Shape: {"case": "...", "question": "...", "answer": "...", "next_step": "...", "reason": "...", "options": [{"label": "...", "text": "...", "recommended": true}]}
+Shape: {"case": "...", "question": "...", "answer": "...", "next_step": "...", "reason": "...", "options": [{"label": "...", "text": "...", "recommended": true}], "credential": "..."}
 
 <policy>
 ${policy}
