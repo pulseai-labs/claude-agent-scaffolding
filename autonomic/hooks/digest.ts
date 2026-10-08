@@ -23,11 +23,15 @@ export function originLabel(o: Origin): string {
 // only a bounded window of the text is redacted. The word the window's edge cuts is dropped:
 // a credential cut off from its prefix is never shown in part.
 const WINDOW_CHARS = 4 * DIGEST_ENTRY_CHARS
-function head(text: string): string {
+// Whitespace collapses first (linear), so padding cannot push a credential's prefix out of the
+// window and leave its value behind (PR #694 R5-B).
+function head(raw: string): string {
+  const text = raw.replace(/\s+/g, ' ')
   if (text.length <= WINDOW_CHARS) return text
   return `${text.slice(0, WINDOW_CHARS).replace(/\S*$/, '')}…`
 }
-function end(text: string): string {
+function end(raw: string): string {
+  const text = raw.replace(/\s+/g, ' ')
   if (text.length <= WINDOW_CHARS) return text
   return text.slice(-WINDOW_CHARS).replace(/^\S*/, '')
 }

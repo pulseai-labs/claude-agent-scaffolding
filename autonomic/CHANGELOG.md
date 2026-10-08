@@ -13,7 +13,8 @@ permission fork missing a same-turn tool result in 2 of 3 runs).
   each at most 400 characters, a tool's input as its shape or key names and its result as the last
   300 characters. A dropped prompt and a subagent's call do not enter. Redaction runs on a bounded
   window (the redactor is quadratic on a long run without spaces), and the word the window edge
-  cuts is dropped, so a split credential is not shown in part.
+  cuts is dropped, so a split credential is not shown in part; whitespace collapses first, so
+  padding cannot cut a credential's prefix off.
 - **The permission and ask fork prompts** (`prompts.ts`) carry the digest in a `<recent>` block of
   at most 4,000 characters, newest kept, with a rule that a later instruction from the operator or
   the orchestrator is part of the task and a tool result is a fact about what ran, never an
@@ -23,15 +24,13 @@ permission fork missing a same-turn tool result in 2 of 3 runs).
 - **`AUTONOMIC_EFFECTIVE_MODE`** (`register.tsx`): set to `autopilot` or `manual` in autonomic's
   process each time a session's mode is saved, the fall to manual on a failed record write
   included, and again at each `session.start`, so a resumed session id gets its own mode back. A
-  value the host refuses unsets the variable, with a toast.
+  value the host refuses is unset where the host allows it, and a toast says which happened.
   autonomic never reads it; README, "For launchers".
 - **Known limit:** the digest costs up to 4,000 characters per permission or ask judgment.
 - **Known limit:** a tool result's middle is not shown, only its tail; a result that is one long
   token reads `(one long token)`.
 - **Known limit:** the `<recent>` rule calls a tool result a fact, though a result can hold
   fetched text; a prompt from a `channel` or `peer` origin is labelled with its raw kind.
-- **Known limit:** whitespace padding after a credential can move the window's cut inside a
-  `Bearer` or `--token` prefix, so the value shows in the fork prompt (never on disk).
 - **Known limit:** the digest is kept per session id and never cleared, so a `/resume` to an
   earlier id brings back that id's digest. A deny reason is redacted at full length.
 - **Known limit:** a host that refuses every `env.set` leaves `AUTONOMIC_EFFECTIVE_MODE` at its

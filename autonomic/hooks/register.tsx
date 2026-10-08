@@ -73,8 +73,9 @@ async function touch($: Engine, path: string): Promise<boolean> {
   }
 }
 
+// Best effort: a log that cannot be written never stops the step that called it (PR #694 R5-A).
 async function log($: Engine, line: string): Promise<void> {
-  await appendLine($, logPath(await home($)), `${new Date().toISOString()} ${line}`)
+  try { await appendLine($, logPath(await home($)), `${new Date().toISOString()} ${line}`) } catch {}
 }
 
 async function policyText($: Engine): Promise<string | undefined> {
@@ -113,15 +114,14 @@ async function guard($: Engine, rec: Live): Promise<Live> {
 // A value that cannot be set is unset, so a launcher reads no stale mode (PR #694 R3-C).
 async function publish($: Engine, mode: Live['mode']): Promise<void> {
   try { await $.env.set('AUTONOMIC_EFFECTIVE_MODE', mode) } catch (err) {
-    await log($, `env set failed ${String(err)}`)
-    try {
-      await $.env.set('AUTONOMIC_EFFECTIVE_MODE', undefined)
-      $.ui.toast(`autonomic: AUTONOMIC_EFFECTIVE_MODE could not be set to ${mode}; it is unset, so a launcher starts no child in autopilot.`)
-    } catch (err2) {
-      // The host refuses every change: say so, never claim an unset that did not happen (PR #694 R4).
-      await log($, `env unset failed ${String(err2)}`)
-      $.ui.toast(`autonomic: AUTONOMIC_EFFECTIVE_MODE could not be set to ${mode} or unset; it may still read its previous value, so do not let a launcher trust it in this session.`)
-    }
+    // The cleanup and the toast come first; the log is last (PR #694 R5-A).
+    let unset = true
+    try { await $.env.set('AUTONOMIC_EFFECTIVE_MODE', undefined) } catch { unset = false }
+    // The host refuses every change: say so, never claim an unset that did not happen (PR #694 R4).
+    $.ui.toast(unset
+      ? `autonomic: AUTONOMIC_EFFECTIVE_MODE could not be set to ${mode}; it is unset, so a launcher starts no child in autopilot.`
+      : `autonomic: AUTONOMIC_EFFECTIVE_MODE could not be set to ${mode} or unset; it may still read its previous value, so do not let a launcher trust it in this session.`)
+    await log($, `env set failed ${String(err)}${unset ? '' : '; unset failed too'}`)
   }
 }
 

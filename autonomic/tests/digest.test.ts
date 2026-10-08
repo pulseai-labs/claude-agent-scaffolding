@@ -48,6 +48,12 @@ describe('the turn digest (0.4.0 spec §3.2)', () => {
   test('a result that is one long token says so, not a bare "result:" (final review M1)', () => {
     expect(toolEntry('Bash', { command: 'ls' }, { text: 'a'.repeat(5000) })).toBe('tool Bash ls → result: (one long token)')
   })
+  test('whitespace padding cannot move the window cut inside a credential prefix (PR #694 R5-B)', () => {
+    const e = toolEntry('Bash', { command: 'cat t' }, { text: `Authorization: Bearer${' '.repeat(1700)}SECRETVALUE123 end` })
+    expect(e).not.toContain('SECRETVALUE')
+    const p = promptEntry({ kind: 'composer' }, `${'w '.repeat(900)}--token${' '.repeat(1700)}SECRETVALUE456 end`)
+    expect(p).not.toContain('SECRETVALUE')
+  })
   test('the last 12 entries are kept, oldest dropped', () => {
     let d: string[] = []
     for (let i = 0; i < 20; i++) d = pushEntry(d, `e${i}`)

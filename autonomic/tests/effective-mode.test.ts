@@ -83,6 +83,19 @@ describe('AUTONOMIC_EFFECTIVE_MODE (0.4.0 spec §3.4)', () => {
     expect(t).toContain('may still read its previous value')
     expect(t).not.toContain('it is unset')
   })
+  test('a log that cannot be written never skips the mode or its cleanup (PR #694 R5-A)', async ($, on) => {
+    const w = world(on)
+    w.session.id = 'log-a'
+    await $.session.start(START)
+    w.session.id = 'log-b'
+    await $.session.start(START)
+    await $.command.run(RUN('on'))
+    w.session.id = 'log-a'
+    w.failEnvSet = v => v === 'manual'
+    w.failHome = true
+    await $.session.start(START)
+    expect(last(w)).toBe(undefined)
+  })
   test('a new session id follows its own mode', async ($, on) => {
     const w = world(on)
     await $.session.start(START)

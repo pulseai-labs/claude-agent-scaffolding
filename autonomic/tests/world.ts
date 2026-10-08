@@ -28,6 +28,7 @@ export type World = {
   toolResultText?: string      // the text a non-Ask tool.call result carries
   failRegister?: boolean       // $.command.register throws
   failEnvSet?: (value: string | undefined) => boolean   // $.env.set throws for a matching value
+  failHome?: boolean           // $.env.get('HOME') throws
   failCwd?: boolean            // session.cwd throws (the host cannot answer)
   failAppend?: RegExp          // an append to a matching path fails
   appendsLeft?: number         // appends that still succeed; the next ones fail
@@ -60,7 +61,8 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     usage: { tokens: 100_000, window: 1_000_000 },
   }
   on('env.set', (_$, e) => { if (w.failEnvSet?.(e.value)) throw new Error('env refused'); w.envSets.push([e.name, e.value]); return { value: undefined } as never })
-  mock.env(on, { HOME: '/home/u', ...(opts.env ?? {}) })
+  const env: Record<string, string> = { HOME: '/home/u', ...(opts.env ?? {}) }
+  on('env.get', (_$, e) => { if (w.failHome && e.name === 'HOME') throw new Error('no HOME'); return { value: env[e.name] } as never })
   mock.store(on)
   on('state.set', async (_$, e, next) => {
     const s = e as unknown as { key?: string; value?: unknown }
