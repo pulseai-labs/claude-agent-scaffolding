@@ -420,7 +420,7 @@ HOLD
             if [ -e "$wtp" ] || [ -L "$wtp" ]; then route=halt:planned-with-worktree   # -L: a symlink is present-not-absent (U-157)
             elif [ "$hab" != - ] && [ "$wtp" = "$conv" ]; then
               if [ "$descends" != yes ]; then route=halt:unclassified
-            elif [ "$held" = 1 ]; then route=halt:worktree-held; else route=reattach; fi
+              elif [ "$held" = 1 ]; then route=halt:worktree-held; else route=reattach; fi
             else route=halt:unclassified; fi
           else
             # A stray path at the derived worktree location is not spawn-safe

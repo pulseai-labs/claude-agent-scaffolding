@@ -876,6 +876,7 @@ while IFS=';' read -r shape registry cells expected; do
   mv "$_G_WS/spec.tmp" "$_G_WS/docs/MASTER-SPEC.md"
   if [ "$shape" = numeric-header ]; then
     if cmp -s "$_G_WS/header-only.md" "$_G_WS/docs/MASTER-SPEC.md"; then
+      T_FAIL=$((T_FAIL+1)); echo "FAIL: R6 numeric-header rewrite did not change the header-only fixture"
     else
       T_PASS=$((T_PASS+1))
     fi
@@ -1020,11 +1021,12 @@ _o_ws() { # $1=name ; echoes a workspace whose canonical repo has an empty docs/
   printf '%s\n' "$d"
 }
 _o_next2() { # $1=dir $2=repos $3=destination repo (the block consumes both)
-  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo oss_bin="$OSS" adr_scan_mode=mint repos="$2" bash -c '
+  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo -u adr_scan_mode oss_bin="$OSS" repos="$2" bash -c '
     set -euo pipefail
     if [ "$2" != "[unset]" ]; then dest_repo="$2"; fi
+    if [ "$3" != "[unset]" ]; then adr_scan_mode="$3"; fi
     . "$1"
-  ' fresh "$_SC" "$3" )
+  ' fresh "$_SC" "$3" "${4:-mint}" )
 }
 _o_next() { _o_next2 "$1" canonical canonical; }
 _o_fresh() { # $1=workspace $2=mode $3=repos or [unset] $4=destination $5=invocations
@@ -1046,6 +1048,9 @@ _O_U="$(_o_ws upper)"; : > "$_O_U/canon/docs/adr/ADR-001-redb-for-storage.md"; :
 t_capture _o_next "$_O_U"
 t_assert_rc 0 "#301: the numbering scan completes on an adopted series"
 t_assert_contains "$T_OUT" "ADR-003" "#301 ... and CONTINUES it: ADR-001/ADR-002 are read, so the next id is ADR-003 at the series' own width"
+t_capture _o_next2 "$_O_U" canonical canonical '[unset]'
+t_assert_rc 0 'R6 unset adr_scan_mode retains default mint invocation in fresh shell'
+t_assert_eq ADR-003 "$T_OUT" 'R6 default mint continues the same series as explicit mint'
 if printf '%s' "$T_OUT" | grep -Fq 'ADR-001'; then
   T_FAIL=$((T_FAIL+1)); echo "FAIL: #301 the scan minted an id that already exists - matching one case answers an empty series and restarts at 1"
 else
@@ -1065,6 +1070,7 @@ t_assert_eq $'the numbering scan refuses repos \'[unset]\': declare the repos to
 # 1.14.1 (#647): missing/unscanned destinations refuse, never mint at a
 # guessed width. The unset case clears the variable rather than setting it empty.
 while IFS=';' read -r destination expected_rc expected; do
+  t_capture _o_next2 "$_O_U" canonical "$destination"
   printf 'MINT %s rc=%s: %s\n' "$destination" "$T_RC" "$T_OUT"
   t_assert_rc "$expected_rc" "#647 destination $destination has the required status"
   t_assert_eq "$expected" "$T_OUT" "#647 destination $destination refuses or joins the scanned series"
@@ -1134,6 +1140,8 @@ t_assert_contains "$T_OUT" "$_O_LP/canon/docs/adr" "#301 R9 ... and the refusal 
 # caller is left with no populated mktemp per mint.
 _O_CL="$(_o_ws clean)"; : > "$_O_CL/canon/docs/adr/adr-0001-a.md"
 t_capture _o_next_keep "$_O_CL"
+t_assert_contains "$T_OUT" "ADR-0002" "#301 R6 control: the mint still answers"
+t_assert_contains "$T_OUT" 'STATUS 0 TEMPS 0' "#301 R6 success removes every allocated temp file"
 
 for mode in mint inventory; do
   t_capture _o_fresh "$_O_U" "$mode" missing missing 1

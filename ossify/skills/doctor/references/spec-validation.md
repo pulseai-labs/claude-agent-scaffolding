@@ -149,7 +149,7 @@ else
     sv_fold() { awk 'NF {print toupper($0)}'; }
     reg_all="$(printf '%s\n' "$reg_values" | sv_fold | sort)"
     reg="$(printf '%s\n' "$reg_all" | sort -u)"
-    reg_dupes="$(printf '%s\n' "$reg_all" | grep -v '^$' | uniq -d)" || reg_dupes=""
+    reg_dupes="$(printf '%s\n' "$reg_all" | uniq -d)" || reg_dupes=""
     # Buffer one row: ONLY the row immediately before a full delimiter row is
     # the header. Report an ADR-shaped header; validate every other table row.
     idx_all="$(awk '/^##[[:space:]]*4[.:[:space:]]/ {f=1; next} /^##[[:space:]]/ {f=0} f' "$spec" \
@@ -182,7 +182,7 @@ else
     bad_rows="$(printf '%s\n' "$idx_all" | sed -n 's/^BAD //p')" || bad_rows=""
     adr_headers="$(printf '%s\n' "$idx_all" | sed -n 's/^HEADER //p')" || adr_headers=""
     idx="$(printf '%s\n' "$idx_rows" | sv_fold | sort -u)" || idx=""
-    dupes="$(printf '%s\n' "$idx_rows" | sv_fold | grep -v '^$' | sort | uniq -d)" || dupes=""
+    dupes="$(printf '%s\n' "$idx_rows" | sv_fold | sort | uniq -d)" || dupes=""
     # comm over the two variables - no temp files to create, leak or clean. An
     # empty side is handled explicitly, because comm would count a lone blank
     # line as a difference and manufacture a phantom id.
