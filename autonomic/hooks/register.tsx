@@ -203,15 +203,19 @@ let painSeq = 0   // each notice's seq: rises across a reload too, as it starts 
 
 // A pain signal (spec §3.4): band, toast, bell, and the pain file a launcher may name.
 // It never resumes the run by itself. Options (0.3.0) come only from a turn-end pain: the
-// band shows them as buttons, the bell and the pain file as a numbered list.
-async function pain($: Engine, id: string, reason: string, detail: string, options?: readonly PainOption[]): Promise<void> {
+// band shows them as buttons, the bell and the pain file as a numbered list. A credential
+// request (0.4.1) is its own plain-text line after them, never a button.
+async function pain($: Engine, id: string, reason: string, detail: string, options?: readonly PainOption[], credential?: string): Promise<void> {
   const text = `autopilot: ${reason} — ${oneLine(detail, 200)}`
   const shown = (options ?? []).map(o => ({ label: oneLine(o.label, 40), text: oneLine(o.text, Number.MAX_SAFE_INTEGER), recommended: o.recommended }))
   shown.sort((a, b) => Number(b.recommended) - Number(a.recommended))
-  const listed = shown.length === 0 ? text
+  const plain = credential === undefined ? undefined : oneLine(credential, 200)
+  const numbered = shown.length === 0 ? text
     : `${text} · options: ${shown.map((o, i) => `${i + 1}) ${o.label}${o.recommended ? ' (Recommended)' : ''}`).join(' ')}`
+  const listed = plain === undefined ? numbered : `${numbered} · in plain text: ${plain}`
   painSeq = Math.max(painSeq + 1, Date.now())
   const value: Pain = shown.length === 0 ? { text, seq: painSeq } : { text, question: oneLine(detail), options: shown, seq: painSeq }
+  if (plain !== undefined && value !== null) value.credential = plain
   try { await update($, notice, () => value) } catch {}
   $.ui.toast(text)
   const bell = live.get(id)?.bell
@@ -544,8 +548,9 @@ export const register: Register = (on, options) => {
         $.ui.toast(`autopilot: done — ${oneLine(v.reason, 160)}`)
         return r
       }
-      await record($, id, 'pain', v.question ?? 'turn end', 'ask the operator', v.reason, j.usage)
-      await pain($, id, 'pain', v.question ?? v.reason, v.options)
+      const asked = v.credential === undefined ? v.question ?? 'turn end' : `${v.question ?? 'turn end'} · in plain text: ${v.credential}`
+      await record($, id, 'pain', asked, 'ask the operator', v.reason, j.usage)
+      await pain($, id, 'pain', v.question ?? v.reason, v.options, v.credential)
       return r
     } catch (err) {
       await log($, `Stop error ${String(err)}`)
@@ -631,6 +636,19 @@ export const register: Register = (on, options) => {
     if (value === null || e.props.hasSurvey) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
     const options = value.options ?? []
+    // 0.4.1: a credential request is its own line, typed in plain text; never a button.
+    const plain = value.credential === undefined ? null : <Text wrap="wrap">{`In plain text: ${value.credential}`}</Text>
+    if (options.length === 0 && plain !== null) {
+      return (
+        <Box flexDirection="column">
+          <Text bold>{value.text}</Text>
+          {plain}
+          <Box flexDirection="row">
+            <Button key="dismiss" label="Dismiss" role="dismiss" onPress={() => update($, notice, () => null)} />
+          </Box>
+        </Box>
+      )
+    }
     if (options.length === 0) {
       return (
         <Box>
@@ -658,6 +676,7 @@ export const register: Register = (on, options) => {
             </Box>
           </Box>
         ))}
+        {plain}
         <Box flexDirection="row">
           <Button key="dismiss" label="Dismiss" role="dismiss" onPress={() => update($, notice, () => null)} />
           <Text dimColor> or type your own reply</Text>
