@@ -1048,14 +1048,14 @@ _O_U="$(_o_ws upper)"; : > "$_O_U/canon/docs/adr/ADR-001-redb-for-storage.md"; :
 t_capture _o_next "$_O_U"
 t_assert_rc 0 "#301: the numbering scan completes on an adopted series"
 t_assert_contains "$T_OUT" "ADR-003" "#301 ... and CONTINUES it: ADR-001/ADR-002 are read, so the next id is ADR-003 at the series' own width"
-t_capture _o_next2 "$_O_U" canonical canonical '[unset]'
-t_assert_rc 0 'R6 unset adr_scan_mode retains default mint invocation in fresh shell'
-t_assert_eq ADR-003 "$T_OUT" 'R6 default mint continues the same series as explicit mint'
 if printf '%s' "$T_OUT" | grep -Fq 'ADR-001'; then
   T_FAIL=$((T_FAIL+1)); echo "FAIL: #301 the scan minted an id that already exists - matching one case answers an empty series and restarts at 1"
 else
   T_PASS=$((T_PASS+1))
 fi
+t_capture _o_next2 "$_O_U" canonical canonical '[unset]'
+t_assert_rc 0 'R6 unset adr_scan_mode retains default mint invocation in fresh shell'
+t_assert_eq ADR-003 "$T_OUT" 'R6 default mint continues the same series as explicit mint'
 # 1.14.1 (#647): missing/unscanned destinations refuse, never mint at a
 t_capture _o_fresh "$_O_U" mint canonical canonical 1
 printf 'FRESH mint: %s\n' "$T_OUT"
