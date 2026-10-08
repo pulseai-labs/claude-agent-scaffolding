@@ -28,7 +28,9 @@ across six seats in one PulseTrader run, one of which stalled a top for about 45
   keeps the writer's words; an inert name shadowed by an alias or function defined in an earlier
   call hides words; a written file run without being named (`make` reading a `Makefile`), or
   named only through a variable passed as an argument (`nohup "$F"`), is not tracked; run
-  locations other than `.git/` and `hooks/` (rc files, crontabs) are not tracked.
+  locations other than `.git/` and `hooks/` (rc files, crontabs) are not tracked; an inert name
+  resolved through a changed `PATH`, git config moved by `GIT_CONFIG_*` or `GIT_DIR`, a write
+  through a descriptor opened earlier (`>&3`) and a redirect on a `{ }` group are not handled.
 
 ## 0.4.1
 
