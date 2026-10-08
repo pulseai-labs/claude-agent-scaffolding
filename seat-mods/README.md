@@ -139,8 +139,10 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   (`git "merge"`). A trailer that opens an `-m` message, comes from `--trailer`, or follows a
   backslash-newline inside single quotes, also passes.
 - Backticks and quoted `$(rm …)` can escape recognition; bare `$(rm …)` is checked by the parentheses splitter.
+- A heredoc given as rm's input (`rm -i x <<EOF`) is read as an extra operand and denied.
+- A named descriptor before the command (`{log}>file rm …`) hides the rm.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
-- A double-quoted `<<`, or commands after a heredoc opener on the same line, can hide commands from the rail.
+- A double-quoted `<<`, or commands after a heredoc opener or a `#` comment on the same line, can hide commands from the rail.
 - Paths changed earlier in the same call (`ln -s`, `mv`, `mkdir` before `rm`) are checked against the filesystem as it stands before the call runs.
 - Glob matches are not enumerated: a matched parent symlink can lead outside writable places, as in `rm -rf <worktree>/*/node_modules`.
 - `$` outside literal quoting/escaping and leading `~+`/`~-` are unresolvable, even when Bash could resolve them.

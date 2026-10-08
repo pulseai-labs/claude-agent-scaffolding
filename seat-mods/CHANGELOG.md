@@ -26,8 +26,10 @@ All notable changes to the `seat-mods` plugin.
   `builtin` are recognised; `builtin cd` and `\cd` affect same-call relative operands. Parsing or
   resolution exceptions deny the Bash call, with self-reference/depth protection for markers.
 - Backticks and quoted `$(rm …)` can escape recognition; bare `$(rm …)` is checked by the parentheses splitter.
+- A heredoc given as rm's input (`rm -i x <<EOF`) is read as an extra operand and denied.
+- A named descriptor before the command (`{log}>file rm …`) hides the rm.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
-- A double-quoted `<<`, or commands after a heredoc opener on the same line, can hide commands from the rail.
+- A double-quoted `<<`, or commands after a heredoc opener or a `#` comment on the same line, can hide commands from the rail.
 - Paths changed earlier in the same call (`ln -s`, `mv`, `mkdir` before `rm`) are checked against the filesystem as it stands before the call runs.
 - Glob matches are not enumerated: a matched parent symlink can lead outside writable places, as in `rm -rf <worktree>/*/node_modules`.
 - `$` outside literal quoting/escaping and leading `~+`/`~-` are unresolvable, even when Bash could resolve them.

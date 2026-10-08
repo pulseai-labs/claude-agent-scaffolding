@@ -8,7 +8,7 @@ import type { On } from 'claude-code'
 // call that reaches it answers `ran`; a denied call resolves with { deny }
 // carrying the deny text. A mocked call answers { value }, or { deny } for a
 // missing path, as the kit requires.
-const DIRS = new Set(['/', '/w', '/w/seat-mods', '/w/seat x', '/etc', '/var', '/reports', '/w/build', '/w/seat-mods/sub', '/w/seat-mods/build', '/tmp', '/home', '/home/seat'])
+const DIRS = new Set(['/', '/w', '/w/seat-mods', '/w/seat x', '/etc', '/var', '/reports', '/w/build', '/w/seat-mods/sub', '/w/seat-mods/build', '/tmp', '/home', '/home/seat', '/home/u', '/home/u/scratch'])
 // A dangling symbolic link: it exists, but resolving it fails.
 const LINKS = new Set(['/w/link'])
 const FILES = new Map<string, string>([
@@ -442,5 +442,20 @@ describe('fix2 rm rail', () => {
     expect(result.deny).toContain('Bash command could not be checked')
     expect(result.deny).not.toContain('rm')
     expect((await $.tool.call({ tool: 'Bash', command: 'git commit -m "fix"' })).deny).toBeUndefined()
+  })
+})
+
+describe('close-out HOME root expansion', () => {
+  for (const operand of ['~', '~/*', '~/x']) {
+    test(`HOME=/ denies ${operand} outside /w`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: 'implementer', HOME: '/' })
+      expect((await $.tool.call({ tool: 'Bash', command: `rm -rf ${operand}` })).deny).toBeDefined()
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /w/build' })).deny).toBeUndefined()
+    })
+  }
+  test('reviewer HOME subtree remains allowed by SEAT_MODS_ALLOW', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'reviewer', HOME: '/home/u', SEAT_MODS_ALLOW: '/home/u/scratch' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'rm -f ~/scratch/x' })).deny).toBeUndefined()
+    expect((await $.tool.call({ tool: 'Bash', command: 'rm -f ~/x' })).deny).toBeDefined()
   })
 })

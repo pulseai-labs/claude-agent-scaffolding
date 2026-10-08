@@ -42,7 +42,7 @@ async function removalPath($: any, operand: string, cwd: string, home: string | 
   let path = operand
   if (path === '~' || path.startsWith('~/')) {
     if (home === undefined || !home.startsWith('/')) return undefined
-    path = home.replace(/\/$/, '') + path.slice(1)
+    path = (home.replace(/\/$/, '') + path.slice(1)) || '/'
   }
   if (!path.startsWith('/')) path = `${cwd}/${path}`
   if (glob || /\/(?:\.|\.\.)?$/.test(path)) return realOf($, path)
