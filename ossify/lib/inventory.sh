@@ -11,6 +11,23 @@
 
 _oss_inv_git() { git --no-optional-locks "$@"; }
 
+# Safety rail shared by every branch-presence read: rc 0 present, 1 absent,
+# 2 unreadable. --exists distinguishes malformed refs from true absence;
+# --verify also establishes that a present ref's object can be read.
+_oss_inv_ref() { # $1=root $2=full ref
+  local rc=0
+  _oss_inv_git -C "$1" show-ref --exists "$2" 2>/dev/null || rc=$?
+  case "$rc" in
+    0) _oss_inv_git -C "$1" show-ref --verify --quiet "$2" 2>/dev/null || return 2 ;;
+    2) return 1 ;;
+    129) # Old Git: legacy rc 1 conflates absence and malformed loose refs.
+      rc=0
+      _oss_inv_git -C "$1" show-ref --verify --quiet "$2" 2>/dev/null || rc=$?
+      case "$rc" in 0|1) return "$rc" ;; *) return 2 ;; esac ;;
+    *) return 2 ;;
+  esac
+}
+
 # #673 G2/J1: the durable rejection record is read TRI-STATE, never as a bare
 # match. `grep -qF` says 0 (found) and 1 (no finding) - but 2 means it could
 # not read the file at all, and that must not degrade to the benign "no
@@ -42,18 +59,25 @@ oss_spine_inventory() { # $1=state $2=spine-id
   spine_dir="$matches"; slug="${spine_dir##*/}"; slug="${slug#$spine-}"
   spine_branch="$(oss_id_branch_name "$spine" "$slug")"
 
-  local repos repo root any=0 present head clean base verdict repo_por base_present base_rc
+  local repos repo root any=0 present head clean base verdict repo_por base_present base_rc ref_rc repo_refs=""
   repos="$(jq -r --arg s "$spine" '[.work_items[] | select(.spine == $s and .status != "abandoned") | .target_repo] | unique[]' "$sf")" || return 2
   # Pass 1: does the spine branch exist in ANY hosting repo? That decides fresh.
   while IFS= read -r repo; do
     [ -n "$repo" ] || continue
-    root="$(_oss_repo_root "$repo" 2>/dev/null)" || continue
-    _oss_inv_git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" && any=1
+    ref_rc=2
+    if root="$(_oss_repo_root "$repo" 2>/dev/null)"; then
+      ref_rc=0; _oss_inv_ref "$root" "refs/heads/$spine_branch" || ref_rc=$?
+    fi
+    [ "$ref_rc" != 0 ] || any=1
+    # Retain each probe's status: a failed first-pass read cannot disappear
+    # behind a successful retry or be used to select the fresh arm.
+    repo_refs="${repo_refs}${repo}$(printf '\t')${ref_rc}
+"
   done <<EOF
 $repos
 EOF
-  # Pass 2: one row per hosting repo.
-  while IFS= read -r repo; do
+  # Pass 2: one row per hosting repo, using the captured first-pass probe.
+  while IFS="$(printf '\t')" read -r repo ref_rc; do
     [ -n "$repo" ] || continue
     if ! root="$(_oss_repo_root "$repo" 2>/dev/null)" || [ "$repo" = ai_workspace ]; then
       printf 'repo\t%s\thalt:undeclared\tbranch=-\thead=-\tclean=-\tbase=-\n' "$repo"; halt=1; continue
@@ -67,7 +91,11 @@ EOF
     if [ ! -d "$root" ]; then
       printf 'repo\t%s\thalt:unreadable\tbranch=-\thead=-\tclean=-\tbase=-\n' "$repo"; halt=1; continue
     fi
-    if _oss_inv_git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch"; then present=present; else present=absent; fi
+    case "$ref_rc" in
+      0) present=present ;;
+      1) present=absent ;;
+      *) printf 'repo\t%s\thalt:unreadable\tbranch=-\thead=-\tclean=-\tbase=-\n' "$repo"; halt=1; continue ;;
+    esac
     head="$(_oss_inv_git -C "$root" rev-parse --abbrev-ref HEAD 2>/dev/null)" || head="-"
     [ "$head" = HEAD ] && head=DETACHED
     # A FAILED status command HAS NOT ESTABLISHED clean (#673 A3). The pre-fix
@@ -110,7 +138,7 @@ EOF
     case "$verdict" in halt:*) halt=1 ;; esac
     printf 'repo\t%s\t%s\tbranch=%s\thead=%s\tclean=%s\tbase=%s\n' "$repo" "$verdict" "$present" "$head" "$clean" "$base"
   done <<EOF
-$repos
+$repo_refs
 EOF
   _oss_inv_items "$sf" "$spine" "$spine_dir" "$spine_branch" || halt=1
   [ "$halt" -eq 0 ] || return 3
@@ -122,7 +150,7 @@ EOF
 # still AT base_sha is trivially an ancestor and has merged nothing.
 _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if any halt
   local sf="$1" spine="$2" spine_dir="$3" sb="$4" halt=0
-  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys wt_common root_common held holders hp hl adopt_br brx feed feed_rc=0 gr descends foreign
+  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys wt_common root_common held holders hp hl adopt_br brx feed feed_rc=0 gr descends foreign ref_rc
   # The feed's own rc is caught, and each item renders inside a `try`/`catch`
   # (#673 A2): one unrenderable field used to collapse the WHOLE stream - the
   # shell read a partial feed with no error channel, the empty-field skip
@@ -222,7 +250,15 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
           fi
         fi
       fi
-      if [ -n "$br" ] && _oss_inv_git -C "$root" show-ref --verify --quiet "refs/heads/$br"; then
+      ref_rc=1
+      if [ -n "$br" ]; then
+        ref_rc=0; _oss_inv_ref "$root" "refs/heads/$br" || ref_rc=$?
+      fi
+      if [ "$ref_rc" = 2 ]; then
+        printf 'item\t%s\t%s\thalt:unreadable\trepo=%s\twt=%s\tclean=%s\thead_at_base=-\tmerged=-\treport=%s\tdispatches=%s\n' "$wi" "$st" "$repo" "$wt" "$clean" "$report" "$dc"
+        halt=1; continue
+      fi
+      if [ "$ref_rc" = 0 ]; then
         brx=yes
         tip="$(_oss_inv_git -C "$root" rev-parse "refs/heads/$br")"
         if [ "$tip" = "$bs" ]; then hab=yes; else hab=no; fi
