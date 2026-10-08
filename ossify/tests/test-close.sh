@@ -1798,17 +1798,15 @@ for _r9 in \
   t_assert_eq 0 "$r9_rc" "R9: ${_f##*/} \$$_var executes against real state"
   t_assert_eq "$_want" "$R9_OUT" "R9: ${_f##*/} \$$_var names exactly the live item's $( [ "$_var" = items ] && echo id || echo repo ), not the withdrawn one"
 done
-# round-orchestration.md §2 writes its set to "$repo_list" and names the spine
-# by placeholder; substitute the id, run it, read the file. The extraction is
-# asserted FIRST and separately: an empty one would make `eval ""` return 0 and
-# the rc assertion below pass without executing anything, pointing the failure
-# at the selector instead of at the anchor.
-R9CUT_LINE="$(_r9_extract "$SKILLS/work-item/references/round-orchestration.md" '> "$repo_list"' R9CUT)"; r9_cut_rc=$?
-t_assert_eq 0 "$r9_cut_rc" "R9CUT: the round walk's hosting-repo line is extracted at all"
+# round-orchestration.md §2a now captures the state read before sorting it.
+# Pin that shipped assignment against real state; the whole fresh fence and
+# its failed-read rail run separately in test-reentry-read-guards.sh.
+R9CUT_LINE="$(_r9_extract "$SKILLS/work-item/references/round-orchestration.md" "get '.work_items[] | select(.spine==" R9CUT)"; r9_cut_rc=$?
+t_assert_eq 0 "$r9_cut_rc" "R9CUT: the round walk's hosting-repo assignment is extracted at all"
 R9_CUT="$(printf '%s' "$R9CUT_LINE" | sed "s/<spine-id>/$R8CLOSED_SP/")"
-r9_rc=0; ( cd "$TMP/r8ws" && repo_list="$TMP/r9-list" PATH="$(dirname "$OSS"):$PATH" eval "$R9_CUT" ) || r9_rc=$?
-t_assert_eq 0 "$r9_rc" "R9: round-orchestration.md's hosting-repo read executes against real state"
-t_assert_eq "current" "$(cat "$TMP/r9-list" 2>/dev/null)" "R9: the spine branch is cut only where a live item runs - never in a repo only a withdrawn item names"
+r9_rc=0; R9_REPOS="$(cd "$TMP/r8ws" && oss_bin="$OSS" bash -c 'set -euo pipefail; eval "$1"; printf "%s" "$repos"' fresh "$R9_CUT")" || r9_rc=$?
+t_assert_eq 0 "$r9_rc" "R9: round-orchestration.md's hosting-repo read executes against real state in a fresh shell"
+t_assert_eq "current" "$R9_REPOS" "R9: the spine branch is cut only where a live item runs - never in a repo only a withdrawn item names"
 
 # R10. THE CLASS FORM OF R9, and its limit, stated here where it can be read.
 # R9 pins four files BY NAME, so a fifth spine-scoped SELECTOR written without
