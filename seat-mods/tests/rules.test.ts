@@ -296,3 +296,21 @@ describe('fix1 expansion guard', () => {
     expect(rmTargets('rm "/reports/x"')).toEqual([{ path: '/reports/x', glob: false }])
   })
 })
+
+describe('fix2 shared shell reader and root placement', () => {
+  test('G2 herestring leaves following git commands visible beside a real heredoc body', () => {
+    expect(bashRules('cat <<< x\ngit push --force')).toContain('force-push')
+    expect(bashRules("cat <<'EOF'\ngit push --force\nEOF")).toEqual([])
+  })
+  test('G3 path-qualified wrapper uses the same command matching as a bare wrapper', () => {
+    expect(bashRules('/usr/bin/sudo git push --force')).toContain('force-push')
+    expect(bashRules('sudo git push --force')).toContain('force-push')
+    expect(bashRules('/usr/bin/env git status')).toEqual([])
+  })
+  test('G4 root contains absolute descendants, not relative paths', () => {
+    expect(placeOf('/tmp/x', '/', [])).toBe('worktree')
+    expect(placeOf('/tmp/x', '/w', [])).toBe('outside')
+    expect(placeOf('tmp/x', '/', [])).toBe('outside')
+    expect(placeOf('/tmp/x', '/w', ['/'])).toBe('allow')
+  })
+})

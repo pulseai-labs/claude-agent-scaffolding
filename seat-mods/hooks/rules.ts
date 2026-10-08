@@ -51,7 +51,7 @@ const COMMANDS = /;|&&|\|\||\||\n|\(|\)/
 // name `git merge` or `-n`. Each is swapped for a numbered marker before matching,
 // and the trailer check expands the markers in the commit's own segment.
 // A heredoc opener; its delimiter is any quoted word, or a bare word.
-const HEREDOC = /<<(-?)[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|([^\s;&|<>()'"]+))/g
+const HEREDOC = /(?<!<)<<(?!<)(-?)[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|([^\s;&|<>()'"]+))/g
 const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/g
 const MARKER = /\u0000(\d+)\u0000/g
 // Words that run the next word as the command.
@@ -110,7 +110,7 @@ function commandOf(tokens: readonly string[]): { name: string; args: string[] } 
   for (;;) {
     const token = tokens[i]
     if (token === undefined) return undefined
-    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token) || WRAPPERS.has(token)) i += 1
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token) || WRAPPERS.has(token.replace(/^.*\//, ''))) i += 1
     else return { name: token.replace(/^.*\//, ''), args: tokens.slice(i + 1) }
   }
 }
@@ -261,7 +261,7 @@ export function rmTargets(command: string): RmTarget[] {
   // literal glyphs out of this match. Remove fd prefixes before their operators,
   // then operators with their attached or separate target words.
   const redirects = text.replace(/(^|[\s;|&()])\d+(?=[<>])/g, '$1')
-    .replace(/(?:&>|>\||>>|>&|>|(?<!<)<(?!<))[ \t]*[^\s;&|()]+/g, ' ')
+    .replace(/(?:<<<|&>>|&>|<>|>\||>>|[<>]&|>|(?<!<)<(?!<))[ \t]*[^\s;&|()]+/g, ' ')
   for (const segment of redirects.split(/;|&&|\|\||[|&]|\n|\(|\)/)) {
     let head = commandOf(tokensOf(segment))
     while (head !== undefined && RM_HEAD_WORDS.has(head.name)) head = commandOf(head.args)
@@ -304,7 +304,7 @@ export function removalOf(target: string | undefined, root: string | undefined, 
 }
 
 export function placeOf(target: string, root: string, allow: readonly string[]): Place {
-  const within = (dir: string) => target === dir || target.startsWith(dir + '/')
+  const within = (dir: string) => (dir === '/' && target.startsWith('/')) || target === dir || target.startsWith(dir + '/')
   if (allow.some(within)) return 'allow'
   return within(root) ? 'worktree' : 'outside'
 }
@@ -330,7 +330,7 @@ export function decide(role: Role, facts: Facts): string | undefined {
 }
 
 export function uncheckedRmText(role: Role): string {
-  return denyText(role, 'no rm: command could not be checked', 'run this command')
+  return denyText(role, 'Bash command could not be checked', 'run this command')
 }
 
 export function invalidText(value: string): string {

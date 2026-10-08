@@ -102,14 +102,15 @@ Relative operands
 use the live shell directory from `$.session.cwd()` at the call. This was measured on Claude Code
 2.1.294 on 2026-10-08: after a Bash `cd` into a project subdirectory, the next call's hook and
 `pwd` both reported that subdirectory; after Claude reset an outside-project `cd`, both reported
-the project directory. An earlier `cd`, `pushd` or `popd` in the **same** call makes relative
+the project directory. An earlier recognised `cd`, `pushd` or `popd` in the **same** call makes relative
 operands unresolvable and denies them; absolute operands remain eligible. `worktreeOf()` keeps
 its existing behavior: the worktree is derived from that live directory.
 
 Operands containing active variables, parameter expansions or command substitutions, and
-`~user` operands, cannot be resolved and are denied, including `rm -rf "$OLDPWD"`. Single-quoted
-text and escaped characters
-are literal. Bare `~` and `~/...` use `HOME`. A glob is placed by the directory of its literal
+`~user`, `~+` and `~-` operands, cannot be resolved and are denied, including `rm -rf "$OLDPWD"`.
+Single-quoted text and escaped characters are literal. Any other `$` in an operand is treated as
+unresolvable, including an inert dollar sign. Bare `~` and `~/...` use `HOME`. A glob is placed by
+the directory of its literal
 prefix: `/tmp/tmp.*` is outside, while `build/*.o` is placed in the live directory's `build`.
 The resolver follows links in parent directories, but keeps a terminal link literal because
 `rm` removes the link itself; a trailing `/` follows the directory. A writable root itself or
@@ -137,11 +138,13 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   quoted message, value-taking git globals (`--git-dir x`) and quoted subcommands or flags
   (`git "merge"`). A trailer that opens an `-m` message, comes from `--trailer`, or follows a
   backslash-newline inside single quotes, also passes.
-- `rm` inside command substitutions or backticks (`$(rm …)`, `` `rm …` ``, quoted `$(…)`) can escape recognition; like `bash -c`, it runs its own command.
+- Backticks and quoted `$(rm …)` can escape recognition; bare `$(rm …)` is checked by the parentheses splitter.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
-- A `<<` inside double quotes can be read as a heredoc opener and hide a following command.
+- A double-quoted `<<`, or commands after a heredoc opener on the same line, can hide commands from the rail.
 - Paths changed earlier in the same call (`ln -s`, `mv`, `mkdir` before `rm`) are checked against the filesystem as it stands before the call runs.
 - Glob matches are not enumerated: a matched parent symlink can lead outside writable places, as in `rm -rf <worktree>/*/node_modules`.
+- `$` outside literal quoting/escaping and leading `~+`/`~-` are unresolvable, even when Bash could resolve them.
+- Quoted command names such as `"cd"` are not recognised as directory changes.
 - `POSIXLY_CORRECT` operand ordering and a backslash-newline inside double quotes are not modelled.
 - **The guarded launch needs a POSIX shell in the seat's pane.** herdr-crew sets the variables
   with `export`; a pane whose shell is Nushell leaves them unset, and the session runs under the
@@ -157,10 +160,10 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 - **A `-F` message file is read from the session's working directory.** A relative path after a
   `cd`, or a path in a shell variable, is not found and reads as empty, so a trailer in it passes.
   The repository's commit-msg hook remains the backstop.
-- **The Bash placement rail covers only `rm`.** `rmdir`, `unlink`, `find -delete`, `git clean`,
+- **The Bash placement rail covers only `rm`.** `rmdir`, `unlink`, `find -delete`, `git rm`, `git clean`,
   `xargs rm`, `bash -c '...'`, `mv` over a file, and other Bash writes such as `cat >` and `sed -i`
   remain outside it. These rails stop mistakes, not an adversary; precise shell parsing remains
-  out of scope. An earlier same-call `cd`, `pushd` or `popd` conservatively denies relative `rm`
+  out of scope. An earlier recognised same-call `cd`, `pushd` or `popd` conservatively denies relative `rm`
   operands even if that directory change fails. Cross-call directory changes use the live cwd
   measured above.
 - **A default-guarded session writes only inside the worktree and the `SEAT_MODS_ALLOW`

@@ -393,3 +393,54 @@ describe('fix1 rm rail', () => {
     })
   }
 })
+
+// Last fix round: extending existing operator lists and root placement only.
+describe('fix2 rm rail', () => {
+  for (const role of ['implementer', 'verifier', 'reviewer', undefined, ''] as const) {
+    const label = role === undefined ? 'unset' : role === '' ? 'empty' : role
+    test(`${label}: G1 redirect family leaves safe rm operands intact`, async ($, on) => {
+      world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+      for (const redirect of ['<> /dev/null', '<>/dev/null', '2<> /dev/null', '2<>/dev/null', '&>> log', '&>>log', '<& 0', '<&0', '2<& 0', '2<&0', '>& 1', '>&1', '2>& 1', '2>&1', '<&-', '<& -', '2<&-', '>&-', '>& -', '2>&-']) {
+        expect((await $.tool.call({ tool: 'Bash', command: `rm /reports/x ${redirect}` })).deny).toBeUndefined()
+        expect((await $.tool.call({ tool: 'Bash', command: `rm /etc/x ${redirect}` })).deny).toBeDefined()
+      }
+      if (role !== 'reviewer')
+        expect((await $.tool.call({ tool: 'Bash', command: 'rm /w/x &>> log' })).deny).toBeUndefined()
+    })
+    test(`${label}: G2 herestring is not an operand and exposes later rm`, async ($, on) => {
+      world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /reports/f <<< x' })).deny).toBeUndefined()
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /reports/f <<< x\nrm -rf /etc/nginx' })).deny).toBeDefined()
+      if (role !== 'reviewer')
+        expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /w/f <<< x' })).deny).toBeUndefined()
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /reports/f <<<x' })).deny).toBeUndefined()
+      expect((await $.tool.call({ tool: 'Bash', command: 'cat <<< x\nrm -rf /etc/nginx' })).deny).toBeDefined()
+      expect((await $.tool.call({ tool: 'Bash', command: 'cat <<< x' })).deny).toBeUndefined()
+    })
+    test(`${label}: G3 path-qualified wrappers expose rm`, async ($, on) => {
+      world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+      for (const wrapper of ['/usr/bin/sudo', '/usr/bin/env']) {
+        expect((await $.tool.call({ tool: 'Bash', command: `${wrapper} rm -rf /etc/x` })).deny).toBeDefined()
+        expect((await $.tool.call({ tool: 'Bash', command: `${wrapper} rm -rf /reports/build` })).deny).toBeUndefined()
+      }
+      if (role !== 'reviewer')
+        expect((await $.tool.call({ tool: 'Bash', command: '/usr/bin/sudo rm -rf /w/build' })).deny).toBeUndefined()
+    })
+  }
+  for (const role of ['implementer', 'verifier']) {
+    test(`${role}: G4 root worktree allows descendants but denies its own removal`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: role }, false, '/')
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /tmp/x' })).deny).toBeUndefined()
+      expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /' })).deny).toBeDefined()
+      expect((await $.tool.call({ tool: 'Write', file_path: '/tmp/x', content: 'x' })).deny).toBeUndefined()
+      expect((await $.tool.call({ tool: 'Edit', file_path: '/tmp/y', old_string: 'x', new_string: 'y' })).deny).toBeUndefined()
+    })
+  }
+  test('G5 unknown Bash check is named without assuming rm', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    const result = await $.tool.call({ tool: 'Bash', command: 'git commit -m "\u00000\u0000"' })
+    expect(result.deny).toContain('Bash command could not be checked')
+    expect(result.deny).not.toContain('rm')
+    expect((await $.tool.call({ tool: 'Bash', command: 'git commit -m "fix"' })).deny).toBeUndefined()
+  })
+})

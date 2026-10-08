@@ -14,9 +14,9 @@ All notable changes to the `seat-mods` plugin.
   are placed by their literal prefix directory, so `rm -f /tmp/tmp.*` is denied. Parent symlinks
   resolve, while a terminal symlink is removed literally unless followed by `/`.
 - Relative operands use the live `$.session.cwd()` (measured on Claude Code 2.1.294, 2026-10-08;
-  see README). Known limit: an earlier `cd`, `pushd` or `popd` in the same Bash call makes a relative
+  see README). Known limit: an earlier recognised `cd`, `pushd` or `popd` in the same Bash call makes a relative
   operand unresolvable even if the change fails. Existing live-cwd worktree detection is unchanged.
-- Known limits: `rmdir`, `unlink`, `find -delete`, `git clean`, `xargs rm`, `bash -c '...'`, `mv` over
+- Known limits: `rmdir`, `unlink`, `find -delete`, `git rm`, `git clean`, `xargs rm`, `bash -c '...'`, `mv` over
   a file, and other Bash writes (`cat >`, `sed -i`) remain outside the rail. This is an `rm` matcher
   for mistakes, not precise shell parsing or an adversary boundary. Free roles remain unguarded;
   Bash tool calls from subagents meet the same rail.
@@ -25,12 +25,18 @@ All notable changes to the `seat-mods` plugin.
   fail closed. Redirections are excluded from operands; single `&`, reserved head words and
   `builtin` are recognised; `builtin cd` and `\cd` affect same-call relative operands. Parsing or
   resolution exceptions deny the Bash call, with self-reference/depth protection for markers.
-- `rm` inside command substitutions or backticks (`$(rm …)`, `` `rm …` ``, quoted `$(…)`) can escape recognition; like `bash -c`, it runs its own command.
+- Backticks and quoted `$(rm …)` can escape recognition; bare `$(rm …)` is checked by the parentheses splitter.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
-- A `<<` inside double quotes can be read as a heredoc opener and hide a following command.
+- A double-quoted `<<`, or commands after a heredoc opener on the same line, can hide commands from the rail.
 - Paths changed earlier in the same call (`ln -s`, `mv`, `mkdir` before `rm`) are checked against the filesystem as it stands before the call runs.
 - Glob matches are not enumerated: a matched parent symlink can lead outside writable places, as in `rm -rf <worktree>/*/node_modules`.
+- `$` outside literal quoting/escaping and leading `~+`/`~-` are unresolvable, even when Bash could resolve them.
+- Quoted command names such as `"cd"` are not recognised as directory changes.
 - `POSIXLY_CORRECT` operand ordering and a backslash-newline inside double quotes are not modelled.
+
+- Review round 2: the existing redirect list includes `<>`, `&>>`, fd duplication/closure and
+  `<<<`; herestrings no longer open heredocs. Path-qualified wrappers are recognised, a root
+  worktree contains absolute descendants, and unchecked Bash commands get a Bash-specific deny.
 
 ## 0.2.1 — 2026-10-05
 
