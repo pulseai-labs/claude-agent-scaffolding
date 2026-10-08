@@ -16,8 +16,8 @@ export type Where = { cwd: string; root: string; home: string; branch?: string; 
 const SPLIT = /\$\(|[\s;&|()<>`]+/
 // Two literal heredoc shapes are text Bash never runs, so their bodies are dropped:
 // - a commit message: `-m "$(cat <<'X'` … `X` `)"` (or `--message`), the usual commit;
-// - `cat > file <<'X'` (or `cat <<'X' > file`) at a command's start, when the file is not
-//   named again later in the text (a script written then run keeps its words).
+// - `cat > file <<'X'` (or `cat <<'X' > file`) at a command's start, unless a later command
+//   that is not inert names the file (a script written then run keeps its words; §3.4).
 // The delimiter must be quoted, so the body holds no expansion.
 const MESSAGE = /(?:-m|--message)(?:=|[ \t]*)"\$\(cat[ \t]+<<-?[ \t]*(['"])([A-Za-z_]\w*)\1[ \t]*\n[\s\S]*?\n[ \t]*\2[ \t]*\n?[ \t]*\)"/g
 const WRITE = /(?<=^|[\n;&|(])[ \t]*cat[ \t]+(?:>>?[ \t]*([^\s;&|<>]+)[ \t]+)?<<-?[ \t]*(['"])([A-Za-z_]\w*)\2(?:[ \t]*>>?[ \t]*([^\s;&|<>]+))?[ \t]*\n[\s\S]*?\n[ \t]*\3[ \t]*(?=\n|$)/g
@@ -26,26 +26,101 @@ const WRITE = /(?<=^|[\n;&|(])[ \t]*cat[ \t]+(?:>>?[ \t]*([^\s;&|<>]+)[ \t]+)?<<
 // command starts (`git add .` is a path).
 const RUNNER = /^(?:bash|sh|zsh|dash|ksh|fish|eval|source|xargs|ssh|su|watch|parallel|sed|python[\d.]*|pypy[\d.]*|node|nodejs|deno|bun|perl[\d.]*|ruby[\d.]*|php[\d.]*|lua(?:jit)?[\d.]*|Rscript|pwsh|powershell|osascript|tclsh|expect|[gmn]?awk)$/
 const DOT_SOURCE = /(?:^|[\n;&|(`]|\$\()[ \t]*\.[ \t]/
+// Inert commands never run text they are given and never define a name, so their words
+// leave the bag (#693). Every other command keeps its words: the list is trusted to hold
+// only safe names, never to hold every dangerous one.
+const INERT = new Set(['[', '[[', 'test', 'echo', 'printf', 'exit', 'true', 'false', 'cat', 'head', 'tail', 'wc', 'ls',
+  'stat', 'grep', 'jq', 'cut', 'tr', 'mkdir', 'touch', 'mv', 'cp'])
+const KEYWORD = new Set(['if', 'then', 'else', 'elif', 'do', 'while', 'until', '!', '{', '}'])
 function split(command: string): string[] {
   const text = command.replace(/\\\r?\n/g, '').replace(/[\\'"]/g, '')
   // NAME=VALUE also shows its value: FLAGS=-rf, alias.p=push, remote.x.push=refs/heads/main.
   return text.split(SPLIT).flatMap(w => (w.indexOf('=') > 0 ? [w, w.slice(w.indexOf('=') + 1)] : [w])).filter(w => w !== '')
 }
+// Simple commands: split at ; & | and newlines outside quotes and escapes. `&` and `|` next
+// to a redirect (`2>&1`, `&>f`, `>|f`) belong to the command. An open quote returns undefined.
+type Command = { text: string; end: number }
+function commands(text: string): Command[] | undefined {
+  const out: Command[] = []
+  let from = 0
+  let q: string | undefined
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!
+    if (q === "'") { if (c === "'") q = undefined; continue }
+    if (c === '\\') { i++; continue }
+    if (q === '"') { if (c === '"') q = undefined; continue }
+    if (c === "'" || c === '"') { q = c; continue }
+    const redirect = (c === '&' || c === '|') && (text[i - 1] === '>' || text[i - 1] === '<' || (c === '&' && text[i + 1] === '>'))
+    if ((c === ';' || c === '&' || c === '|' || c === '\n') && !redirect) { out.push({ text: text.slice(from, i), end: i }); from = i + 1 }
+  }
+  if (q !== undefined) return undefined
+  out.push({ text: text.slice(from), end: text.length })
+  return out
+}
+const base = (w: string) => w.replace(/^.*\//, '')
+function head(words: readonly string[]): string | undefined {
+  const w = words.find(x => !KEYWORD.has(x))
+  return w === undefined ? undefined : base(w)
+}
+// `printf -v NAME` assigns a variable, so it is not inert.
+const isInert = (ws: readonly string[]) => { const h = head(ws); return h === undefined || (INERT.has(h) && !(h === 'printf' && ws.includes('-v'))) }
+// git runs a file moved into a hooks directory.
+const hook = (w: string) => /(?:^|\/)(?:\.git|hooks)\//.test(w)
+// Is a file run (or read by a program that may run it) after it is written? Every later
+// command that is not inert and names the file counts; an inert mv or cp passes the name on
+// to its destination. A name matches inside any word, so `./x.sh` and `bin/x.sh` name x.sh.
+function usedLater(files: readonly string[], later: readonly Command[]): boolean {
+  const names = files.map(f => base(f.replace(/[\\'"]/g, ''))).filter(n => n !== '')
+  const named = (ws: readonly string[]) => ws.some(w => names.some(n => w.includes(n)))
+  for (const c of later) {
+    const ws = split(c.text)
+    const h = head(ws)
+    if (h === undefined) continue
+    if (!isInert(ws)) { if (named(ws)) return true; continue }
+    if ((h === 'mv' || h === 'cp') && named(ws.slice(1, -1))) {
+      const to = ws[ws.length - 1]!
+      if (hook(to)) return true
+      names.push(base(to))
+    }
+  }
+  return false
+}
+const REDIRECT = />>?\|?[ \t]*([^\s;&|<>()]+)/g
 function wordsOf(command: string): string[] {
-  const message = command.replace(MESSAGE, m => m.slice(0, m.indexOf('\n')))
-  const text = message.replace(WRITE, (m, before: string | undefined, _q, _d, after: string | undefined, at: number) => {
+  const message = command.replace(MESSAGE, '-m MSG')
+  // Drop every body first; restore a body whose file a later command may run.
+  const writes: { at: number; full: string; stub: string; file: string }[] = []
+  let shift = 0
+  const stubbed = message.replace(WRITE, (m, before: string | undefined, _q, _d, after: string | undefined, at: number) => {
     const file = before ?? after
-    if (file === undefined || message.slice(at + m.length).includes(file)) return m
-    return m.slice(0, m.indexOf('\n'))
+    if (file === undefined) return m
+    const stub = m.slice(0, m.indexOf('\n')).replace(/<<-?[ \t]*['"]\w+['"]/, '')
+    writes.push({ at: at - shift, full: m, stub, file })
+    shift += m.length - stub.length
+    return stub
   })
-  if (text === command) return split(command)
+  const parts = commands(stubbed)
+  let text = stubbed
+  for (const w of [...writes].reverse()) {
+    const later = parts?.filter(c => c.end > w.at + w.stub.length)
+    if (later === undefined || usedLater([w.file], later)) text = text.slice(0, w.at) + w.full + text.slice(w.at + w.stub.length)
+  }
   // Runners are looked for outside the dropped bodies: a message that says "bash" runs nothing.
-  if (DOT_SOURCE.test(text) || split(text).some(w => RUNNER.test(w.replace(/^.*\//, '')))) return split(command)
-  return split(text)
+  if (DOT_SOURCE.test(text) || split(text).some(w => RUNNER.test(base(w)))) return split(command)
+  // A substitution, a backtick or a kept heredoc keeps the whole bag.
+  const cmds = /\$\(|`|<</.test(text) ? undefined : commands(text)
+  if (cmds === undefined) return split(text)
+  return cmds.flatMap((c, i) => {
+    if (!isInert(split(c.text))) return split(c.text)
+    const targets = [...c.text.matchAll(REDIRECT)].map(m => m[1]!)
+    return targets.length > 0 && usedLater(targets, cmds.slice(i + 1)) ? split(c.text) : []
+  })
 }
 
-// A verb is the word itself, or a path or dashed executable ending in it (git-push, /bin/rm).
-const isVerb = (w: string, verb: string) => !w.startsWith('-') && (w === verb || w.endsWith(`-${verb}`) || w.endsWith(`/${verb}`))
+// A verb is the word itself, a path ending in it (/bin/rm), or git's dashed executable
+// (git-push, /usr/lib/git-core/git-push). Prose such as no-rm or force-push is not a verb (#693).
+const isVerb = (w: string, verb: string) => !w.startsWith('-') &&
+  (w === verb || w === `git-${verb}` || w.endsWith(`/${verb}`) || w.endsWith(`/git-${verb}`))
 const PUSH = ['push', 'send-pack', 'http-push']
 const isPush = (w: string) => PUSH.some(v => isVerb(w, v)) || w.includes('.push=')
 
