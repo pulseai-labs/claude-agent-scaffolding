@@ -155,6 +155,11 @@ live in the repo they concern is that the decision belongs with the code it
 governs — **the file joins that repo's series rather than starting a rival one**
 elsewhere. The NUMBER, though, comes from the project-wide sequence below.
 
+**The destination must be one of the scanned repos.** An unset `dest_repo`
+or a value that matches no name in `repos` refuses, naming that value. The
+four-digit default is only for a scanned destination with no existing series;
+it never substitutes for an unknown destination.
+
 **Numbering is project-wide, across every declared repo:** the next number is
 the highest existing plus one **anywhere in the project**, **counting both
 forms**. The *file* still lands in the repo the decision concerns — only the
@@ -162,50 +167,64 @@ SEQUENCE is shared — so the scan takes that repo as `$dest_repo` and takes the
 minted **width** from *its* series: the file must not be the odd one out in its
 own directory. Read it, do not guess:
 
+Execute this entire fence in one fresh shell invocation. It is self-contained:
+`repos` is every declared repo name, one per line; `oss_bin` resolves their roots.
+The default `adr_scan_mode=mint` also requires `dest_repo` and prints the next
+reference. Adoption C3 sets `adr_scan_mode=inventory` and captures the filenames
+printed to stdout, with no destination and no mint. Each invocation owns its
+temp files and removes them before returning, including on refusal; a subshell
+keeps its cleanup trap and variables out of the caller's shell.
+
 ```bash
-# $repos and $dest_repo are NOT ambient: $repos is one declared repo name per
-# line (the set the topology declares - the same convention
-# spine-close.md's $repo_base_branches uses), and $dest_repo is the repo the ADR
-# LANDS in, the one the decision concerns (§3, "Where"). The NUMBER is
-# project-wide; the minted WIDTH is the destination's own, because two repos may
-# pad differently (round 1, C2).
+(
+set -euo pipefail
+mode="${adr_scan_mode:-mint}"
+case "$mode" in mint|inventory) ;; *) echo "the numbering scan refuses mode '$mode'" >&2; exit 1 ;; esac
+# Validate inputs BEFORE allocating either temp file.
+if ! printf '%s\n' "${repos:-}" | grep -q '[^[:space:]]'; then
+  if [ "${repos+x}" = x ]; then shown='[empty]'; else shown='[unset]'; fi
+  echo "the numbering scan refuses repos '$shown': declare the repos to scan" >&2
+  exit 1
+fi
+if [ "$mode" = mint ]; then
+  dest_scanned=0
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    if [ "$name" = "${dest_repo:-}" ]; then dest_scanned=1; fi
+  done <<< "$repos"
+  if [ "$dest_scanned" = 0 ]; then
+    if [ "${dest_repo+x}" != x ]; then shown='[unset]'; else shown="${dest_repo:-[empty]}"; fi
+    echo "the numbering scan refuses dest_repo '$shown': it is not a scanned repo" >&2
+    exit 1
+  fi
+fi
+scan=""; dest=""
+trap 'if [ -n "$scan" ]; then rm -f -- "$scan"; fi; if [ -n "$dest" ]; then rm -f -- "$dest"; fi' EXIT
 scan="$(mktemp)"; dest="$(mktemp)"
 while IFS= read -r name; do
   [ -n "$name" ] || continue
-  root="$("$oss_bin" repo_root "$name")" || { echo "the numbering scan could not resolve a root for repo '$name'" >&2; rm -f "$scan" "$dest"; exit 1; }
-  # A refusal names its path (R9), and every exit path takes both temp files
-  # with it - one populated mktemp per mint is the leak this round closed (R6).
+  root="$("$oss_bin" repo_root "$name")" || { echo "the numbering scan could not resolve a root for repo '$name'" >&2; exit 1; }
   if ! mkdir -p "$root/docs/adr"; then
-    echo "the numbering scan could not create $root/docs/adr - reading it as an empty series would mint an id that may already exist" >&2
-    rm -f "$scan" "$dest"; exit 1
+    echo "the numbering scan could not create $root/docs/adr - an incomplete inventory is not an empty series" >&2
+    exit 1
   fi
-  # An unreadable directory is NOT an empty one: minting from a series that
-  # could not be read is how a duplicate id gets made, so this refuses instead.
   if ! listing="$(ls -1 "$root/docs/adr" 2>/dev/null)"; then
-    echo "the numbering scan could not read $root/docs/adr - reading it as an empty series would mint an id that may already exist" >&2
-    rm -f "$scan" "$dest"; exit 1
+    echo "the numbering scan could not read $root/docs/adr - an incomplete inventory is not an empty series" >&2
+    exit 1
   fi
   printf '%s\n' "$listing" >> "$scan"
   if [ "$name" = "${dest_repo:-}" ]; then printf '%s\n' "$listing" > "$dest"; fi
-done <<EOF
-$repos
-EOF
-# Every form an adopter's series can already be in: the prefixed form in EITHER
-# case (scaffold-dev writes `adr-`, PulseDB's series is `ADR-`) and the bare
-# form (scaffold-onboard's seed). Matching one case only returns NOTHING on the
-# other, and an empty answer there is not "start at 1" - it is a duplicate id.
+done <<< "$repos"
+if [ "$mode" = inventory ]; then cat "$scan"; exit 0; fi
+# Project-wide NUMBER: prefixed ADRs in either case and bare seed filenames.
 highest="$(sed -n -e 's/^[Aa][Dd][Rr]-\([0-9][0-9]*\)-.*\.md$/\1/p' \
                     -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' "$scan" | sort -n | tail -1)"
-# The WIDTH follows the DESTINATION repo's series, never the project-wide one:
-# with an `ADR-099-*` series elsewhere and `adr-0007-*` in the destination, a
-# project-wide width mints `ADR-100` into a four-digit directory (round 1, C2).
-# It comes from the same string the destination's own highest number does, so
-# the two cannot disagree; a destination with no series yet -> 4 digits.
+# WIDTH follows only the destination's existing series; an empty one -> 4.
 narrow="$(sed -n -e 's/^[Aa][Dd][Rr]-\([0-9][0-9]*\)-.*\.md$/\1/p' \
                    -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p' "$dest" | sort -n | tail -1)"
 if [ -z "$narrow" ]; then fmt='%04d'; else fmt="%0$(printf '%s' "$narrow" | wc -c | tr -d ' ')d"; fi
-rm -f "$scan" "$dest"
 printf "ADR-${fmt}\n" "$(( 10#${highest:-0} + 1 ))"
+)
 ```
 
 **Why project-wide and not per repo.** A bone record stores `adr`, `title` and
