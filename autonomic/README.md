@@ -94,7 +94,7 @@ the count.
 
 **`AskUserQuestion`.** The fork judges the questions. When every one has an answer that is
 exactly one of its option labels, autonomic answers in your place, tells the model it did and why,
-and writes one ledger line per question. A question with no options (free text) always goes to you. Anything else — not covered, a label that is not an option, a fork that fails — goes to
+and writes one ledger line per question. The fork also sees the live turn (below). A question with no options (free text) always goes to you. Anything else — not covered, a label that is not an option, a fork that fails — goes to
 you, and the bell rings.
 
 **Permission asks.** A `deny` is never changed (a deny rings once per tool and reason, as "hard
@@ -149,7 +149,15 @@ is the fork's to judge on an ask, and is left alone on an allow. A repo whose de
 direct pushes by design removes `default-branch-push`.
 
 When no rule matches, the fork judges the call against the policy's
-permission scope: `allow` is recorded and the tool runs; anything else leaves the ask and rings. The list applies to any tool whose input has a `command` (Bash, Monitor). A call whose input is longer than the fork is shown (4000 characters) stays an ask and rings. `AskUserQuestion` and `ExitPlanMode` are never approved here: their permission prompt is your own dialog.
+permission scope and the live turn: `allow` is recorded and the tool runs; anything else leaves the ask and rings. The list applies to any tool whose input has a `command` (Bash, Monitor). A call whose input is longer than the fork is shown (4000 characters) stays an ask and rings. `AskUserQuestion` and `ExitPlanMode` are never approved here: their permission prompt is your own dialog.
+
+**The live turn.** The permission and ask forks also get the turn digest: the session's last 12
+prompts and main-thread tool results since the fork's transcript was sent, one line each (a
+command's shape or a tool's input key names, and the last 300 characters of its result, redacted
+first), at most 4,000 characters, newest kept. The fork may miss a result from earlier in the
+same turn without it. A later instruction from you or the orchestrator counts as part of the task.
+The digest lives in memory only: it never reaches the ledger, the pain file, the bell or the log.
+The turn-end fork does not get it.
 
 ## Permission modes
 
@@ -260,6 +268,14 @@ options.
 - **molt rings its own pause.** molt reads `mode` and `bell` from autonomic's record and rings the
   bell when it pauses an autopilot root; autonomic does not ring again.
 
+## For launchers
+
+autonomic sets `AUTONOMIC_EFFECTIVE_MODE` (`autopilot` or `manual`) in its own process each time a
+session's mode changes, so every later Bash call the session runs sees the live mode. Read it there
+to decide whether a child starts in autopilot: `autopilot` marks the child; anything else, unset
+included, does not. It is in memory and cannot go stale the way the session record can after a
+failed write. autonomic never reads it: `AUTONOMIC_MODE` stays the spawn's input.
+
 ## Environment
 
 | Variable | Read for |
@@ -269,6 +285,7 @@ options.
 | `AUTONOMIC_BELL` | the bell command (beats `bell` in `/config`) |
 | `AUTONOMIC_PAIN_PATH` | the pain file |
 | `MOLT_STATUS_PATH` | molt's child status file (the floor) |
+| `AUTONOMIC_EFFECTIVE_MODE` | never read: autonomic sets it for launchers (above) |
 
 ## Settings
 
@@ -315,6 +332,9 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
   project's public canonical, set `AUTONOMIC_LEDGER` to the AI workspace, or ignore `.autonomic/` there; a
   launcher patch (herdr-crew) is to set it per seat.
 - The permission fork judges a subagent's call against the main session's transcript.
+- The turn digest adds up to 4,000 characters to each permission and ask judgment. It shows a tool
+  result's tail only, never its middle, and it reads a tool result as a fact, though a result can
+  hold fetched text. A `/resume` to an earlier session id brings back that id's digest.
 - A deny from a plugin that runs above autonomic is not seen; the turn-end check reports it.
 - Claude Code only: Codex, OpenCode and Devin have no mod runtime.
 
