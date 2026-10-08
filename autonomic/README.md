@@ -134,14 +134,16 @@ push or an `rm`, so does a bare variable (`git push $OPTS`). Beside `branch` or 
 variable is not read as a flag: it is mostly a message or a path.
 
 **Inert commands leave the bag (since 0.4.2).** When the text holds no program that may run text
-(the list below), no `$(`, `<(` or `>(`, no backtick, no heredoc left in place and no open quote,
+(the list below), no `$(`, `<(` or `>(`, no backtick, no heredoc left in place, no function or
+`alias` definition and no open quote,
 the list splits it into simple commands at `;`, `&`, `|`, `&&`, `||` and newlines outside quotes
 and comments. A command whose first word is `[`, `[[`, `test`, `echo`, `printf` (without `-v`),
 `exit`, `true`, `false`, `cat`, `head`, `tail`, `wc`, `ls`, `stat`, `grep`, `jq`, `cut`, `tr`,
 `mkdir`, `touch`, `mv` or `cp` (or a path to one in a system `bin` directory) then adds no words,
-unless it pipes onward, holds a function definition `()`, or writes with `>` into `.git/`, a
-`hooks/` directory, a file that a later command outside this list names, or a file named by a
-variable the text does not assign once while a command outside this list follows. A later command whose own name holds a
+unless it pipes onward, or writes with `>` into `.git/`, a `hooks/` directory, a git config file
+(`~/.gitconfig`, `.gitattributes` …), a file that a later command outside this list names, or a
+file named by a variable the text does not assign once — or by any relative name after a `cd`,
+`pushd` or `popd` — while a command outside this list follows. A later command whose own name holds a
 variable or a glob (`./$T.sh`, `./x*`) counts as naming every file. Every other command keeps its
 words, and so a danger word beside a harmless *non-inert* command is still an extra ask. A dashed
 word is a verb as git's own executable (`git-push`) or as a path (`./force-push`); bare prose such

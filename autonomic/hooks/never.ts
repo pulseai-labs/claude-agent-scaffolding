@@ -92,8 +92,10 @@ function isInert(text: string): boolean {
   if (h === undefined) return true
   return INERT.has(h) && !DEFINES.test(text) && !(h === 'printf' && ws.some(w => /^-[A-Za-z]*v/.test(w)))
 }
-// git runs a file in .git/ (hooks, config) or a hooks directory.
-const hook = (w: string) => /(?:^|\/)(?:\.git|hooks)\//.test(clean(w))
+// git runs or reads a file in .git/ (hooks, config) or a hooks directory, and its config files
+// elsewhere (~/.gitconfig, ~/.config/git/, .gitattributes, .gitmodules, a .git file).
+const hook = (w: string) =>
+  /(?:^|\/)(?:\.git|hooks|\.config\/git)\/|(?:^|\/)\.git$|gitconfig|\.gitattributes|\.gitmodules/.test(clean(w))
 const REDIRECT = />>?[|&]?[ \t]*([^\s;&|<>()]+)/g
 const targets = (text: string) => [...text.matchAll(REDIRECT)].map(m => m[1]!).filter(w => !/^(?:\d+|-)$/.test(w))
 // Is a written file run (or read by a program that may run it) later? A file in .git/ or
@@ -129,13 +131,19 @@ function usedLater(raw: readonly string[], later: readonly Command[], resolve: R
 }
 // Assignments that are a whole command (`T=/s/r.md.tmp`). A name assigned twice stays opaque.
 const ASSIGN = /^[ \t]*([A-Za-z_]\w*)=("[^"$`]*"|'[^']*'|[^\s;&|<>"'$`]*)[ \t]*$/
+// After a directory change (cd, pushd, popd) a relative name may be any file, .git/config
+// included, so it is read as opaque.
 function resolver(parts: readonly Command[]): Resolve {
   const vars = new Map<string, string | undefined>()
   for (const c of parts) {
     const m = ASSIGN.exec(c.text)
     if (m) vars.set(m[1]!, vars.has(m[1]!) ? undefined : clean(m[2]!))
   }
-  return f => clean(f).replace(/\$\{?([A-Za-z_]\w*)\}?/g, (v, n: string) => vars.get(n) ?? v)
+  const moved = parts.some(c => { const h = head(split(c.text)); return h === 'cd' || h === 'pushd' || h === 'popd' })
+  return f => {
+    const r = clean(f).replace(/\$\{?([A-Za-z_]\w*)\}?/g, (v, n: string) => vars.get(n) ?? v)
+    return moved && !/^[/~]/.test(r) ? `$${r}` : r
+  }
 }
 function wordsOf(command: string): string[] {
   const message = command.replace(MESSAGE, '-m MSG')
@@ -157,8 +165,9 @@ function wordsOf(command: string): string[] {
   const text = kept ? message : stubbed
   // Runners are looked for outside the dropped bodies: a message that says "bash" runs nothing.
   if (DOT_SOURCE.test(text) || split(text).some(w => RUNNER.test(base(w)))) return split(command)
-  // A substitution, a process substitution, a backtick or a kept heredoc keeps the whole bag.
-  const cmds = /\$\(|`|<<|[<>]\(/.test(text) ? undefined : commands(text)
+  // A substitution, a process substitution, a backtick, a kept heredoc, or a function or alias
+  // defined in the text (it may shadow an inert name: `echo() { "$@"; }`) keeps the whole bag.
+  const cmds = /\$\(|`|<<|[<>]\(|\([ \t]*\)|(?:^|[\s;&|(])(?:function|alias)[ \t]/.test(text) ? undefined : commands(text)
   if (cmds === undefined) return split(text)
   return cmds.flatMap((c, i) => {
     if (!isInert(c.text) || c.pipe) return split(c.text)

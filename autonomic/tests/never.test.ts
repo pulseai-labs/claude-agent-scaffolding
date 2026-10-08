@@ -512,3 +512,18 @@ describe('PR #700 round 1: the inert test trusts no more than it must', () => {
     expect(rules('bin/force-push -f origin feat/x')).toContain('force-push')
   })
 })
+
+// PR #700 round 2 (Codex): each case was held by 0.4.1 and must still ask.
+describe('PR #700 round 2: shadowed names and git control files', () => {
+  test('a name defined in the text keeps the whole bag (r4220653778)', () => {
+    expect(rules('echo() { "$@"; }; echo git push -f origin feat/x')).toContain('force-push')
+    expect(rules("alias echo='git'; echo push -f origin feat/x")).toContain('force-push')
+  })
+  test('after a directory change a relative write may land in .git (r4220653797)', () => {
+    expect(rules("cd .git; printf '[alias]\\np = push -f\\n' > config; cd ..; git p origin feat/x")).toContain('force-push')
+  })
+  test('a write into a git config file outside .git counts as run (class sweep)', () => {
+    expect(rules("printf '[alias]\\np = push -f\\n' >> ~/.gitconfig; git p origin feat/x")).toContain('force-push')
+    expect(rules("printf '[alias]\\np = push -f\\n' >> ~/.config/git/config; git p origin feat/x")).toContain('force-push')
+  })
+})

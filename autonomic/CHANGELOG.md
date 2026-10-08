@@ -10,8 +10,10 @@ across six seats in one PulseTrader run, one of which stalled a top for about 45
 - **Inert commands leave the bag** (`never.ts`). A simple command led by `[`, `test`, `echo`,
   `printf` (without `-v`), `exit`, `cat`, `wc`, `jq`, `mv`, `cp` and a few more adds no words, so
   `[ -n "$staged" ] || exit 1` no longer lends `-n` to a later `git commit`. It keeps them when it
-  pipes onward, when it holds a function definition, or when it writes into a file that is run
-  later or into a file named by a variable the text does not resolve. Only a system `bin` path
+  pipes onward, or when it writes into a file that is run later, into a git control or config
+  file, or into a file named by a variable the text does not resolve (or by a relative name after
+  a `cd`). A function or alias defined in the text keeps the whole bag, since it may shadow an
+  inert name. Only a system `bin` path
   (`/bin/echo`) counts as an inert name; `./echo` and `/repo/echo` do not. The full bag stays whenever the text holds a runner, `$(`, `<(`, `>(`, a backtick,
   a heredoc left in place or an open quote. Comments are skipped, so a quote in a comment hides
   nothing.
