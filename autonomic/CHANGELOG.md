@@ -2,6 +2,26 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.4.2
+
+**The never-approve list stops holding commands that only name a danger** (#693: ten false holds
+across six seats in one PulseTrader run, one of which stalled a top for about 45 minutes).
+
+- **Inert commands leave the bag** (`never.ts`). A simple command led by `[`, `test`, `echo`,
+  `printf` (without `-v`), `exit`, `cat`, `wc`, `jq`, `mv`, `cp` and a few more adds no words, so
+  `[ -n "$staged" ] || exit 1` no longer lends `-n` to a later `git commit`. The full bag stays
+  whenever the text holds a runner, `$(`, a backtick, a heredoc left in place or an open quote.
+- **A heredoc body stays dropped when its file is only moved or read.** A later command outside
+  the inert list that names the file keeps the body; `mv` and `cp` pass the name on; a `.git/` or
+  `hooks/` destination counts as run.
+- **A dashed word is a verb only as git's executable** (`git-push`, `/usr/lib/git-core/git-push`):
+  `no-rm` and `force-push` in prose no longer read as `rm` and `push`.
+- **Known limits:** prose quoted in one argument of a non-inert command still pools
+  (`herdr agent prompt "…"`); a non-inert reader of a written file (`dagr check run.json.tmp`)
+  keeps the writer's words; an inert name shadowed by an alias or function defined in an earlier
+  call hides words; run locations other than `.git/` and `hooks/` (rc files, crontabs) are not
+  tracked.
+
 ## 0.4.1
 
 **A credential no longer takes the options from the other decisions in a pain** (a PulseTrader
