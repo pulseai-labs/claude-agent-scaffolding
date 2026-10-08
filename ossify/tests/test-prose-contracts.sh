@@ -1696,5 +1696,14 @@ _CR="$(cat "$HERE/eval/rubrics/adopt-multi-repo.md")"
 t_assert_contains "$_CR" 'reference held by two repos halts' 'C3 rubric scores collision halt'
 t_assert_contains "$(cat "$SKILLS/adopt/SKILL.md")" 'repo names from the captured inventory' 'C4 collision names come from B7 inventory'
 
+# D: source-reporting prose contract, identity remains text-only.
+_D_SECTION="$(sed -n '/^## 7\./,/^## 8\./p' "$SKILLS/close/references/harvest.md")"
+t_assert_contains "$_D_SECTION" "existing trailer's source" 'D1 duplicate skip names existing source'
+t_assert_contains "$_D_SECTION" "skipped candidate's source" 'D1 duplicate skip names candidate source'
+_D06="$(cat "$HERE/eval/fixtures/harvest-apply-integrity/06-adoption-duplicate-under-report-trailer.md" 2>/dev/null)"
+t_assert_contains "$_D06" 'source: adoption' 'D2 adoption/report duplicate fixture exists'
+t_assert_contains "$_D06" 'source: report' 'D2 duplicate fixture declares existing report trailer'
+t_assert_contains "$(cat "$HERE/eval/rubrics/harvest-apply-integrity.md")" 'both sources' 'D2 rubric scores the skip message'
+
 rm -rf "$_PC_TMP"
 t_summary

@@ -221,7 +221,11 @@ a file that already exists.
 
 **Skip only the identical entry.** Before appending, read the target file. The
 same text already sitting under a harvest trailer is a duplicate — a prior run
-of this same harvest after a halt — so skip it and say so. An entry that merely
+of this same harvest after a halt, or identical text from another source — so
+skip it. The skip line names both the existing trailer's source and the
+skipped candidate's source (`report`, `handoff` or `adoption`). Identity remains
+text-only: append nothing for a duplicate, including no additional trailer or
+adoption baseline. An entry that merely
 *resembles* an existing one is a **new entry**: append it. Duplicates are
 visible and cheap; a lesson silently dropped because it "looked like" another
 is the exact failure this ceremony exists to prevent, and the user already
