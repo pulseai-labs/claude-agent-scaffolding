@@ -356,3 +356,174 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     expect(rules('git push origin +main')).toEqual(['default-branch-push', 'force-push'])
   })
 })
+
+// autonomic 0.4.2 (#693): inert commands leave the bag; a heredoc body stays dropped unless a
+// later command that is not inert names its file; prose with a dash is not a verb.
+describe('never-approve false positives (0.4.2 spec §4)', () => {
+  test('case A: a test command does not lend its -n to a commit', () => {
+    expect(rules('[ -n "$staged" ] || exit 1\ngit add -A\ngit commit -q -m "msg"')).toEqual([])
+  })
+  test('case A′: the same with a heredoc commit message', () => {
+    expect(rules("[ -n \"$staged\" ] || exit 1\ngit commit -q -m \"$(cat <<'EOF'\nfix: x\nEOF\n)\"")).toEqual([])
+  })
+  test('case B: a report written to a temp file and renamed over the path', () => {
+    const c = "T=/s/r.md.tmp\ncat > \"$T\" <<'EOF'\nper the standing no-rm rule.\nEOF\nmv \"$T\" /s/r.md"
+    expect(rules(c)).toEqual([])
+    expect(namesDanger(c)).toBe(false)
+  })
+  test('case C: rules prose saved to scratch and counted', () => {
+    const c = "cat > $R/rules.txt <<'EOF'\nNever force-push; never rm -rf outside a worktree; no branch-delete.\nEOF\nwc -l $R/rules.txt"
+    expect(rules(c)).toEqual([])
+  })
+  test('case D: a jq note with deletion words, checked by a command that does not name the file', () => {
+    const c = `jq '.note = "do not rm -rf $X"' run.json > run.json.tmp && dagr check --strict && mv run.json.tmp run.json`
+    expect(rules(c)).toEqual([])
+  })
+})
+
+describe('escape routes the 0.4.2 reading must not open (spec §5)', () => {
+  test('a verb kept in an assignment or an alias still pairs with a flag', () => {
+    expect(rules('V=push; git $V -f origin feat/x')).toContain('force-push')
+    expect(rules('git config alias.p push; git p -f origin feat/x')).toContain('force-push')
+  })
+  test('an inert redirect into a file that is run later keeps its words', () => {
+    expect(rules("echo 'git push -f origin feat/x' > x.sh; ./x.sh")).toContain('force-push')
+    expect(rules("echo 'git push -f origin feat/x' &> x.sh; ./x.sh")).toContain('force-push')
+  })
+  test('a heredoc file renamed, then run through a wrapper, keeps its body', () => {
+    expect(rules("cat > f <<'X'\ngit push -f origin feat/x\nX\nmv f g; nohup g")).toContain('force-push')
+  })
+  test('a quoted ; does not split a command', () => {
+    expect(rules('git push "x; echo" -f')).toContain('force-push')
+  })
+  test('an apostrophe in a kept heredoc body keeps the whole bag', () => {
+    expect(rules("cat > f <<'X'\ndon't\nX\nbash f; echo -f; git push origin feat/x")).toContain('force-push')
+    // No runner here: only the << gate stops the body's apostrophe from hiding -f (final review 12).
+    expect(rules("cat > f <<'X'\necho don't\nX\n./f; echo it\\'s -f\ngit push origin feat/x")).toContain('force-push')
+  })
+  test('printf -v defines a name; sort can run a program; a hooks directory is run by git', () => {
+    expect(rules('printf -v V push; git $V -f origin feat/x')).toContain('force-push')
+    expect(rules("cat > c <<'X'\ngit push -f origin feat/x\nX\nsort --compress-program=./c big.txt")).toContain('force-push')
+    expect(rules("cat > h <<'X'\ngit push -f origin feat/x\nX\ncp h .git/hooks/pre-commit")).toContain('force-push')
+  })
+  test('the dashed and path forms of a verb are still verbs', () => {
+    expect(rules('/usr/lib/git-core/git-push -f origin feat/x')).toContain('force-push')
+    expect(rules('git-push -f origin feat/x')).toContain('force-push')
+    expect(rules('/bin/rm -rf /tmp/x')).toContain('rm-outside')
+  })
+  test('known limit: a command that is not inert and names the written file keeps the jq words', () => {
+    const c = `jq '.note = "do not rm -rf $X"' run.json > run.json.tmp && dagr check run.json.tmp && mv run.json.tmp run.json`
+    expect(rules(c)).toContain('rm-outside')
+  })
+  test('known limit: prose quoted in one argument of a command that is not inert still pools', () => {
+    expect(rules('herdr agent prompt spine "the verifier ran rm -rf $X" ; printf x >> rulings.md')).toContain('rm-outside')
+  })
+})
+
+describe('review focus (0.4.2 plan)', () => {
+  test('two heredocs: the run one keeps its body, the other is dropped', () => {
+    const c = "cat > a <<'X'\nno-rm prose\nX\ncat > b.sh <<'Y'\ngit push -f origin feat/x\nY\n./b.sh"
+    expect(rules(c)).toContain('force-push')
+    expect(rules("cat > a <<'X'\ngit push -f origin feat/x\nX\ncat > b <<'Y'\nok\nY\nwc -l a b")).toEqual([])
+  })
+  test('a move beside an inert command is still a move', () => {
+    expect(rules('echo x; cd /repo/other && git push origin feat/x')).toEqual(['default-branch-push'])
+  })
+  test('a 2>&1 stays in its command', () => {
+    expect(rules("echo 'git push -f origin feat/x' > x.sh 2>&1; ./x.sh")).toContain('force-push')
+  })
+  test('the pre-check sees an escape route', () => {
+    expect(namesDanger("echo 'git push -f' > x.sh; ./x.sh")).toBe(true)
+  })
+  test('a file run through a differently spelled variable keeps its body (0.4.1 dropped it)', () => {
+    expect(rules("cat > x.sh <<'X'\ngit push -f origin feat/x\nX\nT=x; \"$T.sh\"")).toContain('force-push')
+  })
+})
+
+// Final review of the 0.4.2 branch: each case was held by 0.4.1 and must still ask.
+describe('0.4.2 final review: no new false negative against 0.4.1', () => {
+  test('a comment does not open a quote or join the next line', () => {
+    expect(rules("echo start # don't skip\ngit push -f origin feat/x\necho done # that's all")).toContain('force-push')
+    expect(rules('echo x # trailing \\\ngit push -f origin feat/x')).toContain('force-push')
+  })
+  test('a process substitution keeps the whole bag', () => {
+    expect(rules('cat <(git push -f origin feat/x)')).toContain('force-push')
+    expect(rules('echo >(git push -f origin feat/x)')).toContain('force-push')
+  })
+  test('a function defined in the same text is not inert', () => {
+    expect(rules('echo() { git push -f origin feat/x; }; echo hi')).toContain('force-push')
+    expect(rules('cat () { rm -rf ~/work; }; cat f')).toContain('rm-outside')
+    expect(rules('function echo { git push -f origin feat/x; }; echo hi')).toContain('force-push')
+  })
+  test('an inert command piped onward keeps its words', () => {
+    expect(rules("echo 'git push -f origin feat/x' | at now")).toContain('force-push')
+    expect(rules("echo 'git push -f origin feat/x' | cat > x.sh; ./x.sh")).toContain('force-push')
+    expect(rules("echo 'git push -f origin feat/x' |& at now")).toContain('force-push')
+    expect(rules("cat > f <<'X'\ngit push -f origin feat/x\nX\ncat f | at now")).toContain('force-push')
+  })
+  test('>&file is a redirect', () => {
+    expect(rules("echo 'git push -f origin feat/x' >& x.sh; ./x.sh")).toContain('force-push')
+  })
+  test('printf with a -v cluster defines a name', () => {
+    expect(rules('printf -vV push; git $V -f origin feat/x')).toContain('force-push')
+  })
+  test('a write straight into .git/ or hooks/ counts as run', () => {
+    expect(rules("printf '[alias]\\n\\tp = push -f\\n' >> .git/config; git p origin feat/x")).toContain('force-push')
+    expect(rules("echo 'git push -f origin feat/x' > .git/hooks/pre-commit; git commit -m x")).toContain('force-push')
+    expect(rules("cat > .git/hooks/pre-commit <<'X'\ngit push -f origin feat/x\nX\ngit commit -m x")).toContain('force-push')
+  })
+  test('an inert copy by redirect passes the name on', () => {
+    expect(rules("cat > f <<'X'\ngit push -f origin feat/x\nX\ncat f > g; chmod +x g; ./g")).toContain('force-push')
+  })
+  test('a kept body that runs another written file keeps that body too', () => {
+    expect(rules("cat > a.sh <<'A'\ngit push -f origin feat/x\nA\ncat > b.sh <<'B'\n./a.sh\nB\n./b.sh")).toContain('force-push')
+  })
+  test('a relative path is not inert by its last part', () => {
+    expect(rules('./scripts/test push -f origin feat/x')).toContain('force-push')
+  })
+  test('a command named by a variable or a glob may be any written file', () => {
+    expect(rules("echo 'git push -f origin feat/x' > x.sh; T=x; ./$T.sh")).toContain('force-push')
+    expect(rules("echo 'git push -f origin feat/x' > x.sh; ./x*")).toContain('force-push')
+  })
+  test('a file name matches whatever its case', () => {
+    expect(rules("echo 'git push -f origin feat/x' > x.sh; ./X.SH")).toContain('force-push')
+  })
+})
+
+// PR #700 round 1 (Codex): each case was held by 0.4.1 and must still ask.
+describe('PR #700 round 1: the inert test trusts no more than it must', () => {
+  test('a redirect through a variable is resolved, or kept when it cannot be (r4220518542)', () => {
+    expect(rules("P=.git/config; printf '[alias]\\np = push -f\\n' > \"$P\"; git p origin feat/x")).toContain('force-push')
+    expect(rules("printf '[alias]\\np = push -f\\n' > \"$GITCFG\"; git p origin feat/x")).toContain('force-push')
+    // An assignment after the write names its own value, so it never lets the write's words go.
+    expect(rules("printf '[alias]\\np = push -f\\n' > \"$P\"; P=zq9; git p origin feat/x")).toContain('force-push')
+    // An assigned temp file that is only moved stays dropped (case B).
+    expect(rules("T=/s/r.md.tmp\ncat > \"$T\" <<'EOF'\nno-rm\nEOF\nmv \"$T\" /s/r.md\nherdr pane run x ok")).toEqual([])
+  })
+  test('a function defined after a keyword is not inert (r4220518555)', () => {
+    expect(rules('if true; then echo() { git push -f origin feat/x; }; echo hi; fi')).toContain('force-push')
+  })
+  test('only a system path to an inert name is inert (r4220518565)', () => {
+    expect(rules('/repo/echo git push -f origin feat/x')).toContain('force-push')
+    expect(rules('/bin/echo git push -f origin feat/x; true')).toEqual([])
+  })
+  test('a dashed executable path is a verb; bare dashed prose is not (r4220518572)', () => {
+    expect(rules('./force-push -f origin feat/x')).toContain('force-push')
+    expect(rules('bin/force-push -f origin feat/x')).toContain('force-push')
+  })
+})
+
+// PR #700 round 2 (Codex): each case was held by 0.4.1 and must still ask.
+describe('PR #700 round 2: shadowed names and git control files', () => {
+  test('a name defined in the text keeps the whole bag (r4220653778)', () => {
+    expect(rules('echo() { "$@"; }; echo git push -f origin feat/x')).toContain('force-push')
+    expect(rules("alias echo='git'; echo push -f origin feat/x")).toContain('force-push')
+  })
+  test('after a directory change a relative write may land in .git (r4220653797)', () => {
+    expect(rules("cd .git; printf '[alias]\\np = push -f\\n' > config; cd ..; git p origin feat/x")).toContain('force-push')
+  })
+  test('a write into a git config file outside .git counts as run (class sweep)', () => {
+    expect(rules("printf '[alias]\\np = push -f\\n' >> ~/.gitconfig; git p origin feat/x")).toContain('force-push')
+    expect(rules("printf '[alias]\\np = push -f\\n' >> ~/.config/git/config; git p origin feat/x")).toContain('force-push')
+  })
+})

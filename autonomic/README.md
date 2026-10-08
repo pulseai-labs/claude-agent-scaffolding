@@ -106,8 +106,9 @@ matches the list becomes an `ask`, so you get the normal permission dialog, and 
 
 The list reads the whole command text as **one bag of words**. First it joins a backslash-newline
 and drops every `\`, `'` and `"`. Then it splits the text at spaces, `; & | ( ) < >`, backticks and `$(`
-(`${OPTS}` stays one word that starts with `$`). A `NAME=VALUE` word also shows its value. The list never decides which command a word
-belongs to, so a quote, a wrapper, an interpreter or a substitution cannot hide a word:
+(`${OPTS}` stays one word that starts with `$`). A `NAME=VALUE` word also shows its value.
+Outside inert commands (below), the list never decides which command a word belongs to, so a
+quote, a wrapper, an interpreter or a substitution cannot hide a word:
 `python3 -c 'git push -f'`, `bash -c "…"` and `$(git push -f)` all show `push` and `-f`. A danger
 word beside a harmless command is an extra ask; that is the cost of this reading. The rules:
 
@@ -132,10 +133,28 @@ A flag word that holds `$`, `*`, `?`, `[` or `{` (`--forc*`, `-$X`) counts as ev
 push or an `rm`, so does a bare variable (`git push $OPTS`). Beside `branch` or `commit`, a bare
 variable is not read as a flag: it is mostly a message or a path.
 
+**Inert commands leave the bag (since 0.4.2).** When the text holds no program that may run text
+(the list below), no `$(`, `<(` or `>(`, no backtick, no heredoc left in place, no function or
+`alias` definition and no open quote,
+the list splits it into simple commands at `;`, `&`, `|`, `&&`, `||` and newlines outside quotes
+and comments. A command whose first word is `[`, `[[`, `test`, `echo`, `printf` (without `-v`),
+`exit`, `true`, `false`, `cat`, `head`, `tail`, `wc`, `ls`, `stat`, `grep`, `jq`, `cut`, `tr`,
+`mkdir`, `touch`, `mv` or `cp` (or a path to one in a system `bin` directory) then adds no words,
+unless it pipes onward, or writes with `>` into `.git/`, a `hooks/` directory, a git config file
+(`~/.gitconfig`, `.gitattributes` …), a file that a later command outside this list names, or a
+file named by a variable the text does not assign once — or by any relative name after a `cd`,
+`pushd` or `popd` — while a command outside this list follows. A later command whose own name holds a
+variable or a glob (`./$T.sh`, `./x*`) counts as naming every file. Every other command keeps its
+words, and so a danger word beside a harmless *non-inert* command is still an extra ask. A dashed
+word is a verb as git's own executable (`git-push`) or as a path (`./force-push`); bare prose such
+as `no-rm` or `force-push` is not.
+
 Two heredoc shapes with a quoted delimiter are literal text, and their bodies are skipped: a
 commit message, `-m "$(cat <<'EOF'` … `EOF` `)"`, and `cat > file <<'EOF'` at a command's start
-when the file is not named again later in the text. Every other heredoc keeps its words, and so
-do these two when the rest of the text names a program that may run text: a shell, `eval`,
+unless a later command outside the inert list names the file — a `mv`, a `cp` or a redirect passes the check on
+to what it writes, a file in `.git/` or `hooks/` counts as run, and when one body is kept every
+body is. Every other heredoc
+keeps its words, and so do these two when the rest of the text names a program that may run text: a shell, `eval`,
 `source`, `.` at a command's start, `xargs`, `ssh`, `su`, `watch`, `parallel`, `sed`, `awk` or an
 interpreter (`python3`, `node`, `perl`, `ruby` …). A unique prefix of a long option is read as
 that option (`--r` is `--recursive`, `git push --de` is `--delete`), as git and GNU tools accept
