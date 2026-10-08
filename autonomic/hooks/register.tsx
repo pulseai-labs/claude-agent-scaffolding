@@ -209,7 +209,8 @@ async function pain($: Engine, id: string, reason: string, detail: string, optio
   const text = `autopilot: ${reason} — ${oneLine(detail, 200)}`
   const shown = (options ?? []).map(o => ({ label: oneLine(o.label, 40), text: oneLine(o.text, Number.MAX_SAFE_INTEGER), recommended: o.recommended }))
   shown.sort((a, b) => Number(b.recommended) - Number(a.recommended))
-  const plain = credential === undefined ? undefined : oneLine(credential, 200)
+  // Never cut, as an option's text is not: the end can name where the credential goes (PR #699).
+  const plain = credential === undefined ? undefined : oneLine(credential, Number.MAX_SAFE_INTEGER)
   const numbered = shown.length === 0 ? text
     : `${text} · options: ${shown.map((o, i) => `${i + 1}) ${o.label}${o.recommended ? ' (Recommended)' : ''}`).join(' ')}`
   const listed = plain === undefined ? numbered : `${numbered} · in plain text: ${plain}`
@@ -238,7 +239,10 @@ async function choose($: Engine, value: NonNullable<Pain>, o: PainOption): Promi
   let id = ''
   try {
     id = await $.session.id()
-    try { await update($, notice, cur => (cur?.seq === seq ? null : cur)) } catch {}
+    // A pending credential request outlives the press: it stays as a band of its own (PR #699).
+    const rest: Pain = value.credential === undefined ? null
+      : { text: 'autopilot: pain — still needed in plain text', credential: value.credential, seq: (painSeq = Math.max(painSeq + 1, Date.now())) }
+    try { await update($, notice, cur => (cur?.seq === seq ? rest : cur)) } catch {}
     if (!(await record($, id, 'operator', value.question ?? value.text, o.label, 'chosen on the pain band'))) return
     const r = await $.prompt.submit({ text: o.text, asUser: true })
     if (r.drop !== undefined) await pain($, id, 'option not sent', `${o.label} (${String(r.drop)}): type the reply instead`)

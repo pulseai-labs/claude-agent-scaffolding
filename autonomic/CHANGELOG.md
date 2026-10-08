@@ -14,8 +14,9 @@ pain on 2026-10-08 asked about a prod freeze and an agent token together, and sh
 - **The verdict** (`verdict.ts`): a pain keeps a non-empty `credential` string; any other value is
   dropped and the pain and its options stand. Only a pain carries one.
 - **The pain signal** (`register.tsx`): the band shows `In plain text: <request>` after the
-  options, before Dismiss, with no button. The bell, the pain file and the ledger end the pain
-  with `· in plain text: <request>`. The request is redacted like every pain text.
+  options, before Dismiss, with no button, never cut. A press on an option leaves the request as
+  a band of its own. The bell, the pain file and the ledger end the pain with
+  `· in plain text: <request>`. The request is redacted like every pain text.
 - **Known limit:** the session's own `AskUserQuestion` still follows the policy's standing order
   ("For credentials, ask in plain text with no options"). A question the session itself bundles
   with a credential still has no options; the policy file is the operator's to edit.

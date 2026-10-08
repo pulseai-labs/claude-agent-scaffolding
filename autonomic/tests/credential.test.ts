@@ -89,6 +89,33 @@ describe('the credential reaches the operator on its own line (0.4.1)', () => {
     expect(w.runs.find(r => r[0] === 'sh' && (r[2] ?? '').includes('ring-it'))?.[4]).toContain(tail)
     expect(ledgerLines(w).at(-1)).toContain(`Q: Will you write the H = 6 freeze on prod?${tail} · A: ask the operator`)
   })
+  test('a long request is shown whole, never cut (PR #699 round 1)', async ($, on) => {
+    const long = `${'Put the campaign agent token in a 0600 file, '.repeat(5)}then tell me only its path: ~/.cache/pulse-scratch/r4-spines/END-MARKER`
+    const w = world(on, { env: { ...AP, AUTONOMIC_PAIN_PATH: '/run/p' } })
+    w.forks.push(PAIN({ credential: long }))
+    await $.classic.Stop(STOP())
+    expect(long.length).toBeGreaterThan(200)
+    expect(w.files.get('/run/p') ?? '').toContain('END-MARKER')
+    const ui = await $.ui.mount({ plugin: 'autonomic', surface: 'terminal', ...BAND })
+    expect(shown(norm(await ui.drawn()))).toContain(`In plain text: ${long}`)
+    await ui.unmount()
+  })
+  test('a press on an option keeps the credential request on the band (PR #699 round 1)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(PAIN())
+    await $.classic.Stop(STOP())
+    const ui = await $.ui.mount({ plugin: 'autonomic', surface: 'terminal', ...BAND })
+    await ui.press({ key: 'option-0' })
+    await ui.unmount()
+    expect(w.submits.at(-1)?.text).toBe('I write the H = 6 freeze on prod now.')
+    const left = w.notices.at(-1) as { credential?: string; options?: unknown } | null
+    expect(left?.credential).toBe(CRED)
+    expect(left?.options).toBeUndefined()
+    const after = await $.ui.mount({ plugin: 'autonomic', surface: 'terminal', ...BAND })
+    expect((await after.findAll({ type: 'Button' })).map(b => b.props.label)).toEqual(['Dismiss'])
+    expect(shown(norm(await after.drawn()))).toContain(`In plain text: ${CRED}`)
+    await after.unmount()
+  })
   test('the request is redacted like every pain text', async ($, on) => {
     const w = world(on, { env: { ...AP, AUTONOMIC_PAIN_PATH: '/run/p' } })
     w.forks.push(PAIN({ credential: 'Confirm GITHUB_TOKEN=ghp_abcdefghijklmnop is the one to rotate.' }))
