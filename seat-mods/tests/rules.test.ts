@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { parseRole, parseAllow, bashRules, commitMessageFiles, placeOf, decide, invalidText, statusText } from '../hooks/rules'
+import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, placeOf, decide, invalidText, statusText } from '../hooks/rules'
 
 describe('parseRole', () => {
   test('unset and empty default to the guarded implementer', () => {
@@ -238,5 +238,54 @@ describe('decide', () => {
     expect(invalidText('impl')).toContain('"impl"')
     expect(invalidText('impl')).toContain('implementer, verifier, reviewer')
     expect(invalidText('impl')).toContain('orchestrator, coordinator')
+  })
+})
+
+// Literal expectations distinguish quote handling and prefix placement from the
+// resolver: these are inputs to the rail, not a second shell implementation.
+describe('rm operand parsing', () => {
+  test('only rm command segments produce targets', async () => {
+    expect(rmTargets('echo "rm /var/x"; rm /w/x')).toEqual([{ path: '/w/x', glob: false }])
+    expect(rmTargets("cat <<'EOF'\nrm /var/x\nEOF")).toEqual([])
+    expect(rmTargets('git commit -m "rm -rf /var"')).toEqual([])
+    expect(rmTargets('A=1 sudo env command /bin/rm -rf /w/build')).toEqual([{ path: '/w/build', glob: false }])
+  })
+  test('single quotes and escaped expansions are literal; active expansions are unknown', async () => {
+    expect(rmTargets("rm '/w/$X' /w/\\$X")).toEqual([
+      { path: '/w/$X', glob: false }, { path: '/w/$X', glob: false },
+    ])
+    for (const command of ['rm "$OLDPWD"', 'rm /w/"${X}"', 'rm "$(pwd)"', 'rm ~someone/x'])
+      expect(rmTargets(command)).toEqual([{ path: undefined, glob: false }])
+    expect(rmTargets("rm '~/x'")).toEqual([{ path: './~/x', glob: false }])
+    expect(rmTargets('rm ~/x')).toEqual([{ path: '~/x', glob: false }])
+  })
+  test('glob directory is the directory of the literal prefix; quoted patterns stay literal', async () => {
+    expect(rmTargets('rm /tmp/tmp.* build/*.o b*/x *.log /a? /[ab]')).toEqual([
+      { path: '/tmp', glob: true }, { path: 'build', glob: true },
+      { path: '.', glob: true }, { path: '.', glob: true },
+      { path: '/', glob: true }, { path: '/', glob: true },
+    ])
+    expect(rmTargets("rm '/w/*.o' /w/\\*.o")).toEqual([
+      { path: '/w/*.o', glob: false }, { path: '/w/*.o', glob: false },
+    ])
+  })
+  test('options stop at --, even for a quoted delimiter', async () => {
+    expect(rmTargets('rm -rf -- -file -')).toEqual([
+      { path: '-file', glob: false }, { path: '-', glob: false },
+    ])
+    expect(rmTargets('rm "--" -file')).toEqual([{ path: '-file', glob: false }])
+    expect(rmTargets('rm -rf')).toEqual([])
+  })
+  test('earlier directory changes poison only relative operands, including after --', async () => {
+    for (const change of ['cd', 'pushd', 'popd'])
+      expect(rmTargets(`${change} /var; rm -- -file /w/x ~/x`)).toEqual([
+        { path: undefined, glob: false }, { path: '/w/x', glob: false }, { path: '~/x', glob: false },
+      ])
+    expect(rmTargets('rm x; cd /var')).toEqual([{ path: 'x', glob: false }])
+  })
+  test('malformed words fail closed beside valid quoted words', async () => {
+    for (const command of ['rm "unterminated', 'rm dangling\\'])
+      expect(rmTargets(command)).toEqual([{ path: undefined, glob: false }])
+    expect(rmTargets('rm "a b"')).toEqual([{ path: 'a b', glob: false }])
   })
 })

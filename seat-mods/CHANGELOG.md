@@ -2,6 +2,24 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.3.0 — 2026-10-08
+
+- Guarded sessions which `rm` outside their writable places are now denied. Implementers,
+  verifiers and the unmarked default may remove things inside their worktree and `SEAT_MODS_ALLOW`;
+  reviewers may remove things only inside `SEAT_MODS_ALLOW`. Every operand is checked, including
+  `-`-prefixed operands after `--`. Writable roots and their ancestors are protected.
+- Unresolvable operands are denied, including `rm -rf "$OLDPWD"`, variables, parameter and command
+  substitutions, and `~user`. Single-quoted operands are literal; `~` and `~/...` use HOME. Globs
+  are placed by their literal prefix directory, so `rm -f /tmp/tmp.*` is denied. Parent symlinks
+  resolve, while a terminal symlink is removed literally unless followed by `/`.
+- Relative operands use the live `$.session.cwd()` (measured on Claude Code 2.1.294, 2026-10-08;
+  see README). Known limit: an earlier `cd`, `pushd` or `popd` in the same Bash call makes a relative
+  operand unresolvable even if the change fails. Existing live-cwd worktree detection is unchanged.
+- Known limits: `rmdir`, `unlink`, `find -delete`, `git clean`, `xargs rm`, `bash -c '...'`, `mv` over
+  a file, and other Bash writes (`cat >`, `sed -i`) remain outside the rail. This is an `rm` matcher
+  for mistakes, not precise shell parsing or an adversary boundary. Free roles remain unguarded;
+  Bash tool calls from subagents meet the same rail.
+
 ## 0.2.1 — 2026-10-05
 
 Docs only — no code change.

@@ -20,7 +20,8 @@ export type RuleId =
 
 export type Place = 'worktree' | 'allow' | 'outside'
 
-export type Facts = { kind: 'bash'; rules: readonly RuleId[] } | { kind: 'write'; place: Place }
+export type Removal = { place: Place; protected: boolean }
+export type Facts = { kind: 'bash'; rules: readonly RuleId[]; removals?: readonly Removal[] } | { kind: 'write'; place: Place }
 
 // Rules every herdr-crew brief of every role shares (spec §4).
 const COMMON: readonly RuleId[] = ['merge', 'force-push', 'branch-delete', 'no-verify', 'ai-trailer']
@@ -212,6 +213,81 @@ export function commitMessageFiles(command: string): string[] {
   return files
 }
 
+// rm alone gets operand parsing; the other Bash rails keep their existing matcher.
+// Quoting is retained until this point: single quotes and backslash escapes are
+// literal, while active expansions cannot be resolved by the hook.
+export type RmTarget = { path: string | undefined; glob: boolean }
+
+function rmWord(word: string): { path: string; globAt: number; home: boolean } | undefined {
+  let path = ''
+  let quote = ''
+  let globAt = -1
+  const home = word.startsWith('~')
+  for (let i = 0; i < word.length; i++) {
+    const char = word[i]!
+    if (quote === "'") {
+      if (char === "'") quote = ''
+      else path += char
+    } else if (char === "'" && quote === '') quote = "'"
+    else if (char === '"') quote = quote === '"' ? '' : '"'
+    else if (char === '\\') {
+      const next = word[++i]
+      if (next === undefined) return undefined
+      // Inside double quotes Bash only escapes these characters.
+      if (quote === '"' && !['$', '`', '"', '\\', '\n'].includes(next)) path += '\\'
+      path += next
+    } else if (char === '$' || char === '`') return undefined
+    else {
+      if (quote === '' && globAt < 0 && '*?['.includes(char)) globAt = path.length
+      path += char
+    }
+  }
+  if (quote !== '' || path === '') return undefined
+  if (home && path !== '~' && !path.startsWith('~/')) return undefined
+  // A quoted tilde is an ordinary relative file name, not HOME expansion.
+  return { path, globAt, home }
+}
+
+export function rmTargets(command: string): RmTarget[] {
+  const targets: RmTarget[] = []
+  const { text, pieces } = blank(command)
+  let changedDirectory = false
+  for (const segment of text.split(COMMANDS)) {
+    const head = commandOf(tokensOf(segment))
+    if (head === undefined) continue
+    if (['cd', 'pushd', 'popd'].includes(head.name)) changedDirectory = true
+    if (head.name !== 'rm') continue
+    let options = true
+    for (const arg of head.args) {
+      const word = rmWord(expand(arg, pieces))
+      if (word !== undefined && options && word.path === '--') { options = false; continue }
+      if (word !== undefined && options && word.path.startsWith('-') && word.path !== '-') continue
+      if (word === undefined || (changedDirectory && !word.path.startsWith('/') && !word.home)) {
+        targets.push({ path: undefined, glob: false })
+        continue
+      }
+      let path = word.path
+      const glob = word.globAt >= 0
+      if (glob) {
+        const prefix = path.slice(0, word.globAt)
+        const slash = prefix.lastIndexOf('/')
+        path = slash < 0 ? '.' : slash === 0 ? '/' : prefix.slice(0, slash)
+      }
+      // Preserve whether the leading tilde was active, without treating a quoted
+      // literal tilde as HOME. register.ts only expands an active leading tilde.
+      if (!word.home && path.startsWith('~')) path = './' + path
+      targets.push({ path, glob })
+    }
+  }
+  return targets
+}
+
+export function removalOf(target: string | undefined, root: string | undefined, allow: readonly string[], glob: boolean): Removal {
+  if (target === undefined || root === undefined) return { place: 'outside', protected: false }
+  const ancestor = (dir: string) => target === dir || dir.startsWith(target.replace(/\/$/, '') + '/')
+  return { place: placeOf(target, root, allow), protected: !glob && [root, ...allow].some(ancestor) }
+}
+
 export function placeOf(target: string, root: string, allow: readonly string[]): Place {
   const within = (dir: string) => target === dir || target.startsWith(dir + '/')
   if (allow.some(within)) return 'allow'
@@ -226,7 +302,10 @@ export function decide(role: Role, facts: Facts): string | undefined {
   const profile = PROFILES[role]
   if (facts.kind === 'bash') {
     const hit = facts.rules.find(rule => profile.deny.includes(rule))
-    return hit === undefined ? undefined : denyText(role, RULE_TEXT[hit], 'run this command')
+    if (hit !== undefined) return denyText(role, RULE_TEXT[hit], 'run this command')
+    if (facts.removals?.some(target => target.protected || !profile.writeIn.includes(target.place)))
+      return denyText(role, 'no rm outside writable places, of their roots or ancestors, or with unresolvable operands', 'run this command')
+    return undefined
   }
   if (profile.writeIn.includes(facts.place)) return undefined
   const rule = facts.place === 'worktree'

@@ -85,6 +85,9 @@ Each is a `tool.call` deny on Bash, Edit or Write.
 | `--no-verify` on any git command (and `git commit -n`) | deny | deny | deny |
 | A commit message with `Co-Authored-By:` or `🤖 Generated with` — on the command line, in a heredoc, or in the `-F` / `--file` message file | deny | deny | deny |
 | Edit or Write outside the worktree and outside every `SEAT_MODS_ALLOW` directory | deny | deny | deny |
+| `rm` outside writable places, with unresolvable operands, or removing a writable root or its ancestor | deny | deny | deny |
+| `rm` inside the worktree (below its root) | allow | allow | deny |
+| `rm` inside a `SEAT_MODS_ALLOW` directory (below its root) | allow | allow | allow |
 | `git commit`, `git push`, `gh pr create` | allow | deny | deny |
 | Edit or Write inside the worktree | allow | allow | deny |
 | Edit or Write inside a `SEAT_MODS_ALLOW` directory | allow | allow | allow |
@@ -93,6 +96,22 @@ The worktree is the git top level of the session's working directory (outside a 
 the working directory itself). Paths are compared after the file system resolves them, so `..` and
 symbolic links land where they really point; a file in folders that do not exist yet is placed by
 its nearest existing folder.
+
+`rm` checks every operand, including operands beginning with `-` after `--`. Relative operands
+use the live shell directory from `$.session.cwd()` at the call. This was measured on Claude Code
+2.1.294 on 2026-10-08: after a Bash `cd` into a project subdirectory, the next call's hook and
+`pwd` both reported that subdirectory; after Claude reset an outside-project `cd`, both reported
+the project directory. An earlier `cd`, `pushd` or `popd` in the **same** call makes relative
+operands unresolvable and denies them; absolute operands remain eligible. `worktreeOf()` keeps
+its existing behavior: the worktree is derived from that live directory.
+
+Active variables, parameter expansions, command substitutions and `~user` operands cannot be
+resolved and are denied, including `rm -rf "$OLDPWD"`. Single-quoted text and escaped characters
+are literal. Bare `~` and `~/...` use `HOME`. A glob is placed by the directory of its literal
+prefix: `/tmp/tmp.*` is outside, while `build/*.o` is placed in the live directory's `build`.
+The resolver follows links in parent directories, but keeps a terminal link literal because
+`rm` removes the link itself; a trailing `/` follows the directory. A writable root itself or
+its ancestor cannot be removed.
 
 A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report it instead.`
 
@@ -123,8 +142,12 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 - **A `-F` message file is read from the session's working directory.** A relative path after a
   `cd`, or a path in a shell variable, is not found and reads as empty, so a trailer in it passes.
   The repository's commit-msg hook remains the backstop.
-- **File writes made through Bash** (`cat >`, `sed -i`, `mv`) are not path-checked. Only the Edit
-  and Write tools are.
+- **The Bash placement rail covers only `rm`.** `rmdir`, `unlink`, `find -delete`, `git clean`,
+  `xargs rm`, `bash -c '...'`, `mv` over a file, and other Bash writes such as `cat >` and `sed -i`
+  remain outside it. These rails stop mistakes, not an adversary; precise shell parsing remains
+  out of scope. An earlier same-call `cd`, `pushd` or `popd` conservatively denies relative `rm`
+  operands even if that directory change fails. Cross-call directory changes use the live cwd
+  measured above.
 - **A default-guarded session writes only inside the worktree and the `SEAT_MODS_ALLOW`
   directories** — and outside a git repository the worktree is its working directory — so Claude
   Code's own writes outside them, such as memory files under `~/.claude/projects/*/memory` and
