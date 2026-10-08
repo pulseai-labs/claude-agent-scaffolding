@@ -790,4 +790,42 @@ t_assert_contains "$T_OUT" 'halt:' 'E6 status read error is named'
 t_assert_eq no "$(if [ -e "$TMP/e-record" ]; then echo yes; else echo no; fi)" 'E6 failed status never reaches RECORD'
 t_assert_eq 0 "$(find "$TMP/e-temporaries" -type f | wc -l | tr -d ' ')" 'E5/E6 fresh fence cleans every temporary on halt'
 
+# F-V1: physical loose-ref corruption must halt before real RECORD, not only
+# injected git failures. Each entire fence runs alone in a fresh strict shell.
+FV_ENTER="$TMP/fv-enter.sh"; FV_FRESH="$TMP/fv-fresh.sh"
+sed 's/<spine-id>/r0.s1/g; s/<spine-slug>/demo/g' "$E_ENTER" > "$FV_ENTER"
+sed 's/<spine-id>/r0.s1/g; s/<spine-slug>/demo/g' "$E_FRESH" > "$FV_FRESH"
+_fv1_real_fence() {
+  ( cd "$F/ws" && env -u OSS_STATE_FILE TMPDIR="$TMP/e-temporaries" oss_bin="$OSS" \
+    bash -c 'set -euo pipefail; . "$1"' fresh "$1" )
+}
+for fence in "$FV_ENTER" "$FV_FRESH"; do
+  F="$TMP/fv-malformed-$(basename "$fence")"; mkfix "$F"
+  oss_in "$F" work_item_add r0.s1 One core >/dev/null
+  mkdir -p "$F/core/.git/refs/heads/spine"
+  printf 'broken-ref\n' > "$F/core/.git/refs/heads/spine/r0.s1-demo"
+  before="$(cksum < "$F/ws/.ossify/project-state.json")"
+  t_capture _fv1_real_fence "$fence"
+  printf 'F-V1 malformed %s rc=%s: %s\n' "$(basename "$fence")" "$T_RC" "$T_OUT"
+  t_assert_rc 1 "F-V1 $(basename "$fence") malformed loose ref halts; runs alone in a fresh shell"
+  t_assert_contains "$T_OUT" 'halt: cannot read' "F-V1 $(basename "$fence") names unreadable ref"
+  t_assert_eq "$before" "$(cksum < "$F/ws/.ossify/project-state.json")" "F-V1 $(basename "$fence") malformed ref never reaches real RECORD"
+  t_assert_eq '{}' "$(jq -c '.spines[0].bases // {}' "$F/ws/.ossify/project-state.json")" "F-V1 $(basename "$fence") no base journaled"
+  t_assert_eq 0 "$(find "$TMP/e-temporaries" -type f | wc -l | tr -d ' ')" "F-V1 $(basename "$fence") cleans temporaries on halt"
+done
+# Adjacent absent-ref controls must still select fresh and RECORD then cut.
+for fence in "$FV_ENTER" "$FV_FRESH"; do
+  F="$TMP/fv-absent-$(basename "$fence")"; mkfix "$F"
+  oss_in "$F" work_item_add r0.s1 One core >/dev/null
+  t_capture _fv1_real_fence "$fence"
+  t_assert_rc 0 "F-V1 $(basename "$fence") genuinely absent ref control succeeds"
+  if [ "$fence" = "$FV_ENTER" ]; then
+    t_assert_contains "$T_OUT" 'arm=fresh' 'F-V1 absent ref selector still chooses fresh'
+  else
+    t_assert_eq main "$(oss_in "$F" spine_base_get r0.s1 core)" 'F-V1 absent ref fresh fence records the real base'
+    t_assert_eq spine/r0.s1-demo "$(git -C "$F/core" rev-parse --abbrev-ref HEAD)" 'F-V1 absent ref fresh fence cuts the branch'
+  fi
+  t_assert_eq 0 "$(find "$TMP/e-temporaries" -type f | wc -l | tr -d ' ')" "F-V1 $(basename "$fence") absent ref control cleans temporaries"
+done
+
 t_summary

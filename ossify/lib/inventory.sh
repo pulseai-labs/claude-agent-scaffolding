@@ -233,8 +233,8 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
         # item work sits past the cut point - an active item then routed
         # finish-status and a complete one skip, marking lost work landed.
         # `descends` is the shared ancestry fact: `merged` needs it, and the
-        # merge/status arms halt without it; the two `reattach` arms do not yet
-        # read it - tracked as the wider arm fix in #675, not fixed here.
+        # merge/status arms and both `reattach` arms require it before acting
+        # on a recorded branch, so a reset below base_sha cannot be repaired.
         if [ -n "$bs" ] && _oss_inv_git -C "$root" merge-base --is-ancestor "$bs" "refs/heads/$br" 2>/dev/null; then descends=yes; else descends=no; fi
         # "merged" REQUIRES a recorded base (#673 A1). With base_sha unrecorded
         # ("-" unwrapped to ""), `tip != bs` is trivially true and a branch still

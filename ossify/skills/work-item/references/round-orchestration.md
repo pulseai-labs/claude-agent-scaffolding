@@ -91,11 +91,15 @@ arm=fresh
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue
   root="$("$oss_bin" repo_root "$repo")" || exit 1     # undeclared repo halts HERE
+  # --verify --quiet returns 1 for BOTH absence and malformed loose refs.
+  # --exists distinguishes absence (2) from a failed lookup (1).
   ref_rc=0
-  git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" || ref_rc=$?
+  git -C "$root" show-ref --exists "refs/heads/$spine_branch" 2>/dev/null || ref_rc=$?
   case "$ref_rc" in
-    0) arm=re-entry ;;
-    1) ;; # absent ref
+    0) git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" \
+         || { echo "halt: cannot read $spine_branch in $repo"; exit 1; }
+       arm=re-entry ;;
+    2) ;; # genuinely absent ref
     *) echo "halt: cannot read $spine_branch in $repo (git show-ref rc $ref_rc)"; exit 1 ;;
   esac
 done <<EOF
@@ -144,9 +148,15 @@ while IFS= read -r repo; do
   root="$("$oss_bin" repo_root "$repo")" || exit 1     # undeclared repo halts HERE
   porcelain="$(git -C "$root" status --porcelain)" || { echo "halt: cannot read status in $repo"; exit 1; }
   [ -z "$porcelain" ] || { echo "halt: $repo is dirty"; exit 1; }
+  # A failed lookup is not absence, even when quiet --verify would return 1.
   ref_rc=0
-  git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" || ref_rc=$?
-  case "$ref_rc" in 0|1) ;; *) echo "halt: cannot read $spine_branch in $repo (git show-ref rc $ref_rc)"; exit 1 ;; esac
+  git -C "$root" show-ref --exists "refs/heads/$spine_branch" 2>/dev/null || ref_rc=$?
+  case "$ref_rc" in
+    0) git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" \
+         || { echo "halt: cannot read $spine_branch in $repo"; exit 1; } ;;
+    2) ;; # genuinely absent ref
+    *) echo "halt: cannot read $spine_branch in $repo (git show-ref rc $ref_rc)"; exit 1 ;;
+  esac
   if [ "$ref_rc" = 0 ]; then
     echo "halt: $spine_branch already exists in $repo - this spine has started; take the re-entry arm (§2b), not this block."; exit 1
   fi
