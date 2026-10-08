@@ -120,4 +120,36 @@ if [ "$only" = all ] || [ "$only" = R3 ]; then
   git -C "$F/core" worktree remove "$WT"; git -C "$F/core" branch -d work/r0.s1.w1-one >/dev/null; inventory
   t_assert_rc 0 'R3 post-cleanup control succeeds'; t_assert_eq skip "$(verdict item r0.s1.w1 4)" 'R3 truly post-cleanup item still skips'
 fi
+if [ "$only" = all ] || [ "$only" = R5 ]; then
+  fixture r5-state-read
+  oss_block_extract "$HERE/../skills/work-item/references/round-orchestration.md" repo_bases "$TMP/fresh.sh" || exit 1
+  mkdir -p "$TMP/shim" "$TMP/temporaries"
+  cat > "$TMP/shim/oss" <<'OSS'
+#!/usr/bin/env bash
+case "$1" in
+  get) [ "${FAIL_GET:-}" != yes ] || { echo 'injected get rc2' >&2; exit 2; }; echo core ;;
+  branch_name) echo spine/r0.s1-demo ;;
+  repo_root) echo "$FIXTURE_ROOT" ;;
+  spine_base_set) echo RECORD >> "$RECORD" ;;
+  *) exit 2 ;;
+esac
+OSS
+  chmod +x "$TMP/shim/oss"
+  fresh() {
+    env FAIL_GET="$1" FIXTURE_ROOT="$F/core" RECORD="$TMP/record" oss_bin="$TMP/shim/oss" TMPDIR="$TMP/temporaries" \
+      bash -c 'set -eu; set +o pipefail; . "$1"' fresh "$TMP/fresh.sh"
+  }
+  # No caller pipefail: the fence owns the state-read rc itself.
+  t_capture fresh yes
+  printf 'R5 failed state read rc=%s: %s\n' "$T_RC" "$T_OUT"
+  t_assert_rc 1 'R5 failed state read halts alone in a fresh shell without pipefail'
+  t_assert_contains "$T_OUT" 'halt: cannot read' 'R5 failed state read names halt'
+  t_assert_eq no "$(if [ -e "$TMP/record" ]; then echo yes; else echo no; fi)" 'R5 failed state read never RECORDs'
+  t_assert_eq 0 "$(find "$TMP/temporaries" -type f | wc -l | tr -d ' ')" 'R5 halt removes both owned temp files'
+  t_capture fresh no
+  t_assert_rc 0 'R5 valid state control succeeds in fresh shell'
+  t_assert_eq RECORD "$(cat "$TMP/record")" 'R5 valid state still RECORDs'
+  t_assert_eq spine/r0.s1-demo "$(git -C "$F/core" rev-parse --abbrev-ref HEAD)" 'R5 valid state still cuts branch'
+  t_assert_eq 0 "$(find "$TMP/temporaries" -type f | wc -l | tr -d ' ')" 'R5 success removes both owned temp files'
+fi
 t_summary
