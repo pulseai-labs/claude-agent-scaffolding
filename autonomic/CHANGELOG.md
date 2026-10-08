@@ -2,6 +2,61 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.4.2
+
+**The never-approve list stops holding commands that only name a danger** (#693: ten false holds
+across six seats in one PulseTrader run, one of which stalled a top for about 45 minutes).
+
+- **Inert commands leave the bag** (`never.ts`). A simple command led by `[`, `test`, `echo`,
+  `printf` (without `-v`), `exit`, `cat`, `wc`, `jq`, `mv`, `cp` and a few more adds no words, so
+  `[ -n "$staged" ] || exit 1` no longer lends `-n` to a later `git commit`. It keeps them when it
+  pipes onward, or when it writes into a file that is run later, into a git control or config
+  file, or into a file named by a variable the text does not resolve (or by a relative name after
+  a `cd`). A function or alias defined in the text keeps the whole bag, since it may shadow an
+  inert name. Only a system `bin` path
+  (`/bin/echo`) counts as an inert name; `./echo` and `/repo/echo` do not. The full bag stays whenever the text holds a runner, `$(`, `<(`, `>(`, a backtick,
+  a heredoc left in place or an open quote. Comments are skipped, so a quote in a comment hides
+  nothing.
+- **A heredoc body stays dropped when its file is only moved or read.** A later command outside
+  the inert list that names the file keeps the body, and so does one whose own name is a variable
+  or a glob; `mv`, `cp` and redirects pass the name on; a file in `.git/` or `hooks/` counts as
+  run; once one body is kept, every body is.
+- **A bare dashed word is no longer a verb**: `no-rm` and `force-push` in prose no longer read as
+  `rm` and `push`. Git's executable (`git-push`) and a dashed path (`./force-push`) still do.
+- **Known limits:** prose quoted in one argument of a non-inert command still pools
+  (`herdr agent prompt "…"`); a non-inert reader of a written file (`dagr check run.json.tmp`)
+  keeps the writer's words; an inert name shadowed by an alias or function defined in an earlier
+  call hides words; a written file run without being named (`make` reading a `Makefile`), or
+  named only through a variable passed as an argument (`nohup "$F"`), is not tracked; run
+  locations other than `.git/` and `hooks/` (rc files, crontabs) are not tracked; an inert name
+  resolved through a changed `PATH`, git config moved by `GIT_CONFIG_*` or `GIT_DIR`, a write
+  through a descriptor opened earlier (`>&3`) and a redirect on a `{ }` group are not handled.
+
+## 0.4.1
+
+**A credential no longer takes the options from the other decisions in a pain** (a PulseTrader
+pain on 2026-10-08 asked about a prod freeze and an agent token together, and showed no buttons).
+
+- **The turn-end fork prompt** (`prompts.ts`): a credential or secret the operator must supply or
+  issue is never an option. The fork gives `"credential"`, one line asking for it in plain text,
+  and the other decisions in the same pain keep their options. In 0.3.0–0.4.0 the rule was "for
+  credentials, give no options", which dropped the options for the whole pain.
+- **The verdict** (`verdict.ts`): a pain keeps a non-empty `credential` string; any other value is
+  dropped and the pain and its options stand. Only a pain carries one.
+- **The pain signal** (`register.tsx`): the band shows `In plain text: <request>` after the
+  options, before Dismiss, with no button, never cut. A press on an option leaves the request as
+  a band of its own, and a failed press keeps it. The bell, the pain file and the ledger end the pain with
+  `· in plain text: <request>`. The request is redacted like every pain text.
+- **Known limit:** the session's own `AskUserQuestion` still follows the policy's standing order
+  ("For credentials, ask in plain text with no options"). A question the session itself bundles
+  with a credential still has no options; the policy file is the operator's to edit.
+- **Known limit:** the band holds one notice: a later pain, or a typed reply that a plugin beneath
+  refuses, clears a pending credential request. The pain file, the bell and the log keep it.
+- **Known limit:** the ledger cuts its Q field at 300 characters, as for every question, so a long
+  request can lose its end there; the band, the bell and the pain file show it whole.
+- **Known limit:** splitting is the fork's prose. A fork that still folds a credential into the
+  question gives it no options, as in 0.4.0.
+
 ## 0.4.0
 
 **The judge sees the live turn; launchers see the live mode** (0.4.0 spec; probe P1 showed the
