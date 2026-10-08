@@ -68,26 +68,26 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    quotes nothing, so an inherited path is passed on only when every character is a letter,
    a digit, `.`, `_`, `/` or `-`; any other is not passed on: the child gets
    `<run dir>/autonomic-ledger.md` instead. `<run dir>` and `REPORT_PATH` are herdr-crew's own
-   choice and keep to the same characters. The launcher's mode is its own autonomic record, read at each
-   launch — `jq -r .mode ~/.claude/state/autonomic/sessions/$CLAUDE_CODE_SESSION_ID.json` —
-   never `$AUTONOMIC_MODE`: the top may be in autopilot by `/autopilot on` or a molt's lineage,
-   which the environment never shows, and a session whose environment says autopilot may have
-   been refused it. `autopilot` marks the child; anything else, a missing record included,
-   leaves `AUTONOMIC_MODE` unset. A manual seat writes neither file, so the two paths cost
-   nothing. An autopilot seat's scope is its brief; it gets no `/autopilot on`. Its first
-   permission ask, and the first after a clear, has nothing to judge and waits for a human, so
-   a seat meant to run unattended needs a `command:` whose permission mode does not ask first —
-   the operator's file, never a launch-time edit. `AUTONOMIC_BELL` is never set: the pain file
-   reaches the parent. The top's rotation successor takes `AUTONOMIC_MODE` and
-   `AUTONOMIC_LEDGER` by the same rule and no pain path, since it has no parent; the operator's
-   first top and a dsh seat take none. A respawn reads the launcher's mode again.
-   **A molt is not a launch.** The top's in-place molt (`lifecycle.md`, "Where molt runs")
-   keeps the pane's process and its exports, so its `orchestrator` marking stands across the
-   clear, and seat-mods reads the role from the environment on every tool call. The
-   status-line check belongs to the launch read; a later read that finds no `seat: <role>`
-   after a molt is not a missing marking. A respawned child is a launch: this step runs
-   again in full — a fresh export naming its new `MOLT_STATUS_PATH`, its `SEAT_MODS_ALLOW`
-   rebuilt, and the status-line read, a missing `seat: <role>` recorded as at any launch.
+   choice and keep to the same characters. The launcher's mode is autonomic's live mode, read at each
+   launch — `printf %s "$AUTONOMIC_EFFECTIVE_MODE"`, set by autonomic 0.4.0 on every mode change. It is
+   never `$AUTONOMIC_MODE`, the spawn's input: the top may be in autopilot by `/autopilot on` or a
+   molt's lineage, which that never shows, or may have been refused it. It is never the record file
+   either: one that failed to write can still read `autopilot` after a fall to manual. `autopilot`
+   marks the child; anything else, unset included, leaves `AUTONOMIC_MODE` unset. A manual seat writes
+   neither file, so the two paths cost nothing. An autopilot seat's scope is its brief; it gets no
+   `/autopilot on`. Its first permission ask, and the first after a clear, has nothing to judge and
+   waits for a human, so a seat meant to run unattended needs a `command:` whose permission mode does
+   not ask first — the operator's file, never a launch-time edit. `AUTONOMIC_BELL` is never set: the
+   pain file reaches the parent. The top's rotation successor takes `AUTONOMIC_MODE` and
+   `AUTONOMIC_LEDGER` by the same rule and no pain path, since it has no parent; the operator's first
+   top and a dsh seat take none. A respawn reads the launcher's mode again. **A molt is not a launch.**
+   The top's in-place molt (`lifecycle.md`, "Where molt runs") keeps the pane's process and its
+   exports, so its `orchestrator` marking stands across the clear, and seat-mods reads the role from
+   the environment on every tool call. The status-line check belongs to the launch read; a later read
+   that finds no `seat: <role>` after a molt is not a missing marking. A respawned child is a launch:
+   this step runs again in full — a fresh export naming its new `MOLT_STATUS_PATH`, its
+   `SEAT_MODS_ALLOW` rebuilt, and the status-line read, a missing `seat: <role>` recorded as at any
+   launch.
 3. **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry —
    re-running a **launch** command into a pane whose foreground process is already that
    agent's TUI delivers its line as a prompt, the mechanism the undetected seat's one-line

@@ -184,7 +184,9 @@ hands off at its next boundary, and molt never clears it; only the top molts in 
 (`references/lifecycle.md`, "Where molt runs"). Install molt 0.2.0 and herdr-crew 0.2.8
 together. Since 0.2.9, the same launch export carries `autonomic`'s three variables: every
 Claude Code child (autonomic is a Claude Code mod) writes the run's one ledger and its own pain file beside its report, and runs in
-autopilot only when its launcher does (`references/herdr-mechanics.md` step 2). That hook is the only deterministic code a run executes: a run
+autopilot only when its launcher does (`references/herdr-mechanics.md` step 2). Since 0.2.10, the
+launcher's mode is autonomic's live `AUTONOMIC_EFFECTIVE_MODE`, never its record file, which can be
+stale after a failed write. That hook is the only deterministic code a run executes: a run
 has **no `lib/`, no state directory, no parser** — `agents.md` and `roles.md` are read as
 prose and nothing parses them. The suites and the eval harness under `tests/` are
 build-and-test tooling; the plugin never runs them on a user's path.
@@ -219,6 +221,8 @@ unmodified by this release and stays installed until the fleet has moved.
 - The **`herdr-dagr`** plugin's `dagr` binary on PATH, to create and lint the run's
   `run.json`: dagr's producer contract resolves that validator *before* anything is
   written, and with none available the run starts no run file — not an unvalidated one.
+- autonomic 0.4.0 for autopilot children: an older autonomic sets no `AUTONOMIC_EFFECTIVE_MODE`, so
+  every child starts manual.
 - `jq` on PATH for the context-ceiling hook; without it the hook reports the figure as
   unavailable.
 - The agents named in `~/.claude/herdr-crew/agents.md` resolvable where their pane

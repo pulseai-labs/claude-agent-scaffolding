@@ -216,10 +216,14 @@ pin "$REF" 'MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger>
   "step 2's quoted guarded export carries the autonomic variables" flat
 pin "$REF" '`AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot' \
   "autopilot is passed down, never set on a manual launcher's child" flat
-pin "$REF" 'jq -r .mode ~/.claude/state/autonomic/sessions/$CLAUDE_CODE_SESSION_ID.json' \
-  "the launcher's mode is read from its own record" flat
-pin "$REF" 'never `$AUTONOMIC_MODE`' "the mode is never read from the environment" flat
-pin "$REF" 'a missing record included' "a missing record reads as manual" flat
+pin "$REF" 'printf %s "$AUTONOMIC_EFFECTIVE_MODE"' \
+  "the launcher's mode is autonomic's live mode (0.2.10)" flat
+pin "$REF" 'never `$AUTONOMIC_MODE`' "the mode is never read from the spawn's input" flat
+pin "$REF" 'never the record file' "the record file is never the signal (it can be stale)" flat
+pin "$REF" 'unset included' "an unset signal marks no child (D2)" flat
+c="$(count_of "$REF" 'jq -r .mode' flat)"
+if [ "$c" -eq 0 ]; then pass "the record read is gone (0.2.10)"
+else fail "the record read is gone (0.2.10)" "$c left"; fi
 pin "$REF" 'an **absolute** path outside every worktree' "the ledger is absolute and outside every worktree" flat
 pin "$REF" 'the launcher'"'"'s own `$AUTONOMIC_LEDGER` when set, else `<run dir>/autonomic-ledger.md`' \
   "one ledger per run, inherited down the tree" flat

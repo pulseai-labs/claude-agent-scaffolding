@@ -2,6 +2,23 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.10
+
+**A child's autopilot follows the launcher's live mode** (autonomic 0.4.0, PR #694). Install
+with autonomic 0.4.0.
+
+- **The launcher's mode** (`herdr-mechanics.md` step 2) is read from the launcher's own shell,
+  `printf %s "$AUTONOMIC_EFFECTIVE_MODE"`, which autonomic 0.4.0 sets on every mode change. It
+  is never the record file (0.2.9 read `jq -r .mode` from it): a record that failed to write can
+  still read `autopilot` after autonomic fell back to manual. It is still never
+  `$AUTONOMIC_MODE`, the spawn's input. `autopilot` marks the child; anything else, unset
+  included, does not.
+- **Known limit:** under an autonomic older than 0.4.0 the variable is unset, so every child
+  starts manual.
+- **Known limit:** autonomic 0.4.0 treats the variable as advisory under host failures: a host
+  that refuses an env call while autonomic resolves or publishes the mode can leave the previous
+  value (autonomic PR #694 Known limits).
+
 ## 0.2.9
 
 **Seats carry autonomic's variables, and a spine cut mid-round is resumed** (autonomic
