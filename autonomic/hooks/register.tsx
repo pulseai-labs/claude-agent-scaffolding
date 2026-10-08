@@ -435,14 +435,20 @@ export const register: Register = (on, options) => {
   on('tool.call', async ($, e, next) => {
     if (e.agentId !== undefined) return next(e)
     if (e.tool === 'AskUserQuestion') {
+      const questions = (e as unknown as { questions?: Question[] }).questions ?? []
       try {
-        const questions = (e as unknown as { questions?: Question[] }).questions ?? []
         const result = await askReflex($, questions)
-        if (result !== undefined) return { result: { questions: result.questions, answers: result.answers }, context: [result.note] } as never
+        if (result !== undefined) {
+          // An answer is a same-turn result the permission fork must see (final review I1).
+          try { note(await $.session.id(), toolEntry(e.tool, { questions }, { text: `autonomic answered: ${JSON.stringify(result.answers)}` })) } catch {}
+          return { result: { questions: result.questions, answers: result.answers }, context: [result.note] } as never
+        }
       } catch (err) {
         await log($, `ask reflex error ${String(err)}`)
       }
-      return next(e)
+      const r = await next(e)
+      try { note(await $.session.id(), toolEntry(e.tool, { questions }, r as { text?: string; deny?: string; isError?: true })) } catch {}
+      return r
     }
     const r = await next(e)
     try {

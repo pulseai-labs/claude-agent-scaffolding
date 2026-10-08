@@ -39,6 +39,8 @@ export function promptEntry(origin: Origin, text: string): string {
 function tail(text: string | undefined): string {
   if (text === undefined || text.trim() === '') return '(no text)'
   const t = redact(end(text)).replace(/\s+/g, ' ').trim()
+  // The window was one word, and the edge cut it: say so rather than show a bare "result:".
+  if (t === '') return '(one long token)'
   return t.length > TOOL_TAIL_CHARS ? `…${t.slice(-TOOL_TAIL_CHARS)}` : t
 }
 

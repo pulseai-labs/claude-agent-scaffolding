@@ -44,6 +44,9 @@ describe('the turn digest (0.4.0 spec §3.2)', () => {
     const e = toolEntry('Bash', { command: 'cat t' }, { text: `ghp_${'a'.repeat(400)}` })
     expect(e).not.toContain('aaaaaaaaaa')
   })
+  test('a result that is one long token says so, not a bare "result:" (final review M1)', () => {
+    expect(toolEntry('Bash', { command: 'ls' }, { text: 'a'.repeat(5000) })).toBe('tool Bash ls → result: (one long token)')
+  })
   test('the last 12 entries are kept, oldest dropped', () => {
     let d: string[] = []
     for (let i = 0; i < 20; i++) d = pushEntry(d, `e${i}`)
@@ -87,6 +90,22 @@ describe('the digest reaches the forks, and nothing else (0.4.0 spec §3.2)', ()
     expect(p).toContain('<recent>')
     expect(p).toContain('Gate approved; use the UTC timestamp.')
     expect(p).toContain('9847ccd')
+  })
+  test("the operator's answer to a question enters the permission fork prompt (final review I1)", async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(allow({ covered: false, reason: 'open' }))
+    await $.tool.call({ tool: 'AskUserQuestion', questions: [{ question: 'Push now?', header: 'Push', options: [{ label: 'Push', description: '' }], multiSelect: false }] } as never)
+    w.forks.push(allow({ decision: 'allow', reason: 'r' }))
+    await $.tool.check({ tool: 'Bash', input: { command: 'git push' } } as never)
+    expect(w.forkPrompts.at(-1) ?? '').toContain('tool AskUserQuestion {questions} → result: the operator answered')
+  })
+  test("autonomic's own answer to a question enters the permission fork prompt (final review I1)", async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(allow({ covered: true, answers: { 'Push now?': 'Push' }, reason: 'plan step 5' }))
+    await $.tool.call({ tool: 'AskUserQuestion', questions: [{ question: 'Push now?', header: 'Push', options: [{ label: 'Push', description: '' }], multiSelect: false }] } as never)
+    w.forks.push(allow({ decision: 'allow', reason: 'r' }))
+    await $.tool.check({ tool: 'Bash', input: { command: 'git push' } } as never)
+    expect(w.forkPrompts.at(-1) ?? '').toContain('tool AskUserQuestion {questions} → result: autonomic answered: {"Push now?":"Push"}')
   })
   test('a dropped prompt and a subagent tool call do not enter', async ($, on) => {
     const w = world(on, { env: AP })
