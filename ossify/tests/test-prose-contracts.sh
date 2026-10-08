@@ -940,6 +940,30 @@ t_capture _e_run "$_E_WS3"
 t_assert_rc 0 "(e) R3: an unresolvable state route does not abort the drift check under strict mode"
 t_assert_contains "$T_OUT" "could not read" "(e) R3 ... it reaches its refusal arm and says which half it could not read"
 
+# 1.14.2 A: locale pin RAN only after constructing the Turkish locale.
+_A_LOCALE="$_PC_TMP/locales"; mkdir -p "$_A_LOCALE"
+if localedef -i tr_TR -f UTF-8 "$_A_LOCALE/tr_TR.UTF-8" >"$_PC_TMP/localedef.log" 2>&1; then
+  echo 'A2 locale pin RAN: tr_TR.UTF-8 (localedef)'
+  jq '.bones = [{adr:"adr-i",title:"locale",touch:["x"]}]' "$_E_WS/.ossify/project-state.json" > "$_E_WS/locale.json"
+  mv "$_E_WS/locale.json" "$_E_WS/.ossify/project-state.json"
+  _e_spec "$_E_WS"
+  t_capture env LOCPATH="$_A_LOCALE" LC_ALL=tr_TR.UTF-8 oss_bin="$OSS" bash -c '
+    set -euo pipefail
+    cd "$1"; . "$2"
+    printf "CALLER_LOCALE=%s\n" "$LC_ALL"
+  ' fresh "$_E_WS" "$_E_SV"
+  printf 'A2 RED/GREEN: %s\n' "$T_OUT"
+  t_assert_rc 0 "A1 drift fence runs alone in a fresh shell under Turkish locale"
+  t_assert_contains "$T_OUT" 'registry entry with no index row: adr-i' "A2 fail line names the original identifier under Turkish locale"
+  t_assert_contains "$T_OUT" 'CALLER_LOCALE=tr_TR.UTF-8' "A1 locale remains scoped to the fence"
+  _e_spec "$_E_WS" '| ADR-I | paired |'
+  t_capture env LOCPATH="$_A_LOCALE" LC_ALL=tr_TR.UTF-8 oss_bin="$OSS" bash -c 'set -euo pipefail; cd "$1"; . "$2"' fresh "$_E_WS" "$_E_SV"
+  t_assert_contains "$T_OUT" '1 entries, 1 rows' "A1 Turkish clean case-insensitive pair control"
+else
+  T_FAIL=$((T_FAIL+1)); echo 'FAIL: A2 locale pin unavailable: localedef could not build tr_TR.UTF-8'
+  cat "$_PC_TMP/localedef.log"
+fi
+
 # --- phase (f): §3's ADR numbering scan must read an adopted series (#301) ----
 #
 # The scan matched `^adr-` and `^NNNN-` only. On an adopted series in the other

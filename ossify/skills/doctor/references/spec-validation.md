@@ -96,6 +96,9 @@ an invalid index cell is a finding. An empty registry and header-only table
 are a clean pair with zero entries and zero rows.
 
 ```bash
+(
+# Locale and variables are private to this read-out; later surfaces consume stdout.
+export LC_ALL=C
 # Both halves are pinned to THIS directory's manifest: `sv_state` is the routed
 # state, never $OSS_STATE_FILE (see the note below), and it is deliberately NOT
 # named `$sf` - state-inspection.md §2 owns that name for the override-first
@@ -143,7 +146,7 @@ else
     # One identifier grammar for both halves; normalization is only for the
     # comparison. Keep the source spelling for findings and retain duplicates.
     reg_values="$(printf '%s\n' "$reg_raw" | sed -n 's/^OK //p')"
-    reg_all="$(printf '%s\n' "$reg_values" | tr '[:lower:]' '[:upper:]' | sort)"
+    reg_all="$(printf '%s\n' "$reg_values" | awk '{print toupper($0)}' | sort)"
     reg="$(printf '%s\n' "$reg_all" | sort -u)"
     reg_dupes="$(printf '%s\n' "$reg_all" | grep -v '^$' | uniq -d)" || reg_dupes=""
     # Buffer one row: ONLY the row immediately before a full delimiter row is
@@ -177,8 +180,8 @@ else
     idx_rows="$(printf '%s\n' "$idx_all" | sed -n 's/^OK //p')" || idx_rows=""
     bad_rows="$(printf '%s\n' "$idx_all" | sed -n 's/^BAD //p')" || bad_rows=""
     adr_headers="$(printf '%s\n' "$idx_all" | sed -n 's/^HEADER //p')" || adr_headers=""
-    idx="$(printf '%s\n' "$idx_rows" | tr '[:lower:]' '[:upper:]' | sort -u)" || idx=""
-    dupes="$(printf '%s\n' "$idx_rows" | tr '[:lower:]' '[:upper:]' | grep -v '^$' | sort | uniq -d)" || dupes=""
+    idx="$(printf '%s\n' "$idx_rows" | awk '{print toupper($0)}' | sort -u)" || idx=""
+    dupes="$(printf '%s\n' "$idx_rows" | awk '{print toupper($0)}' | grep -v '^$' | sort | uniq -d)" || dupes=""
     # comm over the two variables - no temp files to create, leak or clean. An
     # empty side is handled explicitly, because comm would count a lone blank
     # line as a difference and manufacture a phantom id.
@@ -207,6 +210,7 @@ else
     fi
   fi
 fi
+)
 ```
 
 **Pass the state path explicitly.** A bare `"$oss_bin" get` honours an exported
