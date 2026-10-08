@@ -1,5 +1,5 @@
 import type { Register } from 'claude-code'
-import { parseRole, parseAllow, bashRules, commitMessageFiles, placeOf, decide, invalidText, statusText } from './rules'
+import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
 import type { RoleState } from './rules'
 
 async function roleOf($: any): Promise<RoleState> {
@@ -36,6 +36,21 @@ async function allowOf($: any): Promise<string[]> {
   return real.filter((dir): dir is string => dir !== undefined)
 }
 
+// Resolve rm's parent through links, keeping the final component literal: rm
+// unlinks a terminal symlink. A trailing slash (or . / ..) follows the directory.
+async function removalPath($: any, operand: string, cwd: string, home: string | undefined, glob: boolean): Promise<string | undefined> {
+  let path = operand
+  if (path === '~' || path.startsWith('~/')) {
+    if (home === undefined || !home.startsWith('/')) return undefined
+    path = (home.replace(/\/$/, '') + path.slice(1)) || '/'
+  }
+  if (!path.startsWith('/')) path = `${cwd}/${path}`
+  if (glob || /\/(?:\.|\.\.)?$/.test(path)) return realOf($, path)
+  const cut = path.lastIndexOf('/')
+  const parent = await realOf($, cut === 0 ? '/' : path.slice(0, cut))
+  return parent === undefined ? undefined : `${parent.replace(/\/$/, '')}/${path.slice(cut + 1)}`
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     $.ui.status(statusText(await roleOf($)))
@@ -49,9 +64,23 @@ export const register: Register = on => {
     const role = state.role // 'on' or 'default'
 
     if (e.tool === 'Bash') {
-      const texts = await Promise.all(commitMessageFiles(e.command).map(file => $.fs.read(file).catch(() => '')))
-      const text = texts.join('\n')
-      const deny = decide(role, { kind: 'bash', rules: bashRules(e.command, text) })
+      let deny: string | undefined
+      try {
+        const texts = await Promise.all(commitMessageFiles(e.command).map(file => $.fs.read(file).catch(() => '')))
+        const text = texts.join('\n')
+        const operands = rmTargets(e.command)
+        const removals = []
+        if (operands.length > 0) {
+          const [cwd, home, root, allow] = await Promise.all([$.session.cwd(), $.env.get('HOME'), worktreeOf($), allowOf($)])
+          for (const operand of operands) {
+            const target = operand.path === undefined ? undefined : await removalPath($, operand.path, cwd, home, operand.glob)
+            removals.push(removalOf(target, root, allow, operand.glob))
+          }
+        }
+        deny = decide(role, { kind: 'bash', rules: bashRules(e.command, text), removals })
+      } catch {
+        return { deny: uncheckedRmText(role) }
+      }
       return deny === undefined ? next(e) : { deny }
     }
 

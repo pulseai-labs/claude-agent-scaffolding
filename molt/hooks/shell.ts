@@ -10,7 +10,7 @@ const COMMANDS = /;|&&|\|\||\||\n|\(|\)/
 // name `git merge` or `-n`. Each is swapped for a numbered marker before matching,
 // and the trailer check expands the markers in the commit's own segment.
 // A heredoc opener; its delimiter is any quoted word, or a bare word.
-const HEREDOC = /<<(-?)[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|([^\s;&|<>()'"]+))/g
+const HEREDOC = /(?<!<)<<(?!<)(-?)[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|([^\s;&|<>()'"]+))/g
 
 const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/g
 
@@ -62,7 +62,7 @@ function commandOf(tokens: readonly string[]): { name: string; args: string[] } 
   for (;;) {
     const token = tokens[i]
     if (token === undefined) return undefined
-    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token) || WRAPPERS.has(token)) i += 1
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token) || WRAPPERS.has(token.replace(/^.*\//, ''))) i += 1
     else return { name: token.replace(/^.*\//, ''), args: tokens.slice(i + 1) }
   }
 }

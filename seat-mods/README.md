@@ -85,6 +85,9 @@ Each is a `tool.call` deny on Bash, Edit or Write.
 | `--no-verify` on any git command (and `git commit -n`) | deny | deny | deny |
 | A commit message with `Co-Authored-By:` or `🤖 Generated with` — on the command line, in a heredoc, or in the `-F` / `--file` message file | deny | deny | deny |
 | Edit or Write outside the worktree and outside every `SEAT_MODS_ALLOW` directory | deny | deny | deny |
+| `rm` outside writable places, with unresolvable operands, or removing a writable root or its ancestor | deny | deny | deny |
+| `rm` inside the worktree (below its root) | allow | allow | deny |
+| `rm` inside a `SEAT_MODS_ALLOW` directory (below its root) | allow | allow | allow |
 | `git commit`, `git push`, `gh pr create` | allow | deny | deny |
 | Edit or Write inside the worktree | allow | allow | deny |
 | Edit or Write inside a `SEAT_MODS_ALLOW` directory | allow | allow | allow |
@@ -93,6 +96,34 @@ The worktree is the git top level of the session's working directory (outside a 
 the working directory itself). Paths are compared after the file system resolves them, so `..` and
 symbolic links land where they really point; a file in folders that do not exist yet is placed by
 its nearest existing folder.
+
+`rm` checks operands of commands it recognises, including operands beginning with `-` after `--`.
+Relative operands
+use the live shell directory from `$.session.cwd()` at the call. This was measured on Claude Code
+2.1.294 on 2026-10-08: after a Bash `cd` into a project subdirectory, the next call's hook and
+`pwd` both reported that subdirectory; after Claude reset an outside-project `cd`, both reported
+the project directory. An earlier recognised `cd`, `pushd` or `popd` in the **same** call makes relative
+operands unresolvable and denies them; absolute operands remain eligible. `worktreeOf()` keeps
+its existing behavior: the worktree is derived from that live directory.
+
+Operands containing active variables, parameter expansions or command substitutions, and
+`~user`, `~+` and `~-` operands, cannot be resolved and are denied, including `rm -rf "$OLDPWD"`.
+Single-quoted text and escaped characters are literal. Any other `$` in an operand is treated as
+unresolvable, including an inert dollar sign. Bare `~` and `~/...` use `HOME`. A glob is placed by
+the directory of its literal
+prefix: `/tmp/tmp.*` is outside, while `build/*.o` is placed in the live directory's `build`.
+The resolver follows links in parent directories, but keeps a terminal link literal because
+`rm` removes the link itself; a trailing `/` follows the directory. A writable root itself or
+its ancestor cannot be removed. A glob whose literal-prefix directory has a writable root
+strictly below it is denied, since it could match that root; a glob at the root is eligible when
+no writable root lies below it. Unquoted `{` and a glob suffix containing a `..` component are
+unresolvable and denied.
+A glob component starting with `.` and containing `*`, `?` or `[` is unresolvable and denied.
+Redirections and their destinations are excluded from `rm` operands,
+and a single `&` separates commands. The `rm` matcher also skips the head words `if`, `then`,
+`elif`, `else`, `do`, `while`, `until`, `!`, `{`, `(`, `time` and `builtin`; `builtin cd` and `\cd`
+count as directory changes. A parsing or resolution exception denies the Bash call as a command
+that could not be checked; forged self-referencing or excessively nested markers are rejected.
 
 A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report it instead.`
 
@@ -104,11 +135,24 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   `VAR=value` and `sudo`, `env`, `command`, `exec`, `nohup` or `time`; so `echo git merge` is not a
   merge, and neither are `xargs git push --force`, `bash -c "git push -f"`, `g""it push`, or a
   wrapper with its own options (`env -i git merge`, `sudo -u u git push -f`).
-- **Unparsed shell forms pass:** a single `&` list operator, bundled short flags (`-fqu`),
+- **Unparsed shell forms pass:** a single `&` list operator on non-`rm` rails, bundled short flags (`-fqu`),
   abbreviated long options (`--mir`), several heredocs on one command, a heredoc example inside a
   quoted message, value-taking git globals (`--git-dir x`) and quoted subcommands or flags
   (`git "merge"`). A trailer that opens an `-m` message, comes from `--trailer`, or follows a
   backslash-newline inside single quotes, also passes.
+- Backticks and quoted `$(rm …)` can escape recognition; bare `$(rm …)` is checked by the parentheses splitter.
+- Shell options changed in the same call (`shopt`, e.g. `extglob`, `dotglob`, `nullglob`) are not modelled beyond the `**` and dot-component denials.
+- `**` in an rm glob operand is unresolvable and denies; quoted literal `**` stays literal.
+- An unexecuted shell function body (`cleanup() { rm …; }`) is checked as if it runs and may deny.
+- A heredoc given as rm's input (`rm -i x <<EOF`) is read as an extra operand and denied.
+- A named descriptor before the command (`{log}>file rm …`) hides the rm.
+- One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
+- A double-quoted `<<`, or commands after a heredoc opener or a `#` comment on the same line, can hide commands from the rail.
+- Paths changed earlier in the same call (`ln -s`, `mv`, `mkdir` before `rm`) are checked against the filesystem as it stands before the call runs.
+- Glob matches are not enumerated: a matched parent symlink can lead outside writable places, as in `rm -rf <worktree>/*/node_modules`.
+- `$` outside literal quoting/escaping and leading `~+`/`~-` are unresolvable, even when Bash could resolve them.
+- Quoted command names such as `"cd"` are not recognised as directory changes.
+- `POSIXLY_CORRECT` operand ordering and a backslash-newline inside double quotes are not modelled.
 - **The guarded launch needs a POSIX shell in the seat's pane.** herdr-crew sets the variables
   with `export`; a pane whose shell is Nushell leaves them unset, and the session runs under the
   default implementer rails — the status line reads `seat: implementer (default: SEAT_MODS_ROLE
@@ -123,8 +167,12 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 - **A `-F` message file is read from the session's working directory.** A relative path after a
   `cd`, or a path in a shell variable, is not found and reads as empty, so a trailer in it passes.
   The repository's commit-msg hook remains the backstop.
-- **File writes made through Bash** (`cat >`, `sed -i`, `mv`) are not path-checked. Only the Edit
-  and Write tools are.
+- **The Bash placement rail covers only `rm`.** `rmdir`, `unlink`, `find -delete`, `git rm`, `git clean`,
+  `xargs rm`, `bash -c '...'`, `mv` over a file, and other Bash writes such as `cat >` and `sed -i`
+  remain outside it. These rails stop mistakes, not an adversary; precise shell parsing remains
+  out of scope. An earlier recognised same-call `cd`, `pushd` or `popd` conservatively denies relative `rm`
+  operands even if that directory change fails. Cross-call directory changes use the live cwd
+  measured above.
 - **A default-guarded session writes only inside the worktree and the `SEAT_MODS_ALLOW`
   directories** — and outside a git repository the worktree is its working directory — so Claude
   Code's own writes outside them, such as memory files under `~/.claude/projects/*/memory` and
@@ -134,7 +182,8 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   spawn — a non-zero exit, git missing, a rejected spawn — makes the session's working directory
   the worktree, so a default-guarded session whose git spawn fails gets everything under its cwd
   writable. Pre-existing behaviour, now reachable by more sessions.
-- **The guards fail open.** If the module does not load, or a hook throws, Claude Code skips it and
+- **The runtime can fail open.** If the module does not load, or a hook throws outside the guarded
+  Bash check, Claude Code skips it and
   the seat runs unguarded. The sign is a missing `seat: <role>` in the status line; the debug log
   (`claude --debug`) names the plugin and the reason. Claude Code also holds installed plugins'
   hooks modules behind a rollout flag (`tengu_plugin_hooks_modules`).
