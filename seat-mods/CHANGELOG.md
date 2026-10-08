@@ -26,6 +26,8 @@ All notable changes to the `seat-mods` plugin.
   `builtin` are recognised; `builtin cd` and `\cd` affect same-call relative operands. Parsing or
   resolution exceptions deny the Bash call, with self-reference/depth protection for markers.
 - Backticks and quoted `$(rm …)` can escape recognition; bare `$(rm …)` is checked by the parentheses splitter.
+- `**` in an rm glob operand is unresolvable and denies; quoted literal `**` stays literal.
+- An unexecuted shell function body (`cleanup() { rm …; }`) is checked as if it runs and may deny.
 - A heredoc given as rm's input (`rm -i x <<EOF`) is read as an extra operand and denied.
 - A named descriptor before the command (`{log}>file rm …`) hides the rm.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.

@@ -459,3 +459,19 @@ describe('close-out HOME root expansion', () => {
     expect((await $.tool.call({ tool: 'Bash', command: 'rm -f ~/x' })).deny).toBeDefined()
   })
 })
+
+describe('globstar root protection', () => {
+  test('implementer denies globstar beside ordinary glob and quoted literal controls', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /w/**' })).deny).toBeDefined()
+    expect((await $.tool.call({ tool: 'Bash', command: 'shopt -s globstar; rm -rf /w/**' })).deny).toBeDefined()
+    expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /w/build/*' })).deny).toBeUndefined()
+    expect((await $.tool.call({ tool: 'Bash', command: "rm -f '**'" })).deny).toBeUndefined()
+  })
+  test('reviewer denies allow-root globstar beside ordinary glob and quoted literal controls', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'reviewer', SEAT_MODS_ALLOW: '/reports' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /reports/**' })).deny).toBeDefined()
+    expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /reports/*' })).deny).toBeUndefined()
+    expect((await $.tool.call({ tool: 'Bash', command: "rm -f '/reports/**'" })).deny).toBeUndefined()
+  })
+})

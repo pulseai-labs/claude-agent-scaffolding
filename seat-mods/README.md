@@ -139,6 +139,8 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   (`git "merge"`). A trailer that opens an `-m` message, comes from `--trailer`, or follows a
   backslash-newline inside single quotes, also passes.
 - Backticks and quoted `$(rm …)` can escape recognition; bare `$(rm …)` is checked by the parentheses splitter.
+- `**` in an rm glob operand is unresolvable and denies; quoted literal `**` stays literal.
+- An unexecuted shell function body (`cleanup() { rm …; }`) is checked as if it runs and may deny.
 - A heredoc given as rm's input (`rm -i x <<EOF`) is read as an extra operand and denied.
 - A named descriptor before the command (`{log}>file rm …`) hides the rm.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
