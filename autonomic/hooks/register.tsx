@@ -23,6 +23,7 @@ import type { Question } from './verdict'
 import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields } from './floor'
 import { turnEndPrompt } from './prompts'
 import { parseTurn } from './verdict'
+import { promptEntry, pushEntry, renderDigest, toolEntry } from './digest'
 
 // autonomic: autopilot reflexes (spec §3). Module variables survive /clear; the session
 // record file carries the mode across a molt by way of molt's lineage file.
@@ -37,6 +38,9 @@ const live = new Map<string, Live>()       // each session's resolved record
 const pushes = new Map<string, number>()   // covered or stalled turn ends in a row with no change
 const changed = new Set<string>()          // sessions that changed something since their last turn end
 const announced = new Set<string>()        // sessions whose carried scope has been announced
+const digests = new Map<string, string[]>()   // each session's turn digest (0.4.0 spec §3.2), memory only
+function note(id: string, entry: string): void { digests.set(id, pushEntry(digests.get(id) ?? [], entry)) }
+function digestOf(id: string): string { return renderDigest(digests.get(id) ?? []) }
 const USAGE_TEXT = 'usage: /autopilot on [scope doc …] | off | status'
 
 async function home($: Engine): Promise<string> {
@@ -306,7 +310,7 @@ async function askReflex($: Engine, questions: readonly Question[]): Promise<{ q
     await pain($, id, 'question for you', `${questions[0]?.question ?? 'a question'} (free text)`)
     return undefined
   }
-  const j = await judge($, 'ask', askPrompt(questions, (await policyText($)) ?? ''), t => parseAsk(t, questions))
+  const j = await judge($, 'ask', askPrompt(questions, (await policyText($)) ?? '', digestOf(id)), t => parseAsk(t, questions))
   if ('v' in j && j.v.covered) {
     const { answers, reason } = j.v
     const time = new Date().toISOString()
@@ -386,10 +390,10 @@ export const register: Register = (on, options) => {
     } catch (err) {
       await log($, `prompt.submit error ${String(err)}`)
     }
-    if (context.length === 0) return next(e)
-    const r = await next({ ...e, context: [...(e.context ?? []), ...context] })
+    const r = await next(context.length === 0 ? e : { ...e, context: [...(e.context ?? []), ...context] })
     // A prompt refused beneath autonomic carried no scope: the next prompt that enters does.
     if (announcing !== undefined && r.drop === undefined) announced.add(announcing)
+    try { if (r.drop === undefined) note(await $.session.id(), promptEntry(e.origin as { kind: string; name?: string }, r.text)) } catch {}
     return r
   })
 
@@ -441,6 +445,10 @@ export const register: Register = (on, options) => {
       return next(e)
     }
     const r = await next(e)
+    try {
+      const { tool, tool_use_id, consent, agentId, agent, ...input } = e as unknown as Record<string, unknown>
+      note(await $.session.id(), toolEntry(e.tool, input, r as { text?: string; deny?: string; isError?: true }))
+    } catch {}
     try {
       if (r.deny === undefined && r.isError === undefined && r.isReadOnly !== true && !READ_ONLY.has(e.tool)) changed.add(await $.session.id())
     } catch {}
@@ -580,7 +588,7 @@ export const register: Register = (on, options) => {
         await pain($, id, 'permission for you', `${e.tool} (input too long to judge)`)
         return r
       }
-      const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? ''), parsePermission)
+      const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? '', digestOf(id)), parsePermission)
       if ('v' in j && j.v.decision === 'allow') {
         if (await record($, id, 'permission', `${e.tool}: ${inputShape(e.input)}`, 'allow', j.v.reason, j.usage))
           return { ...r, decision: 'allow', reason: `autonomic: ${j.v.reason}` }

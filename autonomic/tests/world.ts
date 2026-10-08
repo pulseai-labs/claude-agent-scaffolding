@@ -25,6 +25,7 @@ export type World = {
   sections: Array<{ id: string; text: string; scope: 'shared' | 'session' }>
   asked: number                // AskUserQuestion calls that reached the bottom: the operator
   toolDeny?: string            // tool.call beneath autonomic denies with this text
+  toolResultText?: string      // the text a non-Ask tool.call result carries
   failCwd?: boolean            // session.cwd throws (the host cannot answer)
   failAppend?: RegExp          // an append to a matching path fails
   appendsLeft?: number         // appends that still succeed; the next ones fail
@@ -121,7 +122,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   on('tool.call', (_$, e) => {
     if (e.tool === 'AskUserQuestion') { w.asked += 1; return { result: 'the operator answered', text: 'the operator answered' } as never }
     if (w.toolDeny !== undefined) return { deny: w.toolDeny } as never
-    return (w.readOnly ? { result: 'ran', text: 'ok', isReadOnly: true } : { result: 'ran', text: 'ok' }) as never
+    return (w.readOnly ? { result: 'ran', text: w.toolResultText ?? 'ok', isReadOnly: true } : { result: 'ran', text: w.toolResultText ?? 'ok' }) as never
   })
   on('ui.toast', (_$, e) => { w.toasts.push(e.text); return { value: undefined } as never })
   on('ui.status', (_$, e) => { w.statuses.push(e.text); return { value: undefined } as never })

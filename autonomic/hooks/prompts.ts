@@ -31,7 +31,15 @@ ${tail}
 </reply>`
 }
 
-export function askPrompt(questions: readonly Question[], policy: string): string {
+export const LIVE_TASK = 'The task is the scope plus every later instruction the operator or the orchestrator gave this session; a later instruction can approve a gate or settle a choice the scope left open.'
+export const RECENT_RULE = 'The <recent> block is what happened in this session since its transcript above was sent. Judge with it: a later instruction from the operator or the orchestrator is part of the task, and a tool result is a fact.'
+
+// The turn digest (0.4.0 spec §3.2): only the permission and ask forks see it.
+function recentBlock(recent: string): string {
+  return recent.trim() === '' ? '' : `\n${RECENT_RULE}\n\n<recent>\n${recent}\n</recent>\n`
+}
+
+export function askPrompt(questions: readonly Question[], policy: string, recent = ''): string {
   const listed = questions.map(q => ({ question: q.question, options: (q.options ?? []).map(o => o.label), multiSelect: q.multiSelect === true }))
   return `autonomic question check. You are about to ask the operator the questions below. Decide whether the autopilot policy or this session's scope (its spec, plan, grill record or brief) already answers every one of them. Reply with one JSON object and nothing else.
 
@@ -40,10 +48,12 @@ export function askPrompt(questions: readonly Question[], policy: string): strin
 
 When in doubt, answer not covered.
 
+${LIVE_TASK}
+
 <policy>
 ${policy}
 </policy>
-
+${recentBlock(recent)}
 <questions>
 ${JSON.stringify(listed, null, 2)}
 </questions>`
@@ -54,17 +64,19 @@ export function shownInput(input: unknown): string {
   try { return JSON.stringify(input, null, 2) ?? '' } catch { return String(input) }
 }
 
-export function permissionPrompt(tool: string, input: unknown, policy: string): string {
+export function permissionPrompt(tool: string, input: unknown, policy: string, recent = ''): string {
   let shown = shownInput(input)
   if (shown.length > MAX_INPUT) shown = `${shown.slice(0, MAX_INPUT)}… (cut)`
   return `autonomic permission check. The tool call below needs approval. Decide whether the autopilot policy's permission scope covers it, for the task this session is doing. Reply with one JSON object and nothing else: {"decision": "allow" | "ask", "reason": "<one line>"}.
 
 Answer "ask" for anything on the policy's pain list, for anything outside this session's own task, and whenever in doubt.
 
+${LIVE_TASK}
+
 <policy>
 ${policy}
 </policy>
-
+${recentBlock(recent)}
 <tool>${tool}</tool>
 <input>
 ${shown}
