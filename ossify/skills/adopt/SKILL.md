@@ -174,7 +174,8 @@ silent re-mark.
    reason, not a `touch_check` hit, which reports a bare `bone <adr>`. Collect
    every scanned ADR reference across every declared repo and compare the full
    set; **any reference appearing in two repos halts adoption**, naming each
-   colliding reference and the repos that hold it. The remedy is the operator's
+   colliding reference and the repos that hold it. Take repo names from the captured inventory
+   (`<repo-name><TAB><ADR-filename>`); no second scan is needed. The remedy is the operator's
    and it is one-time: renumber in the source repo so the project's references
    are distinct, then re-run `/adopt`. Do not renumber for them — an ADR
    filename is a shipped, cited artifact, and C2's rule that the checkout wins

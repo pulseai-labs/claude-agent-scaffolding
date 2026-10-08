@@ -1685,5 +1685,16 @@ _r=1; grep -Fq 'halt:branch-unknown' "$_RO" \
   && grep -Fq 'never reused for reattach, redispatch or merge' "$_RO" && _r=0
 _pin "$_r" "round-orchestration.md drops a fix-round-3 guard claim: the halt:branch-unknown row, the locked-holder clause, or the foreign-branch clause (L2/L3/L4)"
 
+# C: deterministic contract checks supplement, never replace, fresh LLM evals.
+_C_DIR="$HERE/eval/fixtures/adopt-multi-repo"
+_C03="$(cat "$_C_DIR/03-clean-two-repo-baseline-and-aggregated-adrs.md")"
+t_assert_contains "$_C03" 'ADR-0003-idempotency-key-on-charge-create.md' 'C1 fixture03 holds distinct references'
+_C06="$(cat "$_C_DIR/06-same-reference-in-two-repos-halts.md" 2>/dev/null)"
+t_assert_contains "$_C06" 'expected_outcome: halt' 'C2 fixture06 pins collision halt'
+t_assert_contains "$_C06" 'mints no bone' 'C2 collision answer key forbids mint'
+_CR="$(cat "$HERE/eval/rubrics/adopt-multi-repo.md")"
+t_assert_contains "$_CR" 'reference held by two repos halts' 'C3 rubric scores collision halt'
+t_assert_contains "$(cat "$SKILLS/adopt/SKILL.md")" 'repo names from the captured inventory' 'C4 collision names come from B7 inventory'
+
 rm -rf "$_PC_TMP"
 t_summary

@@ -19,7 +19,7 @@ Current HEAD is `git -C /Users/ops/repos/product-api rev-parse HEAD` →
 
 `/Users/ops/repos/product-api/docs/adr/` contains two files: `ADR-0001-hexagonal-core.md`
 and `ADR-0002-postgres-for-ledger-storage.md`. `/Users/ops/repos/svc-payments/docs/adr/`
-contains one file of its own: `ADR-0001-idempotency-key-on-charge-create.md` — a
+contains one file of its own: `ADR-0003-idempotency-key-on-charge-create.md` — a
 decision recorded in `svc-payments`' own ADR sequence, unrelated in content to
 canonical's `ADR-0001` and about a module (`src/payments/idempotency.rs`) that
 lives only in `svc-payments`.
