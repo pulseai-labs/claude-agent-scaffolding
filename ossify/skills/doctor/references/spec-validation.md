@@ -83,7 +83,7 @@ The complete input grammar is shared by both halves:
 
 | Input | Interpretation |
 |---|---|
-| registry value or data-row first cell | trim surrounding whitespace; the complete value must match case-insensitive `ADR-[A-Za-z0-9]+` (including `ADR-C`); embedded whitespace is invalid |
+| registry value or data-row first cell | trim surrounding whitespace; the complete value must follow bones-registry.md §3 part 1 (the ADR identifier authority) |
 | section-4 table delimiter row | every cell has one or more hyphens, optional alignment colons, and surrounding whitespace |
 | table row immediately before that delimiter | header; a valid ADR reference in its first cell is reported as a misplaced reference |
 | every other section-4 table row | data; an invalid first cell, including an empty one, is reported, never discarded |
@@ -96,6 +96,9 @@ an invalid index cell is a finding. An empty registry and header-only table
 are a clean pair with zero entries and zero rows.
 
 ```bash
+(
+# Locale and variables are private to this read-out; later surfaces consume stdout.
+export LC_ALL=C
 # Both halves are pinned to THIS directory's manifest: `sv_state` is the routed
 # state, never $OSS_STATE_FILE (see the note below), and it is deliberately NOT
 # named `$sf` - state-inspection.md §2 owns that name for the override-first
@@ -143,9 +146,10 @@ else
     # One identifier grammar for both halves; normalization is only for the
     # comparison. Keep the source spelling for findings and retain duplicates.
     reg_values="$(printf '%s\n' "$reg_raw" | sed -n 's/^OK //p')"
-    reg_all="$(printf '%s\n' "$reg_values" | tr '[:lower:]' '[:upper:]' | sort)"
+    sv_fold() { awk 'NF {print toupper($0)}'; }
+    reg_all="$(printf '%s\n' "$reg_values" | sv_fold | sort)"
     reg="$(printf '%s\n' "$reg_all" | sort -u)"
-    reg_dupes="$(printf '%s\n' "$reg_all" | grep -v '^$' | uniq -d)" || reg_dupes=""
+    reg_dupes="$(printf '%s\n' "$reg_all" | uniq -d)" || reg_dupes=""
     # Buffer one row: ONLY the row immediately before a full delimiter row is
     # the header. Report an ADR-shaped header; validate every other table row.
     idx_all="$(awk '/^##[[:space:]]*4[.:[:space:]]/ {f=1; next} /^##[[:space:]]/ {f=0} f' "$spec" \
@@ -177,8 +181,8 @@ else
     idx_rows="$(printf '%s\n' "$idx_all" | sed -n 's/^OK //p')" || idx_rows=""
     bad_rows="$(printf '%s\n' "$idx_all" | sed -n 's/^BAD //p')" || bad_rows=""
     adr_headers="$(printf '%s\n' "$idx_all" | sed -n 's/^HEADER //p')" || adr_headers=""
-    idx="$(printf '%s\n' "$idx_rows" | tr '[:lower:]' '[:upper:]' | sort -u)" || idx=""
-    dupes="$(printf '%s\n' "$idx_rows" | tr '[:lower:]' '[:upper:]' | grep -v '^$' | sort | uniq -d)" || dupes=""
+    idx="$(printf '%s\n' "$idx_rows" | sv_fold | sort -u)" || idx=""
+    dupes="$(printf '%s\n' "$idx_rows" | sv_fold | sort | uniq -d)" || dupes=""
     # comm over the two variables - no temp files to create, leak or clean. An
     # empty side is handled explicitly, because comm would count a lone blank
     # line as a difference and manufacture a phantom id.
@@ -207,6 +211,7 @@ else
     fi
   fi
 fi
+)
 ```
 
 **Pass the state path explicitly.** A bare `"$oss_bin" get` honours an exported
@@ -226,7 +231,7 @@ two directions apart: replace `ADR-0002`'s row with `ADR-9999` and *both*
 directions are present while `.bones | length` and section 4's row count still
 agree — a count comparison reports clean on exactly the drift this check exists
 to find. Ids are compared **case-insensitively** (both halves upper-cased) and as
-**complete values** — `ADR-[A-Za-z0-9]+`, never a numeric substring, so a legal
+**complete values** per bones-registry.md §3 part 1, never a numeric substring, so a legal
 non-numeric ref such as `ADR-C2` is compared too: an adopted series may spell an
 id in either case, and neither spelling is drift. A registry value that is not
 an ADR reference at all **refuses the comparison** (`skip:`) rather than being

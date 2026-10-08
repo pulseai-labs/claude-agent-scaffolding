@@ -11,6 +11,23 @@
 
 _oss_inv_git() { git --no-optional-locks "$@"; }
 
+# Safety rail shared by every branch-presence read: rc 0 present, 1 absent,
+# 2 unreadable. --exists distinguishes malformed refs from true absence;
+# --verify also establishes that a present ref's object can be read.
+_oss_inv_ref() { # $1=root $2=full ref
+  local rc=0
+  _oss_inv_git -C "$1" show-ref --exists "$2" 2>/dev/null || rc=$?
+  case "$rc" in
+    0) _oss_inv_git -C "$1" show-ref --verify --quiet "$2" 2>/dev/null || return 2 ;;
+    2) return 1 ;;
+    129) # Old Git: legacy rc 1 conflates absence and malformed loose refs.
+      rc=0
+      _oss_inv_git -C "$1" show-ref --verify --quiet "$2" 2>/dev/null || rc=$?
+      case "$rc" in 0|1) return "$rc" ;; *) return 2 ;; esac ;;
+    *) return 2 ;;
+  esac
+}
+
 # #673 G2/J1: the durable rejection record is read TRI-STATE, never as a bare
 # match. `grep -qF` says 0 (found) and 1 (no finding) - but 2 means it could
 # not read the file at all, and that must not degrade to the benign "no
@@ -42,18 +59,25 @@ oss_spine_inventory() { # $1=state $2=spine-id
   spine_dir="$matches"; slug="${spine_dir##*/}"; slug="${slug#$spine-}"
   spine_branch="$(oss_id_branch_name "$spine" "$slug")"
 
-  local repos repo root any=0 present head clean base verdict repo_por
+  local repos repo root any=0 present head clean base verdict repo_por base_present base_rc ref_rc repo_refs=""
   repos="$(jq -r --arg s "$spine" '[.work_items[] | select(.spine == $s and .status != "abandoned") | .target_repo] | unique[]' "$sf")" || return 2
   # Pass 1: does the spine branch exist in ANY hosting repo? That decides fresh.
   while IFS= read -r repo; do
     [ -n "$repo" ] || continue
-    root="$(_oss_repo_root "$repo" 2>/dev/null)" || continue
-    _oss_inv_git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" && any=1
+    ref_rc=2
+    if root="$(_oss_repo_root "$repo" 2>/dev/null)"; then
+      ref_rc=0; _oss_inv_ref "$root" "refs/heads/$spine_branch" || ref_rc=$?
+    fi
+    [ "$ref_rc" != 0 ] || any=1
+    # Retain each probe's status: a failed first-pass read cannot disappear
+    # behind a successful retry or be used to select the fresh arm.
+    repo_refs="${repo_refs}${repo}$(printf '\t')${ref_rc}
+"
   done <<EOF
 $repos
 EOF
-  # Pass 2: one row per hosting repo.
-  while IFS= read -r repo; do
+  # Pass 2: one row per hosting repo, using the captured first-pass probe.
+  while IFS="$(printf '\t')" read -r repo ref_rc; do
     [ -n "$repo" ] || continue
     if ! root="$(_oss_repo_root "$repo" 2>/dev/null)" || [ "$repo" = ai_workspace ]; then
       printf 'repo\t%s\thalt:undeclared\tbranch=-\thead=-\tclean=-\tbase=-\n' "$repo"; halt=1; continue
@@ -67,7 +91,11 @@ EOF
     if [ ! -d "$root" ]; then
       printf 'repo\t%s\thalt:unreadable\tbranch=-\thead=-\tclean=-\tbase=-\n' "$repo"; halt=1; continue
     fi
-    if _oss_inv_git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch"; then present=present; else present=absent; fi
+    case "$ref_rc" in
+      0) present=present ;;
+      1) present=absent ;;
+      *) printf 'repo\t%s\thalt:unreadable\tbranch=-\thead=-\tclean=-\tbase=-\n' "$repo"; halt=1; continue ;;
+    esac
     head="$(_oss_inv_git -C "$root" rev-parse --abbrev-ref HEAD 2>/dev/null)" || head="-"
     [ "$head" = HEAD ] && head=DETACHED
     # A FAILED status command HAS NOT ESTABLISHED clean (#673 A3). The pre-fix
@@ -79,7 +107,13 @@ EOF
     else
       printf 'repo\t%s\thalt:unreadable\tbranch=%s\thead=%s\tclean=-\tbase=-\n' "$repo" "$present" "$head"; halt=1; continue
     fi
-    base="$(oss_entity_get_spine_base "$sf" "$spine" "$repo" 2>/dev/null)" || base=unrecorded
+    base_rc=0; base_present=1
+    base="$(oss_entity_get_spine_base "$sf" "$spine" "$repo" 2>/dev/null)" || base_rc=$?
+    case "$base_rc" in
+      0) ;;
+      1) base_present=0; base=unrecorded ;;
+      *) printf 'repo\t%s\thalt:unreadable\tbranch=%s\thead=%s\tclean=%s\tbase=-\n' "$repo" "$present" "$head" "$clean"; halt=1; continue ;;
+    esac
     # #673 G3: a RECORDED base that no longer resolves must halt the read-out.
     # §2b runs its repo repairs before its item repairs, so with several repos
     # needing `cut-missing` it would create and check out the spine branch in
@@ -88,7 +122,7 @@ EOF
     # guarantee. `spine_base_set` validates the branch EXISTS at record time,
     # so a missing ref here means the base was renamed or deleted afterwards;
     # no repair may guess a replacement (that is the operator's call).
-    if [ "$base" != unrecorded ] && ! _oss_inv_git -C "$root" show-ref --verify --quiet "refs/heads/$base"; then
+    if [ "$base_present" = 1 ] && ! _oss_inv_git -C "$root" show-ref --verify --quiet "refs/heads/$base"; then
       printf 'repo\t%s\thalt:base-unresolved\tbranch=%s\thead=%s\tclean=%s\tbase=%s\n' "$repo" "$present" "$head" "$clean" "$base"
       halt=1; continue
     fi
@@ -97,14 +131,14 @@ EOF
     elif [ "$head" = DETACHED ]; then verdict=halt:detached
     elif [ "$present" = present ] && [ "$head" != "$spine_branch" ]; then verdict=halt:parked-elsewhere
     elif [ "$present" = present ]; then
-      if [ "$base" = unrecorded ]; then verdict=base-backfill; else verdict=ok; fi
-    elif [ "$base" = unrecorded ]; then verdict=halt:base-unknown
+      if [ "$base_present" = 0 ]; then verdict=base-backfill; else verdict=ok; fi
+    elif [ "$base_present" = 0 ]; then verdict=halt:base-unknown
     else verdict=cut-missing
     fi
     case "$verdict" in halt:*) halt=1 ;; esac
     printf 'repo\t%s\t%s\tbranch=%s\thead=%s\tclean=%s\tbase=%s\n' "$repo" "$verdict" "$present" "$head" "$clean" "$base"
   done <<EOF
-$repos
+$repo_refs
 EOF
   _oss_inv_items "$sf" "$spine" "$spine_dir" "$spine_branch" || halt=1
   [ "$halt" -eq 0 ] || return 3
@@ -116,7 +150,8 @@ EOF
 # still AT base_sha is trivially an ancestor and has merged nothing.
 _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if any halt
   local sf="$1" spine="$2" spine_dir="$3" sb="$4" halt=0
-  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys wt_common root_common held holders hp hl adopt_br brx feed feed_rc=0 gr descends foreign
+  local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys wt_common root_common held holders hp hl adopt_br brx feed feed_rc=0 gr descends foreign ref_rc
+  local cleanup_kept derived_root rec_root hp_root
   # The feed's own rc is caught, and each item renders inside a `try`/`catch`
   # (#673 A2): one unrenderable field used to collapse the WHOLE stream - the
   # shell read a partial feed with no error channel, the empty-field skip
@@ -159,7 +194,9 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
     wt=-; clean=-; hab=-; merged=-; report=no; route=""; descends=-
     held=0; brx=no
     [ -f "$spine_dir/work-$wi/report.md" ] && report=yes
-    if [ "$st" = abandoned ]; then route=skip
+    if [ "$st" = abandoned ]; then
+      if [ -n "$br" ] || [ -n "$wtp" ] || [ -n "$bs" ] || { [ "$dc" != absent ] && [ "$dc" != 0 ]; }; then route=halt:unclassified
+      else route=skip; fi
     elif [ "$repo" = ai_workspace ] || ! root="$(_oss_repo_root "$repo" 2>/dev/null)"; then route=halt:undeclared-repo
     else
       conv="$root/.worktrees/$wi"
@@ -214,7 +251,15 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
           fi
         fi
       fi
-      if [ -n "$br" ] && _oss_inv_git -C "$root" show-ref --verify --quiet "refs/heads/$br"; then
+      ref_rc=1
+      if [ -n "$br" ]; then
+        ref_rc=0; _oss_inv_ref "$root" "refs/heads/$br" || ref_rc=$?
+      fi
+      if [ "$ref_rc" = 2 ]; then
+        printf 'item\t%s\t%s\thalt:unreadable\trepo=%s\twt=%s\tclean=%s\thead_at_base=-\tmerged=-\treport=%s\tdispatches=%s\n' "$wi" "$st" "$repo" "$wt" "$clean" "$report" "$dc"
+        halt=1; continue
+      fi
+      if [ "$ref_rc" = 0 ]; then
         brx=yes
         tip="$(_oss_inv_git -C "$root" rev-parse "refs/heads/$br")"
         if [ "$tip" = "$bs" ]; then hab=yes; else hab=no; fi
@@ -225,8 +270,8 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
         # item work sits past the cut point - an active item then routed
         # finish-status and a complete one skip, marking lost work landed.
         # `descends` is the shared ancestry fact: `merged` needs it, and the
-        # merge/status arms halt without it; the two `reattach` arms do not yet
-        # read it - tracked as the wider arm fix in #675, not fixed here.
+        # merge/status arms and both `reattach` arms require it before acting
+        # on a recorded branch, so a reset below base_sha cannot be repaired.
         if [ -n "$bs" ] && _oss_inv_git -C "$root" merge-base --is-ancestor "$bs" "refs/heads/$br" 2>/dev/null; then descends=yes; else descends=no; fi
         # "merged" REQUIRES a recorded base (#673 A1). With base_sha unrecorded
         # ("-" unwrapped to ""), `tip != bs` is trivially true and a branch still
@@ -282,6 +327,27 @@ HOLD
       fi
       case "$st" in
         complete)
+          # Mirror worktree_remove's conv-absent kept-condition (#673 L5).
+          # A live linked worktree's physical path is its registration path;
+          # only a /.worktrees/<wi> suffix under the derived or recorded root
+          # is cleanup's to remove. A suffix under any other root is refused.
+          cleanup_kept=no
+          if [ "$wt" = present ]; then
+            derived_root="$(_oss_worktree_phys "$root")"
+            rec_root=""
+            case "$wtp" in
+              */.worktrees/"$wi") rec_root="$(_oss_worktree_phys "${wtp%/.worktrees/$wi}")" ;;
+            esac
+            case "$wtp_phys" in
+              */.worktrees/"$wi")
+                hp_root="${wtp_phys%/.worktrees/$wi}"
+                hp_root="$(_oss_worktree_phys "$hp_root")"
+                if [ "$hp_root" = "$derived_root" ] || { [ -n "$rec_root" ] && [ "$hp_root" = "$rec_root" ]; }; then
+                  cleanup_kept=yes
+                fi
+                ;;
+            esac
+          fi
           # #673 I2: a dirty linked worktree is a halt for EVERY complete
           # route, `skip` included - the already-computed clean=no was
           # otherwise consulted nowhere on this arm, so re-entry ran other
@@ -304,6 +370,18 @@ HOLD
           # re-entry declare the round done. Halt under its own route: the
           # state, not the repos, is the record to repair.
           elif [ -z "$br" ]; then route=halt:branch-unknown
+          # Close cleans the conventional path even when state records a
+          # different worktree. Compare physically so aliases of the SAME
+          # live linked worktree remain valid. With conv absent, cleanup also
+          # removes a kept suffix registration under the derived or recorded
+          # root; other live alternate holders make branch deletion refuse.
+          # An occupied conv outside the live worktree still halts.
+          elif { [ "$wt" != present ] || [ "$(cd -P "$conv" 2>/dev/null && pwd)" != "$wtp_phys" ]; } \
+               && { [ -e "$conv" ] || [ -L "$conv" ] || { [ "$wt" = present ] && [ "$cleanup_kept" != yes ]; }; }; then
+            if [ "$held" = 1 ]; then route=halt:worktree-held; else route=halt:unclassified; fi
+          elif [ "$wt" != present ] && [ "$wtp" != "$conv" ] \
+               && { [ -e "$wtp" ] || [ -L "$wtp" ]; }; then
+            if [ "$held" = 1 ]; then route=halt:worktree-held; else route=halt:unclassified; fi
           elif [ "$brx" = no ]; then route=skip
           # #673 round 4 (U-15p/U-151): a merge that landed is `skip` only when
           # nothing about the repos contradicts the record. Two shapes do, and
@@ -366,7 +444,8 @@ HOLD
             # recorded location is the planned-with-worktree shape.
             if [ -e "$wtp" ] || [ -L "$wtp" ]; then route=halt:planned-with-worktree   # -L: a symlink is present-not-absent (U-157)
             elif [ "$hab" != - ] && [ "$wtp" = "$conv" ]; then
-              if [ "$held" = 1 ]; then route=halt:worktree-held; else route=reattach; fi
+              if [ "$descends" != yes ]; then route=halt:unclassified
+              elif [ "$held" = 1 ]; then route=halt:worktree-held; else route=reattach; fi
             else route=halt:unclassified; fi
           else
             # A stray path at the derived worktree location is not spawn-safe
@@ -437,21 +516,15 @@ HOLD
                 *) route=halt:unreadable ;;
               esac
             else route=halt:dirty-worktree; fi
+          # Any occupied non-worktree path would make close's cleanup refuse,
+          # even after a landed merge: halt before finish-status or reattach.
+          elif [ -e "$wtp" ] || [ -L "$wtp" ]; then route=halt:unclassified
           elif [ "$hab" = - ]; then route=halt:work-lost
           elif [ "$merged" = yes ]; then route=finish-status
-          # reattach is a repair for a directory that is GONE (spec §2); when a
-          # path exists but is not a linked worktree, `oss worktree_reattach`
-          # refuses (rc 8) - and the lane meets that refusal only after its
-          # earlier repairs have already mutated state (§3 step 5 runs item
-          # repairs after repo repairs), breaking "halts before any mutation".
-          # The check guards ONLY the reattach decision (round 3): a merged
-          # item's repair is finish-status, which touches no worktree.
-          # A branch held elsewhere (#673 A4) is the same class: reattach can
-          # only clear THIS item's own stale registration, so a live holder (or
-          # a holder at any other path) halts now rather than mid-repair.
-          elif [ -e "$wtp" ] || [ -L "$wtp" ]; then route=halt:unclassified   # -L: a symlink is present-not-absent (U-157)
+          # A branch held elsewhere cannot be reattached by this item.
           elif [ "$wtp" = "$conv" ]; then
-            if [ "$held" = 1 ]; then route=halt:worktree-held; else route=reattach; fi
+            if [ "$descends" != yes ]; then route=halt:unclassified
+            elif [ "$held" = 1 ]; then route=halt:worktree-held; else route=reattach; fi
           else route=halt:unclassified; fi ;;
         *) route=halt:unclassified ;;
       esac

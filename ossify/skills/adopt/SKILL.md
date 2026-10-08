@@ -172,9 +172,16 @@ silent re-mark.
    unchanged puts two different decisions under one identifier, and from there
    nothing downstream can separate them: not a citation, not a reclassification
    reason, not a `touch_check` hit, which reports a bare `bone <adr>`. Collect
-   every scanned ADR reference across every declared repo and compare the full
-   set; **any reference appearing in two repos halts adoption**, naming each
-   colliding reference and the repos that hold it. The remedy is the operator's
+   the reference you will pass to `bone_add` for every inventory filename,
+   using the filename conventions and identifier authority in `bones-registry.md`
+   §3: a prefixed filename contributes its reference before the title; a
+   bare seed filename contributes its number with `ADR-` prepended,
+   retaining its width. Case-fold these references under `LC_ALL=C` for
+   comparison, retaining the source spellings and filenames for the halt.
+   **Any folded reference appearing in two repos halts adoption**, naming the
+   original reference spellings and each repo (include the source filename for
+   a bare seed). Distinct references still proceed. Take repo names from the captured inventory
+   (`<repo-name><TAB><ADR-filename>`); no second scan is needed. The remedy is the operator's
    and it is one-time: renumber in the source repo so the project's references
    are distinct, then re-run `/adopt`. Do not renumber for them — an ADR
    filename is a shipped, cited artifact, and C2's rule that the checkout wins

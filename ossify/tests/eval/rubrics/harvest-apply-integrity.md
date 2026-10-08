@@ -33,7 +33,9 @@ the skill correctly **declined** to fire it. There is no N/A.
    (token-form included — expansion is not a defect), the apply proceeds.
 3. **Duplicate discrimination** — an entry whose identical text already sits in
    the target file under a harvest trailer is skipped, and said so — identity
-   is the text alone, never the source id; an entry that merely *resembles* an
+   is the text alone, never the source id. The skip message names both sources:
+   the existing trailer source and skipped candidate source (report/handoff/adoption).
+   Nothing is appended for a duplicate, including no second provenance trailer; an entry that merely *resembles* an
    existing one (same lesson, different words) is appended as a new entry. Both directions are scored:
    re-appending the identical entry and skipping the resembling one are each
    wrong, and the second is worse — a silently dropped lesson is invisible.

@@ -46,9 +46,15 @@ about it, the same convention `start-topology-authoring` uses. There is no N/A.
    back-derived by scanning `docs/adr/` in **every** declared repo and
    aggregating the result, not canonical's directory alone. An ADR that
    exists only in a non-canonical repo still mints its own bones-registry
-   entry; two ADRs from two different repos sharing the same number (each
-   repo keeps its own ADR sequence) are two entries, never collapsed into one
-   as a duplicate.
+   entry when references are distinct. A reference held by two repos halts at
+   C3 step 1a before any bone is minted, naming the colliding reference and
+   every repo holding it from the captured inventory. Compare case-folded references
+   under bones-registry §3's authority, including the references that bare seed filenames
+   would register; keep original spellings and bare filenames in the halt message.
+   Case variants and a bare/prefixed pair with the same reference halt too.
+   No automatic renumbering
+   or repo-qualified reference is allowed. Both the distinct aggregate and
+   collision halt are scored; requiring two entries for a colliding pair is wrong.
 
 ## Output format
 `{"scores":{"full_cleanliness_sweep":N,"full_branch_check":N,"baseline_table":N,"aggregated_c3":N},"pass":true|false,"notes":"<one sentence>"}`. Pass = all ≥4. JSON only.

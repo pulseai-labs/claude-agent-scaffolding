@@ -1,4 +1,4 @@
-# ossify (v1.14.1)
+# ossify (v1.14.2)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
@@ -93,6 +93,18 @@ The private boundary inventory has one address —
 "composition root" is defined as a path rather than a repo key, and the critic
 moment's non-interactive default records that no operator answered (#299). No
 `lib/` code, no state change.
+
+Since 1.14.2 (#692, #691, #645, #646, #675), doctor's bones drift check folds
+both halves under one scoped C locale, preserving identifiers in findings under
+non-C locales. The ADR grammar has one prose authority; the numbering scan
+shares its destination predicate and adoption inventory names the repo holding
+each ADR. Adoption's fixtures and rubric follow the existing collision halt,
+while distinct references from every repo still mint their own entries. Harvest
+keeps text-only duplicate identity and names both sources when it skips an entry.
+Spine re-entry fails closed on retained abandoned-item dispatch evidence,
+unreadable base/ref/status reads, work branches below their recorded base and
+occupied non-worktree paths; a branch named `unrecorded` remains a recorded base.
+No state schema or journal operation changes.
 
 Since 1.14.1 (#648, #647, #649), doctor's bones drift check identifies table
 headers structurally, accepts short and aligned delimiter cells, and validates

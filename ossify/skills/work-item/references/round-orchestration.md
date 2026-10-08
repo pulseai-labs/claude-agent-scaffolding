@@ -91,7 +91,24 @@ arm=fresh
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue
   root="$("$oss_bin" repo_root "$repo")" || exit 1     # undeclared repo halts HERE
-  if git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch"; then arm=re-entry; fi
+  # --verify --quiet returns 1 for BOTH absence and malformed loose refs.
+  # --exists distinguishes absence (2) from a failed lookup (1).
+  ref_rc=0
+  git -C "$root" show-ref --exists "refs/heads/$spine_branch" 2>/dev/null || ref_rc=$?
+  # Git without --exists returns usage rc 129: retain the legacy probe only
+  # there. Known limit: legacy rc 1 conflates absence and malformed loose refs.
+  if [ "$ref_rc" = 129 ]; then
+    ref_rc=0
+    git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" || ref_rc=$?
+    [ "$ref_rc" != 1 ] || ref_rc=2
+  fi
+  case "$ref_rc" in
+    0) git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" \
+         || { echo "halt: cannot read $spine_branch in $repo"; exit 1; }
+       arm=re-entry ;;
+    2) ;; # absent (or ambiguous legacy rc 1)
+    *) echo "halt: cannot read $spine_branch in $repo (git show-ref rc $ref_rc)"; exit 1 ;;
+  esac
 done <<EOF
 $repos
 EOF
@@ -124,17 +141,39 @@ echo "arm=$arm"
 ### 2a. Fresh arm — check, record, cut, check out
 
 ```bash
+(
+repo_list=""; repo_bases=""
+trap '[ -z "$repo_list" ] || rm -f -- "$repo_list"; [ -z "$repo_bases" ] || rm -f -- "$repo_bases"' EXIT
 spine_branch="$("$oss_bin" branch_name "<spine-id>" "<spine-slug>")"
-repo_list="$(mktemp)"; repo_bases="$(mktemp)"
-"$oss_bin" get '.work_items[] | select(.spine=="<spine-id>" and .status != "abandoned") | .target_repo' | sort -u > "$repo_list"
+repo_list="$(mktemp)" || exit 1; repo_bases="$(mktemp)" || exit 1
+repos="$("$oss_bin" get '.work_items[] | select(.spine=="<spine-id>" and .status != "abandoned") | .target_repo')" \
+  || { echo "halt: cannot read the spine's work items from state"; exit 1; }
+printf '%s\n' "$repos" | sort -u > "$repo_list"
 
 # PASS 1 - CHECK every hosting repo. Mutate nothing. A halt here leaves every
 # repo exactly as it was found.
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue
   root="$("$oss_bin" repo_root "$repo")" || exit 1     # undeclared repo halts HERE
-  [ -z "$(git -C "$root" status --porcelain)" ] || { echo "halt: $repo is dirty"; exit 1; }
-  if git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch"; then
+  porcelain="$(git -C "$root" status --porcelain)" || { echo "halt: cannot read status in $repo"; exit 1; }
+  [ -z "$porcelain" ] || { echo "halt: $repo is dirty"; exit 1; }
+  # A failed lookup is not absence, even when quiet --verify would return 1.
+  ref_rc=0
+  git -C "$root" show-ref --exists "refs/heads/$spine_branch" 2>/dev/null || ref_rc=$?
+  # Git without --exists returns usage rc 129: retain the legacy probe only
+  # there. Known limit: legacy rc 1 conflates absence and malformed loose refs.
+  if [ "$ref_rc" = 129 ]; then
+    ref_rc=0
+    git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" || ref_rc=$?
+    [ "$ref_rc" != 1 ] || ref_rc=2
+  fi
+  case "$ref_rc" in
+    0) git -C "$root" show-ref --verify --quiet "refs/heads/$spine_branch" \
+         || { echo "halt: cannot read $spine_branch in $repo"; exit 1; } ;;
+    2) ;; # absent (or ambiguous legacy rc 1)
+    *) echo "halt: cannot read $spine_branch in $repo (git show-ref rc $ref_rc)"; exit 1 ;;
+  esac
+  if [ "$ref_rc" = 0 ]; then
     echo "halt: $spine_branch already exists in $repo - this spine has started; take the re-entry arm (§2b), not this block."; exit 1
   fi
   base_branch="$(git -C "$root" rev-parse --abbrev-ref HEAD)"
@@ -155,6 +194,7 @@ while IFS="$(printf '\t')" read -r repo base_branch; do
   [ -n "$repo" ] || continue
   git -C "$("$oss_bin" repo_root "$repo")" checkout -q -b "$spine_branch" || exit 1
 done < "$repo_bases"
+)
 ```
 
 Each of these is load-bearing:
@@ -295,14 +335,15 @@ arm's own repairs can hand back, and their routes out:
 
 | Halt row | The repair it names |
 |---|---|
-| `halt:state-claims-merge` — a `complete` item whose branch still sits at its recorded base | the branch holds no commits past its base, so no merge can be reconstructed from repo state: if the item's work exists elsewhere, return it to `planned` (`"$oss_bin" work_item_status <wi-id> planned`) and re-run its round; if it truly landed nothing, the state is the record to repair. (`complete` items whose branch holds unmerged commits now route `finish-merge` instead; a branch that is gone is the cleanup arm and routes `skip` — #673 A5) |
+| `halt:state-claims-merge` — a `complete` item whose branch still sits at its recorded base | the branch holds no commits past its base, so no merge can be reconstructed from repo state: if the item's work exists elsewhere, return it to `planned` (`"$oss_bin" work_item_status <wi-id> planned`) and re-run its round; if it truly landed nothing, the state is the record to repair. (`complete` items whose branch holds unmerged commits now route `finish-merge` instead; a branch that is gone is the cleanup arm and routes `skip` only when neither the conventional nor a differing recorded path is occupied outside the item's live linked worktree — #673 A5) |
 | `halt:base-unknown` — an ITEM row: a branch is recorded with no `base_sha` | a half-written `work_item_exec` record; repair it with a full re-dispatch — `"$oss_bin" work_item_exec <wi-id> <branch> <worktree_path> <the base the branch was cut at>` — which replaces all three fields (#673 A1) |
 | `halt:base-unresolved` — a repo row: the recorded base branch no longer resolves locally (renamed or deleted since it was recorded) | the `cut-missing` repair cuts from that ref, so re-entry would create the spine branch in the earlier repos and only then fail here — a partial mutation. Restore the branch, or, if it was renamed, record the new name with `"$oss_bin" spine_base_reset <spine-id> <repo> <new-branch>` (an operator decision, §2a); the lane never guesses a replacement (#673 G3) |
 | `halt:branch-unknown` — a `complete` item with no branch ever recorded | nothing proves a branch existed, so the cleanup-finished `skip` reading is unearned: state, not the repos, is the record to repair. If the item truly ran, restore the full execution record (a full re-dispatch replaces all three fields, as `halt:base-unknown` says) or return it to `planned`; if it was withdrawn, mark it `abandoned` (#673 L3) |
-| `halt:worktree-held` | the branch is checked out somewhere that is not this item's own missing registration (`git -C <repo-root> worktree list`) — or that list itself could not be read, which reads the same way (#673 A4/G1), or the registration is LOCKED, which reattach refuses too (#673 L4); reconcile with the holder — the lane touches nothing on the holder's behalf (#673 A4) |
+| `halt:worktree-held` | the branch is checked out somewhere that is not this item's own missing registration (`git -C <repo-root> worktree list`) — or that list itself could not be read, which reads the same way (#673 A4/G1), or the registration is LOCKED, which reattach refuses too (#673 L4); for a complete item with the conventional path absent, cleanup also owns a live `/.worktrees/<wi>` registration under the derived or recorded root (compared physically), so a clean merged item there skips; an occupied conventional path outside that live worktree or a holder cleanup does not own still halts. Reconcile with the holder — the lane touches nothing on an unowned holder's behalf (#673 A4) |
 | `halt:unverified-merge` | the row's RE-RUN of close §2's gate came back RED on the item's committed tree (#673 K1): run the item's correction — the recovery menu's path, or the external seam's continuation — before anything merges; nothing was merged, and a `[fidelity]` finding the red run wrote routes the next read-out `halt:close-rejected` |
 | `halt:close-rejected` | the result's last completed gate run recorded a `[fidelity]` finding (durable in `verify.md`); the correction must complete — the external seam's continuation or the close's recovery menu — before anything re-verifies or RE-LANDS the result. Gates `close-finished` AND every `finish-merge` arm (#673 C2/J1) |
-| `halt:unreadable` | a repo root, a `git status`, a `verify.md` rejection record, or the state feed could not be read; fix that and re-run — nothing here is in the lane's hands (#673 A2/A3/G2) |
+| `halt:unreadable` | a repo root, a branch-presence probe, a `git status`, the `spine_base_get` base getter, a `verify.md` rejection record, or the state feed could not be read; fix that and re-run — nothing here is in the lane's hands (#673 A2/A3/G2) |
+| `halt:unclassified` — an `abandoned` item retaining execution evidence | halt rather than skip: inspect the item's recorded `branch`, `worktree_path`, `base_sha` and `dispatches`, its handoff/report, and the branch and worktree in its target repo. The operator decides which record is right before retrying; never erase evidence or invent a state-editing verb to clear the halt |
 | `halt:work-lost`, `halt:unclassified`, `halt:planned-with-worktree`, `halt:dirty-worktree` | state and repos disagree, or the shape is outside this table; surface both and decide — a branch no longer descended from its recorded `base_sha` is a history rewrite, never a landing: restore the expected history or re-dispatch the item (#673 H1); a completed item's dirty worktree halts here too, since cleanup's `worktree_remove` would refuse it at close (#673 I2); a recorded branch that is not this item's own `work/<wi-id>-*` is never reused for reattach, redispatch or merge (#673 L2) |
 
 **5. Continue into §3 for round *R*.**
@@ -335,9 +376,13 @@ inventing one — the close still cross-checks at landing time.
 
 ## 3. Per work item in the round
 
-**First, skip an `abandoned` item.** Read its status —
+**First, check an `abandoned` item before skipping it.** Retained execution
+evidence (`branch`, `worktree_path`, `base_sha` or a positive `dispatches`
+count) is §2b's `halt:unclassified`, with the operator's inspection and decision
+there; never skip that shape or dispatch it. Only a clean abandoned record is
+skipped. Read its status —
 `"$oss_bin" get '.work_items[] | select(.id=="<wi-id>") | .status'` — and if it is
-`abandoned`, the item was withdrawn before dispatch
+`abandoned` with no retained execution evidence, the item was withdrawn before dispatch
 (`plan-spine/references/decomposition.md` §1) and the plan still lists it: no
 spec check, no worktree, no handoff, no dispatch, and the §7 barrier does not
 wait for it. This holds in both dispatch modes — `external-executor.md` §2 runs
