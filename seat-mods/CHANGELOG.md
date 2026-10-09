@@ -2,6 +2,26 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.3.1 — 2026-10-09
+
+- Every Bash rail now walks the reserved head words already recognised by `rm`, so
+  `if git push --force`, `! gh pr merge` and commits behind those heads meet the
+  same role and AI-trailer checks as a bare command (#701). Shared parser declarations
+  remain unchanged; no new shell forms are parsed. Reserved words are recognised only
+  as exact unquoted command heads, so executable paths such as `/tools/if` and head-name
+  programs after assignments or execution wrappers remain allowed.
+- Heredoc bodies and closing lines supplied to `rm`, including fd-prefixed input
+  such as `2<<EOF`, are excluded from operands. Words and redirections after the
+  delimiter on the opener line remain part of the command: inside operands are
+  allowed and outside operands denied, including after an adjacent redirection.
+  Attached operands (`x<<EOF`) retain their checks; non-rm heredocs are unchanged
+  (#702 item 1).
+- Add molt regression pins for herestrings and path-qualified wrappers, without
+  changing molt source or version (#702 item 4). Add allowed controls in the same
+  `//`, `/.` and `/..` spellings beside writable-root denial tests (#702 item 5).
+- #702 items 2 and 3 and its comment-thread parser limits remain open under the
+  PR #644 rule: the matcher grows only for a form that ran in practice.
+
 ## 0.3.0 — 2026-10-08
 
 - Guarded sessions are denied an `rm` the rail recognises when operands are outside their

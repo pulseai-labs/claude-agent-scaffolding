@@ -157,11 +157,28 @@ function gitOf(tokens: string[]): { sub: string; args: string[] } | undefined {
   return { sub, args: end < 0 ? args : args.slice(0, end) }
 }
 
+// Shell syntax is an exact raw head, before assignments or execution wrappers.
+// Keep this walk outside the declarations shared with molt. `builtin` is an
+// execution prefix, not syntax: its argument must never restart this walk.
+const HEAD_WORDS = new Set(['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '(', 'time'])
+
+function afterHeads(tokens: string[]): string[] {
+  while (HEAD_WORDS.has(tokens[0] ?? '')) tokens = tokens.slice(1)
+  // Preserve the existing builtin command/cd recognition where Bash itself
+  // invokes it: at the head, after assignments, or through the command builtin.
+  // Other wrappers execute a program, so they cannot expose shell syntax here.
+  let i = 0
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[i] ?? '') || tokens[i] === 'command') i += 1
+  if (tokens[i] !== 'builtin') return tokens
+  while (tokens[i] === 'builtin') i += 1
+  return tokens.slice(i)
+}
+
 export function bashRules(command: string, messageFileText = ''): RuleId[] {
   const found = new Set<RuleId>()
   const { text, pieces } = blank(command)
   for (const segment of text.split(COMMANDS)) {
-    const tokens = tokensOf(segment)
+    const tokens = afterHeads(tokensOf(segment))
     const head = commandOf(tokens)
     if (head?.name === 'gh' && head.args[0] === 'pr') {
       // `gh pr` takes -R/--repo before its subcommand.
@@ -201,7 +218,7 @@ export function commitMessageFiles(command: string): string[] {
   const files: string[] = []
   const { text, pieces } = blank(command)
   for (const segment of text.split(COMMANDS)) {
-    const git = gitOf(tokensOf(segment))
+    const git = gitOf(afterHeads(tokensOf(segment)))
     if (git?.sub !== 'commit') continue
     const { args } = git
     for (const [i, arg] of args.entries()) {
@@ -216,7 +233,7 @@ export function commitMessageFiles(command: string): string[] {
   return files
 }
 
-// rm alone gets operand parsing; the other Bash rails keep their existing matcher.
+// rm alone gets operand parsing; all Bash rails share the head-word walk.
 // Quoting is retained until this point: single quotes and backslash escapes are
 // literal, while active expansions cannot be resolved by the hook.
 export type RmTarget = { path: string | undefined; glob: boolean }
@@ -251,20 +268,26 @@ function rmWord(word: string): { path: string; globAt: number; home: boolean } |
   return { path, globAt, home }
 }
 
-const RM_HEAD_WORDS = new Set(['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '(', 'time', 'builtin'])
-
 export function rmTargets(command: string): RmTarget[] {
   const targets: RmTarget[] = []
-  const { text, pieces } = blank(command)
+  // Only the heredoc body and closing line are input. Keep opener-line words
+  // in the command so the normal quote, escape and redirect walk judges them.
+  // Remove a numeric fd at a word boundary, preserving x2 and quoted '2'.
+  const joined = command.replace(/\\\n/g, ' ')
+    .replace(/(^|[\s;|&()])\d+(?=<<(?!<))/g, '$1')
+  const withoutInput = blankHeredocs(joined, piece => {
+    const opener = /^<<-?[ \t]*(?:'[^'\n]+'|"[^"\n]+"|[^\s;&|<>()'"]+)/.exec(piece)!
+    return ' ' + piece.slice(opener[0].length).split('\n')[0] + ' '
+  })
+  const { text: input, pieces } = blank(withoutInput)
   let changedDirectory = false
   // Redirections belong to the shell, not rm. Blanked quotes/escapes keep
   // literal glyphs out of this match. Remove fd prefixes before their operators,
   // then operators with their attached or separate target words.
-  const redirects = text.replace(/(^|[\s;|&()])\d+(?=[<>])/g, '$1')
+  const redirects = input.replace(/(^|[\s;|&()])\d+(?=[<>])/g, '$1')
     .replace(/(?:<<<|&>>|&>|<>|>\||>>|[<>]&|>|(?<!<)<(?!<))[ \t]*[^\s;&|()]+/g, ' ')
   for (const segment of redirects.split(/;|&&|\|\||[|&]|\n|\(|\)/)) {
-    let head = commandOf(tokensOf(segment))
-    while (head !== undefined && RM_HEAD_WORDS.has(head.name)) head = commandOf(head.args)
+    const head = commandOf(afterHeads(tokensOf(segment)))
     if (head === undefined) continue
     if (['cd', 'pushd', 'popd'].includes(head.name) || expand(head.name, pieces) === '\\cd') changedDirectory = true
     if (head.name !== 'rm') continue

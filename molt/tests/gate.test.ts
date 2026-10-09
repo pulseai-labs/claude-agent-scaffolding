@@ -52,3 +52,23 @@ describe('isProgress', () => {
     expect(isProgress('Bash', { command: 'echo git commit' })).toBe(false)
   })
 })
+
+// Pins for the shared reader changes shipped in molt 0.2.2 / seat-mods 0.3.0.
+describe('shared shell reader pins (#702 item 4)', () => {
+  test('herestring leaves later commands visible beside inert heredoc text', () => {
+    const command = 'git add a <<<EOF\ncat huge.log\nEOF'
+    expect(gitSubcommands(command)).toEqual(['add', undefined, undefined])
+    expect(bash(command)).toBe(false)
+    const heredoc = 'git add a <<EOF\ncat huge.log\nEOF'
+    expect(gitSubcommands(heredoc)).toEqual(['add'])
+    expect(bash(heredoc)).toBe(true)
+  })
+  test('path-qualified wrapper matches bare wrapper beside a non-git command', () => {
+    expect(gitSubcommands('/usr/bin/env git add h.md')).toEqual(['add'])
+    expect(bash('/usr/bin/env git add h.md')).toBe(true)
+    expect(gitSubcommands('env git add h.md')).toEqual(['add'])
+    expect(bash('env git add h.md')).toBe(true)
+    expect(gitSubcommands('/usr/bin/env cat huge.log')).toEqual([undefined])
+    expect(bash('/usr/bin/env cat huge.log')).toBe(false)
+  })
+})

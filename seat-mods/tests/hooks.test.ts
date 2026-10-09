@@ -8,7 +8,7 @@ import type { On } from 'claude-code'
 // call that reaches it answers `ran`; a denied call resolves with { deny }
 // carrying the deny text. A mocked call answers { value }, or { deny } for a
 // missing path, as the kit requires.
-const DIRS = new Set(['/', '/w', '/w/seat-mods', '/w/seat x', '/etc', '/var', '/reports', '/w/build', '/w/seat-mods/sub', '/w/seat-mods/build', '/tmp', '/home', '/home/seat', '/home/u', '/home/u/scratch'])
+const DIRS = new Set(['/', '/w', '/w/seat-mods', '/w/seat x', '/etc', '/var', '/reports', '/reports/sub', '/w/build', '/w/seat-mods/sub', '/w/seat-mods/build', '/tmp', '/home', '/home/seat', '/home/u', '/home/u/scratch'])
 // A dangling symbolic link: it exists, but resolving it fails.
 const LINKS = new Set(['/w/link'])
 const FILES = new Map<string, string>([
@@ -230,9 +230,9 @@ describe('rm placement: R1-R7', () => {
       ['ancestor inside worktree', 'rm -rf /w/build', 'rm -f /w/build/reports/x.log'],
       ['parent symlink outside', 'rm -f /w/outside/x', `rm -f ${inside}/x`],
       ['terminal symlink outside', 'rm -rf /w/outside/', 'rm -f /reports/outside'],
-      ['double slash root', 'rm -rf /reports///', 'rm -f /reports/x.log'],
-      ['dot root', 'rm -rf /reports/.', 'rm -f /reports/x.log'],
-      ['dotdot root', 'rm -rf /w/build/..', 'rm -f /reports/x.log'],
+      ['double slash root', 'rm -rf /reports///', 'rm -f /reports//x.log'],
+      ['dot root', 'rm -rf /reports/.', 'rm -f /reports/./x.log'],
+      ['dotdot root', 'rm -rf /w/build/..', 'rm -f /reports/sub/../x.log'],
       ['missing parent dotdot', 'rm -rf /w/missing/../../var/x', `rm -f ${inside}/new/sub/x`],
       ['wrapper/path', 'A=1 env command /bin/rm -f /var/x', `A=1 env command /bin/rm -f ${inside}/x`],
       ['after delimiter', 'rm -- -f /var/x', 'rm -- /reports/-f'],
@@ -492,4 +492,171 @@ describe('dot-glob parent protection', () => {
     expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /reports/.cache/*' })).deny).toBeUndefined()
     expect((await $.tool.call({ tool: 'Bash', command: "rm -f '/reports/.*'" })).deny).toBeUndefined()
   })
+})
+
+// 0.3.1: each new deny has its nearest allowed control in the same test.
+describe('reserved heads reach role and commit-file rails (#701)', () => {
+  for (const [denied, allowed, rule] of [
+    ['if git push --force; then :; fi', 'if git status; then :; fi', 'force-push'],
+    ['! git push --force', '! git diff --quiet', 'force-push'],
+    ['{ git push --force; }', '{ git log -1; }', 'force-push'],
+    ['if true; then git push -f; fi', 'if true; then git status; fi', 'force-push'],
+    ['while true; do git merge x; done', 'while read l; do echo "$l"; done', 'no merges'],
+    ['! gh pr merge 1', '! gh pr view 1', 'no merges'],
+  ]) {
+    test(`implementer: ${denied} denied beside safe control`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: 'implementer' })
+      expect((await $.tool.call({ tool: 'Bash', command: denied })).deny).toContain(rule)
+      expect((await $.tool.call({ tool: 'Bash', command: allowed })).deny).toBeUndefined()
+    })
+  }
+  test('verifier: if commit denied beside if status', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'verifier' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'if git commit -m x; then :; fi' })).deny).toContain('no git commit')
+    expect((await $.tool.call({ tool: 'Bash', command: 'if git status; then :; fi' })).deny).toBeUndefined()
+  })
+  test('implementer: if commit file trailer denied beside clean file', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'if git commit -F /w/msg-trailer.txt; then :; fi' })).deny).toContain('AI trailers')
+    expect((await $.tool.call({ tool: 'Bash', command: 'if git commit -F /w/README.md; then :; fi' })).deny).toBeUndefined()
+  })
+  test('implementer: plain if push allowed beside force push denial', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'if git push --force; then :; fi' })).deny).toBeDefined()
+    expect((await $.tool.call({ tool: 'Bash', command: 'if git push; then :; fi' })).deny).toBeUndefined()
+  })
+  test('verifier: plain if push denied beside status', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'verifier' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'if git push; then :; fi' })).deny).toContain('no git push')
+    expect((await $.tool.call({ tool: 'Bash', command: 'if git status; then :; fi' })).deny).toBeUndefined()
+  })
+})
+
+describe('rm heredoc input stays out of operands (#702 item 1)', () => {
+  for (const input of ['<<EOF\ny\nEOF', '<<-EOF\n\ty\n\tEOF', "<<'EOF'\ny\nEOF"]) {
+    for (const gap of [' ', '']) {
+      test(`implementer: ${gap === '' ? 'attached' : 'separate'} ${input.split('\n')[0]} inside allowed beside outside denial`, async ($, on) => {
+        world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
+        expect((await $.tool.call({ tool: 'Bash', command: `rm -i /var/x${gap}${input}` })).deny).toContain('no rm')
+        expect((await $.tool.call({ tool: 'Bash', command: `rm -i /reports/x${gap}${input}` })).deny).toBeUndefined()
+      })
+    }
+  }
+  test('literal << operand is checked beside its inside spelling', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
+    for (const command of ["rm /reports/x '/var/<<EOF'", 'rm /reports/x /var/\\<\\<EOF'])
+      expect((await $.tool.call({ tool: 'Bash', command })).deny).toContain('no rm')
+    for (const command of ["rm /reports/x '/reports/<<EOF'", 'rm /reports/x /reports/\\<\\<EOF'])
+      expect((await $.tool.call({ tool: 'Bash', command })).deny).toBeUndefined()
+  })
+})
+
+// Fix task 1: /if and /do execute ordinary programs; their argv is not shell syntax.
+describe('head-name executable controls', () => {
+  for (const role of ['implementer', 'verifier', 'reviewer', undefined, ''] as const) {
+    const label = role || 'default'
+    for (const prefix of ['/fixtures/if', '/fixtures/do', 'A=1 if', 'env if', 'command if', 'time env if']) {
+      for (const payload of ['git push --force', 'gh pr merge 1', 'rm /var/x']) {
+        const bare = prefix.endsWith('do') ? `while true; do ${payload}; break; done` : `if ${payload}; then :; fi`
+        test(`${label}: ${prefix} ${payload} allowed beside bare denial`, async ($, on) => {
+          world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+          expect((await $.tool.call({ tool: 'Bash', command: bare })).deny).toBeDefined()
+          expect((await $.tool.call({ tool: 'Bash', command: `${prefix} ${payload}` })).deny).toBeUndefined()
+        })
+      }
+    }
+  }
+})
+
+// These hook allowances, unlike a plain implementer heredoc, are genuinely red
+// on 0.3.0: its bogus operand is unwritable, expands, or follows a same-call cd.
+describe('heredoc allowances with real tag denial provenance', () => {
+  for (const opener of ['<<EOF', '<<-EOF', "<<'EOF'"]) {
+    const ending = opener === '<<-EOF' ? '\tEOF' : 'EOF'
+    for (const gap of [' ', '']) {
+      for (const [label, role, prefix, body] of [
+        ['reviewer unwritable phantom', 'reviewer', '', 'y'],
+        ['implementer dollar in input', 'implementer', '', '$CONFIRM'],
+        ['implementer earlier cd', 'implementer', 'cd /var; ', 'y'],
+      ] as const) {
+        // Attached plain inputs already pass on the tag; only add pins with a real RED.
+        if (gap === '' && label !== 'implementer dollar in input') continue
+        const input = `${opener}\n${body}\n${ending}`
+        test(`${label}: ${gap === '' ? 'attached' : 'separate'} ${opener} allowed beside outside deny`, async ($, on) => {
+          world(on, { SEAT_MODS_ROLE: role, SEAT_MODS_ALLOW: '/reports' })
+          expect((await $.tool.call({ tool: 'Bash', command: `${prefix}rm -i /var/x${gap}${input}` })).deny).toContain('no rm')
+          expect((await $.tool.call({ tool: 'Bash', command: `${prefix}rm -i /reports/x${gap}${input}` })).deny).toBeUndefined()
+        })
+      }
+    }
+  }
+})
+
+// Review round 1: opener-line argv must not vanish with a heredoc piece.
+describe('rm heredoc opener boundaries', () => {
+  for (const opener of ['<<EOF', "<<'EOF'", '<<-EOF']) {
+    for (const operand of ['/etc/passwd', '/reports/x', '/reports/x; rm /etc/passwd']) {
+      test(`${opener} followed by ${operand}: opener-line operands beside ordinary input`, async ($, on) => {
+        world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
+        const result = await $.tool.call({ tool: 'Bash', command: `rm -i ${opener} ${operand}\ny\nEOF` })
+        if (operand === '/reports/x') expect(result.deny).toBeUndefined()
+        else expect(result.deny).toContain('no rm')
+        expect((await $.tool.call({ tool: 'Bash', command: `rm -i /reports/x ${opener}\ny\nEOF` })).deny).toBeUndefined()
+        expect((await $.tool.call({ tool: 'Bash', command: `cat ${opener} > /reports/x\ny\nEOF` })).deny).toBeUndefined()
+      })
+    }
+    test(`${opener} on fd 2: inside operand alone beside outside denial`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: 'reviewer', SEAT_MODS_ALLOW: '/reports' })
+      expect((await $.tool.call({ tool: 'Bash', command: `rm -i /var/x 2${opener}\ny\nEOF` })).deny).toContain('no rm')
+      expect((await $.tool.call({ tool: 'Bash', command: `rm -i /reports/x 2${opener}\ny\nEOF` })).deny).toBeUndefined()
+    })
+  }
+})
+
+// Last round: restore opener-line words before quotes and redirections are parsed.
+describe('heredoc opener line retains rm operands and redirections', () => {
+  const insideShapes = [
+    'rm -i <<EOF /reports/x',
+    'rm -i /reports/x <<EOF > /reports/log',
+    'rm -i /reports/x <<EOF 2>/reports/log',
+    'rm -i 2<<EOF /reports/x',
+    "rm -i <<'EOF' /reports/x",
+    "rm -i 2<<'EOF' /reports/x",
+    'rm -i <<"EOF" /reports/x',
+    'rm -i 2<<"EOF" /reports/x',
+    'rm -i <<-EOF /reports/x',
+    'rm -i 2<<-EOF /reports/x',
+  ]
+  for (const role of ['implementer', 'verifier', undefined, '']) {
+    for (const shape of insideShapes) {
+      test(`${role ?? 'unset'}: ${shape} allowed beside outside operand`, async ($, on) => {
+        world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+        const input = shape.includes('<<-') ? '\n\ty\n\tEOF' : '\ny\nEOF'
+        expect((await $.tool.call({ tool: 'Bash', command: shape.replace('/reports/x', '/etc/passwd') + input })).deny).toContain('no rm')
+        expect((await $.tool.call({ tool: 'Bash', command: shape + input })).deny).toBeUndefined()
+      })
+    }
+  }
+  for (const role of ['implementer', 'verifier', 'reviewer', undefined, '']) {
+    for (const shape of [
+      'rm -i >/reports/log<<EOF /etc/passwd',
+      'rm -i </dev/null<<EOF /etc/passwd',
+      'rm -i /reports/x >/reports/log<<EOF /etc/passwd',
+    ]) {
+      test(`${role ?? 'unset'}: ${shape} denied beside inside operand`, async ($, on) => {
+        world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+        expect((await $.tool.call({ tool: 'Bash', command: shape + '\ny\nEOF' })).deny).toContain('no rm')
+        expect((await $.tool.call({ tool: 'Bash', command: shape.replace('/etc/passwd', '/reports/y') + '\ny\nEOF' })).deny).toBeUndefined()
+        expect((await $.tool.call({ tool: 'Bash', command: "cat <<'EOF' > /reports/log\ny\nEOF" })).deny).toBeUndefined()
+      })
+    }
+  }
+})
+
+// A heredoc tail in cat must not contaminate a later rm segment.
+test('cat heredoc opener tail leaves a clean rm segment allowed beside outside denial', async ($, on) => {
+  world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
+  const prefix = 'cat <<EOF foo\ny\nEOF\n'
+  expect((await $.tool.call({ tool: 'Bash', command: prefix + 'rm /etc/passwd' })).deny).toContain('no rm')
+  expect((await $.tool.call({ tool: 'Bash', command: prefix + 'rm /reports/x' })).deny).toBeUndefined()
 })
