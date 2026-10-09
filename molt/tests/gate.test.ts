@@ -137,23 +137,30 @@ describe('reserved head words past the hard threshold (#711)', () => {
   })
 })
 
-// #711 review R2: a commit counts as progress only where the line runs it. A commit
-// behind a conditional or negating head may not run, so it does not count.
-describe('isProgress with reserved head words (#711 review R2)', () => {
-  test('a commit a brace group or time runs counts', () => {
-    expect(isProgress('Bash', { command: '{ git add f; git commit -m m; }' })).toBe(true)
-    expect(isProgress('Bash', { command: '{ time git commit -m m; }' })).toBe(true)
-    expect(isProgress('Bash', { command: 'time git commit -m m' })).toBe(true)
+// #711 review R2/RR1: a commit counts as progress only where the line runs it for
+// sure — bare, or behind `time`. A commit behind a conditional or negating head may
+// not run; a `{ … }` body cannot be told from a function definition's, which runs
+// no commit.
+describe('isProgress with reserved head words (#711 review R2/RR1)', () => {
+  test('a bare commit or one behind time counts', () => {
     expect(isProgress('Bash', { command: 'git commit -m m' })).toBe(true)
+    expect(isProgress('Bash', { command: 'time git commit -m m' })).toBe(true)
   })
   test('a commit behind a conditional or negating head does not count', () => {
     expect(isProgress('Bash', { command: 'if git add missing.lock; then git commit -m m; fi' })).toBe(false)
     expect(isProgress('Bash', { command: 'then git commit -m m' })).toBe(false)
     expect(isProgress('Bash', { command: '! git commit -m m' })).toBe(false)
   })
-  test('the run-only reader sees the commit a brace group runs, and not one behind if', () => {
-    expect(walked.gitSubcommandsThatRun?.('{ git commit -m m; }')).toEqual(['commit'])
+  test('a commit behind { or a function definition does not count (RR1)', () => {
+    expect(isProgress('Bash', { command: '{ git commit -m m; }' })).toBe(false)
+    expect(isProgress('Bash', { command: '{ time git commit -m m; }' })).toBe(false)
+    expect(isProgress('Bash', { command: 'f() { git commit -m m; }' })).toBe(false)
+    expect(isProgress('Bash', { command: 'function f { git commit -m m; }' })).toBe(false)
+  })
+  test('the run-only reader sees only a bare commit or one behind time', () => {
     expect(walked.gitSubcommandsThatRun?.('git commit -m m')).toEqual(['commit'])
+    expect(walked.gitSubcommandsThatRun?.('time git commit -m m')).toEqual(['commit'])
+    expect(walked.gitSubcommandsThatRun?.('{ git commit -m m; }')).toEqual([])
     expect(walked.gitSubcommandsThatRun?.('if git commit -m m')).toEqual([])
     expect(walked.gitSubcommandsThatRun?.('! git commit -m m')).toEqual([])
   })

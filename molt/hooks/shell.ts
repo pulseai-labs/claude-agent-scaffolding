@@ -141,13 +141,16 @@ export function gitSubcommands(command: string): Array<string | undefined> {
   return segmentsOf(command).map(segment => gitOf(segment.rest)?.sub)
 }
 
-// The head words that always run the command after them: a brace group runs its
-// body, and `time` runs what it times. Every other head the walk skips — `if`,
-// `then`, `elif`, `else`, `!` — may not run its command, and a commit behind one
-// can exit 0 having committed nothing (`if git add missing.lock; then git commit
-// -m m; fi`); a successful `! git commit` exits 1 and never reaches the count. So
-// the autopilot progress count reads only a commit the line really runs (review R2).
-const RUNS_ITS_COMMAND = new Set(['{', 'time'])
+// The one head word that surely runs the command after it: `time` runs what it
+// times. `{` does not qualify (review RR1): the shared COMMANDS splits on the
+// parentheses, so a brace-group body and a function definition's body present the
+// same `{ git commit …` segment — and `f() { git commit -m m; }` only defines the
+// function, running no commit. Every other head the walk skips — `if`, `then`,
+// `elif`, `else`, `!` — may not run its command either, and a commit behind one can
+// exit 0 having committed nothing (`if git add missing.lock; then git commit -m m;
+// fi`); a successful `! git commit` exits 1 and never reaches the count. So the
+// autopilot progress count reads only a commit the line really runs (review R2/RR1).
+const RUNS_ITS_COMMAND = new Set(['time'])
 
 // The subs of the segments whose head words all run their command. The gate reads
 // every segment (gitSubcommands); the autopilot progress count reads this one.

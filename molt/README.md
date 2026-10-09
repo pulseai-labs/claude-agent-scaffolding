@@ -195,8 +195,9 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   backstop. If it runs at or below the block threshold, it acts first. `/molt status` checks.
 - **A Bash write is not progress unless it commits.** The autopilot loop guard counts Write,
   Edit, NotebookEdit and `git commit`; `sed -i` or `cat >` alone reads as no progress. A
-  `git commit` counts only where the line runs it — bare, or behind `{` or `time`; behind `if`,
-  `then`, `elif`, `else` or `!` it may not run, so it does not count.
+  `git commit` counts only bare, or behind `time`: a `{ … }` segment cannot be told from a
+  function definition's body (`f() { git commit -m m; }`, which runs no commit), and one behind
+  `if`, `then`, `elif`, `else` or `!` may not run, so neither counts.
 - **A worker's ping is a message from you, to molt.** A ping a crew worker types into a top's
   pane (`herdr agent prompt`) reaches molt as a `composer` prompt, so it resets the manual pause
   count; a looping root top is then bounded only by minimum room (#668).

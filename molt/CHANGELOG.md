@@ -17,10 +17,12 @@ All notable changes to the `molt` plugin.
   redirections that carry `&` (`2>&1`, `>&2`, `&>`, `&>>`) are untouched. Both effects were
   fail-closed before: past the block threshold `if git add f; then git commit -m m; fi` was refused
   although every command in it is a git command, and a head-wrapped `git commit` was not counted as
-  progress, so the autopilot loop guard could read a committing session as stalled. Progress now
-  counts a commit only where the line runs it — bare, or behind `{` or `time`; behind `if`, `then`,
-  `elif`, `else` or `!` it may not run, and counting it would hide a stalled loop. The walk is an
-  exact raw head: a path-qualified or quoted head word is an ordinary program and stays refused.
+  progress, so the autopilot loop guard could read a committing session as stalled. Progress
+  counts a commit only bare, or behind `time`: the `(`/`)` split leaves a `{ … }` segment
+  indistinguishable from a function definition's body (`f() { git commit -m m; }` defines the
+  function and commits nothing), and behind `if`, `then`, `elif`, `else` or `!` a commit may not
+  run — so counting either would hide a stalled loop. The walk is an exact raw head: a
+  path-qualified or quoted head word is an ordinary program and stays refused.
 
 ## 0.2.3 — 2026-10-09
 
