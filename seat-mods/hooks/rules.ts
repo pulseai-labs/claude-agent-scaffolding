@@ -99,33 +99,49 @@ function blank(command: string): { text: string; pieces: string[] } {
   return { text: text.replace(/(^|[ \t;&|()])#[^\n]*/gm, '$1'), pieces }
 }
 
-// An unquoted `${…}` or `$[…]` expansion is one word to Bash: a `&` inside it is
-// text, not a list separator, and splitting there would hide the command the word
-// carries (`X=${x/a&b/c} git push --force` runs one command). Blanked as one piece,
-// as blank() blanks quotes; expand() restores it where a segment's own text is
-// read. seat-mods-local by ruling: molt's gate keeps its 0.2.4 reading of these
-// words (#723 review R1); kept outside the parity-held declarations.
-function blankExpansions(text: string, pieces: string[]): string {
+// A lone `&` inside an unquoted `${…}` or `$[…]` is literal to Bash — the word
+// carries it — so only that `&` stops being a boundary; every other character
+// (`(`, `)`, `;`, `|`, newline) keeps its COMMANDS meaning, and the `&` of a
+// `$(…)` nested in an expansion is a real separator and keeps splitting. Each
+// masked `&` becomes a marker piece, so expand() restores the real text for the
+// trailer and `-F` readers. `$$` is one token, so a `${` right after it opens an
+// expansion while the `{` after a completed `$$` stays literal; an unterminated
+// expansion masks nothing — the split stays, fail closed. seat-mods-local by
+// ruling: molt's gate keeps its 0.2.4 reading of these words (#723 review
+// R1/C1/C2, round 3); kept outside the parity-held declarations.
+function maskExpansionAmps(text: string, pieces: string[]): string {
+  type Zone = { kind: 'brace' | 'bracket' | 'paren'; closed: boolean }
+  const stack: Zone[] = []
+  const candidates: Array<{ at: number; zones: Zone[] }> = []
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]!
+    if (char === '$') {
+      const next = text[i + 1]
+      if (next === '$') { i += 1; continue }                    // `$$` is a complete token
+      if (next === '{') { stack.push({ kind: 'brace', closed: false }); i += 1; continue }
+      if (next === '[') { stack.push({ kind: 'bracket', closed: false }); i += 1; continue }
+      if (next === '(') { stack.push({ kind: 'paren', closed: false }); i += 1; continue }
+      continue
+    }
+    const top = stack[stack.length - 1]
+    if (char === '}' && top?.kind === 'brace') { top.closed = true; stack.pop(); continue }
+    if (char === ']' && top?.kind === 'bracket') { top.closed = true; stack.pop(); continue }
+    if (char === ')' && top?.kind === 'paren') { top.closed = true; stack.pop(); continue }
+    if (char === '(' && top?.kind === 'paren') { stack.push({ kind: 'paren', closed: false }); continue }
+    if (char === '[' && top?.kind === 'bracket') { stack.push({ kind: 'bracket', closed: false }); continue }
+    if (char !== '&') continue
+    if (top?.kind !== 'brace' && top?.kind !== 'bracket') continue
+    if ('&<>'.includes(text[i - 1] ?? '') || '&>'.includes(text[i + 1] ?? '')) continue
+    // The snapshot shares the zone objects, so a later close flips `closed` here:
+    // a candidate survives only when every zone around it terminated.
+    candidates.push({ at: i, zones: [...stack] })
+  }
   let out = ''
   let from = 0
-  let i = 0
-  while (i < text.length) {
-    const opener = text[i] === '$' && text[i - 1] !== '$' ? text[i + 1] : undefined
-    const closer = opener === '{' ? '}' : opener === '[' ? ']' : undefined
-    if (closer === undefined) { i += 1; continue }
-    let depth = 1
-    let end = -1
-    for (let j = i + 2; j < text.length; j++) {
-      if (opener === '{' && text[j] === '$' && text[j + 1] === '{') { depth += 1; j += 1; continue }
-      if (opener === '[' && text[j] === '[') { depth += 1; continue }
-      if (text[j] !== closer) continue
-      if ((depth -= 1) === 0) { end = j; break }
-    }
-    // An unterminated expansion is a syntax error, not a word: leave the text as it is.
-    if (end < 0) { i += 1; continue }
-    out += text.slice(from, i) + `\u0000${pieces.push(text.slice(i, end + 1)) - 1}\u0000`
-    from = end + 1
-    i = end + 1
+  for (const candidate of candidates) {
+    if (candidate.zones.some(zone => !zone.closed)) continue
+    out += text.slice(from, candidate.at) + `\u0000${pieces.push('&') - 1}\u0000`
+    from = candidate.at + 1
   }
   return out + text.slice(from)
 }
@@ -212,7 +228,7 @@ function afterHeads(tokens: string[]): string[] {
 export function bashRules(command: string, messageFileText = ''): RuleId[] {
   const found = new Set<RuleId>()
   const { text, pieces } = blank(command)
-  for (const segment of blankExpansions(text, pieces).split(COMMANDS)) {
+  for (const segment of maskExpansionAmps(text, pieces).split(COMMANDS)) {
     const tokens = afterHeads(tokensOf(segment))
     const head = commandOf(tokens)
     if (head?.name === 'gh' && head.args[0] === 'pr') {
@@ -252,7 +268,7 @@ export function bashRules(command: string, messageFileText = ''): RuleId[] {
 export function commitMessageFiles(command: string): string[] {
   const files: string[] = []
   const { text, pieces } = blank(command)
-  for (const segment of blankExpansions(text, pieces).split(COMMANDS)) {
+  for (const segment of maskExpansionAmps(text, pieces).split(COMMANDS)) {
     const git = gitOf(afterHeads(tokensOf(segment)))
     if (git?.sub !== 'commit') continue
     const { args } = git

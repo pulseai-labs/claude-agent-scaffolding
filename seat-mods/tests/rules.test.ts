@@ -462,18 +462,41 @@ describe('a lone & is a command boundary (#723)', () => {
   })
 })
 
-// #723 review R1: an `&` inside an unquoted `${…}` or `$[…]` expansion is literal
-// in Bash — the line runs one command, as the tag read it — so the split must not
-// fire there. seat-mods blanks those expansions as one word before the COMMANDS
-// split; molt's gate keeps the raw split on purpose (molt 0.2.4's reading).
+// #723 review R1/C1/C2, round 3: an `&` inside an unquoted `${…}` or `$[…]` is
+// literal in Bash — the word carries it — so only that `&` stops being a boundary;
+// every other character (`(`, `)`, `;`, `|`, newline) keeps its COMMANDS meaning,
+// and the `&` of a `$(…)` nested in an expansion is a real separator and keeps
+// splitting. seat-mods-local; molt's gate keeps the raw split by ruling.
 describe('an & inside an unquoted expansion is not a boundary (#723 review R1)', () => {
   test('an assignment-prefixed expansion leaves the command behind it reachable', () => {
     expect(bashRules('X=${x/a&b/c} git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
     expect(bashRules('X=$[2&3] git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
     expect(bashRules('X=${x/a&b/c} gh pr merge 12')).toContain('merge')
   })
-  test('a nested expansion is one word too', () => {
+  test('a nested expansion is one word, including a & after its close', () => {
     expect(bashRules('X=${a:-${b/&/c}} git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
+    // The nesting pin (review RR1): with the nested `${` untracked, the first `}`
+    // closes the outer word and this `&` splits, junk-heading the follower.
+    expect(bashRules('X=${a:-${b/&/c}&d} git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
+  })
+  test('a nested command substitution stays executable (review C1)', () => {
+    expect(bashRules('echo ${x:-$(git push --force)}')).toEqual(expect.arrayContaining(['push', 'force-push']))
+    expect(bashRules('echo ${x:-$(git status)}')).toEqual([])
+  })
+  test('the & of a nested substitution still splits (review C1/P6)', () => {
+    expect(bashRules('echo ${x:-$(true & git push --force)}')).toEqual(expect.arrayContaining(['push', 'force-push']))
+    expect(bashRules('echo ${x:-$(true & git status)}')).toEqual([])
+  })
+  test('$$ is a complete token: ${ after it opens, the { after a bare $$ stays literal (review C2)', () => {
+    expect(bashRules('X=$$${x/a&b/c} git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
+    expect(bashRules('X=$${x} git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
+    expect(bashRules('X=$${x/a&b/c} git push --force')).toEqual([])
+  })
+  test('an escaped $ is text, and the & behind it splits as Bash splits it', () => {
+    expect(bashRules('\\${x/a&b/c} git push --force')).toEqual([])
+  })
+  test('an unterminated expansion masks nothing: the split stays (fail closed)', () => {
+    expect(bashRules('echo ${x & git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
   })
   test('a flag and a message file beside the expansion stay with their command', () => {
     expect(bashRules('git push ${x/a&b/c} --force')).toContain('force-push')
@@ -482,6 +505,7 @@ describe('an & inside an unquoted expansion is not a boundary (#723 review R1)',
   test('control: an expansion without a boundary & reads as before', () => {
     expect(bashRules('git push ${x/a&b/c} origin main')).toEqual(['push'])
     expect(bashRules('echo ${x//&/y}')).toEqual([])
+    expect(bashRules('printf x ${x/a/& git push --force }')).toEqual([])
   })
   test('control: the & beside an expansion still splits', () => {
     expect(bashRules('echo ${x//&/y} & git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))

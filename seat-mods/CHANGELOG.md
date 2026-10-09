@@ -12,14 +12,18 @@ All notable changes to the `seat-mods` plugin.
   the `&` of a `|&` pipe included — while `&&` and the redirections that carry `&`
   (`2>&1`, `>&2`, `&>`, `&>>`, `<&0`, `>&-`) are not boundaries, so the forms the previous
   release allowed keep their rules. An `&` inside an unquoted `${…}` or `$[…]` expansion is
-  literal in Bash, so the seat-mods rails blank those expansions as one word before the
-  split: `X=${x/a&b/c} git push --force` meets its rails as the previous release read it.
-  molt's gate keeps the raw split and its 0.2.4 reading of those words on purpose — the two
-  mods differ there — and the `rm` rail's own split is a second spelling of `&` in
-  `rules.ts`: change one and check the others. Known limit: an `&` on a heredoc opener line
-  is still swallowed with the heredoc body — the boundary is a property of the `COMMANDS`
-  split, not of every Bash line (#724 carries it). The `rm` rail is otherwise unchanged: it
-  already split on `&`.
+  literal in Bash, so the seat-mods rails mask exactly that `&` before the split — every
+  other character keeps its `COMMANDS` meaning, so `(`, `)`, `;` and `|` inside an expansion
+  still split, a nested `$(…)` stays executable (`echo ${x:-$(git push --force)}` reads
+  `push`, `force-push`), the `&` of a `$(…)` in an expansion still splits, `$$` is read as a
+  complete token, and an unterminated expansion masks nothing (the split stays, fail closed).
+  `X=${x/a&b/c} git push --force` meets its rails as the previous release read it. molt's
+  gate keeps the raw split and its 0.2.4 reading of those words on purpose — the two mods
+  differ there — and the `rm` rail's own split is a second spelling of `&` in `rules.ts`:
+  change one and check the others. Known limits (#724): an `&` on a heredoc opener line is
+  still swallowed with the heredoc body, a `&&` inside an expansion keeps the previous
+  release's reading, and a backtick substitution inside an expansion stays invisible — the
+  reader cannot follow it. The `rm` rail is otherwise unchanged: it already split on `&`.
 - Mirrored byte-identically into `molt/hooks/shell.ts` under the shared-reader parity
   contract; `molt` 0.2.5 drops its interim `LONE_AMP` split.
 
