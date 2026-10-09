@@ -165,8 +165,9 @@ published line is exactly the defect this step exists to prevent.**
 hosting repo: local repos merge now, remote repos push their spine branch and
 open a PR against that repo's base branch. The prose between the passes hands
 each open PR to `/ossify:work-pr`. Pass two records the merged PRs against
-freshly fetched refs. `$merge_shas` — the `repo:sha` pairs §6's touch check
-reads — accumulates across both passes.
+freshly fetched refs. `$merge_shas` — the `repo:sha` lines §6's touch check
+reads, with a third `:before` field where a PR landed by squash or rebase —
+accumulates across both passes.
 
 One of the two facts this step needs is not in state; the other is:
 
@@ -483,8 +484,10 @@ in its own session where the caller supplies one.
 The invocation states, in full: the spine context (this PR *is* the spine's
 accumulated diff landing — the smallest independently meaningful diff, which is
 why the tier sits here and not at the work item, whose merges stay local); the
-**merge convention is a merge commit** — a rebase or squash landing cannot feed
-§6's first-parent diff and is turned away at the record pass below; and that
+**merge convention is a merge commit** where the repo allows one; a squash or
+rebase landing of exactly the reviewed head is also accepted — a base branch that
+enforces linear history allows nothing else — because the record pass below
+proves it (#708); and that
 whatever the loop leaves owed lands **in that repo** and is linked from the
 spine's retrospective (§8) — a tracked deferral issue under the bundled loop;
 merge-bar's one out-of-scope issue and its `[KL]` ledger lines under
@@ -508,8 +511,9 @@ steps remain, and stop. That is the named halt state; re-invoke `/close
 **On a surface that does not carry `/ossify:work-pr` — OpenCode and Devin today,
 where the utility is not published (#131) — the operator drives the
 review-fix-merge loop by their own means and says so.** What this ceremony
-REQUIRES is a merge-commit landing of the PR it opened; who drove the loop to
-that merge is the operator's affair. The record pass below still proves the
+REQUIRES is a landing of the PR it opened that the record pass can prove — a
+merge commit of its head, or a squash or rebase of exactly its head; who drove
+the loop to that merge is the operator's affair. The record pass below still proves the
 landing — identity, lineage, base — against fetched refs, so a hand-driven loop
 gets exactly the same verification a work-pr-driven one does. The port of the
 work-pr lane to the remaining surfaces is #131's scope, not this step's.
@@ -749,10 +753,12 @@ the cumulative ledger stops meaning anything.
 **Compute the path list first — it is every hosting repo's own first-parent
 diff, concatenated into ONE call.** §3 merges once per hosting repo, and each
 merge is a separate commit in a separate repository — there is no single
-`$merge_sha` any more, so this step reads `$merge_shas`, the `repo:sha` pairs §3
+`$merge_sha` any more, so this step reads `$merge_shas`, the `repo:sha` lines §3
 recorded at each repo's own merge step, and computes each repo's diff the exact
 same way §3's single-repo predecessor did: the merge commit against its **first
-parent**.
+parent** — or, for a PR that landed by squash or rebase, against the
+**before-point** the record pass proved and wrote as the line's third field (a
+rebase lands several commits, so its first parent would see only the last).
 
 ```bash
 # Collect into a FILE, and let each repo's failure halt on the spot. The earlier
@@ -810,9 +816,9 @@ full path list first, across every repo, and let the one call judge all of it �
 the same discipline §3's loop already established for the merge itself.
 
 **The inner loop, never a bash associative array.** `$merge_shas` is a flat
-`repo:sha` list, one pair per line — exactly what §3 built, one line appended
-per repo at that repo's own merge. A single `while IFS=: read -r repo sha` loop
-splits each line on its first colon (git ref names cannot contain `:`, so the
+`repo:sha[:before]` list, one line per repo — exactly what §3 built, one line appended
+per repo at that repo's own merge. A single `while IFS=: read -r repo sha before` loop
+splits each line on its colons (git ref names cannot contain `:`, so the
 split is unambiguous) and calls `"$oss_bin" repo_root` fresh for each — there is no
 `$merge_sha_by_repo[$repo]`-style lookup anywhere in this file, because bash 3.2
 has no associative arrays to hold one. The outer `while IFS= read -r p` loop is
@@ -832,7 +838,7 @@ answers "what did this merge bring in," per repo, and it is stable whether or
 not that repo's base moved. **This holds identically for a PR-landed repo: its
 pair's SHA is the remote merge commit, and the first-parent diff of the fetched
 merge commit — planned changes and review-fix commits alike — is that repo's
-list.** Fix commits are not filtered out and are not compared against the
+list; for a squash or rebase landing, the diff from the proved before-point is.** Fix commits are not filtered out and are not compared against the
 spine's declared surfaces: nothing in steps 3-11 performs a plan-scope
 comparison, so a test file or version surface a fix commit moved is simply part
 of the union `touch_check` judges. A fix commit that hits a registered bone or
@@ -1043,8 +1049,9 @@ clean, and an unreadable registry.
 - **Binding the record guards to the push-time tip.** work-pr lands fix commits
   on the spine branch; the merged head is a *descendant* of the pushed tip, and
   an equality-shaped guard fails every PR that had one fix round (§3).
-- **Accepting a rebase- or squash-landed PR.** §6's first-parent diff needs a
-  two-parent merge commit; the record pass turns the landing away at record
+- **Accepting a squash or rebase landing without its proof.** The landed tree
+  must equal the reviewed head's, and the landed run must sit on a commit the
+  head holds, through one-parent commits only; anything else halts at record
   time (§3).
 - **Running the stranded-merge repair automatically.** The halt names
   `git reset --hard <remote>/<base>` and its containment precondition; resetting

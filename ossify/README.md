@@ -1,4 +1,4 @@
-# ossify (v1.14.2)
+# ossify (v1.14.3)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
@@ -93,6 +93,14 @@ The private boundary inventory has one address —
 "composition root" is defined as a path rather than a repo key, and the critic
 moment's non-interactive default records that no operator answered (#299). No
 `lib/` code, no state change.
+
+Since 1.14.3 (#708), a spine close records a PR that landed by squash or rebase,
+for a base branch that enforces linear history: the landed tree must equal the
+reviewed head's, and the landed run must sit on a commit the head holds through
+one-parent commits only. The record line names its proof (`merge`, `squash` or
+`rebase`), and the changed-path list and the cumulative demo compare against the
+proved before-point. A merge commit is still the convention where the repo
+allows one; a fast-forward or any other shape still halts at record time.
 
 Since 1.14.2 (#692, #691, #645, #646, #675), doctor's bones drift check folds
 both halves under one scoped C locale, preserving identifiers in findings under
