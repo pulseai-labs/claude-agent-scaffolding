@@ -95,7 +95,8 @@ a native `claude --model <id> --effort <level>` command rather than an alias; th
 model is confirmed as the row's `model_shows` says and by the worker's own check, exactly
 as *The launch* requires; and each item gets a
 **fresh** pair, retained across that item's corrections and released when it closes or
-escalates. A pair never crosses work items there.
+escalates. A pair never crosses work items there. Each seat is marked as
+`herdr-mechanics.md` step 2 states, in the brief of the session that launches it.
 
 Everything else on this page — the class routing, the retention rule, the placement
 and writer rules, and the budget below — is unchanged and still governs every session

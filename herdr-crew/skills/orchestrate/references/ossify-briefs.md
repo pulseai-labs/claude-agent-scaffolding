@@ -181,6 +181,7 @@ verbatim.
 Launched from its SEATS row's verifier command, verbatim. Its procedure is the
 fixed `all-claims-work-item-verify/v1`; its CLAIMS is `briefs.md`'s verifier CLAIMS
 body, supplied verbatim with the dispatch; its placements and retention are its own.
+Marked as `herdr-mechanics.md` step 2 states, in the brief of the session that launches it.
 
 ```text
 ROLE: verifier for <work-item-id>, read-only, in worktree <abs path>, at the accepted result's

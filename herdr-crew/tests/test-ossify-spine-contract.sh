@@ -66,7 +66,7 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=230          # A3: each ossify reference stays under 209 lines; 0.2.9 raised it from 214 for the spine brief's 1.14.0 caller rules and re-entry seat rule.
+REF_BUDGET=231          # A3: each ossify reference stays under 209 lines; 0.2.9 raised it from 214 for the spine brief's 1.14.0 caller rules and re-entry seat rule.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
                         # each launch site gained; the files' own maximum is 209
                         # (`ossify-nested-run.md`), and the budget section's adjacent
@@ -74,6 +74,8 @@ REF_BUDGET=230          # A3: each ossify reference stays under 209 lines; 0.2.9
                         # longest budgeted reference is still refused.
                         # 0.2.8: raised for the molt clauses — nested-run §4 (211), the spine brief (214), then the
                         # spine, work-PR and leaf MOLT lines; it always equals the maximum.
+                        # 0.2.11 (#663): raised from 230 for the two launch-site citing clauses
+                        # (ossify-briefs.md's item-verifier intro, 231); it still equals the maximum.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
