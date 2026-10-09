@@ -598,11 +598,44 @@ while IFS=: read -r repo pr_num; do
   git -C "$repo_root" merge --ff-only "$remote_name/$base_branch" \
     || { echo "close: local '$base_branch' cannot fast-forward to $remote_name in $repo - halt"; exit 1; }
 
-  # HEAD IDENTITY - the merge merged exactly the PR's reviewed head. A rebase-
-  # or squash-landed PR fails HERE, at record time with the method named,
-  # instead of obscurely in §6's touch check.
-  [ "$(git -C "$repo_root" rev-parse "$merge_sha^2" 2>/dev/null)" = "$head_oid" ] \
-    || { echo "close: $repo PR #$pr_num did not land as a two-parent merge commit - a rebase or squash merge cannot feed step 5's first-parent diff - halt"; exit 1; }
+  # HEAD IDENTITY - what landed is exactly the PR's reviewed head, by one of
+  # three proofs (#708). The proof also fixes this repo's BEFORE-POINT: the
+  # commit §6's changed-path list and the cumulative demo compare against.
+  #   merge  - two parents, the second is the head; before-point = merge^1.
+  #   squash - one parent; the landed tree IS the head's tree, and the parent
+  #            is already in the head's history (the base did not move).
+  #   rebase - the same, over a run of one-parent commits: walk the landed
+  #            tip's first parents down to the first commit the head holds.
+  # A base branch that enforces linear history cannot take a merge commit, so
+  # the second and third proofs are how such a repo's spine lands at all.
+  # Anything else halts HERE, at record time with the shape named, instead of
+  # obscurely in §6's touch check.
+  _parents="$(git -C "$repo_root" rev-list --parents -n 1 "$merge_sha" | awk '{print NF-1}')"
+  before=""
+  if [ "$_parents" = 2 ]; then
+    [ "$(git -C "$repo_root" rev-parse "$merge_sha^2")" = "$head_oid" ] \
+      || { echo "close: $repo PR #$pr_num landed as a two-parent merge commit whose second parent is not the PR's head ($head_oid) - halt"; exit 1; }
+    proof=merge
+  elif [ "$_parents" = 1 ]; then
+    [ "$(git -C "$repo_root" rev-parse "$merge_sha^{tree}")" = "$(git -C "$repo_root" rev-parse "$head_oid^{tree}")" ] \
+      || { echo "close: $repo PR #$pr_num's landed commit $merge_sha is neither a two-parent merge commit of its head nor a squash or rebase of it - its tree differs from the reviewed head's ($head_oid) - halt"; exit 1; }
+    ! git -C "$repo_root" merge-base --is-ancestor "$merge_sha" "$head_oid" \
+      || { echo "close: $repo PR #$pr_num landed by fast-forward ($merge_sha is already in the reviewed head) - neither a two-parent merge commit nor a squash or rebase, so there is no before-point to prove - halt"; exit 1; }
+    _run=0
+    for _c in $(git -C "$repo_root" rev-list --first-parent --max-count=1000 "$merge_sha"); do
+      if [ "$_run" -gt 0 ] && git -C "$repo_root" merge-base --is-ancestor "$_c" "$head_oid"; then
+        before="$_c"; break
+      fi
+      [ "$(git -C "$repo_root" rev-list --parents -n 1 "$_c" | awk '{print NF-1}')" = 1 ] \
+        || { echo "close: $repo PR #$pr_num's landed commit $merge_sha sits on a merge commit below the landed run ($_c) that the reviewed head does not hold - no before-point can be proved - halt"; exit 1; }
+      _run=$((_run + 1))
+    done
+    [ -n "$before" ] \
+      || { echo "close: $repo PR #$pr_num's landed commit $merge_sha reaches no commit of the reviewed head within 1000 first parents - no before-point can be proved - halt"; exit 1; }
+    if [ "$_run" = 1 ]; then proof=squash; else proof=rebase; fi
+  else
+    echo "close: $repo PR #$pr_num's landed commit $merge_sha has $_parents parents - neither a two-parent merge commit nor a squash or rebase - halt"; exit 1
+  fi
 
   # LINEAGE - the merged head DESCENDS from what this close pushed. Ancestry,
   # not equality: work-pr's fix commits sit on top of the pushed tip. A
@@ -615,8 +648,8 @@ while IFS=: read -r repo pr_num; do
     || { echo "close: $base_branch in $repo does not contain merge commit $merge_sha - halt"; exit 1; }
 
   merge_shas="$merge_shas
-$repo:$merge_sha"
-  echo "close: $repo landed PR #$pr_num at $merge_sha"
+$repo:$merge_sha${before:+:$before}"
+  echo "close: $repo landed PR #$pr_num at $merge_sha ($proof)"
 done <<EOF
 $pr_lines
 EOF
@@ -731,12 +764,13 @@ parent**.
 # or risk-gate hit in the failing repo goes unreported and the close continues
 # looking clean. A partial list is the INCONCLUSIVE case, not the clean one.
 paths="$(mktemp)"; : > "$paths"
-while IFS=: read -r repo sha; do
+while IFS=: read -r repo sha before; do
   [ -n "$repo" ] || continue
   root="$("$oss_bin" repo_root "$repo")" \
     || { echo "close: \$merge_shas names undeclared repo '$repo' - the changed-path list would be INCOMPLETE - halt"; exit 1; }
-  git -C "$root" diff --name-only "$sha^1" "$sha" >> "$paths" \
-    || { echo "close: cannot diff $sha against its first parent in $repo - the changed-path list would be INCOMPLETE - halt"; exit 1; }
+  # The before-point §3 proved: a squash's or rebase's, else the merge's first parent.
+  git -C "$root" diff --name-only "${before:-$sha^1}" "$sha" >> "$paths" \
+    || { echo "close: cannot diff $sha against its before-point in $repo - the changed-path list would be INCOMPLETE - halt"; exit 1; }
 done <<EOF
 $merge_shas
 EOF
