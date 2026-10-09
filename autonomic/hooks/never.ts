@@ -80,6 +80,8 @@ function commands(text: string): Command[] | undefined {
       if (text[i + 2] === '(') return undefined
       const e = closeOf(text, i + 1)
       if (e < 0) return undefined
+      // A case pattern's `)` or a comment's may close the substitution early: read none of it.
+      if (/(?:^|[\s;&|(])(?:case[\s;]|#)/.test(text.slice(i + 2, e - 1))) return undefined
       bare += text.slice(mark, i) + '$S'
       subs.push(text.slice(i + 2, e - 1))
       mark = e
@@ -151,7 +153,8 @@ function groups(cmds: readonly Command[]): Group[] | undefined {
 function pipesOn(cmds: readonly Command[], i: number): boolean {
   for (let j = i; cmds[j]?.pipe; j++) {
     const next = cmds[j + 1]
-    if (next === undefined || !isInert(next.bare) || targets(next.bare).length > 0) return true
+    // A group on the right takes the input for all its commands: it counts (`… | { cat; } | make -f -`).
+    if (next === undefined || !isInert(next.bare) || targets(next.bare).length > 0 || /^\s*(?:\(|\{\s|(?:if|while|until|for|case|select)\s)/.test(next.bare)) return true
   }
   return false
 }
@@ -259,7 +262,8 @@ function resolver(parts: readonly Command[]): Resolve {
     const ws = split(c.bare)
     const i = ws.findIndex(x => !KEYWORD.has(x))
     const h = i < 0 ? undefined : ws[i]
-    if (h === 'popd') unknown = true
+    // A link made in the text may make a literal directory another one (`ln -s .git d; cd d`).
+    if (h === 'popd' || h === 'ln') unknown = true
     if (h !== 'cd' && h !== 'pushd') continue
     const t = ws.slice(i + 1).find(w => !/^-[LPe@]+$/.test(w))
     if (t === undefined) dirs.push('~')
@@ -282,7 +286,8 @@ function safeSed(text: string): boolean {
   const ws = argv(text.replace(REDIRS, ' '))
   const i = ws.findIndex(x => !KEYWORD.has(x))
   const rest = ws.slice(i + 1)
-  if (rest.some(w => /^-[A-Za-z]*[efi]/.test(w) || /^--(?:expression|file|in-place)/.test(w))) return false
+  // Only options that take no value: any other (`-l N`, `-e`, `-f`, `-i`) is not narrow.
+  if (rest.some(w => w.startsWith('-') && !/^-[nErsuz]+$|^--(?:quiet|silent|regexp-extended|separate|unbuffered|null-data|posix|debug|sandbox)$/.test(w))) return false
   const script = rest.find(w => !w.startsWith('-'))
   return script !== undefined && SAFE_SED.test(script)
 }
@@ -298,8 +303,10 @@ function runs(text: string, cmds: readonly Command[] | undefined): boolean {
   })
 }
 // An unquoted heredoc body is literal when it holds no substitution or expansion that runs code
-// (`$(`, a backtick, `$((`, `$[`, `${…@…}`); a plain `$VAR` only expands (0.4.3 §3.3).
-const LIVE_BODY = /\$\(|(?<!\\)`|\$\[|\$\{[^}]*@/
+// (`$(`, a backtick, `$((`, `$[`, `${…@…}`); a plain `$VAR` only expands (0.4.3 §3.3). A
+// backtick after an even run of backslashes is live (`\\` is one literal backslash), and so is
+// a line continuation.
+const LIVE_BODY = /\$\(|(?<!\\)(?:\\\\)*`|\$\[|\$\{[^}]*@|\\\n/
 const WRITE_ANY = /(?<=^|[\n;&|({)])[ \t]*cat[ \t]+(?:>>?[ \t]*([^\s;&|<>]+)[ \t]+)?<<-?[ \t]*(['"]?)([A-Za-z_]\w*)\2(?:[ \t]*>>?[ \t]*([^\s;&|<>]+))?[ \t]*\n([\s\S]*?)\n[ \t]*\3[ \t]*(?=\n|$)/g
 // Whether `at` sits inside a `$(` or a backtick not closed before it. A substitution that
 // does not close counts as open.

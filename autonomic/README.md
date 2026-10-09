@@ -155,10 +155,12 @@ are judged the same way; a command that is not inert keeps everything. A redirec
 group's closer (`}`, `)`, `fi`, `done`, `esac`) applies to every command in the group. `cat <<'EOF'`
 with no file prints to standard output, and its body drops unless it is piped to a command that
 is not inert (or into a file), its group's target is used later, or it sits anywhere inside a `$(` or backticks; an unquoted
-`cat <<EOF` body counts when it holds no `$(`, backtick, `$((`, `$[` or `${…@…}`. A `sed` with no
-`-e`, `-f` or `-i` whose script is one address plus `p`, `d` or `q` (`sed -n 8,9p`) is inert. After
+`cat <<EOF` body counts when it holds no `$(`, unescaped backtick, `$((`, `$[`, `${…@…}` or line
+continuation. A `sed` whose only options take no value (`-n`, `-E` …) and whose script is one address plus `p`, `d` or `q` (`sed -n 8,9p`) is inert. After
 a `cd` to a literal directory a relative name is read inside it (`cd .git` makes `config`
-`.git/config`). A command in `readers` (below) that names a written file does not run it.
+`.git/config`), unless the text runs `ln`. A command in `readers` (below) that names a written file
+does not run it. A `$(` that holds `case` or a comment keeps the whole bag, and a pipe into a group
+counts as reaching a command that is not inert.
 
 Two heredoc shapes with a quoted delimiter are literal text, and their bodies are skipped: a
 commit message, `-m "$(cat <<'EOF'` … `EOF` `)"`, and `cat > file <<'EOF'` at a command's start

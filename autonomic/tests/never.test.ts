@@ -695,3 +695,28 @@ describe('0.4.3 final review: a heredoc inside a substitution keeps its body', (
     expect(rules(`echo "$(date)"\ncat <<'X'\n${PROSE}\nX\n`)).toEqual([])
   })
 })
+
+// PR #709 round 1 (Codex): spellings that 0.4.2 asked on and the first 0.4.3 head did not.
+describe('0.4.3 PR review: shapes 0.4.2 asked on still ask', () => {
+  const P = 'git push -f origin feat/x'
+  test('a case or a comment inside $( keeps the whole bag', () => {
+    expect(rules(`echo "$(case x in x) ${P};; esac)"`)).toContain('force-push')
+    expect(rules(`echo "$(echo hi # )\n${P})"`)).toContain('force-push')
+  })
+  test('an unquoted heredoc body with any backtick or a line continuation is live', () => {
+    expect(rules(`cat <<X\n\\\\\`${P}\\\\\`\nX\n`)).toContain('force-push')
+    expect(rules(`cat > b.md <<X\n\\\\\`${P}\\\\\`\nX\n`)).toContain('force-push')
+    expect(rules(`cat <<X\n$\\\n(${P})\nX\n`)).toContain('force-push')
+  })
+  test('a sed option that takes a value is not narrow', () => {
+    expect(rules(`sed -l 1p "e ${P}" f`)).toContain('force-push')
+    expect(rules(`sed --line-length=1 -n 1p "e ${P}" f`)).toContain('force-push')
+    expect(rules('sed -n -E 8,9p f')).toEqual([])
+  })
+  test('a symlink made in the text makes a cd target unknown', () => {
+    expect(rules("ln -s .git d; cd d; printf '[alias]\\np = push -f\\n' > config; cd ..; git p origin feat/x")).toContain('force-push')
+  })
+  test('a pipe into a group counts', () => {
+    expect(rules(`{ cat <<'X'\nall:\n\t${P}\nX\n} | { cat; } | make -f -`)).toContain('force-push')
+  })
+})
