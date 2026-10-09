@@ -550,3 +550,63 @@ describe('rm heredoc input stays out of operands (#702 item 1)', () => {
       expect((await $.tool.call({ tool: 'Bash', command })).deny).toBeUndefined()
   })
 })
+
+// Fix task 1: /if and /do execute ordinary programs; their argv is not shell syntax.
+describe('head-name executable controls', () => {
+  for (const role of ['implementer', 'verifier', 'reviewer', undefined, ''] as const) {
+    const label = role || 'default'
+    for (const prefix of ['/fixtures/if', '/fixtures/do', 'A=1 if', 'env if', 'command if', 'time env if']) {
+      for (const payload of ['git push --force', 'gh pr merge 1', 'rm /var/x']) {
+        const bare = prefix.endsWith('do') ? `while true; do ${payload}; break; done` : `if ${payload}; then :; fi`
+        test(`${label}: ${prefix} ${payload} allowed beside bare denial`, async ($, on) => {
+          world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+          expect((await $.tool.call({ tool: 'Bash', command: bare })).deny).toBeDefined()
+          expect((await $.tool.call({ tool: 'Bash', command: `${prefix} ${payload}` })).deny).toBeUndefined()
+        })
+      }
+    }
+  }
+})
+
+// These hook allowances, unlike a plain implementer heredoc, are genuinely red
+// on 0.3.0: its bogus operand is unwritable, expands, or follows a same-call cd.
+describe('heredoc allowances with real tag denial provenance', () => {
+  for (const opener of ['<<EOF', '<<-EOF', "<<'EOF'"]) {
+    const ending = opener === '<<-EOF' ? '\tEOF' : 'EOF'
+    for (const gap of [' ', '']) {
+      for (const [label, role, prefix, body] of [
+        ['reviewer unwritable phantom', 'reviewer', '', 'y'],
+        ['implementer dollar in input', 'implementer', '', '$CONFIRM'],
+        ['implementer earlier cd', 'implementer', 'cd /var; ', 'y'],
+      ] as const) {
+        // Attached plain inputs already pass on the tag; only add pins with a real RED.
+        if (gap === '' && label !== 'implementer dollar in input') continue
+        const input = `${opener}\n${body}\n${ending}`
+        test(`${label}: ${gap === '' ? 'attached' : 'separate'} ${opener} allowed beside outside deny`, async ($, on) => {
+          world(on, { SEAT_MODS_ROLE: role, SEAT_MODS_ALLOW: '/reports' })
+          expect((await $.tool.call({ tool: 'Bash', command: `${prefix}rm -i /var/x${gap}${input}` })).deny).toContain('no rm')
+          expect((await $.tool.call({ tool: 'Bash', command: `${prefix}rm -i /reports/x${gap}${input}` })).deny).toBeUndefined()
+        })
+      }
+    }
+  }
+})
+
+// Review round 1: opener-line argv must not vanish with a heredoc piece.
+describe('rm heredoc opener boundaries', () => {
+  for (const opener of ['<<EOF', "<<'EOF'", '<<-EOF']) {
+    for (const operand of ['/etc/passwd', '/reports/x', '/reports/x; rm /etc/passwd']) {
+      test(`${opener} followed by ${operand}: unresolvable beside ordinary input`, async ($, on) => {
+        world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
+        expect((await $.tool.call({ tool: 'Bash', command: `rm -i ${opener} ${operand}\ny\nEOF` })).deny).toContain('no rm')
+        expect((await $.tool.call({ tool: 'Bash', command: `rm -i /reports/x ${opener}\ny\nEOF` })).deny).toBeUndefined()
+        expect((await $.tool.call({ tool: 'Bash', command: `cat ${opener} > /reports/x\ny\nEOF` })).deny).toBeUndefined()
+      })
+    }
+    test(`${opener} on fd 2: inside operand alone beside outside denial`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: 'reviewer', SEAT_MODS_ALLOW: '/reports' })
+      expect((await $.tool.call({ tool: 'Bash', command: `rm -i /var/x 2${opener}\ny\nEOF` })).deny).toContain('no rm')
+      expect((await $.tool.call({ tool: 'Bash', command: `rm -i /reports/x 2${opener}\ny\nEOF` })).deny).toBeUndefined()
+    })
+  }
+})

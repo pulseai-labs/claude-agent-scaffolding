@@ -157,16 +157,21 @@ function gitOf(tokens: string[]): { sub: string; args: string[] } | undefined {
   return { sub, args: end < 0 ? args : args.slice(0, end) }
 }
 
-// The same reserved heads are skipped by every rail, after existing assignments
-// and wrappers. Keep this walk outside the declarations shared with molt.
-const HEAD_WORDS = new Set(['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '(', 'time', 'builtin'])
+// Shell syntax is an exact raw head, before assignments or execution wrappers.
+// Keep this walk outside the declarations shared with molt. `builtin` is an
+// execution prefix, not syntax: its argument must never restart this walk.
+const HEAD_WORDS = new Set(['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '(', 'time'])
 
 function afterHeads(tokens: string[]): string[] {
-  for (;;) {
-    const head = commandOf(tokens)
-    if (head === undefined || !HEAD_WORDS.has(head.name)) return tokens
-    tokens = head.args
-  }
+  while (HEAD_WORDS.has(tokens[0] ?? '')) tokens = tokens.slice(1)
+  // Preserve the existing builtin command/cd recognition where Bash itself
+  // invokes it: at the head, after assignments, or through the command builtin.
+  // Other wrappers execute a program, so they cannot expose shell syntax here.
+  let i = 0
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[i] ?? '') || tokens[i] === 'command') i += 1
+  if (tokens[i] !== 'builtin') return tokens
+  while (tokens[i] === 'builtin') i += 1
+  return tokens.slice(i)
 }
 
 export function bashRules(command: string, messageFileText = ''): RuleId[] {
@@ -273,7 +278,22 @@ export function rmTargets(command: string): RmTarget[] {
   // Only pieces blanked as heredocs are shell input. Removing the marker rather
   // than its token preserves a glued operand such as x<<EOF. Quotes and escapes
   // start with their own glyph, so literal << words remain operands.
-  const input = text.replace(MARKER, (marker, i: string) => pieces[Number(i)]?.startsWith('<<') ? '' : marker)
+  const heredocs = new Set<number>()
+  const trailingWords = new Set<number>()
+  for (const [i, piece] of pieces.entries()) {
+    // This relies on blank() blanking heredocs before quotes.
+    if (!piece.startsWith('<<')) continue
+    heredocs.add(i)
+    const opener = /^<<-?[ \t]*(?:'[^'\n]+'|"[^"\n]+"|[^\s;&|<>()'"]+)/.exec(piece)
+    if (opener === null || piece.slice(opener[0].length).split('\n')[0]!.trim() !== '') trailingWords.add(i)
+  }
+  // A boundary-delimited fd digit belongs to the redirect; x2<<EOF keeps x2.
+  const withoutFds = text.replace(/(^|[\s;|&()])\d+(\u0000(\d+)\u0000)/g,
+    (whole, boundary: string, marker: string, i: string) => heredocs.has(Number(i)) ? boundary + marker : whole)
+  // Opener-line tails are command words too. Retain their markers so an rm
+  // segment can fail closed rather than silently drop an operand or command.
+  const input = withoutFds.replace(MARKER, (marker, i: string) =>
+    heredocs.has(Number(i)) && !trailingWords.has(Number(i)) ? '' : marker)
   const redirects = input.replace(/(^|[\s;|&()])\d+(?=[<>])/g, '$1')
     .replace(/(?:<<<|&>>|&>|<>|>\||>>|[<>]&|>|(?<!<)<(?!<))[ \t]*[^\s;&|()]+/g, ' ')
   for (const segment of redirects.split(/;|&&|\|\||[|&]|\n|\(|\)/)) {
@@ -281,6 +301,10 @@ export function rmTargets(command: string): RmTarget[] {
     if (head === undefined) continue
     if (['cd', 'pushd', 'popd'].includes(head.name) || expand(head.name, pieces) === '\\cd') changedDirectory = true
     if (head.name !== 'rm') continue
+    if ([...segment.matchAll(MARKER)].some(match => trailingWords.has(Number(match[1])))) {
+      targets.push({ path: undefined, glob: false })
+      continue
+    }
     let options = true
     for (const arg of head.args) {
       const word = rmWord(expand(arg, pieces))

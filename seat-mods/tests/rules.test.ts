@@ -332,8 +332,8 @@ describe('reserved heads across Bash rails (#701)', () => {
     })
   }
   for (const prefix of ['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '(', 'time', 'builtin']) {
-    // Some fragments are not complete Bash programs; these pin the same head set
-    // rm already recognises, without executing git or adding any grammar.
+    // Some fragments are not complete Bash programs. time and ( are existing
+    // wrapper/splitter controls; those rows do not prove HEAD_WORDS coverage.
     for (const [command, expected, control] of [
       ['git branch -D b', ['branch-delete'], 'git branch -d b'],
       ['git status --no-verify', ['no-verify'], 'git status'],
@@ -343,7 +343,7 @@ describe('reserved heads across Bash rails (#701)', () => {
       ['git merge x', ['merge'], 'git diff --quiet'],
       ['git push -f', ['push', 'force-push'], 'git status'],
     ] as const) {
-      test(`${prefix} ${command}: existing rail beside allowed control`, () => {
+      test(`${prefix} ${command}: ${['time', '('].includes(prefix) ? 'wrapper/splitter control' : 'head recognition'} beside allowed control`, () => {
         expect(bashRules(`${prefix} ${command}`)).toEqual([...expected])
         expect(bashRules(`${prefix} ${control}`)).toEqual([])
       })
@@ -375,5 +375,45 @@ describe('rm heredoc input (#702 item 1)', () => {
       { path: '/reports/x', glob: false }, { path: '<<EOF', glob: false },
     ])
     expect(rmTargets('rm /reports/x <<EOF\ny\nEOF')).toEqual([{ path: '/reports/x', glob: false }])
+  })
+})
+
+// Fix task 1: Bash syntax belongs to raw heads, not basenames or program argv.
+describe('ordinary programs named like head words', () => {
+  for (const prefix of ['/fixtures/if', '/fixtures/do', 'A=1 if', 'A=1 do', 'env if', '/usr/bin/env do', 'command if', 'exec if', 'nohup if', 'A=1 time if', 'time env if', 'if A=1 if', 'if env if', '"if"', '\\if', 'builtin if', 'A=1 builtin if']) {
+    for (const [payload, rule] of [
+      ['git push --force', 'force-push'], ['git merge x', 'merge'],
+      ['git branch -D b', 'branch-delete'], ['git status --no-verify', 'no-verify'],
+      ['gh pr create', 'pr-create'], ['git commit -m x', 'commit'], ['git push', 'push'],
+    ]) {
+      test(`${prefix} ${payload}: program argv allowed beside bare head rail`, () => {
+        const bare = prefix.endsWith('do') ? `while true; do ${payload}; break; done` : `if ${payload}; then :; fi`
+        expect(bashRules(bare)).toContain(rule)
+        expect(bashRules(`${prefix} ${payload}`)).toEqual([])
+      })
+    }
+    test(`${prefix}: commit file and rm argv stay text beside bare heads`, () => {
+      const commit = prefix.endsWith('do') ? 'while true; do git commit -F /w/msg-trailer.txt; break; done' : 'if git commit -F /w/msg-trailer.txt; then :; fi'
+      const remove = prefix.endsWith('do') ? 'while true; do rm /var/x; break; done' : 'if rm /var/x; then :; fi'
+      expect(commitMessageFiles(commit)).toEqual(['/w/msg-trailer.txt'])
+      expect(commitMessageFiles(`${prefix} git commit -F /w/msg-trailer.txt`)).toEqual([])
+      expect(rmTargets(remove)).toEqual([{ path: '/var/x', glob: false }])
+      expect(rmTargets(`${prefix} rm /var/x`)).toEqual([])
+    })
+  }
+  test('builtin still invokes cd through assignments and the command builtin', () => {
+    for (const prefix of ['builtin', 'A=1 builtin', 'command builtin', 'builtin builtin', 'time builtin']) {
+      expect(rmTargets(`${prefix} cd /var; rm x`)).toEqual([{ path: undefined, glob: false }])
+      expect(rmTargets(`${prefix} cd /var; rm /reports/x`)).toEqual([{ path: '/reports/x', glob: false }])
+    }
+  })
+})
+
+describe('rm heredoc fd and opener provenance', () => {
+  test('fd 2 is shell input; an operand ending in 2 stays an operand', () => {
+    expect(rmTargets('rm -i /reports/x 2<<EOF\ny\nEOF')).toEqual([{ path: '/reports/x', glob: false }])
+    expect(rmTargets('rm -i /var/x 2<<EOF\ny\nEOF')).toEqual([{ path: '/var/x', glob: false }])
+    expect(rmTargets('rm -i /reports/x2<<EOF\ny\nEOF')).toEqual([{ path: '/reports/x2', glob: false }])
+    expect(rmTargets("rm -i /reports/x '2'<<EOF\ny\nEOF")).toEqual([{ path: '/reports/x', glob: false }, { path: '2', glob: false }])
   })
 })

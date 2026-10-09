@@ -227,7 +227,7 @@ Don't run `/grill-me` and `/council` in the same session — different interacti
 ├── paseo-crew/                        # paseo-crew plugin (v0.1.5)
 ├── seat-mods/                         # seat-mods plugin (v0.3.1)
 ├── molt/                              # molt plugin (v0.2.2)
-├── autonomic/                         # autonomic plugin (v0.4.1)
+├── autonomic/                         # autonomic plugin (v0.4.2)
 ├── docs/
 │   ├── SPEC-ai-mentor.md              # ai-mentor spec (v1.1 amendments)
 │   ├── SPEC-scaffold.md               # scaffold spec (v1.0 amendments)
