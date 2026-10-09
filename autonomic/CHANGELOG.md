@@ -2,6 +2,26 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.4.3
+
+**The never-approve list stops holding dispatch briefs and item closes** (the 0.4.2 live replay:
+the PulseTrader top's two holds, the seat-mods briefs, the pulsebase item closes).
+
+- **Command substitutions are read as commands** (`never.ts`): `test -n "$(git diff --cached …)"`
+  no longer lends `-n` to the next `git commit`, and a `$(date)` in a ruling line no longer keeps
+  every word.
+- **Groups carry their redirects and pipes**: `{ … } > brief.md` drops the brief's prose when the
+  brief is only read; `{ echo …; } > x.sh; ./x.sh` asks (a 0.4.2 Known limit, closed).
+- **Heredocs that print to standard output drop their bodies**, quoted or with plain `$VAR`s only.
+- **A narrow `sed` (`sed -n 8,9p f`) is inert.** Any other `sed` stays a runner.
+- **A redirect target is never a command word**, a pipe counts only when its output reaches a
+  command that is not inert or a file, and a `cd` to a literal directory resolves relative names.
+- **`readers`** (new setting): commands that name a file without running it; default the gh
+  `--body-file` commands. Add `herdr agent prompt` for herdr dispatches.
+- **Known limits:** a reader is trusted by name; a reader's own words still pool (#693 case E);
+  `sed -n '/x/p'` and multi-command scripts stay runners; a word `bash` anywhere (`bash --version`)
+  keeps the whole bag.
+
 ## 0.4.2
 
 **The never-approve list stops holding commands that only name a danger** (#693: ten false holds
