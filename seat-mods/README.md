@@ -136,15 +136,20 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 ## Limits
 
 - **The rails stop mistakes, not an adversary.** Bash matching is whitespace tokens split on `;`,
-  `&&`, `||`, `|`, parentheses and newlines, after quoted strings and heredoc bodies are blanked as
-  text, so a commit message may mention `git merge` or `-n`. Only the command word counts, after any
+  `&&`, `||`, `|`, a lone `&` (the `&` of a `|&` pipe included; the `&` a redirection carries and
+  the lone `&` inside an unquoted `${…}` or `$[…]` expansion are not boundaries — inside an
+  expansion only that character is masked, so its `(`, `)`, `;`, `|` and a nested `$(…)` keep
+  their meaning), parentheses and newlines, after quoted strings and heredoc bodies are blanked as
+  text, so a commit message may mention `git merge` or `-n`. Every rule set is the union of that
+  reading with the `seat-mods-v0.3.1` separator read over the same command, so the rails see
+  everything 0.3.1 saw — plus a command after a lone `&`. Only the command word counts, after any
   `VAR=value` and `sudo`, `env`, `command`, `exec`, `nohup` or `time`, and the head words
   `if`, `then`, `elif`, `else`, `do`, `while`, `until`, `!`, `{`, `(` and `time` on every rail only
   as exact unquoted words before assignments or execution wrappers (`builtin` is an execution prefix);
   so `echo git merge` is not a merge, and neither are `xargs git push --force`, `bash -c "git push -f"`, `g""it push`, or a
   wrapper with its own options (`env -i git merge`, `sudo -u u git push -f`).
 - **Known limit:** `time -p <cmd>` is not parsed; for example, `time -p git push --force` passes.
-- **Unparsed shell forms pass:** a single `&` list operator on non-`rm` rails, bundled short flags (`-fqu`),
+- **Unparsed shell forms pass:** bundled short flags (`-fqu`),
   abbreviated long options (`--mir`), several heredocs on one command, a heredoc example inside a
   quoted message, value-taking git globals (`--git-dir x`) and quoted subcommands or flags
   (`git "merge"`). A trailer that opens an `-m` message, comes from `--trailer`, or follows a

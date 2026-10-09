@@ -2,6 +2,14 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.2.5 — 2026-10-09
+
+- **The interim lone-`&` split moved into the shared reader** (#723). The `LONE_AMP`
+  pre-pass and its comment, added in 0.2.4, are removed; the split is now part of the shared
+  `COMMANDS` declaration, mirrored byte-identically from seat-mods 0.3.2 under the
+  shared-reader parity contract. No behaviour change: the 0.2.4 lone-`&` and redirection
+  rows pin the shared split unchanged.
+
 ## 0.2.4 — 2026-10-09
 
 - **The git reader skips reserved head words, splits on a lone `&`, and counts progress only where

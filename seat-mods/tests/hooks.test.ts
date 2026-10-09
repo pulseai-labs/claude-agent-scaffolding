@@ -660,3 +660,45 @@ test('cat heredoc opener tail leaves a clean rm segment allowed beside outside d
   expect((await $.tool.call({ tool: 'Bash', command: prefix + 'rm /etc/passwd' })).deny).toContain('no rm')
   expect((await $.tool.call({ tool: 'Bash', command: prefix + 'rm /reports/x' })).deny).toBeUndefined()
 })
+
+// #723: the shared split must reach the tool call itself — a command behind a
+// lone `&` is denied exactly as bare, and every form the tag allowed stays allowed.
+describe('a lone & reaches the hook rails (#723)', () => {
+  test('implementer: a force-push behind a lone & is denied, spaced or glued', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'true & git push origin b' })).deny).toBeUndefined()
+    const spaced = await $.tool.call({ tool: 'Bash', command: 'true & git push --force' })
+    expect(spaced.deny).toBeDefined()
+    expect(spaced.deny).toContain('force-push')
+    expect((await $.tool.call({ tool: 'Bash', command: 'true& git push --force' })).deny).toBeDefined()
+  })
+  test('implementer: a merge behind a lone & is denied beside the plain view', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'true & gh pr view 12' })).deny).toBeUndefined()
+    expect((await $.tool.call({ tool: 'Bash', command: 'true & gh pr merge 12' })).deny).toContain('no merges')
+  })
+  test('implementer: a trailer behind a lone & is denied, on the line and in the file', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'true & git commit -F /w/README.md' })).deny).toBeUndefined()
+    expect((await $.tool.call({ tool: 'Bash', command: 'echo & git commit -m "x\n\nCo-Authored-By: a"' })).deny).toContain('AI trailers')
+    expect((await $.tool.call({ tool: 'Bash', command: 'true & git commit -F /w/msg-trailer.txt' })).deny).toContain('AI trailers')
+  })
+  test('control: redirections, &&, a trailing & and a |& pipe keep the line allowed', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    for (const command of [
+      'git commit -m m 2>&1',
+      'git push origin main >&2',
+      'git push origin main &>/dev/null',
+      'git push origin main <&0',
+      'git add f && git commit -m m',
+      'git commit -m m &',
+      'git push origin main |& cat',
+    ])
+      expect((await $.tool.call({ tool: 'Bash', command })).deny).toBeUndefined()
+  })
+  test('implementer: rm behind a lone & keeps its rm rail (control)', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'true & rm -rf /var/x' })).deny).toContain('no rm')
+    expect((await $.tool.call({ tool: 'Bash', command: 'true & rm -rf /w/build' })).deny).toBeUndefined()
+  })
+})

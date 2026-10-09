@@ -45,8 +45,18 @@ const RULE_TEXT: Record<RuleId, string> = {
 
 // At a line start, as the repository's commit-msg hook reads them; mid-line prose is not a trailer.
 const TRAILER = /^[ \t]*(?:co-authored-by:|🤖 generated with)/im
-// Command boundaries for matching; subshell parentheses count too.
-const COMMANDS = /;|&&|\|\||\||\n|\(|\)/
+// Command boundaries for matching; subshell parentheses count too. A lone `&` —
+// Bash's background list separator — is one, and only a lone one: `&&` is the
+// and-list, and a `&` a redirection carries (`>&`, `<&`, `&>`, `&>>`) is not a
+// boundary (#723). `rmTargets` splits on `&` through its own second spelling;
+// change one and check the other.
+const COMMANDS = /;|&&|(?<![&<>])&(?![&>])|\|\||\||\n|\(|\)/
+// The seat-mods-v0.3.1 separator, kept as the union's second reading: it ran every rail
+// before 0.3.2, so a union with it can miss nothing the tag caught, whatever exotic grammar
+// the newer reading mis-scans (#723 rounds 3-4). seat-mods-local, outside the parity-held
+// declarations; it can go when a fresh review finds no shape where the shared reading alone
+// misses a command Bash runs that this separator caught.
+const TAG_COMMANDS = /;|&&|\|\||\||\n|\(|\)/
 // Heredoc bodies and quoted strings are text, not commands: a commit message may
 // name `git merge` or `-n`. Each is swapped for a numbered marker before matching,
 // and the trailer check expands the markers in the commit's own segment.
@@ -93,6 +103,62 @@ function blank(command: string): { text: string; pieces: string[] } {
   // A `#` that starts a word begins a comment, which runs no command.
   const text = blankHeredocs(joined, keep).replace(QUOTED, keep).replace(/\\./g, keep)
   return { text: text.replace(/(^|[ \t;&|()])#[^\n]*/gm, '$1'), pieces }
+}
+
+// A lone `&` inside an unquoted `${…}` or `$[…]` is literal to Bash — the word
+// carries it — so only that `&` stops being a boundary; every other character
+// (`(`, `)`, `;`, `|`, newline) keeps its COMMANDS meaning, and the `&` of a
+// `$(…)` nested in an expansion is a real separator and keeps splitting. Each
+// masked `&` becomes a marker piece, so expand() restores the real text for the
+// trailer and `-F` readers. `$$` is one token, so a `${` right after it opens an
+// expansion while the `{` after a completed `$$` stays literal; an unterminated
+// expansion masks nothing — the split stays, fail closed. seat-mods-local by
+// ruling: molt's gate keeps its 0.2.4 reading of these words (#723 review
+// R1/C1/C2, round 3); kept outside the parity-held declarations.
+function maskExpansionAmps(text: string, pieces: string[]): string {
+  type Zone = { kind: 'brace' | 'bracket' | 'paren'; closed: boolean }
+  const stack: Zone[] = []
+  const candidates: Array<{ at: number; zones: Zone[] }> = []
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]!
+    if (char === '$') {
+      const next = text[i + 1]
+      if (next === '$') { i += 1; continue }                    // `$$` is a complete token
+      if (next === '{') { stack.push({ kind: 'brace', closed: false }); i += 1; continue }
+      if (next === '[') { stack.push({ kind: 'bracket', closed: false }); i += 1; continue }
+      if (next === '(') { stack.push({ kind: 'paren', closed: false }); i += 1; continue }
+      continue
+    }
+    const top = stack[stack.length - 1]
+    if (char === '}' && top?.kind === 'brace') { top.closed = true; stack.pop(); continue }
+    if (char === ']' && top?.kind === 'bracket') { top.closed = true; stack.pop(); continue }
+    if (char === ')' && top?.kind === 'paren') { top.closed = true; stack.pop(); continue }
+    if (char === '(' && top?.kind === 'paren') { stack.push({ kind: 'paren', closed: false }); continue }
+    if (char === '[' && top?.kind === 'bracket') { stack.push({ kind: 'bracket', closed: false }); continue }
+    if (char !== '&') continue
+    if (top?.kind !== 'brace' && top?.kind !== 'bracket') continue
+    if ('&<>'.includes(text[i - 1] ?? '') || '&>'.includes(text[i + 1] ?? '')) continue
+    // The snapshot shares the zone objects, so a later close flips `closed` here:
+    // a candidate survives only when every zone around it terminated.
+    candidates.push({ at: i, zones: [...stack] })
+  }
+  let out = ''
+  let from = 0
+  for (const candidate of candidates) {
+    if (candidate.zones.some(zone => !zone.closed)) continue
+    out += text.slice(from, candidate.at) + `\u0000${pieces.push('&') - 1}\u0000`
+    from = candidate.at + 1
+  }
+  return out + text.slice(from)
+}
+
+// One reading of a command: its splits under `separator`, with the expansion mask applied
+// when `mask` says so. Every COMMANDS-split rail reads the command twice — once with the
+// shared `COMMANDS` and the mask, once with the 0.3.1 `TAG_COMMANDS` and no mask — and takes
+// the union of the two rule sets (and of the `-F` files), so by construction the rails can
+// miss nothing the tag caught (#723 round 4, the structural fix).
+function segmentsFor(text: string, pieces: string[], separator: RegExp, mask: boolean): string[] {
+  return (mask ? maskExpansionAmps(text, pieces) : text).split(separator)
 }
 
 // A segment's text with its blanked pieces put back, nested pieces included.
@@ -177,7 +243,11 @@ function afterHeads(tokens: string[]): string[] {
 export function bashRules(command: string, messageFileText = ''): RuleId[] {
   const found = new Set<RuleId>()
   const { text, pieces } = blank(command)
-  for (const segment of text.split(COMMANDS)) {
+  const segments = [
+    ...segmentsFor(text, pieces, COMMANDS, true),
+    ...segmentsFor(text, pieces, TAG_COMMANDS, false),
+  ]
+  for (const segment of segments) {
     const tokens = afterHeads(tokensOf(segment))
     const head = commandOf(tokens)
     if (head?.name === 'gh' && head.args[0] === 'pr') {
@@ -217,7 +287,11 @@ export function bashRules(command: string, messageFileText = ''): RuleId[] {
 export function commitMessageFiles(command: string): string[] {
   const files: string[] = []
   const { text, pieces } = blank(command)
-  for (const segment of text.split(COMMANDS)) {
+  const segments = [
+    ...segmentsFor(text, pieces, COMMANDS, true),
+    ...segmentsFor(text, pieces, TAG_COMMANDS, false),
+  ]
+  for (const segment of segments) {
     const git = gitOf(afterHeads(tokensOf(segment)))
     if (git?.sub !== 'commit') continue
     const { args } = git
@@ -227,7 +301,7 @@ export function commitMessageFiles(command: string): string[] {
         : arg.startsWith('-F') ? arg.slice(2) : undefined
       if (value === undefined) continue
       const path = expand(value, pieces).replace(/^(['"])(.*)\1$/s, '$2')
-      if (path !== '' && path !== '-') files.push(path)
+      if (path !== '' && path !== '-' && !files.includes(path)) files.push(path)
     }
   }
   return files
@@ -286,6 +360,8 @@ export function rmTargets(command: string): RmTarget[] {
   // then operators with their attached or separate target words.
   const redirects = input.replace(/(^|[\s;|&()])\d+(?=[<>])/g, '$1')
     .replace(/(?:<<<|&>>|&>|<>|>\||>>|[<>]&|>|(?<!<)<(?!<))[ \t]*[^\s;&|()]+/g, ' ')
+  // rm's own second spelling of `&` (COMMANDS above): this list keeps every `&`
+  // and runs after redirection stripping. Change one spelling and check the other.
   for (const segment of redirects.split(/;|&&|\|\||[|&]|\n|\(|\)/)) {
     const head = commandOf(afterHeads(tokensOf(segment)))
     if (head === undefined) continue

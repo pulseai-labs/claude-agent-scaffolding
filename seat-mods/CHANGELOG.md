@@ -2,6 +2,35 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.3.2 — 2026-10-09
+
+- **A lone `&` is a command boundary on every `COMMANDS`-split rail** (#723, a fail-open
+  guard bypass). `COMMANDS` lacked Bash's background list separator, so `true & git push
+  --force`, `echo & git commit -m "…Co-Authored-By: …"` and a `gh pr merge` behind `&` read
+  as one command under the first head, and push, force-push, merge, AI-trailer and the
+  commit-message reader never saw the second command. `COMMANDS` now splits on a lone `&` —
+  the `&` of a `|&` pipe included — while `&&` and the redirections that carry `&`
+  (`2>&1`, `>&2`, `&>`, `&>>`, `<&0`, `>&-`) are not boundaries, so the forms the previous
+  release allowed keep their rules. Every rail that splits on `COMMANDS` now reads the
+  command twice — the shared `COMMANDS` with the expansion mask, and the seat-mods-v0.3.1
+  separator with no mask — and denies on the **union** of the two rule sets (and of the two
+  `-F` file sets): by construction the rails see everything the previous release saw, plus a
+  command after a lone `&`, and the only denies the union adds are the 0.3.1 reading's own.
+  The mask itself is narrow: an `&` inside an unquoted `${…}` or `$[…]` expansion is masked
+  only when it is a lone `&`, so `(`, `)`, `;` and `|` inside an expansion keep their
+  `COMMANDS` meaning, a nested `$(…)` stays executable (`echo ${x:-$(git push --force)}`
+  reads `push`, `force-push`), the `&` of a `$(…)` still splits, `$$` is read as one token,
+  and an unterminated expansion masks nothing (the split stays, fail closed).
+  `X=${x/a&b/c} git push --force` meets its rails as the previous release read it. molt is
+  unchanged: its gate reads the shared split once, with no union. The `rm` rail's own split
+  is a second spelling of `&` in `rules.ts`: change one and check the others. Known limits
+  (#724): an `&` on a heredoc opener line is still swallowed with the heredoc body, a `&&`
+  inside an expansion and a backtick substitution inside an expansion keep the previous
+  release's reading, and whitespace inside an expansion behind `VAR=` can hide the command.
+  The `rm` rail is otherwise unchanged: it already split on `&`.
+- Mirrored byte-identically into `molt/hooks/shell.ts` under the shared-reader parity
+  contract; `molt` 0.2.5 drops its interim `LONE_AMP` split.
+
 ## 0.3.1 — 2026-10-09
 
 - Every Bash rail now walks the reserved head words already recognised by `rm`, so
