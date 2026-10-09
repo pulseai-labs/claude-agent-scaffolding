@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { namesDanger, neverRules } from '../hooks/never'
+import { DEFAULT_READERS, namesDanger, neverRules, parseReaders } from '../hooks/never'
 import type { Where } from '../hooks/never'
 
 const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x', defaultBranch: 'main' }
@@ -525,5 +525,154 @@ describe('PR #700 round 2: shadowed names and git control files', () => {
   test('a write into a git config file outside .git counts as run (class sweep)', () => {
     expect(rules("printf '[alias]\\np = push -f\\n' >> ~/.gitconfig; git p origin feat/x")).toContain('force-push')
     expect(rules("printf '[alias]\\np = push -f\\n' >> ~/.config/git/config; git p origin feat/x")).toContain('force-push')
+  })
+})
+
+const HERDR = [...DEFAULT_READERS, ['herdr', 'agent', 'prompt']]
+const PROSE = 'Never rm -rf outside a worktree; never git push -f or --force; never --no-verify; no git branch -D.'
+
+// autonomic 0.4.3 (spec 2026-10-09 §4): the live brief writes and close scripts, sanitized.
+describe('0.4.3 live fixtures: brief writes and close scripts go silent', () => {
+  test('a group brief with an unquoted header, a rules file and a quoted tail, checked with sed (19:18:45Z)', () => {
+    const c = `cd ~/.cache/scratch/run; SB=$(git -C /repo branch --show-current); SP=/repo-ai/docs/specs\n{\ncat <<EOF\nROLE: close for s2 on \\\`$SB\\\`.\n${PROSE}\nEOF\ncat scratch/rules-a.txt\ncat <<'EOF'\n${PROSE}\nEOF\n} > briefs/close-1.md; wc -l briefs/close-1.md; grep -n 'PING:' briefs/close-1.md | cut -c1-400; sed -n 8,9p briefs/close-1.md | cut -c1-300`
+    expect(rules(c)).toEqual([])
+  })
+  test('a group brief, then a ruling line with a date substitution (19:37:00Z)', () => {
+    const c = `cd ~/.cache/scratch/run; mkdir -p scratch/writer-2\n{\ncat <<'EOF'\n${PROSE}\nEOF\ngrep -E '^\\| F[123] \\|' reports/close-1.md\ncat <<'EOF'\n${PROSE}\nEOF\n} > briefs/writer-1.md; grep -c '^| F' briefs/writer-1.md; wc -l briefs/writer-1.md\necho "- $(date -u +%FT%TZ) operator: writer brief briefs/writer-1.md." >> rulings.md`
+    expect(rules(c)).toEqual([])
+  })
+  test('a brief written, then named in herdr agent prompt: silent with the reader, asks without (19:12:50Z)', () => {
+    const c = `cat > /run/briefs/impl-1.md <<'EOF'\n${PROSE}\nEOF\nherdr pane read w1:p1 --source visible | grep -oE 'Model [a-z]+' | tail -1\nherdr agent prompt w1:p1 'Your brief is /run/briefs/impl-1.md. Read it in full.' | jq -r .ok`
+    expect(neverRules(c, W, HERDR)).toEqual([])
+    expect(rules(c)).not.toEqual([])
+  })
+  test('an item close guarded by test -n "$(git diff --cached …)" (17:54:39Z)', () => {
+    const c = `set -euo pipefail\nwt="$($oss get '.items[0].worktree')"\ntest "$(git -C "$wt" rev-parse --abbrev-ref HEAD)" = "$branch"\ntest -z "$(git -C "$root" status --porcelain)"\ntest -n "$(git -C "$wt" diff --cached --name-only)"\ngit -C "$wt" diff --exit-code\ngit -C "$wt" commit -m 'feat: deliver events'\ngit -C "$root" merge --no-ff "$branch" -m 'merge w3'\nprintf 'ITEM=%s\\n' "$(git -C "$wt" rev-parse HEAD)"`
+    expect(rules(c)).toEqual([])
+  })
+})
+
+describe('0.4.3 §3.1 substitutions: escape routes', () => {
+  test('a substitution feeding a non-inert command keeps its words', () => {
+    expect(rules('git commit $(echo -n) -m x')).toContain('no-verify')
+  })
+  test('the commands inside an inert command\'s substitution are judged', () => {
+    expect(rules('echo "$(git push -f origin feat/x)"')).toContain('force-push')
+    expect(rules('test -n "$(git commit -n -m x)"')).toContain('no-verify')
+    expect(rules('echo "$(echo "$(git push -f origin feat/x)")"')).toContain('force-push')
+  })
+  test('an unbalanced substitution or arithmetic keeps the whole bag', () => {
+    expect(rules('echo "$(git push -f origin feat/x"')).toContain('force-push')
+    expect(rules('echo $((1)) -f; git push origin feat/x')).toContain('force-push')
+  })
+  test('a substitution inside single quotes is text', () => {
+    expect(rules("echo '$(git push -f origin feat/x)'")).toEqual([])
+  })
+})
+
+describe('0.4.3 §3.2 groups: escape routes', () => {
+  test('a redirect on a group applies to its commands', () => {
+    expect(rules("{ echo 'git push -f origin feat/x'; } > x.sh; ./x.sh")).toContain('force-push')
+    expect(rules("( echo 'git push -f origin feat/x' ) > .git/hooks/pre-commit")).toContain('force-push')
+    expect(rules("if true; then cat <<'X'\ngit push -f origin feat/x\nX\nfi > x.sh; ./x.sh")).toContain('force-push')
+    expect(rules("for i in 1; do echo 'git push -f origin feat/x'; done > x.sh; ./x.sh")).toContain('force-push')
+  })
+  test('a pipe on a group applies to its commands', () => {
+    expect(rules("{ echo 'git push -f origin feat/x'; } | at now")).toContain('force-push')
+  })
+  test('an unmatched closer keeps the whole bag', () => {
+    expect(rules("echo 'git push -f origin feat/x'; } > x")).toContain('force-push')
+  })
+})
+
+describe('0.4.3 §3.3 stdout heredocs: escape routes', () => {
+  test('a stdout body piped onward or captured keeps its words', () => {
+    expect(rules("cat <<'X' | sh\ngit push -f origin feat/x\nX")).toContain('force-push')
+    expect(rules("cat <<'X' | at now\ngit push -f origin feat/x\nX")).toContain('force-push')
+    expect(rules("cmd=$(cat <<'X'\ngit push -f origin feat/x\nX\n); $cmd")).toContain('force-push')
+  })
+  test('an unquoted body with a substitution or a backtick keeps its words', () => {
+    expect(rules('cat <<X\n$(git push -f origin feat/x)\nX')).toContain('force-push')
+    expect(rules('cat <<X\n`git push -f origin feat/x`\nX')).toContain('force-push')
+  })
+  test('a stdout body that only prints is text', () => {
+    expect(rules(`cat <<'X'\n${PROSE}\nX`)).toEqual([])
+  })
+})
+
+describe('0.4.3 §3.4 sed: escape routes', () => {
+  test('a sed that may run code stays a runner', () => {
+    for (const c of ["sed 1e f; echo 'git push -f origin feat/x'", "sed 's/x/y/e' f; echo 'git push -f origin feat/x'",
+      "sed -e 1p -e 2e f; echo 'git push -f origin feat/x'", "sed -f s.sed f; echo 'git push -f origin feat/x'",
+      "sed -ni 1p f; echo 'git push -f origin feat/x'"])
+      expect([c, rules(c)]).toEqual([c, ['force-push']])
+  })
+  test('a narrow sed that names a written file does not run it', () => {
+    expect(rules(`cat > b.md <<'X'\n${PROSE}\nX\nsed -n 1,5p b.md`)).toEqual([])
+  })
+})
+
+describe('0.4.3 §3.5 readers: escape routes', () => {
+  test('a command that runs a file is not a reader', () => {
+    expect(neverRules("cat > b.sh <<'X'\ngit push -f origin feat/x\nX\nherdr pane run p './b.sh'", W, HERDR)).toContain('force-push')
+  })
+  test('a reader does not hide a later run, or a run in its substitution', () => {
+    expect(neverRules("cat > b.md <<'X'\ngit push -f origin feat/x\nX\nherdr agent prompt p 'read b.md'; ./b.md", W, HERDR)).toContain('force-push')
+    expect(neverRules("cat > b.sh <<'X'\ngit push -f origin feat/x\nX\nherdr agent prompt p \"$(./b.sh)\"", W, HERDR)).toContain('force-push')
+  })
+  test('a reader matches whole words only', () => {
+    expect(rules("cat > b.md <<'X'\ngit push -f origin feat/x\nX\ngh pr creator --body-file b.md")).toContain('force-push')
+    expect(rules(`cat > b.md <<'X'\n${PROSE}\nX\ngh pr create --body-file b.md`)).toEqual([])
+  })
+  test('a reader keeps its own words (#693 case E)', () => {
+    expect(neverRules('herdr agent prompt p "the verifier ran rm -rf $X"', W, HERDR)).toContain('rm-outside')
+  })
+  test('parseReaders reads ;-separated prefixes; blank is none', () => {
+    expect(parseReaders('gh pr create; herdr agent prompt;;')).toEqual([['gh', 'pr', 'create'], ['herdr', 'agent', 'prompt']])
+    expect(parseReaders('')).toEqual([])
+  })
+})
+
+describe('0.4.3 prototype findings: escape routes', () => {
+  test('a cd to a literal directory resolves relative writes; .git stays a git control path', () => {
+    expect(rules("cd .git; printf '[alias]\\np = push -f\\n' > config; cd ..; git p origin feat/x")).toContain('force-push')
+    expect(rules("cd sub && printf '[alias]\\np = push -f\\n' > ../.git/config; git p origin feat/x")).toContain('force-push')
+    expect(rules("cd ~ && printf '[alias]\\np = push -f\\n' >> .gitconfig; git p origin feat/x")).toContain('force-push')
+  })
+  test('a cd to a variable, cd - or popd leaves relative writes opaque', () => {
+    expect(rules("cd \"$D\"; printf '[alias]\\np = push -f\\n' > config; git p origin feat/x")).toContain('force-push')
+    expect(rules("cd -; printf '[alias]\\np = push -f\\n' > config; git p origin feat/x")).toContain('force-push')
+    expect(rules("popd; printf '[alias]\\np = push -f\\n' > config; git p origin feat/x")).toContain('force-push')
+  })
+  test('a redirect target is never a command word', () => {
+    expect(rules(`{ cat <<'X'\n${PROSE}\nX\n} > notes.md; wc -l notes.md`)).toEqual([])
+  })
+  test('a pipeline of inert commands only prints; a later stage that runs or saves counts', () => {
+    expect(rules(`cat > b.md <<'X'\n${PROSE}\nX\ngrep -n x b.md | cut -c1-80`)).toEqual([])
+    expect(rules("cat > b.sh <<'X'\ngit push -f origin feat/x\nX\ncat b.sh | cut -c1-999 | at now")).toContain('force-push')
+    expect(rules("cat > b.sh <<'X'\ngit push -f origin feat/x\nX\ncat b.sh | cut -c1-999 > c.sh; ./c.sh")).toContain('force-push')
+  })
+})
+
+describe('0.4.3 plan review focus', () => {
+  test('a case statement parses; a push inside it still asks', () => {
+    expect(rules(`case "$x" in a) echo ok;; b) cat <<'X'\n${PROSE}\nX\n;; esac`)).toEqual([])
+    expect(rules('case "$x" in a) git push -f origin feat/x;; esac')).toContain('force-push')
+  })
+  test('an input redirect or a here-string keeps an inert head', () => {
+    expect(rules(`cat > b.md <<'X'\n${PROSE}\nX\nwc -l < b.md; grep -c x <<< "$v"`)).toEqual([])
+  })
+  test('a substitution in a redirect target is opaque', () => {
+    expect(rules(`echo '${PROSE}' > "$(mktemp)"`)).toEqual([])
+    expect(rules("echo 'git push -f origin feat/x' > \"$(mktemp)\"; git status")).toContain('force-push')
+  })
+  test('a sed script with more than one command stays a runner', () => {
+    expect(rules("sed -n '1,5p;8q' f; echo 'git push -f origin feat/x'")).toEqual(['force-push'])
+  })
+})
+
+describe('0.4.3 plan review focus: sed reads its quoted script whole', () => {
+  test('a quoted script with a second command is not a narrow sed', () => {
+    expect(rules("sed -n '1p;e id' f; echo 'git push -f origin feat/x'")).toEqual(['force-push'])
   })
 })
