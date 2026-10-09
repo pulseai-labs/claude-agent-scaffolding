@@ -4,17 +4,23 @@ All notable changes to the `molt` plugin.
 
 ## 0.2.4 — 2026-10-09
 
-- **The git reader skips the shell's reserved head words** (#711, `shell.ts` `afterHeads` /
-  `gitSubcommands`). Before reading a segment's git subcommand, the reader now skips the exact
-  unquoted head words seat-mods 0.3.1's walk skips (`if then elif else do while until ! { ( time`),
-  and a segment that only closes a construct (`fi`, `done`, `}`, `)`) — or that the walk emptied,
-  such as a bare `else` or `then` — names no command at all: it is neither a refused segment nor a
-  git subcommand. Both effects were fail-closed before: past the block threshold
-  `if git add f; then git commit -m m; fi` was refused although every command in it is a git
-  command, and a head-wrapped `git commit` was not counted as progress, so the autopilot loop guard
-  could read a committing session as stalled. The walk is an exact raw head: a path-qualified or
-  quoted head word is an ordinary program and stays refused, and `builtin` is an execution prefix,
-  not a head word — its argument must never restart the walk — so nothing behind it is exposed.
+- **The git reader skips reserved head words, splits on a lone `&`, and counts progress only where
+  a commit runs** (#711, `shell.ts` `afterHeads` / `gitSubcommands` / `gitSubcommandsThatRun`;
+  review round 1). Before reading a segment's git subcommand the reader skips the head words
+  `if then elif else ! { time` — deliberately a subset of the walk seat-mods 0.3.1 ships: a loop
+  head (`while`, `until`, `do`) and its closer (`done`) are not skipped, so a loop stays refused
+  past the block, where the hard threshold is for wrapping up, and `builtin` is an execution
+  prefix, never a head word: nothing behind it is exposed. A segment that only closes a construct
+  (`fi`, `}`) or that the walk emptied (a bare `else` or `then`) names no command at all. A lone
+  `&` — Bash's third list separator, which the shared `COMMANDS` does not split on — now ends a
+  segment, so `! git commit -m m & evil` and `git add f & evil` are refused; `&&` and the
+  redirections that carry `&` (`2>&1`, `>&2`, `&>`, `&>>`) are untouched. Both effects were
+  fail-closed before: past the block threshold `if git add f; then git commit -m m; fi` was refused
+  although every command in it is a git command, and a head-wrapped `git commit` was not counted as
+  progress, so the autopilot loop guard could read a committing session as stalled. Progress now
+  counts a commit only where the line runs it — bare, or behind `{` or `time`; behind `if`, `then`,
+  `elif`, `else` or `!` it may not run, and counting it would hide a stalled loop. The walk is an
+  exact raw head: a path-qualified or quoted head word is an ordinary program and stays refused.
 
 ## 0.2.3 — 2026-10-09
 

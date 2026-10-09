@@ -87,23 +87,36 @@ function gitOf(tokens: string[]): { sub: string; args: string[] } | undefined {
 }
 
 // A Bash construct opens with a reserved head word; the reader skips those before
-// reading a segment's command, as seat-mods 0.3.1 does (#711). The walk is an exact
-// raw head: a path-qualified or quoted head word is an ordinary program, so it is
-// not in the set, and `builtin` is not one either — its argument must never restart
-// the walk. Kept outside the declarations above that tests/test-mod-shell-parity.sh
-// holds identical to seat-mods.
-const HEAD_WORDS = new Set(['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '(', 'time'])
+// reading a segment's command (#711). Deliberately a subset of the words seat-mods
+// 0.3.1 skips (review R4): a loop head (`while`, `until`, `do`) and its closer
+// (`done`) are not skipped, so a loop stays refused past the block, where the hard
+// threshold is for wrapping up; and `builtin` is an execution prefix, never a head
+// word — its argument must never restart the walk. The walk is an exact raw head:
+// a path-qualified or quoted head word is an ordinary program, so it is not in the
+// set. Kept outside the declarations above that tests/test-mod-shell-parity.sh
+// holds identical to seat-mods; molt's own suite pins these sets.
+export const HEAD_WORDS = new Set(['if', 'then', 'elif', 'else', '!', '{', 'time'])
 
-function afterHeads(tokens: readonly string[]): string[] {
+// The words that only close a construct a head word opens: if→fi, {→}. Each is a
+// Bash reserved word, read as syntax at the head of a command and never as a
+// program there, so a segment of nothing else runs no command of its own. `done`
+// is not here: the loop words are unskipped, so a loop's closer stays a refused
+// segment.
+export const CLOSERS = new Set(['fi', '}'])
+
+// A lone `&` — not part of `&&`, not part of a redirection — is Bash's third list
+// separator: a command boundary the shared COMMANDS never splits on. The
+// redirections that carry `&` (`&>`, `&>>`, `2>&1`, `>&2`, `<&0`, `>&-`) are not
+// boundaries, so a `&` that neither follows nor precedes `&<>` is one. Replaced
+// with `;` before the split; molt-local until the shared reader takes it (#723).
+const LONE_AMP = /(?<![&<>])&(?![&>])/g
+
+// The segment's leading head words and the tokens after them.
+function afterHeads(tokens: readonly string[]): { heads: string[]; rest: string[] } {
   let i = 0
   while (HEAD_WORDS.has(tokens[i] ?? '')) i += 1
-  return tokens.slice(i)
+  return { heads: tokens.slice(0, i), rest: tokens.slice(i) }
 }
-
-// The words that only close a construct a head word opens: if→fi, while/until/do→done,
-// {→}, (→). Each is a Bash reserved word, read as syntax at the head of a command and
-// never as a program there, so a segment of nothing else runs no command of its own.
-const CLOSERS = new Set(['fi', 'done', '}', ')'])
 
 // A segment that names no command: one the head walk emptied (a bare then, else or
 // lone !), or one made only of closing words. It is neither a refused segment nor a
@@ -112,13 +125,34 @@ function namesNoCommand(tokens: readonly string[]): boolean {
   return tokens.every(token => CLOSERS.has(token))
 }
 
-export function gitSubcommands(command: string): Array<string | undefined> {
+// The segments that name a command, each with the head words the walk skipped.
+function segmentsOf(command: string): Array<{ heads: string[]; rest: string[] }> {
   const { text } = blank(command)
-  const subs: Array<string | undefined> = []
-  for (const segment of text.split(COMMANDS)) {
-    const tokens = afterHeads(tokensOf(segment))
-    if (namesNoCommand(tokens)) continue
-    subs.push(gitOf(tokens)?.sub)
+  const segments: Array<{ heads: string[]; rest: string[] }> = []
+  for (const segment of text.replace(LONE_AMP, ';').split(COMMANDS)) {
+    const { heads, rest } = afterHeads(tokensOf(segment))
+    if (namesNoCommand(rest)) continue
+    segments.push({ heads, rest })
   }
-  return subs
+  return segments
+}
+
+export function gitSubcommands(command: string): Array<string | undefined> {
+  return segmentsOf(command).map(segment => gitOf(segment.rest)?.sub)
+}
+
+// The head words that always run the command after them: a brace group runs its
+// body, and `time` runs what it times. Every other head the walk skips — `if`,
+// `then`, `elif`, `else`, `!` — may not run its command, and a commit behind one
+// can exit 0 having committed nothing (`if git add missing.lock; then git commit
+// -m m; fi`); a successful `! git commit` exits 1 and never reaches the count. So
+// the autopilot progress count reads only a commit the line really runs (review R2).
+const RUNS_ITS_COMMAND = new Set(['{', 'time'])
+
+// The subs of the segments whose head words all run their command. The gate reads
+// every segment (gitSubcommands); the autopilot progress count reads this one.
+export function gitSubcommandsThatRun(command: string): Array<string | undefined> {
+  return segmentsOf(command)
+    .filter(segment => segment.heads.every(head => RUNS_ITS_COMMAND.has(head)))
+    .map(segment => gitOf(segment.rest)?.sub)
 }
