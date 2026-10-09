@@ -107,4 +107,17 @@ describe('past hard', () => {
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeUndefined()
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/b' } as never)).deny).toContain("past molt's block threshold")
   })
+  test('a head-wrapped add/commit sequence runs past the block (#711)', async ($, on) => {
+    const w = world(on); at(w, 76)
+    expect((await $.tool.call({ tool: 'Bash', command: 'if git add h.md; then git commit -F /tmp/m; fi' } as never)).deny).toBeUndefined()
+    expect((await $.tool.call({ tool: 'Bash', command: '{ git add h.md; git commit -F /tmp/m; }' } as never)).deny).toBeUndefined()
+    expect((await $.tool.call({ tool: 'Bash', command: '! git commit -F /tmp/m' } as never)).deny).toBeUndefined()
+  })
+  test('the gate still refuses what the walk exposes (#711 controls)', async ($, on) => {
+    const w = world(on); at(w, 76)
+    expect((await $.tool.call({ tool: 'Bash', command: 'if rm -rf x; then git commit -F /tmp/m; fi' } as never)).deny).toBeDefined()
+    expect((await $.tool.call({ tool: 'Bash', command: '/x/if git commit -F /tmp/m' } as never)).deny).toBeDefined()
+    expect((await $.tool.call({ tool: 'Bash', command: 'builtin git add h.md' } as never)).deny).toBeDefined()
+    expect((await $.tool.call({ tool: 'Bash', command: '{ }' } as never)).deny).toBeDefined()
+  })
 })

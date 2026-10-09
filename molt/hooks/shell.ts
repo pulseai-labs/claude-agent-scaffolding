@@ -86,7 +86,39 @@ function gitOf(tokens: string[]): { sub: string; args: string[] } | undefined {
   return { sub, args: end < 0 ? args : args.slice(0, end) }
 }
 
+// A Bash construct opens with a reserved head word; the reader skips those before
+// reading a segment's command, as seat-mods 0.3.1 does (#711). The walk is an exact
+// raw head: a path-qualified or quoted head word is an ordinary program, so it is
+// not in the set, and `builtin` is not one either — its argument must never restart
+// the walk. Kept outside the declarations above that tests/test-mod-shell-parity.sh
+// holds identical to seat-mods.
+const HEAD_WORDS = new Set(['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '(', 'time'])
+
+function afterHeads(tokens: readonly string[]): string[] {
+  let i = 0
+  while (HEAD_WORDS.has(tokens[i] ?? '')) i += 1
+  return tokens.slice(i)
+}
+
+// The words that only close a construct a head word opens: if→fi, while/until/do→done,
+// {→}, (→). Each is a Bash reserved word, read as syntax at the head of a command and
+// never as a program there, so a segment of nothing else runs no command of its own.
+const CLOSERS = new Set(['fi', 'done', '}', ')'])
+
+// A segment that names no command: one the head walk emptied (a bare then, else or
+// lone !), or one made only of closing words. It is neither a refused segment nor a
+// git subcommand (#711).
+function namesNoCommand(tokens: readonly string[]): boolean {
+  return tokens.every(token => CLOSERS.has(token))
+}
+
 export function gitSubcommands(command: string): Array<string | undefined> {
   const { text } = blank(command)
-  return text.split(COMMANDS).map(tokensOf).filter(tokens => tokens.length > 0).map(tokens => gitOf(tokens)?.sub)
+  const subs: Array<string | undefined> = []
+  for (const segment of text.split(COMMANDS)) {
+    const tokens = afterHeads(tokensOf(segment))
+    if (namesNoCommand(tokens)) continue
+    subs.push(gitOf(tokens)?.sub)
+  }
+  return subs
 }

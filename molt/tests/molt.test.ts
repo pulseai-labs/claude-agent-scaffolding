@@ -302,6 +302,23 @@ describe('loop guards', () => {
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(1)
   })
+  test('autopilot: a head-wrapped commit is progress, so the molt goes ahead (#711)', async ($, on) => {
+    const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
+      '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
+    await $.tool.call({ tool: 'Bash', command: 'if git commit -m m; then :; fi' })
+    at(w, 67)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(1)
+  })
+  test('autopilot: a path-qualified head word committing is no progress (control)', async ($, on) => {
+    const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
+      '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
+    await $.tool.call({ tool: 'Bash', command: '/x/if git commit -m m' })
+    at(w, 67)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(0)
+    expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
+  })
 })
 
 describe('/molt now', () => {
