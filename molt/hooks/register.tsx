@@ -29,9 +29,11 @@ let paused: string | undefined
 let seeded: { session: string; startPercent?: number } | undefined
 
 const MAX_STOP_BLOCKS = 2
-// A bell is a one-shot notification command; 5 s is far past any of them and bounds a hung
-// bell at a sixth of `process.run`'s 30 s default, on the turn-end path the person waits on.
-const BELL_TIMEOUT_MS = 5000
+// The engine kills a `process.run` child at 30 s when no bound is given — the same bound
+// molt-v0.2.2's awaited bell therefore ran under. Stated explicitly, and never tightened:
+// a slow bell (a remote notify curl) that completed on 0.2.2 must still complete, while a
+// hung one stays bounded. Nothing waits on it (see `pause`), so this is only a backstop.
+const BELL_TIMEOUT_MS = 30_000
 let unmeasured = 0                        // tool and response output no response has measured yet
 let inFlight = false                      // a molt between /clear and its seed
 let progress = 0                          // Write, Edit or commit since the last molt
@@ -198,12 +200,14 @@ async function warningText($: Engine, sessionId: string, which: 1 | 2): Promise<
   return (await isChild($)) ? `${text}\n\n${CHILD_WARNING}` : text
 }
 
-// Rung once and left to finish: the bell never gates the hook that paused the session. It
-// catches its own failure — a hung bell reaching BELL_TIMEOUT_MS included — and `log` never
-// throws, so this promise always resolves and nothing is left unhandled (#665 item 4).
+// Rung once and left to finish: the bell never gates the hook that paused the session. A bell
+// that cannot start, throws, or is killed at BELL_TIMEOUT_MS rejects; one that runs and exits
+// non-zero resolves. Both are failures and both are logged once — `log` never throws, so this
+// promise always resolves and nothing is left unhandled (#665 item 4).
 async function ring($: Engine, bell: string, message: string): Promise<void> {
   try {
-    await $.process.run(['sh', '-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${bell}`, 'sh', message], { timeoutMs: BELL_TIMEOUT_MS })
+    const r = await $.process.run(['sh', '-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${bell}`, 'sh', message], { timeoutMs: BELL_TIMEOUT_MS })
+    if (r.exitCode !== 0) await log($, `bell failed exit=${r.exitCode}`)
   } catch (err) {
     await log($, `bell failed ${String(err)}`)
   }

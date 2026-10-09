@@ -125,7 +125,7 @@ All under `~/.claude/state/molt/`, keyed by session id:
 
 | Path | What it holds |
 |---|---|
-| `active/<id>` | The active marker: written at start, after a clear, on every prompt, every turn end and by `/molt now`; removed at session end, by `/molt off`, and while the session is paused. The crew hooks read it. |
+| `active/<id>` | The active marker: written at start, after a clear, on every prompt, every turn end, and by `/molt now` and `/molt on`; removed at session end, by `/molt off`, and while the session is paused. The crew hooks read it. |
 | `lineage/<id>.json` | Written for each seeded session: `{ from, chain, depth, handoff }` — the session it came from, the first session of the chain, how many molts deep it is, and the handoff it resumed from. `autonomic` reads it to carry its mode across a molt. |
 | `briefs/<id>.md` | A fallback brief, when molt wrote one. |
 | `stage/<id>` | The stage file (0.2.1): `{ stage, percent?, command, block, fallback, at }` — see below. |
@@ -170,10 +170,11 @@ cannot loop — and differ by mode:
 - **Autopilot.** There is no count limit. A molt with no progress since the previous one — no
   Write, Edit or NotebookEdit, and no `git commit`, made below the first warning — pauses the
   session and rings the record's bell, a shell command run with `AUTONOMIC_MESSAGE` set to the
-  reason. The bell never delays the turn end: it is rung and left to finish, killed after five
-  seconds if it has not answered, and its failure is logged once. Work past the first warning
-  does not count: there the session may write and commit its handoff, which would make every
-  molt look like progress.
+  reason. The bell never delays the turn end: it is rung and left to finish, killed at the
+  engine's 30-second process default if it has not answered, and a failure — a non-zero exit or
+  a rejection, the kill included — is logged once. Work past the first warning does not count:
+  there the session may write and commit its handoff, which would make every molt look like
+  progress.
 
 ## With the crews
 
