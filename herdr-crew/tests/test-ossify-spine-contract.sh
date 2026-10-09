@@ -66,14 +66,17 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=230          # A3: each ossify reference stays under 209 lines; 0.2.9 raised it from 214 for the spine brief's 1.14.0 caller rules and re-entry seat rule.
+REF_BUDGET=232          # A3: the budget equals the longest budgeted reference (232, ossify-briefs.md); 0.2.9 raised the number from 214 for the spine brief's 1.14.0 caller rules and re-entry seat rule.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
-                        # each launch site gained; the files' own maximum is 209
-                        # (`ossify-nested-run.md`), and the budget section's adjacent
+                        # each launch site gained; the files' own maximum is 232
+                        # (`ossify-briefs.md`), and the budget section's adjacent
                         # control holds the gate at that minimum — one line over the
                         # longest budgeted reference is still refused.
                         # 0.2.8: raised for the molt clauses — nested-run §4 (211), the spine brief (214), then the
                         # spine, work-PR and leaf MOLT lines; it always equals the maximum.
+                        # 0.2.11 (#663): raised from 230 for the two launch-site citing clauses
+                        # (ossify-briefs.md's item-verifier intro takes the two lines, 232); it
+                        # still equals the maximum.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
@@ -2075,6 +2078,22 @@ pin "$SKILL_MD" 'a non-spine close is a coordinator seat, marked `coordinator`' 
   "SKILL.md §6 marks the non-spine close as a coordinator seat" flat
 pin "$SKILL_MD" 'Mark the doctor seat `coordinator` before its command' \
   "SKILL.md §6 marks the doctor seat as a coordinator seat" flat
+
+# 0.2.11 (#663): the citing clauses the launch-site check's selected sites carry — one
+# pin per site, so a reword that keeps a clause token but drops the citation reads here.
+pin "$EXEC_MD" 'marks each seat it launches as' \
+  "ossify-execution.md's resumed top states the marking at its launches" flat
+pin "$ROLES_MD" 'The session that launches the seat marks it in the pane, before its command, as' \
+  "roles.md's activated-spine rows state the marking where the launcher acts" flat
+pin "$BRIEFS_MD" 'The session that launches the seat marks it in the pane, before its command, as' \
+  "ossify-briefs.md's item-verifier intro states the marking where the launcher acts" flat
+# The fourth citing clause this PR adds (R8), in the close brief's NEVER aside — the
+# site the launch-site check selects as `ossify-pr-briefs.md:61`. Pinned here so the
+# claim that all four clause texts are pinned stays true; the needle carries the
+# citation with the marking, so a reword that keeps the token and drops "before its
+# command" reads red.
+pin "$PRBRIEFS_MD" 'remediated, the top dispatches a fresh close session, marked `coordinator` before its command' \
+  "ossify-pr-briefs.md's close-brief NEVER states the fresh close's marking where the launcher acts" flat
 pin "$GENERIC_BRIEFS_MD" 'seat — its report, scratch and handoff directories in `SEAT_MODS_ALLOW`' \
   "the direct work-item template marks its handoff directory too" flat
 pin "$GENERIC_BRIEFS_MD" 'The top marks it `coordinator` before its' \

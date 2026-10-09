@@ -61,7 +61,8 @@ cannot reconstruct it. Then: Changed / Evidence / Open / Files as ids, SHAs, cou
 MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: create a seat, merge on your own authority, ask the operator anything
 (questions go up to the top in your report file), or re-invoke `/ossify:close` — a halt
-settles this dispatch; remediated, the top dispatches a fresh close session.
+settles this dispatch; remediated, the top dispatches a fresh close session, marked
+`coordinator` before its command (`herdr-mechanics.md` step 2).
 Report a refusal verbatim.
 ```
 

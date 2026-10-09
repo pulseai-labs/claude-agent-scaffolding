@@ -2,6 +2,49 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.11
+
+**A launch site with no marking clause now fails a suite** (#663). Test tooling only: no
+shipped behaviour changes and the row contract (`config.md`) is untouched.
+
+- **`tests/test-launch-site-marking.sh`** selects launch sites in the shipped prose
+  (`skills/**`, `commands/**`) by the rule stated in its header — which also names the
+  shapes it does not select — and fails a selected site whose own paragraph or list item
+  carries no seat-mods marking clause: the guarded
+  `SEAT_MODS_ROLE` export, a guarded role, `coordinator`, `orchestrator`, or a citation of
+  `herdr-mechanics.md` step 2 / "Seat marking". `**` spans are stripped before matching,
+  so a bold verb or article selects. Each failure names file, line and the site text; the
+  suite prints the number of sites it selected and pins today's count (26) as a floor, so
+  a grammar change that silently selects fewer sites fails, and a scanned path whose own
+  scan dies (an unreadable file, a directory named `*.md`) prints `SCAN-ERROR` and fails
+  the run rather than vanishing behind the other files' counts.
+- **What the rule covers:** the three placement commands (`tab create`; `worktree create`
+  with `--path`; `workspace create` for a seat); "launch(ed) from the … seat";
+  "launch a/the/its … [fresh|new] seat|pair|…" with bold verbs and articles, the
+  create/dispatch/respawn verb forms, the close-session and doctor-session nouns and
+  "launched from the … SEATS row(s)" included; bare `respawn`. **What it does not:** the
+  bare noun "the seat launch"; "launched at its point or on demand"; marking directives
+  with no launch verb ("Mark it `coordinator` before its command"); router and depth
+  descriptions ("drives a fresh tab and pane per item seat", "launches item sessions of its
+  own", "launched by seat name", "start one spine session"); "create … from its … row"; a
+  dispatch whose command string intervenes before the fresh noun ("dispatch
+  `/ossify:close <spine-id>` to a fresh close session"); the elided noun "a/the fresh
+  close" ("then dispatches a fresh close", "the top dispatch the fresh close"); a
+  pronoun or preposition between the verb and the noun ("dispatch it to a fresh close
+  session", "dispatches to a fresh close session"); a launch sentence directly under a
+  heading; frontmatter with no blank line after `---`; `kind: dsh-spine-driver` sessions
+  (not panes, never marked); headings and frontmatter. A new site in one of those shapes
+  still passes — the accepted residual, named in the suite's header.
+- **Four launch statements gained a citing clause** — a pointer, not a second copy of the
+  marking: `roles.md`'s activated-ossify-spine rows and `ossify-briefs.md`'s item-verifier
+  intro now say the session that launches the seat marks it in the pane, before its
+  command, as `herdr-mechanics.md` step 2 states, and `ossify-execution.md`'s resumed top
+  marks each seat it launches as step 2 states; `ossify-pr-briefs.md`'s close brief names
+  the fresh close session's own marking.
+- **Known looseness:** any bare mention of a clause token in the site's region satisfies
+  the check, and `step 2` is also lifecycle's own step 2. The clause texts themselves stay
+  pinned by the sibling suites.
+
 ## 0.2.10
 
 **A child's autopilot follows the launcher's live mode** (autonomic 0.4.0, PR #694). Install
