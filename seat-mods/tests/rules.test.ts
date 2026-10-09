@@ -314,3 +314,66 @@ describe('fix2 shared shell reader and root placement', () => {
     expect(placeOf('/tmp/x', '/w', ['/'])).toBe('allow')
   })
 })
+
+// 0.3.1: the existing rails share rm's head-word walk, with safe commands beside them.
+describe('reserved heads across Bash rails (#701)', () => {
+  const cases: Array<[string, string, string]> = [
+    ['if git push --force; then :; fi', 'force-push', 'if git status; then :; fi'],
+    ['! git push --force', 'force-push', '! git diff --quiet'],
+    ['{ git push --force; }', 'force-push', '{ git log -1; }'],
+    ['if true; then git push -f; fi', 'force-push', 'if true; then git status; fi'],
+    ['while true; do git merge x; done', 'merge', 'while read l; do echo "$l"; done'],
+    ['! gh pr merge 1', 'merge', '! gh pr view 1'],
+  ]
+  for (const [command, rule, control] of cases) {
+    test(`${command}: rail beside allowed control`, () => {
+      expect(bashRules(command)).toContain(rule)
+      expect(bashRules(control)).toEqual([])
+    })
+  }
+  for (const prefix of ['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '(', 'time', 'builtin']) {
+    // Some fragments are not complete Bash programs; these pin the same head set
+    // rm already recognises, without executing git or adding any grammar.
+    for (const [command, expected, control] of [
+      ['git branch -D b', ['branch-delete'], 'git branch -d b'],
+      ['git status --no-verify', ['no-verify'], 'git status'],
+      ['gh pr create', ['pr-create'], 'gh pr view 1'],
+      ['git commit -m x', ['commit'], 'git log -1'],
+      ['git push', ['push'], 'git status'],
+      ['git merge x', ['merge'], 'git diff --quiet'],
+      ['git push -f', ['push', 'force-push'], 'git status'],
+    ] as const) {
+      test(`${prefix} ${command}: existing rail beside allowed control`, () => {
+        expect(bashRules(`${prefix} ${command}`)).toEqual([...expected])
+        expect(bashRules(`${prefix} ${control}`)).toEqual([])
+      })
+    }
+  }
+  test('plain push counts only as push; mentions remain text', () => {
+    expect(bashRules('if git push; then :; fi')).toEqual(['push'])
+    expect(bashRules('echo if git push --force')).toEqual([])
+  })
+  test('commit files follow the head walk; a non-commit mention has no file', () => {
+    expect(commitMessageFiles('if git commit -F /w/msg-trailer.txt; then :; fi')).toEqual(['/w/msg-trailer.txt'])
+    expect(commitMessageFiles('echo if git commit -F /w/msg-trailer.txt')).toEqual([])
+  })
+})
+
+describe('rm heredoc input (#702 item 1)', () => {
+  for (const input of ['<<EOF\ny\nEOF', '<<-EOF\n\ty\n\tEOF', "<<'EOF'\ny\nEOF"]) {
+    test(`${input.split('\n')[0]} leaves only the operand, including when attached`, () => {
+      expect(rmTargets(`rm -i /reports/x ${input}`)).toEqual([{ path: '/reports/x', glob: false }])
+      expect(rmTargets(`rm -i /var/x ${input}`)).toEqual([{ path: '/var/x', glob: false }])
+      expect(rmTargets(`rm -i /reports/x${input}`)).toEqual([{ path: '/reports/x', glob: false }])
+      expect(rmTargets(`rm -i /var/x${input}`)).toEqual([{ path: '/var/x', glob: false }])
+    })
+  }
+  test('quoted and escaped << words stay operands beside a real heredoc', () => {
+    expect(rmTargets("rm '/reports/<<EOF'")).toEqual([{ path: '/reports/<<EOF', glob: false }])
+    expect(rmTargets('rm /reports/\\<\\<EOF')).toEqual([{ path: '/reports/<<EOF', glob: false }])
+    expect(rmTargets("rm /reports/x '<<EOF'")).toEqual([
+      { path: '/reports/x', glob: false }, { path: '<<EOF', glob: false },
+    ])
+    expect(rmTargets('rm /reports/x <<EOF\ny\nEOF')).toEqual([{ path: '/reports/x', glob: false }])
+  })
+})

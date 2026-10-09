@@ -119,8 +119,8 @@ strictly below it is denied, since it could match that root; a glob at the root 
 no writable root lies below it. Unquoted `{` and a glob suffix containing a `..` component are
 unresolvable and denied.
 A glob component starting with `.` and containing `*`, `?` or `[` is unresolvable and denied.
-Redirections and their destinations are excluded from `rm` operands,
-and a single `&` separates commands. The `rm` matcher also skips the head words `if`, `then`,
+Redirections, heredoc input and their destinations are excluded from `rm` operands,
+and a single `&` separates commands for `rm`. Every Bash rail skips the head words `if`, `then`,
 `elif`, `else`, `do`, `while`, `until`, `!`, `{`, `(`, `time` and `builtin`; `builtin cd` and `\cd`
 count as directory changes. A parsing or resolution exception denies the Bash call as a command
 that could not be checked; forged self-referencing or excessively nested markers are rejected.
@@ -132,8 +132,9 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 - **The rails stop mistakes, not an adversary.** Bash matching is whitespace tokens split on `;`,
   `&&`, `||`, `|`, parentheses and newlines, after quoted strings and heredoc bodies are blanked as
   text, so a commit message may mention `git merge` or `-n`. Only the command word counts, after any
-  `VAR=value` and `sudo`, `env`, `command`, `exec`, `nohup` or `time`; so `echo git merge` is not a
-  merge, and neither are `xargs git push --force`, `bash -c "git push -f"`, `g""it push`, or a
+  `VAR=value` and `sudo`, `env`, `command`, `exec`, `nohup` or `time`, and the head words
+  `if`, `then`, `elif`, `else`, `do`, `while`, `until`, `!`, `{`, `(` and `builtin` on every rail;
+  so `echo git merge` is not a merge, and neither are `xargs git push --force`, `bash -c "git push -f"`, `g""it push`, or a
   wrapper with its own options (`env -i git merge`, `sudo -u u git push -f`).
 - **Unparsed shell forms pass:** a single `&` list operator on non-`rm` rails, bundled short flags (`-fqu`),
   abbreviated long options (`--mir`), several heredocs on one command, a heredoc example inside a
@@ -144,7 +145,6 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 - Shell options changed in the same call (`shopt`, e.g. `extglob`, `dotglob`, `nullglob`) are not modelled beyond the `**` and dot-component denials.
 - `**` in an rm glob operand is unresolvable and denies; quoted literal `**` stays literal.
 - An unexecuted shell function body (`cleanup() { rm …; }`) is checked as if it runs and may deny.
-- A heredoc given as rm's input (`rm -i x <<EOF`) is read as an extra operand and denied.
 - A named descriptor before the command (`{log}>file rm …`) hides the rm.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
 - A double-quoted `<<`, or commands after a heredoc opener or a `#` comment on the same line, can hide commands from the rail.

@@ -157,11 +157,23 @@ function gitOf(tokens: string[]): { sub: string; args: string[] } | undefined {
   return { sub, args: end < 0 ? args : args.slice(0, end) }
 }
 
+// The same reserved heads are skipped by every rail, after existing assignments
+// and wrappers. Keep this walk outside the declarations shared with molt.
+const HEAD_WORDS = new Set(['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '(', 'time', 'builtin'])
+
+function afterHeads(tokens: string[]): string[] {
+  for (;;) {
+    const head = commandOf(tokens)
+    if (head === undefined || !HEAD_WORDS.has(head.name)) return tokens
+    tokens = head.args
+  }
+}
+
 export function bashRules(command: string, messageFileText = ''): RuleId[] {
   const found = new Set<RuleId>()
   const { text, pieces } = blank(command)
   for (const segment of text.split(COMMANDS)) {
-    const tokens = tokensOf(segment)
+    const tokens = afterHeads(tokensOf(segment))
     const head = commandOf(tokens)
     if (head?.name === 'gh' && head.args[0] === 'pr') {
       // `gh pr` takes -R/--repo before its subcommand.
@@ -201,7 +213,7 @@ export function commitMessageFiles(command: string): string[] {
   const files: string[] = []
   const { text, pieces } = blank(command)
   for (const segment of text.split(COMMANDS)) {
-    const git = gitOf(tokensOf(segment))
+    const git = gitOf(afterHeads(tokensOf(segment)))
     if (git?.sub !== 'commit') continue
     const { args } = git
     for (const [i, arg] of args.entries()) {
@@ -216,7 +228,7 @@ export function commitMessageFiles(command: string): string[] {
   return files
 }
 
-// rm alone gets operand parsing; the other Bash rails keep their existing matcher.
+// rm alone gets operand parsing; all Bash rails share the head-word walk.
 // Quoting is retained until this point: single quotes and backslash escapes are
 // literal, while active expansions cannot be resolved by the hook.
 export type RmTarget = { path: string | undefined; glob: boolean }
@@ -251,8 +263,6 @@ function rmWord(word: string): { path: string; globAt: number; home: boolean } |
   return { path, globAt, home }
 }
 
-const RM_HEAD_WORDS = new Set(['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '(', 'time', 'builtin'])
-
 export function rmTargets(command: string): RmTarget[] {
   const targets: RmTarget[] = []
   const { text, pieces } = blank(command)
@@ -260,11 +270,14 @@ export function rmTargets(command: string): RmTarget[] {
   // Redirections belong to the shell, not rm. Blanked quotes/escapes keep
   // literal glyphs out of this match. Remove fd prefixes before their operators,
   // then operators with their attached or separate target words.
-  const redirects = text.replace(/(^|[\s;|&()])\d+(?=[<>])/g, '$1')
+  // Only pieces blanked as heredocs are shell input. Removing the marker rather
+  // than its token preserves a glued operand such as x<<EOF. Quotes and escapes
+  // start with their own glyph, so literal << words remain operands.
+  const input = text.replace(MARKER, (marker, i: string) => pieces[Number(i)]?.startsWith('<<') ? '' : marker)
+  const redirects = input.replace(/(^|[\s;|&()])\d+(?=[<>])/g, '$1')
     .replace(/(?:<<<|&>>|&>|<>|>\||>>|[<>]&|>|(?<!<)<(?!<))[ \t]*[^\s;&|()]+/g, ' ')
   for (const segment of redirects.split(/;|&&|\|\||[|&]|\n|\(|\)/)) {
-    let head = commandOf(tokensOf(segment))
-    while (head !== undefined && RM_HEAD_WORDS.has(head.name)) head = commandOf(head.args)
+    const head = commandOf(afterHeads(tokensOf(segment)))
     if (head === undefined) continue
     if (['cd', 'pushd', 'popd'].includes(head.name) || expand(head.name, pieces) === '\\cd') changedDirectory = true
     if (head.name !== 'rm') continue
