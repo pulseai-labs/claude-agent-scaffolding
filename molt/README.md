@@ -23,7 +23,7 @@ orca-crew (#667) do not mark their children yet.
 | 40% (`warnPercent`) | Once, after the next tool result (or with the next prompt when the turn ended first), a warning: find a good point to hand off. Work continues. | The same, plus "tell your parent". molt appends `warned 40` to the status file. |
 | 50% (`warnAgainPercent`) | Once, a second warning: the handoff is past due. Work continues. | The same; `warned 50`. |
 | 65% (`commandPercent`) | Once, after a tool result: finish the step in hand and write the handoff now. At the end of a turn with no `MOLT-HANDOFF:` line, or with one that names a file that does not exist, the Stop reflex blocks the stop and asks again, at most twice. | The same; `handoff required`. |
-| 75% (`blockPercent`) | Only Write, Edit, Skill, and Bash made only of `git add` and `git commit` run. Every other tool call, reads included, is refused with the instruction and a note on the block. | The same. |
+| 75% (`blockPercent`) | Only Write, Edit, Skill, and Bash whose every command is `git add` or `git commit` run — a leading head word (`if`, `then`, `elif`, `else`, `!`, `{`, `time`) is skipped, a segment that only closes one (`fi`, `}`) is ignored, and a lone `&` splits commands as `;` does (`&&` and the redirections that carry `&` are untouched). A loop head (`while`, `until`, `do`) is not skipped, so a loop stays refused. Every other tool call, reads included, is refused with the instruction and a note on the block. | The same. |
 | 80% (block + `fallbackMargin`) | molt stops waiting. With no handoff, it writes one: Haiku summarises the transcript into `~/.claude/state/molt/briefs/<id>.md`, above the facts molt extracts itself (files written, commits, issues, the last request). If Haiku fails, the facts alone stand in. molt molts on that brief. | The brief is written and handed off: `handed-off <brief path>`. No clear. |
 
 A warning never blocks a stop. Past 65% only the command is delivered; a warning the session
@@ -168,9 +168,9 @@ cannot loop — and differ by mode:
   speaks again. Your next message resumes it and brings the marker back. The seed prompt does
   not count as a message from you.
 - **Autopilot.** There is no count limit. A molt with no progress since the previous one — no
-  Write, Edit or NotebookEdit, and no `git commit`, made below the first warning — pauses the
-  session and rings the record's bell, a shell command run with `AUTONOMIC_MESSAGE` set to the
-  reason. The bell never delays the turn end: it is rung and left to finish, killed at the
+  Write, Edit or NotebookEdit, and no `git commit` the line runs, made below the first warning —
+  pauses the session and rings the record's bell, a shell command run with `AUTONOMIC_MESSAGE` set
+  to the reason. The bell never delays the turn end: it is rung and left to finish, killed at the
   engine's 30-second process default if it has not answered, and a failure — a non-zero exit or
   a rejection, the kill included — is logged once. Work past the first warning does not count:
   there the session may write and commit its handoff, which would make every molt look like
@@ -194,7 +194,10 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
 - **Auto-compact must sit above the block.** molt does not turn auto-compact off; it stays the
   backstop. If it runs at or below the block threshold, it acts first. `/molt status` checks.
 - **A Bash write is not progress unless it commits.** The autopilot loop guard counts Write,
-  Edit, NotebookEdit and `git commit`; `sed -i` or `cat >` alone reads as no progress.
+  Edit, NotebookEdit and `git commit`; `sed -i` or `cat >` alone reads as no progress. A
+  `git commit` counts only bare, or behind `time`: a `{ … }` segment cannot be told from a
+  function definition's body (`f() { git commit -m m; }`, which runs no commit), and one behind
+  `if`, `then`, `elif`, `else` or `!` may not run, so neither counts.
 - **A worker's ping is a message from you, to molt.** A ping a crew worker types into a top's
   pane (`herdr agent prompt`) reaches molt as a `composer` prompt, so it resets the manual pause
   count; a looping root top is then bounded only by minimum room (#668).

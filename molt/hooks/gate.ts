@@ -1,4 +1,4 @@
-import { gitSubcommands } from './shell'
+import { gitSubcommands, gitSubcommandsThatRun } from './shell'
 
 // Past the hard threshold only the handoff's own tools run: the file tools that write
 // it, Skill (the instruction names a handoff skill), and Bash made only of git add and
@@ -15,7 +15,10 @@ export function gateAllows(tool: string, args: Readonly<Record<string, unknown>>
 }
 
 // Progress, for the autopilot loop guard (spec §2): a file written or a commit made.
+// A commit counts only where the line runs it — bare, or behind `{` or `time`; behind
+// `if`, `then`, `elif`, `else` or `!` it may not run, and counting it would hide a
+// stalled loop from the guard (review R2).
 export function isProgress(tool: string, args: Readonly<Record<string, unknown>>): boolean {
   if (tool === 'Write' || tool === 'Edit' || tool === 'NotebookEdit') return true
-  return tool === 'Bash' && typeof args.command === 'string' && gitSubcommands(args.command).includes('commit')
+  return tool === 'Bash' && typeof args.command === 'string' && gitSubcommandsThatRun(args.command).includes('commit')
 }

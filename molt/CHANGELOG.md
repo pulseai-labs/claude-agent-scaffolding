@@ -2,6 +2,28 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.2.4 — 2026-10-09
+
+- **The git reader skips reserved head words, splits on a lone `&`, and counts progress only where
+  a commit runs** (#711, `shell.ts` `afterHeads` / `gitSubcommands` / `gitSubcommandsThatRun`;
+  review round 1). Before reading a segment's git subcommand the reader skips the head words
+  `if then elif else ! { time` — deliberately a subset of the walk seat-mods 0.3.1 ships: a loop
+  head (`while`, `until`, `do`) and its closer (`done`) are not skipped, so a loop stays refused
+  past the block, where the hard threshold is for wrapping up, and `builtin` is an execution
+  prefix, never a head word: nothing behind it is exposed. A segment that only closes a construct
+  (`fi`, `}`) or that the walk emptied (a bare `else` or `then`) names no command at all. A lone
+  `&` — Bash's third list separator, which the shared `COMMANDS` does not split on — now ends a
+  segment, so `! git commit -m m & evil` and `git add f & evil` are refused; `&&` and the
+  redirections that carry `&` (`2>&1`, `>&2`, `&>`, `&>>`) are untouched. Both effects were
+  fail-closed before: past the block threshold `if git add f; then git commit -m m; fi` was refused
+  although every command in it is a git command, and a head-wrapped `git commit` was not counted as
+  progress, so the autopilot loop guard could read a committing session as stalled. Progress
+  counts a commit only bare, or behind `time`: the `(`/`)` split leaves a `{ … }` segment
+  indistinguishable from a function definition's body (`f() { git commit -m m; }` defines the
+  function and commits nothing), and behind `if`, `then`, `elif`, `else` or `!` a commit may not
+  run — so counting either would hide a stalled loop. The walk is an exact raw head: a
+  path-qualified or quoted head word is an ordinary program and stays refused.
+
 ## 0.2.3 — 2026-10-09
 
 - **A bell that does not answer no longer holds the turn end** (#665 item 4, `register.tsx`
