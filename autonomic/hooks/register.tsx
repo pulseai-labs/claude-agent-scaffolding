@@ -11,7 +11,7 @@ import { DEFAULT_POLICY, POLICY_ID, expandHome } from './policy'
 import { scopeMessage } from './prompts'
 import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from './records'
 import type { SessionRecord } from './records'
-import { namesDanger, neverRules } from './never'
+import { DEFAULT_READERS, namesDanger, neverRules } from './never'
 import { enforced } from './enforce'
 import { inputShape, shape } from './shape'
 import type { NeverRule, Where } from './never'
@@ -297,6 +297,7 @@ async function statusReport($: Engine, id: string): Promise<string> {
     `policy: ${pol === undefined ? 'missing or empty' : pol === DEFAULT_POLICY.trim() ? 'default' : 'edited'} (${policyPath})`,
     `yieldAtPercent: ${cfg.yieldAtPercent} (used only without a molt stage file) · loopMax: ${cfg.loopMax} · tailChars: ${cfg.tailChars}`,
     `never-approve: ${cfg.neverApprove.length === 0 ? "none (every command is the fork's to judge)" : cfg.neverApprove.join(' ')}`,
+    `readers: ${(cfg.readers ?? DEFAULT_READERS).map(r => r.join(' ')).join('; ') || 'none'}`,
     `molt stage: ${stageNow ?? 'none'}`,
     `ledger: ${await ledgerPath($)}`,
     `bell: ${rec.bell === undefined ? 'not set' : 'set'}; pain file: ${painPath === '' ? 'not set' : painPath}`,
@@ -574,7 +575,7 @@ export const register: Register = (on, options) => {
         // The bypass floor (0.1.1 §3.1): in autopilot a never-approve match reaches the
         // operator whatever allowed it. Manual mode never touches an allow.
         const raw = (e.input as { command?: unknown } | undefined)?.command
-        if (typeof raw !== 'string' || !namesDanger(raw)) return r
+        if (typeof raw !== 'string' || !namesDanger(raw, cfg.readers)) return r
         // From here every failure keeps the call with the operator (final review I1): an
         // unneeded ask costs one dialog, a missed one a force push.
         let rules: NeverRule[]
@@ -583,7 +584,7 @@ export const register: Register = (on, options) => {
           // floor: under bypass, manual means no asks at all (PR #681). /autopilot off clears it.
           const m = await modeOf($)
           if (m.mode !== 'autopilot' && m.problem === undefined) return r
-          rules = enforced(neverRules(raw, await where($)), cfg.neverApprove)
+          rules = enforced(neverRules(raw, await where($), cfg.readers), cfg.neverApprove)
         } catch (err) {
           await log($, `floor error ${String(err)}`)
           return { ...r, decision: 'ask', reason: 'autonomic: the never-approve check failed; this call stays with you' }
@@ -613,7 +614,7 @@ export const register: Register = (on, options) => {
       const raw = (e.input as { command?: unknown } | undefined)?.command
       if (typeof raw === 'string') {
         const command = raw
-        const rules = enforced(neverRules(command, await where($)), cfg.neverApprove)
+        const rules = enforced(neverRules(command, await where($), cfg.readers), cfg.neverApprove)
         if (rules.length > 0) {
           await record($, id, 'permission', `${e.tool}: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
           await pain($, id, 'never-approve', painFocus(rules, command))

@@ -1,6 +1,6 @@
 {
   "name": "autonomic",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Autopilot as a Claude Code mod. In autopilot (AUTONOMIC_MODE=autopilot per spawn, or /autopilot on) a global policy joins the system prompt; at each turn end, each AskUserQuestion and each permission ask a cached fork judges the stop against the policy and the session's scope; covered asks and stalls continue, every decision is appended to a ledger, and the closed pain list reaches you by toast, band and an optional bell. A turn-end pain offers up to three options on the band: one press records the choice in the ledger and submits it as your prompt. Fails toward manual. Requires Claude Code 2.1.289 or later.",
   "author": { "name": "Pras" },
   "types": "./types/index.d.ts",
@@ -42,6 +42,12 @@
       "title": "Never-approve rules",
       "description": "In autopilot, a command matching one of these always reaches you, even under bypass permissions. Remove a name to let the fork judge it. Known: force-push default-branch-push branch-delete rm-outside no-verify unreadable (unreadable matches nothing since 0.2.0). Empty: none.",
       "default": "force-push default-branch-push branch-delete rm-outside no-verify unreadable"
+    },
+    "readers": {
+      "type": "string",
+      "title": "Reader commands",
+      "description": "Command prefixes, separated by ;, that name a file but never run it. A reader that names a file a command just wrote does not keep that file's words for the never-approve list. Add your own, for example: gh pr create; gh pr edit; gh issue create; gh issue comment; herdr agent prompt. Empty: none.",
+      "default": "gh pr create; gh pr edit; gh issue create; gh issue comment"
     }
   }
 }

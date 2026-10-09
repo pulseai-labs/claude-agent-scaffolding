@@ -2,6 +2,7 @@
 // its default and the problem is reported, never silently clamped.
 
 import type { NeverRule } from './never'
+import { parseReaders } from './never'
 
 // The coded never-approve rules (never.ts) the operator can toggle with neverApprove.
 export const NEVER_RULES: readonly NeverRule[] = ['force-push', 'default-branch-push', 'branch-delete', 'rm-outside', 'no-verify', 'unreadable']
@@ -13,6 +14,8 @@ export type AutonomicConfig = {
   tailChars: number
   yieldAtPercent: number
   neverApprove: NeverRule[]
+  // Absent: never.ts's DEFAULT_READERS. Set only when the readers key is given (0.4.3 §3.5).
+  readers?: string[][]
   problems: string[]
 }
 
@@ -47,6 +50,8 @@ export function parseConfig(options: Readonly<Record<string, unknown>> | undefin
     }
   }
   const bell = str(o.bell)
-  const base = { policyPath: str(o.policyPath) ?? DEFAULTS.policyPath, loopMax: Math.floor(loopMax), tailChars: Math.floor(tailChars), yieldAtPercent, neverApprove, problems }
-  return bell === undefined ? base : { ...base, bell }
+  const base: AutonomicConfig = { policyPath: str(o.policyPath) ?? DEFAULTS.policyPath, loopMax: Math.floor(loopMax), tailChars: Math.floor(tailChars), yieldAtPercent, neverApprove, problems }
+  // readers: command prefixes separated by ;. An empty string is none.
+  const withReaders = typeof o.readers === 'string' ? { ...base, readers: parseReaders(o.readers) } : base
+  return bell === undefined ? withReaders : { ...withReaders, bell }
 }
