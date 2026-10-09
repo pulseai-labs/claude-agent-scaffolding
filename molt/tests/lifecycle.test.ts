@@ -27,6 +27,15 @@ describe('the active marker (spec §7.1)', () => {
     expect(w.files.has(MARK())).toBe(true)
   })
 
+  test('/molt now rewrites the active marker in the same command (#665 item 6)', async ($, on) => {
+    const w = world(on)
+    await $.session.start(START)
+    await $.command.run(RUN('off'))
+    expect(w.files.has(MARK())).toBe(false)   // the off guard still holds
+    await $.command.run(RUN('now'))
+    expect(w.files.has(MARK())).toBe(true)    // not deferred to the next prompt
+  })
+
   test('a prompt refreshes it', async ($, on) => {
     const w = world(on)
     await $.prompt.submit({ text: 'hi', wait: false, origin: { kind: 'composer' } } as never)

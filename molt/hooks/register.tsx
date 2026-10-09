@@ -29,6 +29,11 @@ let paused: string | undefined
 let seeded: { session: string; startPercent?: number } | undefined
 
 const MAX_STOP_BLOCKS = 2
+// The engine kills a `process.run` child at 30 s when no bound is given — the same bound
+// molt-v0.2.2's awaited bell therefore ran under. Stated explicitly, and never tightened:
+// a slow bell (a remote notify curl) that completed on 0.2.2 must still complete, while a
+// hung one stays bounded. Nothing waits on it (see `pause`), so this is only a backstop.
+const BELL_TIMEOUT_MS = 30_000
 let unmeasured = 0                        // tool and response output no response has measured yet
 let inFlight = false                      // a molt between /clear and its seed
 let progress = 0                          // Write, Edit or commit since the last molt
@@ -195,9 +200,14 @@ async function warningText($: Engine, sessionId: string, which: 1 | 2): Promise<
   return (await isChild($)) ? `${text}\n\n${CHILD_WARNING}` : text
 }
 
+// Rung once and left to finish: the bell never gates the hook that paused the session. A bell
+// that cannot start, throws, or is killed at BELL_TIMEOUT_MS rejects; one that runs and exits
+// non-zero resolves. Both are failures and both are logged once — `log` never throws, so this
+// promise always resolves and nothing is left unhandled (#665 item 4).
 async function ring($: Engine, bell: string, message: string): Promise<void> {
   try {
-    await $.process.run(['sh', '-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${bell}`, 'sh', message])
+    const r = await $.process.run(['sh', '-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${bell}`, 'sh', message], { timeoutMs: BELL_TIMEOUT_MS })
+    if (r.exitCode !== 0) await log($, `bell failed exit=${r.exitCode}`)
   } catch (err) {
     await log($, `bell failed ${String(err)}`)
   }
@@ -209,7 +219,10 @@ async function pause($: Engine, sessionId: string, text: string, bell: string | 
   await setNotice($, { text, tone: 'warn' })
   $.ui.toast(text)
   showStatus($, sessionId)
-  if (bell !== undefined) await ring($, bell, text)
+  // Not awaited: every caller of pause (both loop guards, both from turn.complete) returns
+  // without waiting on the bell. That is not silence — it still rings, with this same text,
+  // and still logs a failure once.
+  if (bell !== undefined) void ring($, bell, text)
   await log($, `pause session=${sessionId} ${text}`)
 }
 
@@ -614,6 +627,9 @@ export const register: Register = (on, options) => {
     if (arg === 'now') {
       off.delete(sessionId)
       paused = undefined
+      // Lifting off (or a pause) turns the session back on here, so the marker comes back
+      // here too — not at the next prompt, which a session with no prompt box never sends (#665 item 6).
+      await touchActive($, sessionId)
       forced.add(sessionId)
       await measure($, sessionId)
       // The host refuses $.prompt.submit here: it would wait on the turn this hook holds.

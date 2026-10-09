@@ -8,6 +8,12 @@ import { mock } from 'claude-code/testing'
 export type World = {
   files: Map<string, string>
   runs: string[][]
+  runInits: Array<{ timeoutMs?: number } | undefined>  // what each run was given, in step with runs
+  bellRuns: string[][]         // every autopilot bell's argv, in order
+  bellDelayMs?: number         // a bell answers after this long instead of at once
+  failBell?: boolean           // the bell process rejects
+  bellExit?: number            // a bell that runs answers with this exit status
+  bellFinished: boolean        // a bell answered (after its delay, if any)
   prompts: string[]
   contexts: string[]           // what reached the model beside each prompt, in order
   fills: string[]              // what molt put in the prompt box
@@ -45,7 +51,7 @@ const ZERO = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, ca
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string> } = {}): World {
   const w: World = {
     files: new Map(Object.entries(opts.files ?? {})),
-    runs: [], prompts: [], contexts: [], fills: [], hasBox: true, clears: 0, clearTo: [], notices: [], dirs: new Set(), toasts: [], statuses: [],
+    runs: [], runInits: [], bellRuns: [], bellFinished: false, prompts: [], contexts: [], fills: [], hasBox: true, clears: 0, clearTo: [], notices: [], dirs: new Set(), toasts: [], statuses: [],
     usage: { tokens: 100_000, window: 1_000_000 },
     session: { id: 's1', cwd: '/repo' },
     messages: [],
@@ -79,11 +85,27 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     return { value: undefined } as never
   })
   on('fs.exists', (_$, e) => ({ value: w.files.has(e.path) || w.dirs.has(e.path) }) as never)
-  on('process.run', (_$, e) => {
+  on('process.run', async (_$, e) => {
     const argv = [...e.argv]
     w.runs.push(argv)
+    w.runInits.push(e.init)
+    let exitCode = 0
+    // The autopilot bell, `sh -c 'AUTONOMIC_MESSAGE="$1"; …'`. It is answered here, never
+    // by the engine, so the bound `ring` passes is observable only through runInits. A delay
+    // stands in for a bell that has not answered yet; a delay past the bound it was given
+    // rejects, as the engine kills it (here at once — waiting the bound out in real time
+    // would only slow the suite). bellExit answers with a non-zero exit instead.
+    if (typeof argv[2] === 'string' && argv[2].includes('AUTONOMIC_MESSAGE')) {
+      w.bellRuns.push(argv)
+      if (w.failBell) return { deny: 'bell refused' } as never
+      const bound = e.init?.timeoutMs ?? 30_000
+      if ((w.bellDelayMs ?? 0) > bound) return { deny: `timed out after ${bound}ms` } as never
+      if (w.bellDelayMs !== undefined) await new Promise(resolve => sleep(resolve, w.bellDelayMs))
+      w.bellFinished = true
+      exitCode = w.bellExit ?? 0
+    }
     if (argv[0] === 'rm' && argv[1] === '-f' && argv[2] !== undefined) w.files.delete(argv[2])
-    return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false } } as never
+    return { value: { exitCode, stdout: '', stderr: '', isStdoutTruncated: false } } as never
   })
   on('model.complete', () => {
     w.modelCalls += 1

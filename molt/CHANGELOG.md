@@ -2,6 +2,21 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.2.3 — 2026-10-09
+
+- **A bell that does not answer no longer holds the turn end** (#665 item 4, `register.tsx`
+  `ring`, `pause`). `pause` no longer awaits the bell: `turn.complete` and both loop guards
+  return while it is still running. The bound stays the engine's own — 30 s, passed explicitly
+  rather than tightened, so a slow bell that completed on 0.2.2 (a remote notify curl) still
+  completes and a hung one is still killed. Not silence: the bell still rings with the pause
+  text as `AUTONOMIC_MESSAGE`, and a failure is still logged once — `bell failed exit=<n>` for a
+  non-zero exit, `bell failed <error>` for a rejection or the timeout kill.
+- **`/molt now` rewrites the active marker in the same command** (#665 item 6, `register.tsx`
+  `command.run`). Lifting `/molt off` (or a pause) turns the session back on, so the command
+  writes the marker there. An absent marker is what makes the crew context-ceiling hooks speak,
+  so until the next prompt they went on speaking — and could act on the session — after molt had
+  taken it back.
+
 ## 0.2.2 — 2026-10-08
 
 - A `<<<` herestring no longer opens a heredoc; mirrored from seat-mods 0.3.0 by the shared shell parity contract (PR #698).
