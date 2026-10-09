@@ -1475,6 +1475,172 @@ t_assert_rc 1 "P7: a local base ahead of origin halts the record pass"
 t_assert_contains "$T_OUT" "reset --hard origin/main" "P7: ...naming the repair command, not running it"
 t_assert_eq "$STRANDED_SHA" "$(git -C "$PR_REPO" rev-parse main)" "P7: ...and local main was left exactly as it was (never auto-reset)"
 
+# P5b-P5h. LINEAR LANDINGS (1.14.3, #708). A base branch that enforces linear
+# history cannot take a merge commit, so the record pass also accepts a squash
+# or a rebase landing that it can PROVE: the landed tree equals the reviewed
+# head's, and the landed tip's first-parent chain reaches a commit the head
+# already holds through one-parent commits only. That commit is the
+# BEFORE-POINT, carried as a third field on the $merge_shas line, and step 5
+# and the cumulative demo read it instead of `$sha^1`.
+#
+# Each case opens the PR, lands ONE review-fix commit on the spine branch (so
+# the head carries two commits and a rebase landing is longer than one commit),
+# lands it on the remote, then runs the resumed close through the touch check.
+_pr_land_flow() { # $1=fixture name — sets LF_BASE / LF_TIP / LF_HEAD
+  _pr_fixture "$1"
+  LF_BASE="$(git -C "$PR_REPO" rev-parse main)"
+  LF_TIP="$(git -C "$PR_REPO" rev-parse "$PR_BRANCH")"
+  t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
+    "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'" >/dev/null
+  echo fix > "$PR_REPO/fix.txt"; git -C "$PR_REPO" add fix.txt; git -C "$PR_REPO" commit -qm "review fix"
+  git -C "$PR_REPO" push -q origin "$PR_BRANCH"
+  LF_HEAD="$(git -C "$PR_REPO" rev-parse "$PR_BRANCH")"
+}
+_pr_sim_clone() { # prints the clone path, on main
+  local clone="$TMP/sim-clone"; rm -rf "$clone"
+  git clone -q "$PR_ORIGIN" "$clone"
+  git -C "$clone" config user.email t@t; git -C "$clone" config user.name t
+  git -C "$clone" checkout -q main
+  printf '%s\n' "$clone"
+}
+_pr_sim_publish() { # $1=clone $2=headRefOid — push main and stage the merged PR
+  git -C "$1" push -q origin main
+  git -C "$1" rev-parse main > "$PR_STATE/merge_commit"
+  printf "%s\n" "$2" > "$PR_STATE/head_oid"
+  printf "7 MERGED\n" > "$PR_STATE/pr"
+  rm -rf "$1"
+}
+_pr_simulate_squash() { # $1=head [$2=an extra file the squash adds, so its tree differs]
+  local clone; clone="$(_pr_sim_clone)"
+  git -C "$clone" merge -q --squash "$1" >/dev/null
+  if [ -n "${2:-}" ]; then echo extra > "$clone/$2"; git -C "$clone" add "$2"; fi
+  git -C "$clone" commit -qm "squash r0.s5"
+  _pr_sim_publish "$clone" "$1"
+}
+_pr_simulate_rebase() { # $1=head — GitHub's rebase-and-merge rewrites every commit onto main
+  local clone; clone="$(_pr_sim_clone)"
+  git -C "$clone" checkout -q -b land "$1"
+  GIT_COMMITTER_DATE='2030-01-01T00:00:00Z' git -C "$clone" rebase -q --force-rebase main
+  git -C "$clone" checkout -q main; git -C "$clone" merge -q --ff-only land
+  _pr_sim_publish "$clone" "$1"
+}
+_pr_record() { # resumed close: pass one, the record pass, then step 5's touch check
+  : > "$PR_SHIM/args.log"
+  t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" "oss_bin=$PR_SHIM/oss" bash -c \
+    "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'; . '$PRRECORD_BLOCK'; printf 'PAIRS%s\n' \"\$merge_shas\"; . '$TOUCH_BLOCK'"
+  LF_TOUCH="$(awk '/^touch_check /' "$PR_SHIM/args.log")"
+}
+_pr_not_recorded() { # $1=label
+  case "$T_OUT" in *"landed PR"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: $1 - recorded anyway";; *) T_PASS=$((T_PASS+1));; esac
+}
+
+# P5b. SQUASH: one commit, tree equal to the head's, its parent in the head's
+# history. Recorded as a squash, before-point = its parent.
+_pr_land_flow p5b
+_pr_simulate_squash "$LF_HEAD"
+SQ="$(cat "$PR_STATE/merge_commit")"
+_pr_record
+t_assert_contains "$T_OUT" "landed PR #7 at $SQ (squash)" "P5b: a tree-equal squash is recorded, naming its proof"
+t_assert_contains "$T_OUT" "canonical:$SQ:$LF_BASE" "P5b: ...with its parent as the before-point in \$merge_shas"
+case "$LF_TOUCH" in *spine.txt*fix.txt*|*fix.txt*spine.txt*) T_PASS=$((T_PASS+1));; *) T_FAIL=$((T_FAIL+1)); echo "FAIL: P5b - step 5's path list lacks the squash's files: $LF_TOUCH";; esac
+
+# P5c. REBASE: every commit rewritten onto main. Recorded as a rebase; the
+# before-point is the base tip under the rewritten run, so step 5 sees BOTH
+# commits' files — `$sha^1` would see only the last one.
+_pr_land_flow p5c
+_pr_simulate_rebase "$LF_HEAD"
+RB="$(cat "$PR_STATE/merge_commit")"
+case "$(git --git-dir="$PR_ORIGIN" diff --name-only "$RB^1" "$RB")" in
+  *spine.txt*) T_FAIL=$((T_FAIL+1)); echo "FAIL: P5c fixture is vacuous - \$sha^1 alone already sees spine.txt";;
+  *) T_PASS=$((T_PASS+1));;
+esac
+_pr_record
+t_assert_contains "$T_OUT" "landed PR #7 at $RB (rebase)" "P5c: a tree-equal rebase is recorded, naming its proof"
+t_assert_contains "$T_OUT" "canonical:$RB:$LF_BASE" "P5c: ...with the base tip under the run as the before-point"
+case "$LF_TOUCH" in *spine.txt*) T_PASS=$((T_PASS+1));; *) T_FAIL=$((T_FAIL+1)); echo "FAIL: P5c - step 5 diffed from \$sha^1, not the before-point: $LF_TOUCH";; esac
+
+# P5d. A MERGE COMMIT still records as one, with no third field (adjacent
+# control for the default before-point).
+_pr_land_flow p5d
+_pr_simulate_merge "$LF_HEAD"
+MG="$(cat "$PR_STATE/merge_commit")"
+_pr_record
+t_assert_contains "$T_OUT" "landed PR #7 at $MG (merge)" "P5d: a two-parent merge of the head records as a merge"
+case "$T_OUT" in *"canonical:$MG:"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: P5d - a merge commit gained a before-point field";; *) T_PASS=$((T_PASS+1));; esac
+
+# P5e. CONTROL: a squash whose tree is NOT the head's (it adds a file nobody
+# reviewed) halts.
+_pr_land_flow p5e
+_pr_simulate_squash "$LF_HEAD" unreviewed.txt
+_pr_record
+t_assert_rc 1 "P5e: a squash whose tree differs from the head halts"
+t_assert_contains "$T_OUT" "tree differs from the reviewed head" "P5e: ...naming the tree mismatch"
+_pr_not_recorded "P5e"
+
+# P5f. CONTROL: a two-parent merge whose second parent is not the head (it
+# merged the pushed tip, not the head with its fix round) halts.
+_pr_land_flow p5f
+_pr_simulate_merge "$LF_TIP"
+printf "%s\n" "$LF_HEAD" > "$PR_STATE/head_oid"
+_pr_record
+t_assert_rc 1 "P5f: a merge commit of something other than the head halts"
+t_assert_contains "$T_OUT" "second parent is not the PR's head" "P5f: ...naming the wrong second parent"
+_pr_not_recorded "P5f"
+
+# P5g. CONTROL: a fast-forward (the landed tip is the head itself) has no
+# before-point to prove and halts.
+_pr_land_flow p5g
+FF_CLONE="$(_pr_sim_clone)"
+git -C "$FF_CLONE" merge -q --ff-only "$LF_HEAD"
+_pr_sim_publish "$FF_CLONE" "$LF_HEAD"
+_pr_record
+t_assert_rc 1 "P5g: a fast-forward landing halts"
+t_assert_contains "$T_OUT" "fast-forward" "P5g: ...naming the fast-forward"
+_pr_not_recorded "P5g"
+
+# P5h. CONTROL: the landed run sits on a merge commit the head does not hold.
+# The head carries the merged change by cherry-pick, so the trees ARE equal —
+# only the chain walk can refuse it.
+_pr_land_flow p5h
+MC_CLONE="$(_pr_sim_clone)"
+git -C "$MC_CLONE" checkout -q -b other main
+echo other > "$MC_CLONE/other.txt"; git -C "$MC_CLONE" add other.txt; git -C "$MC_CLONE" commit -qm other
+OTHER="$(git -C "$MC_CLONE" rev-parse other)"
+git -C "$MC_CLONE" checkout -q main; git -C "$MC_CLONE" merge -q --no-ff other -m "merge other" >/dev/null
+git -C "$MC_CLONE" fetch -q origin "$PR_BRANCH"
+git -C "$MC_CLONE" checkout -q -b head2 "$LF_HEAD"; git -C "$MC_CLONE" cherry-pick "$OTHER" >/dev/null
+MC_HEAD="$(git -C "$MC_CLONE" rev-parse head2)"
+git -C "$MC_CLONE" push -q origin "head2:$PR_BRANCH"
+git -C "$MC_CLONE" checkout -q main; git -C "$MC_CLONE" merge -q --squash "$MC_HEAD" >/dev/null 2>&1
+git -C "$MC_CLONE" commit -qm "squash r0.s5"
+t_assert_eq "$(git -C "$MC_CLONE" rev-parse "main^{tree}")" "$(git -C "$MC_CLONE" rev-parse "$MC_HEAD^{tree}")" \
+  "P5h: the fixture's trees are equal, so only the chain walk can refuse it"
+_pr_sim_publish "$MC_CLONE" "$MC_HEAD"
+git -C "$PR_REPO" fetch -q origin "$PR_BRANCH"
+_pr_record
+t_assert_rc 1 "P5h: a run that sits on a merge commit the head lacks halts"
+t_assert_contains "$T_OUT" "merge commit below the landed run" "P5h: ...naming the merge commit in the chain"
+_pr_not_recorded "P5h"
+
+# P5i. The cumulative demo's before-checkout reads the before-point too: on a
+# linear run base -> one -> two, `cat f.txt` differs between the tip and the
+# before-point (`base`), but not between the tip and `$sha^1` (`one`).
+LREPO="$TMP/lrepo"; mkdir -p "$LREPO"; git -C "$LREPO" init -q
+git -C "$LREPO" config user.email t@t; git -C "$LREPO" config user.name t
+echo base > "$LREPO/f.txt"; git -C "$LREPO" add f.txt; git -C "$LREPO" commit -qm base
+LBASE="$(git -C "$LREPO" rev-parse HEAD)"
+echo one > "$LREPO/f.txt"; git -C "$LREPO" commit -qam one
+echo two > "$LREPO/g.txt"; git -C "$LREPO" add g.txt; git -C "$LREPO" commit -qm two
+LTIP="$(git -C "$LREPO" rev-parse HEAD)"
+Q_SAVED="$QREPO"; QREPO="$LREPO"; _qshim "$TMP/qshim-linear" 'cat f.txt'; QREPO="$Q_SAVED"
+t_capture env "TMPDIR=$QTMP" "oss_bin=$TMP/qshim-linear/oss" "merge_shas=myrepo:$LTIP:$LBASE" "QBLOCK=$QBLOCK" \
+  bash -c 'set -euo pipefail; . "$QBLOCK"'
+t_assert_rc 1 "P5i: the demo compares the tip against the before-point, not \$sha^1"
+t_assert_contains "$T_OUT" "parent rc=0" "P5i: ...after a before-checkout that really ran (an unreadable line halts at the detach instead)"
+t_capture env "TMPDIR=$QTMP" "oss_bin=$TMP/qshim-linear/oss" "merge_shas=myrepo:$LTIP" "QBLOCK=$QBLOCK" \
+  bash -c 'set -euo pipefail; . "$QBLOCK"'
+t_assert_rc 0 "P5i: ...and with no third field it still compares against \$sha^1 (control)"
+
 # P8. A NON-ORIGIN REMOTE (round 2, T3/T10): the arm test selects the PR arm on
 # any non-empty remote, so a repo whose only remote is named something else
 # must have that remote RESOLVED and used for the push - and the PR creation

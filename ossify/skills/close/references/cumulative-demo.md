@@ -206,7 +206,7 @@ echo "head rc=$head_rc"
 # Detaching one and leaving the rest at post-merge state compares a tree that is
 # half before and half after this spine, and both wrong answers - "already
 # broken" and "this spine broke it" - come back looking like evidence.
-while IFS=: read -r repo sha; do
+while IFS=: read -r repo sha before; do
   [ -n "$repo" ] || continue
   root="$("$oss_bin" repo_root "$repo")" \
     || { echo "halt: \$merge_shas names undeclared repo '$repo'"; exit 1; }
@@ -214,8 +214,9 @@ while IFS=: read -r repo sha; do
   # it is per-repo and only remembers one step, and a second detach in the same
   # repo would lose the original.
   printf '%s\t%s\n' "$root" "$(git -C "$root" rev-parse --abbrev-ref HEAD)" >> "$restore"
-  git -C "$root" checkout --detach "$sha^1" \
-    || { echo "halt: cannot reach $sha^1 in $repo - the comparison is void"; exit 1; }
+  # The before-point spine-close §3 proved (a squash's or rebase's), else the merge's first parent.
+  git -C "$root" checkout --detach "${before:-$sha^1}" \
+    || { echo "halt: cannot reach ${before:-$sha^1} in $repo - the comparison is void"; exit 1; }
 done < "$pairs"
 
 if ( cd "$wd" && bash -c "$cmd" ) > "$evd/oss-parent.txt" 2>&1; then parent_rc=0; else parent_rc=$?; fi

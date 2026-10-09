@@ -32,8 +32,8 @@ Under the bundled loop, three rails survive any adaptation:
   and a mergeability verdict, then stop at the ask. Never auto-merge.
 
 Whichever loop runs, the merge is the operator's, and requirements a caller
-states in the invocation bind it: spine close states a merge-commit landing and
-no history rewrite.
+states in the invocation bind it: spine close states its landing (a merge commit where the repo allows one,
+else a squash or rebase of exactly the reviewed head) and no history rewrite.
 
 This is a generic utility: it needs no pairing manifest and works on any
 repository `gh` can reach. Since #339 it is also the spine-close merge lane: a
