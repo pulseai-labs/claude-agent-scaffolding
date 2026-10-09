@@ -3,8 +3,11 @@
 // tests/test-mod-shell-parity.sh holds the copies identical. Change them there
 // first, then copy.
 
-// Command boundaries for matching; subshell parentheses count too.
-const COMMANDS = /;|&&|\|\||\||\n|\(|\)/
+// Command boundaries for matching; subshell parentheses count too. A lone `&` —
+// Bash's background list separator — is one, and only a lone one: `&&` is the
+// and-list, and a `&` a redirection carries (`>&`, `<&`, `&>`, `&>>`) is not a
+// boundary (#723).
+const COMMANDS = /;|&&|(?<![&<>])&(?![&>])|\|\||\||\n|\(|\)/
 
 // Heredoc bodies and quoted strings are text, not commands: a commit message may
 // name `git merge` or `-n`. Each is swapped for a numbered marker before matching,
@@ -104,13 +107,6 @@ export const HEAD_WORDS = new Set(['if', 'then', 'elif', 'else', '!', '{', 'time
 // segment.
 export const CLOSERS = new Set(['fi', '}'])
 
-// A lone `&` — not part of `&&`, not part of a redirection — is Bash's third list
-// separator: a command boundary the shared COMMANDS never splits on. The
-// redirections that carry `&` (`&>`, `&>>`, `2>&1`, `>&2`, `<&0`, `>&-`) are not
-// boundaries, so a `&` that neither follows nor precedes `&<>` is one. Replaced
-// with `;` before the split; molt-local until the shared reader takes it (#723).
-const LONE_AMP = /(?<![&<>])&(?![&>])/g
-
 // The segment's leading head words and the tokens after them.
 function afterHeads(tokens: readonly string[]): { heads: string[]; rest: string[] } {
   let i = 0
@@ -129,7 +125,7 @@ function namesNoCommand(tokens: readonly string[]): boolean {
 function segmentsOf(command: string): Array<{ heads: string[]; rest: string[] }> {
   const { text } = blank(command)
   const segments: Array<{ heads: string[]; rest: string[] }> = []
-  for (const segment of text.replace(LONE_AMP, ';').split(COMMANDS)) {
+  for (const segment of text.split(COMMANDS)) {
     const { heads, rest } = afterHeads(tokensOf(segment))
     if (namesNoCommand(rest)) continue
     segments.push({ heads, rest })

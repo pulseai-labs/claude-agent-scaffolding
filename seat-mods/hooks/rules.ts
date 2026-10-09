@@ -45,8 +45,11 @@ const RULE_TEXT: Record<RuleId, string> = {
 
 // At a line start, as the repository's commit-msg hook reads them; mid-line prose is not a trailer.
 const TRAILER = /^[ \t]*(?:co-authored-by:|🤖 generated with)/im
-// Command boundaries for matching; subshell parentheses count too.
-const COMMANDS = /;|&&|\|\||\||\n|\(|\)/
+// Command boundaries for matching; subshell parentheses count too. A lone `&` —
+// Bash's background list separator — is one, and only a lone one: `&&` is the
+// and-list, and a `&` a redirection carries (`>&`, `<&`, `&>`, `&>>`) is not a
+// boundary (#723).
+const COMMANDS = /;|&&|(?<![&<>])&(?![&>])|\|\||\||\n|\(|\)/
 // Heredoc bodies and quoted strings are text, not commands: a commit message may
 // name `git merge` or `-n`. Each is swapped for a numbered marker before matching,
 // and the trailer check expands the markers in the commit's own segment.

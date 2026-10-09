@@ -417,3 +417,44 @@ describe('rm heredoc fd and opener provenance', () => {
     expect(rmTargets("rm -i /reports/x '2'<<EOF\ny\nEOF")).toEqual([{ path: '/reports/x', glob: false }, { path: '2', glob: false }])
   })
 })
+
+// #723: a lone `&` is Bash's background list separator. Without it the whole line
+// read as one command with the first head, so every rail after the `&` was
+// invisible — fail-open. `&&` and the redirections that carry `&` are not
+// boundaries; the `&` of a `|&` pipe is.
+describe('a lone & is a command boundary (#723)', () => {
+  test('a command behind a lone & meets its rails, spaced or glued', () => {
+    expect(bashRules('true & git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
+    expect(bashRules('true &git push origin main')).toContain('push')
+    expect(bashRules('true& git push origin main')).toContain('push')
+    expect(bashRules('true & gh pr merge 12')).toContain('merge')
+  })
+  test('control: && keeps its meaning beside the split', () => {
+    expect(bashRules('git add f && git push origin b')).toContain('push')
+    expect(bashRules('git log --oneline && git status')).toEqual([])
+  })
+  test('the trailer check reads the commit behind a lone &, not the line before it', () => {
+    expect(bashRules('echo & git commit -m "x\n\nCo-Authored-By: a"')).toContain('ai-trailer')
+    expect(bashRules('echo & git commit -m "x"')).toEqual(['commit'])
+  })
+  test('the commit-file reader sees the commit behind a lone &', () => {
+    expect(commitMessageFiles('true & git status')).toEqual([])
+    expect(commitMessageFiles('true & git commit -F /w/msg-trailer.txt')).toEqual(['/w/msg-trailer.txt'])
+  })
+  test('the & of a |& pipe splits too, and the piping command keeps its rules', () => {
+    expect(bashRules('git push origin main |& cat')).toEqual(['push'])
+    expect(bashRules('echo a |& git push --force')).toContain('force-push')
+  })
+  test('control: redirections carry & without splitting it', () => {
+    expect(bashRules('git commit -m m 2>&1')).toEqual(['commit'])
+    expect(bashRules('git push origin main >&2')).toEqual(['push'])
+    expect(bashRules('git push origin main &>/dev/null')).toEqual(['push'])
+    expect(bashRules('git push origin main &>>/dev/null')).toEqual(['push'])
+    expect(bashRules('git push origin main <&0')).toEqual(['push'])
+    expect(bashRules('git push origin main >&-')).toEqual(['push'])
+  })
+  test('control: a trailing & leaves the line to its one command', () => {
+    expect(bashRules('git commit -m m &')).toEqual(['commit'])
+    expect(bashRules('git push origin main &')).toEqual(['push'])
+  })
+})

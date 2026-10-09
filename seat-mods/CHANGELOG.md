@@ -2,6 +2,19 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.3.2 — 2026-10-09
+
+- **A lone `&` no longer hides the next command from any Bash rail** (#723, a fail-open
+  guard bypass). `COMMANDS` lacked Bash's background list separator, so `true & git push
+  --force`, `echo & git commit -m "…Co-Authored-By: …"` and a `gh pr merge` behind `&` read
+  as one command under the first head, and push, force-push, merge, AI-trailer and the
+  commit-message reader never saw the second command. `COMMANDS` now splits on a lone `&` —
+  the `&` of a `|&` pipe included — while `&&` and the redirections that carry `&`
+  (`2>&1`, `>&2`, `&>`, `&>>`, `<&0`, `>&-`) are not boundaries, so the forms the previous
+  release allowed keep their rules. The `rm` rail is unchanged: it already split on `&`.
+- Mirrored byte-identically into `molt/hooks/shell.ts` under the shared-reader parity
+  contract; `molt` 0.2.5 drops its interim `LONE_AMP` split.
+
 ## 0.3.1 — 2026-10-09
 
 - Every Bash rail now walks the reserved head words already recognised by `rm`, so
