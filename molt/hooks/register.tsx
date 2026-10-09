@@ -29,6 +29,9 @@ let paused: string | undefined
 let seeded: { session: string; startPercent?: number } | undefined
 
 const MAX_STOP_BLOCKS = 2
+// A bell is a one-shot notification command; 5 s is far past any of them and bounds a hung
+// bell at a sixth of `process.run`'s 30 s default, on the turn-end path the person waits on.
+const BELL_TIMEOUT_MS = 5000
 let unmeasured = 0                        // tool and response output no response has measured yet
 let inFlight = false                      // a molt between /clear and its seed
 let progress = 0                          // Write, Edit or commit since the last molt
@@ -195,9 +198,12 @@ async function warningText($: Engine, sessionId: string, which: 1 | 2): Promise<
   return (await isChild($)) ? `${text}\n\n${CHILD_WARNING}` : text
 }
 
+// Rung once and left to finish: the bell never gates the hook that paused the session. It
+// catches its own failure — a hung bell reaching BELL_TIMEOUT_MS included — and `log` never
+// throws, so this promise always resolves and nothing is left unhandled (#665 item 4).
 async function ring($: Engine, bell: string, message: string): Promise<void> {
   try {
-    await $.process.run(['sh', '-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${bell}`, 'sh', message])
+    await $.process.run(['sh', '-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${bell}`, 'sh', message], { timeoutMs: BELL_TIMEOUT_MS })
   } catch (err) {
     await log($, `bell failed ${String(err)}`)
   }
@@ -209,7 +215,10 @@ async function pause($: Engine, sessionId: string, text: string, bell: string | 
   await setNotice($, { text, tone: 'warn' })
   $.ui.toast(text)
   showStatus($, sessionId)
-  if (bell !== undefined) await ring($, bell, text)
+  // Not awaited: every caller of pause (both loop guards, both from turn.complete) returns
+  // without waiting on the bell. That is not silence — it still rings, with this same text,
+  // and still logs a failure once.
+  if (bell !== undefined) void ring($, bell, text)
   await log($, `pause session=${sessionId} ${text}`)
 }
 
@@ -614,6 +623,9 @@ export const register: Register = (on, options) => {
     if (arg === 'now') {
       off.delete(sessionId)
       paused = undefined
+      // Lifting off (or a pause) turns the session back on here, so the marker comes back
+      // here too — not at the next prompt, which a session with no prompt box never sends (#665 item 6).
+      await touchActive($, sessionId)
       forced.add(sessionId)
       await measure($, sessionId)
       // The host refuses $.prompt.submit here: it would wait on the turn this hook holds.
