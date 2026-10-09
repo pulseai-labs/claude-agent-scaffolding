@@ -452,9 +452,38 @@ describe('a lone & is a command boundary (#723)', () => {
     expect(bashRules('git push origin main &>>/dev/null')).toEqual(['push'])
     expect(bashRules('git push origin main <&0')).toEqual(['push'])
     expect(bashRules('git push origin main >&-')).toEqual(['push'])
+    // The flag after the redirection stays with its command: this row dies if a
+    // lookaround is dropped (review R4).
+    expect(bashRules('git push origin main 2>&1 --force')).toContain('force-push')
   })
   test('control: a trailing & leaves the line to its one command', () => {
     expect(bashRules('git commit -m m &')).toEqual(['commit'])
     expect(bashRules('git push origin main &')).toEqual(['push'])
+  })
+})
+
+// #723 review R1: an `&` inside an unquoted `${…}` or `$[…]` expansion is literal
+// in Bash — the line runs one command, as the tag read it — so the split must not
+// fire there. seat-mods blanks those expansions as one word before the COMMANDS
+// split; molt's gate keeps the raw split on purpose (molt 0.2.4's reading).
+describe('an & inside an unquoted expansion is not a boundary (#723 review R1)', () => {
+  test('an assignment-prefixed expansion leaves the command behind it reachable', () => {
+    expect(bashRules('X=${x/a&b/c} git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
+    expect(bashRules('X=$[2&3] git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
+    expect(bashRules('X=${x/a&b/c} gh pr merge 12')).toContain('merge')
+  })
+  test('a nested expansion is one word too', () => {
+    expect(bashRules('X=${a:-${b/&/c}} git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
+  })
+  test('a flag and a message file beside the expansion stay with their command', () => {
+    expect(bashRules('git push ${x/a&b/c} --force')).toContain('force-push')
+    expect(commitMessageFiles('git commit -F ${x/a&b/c}')).toEqual(['${x/a&b/c}'])
+  })
+  test('control: an expansion without a boundary & reads as before', () => {
+    expect(bashRules('git push ${x/a&b/c} origin main')).toEqual(['push'])
+    expect(bashRules('echo ${x//&/y}')).toEqual([])
+  })
+  test('control: the & beside an expansion still splits', () => {
+    expect(bashRules('echo ${x//&/y} & git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
   })
 })

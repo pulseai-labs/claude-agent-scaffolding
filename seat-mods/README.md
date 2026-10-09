@@ -136,8 +136,9 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 ## Limits
 
 - **The rails stop mistakes, not an adversary.** Bash matching is whitespace tokens split on `;`,
-  `&&`, `||`, `|`, a lone `&` (the `&` of a `|&` pipe included; the `&` a redirection carries is
-  not a boundary), parentheses and newlines, after quoted strings and heredoc bodies are blanked as
+  `&&`, `||`, `|`, a lone `&` (the `&` of a `|&` pipe included; the `&` a redirection carries,
+  and the `&` inside an unquoted `${…}` or `$[…]` expansion, are not boundaries), parentheses
+  and newlines, after quoted strings and heredoc bodies are blanked as
   text, so a commit message may mention `git merge` or `-n`. Only the command word counts, after any
   `VAR=value` and `sudo`, `env`, `command`, `exec`, `nohup` or `time`, and the head words
   `if`, `then`, `elif`, `else`, `do`, `while`, `until`, `!`, `{`, `(` and `time` on every rail only

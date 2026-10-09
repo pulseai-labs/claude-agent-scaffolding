@@ -6,7 +6,8 @@
 // Command boundaries for matching; subshell parentheses count too. A lone `&` —
 // Bash's background list separator — is one, and only a lone one: `&&` is the
 // and-list, and a `&` a redirection carries (`>&`, `<&`, `&>`, `&>>`) is not a
-// boundary (#723).
+// boundary (#723). `rmTargets` splits on `&` through its own second spelling;
+// change one and check the other.
 const COMMANDS = /;|&&|(?<![&<>])&(?![&>])|\|\||\||\n|\(|\)/
 
 // Heredoc bodies and quoted strings are text, not commands: a commit message may

@@ -48,7 +48,8 @@ const TRAILER = /^[ \t]*(?:co-authored-by:|🤖 generated with)/im
 // Command boundaries for matching; subshell parentheses count too. A lone `&` —
 // Bash's background list separator — is one, and only a lone one: `&&` is the
 // and-list, and a `&` a redirection carries (`>&`, `<&`, `&>`, `&>>`) is not a
-// boundary (#723).
+// boundary (#723). `rmTargets` splits on `&` through its own second spelling;
+// change one and check the other.
 const COMMANDS = /;|&&|(?<![&<>])&(?![&>])|\|\||\||\n|\(|\)/
 // Heredoc bodies and quoted strings are text, not commands: a commit message may
 // name `git merge` or `-n`. Each is swapped for a numbered marker before matching,
@@ -96,6 +97,37 @@ function blank(command: string): { text: string; pieces: string[] } {
   // A `#` that starts a word begins a comment, which runs no command.
   const text = blankHeredocs(joined, keep).replace(QUOTED, keep).replace(/\\./g, keep)
   return { text: text.replace(/(^|[ \t;&|()])#[^\n]*/gm, '$1'), pieces }
+}
+
+// An unquoted `${…}` or `$[…]` expansion is one word to Bash: a `&` inside it is
+// text, not a list separator, and splitting there would hide the command the word
+// carries (`X=${x/a&b/c} git push --force` runs one command). Blanked as one piece,
+// as blank() blanks quotes; expand() restores it where a segment's own text is
+// read. seat-mods-local by ruling: molt's gate keeps its 0.2.4 reading of these
+// words (#723 review R1); kept outside the parity-held declarations.
+function blankExpansions(text: string, pieces: string[]): string {
+  let out = ''
+  let from = 0
+  let i = 0
+  while (i < text.length) {
+    const opener = text[i] === '$' && text[i - 1] !== '$' ? text[i + 1] : undefined
+    const closer = opener === '{' ? '}' : opener === '[' ? ']' : undefined
+    if (closer === undefined) { i += 1; continue }
+    let depth = 1
+    let end = -1
+    for (let j = i + 2; j < text.length; j++) {
+      if (opener === '{' && text[j] === '$' && text[j + 1] === '{') { depth += 1; j += 1; continue }
+      if (opener === '[' && text[j] === '[') { depth += 1; continue }
+      if (text[j] !== closer) continue
+      if ((depth -= 1) === 0) { end = j; break }
+    }
+    // An unterminated expansion is a syntax error, not a word: leave the text as it is.
+    if (end < 0) { i += 1; continue }
+    out += text.slice(from, i) + `\u0000${pieces.push(text.slice(i, end + 1)) - 1}\u0000`
+    from = end + 1
+    i = end + 1
+  }
+  return out + text.slice(from)
 }
 
 // A segment's text with its blanked pieces put back, nested pieces included.
@@ -180,7 +212,7 @@ function afterHeads(tokens: string[]): string[] {
 export function bashRules(command: string, messageFileText = ''): RuleId[] {
   const found = new Set<RuleId>()
   const { text, pieces } = blank(command)
-  for (const segment of text.split(COMMANDS)) {
+  for (const segment of blankExpansions(text, pieces).split(COMMANDS)) {
     const tokens = afterHeads(tokensOf(segment))
     const head = commandOf(tokens)
     if (head?.name === 'gh' && head.args[0] === 'pr') {
@@ -220,7 +252,7 @@ export function bashRules(command: string, messageFileText = ''): RuleId[] {
 export function commitMessageFiles(command: string): string[] {
   const files: string[] = []
   const { text, pieces } = blank(command)
-  for (const segment of text.split(COMMANDS)) {
+  for (const segment of blankExpansions(text, pieces).split(COMMANDS)) {
     const git = gitOf(afterHeads(tokensOf(segment)))
     if (git?.sub !== 'commit') continue
     const { args } = git
@@ -289,6 +321,8 @@ export function rmTargets(command: string): RmTarget[] {
   // then operators with their attached or separate target words.
   const redirects = input.replace(/(^|[\s;|&()])\d+(?=[<>])/g, '$1')
     .replace(/(?:<<<|&>>|&>|<>|>\||>>|[<>]&|>|(?<!<)<(?!<))[ \t]*[^\s;&|()]+/g, ' ')
+  // rm's own second spelling of `&` (COMMANDS above): this list keeps every `&`
+  // and runs after redirection stripping. Change one spelling and check the other.
   for (const segment of redirects.split(/;|&&|\|\||[|&]|\n|\(|\)/)) {
     const head = commandOf(afterHeads(tokensOf(segment)))
     if (head === undefined) continue

@@ -15,9 +15,10 @@ export function gateAllows(tool: string, args: Readonly<Record<string, unknown>>
 }
 
 // Progress, for the autopilot loop guard (spec §2): a file written or a commit made.
-// A commit counts only where the line runs it — bare, or behind `{` or `time`; behind
-// `if`, `then`, `elif`, `else` or `!` it may not run, and counting it would hide a
-// stalled loop from the guard (review R2).
+// A commit counts only where the line runs it — bare, or behind `time`; behind `{`
+// (a brace-group body reads the same as a function definition's), `if`, `then`,
+// `elif`, `else` or `!` it may not run, and counting it would hide a stalled loop
+// from the guard (review R2/RR1).
 export function isProgress(tool: string, args: Readonly<Record<string, unknown>>): boolean {
   if (tool === 'Write' || tool === 'Edit' || tool === 'NotebookEdit') return true
   return tool === 'Bash' && typeof args.command === 'string' && gitSubcommandsThatRun(args.command).includes('commit')

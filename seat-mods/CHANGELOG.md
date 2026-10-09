@@ -4,14 +4,22 @@ All notable changes to the `seat-mods` plugin.
 
 ## 0.3.2 — 2026-10-09
 
-- **A lone `&` no longer hides the next command from any Bash rail** (#723, a fail-open
+- **A lone `&` is a command boundary on every `COMMANDS`-split rail** (#723, a fail-open
   guard bypass). `COMMANDS` lacked Bash's background list separator, so `true & git push
   --force`, `echo & git commit -m "…Co-Authored-By: …"` and a `gh pr merge` behind `&` read
   as one command under the first head, and push, force-push, merge, AI-trailer and the
   commit-message reader never saw the second command. `COMMANDS` now splits on a lone `&` —
   the `&` of a `|&` pipe included — while `&&` and the redirections that carry `&`
   (`2>&1`, `>&2`, `&>`, `&>>`, `<&0`, `>&-`) are not boundaries, so the forms the previous
-  release allowed keep their rules. The `rm` rail is unchanged: it already split on `&`.
+  release allowed keep their rules. An `&` inside an unquoted `${…}` or `$[…]` expansion is
+  literal in Bash, so the seat-mods rails blank those expansions as one word before the
+  split: `X=${x/a&b/c} git push --force` meets its rails as the previous release read it.
+  molt's gate keeps the raw split and its 0.2.4 reading of those words on purpose — the two
+  mods differ there — and the `rm` rail's own split is a second spelling of `&` in
+  `rules.ts`: change one and check the others. Known limit: an `&` on a heredoc opener line
+  is still swallowed with the heredoc body — the boundary is a property of the `COMMANDS`
+  split, not of every Bash line (#724 carries it). The `rm` rail is otherwise unchanged: it
+  already split on `&`.
 - Mirrored byte-identically into `molt/hooks/shell.ts` under the shared-reader parity
   contract; `molt` 0.2.5 drops its interim `LONE_AMP` split.
 
