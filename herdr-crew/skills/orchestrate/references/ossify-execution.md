@@ -87,7 +87,9 @@ decision you relay down through the reply; no session re-reads the file for it.
 
 A handoff the top writes **carries the approved seats verbatim** — the item rows
 and the three resolved coordinator profiles beside them; a resumed top
-launches from those, never a fresh read. A resumed top whose handoff lacks them asks the operator before any launch that spends an approved seat.
+launches from those, never a fresh read, and marks each seat it launches as
+`herdr-mechanics.md` step 2 states — a guarded role with its allow paths, `coordinator`
+for a coordinator seat. A resumed top whose handoff lacks them asks the operator before any launch that spends an approved seat.
 
 ## Fixed procedures
 

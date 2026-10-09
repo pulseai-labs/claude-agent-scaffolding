@@ -13,22 +13,23 @@
 # THE SITE RULE (A2). A *region* is a markdown list item (its marker line through its
 # deeper-indented continuation lines) when the text sits in one, else a
 # blank-line-delimited paragraph. YAML frontmatter (a region starting at line 1 with
-# `---`) and heading lines are skipped. A region is a launch site when its
-# whitespace-squeezed text matches any of:
+# `---`) and heading lines are skipped. `**` spans are stripped and whitespace is
+# squeezed before matching, so a bold verb or article still selects. A region is a
+# launch site when its stripped text matches any of:
 #
 #   1. `herdr tab create`
 #   2. `herdr worktree create` with `--path` in the same region (the flag that names
 #      the seat's new tree; a bare mention that defers its flags elsewhere is not one)
 #   3. `herdr workspace create` with no `run:` in the region (the run's own workspace
 #      is not a seat launch)
-#   4. `launch(ed|es|ing)? [**] {a|an|the|its|each|every|from|as|it|to|at} <0-40 chars,
+#   4. `launch(ed|es|ing)? {a|an|the|its|each|every|from|as|it|to|at} <0-40 chars,
 #      sentence- and paren-bounded> seat(s)` — "launched from the project file's
 #      close-session seat", "Launch it as the seat launch", "launches each writer as a
 #      guarded seat", the `SEATS row(s)` spellings included
 #   5. `launch(ed|es|ing)? from {those|them|these}`
-#   6. `{launch(es|ed)?|dispatch(es|ed)?|create[sd]?|respawn(s|ed)?} [det] [**]
-#      {fresh|new} <0-20 chars, sentence- and paren-bounded> {seat(s)|pair|
-#      implementer|verifier|reviewer|writer|spine session|work-PR session}`
+#   6. `{launch(es|ed)?|dispatch(es|ed)?|create[sd]?|respawn(s|ed)?} [det] {fresh|new}
+#      <0-20 chars, sentence- and paren-bounded> {seat(s)|pair|implementer|verifier|
+#      reviewer|writer|spine session|work-PR session|close session|doctor session}`
 #   7. `{fresh|new} <0-20> {seat(s)|pair} <0-20> {you create|you dispatch|you launch|
 #      you spawn|to resume}`
 #   8. `respawn`
@@ -37,10 +38,10 @@
 # `SEAT_MODS_ROLE=`, `guarded`, `coordinator`, `orchestrator`, `step 2`, `Seat marking`.
 #
 # COVERED: the three placement commands; "launch(ed) from the … seat"; "launch
-# a/the/its … [fresh|new] seat|pair|…" including bold spans and the
-# create/dispatch/respawn verb forms; "launched from the … SEATS row(s)"; "every
-# respawn … is launched from the same row"; "a fresh seat you create"; "a fresh seat
-# to resume"; bare `respawn`.
+# a/the/its … [fresh|new] seat|pair|…" including bold verbs and articles and the
+# create/dispatch/respawn verb forms, the close-session and doctor-session nouns
+# included; "launched from the … SEATS row(s)"; "every respawn … is launched from the
+# same row"; "a fresh seat you create"; "a fresh seat to resume"; bare `respawn`.
 #
 # NOT COVERED — a new site in one of these shapes still passes, and that residual is
 # accepted (naming it is the point): the bare noun "the seat launch" (it collides with
@@ -48,29 +49,48 @@
 # its point or on demand" (operator roles); a marking directive with no launch verb
 # ("Mark it `coordinator` before its command", "is a guarded `implementer`"); router and
 # depth descriptions ("drives a fresh tab and pane per item seat", "launches item
-# sessions of its own", "launched by seat name", "start one spine session"); a launch
-# written only inside a `kind: dsh-spine-driver` session (not a pane — it is never
-# marked); headings and frontmatter.
+# sessions of its own", "launched by seat name", "start one spine session"); "create …
+# from its … row" (the reviewer-row instruction, clause-carrying where it stands); a
+# dispatch whose command string intervenes before the fresh noun ("dispatch
+# `/ossify:close <spine-id>` to a fresh close session", SKILL.md:156 — clause-carrying
+# where it stands); a launch sentence directly under a heading with no blank line (it
+# merges into the heading's region and is dropped); frontmatter whose `---` has no blank
+# line after it (the skip takes the body's first region with it); a launch written only
+# inside a `kind: dsh-spine-driver` session (not a pane — it is never marked); headings
+# and frontmatter.
 #
 # CLAUSE-SIDE LOOSENING, stated: any bare mention of the clause tokens in the region
 # satisfies the check (e.g. a site beside the words "the coordinator seats" passes
 # without stating the marking), and `step 2` is also lifecycle's own step 2 — a site
 # next to such a mention passes. That direction is deliberate: it keeps today's correct
-# sites green, and the pins in the sibling suites hold the clause texts themselves.
+# sites green, and test-ossify-spine-contract.sh's one-pin-per-site block holds every
+# clause text the shipped prose states.
+#
+# FENCE BLINDNESS, stated: the scanner does not model ``` fences — a fenced template's
+# prose is scanned like any paragraph. Today's green there is for the right reason (the
+# spine brief's item steps carry their real guard clauses), but a template-only reword
+# is judged on its own text, not on its role as a template.
 #
 # CONTROLS, beside the assertions they protect:
 #   - B2 (red/green): a fixture copy of the shipped tree with ONE added unmarked
 #     launch site must fail, naming file, line and the site text; the same site with a
 #     clause must pass. The fixture lives under mktemp, never in a shipped file.
+#   - bold spans: fixture paragraphs with a bold article and with a bold verb must each
+#     be selected — the "bold" half of the COVERED claim above, measured.
 #   - B4 (floor): the number of sites selected is printed and pinned at today's count;
 #     a grammar change that silently selects fewer sites fails. Its adjacent control is
 #     a fixture the same predicate must refuse: a tree below the floor is not accepted.
+#     The floor is a SUMMED total, so a net-zero grammar swap (one pattern dropped, one
+#     added) keeps it — the per-pattern coverage rests on the controls here.
+#   - per-file death: a scanned path whose own scan dies must print SCAN-ERROR and fail
+#     the run, not vanish behind the other files' counts.
 #
 # Usage: bash herdr-crew/tests/test-launch-site-marking.sh
 # Env:   HERDR_CREW_PROSE_ROOT=<dir>  scan that tree instead of the plugin's — the
 #        red/green runs above use it; the suite's own controls always build their own
 #        fixtures.
-# Deps:  bash 3.2+, awk (POSIX ERE), mktemp.
+# Deps:  bash 3.2+, awk with ERE interval expressions (`{m,n}` — gawk, or mawk 1.3.4+;
+#        an older mawk fails the scan), mktemp.
 
 set -u
 
@@ -78,11 +98,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SCAN_ROOT="${HERDR_CREW_PROSE_ROOT:-$PLUGIN_ROOT}"
 
-# 24 — measured on the tree this suite ships with (2026-10-09, #663): the count the
-# A2 rule selects after roles.md's activated-spine rows and ossify-briefs.md's item
-# verifier intro gained their citing clauses. A grammar change that selects fewer must
-# fail the floor below; adding sites raises this constant deliberately.
-SITE_FLOOR=24
+# 26 — measured on the tree this suite ships with (2026-10-09, #663 fix round 1): the
+# count the A2 rule selects after the close-session and doctor-session nouns joined
+# pattern 6 (ossify-nested-run.md's re-dispatched close and ossify-pr-briefs.md's NEVER
+# aside) and after roles.md's activated-spine rows, ossify-briefs.md's item-verifier
+# intro and ossify-execution.md's resumed top carry their citing clauses. A grammar
+# change that selects fewer must fail the floor below; adding sites raises this constant
+# deliberately.
+SITE_FLOOR=26
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -91,44 +114,54 @@ SITE_FLOOR=24
 #
 # Reads every .md under <root>/skills/** and <root>/commands/** — herdr-crew's shipped
 # prose — and prints, one per line:
-#   FAIL <file>:<line> :: <site text>   for each selected site with no clause
-#   SITES <n>                           the number of sites selected, always last
-# The caller asserts on the stream; a missing `SITES` line is a failed scan, never a
-# clean one. `line` is the first line of the region that itself carries a launch token,
-# so the pointer lands on the sentence, not the paragraph's first line; the printed
-# site text is the whole joined region, capped at 400 characters.
+#   FAIL <file>:<line> [<site kind>] :: <site text>   for each selected site with no clause
+#   SITES <n>                            the number of sites that file selected
+#   SCAN-ERROR <path>: <reason>          a path whose scan did not finish
+# `line` is the first line of the region that itself carries a launch token, so the
+# pointer lands on the sentence, not the paragraph's first line; `site kind` is the
+# pattern that selected the region; the printed site text is the whole joined region
+# with `**` stripped, capped at 400 characters. A file with no `SITES` line is a failed
+# scan, never a clean one, and the caller refuses any `SCAN-ERROR`.
 scan_launch_sites() { # <root>
   _root="${1:-}"
   if [ ! -d "$_root/skills" ] || [ ! -d "$_root/commands" ]; then
-    printf 'SCAN-ERROR: %s needs skills/ and commands/ directories\n' "$_root"
+    printf 'SCAN-ERROR %s: needs skills/ and commands/ directories\n' "$_root"
     return 0
   fi
   _files="$(find "$_root/skills" "$_root/commands" -name '*.md' | sort)"
   if [ -z "$_files" ]; then
-    printf 'SCAN-ERROR: no .md files under %s/skills or %s/commands\n' "$_root" "$_root"
+    printf 'SCAN-ERROR %s: no .md files under skills/ or commands/\n' "$_root"
     return 0
   fi
   printf '%s\n' "$_files" | while IFS= read -r _f; do
-    awk -v file="$_f" '
+    if [ ! -f "$_f" ] || [ ! -r "$_f" ]; then
+      printf 'SCAN-ERROR %s: not a readable regular file — its scan cannot run\n' "$_f"
+      continue
+    fi
+    _out="$(awk -v file="$_f" '
       function indent(s,   n) { n = 0; while (substr(s, n+1, 1) == " ") n++; return n }
       function is_marker(s,   t) {
         t = s; sub(/^ +/, "", t)
         return (t ~ /^[-*+] / || t ~ /^[0-9]+[.)] /)
       }
       function is_heading(s,   t) { t = s; sub(/^ +/, "", t); return t ~ /^#+ / }
-      # the A2 site predicate, on the region text (whitespace already squeezed)
-      function is_site(region) {
-        if (region ~ /herdr tab create/) return 1
-        if (region ~ /herdr worktree create/ && region ~ /--path/) return 1
-        if (region ~ /herdr workspace create/ && region !~ /run:/) return 1
-        if (region ~ /[Ll]aunch(ed|es|ing)?[[:space:]]+[*]{0,2}(a|an|the|its|each|every|from|as|it|to|at)[[:space:]][^.;()]{0,40}[Ss][Ee][Aa][Tt][Ss]?([^A-Za-z]|$)/) return 1
-        if (region ~ /[Ll]aunch(ed|es|ing)? from (those|them|these)([^A-Za-z]|$)/) return 1
-        if (region ~ /(launch(es|ed)?|dispatch(es|ed)?|create[sd]?|respawn(s|ed)?)[[:space:]]+((a|an|the|its|their|another)[[:space:]]+|(that|the) item.s[[:space:]]+)?[*]{0,2}(fresh|new)([^A-Za-z]|$)[^.;()]{0,20}([Ss][Ee][Aa][Tt][Ss]?([^A-Za-z]|$)|pair([^A-Za-z]|$)|implementer|verifier|reviewer|writer|spine session|work-PR session)/) return 1
-        if (region ~ /(fresh|new)[^.;()]{0,20}([Ss][Ee][Aa][Tt][Ss]?([^A-Za-z]|$)|pair([^A-Za-z]|$))[^.;()]{0,20}(you (create|dispatch|launch|spawn)|to resume)/) return 1
-        if (region ~ /respawn/) return 1
-        return 0
+      # The A2 site predicate on the region text (whitespace squeezed, `**` stripped).
+      # Returns the matched pattern names, space-separated, "" when the region is not a
+      # site — the names become the FAIL line'"'"'s site kind.
+      function site_why(region,   w) {
+        w = ""
+        if (region ~ /herdr tab create/) w = w " tab-create"
+        if (region ~ /herdr worktree create/ && region ~ /--path/) w = w " worktree-create"
+        if (region ~ /herdr workspace create/ && region !~ /run:/) w = w " workspace-create"
+        if (region ~ /[Ll]aunch(ed|es|ing)?[[:space:]]+(a|an|the|its|each|every|from|as|it|to|at)[[:space:]][^.;()]{0,40}[Ss][Ee][Aa][Tt][Ss]?([^A-Za-z]|$)/) w = w " launch-from-seat"
+        if (region ~ /[Ll]aunch(ed|es|ing)? from (those|them|these)([^A-Za-z]|$)/) w = w " launch-from-those"
+        if (region ~ /(launch(es|ed)?|dispatch(es|ed)?|create[sd]?|respawn(s|ed)?)[[:space:]]+((a|an|the|its|their|another)[[:space:]]+|(that|the) item.s[[:space:]]+)?(fresh|new)([^A-Za-z]|$)[^.;()]{0,20}([Ss][Ee][Aa][Tt][Ss]?([^A-Za-z]|$)|pair([^A-Za-z]|$)|implementer|verifier|reviewer|writer|spine session|work-PR session|close session|doctor session)/) w = w " fresh-seat"
+        if (region ~ /(fresh|new)[^.;()]{0,20}([Ss][Ee][Aa][Tt][Ss]?([^A-Za-z]|$)|pair([^A-Za-z]|$))[^.;()]{0,20}(you (create|dispatch|launch|spawn)|to resume)/) w = w " fresh-seat-verb"
+        if (region ~ /respawn/) w = w " respawn"
+        return w
       }
-      # the clause forms; the FIRST that matches names the kind in the failure line
+      # The clause forms, tried in order; "" is the failure this suite reports. A FAIL
+      # line names the site kind above instead — a failing site has no clause kind.
       function clause_kind(region) {
         if (region ~ /SEAT_MODS_ROLE=/) return "SEAT_MODS_ROLE"
         if (region ~ /guarded/) return "guarded"
@@ -138,24 +171,25 @@ scan_launch_sites() { # <root>
         if (region ~ /Seat marking/) return "Seat marking"
         return ""
       }
-      function emit(a, b,   k, region, line, text, cl) {
+      function emit(a, b,   k, region, line, text, why) {
         region = ""
         for (k = a; k <= b; k++) region = region " " L[k]
         gsub(/[[:space:]]+/, " ", region)
+        gsub(/\*\*/, "", region)
         sub(/^ /, "", region)
         if (is_heading(L[a])) return
         if (a == 1 && L[1] == "---") return
-        if (!is_site(region)) return
+        why = site_why(region)
+        if (why == "") return
         sites++
-        cl = clause_kind(region)
-        if (cl != "") return
+        if (clause_kind(region) != "") return
         line = a
         for (k = a; k <= b; k++) {
           if (L[k] ~ /[Ll]aunch/ || L[k] ~ /respawn/ || L[k] ~ /herdr (tab|worktree|workspace) create/) { line = k; break }
         }
         text = region
         if (length(text) > 400) text = substr(text, 1, 400) " …"
-        printf "FAIL %s:%d :: %s\n", file, line, text
+        printf "FAIL %s:%d [%s] :: %s\n", file, line, substr(why, 2), text
       }
       { L[NR] = $0 }
       END {
@@ -179,7 +213,12 @@ scan_launch_sites() { # <root>
         }
         printf "SITES %d\n", sites
       }
-    ' "$_f"
+    ' "$_f")"
+    case "$_out" in
+      *"SITES "*) : ;;
+      *) printf 'SCAN-ERROR %s: no SITES line — that file%s scan did not finish\n' "$_f" "'" ;;
+    esac
+    printf '%s\n' "$_out"
   done
 }
 
@@ -203,17 +242,24 @@ scan_fails() { # <scan output>
   printf '%s\n' "$1" | awk '$1 == "FAIL"'
 }
 
+scan_errors() { # <scan output>
+  printf '%s\n' "$1" | awk '$1 == "SCAN-ERROR"'
+}
+
 printf '%slaunch-site marking (#663)%s\n\n' "$DIM" "$RST"
 
 section "the rule scans the shipped prose"
 
 scan="$(scan_launch_sites "$SCAN_ROOT")"
-case "$scan" in
-  SCAN-ERROR*)
-    fail "the scan ran over $SCAN_ROOT" "$scan"
-    report; exit $?
-    ;;
-esac
+errors="$(scan_errors "$scan")"
+if [ -n "$errors" ]; then
+  fail "every scanned file reports its site count" \
+    "a path's scan did not finish — a missing SITES line must fail the run, never vanish behind the rest:"
+  printf '%s\n' "$errors" | while IFS= read -r l; do
+    printf '      %s%s%s\n' "$DIM" "$l" "$RST"
+  done
+  report; exit $?
+fi
 
 if [ "$(sites_lines "$scan")" -eq 0 ]; then
   fail "the scan reports the number of sites it selected" \
@@ -243,10 +289,14 @@ fi
 
 section "controls beside the assertions"
 
+# Every fixture this suite builds lives under one EXIT trap, so a later early exit
+# cannot leak one of them.
+tmp="$(mktemp -d)"
+tmp2=""
+trap 'rm -rf "$tmp"; [ -z "${tmp2:-}" ] || rm -rf "$tmp2"' EXIT
+
 # B2, red: a fixture copy with ONE added unmarked site must fail, naming file, line and
 # the site text. The fixture is a temp copy; no shipped file is ever edited to stage it.
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
 cp -R "$PLUGIN_ROOT/skills" "$tmp/skills"
 cp -R "$PLUGIN_ROOT/commands" "$tmp/commands"
 planted="When the operator asks for a second opinion, launch a fresh reviewer seat from the project file's reviewer seat."
@@ -279,6 +329,25 @@ else
     "expected 0 failures over $red_sites sites; got: $green"
 fi
 
+# bold spans: `**` is stripped before matching, so a bold article and a bold verb each
+# still select. Both fixture paragraphs are unmarked, so each must appear as a failure
+# with its sentence intact — a bold span that hid a site reads as zero failures here.
+printf '\nLaunch **a** fresh reviewer seat from the project file'"'"'s reviewer seat.\n' \
+  >> "$tmp/skills/orchestrate/references/roles.md"
+printf '\n**You dispatch** a fresh writer seat from the project file'"'"'s work-PR session seat.\n' \
+  >> "$tmp/skills/orchestrate/references/roles.md"
+bold="$(scan_launch_sites "$tmp")"
+bold_fails="$(scan_fails "$bold")"
+bold_n="$(printf '%s\n' "$bold_fails" | awk 'END { print NR }')"
+if [ "$bold_n" -eq 2 ] \
+   && printf '%s\n' "$bold_fails" | awk 'index($0, "Launch a fresh reviewer seat") > 0 { a++ } END { exit(a == 1 ? 0 : 1) }' \
+   && printf '%s\n' "$bold_fails" | awk 'index($0, "You dispatch a fresh writer seat") > 0 { b++ } END { exit(b == 1 ? 0 : 1) }'; then
+  pass "control: bold articles and bold verbs are selected (2 failures, one per shape)"
+else
+  fail "control: bold articles and bold verbs are selected" \
+    "expected exactly two failures, one per bold shape; got: $bold"
+fi
+
 # B4's adjacent control: the floor predicate must refuse a tree that selects fewer
 # sites — a floor that cannot fail holds nothing.
 tmp2="$(mktemp -d)"
@@ -292,7 +361,20 @@ else
   fail "control: a tree below the floor is refused" \
     "the floor predicate accepted $small_n sites at SITE_FLOOR=$SITE_FLOOR; lower SITE_FLOOR to the tree it is meant to hold"
 fi
-rm -rf "$tmp2"
+
+# Per-file death: a scanned path whose own scan dies must print SCAN-ERROR and fail the
+# run. The fixture plants a DIRECTORY named *.md — find matches it, awk cannot read it,
+# and no SITES line comes back for that path; a suite that only checked for one SITES
+# line anywhere would read this green.
+mkdir -p "$tmp2/bad/skills/orchestrate/references/evil.md" "$tmp2/bad/commands"
+bad="$(scan_launch_sites "$tmp2/bad")"
+if [ "$(printf '%s\n' "$bad" | awk '$1 == "SCAN-ERROR" { c++ } END { print c+0 }')" -ge 1 ] \
+   && printf '%s\n' "$bad" | awk 'index($0, "evil.md") > 0 { hit = 1 } END { exit(hit ? 0 : 1) }'; then
+  pass "control: a path whose scan dies is refused by name, not dropped"
+else
+  fail "control: a path whose scan dies is refused by name, not dropped" \
+    "expected a SCAN-ERROR naming evil.md; got: $bad"
+fi
 
 # #514, L1: the shape, asserted rather than assumed — a counter re-copied into any
 # suite shadows the hoisted one and keeps passing.
