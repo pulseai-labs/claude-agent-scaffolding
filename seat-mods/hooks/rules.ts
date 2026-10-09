@@ -270,30 +270,20 @@ function rmWord(word: string): { path: string; globAt: number; home: boolean } |
 
 export function rmTargets(command: string): RmTarget[] {
   const targets: RmTarget[] = []
-  const { text, pieces } = blank(command)
+  // Only the heredoc body and closing line are input. Keep opener-line words
+  // in the command so the normal quote, escape and redirect walk judges them.
+  // Remove a numeric fd at a word boundary, preserving x2 and quoted '2'.
+  const joined = command.replace(/\\\n/g, ' ')
+    .replace(/(^|[\s;|&()])\d+(?=<<(?!<))/g, '$1')
+  const withoutInput = blankHeredocs(joined, piece => {
+    const opener = /^<<-?[ \t]*(?:'[^'\n]+'|"[^"\n]+"|[^\s;&|<>()'"]+)/.exec(piece)!
+    return ' ' + piece.slice(opener[0].length).split('\n')[0] + ' '
+  })
+  const { text: input, pieces } = blank(withoutInput)
   let changedDirectory = false
   // Redirections belong to the shell, not rm. Blanked quotes/escapes keep
   // literal glyphs out of this match. Remove fd prefixes before their operators,
   // then operators with their attached or separate target words.
-  // Only pieces blanked as heredocs are shell input. Removing the marker rather
-  // than its token preserves a glued operand such as x<<EOF. Quotes and escapes
-  // start with their own glyph, so literal << words remain operands.
-  const heredocs = new Set<number>()
-  const trailingWords = new Set<number>()
-  for (const [i, piece] of pieces.entries()) {
-    // This relies on blank() blanking heredocs before quotes.
-    if (!piece.startsWith('<<')) continue
-    heredocs.add(i)
-    const opener = /^<<-?[ \t]*(?:'[^'\n]+'|"[^"\n]+"|[^\s;&|<>()'"]+)/.exec(piece)
-    if (opener === null || piece.slice(opener[0].length).split('\n')[0]!.trim() !== '') trailingWords.add(i)
-  }
-  // A boundary-delimited fd digit belongs to the redirect; x2<<EOF keeps x2.
-  const withoutFds = text.replace(/(^|[\s;|&()])\d+(\u0000(\d+)\u0000)/g,
-    (whole, boundary: string, marker: string, i: string) => heredocs.has(Number(i)) ? boundary + marker : whole)
-  // Opener-line tails are command words too. Retain their markers so an rm
-  // segment can fail closed rather than silently drop an operand or command.
-  const input = withoutFds.replace(MARKER, (marker, i: string) =>
-    heredocs.has(Number(i)) && !trailingWords.has(Number(i)) ? '' : marker)
   const redirects = input.replace(/(^|[\s;|&()])\d+(?=[<>])/g, '$1')
     .replace(/(?:<<<|&>>|&>|<>|>\||>>|[<>]&|>|(?<!<)<(?!<))[ \t]*[^\s;&|()]+/g, ' ')
   for (const segment of redirects.split(/;|&&|\|\||[|&]|\n|\(|\)/)) {
@@ -301,10 +291,6 @@ export function rmTargets(command: string): RmTarget[] {
     if (head === undefined) continue
     if (['cd', 'pushd', 'popd'].includes(head.name) || expand(head.name, pieces) === '\\cd') changedDirectory = true
     if (head.name !== 'rm') continue
-    if ([...segment.matchAll(MARKER)].some(match => trailingWords.has(Number(match[1])))) {
-      targets.push({ path: undefined, glob: false })
-      continue
-    }
     let options = true
     for (const arg of head.args) {
       const word = rmWord(expand(arg, pieces))

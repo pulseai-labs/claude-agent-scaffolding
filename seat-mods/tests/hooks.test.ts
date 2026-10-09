@@ -596,9 +596,11 @@ describe('heredoc allowances with real tag denial provenance', () => {
 describe('rm heredoc opener boundaries', () => {
   for (const opener of ['<<EOF', "<<'EOF'", '<<-EOF']) {
     for (const operand of ['/etc/passwd', '/reports/x', '/reports/x; rm /etc/passwd']) {
-      test(`${opener} followed by ${operand}: unresolvable beside ordinary input`, async ($, on) => {
+      test(`${opener} followed by ${operand}: opener-line operands beside ordinary input`, async ($, on) => {
         world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
-        expect((await $.tool.call({ tool: 'Bash', command: `rm -i ${opener} ${operand}\ny\nEOF` })).deny).toContain('no rm')
+        const result = await $.tool.call({ tool: 'Bash', command: `rm -i ${opener} ${operand}\ny\nEOF` })
+        if (operand === '/reports/x') expect(result.deny).toBeUndefined()
+        else expect(result.deny).toContain('no rm')
         expect((await $.tool.call({ tool: 'Bash', command: `rm -i /reports/x ${opener}\ny\nEOF` })).deny).toBeUndefined()
         expect((await $.tool.call({ tool: 'Bash', command: `cat ${opener} > /reports/x\ny\nEOF` })).deny).toBeUndefined()
       })
@@ -609,4 +611,52 @@ describe('rm heredoc opener boundaries', () => {
       expect((await $.tool.call({ tool: 'Bash', command: `rm -i /reports/x 2${opener}\ny\nEOF` })).deny).toBeUndefined()
     })
   }
+})
+
+// Last round: restore opener-line words before quotes and redirections are parsed.
+describe('heredoc opener line retains rm operands and redirections', () => {
+  const insideShapes = [
+    'rm -i <<EOF /reports/x',
+    'rm -i /reports/x <<EOF > /reports/log',
+    'rm -i /reports/x <<EOF 2>/reports/log',
+    'rm -i 2<<EOF /reports/x',
+    "rm -i <<'EOF' /reports/x",
+    "rm -i 2<<'EOF' /reports/x",
+    'rm -i <<"EOF" /reports/x',
+    'rm -i 2<<"EOF" /reports/x',
+    'rm -i <<-EOF /reports/x',
+    'rm -i 2<<-EOF /reports/x',
+  ]
+  for (const role of ['implementer', 'verifier', undefined, '']) {
+    for (const shape of insideShapes) {
+      test(`${role ?? 'unset'}: ${shape} allowed beside outside operand`, async ($, on) => {
+        world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+        const input = shape.includes('<<-') ? '\n\ty\n\tEOF' : '\ny\nEOF'
+        expect((await $.tool.call({ tool: 'Bash', command: shape.replace('/reports/x', '/etc/passwd') + input })).deny).toContain('no rm')
+        expect((await $.tool.call({ tool: 'Bash', command: shape + input })).deny).toBeUndefined()
+      })
+    }
+  }
+  for (const role of ['implementer', 'verifier', 'reviewer', undefined, '']) {
+    for (const shape of [
+      'rm -i >/reports/log<<EOF /etc/passwd',
+      'rm -i </dev/null<<EOF /etc/passwd',
+      'rm -i /reports/x >/reports/log<<EOF /etc/passwd',
+    ]) {
+      test(`${role ?? 'unset'}: ${shape} denied beside inside operand`, async ($, on) => {
+        world(on, { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/reports' })
+        expect((await $.tool.call({ tool: 'Bash', command: shape + '\ny\nEOF' })).deny).toContain('no rm')
+        expect((await $.tool.call({ tool: 'Bash', command: shape.replace('/etc/passwd', '/reports/y') + '\ny\nEOF' })).deny).toBeUndefined()
+        expect((await $.tool.call({ tool: 'Bash', command: "cat <<'EOF' > /reports/log\ny\nEOF" })).deny).toBeUndefined()
+      })
+    }
+  }
+})
+
+// A heredoc tail in cat must not contaminate a later rm segment.
+test('cat heredoc opener tail leaves a clean rm segment allowed beside outside denial', async ($, on) => {
+  world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
+  const prefix = 'cat <<EOF foo\ny\nEOF\n'
+  expect((await $.tool.call({ tool: 'Bash', command: prefix + 'rm /etc/passwd' })).deny).toContain('no rm')
+  expect((await $.tool.call({ tool: 'Bash', command: prefix + 'rm /reports/x' })).deny).toBeUndefined()
 })

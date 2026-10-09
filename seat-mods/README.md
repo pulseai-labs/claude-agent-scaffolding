@@ -120,8 +120,9 @@ no writable root lies below it. Unquoted `{` and a glob suffix containing a `..`
 unresolvable and denied.
 A glob component starting with `.` and containing `*`, `?` or `[` is unresolvable and denied.
 Redirections, heredoc input and their destinations are excluded from `rm` operands.
-An fd prefix such as `2<<EOF` supplies shell input. Non-blank text after a heredoc
-delimiter on an rm opener line makes that rm unresolvable and denied,
+An fd prefix such as `2<<EOF` supplies shell input. Words and redirections after a heredoc
+delimiter on the rm opener line remain part of the command and meet the usual
+operand checks; only its body and closing line are excluded,
 and a single `&` separates commands for `rm`. Every Bash rail skips the unquoted reserved words
 `if`, `then`, `elif`, `else`, `do`, `while`, `until`, `!`, `{`, `(` and `time` at a command's
 head, before assignments or execution wrappers. A path such as `/tools/if`, or `if` after
