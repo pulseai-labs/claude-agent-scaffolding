@@ -154,7 +154,7 @@ as `no-rm` or `force-push` is not.
 are judged the same way; a command that is not inert keeps everything. A redirect or a pipe on a
 group's closer (`}`, `)`, `fi`, `done`, `esac`) applies to every command in the group. `cat <<'EOF'`
 with no file prints to standard output, and its body drops unless it is piped to a command that
-is not inert (or into a file), its group's target is used later, or it sits in a `$(`; an unquoted
+is not inert (or into a file), its group's target is used later, or it sits anywhere inside a `$(` or backticks; an unquoted
 `cat <<EOF` body counts when it holds no `$(`, backtick, `$((`, `$[` or `${…@…}`. A `sed` with no
 `-e`, `-f` or `-i` whose script is one address plus `p`, `d` or `q` (`sed -n 8,9p`) is inert. After
 a `cd` to a literal directory a relative name is read inside it (`cd .git` makes `config`
