@@ -114,7 +114,7 @@ I	skills/adopt/SKILL.md	1	single-verb calls with <placeholder> args: release_add
 D	skills/challenge/references/adversaries.md	3	#138	the plugin-root resolution (oss-dispatcher shape, the budget-check workaround), and the codex and claude adversary invocation recipes - schema-backed exec forms the close-depth audit runs; documented shell the agent runs, never executed by the suite, and a wrong shape fails loudly into host-only
 O	skills/close/references/spine-close.md	work items that are not complete	tests/test-close.sh	the open-work-item gate refuses to close a spine with incomplete items, and its two EMPTY arms refuse a spine with no work items and one whose items were all withdrawn (#533 half B, #531), and the withdrawn arm's route out names the ledger remedy's by-spine argument - keyed to a spine that closes, since the amendment is applied by that spine's close (F15) - and the SPINE.md record a halt cannot write, and the zero-item arm's work_item_add names the target repo the verb requires once more than one is declared
 O	skills/close/references/spine-close.md	merge --no-ff	tests/test-close.sh	the landing pass: the local arm's merge guard (the spine tip must actually reach the base branch) and the PR arm's push/create with the gh-inoperable third-leg halt. #339 re-anchored this row from 'is-ancestor' - the record pass added its own --is-ancestor lineage guard and the harness refuses a duplicated anchor. 1.13.1 (#614): the PR arm loads merge-bar's fields per hosting repo from $pr_fields_dir and halts on a missing file before the push (P1b, P1c)
-O	skills/close/references/spine-close.md	mergeCommit	tests/test-close.sh	the record pass (#339): a MERGED PR is proven locally - head identity (mergeCommit^2 == headRefOid, a rebase/squash landing halts), lineage (the pushed tip from the PR body is an ANCESTOR of the merged head, so fix rounds pass and rewrites halt), the stranded-merge guard (local base ahead of origin halts, repair named, never run), then repo:mergeCommit lands in $merge_shas
+O	skills/close/references/spine-close.md	mergeCommit	tests/test-close.sh	the record pass (#339): a MERGED PR is proven locally - head identity by one of three proofs (#708, P5b-P5h): a merge commit whose second parent is headRefOid, or a squash or rebase whose tree equals headRefOid's and whose one-parent run sits on a commit the head holds (that commit is the before-point); a wrong second parent, a differing tree, a fast-forward and a run on a merge commit halt, lineage (the pushed tip from the PR body is an ANCESTOR of the merged head, so fix rounds pass and rewrites halt), the stranded-merge guard (local base ahead of origin halts, repair named, never run), then repo:mergeCommit[:before] lands in $merge_shas
 O	skills/close/references/spine-close.md	touch_check	tests/test-close.sh	bone-touch at close re-classifies the spine rather than trusting the plan
 D	skills/close/references/spine-close.md	1	#138	the resume containment probe inside the local arm (audit #47, operative, unexecuted). #272/#310 Task 9 turned the once-per-spine probe into a loop over every hosting repo, same shape as round-orchestration.md's `checkout -q -b` conversion
 I	skills/close/references/spine-close.md	4	single-verb calls with <placeholder> args: ledger_apply_pending, class_set, risk-gate read, worktree_remove, spine_status
@@ -131,7 +131,7 @@ O	skills/close/references/work-item-close.md	abbrev-ref	tests/test-close.sh	W1: 
 D	skills/close/references/work-item-close.md	4	#138	path resolution (which now reads .status and refuses an `abandoned` item BEFORE diagnosing a missing worktree, #531) - and that arm's route out reopens an already-closed parent spine, since un-withdrawing alone leaves a planned item inside a closed spine that release close's tag selector then accepts, the spec-exists halt, the staged-changes read, and the Route A/B close sequence
 I	skills/close/references/work-item-close.md	1	a single <placeholder> assignment showing the report path's origin
 O	skills/close/references/cumulative-demo.md	elapsed=	tests/test-close.sh	D1-D4: the demo measurement block preserves the runner's rc instead of flattening it
-O	skills/close/references/cumulative-demo.md	evd=	tests/test-close.sh	F3a-g: the quarantine-comparison block disposes of its evidence dir on green, differing, halt, failing-command, lookup-failure, and signal-during-diff paths
+O	skills/close/references/cumulative-demo.md	evd=	tests/test-close.sh	F3a-g: the quarantine-comparison block disposes of its evidence dir on green, differing, halt, failing-command, lookup-failure, and signal-during-diff paths; P5i: the before-checkout reads a line's before-point, else sha^1
 I	skills/close/references/cumulative-demo.md	4	single-verb calls: demo_run, ledger_quarantine, budget read, demo_record
 O	skills/close/references/impl-check.md	while IFS=	tests/test-close.sh	the halt loop exits nonzero on the first failing AC and names the row
 I	skills/close/references/impl-check.md	2	single-verb calls: verify_acs, report_cross_check (the harvest_dir resolve went with the verb - the bank path is prose-resolved per close/references/harvest.md §7 now)
@@ -222,7 +222,7 @@ H	skills/adopt/SKILL.md	1739936869-205
 H	skills/challenge/references/adversaries.md	755500974-2123
 H	skills/close/SKILL.md	505737925-398
 H	skills/close/references/code-review.md	460889698-1802
-H	skills/close/references/cumulative-demo.md	398889074-7685
+H	skills/close/references/cumulative-demo.md	3161379839-7815
 H	skills/close/references/fake-expiry.md	3491573094-743
 H	skills/close/references/harvest.md	1931122618-713
 H	skills/close/references/impl-check.md	3998988429-864
@@ -230,7 +230,7 @@ H	skills/close/references/patch-lane.md	1122131773-2611
 H	skills/close/references/release-close.md	2526010048-13100
 H	skills/close/references/retrospective.md	1694933006-117
 H	skills/close/references/routing.md	2855300955-280
-H	skills/close/references/spine-close.md	3771989858-25793
+H	skills/close/references/spine-close.md	3438791973-28427
 H	skills/close/references/work-item-close.md	3705689758-6494
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	1897652786-133
