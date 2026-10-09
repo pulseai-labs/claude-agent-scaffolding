@@ -490,7 +490,18 @@ describe('an & inside an unquoted expansion is not a boundary (#723 review R1)',
   test('$$ is a complete token: ${ after it opens, the { after a bare $$ stays literal (review C2)', () => {
     expect(bashRules('X=$$${x/a&b/c} git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
     expect(bashRules('X=$${x} git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
-    expect(bashRules('X=$${x/a&b/c} git push --force')).toEqual([])
+    // The 0.3.1 reading of the third row splits at the expansion's `&` and reads no rule,
+    // while its raw separator reads the rules; the union keeps the tag's reading, the only
+    // denies it adds being the 0.3.1 reading's own (round 4, the structural fix).
+    expect(bashRules('X=$${x/a&b/c} git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
+  })
+  test('the union reads the 0.3.1 spelling too: a backtick } cannot sever the tail (review RR3-1)', () => {
+    expect(bashRules('git push ${x:-`echo }` & echo hi} --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
+    expect(bashRules('git push origin ${x:-`echo }` & hi} :refs/heads/main')).toEqual(expect.arrayContaining(['push', 'branch-delete']))
+  })
+  test('the zone-level && and redirection guards stay pinned (review RR3-3)', () => {
+    expect(bashRules('X=${x/a&&b/c} git push --force')).toEqual([])
+    expect(bashRules('X=${x/a>&b/c} git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
   })
   test('an escaped $ is text, and the & behind it splits as Bash splits it', () => {
     expect(bashRules('\\${x/a&b/c} git push --force')).toEqual([])
@@ -510,4 +521,183 @@ describe('an & inside an unquoted expansion is not a boundary (#723 review R1)',
   test('control: the & beside an expansion still splits', () => {
     expect(bashRules('echo ${x//&/y} & git push --force')).toEqual(expect.arrayContaining(['push', 'force-push']))
   })
+})
+
+
+// RR3/round 4 structural pin: the union guarantee, row by row, over the round-3
+// verifier's own matrix exports (scratch/s2-verifier-3, tag side; their msgFileText
+// travels with each row). The rows below are every matrix row whose seat-mods-v0.3.1
+// reading found a rule or a -F file; the other 311 rows read nothing
+// there, which every head reading contains trivially. Every rule and file the 0.3.1
+// reading found must appear in the head's reading of that row — the rails can miss
+// nothing the tag caught (#723 round 4).
+const TAG_SUPERSET_ROWS = [
+  '["true &\\ngit push origin main","",["push"],[]]',
+  '["true &\\ngit commit -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["true &\\ngit push --force origin main","",["push","force-push"],[]]',
+  '["true &\\ngit commit -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["true &\\ngit merge feature","",["merge"],[]]',
+  '["true &\\ngit commit -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["true &\\ngh pr merge 12","",["merge"],[]]',
+  '["true &\\ngit commit -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["true &\\ngit commit -m \\"x\\n\\nCo-Authored-By: a\\"","",["commit","ai-trailer"],[]]',
+  '["true &\\ngit commit -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["true &\\ngit commit -F /w/msg-trailer.txt","fix\\n\\nCo-Authored-By: someone <x@y>\\n",["commit","ai-trailer"],["/w/msg-trailer.txt"]]',
+  '["true &\\ngit commit -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["true &\\ngit commit --no-verify -m m","",["no-verify","commit"],[]]',
+  '["true &\\ngit commit -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["true &\\ngit branch -D feature","",["branch-delete"],[]]',
+  '["true &\\ngit commit -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["true &\\ngit push --delete origin b","",["push","branch-delete"],[]]',
+  '["true &\\ngit commit -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["true &\\ngit commit -m m","",["commit"],[]]',
+  '["true &\\ngit commit -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["true & ( git push origin main )","",["push"],[]]',
+  '["true & ( git commit -F /w/msg.txt )","",["commit"],["/w/msg.txt"]]',
+  '["true & ( git push --force origin main )","",["push","force-push"],[]]',
+  '["true & ( git commit -F /w/msg.txt )","",["commit"],["/w/msg.txt"]]',
+  '["true & ( git merge feature )","",["merge"],[]]',
+  '["true & ( git commit -F /w/msg.txt )","",["commit"],["/w/msg.txt"]]',
+  '["true & ( gh pr merge 12 )","",["merge"],[]]',
+  '["true & ( git commit -F /w/msg.txt )","",["commit"],["/w/msg.txt"]]',
+  '["true & ( git commit -m \\"x\\n\\nCo-Authored-By: a\\" )","",["commit","ai-trailer"],[]]',
+  '["true & ( git commit -F /w/msg.txt )","",["commit"],["/w/msg.txt"]]',
+  '["true & ( git commit -F /w/msg-trailer.txt )","fix\\n\\nCo-Authored-By: someone <x@y>\\n",["commit","ai-trailer"],["/w/msg-trailer.txt"]]',
+  '["true & ( git commit -F /w/msg.txt )","",["commit"],["/w/msg.txt"]]',
+  '["true & ( git commit --no-verify -m m )","",["no-verify","commit"],[]]',
+  '["true & ( git commit -F /w/msg.txt )","",["commit"],["/w/msg.txt"]]',
+  '["true & ( git branch -D feature )","",["branch-delete"],[]]',
+  '["true & ( git commit -F /w/msg.txt )","",["commit"],["/w/msg.txt"]]',
+  '["true & ( git push --delete origin b )","",["push","branch-delete"],[]]',
+  '["true & ( git commit -F /w/msg.txt )","",["commit"],["/w/msg.txt"]]',
+  '["true & ( git commit -m m )","",["commit"],[]]',
+  '["true & ( git commit -F /w/msg.txt )","",["commit"],["/w/msg.txt"]]',
+  '["git push origin main & git merge x","",["push"],[]]',
+  '["git status & git commit --no-verify -m m","",["no-verify"],[]]',
+  '["git commit -m m 2>&1","",["commit"],[]]',
+  '["git push origin main >&2","",["push"],[]]',
+  '["git push origin main >& 2","",["push"],[]]',
+  '["git push origin main &>","",["push"],[]]',
+  '["git push origin main &>>","",["push"],[]]',
+  '["git push origin main &>/dev/null","",["push"],[]]',
+  '["git push origin main &> /dev/null","",["push"],[]]',
+  '["git push origin main &>>/dev/null","",["push"],[]]',
+  '["git push origin main <&0","",["push"],[]]',
+  '["git push origin main >&-","",["push"],[]]',
+  '["git push origin main 2>&-","",["push"],[]]',
+  '["git commit -m \\"x\\n\\nCo-Authored-By: a\\" 2>&1","",["commit","ai-trailer"],[]]',
+  '["git push origin main 2 >&1","",["push"],[]]',
+  '["git push origin main > /dev/null 2>&1","",["push"],[]]',
+  '["git commit -m m 2>&1 &","",["commit"],[]]',
+  '["git commit -m m 2>&1 && git push origin main","",["commit","push"],[]]',
+  '["git push origin main 2>&1 | tail -1","",["push"],[]]',
+  '["git add f && git push --force","",["push","force-push"],[]]',
+  '["git add f&&git push origin main","",["push"],[]]',
+  '["git commit -m m &","",["commit"],[]]',
+  '["git push origin main &","",["push"],[]]',
+  '["git commit -m \\"a & b\\"","",["commit"],[]]',
+  '["git commit -m \'a & b\'","",["commit"],[]]',
+  '["git commit -m \'x & git push --force\'","",["commit"],[]]',
+  '["git commit -m \\"x && y\\"","",["commit"],[]]',
+  '["git commit -m m <<\'EOF\'\\nbody & more\\nEOF","",["commit"],[]]',
+  '["git push origin main # & push & force","",["push"],[]]',
+  '["git push origin main |& cat","",["push"],[]]',
+  '["git add f\\ngit push origin main","",["push"],[]]',
+  '["FOO=1 git push origin main &","",["push"],[]]',
+  '["env git push origin main","",["push"],[]]',
+  '["git push origin main","",["push"],[]]',
+  '["git merge x 2>&1","",["merge"],[]]',
+  '["gh pr merge 12 2>&1","",["merge"],[]]',
+  '["git branch -D x 2>&1","",["branch-delete"],[]]',
+  '["git commit -F /w/msg.txt 2>&1","",["commit"],["/w/msg.txt"]]',
+  '["git commit -F /w/msg.txt &","",["commit"],["/w/msg.txt"]]',
+  '["git commit -m m -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["git commit --file=/w/msg2.txt","",["commit"],["/w/msg2.txt"]]',
+  '["git commit -F/w/msg3.txt","",["commit"],["/w/msg3.txt"]]',
+  '["X=${x/a&b/c} git push --force","",["push","force-push"],[]]',
+  '["X=$[2&3] git push --force","",["push","force-push"],[]]',
+  '["X=${x/a&b/c} gh pr merge 12","",["merge"],[]]',
+  '["X=${a:-${b/&/c}} git push --force","",["push","force-push"],[]]',
+  '["git push ${x/a&b/c} --force","",["push","force-push"],[]]',
+  '["git push origin main ${x/a&b/c}","",["push"],[]]',
+  '["git push origin main $[2&3]","",["push"],[]]',
+  '["X=${x/[a&b]/c} git push --force","",["push","force-push"],[]]',
+  '["X=$[a[1]&2] git push --force","",["push","force-push"],[]]',
+  '["X=${x/a&b/c} git commit -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["X=${x/a&b/c} git commit -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["git commit -F ${x/a&b/c}","",["commit"],["${x/a&b/c}"]]',
+  '["git commit -F ${d}/msg.txt","",["commit"],["${d}/msg.txt"]]',
+  '["git commit ${x/a&b/c} -F /w/msg.txt","",["commit"],["/w/msg.txt"]]',
+  '["git commit -m ${x:-a\\nCo-Authored-By: b}","",["commit"],[]]',
+  '["X=${x/a&b/c} git commit -m \\"x\\n\\nCo-Authored-By: a\\"","",["commit","ai-trailer"],[]]',
+  '["git push ${x/a&b/c} origin main","",["push"],[]]',
+  '["git commit -m ${x/a&b/c}","",["commit"],[]]',
+  '["git commit -m \'${x&y}\'","",["commit"],[]]',
+  '["git commit -m \\"a & ${x&y}\\"","",["commit"],[]]',
+  '["git push origin main ${x} 2>&1","",["push"],[]]',
+  '["${x} && git push --force","",["push","force-push"],[]]',
+  '["X=${x/a&b/c git push --force","",["push","force-push"],[]]',
+  '["X=$[2&3 git push --force","",["push","force-push"],[]]',
+  '["X=${x/a}b&c/d} git push --force","",["push","force-push"],[]]',
+  '["X=$[a]b&c]d git push --force","",["push","force-push"],[]]',
+  '["echo ${x:-$(git push --force)}","",["push","force-push"],[]]',
+  '["X=${x:-$(git push --force)}","",["push","force-push"],[]]',
+  '["echo ${x:-$(git push --force>&2)}","",["push"],[]]',
+  '["echo ${x:-$(true&&git push --force)}","",["push","force-push"],[]]',
+  '["echo ${x:-$(git push --force) & git status}","",["push","force-push"],[]]',
+  '["echo ${x:-$(X=${y/a&b/c} git push --force)}","",["push","force-push"],[]]',
+  '["echo $(X=${y/a&b/c} git push --force)","",["push","force-push"],[]]',
+  '["X=${x:-$[2&3]} git push --force","",["push","force-push"],[]]',
+  '["X=$[${x:-2}&3] git push --force","",["push","force-push"],[]]',
+  '["X=$[$[2&3]&1] git push --force","",["push","force-push"],[]]',
+  '["X=$[arr[1]&2] git push --force","",["push","force-push"],[]]',
+  '["X=$$${x/a&b/c} git push --force","",["push","force-push"],[]]',
+  '["X=$$$(git push --force)","",["push","force-push"],[]]',
+  '["X=$$$[2&3] git push --force","",["push","force-push"],[]]',
+  '["X=$$& git push --force","",["push","force-push"],[]]',
+  '["X=$${x} git push --force","",["push","force-push"],[]]',
+  '["X=$${x/a&b/c} git push --force","",["push","force-push"],[]]',
+  '["X=$$$${x&y} git push --force","",["push","force-push"],[]]',
+  '["X=\\\\$${x/a&b/c} git push --force","",["push","force-push"],[]]',
+  '["X=${x:-\'a&b\'} git push --force","",["push","force-push"],[]]',
+  '["X=${x:-\\"a&b\\"} git push --force","",["push","force-push"],[]]',
+  '["X=${x/a\\"b&c\\"d/e} git push --force","",["push","force-push"],[]]',
+  '["X=${x:-\\"a&b} git push --force","",["push","force-push"],[]]',
+  '["X=${x:-\'a&b} git push --force","",["push","force-push"],[]]',
+  '["X=\\"${x/a&b/c}\\" git push --force","",["push","force-push"],[]]',
+  '["git push --force ${x/a&b/c","",["push","force-push"],[]]',
+  '["git push --force $[2&3","",["push","force-push"],[]]',
+  '["X=${a:-${b/&/c git push --force","",["push","force-push"],[]]',
+  '["X=${x/[}a]&b/c} git push --force","",["push","force-push"],[]]',
+  '["X=${x/a]b&c/d} git push --force","",["push","force-push"],[]]',
+  '["X=$[a]&2] git push --force","",["push","force-push"],[]]',
+  '["X=${x/a&>b/c} git push --force","",["push","force-push"],[]]',
+  '["X=${x/a&}&b git push --force","",["push","force-push"],[]]',
+  '["echo ${x/a&b/c}\\ngit push --force","",["push","force-push"],[]]',
+  '["X=$(echo a\\ngit push --force)","",["push","force-push"],[]]',
+  '["git commit -m ${x:-a&b\\n\\nCo-Authored-By: c}","",["commit"],[]]',
+  '["git commit -F ${x/a&b/c}/msg.txt","",["commit"],["${x/a&b/c}/msg.txt"]]',
+  '["git commit -F ${x/a&b/c}","",["commit"],["${x/a&b/c}"]]',
+  '["X=${x/a&b/c} git commit -m \\"x\\n\\nCo-Authored-By: a\\"","",["commit","ai-trailer"],[]]',
+  '["git push origin main 2>&1 --force","",["push","force-push"],[]]',
+  '["git push origin main >&2","",["push"],[]]',
+  '["git push origin main &>/dev/null","",["push"],[]]',
+  '["git push origin main <&0","",["push"],[]]',
+  '["a && git push --force","",["push","force-push"],[]]',
+  '["git commit -m m &","",["commit"],[]]',
+  '["X=$((2&3)) git push --force","",["push","force-push"],[]]',
+  '["git push $((2&3)) --force","",["push"],[]]',
+].map(row => JSON.parse(row) as [string, string, string[], string[]])
+const TAG_SUPERSET_VACUOUS = 311
+
+test('head rules and -F files are a superset of the 0.3.1 reading, over the verifier matrix', () => {
+  expect(TAG_SUPERSET_ROWS.length + TAG_SUPERSET_VACUOUS).toBe(466)
+  const missing: string[] = []
+  for (const [command, messageFileText, rules, files] of TAG_SUPERSET_ROWS) {
+    for (const rule of rules)
+      if (!(bashRules(command, messageFileText) as string[]).includes(rule)) missing.push(`rule ${rule} :: ${command}`)
+    for (const file of files)
+      if (!commitMessageFiles(command).includes(file)) missing.push(`file ${file} :: ${command}`)
+  }
+  expect(missing).toEqual([])
 })

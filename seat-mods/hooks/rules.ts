@@ -51,6 +51,12 @@ const TRAILER = /^[ \t]*(?:co-authored-by:|🤖 generated with)/im
 // boundary (#723). `rmTargets` splits on `&` through its own second spelling;
 // change one and check the other.
 const COMMANDS = /;|&&|(?<![&<>])&(?![&>])|\|\||\||\n|\(|\)/
+// The seat-mods-v0.3.1 separator, kept as the union's second reading: it ran every rail
+// before 0.3.2, so a union with it can miss nothing the tag caught, whatever exotic grammar
+// the newer reading mis-scans (#723 rounds 3-4). seat-mods-local, outside the parity-held
+// declarations; it can go when a fresh review finds no shape where the shared reading alone
+// misses a command Bash runs that this separator caught.
+const TAG_COMMANDS = /;|&&|\|\||\||\n|\(|\)/
 // Heredoc bodies and quoted strings are text, not commands: a commit message may
 // name `git merge` or `-n`. Each is swapped for a numbered marker before matching,
 // and the trailer check expands the markers in the commit's own segment.
@@ -146,6 +152,15 @@ function maskExpansionAmps(text: string, pieces: string[]): string {
   return out + text.slice(from)
 }
 
+// One reading of a command: its splits under `separator`, with the expansion mask applied
+// when `mask` says so. Every COMMANDS-split rail reads the command twice — once with the
+// shared `COMMANDS` and the mask, once with the 0.3.1 `TAG_COMMANDS` and no mask — and takes
+// the union of the two rule sets (and of the `-F` files), so by construction the rails can
+// miss nothing the tag caught (#723 round 4, the structural fix).
+function segmentsFor(text: string, pieces: string[], separator: RegExp, mask: boolean): string[] {
+  return (mask ? maskExpansionAmps(text, pieces) : text).split(separator)
+}
+
 // A segment's text with its blanked pieces put back, nested pieces included.
 function expand(text: string, pieces: readonly string[], seen: readonly string[] = []): string {
   return text.replace(MARKER, (_, i: string) => {
@@ -228,7 +243,11 @@ function afterHeads(tokens: string[]): string[] {
 export function bashRules(command: string, messageFileText = ''): RuleId[] {
   const found = new Set<RuleId>()
   const { text, pieces } = blank(command)
-  for (const segment of maskExpansionAmps(text, pieces).split(COMMANDS)) {
+  const segments = [
+    ...segmentsFor(text, pieces, COMMANDS, true),
+    ...segmentsFor(text, pieces, TAG_COMMANDS, false),
+  ]
+  for (const segment of segments) {
     const tokens = afterHeads(tokensOf(segment))
     const head = commandOf(tokens)
     if (head?.name === 'gh' && head.args[0] === 'pr') {
@@ -268,7 +287,11 @@ export function bashRules(command: string, messageFileText = ''): RuleId[] {
 export function commitMessageFiles(command: string): string[] {
   const files: string[] = []
   const { text, pieces } = blank(command)
-  for (const segment of maskExpansionAmps(text, pieces).split(COMMANDS)) {
+  const segments = [
+    ...segmentsFor(text, pieces, COMMANDS, true),
+    ...segmentsFor(text, pieces, TAG_COMMANDS, false),
+  ]
+  for (const segment of segments) {
     const git = gitOf(afterHeads(tokensOf(segment)))
     if (git?.sub !== 'commit') continue
     const { args } = git
@@ -278,7 +301,7 @@ export function commitMessageFiles(command: string): string[] {
         : arg.startsWith('-F') ? arg.slice(2) : undefined
       if (value === undefined) continue
       const path = expand(value, pieces).replace(/^(['"])(.*)\1$/s, '$2')
-      if (path !== '' && path !== '-') files.push(path)
+      if (path !== '' && path !== '-' && !files.includes(path)) files.push(path)
     }
   }
   return files

@@ -140,7 +140,9 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   the lone `&` inside an unquoted `${…}` or `$[…]` expansion are not boundaries — inside an
   expansion only that character is masked, so its `(`, `)`, `;`, `|` and a nested `$(…)` keep
   their meaning), parentheses and newlines, after quoted strings and heredoc bodies are blanked as
-  text, so a commit message may mention `git merge` or `-n`. Only the command word counts, after any
+  text, so a commit message may mention `git merge` or `-n`. Every rule set is the union of that
+  reading with the `seat-mods-v0.3.1` separator read over the same command, so the rails see
+  everything 0.3.1 saw — plus a command after a lone `&`. Only the command word counts, after any
   `VAR=value` and `sudo`, `env`, `command`, `exec`, `nohup` or `time`, and the head words
   `if`, `then`, `elif`, `else`, `do`, `while`, `until`, `!`, `{`, `(` and `time` on every rail only
   as exact unquoted words before assignments or execution wrappers (`builtin` is an execution prefix);
