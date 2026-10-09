@@ -186,11 +186,10 @@ together. Since 0.2.9, the same launch export carries `autonomic`'s three variab
 Claude Code child (autonomic is a Claude Code mod) writes the run's one ledger and its own pain file beside its report, and runs in
 autopilot only when its launcher does (`references/herdr-mechanics.md` step 2). Since 0.2.10, the
 launcher's mode is autonomic's live `AUTONOMIC_EFFECTIVE_MODE`, never its record file, which can be
-stale after a failed write. Since 0.2.11, the suite `tests/test-launch-site-marking.sh` selects
-every launch-verb site in the shipped prose and fails a site whose own paragraph or list item
-carries no seat-mods marking clause (`herdr-mechanics.md` step 2), so a new launch site cannot be
-added without one; the shapes the rule does not select are named in the suite's header. Test
-tooling only — no shipped behaviour changes. That hook is the only deterministic code a run executes: a run
+stale after a failed write. Since 0.2.11, the suite `tests/test-launch-site-marking.sh` selects the launch
+shapes its own header lists and fails a selected site whose own paragraph or list item
+carries no seat-mods marking clause (`herdr-mechanics.md` step 2); the shapes it does not select are named under
+NOT COVERED in that header. Test tooling only — no shipped behaviour changes. That hook is the only deterministic code a run executes: a run
 has **no `lib/`, no state directory, no parser** — `agents.md` and `roles.md` are read as
 prose and nothing parses them. The suites and the eval harness under `tests/` are
 build-and-test tooling; the plugin never runs them on a user's path.

@@ -68,8 +68,8 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 
 REF_BUDGET=232          # A3: the budget equals the longest budgeted reference (232, ossify-briefs.md); 0.2.9 raised the number from 214 for the spine brief's 1.14.0 caller rules and re-entry seat rule.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
-                        # each launch site gained; the files' own maximum is 209
-                        # (`ossify-nested-run.md`), and the budget section's adjacent
+                        # each launch site gained; the files' own maximum is 232
+                        # (`ossify-briefs.md`), and the budget section's adjacent
                         # control holds the gate at that minimum — one line over the
                         # longest budgeted reference is still refused.
                         # 0.2.8: raised for the molt clauses — nested-run §4 (211), the spine brief (214), then the
@@ -2087,6 +2087,13 @@ pin "$ROLES_MD" 'The session that launches the seat marks it in the pane, before
   "roles.md's activated-spine rows state the marking where the launcher acts" flat
 pin "$BRIEFS_MD" 'The session that launches the seat marks it in the pane, before its command, as' \
   "ossify-briefs.md's item-verifier intro states the marking where the launcher acts" flat
+# The fourth citing clause this PR adds (R8), in the close brief's NEVER aside — the
+# site the launch-site check selects as `ossify-pr-briefs.md:61`. Pinned here so the
+# claim that all four clause texts are pinned stays true; the needle carries the
+# citation with the marking, so a reword that keeps the token and drops "before its
+# command" reads red.
+pin "$PRBRIEFS_MD" 'remediated, the top dispatches a fresh close session, marked `coordinator` before its command' \
+  "ossify-pr-briefs.md's close-brief NEVER states the fresh close's marking where the launcher acts" flat
 pin "$GENERIC_BRIEFS_MD" 'seat — its report, scratch and handoff directories in `SEAT_MODS_ALLOW`' \
   "the direct work-item template marks its handoff directory too" flat
 pin "$GENERIC_BRIEFS_MD" 'The top marks it `coordinator` before its' \

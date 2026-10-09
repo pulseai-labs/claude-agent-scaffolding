@@ -53,7 +53,12 @@
 # from its … row" (the reviewer-row instruction, clause-carrying where it stands); a
 # dispatch whose command string intervenes before the fresh noun ("dispatch
 # `/ossify:close <spine-id>` to a fresh close session", SKILL.md:156 — clause-carrying
-# where it stands); a launch sentence directly under a heading with no blank line (it
+# where it stands); the elided noun "a/the fresh close" (`ossify-nested-run.md:182`,
+# `ossify-close-writer.md:20` — clause-less asides whose governing launch carries its
+# clause); a pronoun or preposition between the verb and the noun, "dispatch it/to a
+# fresh close session" (`ossify-briefs.md:110`, `:129` — clause-less asides, and not the
+# command-string shape above: no command intervenes, and selecting them would fail
+# clause-less prose); a launch sentence directly under a heading with no blank line (it
 # merges into the heading's region and is dropped); frontmatter whose `---` has no blank
 # line after it (the skip takes the body's first region with it); a launch written only
 # inside a `kind: dsh-spine-driver` session (not a pane — it is never marked); headings

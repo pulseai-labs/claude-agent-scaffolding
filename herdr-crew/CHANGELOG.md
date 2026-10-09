@@ -7,9 +7,10 @@ All notable changes to the `herdr-crew` plugin.
 **A launch site with no marking clause now fails a suite** (#663). Test tooling only: no
 shipped behaviour changes and the row contract (`config.md`) is untouched.
 
-- **`tests/test-launch-site-marking.sh`** selects every launch-verb site in the shipped
-  prose (`skills/**`, `commands/**`) by one rule — stated in its header — and fails a site
-  whose own paragraph or list item carries no seat-mods marking clause: the guarded
+- **`tests/test-launch-site-marking.sh`** selects launch sites in the shipped prose
+  (`skills/**`, `commands/**`) by the rule stated in its header — which also names the
+  shapes it does not select — and fails a selected site whose own paragraph or list item
+  carries no seat-mods marking clause: the guarded
   `SEAT_MODS_ROLE` export, a guarded role, `coordinator`, `orchestrator`, or a citation of
   `herdr-mechanics.md` step 2 / "Seat marking". `**` spans are stripped before matching,
   so a bold verb or article selects. Each failure names file, line and the site text; the
@@ -27,11 +28,14 @@ shipped behaviour changes and the row contract (`config.md`) is untouched.
   descriptions ("drives a fresh tab and pane per item seat", "launches item sessions of its
   own", "launched by seat name", "start one spine session"); "create … from its … row"; a
   dispatch whose command string intervenes before the fresh noun ("dispatch
-  `/ossify:close <spine-id>` to a fresh close session"); a launch sentence directly under a
+  `/ossify:close <spine-id>` to a fresh close session"); the elided noun "a/the fresh
+  close" ("then dispatches a fresh close", "the top dispatch the fresh close"); a
+  pronoun or preposition between the verb and the noun ("dispatch it to a fresh close
+  session", "dispatches to a fresh close session"); a launch sentence directly under a
   heading; frontmatter with no blank line after `---`; `kind: dsh-spine-driver` sessions
   (not panes, never marked); headings and frontmatter. A new site in one of those shapes
   still passes — the accepted residual, named in the suite's header.
-- **Three launch statements gained a citing clause** — a pointer, not a second copy of the
+- **Four launch statements gained a citing clause** — a pointer, not a second copy of the
   marking: `roles.md`'s activated-ossify-spine rows and `ossify-briefs.md`'s item-verifier
   intro now say the session that launches the seat marks it in the pane, before its
   command, as `herdr-mechanics.md` step 2 states, and `ossify-execution.md`'s resumed top
