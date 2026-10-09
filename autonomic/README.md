@@ -134,7 +134,7 @@ push or an `rm`, so does a bare variable (`git push $OPTS`). Beside `branch` or 
 variable is not read as a flag: it is mostly a message or a path.
 
 **Inert commands leave the bag (since 0.4.2).** When the text holds no program that may run text
-(the list below), no `$(`, `<(` or `>(`, no backtick, no heredoc left in place, no function or
+(the list below), no `<(` or `>(`, no `$((`, no backtick, no heredoc left in place, no function or
 `alias` definition and no open quote,
 the list splits it into simple commands at `;`, `&`, `|`, `&&`, `||` and newlines outside quotes
 and comments. A command whose first word is `[`, `[[`, `test`, `echo`, `printf` (without `-v`),
@@ -148,6 +148,19 @@ variable or a glob (`./$T.sh`, `./x*`) counts as naming every file. Every other 
 words, and so a danger word beside a harmless *non-inert* command is still an extra ask. A dashed
 word is a verb as git's own executable (`git-push`) or as a path (`./force-push`); bare prose such
 as `no-rm` or `force-push` is not.
+
+**Since 0.4.3** a command substitution is read as commands of its own: an inert command such as
+`test -n "$(git diff --cached)"` or `echo "… $(date)"` drops its own words, and the commands inside
+are judged the same way; a command that is not inert keeps everything. A redirect or a pipe on a
+group's closer (`}`, `)`, `fi`, `done`, `esac`) applies to every command in the group. `cat <<'EOF'`
+with no file prints to standard output, and its body drops unless it is piped to a command that
+is not inert (or into a file), its group's target is used later, or it sits anywhere inside a `$(` or backticks; an unquoted
+`cat <<EOF` body counts when it holds no `$(`, unescaped backtick, `$((`, `$[`, `${…@…}` or line
+continuation. A `sed` whose only options take no value (`-n`, `-E` …) and whose script is one address plus `p`, `d` or `q` (`sed -n 8,9p`) is inert. After
+a `cd` to a literal directory a relative name is read inside it (`cd .git` makes `config`
+`.git/config`), unless the text runs `ln`. A command in `readers` (below) that names a written file
+does not run it. A `$(` that holds `case` or a comment keeps the whole bag, and a pipe into a group
+counts as reaching a command that is not inert.
 
 Two heredoc shapes with a quoted delimiter are literal text, and their bodies are skipped: a
 commit message, `-m "$(cat <<'EOF'` … `EOF` `)"`, and `cat > file <<'EOF'` at a command's start
@@ -329,6 +342,7 @@ toast; a launcher reads no stale mode only when the unset works (see "Limits"). 
 | `tailChars` | 4000 | how much of the last reply the turn-end fork quotes |
 | `yieldAtPercent` | 65 | used only without a molt stage file: context fill at or above which every turn end is molt's |
 | `neverApprove` | all six rules | the never-approve rules enforced, separated by spaces or commas: `force-push default-branch-push branch-delete rm-outside no-verify unreadable` (`unreadable` matches nothing since 0.2.0). Empty means none (`/autopilot status` says so). Only these names exist. |
+| `readers` | `gh pr create; gh pr edit; gh issue create; gh issue comment` | command prefixes, separated by `;`, that name a file but never run it: a reader that names a file the command just wrote does not keep that file's words for the never-approve list. Add your own, for example `herdr agent prompt`. Empty means none. `/autopilot status` lists them. |
 
 No `/plugin configure` step is needed: every setting has a default except the optional `bell`.
 A bad number falls back to its default, and an unknown `neverApprove` name is ignored;
