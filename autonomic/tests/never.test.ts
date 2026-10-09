@@ -676,3 +676,22 @@ describe('0.4.3 plan review focus: sed reads its quoted script whole', () => {
     expect(rules("sed -n '1p;e id' f; echo 'git push -f origin feat/x'")).toEqual(['force-push'])
   })
 })
+
+// The final review: a stdout heredoc anywhere inside a substitution is captured, and a
+// substitution in command position runs it; 0.4.2 kept these words.
+describe('0.4.3 final review: a heredoc inside a substitution keeps its body', () => {
+  const P = 'git push -f origin feat/x'
+  test('after a newline, a command or a group inside $(', () => {
+    expect(rules(`$(\ncat <<'X'\n${P}\nX\n)`)).toContain('force-push')
+    expect(rules(`$(true; cat <<'X'\n${P}\nX\n)`)).toContain('force-push')
+    expect(rules(`$({ cat <<'X'\n${P}\nX\n})`)).toContain('force-push')
+    expect(rules(`x=$(\ncat <<'X'\n${P}\nX\n)\n$x`)).toContain('force-push')
+  })
+  test('inside backticks', () => {
+    expect(rules(`\`\ncat <<'X'\n${P}\nX\n\``)).toContain('force-push')
+    expect(rules(`x=\`\ncat <<'X'\n${P}\nX\n\`\n$x`)).toContain('force-push')
+  })
+  test('a closed substitution before the heredoc does not keep it', () => {
+    expect(rules(`echo "$(date)"\ncat <<'X'\n${PROSE}\nX\n`)).toEqual([])
+  })
+})

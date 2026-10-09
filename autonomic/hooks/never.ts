@@ -301,6 +301,32 @@ function runs(text: string, cmds: readonly Command[] | undefined): boolean {
 // (`$(`, a backtick, `$((`, `$[`, `${…@…}`); a plain `$VAR` only expands (0.4.3 §3.3).
 const LIVE_BODY = /\$\(|(?<!\\)`|\$\[|\$\{[^}]*@/
 const WRITE_ANY = /(?<=^|[\n;&|({)])[ \t]*cat[ \t]+(?:>>?[ \t]*([^\s;&|<>]+)[ \t]+)?<<-?[ \t]*(['"]?)([A-Za-z_]\w*)\2(?:[ \t]*>>?[ \t]*([^\s;&|<>]+))?[ \t]*\n([\s\S]*?)\n[ \t]*\3[ \t]*(?=\n|$)/g
+// Whether `at` sits inside a `$(` or a backtick not closed before it. A substitution that
+// does not close counts as open.
+function insideSub(text: string, at: number): boolean {
+  let q: string | undefined
+  for (let i = 0; i < at; i++) {
+    const c = text[i]!
+    if (q === "'") { if (c === "'") q = undefined; continue }
+    if (c === '\\') { i++; continue }
+    if (c === '$' && text[i + 1] === '(') {
+      const e = closeOf(text, i + 1)
+      if (e < 0 || e > at) return true
+      i = e - 1
+      continue
+    }
+    if (c === '`') {
+      let e = i + 1
+      while (e < text.length && text[e] !== '`') e += text[e] === '\\' ? 2 : 1
+      if (e >= at) return true
+      i = e
+      continue
+    }
+    if (q === '"') { if (c === '"') q = undefined; continue }
+    if (c === "'" || c === '"') q = c
+  }
+  return false
+}
 function wordsOf(command: string, readers: Readers): string[] {
   const message = command.replace(MESSAGE, '-m MSG')
   // Drop every body; if a later command may run any written file, keep them all (a kept body
@@ -310,7 +336,7 @@ function wordsOf(command: string, readers: Readers): string[] {
   const stubbed = message.replace(WRITE_ANY, (m, before: string | undefined, quote: string, _d, after: string | undefined, body: string, at: number) => {
     if (quote === '' && LIVE_BODY.test(body)) return m
     // Inside a substitution the output is captured and may be run: keep it (§3.3).
-    if (/\$\([ \t]*$/.test(message.slice(0, at))) return m
+    if (insideSub(message, at)) return m
     const file = before ?? after
     const stub = m.slice(0, m.indexOf('\n')).replace(/<<-?[ \t]*['"]?\w+['"]?/, '')
     writes.push({ end: at - shift + stub.length, file })
