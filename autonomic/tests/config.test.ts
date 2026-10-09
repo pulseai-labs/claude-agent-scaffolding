@@ -32,3 +32,13 @@ describe('settings', () => {
     expect(parseConfig({ bell: '   ' }).bell).toBeUndefined()
   })
 })
+
+describe('readers (0.4.3 §3.5)', () => {
+  test('absent: no readers field, so never.ts uses its default', () => {
+    expect(parseConfig({}).readers).toBeUndefined()
+  })
+  test('a ;-separated list is parsed; empty is none', () => {
+    expect(parseConfig({ readers: 'gh pr create; herdr agent prompt' }).readers).toEqual([['gh', 'pr', 'create'], ['herdr', 'agent', 'prompt']])
+    expect(parseConfig({ readers: '' }).readers).toEqual([])
+  })
+})
