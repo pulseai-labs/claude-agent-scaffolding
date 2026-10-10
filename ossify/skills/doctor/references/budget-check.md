@@ -144,7 +144,7 @@ which plugins are enabled in that project.
 skill-listing percentage. That is ground truth for the spec §64 claim, and it is
 the only place the claim can honestly be checked (spec §556 says so explicitly).
 
-Three things to know when reading it:
+Two things to know when reading it:
 
 - **The figure is per-project.** Dormant plugins can be disabled in project
   settings, and project settings override user settings. A repo with the whole

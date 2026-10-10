@@ -300,7 +300,10 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   [[ -n "$row" ]] || { echo "    workspace-init row not found in root README"; return 1; }
   # The row carries the shipped version: read it from the manifest, not a literal
   # that every bump would have to edit.
-  assert_contains "v$(jq -r .version "$WI_PLUGIN_ROOT/.claude-plugin/plugin.json")" "$row" || return 1
+  local wi_ver
+  wi_ver="$(jq -r .version "$WI_PLUGIN_ROOT/.claude-plugin/plugin.json" 2>/dev/null)"
+  [[ -n "$wi_ver" && "$wi_ver" != null ]] || { echo "    no version in the workspace-init manifest"; return 1; }
+  assert_contains "v$wi_ver" "$row" || return 1
   assert_not_contains 'scaffold-onboard' "$row" || return 1
   assert_not_contains 'scaffold-dev' "$row" || return 1
   assert_not_contains 'scaffolding chain' "$row" || return 1

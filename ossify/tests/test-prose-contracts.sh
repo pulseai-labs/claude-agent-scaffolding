@@ -1721,9 +1721,19 @@ t_assert_contains "$(cat "$HERE/eval/rubrics/harvest-apply-integrity.md")" 'both
 # E: no shipped file points at the deleted dispatcher rule. The file
 # is gone, so a pointer sends a model hunting for `oss` (spec A, PR 1). The
 # needle is split so this file does not match itself.
+# Tracked files only: an installed plugin cache holds older ossify versions that
+# still ship the rule, and a checkout's ignored worktrees hold old commits.
 _E_RULE="rules/dispatcher""-path.md"
-_E_HITS="$(grep -rlF --exclude-dir=.git --exclude=CHANGELOG.md "$_E_RULE" "$HERE/../.." 2>/dev/null || true)"
-t_assert_eq "" "$_E_HITS" 'E1 no file in the marketplace names the deleted dispatcher rule'
+_E_ROOT="$(cd "$HERE/../.." && pwd)"
+if git -C "$_E_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  _E_HITS="$(git -C "$_E_ROOT" grep -lF "$_E_RULE" -- . ':!CHANGELOG.md' ':!*/CHANGELOG.md')"
+  _E_RC=$?
+  # git grep exits 1 on no match; anything else is an error, never a pass.
+  [ "$_E_RC" -le 1 ] || _E_HITS="git grep failed (rc=$_E_RC)"
+  t_assert_eq "" "$_E_HITS" 'E1 no tracked file in the marketplace names the deleted dispatcher rule'
+else
+  echo "SKIP: E1 needs a git checkout of the marketplace ($_E_ROOT is not one)"
+fi
 
 rm -rf "$_PC_TMP"
 t_summary
