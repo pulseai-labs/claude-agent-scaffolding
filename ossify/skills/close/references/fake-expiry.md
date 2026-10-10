@@ -5,7 +5,7 @@ ledger's promise enforceable exactly here: *deferred truth never becomes
 permanent silently*. A fake reduces **breadth, not truth**, and the only thing
 keeping that sentence honest is a gate that fires at a release boundary.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 `plan-spine` authors these entries (`plan-spine/references/fake-ledger-discipline.md`).
 This file is the first **close-time** reader of them — until this layer existed,

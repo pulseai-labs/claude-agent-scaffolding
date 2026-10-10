@@ -15,7 +15,7 @@ This skill is intentionally narrow: read, format, display. No judgment, no rebut
 
 Resolve the state file through the dispatcher, never a hardcoded path — `ac_state_path` resolves `ac_data_dir` (which honors a `CLAUDE_PLUGIN_DATA` override) and appends `state.json`, so this read path always matches the write path other skills use.
 
-Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
 ```bash
 STATE_FILE="$("$arc_bin" state_path)"
@@ -31,7 +31,7 @@ Do not error. Do not try to create the file. Exit gracefully.
 
 ## Step 2: Parse `--limit N` from `$ARCHITECT_CRITIC_ARGS`
 
-The slash-command wrapper (`commands/critique-list.md`) exports the raw argument string as `$ARCHITECT_CRITIC_ARGS`. Read that env var — do not reference bash positionals like `$1` or `$2`, which get silently corrupted by Claude Code's template substitution at render time. On shim-less channels — Devin, `Skill()`, natural language — nothing exports it; read `--limit N` as a literal token in the invocation/request text.
+The slash-command wrapper (`commands/critique-list.md`) exports the raw argument string as `$ARCHITECT_CRITIC_ARGS`. Read that env var — do not reference bash positionals like `$1` or `$2`, which get silently corrupted by Claude Code's template substitution at render time. On shim-less channels — `Skill()`, natural language — nothing exports it; read `--limit N` as a literal token in the invocation/request text.
 
 Parse the limit with:
 

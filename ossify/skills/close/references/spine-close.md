@@ -46,7 +46,7 @@ known gap rather than papered over.
 
 `$spine_id` is the id `/close` was invoked with, carried from §2's routing.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 ```bash
 open="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"complete\" and .status != \"abandoned\") | .id] | join(\", \")")"
@@ -508,15 +508,14 @@ open, the close halts here, recording nothing**: surface the PR URLs, say which
 steps remain, and stop. That is the named halt state; re-invoke `/close
 <spine-id>` once the PR has merged.
 
-**On a surface that does not carry `/ossify:work-pr` — OpenCode and Devin today,
-where the utility is not published (#131) — the operator drives the
+**On a surface that does not carry `/ossify:work-pr` — Codex today, which
+publishes ossify's skills but not its commands — the operator drives the
 review-fix-merge loop by their own means and says so.** What this ceremony
 REQUIRES is a landing of the PR it opened that the record pass can prove — a
 merge commit of its head, or a squash or rebase of exactly its head; who drove
 the loop to that merge is the operator's affair. The record pass below still proves the
 landing — identity, lineage, base — against fetched refs, so a hand-driven loop
-gets exactly the same verification a work-pr-driven one does. The port of the
-work-pr lane to the remaining surfaces is #131's scope, not this step's.
+gets exactly the same verification a work-pr-driven one does.
 
 ```bash
 # SECOND PASS — record the PR-armed repos. work-pr has driven each PR to an

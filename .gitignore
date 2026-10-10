@@ -41,13 +41,6 @@ docs/REPORT-*.md
 docs/discussion.md
 docs/wabash-reference-working-project.md
 
-# OpenCode project runtime metadata and dependencies
-.opencode/.gitignore
-.opencode/node_modules/
-.opencode/package.json
-.opencode/package-lock.json
-.opencode/bun.lock
-
 # scaffold-onboard test fixtures (generated at test-run time)
 scaffold-onboard/tests/fixtures/
 

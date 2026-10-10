@@ -81,7 +81,7 @@ independently" is the architecture astrology this bar exists to refuse, and
 a seam cut cleanly today can be deployed separately later at far lower cost
 than an unwind.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 When the evidence is absent, **say so and keep the single deployable**; the
 split becomes a feature-map entry, not a rejection to re-litigate. **The map

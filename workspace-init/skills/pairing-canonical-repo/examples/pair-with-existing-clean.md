@@ -77,7 +77,7 @@ The skill verifies all fresh-mode preconditions PLUS pair-with-specific checks:
 
 ## Canonical metadata detection
 
-_Dispatcher invocations below are `"$wi_bin" …` — the calling skill resolves `wi_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$wi_bin" …` — the calling skill resolves `wi_bin` once (`command -v wi`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 Before creating the AI workspace, the skill detects the canonical's git configuration:
 

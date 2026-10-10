@@ -18,7 +18,7 @@ at each groom rather than in state (§2). Each entry:
 | `class_guess` | `bone` or `flesh` — a **guess**, made before any plan existed |
 | `source` | `journey-map` · `spec` · `release-retro` · `deferral` · `real-use` · `fake-replacement` · `feature-map-return` · `intake` |
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 ```bash
 "$oss_bin" feature_list                                   # the whole map, as JSON

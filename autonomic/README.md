@@ -384,7 +384,7 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
 - A host that refuses every `env.set` leaves `AUTONOMIC_EFFECTIVE_MODE` at its previous value; a toast
   says it may be stale.
 - A deny from a plugin that runs above autonomic is not seen; the turn-end check reports it.
-- Claude Code only: Codex, OpenCode and Devin have no mod runtime.
+- Claude Code only: Codex has no mod runtime.
 
 ## Tests
 

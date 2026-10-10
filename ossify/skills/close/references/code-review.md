@@ -60,7 +60,7 @@ contaminated by the other.
 
 ### Getting the diff
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 ```bash
 # $spine_branch and $repo_base_branches (one "<repo>:<base_branch>" pair per

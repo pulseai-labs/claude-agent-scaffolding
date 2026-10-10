@@ -65,7 +65,7 @@ is **`fully-private`**, and the public repo is a migration task, not a posture.
 | `open-core` | The core is open; specific **intelligence** stays private. | `license` (e.g. AGPL + commercial dual-license) |
 | `fully-open` | All code open; no functionality moat. Doc routing may still tighten. | `none` |
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 Record it:
 

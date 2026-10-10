@@ -200,7 +200,7 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   the seat runs unguarded. The sign is a missing `seat: <role>` in the status line; the debug log
   (`claude --debug`) names the plugin and the reason. Claude Code also holds installed plugins'
   hooks modules behind a rollout flag (`tengu_plugin_hooks_modules`).
-- Claude Code only. Codex, OpenCode and Devin have no mod runtime.
+- Claude Code only. Codex has no mod runtime.
 
 ## Tests
 

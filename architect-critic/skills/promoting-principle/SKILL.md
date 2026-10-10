@@ -36,7 +36,7 @@ PRINCIPLE_TEXT="${PRINCIPLE_TEXT#\"}"
 PRINCIPLE_TEXT="${PRINCIPLE_TEXT%\"}"
 ```
 
-If the user invoked the skill via natural language (no `$ARCHITECT_CRITIC_ARGS` — this includes Devin and `Skill()` invocations, where the request text is the conversation), the principle text and scope come from the conversation. If the user has not yet stated the principle text, ask: *"What principle text would you like to promote, and which scope — `user` (global across projects) or `project` (this repo only)?"* Wait for a reply before proceeding.
+If the user invoked the skill via natural language (no `$ARCHITECT_CRITIC_ARGS` — this includes `Skill()` invocations, where the request text is the conversation), the principle text and scope come from the conversation. If the user has not yet stated the principle text, ask: *"What principle text would you like to promote, and which scope — `user` (global across projects) or `project` (this repo only)?"* Wait for a reply before proceeding.
 
 ---
 
@@ -68,7 +68,7 @@ Stop. Do not write to any file.
 
 Determine the target `principles.md` path based on scope.
 
-Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
 **`user` scope:**
 
@@ -175,7 +175,7 @@ Example formatted entry:
 
 ## Step 6: Record in state.json
 
-Initialize state via the `arc` dispatcher (`architect-critic/bin/arc`; on Claude Code `arc` is on `$PATH` automatically, on Devin `arc_bin` is resolved per `rules/dispatcher-path.md`; the dispatcher's bash shebang forces a bash runtime for the lib regardless of the caller shell, fixing the BASH_SOURCE crash that bare `source` triggers under zsh):
+Initialize state via the `arc` dispatcher (`architect-critic/bin/arc`; on Claude Code `arc` is on `$PATH` automatically; the dispatcher's bash shebang forces a bash runtime for the lib regardless of the caller shell, fixing the BASH_SOURCE crash that bare `source` triggers under zsh):
 
 ```bash
 "$arc_bin" state_init

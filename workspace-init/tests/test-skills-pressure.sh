@@ -141,9 +141,6 @@ test_printed_skill_routes_point_to_ossify() {
   assert_contains 'on Codex, invoke the corresponding ossify skill — `start`, or `adopt`' "$init_sec" || return 1
   assert_contains 'a recorded tooling repo that already carries history refuses it too' "$init_sec" || return 1
 
-  # S8 round 5 (F5): Devin publishes `start` as a skill and no `adopt` at all, so the
-  # same note must say which form works there and where the adopt paths live.
-  assert_contains 'on Devin, invoke the ossify skill `start`; the adopt paths are not published on that surface' "$init_sec" || return 1
   # Scenario A + C: existing source or history routes directly to /ossify:adopt;
   # /ossify:start appears only as the empty-canonical exception.
   assert_contains '/ossify:adopt' "$pair_sec" || return 1
@@ -228,11 +225,8 @@ test_examples_routes_and_created_paths_match_reality() {
   # Closing sentences name the ossify route, not the retired one.
   assert_contains '/ossify:start' "$init_ex_sec" || return 1
   assert_contains '/ossify:adopt' "$pair_ex_sec" || return 1
-  # F3's clause rides the same mirror: the example must state it too. F5's Devin clause
-  # is selected by the same `ossify skill` term, and is asserted here as well so a
-  # reworded example cannot pass on the mirror alone.
+  # F3's clause rides the same mirror: the example must state it too.
   assert_contains 'a recorded tooling repo that already carries history refuses it too' "$init_ex_sec" || return 1
-  assert_contains 'on Devin, invoke the ossify skill `start`; the adopt paths are not published on that surface' "$init_ex_sec" || return 1
   if grep -Eq "$_retired_route_patterns" <<<"$init_ex_sec"; then
     echo "    retired route survives in fresh-bootstrap next-steps"; return 1
   fi
@@ -304,7 +298,12 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   local row
   row="$(grep -F '| [`workspace-init`](./workspace-init/)' "$ROOT_README")"
   [[ -n "$row" ]] || { echo "    workspace-init row not found in root README"; return 1; }
-  assert_contains 'v0.7.1' "$row" || return 1
+  # The row carries the shipped version: read it from the manifest, not a literal
+  # that every bump would have to edit.
+  local wi_ver
+  wi_ver="$(jq -r .version "$WI_PLUGIN_ROOT/.claude-plugin/plugin.json" 2>/dev/null)"
+  [[ -n "$wi_ver" && "$wi_ver" != null ]] || { echo "    no version in the workspace-init manifest"; return 1; }
+  assert_contains "v$wi_ver" "$row" || return 1
   assert_not_contains 'scaffold-onboard' "$row" || return 1
   assert_not_contains 'scaffold-dev' "$row" || return 1
   assert_not_contains 'scaffolding chain' "$row" || return 1

@@ -105,7 +105,7 @@ Steps 1-4 are the thinnest coherent path: a trader gets a real, judged answer to
 
 ## 5. Harvest: unmarked/`next`/`later` steps become feature-map entries
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 Every step NOT marked `skeleton` is recorded as a candidate spine before you
 leave this block — this is what stops the vision conversation from evaporating:

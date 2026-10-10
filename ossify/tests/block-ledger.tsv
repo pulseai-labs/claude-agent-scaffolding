@@ -219,7 +219,7 @@ H	commands/run-spine.md	2545938813-144
 H	commands/start.md	3557017349-140
 H	commands/work-item.md	2378584622-144
 H	skills/adopt/SKILL.md	1739936869-205
-H	skills/challenge/references/adversaries.md	755500974-2123
+H	skills/challenge/references/adversaries.md	2543440762-995
 H	skills/close/SKILL.md	505737925-398
 H	skills/close/references/code-review.md	460889698-1802
 H	skills/close/references/cumulative-demo.md	3161379839-7815
@@ -234,11 +234,11 @@ H	skills/close/references/spine-close.md	3438791973-28427
 H	skills/close/references/work-item-close.md	3705689758-6494
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	1897652786-133
-H	skills/doctor/references/budget-check.md	3813294467-2669
+H	skills/doctor/references/budget-check.md	2942541912-1024
 H	skills/doctor/references/interop-check.md	3316355601-827
 H	skills/doctor/references/spec-validation.md	943999998-7046
 H	skills/doctor/references/state-inspection.md	778749236-5777
-H	skills/plan-release/SKILL.md	1172871519-2561
+H	skills/plan-release/SKILL.md	1733167162-2418
 H	skills/plan-release/references/bone-touch-judge.md	3422967488-1278
 H	skills/plan-release/references/class-declaration.md	2145716635-323
 H	skills/plan-release/references/critic-veto.md	3678162678-495
@@ -247,7 +247,7 @@ H	skills/plan-release/references/real-use-findings.md	1286777686-510
 H	skills/plan-release/references/release-md-emission.md	1651931469-187
 H	skills/plan-release/references/rolling-wave.md	1157652703-218
 H	skills/plan-release/references/spine-sequencing-dag.md	1267392964-148
-H	skills/plan-spine/SKILL.md	2172740796-2802
+H	skills/plan-spine/SKILL.md	804553176-2659
 H	skills/plan-spine/references/citation-foldin.md	2955820270-361
 H	skills/plan-spine/references/cross-repo.md	1560286378-920
 H	skills/plan-spine/references/decomposition.md	1735798245-670
@@ -256,7 +256,7 @@ H	skills/plan-spine/references/demo-authoring.md	1062611185-1621
 H	skills/plan-spine/references/fake-ledger-discipline.md	95797153-393
 H	skills/plan-spine/references/intake-and-ledger.md	3936310853-289
 H	skills/patch/SKILL.md	2505586866-556
-H	skills/start/SKILL.md	713231529-1195
+H	skills/start/SKILL.md	1436369312-1052
 H	skills/start/references/bones-registry.md	4240564404-3307
 H	skills/start/references/journey-map.md	2970283972-104
 H	skills/start/references/posture-block.md	663882063-607

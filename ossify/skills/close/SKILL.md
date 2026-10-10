@@ -59,7 +59,7 @@ recorded, and the recovery is the user's to pick.
 The scope is derived **mechanically from the id's shape**. Never ask which scope
 the user meant, and never infer it from the wording of the request.
 
-Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+Resolve the `oss` dispatcher once and hold it in `oss_bin`: `oss_bin="$(command -v oss)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
 
 ```bash
 id="<the id from $ARGUMENTS>"
@@ -135,7 +135,7 @@ ai_root="$("$oss_bin" repo_root ai_workspace)"
    | `fail: shape` | **`"$oss_bin" state_restore`** — a required key is missing; same rebuild |
    | `fail: schema`, version **below** this build | **`"$oss_bin" migrate`** — the state predates this build |
    | `fail: schema`, version **above** this build | **upgrade ossify** — `migrate` accepts v1/v2 only |
-   | `fail: state` | **`/ossify:start`** (a new project) or **`/ossify:adopt`** (one that already has code) — on Codex the `start`/`adopt` skills; on Devin run `adopt` on Claude Code or Codex — never initialised; each runs `init` itself, and a bare `init` first leaves state both refuse |
+   | `fail: state` | **`/ossify:start`** (a new project) or **`/ossify:adopt`** (one that already has code) — on Codex the `start`/`adopt` skills — never initialised; each runs `init` itself, and a bare `init` first leaves state both refuse |
 
    Naming `state_restore` for every line wedges the close on a schema failure:
    against a v1/v2 state it prints `restore: state is already clean - nothing to
@@ -233,7 +233,7 @@ steps, in **binding order**:
 2. **Land each hosting repo on its own `base_branch` — by PR where a remote
    exists, locally where none does (#339)**. The PR arm pushes the spine branch,
    opens the PR, and hands it to `/ossify:work-pr` — not published on
-   Devin/OpenCode, where the operator drives the merge loop manually
+   Codex, where the operator drives the merge loop manually
    (`spine-close.md` §3); the record pass proves the
    remote merge locally (identity, lineage, base-contained) before anything is
    recorded. A remote `gh` cannot operate on halts — never a silent local
@@ -458,8 +458,7 @@ A versioned patch — a shipped defect or a can't-fake request — is
 ## 9. Slash-command interaction
 
 `/close <id>` (`commands/close.md`) exports the raw argument string as
-`$ARGUMENTS` through an env-var bridge — on shim-less channels (Devin,
-`Skill()`, natural language) nothing exports it; the id arrives as a literal
+`$ARGUMENTS` through an env-var bridge — on shim-less channels (`Skill()`, natural language) nothing exports it; the id arrives as a literal
 token in the invocation/request text. **Parse `$ARGUMENTS` in bash; never
 reference `$1` / `$2` / `$N`** — Claude Code substitutes positional tokens in
 command bodies at template-render time and silently corrupts them.

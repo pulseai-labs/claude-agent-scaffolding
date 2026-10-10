@@ -27,9 +27,7 @@ auto-commits (SPEC §7.4).
 This skill delegates bookkeeping to bash modules under
 `workspace-init/lib/`. Those modules expose stable function names; this skill
 calls them via the `wi` dispatcher (`workspace-init/bin/wi`). On Claude Code,
-`wi` is on `$PATH` automatically (every plugin's `bin/` is added); on Devin,
-locate it at the plugin's source directory + `/bin/wi` and invoke via the
-`exec` tool with the full path. The dispatcher has a bash shebang so the libs
+`wi` is on `$PATH` automatically (every plugin's `bin/` is added). The dispatcher has a bash shebang so the libs
 always run under bash even when the calling shell is zsh. Never `source`
 the lib files directly from skill body — under zsh `${BASH_SOURCE[0]}` is
 unset and the libs crash. Always go through `wi`.
@@ -67,7 +65,7 @@ Slash-command grammar:
 
 Read the raw slash-command text from the `$ARGUMENTS` env-var bridge — never
 from `$1`/`$2`, per the slash-command `$N` substitution bug. On shim-less
-channels (Devin, `Skill()`, natural language) nothing exports `$ARGUMENTS`;
+channels (`Skill()`, natural language) nothing exports `$ARGUMENTS`;
 read the name and `--wrapper` tokens from the invocation/request text. Interpret exactly
 one positional project name plus the optional `--wrapper <existing-dir>` pair.
 Reject an unknown option, duplicate `--wrapper`, a missing/empty wrapper value,
@@ -109,7 +107,7 @@ the repository state matches the manifest default on every machine.
 
 ## 4. Validate via lib/
 
-Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
+Resolve the `wi` dispatcher once and hold it in `wi_bin`: `wi_bin="$(command -v wi)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
 
 Run preflight via the `wi` dispatcher:
 
@@ -262,7 +260,6 @@ Next steps:
   3. cd /abs/path/{name}-ai && claude
   4. /ossify:start                         # bare canonical; routes to /ossify:adopt if source or history is present
                                            # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
-                                           # on Devin, invoke the ossify skill `start`; the adopt paths are not published on that surface, so reopen the checkout in Claude Code or Codex
                                            # a recorded tooling repo that already carries history refuses it too, with no supported ossify continuation yet
 
 Manifest at: /abs/path/{name}-ai/.workspace/pairing.json

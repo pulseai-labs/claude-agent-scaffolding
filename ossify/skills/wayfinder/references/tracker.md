@@ -71,7 +71,7 @@ them from the workspace remote below; branches 2 and 3 derive them from
 no branch that leaves them unbound: **wayfinder requires a reachable issue
 tracker**, and every path that cannot produce one stops.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 Resolve the workspace root with the shipped resolver, then read its remote
 **from git, never from the manifest**:

@@ -16,12 +16,8 @@
 #     NOT exempt: a scenario or scoring rule describing the deleted path as
 #     current behaviour is residue, not history.
 #   - Outside ossify/ only the mechanism-UNIQUE needles are scanned, and only
-#     over README.md and tests/test-opencode-runtime-adapter.mjs: the root
-#     README carries every plugin's row, so a generic word there could fail an
-#     ossify test over another plugin's text.
-#   - .opencode/lib/translate.js is deliberately not scanned: its directory
-#     list names dirs shipped plugins carry, and if a plugin ships such a dir
-#     again the entry legitimately returns - not this gate's call.
+#     over README.md: the root README carries every plugin's row, so a generic
+#     word there could fail an ossify test over another plugin's text.
 #
 # Needles are LITERAL substrings matched with awk index(), never regex - the
 # same counting discipline as test-external-executor-contract.sh. And index()
@@ -156,7 +152,7 @@ done < "$NEEDLES_INNER"
 # subset only (see the header for why path-form and tool-name needles are not
 # scanned here: README's own structure carries `.github/workflows` references
 # for CI that have nothing to do with this mechanism).
-for f in "$REPO/README.md" "$REPO/tests/test-opencode-runtime-adapter.mjs"; do
+for f in "$REPO/README.md"; do
   while IFS= read -r needle; do
     [ -n "$needle" ] || continue
     hits="$(awk -v needle="$needle" 'index($0, needle) { print FILENAME ":" FNR }' "$f")"

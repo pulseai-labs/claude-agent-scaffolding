@@ -28,15 +28,6 @@ a `kind: dsh-spine-driver` entry has no `command:` or `expected_model:`; its fie
 values and profile row are `dsh-driver.md`'s. Every other entry has this shape:
 
 ```markdown
-### devin-impl
-command: devin-implementer --effort max
-expected_model: <the model id its banner or screen must show>
-effort: max
-model_shows: screen
-brief_delivery: inject
-can: —
-note: the seat guard only arms through this launcher; never define a bare `devin` agent
-
 ### mcode-glm
 command: mcode-glm
 expected_model: <the model id its banner or screen must show>

@@ -54,7 +54,7 @@ the column is ceremony inflation.
 
 ## 3. Recording a gate
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 ```bash
 "$oss_bin" risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"   # refuses a duplicate name (#305); refuses a contaminated or multi-line list at rc 2

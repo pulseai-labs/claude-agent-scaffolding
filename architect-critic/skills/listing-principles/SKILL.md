@@ -11,7 +11,7 @@ You have been invoked because the user wants to see all principles currently in 
 
 ## Step 1: Parse `--source` filter
 
-Read `$ARCHITECT_CRITIC_ARGS` (the env-var bridge the slash-command wrapper exports — do not reference bash positionals `$1`/`$2`, which Claude Code corrupts at template-render time). On shim-less channels — Devin, `Skill()`, natural language — nothing exports it; read `--source VALUE` as a literal token in the invocation/request text. Extract `--source VALUE` if present; default to `all`.
+Read `$ARCHITECT_CRITIC_ARGS` (the env-var bridge the slash-command wrapper exports — do not reference bash positionals `$1`/`$2`, which Claude Code corrupts at template-render time). On shim-less channels — `Skill()`, natural language — nothing exports it; read `--source VALUE` as a literal token in the invocation/request text. Extract `--source VALUE` if present; default to `all`.
 
 ```bash
 SOURCE_FILTER="$(printf "%s" "${ARCHITECT_CRITIC_ARGS:-}" \
@@ -29,7 +29,7 @@ You read up to four sources in this exact order. Each is optional except shipped
 
 **Source 1 — Shipped defaults** (`shipped`)
 
-Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
 The plugin ships `templates/principles.md`. It always exists. Resolve it through the `arc` dispatcher — `arc_bin` above — which self-locates the installed plugin root on every surface:
 

@@ -76,7 +76,7 @@ REGEX_NEEDLES=(
 # ---------------------------------------------------------------------------
 scan_scope() {
   local pdir="$1" rroot="$2"
-  local dirs=(lib bin skills commands hooks-handlers templates rules hooks .claude-plugin .codex-plugin .devin-plugin)
+  local dirs=(lib bin skills commands hooks-handlers templates rules hooks .claude-plugin .codex-plugin)
   local files=()
   local d
   for d in "${dirs[@]}"; do
@@ -282,7 +282,7 @@ test_deleted_verbs_not_listed
 test_step10_contract_labels
 
 echo ""
-echo "Scope: architect-critic/{lib,bin,skills,commands,hooks-handlers,templates,rules,hooks,.claude-plugin,.codex-plugin,.devin-plugin}/ + architect-critic/README.md + <repo>/.claude-plugin/marketplace.json + <repo>/README.md"
+echo "Scope: architect-critic/{lib,bin,skills,commands,hooks-handlers,templates,rules,hooks,.claude-plugin,.codex-plugin}/ + architect-critic/README.md + <repo>/.claude-plugin/marketplace.json + <repo>/README.md"
 echo "Needles checked: ${#FIXED_NEEDLES[@]} fixed-string + ${#REGEX_NEEDLES[@]} case-insensitive regex"
 echo "Results: $TESTS_PASSED passed, $TESTS_FAILED failed"
 [[ $TESTS_FAILED -eq 0 ]]

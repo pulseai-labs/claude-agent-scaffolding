@@ -50,7 +50,7 @@ Name the repo the fix goes into and the paths it will touch. Then:
   each a disposition (`plan-spine/references/intake-and-ledger.md` §2). A line
   this patch resolves is pulled in as one of its ACs.
 - **Bones and risk gates**, on an ossify project — a topology resolves; resolve
-  `oss_bin` per the plugin's `rules/dispatcher-path.md`. Run
+  `oss_bin` with `command -v oss`. Run
   `"$oss_bin" touch_check` with the paths, one argument per path: rc 0 is a hit
   (stdout names it), rc 1 is clean, rc 2 could not check and is never clean. A
   `risk_gate` hit makes that gate's controls (`"$oss_bin" get '.risk_gates'`)

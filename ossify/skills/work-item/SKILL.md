@@ -31,16 +31,12 @@ and has its own contract):
   `Task(subagent_type="ossify:implementer-agent", prompt=<the
   invocation block naming the handoff path>)`. This body is that subagent's
   binding contract; `agents/implementer-agent.md` is the registration that points
-  at it. On Devin the same lane invokes the **`ossify:work-item-worker`** skill
-  (a `subagent: true` registration under `.devin/skills/`); the
-  `implementer-agent` file is the Claude Code registration and its `tools` list
-  is Claude-namespaced. The dispatcher is **not** `plan-spine` — it authors your
+  at it. The dispatcher is **not** `plan-spine` — it authors your
   spec and the spine's demo lines and stops there. Resolve `oss` into `oss_bin`
-  per `rules/dispatcher-path.md`; every `oss` call below is `"$oss_bin"`.
+  (`command -v oss`); every `oss` call below is `"$oss_bin"`.
 
 **On Claude Code, `ossify:implementer-agent` is the only worker ossify itself
-dispatches** — on Devin it is `ossify:work-item-worker` — and
-it is the default. The one exception is opt-in and belongs to the lane, not to
+dispatches**, and it is the default. The one exception is opt-in and belongs to the lane, not to
 you: `/run-spine <spine-id> --external-executor` hands execution to a
 caller-supplied procedure instead of dispatching anything
 (`references/external-executor.md`). Your contract below is identical either
@@ -399,7 +395,7 @@ you here.
 ## 11. Slash-command interaction
 
 `/work-item <handoff-path>` (`commands/work-item.md`) exports the raw argument
-as `$ARGUMENTS` via an env-var bridge — on shim-less channels (Devin, `Skill()`,
+as `$ARGUMENTS` via an env-var bridge — on shim-less channels (`Skill()`,
 natural language) nothing exports it; the handoff path arrives as a literal
 token in the invocation/request text. **Parse `$ARGUMENTS` in bash; never
 reference `$1`/`$2`/`$N`** — Claude Code substitutes positionals at render time.

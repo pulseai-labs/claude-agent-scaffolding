@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.7.1 — 2026-10-11
+
+Devin is no longer a surface (Devin seats retired 2026-09-22).
+
+### Removed
+- **The Devin host arm.** `HOST_AGENT=devin`, its host-only audit rows, the `--async` refusal, and the readiness and async-jobs no-op paragraphs are gone from the skills. `reviewing-critique-history` still renders `["devin"]` rows already stored in a `state.json`.
+- **`rules/dispatcher-path.md`** (Devin-only). Each skill resolves `arc` with `command -v arc`.
+- **`.devin-plugin/`.**
+
 ## v0.7.0 — 2026-09-22
 
 **Breaking:** auto-promotion and deterministic consolidation are withdrawn. Manual `/promote-principle` is unchanged.

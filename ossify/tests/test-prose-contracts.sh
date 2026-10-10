@@ -1488,7 +1488,7 @@ _r=0
 for _f in "$_OSSR/skills/doctor/references/state-inspection.md" "$_OSSR/skills/close/SKILL.md"; do
   grep -Fq '`"$oss_bin" init <name>`' "$_f" && { _r=1; echo "  (#266 site: $(basename "$_f"))"; }
   grep -F '| `fail: state` |' "$_f" | grep -Fq '/ossify:start' || { _r=1; echo "  (#266 no /ossify:start in: $(basename "$_f"))"; }
-  grep -F '| `fail: state` |' "$_f" | grep -Fq 'on Devin run `adopt` on Claude Code or Codex' || { _r=1; echo "  (#636 no non-Claude route in: $(basename "$_f"))"; }
+  grep -F '| `fail: state` |' "$_f" | grep -Fq 'on Codex the `start`/`adopt` skills' || { _r=1; echo "  (#636 no Codex route in: $(basename "$_f"))"; }
 done
 _pin "$_r" "the fail: state remedy names a bare init - following it leaves state that /start and /adopt both refuse"
 
@@ -1717,6 +1717,23 @@ _D06="$(cat "$HERE/eval/fixtures/harvest-apply-integrity/06-adoption-duplicate-u
 t_assert_contains "$_D06" 'source: adoption' 'D2 adoption/report duplicate fixture exists'
 t_assert_contains "$_D06" 'source: report' 'D2 duplicate fixture declares existing report trailer'
 t_assert_contains "$(cat "$HERE/eval/rubrics/harvest-apply-integrity.md")" 'both sources' 'D2 rubric scores the skip message'
+
+# E: no shipped file points at the deleted dispatcher rule. The file
+# is gone, so a pointer sends a model hunting for `oss` (spec A, PR 1). The
+# needle is split so this file does not match itself.
+# Tracked files only: an installed plugin cache holds older ossify versions that
+# still ship the rule, and a checkout's ignored worktrees hold old commits.
+_E_RULE="rules/dispatcher""-path.md"
+_E_ROOT="$(cd "$HERE/../.." && pwd)"
+if git -C "$_E_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  _E_HITS="$(git -C "$_E_ROOT" grep -lF "$_E_RULE" -- . ':!CHANGELOG.md' ':!*/CHANGELOG.md')"
+  _E_RC=$?
+  # git grep exits 1 on no match; anything else is an error, never a pass.
+  [ "$_E_RC" -le 1 ] || _E_HITS="git grep failed (rc=$_E_RC)"
+  t_assert_eq "" "$_E_HITS" 'E1 no tracked file in the marketplace names the deleted dispatcher rule'
+else
+  echo "SKIP: E1 needs a git checkout of the marketplace ($_E_ROOT is not one)"
+fi
 
 rm -rf "$_PC_TMP"
 t_summary

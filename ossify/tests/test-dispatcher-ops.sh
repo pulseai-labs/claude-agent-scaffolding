@@ -245,6 +245,14 @@ case "$T_OUT" in v0.2|v0.3|absent) T_PASS=$((T_PASS+1));; *) T_FAIL=$((T_FAIL+1)
 # carried so the interpreter and jq remain findable.
 t_capture env -i PATH="$PATH" bash "$OSS" critic_detect
 t_assert_eq "absent" "$T_OUT" "critic_detect still answers when HOME is unset (set -u safety)"
+# The retired wrapper's OSS_ARCHITECT_CRITIC_ROOT override is gone: only the
+# plugin caches decide. A planted critic root with no cache
+# must still read absent.
+_cr_tmp="$(mktemp -d)"; mkdir -p "$_cr_tmp/root/skills/critiquing-spec" "$_cr_tmp/home"
+: > "$_cr_tmp/root/skills/critiquing-spec/SKILL.md"
+t_capture env -i PATH="$PATH" HOME="$_cr_tmp/home" OSS_ARCHITECT_CRITIC_ROOT="$_cr_tmp/root" bash "$OSS" critic_detect
+t_assert_eq "absent" "$T_OUT" "critic_detect ignores OSS_ARCHITECT_CRITIC_ROOT (wrapper override retired)"
+rm -rf "$_cr_tmp"
 
 # The remaining two dispatcher wrappers this task added. Both are pure
 # pass-throughs, which is exactly why they need a dispatcher-path assertion:

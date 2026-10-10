@@ -1,5 +1,14 @@
 # workspace-init changelog
 
+## 0.7.2 (2026-10-11)
+
+Devin is no longer a surface.
+
+### Removed
+- **`rules/dispatcher-path.md`** (Devin-only). The skills resolve `wi` with `command -v wi`.
+- **The Devin next-steps line** in the fresh-bootstrap summary and its example mirror, and the Devin arms of the dispatcher and `$ARGUMENTS` notes.
+- **`.devin-plugin/`.**
+
 ## 0.7.1 (2026-09-27)
 
 The four `pairing.json` gaps deferred from the 0.7.0 review (#582). None were introduced by 0.7.0; the validator never checked these values, and two writers still used the predictable temp name 0.7.0 removed from `manifest_relocate`.

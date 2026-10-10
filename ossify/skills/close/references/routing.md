@@ -17,7 +17,7 @@ validates, or invents an id shape.
 | Spine | `r<N>.s<K>` | `r2.s1` |
 | Work item | `r<N>.s<K>.w<J>` | `r2.s1.w3` |
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 `<N>`, `<K>` and `<J>` are unbounded digit runs. Two branch namespaces derive
 from those ids and neither is an id itself:

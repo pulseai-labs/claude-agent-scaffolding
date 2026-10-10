@@ -60,7 +60,7 @@ do **not** decompose spines into work items, author demo lines, or author specs 
 
 ## 3. Pre-flight
 
-Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+Resolve the `oss` dispatcher once and hold it in `oss_bin`: `oss_bin="$(command -v oss)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
 
 All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`, on `$PATH`
 because Claude Code adds each plugin's `bin/` automatically; the dispatcher's bash
@@ -74,7 +74,7 @@ libs break. Use `"$oss_bin" help` for discovery.
 
 ```bash
 if ! sp="$("$oss_bin" state_path 2>/dev/null)"; then
-  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands. On Devin, adopt is not published - run it on Claude Code or Codex against the same checkout; the .ossify state it authors is surface-agnostic."
+  printf '%s\n' "ossify requires a topology declaration (none found on the walk-up path). /ossify:start and /ossify:adopt author one (.ossify/topology.json); an existing dual-repo workspace can instead pair via /init-workspace or /pair-workspace. On Codex, invoke the ossify skills start or adopt - that surface publishes skills, not commands."
   exit 0
 fi
 # Later bare verbs resolve state alone and would honor this override —
@@ -425,7 +425,7 @@ in the DAG.
 
 The `/plan-release` slash command (`commands/plan-release.md`) exports the raw
 argument string as `$ARGUMENTS` via an env-var bridge — on shim-less channels
-(Devin, `Skill()`, natural language) nothing exports it; the release name
+(`Skill()`, natural language) nothing exports it; the release name
 arrives as a literal token in the invocation/request text. **Parse `$ARGUMENTS`
 in bash; never reference `$1` / `$2` / `$N`** — Claude Code substitutes
 positional tokens in command bodies at template-render time and silently

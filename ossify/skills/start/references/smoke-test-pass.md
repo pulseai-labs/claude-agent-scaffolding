@@ -73,7 +73,7 @@ Then, in the bone's ADR:
 - `<claim>` — unverified (<why>). Revisit trigger: <the event that forces it>.
 ```
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 An `unverified` claim **must** get a revisit trigger, and it is a strong
 candidate for the bone's own `revisit_trigger` field. It is also good

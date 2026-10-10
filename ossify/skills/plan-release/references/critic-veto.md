@@ -90,7 +90,7 @@ list is a two-way sort and they fall out of it producing **nothing** — not a
 veto, not a digest line, not a mention. A real problem with the release, found
 and then dropped, because the only machinery on this page is about class.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 **So route them: surface substantive non-class findings to the user as ordinary
 critique, and fold the accepted ones into the plan before the final render**
