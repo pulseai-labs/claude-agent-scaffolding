@@ -19,18 +19,18 @@ Auto-invokes on phrases like "pair my existing AI workspace", "both repos alread
 
 If any fail, exit non-zero with a clear error; do NOT write the manifest or install any hook.
 
-Resolve the `wi` dispatcher once and hold it in `wi_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v wi` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
+Resolve the `wi` dispatcher once and hold it in `wi_bin`: `wi_bin="$(command -v wi)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
 
 - `command -v jq` and `command -v git` on PATH.
 - **AI workspace path absolute + exists + non-empty.** It is already populated; an empty or missing directory is the wrong target (or means the user wants Scenario A fresh-pair instead).
 - **Canonical path absolute + exists + is a git repo.** `git -C "$canonical_root" rev-parse --git-dir`.
 - AI workspace and canonical must be different paths (no self-pairing).
 
-These are validated by `"$wi_bin" skeleton_preflight_existing_dual "$ai_root" "$canonical_root"` (lib/skeleton.sh) — call it through the `wi` dispatcher (`workspace-init/bin/wi`; on Claude Code `wi` is on `$PATH` automatically, on Devin `wi_bin` is resolved per `rules/dispatcher-path.md`); never `source` lib files from the skill body (under zsh `${BASH_SOURCE[0]}` is unset and the libs crash).
+These are validated by `"$wi_bin" skeleton_preflight_existing_dual "$ai_root" "$canonical_root"` (lib/skeleton.sh) — call it through the `wi` dispatcher (`workspace-init/bin/wi`, on `$PATH` automatically on Claude Code); never `source` lib files from the skill body (under zsh `${BASH_SOURCE[0]}` is unset and the libs crash).
 
 ## 3. Input collection
 
-Inputs (prompt the user OR read from `$ARGUMENTS` for the slash command — never positional `$1`/`$2` per the slash-command `$N` substitution bug; on shim-less channels like Devin nothing exports `$ARGUMENTS`, so read the values as literal tokens in the invocation/request text):
+Inputs (prompt the user OR read from `$ARGUMENTS` for the slash command — never positional `$1`/`$2` per the slash-command `$N` substitution bug; on shim-less channels (`Skill()`, natural language) nothing exports `$ARGUMENTS`, so read the values as literal tokens in the invocation/request text):
 
 - **existing AI workspace absolute path** (already populated; first `/pair-existing-dual` arg).
 - **existing canonical absolute path** (already a git repo; second `/pair-existing-dual` arg).

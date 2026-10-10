@@ -16,7 +16,7 @@ handoff, this file is context, not instruction — your contract is SKILL.md §3
 
 ## 1. Where the rounds come from
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 The work-item rounds live in the **spine plan document** that `plan-spine`
 authored, under:
@@ -528,13 +528,6 @@ every clarification re-dispatch and every broken-envelope retry.
 ```text
 Task(subagent_type="ossify:implementer-agent", prompt=<invocation block naming the absolute handoff path>)
 ```
-
-On Devin the dispatch target is the **`ossify:work-item-worker`** skill — a
-`subagent: true` registration under `.devin/skills/` with Devin-namespaced
-`allowed-tools`. Invoke it by name with the same invocation block naming the
-absolute handoff path. `ossify:implementer-agent` is the Claude Code
-registration; its `tools` list is Claude-namespaced and is not the Devin
-dispatch.
 
 **Never pass the Task tool's `isolation: "worktree"`.** The worktree already
 exists — you created it in §3, in a different repo, at a path the handoff names.

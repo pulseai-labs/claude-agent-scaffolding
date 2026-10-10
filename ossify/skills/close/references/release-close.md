@@ -34,7 +34,7 @@ here**, and each is named rather than left to read as executed:
 A missing step and a step that silently does nothing are indistinguishable to
 every later reader, which is why they are a table rather than an omission.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 **Every step here is per-repo except the boundary audit and the release
 ladder.** Spines and work items carry a `target_repo`, and Tasks 8/9 (#272/#310)

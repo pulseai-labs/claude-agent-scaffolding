@@ -12,7 +12,7 @@ This skill body is the centerpiece of the architect-critic plugin. Everything th
 You may be invoked through any of these channels:
 - **Slash command:** `/critique [path] [--close] [--neutral] [--model NAME] [--principles PATH]`. The wrapper at `commands/critique.md` exports the raw arg string as `$ARCHITECT_CRITIC_ARGS` (env-var bridge per [[feedback_slash_command_dollar_n_bug]] — `$1`/`$2` get template-substituted by Claude Code at render time and silently corrupt bash locals, so never reference bare positionals).
 - **Skill() call from a peer skill:** `Skill(architect-critic:critiquing-spec, target=…, [phase_id=…,] depth=…, artifact_path=…)` — the channel scaffold-onboard's critic moments use (`scaffold-onboard/skills/onboarding-project/references/critic-moments.md` §1). These arrive as invocation arguments, not `$ARCHITECT_CRITIC_ARGS`: `artifact_path` is this channel's Step-1 path source, and `target`/`phase_id` feed the Step-10 closing line. `depth` names the caller's intent (`premise-audit`/`close`); no shipped step parses it — close-depth comes only from `--close` in `$ARCHITECT_CRITIC_ARGS`.
-- **Devin and other shim-less channels:** no `commands/critique.md` wrapper runs on Devin, so nothing exports `$ARCHITECT_CRITIC_ARGS`. Flags and the artifact path arrive as literal tokens in the invocation/request text itself — parse them from there exactly as if the env var had carried them. The same applies to `Skill()` and natural-language invocations.
+- **Shim-less channels:** on `Skill()` and natural-language invocations nothing exports `$ARCHITECT_CRITIC_ARGS`. Flags and the artifact path arrive as literal tokens in the invocation/request text itself — parse them from there exactly as if the env var had carried them.
 - **Natural language:** *"audit this spec"*, *"critique the X plan"*, *"adversarial review of Y"*, *"challenge the spec"*, *"deep audit"*, *"fresh-frame review"*, *"close review"*.
 
 Walk these ten steps in order. Do not skip steps. Do not bash-orchestrate the judgment work.
@@ -24,7 +24,7 @@ Walk these ten steps in order. Do not skip steps. Do not bash-orchestrate the ju
 You need the absolute path of the artifact to audit. Try sources in this exact order; stop at the first one that yields a readable file.
 
 **1a. Explicit invocation argument.** If the invocation carried a path:
-- Read `$ARCHITECT_CRITIC_ARGS` when present (env var the slash wrapper exports). On shim-less channels — Devin, `Skill()`, natural language — nothing exports it: read the path as a literal token in the invocation/request text instead.
+- Read `$ARCHITECT_CRITIC_ARGS` when present (env var the slash wrapper exports). On shim-less channels — `Skill()`, natural language — nothing exports it: read the path as a literal token in the invocation/request text instead.
 - Extract `--spec PATH` if present, else the first positional argument.
 - Strip a leading `@` if present (Claude Code uses `@path` to load file content into context — fs access wants the bare path).
 - If the resolved path exists and is readable, use it.
@@ -62,7 +62,7 @@ Once you have a path: `Read` the artifact end-to-end. Hold its contents in your 
 
 Principles are the lens you audit through. You read each source file yourself with your file-reading tool and merge them in working context, in this exact order, last-wins on duplicates. An absent file is skipped, never created — reading principles must not write anything.
 
-Resolve the `arc` dispatcher once and hold it in `arc_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v arc` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
 1. **Shipped defaults** — `templates/principles.md` (relative to the plugin root; `"$arc_bin" principles_shipped_path` resolves it). Always loaded. Contains the **Ghost Notes principle** (what is absent from the spec is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy as the tone for every challenge raised).
 2. **User-global** — the user's promoted principles across all projects, at the path `"$arc_bin" principles_user_path` resolves (`~/.claude/architect-critic/principles.md`, under `$HOME` — unlike `"$arc_bin" state_path`, this one does not consult `CLAUDE_PLUGIN_DATA`). If the file does not exist, skip it — do not create it.
@@ -96,20 +96,20 @@ Skip CORE and your challenges get dismissed defensively even when they're correc
 
 You need four values: `HOST_AGENT`, `codex_available`, `claude_available`, and `close_depth`.
 
-**HOST_AGENT detection:** `HOST_AGENT` is the runtime that loaded this skill — the agent knows its own host. Codex plugin context → `codex` (`CODEX_HOME` present corroborates). Devin plugin context — the skill arrived via Devin's plugin loader under the Devin CLI/Desktop runtime → `devin`. Otherwise → `claude`. Environment or binary presence never decides alone: a `devin` binary on `$PATH` or an exported `CODEX_HOME` is common on machines whose active session is a different host. Do not ask the user; infer it from the running agent context.
+**HOST_AGENT detection:** `HOST_AGENT` is the runtime that loaded this skill — the agent knows its own host. Codex plugin context → `codex` (`CODEX_HOME` present corroborates). Otherwise → `claude`. Environment or binary presence never decides alone: an exported `CODEX_HOME` is common on machines whose active session is a different host. Do not ask the user; infer it from the running agent context.
 
 **Codex availability:** Run `command -v codex` in a Bash tool call. Capture the return code. If the binary resolves, also capture `codex --version` for the status message in Step 4.
 
 **Claude availability:** Run `command -v claude` in a Bash tool call. Capture the return code. If the binary resolves, also capture `claude --version` for the status message in Step 4.
 
 **Close-depth detection.** Set `close_depth = true` if ANY of:
-- `--close` slash flag present in `$ARCHITECT_CRITIC_ARGS` — or as a literal token in the invocation/request text on shim-less channels (Devin, `Skill()`, natural language)
+- `--close` slash flag present in `$ARCHITECT_CRITIC_ARGS` — or as a literal token in the invocation/request text on shim-less channels (`Skill()`, natural language)
 - `--deep` slash flag present (same dual source)
 - The user's natural-language invocation matched any of: *"deep audit"*, *"close review"*, *"deeper look"*, *"adversarial fresh-frame"*, *"fresh-frame review"*
 
 Otherwise `close_depth = false` (shallow = claude-only audit, the default).
 
-**Async detection (#39).** Set `async_mode = true` if `--async` is present in `$ARCHITECT_CRITIC_ARGS` — or as a literal token in the invocation/request text on shim-less channels. This second source is what makes the Devin refusal below reachable: on Devin nothing exports the env var, so the `--async` a Devin user typed lives only in the request text. Async is only meaningful for a **close-depth** audit with `HOST_AGENT=claude` (the Codex companion is the only proven background backend; Codex-host keeps the synchronous path). If `--async` is set but `close_depth=false` or `HOST_AGENT=codex`, ignore it and run synchronously, telling the user why. When `async_mode=true` and applicable, Step 6 takes the **defer-to-resume** path (dispatch now, resume later) instead of the inline invocation. **`HOST_AGENT=devin` hard-refuses `--async`:** Devin has no external adversary backend and no background job infrastructure for architect-critic. If `--async` is present and `HOST_AGENT=devin`, do NOT enter the foreground critique path either — refuse immediately with a clear message: *"`--async` is not supported on Devin. Devin runs host-only audits with no external adversary. Run `/critique` without `--async`."* Do not append to `external_runs[]`, do not dispatch any job, and do not mutate state.
+**Async detection (#39).** Set `async_mode = true` if `--async` is present in `$ARCHITECT_CRITIC_ARGS` — or as a literal token in the invocation/request text on shim-less channels. Async is only meaningful for a **close-depth** audit with `HOST_AGENT=claude` (the Codex companion is the only proven background backend; Codex-host keeps the synchronous path). If `--async` is set but `close_depth=false` or `HOST_AGENT=codex`, ignore it and run synchronously, telling the user why. When `async_mode=true` and applicable, Step 6 takes the **defer-to-resume** path (dispatch now, resume later) instead of the inline invocation.
 
 **Neutral mode (#93).** Set `neutral_mode = true` if `--neutral` is present in `$ARCHITECT_CRITIC_ARGS` or as a literal token in the invocation/request text, or the user's natural-language invocation matched *"no recommendations"* / *"just list the challenges"* / *"don't recommend"*. When `neutral_mode=true`, Step 8 omits the per-challenge **recommended disposition** and presents challenges neutrally (the pre-#93 behavior). Default is `false` — recommend by default. Opt-out is per-invocation, not sticky.
 
@@ -123,10 +123,6 @@ The close-depth adversary is host-aware:
 | claude     | false       | codex_available | claude-self-audit only |
 | codex      | true        | claude_available | codex-self-audit + claude fresh-frame |
 | codex      | false       | claude_available | codex-self-audit only |
-| devin      | true        | n/a              | devin-self-audit only (host-only, no external adversary) |
-| devin      | false       | n/a              | devin-self-audit only (host-only, no external adversary) |
-
-On `HOST_AGENT=devin`, `close_depth` does not change the audit shape — Devin always runs host-only self-audit with `adversaries_used=["devin"]`. No `external_runs[]` append occurs. The `--close` flag is accepted but does not dispatch an external adversary; it simply runs the same host-only audit at close-depth rigor.
 
 ---
 
@@ -154,7 +150,6 @@ Pick the matching message and emit it as a normal turn message (not a tool call 
 - **HOST_AGENT=codex && claude_available && close_depth →** *"Claude Code detected; will run fresh-frame audit (~60s)"* (substitute the real version string from `claude --version`).
 - **HOST_AGENT=codex && !claude_available →** *"Claude Code not detected; running codex-self-audit only. Install Claude Code CLI for adversarial fresh-frame."*
 - **HOST_AGENT=codex && claude_available && !close_depth →** *"Claude Code available but depth=shallow; running codex-self-audit only. Use --close for fresh-frame."*
-- **HOST_AGENT=devin →** *"Devin host-only audit: no external adversary. Running devin-self-audit."* (regardless of close_depth — Devin has no fresh-frame backend)
 
 Do not phrase this as a tool-progress message ("Running detection..."). Phrase it as a status declaration the user can act on — they may want to abort and re-run with `--close`, or stop to install codex first.
 
@@ -309,15 +304,13 @@ Steps 7 (consolidate), 8 (rebuttal cycle), and 9 (append run) form one reusable 
 
 ## Step 7: Consolidate challenges
 
-You now have one or two challenge lists (claude-only, claude + codex, or the single devin self-audit). Consolidate them yourself — this is judgment work, not a helper call:
+You now have one or two challenge lists (claude-only, or claude + codex). Consolidate them yourself — this is judgment work, not a helper call:
 
 - **Same issue, one challenge.** When two challenges — within one list or across both — raise the same underlying issue, merge them into a single challenge. Keep every rationale that differs.
-- **Adversary attribution.** Each surviving challenge gets a `source` field: `["claude"]`, `["codex"]`, or `["claude", "codex"]` for cross-confirmed challenges — `["devin"]` under a Devin host-only run. **Cross-confirmed challenges are the strongest signal** — both an adversary that read your spec and a fresh-frame adversary that did not landed on the same issue. Surface those first in the rebuttal cycle.
+- **Adversary attribution.** Each surviving challenge gets a `source` field: `["claude"]`, `["codex"]`, or `["claude", "codex"]` for cross-confirmed challenges. **Cross-confirmed challenges are the strongest signal** — both an adversary that read your spec and a fresh-frame adversary that did not landed on the same issue. Surface those first in the rebuttal cycle.
 - **Severity reconciliation.** If both adversaries flagged the same challenge with different severities, preserve the **highest** severity (`premise` > `gap` > `alternative`).
 - **Gaps are findings too.** Each audit result may also carry `gaps` — elements the adversary found absent rather than wrong. Fold them into the merged list as findings of their own — source-tagged like any challenge, at `gap` severity, with no dedup (two adversaries noting the same absence is itself signal, so keep both). A `{challenges: [], gaps: [...]}` result is therefore not clean: its entries are walked in Step 8 and counted in Step 10's `Challenges`/`Candidates piled` like every other finding.
 - **Adversaries used.** An adversary counts as used when it contributed challenges OR gaps. A `{challenges: [], gaps: [...]}` result means the adversary ran and reported observations — `Adversaries used`, Step 9's `ADVERSARIES_JSON`, and the `adversaries_used` state field all include it; the audit never reads as if that adversary found nothing.
-
-On `HOST_AGENT=devin` a lone self-audit has nothing to merge — the self-audit list plays the merged-list role directly.
 
 The merged list — challenges and folded-in gaps alike — is what you walk in Step 8.
 
@@ -445,13 +438,13 @@ State updates happen in bash because they are pure I/O. Initialize state first �
   --elapsed-ms "$ELAPSED_MS"
 ```
 
-`--adversaries` accepts either a JSON array such as `["claude","codex"]` or a CSV string such as `claude,codex` — on `HOST_AGENT=devin` the value is `["devin"]`.
+`--adversaries` accepts either a JSON array such as `["claude","codex"]` or a CSV string such as `claude,codex`.
 
 The schema v3 `recent_runs[]` entry includes:
 - `request_id` — `crit-<ISO8601>-<entropy>` generated upstream
 - `completed_at` — ISO8601 UTC
 - `depth` — `shallow` or `close`
-- `adversaries_used` — `["claude"]`, `["claude","codex"]`, or `["devin"]` on a Devin host-only run
+- `adversaries_used` — `["claude"]` or `["claude","codex"]`
 - `challenge_count` — total surviving challenges after consolidation
 - `concessions` — count of challenges the user conceded
 - `auto_applied_count` — challenges auto-applied by Step 8.0 triage (0 under `--walk`/`--neutral`)
@@ -468,7 +461,7 @@ Final turn message, plain prose. Format:
 ```
 Audit complete for <target>.
 
-  Adversaries used : <claude | claude + codex | devin>
+  Adversaries used : <claude | claude + codex>
   Challenges       : <N> total (<X> premise, <Y> gap, <Z> alternative)
   Concessions      : <C> of <N>
   Auto-applied     : <A> of <N> (disposition triage)

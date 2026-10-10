@@ -289,17 +289,14 @@ loaded doctor body, and the expected checkout or Claude installed version
 separately. A version mismatch exposes prior `oss` verbs and compares only
 product prose actually loaded earlier in the session; it does not scan unused
 skills or decide reruns. The guarantee starts after one update and fresh
-session. Codex and OpenCode installed-reference resolution remains partial
-(#396, #399).
+session. Codex installed-reference resolution remains partial (#399).
 
 `wayfinder` is both at once, which is why it is listed above rather than
 below: an entry skill with its own skill directory, and an any-repo one. It
 charts a question into decision tickets on the issue tracker, or works an
 existing map's frontier one ticket per session. The three utilities have no
 skill directory — their depth lives in `references/` — so they are a Claude
-Code command surface only and the OpenCode bundle does not carry them (#131
-tracks the command-registration gap there). Every entry skill, `wayfinder`
-included, is in the bundle.
+Code command surface only.
 
 `challenge` is the grill and the adversarial critic, absorbed in-tree at 1.1.0:
 the bone grill gate, the spec-core close audit, the release class veto, and the
@@ -310,11 +307,7 @@ fresh-frame adversary when one is configured via `OSSIFY_ADVERSARY`
 (`skills/challenge/references/adversaries.md`); unconfigured means host-only,
 by declaration.
 
-Ossify is in the Claude and Codex marketplaces as of v1.0.0. In the OpenCode
-bundle it stays an explicit opt-in: bundle installability begins only after an
-immutable bundle tag is published, and it requires the root bundle's explicit
-four-plugin allowlist documented in
-[`../.opencode/INSTALL.md`](../.opencode/INSTALL.md). Plan D's consolidated eval
+Ossify is in the Claude and Codex marketplaces as of v1.0.0. Plan D's consolidated eval
 covers all 10 acceptance scenarios; scenario 10 is a run rather than a standing
 fixture, and its second run agreed **5 of 5 with no divergence** after the prose
 fixes its first run prompted (#250, #251). That is two runs on one scenario, not
@@ -325,10 +318,8 @@ Ossify requires a topology declaration and nothing else: `/ossify:start` and
 `/ossify:adopt` author `.ossify/topology.json` themselves, and a workspace-init
 `.workspace/pairing.json` is read as a translated fallback when one exists.
 `workspace-init` is optional. Round execution dispatches the
-`ossify:implementer-agent` subagent. Claude Code registers it natively, and the
-OpenCode adapter registers `ossify-implementer-agent` as well, so rounds run on
-both. **Codex** has no worker path: its planning, diagnosis and close skills
-work, and rounds are driven from Claude Code or OpenCode. The critic is
+`ossify:implementer-agent` subagent. Claude Code registers it natively. **Codex** has no worker path: its planning,
+diagnosis and close skills work, and rounds are driven from Claude Code. The critic is
 internal, so the release-planning veto and the spine-close audit run on every
 install, Codex-only included.
 

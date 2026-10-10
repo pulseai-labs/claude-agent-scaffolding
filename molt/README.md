@@ -208,7 +208,7 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   still shows the old session's fill.
 - **Background waits survive the clear** (probe P6). A root that molts keeps every wait it armed;
   its handoff must list them so the resumed session does not arm them again.
-- Claude Code only. Codex, OpenCode and Devin have no mod runtime.
+- Claude Code only. Codex has no mod runtime.
 
 ## Tests
 

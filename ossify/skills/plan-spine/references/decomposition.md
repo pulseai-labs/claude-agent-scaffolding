@@ -39,7 +39,7 @@ must still cross the product end to end; a split that leaves one half unable to
 reach an outcome has produced an `internal-enabler`, which is a different
 conversation (`plan-release/references/class-declaration.md` §4).
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 Concretely, on the spine already in state: `"$oss_bin" spine_status <spine> abandoned`,
 then `"$oss_bin" spine_add` each half at `plan-release` with its own class and DAG

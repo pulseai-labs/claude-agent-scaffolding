@@ -173,7 +173,7 @@ lists are judgment work, not helper work:
 The heart of the user experience — **for a standalone invocation.** You ask in
 your turn; the user replies in theirs. Never capture answers through bash.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 **A ceremony caller skips this cycle entirely.** When the invoking prose is a
 lifecycle moment that dispositions findings itself — the release veto's

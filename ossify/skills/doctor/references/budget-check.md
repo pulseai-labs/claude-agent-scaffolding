@@ -20,7 +20,7 @@ room, open the check that enforces the budget you mean.**
 | **SKILL.md body** | line count, per file, cap 500 | `check 6` — a red test | **none** |
 | **Agent listing** | `agents/*.md` descriptions | **nothing** | **none** |
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"
@@ -68,9 +68,7 @@ fail silently:
 
 `oss` is on `$PATH` on Claude Code (which adds each plugin's `bin/`
 automatically), and `command -v` finds it in the subprocess where the env var
-does not survive. On Devin, `bin/` is NOT on `$PATH` — resolve `oss` into
-`oss_bin` per `rules/dispatcher-path.md` (the plugin-cache manifest glob covers
-remote installs, where `source:` is a URL, not a path). Resolving against the
+does not survive. Resolving against the
 installed plugin also measures the thing the budget is actually about.
 
 ### What does *not* move either budget
@@ -180,13 +178,6 @@ the only place the claim can honestly be checked (spec §556 says so explicitly)
 
 Three things to know when reading it:
 
-- **Name the host before naming the command.** Under OpenCode, ossify's own
-  entry skills are registered as native slash commands — including **`/doctor`,
-  which is this skill**. Telling an OpenCode user to "run `/doctor`" re-enters
-  this very surface instead of opening any diagnostics panel, and the loop is
-  the only thing they get. On OpenCode, report the session-level figure as
-  **unavailable** and give them the plugin-level measurement from §1 instead.
-  Do not dress one up as the other.
 - **The figure is per-project.** Dormant plugins can be disabled in project
   settings, and project settings override user settings. A repo with the whole
   scaffold family enabled reads far above one running ossify alone.

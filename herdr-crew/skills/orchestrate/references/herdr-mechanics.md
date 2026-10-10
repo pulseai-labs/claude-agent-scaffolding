@@ -110,7 +110,7 @@ is there, chooses only the **readiness wait** below; made once step 5's model re
 it the **completion wait**, so the route that delivered the message is the one that can wake
 it. A pane absent to that ask is undetected for the send.
 
-**Detected** (a `claude-*` lane, `devin-*`, `pi`): the typed wait below. Detection is not
+**Detected** (a `claude-*` lane, `pi`): the typed wait below. Detection is not
 readiness: a fresh agent's first detected state may be `blocked` on a folder-trust dialog,
 which `--dangerously-skip-permissions` does not skip, and it is handled as a `blocked` wake.
 

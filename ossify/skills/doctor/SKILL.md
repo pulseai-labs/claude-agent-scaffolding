@@ -17,8 +17,7 @@ item claims. Whether a rule block is well-formed is yours since the skill-first
 conversion — checked by reading against the reference's field table (§6). The
 judgment — is this drift the record's fault or the repo's, is this rule the
 right rule for this project, is this warning worth acting on today — happens
-here, in your reasoning. Resolve `oss` once into `oss_bin` per
-`rules/dispatcher-path.md`; every `oss` below and in references is `"$oss_bin"`.
+here, in your reasoning. Resolve `oss` once into `oss_bin` (`command -v oss`); every `oss` below and in references is `"$oss_bin"`.
 
 ---
 
@@ -77,8 +76,7 @@ the verb, let the user run it.
   release's blocking findings. Those are `/close`, and they halt; you do not.
 - The user wants to **author or amend the spec itself**. Fresh authoring is
   `/start`, which refuses on a declared repo that already carries code; a
-  project that already has code adopts via `/ossify:adopt` — not on Devin
-  (run `adopt` there on Claude Code or Codex — `.ossify` state is shared).
+  project that already has code adopts via `/ossify:adopt`.
   Amending an existing spec is not this surface's job — you validate it.
 - The user wants to **plan, decompose, or execute** anything. Those are
   `/plan-release`, `/plan-spine`, `/work-item`.
@@ -449,7 +447,7 @@ Named here rather than left to read as executed:
 ## 12. Slash-command interaction
 
 `/ossify:doctor [surface]` (`commands/doctor.md`) exports the raw argument as
-`$ARGUMENTS` via an env-var bridge — on shim-less channels (Devin, `Skill()`,
+`$ARGUMENTS` via an env-var bridge — on shim-less channels (`Skill()`,
 natural language) nothing exports it; read the surface token from the
 invocation/request text. **Parse `$ARGUMENTS` in bash; never reference
 `$1`/`$2`/`$N`** — Claude Code substitutes positionals at render time.

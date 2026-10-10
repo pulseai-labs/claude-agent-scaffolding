@@ -4,7 +4,7 @@ Depth for SKILL.md §7b. The mechanical, non-skippable half of class declaration
 **a spine whose plan touches a registered touch surface is reclassified to `bone`
 automatically.**
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 It is called a *judge* rather than a *check* because it returns a verdict nobody
 argues with. `"$oss_bin" touch_check` matches globs; the meaning of a match is fixed by

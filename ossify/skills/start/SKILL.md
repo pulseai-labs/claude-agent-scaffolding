@@ -65,7 +65,7 @@ spec?"*
 All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`):
 `oss <subcommand>` → `oss_cmd_<subcommand>` under a forced bash shebang —
 never `source` the libs (zsh leaves `BASH_SOURCE` unset). Resolve `oss` once
-into `oss_bin` per `rules/dispatcher-path.md`; every `oss` below and in
+into `oss_bin` (`command -v oss`); every `oss` below and in
 references is `"$oss_bin"` — `"$oss_bin" help` for discovery.
 
 **Topology probe (resolves, authors, or refuses fail-closed).** ossify's state lives in
@@ -97,8 +97,7 @@ establish whether any declared repo (`"$oss_bin" repo_root <name>` per name) alr
 carries the product's own source or its own history — either alone refuses,
 and a bare pairing scaffold is neither. If so, author nothing and refuse,
 naming what you found and routing to **`/ossify:adopt`** — the adopt-forward
-path for a project that already has code (native `adopt` on Codex/OpenCode;
-on Devin run `adopt` on Claude Code or Codex — `.ossify` state is shared).
+path for a project that already has code (native `adopt` on Codex).
 Those tokens are load-bearing too. Past both gates, settle every occupied destination
 (`references/occupied-destinations.md`), then `"$oss_bin" init "<project-name>"`, which refuses
 if ossify state already exists — the "already onboarded" signal; route per §2, never force past it.
@@ -437,7 +436,7 @@ the skeleton spine pre-seeded from the cut.
 ## 14. Slash-command interaction
 
 The `/start` slash command (`commands/start.md`) exports the raw argument as
-`$ARGUMENTS` via an env-var bridge — on shim-less channels (Devin, `Skill()`,
+`$ARGUMENTS` via an env-var bridge — on shim-less channels (`Skill()`,
 natural language) nothing exports it; read the name from the invocation text.
 **Parse `$ARGUMENTS` in bash; never reference `$1`/`$2`/`$N`** — Claude Code
 substitutes positionals at render time and corrupts them.

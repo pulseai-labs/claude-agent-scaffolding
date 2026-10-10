@@ -38,7 +38,7 @@ silently disagree with it.**
 3. **Correct the map if the answer is no** — go back to `journey-map.md` §3 and
    fix the marks there. Do not patch the set here; the map is the record.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
    **By the time you are reading this, the harvest has already run.** This file
    is depth for SKILL.md **§6**, and §5's "Harvest before moving on" step

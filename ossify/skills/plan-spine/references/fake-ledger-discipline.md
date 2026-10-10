@@ -20,7 +20,7 @@ the existing boundary through `fake_status` (§3) instead:
 - it **keeps** the fake → `renewed`, with a new expiry release if the deadline moves;
 - it **built the real one** → `replaced`.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 ```bash
 "$oss_bin" fake_add "<boundary>" "<real|fake|deferred>" "<reason>" "<replacement trigger>" "<expiry release>"

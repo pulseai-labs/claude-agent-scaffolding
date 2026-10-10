@@ -90,7 +90,7 @@ branch:         work/r1.s2.w1-toc-anchors
 spec_path:      /abs/path/to/ai-workspace/docs/specs/r1/r1.s2-toc/work-r1.s2.w1/spec.md
 ```
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 **`spec_path` is not optional and lives nowhere else.** Pre-flight's Gate 2 runs
 `"$oss_bin" verify_acs "<abs spec path>"` against it and the whole TDD loop works the

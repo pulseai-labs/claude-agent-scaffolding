@@ -28,7 +28,7 @@ restated here.
 - `/adopt` (slash command — §8 for the `$ARGUMENTS` bridge)
 - "adopt this project into ossify", "onboard a project that already has code"
 
-Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+Resolve the `oss` dispatcher once and hold it in `oss_bin`: `oss_bin="$(command -v oss)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
 
 **Do NOT auto-invoke when:**
 
@@ -301,10 +301,9 @@ Close with `"$oss_bin" doctor` (the state gate: `state`, `schema`, `replay`,
 
 The `/adopt` command exports the raw argument as `$ARGUMENTS` via the env-var
 bridge — parse it in bash; never reference `$1`/`$2`/`$N`. On shim-less
-channels (Devin, `Skill()`, natural language) nothing exports `$ARGUMENTS` —
+channels (`Skill()`, natural language) nothing exports `$ARGUMENTS` —
 the argument arrives as a literal token in the invocation/request text; read
 it from there. The only argument
 is an optional project name, passed to `"$oss_bin" init`; when absent, ask before
-initializing. The command is Claude-Code-only; the skill body reaches
-OpenCode by path as the native `adopt` skill (#131 tracks the command gap
-for all eleven).
+initializing. The command is Claude-Code-only; on Codex the skill body is the native
+`adopt` skill.

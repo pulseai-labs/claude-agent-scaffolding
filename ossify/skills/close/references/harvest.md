@@ -18,7 +18,7 @@ derived from the lean spec and is off limits here.
 Step 8 authors the retrospective. **Step 9 is this.** Step 10 is worktree +
 branch cleanup. The harvest runs **before cleanup, always**.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 **The reason is that cleanup is terminal, not that the inputs live in the
 worktree.** They do not: `report.md` and `handoff.md` sit beside `spec.md` in the

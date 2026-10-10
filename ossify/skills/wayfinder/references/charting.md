@@ -20,7 +20,7 @@ that is work mode's job, once the map exists, not this one's.
    read `skills/challenge/references/interview.md` (relative to the plugin root) end
    to end and follow it — plus `start/references/domain-modeling.md`. Read the
    reference, never a slash command: `/ossify:challenge` is the Claude Code
-   spelling and wayfinder also ships on the OpenCode bundle, where that
+   spelling and wayfinder also ships on Codex, where that
    command does not exist (`references/ticket-types.md` §1). The destination
    fixes the scope, so it settles first.
 2. **Map the frontier, breadth-first** — fan out across the whole space

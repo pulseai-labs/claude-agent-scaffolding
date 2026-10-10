@@ -23,6 +23,5 @@ the plan in conversation if none was (interview mode). The skill body routes;
 `references/audit.md`, `references/interview.md`, and
 `references/adversaries.md` carry the procedures.
 
-This command registers on Claude Code only — no ossify command registers on
-OpenCode at all (#131 tracks that gap) — while the skill body itself reaches
-OpenCode by path as the native `challenge` skill.
+This command registers on Claude Code only; on Codex the skill body is the
+native `challenge` skill.

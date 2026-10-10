@@ -77,7 +77,7 @@ becomes unable to demonstrate any. `plan-spine/references/demo-authoring.md`
 
 > **Does the spine's plan touch a registered bone or risk-gate surface?**
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 `"$oss_bin" touch_check <paths…>` — rc 0 means matched. A hit → **`bone`**, regardless of
 the declared class, regardless of the critic. rc 2 means the judge could not run

@@ -1,6 +1,6 @@
 # State inspection
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 The depth behind `doctor/SKILL.md` §4. **`"$oss_bin" doctor` is now its four-check
 gate** — the ones a close blocks a mutation on. The other **five** advisory
@@ -182,7 +182,7 @@ The remedy differs by line, and the wrong one loops the operator:
 | `fail: shape` | **`"$oss_bin" state_restore`** — a required key is missing; same rebuild |
 | `fail: schema`, version **below** this build | **`"$oss_bin" migrate`** — the state predates this build |
 | `fail: schema`, version **above** this build | **upgrade ossify.** `migrate` accepts v1/v2 only; there is no downgrade |
-| `fail: state` | **`/ossify:start`** (a new project) or **`/ossify:adopt`** (one that already has code) — on Codex the `start`/`adopt` skills; on Devin run `adopt` on Claude Code or Codex — never initialised; each runs `init` itself, and a bare `init` first leaves state both refuse |
+| `fail: state` | **`/ossify:start`** (a new project) or **`/ossify:adopt`** (one that already has code) — on Codex the `start`/`adopt` skills — never initialised; each runs `init` itself, and a bare `init` first leaves state both refuse |
 | `warn: lock` (stale) | `rmdir '<state>.lock'`, **only** if no ceremony is running |
 
 The rc rule SKILL.md §3 states — rc 0 unless a `fail:` line printed — holds only

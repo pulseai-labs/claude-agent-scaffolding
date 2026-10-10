@@ -30,9 +30,8 @@ established pattern — `challenge/SKILL.md` already reads references that
 way, and the absorption spec sanctions it. **The grill is reached the same
 way** — read `skills/challenge/references/interview.md` (relative to the plugin root),
 as every other ossify caller of the grill does. Never name the slash command:
-`/ossify:challenge` is the Claude Code spelling, and wayfinder now ships on
-the OpenCode bundle too, where the same skill is registered as a native
-`/challenge` and no `ossify:` alias exists. The reference path is the one
+`/ossify:challenge` is the Claude Code spelling, and wayfinder also ships on
+Codex, which publishes the `challenge` skill but no slash commands. The reference path is the one
 address that is correct on every surface.
 
 **Take each instrument's method; do not take its storage.** All four were
@@ -100,8 +99,7 @@ reverses that.
 
 **`Task` is a Claude Code tool, and wayfinder ships on surfaces that do not
 have it.** The Codex manifest registers no agent and no tool, and
-`ossify/README.md` states outright that Codex has no worker path; the OpenCode
-bundle exposes the skill without one either. **On any surface with no subagent
+`ossify/README.md` states outright that Codex has no worker path. **On any surface with no subagent
 mechanism, the fan-out does not happen and is not simulated.** Chart mode
 finishes at step 5, says which AFK tickets it left unworked and why, and those
 tickets stay open on the frontier for a later work-mode session to pick up one

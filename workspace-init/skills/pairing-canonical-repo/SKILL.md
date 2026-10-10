@@ -47,7 +47,7 @@ error; do NOT start any tasks (per **SPEC §8.1**, **SPEC §13.3**).
 
 Inputs (prompt the user OR read from `$ARGUMENTS` for the slash command —
 never positional `$1`/`$2` per the slash-command `$N` substitution bug; on
-shim-less channels like Devin nothing exports `$ARGUMENTS`, so read the values
+shim-less channels (`Skill()`, natural language) nothing exports `$ARGUMENTS`, so read the values
 as literal tokens in the invocation/request text):
 
 - **project name** (kebab-case). Often the user wants it to match the
@@ -110,8 +110,7 @@ Exit non-zero. Do NOT touch anything (no mkdirs, no manifest, no hook).
 Detect default branch + remote from the existing repo via the `wi`
 dispatcher (`workspace-init/bin/wi`; bash shebang forces a bash
 runtime even when the calling shell is zsh). Resolve `wi` once into
-`wi_bin` per `rules/dispatcher-path.md` (on Devin, `bin/` is never on
-`$PATH`); every `wi` in this skill and its references is `"$wi_bin"`. Per
+`wi_bin` (`command -v wi`); every `wi` in this skill and its references is `"$wi_bin"`. Per
 **SPEC §8.4** the fallback chain is robust to oddly-configured repos:
 
 - `detected_branch="$("$wi_bin" git_detect_default_branch "$canonical_root")"`

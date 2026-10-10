@@ -9,7 +9,7 @@ repair half was scaffold-onboard's own extension and is not shipped here. This
 surface reports and names the fix. It does not edit the manifest and does not
 touch `AGENTS.md`.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (recipe: the plugin's `rules/dispatcher-path.md`); if it is unset in your context, resolve it there first._
+_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
 
 **You perform this check by reading. There is no dispatcher verb for it** — the
 `interop_check` subcommand was removed. It was 175 lines of bash that opened
@@ -104,9 +104,7 @@ cause and buries the only thing that has to be fixed first. Remedy:
 `/ossify:start` or `/ossify:adopt` (authors `.ossify/topology.json`) for a new
 or adopted project, or `/init-workspace`/`/pair-workspace` (authors
 `.workspace/pairing.json`) for an existing dual-repo workspace — name those
-tokens literally, do not paraphrase them. On Devin `adopt` is not published;
-run it on Claude Code or Codex against the same checkout — the `.ossify`
-state it authors is surface-agnostic.
+tokens literally, do not paraphrase them.
 
 **Present but unreadable → `fail:`, and STOP**, for the same reason. Read
 whichever file you found and satisfy yourself it is **exactly one JSON

@@ -64,7 +64,7 @@ implementer dispatch, verification, and merge belong to the execution engine
 
 ## 3. Pre-flight
 
-Resolve the `oss` dispatcher once and hold it in `oss_bin` — it is on `$PATH` on Claude Code and Codex, but **not** on Devin, where `bin/` is never added. Recipe per the plugin's `rules/dispatcher-path.md`: `command -v oss` where a loader can add `bin/` to `$PATH` (never Devin — a hit there is a foreign binary), else the `source:` path (`--local` installs), else the plugin-cache manifest glob (remote installs). Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
+Resolve the `oss` dispatcher once and hold it in `oss_bin`: `oss_bin="$(command -v oss)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `oss` invocation below — and in this skill's references — is `"$oss_bin"`.
 
 All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`), whose bash
 shebang forces a bash runtime whatever the calling shell (Claude Code's Bash tool
@@ -432,7 +432,7 @@ Full list with the reasoning and worked cases in
 
 The `/plan-spine` slash command (`commands/plan-spine.md`) exports the raw
 argument string as `$ARGUMENTS` via an env-var bridge; on shim-less channels
-(Devin, `Skill()`, natural language) the spine id arrives as a literal token in
+(`Skill()`, natural language) the spine id arrives as a literal token in
 the request. **Parse `$ARGUMENTS` in bash; never reference `$1` / `$2` / `$N`** —
 Claude Code substitutes positional tokens in command bodies at template-render
 time and silently corrupts them. The only argument is the spine id (`r1.s2`);
