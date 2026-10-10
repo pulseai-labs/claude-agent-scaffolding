@@ -67,7 +67,7 @@ else
   # twice per side and the two checks use different machinery. $( ) strips
   # trailing newlines from both sides, so a description differing only in one
   # reads equal; cmp over the streams sees it. Both are hardened the same way as
-  # the two copy pins above.
+  # the copy pin above.
   #
   # Note where this pin's mutations live: on the STREAM, not the file. Appending
   # a blank line to either JSON source leaves jq's output byte-identical —

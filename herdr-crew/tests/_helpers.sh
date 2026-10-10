@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # herdr-crew test helpers — sourced by every suite in this directory.
 #
-# Two plugins in this marketplace — code-judo and this one — keep the colour
-# setup, pass/fail and the report line in a `_helpers.sh` rather than one copy per
+# Three plugins in this marketplace — code-judo, merge-bar and this one — keep
+# the colour setup, pass/fail and the report line in a `_helpers.sh` rather than one copy per
 # suite; the other plugins' `_helpers.sh` carry a different set of primitives
 # (`assert_*` and temp helpers). This follows the first shape rather than inventing
 # a third one.
@@ -161,12 +161,13 @@ present() {
 # test-fidelity-pins.sh is the one exemption, NAMED rather than implied by its
 # absence. It kept its own copies while it was a copy of orca-crew's, pinned by a
 # repo-root parity test. orca-crew is retired and that comparison is gone, so the
-# exemption is now historical: the hoist is owed (#728). The exemption covers BOTH halves of assert_hoisted_counters, so that file
-# calls neither: bash resolves its own `pin` and `occurrences` there, deliberately,
-# and the structural half would report the drift that file intends. The exemption is
-# asserted in both directions; #728 hoists that copy and deletes both this paragraph
-# and the exemption. A suite that legitimately wants one of these names for something else must extend
-# the list deliberately.
+# exemption is now historical: the hoist is owed (#728). The exemption covers BOTH
+# halves of assert_hoisted_counters, so that file calls neither: bash resolves its
+# own `pin` and `occurrences` there, deliberately, and the structural half would
+# report the drift that file intends. The exemption is asserted in both directions;
+# #728 hoists that copy and deletes both this paragraph and the exemption. A suite
+# that legitimately wants one of these names for something else must extend the
+# list deliberately.
 HOISTED_FNS="count_literal occurrences occurrences_flat count_of pin present"
 HOISTED_EXEMPT="test-fidelity-pins.sh"
 
