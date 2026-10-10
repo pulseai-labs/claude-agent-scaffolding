@@ -2,6 +2,12 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.12
+
+**No Devin seat in the examples.** `references/config.md` drops its `devin-impl`
+example row, and `herdr-mechanics.md` and `roles.md` no longer suggest a
+`devin-*` lane. Devin seats were retired on 2026-09-22. The row contract is unchanged.
+
 ## 0.2.11
 
 **A launch site with no marking clause now fails a suite** (#663). Test tooling only: no

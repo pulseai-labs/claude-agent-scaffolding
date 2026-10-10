@@ -1,4 +1,4 @@
-# ossify (v1.14.3)
+# ossify (v1.14.4)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
@@ -101,6 +101,14 @@ one-parent commits only. The record line names its proof (`merge`, `squash` or
 `rebase`), and the changed-path list and the cumulative demo compare against the
 proved before-point. A merge commit is still the convention where the repo
 allows one; a fast-forward or any other shape still halts at record time.
+
+Since 1.14.4, ossify ships on two surfaces, Claude Code and Codex. The Devin
+plugin manifest, the Devin worker skill and the Devin-only dispatcher rule are
+gone, and every skill resolves `oss` with `command -v oss`. Ossify's
+resolution blocks fail loud when nothing on `PATH` answers as ossify, instead of
+falling through to a Devin plugin-cache search. `critic_detect` no longer reads
+the OpenCode wrapper's `OSS_ARCHITECT_CRITIC_ROOT`. The manifest refusal drops
+its Devin sentence. No state schema or journal operation changes.
 
 Since 1.14.2 (#692, #691, #645, #646, #675), doctor's bones drift check folds
 both halves under one scoped C locale, preserving identifiers in findings under
