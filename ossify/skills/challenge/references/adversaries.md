@@ -42,39 +42,17 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 a blocked ceremony.** And both resolve the schema path **before entering
 Bash**: `${CLAUDE_PLUGIN_ROOT}` is not exported into Bash-tool subprocesses
 (it expands to empty there — `doctor/references/budget-check.md` documents the
-behaviour). Resolve from the `oss` dispatcher, and **account for the OpenCode
-wrapper**: on that surface `command -v oss` finds `.opencode/bin/oss`, whose
-parent is the bundle package, not the plugin — the plugin sits one level
-further up, beside it. Two steps, loud on failure:
+behaviour). Resolve from the `oss` dispatcher. Two steps, loud on failure:
 
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"
-# A PATH hit is ours only where a plugin loader adds bin/ — on Devin a hit is
-# a foreign binary by construction; verify it answers our dispatcher first.
+# Verify a PATH hit answers our dispatcher — an unrelated `oss` binary can shadow it.
 if [ -n "$oss_bin" ]; then
   case "$("$oss_bin" help 2>/dev/null)" in *ossify*) : ;; *) oss_bin="" ;; esac
 fi
-# Devin: bin/ is not on PATH — resolve the installed source instead. For a
-# --local install `source:` is the linked filesystem path; a remote install
-# reports a git URL (file://… or https://…#ossify) and the tree materializes
-# under the plugin cache — measured on 3000.10.21:
-# ${XDG_DATA_HOME:-$HOME/.local/share}/devin/cli/plugins/cache/<id>-<hash>/<ver>/
-[ -n "$oss_bin" ] || {
-  oss_src="$(devin plugins info ossify | sed -n 's/^ *source: *//p')"
-  case "$oss_src" in
-    /*) oss_bin="$oss_src/bin/oss" ;;
-    *)  for mf in "${XDG_DATA_HOME:-$HOME/.local/share}"/devin/cli/plugins/cache/*/*/.devin-plugin/plugin.json; do
-          [ -f "$mf" ] || continue
-          [ "$(jq -r .name "$mf" 2>/dev/null)" = "ossify" ] || continue
-          oss_bin="${mf%/.devin-plugin/plugin.json}/bin/oss"; break
-        done ;;
-  esac
-  [ -n "$oss_bin" ] && [ -x "$oss_bin" ] || { echo "cannot resolve ossify plugin root (source: '${oss_src:-none}')" >&2; exit 1; }
-}
-plugin_root="$(cd "$(dirname "$oss_bin")/.." && pwd)"          # direct install / Devin
+[ -n "$oss_bin" ] || { echo "cannot resolve the ossify dispatcher: nothing on PATH answers as ossify" >&2; exit 1; }
+plugin_root="$(cd "$(dirname "$oss_bin")/.." && pwd)"          # plugin root
 schema="$plugin_root/skills/challenge/templates/output-schema.json"
-[ -f "$schema" ] || { plugin_root="$(cd "$(dirname "$oss_bin")/../.." && pwd)/ossify"  # OpenCode wrapper
-                      schema="$plugin_root/skills/challenge/templates/output-schema.json"; }
 [ -f "$schema" ] || { echo "cannot locate the challenge schema from $oss_bin"; exit 1; }
 ```
 

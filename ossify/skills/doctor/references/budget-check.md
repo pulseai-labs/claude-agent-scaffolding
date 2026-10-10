@@ -24,28 +24,11 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"
-# A PATH hit is ours only where a plugin loader adds bin/ — on Devin a hit is
-# a foreign binary by construction; verify it answers our dispatcher first.
+# Verify a PATH hit answers our dispatcher — an unrelated `oss` binary can shadow it.
 if [ -n "$oss_bin" ]; then
   case "$("$oss_bin" help 2>/dev/null)" in *ossify*) : ;; *) oss_bin="" ;; esac
 fi
-# Devin: bin/ is not on PATH — resolve the installed source instead. For a
-# --local install `source:` is the linked filesystem path; a remote install
-# reports a git URL and the tree materializes under the plugin cache —
-# measured on 3000.10.21: cache/<source-id>-<hash>/<version>/ under
-# ${XDG_DATA_HOME:-$HOME/.local/share}/devin/cli/plugins/.
-[ -n "$oss_bin" ] || {
-  oss_src="$(devin plugins info ossify | sed -n 's/^ *source: *//p')"
-  case "$oss_src" in
-    /*) oss_bin="$oss_src/bin/oss" ;;
-    *)  for mf in "${XDG_DATA_HOME:-$HOME/.local/share}"/devin/cli/plugins/cache/*/*/.devin-plugin/plugin.json; do
-          [ -f "$mf" ] || continue
-          [ "$(jq -r .name "$mf" 2>/dev/null)" = "ossify" ] || continue
-          oss_bin="${mf%/.devin-plugin/plugin.json}/bin/oss"; break
-        done ;;
-  esac
-  [ -n "$oss_bin" ] && [ -x "$oss_bin" ] || { echo "cannot resolve ossify plugin root (source: '${oss_src:-none}')" >&2; exit 1; }
-}
+[ -n "$oss_bin" ] || { echo "cannot resolve the ossify dispatcher: nothing on PATH answers as ossify" >&2; exit 1; }
 oss_root="$(cd "$(dirname "$oss_bin")/.." && pwd)"
 bash "$oss_root/tests/test-skill-bash-blocks.sh"
 ```
@@ -128,26 +111,11 @@ So measure it rather than quoting a remembered figure:
 
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"
-# A PATH hit is ours only where a plugin loader adds bin/ — on Devin a hit is
-# a foreign binary by construction; verify it answers our dispatcher first.
+# Verify a PATH hit answers our dispatcher — an unrelated `oss` binary can shadow it.
 if [ -n "$oss_bin" ]; then
   case "$("$oss_bin" help 2>/dev/null)" in *ossify*) : ;; *) oss_bin="" ;; esac
 fi
-# Devin: bin/ is not on PATH — resolve the installed source instead (same
-# guarded recipe as above: absolute source: path, else the materialized
-# plugin-cache manifest for remote installs).
-[ -n "$oss_bin" ] || {
-  oss_src="$(devin plugins info ossify | sed -n 's/^ *source: *//p')"
-  case "$oss_src" in
-    /*) oss_bin="$oss_src/bin/oss" ;;
-    *)  for mf in "${XDG_DATA_HOME:-$HOME/.local/share}"/devin/cli/plugins/cache/*/*/.devin-plugin/plugin.json; do
-          [ -f "$mf" ] || continue
-          [ "$(jq -r .name "$mf" 2>/dev/null)" = "ossify" ] || continue
-          oss_bin="${mf%/.devin-plugin/plugin.json}/bin/oss"; break
-        done ;;
-  esac
-  [ -n "$oss_bin" ] && [ -x "$oss_bin" ] || { echo "cannot resolve ossify plugin root (source: '${oss_src:-none}')" >&2; exit 1; }
-}
+[ -n "$oss_bin" ] || { echo "cannot resolve the ossify dispatcher: nothing on PATH answers as ossify" >&2; exit 1; }
 oss_root="$(cd "$(dirname "$oss_bin")/.." && pwd)"
 awk -F'description: ' '/^description: /{print length($2); exit}' "$oss_root/agents/implementer-agent.md"
 ```

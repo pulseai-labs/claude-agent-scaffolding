@@ -255,20 +255,7 @@ oss_cmd_migrate() { # [$1=state-file]
 # previous form returned on the first hit and globbed only critiquing-spec, so a
 # stale v0.2 directory won over a newer v0.3 install and v0.3 was unreportable.
 oss_cmd_critic_detect() {
-  local cache critic_root skill_md found="absent"
-  # An explicit override root (set by the .opencode wrapper when ossify is
-  # selected as the architect-critic capability) takes priority over the
-  # ambient cache scan. The root points at the plugin directory itself
-  # (e.g. architect-critic/skills/critiquing-spec/SKILL.md).
-  critic_root="${OSS_ARCHITECT_CRITIC_ROOT:-}"
-  if [ -n "$critic_root" ] && [ -f "$critic_root/skills/critiquing-spec/SKILL.md" ]; then
-    if [ -f "$critic_root/skills/managing-async-critique/SKILL.md" ]; then
-      echo "v0.3"
-    else
-      echo "v0.2"
-    fi
-    return 0
-  fi
+  local cache skill_md found="absent"
   # `${HOME:-}`, not `${HOME}`: under the dispatcher's `set -u` an unset HOME is a
   # fatal parameter-expansion error raised BEFORE the loop body runs, so none of
   # the errexit-exemption machinery below applies - the probe dies with empty
