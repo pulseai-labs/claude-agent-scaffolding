@@ -2,6 +2,18 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.13
+
+**The DeepSeek Harness seat is gone, with the crews it came from.** `orca-crew`,
+`paseo-crew` and `dsh-crew` are retired from the marketplace, and herdr-crew drops the
+`kind: dsh-spine-driver` seat kind that needed `dsh-crew` beside it:
+`references/dsh-driver.md` is deleted, and the skill, command, `config.md`,
+`herdr-mechanics.md`, `lifecycle.md`, `ossify-execution.md` (§7) and
+`ossify-nested-run.md` lose their dsh carve-outs. A roles file that still names a
+`kind: dsh-spine-driver` agent is no longer a supported shape. The manifest descriptions
+drop the dsh sentence; the README drops the orca-crew migration note. Tests lose the
+dsh and Orca pins, and `REF_BUDGET` follows `herdr-mechanics.md` down to 357.
+
 ## 0.2.12
 
 **No Devin seat in the examples.** `references/config.md` drops its `devin-impl`

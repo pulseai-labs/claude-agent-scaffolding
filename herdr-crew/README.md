@@ -113,13 +113,11 @@ session, the doctor session, the lane driver — with `SEAT_MODS_ROLE=coordinato
 the top's rotation successor with `SEAT_MODS_ROLE=orchestrator`. The two free roles
 carry no `SEAT_MODS_ALLOW`. Never through `settings.json`'s `env`, a shell profile or a
 `command:` line. The operator's own top is launched by the operator, through an alias that
-sets `orchestrator`; herdr-crew launches no top but a rotation successor. A
-`kind: dsh-spine-driver` seat is a dsh session, not a herdr pane, and is never marked
-(`references/dsh-driver.md`).
+sets `orchestrator`; herdr-crew launches no top but a rotation successor.
 
 **Known limit.** `seat-mods` 0.1.0 does not know the two free roles: it reads either as an
 invalid role and denies every tool call, so herdr-crew 0.2.7 must be installed together
-with `seat-mods` 0.2.0. `paseo-crew`, `orca-crew` and `dsh-crew` do not mark sessions yet.
+with `seat-mods` 0.2.0.
 An operator-declared role with no `replaces:` is marked a guarded `implementer` and runs
 under implementer rails.
 
@@ -155,7 +153,7 @@ promised. The parent consumes a given hash/identity generation once and retires 
 dispatch's wait when it does; a ping naming a path other than the briefed report path is
 surfaced, never read.
 **The heartbeat backstop** is one background timer of about 15 minutes per session holding a
-live herdr-pane dispatch — a typed-wait seat included; a dsh session keeps its own route: one
+live herdr-pane dispatch — a typed-wait seat included: one
 health check per live seat per tick, never a completion wait and never a
 re-entry, catching a stopped, blocked or unreadable seat whose wait missed its wake. It is
 killed at teardown and at a rotation's stand-down, and the successor arms a fresh one; a host
@@ -205,16 +203,9 @@ that choose between seats — it wins for anything it names. With neither file t
 session's own work needs no setup, and the first delegated dispatch halts naming the file
 to add; a seat name neither defines halts the run.
 
-Only those two paths are read. The ones orca-crew used resolve to nothing here —
-the project file is found by walking up from the session's working directory
-looking for `.herdr-crew/roles.md`, and the machine file has one fixed path — so
-migrating is a copy of the two files to the paths above. orca-crew itself is
-unmodified by this release and stays installed until the fleet has moved.
-
-**DeepSeek Harness seats.** A spine's `spine session` and `close session` seats can name a
-`kind: dsh-spine-driver` agent: a dsh session the top spawns and watches through dsh-crew's
-`dsh-session` skill, whose items take their routes from `.dsh-crew/roles.md`.
-`references/dsh-driver.md` is the contract.
+Only those two paths are read: the project file is found by walking up from the
+session's working directory looking for `.herdr-crew/roles.md`, and the machine file
+has one fixed path.
 
 ## Requirements
 

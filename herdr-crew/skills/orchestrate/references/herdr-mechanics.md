@@ -30,8 +30,7 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    response, `result.root_pane.pane_id` included.
 
    **Seat marking** (seat-mods): every launch that places a seat in a herdr pane marks it, in the pane, before the
-   command — one `herdr pane run <pane> "export …"` (`worktree create` takes no `--env`); a
-   `kind: dsh-spine-driver` seat is a dsh session, not a pane, and is never marked (`dsh-driver.md`).
+   command — one `herdr pane run <pane> "export …"` (`worktree create` takes no `--env`).
    A guarded seat — implementer, verifier or reviewer — is marked by its launcher, before its command, with `herdr pane run <pane> "export SEAT_MODS_ROLE=<role>
    SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"`, plus `AUTONOMIC_MODE=autopilot` where the autonomic marking below says. A project-file role whose `replaces:` names one of those roles is guarded as that role.
    A project-file role with no `replaces:` is marked a guarded `implementer` — its own
@@ -55,8 +54,7 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    coordinator seat and every operator-declared role — by adding `MOLT_HANDOFF=parent` and `MOLT_STATUS_PATH=<REPORT_PATH>.molt-status` (the guarded export above shows both),
    `<REPORT_PATH>` the path that seat's brief names. molt then never clears that session; it
    hands off to its parent (Completion, "A child past molt's warnings"). The operator's first
-   top and the top's rotation successor are roots and take neither; a dsh seat is not a pane
-   and takes neither.
+   top and the top's rotation successor are roots and take neither.
    **autonomic marking.** The same export adds `AUTONOMIC_LEDGER=<ledger>
    AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain` for every child the molt marking reaches,
    and `AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot. `<ledger>` is
@@ -80,7 +78,7 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    not ask first — the operator's file, never a launch-time edit. `AUTONOMIC_BELL` is never set: the
    pain file reaches the parent. The top's rotation successor takes `AUTONOMIC_MODE` and
    `AUTONOMIC_LEDGER` by the same rule and no pain path, since it has no parent; the operator's first
-   top and a dsh seat take none. A respawn reads the launcher's mode again. **A molt is not a launch.**
+   top takes none. A respawn reads the launcher's mode again. **A molt is not a launch.**
    The top's in-place molt (`lifecycle.md`, "Where molt runs") keeps the pane's process and its
    exports, so its `orchestrator` marking stands across the clear, and seat-mods reads the role from
    the environment on every tool call. The status-line check belongs to the launch read; a later read
@@ -246,8 +244,7 @@ path is not this dispatch's `REPORT_PATH` is not delivered — nothing is opened
 dispatch is reached — and gets `briefs.md`'s correction request; an unmatched ping is reported.
 
 **The heartbeat.** One bounded background timer of about 15 minutes per session holding any live
-herdr-pane dispatch — a typed-wait seat included, not only a report-file wait; a dsh session,
-which has no pane, keeps `dsh-driver.md`'s own route — re-armed per tick (herdr has no
+herdr-pane dispatch — a typed-wait seat included, not only a report-file wait — re-armed per tick (herdr has no
 scheduler), never a completion wait and never re-entering, restarting or extending one. Per tick,
 per live dispatch: the generation check, then —
 absent a new report — one health check, never a second (`herdr agent get` where herdr has a

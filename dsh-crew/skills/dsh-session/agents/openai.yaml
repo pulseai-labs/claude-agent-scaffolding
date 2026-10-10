@@ -1,3 +1,0 @@
-interface:
-  display_name: "dsh session"
-  short_description: "Drive a DeepSeek Harness session from outside through its web API"

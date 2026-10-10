@@ -1957,8 +1957,6 @@ pin "$MECHANICS_MD" 'the spine, close or work-PR session, the doctor session, th
   "step 2's coordinator marking enumerates the coordinator seats" flat
 pin "$MECHANICS_MD" 'A project-file role with no `replaces:` is marked a guarded `implementer`' \
   "step 2 marks an operator role with no replaces as a guarded implementer" flat
-pin "$MECHANICS_MD" '`kind: dsh-spine-driver` seat is a dsh session, not a pane' \
-  "step 2 carves out dsh seats once" flat
 pin "$MECHANICS_MD" 'the top'"'"'s rotation successor exports `SEAT_MODS_ROLE=orchestrator`' \
   "step 2 marks the top's rotation successor orchestrator" flat
 pin "$MECHANICS_MD" '`SEAT_MODS_ROLE=coordinator`' \

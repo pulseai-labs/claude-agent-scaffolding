@@ -57,9 +57,6 @@ Every command's syntax comes from `herdr --skill`.
    **But a closed return skips the record pass**
    and goes straight to teardown: the pass exists to record PRs, and that return named
    none. Absent any of those four facts, continue at step 2.
-   **A `kind: dsh-spine-driver` spine seat** keeps this step's order, but
-   `references/dsh-driver.md` replaces its SEATS block, depth ask, spine and close
-   launches and completion signals: read it before agreeing any seat.
 2. **Decompose.** One task per brief in the run's `run.json`, its `deps` the task ids it
    waits on (the run is a DAG), each carrying the complexity class the orchestrator
    derives from the work item's spec and its spine's bone/flesh class: `contract` if it
@@ -116,8 +113,7 @@ Every command's syntax comes from `herdr --skill`.
    one health check per live seat per tick; it is not a completion wait and never re-enters
    or restarts one. This session arms it with the first live herdr-pane dispatch — a typed-wait
    seat is in scope, not only a report-file wait — and kills it when its last dispatch settles,
-   at teardown, and at a rotation's stand-down; a dsh session keeps `dsh-driver.md`'s own route,
-   and a host with no background timer keeps the wait/ping fallback, never a rolling foreground
+   at teardown, and at a rotation's stand-down; a host with no background timer keeps the wait/ping fallback, never a rolling foreground
    loop (`herdr-mechanics.md`).
    `herdr pane read`
    only on a `blocked` wake, a missing or malformed report, a timeout's checkpoint, the
