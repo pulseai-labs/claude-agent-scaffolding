@@ -1,9 +1,0 @@
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "command": "echo hook-fired-userpromptsubmit"
-      }
-    ]
-  }
-}

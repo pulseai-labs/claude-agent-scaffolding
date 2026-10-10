@@ -1,8 +1,0 @@
-{
-  "name": "ai-mentor",
-  "version": "2.4.0",
-  "description": "Decision-making mentor for project work. Four surfaces: grill-me, council, eli10, fool. Skill-first; no hooks, no state machinery.",
-  "author": {
-    "name": "Pras"
-  }
-}
