@@ -12,8 +12,7 @@ replaces it. molt works in any terminal or orchestration layer and reads no crew
 state; it reads two environment variables.
 
 **On a crew host, install molt with a crew version that marks its child seats** (herdr-crew 0.2.8
-or later). An unmarked child is a root and clears itself in place. paseo-crew (#666) and
-orca-crew (#667) do not mark their children yet.
+or later). An unmarked child is a root and clears itself in place.
 
 ## The ladder
 
@@ -178,9 +177,9 @@ cannot loop — and differ by mode:
 
 ## With the crews
 
-`herdr-crew` 0.2.6, `paseo-crew` 0.1.5 and `orca-crew` 0.8.2 and later stand their
-context-ceiling hooks down in a session whose active marker exists and is under 24 hours old.
-molt owns the context boundary there. Without molt no marker exists, and the crew hooks behave
+`herdr-crew` 0.2.6 and later stands its
+context-ceiling hook down in a session whose active marker exists and is under 24 hours old.
+molt owns the context boundary there. Without molt no marker exists, and the crew hook behaves
 as before. molt never reads crew state; the crews read molt's marker and mark their children.
 
 ## Limits

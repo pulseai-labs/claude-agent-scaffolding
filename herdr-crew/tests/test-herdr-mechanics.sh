@@ -65,7 +65,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=360  # 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
+REF_BUDGET=357  # 0.2.13: lowered from 360 when the dsh carve-out left step 2 and the heartbeat. 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

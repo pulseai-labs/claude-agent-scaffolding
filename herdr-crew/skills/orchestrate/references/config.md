@@ -23,9 +23,7 @@ redefines how an agent is launched. Workers never read either file — a brief i
 
 ## Agent entries
 
-The machine file is one block per agent, named by a `###` heading. One kind differs:
-a `kind: dsh-spine-driver` entry has no `command:` or `expected_model:`; its fields,
-values and profile row are `dsh-driver.md`'s. Every other entry has this shape:
+The machine file is one block per agent, named by a `###` heading. Every entry has this shape:
 
 ```markdown
 ### mcode-glm
@@ -95,7 +93,6 @@ a session launches nothing with its own profile.
 | item verifier | no command | — |
 | spine session, default lane | `/ossify:run-spine`; spawns `ossify:implementer-agent` subagents through the `Agent` tool | `slash-commands, subagents` |
 | spine session, external-executor lane | `/ossify:run-spine` | `slash-commands` |
-| spine or close session on a `kind: dsh-spine-driver` agent | its persona, no command (`dsh-driver.md`) | — |
 | close session | `/ossify:close` | `slash-commands` |
 | work-PR session | `/ossify:work-pr` | `slash-commands` |
 | doctor session | `/ossify:doctor` | `slash-commands` |

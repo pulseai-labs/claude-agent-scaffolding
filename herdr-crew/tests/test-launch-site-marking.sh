@@ -60,8 +60,7 @@
 # command-string shape above: no command intervenes, and selecting them would fail
 # clause-less prose); a launch sentence directly under a heading with no blank line (it
 # merges into the heading's region and is dropped); frontmatter whose `---` has no blank
-# line after it (the skip takes the body's first region with it); a launch written only
-# inside a `kind: dsh-spine-driver` session (not a pane — it is never marked); headings
+# line after it (the skip takes the body's first region with it); headings
 # and frontmatter.
 #
 # CLAUSE-SIDE LOOSENING, stated: any bare mention of the clause tokens in the region

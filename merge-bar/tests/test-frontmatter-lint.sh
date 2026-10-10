@@ -8,8 +8,8 @@
 # agents/openai.yaml with interface.display_name and short_description (Codex).
 #
 # The description is required to be one line so this lint needs no YAML
-# parser: orca-crew's Psych-based lint exists because folded scalars and
-# nested keys defeated hand parsers; this plugin forbids those shapes instead.
+# parser: folded scalars and nested keys defeat hand parsers, so this plugin
+# forbids those shapes instead.
 #
 # Usage: bash merge-bar/tests/test-frontmatter-lint.sh   Exit 0 when clean.
 

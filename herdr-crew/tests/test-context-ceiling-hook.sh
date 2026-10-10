@@ -158,10 +158,6 @@ for entry in 'agent wait|herdr agent wait w7:p2 --until idle --timeout 60000' \
 done
 run "$(input PreToolUse "$T_PAST" 'git status --short')"
 expect_silent "past the ceiling: silent before a non-herdr command"
-# The matcher MOVED, it did not widen: an Orca new-work command — the source of
-# every substring above — no longer arms it.
-run "$(input PreToolUse "$T_PAST" 'orca terminal create --worktree active --command claude --json')"
-expect_silent "control: an Orca new-work command no longer arms the matcher"
 # The gate case's adjacent control: the same fixture and event, armed, fires —
 # so the silence below belongs to the gate and not to a handler that is mute anyway.
 run "$(input UserPromptSubmit "$T_PAST")"

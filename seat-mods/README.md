@@ -14,9 +14,8 @@ orchestrator (or any session you start to drive work) and `SEAT_MODS_ROLE=coordi
 close, work-PR and doctor sessions and lane drivers; both are unguarded.
 
 **Rollout: do not install 0.2.0 until every launcher you use — and your own interactive sessions —
-marks its free sessions.** `herdr-crew` 0.2.7 does; `paseo-crew`, `orca-crew` and
-`dsh-crew` do not set `SEAT_MODS_ROLE` yet; set `SEAT_MODS_ROLE=orchestrator` yourself, e.g. in your
-launch alias. Until then a coordinator or a bare `claude` session starts guarded as an implementer
+marks its free sessions.** `herdr-crew` 0.2.7 does; for any other
+launcher, set `SEAT_MODS_ROLE=orchestrator` yourself, e.g. in your launch alias. Until then a coordinator or a bare `claude` session starts guarded as an implementer
 and cannot merge.
 
 ## The contract

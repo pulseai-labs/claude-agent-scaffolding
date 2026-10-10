@@ -1,3 +1,0 @@
-interface:
-  display_name: "dsh executor"
-  short_description: "ossify external executor for a dsh spine session"

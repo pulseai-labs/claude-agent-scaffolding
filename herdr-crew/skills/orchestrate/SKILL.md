@@ -31,13 +31,11 @@ Your own turns take these kinds of action, and no others:
 2. Write briefs from the templates in `references/briefs.md`, `references/ossify-briefs.md`,
    `references/ossify-pr-briefs.md` and `references/ossify-close-writer.md`, dispositions,
    the handoff, and — on an activated
-   ossify spine — the spine's seats in `.herdr-crew/roles.md`, and `.dsh-crew/roles.md`
-   when a dsh spine driver runs it (`references/dsh-driver.md`).
-3. Read the seats' report files, and a dsh session's final message (`references/dsh-driver.md` §5).
+   ossify spine — the spine's seats in `.herdr-crew/roles.md`.
+3. Read the seats' report files.
 4. Decide.
 5. Converse: operator questions, and answers to what workers write in their report files.
-6. Execute single authorized mutations: worktree, tab and pane creation, dispatch —
-   for a dsh spine driver, its `dsh-session` spawn, steer and cancel calls —
+6. Execute single authorized mutations: worktree, tab and pane creation, dispatch,
    the PR comment, the merge — and, after it, the teardown: releasing workers (a pane
    closed, or a worktree removed), closing the run, and the verified branch delete.
 
@@ -67,7 +65,7 @@ Three consequences:
   seat, wait on their report files instead, with no keepalive and no re-entry — the run's
   ping and its heartbeat are neither: the ping is a wake the worker sends, and the
   heartbeat is a session-level timer over every live herdr-pane dispatch, typed-wait seats
-  included (a dsh session keeps its own route). The two dead
+  included. The two dead
   ends — a timeout, and a wake with nothing new in the report while the seat still works —
   are that file's, and it names the next action for each. A loop of waits, and restarting a
   wait after an empty timeout, stays forbidden; the ping and the heartbeat are not that
@@ -76,8 +74,7 @@ Three consequences:
   bounded reads are the launch-banner `pane read` in `roles.md`, the readiness
   `pane wait-output` of a seat herdr does not detect, and the one `/context` reply at
   each task boundary for a seat that can answer the probe — one that cannot rotates at
-  its item boundary instead (`references/roles.md`) — and a dsh spine driver's transcript reads,
-  with the one shell wait that bounds them (`references/dsh-driver.md` §5).
+  its item boundary instead (`references/roles.md`).
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
   and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
   Where molt runs, its warnings replace the notice: a child hands off to its parent
