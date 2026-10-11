@@ -1,13 +1,13 @@
-# ossify (v1.14.5)
+# ossify (v1.15.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
-spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
+spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
 `plan-release`, `plan-spine`, `work-item`, `close`, `doctor`, `challenge`,
-`wayfinder`, `patch`) plus `/ossify:run-spine`, which drives a planned spine's rounds
+`wayfinder`, `patch`), `/ossify:run-spine`, which drives a planned spine's rounds
 end to end, and the standalone utilities — session handoff
 (`/ossify:handoff`, `/ossify:handoff-resume`) and the PR review-fix-merge
 loop (`/ossify:work-pr`) — which work in any repository, ossify-initialised
-or not. Since 1.5.0 (#339) `work-pr` is also the spine-close merge lane: a
+or not. Each is a slash command and a skill. Since 1.5.0 (#339) `work-pr` is also the spine-close merge lane: a
 spine's hosting repos land on their base branches by PR where a remote exists
 (merged locally only where none does), and a release is a tag on the merged
 line. Since 1.6.0 (#139) `close`'s impl-check gate gains Layer 4: a semantic
