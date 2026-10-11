@@ -2,7 +2,7 @@
 # lib/manifest.sh — pairing manifest read/write/resolve/validate
 #
 # Cross-plugin contract per SPEC §6.2 / §6.3 / §6.4 / §6.5.
-# Consumers: scaffold-onboard v0.2, scaffold-dev v0.1, architect-critic v0.2 (loose).
+# Consumers: ossify (reads pairing.json as a translated fallback), architect-critic v0.2 (loose).
 #
 # Bash 3.2+ compatible (stock macOS). Requires: jq.
 #
@@ -670,8 +670,8 @@ wi_manifest_resolve() {
 }
 
 # SPEC §6.3 refers to this resolver as `mi_manifest_resolve` (cross-plugin
-# canonical name). Provided as an alias so consumers (scaffold-onboard,
-# scaffold-dev) that follow the SPEC name verbatim find it without indirection.
+# canonical name). Provided as an alias so consumers that follow the
+# SPEC name verbatim find it without indirection.
 mi_manifest_resolve() { wi_manifest_resolve "$@"; }
 
 # ---------------------------------------------------------------------------

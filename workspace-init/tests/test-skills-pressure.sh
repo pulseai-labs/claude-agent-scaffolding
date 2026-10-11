@@ -315,13 +315,14 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
 
   # S8 round 1 (F3): the lifecycle overview above the table must not leave
   # workspace-init at the head of the chain this release retires for new
-  # workspaces — it names ossify as the continuation and the old chain as legacy.
+  # workspaces — it names ossify as the continuation and no longer names the
+  # retired chain.
   local overview
   overview="$(awk '/^Most of the marketplace is designed to/,/^## Install/' "$ROOT_README")"
   [[ -n "$overview" ]] || { echo "    root lifecycle overview not found"; return 1; }
   assert_not_contains '(chain head)' "$overview" || return 1
   assert_contains 'its continuation for new workspaces is `ossify`' "$overview" || return 1
-  assert_contains 'not the legacy `scaffold-onboard` + `scaffold-dev` chain' "$overview" || return 1
+  assert_not_contains 'scaffold-onboard' "$overview" || return 1
 
   # S8 round 3 (H1): this plugin's own README states the continuation twice, and
   # both must state adoption's scope rather than imply that "existing source or

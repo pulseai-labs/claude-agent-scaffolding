@@ -210,8 +210,7 @@ check_2_verbs() { # $1=ossify-root $2=workdir; writes $2/check2-{verbs,ctx,token
 # ---------------------------------------------------------------------------
 # Check 3 - no Skill() invocation carries an argument. The runtime takes a bare
 # skill name; a documented `Skill(x, target=y)` is a contract nothing honours,
-# and this branch has shipped exactly that. Scoped to ossify: scaffold-onboard
-# still ships the v0.1.x parameterized form and is not this harness's business.
+# and this branch has shipped exactly that. Scoped to ossify.
 # ---------------------------------------------------------------------------
 check_3_skill_args() { # $1=ossify-root
   local f hit

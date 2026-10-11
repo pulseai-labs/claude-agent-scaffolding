@@ -362,8 +362,8 @@ Named here rather than left to read as executed:
   work-item gate's Layer 3 agent read is ossify's evaluation mechanism, and
   no ossify evaluator will ship.
 - **Interop repair.** §7 checks; it does not add manifest keys or merge
-  `AGENTS.md`. Spec §9.1 says *check*, and the repair half belongs to
-  `scaffold-onboard`'s original — porting it would also mean porting a managed
+  `AGENTS.md`. Spec §9.1 says *check*, and the repair half was the
+  retired `scaffold-onboard`'s — porting it would also mean porting a managed
   `AGENTS.md` section this stack does not yet define.
 - **Vocabulary maintenance.** A term drifting is a domain-model finding, not
   a state defect — the discipline is `start`'s `references/domain-modeling.md`,

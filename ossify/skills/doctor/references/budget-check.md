@@ -44,8 +44,7 @@ fail silently:
   to be the scaffolding checkout. Everywhere else it is a "No such file" that
   takes both budgets down with it.
 - **`${CLAUDE_PLUGIN_ROOT}`** is *not exported into Bash-tool subprocesses*
-  on Claude Code (anthropics/claude-code#48230 — `scaffold-onboard/bin/sf`
-  documents the same behaviour and self-locates for exactly this reason). It
+  on Claude Code (anthropics/claude-code#48230). It
   expands to the empty string, so the path becomes `/tests/...` — which fails
   identically to the repo-relative form while looking like it was fixed.
 

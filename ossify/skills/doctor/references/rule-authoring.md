@@ -260,4 +260,4 @@ If the *user* asks for an unsupported type, do not silently re-classify their
 ask into one of the four. Name the four, say the block can be hand-authored
 ahead of support per §4's grammar, and note that this build's ceremonies will
 preserve it as an opaque block — not apply it — unless a later revision of
-§3's table (here, or in the paired scaffold-onboard stack) picks the type up.
+§3's table picks the type up.

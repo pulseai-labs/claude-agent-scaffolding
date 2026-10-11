@@ -62,7 +62,7 @@ LLM-behavior fixtures (skill auto-invocation, grill-me escape valves, council 5-
 
 ## Composition with other plugins
 
-ai-mentor stays orthogonal — no manifest dependencies, no shared state. Other plugins (scaffold-onboard, architect-critic, scaffold) probe for ai-mentor's surfaces via natural-language invocation in their own workflows; ai-mentor itself doesn't probe back. Don't run `grill-me` and `council` in the same session (different interaction shapes — pick one).
+ai-mentor stays orthogonal — no manifest dependencies, no shared state. Other plugins (architect-critic) probe for ai-mentor's surfaces via natural-language invocation in their own workflows; ai-mentor itself doesn't probe back. Don't run `grill-me` and `council` in the same session (different interaction shapes — pick one).
 
 ## Platforms
 
