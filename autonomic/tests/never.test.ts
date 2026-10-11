@@ -925,3 +925,61 @@ describe('0.5.0 §3.11 namers', () => {
     ask("cat > c.sh <<'EOF'\ngit push -f origin x\nEOF\ngit -c core.pager=./c.sh log")
   })
 })
+
+describe('0.5.0 final review: shapes 0.4.3 asked on still ask', () => {
+  test('C1: a branch switch earlier in the text makes the branch unknown', () => {
+    for (const c of ['git checkout main && git merge feat/x && git push', 'git switch main; git merge --ff-only feat/x; git push origin HEAD',
+      'git checkout -q main\ngit merge feat/x\ngit push -q', 'git branch -m main && git push -u origin HEAD',
+      'git checkout -B main && git push origin HEAD', 'git symbolic-ref HEAD refs/heads/main && git push',
+      'git checkout -b feat/y origin/main && git push', 'git checkout $B && git push'])
+      ask(c)
+    // A push that names a literal non-default destination still passes, and a switch to no default name is no switch.
+    silent('git checkout main && git pull && git checkout -b feat/y && git push -u origin feat/y')
+    silent('git checkout -b feat/y && git push -u origin feat/y')
+    silent('git checkout -- a.ts && git push')
+  })
+  test('C2: an assignment after &&, || or a pipe across a newline, or sent to the background, is not read', () => {
+    for (const c of ['test -d /repo/sub/build &&\nB=/repo/sub/build\nrm -rf "$B"/*', 'test -d /repo/sub/build ||\nB=/repo/sub/build\nrm -rf "$B"/*',
+      'echo x |\nB=/repo/sub/build\nrm -rf "$B"/*', 'B=/repo/sub/build & rm -rf "$B"/*',
+      "git commit -F - <<'EOF' &&\nmsg\nEOF\nB=/repo/sub/build\nrm -rf \"$B\"/*", 'cd /other\ngit fetch &&\nB=feat/x\ngit push origin $B'])
+      ask(c)
+    silent('git fetch\nB=/repo/sub/build\nrm -rf "$B"/*')
+  })
+  test('I1: a flag in a variable the text binds but the floor cannot read, beside commit or branch', () => {
+    for (const c of ['export NV=-n; git commit $NV -m x', 'declare NV=-n; git commit $NV -m x', 'if true; then NV=-n; fi; git commit $NV -m x',
+      'NV=-n; NV=-n; git commit $NV -m x', 'export F=-D; git branch $F feat/y', 'for F in -n; do git commit $F -m x; done'])
+      ask(c)
+    // A variable the text never binds is still not read as a flag beside commit (0.2.0).
+    silent('make -n check; git commit -q -F "$M"')
+  })
+  test('I2: a move or a config write inside a loop applies to the whole loop', () => {
+    for (const c of ['for p in a b; do rm -rf node_modules; cd ../$p; done', 'while true; do git push; cd /other; done',
+      'for i in 1 2; do git p origin feat/x; V=$(echo push -f); git config alias.p "$V"; done'])
+      ask(c)
+    silent('for p in a b; do echo $p; done; git push -u origin feat/x')
+  })
+  test('I3: a message consumer does not reach past ; && or a pipe', () => {
+    ask("git commit --allow-empty -m wip; make --file - <<'EOF'\nall:\n\tgit push -f origin main\nEOF")
+    ask("git tag -l | make --file - <<'EOF'\nall:\n\tgit push -f origin main\nEOF")
+    silent("git commit -q --file - <<'EOF'\nfix: git push -f\nEOF")
+  })
+  test('I4: a large script of redirects stays fast', () => {
+    const same = [...Array.from({ length: 2000 }, (_, i) => `echo "step ${i}" >> log.txt`), 'git push -u origin feat/x'].join('\n')
+    const distinct = [...Array.from({ length: 2000 }, (_, i) => `echo "step ${i}" > out${i}.txt`), 'git push -u origin feat/x'].join('\n')
+    for (const big of [same, distinct]) {
+      const t0 = Date.now()
+      silent(big)
+      namesDanger(big)
+      expect(Date.now() - t0 < 2000).toEqual(true)
+    }
+  })
+  test('M2: Python process calls behind an underscore', () => {
+    ask("python3 - <<'X'\nimport asyncio\nasyncio.run(asyncio.create_subprocess_shell('git push -f origin x'))\nX")
+    ask("python3 - <<'X'\nimport os\nos.posix_spawnp('sh', ['sh', '-c', 'git push -f origin x'], {})\nX")
+  })
+  test('M5: a hook in .husky/ or .githooks/ is a git control path', () => {
+    ask("cat > .husky/pre-commit <<'EOF'\ngit push -f origin main\nEOF\ngit add .husky/pre-commit && git commit -m x")
+    ask("cat > .githooks/pre-push <<'EOF'\ngit push -f origin main\nEOF\ngit add .githooks/pre-push && git commit -m x")
+    silent("cat > docs/husky.md <<'EOF'\nnever git push -f\nEOF\ngit add docs/husky.md && git commit -m x")
+  })
+})

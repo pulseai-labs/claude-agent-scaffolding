@@ -36,6 +36,14 @@ transcripts: prompts in other projects fall from 386 to 266, none newly asked).
   the file-name match, so `P=/x/a.sh; cat > $P …; mv $P run.sh; ./run.sh` asks again.
 - **Namers** (`rm`, `chmod`, `wc`, `diff`, `git add|commit|status …`, `gh api`, `gh pr|issue view` …)
   name a written file without running it.
+- **Context the per-command reading keeps** (whole-branch review): a branch switch that names a
+  default branch name (`git checkout main && git merge … && git push`) makes later pushes read as
+  moved; a move, config write or switch anywhere in a loop body counts from the loop's start; a
+  `commit` or `branch` holding a variable the text binds but cannot read is judged on the whole
+  bag; an assignment after `&&`, `||` or a pipe on the next line, or sent to the background, is
+  not read; a message consumer never reaches past `;`, `&&` or `|`; `.husky/` and `.githooks/` are
+  git control paths; the Python deny words also match after `_` (`create_subprocess_shell`); and a
+  script of many redirects is read in well under a second (0.4.3 took over a minute at 2,000 lines).
 - **Known limits:** a moved push trusts only `main`, `master` and the session's default branch as
   default names; the Python deny list is a judgment rule; namers and message consumers are trusted
   by name; the floor still needs a danger word; variable values come from the text only

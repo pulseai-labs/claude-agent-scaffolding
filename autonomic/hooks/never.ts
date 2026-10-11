@@ -2,7 +2,8 @@
 // before any fork. A match leaves the ask in place.
 //
 // Since 0.5.0 the floor judges each simple command on its own words when the text parses, with
-// context from the whole text (moves, variables assigned once to a literal, git config writes).
+// context from the whole text (moves, branch switches, variables assigned once to a literal, git
+// config writes).
 // Text it cannot parse, and text that names a program that may run text, is read as one bag of
 // words, so quoting, nesting, wrappers and interpreters still cannot hide a word there:
 // `python3 -c 'git push -f'` shows `push` and `-f`. Text that never runs (messages, heredoc
@@ -203,7 +204,7 @@ function assignOnly(text: string): boolean {
 // git runs or reads a file in .git/ (hooks, config) or a hooks directory, and its config files
 // elsewhere (~/.gitconfig, ~/.config/git/, .gitattributes, .gitmodules, a .git file).
 const hook = (w: string) =>
-  /(?:^|\/)(?:\.git|hooks|\.config\/git)\/|(?:^|\/)\.git$|gitconfig|\.gitattributes|\.gitmodules/.test(clean(w))
+  /(?:^|\/)(?:\.git|hooks|\.githooks|\.husky|\.config\/git)\/|(?:^|\/)\.git$|gitconfig|\.gitattributes|\.gitmodules/.test(clean(w))
 const REDIRECT = />>?[|&]?[ \t]*([^\s;&|<>()]+)/g
 const targets = (text: string) => [...text.matchAll(REDIRECT)].map(m => m[1]!).filter(w => !/^(?:\d+|-)$/.test(w))
 // Readers (0.4.3 §3.5): command prefixes that name a file but never run it. The operator's
@@ -233,10 +234,14 @@ function isReader(ws: readonly string[], readers: Readers): boolean {
 // stands as one command holding its whole text.
 // `pipe` in the result means the output reaches a command that is not inert (pipesOn).
 function flat(cmds: readonly Command[]): Command[] {
-  return cmds.flatMap((c, i) => [
+  return cmds.flatMap((_, i) => flatOne(cmds, i))
+}
+function flatOne(cmds: readonly Command[], i: number): Command[] {
+  const c = cmds[i]!
+  return [
     ...c.subs.flatMap(s => { const inner = commands(s); return inner === undefined ? [{ text: s, bare: s, subs: [], end: c.end, pipe: false }] : flat(inner) }),
     { ...c, pipe: pipesOn(cmds, i) },
-  ])
+  ]
 }
 // Is a written file run (or read by a program that may run it) later? A file in .git/ or
 // hooks/ is. So is one a later command that is not inert names, and every file when that
@@ -249,31 +254,50 @@ function flat(cmds: readonly Command[]): Command[] {
 type Resolve = (f: string) => string
 type Ctx = { resolve: Resolve; readers: Readers }
 const opaqueName = (f: string) => /[$*?[`{]/.test(f)
-function usedLater(raw: readonly string[], later0: readonly Command[], ctx: Ctx): boolean {
-  const later = flat(later0)
+// What usedLater reads of each later command, worked out once per command list, so a script of
+// many redirects is not re-split for every target (final review I4). `from[i]` is where command
+// i's entries start; the commands after i are `list.slice(from[i + 1])`.
+type Later = { low: string[]; h: string | undefined; inert: boolean; namer: boolean; reader: boolean; pipe: boolean; hook: boolean; opaque: boolean; names: string[] }
+function laters(cmds: readonly Command[], ctx: Ctx): { list: Later[]; from: number[] } {
+  const list: Later[] = []
+  const from: number[] = []
+  cmds.forEach((_, i) => {
+    from.push(list.length)
+    for (const c of flatOne(cmds, i)) {
+      // 0.5.0 fix: a later word holding a variable is read with its value, as the file names are.
+      const ws = split(c.bare).map(w => (w.includes('$') ? ctx.resolve(w) : w))
+      const h = head(command(c.bare))
+      const to = targets(c.bare)
+      if ((h === 'mv' || h === 'cp') && ws.length > 1) to.push(ws[ws.length - 1]!)
+      const next = to.map(ctx.resolve)
+      list.push({ low: ws.map(w => w.toLowerCase()), h, inert: isInert(c.bare), namer: namer(ws), reader: isReader(ws, ctx.readers), pipe: c.pipe,
+        hook: next.some(hook), opaque: next.some(opaqueName), names: next.map(t => base(clean(t)).toLowerCase()).filter(n => n !== '') })
+    }
+  })
+  from.push(list.length)
+  return { list, from }
+}
+function usedLater(raw: readonly string[], later: readonly Later[], ctx: Ctx): boolean {
   const files = raw.map(ctx.resolve)
   if (files.some(hook)) return true
-  if (files.some(opaqueName)) return later.some(c => !isInert(c.bare))
-  const names = files.map(f => base(clean(f)).toLowerCase()).filter(n => n !== '')
-  const named = (ws: readonly string[]) => ws.some(w => names.some(n => w.toLowerCase().includes(n)))
+  if (files.some(opaqueName)) return later.some(c => !c.inert)
+  const names = new Set(files.map(f => base(clean(f)).toLowerCase()).filter(n => n !== ''))
+  const named = (low: readonly string[], skip: number) => {
+    for (let k = skip; k < low.length; k++) for (const n of names) if (low[k]!.includes(n)) return true
+    return false
+  }
   for (const c of later) {
-    // 0.5.0 fix: a later word holding a variable is read with its value, as the file names are.
-    const ws = split(c.bare).map(w => (w.includes('$') ? ctx.resolve(w) : w))
-    const h = head(command(c.bare))
-    if (h === undefined) continue
-    if (!isInert(c.bare) && !namer(ws)) {
-      if (isReader(ws, ctx.readers)) continue
-      if (named(ws) || /[$*?[]/.test(h)) return true
+    if (c.h === undefined) continue
+    if (!c.inert && !c.namer) {
+      if (c.reader) continue
+      if (named(c.low, 0) || /[$*?[]/.test(c.h)) return true
       continue
     }
-    if (!named(ws.slice(1))) continue
+    if (!named(c.low, 1)) continue
     if (c.pipe) return true
-    const to = targets(c.bare)
-    if ((h === 'mv' || h === 'cp') && ws.length > 1) to.push(ws[ws.length - 1]!)
-    const next = to.map(ctx.resolve)
-    if (next.some(hook)) return true
-    if (next.some(opaqueName)) return later.some(c => !isInert(c.bare))
-    names.push(...next.map(t => base(clean(t)).toLowerCase()).filter(n => n !== ''))
+    if (c.hook) return true
+    if (c.opaque) return later.some(c => !c.inert)
+    for (const n of c.names) names.add(n)
   }
   return false
 }
@@ -456,11 +480,11 @@ function insideSub(text: string, at: number): boolean {
 // body names nothing that starts a process and no git control path drops its body. A file the
 // body names that a later command runs keeps it, as for a cat write.
 // The deny words match as identifiers (`filesystem`, `evaluation` are prose).
-const PY_DENY = /\b(?:subprocess|system|popen|exec(?:v|ve|vp|vpe|l|le|lp|lpe)?|spawn\w*|fork\w*|pty|eval|compile|__import__|importlib|getattr|ctypes|multiprocessing)\b/
+const PY_DENY = /(?<![A-Za-z0-9])(?:subprocess|system|popen|exec(?:v|ve|vp|vpe|l|le|lp|lpe)?|spawn\w*|fork\w*|pty|eval|compile|__import__|importlib|getattr|ctypes|multiprocessing)(?![A-Za-z0-9])/
 const PYDOC = String.raw`(?<=^|[\n;&|({)])[ \t]*(?:\S*\/)?(?:python[\d.]*|pypy[\d.]*)((?:[ \t]+-[uBIEsS]+)*)((?:[ \t]+-(?:[ \t]+[^\s<;&|>]+)*)?)[ \t]*<<-?[ \t]*(['"])([A-Za-z_]\w*)\8([^\n]*)\n([\s\S]*?)\n[ \t]*\9[ \t]*(?=\n|$)`
 // 0.5.0: a heredoc read by a command that only takes it as a message (git commit/tag/notes/merge
 // -F -, gh pr|issue|release … --body-file -/-F -/--notes-file -) or by tee (a write).
-const MSGDOC = String.raw`(?<=^|[\n;&|({)])([ \t]*(?:git(?:[ \t]+-[Cc][ \t]+\S+|[ \t]+--?[\w-]+(?:=\S+)?)*[ \t]+(?:commit|tag|notes[ \t]+\w+|merge|commit-tree)[^\n<]*?[ \t](?:-F|--file)(?:[ \t]+|=)-|gh[ \t]+(?:pr|issue|release)[ \t]+[\w-]+[^\n<]*?[ \t](?:--body-file|-F|--notes-file)(?:[ \t]+|=)-|tee((?:[ \t]+[^\s<;&|>]+)*)))[ \t]+<<-?[ \t]*(['"]?)([A-Za-z_]\w*)\14([^\n]*)\n([\s\S]*?)\n[ \t]*\15[ \t]*(?=\n|$)`
+const MSGDOC = String.raw`(?<=^|[\n;&|({)])([ \t]*(?:git(?:[ \t]+-[Cc][ \t]+\S+|[ \t]+--?[\w-]+(?:=\S+)?)*[ \t]+(?:commit|tag|notes[ \t]+\w+|merge|commit-tree)[^\n<;&|]*?[ \t](?:-F|--file)(?:[ \t]+|=)-|gh[ \t]+(?:pr|issue|release)[ \t]+[\w-]+[^\n<;&|]*?[ \t](?:--body-file|-F|--notes-file)(?:[ \t]+|=)-|tee((?:[ \t]+[^\s<;&|>]+)*)))[ \t]+<<-?[ \t]*(['"]?)([A-Za-z_]\w*)\14([^\n]*)\n([\s\S]*?)\n[ \t]*\15[ \t]*(?=\n|$)`
 const WRITES = new RegExp(`${WRITE_ANY.source}|${PYDOC}|${MSGDOC}`, 'g')
 // 0.5.0: the substitutions an unquoted body runs, or undefined when it may run more (arithmetic,
 // a parameter transform) or does not parse. Quotes in a body are text.
@@ -503,7 +527,7 @@ function splice(text: string): string {
 }
 type Vars = Map<string, { value: string; at: number }>
 type Judged = { words: string[]; at: number }
-type Reading = { whole: string[] } | { groups: Judged[]; vars: Vars; bag: string[]; values: string[] }
+type Reading = { whole: string[] } | { groups: Judged[]; vars: Vars; bag: string[]; values: string[]; loops: [number, number][] }
 function wordsOf(command: string, readers: Readers): Reading {
   const message = command.replace(MESSAGE, '-m MSG')
   // Drop every body; if a later command may run any written file, keep them all (a kept body
@@ -542,10 +566,12 @@ function wordsOf(command: string, readers: Readers): Reading {
   const parts = commands(stubbed)
   const pg = parts === undefined ? undefined : groups(parts)
   const ctx0: Ctx = { resolve: resolver(parts ?? []), readers }
+  let pl: ReturnType<typeof laters> | undefined
   const kept = parts === undefined || pg === undefined || writes.some(w => {
     const i = parts.findIndex(c => c.end >= w.end)
     const t = [...w.files, ...pg[i]!.targets]
-    return pipesOn(parts, i) || pg[i]!.pipe || (t.length > 0 && usedLater(t, parts.slice(i + 1), ctx0))
+    pl ??= laters(parts, ctx0)
+    return pipesOn(parts, i) || pg[i]!.pipe || (t.length > 0 && usedLater(t, pl.list.slice(pl.from[i + 1]), ctx0))
   })
   const text = splice(kept ? message : stubbed)
   const parsed = commands(text)
@@ -558,24 +584,41 @@ function wordsOf(command: string, readers: Readers): Reading {
   const g = cmds === undefined ? undefined : groups(cmds)
   if (cmds === undefined || g === undefined) return { whole: split(text) }
   const ctx: Ctx = { resolve: resolver(cmds), readers }
-  return { groups: judge(cmds, g, ctx), vars: literalVars(command, text, cmds), bag: split(text), values: flat(cmds).filter(c => assignOnly(c.bare)).flatMap(c => split(c.text)) }
+  return { groups: judge(cmds, g, ctx), vars: literalVars(command, text, cmds), bag: split(text), values: flat(cmds).filter(c => assignOnly(c.bare)).flatMap(c => split(c.text)), loops: loops(cmds) }
 }
 // The words of parsed commands, one group per command: a command that is not inert keeps all its
 // words, its substitutions' included; an inert one keeps them only when its output may be run (a
 // pipe, or a target used later), and otherwise gives only its substitutions' commands, judged the
 // same way. `at` is the top-level command a group belongs to.
 function judge(cmds: readonly Command[], g: readonly Group[], ctx: Ctx, at?: number): Judged[] {
+  let lt: ReturnType<typeof laters> | undefined
   return cmds.flatMap((c, i): Judged[] => {
     const k = at ?? i
     if ((!isInert(c.bare) && !assignOnly(c.bare)) || pipesOn(cmds, i) || g[i]!.pipe) return [{ words: split(c.text), at: k }]
     const to = [...targets(c.bare), ...g[i]!.targets, ...sedTargets(c.bare)]
-    if (to.length > 0 && usedLater(to, cmds.slice(i + 1), ctx)) return [{ words: split(c.text), at: k }]
+    lt ??= to.length > 0 ? laters(cmds, ctx) : undefined
+    if (to.length > 0 && usedLater(to, lt!.list.slice(lt!.from[i + 1]), ctx)) return [{ words: split(c.text), at: k }]
     return c.subs.flatMap(s => {
       const inner = commands(s)
       const ig = inner === undefined ? undefined : groups(inner)
       return inner === undefined || ig === undefined ? [{ words: split(s), at: k }] : judge(inner, ig, ctx, k)
     })
   })
+}
+// The top-level command spans of each for, while, until or select loop, opener to `done`: a
+// command late in the body runs before the early ones on the next pass (final review I2).
+function loops(cmds: readonly Command[]): [number, number][] {
+  const out: [number, number][] = []
+  const stack: { at: number; kind: string }[] = []
+  cmds.forEach((c, i) => {
+    for (const w of unquoted(c.bare).trim().split(/\s+/)) {
+      if (OPENER.has(w)) { stack.push({ at: i, kind: w }); continue }
+      if (CLOSER.has(w)) { const s = stack.pop(); if (s !== undefined && /^(?:for|while|until|select)$/.test(s.kind)) out.push([s.at, i]); continue }
+      if (w === 'then' || w === 'do' || w === 'else' || w === 'elif' || w === '!') continue
+      break
+    }
+  })
+  return out
 }
 // Inside a group at command i: an opener before it not yet closed, or a paren in it.
 function depths(cmds: readonly Command[]): boolean[] {
@@ -603,8 +646,15 @@ function literalVars(command: string, text: string, cmds: readonly Command[]): V
     const m = ASSIGN.exec(c.text)
     if (!m) return
     const start = c.end - c.text.length
-    const prev = text[start - 1]
-    const ok = (start === 0 || prev === '\n' || (prev === ';' && text[start - 2] !== ';')) && !c.pipe && !inside[i]!
+    // The separator before it, past blanks and empty commands: `a &&\nB=x` follows `&&`. A newline
+    // after `&`, `|` or a backslash continues that command; a lone `&` after it runs it apart.
+    let p = start - 1
+    let line = false
+    while (p >= 0 && /\s/.test(text[p]!)) { if (text[p] === '\n') line = true; p-- }
+    const prev = text[p]
+    const first = p < 0 || (prev === ';' && text[p - 1] !== ';') || (line && !/[&|\\]/.test(prev!))
+    const background = text[c.end] === '&' && text[c.end + 1] !== '&'
+    const ok = first && !background && !c.pipe && !inside[i]!
     const s = seen.get(m[1]!)
     seen.set(m[1]!, { value: clean(m[2]!), at: i, ok: ok && s === undefined, n: (s?.n ?? 0) + 1 })
   })
@@ -709,16 +759,50 @@ export function neverRules(command: string, where: Where, readers: Readers = DEF
   const found = new Set<NeverRule>()
   if ('whole' in r) { rulesOf(r.whole, where, moves(r.whole, where), false, found); return [...found] }
   const all = [...r.groups.flatMap(g => g.words), ...r.values]
-  let moved = r.bag.some(w => /^GIT_(?:DIR|WORK_TREE)=/.test(w))
-  let config = r.bag.some(w => /^GIT_CONFIG/.test(w))
-  for (const g of r.groups) {
+  const names = [...new Set([...(where.defaultBranch !== undefined ? [where.defaultBranch] : []), 'main', 'master'])]
+  // What a command changes for every later one: a move, a git config write, a branch switch.
+  const effects = r.groups.map(g => {
     const ws = substitute(g.words, r.vars, g.at)
     const git = isGit(ws)
-    rulesOf((config && git) || verbOpaque(ws) ? all : ws, where, moved || moves(ws, where), true, found)
-    if (ws.some(w => w === 'cd' || w === 'pushd' || w === 'popd') && moves(ws, where)) moved = true
-    if (git && writesConfig(ws)) config = true
-  }
+    return { ws, git, move: ws.some(w => w === 'cd' || w === 'pushd' || w === 'popd') && moves(ws, where), config: git && writesConfig(ws), switches: git && switchesTo(ws, names) }
+  })
+  // In a loop, an effect anywhere in the body holds from the loop's first command (final review I2).
+  const lifted = { move: new Set<number>(), config: new Set<number>(), switches: new Set<number>() }
+  r.groups.forEach((g, k) => {
+    for (const [a, b] of r.loops) {
+      if (g.at < a || g.at > b) continue
+      for (const e of ['move', 'config', 'switches'] as const) if (effects[k]![e]) for (let t = a; t <= b; t++) lifted[e].add(t)
+    }
+  })
+  // A variable the text binds anywhere but the floor cannot read (final review I1).
+  const bound = (n: string) => new RegExp(`(?<![\\w$])(?<!\\$\\{)${n}(?!\\w)`).test(command)
+  let moved = r.bag.some(w => /^GIT_(?:DIR|WORK_TREE)=/.test(w))
+  let config = r.bag.some(w => /^GIT_CONFIG/.test(w))
+  let switched = false
+  r.groups.forEach((g, k) => {
+    const { ws, git, move, config: writes, switches } = effects[k]!
+    if (lifted.move.has(g.at)) moved = true
+    if (lifted.config.has(g.at)) config = true
+    if (lifted.switches.has(g.at)) switched = true
+    // Beside commit or branch a bare variable is not a flag, so one the text binds but the floor
+    // cannot read is judged on the whole bag, as 0.4.3 did (`export NV=-n; git commit $NV`).
+    const loose = ws.some(w => isVerb(w, 'commit') || isVerb(w, 'branch')) &&
+      ws.some(w => [...w.matchAll(/\$\{?([A-Za-z_]\w*)/g)].some(m => bound(m[1]!)))
+    rulesOf((config && git) || verbOpaque(ws) || loose ? all : ws, where, moved || moves(ws, where), true, found, switched)
+    if (move) moved = true
+    if (writes) config = true
+    if (switches) switched = true
+  })
   return [...found]
+}
+// Final review C1: a checkout, switch, branch rename or copy, or symbolic-ref that names a
+// default branch name or an opaque word may leave HEAD on the default branch for later pushes.
+function switchesTo(ws: readonly string[], names: readonly string[]): boolean {
+  const at = ws.findIndex(w => w === 'checkout' || w === 'switch' || w === 'symbolic-ref' || w === 'branch')
+  if (at < 0) return false
+  const rest = ws.slice(at + 1)
+  if (ws[at] === 'branch' && !rest.some(w => /^-[A-Za-z]*[mMcC]/.test(w) || /^--(?:move|copy)$/.test(w))) return false
+  return rest.some(w => opaque(w) || names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))))
 }
 
 // Cause 3: a push that names a remote and only literal destinations other than the default
@@ -743,7 +827,7 @@ function namedRefs(words: readonly string[], names: readonly string[]): boolean 
   })
 }
 
-function rulesOf(words: readonly string[], where: Where, moved: boolean, single: boolean, found: Set<NeverRule>): void {
+function rulesOf(words: readonly string[], where: Where, moved: boolean, single: boolean, found: Set<NeverRule>, switched = false): void {
   const any = (f: (w: string) => boolean) => words.some(w => f(w) || anyFlag(w))
   const anyNamed = (f: (w: string) => boolean) => words.some(w => f(w) || flagLike(w))
   const short = (c: string) => (w: string) => letters(w).includes(c)
@@ -759,7 +843,8 @@ function rulesOf(words: readonly string[], where: Where, moved: boolean, single:
     // send-pack and http-push with no refspec update the matching refs, the default one included.
     const plumbing = words.some(w => isVerb(w, 'send-pack') || isVerb(w, 'http-push'))
     // 0.5.0 cause 3: only when the floor reads this one command, never the whole bag.
-    const away = moved && !(single && namedRefs(words, names))
+    // A branch switch earlier in the text (final review C1) is read the same way as a move.
+    const away = (moved || switched) && !(single && namedRefs(words, names))
     if (plumbing || where.branch === undefined || names.includes(where.branch) || away ||
       any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))
       found.add('default-branch-push')

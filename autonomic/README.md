@@ -109,9 +109,11 @@ it joins a backslash-newline and drops every `\`, `'` and `"`. Then it splits th
 `; & | ( ) < >`, backticks and `$(` (`${OPTS}` stays one word that starts with `$`). A `NAME=VALUE`
 word also shows its value. A rule fires only when its verb and its flags are in the same command,
 and each command still takes context from the whole text: a move before it, a git config write
-before it (after one, every later git command is read on the whole bag), and a variable assigned
-once to a literal. A command whose verb is a variable or a glob (`$CMD -f`, `git $V -f`) is read on
-the whole bag. When the text does not parse or names a program that may run text, the list reads
+before it (after one, every later git command is read on the whole bag), a branch switch before
+it, and a variable assigned once to a literal. In a loop, a move, a config write or a branch switch
+anywhere in the body counts from the loop's first command. A command whose verb is a variable or a
+glob (`$CMD -f`, `git $V -f`) is read on the whole bag, and so is a `commit` or `branch` that
+holds a variable the text binds but the list cannot read (`export NV=-n; git commit $NV`). When the text does not parse or names a program that may run text, the list reads
 it as **one bag of words** and never decides which command a word belongs to, so a quote, a
 wrapper or an interpreter cannot hide a word there: `python3 -c 'git push -f'` shows `push` and
 `-f`. In the bag, a danger word beside a harmless command is an extra ask; that is the cost of
@@ -128,7 +130,9 @@ this reading. The rules, read per command or on the bag:
   `--mirror`, the matching refspec `:`, or a word holding `$`, `*`, `?`, `[` or `{`; or any push
   while the session's branch is the default branch or unknown; or a push after a move (`cd`,
   `pushd`, `git -C` to a directory other than the session's own or the repo root, `popd`,
-  `--git-dir`, `--work-tree`, `GIT_DIR=`, `GIT_WORK_TREE=`), unless since 0.5.0 the list reads
+  `--git-dir`, `--work-tree`, `GIT_DIR=`, `GIT_WORK_TREE=`) or after a branch switch (a `checkout`,
+  `switch`, `branch -m`/`-c` or `symbolic-ref` that names a default branch name or a variable),
+  unless since 0.5.0 the list reads
   that one command and it names a remote and only literal destinations that are not the default
   branch, `main`, `master`, `HEAD`, `@` or empty, with no option outside `-u -q -v -n`,
   `--set-upstream`, `--quiet`, `--verbose`, `--tags`, `--follow-tags`, `--atomic`, `--porcelain`,
@@ -150,7 +154,7 @@ the list splits it into simple commands at `;`, `&`, `|`, `&&`, `||` and newline
 and comments. A command whose first word is `[`, `[[`, `test`, `echo`, `printf` (without `-v`),
 `exit`, `true`, `false`, `cat`, `head`, `tail`, `wc`, `ls`, `stat`, `grep`, `jq`, `cut`, `tr`,
 `mkdir`, `touch`, `mv` or `cp` (or a path to one in a system `bin` directory) then adds no words,
-unless it pipes onward, or writes with `>` into `.git/`, a `hooks/` directory, a git config file
+unless it pipes onward, or writes with `>` into `.git/`, a `hooks/`, `.husky/` or `.githooks/` directory, a git config file
 (`~/.gitconfig`, `.gitattributes` …), a file that a later command outside this list names, or a
 file named by a variable the text does not assign once — or by any relative name after a `cd`,
 `pushd` or `popd` — while a command outside this list follows. A later command whose own name holds a
@@ -179,10 +183,11 @@ counts as reaching a command that is not inert.
 - A variable assigned exactly once to a literal, as a whole top-level command that starts the text
   or follows `;` or a newline, and named nowhere else except as `$N` or `${N}`, is read as its value
   after that command; `for N`, `read N`, `export N=…`, `${N:=…}`, a second binding, a binding inside
-  a group or after `&&` leaves it opaque.
+  a group, one after `&&`, `||` or a pipe (also on the next line), or one sent to the background
+  with `&` leaves it opaque.
 - A command made only of assignments drops its words; the values stay in the whole bag that an
   opaque verb or a git config write reads.
-- A runner word that is an argument of `cd`, `pushd` or an inert command, or the value after
+- A runner word that is an argument of `cd`, `pushd` or an inert command, or a path after
   `git -C`, runs nothing (`cd tests/eval`); dot-sourcing counts only as a command whose word is `.`.
 - `sh -c 'literal'` (also `bash`, `zsh`, `dash`, with `-e -u -x -o pipefail`) is read as a
   subshell holding the string, up to four levels deep, when the string holds no `$` or backtick
