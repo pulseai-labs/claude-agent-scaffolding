@@ -1,6 +1,6 @@
 ---
 name: critiquing-spec
-description: "Adversarial audit of a written spec or plan. Triggers on phrases like \"audit this spec\", \"critique X\", \"adversarial review\", \"challenge the spec\", \"deep audit\", \"fresh-frame review\". Runs host-agent self-audit in conversation; optionally invokes the other agent as a fresh-frame adversary at close-depth (--close flag or NL trigger): Codex when hosted in Claude Code, Claude Code when hosted in Codex. Produces challenges/gaps/alternatives, runs sequential rebuttal cycle with 1-5 concession scoring, appends run to state.json."
+description: Use when auditing a written spec or plan ("audit this spec", "critique X", "adversarial review", "challenge the spec", "deep audit", "fresh-frame review") — runs a host-agent self-audit in conversation; at close-depth (--close or NL trigger) also invokes the other agent as a fresh-frame adversary (Codex when hosted in Claude Code, Claude Code when hosted in Codex); produces challenges/gaps/alternatives, runs a sequential rebuttal cycle with 1-5 concession scoring, appends the run to state.json.
 ---
 
 # critiquing-spec
@@ -11,7 +11,7 @@ This skill body is the centerpiece of the architect-critic plugin. Everything th
 
 You may be invoked through any of these channels:
 - **Slash command:** `/critique [path] [--close] [--neutral] [--model NAME] [--principles PATH]`. The wrapper at `commands/critique.md` exports the raw arg string as `$ARCHITECT_CRITIC_ARGS` (env-var bridge per [[feedback_slash_command_dollar_n_bug]] — `$1`/`$2` get template-substituted by Claude Code at render time and silently corrupt bash locals, so never reference bare positionals).
-- **Skill() call from a peer skill:** `Skill(architect-critic:critiquing-spec, target=…, [phase_id=…,] depth=…, artifact_path=…)`. These arrive as invocation arguments, not `$ARCHITECT_CRITIC_ARGS`: `artifact_path` is this channel's Step-1 path source, and `target`/`phase_id` feed the Step-10 closing line. `depth` names the caller's intent (`premise-audit`/`close`); no shipped step parses it — close-depth comes only from `--close` in `$ARCHITECT_CRITIC_ARGS`.
+- **Skill() call from a peer skill:** `Skill(architect-critic:critiquing-spec, target=…, [phase_id=…,] depth=…, artifact_path=…)`. These arrive as invocation arguments, not `$ARCHITECT_CRITIC_ARGS`: `artifact_path` is this channel's Step-1 path source, and `target`/`phase_id` feed the Step-10 closing line. `depth` names the caller's intent (`premise-audit`/`close`); no shipped step parses it — close-depth comes only from `--close` in `$ARCHITECT_CRITIC_ARGS`. In OMP a peer reads `skill://critiquing-spec` and states the path in text (next bullet).
 - **Shim-less channels:** on `Skill()` and natural-language invocations nothing exports `$ARCHITECT_CRITIC_ARGS`. Flags and the artifact path arrive as literal tokens in the invocation/request text itself — parse them from there exactly as if the env var had carried them.
 - **Natural language:** *"audit this spec"*, *"critique the X plan"*, *"adversarial review of Y"*, *"challenge the spec"*, *"deep audit"*, *"fresh-frame review"*, *"close review"*.
 
@@ -44,12 +44,12 @@ Use the Read tool and `jq`-style traversal (or just Read + parse). If the field 
 
 Use the Glob tool with each pattern explicitly. **Never glob `*.md`.** That was the root cause of bug #3 in v0.1 — globbing all markdown files surfaced READMEs, CHANGELOGs, and stray notes as "spec candidates", then the orchestrator hard-failed when none looked like a master spec. The restricted patterns above are deliberate.
 
-**1d. AskUserQuestion fallback.** If multiple candidates survived 1c (or zero), use the AskUserQuestion tool with up to 5 candidate paths plus an "Other (provide path)" option. Phrase the question concretely: *"Which artifact should I audit?"*. Wait for the user's pick; record it.
+**1d. AskUserQuestion fallback.** If multiple candidates survived 1c (or zero), use the AskUserQuestion tool (OMP: `ask`) with up to 5 candidate paths plus an "Other (provide path)" option. Phrase the question concretely: *"Which artifact should I audit?"*. Wait for the user's pick; record it.
 
 If the user provides a path that does not exist, ask once more rather than hard-failing. Hard-failing on missing artifact (bug #3) is what this discovery chain exists to prevent.
 
 **Edge cases:**
-- *Path points to a directory.* If the resolved path is a directory, look inside for one of the restricted patterns (`SPEC*`, `MASTER-SPEC*`, `PLAN*`). If exactly one matches, use it; if multiple, AskUserQuestion; if zero, ask the user to point at a file.
+- *Path points to a directory.* If the resolved path is a directory, look inside for one of the restricted patterns (`SPEC*`, `MASTER-SPEC*`, `PLAN*`). If exactly one matches, use it; if multiple, AskUserQuestion (OMP: `ask`); if zero, ask the user to point at a file.
 - *Path is a URL.* Reject — this skill audits local artifacts. Tell the user *"I can only audit files on disk. If this lives in a Google Doc / Notion / GitHub PR, please save it locally first or paste the content into a markdown file."*
 - *Artifact is huge (>50K lines).* Surface the size to the user: *"This artifact is N lines. The audit will focus on structural concerns rather than line-level review. Continue?"* and wait for confirmation.
 - *Artifact is tiny (<20 lines).* Don't bail, but tell the user *"This artifact is short — the audit will likely surface few challenges. Is this the right file?"*
@@ -62,7 +62,7 @@ Once you have a path: `Read` the artifact end-to-end. Hold its contents in your 
 
 Principles are the lens you audit through. You read each source file yourself with your file-reading tool and merge them in working context, in this exact order, last-wins on duplicates. An absent file is skipped, never created — reading principles must not write anything.
 
-Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH`. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
 1. **Shipped defaults** — `templates/principles.md` (relative to the plugin root; `"$arc_bin" principles_shipped_path` resolves it). Always loaded. Contains the **Ghost Notes principle** (what is absent from the spec is often more important than what is present) and the **CORE protocol** (Curiosity → Objectivity → Reassurance → Empathy as the tone for every challenge raised).
 2. **User-global** — the user's promoted principles across all projects, at the path `"$arc_bin" principles_user_path` resolves (`~/.claude/architect-critic/principles.md`, under `$HOME` — unlike `"$arc_bin" state_path`, this one does not consult `CLAUDE_PLUGIN_DATA`). If the file does not exist, skip it — do not create it.

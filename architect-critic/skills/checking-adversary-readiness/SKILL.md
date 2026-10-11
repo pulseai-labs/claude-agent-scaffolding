@@ -1,6 +1,6 @@
 ---
 name: checking-adversary-readiness
-description: Check whether the external adversary (Codex/Claude) is installed, authenticated, and schema-capable before a deep critique. Triggers on "check adversary readiness", "is codex ready", "critique doctor", "/critique-doctor", "can I run an async critique". Advisory and fail-soft — never blocks, never auto-installs.
+description: Use when the user says "check adversary readiness", "is codex ready", "critique doctor", "/critique-doctor", "can I run an async critique" — checks the external adversary (Codex/Claude) is installed, authenticated, and schema-capable before a deep critique. Advisory, fail-soft; never auto-installs.
 ---
 
 # checking-adversary-readiness
@@ -13,7 +13,7 @@ This skill is **advisory and fail-soft**: it reports readiness and how to fix ga
 
 ## Step 1: Run the readiness probe
 
-Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH`. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
 Run the doctor through the dispatcher (it sources the libs and always exits 0):
 

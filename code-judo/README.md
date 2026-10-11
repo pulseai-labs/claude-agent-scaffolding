@@ -74,3 +74,7 @@ Several things were deliberately changed rather than ported — the stopping dis
 one. `CHANGELOG.md` carries the canonical list of departures; issue #382 carries the full port
 record, including what was knowingly left out and why. Neither is restated here, because a
 count kept in two places is a count that drifts.
+
+## OMP
+
+Install per the root README. Skills are reachable as `skill://<name>`, with no `code-judo:` prefix. No Claude Code-only parts.

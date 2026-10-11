@@ -1,5 +1,15 @@
 # workspace-init changelog
 
+## 0.8.0 (2026-10-11)
+
+OMP marketplace surface.
+
+### Changed
+- Wrappers name the skill by `skill://` path as well as `${CLAUDE_PLUGIN_ROOT}`; skill descriptions lead with the trigger ("Use when ...") so OMP's skill match fires; Claude Code tool names carry an OMP alias where a skill names one; the README gains an OMP note.
+
+### Added
+- **`omp/bin-path.ts`** — puts the plugin's `bin/` (`wi`) on `PATH` for OMP sessions, which have no plugin `bin/` mechanism. A byte-identical copy of the marketplace's source at `omp/bin-path.ts`; the user-level loader imports the newest installed copy.
+
 ## 0.7.3 (2026-10-11)
 
 The scaffold stack (`scaffold-onboard`, `scaffold-dev`, `scaffold`) left the marketplace.

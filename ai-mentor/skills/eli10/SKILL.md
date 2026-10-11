@@ -1,6 +1,6 @@
 ---
 name: eli10
-description: Re-explain the current topic at a 10-year-old comprehension level when the user signals confusion or asks for simpler framing. Repeatable — each invocation drops a level (ELI10 → ELI5 → ELI3). Activate on "eli10", "ELI10", "ELI5", "ELI3", "explain like I'm 10", "explain in simpler terms", "explain this simpler", "make it simpler", "too complex", "I don't get it", "break it down simpler", "dumb it down", "/eli10". Assumes a current topic in the conversation; if none, ask what to simplify. Do NOT activate for first-pass explanations of new topics (no prior framing to simplify) or for code-walkthrough requests.
+description: Use when the user signals confusion or asks for simpler framing ("eli10", "ELI10", "ELI5", "ELI3", "explain like I'm 10", "explain in simpler terms", "explain this simpler", "make it simpler", "too complex", "I don't get it", "break it down simpler", "dumb it down", "/eli10") — re-explains the current topic at a 10-year-old level; repeatable, each invocation drops a level (ELI10 → ELI5 → ELI3). Assumes a current topic; if none, ask what to simplify. Do NOT activate for first-pass explanations of new topics or code-walkthrough requests.
 ---
 
 # Simplify the current topic

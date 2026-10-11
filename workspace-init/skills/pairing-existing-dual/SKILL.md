@@ -1,6 +1,6 @@
 ---
 name: pairing-existing-dual
-description: Pair an already-populated AI workspace with an already-populated canonical repository (Scenario C). Both directories already exist — the AI workspace grew its memory-bank/specs organically before the plugins were discovered, and the canonical holds production code. Writes the pairing manifest and installs the trace-filter commit-msg hook; never creates, seeds, stubs, or overwrites the existing AI-workspace content. Use when the user says "pair my existing workspace", "wire up an existing AI workspace", "both repos already exist", or runs /pair-existing-dual.
+description: Use when the user says "pair my existing workspace", "wire up an existing AI workspace", "both repos already exist", or runs /pair-existing-dual (Scenario C, populated AI workspace and populated canonical) — writes the pairing manifest and installs the trace-filter commit-msg hook; never creates, seeds, stubs, or overwrites existing AI-workspace content.
 ---
 
 # Skill — pairing-existing-dual
@@ -19,14 +19,14 @@ Auto-invokes on phrases like "pair my existing AI workspace", "both repos alread
 
 If any fail, exit non-zero with a clear error; do NOT write the manifest or install any hook.
 
-Resolve the `wi` dispatcher once and hold it in `wi_bin`: `wi_bin="$(command -v wi)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
+Resolve the `wi` dispatcher once and hold it in `wi_bin`: `wi_bin="$(command -v wi)"` — the plugin loader puts `bin/` on `$PATH`. Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
 
 - `command -v jq` and `command -v git` on PATH.
 - **AI workspace path absolute + exists + non-empty.** It is already populated; an empty or missing directory is the wrong target (or means the user wants Scenario A fresh-pair instead).
 - **Canonical path absolute + exists + is a git repo.** `git -C "$canonical_root" rev-parse --git-dir`.
 - AI workspace and canonical must be different paths (no self-pairing).
 
-These are validated by `"$wi_bin" skeleton_preflight_existing_dual "$ai_root" "$canonical_root"` (lib/skeleton.sh) — call it through the `wi` dispatcher (`workspace-init/bin/wi`, on `$PATH` automatically on Claude Code); never `source` lib files from the skill body (under zsh `${BASH_SOURCE[0]}` is unset and the libs crash).
+These are validated by `"$wi_bin" skeleton_preflight_existing_dual "$ai_root" "$canonical_root"` (lib/skeleton.sh) — call it through the `wi` dispatcher (`workspace-init/bin/wi`, the plugin loader puts `bin/` on `$PATH`); never `source` lib files from the skill body (under zsh `${BASH_SOURCE[0]}` is unset and the libs crash).
 
 ## 3. Input collection
 

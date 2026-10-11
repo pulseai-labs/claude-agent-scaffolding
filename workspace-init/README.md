@@ -171,3 +171,9 @@ The hook itself lives in `.git/hooks/commit-msg`, which is **not tracked by git*
 ## License
 
 MIT — see [`LICENSE`](./LICENSE).
+
+## OMP
+
+Install per the root README (the plugin, plus the one-time `PATH` extension for `wi`). Skills are reachable as
+`skill://<name>`, with no `workspace-init:` prefix. No Claude Code-only parts: `hooks/commit-msg.tmpl` is a git
+hook template, not a harness hook, and works the same in OMP.

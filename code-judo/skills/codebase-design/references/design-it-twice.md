@@ -23,7 +23,7 @@ sub-agents work.
 
 ## 2. Spawn sub-agents
 
-Spawn three or more in parallel. Each one must produce a **radically different** interface
+Spawn three or more in parallel (`Agent` in Claude Code, `task` in OMP). Each one must produce a **radically different** interface
 for the module — not three variations on the same idea.
 
 Give each a separate technical brief: file paths, the coupling that exists today, the
