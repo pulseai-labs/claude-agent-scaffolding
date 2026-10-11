@@ -92,13 +92,13 @@ ticket, not resolved it.
 
 ## 3. Dispatching the AFK tickets
 
-Fan `research`, `smoke-test`, and `spike` tickets out through the `Task` tool
+Fan `research`, `smoke-test`, and `spike` tickets out through the `Task` tool (OMP: `task`)
 directly, not `superpowers:dispatching-parallel-agents` — Batch S ossified
 `challenge` in-tree to drop plugin dependencies, and taking one back
 reverses that.
 
-**`Task` is a Claude Code tool, and wayfinder ships on surfaces that do not
-have it.** The Codex manifest registers no agent and no tool, and
+**`Task` (Claude Code) and `task` (OMP) are subagent tools, and wayfinder ships on
+surfaces that have neither.** The Codex manifest registers no agent and no tool, and
 `ossify/README.md` states outright that Codex has no worker path. **On any surface with no subagent
 mechanism, the fan-out does not happen and is not simulated.** Chart mode
 finishes at step 5, says which AFK tickets it left unworked and why, and those

@@ -6,7 +6,7 @@ allowed-tools: Bash(bash:*), Bash(git:*), Bash(gh:*), Bash(oss:*), Read, Write, 
 
 Invoke the patch skill with: $ARGUMENTS
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/patch/SKILL.md` end to end and follow it** —
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/patch/SKILL.md` (in OMP: `skill://patch`) end to end and follow it** —
 with the parsed argument, if any. The skill owns the whole lane: whether the work
 is a patch at all, the ledger and touch-surface read, the fix by kind, the branch
 and version, the PR, and the tag.

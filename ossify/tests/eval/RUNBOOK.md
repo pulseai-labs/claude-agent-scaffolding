@@ -10,14 +10,6 @@ For each `surface` in `[posture-derivation, spike-contract-integrity, risk-gate-
 
   1. **Apply the judgment.** Dispatch `Agent` (general-purpose): "Read the owning skill's SKILL.md + the relevant `references/*.md` for `<surface>` end-to-end. Apply ONLY that skill's documented decision procedure to this fixture scenario (paste body). Output the judgment the skill would produce (e.g. the derived posture+channel, the accept/reject verdict + reason, the declared class, the veto disposition, or — for `close-gate-integrity` — what the ceremony does next and what it records). Do not improvise beyond the skill body." Capture the output.
 
-  **The `handoff-*` and `work-pr-*` surfaces have no SKILL.md** — those
-  utilities are command-routed, not skill-routed. Their owning prose is
-  `ossify/references/handoff/` (`compose.md` + `sections.md` for
-  `handoff-compose`; `resume.md` + `sections.md` for `handoff-resume`) and
-  `ossify/references/work-pr/loop.md` (for `work-pr-disposition`), plus the
-  command wrappers in `ossify/commands/`; point the invoke agent there
-  instead.
-
   **Two 1.13.0 surfaces span several skills** — point the invoke agent at every
   file the README's Surfaces table names for them. `spine-freeze` reads
   `plan-spine/SKILL.md`, `plan-spine/references/intake-and-ledger.md` and

@@ -1,6 +1,6 @@
 ---
 name: challenge
-description: Stress-test a plan or design by interview, or run an adversarial audit of a written spec or plan with an optional external fresh-frame adversary. Activate on "grill me", "stress-test this", "pressure-test this", "challenge my design", "poke holes", "what am I missing", "audit this spec", "adversarial review", "deep audit", "fresh-frame review", or /ossify:challenge. Ossify's lifecycle moments call both modes internally — the bone grill gate, the spec-core close audit, the release class veto, the spine plan and close audits.
+description: Use when asked to "grill me", "stress-test this", "pressure-test this", "challenge my design", "poke holes", "what am I missing", "audit this spec", "adversarial review", "deep audit" or "fresh-frame review", or on /ossify:challenge — interview a plan or design, or adversarially audit a written spec or plan, with an optional external adversary
 ---
 
 # challenge

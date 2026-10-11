@@ -17,7 +17,7 @@ ARGS_FROM_CLAUDE="$ARGUMENTS" bash -c '
 
 Now load the skill body and follow it:
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/challenge/SKILL.md` end to end and follow
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/challenge/SKILL.md` (in OMP: `skill://challenge`) end to end and follow
 it** — with the parsed artifact path if one was given (audit mode), or against
 the plan in conversation if none was (interview mode). The skill body routes;
 `references/audit.md`, `references/interview.md`, and

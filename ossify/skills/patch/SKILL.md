@@ -1,6 +1,6 @@
 ---
 name: patch
-description: Ship a defect in shipped behaviour, or a small request from another project that it cannot fake, as a versioned patch off the default branch — reproduce-first for a defect, acceptance-criteria-first for a request, then a PR and a tag. Use when handed issue numbers or a described defect to fix outside any spine, or on /ossify:patch. Not new scope (the intake queue), not a large request (/plan-spine), not a change nothing observes (close's direct-commit patch lane).
+description: Use when handed issue numbers or a described defect to fix outside any spine, a small request from another project it cannot fake, or /ossify:patch — ship a versioned patch off the default branch, reproduce-first or AC-first, then PR and tag. Not new scope (intake queue), not a large request (/plan-spine), not a change nothing observes (close's direct-commit lane).
 ---
 
 # patch
@@ -128,7 +128,7 @@ the patch worktree, `<new-worktree-path>` — they read the current directory's
 branch and `HEAD`, so never from a checkout a spine is parked on.
 
 **Otherwise**, write the six-field body from ossify's copy of that template,
-`references/work-pr/pr-body.md` at the plugin root: its headings in order, and
+`../work-pr/references/pr-body.md`: its headings in order, and
 its Merge bar block word for word. Push the branch first —
 `git -C "<new-worktree-path>" push -u origin "fix/<plugin-or-project>-<version>"` —
 because `gh pr create --head` does no pushing of its own. Then open it:
@@ -137,7 +137,7 @@ because `gh pr create --head` does no pushing of its own. Then open it:
 gh pr create --repo "<owner/repo>" --base "<default-branch>" --head "fix/<plugin-or-project>-<version>" --title "<title>" --body-file "<body-file>"
 ```
 
-Then work it by the plugin root's `references/work-pr/loop.md` (on Claude Code,
+Then work it by `../work-pr/references/loop.md` (on Claude Code,
 `/ossify:work-pr <PR>` routes there).
 
 Either way, re-run §2's changed-path re-check after each review-fix round, and

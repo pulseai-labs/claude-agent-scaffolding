@@ -1,6 +1,6 @@
 ---
 name: adopt
-description: Adopt an existing project into ossify — six fail-closed gates, six conversions (journey re-marked shipped|next|later, the current cut as a present-tense clean-checkout test, bones back-derived from ADRs, Release 0 closed retroactively, artifacts reconciled, demo-ledger seed candidates recorded), and an adoption record. For the codebase that already has code, tests, history, and decisions; /ossify:start refuses it.
+description: Use when onboarding a project that already has code, tests, history and ADRs, which /ossify:start refuses — six fail-closed gates, six conversions, Release 0 closed retroactively, an adoption record
 ---
 
 # adopt

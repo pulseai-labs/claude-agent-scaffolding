@@ -34,6 +34,7 @@ WI="$OSSIFY/skills/work-item"
 EXT="$WI/references/external-executor.md"
 CORR="$WI/references/correction-continuation.md"
 RUNSPINE="$OSSIFY/commands/run-spine.md"
+RUNSPINE_SK="$OSSIFY/skills/run-spine/SKILL.md"
 RO="$WI/references/round-orchestration.md"
 WIC="$OSSIFY/skills/close/references/work-item-close.md"
 
@@ -111,8 +112,8 @@ assert_keyset() {
 # ---------------------------------------------------------------------------
 # 1. Flag grammar — the two command shapes a consumer types
 # ---------------------------------------------------------------------------
-pin "$RUNSPINE" '/run-spine <spine-id> --external-executor' \
-  "run-spine.md names the external command shape exactly once"
+pin "$RUNSPINE_SK" '/run-spine <spine-id> --external-executor' \
+  "run-spine/SKILL.md names the external command shape exactly once"
 
 ah="$(awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} NR>1 && /^argument-hint: / {sub(/^argument-hint: /,""); print; exit}' "$RUNSPINE")"
 t_assert_eq '"<spine-id> [--external-executor]"' "$ah" \
