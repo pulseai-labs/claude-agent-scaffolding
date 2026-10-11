@@ -737,3 +737,52 @@ describe('0.5.0 §3.5 backticks are substitutions', () => {
     ask('echo `git status; git push -f origin feat/x')
   })
 })
+
+describe('0.5.0 §3.1 each command on its own words', () => {
+  test('flags in another command no longer pool', () => {
+    silent('git add a.ts && git commit -q -m x && git push -q -u origin feat/x; npm run lint -- --fix -d')
+    silent('make -n check; git commit -m y')
+  })
+  test('context from the whole text still applies', () => {
+    ask('export GIT_DIR=/x; git push')
+    ask('cd /other; git push')
+    ask("git config alias.p 'push -f'; git p origin feat/x")
+    ask('git config alias.p push; git p -f origin feat/x')
+    ask('GIT_CONFIG_GLOBAL=/tmp/g git p origin x; npm push -f')
+    ask('printf -v V push; git $V -f origin feat/x')
+    ask('$CMD -f origin feat/x; npm push')
+  })
+  test('line endings, empty text and size', () => {
+    ask('echo ok\r\ngit push -f origin feat/x\r\n')
+    silent('')
+    const big = Array.from({ length: 2000 }, (_, i) => `echo line ${i}; git status --short`).join('\n')
+    const t0 = Date.now()
+    silent(big)
+    expect(Date.now() - t0 < 2000).toEqual(true)
+  })
+})
+
+describe('0.5.0 §3.1 variables and assignment-only commands', () => {
+  test('a literal assigned once is read', () => {
+    silent('M=/tmp/msg; git commit -q -F $M && git push -q -u origin feat/x')
+    silent('B=spine/x; git push -u origin "$B"')
+    silent('D="never git push -f"; git push -u origin feat/x')
+  })
+  test('escape routes', () => {
+    for (const c of ['F=-f; git push $F origin feat/x', 'C=push; git $C -f origin feat/x', 'B=feat/x; B=main; git push origin $B',
+      'if true; then B=feat/x; fi; git push origin $B', 'false && B=feat/x; git push origin $B', '(B=feat/x); git push origin $B',
+      'git push origin $B; B=feat/x', 'B=feat/x; for B in main; do git push origin $B; done', 'B=feat/x; read B; git push origin $B',
+      'B=feat/x; git push origin ${B:=main}', 'git push origin $UNSET', 'B=main; git push origin $B'])
+      ask(c)
+  })
+})
+
+describe('0.5.0 §3.1 variables: the paths the simple forms do not reach', () => {
+  test('a binding on its own line inside a group is not top level', () => {
+    ask('if true; then\nB=feat/x\nfi\ngit push origin $B')
+    ask('(\nB=feat/x\n)\ngit push origin $B')
+  })
+  test('an opaque verb reads the values of assignment-only commands', () => {
+    ask('C=push; git $C -f origin feat/x; C=x')
+  })
+})

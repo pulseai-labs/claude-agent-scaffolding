@@ -196,6 +196,11 @@ function isInert(text: string): boolean {
   if (h === 'sed') return safeSed(text) && !DEFINES.test(text)
   return INERT.has(h) && !DEFINES.test(text) && !(h === 'printf' && ws.some(w => /^-[A-Za-z]*v/.test(w)))
 }
+// A command of assignments only runs nothing; a value is read where the variable is used (0.5.0).
+const ASSIGNS = /^[ \t]*(?:[A-Za-z_]\w*=(?:'[^']*'|"(?:\\.|[^"\\])*"|[^\s'";&|<>()`])*[ \t]*)+$/
+function assignOnly(text: string): boolean {
+  return ASSIGNS.test(text) && targets(text).length === 0
+}
 // git runs or reads a file in .git/ (hooks, config) or a hooks directory, and its config files
 // elsewhere (~/.gitconfig, ~/.config/git/, .gitattributes, .gitmodules, a .git file).
 const hook = (w: string) =>
@@ -348,56 +353,105 @@ function insideSub(text: string, at: number): boolean {
   }
   return false
 }
-function wordsOf(command: string, readers: Readers): string[] {
+type Vars = Map<string, { value: string; at: number }>
+type Judged = { words: string[]; at: number }
+type Reading = { whole: string[] } | { groups: Judged[]; vars: Vars; bag: string[]; values: string[] }
+function wordsOf(command: string, readers: Readers): Reading {
   const message = command.replace(MESSAGE, '-m MSG')
   // Drop every body; if a later command may run any written file, keep them all (a kept body
   // may run another written file). A body with no file prints to standard output (§3.3).
-  const writes: { end: number; file?: string }[] = []
+  const writes: { end: number; files: string[] }[] = []
   let shift = 0
   const stubbed = message.replace(WRITE_ANY, (m, before: string | undefined, quote: string, _d, after: string | undefined, body: string, at: number) => {
     if (quote === '' && LIVE_BODY.test(body)) return m
     // Inside a substitution the output is captured and may be run: keep it (§3.3).
     if (insideSub(message, at)) return m
-    const file = before ?? after
     const stub = m.slice(0, m.indexOf('\n')).replace(/<<-?[ \t]*['"]?\w+['"]?/, '')
-    writes.push({ end: at - shift + stub.length, file })
+    writes.push({ end: at - shift + stub.length, files: [before ?? after].filter((x): x is string => x !== undefined) })
     shift += m.length - stub.length
     return stub
   })
   const parts = commands(stubbed)
   const pg = parts === undefined ? undefined : groups(parts)
-  const ctx: Ctx = { resolve: resolver(parts ?? []), readers }
+  const ctx0: Ctx = { resolve: resolver(parts ?? []), readers }
   const kept = parts === undefined || pg === undefined || writes.some(w => {
     const i = parts.findIndex(c => c.end >= w.end)
-    const t = [...(w.file === undefined ? [] : [w.file]), ...pg[i]!.targets]
-    return pipesOn(parts, i) || pg[i]!.pipe || (t.length > 0 && usedLater(t, parts.slice(i + 1), ctx))
+    const t = [...w.files, ...pg[i]!.targets]
+    return pipesOn(parts, i) || pg[i]!.pipe || (t.length > 0 && usedLater(t, parts.slice(i + 1), ctx0))
   })
   const text = kept ? message : stubbed
   const parsed = commands(text)
   // Runners are looked for outside the dropped bodies: a message that says "bash" runs nothing.
-  if (runs(text, parsed)) return split(command)
-  // A process substitution, a kept heredoc, or a function or alias defined in the
-  // text (it may shadow an inert name: `echo() { "$@"; }`) keeps the whole bag; so does text
-  // whose commands or groups do not parse. A backtick no longer does (0.5.0 cause 5).
+  if (runs(text, parsed)) return { whole: split(command) }
+  // A process substitution, a kept heredoc, or a function or alias defined in the text (it may
+  // shadow an inert name: `echo() { "$@"; }`) keeps the whole bag; so does text whose commands
+  // or groups do not parse. A backtick no longer does (0.5.0 cause 5).
   const cmds = /<<|[<>]\(|\([ \t]*\)|(?:^|[\s;&|(])(?:function|alias)[ \t]/.test(text) ? undefined : parsed
   const g = cmds === undefined ? undefined : groups(cmds)
-  if (cmds === undefined || g === undefined) return split(text)
-  return judge(cmds, g, ctx)
+  if (cmds === undefined || g === undefined) return { whole: split(text) }
+  const ctx: Ctx = { resolve: resolver(cmds), readers }
+  return { groups: judge(cmds, g, ctx), vars: literalVars(command, text, cmds), bag: split(text), values: flat(cmds).filter(c => assignOnly(c.bare)).flatMap(c => split(c.text)) }
 }
-// The words of parsed commands: a command that is not inert keeps all its words, its
-// substitutions' included; an inert one keeps them only when its output may be run (a pipe, or
-// a target used later), and otherwise gives only its substitutions' commands, judged the same way.
-function judge(cmds: readonly Command[], g: readonly Group[], ctx: Ctx): string[] {
-  return cmds.flatMap((c, i) => {
-    if (!isInert(c.bare) || pipesOn(cmds, i) || g[i]!.pipe) return split(c.text)
+// The words of parsed commands, one group per command: a command that is not inert keeps all its
+// words, its substitutions' included; an inert one keeps them only when its output may be run (a
+// pipe, or a target used later), and otherwise gives only its substitutions' commands, judged the
+// same way. `at` is the top-level command a group belongs to.
+function judge(cmds: readonly Command[], g: readonly Group[], ctx: Ctx, at?: number): Judged[] {
+  return cmds.flatMap((c, i): Judged[] => {
+    const k = at ?? i
+    if ((!isInert(c.bare) && !assignOnly(c.bare)) || pipesOn(cmds, i) || g[i]!.pipe) return [{ words: split(c.text), at: k }]
     const to = [...targets(c.bare), ...g[i]!.targets]
-    if (to.length > 0 && usedLater(to, cmds.slice(i + 1), ctx)) return split(c.text)
+    if (to.length > 0 && usedLater(to, cmds.slice(i + 1), ctx)) return [{ words: split(c.text), at: k }]
     return c.subs.flatMap(s => {
       const inner = commands(s)
       const ig = inner === undefined ? undefined : groups(inner)
-      return inner === undefined || ig === undefined ? split(s) : judge(inner, ig, ctx)
+      return inner === undefined || ig === undefined ? [{ words: split(s), at: k }] : judge(inner, ig, ctx, k)
     })
   })
+}
+// Inside a group at command i: an opener before it not yet closed, or a paren in it.
+function depths(cmds: readonly Command[]): boolean[] {
+  let d = 0
+  return cmds.map(c => {
+    const shape = unquoted(c.bare)
+    for (const w of shape.trim().split(/\s+/)) {
+      if (OPENER.has(w)) { d++; continue }
+      if (CLOSER.has(w)) { d = Math.max(0, d - 1); continue }
+      if (w === 'then' || w === 'do' || w === 'else' || w === 'elif' || w === '!') continue
+      break
+    }
+    const inside = d > 0 || /[()]/.test(shape)
+    d = Math.max(0, d + (shape.match(/\(/g) ?? []).length - (shape.match(/\)/g) ?? []).length)
+    return inside
+  })
+}
+// Section 1 variables: a name assigned exactly once, to a literal, as a whole top-level command
+// that starts the text or follows `;` or a newline (never a pipe, `&&`, `||` or a group), and
+// named nowhere else in the text except as `$N` or `${N}`. Its value holds after that command.
+function literalVars(command: string, text: string, cmds: readonly Command[]): Vars {
+  const inside = depths(cmds)
+  const seen = new Map<string, { value: string; at: number; ok: boolean; n: number }>()
+  cmds.forEach((c, i) => {
+    const m = ASSIGN.exec(c.text)
+    if (!m) return
+    const start = c.end - c.text.length
+    const prev = text[start - 1]
+    const ok = (start === 0 || prev === '\n' || (prev === ';' && text[start - 2] !== ';')) && !c.pipe && !inside[i]!
+    const s = seen.get(m[1]!)
+    seen.set(m[1]!, { value: clean(m[2]!), at: i, ok: ok && s === undefined, n: (s?.n ?? 0) + 1 })
+  })
+  const out: Vars = new Map()
+  for (const [name, v] of seen) {
+    if (!v.ok || v.n !== 1) continue
+    let bindings = 0
+    for (const m of command.matchAll(new RegExp(`(?<![\\w])${name}(?![\\w])`, 'g'))) {
+      const at = m.index!
+      const use = command[at - 1] === '$' || (command[at - 1] === '{' && command[at - 2] === '$' && command[at + name.length] === '}')
+      if (!use) bindings++
+    }
+    if (bindings === 1) out.set(name, { value: v.value, at: v.at })
+  }
+  return out
 }
 
 // A verb is the word itself, a path ending in it (/bin/rm), git's dashed executable (git-push),
@@ -433,13 +487,73 @@ function moves(words: readonly string[], where: Where): boolean {
     /^--(?:git-dir|work-tree)/.test(w) || /^GIT_(?:DIR|WORK_TREE)=/.test(w))
 }
 
+// Every word a rule may read: the whole bag, or each command's words with its variables read, and
+// the values of assignment-only commands (an opaque verb reads them).
+const allWords = (r: Reading) => ('whole' in r ? r.whole : [...r.groups.flatMap(g => [...g.words, ...substitute(g.words, r.vars, g.at)]), ...r.values])
 // The cheap pre-check: every rule needs one of these words, so a command without one runs no git.
 export const namesDanger = (command: string, readers: Readers = DEFAULT_READERS): boolean =>
-  wordsOf(command, readers).some(w => isPush(w) || isVerb(w, 'branch') || isVerb(w, 'commit') || isVerb(w, 'rm') || abbrev(w, '--no-verify', 6))
+  allWords(wordsOf(command, readers)).some(w => isPush(w) || isVerb(w, 'branch') || isVerb(w, 'commit') || isVerb(w, 'rm') || abbrev(w, '--no-verify', 6))
+
+// Section 1: a group's words with each literal variable assigned before it read as its value.
+function substitute(words: readonly string[], vars: Vars, at: number): string[] {
+  return words.flatMap(w => {
+    const r = w.replace(/\$\{([A-Za-z_]\w*)\}|\$([A-Za-z_]\w*)/g, (v, a?: string, b?: string) => {
+      const x = vars.get((a ?? b)!)
+      return x !== undefined && x.at < at ? x.value : v
+    })
+    return r === w ? [w] : r.split(/\s+/).filter(x => x !== '')
+  })
+}
+// A command whose verb is a variable or a glob may be any command (`$CMD x`, `git $V -f`,
+// `sudo $C`): the floor reads it on the whole bag.
+const WRAPS = new Set(['env', 'sudo', 'doas', 'nice', 'nohup', 'timeout', 'time', 'command', 'exec', 'builtin', 'stdbuf', 'ionice', 'chrt', 'taskset', 'setsid'])
+function verbOpaque(ws: readonly string[]): boolean {
+  let i = ws.findIndex(w => !KEYWORD.has(w) && !/^[A-Za-z_]\w*=/.test(w))
+  while (i >= 0 && i < ws.length) {
+    const w = ws[i]!
+    if (opaque(w)) return true
+    const b = base(w)
+    if (WRAPS.has(b)) { i++; while (i < ws.length && (ws[i]!.startsWith('-') || /^[A-Za-z_]\w*=/.test(ws[i]!) || /^\d+[smhd]?$/.test(ws[i]!))) i++; continue }
+    if (b === 'git') {
+      i++
+      while (i < ws.length && ws[i]!.startsWith('-')) { if (/^-[Cc]$|^--(?:git-dir|work-tree|namespace|exec-path|config-env)$/.test(ws[i]!)) i++; i++ }
+      return i < ws.length && opaque(ws[i]!)
+    }
+    return false
+  }
+  return false
+}
+const isGit = (ws: readonly string[]) => ws.some(w => isVerb(w, 'git') || /^git-/.test(base(w)))
+const READ_CONFIG = /^(?:--(?:get|get-all|get-regexp|get-urlmatch|get-color|get-colorbool|list|show-origin|show-scope|name-only|null|includes|type=\w+|global|local|system|worktree)|-[lz]+)$/
+// Section 1: any git config that is not a plain read (one key, or a --get/--list form) is a write.
+function writesConfig(ws: readonly string[]): boolean {
+  const at = ws.findIndex(w => isVerb(w, 'config'))
+  if (at < 0) return false
+  const rest = ws.slice(at + 1)
+  const flags = rest.filter(w => w.startsWith('-'))
+  const args = rest.filter(w => !w.startsWith('-'))
+  const read = flags.every(f => READ_CONFIG.test(f)) && (args.length <= 1 || ['get', 'list'].includes(args[0]!) || flags.some(f => /^--get/.test(f)))
+  return !read
+}
 
 export function neverRules(command: string, where: Where, readers: Readers = DEFAULT_READERS): NeverRule[] {
-  const words = wordsOf(command, readers)
+  const r = wordsOf(command, readers)
   const found = new Set<NeverRule>()
+  if ('whole' in r) { rulesOf(r.whole, where, moves(r.whole, where), false, found); return [...found] }
+  const all = [...r.groups.flatMap(g => g.words), ...r.values]
+  let moved = r.bag.some(w => /^GIT_(?:DIR|WORK_TREE)=/.test(w))
+  let config = r.bag.some(w => /^GIT_CONFIG/.test(w))
+  for (const g of r.groups) {
+    const ws = substitute(g.words, r.vars, g.at)
+    const git = isGit(ws)
+    rulesOf((config && git) || verbOpaque(ws) ? all : ws, where, moved || moves(ws, where), true, found)
+    if (ws.some(w => w === 'cd' || w === 'pushd' || w === 'popd') && moves(ws, where)) moved = true
+    if (git && writesConfig(ws)) config = true
+  }
+  return [...found]
+}
+
+function rulesOf(words: readonly string[], where: Where, moved: boolean, single: boolean, found: Set<NeverRule>): void {
   const any = (f: (w: string) => boolean) => words.some(w => f(w) || anyFlag(w))
   const anyNamed = (f: (w: string) => boolean) => words.some(w => f(w) || flagLike(w))
   const short = (c: string) => (w: string) => letters(w).includes(c)
@@ -454,7 +568,7 @@ export function neverRules(command: string, where: Where, readers: Readers = DEF
     const isDefault = (r: string) => { const w = r.replace(/^\+/, ''); return names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))) }
     // send-pack and http-push with no refspec update the matching refs, the default one included.
     const plumbing = words.some(w => isVerb(w, 'send-pack') || isVerb(w, 'http-push'))
-    if (plumbing || where.branch === undefined || names.includes(where.branch) || moves(words, where) ||
+    if (plumbing || where.branch === undefined || names.includes(where.branch) || moved ||
       any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))
       found.add('default-branch-push')
   }
@@ -476,7 +590,6 @@ export function neverRules(command: string, where: Where, readers: Readers = DEF
     const unknown = (w: string) => /[${]/.test(w) || /(?:^|\/)\.[^/]*[*?[]/.test(w)
     const outside = (w: string) => (!w.startsWith('-') || w.includes('/')) &&
       (w.startsWith('~') || w.split('/').includes('..') || unknown(w) || (w.startsWith('/') && !below(w)))
-    if (recursive && (moves(words, where) || words.includes('xargs') || after.some(outside))) found.add('rm-outside')
+    if (recursive && (moved || words.includes('xargs') || after.some(outside))) found.add('rm-outside')
   }
-  return [...found]
 }
