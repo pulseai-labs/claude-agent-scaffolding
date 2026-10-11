@@ -313,12 +313,16 @@ function safeSed(text: string): boolean {
 // Does the text name a program that may run text? Per command where it parses, so a narrow sed
 // at a command's head is not one; anywhere else the word alone counts.
 function runs(text: string, cmds: readonly Command[] | undefined): boolean {
-  if (DOT_SOURCE.test(text)) return true
+  if (cmds === undefined ? DOT_SOURCE.test(text) : flat(cmds).some(c => head(split(c.bare)) === '.')) return true
   if (cmds === undefined) return split(text).some(w => RUNNER.test(base(w)))
   return flat(cmds).some(c => {
     const ws = split(c.bare)
     const h = head(ws)
-    return ws.some(w => RUNNER.test(base(w)) && !(w === h && base(w) === 'sed' && safeSed(c.bare)))
+    const hi = ws.findIndex(x => !KEYWORD.has(x))
+    // 0.5.0 cause 1: an argument of cd, pushd or an inert command, or git -C's value, runs nothing.
+    const argOnly = h === 'cd' || h === 'pushd' || isInert(c.bare)
+    return ws.some((w, k) => RUNNER.test(base(w)) && !(k === hi && base(w) === 'sed' && safeSed(c.bare)) &&
+      !(k !== hi && argOnly) && !(k !== hi && w.includes('/') && h === 'git' && ws[k - 1] === '-C'))
   })
 }
 // An unquoted heredoc body is literal when it holds no substitution or expansion that runs code

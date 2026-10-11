@@ -786,3 +786,15 @@ describe('0.5.0 §3.1 variables: the paths the simple forms do not reach', () =>
     ask('C=push; git $C -f origin feat/x; C=x')
   })
 })
+
+describe('0.5.0 §3.2 and §3.5 runner words that cannot run', () => {
+  test('an argument of cd or an inert command; dot-source per command', () => {
+    silent('grep -n "bash" f.md && git push -u origin feat/x; echo -f')
+    silent("echo 'run `. env.sh` first' && git push -u origin feat/x; echo -f")
+  })
+  test('escape routes', () => {
+    ask('cd tests/eval && git push -f origin feat/x')
+    ask('env bash x.sh; git status; echo -f push')
+    ask('. ./env.sh; echo push -f')
+  })
+})
