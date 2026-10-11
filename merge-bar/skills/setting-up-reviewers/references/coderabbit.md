@@ -2,7 +2,7 @@
 https://docs.coderabbit.ai/guides/review-instructions, https://docs.coderabbit.ai/faq,
 https://docs.coderabbit.ai/overview/pull-request-review.md and
 https://docs.coderabbit.ai/knowledge-base/index.md: none of them lists the pull request title
-or description among a review's inputs, so the six-field body must be assumed invisible to
+or description among a review's inputs, so the PR body's fields must be assumed invisible to
 CodeRabbit too. What it *is* documented to read: `**/AGENTS.md` and other code-guideline files,
 automatically, as review criteria (https://docs.coderabbit.ai/knowledge-base/code-guidelines.md)
 — so the Code Review Rules section reaches CodeRabbit as well as Codex.

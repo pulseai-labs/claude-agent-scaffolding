@@ -40,4 +40,4 @@ stated in the invocation. Repos with no remote never reach this lane; the
 ceremony merges them locally. The ceremony owns the tier; the loop above owns
 the rest.
 
-The six-field PR body template, for callers that open the PR: `references/pr-body.md`.
+The seven-field PR body template, for callers that open the PR: `references/pr-body.md`.

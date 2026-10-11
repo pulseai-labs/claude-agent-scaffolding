@@ -1,5 +1,5 @@
 ---
-description: Open a pull request with the six-field body and a merge bar fixed at open time — proposes a split when the claim or scope is too wide.
+description: Open a pull request with the seven-field body and a merge bar fixed at open time — proposes a split when the claim or scope is too wide.
 argument-hint: "[base-branch]"
 allowed-tools: Bash(git:*), Bash(gh:*), Read, Write, Glob, Grep
 ---
