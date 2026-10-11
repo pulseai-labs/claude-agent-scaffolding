@@ -29,6 +29,10 @@ maintaining the plugins themselves — version bumps, linting, test runners, par
 is unconstrained by this rule, because it never executes on a consumer's machine and so
 cannot produce a user-facing defect.
 
+Verification code that **ships** in a plugin is not that tooling. A gate that decides whether
+a user's tests passed, or whether a user's change meets its spec, runs on the user's path: it
+is in scope, and as a safety rail it falls under question 3.
+
 Everything below is about the other kind of code: what ships and runs for a user.
 
 ## The rule
