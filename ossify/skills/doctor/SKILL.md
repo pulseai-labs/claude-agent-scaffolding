@@ -1,6 +1,6 @@
 ---
 name: doctor
-description: Diagnose an ossify project and name the remedy for what it finds — state health and state-vs-repo drift, rotting demo lines, outstanding fakes, patch records, orphan worktrees, lean-spec validation, machine-checkable-rule authoring, the Claude/Codex interop check, the skill budgets, and plugin provenance. Use when the user says run doctor, check project health, validate the spec, add a project rule, check Codex interop, find orphan worktrees, check plugin provenance, or /ossify:doctor. Not the close gates (/close), not onboarding (/start).
+description: Use when the user says run doctor, check project health, validate the spec, add a project rule, check Codex interop, find orphan worktrees, check plugin provenance, or /ossify:doctor — diagnose an ossify project and name the remedy. Not the /close gates or /start onboarding.
 ---
 
 # doctor

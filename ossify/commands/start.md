@@ -17,7 +17,7 @@ ARGS_FROM_CLAUDE="$ARGUMENTS" bash -c '
 
 Now load the skill body and follow it:
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/start/SKILL.md` end to end and follow it** —
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/start/SKILL.md` (in OMP: `skill://start`) end to end and follow it** —
 with the parsed project name. The skill body owns the journey map →
 skeleton-cut → bones → risk gates → smoke-test → posture block → spec-core
 critic moment flow and shells out to `oss` for all state.

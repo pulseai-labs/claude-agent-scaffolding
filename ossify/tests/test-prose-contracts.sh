@@ -1319,12 +1319,12 @@ fi
 # is installed, the bundled loop otherwise. Losing either arm strands a host:
 # without the fallback, an install with no merge-bar has no loop at all; without
 # the route, merge-bar is never used from ossify.
-_WP="$HERE/../commands/work-pr.md"
-for _lit in 'working-a-pr' 'references/work-pr/loop.md'; do
+_WP="$HERE/../skills/work-pr/SKILL.md"
+for _lit in 'merge-bar:working-a-pr' 'references/loop.md'; do
   if grep -Fq -- "$_lit" "$_WP"; then
     T_PASS=$((T_PASS+1))
   else
-    T_FAIL=$((T_FAIL+1)); echo "FAIL: commands/work-pr.md no longer names '$_lit' - the router lost an arm"
+    T_FAIL=$((T_FAIL+1)); echo "FAIL: skills/work-pr/SKILL.md no longer names '$_lit' - the router lost an arm"
   fi
 done
 
@@ -1577,13 +1577,32 @@ _EX="$HERE/../skills/work-item/references/external-executor.md"
 _HC="$HERE/../skills/work-item/references/handoff-contract.md"
 _WC="$HERE/../skills/close/references/work-item-close.md"
 _SA="$HERE/../skills/plan-spine/references/spec-authoring.md"
-_RS="$HERE/../commands/run-spine.md"
+_RS="$HERE/../skills/run-spine/SKILL.md"
 for _pair in "$_RO|spine_inventory" "$_RO|The count lives in state" "$_RO|halt:out-of-order" \
              "$_EX|staged result" "$_EX|work_item_dispatched" "$_HC|spine_base_get" \
              "$_SA|re-entering" "$_RS|resumes"; do
   _f="${_pair%%|*}"; _lit="${_pair#*|}"
   _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
   _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.14.0 re-entry)"
+done
+# 1.15.0 - the run-spine grammar rails moved with the body into the skill (Rule 2).
+for _lit in 'Exactly two command shapes are accepted' 'before the spine-branch cut' 'refuse rather than guess'; do
+  _r=1; grep -Fq -- "$_lit" "$_RS" && _r=0
+  _pin "$_r" "skills/run-spine/SKILL.md does not state '$_lit' (1.15.0 grammar rails)"
+done
+# 1.15.0 final review: run-spine outside the slash command (I2) and on a harness without
+# the nested implementer (I3), and the spine close hand-off to work-pr on every surface (I1).
+for _lit in 'arrive as tokens in the request' 'a harness without it (OMP, Codex) refuse it before the spine-branch cut'; do
+  _r=1; tr '\n' ' ' < "$_RS" | tr -s ' ' | grep -Fq -- "$_lit" && _r=0
+  _pin "$_r" "skills/run-spine/SKILL.md does not state '$_lit' (1.15.0 final review)"
+done
+_CL="$HERE/../skills/close/SKILL.md"
+_SCL="$HERE/../skills/close/references/spine-close.md"
+for _f in "$_CL" "$_SCL"; do
+  _r=1; grep -Fq 'skill://work-pr' "$_f" && _r=0
+  _pin "$_r" "$(basename "$_f") does not hand the PR to work-pr on OMP (skill://work-pr) - 1.15.0 final review I1"
+  _r=0; tr '\n' ' ' < "$_f" | tr -s ' ' | grep -Fq -e 'not published on Codex' -e 'Codex today' -e 'does not carry `/ossify:work-pr`' && _r=1
+  _pin "$_r" "$(basename "$_f") still says work-pr is unavailable on Codex - false since 1.15.0, a Codex close would skip the P1 rail"
 done
 # Fix round 1: the staged-result rule is SCOPED to a `close-finished` item -
 # one the caller has not executed in this session. A close-rejected result also

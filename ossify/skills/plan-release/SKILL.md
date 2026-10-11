@@ -1,6 +1,6 @@
 ---
 name: plan-release
-description: Plan an ossify release — groom the feature map into spines, phrase exit criteria as user journeys, sequence spines by DAG, declare each spine bone or flesh under a fail-closed internal critic veto, and emit RELEASE.md. Use when the user wants to plan a release, groom the feature map, pick spines for the next release, plan Release 0 (the skeleton), or runs /plan-release. Requires a project onboarded via /start. Not spec-core onboarding (/start) or spine decomposition (/plan-spine).
+description: Use when the user wants to plan a release, groom the feature map, pick spines for the next release, plan Release 0 (the skeleton), or runs /plan-release — declare each spine bone or flesh under a fail-closed critic veto and emit RELEASE.md. Needs a project onboarded via /start. Not /plan-spine.
 ---
 
 # plan-release
@@ -111,7 +111,7 @@ it reintroduces a silent cross-project read that looks exactly like success.
 `"$oss_bin" doctor` is available at any point, but it is the state **gate** — `state`,
 `schema`, `replay`, `shape` — not a read-out. It says nothing about pending
 amendments, quarantined lines, outstanding fakes, patch records, a held lock or
-orphan worktrees. Run it if the state itself looks inconsistent; invoke **`ossify:doctor`**
+orphan worktrees. Run it if the state itself looks inconsistent; invoke **`ossify:doctor`** (OMP: `skill://doctor`)
 if you want the advisory surfaces, which this skill does not invoke.
 
 **Wayfinder pre-flight.** If a map exists for this repo, its resolved decisions

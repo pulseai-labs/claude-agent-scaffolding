@@ -1,13 +1,13 @@
-# ossify (v1.14.6)
+# ossify (v1.15.1)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
-spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
+spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
 `plan-release`, `plan-spine`, `work-item`, `close`, `doctor`, `challenge`,
-`wayfinder`, `patch`) plus `/ossify:run-spine`, which drives a planned spine's rounds
+`wayfinder`, `patch`), `/ossify:run-spine`, which drives a planned spine's rounds
 end to end, and the standalone utilities — session handoff
 (`/ossify:handoff`, `/ossify:handoff-resume`) and the PR review-fix-merge
 loop (`/ossify:work-pr`) — which work in any repository, ossify-initialised
-or not. Since 1.5.0 (#339) `work-pr` is also the spine-close merge lane: a
+or not. Each is a slash command and a skill. Since 1.5.0 (#339) `work-pr` is also the spine-close merge lane: a
 spine's hosting repos land on their base branches by PR where a remote exists
 (merged locally only where none does), and a release is a tag on the merged
 line. Since 1.6.0 (#139) `close`'s impl-check gate gains Layer 4: a semantic
@@ -121,8 +121,8 @@ one-change amendment to `/amend-spec`, a command only `scaffold-onboard` shipped
 projects onboarded with the legacy scaffold stack. No state schema, journal
 operation or command changes.
 
-Since 1.14.6, ossify's copy of merge-bar's PR body template
-(`references/work-pr/pr-body.md`) carries merge-bar 0.2.0's seventh field,
+Since 1.15.1, ossify's copy of merge-bar's PR body template
+(`skills/work-pr/references/pr-body.md`) carries merge-bar 0.2.0's seventh field,
 `## Merge danger`: the door (whether a revert of the merge undoes all of it) and
 the blast radius. `/ossify:patch` writes it on the no-merge-bar fallback. Spine
 close composes it per hosting repo, beside Scope and Known limits, only where
@@ -321,9 +321,9 @@ session. Codex installed-reference resolution remains partial (#399).
 `wayfinder` is both at once, which is why it is listed above rather than
 below: an entry skill with its own skill directory, and an any-repo one. It
 charts a question into decision tickets on the issue tracker, or works an
-existing map's frontier one ticket per session. The three utilities have no
-skill directory — their depth lives in `references/` — so they are a Claude
-Code command surface only.
+existing map's frontier one ticket per session. The three utilities are skills
+too since 1.15.0 (`handoff`, `handoff-resume`, `work-pr`; so is `run-spine`). Their depth lives
+in each skill's `references/`, so every harness the plugin ships on has them.
 
 `challenge` is the grill and the adversarial critic, absorbed in-tree at 1.1.0:
 the bone grill gate, the spec-core close audit, the release class veto, and the
@@ -354,3 +354,11 @@ Design of record and the release roadmap are tracked in this repository's
 issues and git history rather than as shipped files.
 
 Dispatcher: `bin/oss`. Tests: `bash tests/run-all.sh`.
+
+## OMP
+
+Install per the root README (the plugin, plus the one-time `PATH` extension for `oss`, `wi` and `arc`).
+Skill names are bare in OMP, with no `ossify:` prefix. The standalone skills `handoff`, `handoff-resume`,
+`work-pr` and `run-spine` are reachable as `skill://<name>`. The `implementer-agent` file is Claude
+Code-only for now: OMP discovers it, but its tool names are not yet translated, so round execution's
+nested implementer dispatch (`run-spine`'s default) is Claude Code-only today.

@@ -17,7 +17,7 @@ ARGS_FROM_CLAUDE="$ARGUMENTS" bash -c '
 
 Now load the skill body and follow it:
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/work-item/SKILL.md` end to end and follow
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/work-item/SKILL.md` (in OMP: `skill://work-item`) end to end and follow
 it** — with the parsed absolute handoff path. The skill body owns the pre-flight
 gates (handoff + spec read end-to-end, a clean worktree on the declared branch,
 the ambiguity scan) → the RED gate per command-bearing AC → the TDD loop in
