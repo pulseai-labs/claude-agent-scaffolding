@@ -1,6 +1,6 @@
 ---
 name: opening-a-pr
-description: Open a pull request whose body carries six fields — Claim, Scope, Known limits, Merge bar, Evidence, Closes — so every reviewer and the session that works the PR judge it against a finish line fixed before review starts. Use when opening, raising or creating a PR, writing a PR description, or when another skill hands you a finished branch to open. Proposes a split instead of opening when the honest claim or scope is too wide.
+description: Open a pull request whose body carries seven fields — Claim, Scope, Known limits, Merge danger, Merge bar, Evidence, Closes — so every reviewer and the session that works the PR judge it against a finish line fixed before review starts. Use when opening, raising or creating a PR, writing a PR description, or when another skill hands you a finished branch to open. Proposes a split instead of opening when the honest claim or scope is too wide.
 ---
 
 # Opening a pull request
@@ -9,8 +9,9 @@ description: Open a pull request whose body carries six fields — Claim, Scope,
 
 A review loop with no finish line agreed before it starts ends only when someone tires, and
 every finding it cannot place becomes an issue. The body fixes the finish line before any
-reviewer speaks: the **Merge bar** says which findings can block, and the **Claim**, **Scope**
-and **Known limits** say what this PR promises and what it deliberately leaves alone.
+reviewer speaks: the **Merge bar** says which findings can block, the **Claim**, **Scope**
+and **Known limits** say what this PR promises and what it deliberately leaves alone, and the
+**Merge danger** says whether a revert undoes the merge.
 `working-a-pr` judges every finding against this body, so write it as if nobody will read
 anything else.
 
@@ -38,14 +39,14 @@ at §5's printed title and body.
 
 ## 3. Write the body
 
-Use the template in `references/pr-body.md` exactly — its six headings, in order, and its
+Use the template in `references/pr-body.md` exactly — its seven headings, in order, and its
 Merge bar block word for word. Its "Filling each field" section says what goes in each one.
 
 ## 4. Follow the repository's own conventions
 
 - **A PR template already exists** (`.github/pull_request_template.md`, a file under
   `.github/PULL_REQUEST_TEMPLATE/`, or the root or `docs/` equivalents): keep every one of its
-  sections, fill them, and put the six fields after them. Never delete a template section.
+  sections, fill them, and put the seven fields after them. Never delete a template section.
 - **Closing issues:** one `Closes #N` line per issue. GitHub closes only the first issue of `Closes #1, #2`.
 - **The repository's rules for commit and PR text** apply to this body too. Read its
   `CLAUDE.md`, `AGENTS.md` and `CONTRIBUTING.md` — for example, a repo that forbids AI

@@ -21,7 +21,7 @@ Everything else is non-blocking.
 
 | Skill | Command | What it does |
 |---|---|---|
-| `opening-a-pr` | `/merge-bar:open-pr` | Writes the six-field body (Claim, Scope, Known limits, Merge bar, Evidence, Closes) and opens the PR |
+| `opening-a-pr` | `/merge-bar:open-pr` | Writes the seven-field body (Claim, Scope, Known limits, Merge danger, Merge bar, Evidence, Closes) and opens the PR |
 | `working-a-pr` | `/merge-bar:work-pr <PR>` | Works the PR to mergeable against its own bar; merges only on your ack |
 | `setting-up-reviewers` | `/merge-bar:setup-reviewers` | Once per repository: `AGENTS.md` review rules, and `.coderabbit.yaml` if public |
 

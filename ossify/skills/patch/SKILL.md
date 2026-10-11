@@ -127,7 +127,7 @@ work it with `working-a-pr` (on Claude Code, `/merge-bar:open-pr` and
 the patch worktree, `<new-worktree-path>` — they read the current directory's
 branch and `HEAD`, so never from a checkout a spine is parked on.
 
-**Otherwise**, write the six-field body from ossify's copy of that template,
+**Otherwise**, write the seven-field body from ossify's copy of that template,
 `../work-pr/references/pr-body.md`: its headings in order, and
 its Merge bar block word for word. Push the branch first —
 `git -C "<new-worktree-path>" push -u origin "fix/<plugin-or-project>-<version>"` —

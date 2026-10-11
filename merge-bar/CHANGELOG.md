@@ -2,6 +2,17 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.2.0
+
+- `opening-a-pr` — the PR body has a seventh field, `## Merge danger`, between Known limits
+  and Merge bar. It names the door (two-way when a revert of the merge undoes all of it,
+  one-way when something outlives the revert) and the blast radius. It does not change which
+  findings block.
+- `working-a-pr` — the terminus report quotes the body's Merge danger, or says the body has
+  none, before it asks for the merge ack.
+- The `opening-a-pr` eval rubric's first criterion is renamed `body_fields` and checks seven
+  headings. The committed eval results predate this change.
+
 ## 0.1.0
 
 Initial release. Three prose skills and three slash commands, no runtime library.
