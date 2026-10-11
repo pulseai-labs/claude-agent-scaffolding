@@ -1,4 +1,4 @@
-# Skill-first — the one rule that matters most
+# Skill-first — prose by default, code where the input is closed
 
 > **Single source of truth.** This file is authored once at the marketplace root
 > (`docs/conventions/skill-first.md`) and imported by every `CLAUDE.md` that needs it,
@@ -11,14 +11,16 @@
 > the one sentence.** Where a headline and this file disagree, this file wins.
 >
 > Nothing else restates the rule. A restatement is the failure mode this file exists to
-> prevent — the last one replaced a decidable test with a judgment call.
+> prevent.
 
 ## What we are building, and why it constrains how
 
-These plugins are built for our own daily workflow across many projects, and the design
-lineage is `superpowers` and mattpocock's skills. That lineage is the rule, not a credit:
-both ship capability as **prose skills a model follows**, not as runtime code the model
-calls. Plugins here are developed **skill-first, not deterministic-code-first**.
+These plugins are built for our own daily workflow across many projects. The design lineage
+is `superpowers` and mattpocock's skills: capability ships as **prose skills a model
+follows**, with code only where code is the better tool. Poteto's "gradient" (Matt Pocock ×
+Poteto, 2026) names where that line falls: judgment goes to the agent, mechanical work goes
+into code so that agents do not "rebuild the world each time". This file makes the line
+decidable for our stack.
 
 ## Scope: this governs code that runs on a user's path
 
@@ -27,56 +29,63 @@ maintaining the plugins themselves — version bumps, linting, test runners, par
 is unconstrained by this rule, because it never executes on a consumer's machine and so
 cannot produce a user-facing defect.
 
-`superpowers` is the reference point: ~40 shell scripts and **no runtime library**. Every
-one is build/release/test tooling — `bump-version.sh`, `lint-shell.sh`, `run-test.sh`.
+Verification code that **ships** in a plugin is not that tooling. A gate that decides whether
+a user's tests passed, or whether a user's change meets its spec, runs on the user's path: it
+is in scope, and goes through the test like any other code: reading an exit status is
+question 2, judging whether a change meets its spec is question 1, and a gate that reads
+another tool's open output is question 3 only if it never approves — one that can pass a
+failed run goes to question 4.
 
 Everything below is about the other kind of code: what ships and runs for a user.
 
 ## The rule
 
-**Code that MUTATES DURABLE STATE may be deterministic. Code that READS AND REPORTS must be prose.**
+**Prose is the default. Code is allowed when the work is mechanical and its inputs are closed, or when it is a mechanical check that can only add a stop.**
 
-The consumer of these plugins is a frontier model. It does not need a runtime library to
-tell it what a path is or whether a file looks wrong — it can read the file. Every line of
-shell we ship to do that work is a line the model would have done better, and a line that
-can carry a bug.
+Ask in order; the first question that matches decides.
 
-| Deterministic is justified | Prose is correct |
-|---|---|
-| journal mutation, replay, locking | diagnostics ("read this, say what's wrong") |
-| exact identity — digests, hashes | verification ("run this, did it pass") |
-| real side effects — git, worktrees | extraction ("read these docs, pull out the lessons") |
-| monotonic ID minting | validation of prose the agent itself authored |
-| safety rails the agent must not argue past | anything heuristic or judgment-laden |
+| # | Question | If yes |
+|---|---|---|
+| 1 | Does the work need judgment — choosing, weighing, reading meaning? | **Prose.** |
+| 2 | Is it mechanical, **and** is its input closed — a small, known set of shapes that tests can cover fully (our own state files, IDs we mint, digests, git commands with fixed arguments, version strings)? | **Code.** |
+| 3 | Is it a mechanical check on open-ended input (free shell text, paths people type, prose, another tool's changing output), **and** can it only add a stop — an extra question, a refusal — and never approves anything, so whatever it misses goes on to the next judge (a model or the operator) exactly as if the check were absent? | **Code, as a safety rail.** It states what it stops and what it leaves to the next judge. |
+| 4 | None of the above. | **Prose**, or a model judgment called from code. |
 
-**The test, and it is deliberately decidable.** Before adding anything to a `lib/`, answer:
-*what breaks if a model does this by reading files instead?* If the answer is "nothing",
-write the prose.
+**New work and existing work.** New work follows the test from the start. Existing work
+moves only when evidence — a pulse360 finding, a review finding, a recorded incident — shows
+the current form failing.
 
-It is decidable on purpose. A criterion like "only where deterministic code is really
-crucial" is the sentence a session writes to justify the library it already wanted; mutation
-is a property you can check.
+**"Rebuild the world."** When agents keep re-deriving the same mechanical step, make one
+shared tool — only if question 2 or 3 allows it. Otherwise write the step once into the skill
+as fixed wording.
+
+**Two consequences worth naming.** Most state mutation — journals, locks, IDs, git side
+effects — comes out as code, because its input is closed. "Run this; did it pass" may be code
+when it reads only an exit status; explaining *why* it failed stays prose.
+
+**The test is decidable on purpose.** Each question asks for a property you can check: does
+the work judge, is the input set closed, can the code ever approve anything. A criterion like
+"only where deterministic code is really crucial" is the sentence a session writes to justify
+the code it already wanted.
 
 ## Measured, not asserted
 
 On this repo, new library bash has been ~29% of changed volume and ~57% of review findings —
 roughly 4x the defect density of prose. On PR #166 it was 100%: four review rounds, five
-defects, every one in path-string handling, net product value a path normalizer. At the time
-of writing, **6 of 41 open issues are bugs in library code the skill-first direction marks
-for deletion** — 8 at the ceiling, and only if converting *both* `interop` and `doctor` also
-orphans the shared path helper they call.
+defects, every one in path-string handling, net product value a path normalizer. The defects
+sit outside question 2's boundary: code reading open input.
 
-An earlier draft of this line claimed 15 of 38. That number came from a keyword grep over
-issue **titles**, and a per-issue read retired it: it swept in prose bugs, other plugins'
-bugs, and bugs in `manifest.sh` and `commands.sh` — 586 LOC the deterministic/prose sort
-never classified in either direction. The direction still rests on the defect-density
-measurement above; it does not rest on issue count.
+autonomic 0.5.0 (PR #735) is the worked example of question 3. Its never-approve check reads
+free shell text — mechanical work on open input. It is allowed as code only because it never
+approves anything: it can force an ask, and a command it misses goes on to the model's
+judgment exactly as if the check were absent. It still took four review rounds and ships with
+16 recorded known limits — commands it misses — the cost of open input.
 
 ## In practice
 
-Default to a skill (prose instructions the model follows). Reach for deterministic code only
-when the table above says so. Prefer agent/LLM-judge review over brittle deterministic gates
-for anything semantic; keep deterministic checks for mechanical facts only.
+Default to a skill. Reach for code when the test says so, and say which question allowed it.
+Prefer agent/LLM-judge review over brittle deterministic gates for anything semantic; keep
+deterministic checks for mechanical facts on closed input.
 
 Over-specifying mechanical precision in prose is its own failure — it drives review churn
 without buying correctness.
