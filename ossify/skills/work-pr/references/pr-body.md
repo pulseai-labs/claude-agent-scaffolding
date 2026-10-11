@@ -11,6 +11,8 @@ merge-bar's first, then copy the block here.
 Copy this template exactly. Seven `##` headings, in this order. The Merge bar block is copied
 word for word; the only permitted change is one optional line after it that **raises** the
 bar (for example "Any change to the on-disk format blocks."). It never lowers conditions 1–4.
+A review stopping rule is not a bar and never goes here: `working-a-pr` decides when rounds
+stop, and a finding that meets a condition blocks in every round.
 
 ```markdown
 ## Claim
@@ -53,7 +55,8 @@ Closes #<n>
   something outlives the revert (a migration run, data in a new format, a published release,
   a removed flag a consumer used) — name it. **Blast radius**: who or what breaks if this is
   wrong, not a size word like "low". It does not change the Merge bar.
-- **Merge bar** — the block above, unchanged, plus at most one raising line.
+- **Merge bar** — the block above, unchanged, plus at most one raising line. "After round 2,
+  block only on X" is a lower bar, not a raising line.
 - **Evidence** — only what ran in this session, with its result. If nothing ran, write
   `Not run — <why>`.
 - **Closes** — one `Closes #N` line per issue. If the PR closes nothing, write `None.`

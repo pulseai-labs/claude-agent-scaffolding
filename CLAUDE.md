@@ -156,7 +156,9 @@ The four spellings that failed, so nobody re-derives one:
   grind one-at-a-time.
 - If a function draws a finding in more than one round, **restructure it** rather than
   patching again. Three findings on one function means the shape is wrong.
-- Agree the review stopping rule *before* opening the PR, never mid-cycle.
+- The review loop is merge-bar's `working-a-pr`. The body's Merge bar, written when the PR
+  opens, decides what blocks, and that skill decides when rounds stop. Do not agree a separate
+  stopping rule, and never write one into the bar.
 
 ---
 
