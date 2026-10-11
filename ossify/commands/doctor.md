@@ -17,7 +17,7 @@ ARGS_FROM_CLAUDE="$ARGUMENTS" bash -c '
 
 Now load the skill body and follow it:
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/doctor/SKILL.md` end to end and follow it** —
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/doctor/SKILL.md` (in OMP: `skill://doctor`) end to end and follow it** —
 with the parsed surface name, if any. The skill body owns the routing (an
 optional surface token; empty runs the full sweep) → state inspection
 (`oss doctor`'s four gate lines, the remedy table, then the advisory reads the

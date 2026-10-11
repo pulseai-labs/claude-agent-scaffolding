@@ -3,7 +3,7 @@
 Score each 1-5. Pass = all ≥4.
 
 This surface scores the **disposition judgment** of
-`ossify/references/work-pr/loop.md` — the review-fix-merge lane's contract
+`ossify/skills/work-pr/references/loop.md` — the review-fix-merge lane's contract
 held without any deterministic gate.
 
 **Every criterion is scored on every fixture.** Each names a thing the loop

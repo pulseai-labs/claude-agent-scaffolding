@@ -17,7 +17,7 @@ ARGS_FROM_CLAUDE="$ARGUMENTS" bash -c '
 
 Now load the skill body and follow it:
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/plan-spine/SKILL.md` end to end and follow
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/plan-spine/SKILL.md` (in OMP: `skill://plan-spine`) end to end and follow
 it** — with the parsed spine id (`r1.s2`). The skill body owns the pre-flight
 probes (manifest + project + a planned release) → decomposition into 1-5 work
 items with a `target_repo` → round identification via the work-item DAG →

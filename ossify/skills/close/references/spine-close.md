@@ -196,8 +196,8 @@ One of the two facts this step needs is not in state; the other is:
 
 **The PR body, when merge-bar is installed.** Where this session lists the
 `merge-bar` plugin's `working-a-pr` skill, compose the six fields before the
-pass, **one file per hosting repo**, from the template in the plugin root's
-`references/work-pr/pr-body.md`: its headings in order and its Merge bar block word
+pass, **one file per hosting repo**, from the template in
+`../../work-pr/references/pr-body.md`: its headings in order and its Merge bar block word
 for word, so the bar exists before the first review.
 
 - **Claim** — what this spine makes true, from `SPINE.md`'s demo contribution.
@@ -479,7 +479,7 @@ is `merge-conflict-resolution.md` — hunk by hunk, by each side's recorded
 intent. Resuming means finishing *this* repo's landing and continuing from
 there, not re-running the layer or restarting a repo that already landed.
 
-**Between the passes: hand every open PR to `/ossify:work-pr`, one at a time** — each
+**Between the passes: hand every open PR to work-pr (`/ossify:work-pr`; the `work-pr` skill on Codex, `skill://work-pr` in OMP), one at a time** — each
 in its own session where the caller supplies one.
 The invocation states, in full: the spine context (this PR *is* the spine's
 accumulated diff landing — the smallest independently meaningful diff, which is
@@ -508,8 +508,7 @@ open, the close halts here, recording nothing**: surface the PR URLs, say which
 steps remain, and stop. That is the named halt state; re-invoke `/close
 <spine-id>` once the PR has merged.
 
-**On a surface that does not carry `/ossify:work-pr` — Codex today, which
-publishes ossify's skills but not its commands — the operator drives the
+**Where no work-pr is available at all, the operator drives the
 review-fix-merge loop by their own means and says so.** What this ceremony
 REQUIRES is a landing of the PR it opened that the record pass can prove — a
 merge commit of its head, or a squash or rebase of exactly its head; who drove

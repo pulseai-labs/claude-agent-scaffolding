@@ -17,7 +17,7 @@ ARGS_FROM_CLAUDE="$ARGUMENTS" bash -c '
 
 Now load the skill body and follow it:
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/close/SKILL.md` end to end and follow it** —
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/close/SKILL.md` (in OMP: `skill://close`) end to end and follow it** —
 with the parsed id. The skill body owns the routing (the id's shape decides the
 scope; it is never asked) → the common pre-flight (a resolvable topology
 declaration, a green

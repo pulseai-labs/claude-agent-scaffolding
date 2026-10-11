@@ -1,6 +1,6 @@
 ---
 name: wayfinder
-description: Decision-ticket maps on an issue tracker — chart a question into a map plus its research/smoke-test/spike/prototype/grilling/task tickets, or work an existing map's frontier one ticket per session. Activate on a wayfinder map name, number, or URL, a loose decision-shaped question too big for one session, or /ossify:wayfinder. Not release or spine planning — those stay build-slice DAGs (/ossify:plan-release, /ossify:plan-spine).
+description: Use when given a wayfinder map name, number or URL, a loose decision-shaped question too big for one session, or /ossify:wayfinder — chart decision tickets on the issue tracker, or work a map's frontier one ticket per session. Not release or spine planning (/ossify:plan-release, /ossify:plan-spine).
 ---
 
 # wayfinder

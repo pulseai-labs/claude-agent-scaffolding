@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ossify's copy of merge-bar's PR-body template (ossify 1.13.0).
 #
-# /ossify:patch opens a PR from ossify/references/work-pr/pr-body.md where the
+# /ossify:patch opens a PR from ossify/skills/work-pr/references/pr-body.md where the
 # merge-bar plugin is not installed, and spine close composes a spine PR's six
 # fields from the same file. The copy exists because merge-bar's own file is
 # absent exactly when the fallback runs. A drifted copy ships a different merge
@@ -19,7 +19,7 @@ set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 THEIRS="$ROOT/merge-bar/skills/opening-a-pr/references/pr-body.md"
-OURS="$ROOT/ossify/references/work-pr/pr-body.md"
+OURS="$ROOT/ossify/skills/work-pr/references/pr-body.md"
 
 PASS=0
 FAIL=0
@@ -49,7 +49,7 @@ fi
 if cmp -s "$T/theirs" "$T/ours"; then
   pass "ossify's template block is byte-identical to merge-bar's"
 else
-  fail "ossify's template block is byte-identical to merge-bar's - copy merge-bar's block into ossify/references/work-pr/pr-body.md"
+  fail "ossify's template block is byte-identical to merge-bar's - copy merge-bar's block into ossify/skills/work-pr/references/pr-body.md"
 fi
 
 printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"

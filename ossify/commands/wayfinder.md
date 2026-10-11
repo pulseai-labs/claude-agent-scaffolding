@@ -6,7 +6,7 @@ allowed-tools: Bash(bash:*), Bash(gh:*), Bash(jq:*), Bash(git:*), Bash(oss:*), B
 
 Invoke the wayfinder skill with: $ARGUMENTS
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/SKILL.md` end to end and follow
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/wayfinder/SKILL.md` (in OMP: `skill://wayfinder`) end to end and follow
 it** — with the parsed argument, if any. The skill body owns the routing: no
 argument or a loose idea is chart mode, a map name/number/URL is work mode,
 a map plus a ticket is work mode on that ticket. Either way it resolves the
