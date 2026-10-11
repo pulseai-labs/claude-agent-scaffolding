@@ -1,6 +1,6 @@
 ---
 name: patch
-description: Ship a defect in shipped behaviour, or a small request from another project that it cannot fake, as a versioned patch off the default branch — reproduce-first for a defect, acceptance-criteria-first for a request, then a PR and a tag. Use when handed issue numbers or a described defect to fix outside any spine, or on /ossify:patch. Not new scope (the intake queue), not a large request (/plan-spine), not a change nothing observes (close's direct-commit patch lane).
+description: Use when handed issue numbers or a described defect to fix outside any spine, a small request from another project it cannot fake, or /ossify:patch — ship a versioned patch off the default branch, reproduce-first or AC-first, then PR and tag. Not new scope (intake queue), not a large request (/plan-spine), not a change nothing observes (close's direct-commit lane).
 ---
 
 # patch

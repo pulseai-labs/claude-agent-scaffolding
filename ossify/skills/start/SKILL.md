@@ -1,6 +1,6 @@
 ---
 name: start
-description: Drive ossify spec-core onboarding for a new project — the Patton journey map, the skeleton cut that fixes Release 0, the bones registry, and the privacy posture with its moat channels — producing a lean MASTER-SPEC, memory bank, bones ADRs and a seed feature map. Use when the user wants to start a new project, onboard a project into ossify, kick off a skeleton-first build, or runs /start. Resolves or authors the topology declaration; halts only if it still fails to resolve. Not release planning (/plan-release), spine decomposition (/plan-spine), or amending an existing spec.
+description: Use when the user wants to start a new project, onboard a project into ossify, kick off a skeleton-first build, or runs /start — journey map, skeleton cut, bones registry, privacy posture; produces a lean MASTER-SPEC, memory bank, bones ADRs and seed feature map. Not /plan-release, /plan-spine or amending an existing spec.
 ---
 
 # start

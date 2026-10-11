@@ -1,6 +1,6 @@
 ---
 name: plan-spine
-description: Plan one ossify spine — decompose it into 1-5 work items, identify rounds via a DAG, author a spec per round, and author the cumulative-demo criteria under the journey-line floor. Use when the user wants to plan a spine, decompose a spine into work items, author demo criteria, start building a spine, or runs /plan-spine. Requires a release planned via /plan-release. Not release selection or the bone/flesh declaration (/plan-release), not spec-core onboarding (/start).
+description: Use when the user wants to plan a spine, decompose a spine into work items, author demo criteria, start building a spine, or runs /plan-spine — 1-5 work items, rounds by DAG, a spec per round, cumulative-demo criteria. Needs a release planned via /plan-release. Not release selection or /start.
 ---
 
 # plan-spine

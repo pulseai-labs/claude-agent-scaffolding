@@ -1,6 +1,6 @@
 ---
 name: work-pr
-description: Use when driving a pull request to merge on a repo without merge-bar's working-a-pr — the bundled review-fix-merge loop; every finding dispositioned, merge only on explicit ack
+description: Use when driving a pull request to merge — merge-bar's working-a-pr if installed, else the bundled loop; every finding dispositioned, merge only on explicit ack
 ---
 
 **Pick the loop, and say in one line which one before round 1.**
