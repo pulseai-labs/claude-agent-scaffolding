@@ -17,7 +17,8 @@ keeping everything already there, and tell the operator you did. A bar written b
 first disposition is a bar; one written after is a rationalisation.
 
 **A bar below the template?** Conditions 1–4 are a floor: if the body's bar drops or rewords
-one, judge by all four anyway and tell the operator.
+one, judge by all four anyway and tell the operator. A stopping rule written in the bar's place
+is such a bar: §3.5 decides when rounds stop, never the body.
 
 ## 1. Preflight — resolve the target, stop early, stop loudly
 

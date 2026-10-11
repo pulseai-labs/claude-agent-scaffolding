@@ -2,6 +2,16 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.2.1
+
+- `opening-a-pr` — the template says a review stopping rule is not a bar and never goes in
+  the Merge bar block: `working-a-pr` decides when rounds stop, and "after round 2, block only
+  on X" is a lower bar. Seven PRs (#626, #653, #707, #712, #720, #722, #725) wrote a stopping
+  rule in place of the four conditions, following a pre-merge-bar "2 rounds, then defer" rule.
+- `working-a-pr` — a stopping rule in the bar's place is judged as a bar below the template.
+- The repository `CLAUDE.md` drops its separate "agree a stopping rule" line and points at
+  `working-a-pr`.
+
 ## 0.2.0
 
 - `opening-a-pr` — the PR body has a seventh field, `## Merge danger`, between Known limits
