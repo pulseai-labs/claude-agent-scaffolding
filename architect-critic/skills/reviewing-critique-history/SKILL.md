@@ -15,7 +15,7 @@ This skill is intentionally narrow: read, format, display. No judgment, no rebut
 
 Resolve the state file through the dispatcher, never a hardcoded path — `ac_state_path` resolves `ac_data_dir` (which honors a `CLAUDE_PLUGIN_DATA` override) and appends `state.json`, so this read path always matches the write path other skills use.
 
-Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH`. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
 ```bash
 STATE_FILE="$("$arc_bin" state_path)"

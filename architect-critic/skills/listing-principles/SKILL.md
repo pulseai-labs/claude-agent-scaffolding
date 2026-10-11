@@ -29,7 +29,7 @@ You read up to four sources in this exact order. Each is optional except shipped
 
 **Source 1 — Shipped defaults** (`shipped`)
 
-Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH`. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
 The plugin ships `templates/principles.md`. It always exists. Resolve it through the `arc` dispatcher — `arc_bin` above — which self-locates the installed plugin root on every surface:
 

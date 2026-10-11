@@ -9,7 +9,7 @@ You have been invoked to manage **background close-depth critique jobs** created
 
 Parse the verb (+ optional `<run-id>`) from `$ARCHITECT_CRITIC_ARGS` (the `/critique-jobs` wrapper exports it; env-var bridge per [[feedback_slash_command_dollar_n_bug]]) — on shim-less channels (`Skill()`, natural language) nothing exports it, so read the verb, `<run-id>`, and `--neutral` as literal tokens in the invocation/request text. If no `<run-id>` is given, default to the most recent applicable run (see each verb). If `--neutral` is present on `resume`, force `neutral_mode=true`; otherwise resume inherits `external_runs[].neutral_mode` from the original `/critique --close --async [--neutral]` dispatch. All state/spine calls go through the `arc` dispatcher. Likewise re-derive `walk_mode` from the run record — `external_runs[].walk_mode`, persisted at dispatch: when `true`, the resumed unified rebuttal walks every consolidated challenge; otherwise it runs `critiquing-spec` Step 8.0 triage first (auto-apply predicate-clean dispositions, walk the escalated subset).
 
-Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH`. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
 List runs for context with:
 

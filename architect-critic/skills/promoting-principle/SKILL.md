@@ -68,7 +68,7 @@ Stop. Do not write to any file.
 
 Determine the target `principles.md` path based on scope.
 
-Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH`. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
 **`user` scope:**
 
@@ -175,7 +175,7 @@ Example formatted entry:
 
 ## Step 6: Record in state.json
 
-Initialize state via the `arc` dispatcher (`architect-critic/bin/arc`; on Claude Code `arc` is on `$PATH` automatically; the dispatcher's bash shebang forces a bash runtime for the lib regardless of the caller shell, fixing the BASH_SOURCE crash that bare `source` triggers under zsh):
+Initialize state via the `arc` dispatcher (`architect-critic/bin/arc`; `arc` is on `$PATH` automatically; the dispatcher's bash shebang forces a bash runtime for the lib regardless of the caller shell, fixing the BASH_SOURCE crash that bare `source` triggers under zsh):
 
 ```bash
 "$arc_bin" state_init

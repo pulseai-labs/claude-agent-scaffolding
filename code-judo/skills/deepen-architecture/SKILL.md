@@ -54,7 +54,7 @@ Read the resolved vocabulary source and the ADRs covering the area you are touch
 before forming opinions — whatever was resolved under *Resolve where the vocabulary lives*,
 never whatever happens to sit at the repo root.
 
-Then spawn a sub-agent to walk the codebase. Do not follow rigid heuristics — explore
+Then spawn a sub-agent (`Agent` in Claude Code, `task` in OMP) to walk the codebase. Do not follow rigid heuristics — explore
 organically and note where *you* experience friction:
 
 - Where does understanding one concept require bouncing between many small modules?

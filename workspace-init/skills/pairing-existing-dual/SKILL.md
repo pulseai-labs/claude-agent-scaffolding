@@ -19,7 +19,7 @@ Auto-invokes on phrases like "pair my existing AI workspace", "both repos alread
 
 If any fail, exit non-zero with a clear error; do NOT write the manifest or install any hook.
 
-Resolve the `wi` dispatcher once and hold it in `wi_bin`: `wi_bin="$(command -v wi)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
+Resolve the `wi` dispatcher once and hold it in `wi_bin`: `wi_bin="$(command -v wi)"` — the plugin loader puts `bin/` on `$PATH`. Every `wi` invocation below — and in this skill's references — is `"$wi_bin"`.
 
 - `command -v jq` and `command -v git` on PATH.
 - **AI workspace path absolute + exists + non-empty.** It is already populated; an empty or missing directory is the wrong target (or means the user wants Scenario A fresh-pair instead).
