@@ -31,13 +31,15 @@ cannot produce a user-facing defect.
 
 Verification code that **ships** in a plugin is not that tooling. A gate that decides whether
 a user's tests passed, or whether a user's change meets its spec, runs on the user's path: it
-is in scope, and as a safety rail it falls under question 3.
+is in scope, and goes through the test like any other code: reading an exit status is
+question 2, judging whether a change meets its spec is question 1, and a gate that reads
+another tool's open output is question 3.
 
 Everything below is about the other kind of code: what ships and runs for a user.
 
 ## The rule
 
-**Prose is the default. Code is allowed when the work is mechanical and its inputs are closed, or when its only possible mistake is an extra stop.**
+**Prose is the default. Code is allowed when the work is mechanical and its inputs are closed, or when it is a mechanical check that can only add a stop.**
 
 Ask in order; the first question that matches decides.
 
@@ -45,7 +47,7 @@ Ask in order; the first question that matches decides.
 |---|---|---|
 | 1 | Does the work need judgment — choosing, weighing, reading meaning? | **Prose.** |
 | 2 | Is it mechanical, **and** is its input closed — a small, known set of shapes that tests can cover fully (our own state files, IDs we mint, digests, git commands with fixed arguments, version strings)? | **Code.** |
-| 3 | Is the input open-ended (free shell text, paths people type, prose, another tool's changing output), **and** can every mistake the code makes only add a stop — an extra question, a refusal — never let something through? | **Code, as a safety rail.** It states which way it fails. |
+| 3 | Is it a mechanical check on open-ended input (free shell text, paths people type, prose, another tool's changing output), **and** can it only add a stop — an extra question, a refusal — and never approves anything, so whatever it misses goes on to the next judge (a model or the operator) exactly as if the check were absent? | **Code, as a safety rail.** It states what it stops and what it leaves to the next judge. |
 | 4 | None of the above. | **Prose**, or a model judgment called from code. |
 
 **New work and existing work.** New work follows the test from the start. Existing work
@@ -61,7 +63,7 @@ effects — comes out as code, because its input is closed. "Run this; did it pa
 when it reads only an exit status; explaining *why* it failed stays prose.
 
 **The test is decidable on purpose.** Each question asks for a property you can check: does
-the work judge, is the input set closed, which way can the code be wrong. A criterion like
+the work judge, is the input set closed, can the code ever approve anything. A criterion like
 "only where deterministic code is really crucial" is the sentence a session writes to justify
 the code it already wanted.
 
@@ -73,9 +75,10 @@ defects, every one in path-string handling, net product value a path normalizer.
 sit where question 2 says they will: code reading open input.
 
 autonomic 0.5.0 (PR #735) is the worked example of question 3. Its never-approve check reads
-free shell text — mechanical work on open input. It is allowed as code only because every
-mistake it can make is an extra ask, never a missed one. It still took four review rounds and
-ships with 16 recorded known limits: the cost of open input, paid in the safe direction.
+free shell text — mechanical work on open input. It is allowed as code only because it never
+approves anything: it can force an ask, and a command it misses goes on to the model's
+judgment exactly as if the check were absent. It still took four review rounds and ships with
+16 recorded known limits — commands it misses — the cost of open input.
 
 ## In practice
 

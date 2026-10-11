@@ -22,7 +22,7 @@ never be added back here.
 
 ## The one rule that matters most
 
-**Prose is the default. Code is allowed when the work is mechanical and its inputs are closed, or when its only possible mistake is an extra stop.**
+**Prose is the default. Code is allowed when the work is mechanical and its inputs are closed, or when it is a mechanical check that can only add a stop.**
 
 @docs/conventions/skill-first.md
 
