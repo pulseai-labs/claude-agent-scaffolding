@@ -175,7 +175,7 @@ Example formatted entry:
 
 ## Step 6: Record in state.json
 
-Initialize state via the `arc` dispatcher (`architect-critic/bin/arc`; `arc` is on `$PATH` automatically; the dispatcher's bash shebang forces a bash runtime for the lib regardless of the caller shell, fixing the BASH_SOURCE crash that bare `source` triggers under zsh):
+Initialize state via the `arc` dispatcher (`architect-critic/bin/arc`; the plugin loader puts `bin/` on `$PATH`; the dispatcher's bash shebang forces a bash runtime for the lib regardless of the caller shell, fixing the BASH_SOURCE crash that bare `source` triggers under zsh):
 
 ```bash
 "$arc_bin" state_init

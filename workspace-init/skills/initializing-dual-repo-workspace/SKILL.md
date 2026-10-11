@@ -26,7 +26,7 @@ auto-commits (SPEC §7.4).
 
 This skill delegates bookkeeping to bash modules under
 `workspace-init/lib/`. Those modules expose stable function names; this skill
-calls them via the `wi` dispatcher (`workspace-init/bin/wi`). `wi` is on `$PATH` automatically (every plugin's `bin/` is added). The dispatcher has a bash shebang so the libs
+calls them via the `wi` dispatcher (`workspace-init/bin/wi`). The plugin loader puts `bin/` on `$PATH`. The dispatcher has a bash shebang so the libs
 always run under bash even when the calling shell is zsh. Never `source`
 the lib files directly from skill body — under zsh `${BASH_SOURCE[0]}` is
 unset and the libs crash. Always go through `wi`.

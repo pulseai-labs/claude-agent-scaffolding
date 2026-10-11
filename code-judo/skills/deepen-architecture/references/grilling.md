@@ -29,7 +29,7 @@ Take the first of these that works:
 3. **The protocol below** — in-plugin, no dependency, always available.
 
 **How to probe: just call it**, the way your host invokes a skill — the Skill tool in Claude
-Code, `skill://<name>` in OMP, an explicit `$skill` invocation on Codex. Do not try to detect
+Code, `skill://<name>` in OMP (bare name: `skill://challenge`, `skill://grill-me`), an explicit `$skill` invocation on Codex. Do not try to detect
 installation by looking for plugin directories on disk — the install path differs by host and
 by install mode, so a wrong guess reports "not installed" for a plugin that is right there and
 silently downgrades a user who has the better griller.
