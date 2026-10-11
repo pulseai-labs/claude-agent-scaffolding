@@ -111,7 +111,7 @@ it reintroduces a silent cross-project read that looks exactly like success.
 `"$oss_bin" doctor` is available at any point, but it is the state **gate** — `state`,
 `schema`, `replay`, `shape` — not a read-out. It says nothing about pending
 amendments, quarantined lines, outstanding fakes, patch records, a held lock or
-orphan worktrees. Run it if the state itself looks inconsistent; invoke **`ossify:doctor`**
+orphan worktrees. Run it if the state itself looks inconsistent; invoke **`ossify:doctor`** (OMP: `skill://doctor`)
 if you want the advisory surfaces, which this skill does not invoke.
 
 **Wayfinder pre-flight.** If a map exists for this repo, its resolved decisions

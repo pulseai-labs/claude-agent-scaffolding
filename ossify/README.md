@@ -347,3 +347,11 @@ Design of record and the release roadmap are tracked in this repository's
 issues and git history rather than as shipped files.
 
 Dispatcher: `bin/oss`. Tests: `bash tests/run-all.sh`.
+
+## OMP
+
+Install per the root README (the plugin, plus the one-time `PATH` extension for `oss`, `wi` and `arc`).
+Skill names are bare in OMP, with no `ossify:` prefix. The standalone skills `handoff`, `handoff-resume`,
+`work-pr` and `run-spine` are reachable as `skill://<name>`. The `implementer-agent` file is Claude
+Code-only for now: OMP discovers it, but its tool names are not yet translated, so round execution's
+nested implementer dispatch (`run-spine`'s default) is Claude Code-only today.

@@ -136,7 +136,7 @@ every later verb resolves state on its own. **`"$oss_bin" doctor` is the state G
 (`state`, `schema`, `replay`, `shape`). It says nothing about pending
 amendments, quarantined lines, outstanding fakes, patch records, a held lock or
 orphan worktrees; those are the `ossify:doctor` skill's, and invoking this skill does
-not invoke it. Invoke `ossify:doctor` when you want them.
+not invoke it. Invoke `ossify:doctor` (OMP: `skill://doctor`) when you want them.
 **Then, before §4, read what arrived** since the release was planned — the intake
 queue and the tech-debt ledger lines on this spine's surface — and give each a
 disposition (`references/intake-and-ledger.md`) — and again for any path §4 adds.
