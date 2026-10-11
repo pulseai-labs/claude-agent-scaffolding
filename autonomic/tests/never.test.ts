@@ -604,8 +604,7 @@ describe('0.4.3 §3.3 stdout heredocs: escape routes', () => {
 describe('0.4.3 §3.4 sed: escape routes', () => {
   test('a sed that may run code stays a runner', () => {
     for (const c of ["sed 1e f; echo 'git push -f origin feat/x'", "sed 's/x/y/e' f; echo 'git push -f origin feat/x'",
-      "sed -e 1p -e 2e f; echo 'git push -f origin feat/x'", "sed -f s.sed f; echo 'git push -f origin feat/x'",
-      "sed -ni 1p f; echo 'git push -f origin feat/x'"])
+      "sed -e 1p -e 2e f; echo 'git push -f origin feat/x'", "sed -f s.sed f; echo 'git push -f origin feat/x'"])
       expect([c, rules(c)]).toEqual([c, ['force-push']])
   })
   test('a narrow sed that names a written file does not run it', () => {
@@ -668,7 +667,8 @@ describe('0.4.3 plan review focus', () => {
     expect(rules("echo 'git push -f origin feat/x' > \"$(mktemp)\"; git status")).toContain('force-push')
   })
   test('a sed script with more than one command stays a runner', () => {
-    expect(rules("sed -n '1,5p;8q' f; echo 'git push -f origin feat/x'")).toEqual(['force-push'])
+    // 0.5.0 §3.7: a multi-command script of p/d/q is inert; one holding `e` stays a runner.
+    expect(rules("sed -n '1p;2e id' f; echo 'git push -f origin feat/x'")).toEqual(['force-push'])
   })
 })
 
@@ -824,6 +824,23 @@ describe('0.5.0 §3.6 sh -c read-through', () => {
   test('escape routes', () => {
     for (const c of ["sh -c 'git push -f origin feat/x'", 'bash -c "rm -rf ~/x"', "bash -lc 'git push origin main'", 'sh -c "$CMD"; echo push -f',
       "cd /other; sh -c 'git push'", "bash -c 'sh -c \"git push -f origin x\"'", "F=x; sh -c 'git push $F origin x'; echo -f"])
+      ask(c)
+  })
+})
+
+describe('0.5.0 §3.7 a wider safe sed', () => {
+  test('substitutions, address prints and in-place edits', () => {
+    silent("sed -i 's/a/b/g' src/x.ts && git push -u origin feat/x; echo -f")
+    silent("sed -n '/re/p' f.md; git push -u origin feat/x; echo -f")
+    silent("sed -i.bak -e 's|a|b|' -e '/x/d' f; git push -u origin feat/x; echo -f")
+    silent("sed -ni 1p f; echo 'git push -f origin feat/x'")
+    silent("sed -n '1,5p;8q' f; echo 'git push -f origin feat/x'")
+  })
+  test('escape routes', () => {
+    for (const c of ["sed -i 's/x/y/e' f; git push origin feat/x; echo -f", "sed '1e id' f; echo 'git push -f origin feat/x'",
+      "sed 's/x/y/w /tmp/o' f; echo 'git push -f origin feat/x'", "sed -f s.sed f; echo 'git push -f origin feat/x'",
+      "sed -i 's/a/b/' .git/hooks/pre-push; echo 'git push -f origin feat/x'", "sed -i 's/x/git push -f/' run.sh; ./run.sh",
+      "sed -n '1p;2e id' f; echo 'git push -f origin feat/x'"])
       ask(c)
   })
 })

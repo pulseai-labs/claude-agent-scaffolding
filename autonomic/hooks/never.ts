@@ -296,19 +296,84 @@ function resolver(parts: readonly Command[]): Resolve {
     return dirs.map(d => `${d}/${r}`).find(hook) ?? `${dirs[0]}/${r}`
   }
 }
-// sed runs shell code through its `e` command and `s///e` flag. A sed with no -e/-f/-i and a
-// script that is an address plus p, d or q (`8,9p`, `1d`, `q`) runs none (0.4.3 §3.4).
-const SAFE_SED = /^(?:\d+|\$)?(?:,(?:\d+|\$))?[pdq]$/
+// sed runs shell code through its `e` command and `s///e` flag.
 // sed's arguments as the shell passes them: a quoted script stays one word (`'1p;e cmd'`).
 const argv = (text: string) => (text.match(/'[^']*'|"(?:\\.|[^"\\])*"|[^\s'"]+/g) ?? []).map(clean)
+// 0.5.0 shape B: a wider safe sed. Options from -n -E -r -s -z -u, -e SCRIPT and -i (with a
+// suffix); each script a `;`/newline list of `s<d>re<d>repl<d>[gpiImM0-9]*` or an address plus
+// p, d, q or =. No e, w, W, r, R command or flag; no -i target that is a git control path.
+function safeScript(s: string): boolean {
+  let p = 0
+  const n = s.length
+  const ws = () => { while (p < n && /[\s;]/.test(s[p]!)) p++ }
+  const addr1 = (): boolean => {
+    if (s[p] === '$') { p++; return true }
+    if (/\d/.test(s[p] ?? '')) { while (/\d/.test(s[p] ?? '')) p++; return true }
+    if (s[p] === '/') {
+      p++
+      while (p < n && s[p] !== '/') { if (s[p] === '\\') p++; if (s[p] === '\n') return false; p++ }
+      if (p >= n) return false
+      p++
+      if (s[p] === 'I') p++
+      return true
+    }
+    return true // no address
+  }
+  ws()
+  if (p >= n) return false
+  while (p < n) {
+    if (!addr1()) return false
+    if (s[p] === ',') { p++; if (s[p] === '+' || s[p] === '~') p++; const at = p; if (!addr1() || p === at) return false }
+    if (s[p] === '!') p++
+    const c = s[p]
+    if (c === undefined) return false
+    if ('pdq='.includes(c)) { p++; if (c === 'q') while (/\d/.test(s[p] ?? '')) p++ }
+    else if (c === 's') {
+      const d = s[p + 1]
+      if (d === undefined || /[\s\\\n]/.test(d)) return false
+      p += 2
+      for (let part = 0; part < 2; part++) {
+        while (p < n && s[p] !== d) { if (s[p] === '\\') p++; p++ }
+        if (p >= n) return false
+        p++
+      }
+      while (p < n && /[gpiImM0-9]/.test(s[p]!)) p++
+    } else return false
+    while (p < n && /[ \t]/.test(s[p]!)) p++
+    if (p < n && !/[;\n]/.test(s[p]!)) return false
+    ws()
+  }
+  return true
+}
 function safeSed(text: string): boolean {
   const ws = argv(text.replace(REDIRS, ' '))
   const i = ws.findIndex(x => !KEYWORD.has(x))
   const rest = ws.slice(i + 1)
-  // Only options that take no value: any other (`-l N`, `-e`, `-f`, `-i`) is not narrow.
-  if (rest.some(w => w.startsWith('-') && !/^-[nErsuz]+$|^--(?:quiet|silent|regexp-extended|separate|unbuffered|null-data|posix|debug|sandbox)$/.test(w))) return false
-  const script = rest.find(w => !w.startsWith('-'))
-  return script !== undefined && SAFE_SED.test(script)
+  const scripts: string[] = []
+  const files: string[] = []
+  let inplace = false
+  let fromE = false
+  for (let k = 0; k < rest.length; k++) {
+    const w = rest[k]!
+    if (w === '-e' || w === '--expression') { const s = rest[++k]; if (s === undefined) return false; scripts.push(s); fromE = true; continue }
+    if (w.startsWith('--expression=')) { scripts.push(w.slice(13)); fromE = true; continue }
+    if (/^-[nErsuz]*i/.test(w) || /^--in-place(?:=|$)/.test(w)) { inplace = true; if (w === '-i' && rest[k + 1] === '') k++; continue }
+    if (/^-[nErsuz]+$|^--(?:quiet|silent|regexp-extended|separate|unbuffered|null-data|posix|debug|sandbox)$/.test(w)) continue
+    if (w.startsWith('-')) return false
+    if (!fromE && scripts.length === 0) scripts.push(w)
+    else files.push(w)
+  }
+  if (scripts.length === 0 || !scripts.every(safeScript)) return false
+  return !inplace || !files.some(hook)
+}
+// The files a sed -i edits: like a redirect target, a file a later command runs keeps the words.
+function sedTargets(text: string): string[] {
+  const ws = argv(text.replace(REDIRS, ' '))
+  const i = ws.findIndex(x => !KEYWORD.has(x))
+  if (i < 0 || base(ws[i]!) !== 'sed') return []
+  const rest = ws.slice(i + 1)
+  if (!rest.some(w => /^-[nErsuz]*i/.test(w) || /^--in-place(?:=|$)/.test(w))) return []
+  return rest.filter(w => !w.startsWith('-') && w !== '').slice(rest.some(w => w === '-e' || w.startsWith('--expression')) ? 0 : 1)
 }
 // Does the text name a program that may run text? Per command where it parses, so a narrow sed
 // at a command's head is not one; anywhere else the word alone counts.
@@ -427,7 +492,7 @@ function judge(cmds: readonly Command[], g: readonly Group[], ctx: Ctx, at?: num
   return cmds.flatMap((c, i): Judged[] => {
     const k = at ?? i
     if ((!isInert(c.bare) && !assignOnly(c.bare)) || pipesOn(cmds, i) || g[i]!.pipe) return [{ words: split(c.text), at: k }]
-    const to = [...targets(c.bare), ...g[i]!.targets]
+    const to = [...targets(c.bare), ...g[i]!.targets, ...sedTargets(c.bare)]
     if (to.length > 0 && usedLater(to, cmds.slice(i + 1), ctx)) return [{ words: split(c.text), at: k }]
     return c.subs.flatMap(s => {
       const inner = commands(s)
