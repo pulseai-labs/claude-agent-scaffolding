@@ -1,8 +1,0 @@
-[
-  {
-    "number": 7,
-    "title": "Tune retry backoff in the ingest client",
-    "body": "Deferred from VS-1.1.1 — retry uses a fixed 1s sleep; should be exponential. Non-blocking.",
-    "labels": [{"name": "tech-debt"}]
-  }
-]

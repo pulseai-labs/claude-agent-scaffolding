@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.7.2 — 2026-10-11
+
+The scaffold stack (`scaffold-onboard`, `scaffold-dev`, `scaffold`) left the marketplace.
+
+### Changed
+- **`critiquing-spec` no longer cites scaffold-onboard.** The peer-skill `Skill()` channel and the closing-line format are unchanged; only the pointers to `scaffold-onboard`'s `critic-moments.md` and its parser are gone, and the consumer list names ossify. Whether to retire the parameterized channel itself is #731.
+- **README.** Consumers are described generically; the v0.1.x scaffold-onboard incompatibility note and the dead composition-contract link are gone.
+
+### Removed
+- `tests/integration/test-scaffold-onboard.sh` and `test-scaffold-dev.sh` — stubs that always skipped once their consumer was absent.
+
 ## v0.7.1 — 2026-10-11
 
 Devin is no longer a surface (Devin seats retired 2026-09-22).

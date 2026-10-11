@@ -1,6 +1,6 @@
 ---
 name: start
-description: Drive ossify spec-core onboarding for a new project — the Patton journey map, the skeleton cut that fixes Release 0, the bones registry, and the privacy posture with its moat channels — producing a lean MASTER-SPEC, memory bank, bones ADRs and a seed feature map. Use when the user wants to start a new project, onboard a project into ossify, kick off a skeleton-first build, or runs /start. Resolves or authors the topology declaration; halts only if it still fails to resolve. Not release planning (/plan-release), spine decomposition (/plan-spine), or amending an existing spec (/amend-spec).
+description: Drive ossify spec-core onboarding for a new project — the Patton journey map, the skeleton cut that fixes Release 0, the bones registry, and the privacy posture with its moat channels — producing a lean MASTER-SPEC, memory bank, bones ADRs and a seed feature map. Use when the user wants to start a new project, onboard a project into ossify, kick off a skeleton-first build, or runs /start. Resolves or authors the topology declaration; halts only if it still fails to resolve. Not release planning (/plan-release), spine decomposition (/plan-spine), or amending an existing spec.
 ---
 
 # start
@@ -50,7 +50,8 @@ no work item — `plan-release` owns those.
   `plan-release`. Release 0 itself is planned there, not here.
 - The user wants to decompose a spine into work items — that is `plan-spine`.
 - A lean MASTER-SPEC already exists and the user wants **one** change folded in
-  — that is the `/amend-spec` utility, not a re-run of spec-core.
+  — that is an amendment (name the section and the edit), not a re-run of
+  spec-core.
 - The user wants to close a spine or a release — that is `close`.
 - A MASTER-SPEC of any schema, lean or legacy, already exists at the routing
   destination AND the user did not explicitly type `/start`. Ask first.

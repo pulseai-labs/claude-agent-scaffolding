@@ -2,7 +2,7 @@
 # lib/manifest.sh — pairing manifest read/write/resolve/validate
 #
 # Cross-plugin contract per SPEC §6.2 / §6.3 / §6.4 / §6.5.
-# Consumers: scaffold-onboard v0.2, scaffold-dev v0.1, architect-critic v0.2 (loose).
+# Consumers: ossify (reads pairing.json as a translated fallback), architect-critic v0.2 (loose).
 #
 # Bash 3.2+ compatible (stock macOS). Requires: jq.
 #
@@ -74,7 +74,7 @@ wi_plugin_version() {
 #   - Actual layout on disk: ~/.claude/plugins/data/<plugin>-<marketplace>/
 #     (e.g. architect-critic-claude-agent-scaffolding).
 #   - But marketplace suffix is unknown at manifest-author time. Existing
-#     plugins (scaffold, scaffold-onboard, ai-mentor, architect-critic) all
+#     plugins (ai-mentor, architect-critic) all
 #     fall back to ${HOME}/.claude/plugins/data/<plugin> for their own data
 #     paths when ${CLAUDE_PLUGIN_DATA} is unset (e.g. shell-level tests).
 #
@@ -670,8 +670,8 @@ wi_manifest_resolve() {
 }
 
 # SPEC §6.3 refers to this resolver as `mi_manifest_resolve` (cross-plugin
-# canonical name). Provided as an alias so consumers (scaffold-onboard,
-# scaffold-dev) that follow the SPEC name verbatim find it without indirection.
+# canonical name). Provided as an alias so consumers that follow the
+# SPEC name verbatim find it without indirection.
 mi_manifest_resolve() { wi_manifest_resolve "$@"; }
 
 # ---------------------------------------------------------------------------
@@ -844,7 +844,7 @@ wi_manifest_validate() {
          (["tooling_repo","git_remote"] as $p | opt($p; ["string","null"]))
        else empty end),
       # well_known_paths is optional, but a present value is read as a path
-      # (scaffold-onboard reads roadmap_state with `jq -r`), so every entry
+      # (the retired scaffold-onboard read roadmap_state with `jq -r`), so every entry
       # must be a string: an object would be rendered as a path (#582).
       (if (.well_known_paths | type) == "object" then
          ((.well_known_paths | keys[] | ["well_known_paths", .]) as $p | want($p; ["string"]))

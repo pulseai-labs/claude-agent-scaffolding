@@ -3,8 +3,7 @@
 > - **Status:** Accepted design reference, v0.1
 > - **Audience:** Senior solo builders using AI agents
 > - **Scope:** Tool-agnostic product architecture and delivery decisions
-> - **Non-goal:** This document does not change current `scaffold-onboard` or
->   `scaffold-dev` behavior. Plugin translation is a separate future change.
+> - **Non-goal:** This document does not itself change any plugin's behavior.
 > - **Delivery:** **cited source** — read where it is needed, never copied and
 >   never imported. It has no plugin copy and no parity test, so nothing breaks
 >   if it is edited; what depends on it is prose that cites it, currently
@@ -31,20 +30,12 @@ This playbook separates two kinds of early code:
 The distinction is code fate, not polish. If code is expected to survive, it is
 not a PoC.
 
-### 1.1 Relationship to the current scaffold workflow
+### 1.1 Relationship to plugin mechanics
 
-The marketplace currently implements a Phase → Sprint → Vertical Slice → Work
-Item hierarchy through the
-[scaffold-onboard roadmap contract](../SPEC-scaffold-onboard-v02.md), the
-[timeline framing](../../scaffold-onboard/skills/planning-project-roadmap/references/3-timelines-framing.md),
-and the [scaffold-dev execution contract](../SPEC-scaffold-dev.md). Those remain
-the live plugin contracts until a separately specified implementation changes
-them.
-
-This playbook operates one level above those mechanics. It defines what must
-count as product evidence, which architecture decisions are timely, and which
-controls are required before work is decomposed into sprints, work items, or
-agent rounds.
+This playbook operates one level above any plugin's mechanics. It defines what
+must count as product evidence, which architecture decisions are timely, and
+which controls are required before work is decomposed into sprints, work items,
+or agent rounds.
 
 ## 2. Four independent axes
 
@@ -62,8 +53,8 @@ Sprints, work items, branches, and execution rounds are delivery containers.
 They do not establish any value on these axes.
 
 Risk tiers are always written `Risk-N`. Do not shorten them to `R1`/`R2`/`R3`:
-the current scaffold marketplace already uses those names for its roadmap,
-machine-rule, and demo contract layers.
+the retired scaffold plugins used those names for their roadmap, machine-rule,
+and demo contract layers, and legacy workspaces still carry them.
 
 ## 3. Decision procedure
 

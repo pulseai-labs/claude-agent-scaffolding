@@ -510,7 +510,8 @@ test_I7_tooling_repo_root_must_be_absolute() {
   local d="$_WI_TMP/i7"
   local ai="$d/foo-ai" cn="$d/foo"
   mkdir -p "$ai/.workspace" "$cn"
-  # A relative root would break the later `cd "$target"` in /defer --tooling.
+  # A relative root broke the later `cd "$target"` in scaffold-dev's retired
+  # /defer --tooling; roots stay absolute.
   assert_exits_with 1 wi_manifest_write "$ai" "$cn" personal \
     --tooling-repo "../relative-tools" 2>/dev/null || return 1
 }

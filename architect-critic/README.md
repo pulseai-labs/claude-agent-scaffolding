@@ -1,6 +1,6 @@
 # architect-critic
 
-Anti-sycophancy reviewer plugin for Claude Code and Codex (skill-first). Six gerund-named skills auto-invoke on natural-language triggers: `critiquing-spec` runs a host-agent self-audit followed by sequential adversarial rebuttal with T=4 concession scoring, `managing-async-critique` tracks background async audits (status / result / cancel / resume), `checking-adversary-readiness` verifies the external adversary before a deep critique, `reviewing-critique-history` surfaces recent run summaries, `listing-principles` renders the merged principle set, and `promoting-principle` adds a principle manually. Ships two shipped-default principles — ghost notes (Wald survivor-bias: look for what is *absent*) and CORE protocol (Curiosity / Objectivity / Reassurance / Empathy rebuttal tone) — read from `templates/principles.md` at audit time. Principle promotion is manual, via `/promote-principle`. At `--close` depth, the plugin dispatches the other agent as the adversarial fresh-frame reviewer: Codex when hosted in Claude Code, Claude Code when hosted in Codex. Standalone-invocable; consumer plugins (`scaffold-onboard v0.2+`, `scaffold-dev v0.1+`) invoke `critiquing-spec` in-conversation with no file IPC.
+Anti-sycophancy reviewer plugin for Claude Code and Codex (skill-first). Six gerund-named skills auto-invoke on natural-language triggers: `critiquing-spec` runs a host-agent self-audit followed by sequential adversarial rebuttal with T=4 concession scoring, `managing-async-critique` tracks background async audits (status / result / cancel / resume), `checking-adversary-readiness` verifies the external adversary before a deep critique, `reviewing-critique-history` surfaces recent run summaries, `listing-principles` renders the merged principle set, and `promoting-principle` adds a principle manually. Ships two shipped-default principles — ghost notes (Wald survivor-bias: look for what is *absent*) and CORE protocol (Curiosity / Objectivity / Reassurance / Empathy rebuttal tone) — read from `templates/principles.md` at audit time. Principle promotion is manual, via `/promote-principle`. At `--close` depth, the plugin dispatches the other agent as the adversarial fresh-frame reviewer: Codex when hosted in Claude Code, Claude Code when hosted in Codex. Standalone-invocable; other skills can invoke `critiquing-spec` in-conversation with no file IPC.
 
 ## Install
 
@@ -87,7 +87,7 @@ Promotion is manual. When an audit surfaces a pattern worth keeping, add it your
 
 ## Standalone use
 
-`architect-critic` works in any Claude Code session without `scaffold-onboard` or any other plugin installed.
+`architect-critic` works in any Claude Code session without any other plugin installed.
 
 **Spec file discovery order:**
 
@@ -152,9 +152,7 @@ No manual steps required. If anything looks wrong after migration, restore from 
 
 ## Composition
 
-`scaffold-onboard v0.2+` and `scaffold-dev v0.1+` invoke `critiquing-spec` in-conversation — Claude calls the skill directly, no file IPC. This is the v0.2 contract: consumer plugins pass context through the conversation turn, not through inbox/outbox JSON files.
-
-**v0.1.x `scaffold-onboard` is incompatible with `architect-critic v0.2`.** The v0.1.x onboard plugin writes to an inbox directory that no longer exists. Upgrade scaffold-onboard to v0.2+ before using architect-critic v0.2.
+Consumer skills invoke `critiquing-spec` in-conversation — Claude calls the skill directly, no file IPC. This is the v0.2 contract: consumers pass context through the conversation turn, not through inbox/outbox JSON files.
 
 ## Development
 
@@ -174,7 +172,6 @@ See tests/eval/RUNBOOK.md
 
 - Design spec: [`docs/SPEC-architect-critic.md`](../docs/SPEC-architect-critic.md)
 - Implementation plan: [`docs/PLAN-architect-critic.md`](../docs/PLAN-architect-critic.md)
-- Composition contract: [`docs/SPEC-scaffold-onboard.md`](../docs/SPEC-scaffold-onboard.md) §8.3
 
 ## Platforms
 

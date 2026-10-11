@@ -1,4 +1,4 @@
-# ossify (v1.14.4)
+# ossify (v1.14.5)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
@@ -109,6 +109,17 @@ resolution blocks fail loud when nothing on `PATH` answers as ossify, instead of
 falling through to a Devin plugin-cache search. `critic_detect` no longer reads
 the OpenCode wrapper's `OSS_ARCHITECT_CRITIC_ROOT`. The manifest refusal drops
 its Devin sentence. No state schema or journal operation changes.
+
+Since 1.14.5, ossify no longer describes itself as an alternative to
+`scaffold-onboard` + `scaffold-dev`, which left the marketplace. Both manifest
+descriptions drop the install-one-or-the-other framing, and doctor's prose no
+longer cites `scaffold-onboard` files as live: the interop-repair deferral calls
+that repair the retired plugin's, the budget check cites only the upstream issue,
+rule authoring no longer names a paired stack, and `start` no longer routes a
+one-change amendment to `/amend-spec`, a command only `scaffold-onboard` shipped
+(name the section and the edit instead). `/ossify:adopt` still targets
+projects onboarded with the legacy scaffold stack. No state schema, journal
+operation or command changes.
 
 Since 1.14.2 (#692, #691, #645, #646, #675), doctor's bones drift check folds
 both halves under one scoped C locale, preserving identifiers in findings under

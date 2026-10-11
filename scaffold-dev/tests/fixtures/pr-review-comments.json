@@ -1,9 +1,0 @@
-[
-  {
-    "id": 9001,
-    "user": {"login": "chatgpt-codex-connector[bot]"},
-    "path": "scaffold-dev/lib/pr.sh",
-    "line": 135,
-    "body": "P1: this still merges over an unresolved inline finding when CI is green."
-  }
-]

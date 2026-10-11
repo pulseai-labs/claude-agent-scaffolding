@@ -2,6 +2,11 @@
 
 All notable changes to the `code-judo` plugin.
 
+## 0.1.1
+
+- `domain-modeling`'s ADR-format reference no longer names `scaffold-dev`'s ADR skill as an owner of
+  `docs/adr/`; `scaffold-dev` left the marketplace. ossify's ceremonies remain the named owner.
+
 ## 0.1.0
 
 Initial release. Four prose skills, no runtime library.

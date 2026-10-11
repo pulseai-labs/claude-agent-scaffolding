@@ -54,12 +54,6 @@ jobs:
       - name: ai-mentor suite
         run: bash ai-mentor/tests/test-frontmatter-lint.sh
 
-      - name: scaffold-dev suite
-        run: bash scaffold-dev/run-tests.sh
-
-      - name: scaffold-onboard suite
-        run: bash scaffold-onboard/run-tests.sh
-
       - name: architect-critic suite
         run: bash architect-critic/run-tests.sh
 

@@ -29,7 +29,7 @@ ROOT_README="$REPO_ROOT/README.md"
 # Patterns that name the retired stack's continuation routes or ornamental
 # version claims. `scaffold-\*` is a literal asterisk; `workspace-init v[0-9]`
 # and `workspace-init@[0-9]` catch hardcoded version strings.
-_retired_route_patterns='(/onboard|/scaffold-project|scaffold-onboard|scaffold-dev|scaffold-\*|workspace-init v[0-9]|workspace-init@[0-9])'
+_retired_route_patterns='(/onboard|/scaffold-project|scaffold-onboard|scaffold-dev|scaffold-\*|/defer([^a-z]|$)|workspace-init v[0-9]|workspace-init@[0-9])'
 
 # 1. Skill exists at expected path
 test_init_skill_file_exists() { assert_file_exists "$INIT_SKILL"; }
@@ -307,6 +307,7 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   assert_not_contains 'scaffold-onboard' "$row" || return 1
   assert_not_contains 'scaffold-dev' "$row" || return 1
   assert_not_contains 'scaffolding chain' "$row" || return 1
+  assert_not_contains '/defer' "$row" || return 1
 
   # S8 closing edit (item 3): the row's continuation clause states adoption's
   # qualifier — the claim it replaced ("for existing source or history" alone)
@@ -315,13 +316,14 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
 
   # S8 round 1 (F3): the lifecycle overview above the table must not leave
   # workspace-init at the head of the chain this release retires for new
-  # workspaces — it names ossify as the continuation and the old chain as legacy.
+  # workspaces — it names ossify as the continuation and no longer names the
+  # retired chain.
   local overview
   overview="$(awk '/^Most of the marketplace is designed to/,/^## Install/' "$ROOT_README")"
   [[ -n "$overview" ]] || { echo "    root lifecycle overview not found"; return 1; }
   assert_not_contains '(chain head)' "$overview" || return 1
   assert_contains 'its continuation for new workspaces is `ossify`' "$overview" || return 1
-  assert_contains 'not the legacy `scaffold-onboard` + `scaffold-dev` chain' "$overview" || return 1
+  assert_not_contains 'scaffold-onboard' "$overview" || return 1
 
   # S8 round 3 (H1): this plugin's own README states the continuation twice, and
   # both must state adoption's scope rather than imply that "existing source or

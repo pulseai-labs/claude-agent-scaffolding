@@ -183,8 +183,8 @@ is passed; `wi_manifest_write` defaults `default_branch` to `"main"` and
 ```
 
 **Optional — tooling repo (#48 Stage 2).** If the user volunteers a separate
-*tooling/marketplace* repo (so `/defer --tooling` can route tech-debt there rather
-than the project repo), append `--tooling-repo "$tooling_root"` (and
+*tooling/marketplace* repo (ossify's close boundary audit then scans it like any
+other declared repo), append `--tooling-repo "$tooling_root"` (and
 `--tooling-repo-remote "$tooling_remote"` if known). Don't prompt for one in fresh
 mode; omit the flags and the `tooling_repo` key is left out entirely (unchanged).
 

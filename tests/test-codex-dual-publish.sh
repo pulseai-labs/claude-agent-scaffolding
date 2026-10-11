@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MARKETPLACE="$ROOT/.agents/plugins/marketplace.json"
 CLAUDE_MARKETPLACE="$ROOT/.claude-plugin/marketplace.json"
 # seat-mods, molt and autonomic are Claude Code mods (hooks.json "modules"); Codex has no mod runtime.
-DEFERRED_PLUGINS="scaffold seat-mods molt autonomic"
+DEFERRED_PLUGINS="seat-mods molt autonomic"
 
 # THE INVENTORY IS THE FILESYSTEM, NOT A MARKETPLACE.
 #

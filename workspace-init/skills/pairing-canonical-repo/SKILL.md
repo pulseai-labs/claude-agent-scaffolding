@@ -184,7 +184,7 @@ If `$detected_remote` is empty the flag is omitted and the helper records
 `wi git_detect_default_branch` or pass an explicit branch name.
 
 **Optional — tooling repo (#48 Stage 2).** If the user keeps a separate *tooling/marketplace*
-repo (so `/defer --tooling` can route tech-debt there instead of the project repo), append
+repo (ossify's close boundary audit then scans it like any other declared repo), append
 `--tooling-repo "$tooling_root"` (and `--tooling-repo-remote "$tooling_remote"` if known).
 Only ask when the user volunteers one — omit the flags otherwise and the `tooling_repo` key
 is left out entirely (today's behavior, unchanged).

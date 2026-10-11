@@ -1,9 +1,0 @@
-{
-  "mergeStateStatus": "CLEAN",
-  "statusCheckRollup": [{"name": "ci", "conclusion": "SUCCESS"}],
-  "reviews": [],
-  "latestReviews": [],
-  "comments": [],
-  "reviewDecision": "",
-  "commits": []
-}

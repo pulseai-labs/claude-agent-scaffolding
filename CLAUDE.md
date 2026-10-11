@@ -6,11 +6,12 @@ dual-publish contract). There is no application — the plugins *are* the produc
 
 **A change to a plugin manifest or to packaging has to be carried to every surface that
 plugin ships on**, and CI enforces it rather than advising it: `tests/test-codex-dual-publish.sh`
-checks version and frontmatter parity across the two marketplaces. `scaffold` is deliberately
-absent from the Codex v0 set — check the deferred list before assuming a plugin ships everywhere.
+checks version and frontmatter parity across the two marketplaces. `seat-mods`, `molt` and
+`autonomic` are deliberately absent from the Codex set — check the deferred list in
+`tests/test-codex-dual-publish.sh` before assuming a plugin ships everywhere.
 
-Shipped: `workspace-init`, `scaffold-onboard`, `scaffold-dev`, `scaffold`, `ai-mentor`,
-`architect-critic`, `claude-security-audit`, `ossify`, `code-judo`, `herdr-crew`, `merge-bar`.
+Shipped: `workspace-init`, `ai-mentor`, `architect-critic`, `claude-security-audit`, `ossify`,
+`code-judo`, `herdr-crew`, `merge-bar`, `seat-mods`, `molt`, `autonomic`.
 
 This repo is the **public canonical half** of a dual-repo project. Design specs, session
 handoffs, review records and process exhaust live in a private sibling workspace and must
@@ -172,7 +173,7 @@ follows is only what reading it will not tell you.
 
 **Run the suite for the plugin you changed.** `ossify/tests/run-all.sh` is not a proxy for the
 others — it exercises none of their code, so an ossify-only run reports ALL GREEN on a
-scaffold-dev change that was never tested. Plus the repo-root `tests/` set, which catches
+merge-bar change that was never tested. Plus the repo-root `tests/` set, which catches
 cross-plugin parity breaks no single plugin suite can see.
 
 **Some gates do not run themselves, and CI does not run them either.** Several plugins ship

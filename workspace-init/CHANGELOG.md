@@ -1,5 +1,16 @@
 # workspace-init changelog
 
+## 0.7.3 (2026-10-11)
+
+The scaffold stack (`scaffold-onboard`, `scaffold-dev`, `scaffold`) left the marketplace.
+
+### Changed
+- **The optional tooling repo no longer promises `/defer --tooling`.** That command was `scaffold-dev`'s. The three pairing skills and `templates/pairing.json.tmpl` now give the key's surviving use: ossify reads `tooling_repo` as a declared repo, and its close boundary audit scans it. The `tooling_repo` schema is unchanged; retiring the other scaffold-only pairing keys is #521.
+- `lib/manifest.sh` comments no longer name the removed plugins as present consumers.
+
+### Tests
+- `test-skills-pressure.sh` adds `/defer` to `_retired_route_patterns` and checks the root README row for it, and the README overview check asserts the retired chain is absent.
+
 ## 0.7.2 (2026-10-11)
 
 Devin is no longer a surface.

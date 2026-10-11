@@ -41,16 +41,13 @@ docs/REPORT-*.md
 docs/discussion.md
 docs/wabash-reference-working-project.md
 
-# scaffold-onboard test fixtures (generated at test-run time)
-scaffold-onboard/tests/fixtures/
-
 # Local Claude Code session config and notes. Untracked AND ignored: this repo is
 # PUBLIC, and .claude/ has held third-party transcripts that a stray `git add .`
 # would have published. Process notes belong in the private AI workspace.
 #
 # ANCHORED to the repo root. An unanchored `.claude/` matches at ANY depth, which would
-# shadow the 19 tracked fixture files under paths like
-# claude-security-audit/fixtures/*/.claude/ and scaffold-onboard/examples/sample-project/.claude/.
+# shadow the 18 tracked fixture files under
+# claude-security-audit/fixtures/*/*/.claude/.
 # Already-tracked files are exempt from ignore rules, so nothing would have disappeared —
 # but every NEW file added beside them would have been silently skipped by `git add .`,
 # which is the same untracked-and-invisible failure this rule exists to prevent.
