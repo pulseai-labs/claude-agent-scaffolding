@@ -557,6 +557,28 @@ export function neverRules(command: string, where: Where, readers: Readers = DEF
   return [...found]
 }
 
+// Cause 3: a push that names a remote and only literal destinations other than the default
+// branch, main or master (never HEAD, @, empty or opaque) needs no default-branch ask after a move.
+const NO_VALUE = /^(?:-[uqvn]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin))$/
+function namedRefs(words: readonly string[], names: readonly string[]): boolean {
+  const at = words.findIndex(w => isVerb(w, 'push'))
+  if (at < 0) return false
+  const args: string[] = []
+  for (const w of words.slice(at + 1)) {
+    if (w.startsWith('-')) { if (!NO_VALUE.test(w)) return false; continue }
+    args.push(w)
+  }
+  if (args.length < 2 || opaque(args[0]!)) return false
+  const all = [...new Set([...names, 'main', 'master'])]
+  return args.slice(1).every(ref => {
+    const r = ref.replace(/^\+/, '')
+    if (opaque(r)) return false
+    const dst = r.includes(':') ? r.slice(r.lastIndexOf(':') + 1) : r
+    if (dst === '' || dst === 'HEAD' || dst === '@') return false
+    return !all.some(n => dst === n || dst.endsWith(`/${n}`) || r === n)
+  })
+}
+
 function rulesOf(words: readonly string[], where: Where, moved: boolean, single: boolean, found: Set<NeverRule>): void {
   const any = (f: (w: string) => boolean) => words.some(w => f(w) || anyFlag(w))
   const anyNamed = (f: (w: string) => boolean) => words.some(w => f(w) || flagLike(w))
@@ -572,7 +594,9 @@ function rulesOf(words: readonly string[], where: Where, moved: boolean, single:
     const isDefault = (r: string) => { const w = r.replace(/^\+/, ''); return names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))) }
     // send-pack and http-push with no refspec update the matching refs, the default one included.
     const plumbing = words.some(w => isVerb(w, 'send-pack') || isVerb(w, 'http-push'))
-    if (plumbing || where.branch === undefined || names.includes(where.branch) || moved ||
+    // 0.5.0 cause 3: only when the floor reads this one command, never the whole bag.
+    const away = moved && !(single && namedRefs(words, names))
+    if (plumbing || where.branch === undefined || names.includes(where.branch) || away ||
       any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))
       found.add('default-branch-push')
   }

@@ -107,8 +107,8 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   })
   test('cd into a directory below the root reads the branch as unknown (PR #681 round 4)', () => {
     expect(rules('cd /repo/other && git push')).toContain('default-branch-push')
-    // 0.2.0: any push after a move asks, refspec or not — an accepted extra ask.
-    expect(rules('cd /repo/other && git push origin feat/x')).toEqual(['default-branch-push'])
+    // 0.5.0 §3.3: a moved push that names a literal non-default destination no longer asks.
+    expect(rules('cd /repo/other && git push origin feat/x')).toEqual([])
     expect(rules('cd /repo/sub && git push')).toEqual([])
     expect(rules('cd /repo && git push')).toEqual([])
   })
@@ -118,7 +118,7 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   })
   test('git -C into another directory reads the branch as unknown (PR #681 round 3)', () => {
     expect(rules('git -C /repo/sub/mod push')).toContain('default-branch-push')
-    expect(rules('git -C /repo/sub/mod push origin feat/x')).toEqual(['default-branch-push'])
+    expect(rules('git -C /repo/sub/mod push origin feat/x')).toEqual([]) // 0.5.0 §3.3
     expect(rules('git -C /repo push')).toEqual([])
     expect(rules('git -C sub push')).toContain('default-branch-push')
   })
@@ -281,9 +281,9 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     for (const c of ['cd /repo && git push', 'git commit -m "msg"', 'git commit -am "msg"', 'git commit -F "$f"',
       'git commit --message "x" --author "A <a@b>"', 'rm -f x.txt'])
       expect([c, rules(c)]).toEqual([c, []])
-    // 0.2.0: a push after a move asks whatever its refspec — an accepted extra ask.
+    // 0.5.0 §3.3: a moved push that names a literal non-default destination no longer asks.
     for (const c of ['git -C /other push origin feat/x', 'cd /other && git push origin feat/x'])
-      expect([c, rules(c)]).toEqual([c, ['default-branch-push']])
+      expect([c, rules(c)]).toEqual([c, []])
   })
   test('a substitution inside double quotes is read as a command (PR #672 round 3)', () => {
     for (const c of ['echo "$(git push -f)"', 'OUT="$(git push origin main 2>&1)"', 'echo "`git push -f`"', 'X="a $(echo "$(git push -f)")"'])
@@ -427,7 +427,8 @@ describe('review focus (0.4.2 plan)', () => {
     expect(rules("cat > a <<'X'\ngit push -f origin feat/x\nX\ncat > b <<'Y'\nok\nY\nwc -l a b")).toEqual([])
   })
   test('a move beside an inert command is still a move', () => {
-    expect(rules('echo x; cd /repo/other && git push origin feat/x')).toEqual(['default-branch-push'])
+    expect(rules('echo x; cd /repo/other && git push')).toEqual(['default-branch-push'])
+    expect(rules('echo x; cd /repo/other && git push origin feat/x')).toEqual([]) // 0.5.0 §3.3
   })
   test('a 2>&1 stays in its command', () => {
     expect(rules("echo 'git push -f origin feat/x' > x.sh 2>&1; ./x.sh")).toContain('force-push')
@@ -796,5 +797,21 @@ describe('0.5.0 §3.2 and §3.5 runner words that cannot run', () => {
     ask('cd tests/eval && git push -f origin feat/x')
     ask('env bash x.sh; git status; echo -f push')
     ask('. ./env.sh; echo push -f')
+  })
+})
+
+describe('0.5.0 §3.3 a moved push that names its destination', () => {
+  test('a literal non-default destination', () => {
+    silent('git -C /x push -u origin spine/x')
+    silent('R=/x; git -C $R push -u origin spine/x')
+    silent('cd /other && git push -u origin spine/x')
+    // Moved here from Task 4 (§3.2): the runner word in a cd argument, then a moved push.
+    silent('cd /repo/tests/eval && git push -u origin feat/x && echo -f')
+  })
+  test('escape routes', () => {
+    for (const c of ['git -C /x push', 'git -C /x push origin HEAD', 'git -C /x push origin main', 'git -C /x push origin master',
+      'git -C /x push origin x:main', 'git -C /x push -f origin spine/x', 'git -C /x push --repo origin spine/x', 'cd /x && git push origin @',
+      'python3 x.py; git -C /x push origin spine/x', 'cd /repo/other && git push'])
+      ask(c)
   })
 })
