@@ -256,7 +256,9 @@ type Resolve = (f: string) => string
 // written file it never names — through an alias or core.hooksPath (PR #735 round 1).
 type Ctx = { resolve: Resolve; readers: Readers; gitRuns: boolean }
 const configWritten = (text: string, cmds: readonly Command[]) =>
-  /GIT_CONFIG/.test(text) || flat(cmds).some(c => { const ws = split(c.bare); return isGit(ws) && writesConfig(ws) })
+  /GIT_CONFIG/.test(text) || flat(cmds).some(c => { const ws = split(c.bare); return (isGit(ws) && writesConfig(ws)) || ws.some(gitConfigFile) })
+// A git config file a command names, as a redirect target among them (PR #735 round 2).
+const gitConfigFile = (w: string) => /(?:^|\/)\.git\/config$|gitconfig|\.config\/git\/config$/.test(clean(w))
 const opaqueName = (f: string) => /[$*?[`{]/.test(f)
 // What usedLater reads of each later command, worked out once per command list, so a script of
 // many redirects is not re-split for every target (final review I4). `from[i]` is where command
@@ -324,7 +326,7 @@ function resolver(parts: readonly Command[]): Resolve {
     if (!a) continue
     const name = a[1]!
     let v: string | undefined
-    if (/^[ \t]*[A-Za-z_]\w*=("?)\$\((?:\S*\/)?mktemp(?:[ \t]+[^\s)`$;&|<>'"]+)*\)\1[ \t]*$/.test(c.text)) v = `/tmp/.mktemp-${name}`
+    if (/^[ \t]*[A-Za-z_]\w*=("?)\$\((?:\/(?:usr\/)?bin\/)?mktemp(?:[ \t]+[^\s)`$;&|<>'"]+)*\)\1[ \t]*$/.test(c.text)) v = `/tmp/.mktemp-${name}`
     else {
       const ch = /^[ \t]*[A-Za-z_]\w*=("[^"`]*"|[^\s;&|<>"'`]*)[ \t]*$/.exec(c.text)
       if (ch && !/\$\(/.test(ch[1]!)) {
@@ -509,6 +511,8 @@ function liveSubs(body: string): string[] | undefined {
 }
 const literalsIn = (body: string) => [...body.matchAll(/'([^'\n]{1,200})'|"([^"\n]{1,200})"/g)]
   .map(m => m[1] ?? m[2]!).filter(s => /[./]/.test(s) && !/\s/.test(s))
+  // The first argument of open( or Path( is a file name whatever its shape (`open('run','w')`; PR #735 round 2).
+  .concat([...body.matchAll(/(?:open|Path)\(\s*['"]([^'"\s]{1,200})['"]/g)].map(m => m[1]!))
 // 0.5.0 shape A: `sh -c 'literal'` (bash, zsh, dash; -e -u -x -o pipefail) is read as a subshell
 // holding the string. The string holds no `$`, backtick or backslash when double-quoted, and
 // none of `$` or backtick when single-quoted, so trailing arguments are never read.
@@ -598,6 +602,11 @@ function reading(command: string, readers: Readers): Reading {
   // shadow an inert name: `echo() { "$@"; }`) keeps the whole bag; so does text whose commands
   // or groups do not parse. A backtick no longer does (0.5.0 cause 5).
   // The keywords are read with quotes and backslashes dropped, as Bash reads them (`a""lias`).
+  // A name defined in the text (a command `alias` or `function`, or `()` outside quotes) may shadow
+  // any trusted command, a message consumer or tee included, so the whole bag then holds the
+  // dropped bodies too (PR #735 round 2). A `()` or the word in quoted prose only keeps the bag.
+  if (parsed !== undefined && (/\([ \t]*\)/.test(unquoted(text)) || parsed.some(c => { const h = head(split(c.bare)); return h === 'alias' || h === 'function' })))
+    return { whole: split(command) }
   const cmds = /<<|[<>]\(|\([ \t]*\)/.test(text) || /(?:^|[\s;&|(])(?:function|alias)[ \t]/.test(text.replace(/[\\'"]/g, '')) ? undefined : parsed
   const g = cmds === undefined ? undefined : groups(cmds)
   if (cmds === undefined || g === undefined) return { whole: split(text) }
@@ -612,7 +621,13 @@ function judge(cmds: readonly Command[], g: readonly Group[], ctx: Ctx, at?: num
   let lt: ReturnType<typeof laters> | undefined
   return cmds.flatMap((c, i): Judged[] => {
     const k = at ?? i
-    if ((!isInert(c.bare) && !assignOnly(c.bare)) || pipesOn(cmds, i) || g[i]!.pipe) return [{ words: split(c.text), at: k }]
+    if ((!isInert(c.bare) && !assignOnly(c.bare)) || pipesOn(cmds, i) || g[i]!.pipe) {
+      // A command that reads a pipe may run what it reads with its own words (`… | make -f - F=-f`):
+      // it is judged with the pipeline's earlier stages (PR #735 round 2).
+      let s = i
+      while (s > 0 && cmds[s - 1]!.pipe) s--
+      return [{ words: !isInert(c.bare) && s < i ? cmds.slice(s, i + 1).flatMap(x => split(x.text)) : split(c.text), at: k }]
+    }
     const to = [...targets(c.bare), ...g[i]!.targets, ...sedTargets(c.bare)]
     lt ??= to.length > 0 ? laters(cmds, ctx) : undefined
     if (to.length > 0 && usedLater(to, lt!.list, ctx, lt!.from[i + 1])) return [{ words: split(c.text), at: k }]
@@ -657,7 +672,10 @@ function depths(cmds: readonly Command[]): boolean[] {
 // Section 1 variables: a name assigned exactly once, to a literal, as a whole top-level command
 // that starts the text or follows `;` or a newline (never a pipe, `&&`, `||` or a group), and
 // named nowhere else in the text except as `$N` or `${N}`. Its value holds after that command.
+// `printf -v`, `read` or a nameref whose target is itself a variable may assign any name: read none.
+const DYNAMIC = /(?:printf[ \t]+(?:-[A-Za-z]+[ \t]+)*-[A-Za-z]*v[ \t]*|read[ \t]+(?:-[A-Za-z]+[ \t]+(?:\S+[ \t]+)?)*|(?:declare|local|typeset)[ \t]+-[A-Za-z]*n[A-Za-z]*[ \t]+)["']?\$/
 function literalVars(command: string, text: string, cmds: readonly Command[]): Vars {
+  if (DYNAMIC.test(command)) return new Map()
   const inside = depths(cmds)
   const seen = new Map<string, { value: string; at: number; ok: boolean; n: number }>()
   cmds.forEach((c, i) => {
@@ -782,7 +800,8 @@ export function neverRules(command: string, where: Where, readers: Readers = DEF
   const effects = r.groups.map(g => {
     const ws = substitute(g.words, r.vars, g.at)
     const git = isGit(ws)
-    return { ws, git, move: ws.some(w => w === 'cd' || w === 'pushd' || w === 'popd') && moves(ws, where), config: git && writesConfig(ws), switches: git && switchesTo(ws, names) }
+    return { ws, git, move: ws.some(w => w === 'cd' || w === 'pushd' || w === 'popd') && moves(ws, where), config: (git && writesConfig(ws)) || ws.some(gitConfigFile),
+      switches: (git && switchesTo(ws, names)) || ws.some(w => /(?:^|\/)\.git\/HEAD$/.test(clean(w))) }
   })
   // In a loop, an effect anywhere in the body holds from the loop's first command (final review I2).
   const lifted = { move: new Set<number>(), config: new Set<number>(), switches: new Set<number>() }

@@ -1001,3 +1001,31 @@ describe('0.5.0 PR #735 round 1: shapes 0.4.3 asked on still ask', () => {
     silent("sed 's/a/b/'g f; git push -u origin feat/x; echo -f")
   })
 })
+
+describe('0.5.0 PR #735 round 2: shapes 0.4.3 asked on still ask', () => {
+  test('a Python write to a bare file name that a later command runs', () => {
+    ask("python3 - <<'X'\nopen('run','w').write('#!/bin/sh\\ngit push -f origin x')\nX\nchmod +x run; ./run")
+    silent("python3 - <<'X'\nopen('notes','w').write('never git push -f')\nX\ngit push -u origin feat/x")
+  })
+  test('a write into a git control file changes git context', () => {
+    ask("printf '%s\\n' '[alias]' 'p = push' > /repo/.git/config; git p -f origin feat/x")
+    ask("echo 'ref: refs/heads/main' > /repo/.git/HEAD; git push")
+  })
+  test('a dynamically named assignment reads no variables', () => {
+    ask('X=f; F=x; printf -v "${X^^}" %s -f; git push $F origin feat/x')
+    ask('F=x; N=F; read -r "$N" < /tmp/v; git push $F origin feat/x')
+  })
+  test('an alias or function in the text keeps every heredoc body', () => {
+    ask("shopt -s expand_aliases; alias tee='$SHELL -s --'\ntee note <<'X'\ngit push -f origin main\nX")
+    // A `()` or the word alias in quoted prose defines nothing: the body stays dropped.
+    silent("cat > r.md <<'EOF'\nnever run git commit -n here\nEOF\ngh issue create --title \"x.exp() is missing; alias rules\" --body-file r.md")
+  })
+  test('a command that reads a pipe is judged with the words piped into it', () => {
+    ask("printf 'all:\\n\\tgit push $(F) origin feat/x\\n' | make -f - F=-f")
+    silent('git log --oneline | grep -n push; git push -u origin feat/x; echo -f')
+  })
+  test('only a system mktemp names a fresh temp file', () => {
+    ask("T=$(./mktemp); cat > $T <<'EOF'\ngit push -f origin main\nEOF\ngit commit -m x")
+    silent("T=$(/usr/bin/mktemp); cat > $T <<'EOF'\nverdict: git push -f was refused\nEOF\nmv $T /x/report.md; gh issue comment 1 --body-file /x/report.md")
+  })
+})
