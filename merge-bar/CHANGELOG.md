@@ -2,11 +2,32 @@
 
 All notable changes to the `merge-bar` plugin.
 
-## 0.2.0
+## 0.3.0
 
 OMP marketplace surface.
 
 - Wrappers name the skill by `skill://` path as well as `${CLAUDE_PLUGIN_ROOT}`; skill descriptions lead with the trigger ("Use when ...") so OMP's skill match fires; Claude Code tool names carry an OMP alias where a skill names one; the README gains an OMP note. No Claude Code-only parts.
+
+## 0.2.1
+
+- `opening-a-pr` — the template says a review stopping rule is not a bar and never goes in
+  the Merge bar block: `working-a-pr` decides when rounds stop, and "after round 2, block only
+  on X" is a lower bar. Seven PRs (#626, #653, #707, #712, #720, #722, #725) wrote a stopping
+  rule in place of the four conditions, following a pre-merge-bar "2 rounds, then defer" rule.
+- `working-a-pr` — a stopping rule in the bar's place is judged as a bar below the template.
+- The repository `CLAUDE.md` drops its separate "agree a stopping rule" line and points at
+  `working-a-pr`.
+
+## 0.2.0
+
+- `opening-a-pr` — the PR body has a seventh field, `## Merge danger`, between Known limits
+  and Merge bar. It names the door (two-way when a revert of the merge undoes all of it,
+  one-way when something outlives the revert) and the blast radius. It does not change which
+  findings block.
+- `working-a-pr` — the terminus report quotes the body's Merge danger, or says the body has
+  none, before it asks for the merge ack.
+- The `opening-a-pr` eval rubric's first criterion is renamed `body_fields` and checks seven
+  headings. The committed eval results predate this change.
 
 ## 0.1.0
 
