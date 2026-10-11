@@ -33,7 +33,8 @@ Verification code that **ships** in a plugin is not that tooling. A gate that de
 a user's tests passed, or whether a user's change meets its spec, runs on the user's path: it
 is in scope, and goes through the test like any other code: reading an exit status is
 question 2, judging whether a change meets its spec is question 1, and a gate that reads
-another tool's open output is question 3.
+another tool's open output is question 3 only if it never approves — one that can pass a
+failed run goes to question 4.
 
 Everything below is about the other kind of code: what ships and runs for a user.
 
@@ -72,7 +73,7 @@ the code it already wanted.
 On this repo, new library bash has been ~29% of changed volume and ~57% of review findings —
 roughly 4x the defect density of prose. On PR #166 it was 100%: four review rounds, five
 defects, every one in path-string handling, net product value a path normalizer. The defects
-sit where question 2 says they will: code reading open input.
+sit outside question 2's boundary: code reading open input.
 
 autonomic 0.5.0 (PR #735) is the worked example of question 3. Its never-approve check reads
 free shell text — mechanical work on open input. It is allowed as code only because it never
