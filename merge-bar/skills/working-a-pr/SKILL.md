@@ -11,7 +11,7 @@ against an ideal: the loop fixes what the bar says blocks, answers or records th
 merges only on the operator's explicit ack. The loop is judgment; the shell is only for
 mechanical `git`/`gh` facts. Nothing here needs a manifest, a worktree, or any plugin state.
 
-**No Merge bar in the body?** Before round 1, add the six fields from
+**No Merge bar in the body?** Before round 1, add the seven fields from
 `../opening-a-pr/references/pr-body.md` to the body (`gh pr edit <PR> --body-file <file>`),
 keeping everything already there, and tell the operator you did. A bar written before the
 first disposition is a bar; one written after is a rationalisation.
@@ -197,6 +197,7 @@ now (GraphQL `resolveReviewThread`). A repository can require resolved threads t
 an open one blocks it as surely as a red check.
 
 Then, in one place, give the operator:
+- the body's `## Merge danger`, quoted — or that the body has none,
 
 - the full disposition ledger,
 - CI state and per-reviewer status (ran / skipped / pending / stale),

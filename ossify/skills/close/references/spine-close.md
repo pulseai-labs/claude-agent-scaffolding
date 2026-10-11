@@ -195,7 +195,7 @@ One of the two facts this step needs is not in state; the other is:
   development, and every downstream step then reports green.
 
 **The PR body, when merge-bar is installed.** Where this session lists the
-`merge-bar` plugin's `working-a-pr` skill, compose the six fields before the
+`merge-bar` plugin's `working-a-pr` skill, compose the seven fields before the
 pass, **one file per hosting repo**, from the template in the plugin root's
 `references/work-pr/pr-body.md`: its headings in order and its Merge bar block word
 for word, so the bar exists before the first review.
@@ -210,14 +210,16 @@ for word, so the bar exists before the first review.
   merge, so a limit on two PRs lands twice. A limit that belongs to no one repo
   goes on the first hosting repo that opens a PR, and on that PR alone: a repo
   with no remote takes the local arm and opens none.
+- **Merge danger** — that repo's, judged from its share of the diff as the
+  template's "Filling each field" says.
 - **Evidence** — the gates each work item's close ran, with their results;
   nothing that did not run.
 - **Closes** — `None.` The intake requests this spine pulled in are listed as
   `Refs <owner>/<repo>#<n>`, never `Closes`: they are closed after the landing is
   recorded (below the record pass), not by the first PR to merge.
 
-Claim, Evidence and Closes are the spine's and read the same in every file; Scope
-and Known limits are the repo's. Write each repo's fields to `<fields-dir>/<repo>`,
+Claim, Evidence and Closes are the spine's and read the same in every file; Scope,
+Known limits and Merge danger are the repo's. Write each repo's fields to `<fields-dir>/<repo>`,
 named by the repo as `landing_repos` lists it, and set `pr_fields_dir` to that
 directory. The block loads the repo's file into `$pr_fields` per PR, with
 `cat` — never as a quoted literal: the text routinely carries backticks, `$` and
@@ -425,7 +427,7 @@ $repo:$merge_sha"
       # death - no shell state is trusted across the loop. --head pins the PR to
       # the branch this pass just pushed: gh defaults it to the CURRENT branch,
       # which after a resume or a work-pr loop is not necessarily the spine's.
-      # merge-bar's six fields, when composed, go AFTER these two lines: the
+      # merge-bar's fields, when composed, go AFTER these two lines: the
       # record pass reads the first `pushed-tip:` line. `:+` keeps an unset
       # $pr_fields legal under `set -u`; it was loaded before the push.
       pr_body="spine close $spine_id -> $base_branch in $repo

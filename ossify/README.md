@@ -1,4 +1,4 @@
-# ossify (v1.14.5)
+# ossify (v1.14.6)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
@@ -120,6 +120,13 @@ one-change amendment to `/amend-spec`, a command only `scaffold-onboard` shipped
 (name the section and the edit instead). `/ossify:adopt` still targets
 projects onboarded with the legacy scaffold stack. No state schema, journal
 operation or command changes.
+
+Since 1.14.6, ossify's copy of merge-bar's PR body template
+(`references/work-pr/pr-body.md`) carries merge-bar 0.2.0's seventh field,
+`## Merge danger`: the door (whether a revert of the merge undoes all of it) and
+the blast radius. `/ossify:patch` writes it on the no-merge-bar fallback, and
+spine close composes it per hosting repo, beside Scope and Known limits. No state
+schema, journal operation or command changes.
 
 Since 1.14.2 (#692, #691, #645, #646, #675), doctor's bones drift check folds
 both halves under one scoped C locale, preserving identifiers in findings under
