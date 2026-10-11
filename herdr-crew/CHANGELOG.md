@@ -2,6 +2,15 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.14
+
+**The round stop is merge-bar's.** Lifecycle step 11 drops its own stopping rule ("defer
+the remaining P2s and P3s"). The PR body's Merge bar decides what blocks, a blocking finding
+is never deferred, and `working-a-pr` (or ossify's bundled loop) decides when rounds stop. No
+separate stopping rule is agreed, and none may replace the bar's four conditions. The
+round-five process checkpoint stays. The old rule predated merge-bar and led seven canonical
+PRs to lower their bar. The skill's step list names step 11 "round stop".
+
 ## 0.2.13
 
 **The DeepSeek Harness seat is gone, with the crews it came from.** `orca-crew`,

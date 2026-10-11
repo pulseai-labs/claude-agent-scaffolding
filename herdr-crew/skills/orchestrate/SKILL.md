@@ -99,7 +99,7 @@ name neither file defines halts the run rather than guessing.
 ## 4. The run
 
 `references/lifecycle.md` is the thirteen-step run: orient, decompose, launch, plan
-gate, wait, implementer done, verify, review, disposition, fix rounds, stopping rule,
+gate, wait, implementer done, verify, review, disposition, fix rounds, round stop,
 merge gate, handoff. One run per objective. You drive the steps and nothing else.
 
 ## 5. Briefs
