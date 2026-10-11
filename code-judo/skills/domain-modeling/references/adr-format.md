@@ -8,10 +8,9 @@ arrives, including a direct instruction to write it — see below for why there 
 
 The reason is shared mutable state. An ADR directory is a **sequence**, and a sequence has
 exactly one owner. In the repos this plugin is built for, something else already owns it:
-ossify's ceremonies author into `docs/adr/`. Two
-tools scanning the same directory for "the highest existing number" will both find the same
-answer and both write it, and the collision is silent — two ADR-0007s, discovered months
-later by someone trying to cite one.
+ossify's ceremonies author into `docs/adr/`. Two tools scanning the same directory for
+"the highest existing number" will both find the same answer and both write it, and the
+collision is silent — two ADR-0007s, discovered months later by someone trying to cite one.
 
 So the flow is:
 

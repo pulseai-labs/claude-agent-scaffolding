@@ -47,7 +47,7 @@ docs/wabash-reference-working-project.md
 #
 # ANCHORED to the repo root. An unanchored `.claude/` matches at ANY depth, which would
 # shadow the 18 tracked fixture files under
-# claude-security-audit/fixtures/*/.claude/.
+# claude-security-audit/fixtures/*/*/.claude/.
 # Already-tracked files are exempt from ignore rules, so nothing would have disappeared —
 # but every NEW file added beside them would have been silently skipped by `git add .`,
 # which is the same untracked-and-invisible failure this rule exists to prevent.

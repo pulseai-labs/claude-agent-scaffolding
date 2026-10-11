@@ -32,10 +32,10 @@ not a PoC.
 
 ### 1.1 Relationship to plugin mechanics
 
-This playbook operates one level above any plugin's mechanics. It defines what must
-count as product evidence, which architecture decisions are timely, and which
-controls are required before work is decomposed into sprints, work items, or
-agent rounds.
+This playbook operates one level above any plugin's mechanics. It defines what
+must count as product evidence, which architecture decisions are timely, and
+which controls are required before work is decomposed into sprints, work items,
+or agent rounds.
 
 ## 2. Four independent axes
 

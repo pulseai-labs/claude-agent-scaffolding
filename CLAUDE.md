@@ -10,7 +10,8 @@ checks version and frontmatter parity across the two marketplaces. `seat-mods`, 
 `autonomic` are deliberately absent from the Codex set — check the deferred list in
 `tests/test-codex-dual-publish.sh` before assuming a plugin ships everywhere.
 
-Shipped: `workspace-init`, `ai-mentor`, `architect-critic`, `claude-security-audit`, `ossify`, `code-judo`, `herdr-crew`, `merge-bar`.
+Shipped: `workspace-init`, `ai-mentor`, `architect-critic`, `claude-security-audit`, `ossify`,
+`code-judo`, `herdr-crew`, `merge-bar`, `seat-mods`, `molt`, `autonomic`.
 
 This repo is the **public canonical half** of a dual-repo project. Design specs, session
 handoffs, review records and process exhaust live in a private sibling workspace and must

@@ -36,7 +36,7 @@
 //                                  git_remote = null or the --tooling-repo-remote
 //                                  URL. Absent by default → the key is omitted
 //                                  entirely (NOT null) and behavior is unchanged.
-//                                  Routes `/defer --tooling` to a tooling repo.
+//                                  ossify scans it as a declared repo.
 //   ${PROJECT_TYPE}              — "personal" or "work"
 //   ${CREATED_AT}                — ISO 8601 (e.g. 2026-05-25T14:30:00Z)
 //   ${CREATED_BY}                — "workspace-init@<running plugin version>"
@@ -64,7 +64,7 @@
   },
 
   // OPTIONAL (#48 Stage 2) — present only when wi_manifest_write is given
-  // --tooling-repo. Mirrors canonical's sub-schema; routes `/defer --tooling`.
+  // --tooling-repo. Mirrors canonical's sub-schema; ossify reads it as a declared repo.
   // Omit the whole key when there is no tooling repo (do NOT write null).
   // "tooling_repo": {
   //   "root": "${TOOLING_REPO_ROOT}",

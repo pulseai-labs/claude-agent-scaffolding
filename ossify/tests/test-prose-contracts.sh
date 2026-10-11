@@ -1734,6 +1734,10 @@ if git -C "$_E_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 else
   echo "SKIP: E1 needs a git checkout of the marketplace ($_E_ROOT is not one)"
 fi
+# E2: the start skill routes a one-change amendment to no command. The only
+# /amend-spec was scaffold-onboard's, deleted with it (spec A, PR 3); ossify's
+# spec-validation says ossify ships none.
+t_assert_eq "" "$(grep -n '/amend-spec' "$SKILLS/start/SKILL.md")" 'E2 start names no /amend-spec command'
 
 rm -rf "$_PC_TMP"
 t_summary
