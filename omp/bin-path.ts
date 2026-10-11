@@ -39,7 +39,7 @@ function ours(plugins: Plugins | undefined): Map<string, Entry> {
     const at = id.lastIndexOf("@");
     if (at < 0 || id.slice(at + 1) !== MARKETPLACE || !Array.isArray(entries)) continue;
     const e = entries.find((x) => x?.scope === "user") ?? entries[0];
-    if (e?.installPath) m.set(id.slice(0, at), e);
+    if (typeof e?.installPath === "string" && e.installPath) m.set(id.slice(0, at), e);
   }
   return m;
 }
@@ -69,12 +69,16 @@ export function prependPath(current: string | undefined, dirs: string[]): string
   return [...new Set(dirs), ...rest].join(delimiter);
 }
 
-export default function (_pi: unknown) {
-  const home = homedir();
+// The effectful step, with the home and env injectable so it can be tested.
+export function apply(home: string, env: { PATH?: string } = process.env): void {
   const { dirs, warnings } = resolveBinDirs({
     ompRecord: ompRecordPath(home),
     claudeRecord: join(home, ".claude", "plugins", "installed_plugins.json"),
   });
   for (const w of warnings) console.warn(w);
-  if (dirs.length) process.env.PATH = prependPath(process.env.PATH, dirs);
+  if (dirs.length) env.PATH = prependPath(env.PATH, dirs);
+}
+
+export default function (_pi: unknown) {
+  apply(homedir());
 }

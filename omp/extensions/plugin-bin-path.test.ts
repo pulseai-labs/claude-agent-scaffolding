@@ -24,10 +24,11 @@ function record(h: string, which: ".omp" | ".claude", plugins: Record<string, st
 describe("loader", () => {
   test("runs the highest-VERSION installed module", async () => {
     const h = home();
-    record(h, ".omp", { ossify: stub(h, "ossify", 1), "workspace-init": stub(h, "workspace-init", 2) });
+    // the higher version comes first, so "take the last module" would fail this test
+    record(h, ".omp", { ossify: stub(h, "ossify", 2), "workspace-init": stub(h, "workspace-init", 1) });
     const pi: any = {};
     await load(pi, h);
-    expect(pi.ran).toBe("workspace-init@2");
+    expect(pi.ran).toBe("ossify@2");
   });
   test("finds modules through the Claude record too", async () => {
     const h = home();
@@ -36,10 +37,36 @@ describe("loader", () => {
     await load(pi, h);
     expect(pi.ran).toBe("architect-critic@1");
   });
-  test("ignores plugins that are not module hosts", () => {
+  test("a plugin of our marketplace without omp/bin-path.ts yields no candidate", () => {
     const h = home();
-    record(h, ".omp", { "merge-bar": stub(h, "merge-bar", 9) });
+    const bare = join(h, "cache", "merge-bar-9");
+    mkdirSync(bare, { recursive: true });
+    record(h, ".omp", { "merge-bar": bare });
     expect(moduleCandidates(h)).toEqual([]);
+  });
+  test("any plugin of our marketplace that ships omp/bin-path.ts is a candidate, not only a fixed list", () => {
+    const h = home();
+    const p = stub(h, "brand-new-plugin", 1);
+    record(h, ".omp", { "brand-new-plugin": p });
+    expect(moduleCandidates(h)).toEqual([join(p, "omp", "bin-path.ts")]);
+  });
+  test("a plugin of another marketplace that ships omp/bin-path.ts yields no candidate", () => {
+    const h = home();
+    const p = stub(h, "ossify", 1);
+    const f = join(h, ".omp", "plugins", "installed_plugins.json");
+    mkdirSync(join(f, ".."), { recursive: true });
+    writeFileSync(f, JSON.stringify({ version: 2, plugins: { "ossify@someone-else": [{ scope: "user", installPath: p }] } }));
+    expect(moduleCandidates(h)).toEqual([]);
+  });
+  test("an entry whose installPath is not a string is skipped, not thrown on", () => {
+    const h = home();
+    const good = stub(h, "ossify", 1);
+    const f = join(h, ".omp", "plugins", "installed_plugins.json");
+    mkdirSync(join(f, ".."), { recursive: true });
+    writeFileSync(f, JSON.stringify({ version: 2, plugins: {
+      [`workspace-init@${M}`]: [{ scope: "user", installPath: 42 }],
+      [`ossify@${M}`]: [{ scope: "user", installPath: good }] } }));
+    expect(moduleCandidates(h)).toEqual([join(good, "omp", "bin-path.ts")]);
   });
   test("no installed module: one warning, nothing runs", async () => {
     const h = home();
@@ -70,6 +97,24 @@ describe("loader", () => {
     await load(pi, h);
     expect(pi.ran).toBe("workspace-init@1");
     expect(String(warn.mock.calls[0][0])).toContain("cannot load");
+    warn.mockRestore();
+  });
+  test("a module whose default factory throws: one warning, load resolves", async () => {
+    const h = home();
+    record(h, ".omp", { ossify: stub(h, "ossify", 1, 1, `export const VERSION = 1; export default function () { throw new Error("boom"); }`) });
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    await load({}, h);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("boom");
+    warn.mockRestore();
+  });
+  test("a module with no default function: one warning, load resolves", async () => {
+    const h = home();
+    record(h, ".omp", { ossify: stub(h, "ossify", 1, 1, `export const VERSION = 1; export default 7;`) });
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    await load({}, h);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("no default factory");
     warn.mockRestore();
   });
 });

@@ -12,7 +12,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OMP_SIX="ossify merge-bar workspace-init architect-critic code-judo ai-mentor"
 # Plugins whose text checks 2-4 enforce on the shipped tree. Widened per PR (spec B §4.4).
 GATED_PLUGINS=""
-# Built from parts so this file never matches its own check 5.
+# The (a|b) alternation keeps this line from matching itself in check 5.
 OLD_REF_RE='references/(handoff|work-pr)/'
 
 PASS=0; FAIL=0

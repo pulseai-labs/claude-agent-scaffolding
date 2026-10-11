@@ -79,8 +79,10 @@ the harness: `ossify`, `merge-bar`, `workspace-init`, `architect-critic`, `code-
 OMP does not put a plugin's `bin/` on `PATH`. Install the extension that does, once per machine, in your
 user extension folder; OMP loads it in every session:
 
-    curl -fsSL https://raw.githubusercontent.com/pulseai-labs/claude-agent-scaffolding/main/omp/extensions/plugin-bin-path.ts \
+    curl -fsSL --create-dirs https://raw.githubusercontent.com/pulseai-labs/claude-agent-scaffolding/main/omp/extensions/plugin-bin-path.ts \
       -o ~/.omp/agent/extensions/plugin-bin-path.ts
+
+If you set `PI_CODING_AGENT_DIR`, the folder is `$PI_CODING_AGENT_DIR/extensions/` instead; change the `-o` path to match.
 
 The file is a small loader: the logic ships inside the plugins, so `omp plugin upgrade` keeps it current,
 and the loader warns with this command if it ever needs a new download. Without it, `oss`, `wi` and `arc`

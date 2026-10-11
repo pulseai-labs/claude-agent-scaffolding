@@ -1,8 +1,8 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, spyOn } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveBinDirs, ompRecordPath, prependPath, MARKETPLACE } from "./bin-path";
+import factory, { apply, resolveBinDirs, ompRecordPath, prependPath, MARKETPLACE } from "./bin-path";
 
 let root: string, ompRecord: string, claudeRecord: string;
 
@@ -77,6 +77,11 @@ describe("resolveBinDirs", () => {
     record(claudeRecord, {});
     expect(run()).toEqual({ dirs: [], warnings: [] });
   });
+  test("an entry whose installPath is not a string is skipped, not thrown on", () => {
+    const ok = install("ossify", "1.15.0");
+    record(ompRecord, { [id("ossify")]: [{ scope: "user", installPath: ok }], [id("workspace-init")]: [{ scope: "user", installPath: 42 }] });
+    expect(run()).toEqual({ dirs: [join(ok, "bin")], warnings: [] });
+  });
   test("the user-scope entry is preferred over a project-scope one", () => {
     const proj = install("ossify", "1.0.0");
     const user = install("ossify", "1.15.0");
@@ -91,5 +96,33 @@ describe("ompRecordPath / prependPath", () => {
   });
   test("prependPath puts dirs first and drops duplicates", () => {
     expect(prependPath("/a:/b", ["/b", "/c"])).toBe("/b:/c:/a");
+  });
+});
+
+describe("apply / the default factory", () => {
+  test("apply prepends the resolved bin/ dirs to env.PATH", () => {
+    const p = install("ossify", "1.15.0");
+    record(join(root, "home", ".omp", "plugins", "installed_plugins.json"), { [id("ossify")]: [{ scope: "user", installPath: p }] });
+    const env = { PATH: "/usr/bin:/bin" };
+    apply(join(root, "home"), env);
+    expect(env.PATH).toBe(`${join(p, "bin")}:/usr/bin:/bin`);
+  });
+  test("apply warns through console.warn and leaves PATH alone when no record exists", () => {
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    const env = { PATH: "/usr/bin" };
+    apply(join(root, "empty-home"), env);
+    expect(env.PATH).toBe("/usr/bin");
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toStartWith("plugin bin paths not added: ");
+    warn.mockRestore();
+  });
+  test("the default factory uses the process home and writes process.env.PATH (run in a child process)", () => {
+    const p = install("ossify", "1.15.0");
+    const home = join(root, "home2");
+    record(join(home, ".omp", "plugins", "installed_plugins.json"), { [id("ossify")]: [{ scope: "user", installPath: p }] });
+    const r = Bun.spawnSync([process.execPath, "-e", `import f from ${JSON.stringify(join(import.meta.dir, "bin-path.ts"))}; f({}); console.log(process.env.PATH)`],
+      { env: { HOME: home, PATH: "/usr/bin" }, stdout: "pipe", stderr: "pipe" });
+    expect(r.stderr.toString()).toBe("");
+    expect(r.stdout.toString().trim()).toBe(`${join(p, "bin")}:/usr/bin`);
   });
 });

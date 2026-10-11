@@ -10,16 +10,15 @@ import { join } from "node:path";
 
 export const LOADER_VERSION = 1;
 const MARKETPLACE = "claude-agent-scaffolding";
-const HOSTS = ["ossify", "workspace-init", "architect-critic"];
-const DOWNLOAD = "curl -fsSL https://raw.githubusercontent.com/pulseai-labs/claude-agent-scaffolding/main/omp/extensions/plugin-bin-path.ts -o ~/.omp/agent/extensions/plugin-bin-path.ts";
+const DOWNLOAD = "curl -fsSL https://raw.githubusercontent.com/pulseai-labs/claude-agent-scaffolding/main/omp/extensions/plugin-bin-path.ts --create-dirs -o ~/.omp/agent/extensions/plugin-bin-path.ts";
 
 function installPaths(record: string): string[] {
   try {
     const plugins = JSON.parse(readFileSync(record, "utf8"))?.plugins ?? {};
-    return HOSTS.flatMap((h) => {
-      const e = plugins[`${h}@${MARKETPLACE}`];
+    return Object.entries(plugins).flatMap(([id, e]) => {
+      if (!id.endsWith(`@${MARKETPLACE}`)) return [];
       const pick = Array.isArray(e) ? (e.find((x: any) => x?.scope === "user") ?? e[0]) : undefined;
-      return pick?.installPath ? [pick.installPath as string] : [];
+      return typeof pick?.installPath === "string" && pick.installPath ? [pick.installPath as string] : [];
     });
   } catch { return []; }
 }
@@ -42,7 +41,13 @@ export async function load(pi: any, home: string = homedir()): Promise<void> {
   const mod = mods.reduce((a, b) => ((b.VERSION ?? 0) > (a.VERSION ?? 0) ? b : a));
   if ((mod.MIN_LOADER_VERSION ?? 0) > LOADER_VERSION)
     console.warn(`plugin-bin-path.ts loader is out of date (loader ${LOADER_VERSION}, module needs ${mod.MIN_LOADER_VERSION}); update it: ${DOWNLOAD}`);
-  await mod.default(pi);
+  if (typeof mod.default !== "function") { console.warn("plugin bin paths not added: the newest module has no default factory"); return; }
+  try { await mod.default(pi); }
+  catch (e) { console.warn(`plugin bin paths not added: the module failed (${(e as Error).message})`); }
 }
 
-export default function (pi: any) { return load(pi); }
+// A loader error must never reject the extension factory: users cannot patch this file once copied.
+export default async function (pi: any) {
+  try { await load(pi); }
+  catch (e) { console.warn(`plugin bin paths not added: ${(e as Error).message}`); }
+}
