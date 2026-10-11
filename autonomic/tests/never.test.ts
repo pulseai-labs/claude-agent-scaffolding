@@ -1042,3 +1042,11 @@ describe('0.5.0 PR #735: ordinary script shapes 0.4.3 asked on', () => {
     ask("cat > ${OUT:-.}/run.sh <<'EOF'\ngit push -f origin main\nEOF\n./run.sh")
   })
 })
+
+describe('0.5.0 PR #735: cp -t names its destination directory', () => {
+  test('a hook installed with cp -t or --target-directory still asks', () => {
+    ask("cat > pre-commit <<'EOF'\ngit push -f origin main\nEOF\nchmod +x pre-commit; cp -t .git/hooks pre-commit; git commit -m x")
+    ask("cat > pre-commit <<'EOF'\ngit push -f origin main\nEOF\ncp --target-directory=.git/hooks pre-commit; git commit -m x")
+    silent("cat > notes.md <<'EOF'\nnever git push -f\nEOF\ncp -t docs notes.md; git add docs/notes.md && git commit -m x")
+  })
+})

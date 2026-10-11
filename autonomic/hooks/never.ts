@@ -275,7 +275,12 @@ function laters(cmds: readonly Command[], ctx: Ctx): { list: Later[]; from: numb
       const ws = split(c.bare).map(w => (w.includes('$') ? ctx.resolve(w) : w))
       const h = head(command(c.bare))
       const to = targets(c.bare)
-      if ((h === 'mv' || h === 'cp') && ws.length > 1) to.push(ws[ws.length - 1]!)
+      // mv and cp write to their last word, or to the directory -t / --target-directory names (PR #735).
+      if ((h === 'mv' || h === 'cp') && ws.length > 1) {
+        const t = ws.findIndex(w => w === '-t' || w === '--target-directory')
+        const long = ws.find(w => w.startsWith('--target-directory='))
+        to.push(t > 0 && ws[t + 1] !== undefined ? ws[t + 1]! : long !== undefined ? long.slice(19) : ws[ws.length - 1]!)
+      }
       const next = to.map(ctx.resolve)
       const low = ws.map(w => w.toLowerCase())
       list.push({ all: low.join('\0'), rest: low.slice(1).join('\0'), git: isGit(ws), h, inert: isInert(c.bare), namer: namer(ws), reader: isReader(ws, ctx.readers), pipe: c.pipe,
