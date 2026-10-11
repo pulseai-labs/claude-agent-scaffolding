@@ -40,7 +40,7 @@ reasoning is stated, not just the conclusion).
    version is bumped on every surface that carries the current version.
 5. **pr_and_merge** — with merge-bar installed: `/merge-bar:open-pr` then
    `/merge-bar:work-pr`. Without: `gh pr create` with the six-field body from
-   ossify's `references/work-pr/pr-body.md` (Merge bar word for word), worked by
+   ossify's `skills/work-pr/references/pr-body.md` (Merge bar word for word), worked by
    the bundled loop. One `Closes #N` line per resolved issue. The merge is the
    operator's; the tag follows the project's convention, on the merge commit,
    after the merge.

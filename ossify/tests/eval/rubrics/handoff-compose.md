@@ -3,7 +3,7 @@
 Score each 1-5. Pass = all ≥4.
 
 This surface scores the **compose-mode judgment** of
-`ossify/references/handoff/compose.md` + `sections.md` — where a handoff goes,
+`ossify/skills/handoff/references/compose.md` + `sections.md` — where a handoff goes,
 tracked or not, what enters it, and what the read-out surfaces. The ceremony
 has no gates; the judgment under test is whether the prose holds the rails
 without one.

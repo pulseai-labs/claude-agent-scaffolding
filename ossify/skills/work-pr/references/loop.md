@@ -8,7 +8,7 @@ facts. Nothing here needs a manifest, a worktree, or any ossify state — the
 lane works on any repository `gh` can reach.
 
 `/ossify:work-pr` routes here only where the `merge-bar` plugin is not installed;
-where it is, merge-bar's `working-a-pr` runs instead (`commands/work-pr.md`).
+where it is, merge-bar's `working-a-pr` runs instead (the router is `../SKILL.md`).
 
 ## 1. Preflight — resolve the target, stop early, stop loudly
 

@@ -313,9 +313,10 @@ session. Codex installed-reference resolution remains partial (#399).
 `wayfinder` is both at once, which is why it is listed above rather than
 below: an entry skill with its own skill directory, and an any-repo one. It
 charts a question into decision tickets on the issue tracker, or works an
-existing map's frontier one ticket per session. The three utilities have no
-skill directory — their depth lives in `references/` — so they are a Claude
-Code command surface only.
+existing map's frontier one ticket per session. The three utilities are skills
+too since 1.15.0 (`handoff`, `handoff-resume`, `work-pr`; so is `run-spine`),
+their depth in each skill's `references/`, so every harness the plugin ships on
+has them.
 
 `challenge` is the grill and the adversarial critic, absorbed in-tree at 1.1.0:
 the bone grill gate, the spec-core close audit, the release class veto, and the

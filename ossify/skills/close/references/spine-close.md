@@ -196,8 +196,8 @@ One of the two facts this step needs is not in state; the other is:
 
 **The PR body, when merge-bar is installed.** Where this session lists the
 `merge-bar` plugin's `working-a-pr` skill, compose the six fields before the
-pass, **one file per hosting repo**, from the template in the plugin root's
-`references/work-pr/pr-body.md`: its headings in order and its Merge bar block word
+pass, **one file per hosting repo**, from the template in
+`../../work-pr/references/pr-body.md`: its headings in order and its Merge bar block word
 for word, so the bar exists before the first review.
 
 - **Claim** — what this spine makes true, from `SPINE.md`'s demo contribution.

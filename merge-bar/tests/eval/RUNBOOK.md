@@ -35,7 +35,7 @@ whole surface is re-run.
 They establish that a fixture discriminates, by running it against the behaviour the skill
 replaces. Three fixtures carry baselines, each judged with its own surface's rubric:
 
-- `W1` and `W6` — the invoke agent reads `ossify/references/work-pr/loop.md` end to end instead
+- `W1` and `W6` — the invoke agent reads `ossify/skills/work-pr/references/loop.md` end to end instead
   of any merge-bar skill, and is told to apply only that loop's documented procedure.
 - `O1` — the invoke agent gets no skill: "You are a coding agent. Do what the operator asks."
 

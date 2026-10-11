@@ -3,7 +3,7 @@
 Score each 1-5. Pass = all ≥4.
 
 This surface scores the **resume-mode judgment** of
-`ossify/references/handoff/resume.md` — re-verifying a handoff's claims
+`ossify/skills/handoff-resume/references/resume.md` — re-verifying a handoff's claims
 against the live repo, reporting drift, and rendering a verdict. Resume never
 refuses; the judgment under test is whether drift is detected, read correctly,
 and never invented.
