@@ -67,6 +67,28 @@ Codex support is dual-published from the same repo through
 codex plugin marketplace add github:draco28/claude-agent-scaffolding
 ```
 
+### OMP
+
+OMP reads `.omp-plugin/marketplace.json`, which lists the six plugins whose procedures do not depend on
+the harness: `ossify`, `merge-bar`, `workspace-init`, `architect-critic`, `code-judo`, `ai-mentor`.
+
+    omp plugin marketplace add pulseai-labs/claude-agent-scaffolding
+
+    omp plugin install ossify@claude-agent-scaffolding   # and each plugin you want
+
+OMP does not put a plugin's `bin/` on `PATH`. Install the extension that does, once per machine, in your
+user extension folder; OMP loads it in every session:
+
+    curl -fsSL --create-dirs https://raw.githubusercontent.com/pulseai-labs/claude-agent-scaffolding/main/omp/extensions/plugin-bin-path.ts \
+      -o ~/.omp/agent/extensions/plugin-bin-path.ts
+
+If you set `PI_CODING_AGENT_DIR`, the folder is `$PI_CODING_AGENT_DIR/extensions/` instead; change the `-o` path to match.
+
+The file is a small loader: the logic ships inside the plugins, so `omp plugin upgrade` keeps it current,
+and the loader warns with this command if it ever needs a new download. Without it, `oss`, `wi` and `arc`
+are not found and the skills that need them say so. A session started
+with `--no-extensions` needs `-e <that file>`.
+
 ### Local Claude Code Development
 
 ```

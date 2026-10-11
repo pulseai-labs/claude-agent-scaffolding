@@ -1,8 +1,9 @@
 # claude-agent-scaffolding
 
-A **plugin marketplace** published to two surfaces: Claude Code (`/plugin install`, from
-`.claude-plugin/marketplace.json`) and Codex (`.agents/plugins/marketplace.json`, the v0
-dual-publish contract). There is no application — the plugins *are* the product.
+A **plugin marketplace** published to three surfaces: Claude Code (`/plugin install`, from
+`.claude-plugin/marketplace.json`), Codex (`.agents/plugins/marketplace.json`, the v0
+dual-publish contract), and OMP (`.omp-plugin/marketplace.json`, six plugins;
+`tests/test-omp-surface.sh` keeps it in step). There is no application — the plugins *are* the product.
 
 **A change to a plugin manifest or to packaging has to be carried to every surface that
 plugin ships on**, and CI enforces it rather than advising it: `tests/test-codex-dual-publish.sh`

@@ -103,3 +103,12 @@ jobs:
       - name: merge-bar template parity (repo-root)
         # ossify's fallback PR-body template must match merge-bar's (ossify 1.13.0).
         run: bash tests/test-merge-bar-template-parity.sh
+
+      - name: Install Bun 1.4.2
+        run: npm install --global bun@1.4.2 && bun --version
+
+      - name: OMP bin-path module and loader (bun test)
+        run: bun test omp/
+
+      - name: OMP surface gate (repo-root)
+        run: bash tests/test-omp-surface.sh
