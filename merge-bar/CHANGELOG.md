@@ -2,6 +2,12 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.2.0
+
+OMP marketplace surface.
+
+- Wrappers name the skill by `skill://` path as well as `${CLAUDE_PLUGIN_ROOT}`; skill descriptions lead with the trigger ("Use when ...") so OMP's skill match fires; Claude Code tool names carry an OMP alias where a skill names one; the README gains an OMP note. No Claude Code-only parts.
+
 ## 0.1.0
 
 Initial release. Three prose skills and three slash commands, no runtime library.
