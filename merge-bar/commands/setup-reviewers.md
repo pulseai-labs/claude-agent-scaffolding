@@ -4,5 +4,4 @@ allowed-tools: Bash(git:*), Bash(gh:*), Read, Write, Edit, Glob, Grep
 disable-model-invocation: true
 ---
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/setting-up-reviewers/SKILL.md` end to end and follow it**,
-with its two references. It lands the change through `opening-a-pr`.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/setting-up-reviewers/SKILL.md` (in OMP: `skill://setting-up-reviewers`) end to end and follow it.

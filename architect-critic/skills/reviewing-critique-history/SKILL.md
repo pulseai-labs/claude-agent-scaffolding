@@ -1,6 +1,6 @@
 ---
 name: reviewing-critique-history
-description: Show recent architect-critic runs as a table, plus any in-flight background (async) audits. Triggers on "show recent critiques", "critique history", "list pending audits", "recent audits", "audit log", "in-flight critiques", "background audits". Reads state.json schema v3 (recent_runs[] + external_runs[]). Default N=10 rows; --limit N overrides.
+description: Use when asked for recent critiques ("show recent critiques", "critique history", "list pending audits", "recent audits", "audit log", "in-flight critiques", "background audits") — shows recent architect-critic runs and in-flight background (async) audits as tables, from state.json schema v3; default 10 rows, --limit N overrides.
 ---
 
 # reviewing-critique-history
@@ -15,7 +15,7 @@ This skill is intentionally narrow: read, format, display. No judgment, no rebut
 
 Resolve the state file through the dispatcher, never a hardcoded path — `ac_state_path` resolves `ac_data_dir` (which honors a `CLAUDE_PLUGIN_DATA` override) and appends `state.json`, so this read path always matches the write path other skills use.
 
-Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH` on Claude Code and Codex. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
+Resolve the `arc` dispatcher once and hold it in `arc_bin`: `arc_bin="$(command -v arc)"` — the plugin loader puts `bin/` on `$PATH`. Every `arc` invocation below — and in this skill's references — is `"$arc_bin"`.
 
 ```bash
 STATE_FILE="$("$arc_bin" state_path)"

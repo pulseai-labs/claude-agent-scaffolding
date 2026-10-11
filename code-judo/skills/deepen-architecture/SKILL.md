@@ -19,7 +19,7 @@ vocabulary:
   a hypothetical seam, two is a real one". Use those terms exactly in every suggestion. Do
   not drift into "component", "service", "API", or "boundary".
 
-  **How you load a sibling skill depends on the host.** In Claude Code that is the Skill tool.
+  **How you load a sibling skill depends on the host.** In Claude Code that is the Skill tool; in OMP, `skill://<name>` (bare: `skill://codebase-design`).
   Codex publishes `./skills/` and exposes them as explicit `$skill` invocations rather than a
   tool call. If neither is available to you, read the sibling's `SKILL.md` from this plugin's
   own directory — it is shipped alongside this file, so the vocabulary is never actually
@@ -54,7 +54,7 @@ Read the resolved vocabulary source and the ADRs covering the area you are touch
 before forming opinions — whatever was resolved under *Resolve where the vocabulary lives*,
 never whatever happens to sit at the repo root.
 
-Then spawn a sub-agent to walk the codebase. Do not follow rigid heuristics — explore
+Then spawn a sub-agent (`Agent` in Claude Code, `task` in OMP) to walk the codebase. Do not follow rigid heuristics — explore
 organically and note where *you* experience friction:
 
 - Where does understanding one concept require bouncing between many small modules?

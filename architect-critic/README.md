@@ -180,3 +180,10 @@ macOS and Linux. Windows deferred (matches sibling plugins).
 ## License
 
 MIT
+
+## OMP
+
+Install per the root README (the plugin, plus the one-time `PATH` extension for `arc`). Skills are reachable as
+`skill://<name>`, with no `architect-critic:` prefix. The `SessionStart` hook (`hooks/hooks.json`) does not run in
+OMP, so principles load from the skill text alone; what is lost is the one-line session-start status (principles
+path, count of background audits in flight), and `managing-async-critique` lists them on demand.

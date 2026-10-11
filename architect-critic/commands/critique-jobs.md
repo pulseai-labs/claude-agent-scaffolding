@@ -1,12 +1,10 @@
 ---
 description: Manage background async critique jobs — status / result / cancel / resume
 argument-hint: <status|result|cancel|resume> [run-id]
+allowed-tools: Read
 ---
 
 # /critique-jobs
-
-Invoke the **managing-async-critique** skill to manage background close-depth critique
-jobs created by `/critique --close --async`. This slash command is a thin wrapper.
 
 ## Arguments
 
@@ -21,12 +19,4 @@ jobs created by `/critique --close --async`. This slash command is a thin wrappe
 export ARCHITECT_CRITIC_ARGS="$ARGUMENTS"
 ```
 
-## Invoke
-
-Now invoke the skill via:
-
-```
-Skill(architect-critic:managing-async-critique)
-```
-
-The qualified `<plugin>:<skill>` form is required — pass the arguments above via `$ARCHITECT_CRITIC_ARGS`.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/managing-async-critique/SKILL.md` (in OMP: `skill://managing-async-critique`) end to end and follow it. Its arguments are in `$ARCHITECT_CRITIC_ARGS`.

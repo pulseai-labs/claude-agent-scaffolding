@@ -1,6 +1,6 @@
 ---
 name: opening-a-pr
-description: Open a pull request whose body carries seven fields — Claim, Scope, Known limits, Merge danger, Merge bar, Evidence, Closes — so every reviewer and the session that works the PR judge it against a finish line fixed before review starts. Use when opening, raising or creating a PR, writing a PR description, or when another skill hands you a finished branch to open. Proposes a split instead of opening when the honest claim or scope is too wide.
+description: Use when opening, raising or creating a PR, writing a PR description, or when another skill hands you a finished branch to open — writes a body with seven fields (Claim, Scope, Known limits, Merge danger, Merge bar, Evidence, Closes) so reviewers judge it against a finish line fixed before review starts; proposes a split when the claim or scope is too wide.
 ---
 
 # Opening a pull request

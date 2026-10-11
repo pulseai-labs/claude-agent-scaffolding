@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.8.0 — 2026-10-11
+
+OMP marketplace surface.
+
+### Changed
+- Wrappers name the skill by `skill://` path as well as `${CLAUDE_PLUGIN_ROOT}`; skill descriptions lead with the trigger ("Use when ...") so OMP's skill match fires; Claude Code tool names carry an OMP alias where a skill names one; the README gains an OMP note. The `$ARCHITECT_CRITIC_ARGS` bridge is kept in every argument-taking wrapper. `AskUserQuestion` carries the OMP name `ask`. The SessionStart hook stays Claude Code-only.
+
+### Added
+- **`omp/bin-path.ts`** — puts the plugin's `bin/` (`arc`) on `PATH` for OMP sessions (same shared source as workspace-init and ossify).
+- `tests/unit/test-command-bridge.sh` — guards that every wrapper reading `$ARGUMENTS` keeps the `export ARCHITECT_CRITIC_ARGS` line after the rewrite.
+
 ## v0.7.2 — 2026-10-11
 
 The scaffold stack (`scaffold-onboard`, `scaffold-dev`, `scaffold`) left the marketplace.

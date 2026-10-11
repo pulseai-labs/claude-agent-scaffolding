@@ -1,6 +1,6 @@
 ---
 name: domain-modeling
-description: Build and sharpen a project's domain model as you design. Use when discussing what a codebase's terms actually mean, when a term is fuzzy or overloaded, when writing or editing a CONTEXT.md glossary, or when an architecture decision is worth recording as an ADR — which this skill composes and hands to whoever owns the ADR directory rather than filing itself. Triggers on "what do we call this", "that term is overloaded", "add this to the glossary", "write a CONTEXT.md", "should this be an ADR", "record this decision", "domain model", "ubiquitous language".
+description: Use when discussing what a codebase's terms actually mean, when a term is fuzzy or overloaded, when writing or editing a CONTEXT.md glossary, or when an architecture decision is worth recording as an ADR ("what do we call this", "that term is overloaded", "add this to the glossary", "write a CONTEXT.md", "should this be an ADR", "record this decision", "domain model", "ubiquitous language") — builds and sharpens the domain model as you design; composes ADRs and hands them to whoever owns the ADR directory rather than filing them.
 ---
 
 # Domain modeling
