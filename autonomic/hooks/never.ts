@@ -256,8 +256,9 @@ type Ctx = { resolve: Resolve; readers: Readers }
 const opaqueName = (f: string) => /[$*?[`{]/.test(f)
 // What usedLater reads of each later command, worked out once per command list, so a script of
 // many redirects is not re-split for every target (final review I4). `from[i]` is where command
-// i's entries start; the commands after i are `list.slice(from[i + 1])`.
-type Later = { low: string[]; h: string | undefined; inert: boolean; namer: boolean; reader: boolean; pipe: boolean; hook: boolean; opaque: boolean; names: string[] }
+// i's entries start; the commands after i start at `from[i + 1]`. A command's words are joined
+// by NUL, lowercased, so one `includes` per name reads them all (a name holds no NUL).
+type Later = { all: string; rest: string; h: string | undefined; inert: boolean; namer: boolean; reader: boolean; pipe: boolean; hook: boolean; opaque: boolean; names: string[] }
 function laters(cmds: readonly Command[], ctx: Ctx): { list: Later[]; from: number[] } {
   const list: Later[] = []
   const from: number[] = []
@@ -270,33 +271,33 @@ function laters(cmds: readonly Command[], ctx: Ctx): { list: Later[]; from: numb
       const to = targets(c.bare)
       if ((h === 'mv' || h === 'cp') && ws.length > 1) to.push(ws[ws.length - 1]!)
       const next = to.map(ctx.resolve)
-      list.push({ low: ws.map(w => w.toLowerCase()), h, inert: isInert(c.bare), namer: namer(ws), reader: isReader(ws, ctx.readers), pipe: c.pipe,
+      const low = ws.map(w => w.toLowerCase())
+      list.push({ all: low.join('\0'), rest: low.slice(1).join('\0'), h, inert: isInert(c.bare), namer: namer(ws), reader: isReader(ws, ctx.readers), pipe: c.pipe,
         hook: next.some(hook), opaque: next.some(opaqueName), names: next.map(t => base(clean(t)).toLowerCase()).filter(n => n !== '') })
     }
   })
   from.push(list.length)
   return { list, from }
 }
-function usedLater(raw: readonly string[], later: readonly Later[], ctx: Ctx): boolean {
+function usedLater(raw: readonly string[], later: readonly Later[], ctx: Ctx, start = 0): boolean {
   const files = raw.map(ctx.resolve)
+  const runsAny = () => { for (let k = start; k < later.length; k++) if (!later[k]!.inert) return true; return false }
   if (files.some(hook)) return true
-  if (files.some(opaqueName)) return later.some(c => !c.inert)
+  if (files.some(opaqueName)) return runsAny()
   const names = new Set(files.map(f => base(clean(f)).toLowerCase()).filter(n => n !== ''))
-  const named = (low: readonly string[], skip: number) => {
-    for (let k = skip; k < low.length; k++) for (const n of names) if (low[k]!.includes(n)) return true
-    return false
-  }
-  for (const c of later) {
+  const named = (s: string) => { for (const n of names) if (s.includes(n)) return true; return false }
+  for (let k = start; k < later.length; k++) {
+    const c = later[k]!
     if (c.h === undefined) continue
     if (!c.inert && !c.namer) {
       if (c.reader) continue
-      if (named(c.low, 0) || /[$*?[]/.test(c.h)) return true
+      if (named(c.all) || /[$*?[]/.test(c.h)) return true
       continue
     }
-    if (!named(c.low, 1)) continue
+    if (!named(c.rest)) continue
     if (c.pipe) return true
     if (c.hook) return true
-    if (c.opaque) return later.some(c => !c.inert)
+    if (c.opaque) return runsAny()
     for (const n of c.names) names.add(n)
   }
   return false
@@ -528,7 +529,17 @@ function splice(text: string): string {
 type Vars = Map<string, { value: string; at: number }>
 type Judged = { words: string[]; at: number }
 type Reading = { whole: string[] } | { groups: Judged[]; vars: Vars; bag: string[]; values: string[]; loops: [number, number][] }
+// namesDanger and neverRules read the same command back to back (register.tsx): keep the last
+// reading, keyed by the text and the readers, so a large script is read once, not twice.
+let last: { command: string; readers: string; r: Reading } | undefined
 function wordsOf(command: string, readers: Readers): Reading {
+  const key = JSON.stringify(readers)
+  if (last !== undefined && last.command === command && last.readers === key) return last.r
+  const r = reading(command, readers)
+  last = { command, readers: key, r }
+  return r
+}
+function reading(command: string, readers: Readers): Reading {
   const message = command.replace(MESSAGE, '-m MSG')
   // Drop every body; if a later command may run any written file, keep them all (a kept body
   // may run another written file). A body with no file prints to standard output (§3.3).
@@ -571,7 +582,7 @@ function wordsOf(command: string, readers: Readers): Reading {
     const i = parts.findIndex(c => c.end >= w.end)
     const t = [...w.files, ...pg[i]!.targets]
     pl ??= laters(parts, ctx0)
-    return pipesOn(parts, i) || pg[i]!.pipe || (t.length > 0 && usedLater(t, pl.list.slice(pl.from[i + 1]), ctx0))
+    return pipesOn(parts, i) || pg[i]!.pipe || (t.length > 0 && usedLater(t, pl.list, ctx0, pl.from[i + 1]))
   })
   const text = splice(kept ? message : stubbed)
   const parsed = commands(text)
@@ -597,7 +608,7 @@ function judge(cmds: readonly Command[], g: readonly Group[], ctx: Ctx, at?: num
     if ((!isInert(c.bare) && !assignOnly(c.bare)) || pipesOn(cmds, i) || g[i]!.pipe) return [{ words: split(c.text), at: k }]
     const to = [...targets(c.bare), ...g[i]!.targets, ...sedTargets(c.bare)]
     lt ??= to.length > 0 ? laters(cmds, ctx) : undefined
-    if (to.length > 0 && usedLater(to, lt!.list.slice(lt!.from[i + 1]), ctx)) return [{ words: split(c.text), at: k }]
+    if (to.length > 0 && usedLater(to, lt!.list, ctx, lt!.from[i + 1])) return [{ words: split(c.text), at: k }]
     return c.subs.flatMap(s => {
       const inner = commands(s)
       const ig = inner === undefined ? undefined : groups(inner)
