@@ -1,4 +1,4 @@
-# ossify (v1.15.1)
+# ossify (v1.15.2)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -120,6 +120,11 @@ one-change amendment to `/amend-spec`, a command only `scaffold-onboard` shipped
 (name the section and the edit instead). `/ossify:adopt` still targets
 projects onboarded with the legacy scaffold stack. No state schema, journal
 operation or command changes.
+
+Since 1.15.2, ossify's copy of the template says a review stopping rule is never
+a bar: `working-a-pr` decides when rounds stop, and a finding that meets a
+condition blocks in every round. No state schema, journal operation or command
+changes.
 
 Since 1.15.1, ossify's copy of merge-bar's PR body template
 (`skills/work-pr/references/pr-body.md`) carries merge-bar 0.2.0's seventh field,
