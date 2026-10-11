@@ -96,7 +96,8 @@ to your report file at REPORT_PATH, then wait. Implement only what the orchestra
 reply approves.
 
 DONE: commit on <branch> with messages written to a file under SCRATCH_DIR and `git commit -F`; push;
-write the PR body to a file under SCRATCH_DIR from PR_BODY_TEMPLATE — every heading in order,
+write the PR body to a file under SCRATCH_DIR — every section of the repository's own PR
+template first, if it has one, kept and filled; then PR_BODY_TEMPLATE's headings in order,
 the Merge bar block word for word, each field filled as its "Filling each field" line says,
 Evidence only from commands you ran (where it is `none`: what changed and the test commands
 with their results) — and open the PR from the worktree with `gh pr create --repo
@@ -136,7 +137,8 @@ TASK: <one bounded change, with the exact test command that proves it>.
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
 DONE: commit with a message written to a file under SCRATCH_DIR and `git commit -F`; push; <write
-the PR body to a file under SCRATCH_DIR from PR_BODY_TEMPLATE — every heading in order, the Merge
+the PR body to a file under SCRATCH_DIR — every section of the repository's own PR template
+first, if it has one, kept and filled; then PR_BODY_TEMPLATE's headings in order, the Merge
 bar block word for word, each field filled as its "Filling each field" line says, Evidence only
 from commands you ran (where it is `none`: what changed and the test commands with their
 results) — and open the PR from the worktree with `gh pr create --repo <owner/repo> --base
