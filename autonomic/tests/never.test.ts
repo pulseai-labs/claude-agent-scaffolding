@@ -720,3 +720,20 @@ describe('0.4.3 PR review: shapes 0.4.2 asked on still ask', () => {
     expect(rules(`{ cat <<'X'\nall:\n\t${P}\nX\n} | { cat; } | make -f -`)).toContain('force-push')
   })
 })
+
+// ---- autonomic 0.5.0: each command judged on its own words (spec 2026-10-10) ----
+// A must-ask case also passes the cheap pre-check (namesDanger), which runs first on the allow path.
+const ask = (c: string, w: Where = W) => expect([c, rules(c, w).length > 0, namesDanger(c)]).toEqual([c, true, true])
+const silent = (c: string, w: Where = W) => expect([c, rules(c, w)]).toEqual([c, []])
+
+describe('0.5.0 §3.5 backticks are substitutions', () => {
+  test('a quoted or escaped backtick is text; a live pair is judged as commands', () => {
+    silent("echo 'run `git status` first' && git push -u origin feat/x && echo 'never -f'")
+    silent('echo "head `git rev-parse HEAD`" && git push -u origin feat/x; echo \'not -f\'')
+  })
+  test('escape routes', () => {
+    ask('echo "`git push -f origin feat/x`"')
+    ask('x=`rm -rf ~/a`')
+    ask('echo `git status; git push -f origin feat/x')
+  })
+})

@@ -88,6 +88,20 @@ function commands(text: string): Command[] | undefined {
       i = e - 1
       continue
     }
+    // 0.5.0 cause 5: a live backtick pair (also inside double quotes) is a substitution like `$( )`.
+    // Single-quoted or escaped backticks never reach here. An unclosed one does not parse.
+    if (c === '`') {
+      let e = i + 1
+      while (e < text.length && text[e] !== '`') e += text[e] === '\\' ? 2 : 1
+      if (e >= text.length) return undefined
+      const inner = text.slice(i + 1, e).replace(/\\([`$\\])/g, '$1')
+      if (/(?:^|[\s;&|(])(?:case[\s;]|#)/.test(inner)) return undefined
+      bare += text.slice(mark, i) + '$S'
+      subs.push(inner)
+      mark = e + 1
+      i = e
+      continue
+    }
     if (q === '"') { if (c === '"') q = undefined; continue }
     if (c === "'" || c === '"') { q = c; continue }
     if (c === '#' && (i === 0 || /[\s;&|()]/.test(text[i - 1]!))) {
@@ -362,10 +376,10 @@ function wordsOf(command: string, readers: Readers): string[] {
   const parsed = commands(text)
   // Runners are looked for outside the dropped bodies: a message that says "bash" runs nothing.
   if (runs(text, parsed)) return split(command)
-  // A process substitution, a backtick, a kept heredoc, or a function or alias defined in the
+  // A process substitution, a kept heredoc, or a function or alias defined in the
   // text (it may shadow an inert name: `echo() { "$@"; }`) keeps the whole bag; so does text
-  // whose commands or groups do not parse.
-  const cmds = /`|<<|[<>]\(|\([ \t]*\)|(?:^|[\s;&|(])(?:function|alias)[ \t]/.test(text) ? undefined : parsed
+  // whose commands or groups do not parse. A backtick no longer does (0.5.0 cause 5).
+  const cmds = /<<|[<>]\(|\([ \t]*\)|(?:^|[\s;&|(])(?:function|alias)[ \t]/.test(text) ? undefined : parsed
   const g = cmds === undefined ? undefined : groups(cmds)
   if (cmds === undefined || g === undefined) return split(text)
   return judge(cmds, g, ctx)
