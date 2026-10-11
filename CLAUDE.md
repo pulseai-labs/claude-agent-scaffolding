@@ -22,7 +22,7 @@ never be added back here.
 
 ## The one rule that matters most
 
-**Code that MUTATES DURABLE STATE may be deterministic. Code that READS AND REPORTS must be prose.**
+**Prose is the default. Code is allowed when the work is mechanical and its inputs are closed, or when its only possible mistake is an extra stop.**
 
 @docs/conventions/skill-first.md
 
