@@ -48,7 +48,8 @@ transcripts: prompts in other projects fall from 386 to 266, none newly asked).
   default names; the Python deny list is a judgment rule; namers and message consumers are trusted
   by name; the floor still needs a danger word; variable values come from the text only
   (`export N=…` asks); a shell inside `$( )` is not read through; the run-later resolver does not
-  check order.
+  check order; a quote-disguised command word (`p""rintf -v`) and a Python write through a variable
+  file name (`open(p,'w')`) are not seen (PR #735 review round 3).
 
 ## 0.4.3
 

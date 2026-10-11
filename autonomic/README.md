@@ -199,7 +199,7 @@ counts as reaching a command that is not inert.
 - `python3 - <<'X'` (or `python3 <<'X'`, quoted delimiter) drops its body unless the body names
   `subprocess`, `system`, `popen`, the `exec`/`spawn`/`fork` families, `pty`, `eval`, `compile`,
   `__import__`, `importlib`, `getattr`, `ctypes` or `multiprocessing` as an identifier, names a git
-  control path, or writes a file a later command runs.
+  control path, or writes a file a later command runs (named as a string literal in the body).
 - A heredoc read only as a message (`git commit|tag|notes …|merge|commit-tree … -F -`,
   `gh pr|issue|release … --body-file -`, `-F -`, `--notes-file -`) drops its body, `tee FILE <<`
   is a write like `cat > FILE`, and in an unquoted body of these and of `cat` only the `$( )` and
@@ -223,7 +223,9 @@ naming a listed identifier is silent; namers and message consumers are trusted b
 readers; the floor still needs a danger word (`$CMD -f …`, an alias in a `GIT_CONFIG_GLOBAL` file,
 a Python body that builds `git push -f` from pieces stay silent); variable values come from the
 text only, so `export N=…` and `N=… cmd` ask; a shell inside `$( )` is not read through, and an
-unquoted Python heredoc stays a runner; the run-later file-name resolver does not check order.
+unquoted Python heredoc stays a runner; the run-later file-name resolver does not check order;
+a command word disguised by quotes (`p""rintf -v "$N"`) is not read as that command, and a Python
+body that writes through a variable file name (`p='run'; open(p,'w')`) is dropped.
 
 Two heredoc shapes with a quoted delimiter are literal text, and their bodies are skipped: a
 commit message, `-m "$(cat <<'EOF'` … `EOF` `)"`, and `cat > file <<'EOF'` at a command's start
