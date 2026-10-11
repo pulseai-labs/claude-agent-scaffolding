@@ -89,6 +89,8 @@ and the loader warns with this command if it ever needs a new download. Without 
 are not found and the skills that need them say so. A session started
 with `--no-extensions` needs `-e <that file>`.
 
+Last verified with omp 18.8.9 on 2026-10-11.
+
 ### Local Claude Code Development
 
 ```
