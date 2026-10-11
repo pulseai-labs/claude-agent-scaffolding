@@ -1,6 +1,6 @@
 ---
 name: work-item
-description: Use when the user says execute work item r1.s2.w1, implement the work item, run the handoff at <path>, run the rounds, execute the spine, dispatch the work items, or /work-item — pre-flight gates, RED gate per AC, TDD loop, report.md, stage-never-commit, one JSON return. Not /plan-spine authoring or /close gates.
+description: Use when the user says execute work item r1.s2.w1, implement the work item, run the handoff at <path>, or /work-item — pre-flight gates, RED gate per AC, TDD loop, report.md, stage-never-commit, one JSON return. Not /plan-spine authoring or /close gates.
 ---
 
 # work-item

@@ -1,6 +1,6 @@
 ---
 name: run-spine
-description: Use when a planned ossify spine is ready to execute or a started one must resume — drive its rounds end to end (spine-branch cut, one worktree per item, implementer dispatch, the round barrier)
+description: Use when told to run the rounds, execute the spine or dispatch the work items, or resume a started spine — drive its rounds end to end (worktree per item, implementer dispatch, round barrier)
 ---
 
 **Exactly two command shapes are accepted**, and the grammar is closed:
