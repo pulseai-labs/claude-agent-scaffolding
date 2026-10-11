@@ -357,6 +357,29 @@ function insideSub(text: string, at: number): boolean {
   }
   return false
 }
+// 0.5.0 shape A: `sh -c 'literal'` (bash, zsh, dash; -e -u -x -o pipefail) is read as a subshell
+// holding the string. The string holds no `$`, backtick or backslash when double-quoted, and
+// none of `$` or backtick when single-quoted, so trailing arguments are never read.
+const SHELL_C = /^(\s*(?:(?:then|do|else|!|\{)\s+)*)(?:\/(?:usr\/)?bin\/)?(?:sh|bash|zsh|dash)(?:\s+(?:-[eux]+|-o\s+pipefail))*\s+-[eux]*c[eux]*(?:\s+-o\s+pipefail|\s+-[eux]+)*\s+(?:'([^'$`]*)'|"([^"$`\\]*)")(?:\s+[^\s'"$`;&|<>()]+)*(\s*(?:\d*(?:&>>?|>>?|<)[|&]?\s*[^\s;&|<>()'"$`]+\s*)*)$/
+function splice(text: string): string {
+  for (let round = 0; round < 4; round++) {
+    const cmds = commands(text)
+    if (cmds === undefined) return text
+    let out = text
+    let changed = false
+    for (const c of [...cmds].reverse()) {
+      if (c.subs.length > 0) continue
+      const m = SHELL_C.exec(c.text)
+      if (!m) continue
+      const start = c.end - c.text.length
+      out = `${out.slice(0, start)}${m[1]}(\n${m[2] ?? m[3]!}\n)${m[4]}${out.slice(c.end)}`
+      changed = true
+    }
+    if (!changed) return text
+    text = out
+  }
+  return text
+}
 type Vars = Map<string, { value: string; at: number }>
 type Judged = { words: string[]; at: number }
 type Reading = { whole: string[] } | { groups: Judged[]; vars: Vars; bag: string[]; values: string[] }
@@ -383,7 +406,7 @@ function wordsOf(command: string, readers: Readers): Reading {
     const t = [...w.files, ...pg[i]!.targets]
     return pipesOn(parts, i) || pg[i]!.pipe || (t.length > 0 && usedLater(t, parts.slice(i + 1), ctx0))
   })
-  const text = kept ? message : stubbed
+  const text = splice(kept ? message : stubbed)
   const parsed = commands(text)
   // Runners are looked for outside the dropped bodies: a message that says "bash" runs nothing.
   if (runs(text, parsed)) return { whole: split(command) }

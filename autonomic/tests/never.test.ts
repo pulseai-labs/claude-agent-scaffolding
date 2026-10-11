@@ -815,3 +815,15 @@ describe('0.5.0 §3.3 a moved push that names its destination', () => {
       ask(c)
   })
 })
+
+describe('0.5.0 §3.6 sh -c read-through', () => {
+  test('a literal string is read as commands', () => {
+    silent("bash -c 'npm test -- -f' && git push -u origin feat/x")
+    silent("sh -c 'cd /repo && git push -u origin feat/x'")
+  })
+  test('escape routes', () => {
+    for (const c of ["sh -c 'git push -f origin feat/x'", 'bash -c "rm -rf ~/x"', "bash -lc 'git push origin main'", 'sh -c "$CMD"; echo push -f',
+      "cd /other; sh -c 'git push'", "bash -c 'sh -c \"git push -f origin x\"'", "F=x; sh -c 'git push $F origin x'; echo -f"])
+      ask(c)
+  })
+})
