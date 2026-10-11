@@ -124,9 +124,10 @@ operation or command changes.
 Since 1.14.6, ossify's copy of merge-bar's PR body template
 (`references/work-pr/pr-body.md`) carries merge-bar 0.2.0's seventh field,
 `## Merge danger`: the door (whether a revert of the merge undoes all of it) and
-the blast radius. `/ossify:patch` writes it on the no-merge-bar fallback, and
-spine close composes it per hosting repo, beside Scope and Known limits. No state
-schema, journal operation or command changes.
+the blast radius. `/ossify:patch` writes it on the no-merge-bar fallback. Spine
+close composes it per hosting repo, beside Scope and Known limits, only where
+merge-bar is installed; without merge-bar a spine PR still carries no template
+fields. No state schema, journal operation or command changes.
 
 Since 1.14.2 (#692, #691, #645, #646, #675), doctor's bones drift check folds
 both halves under one scoped C locale, preserving identifiers in findings under
