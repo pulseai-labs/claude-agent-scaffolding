@@ -479,7 +479,7 @@ is `merge-conflict-resolution.md` — hunk by hunk, by each side's recorded
 intent. Resuming means finishing *this* repo's landing and continuing from
 there, not re-running the layer or restarting a repo that already landed.
 
-**Between the passes: hand every open PR to `/ossify:work-pr`, one at a time** — each
+**Between the passes: hand every open PR to work-pr (`/ossify:work-pr`; the `work-pr` skill on Codex, `skill://work-pr` in OMP), one at a time** — each
 in its own session where the caller supplies one.
 The invocation states, in full: the spine context (this PR *is* the spine's
 accumulated diff landing — the smallest independently meaningful diff, which is
@@ -508,8 +508,7 @@ open, the close halts here, recording nothing**: surface the PR URLs, say which
 steps remain, and stop. That is the named halt state; re-invoke `/close
 <spine-id>` once the PR has merged.
 
-**On a surface that does not carry `/ossify:work-pr` — Codex today, which
-publishes ossify's skills but not its commands — the operator drives the
+**Where no work-pr is available at all, the operator drives the
 review-fix-merge loop by their own means and says so.** What this ceremony
 REQUIRES is a landing of the PR it opened that the record pass can prove — a
 merge commit of its head, or a squash or rebase of exactly its head; who drove

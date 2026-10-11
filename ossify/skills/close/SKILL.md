@@ -232,8 +232,7 @@ steps, in **binding order**:
    `"$oss_bin" get` — a `select` matching nothing exits 0.
 2. **Land each hosting repo on its own `base_branch` — by PR where a remote
    exists, locally where none does (#339)**. The PR arm pushes the spine branch,
-   opens the PR, and hands it to `/ossify:work-pr` — not published on
-   Codex, where the operator drives the merge loop manually
+   opens the PR, and hands it to work-pr (`/ossify:work-pr`; the `work-pr` skill on Codex, `skill://work-pr` in OMP)
    (`spine-close.md` §3); the record pass proves the
    remote merge locally (identity, lineage, base-contained) before anything is
    recorded. A remote `gh` cannot operate on halts — never a silent local

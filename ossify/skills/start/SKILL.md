@@ -1,6 +1,6 @@
 ---
 name: start
-description: Use when the user wants to start a new project, onboard a project into ossify, kick off a skeleton-first build, or runs /start — journey map, skeleton cut, bones registry, privacy posture; produces a lean MASTER-SPEC, memory bank, bones ADRs and seed feature map. Not /plan-release, /plan-spine or amending an existing spec.
+description: Use when the user wants to start a new project, onboard a new project into ossify, kick off a skeleton-first build, or runs /start — journey map, skeleton cut, bones registry, privacy posture; produces a lean MASTER-SPEC, memory bank, bones ADRs and seed feature map. Not /plan-release, /plan-spine or amending an existing spec.
 ---
 
 # start

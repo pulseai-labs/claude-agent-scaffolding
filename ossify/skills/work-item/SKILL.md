@@ -68,27 +68,17 @@ here)** → `close`.
 **Mode B has no description-match** — the subagent system prompt fires on
 dispatch, and the handoff path arrives in the invocation block.
 
-**Orchestrator mode — you were asked to drive a SPINE, not one item:**
-
-- `/run-spine <spine-id>` (slash command)
-- "run the rounds", "execute the spine", "dispatch the work items", "drive
-  `r1.s2`'s rounds"
-
-**Read `references/round-orchestration.md` in full and follow it.** It owns the
-whole lane: the spine-branch cut-and-checkout, one worktree per work item,
-`"$oss_bin" work_item_exec`, dispatching `ossify:implementer-agent` per item, the
-3-iteration cap, and the round barrier. **Do not ask for a handoff path** — the
-lane authors one per work item as it goes. `plan-spine` ends where this begins;
-`/close <spine-id>` takes over when the final round clears its barrier.
+**Orchestrator mode — you were asked to drive a SPINE, not one item:** that is `run-spine`
+(`../run-spine/SKILL.md`; OMP `skill://run-spine`), which gates
+`references/round-orchestration.md`. **Do not ask for a handoff path.**
 
 **Do NOT auto-invoke when:**
 
 - **No handoff path was given — *and* you were not asked to drive a spine.** Ask
   once — *"Which handoff? (absolute path to a `handoff.md` under the work item's
   directory)"* — and wait. Do not guess a work item from an id, and do not go
-  hunting the filesystem for the newest handoff. If the ask was a spine id or one
-  of the orchestrator phrases above, this rule does not apply: go to
-  `references/round-orchestration.md` instead of asking.
+  hunting the filesystem for the newest handoff. If the ask was to drive a spine,
+  this rule does not apply: go to `run-spine` instead of asking.
 - The user wants to decompose a spine, author a spec, or author demo criteria —
   that is `plan-spine`.
 - The user wants the per-work-item gate, the cumulative demo run, the harvest, or

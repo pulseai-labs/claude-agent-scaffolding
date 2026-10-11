@@ -11,6 +11,12 @@ description: Use when told to run the rounds, execute the spine or dispatch the 
   execution procedure instead. `../work-item/references/external-executor.md`
   is that mode's contract.
 
+Outside the slash command (Codex, `skill://run-spine`, natural language) the spine
+id and flag arrive as tokens in the request; the same two shapes and refusals
+apply. The default shape dispatches Claude Code's `ossify:implementer-agent`, so on
+a harness without it (OMP, Codex) refuse it before the spine-branch cut, naming
+`--external-executor` as the way to run there.
+
 Anything else is a refusal, and the refusal comes **before the spine-branch cut,
 before any worktree, and before any state write** — a lane that mutates first and
 validates second has already changed the repository by the time it reports the
