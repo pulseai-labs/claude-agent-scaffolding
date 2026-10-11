@@ -1,4 +1,4 @@
-# ossify (v1.14.4)
+# ossify (v1.14.5)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Ten entry skills (`start`, `adopt`,
@@ -101,6 +101,15 @@ one-parent commits only. The record line names its proof (`merge`, `squash` or
 `rebase`), and the changed-path list and the cumulative demo compare against the
 proved before-point. A merge commit is still the convention where the repo
 allows one; a fast-forward or any other shape still halts at record time.
+
+Since 1.14.5, ossify no longer describes itself as an alternative to
+`scaffold-onboard` + `scaffold-dev`, which left the marketplace. Both manifest
+descriptions drop the install-one-or-the-other framing, and doctor's prose no
+longer cites `scaffold-onboard` files as live: the interop-repair deferral calls
+that repair the retired plugin's, the budget check cites only the upstream issue,
+and rule authoring no longer names a paired stack. `/ossify:adopt` still targets
+projects onboarded with the legacy scaffold stack. No state schema, journal
+operation or command changes.
 
 Since 1.14.4, ossify ships on two surfaces, Claude Code and Codex. The Devin
 plugin manifest, the Devin worker skill and the Devin-only dispatcher rule are
