@@ -11,7 +11,8 @@ a blocking finding is never deferred, and no separate stopping rule is agreed or
 the bar. The old rule predated merge-bar and led seven canonical PRs to lower their bar.
 Without `working-a-pr`, the generic loop keeps its default (defer remaining P2s and P3s, never
 P0 or P1). The round-five process checkpoint stays on both paths. The skill's step list names
-step 11 "round stop".
+step 11 "round stop". The ossify work-PR brief's `STOPPING_RULE` slot takes `merge-bar` where
+merge-bar is installed, so `/ossify:work-pr` follows `working-a-pr`'s round stop there.
 
 ## 0.2.13
 
