@@ -428,7 +428,24 @@ function insideSub(text: string, at: number): boolean {
 // The deny words match as identifiers (`filesystem`, `evaluation` are prose).
 const PY_DENY = /\b(?:subprocess|system|popen|exec(?:v|ve|vp|vpe|l|le|lp|lpe)?|spawn\w*|fork\w*|pty|eval|compile|__import__|importlib|getattr|ctypes|multiprocessing)\b/
 const PYDOC = String.raw`(?<=^|[\n;&|({)])[ \t]*(?:\S*\/)?(?:python[\d.]*|pypy[\d.]*)((?:[ \t]+-[uBIEsS]+)*)((?:[ \t]+-(?:[ \t]+[^\s<;&|>]+)*)?)[ \t]*<<-?[ \t]*(['"])([A-Za-z_]\w*)\8([^\n]*)\n([\s\S]*?)\n[ \t]*\9[ \t]*(?=\n|$)`
-const WRITES = new RegExp(`${WRITE_ANY.source}|${PYDOC}`, 'g')
+// 0.5.0: a heredoc read by a command that only takes it as a message (git commit/tag/notes/merge
+// -F -, gh pr|issue|release … --body-file -/-F -/--notes-file -) or by tee (a write).
+const MSGDOC = String.raw`(?<=^|[\n;&|({)])([ \t]*(?:git(?:[ \t]+-[Cc][ \t]+\S+|[ \t]+--?[\w-]+(?:=\S+)?)*[ \t]+(?:commit|tag|notes[ \t]+\w+|merge|commit-tree)[^\n<]*?[ \t](?:-F|--file)(?:[ \t]+|=)-|gh[ \t]+(?:pr|issue|release)[ \t]+[\w-]+[^\n<]*?[ \t](?:--body-file|-F|--notes-file)(?:[ \t]+|=)-|tee((?:[ \t]+[^\s<;&|>]+)*)))[ \t]+<<-?[ \t]*(['"]?)([A-Za-z_]\w*)\14([^\n]*)\n([\s\S]*?)\n[ \t]*\15[ \t]*(?=\n|$)`
+const WRITES = new RegExp(`${WRITE_ANY.source}|${PYDOC}|${MSGDOC}`, 'g')
+// 0.5.0: the substitutions an unquoted body runs, or undefined when it may run more (arithmetic,
+// a parameter transform) or does not parse. Quotes in a body are text.
+function liveSubs(body: string): string[] | undefined {
+  const b = body.replace(/\\\n/g, '')
+  if (/\$\(\(|\$\[|\$\{[^}]*@/.test(b)) return undefined
+  const out: string[] = []
+  for (let i = 0; i < b.length; i++) {
+    const c = b[i]!
+    if (c === '\\') { i++; continue }
+    if (c === '$' && b[i + 1] === '(') { const e = closeOf(b, i + 1); if (e < 0) return undefined; out.push(b.slice(i + 2, e - 1)); i = e - 1; continue }
+    if (c === '`') { let e = i + 1; while (e < b.length && b[e] !== '`') e += b[e] === '\\' ? 2 : 1; if (e >= b.length) return undefined; out.push(b.slice(i + 1, e).replace(/\\([`$\\])/g, '$1')); i = e; continue }
+  }
+  return out
+}
 const literalsIn = (body: string) => [...body.matchAll(/'([^'\n]{1,200})'|"([^"\n]{1,200})"/g)]
   .map(m => m[1] ?? m[2]!).filter(s => /[./]/.test(s) && !/\s/.test(s))
 // 0.5.0 shape A: `sh -c 'literal'` (bash, zsh, dash; -e -u -x -o pipefail) is read as a subshell
@@ -464,24 +481,33 @@ function wordsOf(command: string, readers: Readers): Reading {
   const writes: { end: number; files: string[] }[] = []
   let shift = 0
   const stubbed = message.replace(WRITES, (m: string, ...g: any[]) => {
-    const [before, quote, , after, body, , , , , rest, pbody] = g as (string | undefined)[]
+    const [before, quote, , after, body, , , , , rest, pbody, consumer, teeFiles, mquote, , mrest, mbody] = g as (string | undefined)[]
     const at = g[g.length - 2] as number
     // Inside a substitution the output is captured and may be run: keep it (§3.3).
     if (insideSub(message, at)) return m
     let stub: string
     let files: string[]
+    let extra = ''
     if (pbody !== undefined) {
       if (PY_DENY.test(pbody) || pbody.split(/[\s'"(),[\]]+/).some(hook)) return m
       stub = `${/^[ \t]*/.exec(m)![0]}true${rest ?? ''}`
       files = /\.write\(|write_text|write_bytes|open\([^)]*['"][wax]|\.open\(['"][wax]|os\.(?:rename|replace)|shutil\./.test(pbody) ? literalsIn(pbody) : []
+    } else if (mbody !== undefined) {
+      if (mquote === '' && LIVE_BODY.test(mbody)) { const s = liveSubs(mbody); if (s === undefined) return m; if (s.length) extra = `\ntrue ${s.map(x => `"$(${x})"`).join(' ')}` }
+      stub = `${consumer}${mrest ?? ''}`
+      files = teeFiles === undefined ? [] : teeFiles.trim().split(/[ \t]+/).filter(w => w !== '' && !w.startsWith('-'))
     } else {
-      if (quote === '' && LIVE_BODY.test(body!)) return m
+      if (quote === '' && LIVE_BODY.test(body!)) {
+        const s = liveSubs(body!)
+        if (s === undefined) return m
+        if (s.length) extra = `\ntrue ${s.map(x => `"$(${x})"`).join(' ')}`
+      }
       stub = m.slice(0, m.indexOf('\n')).replace(/<<-?[ \t]*['"]?\w+['"]?/, '')
       files = [before ?? after].filter((x): x is string => x !== undefined)
     }
     writes.push({ end: at - shift + stub.length, files })
-    shift += m.length - stub.length
-    return stub
+    shift += m.length - stub.length - extra.length
+    return stub + extra
   })
   const parts = commands(stubbed)
   const pg = parts === undefined ? undefined : groups(parts)

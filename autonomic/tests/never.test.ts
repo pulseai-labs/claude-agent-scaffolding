@@ -867,3 +867,33 @@ describe('0.5.0 §3.8 Python: a call reached without its name', () => {
     ask("python3 - <<'X'\nimport importlib\nm = importlib.import_module('sub' + 'process')\nm.run('git push -f origin x', shell=True)\nX")
   })
 })
+
+describe('0.5.0 §3.9 heredoc bodies are data unless something can run them', () => {
+  test('message consumers, tee and unquoted bodies', () => {
+    silent("git commit -q -F - <<'EOF'\nfix: git push -f no longer deletes origin/main\nEOF")
+    silent("git commit -F - <<-'EOF'\n\tfix: git push -f\n\tEOF")
+    silent("gh pr create --title x --body-file - <<'EOF'\nRuns rm -rf ~/scratch and git push -f in the test.\nEOF")
+    silent('cat > brief.txt <<EOF\nHead $(git rev-parse HEAD); never git push -f\nEOF')
+    silent("tee notes.md <<'EOF'\nnever git push -f\nEOF\nwc -l notes.md")
+  })
+  test('escape routes', () => {
+    for (const c of ['cat > f <<EOF\n$(git push -f origin x)\nEOF', 'cat > f <<EOF\n`rm -rf ~/x`\nEOF', 'cat > f <<EOF\n$((1+$(git push -f origin x)))\nEOF',
+      'cat > f <<EOF\n$\\\n(git push -f origin x)\nEOF', 'git commit -F - <<EOF\n$(git push -f origin x)\nEOF',
+      "tee run.sh <<'EOF'\ngit push -f origin x\nEOF\n./run.sh", "tee .git/hooks/pre-commit <<'EOF'\ngit push -f\nEOF",
+      "sqlite3 db <<'EOF'\n.shell git push -f\nEOF", "psql <<'EOF'\n\\! rm -rf ~/x\nEOF", "cat <<'EOF' | sh\ngit push -f origin x\nEOF",
+      "x=$(cat <<'EOF'\ngit push -f origin x\nEOF\n); $x", "cat <<A <<B\nx\nA\ngit push -f origin x\nB"])
+      ask(c)
+  })
+})
+
+describe('0.5.0 §3.9 unquoted bodies that run code with no substitution in them', () => {
+  test('arithmetic and a parameter transform keep the body', () => {
+    ask('cat > f <<EOF\n$[$(git push -f origin x)]\nEOF')
+    ask("a='x[$(git push -f origin x)]'; cat > f <<EOF\n$((a))\nEOF")
+    ask("a='x[$(git push -f origin x)]'; cat > f <<EOF\n$[a]\nEOF")
+    ask("X='$(git push -f origin x)'; cat > f <<EOF\n${X@P}\nEOF")
+  })
+  test('a git command that is not a message consumer keeps its body', () => {
+    ask("git config -F - <<'EOF'\n[alias] p = push -f\nEOF\ngit p origin x")
+  })
+})
