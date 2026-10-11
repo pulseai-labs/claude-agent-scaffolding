@@ -192,13 +192,16 @@ Every command's syntax comes from `herdr --skill`.
     thread count. With ossify installed, this
     dispatch is `/ossify:work-pr <PR> --repo-root <worktree holding the PR branch>`
     with the disposition embedded as a third signal.
-11. **Round stop: merge-bar's, not a separate rule.** The PR body's Merge bar, written
-    when the PR opens, decides what blocks, and a blocking finding is never deferred;
-    `working-a-pr` (or ossify's bundled loop where merge-bar is absent) decides when
-    rounds stop. Do not agree a separate stopping rule, and never let one replace the
-    bar's four conditions. A PR that reaches round five halts the non-blocking work and
-    examines process, not code; blocking remediation continues past round five until
-    each finding is fixed or rejected with evidence.
+11. **Round stop.** When the work-PR dispatch runs merge-bar's `working-a-pr` (directly,
+    or through `/ossify:work-pr` where merge-bar is installed), that skill owns the stop:
+    the PR body's Merge bar decides what blocks (`working-a-pr` adds one before round 1
+    if the body has none), a blocking finding is never deferred, and its round stop
+    decides when rounds end. Agree no separate stopping rule there, and never write one
+    into the bar. Otherwise the default holds: when a round does not shrink or fixes
+    generate new findings, stop fixing and defer the remaining P2s and P3s as tracked
+    issues; P0 and P1 are never deferred. Either way, a PR that reaches round five halts
+    the deferrable work and examines process, not code; blocking remediation continues
+    past round five until each finding is fixed or rejected with evidence.
 12. **Merge gate.** Fetch the full gate set against `--repo <owner/repo>` for the head
     SHA immediately before asking: `isDraft`, `mergeable`, `mergeStateStatus`, every
     relevant check-run and status context — all must be successful — the unresolved
