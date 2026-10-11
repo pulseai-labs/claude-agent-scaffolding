@@ -422,6 +422,15 @@ function insideSub(text: string, at: number): boolean {
   }
   return false
 }
+// 0.5.0 shape C: a Python heredoc (`python3 - <<'X'`, `python3 <<'X'`, quoted delimiter) whose
+// body names nothing that starts a process and no git control path drops its body. A file the
+// body names that a later command runs keeps it, as for a cat write.
+// The deny words match as identifiers (`filesystem`, `evaluation` are prose).
+const PY_DENY = /\b(?:subprocess|system|popen|exec(?:v|ve|vp|vpe|l|le|lp|lpe)?|spawn\w*|fork\w*|pty|eval|compile|__import__|importlib|getattr|ctypes|multiprocessing)\b/
+const PYDOC = String.raw`(?<=^|[\n;&|({)])[ \t]*(?:\S*\/)?(?:python[\d.]*|pypy[\d.]*)((?:[ \t]+-[uBIEsS]+)*)((?:[ \t]+-(?:[ \t]+[^\s<;&|>]+)*)?)[ \t]*<<-?[ \t]*(['"])([A-Za-z_]\w*)\8([^\n]*)\n([\s\S]*?)\n[ \t]*\9[ \t]*(?=\n|$)`
+const WRITES = new RegExp(`${WRITE_ANY.source}|${PYDOC}`, 'g')
+const literalsIn = (body: string) => [...body.matchAll(/'([^'\n]{1,200})'|"([^"\n]{1,200})"/g)]
+  .map(m => m[1] ?? m[2]!).filter(s => /[./]/.test(s) && !/\s/.test(s))
 // 0.5.0 shape A: `sh -c 'literal'` (bash, zsh, dash; -e -u -x -o pipefail) is read as a subshell
 // holding the string. The string holds no `$`, backtick or backslash when double-quoted, and
 // none of `$` or backtick when single-quoted, so trailing arguments are never read.
@@ -454,12 +463,23 @@ function wordsOf(command: string, readers: Readers): Reading {
   // may run another written file). A body with no file prints to standard output (§3.3).
   const writes: { end: number; files: string[] }[] = []
   let shift = 0
-  const stubbed = message.replace(WRITE_ANY, (m, before: string | undefined, quote: string, _d, after: string | undefined, body: string, at: number) => {
-    if (quote === '' && LIVE_BODY.test(body)) return m
+  const stubbed = message.replace(WRITES, (m: string, ...g: any[]) => {
+    const [before, quote, , after, body, , , , , rest, pbody] = g as (string | undefined)[]
+    const at = g[g.length - 2] as number
     // Inside a substitution the output is captured and may be run: keep it (§3.3).
     if (insideSub(message, at)) return m
-    const stub = m.slice(0, m.indexOf('\n')).replace(/<<-?[ \t]*['"]?\w+['"]?/, '')
-    writes.push({ end: at - shift + stub.length, files: [before ?? after].filter((x): x is string => x !== undefined) })
+    let stub: string
+    let files: string[]
+    if (pbody !== undefined) {
+      if (PY_DENY.test(pbody) || pbody.split(/[\s'"(),[\]]+/).some(hook)) return m
+      stub = `${/^[ \t]*/.exec(m)![0]}true${rest ?? ''}`
+      files = /\.write\(|write_text|write_bytes|open\([^)]*['"][wax]|\.open\(['"][wax]|os\.(?:rename|replace)|shutil\./.test(pbody) ? literalsIn(pbody) : []
+    } else {
+      if (quote === '' && LIVE_BODY.test(body!)) return m
+      stub = m.slice(0, m.indexOf('\n')).replace(/<<-?[ \t]*['"]?\w+['"]?/, '')
+      files = [before ?? after].filter((x): x is string => x !== undefined)
+    }
+    writes.push({ end: at - shift + stub.length, files })
     shift += m.length - stub.length
     return stub
   })

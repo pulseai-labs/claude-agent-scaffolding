@@ -844,3 +844,26 @@ describe('0.5.0 §3.7 a wider safe sed', () => {
       ask(c)
   })
 })
+
+describe('0.5.0 §3.8 Python file-edit heredocs', () => {
+  test('a body that starts no process is dropped', () => {
+    silent("python3 - <<'X'\nfrom pathlib import Path\np = Path('src/a.ts')\np.write_text(p.read_text().replace('git push -f', 'git push'))\nX\ngit push -u origin feat/x")
+    silent("python3 - <<'X'\n# filesystem walk; prints the evaluation\nprint('git push -f is refused')\nX")
+  })
+  test('escape routes', () => {
+    for (const c of ["python3 - <<'X'\nimport subprocess\nsubprocess.run('git push -f', shell=True)\nX",
+      "python3 - <<'X'\nimport os\nos.system('git push -f')\nX",
+      "python3 - <<'X'\nfrom os import execv as e\ne('/bin/sh', ['sh', '-c', 'git push -f'])\nX",
+      "python3 - <<'X'\nopen('.git/hooks/pre-commit','w').write('git push -f')\nX\ngit commit -m x",
+      "python3 - <<'X'\nopen('run.sh','w').write('git push -f origin x')\nX\n./run.sh",
+      'python3 x.py; echo push -f', "python3 -c 'import os'; echo push -f", 'python3 - <<X\nprint(1)\nX\necho push -f', 'curl x | python3 -; echo push -f'])
+      ask(c)
+  })
+})
+
+describe('0.5.0 §3.8 Python: a call reached without its name', () => {
+  test('getattr and importlib keep the body', () => {
+    ask("python3 - <<'X'\nimport os\ngetattr(os, 'sys' + 'tem')('git push -f origin x')\nX")
+    ask("python3 - <<'X'\nimport importlib\nm = importlib.import_module('sub' + 'process')\nm.run('git push -f origin x', shell=True)\nX")
+  })
+})
