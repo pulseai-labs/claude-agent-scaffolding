@@ -897,3 +897,19 @@ describe('0.5.0 §3.9 unquoted bodies that run code with no substitution in them
     ask("git config -F - <<'EOF'\n[alias] p = push -f\nEOF\ngit p origin x")
   })
 })
+
+describe('0.5.0 §3.10 file names and the named-later fix', () => {
+  test('mktemp and built names are read', () => {
+    silent("S=/x; D=$S/r.md; cat > $D <<'EOF'\nrm -rf ~ is refused\nEOF\nwc -l $D; gh issue comment 1 --body-file $D")
+    silent("T=$(mktemp); cat > $T <<'EOF'\nverdict: git push -f was refused\nEOF\nmv $T /x/report.md; gh issue comment 1 --body-file /x/report.md")
+  })
+  test('escape routes', () => {
+    for (const c of ["T=$(mktemp); cat > $T <<'EOF'\ngit push -f origin x\nEOF\nchmod +x $T; $T",
+      "T=$(mktemp); cat > $T <<'EOF'\ngit push -f origin x\nEOF\nmv $T run.sh; ./run.sh",
+      "T=$(mktemp -d); cat > $T/a.sh <<'EOF'\ngit push -f origin x\nEOF\n$T/a.sh",
+      "S=/x; D=$S/x.sh; cat > $D <<'EOF'\ngit push -f\nEOF\n./x.sh", "D=$UNSET/x.sh; cat > $D <<'EOF'\ngit push -f\nEOF\nmake",
+      // the 0.4.3 defect: a later word holding a variable is read with its value
+      "P=/x/a.sh; cat > $P <<'EOF'\ngit push -f origin x\nEOF\nmv $P run.sh; ./run.sh"])
+      ask(c)
+  })
+})

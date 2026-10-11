@@ -244,7 +244,8 @@ function usedLater(raw: readonly string[], later0: readonly Command[], ctx: Ctx)
   const names = files.map(f => base(clean(f)).toLowerCase()).filter(n => n !== '')
   const named = (ws: readonly string[]) => ws.some(w => names.some(n => w.toLowerCase().includes(n)))
   for (const c of later) {
-    const ws = split(c.bare)
+    // 0.5.0 fix: a later word holding a variable is read with its value, as the file names are.
+    const ws = split(c.bare).map(w => (w.includes('$') ? ctx.resolve(w) : w))
     const h = head(command(c.bare))
     if (h === undefined) continue
     if (!isInert(c.bare)) {
@@ -273,7 +274,23 @@ function resolver(parts: readonly Command[]): Resolve {
   const vars = new Map<string, string | undefined>()
   for (const c of parts) {
     const m = ASSIGN.exec(c.text)
-    if (m) vars.set(m[1]!, vars.has(m[1]!) ? undefined : clean(m[2]!))
+    if (m) { vars.set(m[1]!, vars.has(m[1]!) ? undefined : clean(m[2]!)); continue }
+    // 0.5.0: a temp file from mktemp is a fresh name, never a git control file; a value built from
+    // names already read is read too. Any other assignment makes the name opaque.
+    const a = /^[ \t]*([A-Za-z_]\w*)=/.exec(c.text)
+    if (!a) continue
+    const name = a[1]!
+    let v: string | undefined
+    if (/^[ \t]*[A-Za-z_]\w*=("?)\$\((?:\S*\/)?mktemp(?:[ \t]+[^\s)`$;&|<>'"]+)*\)\1[ \t]*$/.test(c.text)) v = `/tmp/.mktemp-${name}`
+    else {
+      const ch = /^[ \t]*[A-Za-z_]\w*=("[^"`]*"|[^\s;&|<>"'`]*)[ \t]*$/.exec(c.text)
+      if (ch && !/\$\(/.test(ch[1]!)) {
+        let ok = true
+        v = clean(ch[1]!).replace(/\$\{?([A-Za-z_]\w*)\}?/g, (_x, n: string) => { const r = vars.get(n); if (r === undefined) ok = false; return r ?? '' })
+        if (!ok) v = undefined
+      }
+    }
+    vars.set(name, vars.has(name) ? undefined : v)
   }
   const dirs: string[] = []
   let unknown = false
