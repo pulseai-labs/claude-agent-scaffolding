@@ -104,16 +104,23 @@ and rings. On an `allow` verdict — bypass permissions, or a settings allow rul
 matches the list becomes an `ask`, so you get the normal permission dialog, and it rings (the
 **bypass floor**; see "Permission modes").
 
-The list reads the whole command text as **one bag of words**. First it joins a backslash-newline
-and drops every `\`, `'` and `"`. Then it splits the text at spaces, `; & | ( ) < >`, backticks and `$(`
-(`${OPTS}` stays one word that starts with `$`). A `NAME=VALUE` word also shows its value.
-Outside inert commands (below), the list never decides which command a word belongs to, so a
-quote, a wrapper, an interpreter or a substitution cannot hide a word:
-`python3 -c 'git push -f'`, `bash -c "…"` and `$(git push -f)` all show `push` and `-f`. A danger
-word beside a harmless command is an extra ask; that is the cost of this reading. The rules:
+Since 0.5.0 the list judges **each simple command on its own words** when the text parses. First
+it joins a backslash-newline and drops every `\`, `'` and `"`. Then it splits the text at spaces,
+`; & | ( ) < >`, backticks and `$(` (`${OPTS}` stays one word that starts with `$`). A `NAME=VALUE`
+word also shows its value. A rule fires only when its verb and its flags are in the same command,
+and each command still takes context from the whole text: a move before it, a git config write
+before it (after one, every later git command is read on the whole bag), a branch switch before
+it, and a variable assigned once to a literal. In a loop, a move, a config write or a branch switch
+anywhere in the body counts from the loop's first command. A command whose verb is a variable or a
+glob (`$CMD -f`, `git $V -f`) is read on the whole bag, and so is a `commit` or `branch` that
+holds a variable the text binds but the list cannot read (`export NV=-n; git commit $NV`). When the text does not parse or names a program that may run text, the list reads
+it as **one bag of words** and never decides which command a word belongs to, so a quote, a
+wrapper or an interpreter cannot hide a word there: `python3 -c 'git push -f'` shows `push` and
+`-f`. In the bag, a danger word beside a harmless command is an extra ask; that is the cost of
+this reading. The rules, read per command or on the bag:
 
 - `force-push` — a push verb (`push`, `send-pack`, `http-push`, `git-push`, a word holding
-  `.push=`) and anywhere in the text a short-flag cluster with `f` (`-f`, `-uf`), an abbreviation
+  `.push=`) and a short-flag cluster with `f` (`-f`, `-uf`), an abbreviation
   of `--force`, `--force-with-lease`, `--force-if-includes` or `--mirror`, or a word starting `+`;
 - `branch-delete` — a push verb and a cluster with `d`, `--delete`, `--prune`, `--mirror`, or a
   word starting `:`; or `branch` and a cluster with `D`, or `-d`/`--delete` with a force flag (a
@@ -121,9 +128,16 @@ word beside a harmless command is an extra ask; that is the cost of this reading
 - `default-branch-push` — a push verb and the default branch's name (`origin/HEAD`, or
   `main`/`master` when unknown) as a word or after `:`, `/` or `=`, `--all`, `--branches`,
   `--mirror`, the matching refspec `:`, or a word holding `$`, `*`, `?`, `[` or `{`; or any push
-  while the session's branch is the default branch or unknown; or any push after a move (`cd`,
+  while the session's branch is the default branch or unknown; or a push after a move (`cd`,
   `pushd`, `git -C` to a directory other than the session's own or the repo root, `popd`,
-  `--git-dir`, `--work-tree`, `GIT_DIR=`, `GIT_WORK_TREE=`); or any `send-pack` or `http-push`;
+  `--git-dir`, `--work-tree`, `GIT_DIR=`, `GIT_WORK_TREE=`) or after a branch switch (a `checkout`,
+  `switch`, `branch -m`/`-c` or `symbolic-ref` that names a default branch name or a variable),
+  unless since 0.5.0 the list reads
+  that one command and it names a remote and only literal destinations that are not the default
+  branch, `main`, `master`, `HEAD`, `@` or empty, with no option outside `-u -q -v -n`,
+  `--set-upstream`, `--quiet`, `--verbose`, `--tags`, `--follow-tags`, `--atomic`, `--porcelain`,
+  `--progress`, `--no-progress`, `--dry-run`, `--thin` and `--no-thin`; or any `send-pack` or
+  `http-push`;
 - `rm-outside` — `rm` with a recursive flag, and a move, `xargs`, or a later word that starts
   with `/` outside the worktree or with `~`, holds a `..` segment, a `$` or a `{`, or a glob on a
   dot name (`.?`); a plain glob (`build/*`) stays where it is;
@@ -134,13 +148,13 @@ push or an `rm`, so does a bare variable (`git push $OPTS`). Beside `branch` or 
 variable is not read as a flag: it is mostly a message or a path.
 
 **Inert commands leave the bag (since 0.4.2).** When the text holds no program that may run text
-(the list below), no `<(` or `>(`, no `$((`, no backtick, no heredoc left in place, no function or
+(the list below), no `<(` or `>(`, no `$((`, no heredoc left in place, no function or
 `alias` definition and no open quote,
 the list splits it into simple commands at `;`, `&`, `|`, `&&`, `||` and newlines outside quotes
 and comments. A command whose first word is `[`, `[[`, `test`, `echo`, `printf` (without `-v`),
 `exit`, `true`, `false`, `cat`, `head`, `tail`, `wc`, `ls`, `stat`, `grep`, `jq`, `cut`, `tr`,
 `mkdir`, `touch`, `mv` or `cp` (or a path to one in a system `bin` directory) then adds no words,
-unless it pipes onward, or writes with `>` into `.git/`, a `hooks/` directory, a git config file
+unless it pipes onward, or writes with `>` into `.git/`, a `hooks/`, `.husky/` or `.githooks/` directory, a git config file
 (`~/.gitconfig`, `.gitattributes` …), a file that a later command outside this list names, or a
 file named by a variable the text does not assign once — or by any relative name after a `cd`,
 `pushd` or `popd` — while a command outside this list follows. A later command whose own name holds a
@@ -162,14 +176,66 @@ a `cd` to a literal directory a relative name is read inside it (`cd .git` makes
 does not run it. A `$(` that holds `case` or a comment keeps the whole bag, and a pipe into a group
 counts as reaching a command that is not inert.
 
+**Since 0.5.0** each command is judged on its own words (above), and text that never runs is data:
+
+- A live backtick pair, also inside double quotes, is a substitution like `$( )`; a backtick in
+  single quotes or escaped is text, and an unclosed one keeps the whole bag.
+- A variable assigned exactly once to a literal, as a whole top-level command that starts the text
+  or follows `;` or a newline, and named nowhere else except as `$N` or `${N}`, is read as its value
+  after that command; `for N`, `read N`, `export N=…`, `${N:=…}`, a second binding, a binding inside
+  a group, one after `&&`, `||` or a pipe (also on the next line), or one sent to the background
+  with `&` leaves it opaque.
+- A command made only of assignments drops its words; the values stay in the whole bag that an
+  opaque verb or a git config write reads.
+- A runner word that is an argument of `cd`, `pushd` or an inert command, or a path after
+  `git -C`, runs nothing (`cd tests/eval`); dot-sourcing counts only as a command whose word is `.`.
+- `sh -c 'literal'` (also `bash`, `zsh`, `dash`, with `-e -u -x -o pipefail`) is read as a
+  subshell holding the string, up to four levels deep, when the string holds no `$` or backtick
+  (no backslash either when double-quoted); anything else stays a runner.
+- A `sed` is inert when its options come from `-n -E -r -s -z -u`, `-e`, `-i` (with a suffix) and
+  each script is a list of `s<d>re<d>repl<d>` with flags from `g p i I m M` and digits, or an
+  address plus `p`, `d`, `q` or `=`; an `e`, `w`, `r` or `y` command, an `e` or `w` flag, `-f`, or an
+  `-i` target in git's control paths keeps it a runner, and a file a `sed -i` edits counts as written.
+- `python3 - <<'X'` (or `python3 <<'X'`, quoted delimiter) drops its body unless the body names
+  `subprocess`, `system`, `popen`, the `exec`/`spawn`/`fork` families, `pty`, `eval`, `compile`,
+  `__import__`, `importlib`, `getattr`, `ctypes` or `multiprocessing` as an identifier, names a git
+  control path, or writes a file a later command runs (named as a string literal in the body).
+- A heredoc read only as a message (`git commit|tag|notes …|merge|commit-tree … -F -`,
+  `gh pr|issue|release … --body-file -`, `-F -`, `--notes-file -`) drops its body, `tee FILE <<`
+  is a write like `cat > FILE`, and in an unquoted body of these and of `cat` only the `$( )` and
+  backtick substitutions are judged as commands; `$((`, `$[` or `${…@…}` keeps the whole bag, and
+  every other consumer (`ssh`, `sqlite3`, `psql` …) keeps its body.
+- A variable assigned from `$(mktemp …)` names a fresh temp file, a value built from names already
+  read (`S=/x; D=$S/r.md`) is read, and a later command's words are read with variable values
+  before the file-name match — 0.4.3 was silent on `P=/x/a.sh; cat > $P …; mv $P run.sh; ./run.sh`.
+- Namers name a file without running it, so a written file they name passes on as through an
+  inert command: `rm`, `unlink`, `chmod`, `chown`, `wc`, `diff`, `cmp`, the `sha*sum`/`md5sum`/`b2sum`
+  family, `file`, `du`, `readlink`, `realpath`, `basename`, `dirname`; `git add|status|diff|commit|
+  show|log|rm|mv|restore|ls-files|hash-object|blame|cat-file|check-ignore` (not with `-c`, `--exec`
+  or `-x`); `gh api`, `gh pr create|edit|comment|review|view`, `gh issue create|edit|comment|view`
+  and `gh release create|edit|upload|view` (`gh pr creator` is not one). A namer's own
+  words are still judged (`rm -rf ~/x` asks).
+
+Known limits since 0.5.0: a moved push trusts only `main`, `master` and the session's default
+branch as default names, so `git -C /other push origin develop` is silent in a repo whose default
+is `develop`; the Python deny list is a judgment rule, and a body that starts a process without
+naming a listed identifier is silent; namers and message consumers are trusted by name, like
+readers; the floor still needs a danger word (`$CMD -f …`, an alias in a `GIT_CONFIG_GLOBAL` file,
+a Python body that builds `git push -f` from pieces stay silent); variable values come from the
+text only, so `export N=…` and `N=… cmd` ask; a shell inside `$( )` is not read through, and an
+unquoted Python heredoc stays a runner; the run-later file-name resolver does not check order;
+a command word disguised by quotes (`p""rintf -v "$N"`) is not read as that command, and a Python
+body that writes through a variable file name (`p='run'; open(p,'w')`) is dropped.
+
 Two heredoc shapes with a quoted delimiter are literal text, and their bodies are skipped: a
 commit message, `-m "$(cat <<'EOF'` … `EOF` `)"`, and `cat > file <<'EOF'` at a command's start
 unless a later command outside the inert list names the file — a `mv`, a `cp` or a redirect passes the check on
 to what it writes, a file in `.git/` or `hooks/` counts as run, and when one body is kept every
 body is. Every other heredoc
-keeps its words, and so do these two when the rest of the text names a program that may run text: a shell, `eval`,
+keeps its words, unless a 0.5.0 rule above reads it, and so do these two when the rest of the text names a program that may run text: a shell, `eval`,
 `source`, `.` at a command's start, `xargs`, `ssh`, `su`, `watch`, `parallel`, `sed`, `awk` or an
-interpreter (`python3`, `node`, `perl`, `ruby` …). A unique prefix of a long option is read as
+interpreter (`python3`, `node`, `perl`, `ruby` …) — since 0.5.0, not a literal `sh -c` string, an
+inert `sed`, a Python file edit, or a runner word in an argument it cannot run. A unique prefix of a long option is read as
 that option (`--r` is `--recursive`, `git push --de` is `--delete`), as git and GNU tools accept
 it; an ambiguous prefix the tools refuse is only an extra ask.
 

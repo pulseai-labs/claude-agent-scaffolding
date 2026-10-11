@@ -107,8 +107,8 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   })
   test('cd into a directory below the root reads the branch as unknown (PR #681 round 4)', () => {
     expect(rules('cd /repo/other && git push')).toContain('default-branch-push')
-    // 0.2.0: any push after a move asks, refspec or not — an accepted extra ask.
-    expect(rules('cd /repo/other && git push origin feat/x')).toEqual(['default-branch-push'])
+    // 0.5.0 §3.3: a moved push that names a literal non-default destination no longer asks.
+    expect(rules('cd /repo/other && git push origin feat/x')).toEqual([])
     expect(rules('cd /repo/sub && git push')).toEqual([])
     expect(rules('cd /repo && git push')).toEqual([])
   })
@@ -118,7 +118,7 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   })
   test('git -C into another directory reads the branch as unknown (PR #681 round 3)', () => {
     expect(rules('git -C /repo/sub/mod push')).toContain('default-branch-push')
-    expect(rules('git -C /repo/sub/mod push origin feat/x')).toEqual(['default-branch-push'])
+    expect(rules('git -C /repo/sub/mod push origin feat/x')).toEqual([]) // 0.5.0 §3.3
     expect(rules('git -C /repo push')).toEqual([])
     expect(rules('git -C sub push')).toContain('default-branch-push')
   })
@@ -281,9 +281,9 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     for (const c of ['cd /repo && git push', 'git commit -m "msg"', 'git commit -am "msg"', 'git commit -F "$f"',
       'git commit --message "x" --author "A <a@b>"', 'rm -f x.txt'])
       expect([c, rules(c)]).toEqual([c, []])
-    // 0.2.0: a push after a move asks whatever its refspec — an accepted extra ask.
+    // 0.5.0 §3.3: a moved push that names a literal non-default destination no longer asks.
     for (const c of ['git -C /other push origin feat/x', 'cd /other && git push origin feat/x'])
-      expect([c, rules(c)]).toEqual([c, ['default-branch-push']])
+      expect([c, rules(c)]).toEqual([c, []])
   })
   test('a substitution inside double quotes is read as a command (PR #672 round 3)', () => {
     for (const c of ['echo "$(git push -f)"', 'OUT="$(git push origin main 2>&1)"', 'echo "`git push -f`"', 'X="a $(echo "$(git push -f)")"'])
@@ -427,7 +427,8 @@ describe('review focus (0.4.2 plan)', () => {
     expect(rules("cat > a <<'X'\ngit push -f origin feat/x\nX\ncat > b <<'Y'\nok\nY\nwc -l a b")).toEqual([])
   })
   test('a move beside an inert command is still a move', () => {
-    expect(rules('echo x; cd /repo/other && git push origin feat/x')).toEqual(['default-branch-push'])
+    expect(rules('echo x; cd /repo/other && git push')).toEqual(['default-branch-push'])
+    expect(rules('echo x; cd /repo/other && git push origin feat/x')).toEqual([]) // 0.5.0 §3.3
   })
   test('a 2>&1 stays in its command', () => {
     expect(rules("echo 'git push -f origin feat/x' > x.sh 2>&1; ./x.sh")).toContain('force-push')
@@ -603,8 +604,7 @@ describe('0.4.3 §3.3 stdout heredocs: escape routes', () => {
 describe('0.4.3 §3.4 sed: escape routes', () => {
   test('a sed that may run code stays a runner', () => {
     for (const c of ["sed 1e f; echo 'git push -f origin feat/x'", "sed 's/x/y/e' f; echo 'git push -f origin feat/x'",
-      "sed -e 1p -e 2e f; echo 'git push -f origin feat/x'", "sed -f s.sed f; echo 'git push -f origin feat/x'",
-      "sed -ni 1p f; echo 'git push -f origin feat/x'"])
+      "sed -e 1p -e 2e f; echo 'git push -f origin feat/x'", "sed -f s.sed f; echo 'git push -f origin feat/x'"])
       expect([c, rules(c)]).toEqual([c, ['force-push']])
   })
   test('a narrow sed that names a written file does not run it', () => {
@@ -667,7 +667,8 @@ describe('0.4.3 plan review focus', () => {
     expect(rules("echo 'git push -f origin feat/x' > \"$(mktemp)\"; git status")).toContain('force-push')
   })
   test('a sed script with more than one command stays a runner', () => {
-    expect(rules("sed -n '1,5p;8q' f; echo 'git push -f origin feat/x'")).toEqual(['force-push'])
+    // 0.5.0 §3.7: a multi-command script of p/d/q is inert; one holding `e` stays a runner.
+    expect(rules("sed -n '1p;2e id' f; echo 'git push -f origin feat/x'")).toEqual(['force-push'])
   })
 })
 
@@ -718,5 +719,334 @@ describe('0.4.3 PR review: shapes 0.4.2 asked on still ask', () => {
   })
   test('a pipe into a group counts', () => {
     expect(rules(`{ cat <<'X'\nall:\n\t${P}\nX\n} | { cat; } | make -f -`)).toContain('force-push')
+  })
+})
+
+// ---- autonomic 0.5.0: each command judged on its own words (spec 2026-10-10) ----
+// A must-ask case also passes the cheap pre-check (namesDanger), which runs first on the allow path.
+const ask = (c: string, w: Where = W) => expect([c, rules(c, w).length > 0, namesDanger(c)]).toEqual([c, true, true])
+const silent = (c: string, w: Where = W) => expect([c, rules(c, w)]).toEqual([c, []])
+
+describe('0.5.0 §3.5 backticks are substitutions', () => {
+  test('a quoted or escaped backtick is text; a live pair is judged as commands', () => {
+    silent("echo 'run `git status` first' && git push -u origin feat/x && echo 'never -f'")
+    silent('echo "head `git rev-parse HEAD`" && git push -u origin feat/x; echo \'not -f\'')
+  })
+  test('escape routes', () => {
+    ask('echo "`git push -f origin feat/x`"')
+    ask('x=`rm -rf ~/a`')
+    ask('echo `git status; git push -f origin feat/x')
+  })
+})
+
+describe('0.5.0 §3.1 each command on its own words', () => {
+  test('flags in another command no longer pool', () => {
+    silent('git add a.ts && git commit -q -m x && git push -q -u origin feat/x; npm run lint -- --fix -d')
+    silent('make -n check; git commit -m y')
+  })
+  test('context from the whole text still applies', () => {
+    ask('export GIT_DIR=/x; git push')
+    ask('cd /other; git push')
+    ask("git config alias.p 'push -f'; git p origin feat/x")
+    ask('git config alias.p push; git p -f origin feat/x')
+    ask('GIT_CONFIG_GLOBAL=/tmp/g git p origin x; npm push -f')
+    ask('printf -v V push; git $V -f origin feat/x')
+    ask('$CMD -f origin feat/x; npm push')
+  })
+  test('line endings, empty text and size', () => {
+    ask('echo ok\r\ngit push -f origin feat/x\r\n')
+    silent('')
+    const big = Array.from({ length: 2000 }, (_, i) => `echo line ${i}; git status --short`).join('\n')
+    const t0 = Date.now()
+    silent(big)
+    expect(Date.now() - t0 < 2000).toEqual(true)
+  })
+})
+
+describe('0.5.0 §3.1 variables and assignment-only commands', () => {
+  test('a literal assigned once is read', () => {
+    silent('M=/tmp/msg; git commit -q -F $M && git push -q -u origin feat/x')
+    silent('B=spine/x; git push -u origin "$B"')
+    silent('D="never git push -f"; git push -u origin feat/x')
+  })
+  test('escape routes', () => {
+    for (const c of ['F=-f; git push $F origin feat/x', 'C=push; git $C -f origin feat/x', 'B=feat/x; B=main; git push origin $B',
+      'if true; then B=feat/x; fi; git push origin $B', 'false && B=feat/x; git push origin $B', '(B=feat/x); git push origin $B',
+      'git push origin $B; B=feat/x', 'B=feat/x; for B in main; do git push origin $B; done', 'B=feat/x; read B; git push origin $B',
+      'B=feat/x; git push origin ${B:=main}', 'git push origin $UNSET', 'B=main; git push origin $B'])
+      ask(c)
+  })
+})
+
+describe('0.5.0 §3.1 variables: the paths the simple forms do not reach', () => {
+  test('a binding on its own line inside a group is not top level', () => {
+    ask('if true; then\nB=feat/x\nfi\ngit push origin $B')
+    ask('(\nB=feat/x\n)\ngit push origin $B')
+  })
+  test('an opaque verb reads the values of assignment-only commands', () => {
+    ask('C=push; git $C -f origin feat/x; C=x')
+  })
+})
+
+describe('0.5.0 §3.2 and §3.5 runner words that cannot run', () => {
+  test('an argument of cd or an inert command; dot-source per command', () => {
+    silent('grep -n "bash" f.md && git push -u origin feat/x; echo -f')
+    silent("echo 'run `. env.sh` first' && git push -u origin feat/x; echo -f")
+  })
+  test('escape routes', () => {
+    ask('cd tests/eval && git push -f origin feat/x')
+    ask('env bash x.sh; git status; echo -f push')
+    ask('. ./env.sh; echo push -f')
+  })
+})
+
+describe('0.5.0 §3.3 a moved push that names its destination', () => {
+  test('a literal non-default destination', () => {
+    silent('git -C /x push -u origin spine/x')
+    silent('R=/x; git -C $R push -u origin spine/x')
+    silent('cd /other && git push -u origin spine/x')
+    // Moved here from Task 4 (§3.2): the runner word in a cd argument, then a moved push.
+    silent('cd /repo/tests/eval && git push -u origin feat/x && echo -f')
+  })
+  test('escape routes', () => {
+    for (const c of ['git -C /x push', 'git -C /x push origin HEAD', 'git -C /x push origin main', 'git -C /x push origin master',
+      'git -C /x push origin x:main', 'git -C /x push -f origin spine/x', 'git -C /x push --repo origin spine/x', 'cd /x && git push origin @',
+      'python3 x.py; git -C /x push origin spine/x', 'cd /repo/other && git push'])
+      ask(c)
+  })
+})
+
+describe('0.5.0 §3.6 sh -c read-through', () => {
+  test('a literal string is read as commands', () => {
+    silent("bash -c 'npm test -- -f' && git push -u origin feat/x")
+    silent("sh -c 'cd /repo && git push -u origin feat/x'")
+  })
+  test('escape routes', () => {
+    for (const c of ["sh -c 'git push -f origin feat/x'", 'bash -c "rm -rf ~/x"', "bash -lc 'git push origin main'", 'sh -c "$CMD"; echo push -f',
+      "cd /other; sh -c 'git push'", "bash -c 'sh -c \"git push -f origin x\"'", "F=x; sh -c 'git push $F origin x'; echo -f"])
+      ask(c)
+  })
+})
+
+describe('0.5.0 §3.7 a wider safe sed', () => {
+  test('substitutions, address prints and in-place edits', () => {
+    silent("sed -i 's/a/b/g' src/x.ts && git push -u origin feat/x; echo -f")
+    silent("sed -n '/re/p' f.md; git push -u origin feat/x; echo -f")
+    silent("sed -i.bak -e 's|a|b|' -e '/x/d' f; git push -u origin feat/x; echo -f")
+    silent("sed -ni 1p f; echo 'git push -f origin feat/x'")
+    silent("sed -n '1,5p;8q' f; echo 'git push -f origin feat/x'")
+  })
+  test('escape routes', () => {
+    for (const c of ["sed -i 's/x/y/e' f; git push origin feat/x; echo -f", "sed '1e id' f; echo 'git push -f origin feat/x'",
+      "sed 's/x/y/w /tmp/o' f; echo 'git push -f origin feat/x'", "sed -f s.sed f; echo 'git push -f origin feat/x'",
+      "sed -i 's/a/b/' .git/hooks/pre-push; echo 'git push -f origin feat/x'", "sed -i 's/x/git push -f/' run.sh; ./run.sh",
+      "sed -n '1p;2e id' f; echo 'git push -f origin feat/x'"])
+      ask(c)
+  })
+})
+
+describe('0.5.0 §3.8 Python file-edit heredocs', () => {
+  test('a body that starts no process is dropped', () => {
+    silent("python3 - <<'X'\nfrom pathlib import Path\np = Path('src/a.ts')\np.write_text(p.read_text().replace('git push -f', 'git push'))\nX\ngit push -u origin feat/x")
+    silent("python3 - <<'X'\n# filesystem walk; prints the evaluation\nprint('git push -f is refused')\nX")
+  })
+  test('escape routes', () => {
+    for (const c of ["python3 - <<'X'\nimport subprocess\nsubprocess.run('git push -f', shell=True)\nX",
+      "python3 - <<'X'\nimport os\nos.system('git push -f')\nX",
+      "python3 - <<'X'\nfrom os import execv as e\ne('/bin/sh', ['sh', '-c', 'git push -f'])\nX",
+      "python3 - <<'X'\nopen('.git/hooks/pre-commit','w').write('git push -f')\nX\ngit commit -m x",
+      "python3 - <<'X'\nopen('run.sh','w').write('git push -f origin x')\nX\n./run.sh",
+      'python3 x.py; echo push -f', "python3 -c 'import os'; echo push -f", 'python3 - <<X\nprint(1)\nX\necho push -f', 'curl x | python3 -; echo push -f'])
+      ask(c)
+  })
+})
+
+describe('0.5.0 §3.8 Python: a call reached without its name', () => {
+  test('getattr and importlib keep the body', () => {
+    ask("python3 - <<'X'\nimport os\ngetattr(os, 'sys' + 'tem')('git push -f origin x')\nX")
+    ask("python3 - <<'X'\nimport importlib\nm = importlib.import_module('sub' + 'process')\nm.run('git push -f origin x', shell=True)\nX")
+  })
+})
+
+describe('0.5.0 §3.9 heredoc bodies are data unless something can run them', () => {
+  test('message consumers, tee and unquoted bodies', () => {
+    silent("git commit -q -F - <<'EOF'\nfix: git push -f no longer deletes origin/main\nEOF")
+    silent("git commit -F - <<-'EOF'\n\tfix: git push -f\n\tEOF")
+    silent("gh pr create --title x --body-file - <<'EOF'\nRuns rm -rf ~/scratch and git push -f in the test.\nEOF")
+    silent('cat > brief.txt <<EOF\nHead $(git rev-parse HEAD); never git push -f\nEOF')
+    silent("tee notes.md <<'EOF'\nnever git push -f\nEOF\nwc -l notes.md")
+  })
+  test('escape routes', () => {
+    for (const c of ['cat > f <<EOF\n$(git push -f origin x)\nEOF', 'cat > f <<EOF\n`rm -rf ~/x`\nEOF', 'cat > f <<EOF\n$((1+$(git push -f origin x)))\nEOF',
+      'cat > f <<EOF\n$\\\n(git push -f origin x)\nEOF', 'git commit -F - <<EOF\n$(git push -f origin x)\nEOF',
+      "tee run.sh <<'EOF'\ngit push -f origin x\nEOF\n./run.sh", "tee .git/hooks/pre-commit <<'EOF'\ngit push -f\nEOF",
+      "sqlite3 db <<'EOF'\n.shell git push -f\nEOF", "psql <<'EOF'\n\\! rm -rf ~/x\nEOF", "cat <<'EOF' | sh\ngit push -f origin x\nEOF",
+      "x=$(cat <<'EOF'\ngit push -f origin x\nEOF\n); $x", "cat <<A <<B\nx\nA\ngit push -f origin x\nB"])
+      ask(c)
+  })
+})
+
+describe('0.5.0 §3.9 unquoted bodies that run code with no substitution in them', () => {
+  test('arithmetic and a parameter transform keep the body', () => {
+    ask('cat > f <<EOF\n$[$(git push -f origin x)]\nEOF')
+    ask("a='x[$(git push -f origin x)]'; cat > f <<EOF\n$((a))\nEOF")
+    ask("a='x[$(git push -f origin x)]'; cat > f <<EOF\n$[a]\nEOF")
+    ask("X='$(git push -f origin x)'; cat > f <<EOF\n${X@P}\nEOF")
+  })
+  test('a git command that is not a message consumer keeps its body', () => {
+    ask("git config -F - <<'EOF'\n[alias] p = push -f\nEOF\ngit p origin x")
+  })
+})
+
+describe('0.5.0 §3.10 file names and the named-later fix', () => {
+  test('mktemp and built names are read', () => {
+    silent("S=/x; D=$S/r.md; cat > $D <<'EOF'\nrm -rf ~ is refused\nEOF\nwc -l $D; gh issue comment 1 --body-file $D")
+    silent("T=$(mktemp); cat > $T <<'EOF'\nverdict: git push -f was refused\nEOF\nmv $T /x/report.md; gh issue comment 1 --body-file /x/report.md")
+  })
+  test('escape routes', () => {
+    for (const c of ["T=$(mktemp); cat > $T <<'EOF'\ngit push -f origin x\nEOF\nchmod +x $T; $T",
+      "T=$(mktemp); cat > $T <<'EOF'\ngit push -f origin x\nEOF\nmv $T run.sh; ./run.sh",
+      "T=$(mktemp -d); cat > $T/a.sh <<'EOF'\ngit push -f origin x\nEOF\n$T/a.sh",
+      "S=/x; D=$S/x.sh; cat > $D <<'EOF'\ngit push -f\nEOF\n./x.sh", "D=$UNSET/x.sh; cat > $D <<'EOF'\ngit push -f\nEOF\nmake",
+      // the 0.4.3 defect: a later word holding a variable is read with its value
+      "P=/x/a.sh; cat > $P <<'EOF'\ngit push -f origin x\nEOF\nmv $P run.sh; ./run.sh"])
+      ask(c)
+  })
+})
+
+describe('0.5.0 §3.11 namers', () => {
+  test('a file named only to add, commit or remove it is not run', () => {
+    silent("cat > b.md <<'EOF'\nnever git push -f\nEOF\ngit add b.md && git commit -q -m x && git push -u origin feat/x")
+    silent("cat > b.md <<'EOF'\nnever git push -f\nEOF\ngh issue comment 1 --body-file b.md; rm -f b.md")
+  })
+  test('escape routes', () => {
+    ask("cat > b.md <<'EOF'\ngit push -f origin feat/x\nEOF\ngh pr creator --body-file b.md")
+    ask("cat > b.md <<'EOF'\nx\nEOF\nrm -rf ~/x")
+    ask("cat > c.sh <<'EOF'\ngit push -f origin x\nEOF\ngit -c core.pager=./c.sh log")
+  })
+})
+
+describe('0.5.0 final review: shapes 0.4.3 asked on still ask', () => {
+  test('C1: a branch switch earlier in the text makes the branch unknown', () => {
+    for (const c of ['git checkout main && git merge feat/x && git push', 'git switch main; git merge --ff-only feat/x; git push origin HEAD',
+      'git checkout -q main\ngit merge feat/x\ngit push -q', 'git branch -m main && git push -u origin HEAD',
+      'git checkout -B main && git push origin HEAD', 'git symbolic-ref HEAD refs/heads/main && git push',
+      'git checkout -b feat/y origin/main && git push', 'git checkout $B && git push'])
+      ask(c)
+    // A push that names a literal non-default destination still passes, and a switch to no default name is no switch.
+    silent('git checkout main && git pull && git checkout -b feat/y && git push -u origin feat/y')
+    silent('git checkout -b feat/y && git push -u origin feat/y')
+    silent('git checkout -- a.ts && git push')
+  })
+  test('C2: an assignment after &&, || or a pipe across a newline, or sent to the background, is not read', () => {
+    for (const c of ['test -d /repo/sub/build &&\nB=/repo/sub/build\nrm -rf "$B"/*', 'test -d /repo/sub/build ||\nB=/repo/sub/build\nrm -rf "$B"/*',
+      'echo x |\nB=/repo/sub/build\nrm -rf "$B"/*', 'B=/repo/sub/build & rm -rf "$B"/*',
+      "git commit -F - <<'EOF' &&\nmsg\nEOF\nB=/repo/sub/build\nrm -rf \"$B\"/*", 'cd /other\ngit fetch &&\nB=feat/x\ngit push origin $B'])
+      ask(c)
+    silent('git fetch\nB=/repo/sub/build\nrm -rf "$B"/*')
+  })
+  test('I1: a flag in a variable the text binds but the floor cannot read, beside commit or branch', () => {
+    for (const c of ['export NV=-n; git commit $NV -m x', 'declare NV=-n; git commit $NV -m x', 'if true; then NV=-n; fi; git commit $NV -m x',
+      'NV=-n; NV=-n; git commit $NV -m x', 'export F=-D; git branch $F feat/y', 'for F in -n; do git commit $F -m x; done'])
+      ask(c)
+    // A variable the text never binds is still not read as a flag beside commit (0.2.0).
+    silent('make -n check; git commit -q -F "$M"')
+  })
+  test('I2: a move or a config write inside a loop applies to the whole loop', () => {
+    for (const c of ['for p in a b; do rm -rf node_modules; cd ../$p; done', 'while true; do git push; cd /other; done',
+      'for i in 1 2; do git p origin feat/x; V=$(echo push -f); git config alias.p "$V"; done'])
+      ask(c)
+    silent('for p in a b; do echo $p; done; git push -u origin feat/x')
+  })
+  test('I3: a message consumer does not reach past ; && or a pipe', () => {
+    ask("git commit --allow-empty -m wip; make --file - <<'EOF'\nall:\n\tgit push -f origin main\nEOF")
+    ask("git tag -l | make --file - <<'EOF'\nall:\n\tgit push -f origin main\nEOF")
+    silent("git commit -q --file - <<'EOF'\nfix: git push -f\nEOF")
+  })
+  test('I4: a large script of redirects stays fast', () => {
+    const same = [...Array.from({ length: 2000 }, (_, i) => `echo "step ${i}" >> log.txt`), 'git push -u origin feat/x'].join('\n')
+    const distinct = [...Array.from({ length: 2000 }, (_, i) => `echo "step ${i}" > out${i}.txt`), 'git push -u origin feat/x'].join('\n')
+    for (const big of [same, distinct]) {
+      const t0 = Date.now()
+      silent(big)
+      namesDanger(big)
+      expect(Date.now() - t0 < 2000).toEqual(true)
+    }
+  })
+  test('M2: Python process calls behind an underscore', () => {
+    ask("python3 - <<'X'\nimport asyncio\nasyncio.run(asyncio.create_subprocess_shell('git push -f origin x'))\nX")
+    ask("python3 - <<'X'\nimport os\nos.posix_spawnp('sh', ['sh', '-c', 'git push -f origin x'], {})\nX")
+  })
+  test('M5: a hook in .husky/ or .githooks/ is a git control path', () => {
+    ask("cat > .husky/pre-commit <<'EOF'\ngit push -f origin main\nEOF\ngit add .husky/pre-commit && git commit -m x")
+    ask("cat > .githooks/pre-push <<'EOF'\ngit push -f origin main\nEOF\ngit add .githooks/pre-push && git commit -m x")
+    silent("cat > docs/husky.md <<'EOF'\nnever git push -f\nEOF\ngit add docs/husky.md && git commit -m x")
+  })
+})
+
+describe('0.5.0 PR #735 round 1: shapes 0.4.3 asked on still ask', () => {
+  test('a git config write lets a later git command run a written file it does not name', () => {
+    ask("git config alias.x '!/tmp/a.sh'; cat > /tmp/a.sh <<'EOF'\ngit push -f origin main\nEOF\nchmod +x /tmp/a.sh; git x")
+    ask("git config core.hooksPath /tmp/h; cat > /tmp/h/pre-commit <<'EOF'\ngit push -f origin main\nEOF\nchmod +x /tmp/h/pre-commit; git commit -m x")
+    // With no config write, a namer and a git namer still do not run it.
+    silent("cat > /tmp/a.sh <<'EOF'\nnever git push -f\nEOF\nchmod +x /tmp/a.sh; git status")
+  })
+  test('an alias or function keyword split by quotes is still a definition', () => {
+    ask('shopt -s expand_aliases; a""lias p="git push"; p -f origin main')
+    ask("shopt -s expand_aliases; a\\lias p='git push'; p -f origin main")
+  })
+  test('a sed script is the whole shell word, quoted pieces joined', () => {
+    ask("sed 's/x/git push -f origin main/'e file")
+    ask(`sed 's/x/y/'"w /tmp/o" f; echo 'git push -f origin feat/x'`)
+    silent("sed 's/a/b/'g f; git push -u origin feat/x; echo -f")
+  })
+})
+
+describe('0.5.0 PR #735 round 2: shapes 0.4.3 asked on still ask', () => {
+  test('a Python write to a bare file name that a later command runs', () => {
+    ask("python3 - <<'X'\nopen('run','w').write('#!/bin/sh\\ngit push -f origin x')\nX\nchmod +x run; ./run")
+    silent("python3 - <<'X'\nopen('notes','w').write('never git push -f')\nX\ngit push -u origin feat/x")
+  })
+  test('a write into a git control file changes git context', () => {
+    ask("printf '%s\\n' '[alias]' 'p = push' > /repo/.git/config; git p -f origin feat/x")
+    ask("echo 'ref: refs/heads/main' > /repo/.git/HEAD; git push")
+  })
+  test('a dynamically named assignment reads no variables', () => {
+    ask('X=f; F=x; printf -v "${X^^}" %s -f; git push $F origin feat/x')
+    ask('F=x; N=F; read -r "$N" < /tmp/v; git push $F origin feat/x')
+  })
+  test('an alias or function in the text keeps every heredoc body', () => {
+    ask("shopt -s expand_aliases; alias tee='$SHELL -s --'\ntee note <<'X'\ngit push -f origin main\nX")
+    // A `()` or the word alias in quoted prose defines nothing: the body stays dropped.
+    silent("cat > r.md <<'EOF'\nnever run git commit -n here\nEOF\ngh issue create --title \"x.exp() is missing; alias rules\" --body-file r.md")
+  })
+  test('a command that reads a pipe is judged with the words piped into it', () => {
+    ask("printf 'all:\\n\\tgit push $(F) origin feat/x\\n' | make -f - F=-f")
+    silent('git log --oneline | grep -n push; git push -u origin feat/x; echo -f')
+  })
+  test('only a system mktemp names a fresh temp file', () => {
+    ask("T=$(./mktemp); cat > $T <<'EOF'\ngit push -f origin main\nEOF\ngit commit -m x")
+    silent("T=$(/usr/bin/mktemp); cat > $T <<'EOF'\nverdict: git push -f was refused\nEOF\nmv $T /x/report.md; gh issue comment 1 --body-file /x/report.md")
+  })
+})
+
+describe('0.5.0 PR #735: ordinary script shapes 0.4.3 asked on', () => {
+  test('a Python or tee heredoc whose stdout goes to a file a later command runs', () => {
+    ask("python3 - <<'X' > run.sh\nprint('git push -f origin main')\nX\nchmod +x run.sh; ./run.sh")
+    ask("tee /dev/null <<'EOF' > run.sh\ngit push -f origin main\nEOF\nchmod +x run.sh; ./run.sh")
+    silent("python3 - <<'X' > out.txt\nprint('never git push -f')\nX\ngit push -u origin feat/x")
+  })
+  test('a ${NAME:-…} expansion in a file name is not read as $NAME', () => {
+    ask("S=x; D=${S:+run}.sh; cat > $D <<'EOF'\ngit push -f origin main\nEOF\nchmod +x $D; ./run.sh")
+    ask("OUT=/x; D=${OUT:-/tmp}/run.sh; cat > $D <<'EOF'\ngit push -f origin main\nEOF\n/x/run.sh")
+    ask("cat > ${OUT:-.}/run.sh <<'EOF'\ngit push -f origin main\nEOF\n./run.sh")
+  })
+})
+
+describe('0.5.0 PR #735: cp -t names its destination directory', () => {
+  test('a hook installed with cp -t or --target-directory still asks', () => {
+    ask("cat > pre-commit <<'EOF'\ngit push -f origin main\nEOF\nchmod +x pre-commit; cp -t .git/hooks pre-commit; git commit -m x")
+    ask("cat > pre-commit <<'EOF'\ngit push -f origin main\nEOF\ncp --target-directory=.git/hooks pre-commit; git commit -m x")
+    silent("cat > notes.md <<'EOF'\nnever git push -f\nEOF\ncp -t docs notes.md; git add docs/notes.md && git commit -m x")
   })
 })
