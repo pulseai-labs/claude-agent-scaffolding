@@ -913,3 +913,15 @@ describe('0.5.0 §3.10 file names and the named-later fix', () => {
       ask(c)
   })
 })
+
+describe('0.5.0 §3.11 namers', () => {
+  test('a file named only to add, commit or remove it is not run', () => {
+    silent("cat > b.md <<'EOF'\nnever git push -f\nEOF\ngit add b.md && git commit -q -m x && git push -u origin feat/x")
+    silent("cat > b.md <<'EOF'\nnever git push -f\nEOF\ngh issue comment 1 --body-file b.md; rm -f b.md")
+  })
+  test('escape routes', () => {
+    ask("cat > b.md <<'EOF'\ngit push -f origin feat/x\nEOF\ngh pr creator --body-file b.md")
+    ask("cat > b.md <<'EOF'\nx\nEOF\nrm -rf ~/x")
+    ask("cat > c.sh <<'EOF'\ngit push -f origin x\nEOF\ngit -c core.pager=./c.sh log")
+  })
+})

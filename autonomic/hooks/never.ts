@@ -212,6 +212,20 @@ const targets = (text: string) => [...text.matchAll(REDIRECT)].map(m => m[1]!).f
 export const DEFAULT_READERS: readonly (readonly string[])[] = [['gh', 'pr', 'create'], ['gh', 'pr', 'edit'], ['gh', 'issue', 'create'], ['gh', 'issue', 'comment']]
 export const parseReaders = (s: string): string[][] => s.split(';').map(r => r.trim().split(/\s+/).filter(Boolean)).filter(r => r.length > 0)
 type Readers = readonly (readonly string[])[]
+// Namers (0.5.0): commands that name a file to read, remove or change its mode, and never run it. A file they
+// name passes on as an inert command's would (a pipe or a redirect from them still counts).
+const NAMER = new Set(['rm', 'unlink', 'chmod', 'chown', 'wc', 'diff', 'cmp', 'sha1sum', 'sha256sum', 'sha512sum', 'md5sum', 'b2sum', 'file', 'du', 'readlink', 'realpath', 'basename', 'dirname'])
+const GIT_NAMER = new Set(['add', 'status', 'diff', 'check-ignore', 'commit', 'show', 'log', 'rm', 'mv', 'restore', 'ls-files', 'hash-object', 'blame', 'cat-file'])
+const GH_NAMER = new Set(['pr create', 'pr edit', 'pr comment', 'pr review', 'pr view', 'issue create', 'issue edit', 'issue comment', 'issue view', 'release create', 'release edit', 'release upload', 'release view'])
+function namer(ws: readonly string[]): boolean {
+  const i = ws.findIndex(x => !KEYWORD.has(x))
+  if (i < 0) return false
+  const h = ws[i]!
+  if (NAMER.has(h)) return true
+  if (h === 'git') { let k = i + 1; while (ws[k] === '-C' || ws[k] === '-q') k += ws[k] === '-C' ? 2 : 1; return GIT_NAMER.has(ws[k] ?? '') && !ws.some(w => /^-c$|^--exec|^-x$/.test(w)) }
+  if (h === 'gh') return ws[i + 1] === 'api' || GH_NAMER.has(`${ws[i + 1]} ${ws[i + 2]}`)
+  return false
+}
 function isReader(ws: readonly string[], readers: Readers): boolean {
   const i = ws.findIndex(x => !KEYWORD.has(x))
   return i >= 0 && readers.some(r => r.every((w, k) => ws[i + k] === w))
@@ -248,7 +262,7 @@ function usedLater(raw: readonly string[], later0: readonly Command[], ctx: Ctx)
     const ws = split(c.bare).map(w => (w.includes('$') ? ctx.resolve(w) : w))
     const h = head(command(c.bare))
     if (h === undefined) continue
-    if (!isInert(c.bare)) {
+    if (!isInert(c.bare) && !namer(ws)) {
       if (isReader(ws, ctx.readers)) continue
       if (named(ws) || /[$*?[]/.test(h)) return true
       continue
