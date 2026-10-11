@@ -2,6 +2,46 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.5.0
+
+**The never-approve list judges each command on its own words** (a replay of three days of
+transcripts: prompts in other projects fall from 386 to 266, none newly asked).
+
+- **Each simple command is judged alone** when the text parses (`never.ts`): a rule fires only
+  when its verb and its flags are in the same command. Moves, git config writes and an opaque verb
+  (`$CMD -f`, `git $V -f`) still take context from the whole text, and unparsed text and runners
+  keep the whole bag. A variable assigned once to a literal, at the top level and before its use,
+  is read as its value; a command of assignments only drops its words.
+- **A runner word that cannot run** (an argument of `cd`, `pushd` or an inert command, or the
+  value after `git -C`) no longer keeps the whole bag, and dot-sourcing is found per command.
+- **A moved push that names its destination** (a remote and only literal refspecs that are not the
+  default branch, `main`, `master`, `HEAD` or `@`, with no option outside a short safe list) no
+  longer asks `default-branch-push`.
+- **A variable in a push** (`B=spine/x; git push origin "$B"`) reads as its value; one assigned
+  from a substitution stays opaque.
+- **Backticks are substitutions**: a live pair, also inside double quotes, is judged as commands;
+  a quoted or escaped backtick is text.
+- **`sh -c 'literal'`** (bash, zsh, dash) is read as a subshell holding the string, up to four
+  levels; a `$`, a backtick, `-l` or `-i` keeps it a runner.
+- **A wider safe `sed`**: `s///` with any delimiter, address prints, `=` and `-i` edits are inert;
+  `e`, `w`, `r`, `y`, `-f` and an `-i` target in git's control paths keep it a runner, and an
+  edited file a later command runs keeps the words.
+- **Python file-edit heredocs** (`python3 - <<'X'`) drop a body that names no process call
+  (`subprocess`, `system`, `exec…`, `getattr`, `importlib` …) and no git control path.
+- **Heredoc bodies are data unless something can run them**: `git commit -F -`, `gh … --body-file -`
+  and `tee` bodies drop; an unquoted body's `$( )` and backticks are judged as commands, and
+  `$((`, `$[` or `${…@…}` keeps the whole bag.
+- **File names**: a `$(mktemp)` variable names a fresh temp file, and built names (`D=$S/r.md`)
+  are read. **Fixed a 0.4.3 defect:** a later command's words are read with variable values before
+  the file-name match, so `P=/x/a.sh; cat > $P …; mv $P run.sh; ./run.sh` asks again.
+- **Namers** (`rm`, `chmod`, `wc`, `diff`, `git add|commit|status …`, `gh api`, `gh pr|issue view` …)
+  name a written file without running it.
+- **Known limits:** a moved push trusts only `main`, `master` and the session's default branch as
+  default names; the Python deny list is a judgment rule; namers and message consumers are trusted
+  by name; the floor still needs a danger word; variable values come from the text only
+  (`export N=…` asks); a shell inside `$( )` is not read through; the run-later resolver does not
+  check order.
+
 ## 0.4.3
 
 **The never-approve list stops holding dispatch briefs and item closes** (the 0.4.2 live replay:

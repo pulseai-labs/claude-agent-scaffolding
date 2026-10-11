@@ -1,10 +1,12 @@
 // The never-approve list (spec §3.3; autonomic 0.2.0, #684 direction 2′): checked in code
 // before any fork. A match leaves the ask in place.
 //
-// The floor reads the whole command text as one bag of words. It never decides which
-// command a word belongs to, so quoting, nesting, wrappers and interpreters cannot hide a
-// word: `python3 -c 'git push -f'` shows `push` and `-f`. A danger word beside a harmless
-// command is an extra ask, and that is the accepted cost.
+// Since 0.5.0 the floor judges each simple command on its own words when the text parses, with
+// context from the whole text (moves, variables assigned once to a literal, git config writes).
+// Text it cannot parse, and text that names a program that may run text, is read as one bag of
+// words, so quoting, nesting, wrappers and interpreters still cannot hide a word there:
+// `python3 -c 'git push -f'` shows `push` and `-f`. Text that never runs (messages, heredoc
+// bodies, a literal `sh -c` string read as commands) is data.
 
 // 'unreadable' matches nothing since 0.2.0; the name stays valid so an existing setting parses.
 export type NeverRule = 'force-push' | 'default-branch-push' | 'branch-delete' | 'rm-outside' | 'no-verify' | 'unreadable'
@@ -14,13 +16,10 @@ export type Where = { cwd: string; root: string; home: string; branch?: string; 
 // `pu""sh` and `'git' push` are push. A substitution or a backtick opens new words; `${`
 // does not, so `${OPTS}` stays a word that starts with `$`.
 const SPLIT = /\$\(|[\s;&|()<>`]+/
-// Two literal heredoc shapes are text Bash never runs, so their bodies are dropped:
-// - a commit message: `-m "$(cat <<'X'` … `X` `)"` (or `--message`), the usual commit;
-// - `cat > file <<'X'` (or `cat <<'X' > file`) at a command's start, unless a later command
-//   that is not inert names the file (a script written then run keeps its words; §3.4).
-// The delimiter must be quoted, so the body holds no expansion.
+// A commit message is text Bash never runs, so its body is dropped: `-m "$(cat <<'X'` … `X`
+// `)"` (or `--message`), the usual commit. The delimiter must be quoted, so the body holds no
+// expansion. Written files, Python edits and message consumers are read by `WRITES` below.
 const MESSAGE = /(?:-m|--message)(?:=|[ \t]*)"\$\(cat[ \t]+<<-?[ \t]*(['"])([A-Za-z_]\w*)\1[ \t]*\n[\s\S]*?\n[ \t]*\2[ \t]*\n?[ \t]*\)"/g
-const WRITE = /(?<=^|[\n;&|(])[ \t]*cat[ \t]+(?:>>?[ \t]*([^\s;&|<>]+)[ \t]+)?<<-?[ \t]*(['"])([A-Za-z_]\w*)\2(?:[ \t]*>>?[ \t]*([^\s;&|<>]+))?[ \t]*\n[\s\S]*?\n[ \t]*\3[ \t]*(?=\n|$)/g
 // A program that may run text it is given keeps every word, the dropped bodies included:
 // a shell, an interpreter, a remote or wrapping runner, sed, awk. `.` counts only where a
 // command starts (`git add .` is a path).
