@@ -5,11 +5,6 @@ argument-hint: "[path] [--close] [--neutral] [--walk] [--model NAME] [--principl
 
 # /critique
 
-Invoke the **critiquing-spec** skill on the provided artifact. The skill body handles all logic:
-path discovery, principles merging, codex detection, claude-self-audit, optional codex
-fresh-frame, consolidation, sequential rebuttal, bookkeeping, summary emission. This slash
-command is a thin wrapper — the work happens in the skill.
-
 ## Arguments
 
 - `path` (optional) — artifact path; if omitted, the skill resolves via manifest fast-path,
@@ -29,12 +24,4 @@ command is a thin wrapper — the work happens in the skill.
 export ARCHITECT_CRITIC_ARGS="$ARGUMENTS"
 ```
 
-## Invoke
-
-Now invoke the skill via:
-
-```
-Skill(architect-critic:critiquing-spec)
-```
-
-The qualified `<plugin>:<skill>` form is required — the unqualified skill name `critiquing-spec` is ambiguous and the slash-command handler may not route to this plugin's skill otherwise. Pass the arguments above via `$ARCHITECT_CRITIC_ARGS`.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/critiquing-spec/SKILL.md` (in OMP: `skill://critiquing-spec`) end to end and follow it. Its arguments are in `$ARCHITECT_CRITIC_ARGS`.

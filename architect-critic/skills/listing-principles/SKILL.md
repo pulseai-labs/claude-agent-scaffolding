@@ -1,6 +1,6 @@
 ---
 name: listing-principles
-description: Show all principles in effect (shipped defaults + user-promoted + project-scoped + memory-bank patterns) grouped by source with annotations. Triggers on "show principles", "list principles", "what principles apply here", "principles in effect", "audit principles". Optional --source all|shipped|user|project filter.
+description: Use when asked to show principles ("show principles", "list principles", "what principles apply here", "principles in effect", "audit principles") — lists principles in effect (shipped, user-promoted, project-scoped, memory-bank) by source, annotated; optional --source all|shipped|user|project filter.
 ---
 
 # listing-principles

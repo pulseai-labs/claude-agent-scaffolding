@@ -1,6 +1,6 @@
 ---
 name: codebase-design
-description: Shared vocabulary and principles for designing deep modules. Use when designing or improving a module's interface, deciding where a seam goes, judging whether an abstraction earns its keep, making code more testable or easier for an agent to navigate, exploring two competing interfaces for the same problem, or when another skill needs the deep-module vocabulary. Triggers on "design this module", "where should the seam go", "is this abstraction earning its keep", "explain this codebase's seams", "design it twice", "deep module", "shallow module", "deletion test".
+description: Use when designing or improving a module's interface, deciding where a seam goes, judging whether an abstraction earns its keep, making code more testable or easier for an agent to navigate, exploring two competing interfaces for the same problem, or when another skill needs the deep-module vocabulary ("design this module", "where should the seam go", "is this abstraction earning its keep", "explain this codebase's seams", "design it twice", "deep module", "shallow module", "deletion test") — shared vocabulary and principles for designing deep modules.
 ---
 
 # Codebase design

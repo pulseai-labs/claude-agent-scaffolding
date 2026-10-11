@@ -1,6 +1,6 @@
 ---
 name: reviewing-critique-history
-description: Show recent architect-critic runs as a table, plus any in-flight background (async) audits. Triggers on "show recent critiques", "critique history", "list pending audits", "recent audits", "audit log", "in-flight critiques", "background audits". Reads state.json schema v3 (recent_runs[] + external_runs[]). Default N=10 rows; --limit N overrides.
+description: Use when asked for recent critiques ("show recent critiques", "critique history", "list pending audits", "recent audits", "audit log", "in-flight critiques", "background audits") — shows recent architect-critic runs and in-flight background (async) audits as tables, from state.json schema v3; default 10 rows, --limit N overrides.
 ---
 
 # reviewing-critique-history

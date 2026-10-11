@@ -3,7 +3,7 @@ description: Bootstrap a fresh dual-repo workspace (AI workspace + canonical). W
 allowed-tools: ["Read", "Write", "Bash"]
 ---
 
-Invoke the `initializing-dual-repo-workspace` skill from the workspace-init plugin.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/initializing-dual-repo-workspace/SKILL.md` (in OMP: `skill://initializing-dual-repo-workspace`) end to end and follow it.
 
 Arguments: $ARGUMENTS
 
@@ -22,4 +22,4 @@ is supplied, prompt for it interactively. Never use shell positional parameters,
 never infer wrapper mode, and never treat the entire non-empty argument string as
 the name.
 
-Follow the skill body exactly. Do not skip any of the 8 bootstrap tasks. Do not auto-commit (stage only). Print the next-steps message verbatim. If any task fails, invoke the rollback via `wi rollback "${ai_root}/.workspace/init-log"` (the `wi` dispatcher is on PATH; it sources lib modules under bash regardless of caller shell).
+Do not skip any of the 8 bootstrap tasks. Do not auto-commit (stage only). Print the next-steps message verbatim. If any task fails, invoke the rollback via `wi rollback "${ai_root}/.workspace/init-log"` (the `wi` dispatcher is on PATH; it sources lib modules under bash regardless of caller shell).

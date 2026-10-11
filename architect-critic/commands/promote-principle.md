@@ -5,10 +5,6 @@ argument-hint: "\"<text>\" [--scope user|project]"
 
 # /promote-principle
 
-Invoke the **promoting-principle** skill. The skill body validates uniqueness, appends to
-the target principles.md with source tag + timestamp, and records the promotion in
-state.json. This slash command is a thin wrapper.
-
 ## Arguments
 
 - `"<text>"` (required) — principle text, in quotes.
@@ -20,12 +16,4 @@ state.json. This slash command is a thin wrapper.
 export ARCHITECT_CRITIC_ARGS="$ARGUMENTS"
 ```
 
-## Invoke
-
-Now invoke the skill via:
-
-```
-Skill(architect-critic:promoting-principle)
-```
-
-The qualified `<plugin>:<skill>` form is required — pass the arguments above via `$ARCHITECT_CRITIC_ARGS`.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/promoting-principle/SKILL.md` (in OMP: `skill://promoting-principle`) end to end and follow it. Its arguments are in `$ARCHITECT_CRITIC_ARGS`.

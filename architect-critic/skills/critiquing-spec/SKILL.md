@@ -1,6 +1,6 @@
 ---
 name: critiquing-spec
-description: "Adversarial audit of a written spec or plan. Triggers on phrases like \"audit this spec\", \"critique X\", \"adversarial review\", \"challenge the spec\", \"deep audit\", \"fresh-frame review\". Runs host-agent self-audit in conversation; optionally invokes the other agent as a fresh-frame adversary at close-depth (--close flag or NL trigger): Codex when hosted in Claude Code, Claude Code when hosted in Codex. Produces challenges/gaps/alternatives, runs sequential rebuttal cycle with 1-5 concession scoring, appends run to state.json."
+description: Use when auditing a written spec or plan ("audit this spec", "critique X", "adversarial review", "challenge the spec", "deep audit", "fresh-frame review") — runs a host-agent self-audit in conversation; at close-depth (--close or NL trigger) also invokes the other agent as a fresh-frame adversary (Codex when hosted in Claude Code, Claude Code when hosted in Codex); produces challenges/gaps/alternatives, runs a sequential rebuttal cycle with 1-5 concession scoring, appends the run to state.json.
 ---
 
 # critiquing-spec

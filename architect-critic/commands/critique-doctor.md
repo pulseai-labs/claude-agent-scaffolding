@@ -4,16 +4,4 @@ description: Check external-adversary readiness (codex/claude installed, authed,
 
 # /critique-doctor
 
-Invoke the **checking-adversary-readiness** skill. The skill runs `arc codex_doctor`
-(fail-soft, always exits 0), presents the readiness report, and offers user-approved
-remediation for any gaps. This slash command is a thin wrapper. Takes no arguments.
-
-## Invoke
-
-Now invoke the skill via:
-
-```
-Skill(architect-critic:checking-adversary-readiness)
-```
-
-The qualified `<plugin>:<skill>` form is required.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/checking-adversary-readiness/SKILL.md` (in OMP: `skill://checking-adversary-readiness`) end to end and follow it. Takes no arguments.

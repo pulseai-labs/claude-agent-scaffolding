@@ -4,8 +4,6 @@ argument-hint: "[base-branch]"
 allowed-tools: Bash(git:*), Bash(gh:*), Read, Write, Glob, Grep
 ---
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/opening-a-pr/SKILL.md` end to end and follow it**, with
-`${CLAUDE_PLUGIN_ROOT}/skills/opening-a-pr/references/pr-body.md` as the template. Base
-resolution lives in the skill, not here — Codex publishes `./skills/` and never loads this file.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/opening-a-pr/SKILL.md` (in OMP: `skill://opening-a-pr`) end to end and follow it.
 
 Base branch (may be empty — resolve per SKILL.md §2): $ARGUMENTS

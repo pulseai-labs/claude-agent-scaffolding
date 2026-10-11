@@ -1,6 +1,6 @@
 ---
 name: pairing-canonical-repo
-description: Pair a new AI workspace with an existing canonical repository (Scenario A migration). Creates the sibling AI workspace and writes a manifest pointing at existing canonical. Does NOT modify the existing canonical except for installing the commit-msg hook. Use when user has existing repo without AI scaffolding and wants to add an AI workspace alongside.
+description: Use when the user has an existing repo without AI scaffolding and wants to add an AI workspace alongside (Scenario A migration) — creates the sibling AI workspace and writes a manifest pointing at the existing canonical; does NOT modify the canonical except for installing the commit-msg hook.
 ---
 
 # Skill — pairing-canonical-repo

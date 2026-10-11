@@ -4,4 +4,4 @@ argument-hint: ""
 allowed-tools: []
 ---
 
-The user invoked `/fool`. Enter beginner's-mind mode for the rest of the conversation using the `ai-mentor:fool` skill. Acknowledge briefly, then stay in mode until the user signals exit.
+The user invoked `/fool`. Read `${CLAUDE_PLUGIN_ROOT}/skills/fool/SKILL.md` (in OMP: `skill://fool`) end to end and follow it.

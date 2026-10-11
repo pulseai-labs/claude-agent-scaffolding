@@ -1,6 +1,6 @@
 ---
 name: promoting-principle
-description: Promote a principle to user-global or project-scoped principles.md. Triggers on "promote this principle", "record this as a principle", "add to principles.md", "make this a principle", "save this principle". Validates uniqueness, tags with source + timestamp, records the promotion in state.json.
+description: Use when asked to promote a principle ("promote this principle", "record this as a principle", "add to principles.md", "make this a principle", "save this principle") — writes it to user-global or project-scoped principles.md if unique, tagged source + timestamp; records it in state.json.
 ---
 
 # promoting-principle

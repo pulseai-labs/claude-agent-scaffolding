@@ -1,6 +1,6 @@
 ---
 name: managing-async-critique
-description: Manage background (async) close-depth critique jobs — status, result, cancel, and resume. Triggers on "critique jobs", "resume critique", "resume the async audit", "cancel critique audit", "check critique job", "/critique-jobs". Resume consolidates the finished Codex result with the persisted host self-audit and runs one unified rebuttal; a concluded run resumes inspect-only.
+description: Use when managing background (async) close-depth critique jobs ("critique jobs", "resume critique", "resume the async audit", "cancel critique audit", "check critique job", "/critique-jobs") — status, result, cancel, resume; resume consolidates the finished Codex result with the host self-audit and runs one unified rebuttal; a concluded run resumes inspect-only.
 ---
 
 # managing-async-critique

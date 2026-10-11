@@ -5,10 +5,6 @@ argument-hint: [--source all|shipped|user|project]
 
 # /principles-list
 
-Invoke the **listing-principles** skill. The skill body merges shipped defaults
-(ghost-notes + CORE) → user-global → project-scoped → memory-bank patterns, renders grouped
-by source with annotations. This slash command is a thin wrapper.
-
 ## Arguments
 
 - `--source all|shipped|user|project` — filter to a single source (default `all`).
@@ -19,12 +15,4 @@ by source with annotations. This slash command is a thin wrapper.
 export ARCHITECT_CRITIC_ARGS="$ARGUMENTS"
 ```
 
-## Invoke
-
-Now invoke the skill via:
-
-```
-Skill(architect-critic:listing-principles)
-```
-
-The qualified `<plugin>:<skill>` form is required — pass the arguments above via `$ARCHITECT_CRITIC_ARGS`.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/listing-principles/SKILL.md` (in OMP: `skill://listing-principles`) end to end and follow it. Its arguments are in `$ARCHITECT_CRITIC_ARGS`.

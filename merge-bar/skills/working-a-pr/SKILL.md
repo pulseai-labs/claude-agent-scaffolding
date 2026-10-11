@@ -1,6 +1,6 @@
 ---
 name: working-a-pr
-description: Drive an open pull request to a mergeable state against the merge bar its own body declares — fetch every reviewer finding, sort each as blocking or non-blocking by that bar, fix only the blocking ones in one push per round, answer the rest in the thread or record them as known limits, stop at round 3 or later when the fixes are generating the findings, and merge only on the operator's explicit ack. Use when working, driving, babysitting or landing a PR, addressing review comments, or when handed a PR number to get merged.
+description: Use when working, driving, babysitting or landing a PR, addressing review comments, or when handed a PR number to get merged — drives it to mergeable against the merge bar its own body declares; fixes only blocking findings in one push per round, answers the rest or records them as known limits, stops at round 3 when fixes generate the findings, merges only on the operator's explicit ack.
 ---
 
 # Working a pull request — against its merge bar

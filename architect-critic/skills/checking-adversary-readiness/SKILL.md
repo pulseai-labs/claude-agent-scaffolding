@@ -1,6 +1,6 @@
 ---
 name: checking-adversary-readiness
-description: Check whether the external adversary (Codex/Claude) is installed, authenticated, and schema-capable before a deep critique. Triggers on "check adversary readiness", "is codex ready", "critique doctor", "/critique-doctor", "can I run an async critique". Advisory and fail-soft — never blocks, never auto-installs.
+description: Use when the user says "check adversary readiness", "is codex ready", "critique doctor", "/critique-doctor", "can I run an async critique" — checks the external adversary (Codex/Claude) is installed, authenticated, and schema-capable before a deep critique. Advisory, fail-soft; never auto-installs.
 ---
 
 # checking-adversary-readiness

@@ -1,6 +1,6 @@
 ---
 name: pairing-existing-dual
-description: Pair an already-populated AI workspace with an already-populated canonical repository (Scenario C). Both directories already exist — the AI workspace grew its memory-bank/specs organically before the plugins were discovered, and the canonical holds production code. Writes the pairing manifest and installs the trace-filter commit-msg hook; never creates, seeds, stubs, or overwrites the existing AI-workspace content. Use when the user says "pair my existing workspace", "wire up an existing AI workspace", "both repos already exist", or runs /pair-existing-dual.
+description: Use when the user says "pair my existing workspace", "wire up an existing AI workspace", "both repos already exist", or runs /pair-existing-dual (Scenario C, populated AI workspace and populated canonical) — writes the pairing manifest and installs the trace-filter commit-msg hook; never creates, seeds, stubs, or overwrites existing AI-workspace content.
 ---
 
 # Skill — pairing-existing-dual

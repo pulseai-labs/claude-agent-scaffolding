@@ -4,8 +4,6 @@ argument-hint: "<PR number or URL> [--repo-root DIR]"
 allowed-tools: Bash(bash:*), Bash(git:*), Bash(gh:*), Read, Write, Edit, Glob, Grep
 ---
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/working-a-pr/SKILL.md` end to end and follow it.** It owns
-the whole lane: preflight, both finding signals, the set-level pass, the dispositions against
-the PR's merge bar, rounds and the round-3 stop, the terminus ask, and the ledger after merge.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/working-a-pr/SKILL.md` (in OMP: `skill://working-a-pr`) end to end and follow it.
 
 The PR to work, and any flags: $ARGUMENTS

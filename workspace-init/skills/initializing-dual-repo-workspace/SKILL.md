@@ -1,6 +1,6 @@
 ---
 name: initializing-dual-repo-workspace
-description: Bootstrap a fresh dual-repo workspace — creates a new AI workspace and clean canonical repository, declares their topology in a pairing manifest, writes temporary agent stubs, and installs AI-trace commit-message filters. Use when the user wants to start a new project with the dual-repo topology, mentions "create workspace", "bootstrap project", "new AI workspace", "set up dual repo", "init project workspace".
+description: Use when the user wants to start a new project with the dual-repo topology, or mentions "create workspace", "bootstrap project", "new AI workspace", "set up dual repo", "init project workspace" — creates a new AI workspace and clean canonical repository, declares their topology in a pairing manifest, writes temporary agent stubs, installs AI-trace commit-message filters.
 ---
 
 # Skill — initializing-dual-repo-workspace
