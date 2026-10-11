@@ -19,7 +19,7 @@ vocabulary:
   a hypothetical seam, two is a real one". Use those terms exactly in every suggestion. Do
   not drift into "component", "service", "API", or "boundary".
 
-  **How you load a sibling skill depends on the host.** In Claude Code that is the Skill tool.
+  **How you load a sibling skill depends on the host.** In Claude Code that is the Skill tool; in OMP, `skill://<name>`.
   Codex publishes `./skills/` and exposes them as explicit `$skill` invocations rather than a
   tool call. If neither is available to you, read the sibling's `SKILL.md` from this plugin's
   own directory — it is shipped alongside this file, so the vocabulary is never actually

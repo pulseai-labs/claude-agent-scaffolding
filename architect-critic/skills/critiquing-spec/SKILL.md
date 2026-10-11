@@ -44,12 +44,12 @@ Use the Read tool and `jq`-style traversal (or just Read + parse). If the field 
 
 Use the Glob tool with each pattern explicitly. **Never glob `*.md`.** That was the root cause of bug #3 in v0.1 — globbing all markdown files surfaced READMEs, CHANGELOGs, and stray notes as "spec candidates", then the orchestrator hard-failed when none looked like a master spec. The restricted patterns above are deliberate.
 
-**1d. AskUserQuestion fallback.** If multiple candidates survived 1c (or zero), use the AskUserQuestion tool with up to 5 candidate paths plus an "Other (provide path)" option. Phrase the question concretely: *"Which artifact should I audit?"*. Wait for the user's pick; record it.
+**1d. AskUserQuestion fallback.** If multiple candidates survived 1c (or zero), use the AskUserQuestion tool (OMP: `ask`) with up to 5 candidate paths plus an "Other (provide path)" option. Phrase the question concretely: *"Which artifact should I audit?"*. Wait for the user's pick; record it.
 
 If the user provides a path that does not exist, ask once more rather than hard-failing. Hard-failing on missing artifact (bug #3) is what this discovery chain exists to prevent.
 
 **Edge cases:**
-- *Path points to a directory.* If the resolved path is a directory, look inside for one of the restricted patterns (`SPEC*`, `MASTER-SPEC*`, `PLAN*`). If exactly one matches, use it; if multiple, AskUserQuestion; if zero, ask the user to point at a file.
+- *Path points to a directory.* If the resolved path is a directory, look inside for one of the restricted patterns (`SPEC*`, `MASTER-SPEC*`, `PLAN*`). If exactly one matches, use it; if multiple, AskUserQuestion (OMP: `ask`); if zero, ask the user to point at a file.
 - *Path is a URL.* Reject — this skill audits local artifacts. Tell the user *"I can only audit files on disk. If this lives in a Google Doc / Notion / GitHub PR, please save it locally first or paste the content into a markdown file."*
 - *Artifact is huge (>50K lines).* Surface the size to the user: *"This artifact is N lines. The audit will focus on structural concerns rather than line-level review. Continue?"* and wait for confirmation.
 - *Artifact is tiny (<20 lines).* Don't bail, but tell the user *"This artifact is short — the audit will likely surface few challenges. Is this the right file?"*

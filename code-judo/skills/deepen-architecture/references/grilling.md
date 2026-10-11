@@ -29,7 +29,7 @@ Take the first of these that works:
 3. **The protocol below** — in-plugin, no dependency, always available.
 
 **How to probe: just call it**, the way your host invokes a skill — the Skill tool in Claude
-Code, an explicit `$skill` invocation on Codex. Do not try to detect
+Code, `skill://<name>` in OMP, an explicit `$skill` invocation on Codex. Do not try to detect
 installation by looking for plugin directories on disk — the install path differs by host and
 by install mode, so a wrong guess reports "not installed" for a plugin that is right there and
 silently downgrades a user who has the better griller.
@@ -102,7 +102,7 @@ askable, so recompute the next batch from the agenda rather than working down a 
 wrote earlier.
 
 **Look things up yourself.** Anything the repository, the tests, or the tools can tell you is
-yours to find — dispatch a sub-agent and keep going. Only decisions go to the user, and a
+yours to find — dispatch a sub-agent (`Agent` in Claude Code, `task` in OMP) and keep going. Only decisions go to the user, and a
 lookup in flight blocks only the questions downstream of it, not the whole batch.
 
 **Done is when the agenda is settled**, not when you run out of questions. All five items —

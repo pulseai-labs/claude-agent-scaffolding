@@ -71,3 +71,7 @@ Linux and macOS. The only bash code that ships is the optional `tests/test-front
 ## License
 
 MIT — see [`LICENSE`](./LICENSE).
+
+## OMP
+
+Install per the root README. Skills are reachable as `skill://<name>`, with no `ai-mentor:` prefix. No Claude Code-only parts.

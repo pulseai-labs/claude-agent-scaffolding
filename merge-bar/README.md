@@ -45,3 +45,7 @@ writes them into the reviewed repository.
 `bash merge-bar/run-tests.sh` runs the frontmatter lint and ten fidelity pins; CI runs it.
 The behaviour evals in `tests/eval/` are session-driven and **not** run by CI — follow
 `tests/eval/RUNBOOK.md` before any version bump.
+
+## OMP
+
+Install per the root README. Skills are reachable as `skill://<name>`, with no `merge-bar:` prefix. No Claude Code-only parts.
