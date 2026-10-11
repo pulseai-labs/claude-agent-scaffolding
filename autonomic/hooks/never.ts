@@ -329,7 +329,8 @@ function resolver(parts: readonly Command[]): Resolve {
     if (/^[ \t]*[A-Za-z_]\w*=("?)\$\((?:\/(?:usr\/)?bin\/)?mktemp(?:[ \t]+[^\s)`$;&|<>'"]+)*\)\1[ \t]*$/.test(c.text)) v = `/tmp/.mktemp-${name}`
     else {
       const ch = /^[ \t]*[A-Za-z_]\w*=("[^"`]*"|[^\s;&|<>"'`]*)[ \t]*$/.exec(c.text)
-      if (ch && !/\$\(/.test(ch[1]!)) {
+      // `${NAME:-…}`, `${NAME#…}` and the like are not `$NAME`: the value stays opaque.
+      if (ch && !/\$\(/.test(ch[1]!) && !/\$\{\w*[^}\w]/.test(ch[1]!)) {
         let ok = true
         v = clean(ch[1]!).replace(/\$\{?([A-Za-z_]\w*)\}?/g, (_x, n: string) => { const r = vars.get(n); if (r === undefined) ok = false; return r ?? '' })
         if (!ok) v = undefined
@@ -352,6 +353,8 @@ function resolver(parts: readonly Command[]): Resolve {
     else dirs.push(t.replace(/\/+$/, ''))
   }
   return f => {
+    // An expansion with an operator (`${OUT:-.}`) may be any name: keep it opaque (PR #735).
+    if (/\$\{\w*[^}\w]/.test(clean(f))) return clean(f)
     const r = clean(f).replace(/\$\{?([A-Za-z_]\w*)\}?/g, (v, n: string) => vars.get(n) ?? v)
     if (/^[/~]/.test(r) || (dirs.length === 0 && !unknown)) return r
     if (unknown) return `$${r}`
@@ -590,7 +593,8 @@ function reading(command: string, readers: Readers): Reading {
   let pl: ReturnType<typeof laters> | undefined
   const kept = parts === undefined || pg === undefined || writes.some(w => {
     const i = parts.findIndex(c => c.end >= w.end)
-    const t = [...w.files, ...pg[i]!.targets]
+    // The stub keeps its own redirect: a Python or tee heredoc's stdout (`> run.sh`) is a write too.
+    const t = [...w.files, ...pg[i]!.targets, ...targets(parts[i]!.bare)]
     pl ??= laters(parts, ctx0)
     return pipesOn(parts, i) || pg[i]!.pipe || (t.length > 0 && usedLater(t, pl.list, ctx0, pl.from[i + 1]))
   })

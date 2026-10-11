@@ -1029,3 +1029,16 @@ describe('0.5.0 PR #735 round 2: shapes 0.4.3 asked on still ask', () => {
     silent("T=$(/usr/bin/mktemp); cat > $T <<'EOF'\nverdict: git push -f was refused\nEOF\nmv $T /x/report.md; gh issue comment 1 --body-file /x/report.md")
   })
 })
+
+describe('0.5.0 PR #735: ordinary script shapes 0.4.3 asked on', () => {
+  test('a Python or tee heredoc whose stdout goes to a file a later command runs', () => {
+    ask("python3 - <<'X' > run.sh\nprint('git push -f origin main')\nX\nchmod +x run.sh; ./run.sh")
+    ask("tee /dev/null <<'EOF' > run.sh\ngit push -f origin main\nEOF\nchmod +x run.sh; ./run.sh")
+    silent("python3 - <<'X' > out.txt\nprint('never git push -f')\nX\ngit push -u origin feat/x")
+  })
+  test('a ${NAME:-…} expansion in a file name is not read as $NAME', () => {
+    ask("S=x; D=${S:+run}.sh; cat > $D <<'EOF'\ngit push -f origin main\nEOF\nchmod +x $D; ./run.sh")
+    ask("OUT=/x; D=${OUT:-/tmp}/run.sh; cat > $D <<'EOF'\ngit push -f origin main\nEOF\n/x/run.sh")
+    ask("cat > ${OUT:-.}/run.sh <<'EOF'\ngit push -f origin main\nEOF\n./run.sh")
+  })
+})
