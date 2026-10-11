@@ -2,6 +2,16 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.15
+
+**Implementer PRs open on merge-bar's template.** The planned and fast implementer briefs
+gain a `PR_BODY_TEMPLATE` slot: the dispatcher pastes the installed merge-bar's PR body
+template into it verbatim (ossify's copy where only ossify is installed; `none` where neither
+is). Their `DONE:` line writes the PR body from that slot — every heading in order, the Merge
+bar block word for word — and opens the PR with `--title` and `--body-file`, where it used to
+run a bare `gh pr create`. The template reaches every seat, a non-Claude one included, without
+the seat loading merge-bar's skills.
+
 ## 0.2.14
 
 **The round stop is merge-bar's wherever `working-a-pr` runs.** Lifecycle step 11 hands the
