@@ -983,3 +983,21 @@ describe('0.5.0 final review: shapes 0.4.3 asked on still ask', () => {
     silent("cat > docs/husky.md <<'EOF'\nnever git push -f\nEOF\ngit add docs/husky.md && git commit -m x")
   })
 })
+
+describe('0.5.0 PR #735 round 1: shapes 0.4.3 asked on still ask', () => {
+  test('a git config write lets a later git command run a written file it does not name', () => {
+    ask("git config alias.x '!/tmp/a.sh'; cat > /tmp/a.sh <<'EOF'\ngit push -f origin main\nEOF\nchmod +x /tmp/a.sh; git x")
+    ask("git config core.hooksPath /tmp/h; cat > /tmp/h/pre-commit <<'EOF'\ngit push -f origin main\nEOF\nchmod +x /tmp/h/pre-commit; git commit -m x")
+    // With no config write, a namer and a git namer still do not run it.
+    silent("cat > /tmp/a.sh <<'EOF'\nnever git push -f\nEOF\nchmod +x /tmp/a.sh; git status")
+  })
+  test('an alias or function keyword split by quotes is still a definition', () => {
+    ask('shopt -s expand_aliases; a""lias p="git push"; p -f origin main')
+    ask("shopt -s expand_aliases; a\\lias p='git push'; p -f origin main")
+  })
+  test('a sed script is the whole shell word, quoted pieces joined', () => {
+    ask("sed 's/x/git push -f origin main/'e file")
+    ask(`sed 's/x/y/'"w /tmp/o" f; echo 'git push -f origin feat/x'`)
+    silent("sed 's/a/b/'g f; git push -u origin feat/x; echo -f")
+  })
+})

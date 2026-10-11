@@ -252,13 +252,17 @@ function flatOne(cmds: readonly Command[], i: number): Command[] {
 // read with its value; one that stays opaque may be any file (.git/config included), so any
 // later command that is not inert counts.
 type Resolve = (f: string) => string
-type Ctx = { resolve: Resolve; readers: Readers }
+// `gitRuns`: the text writes git config (or sets GIT_CONFIG*), so any later git command may run a
+// written file it never names — through an alias or core.hooksPath (PR #735 round 1).
+type Ctx = { resolve: Resolve; readers: Readers; gitRuns: boolean }
+const configWritten = (text: string, cmds: readonly Command[]) =>
+  /GIT_CONFIG/.test(text) || flat(cmds).some(c => { const ws = split(c.bare); return isGit(ws) && writesConfig(ws) })
 const opaqueName = (f: string) => /[$*?[`{]/.test(f)
 // What usedLater reads of each later command, worked out once per command list, so a script of
 // many redirects is not re-split for every target (final review I4). `from[i]` is where command
 // i's entries start; the commands after i start at `from[i + 1]`. A command's words are joined
 // by NUL, lowercased, so one `includes` per name reads them all (a name holds no NUL).
-type Later = { all: string; rest: string; h: string | undefined; inert: boolean; namer: boolean; reader: boolean; pipe: boolean; hook: boolean; opaque: boolean; names: string[] }
+type Later = { all: string; rest: string; git: boolean; h: string | undefined; inert: boolean; namer: boolean; reader: boolean; pipe: boolean; hook: boolean; opaque: boolean; names: string[] }
 function laters(cmds: readonly Command[], ctx: Ctx): { list: Later[]; from: number[] } {
   const list: Later[] = []
   const from: number[] = []
@@ -272,7 +276,7 @@ function laters(cmds: readonly Command[], ctx: Ctx): { list: Later[]; from: numb
       if ((h === 'mv' || h === 'cp') && ws.length > 1) to.push(ws[ws.length - 1]!)
       const next = to.map(ctx.resolve)
       const low = ws.map(w => w.toLowerCase())
-      list.push({ all: low.join('\0'), rest: low.slice(1).join('\0'), h, inert: isInert(c.bare), namer: namer(ws), reader: isReader(ws, ctx.readers), pipe: c.pipe,
+      list.push({ all: low.join('\0'), rest: low.slice(1).join('\0'), git: isGit(ws), h, inert: isInert(c.bare), namer: namer(ws), reader: isReader(ws, ctx.readers), pipe: c.pipe,
         hook: next.some(hook), opaque: next.some(opaqueName), names: next.map(t => base(clean(t)).toLowerCase()).filter(n => n !== '') })
     }
   })
@@ -289,6 +293,7 @@ function usedLater(raw: readonly string[], later: readonly Later[], ctx: Ctx, st
   for (let k = start; k < later.length; k++) {
     const c = later[k]!
     if (c.h === undefined) continue
+    if (ctx.gitRuns && c.git) return true
     if (!c.inert && !c.namer) {
       if (c.reader) continue
       if (named(c.all) || /[$*?[]/.test(c.h)) return true
@@ -352,8 +357,9 @@ function resolver(parts: readonly Command[]): Resolve {
   }
 }
 // sed runs shell code through its `e` command and `s///e` flag.
-// sed's arguments as the shell passes them: a quoted script stays one word (`'1p;e cmd'`).
-const argv = (text: string) => (text.match(/'[^']*'|"(?:\\.|[^"\\])*"|[^\s'"]+/g) ?? []).map(clean)
+// sed's arguments as the shell passes them: a quoted script stays one word (`'1p;e cmd'`), and
+// adjacent quoted and bare pieces join into one (`'s/x/y/'e` is `s/x/y/e`; PR #735 round 1).
+const argv = (text: string) => (text.match(/(?:'[^']*'|"(?:\\.|[^"\\])*"|[^\s'"]+)+/g) ?? []).map(clean)
 // 0.5.0 shape B: a wider safe sed. Options from -n -E -r -s -z -u, -e SCRIPT and -i (with a
 // suffix); each script a `;`/newline list of `s<d>re<d>repl<d>[gpiImM0-9]*` or an address plus
 // p, d, q or =. No e, w, W, r, R command or flag; no -i target that is a git control path.
@@ -576,7 +582,7 @@ function reading(command: string, readers: Readers): Reading {
   })
   const parts = commands(stubbed)
   const pg = parts === undefined ? undefined : groups(parts)
-  const ctx0: Ctx = { resolve: resolver(parts ?? []), readers }
+  const ctx0: Ctx = { resolve: resolver(parts ?? []), readers, gitRuns: configWritten(stubbed, parts ?? []) }
   let pl: ReturnType<typeof laters> | undefined
   const kept = parts === undefined || pg === undefined || writes.some(w => {
     const i = parts.findIndex(c => c.end >= w.end)
@@ -591,10 +597,11 @@ function reading(command: string, readers: Readers): Reading {
   // A process substitution, a kept heredoc, or a function or alias defined in the text (it may
   // shadow an inert name: `echo() { "$@"; }`) keeps the whole bag; so does text whose commands
   // or groups do not parse. A backtick no longer does (0.5.0 cause 5).
-  const cmds = /<<|[<>]\(|\([ \t]*\)|(?:^|[\s;&|(])(?:function|alias)[ \t]/.test(text) ? undefined : parsed
+  // The keywords are read with quotes and backslashes dropped, as Bash reads them (`a""lias`).
+  const cmds = /<<|[<>]\(|\([ \t]*\)/.test(text) || /(?:^|[\s;&|(])(?:function|alias)[ \t]/.test(text.replace(/[\\'"]/g, '')) ? undefined : parsed
   const g = cmds === undefined ? undefined : groups(cmds)
   if (cmds === undefined || g === undefined) return { whole: split(text) }
-  const ctx: Ctx = { resolve: resolver(cmds), readers }
+  const ctx: Ctx = { resolve: resolver(cmds), readers, gitRuns: configWritten(text, cmds) }
   return { groups: judge(cmds, g, ctx), vars: literalVars(command, text, cmds), bag: split(text), values: flat(cmds).filter(c => assignOnly(c.bare)).flatMap(c => split(c.text)), loops: loops(cmds) }
 }
 // The words of parsed commands, one group per command: a command that is not inert keeps all its
