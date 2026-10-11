@@ -1,5 +1,6 @@
 ---
 description: Check external-adversary readiness (codex/claude installed, authed, schema-capable) before a deep critique
+allowed-tools: Read
 ---
 
 # /critique-doctor

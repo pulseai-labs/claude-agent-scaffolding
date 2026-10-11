@@ -1,6 +1,7 @@
 ---
 description: Manage background async critique jobs — status / result / cancel / resume
 argument-hint: <status|result|cancel|resume> [run-id]
+allowed-tools: Read
 ---
 
 # /critique-jobs

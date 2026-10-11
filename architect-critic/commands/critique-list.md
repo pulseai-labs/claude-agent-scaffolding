@@ -1,6 +1,7 @@
 ---
 description: Show recent architect-critic runs
 argument-hint: [--limit N]
+allowed-tools: Read
 ---
 
 # /critique-list

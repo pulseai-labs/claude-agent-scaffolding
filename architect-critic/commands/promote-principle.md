@@ -1,6 +1,7 @@
 ---
 description: Promote a principle to user-global or project-scoped principles.md
 argument-hint: "\"<text>\" [--scope user|project]"
+allowed-tools: Read
 ---
 
 # /promote-principle

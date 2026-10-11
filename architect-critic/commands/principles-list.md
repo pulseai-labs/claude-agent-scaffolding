@@ -1,6 +1,7 @@
 ---
 description: Show the merged principles set (shipped + user + project + memory-bank)
 argument-hint: [--source all|shipped|user|project]
+allowed-tools: Read
 ---
 
 # /principles-list
