@@ -523,7 +523,7 @@ not dispatch — escalate as §6's cap says. Otherwise run `"$oss_bin"
 work_item_dispatched <wi-id>`, then dispatch. This holds for the first run,
 every clarification re-dispatch and every broken-envelope retry.
 
-### The default dispatch (OMP: `task`)
+### The default dispatch
 
 ```text
 Task(subagent_type="ossify:implementer-agent", prompt=<invocation block naming the absolute handoff path>)
