@@ -102,7 +102,7 @@ PRFIX=<command> | model: <expected model> | effort: <effort> | model_shows: <ban
 PRIOR_REVIEW=<the prior dispatch's durable review record — ran, reviewed head,
 clean/findings state, summary, fix rounds run, ledger/comment refs — "none", or "covered">
 MERGE_EXECUTOR=<session|operator — the top's explicit assignment>
-STOPPING_RULE=<the rule agreed before the PR opened>
+STOPPING_RULE=<`merge-bar` where merge-bar is installed; otherwise the rule agreed before the PR opened>
 Everything you tell the top — a question, the round summary, the merge ask, your report —
 goes in your report file at REPORT_PATH; then wait, or stop where this brief says so. Your
 first herdr command is `herdr --skill`. MECHANICS addresses a run's orchestrator, which for
@@ -170,7 +170,8 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      `MECHANICS` step 2). A post-disposition finding returns through a blocking question to the
      top before any seat acts on it, never fixed by you or silently deferred. Relay ONE batched
      summary per round; STOPPING_RULE decides when fixing stops, counting the fix rounds
-     PRIOR_REVIEW carries.
+     PRIOR_REVIEW carries. `merge-bar` means `/ossify:work-pr` runs `working-a-pr`, whose
+     round stop decides and whose Merge bar is never narrowed by a stopping rule.
   6. When the gate is clean, ask the top for the merge word. MERGE_EXECUTOR
      is the top's explicit assignment, not something you infer — never parse
      permission settings, never probe by attempting a merge. On `session`: on
