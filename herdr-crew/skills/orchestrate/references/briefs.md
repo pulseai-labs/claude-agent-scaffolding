@@ -81,6 +81,7 @@ SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
 PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
 SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
+PR_BODY_TEMPLATE=<the installed merge-bar's `skills/opening-a-pr/references/pr-body.md`, pasted verbatim; ossify's `skills/work-pr/references/pr-body.md` where only ossify is installed; `none` only where neither is>
 ROLE: implementer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path>, branch <branch>, base <base-branch>. Use git -C for every
@@ -95,8 +96,13 @@ to your report file at REPORT_PATH, then wait. Implement only what the orchestra
 reply approves.
 
 DONE: commit on <branch> with messages written to a file under SCRATCH_DIR and `git commit -F`; push;
-open the PR from the worktree with `gh pr create --repo <owner/repo> --base
-<base-branch> --head <branch>`. Then write your report file with this body:
+write the PR body to a file under SCRATCH_DIR — every section of the repository's own PR
+template first, if it has one, kept and filled; then PR_BODY_TEMPLATE's headings in order,
+the Merge bar block word for word, each field filled as its "Filling each field" line says,
+Evidence only from commands you ran (where it is `none`: what changed and the test commands
+with their results) — and open the PR from the worktree with `gh pr create --repo
+<owner/repo> --base <base-branch> --head <branch> --title "<title>" --body-file <that file>`.
+Then write your report file with this body:
   Changed: <commit SHAs and the count of files touched>
   Evidence: <each test command with its pass and fail counts; full output in the report>
   PR: <number and head SHA>
@@ -121,6 +127,7 @@ SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
 PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
 SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
+PR_BODY_TEMPLATE=<the installed merge-bar's `skills/opening-a-pr/references/pr-body.md`, pasted verbatim; ossify's `skills/work-pr/references/pr-body.md` where only ossify is installed; `none` only where neither is>
 ROLE: implementer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path>, branch <branch>, base <base-branch>. Use git -C for every
@@ -129,9 +136,14 @@ git command; cd does not persist.
 TASK: <one bounded change, with the exact test command that proves it>.
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
-DONE: commit with a message written to a file under SCRATCH_DIR and `git commit -F`; push; <open the PR
-from the worktree with `gh pr create --repo <owner/repo> --base <base-branch> --head
-<branch> | push to the existing PR>. Then write your report file with this body:
+DONE: commit with a message written to a file under SCRATCH_DIR and `git commit -F`; push; <write
+the PR body to a file under SCRATCH_DIR — every section of the repository's own PR template
+first, if it has one, kept and filled; then PR_BODY_TEMPLATE's headings in order, the Merge
+bar block word for word, each field filled as its "Filling each field" line says, Evidence only
+from commands you ran (where it is `none`: what changed and the test commands with their
+results) — and open the PR from the worktree with `gh pr create --repo <owner/repo> --base
+<base-branch> --head <branch> --title "<title>" --body-file <that file>` | push to the existing
+PR>. Then write your report file with this body:
   Changed / Evidence / PR / Open / Files as ids, SHAs, counts and a report path.
 
 MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
