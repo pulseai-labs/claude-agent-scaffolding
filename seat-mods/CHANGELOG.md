@@ -2,6 +2,15 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.4.0 — 2026-10-12
+
+- **OMP guard.** `omp/extension.ts` applies the shared rules (`hooks/rules.ts`) to OMP's
+  `tool_call`: `bash`, `write`, `edit`, `ast_edit` and `eval`, in the main session and in `task`
+  children. A child is read by agent name: `reviewer` and `scout` get the reviewer rails; `implementer`,
+  `task` and any other name get the verifier rails (no commit, push or PR). It loads only through
+  `omp-roles`' `omp-seat`. Helper calls inside `eval` are a known limit. The Claude hooks module is
+  unchanged.
+
 ## 0.3.2 — 2026-10-09
 
 - **A lone `&` is a command boundary on every `COMMANDS`-split rail** (#723, a fail-open

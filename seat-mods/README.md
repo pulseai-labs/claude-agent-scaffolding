@@ -201,8 +201,20 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
   hooks modules behind a rollout flag (`tengu_plugin_hooks_modules`).
 - Claude Code only. Codex has no mod runtime.
 
+## OMP
+
+`omp/extension.ts` is the same guard for OMP, over the same `hooks/rules.ts`. It loads only through `omp-roles`' `omp-seat` (`-e`, never ambient), so a plain `omp` session stays unguarded. The main session follows `SEAT_MODS_ROLE`; a `task` child inherits its parent's env, so the guard reads the child's agent name:
+
+| Child agent | Rails |
+|---|---|
+| `implementer`, `task`, any other name | verifier: no commit, push or PR; writes in the worktree and `SEAT_MODS_ALLOW` (an `implementer` child stages and never commits) |
+| `reviewer`, `scout` | reviewer: writes only in `SEAT_MODS_ALLOW`; `eval` and `debug` blocked |
+
+A child may not spawn (`task` blocked). **Known limit:** helper calls inside `eval` fire no `tool_call`, so the guard reads `eval` source as best-effort command text; git hooks stay the rail for the rest.
+
 ## Tests
 
 ```bash
 bash seat-mods/run-tests.sh   # claude plugin validate + claude plugin test
+bun test omp/                 # repo root: the OMP guard (omp/tests/seat-mods.test.ts)
 ```
