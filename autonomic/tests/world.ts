@@ -18,7 +18,7 @@ export type World = {
   submits: Array<{ text: string; origin: unknown }>   // prompts that reached the bottom
   hasBox: boolean
   session: { id: string; cwd: string }
-  git: { top?: string; branch?: string; originHead?: string }
+  git: { top?: string; branch?: string; originHead?: string; merged?: string[] }   // merged: refs merge-base --is-ancestor reports as merged (0.5.1 §5)
   forks: Fork[]                // the fork's replies, in order; none left means empty-reply
   forkPrompts: string[]
   verdict: { decision: 'allow' | 'ask' | 'deny'; reason?: string }
@@ -92,6 +92,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
       if (a.includes('--show-toplevel')) return w.git.top === undefined ? fail() : ok(`${w.git.top}\n`)
       if (a.includes('--abbrev-ref')) return w.git.branch === undefined ? fail() : ok(`${w.git.branch}\n`)
       if (a.includes('symbolic-ref')) return w.git.originHead === undefined ? fail() : ok(`${w.git.originHead}\n`)
+      if (a.includes('merge-base --is-ancestor')) return (w.git.merged ?? []).includes(argv[argv.length - 2]!) ? ok() : fail()
       return fail()
     }
     if (argv[0] === 'sh' && argv[2] === APPEND) {
