@@ -270,6 +270,29 @@ oss_ledger_expired_deferrals() { # $1=state $2=release
   printf '%s\n' "$out" | awk -F'\t' '$3 == "due" { f = 1 } END { exit f ? 1 : 0 }'
 }
 
+# #726 part 2: a research spine planned with a time-box escape closes on an
+# honest negative result. The line becomes `escaped` - terminal, never walked
+# again, and distinct from `retired` (the flow is not gone; it failed under a
+# pre-declared escape). The clause is quoted from SPINE.md; the words are the
+# operator's. Only the owning spine, only user: lines.
+oss_ledger_escape() { # $1=state $2=line-id $3=spine $4=escape-clause $5=operator-reason
+  _oss_ledger_require_line "$1" "$2" || return $?
+  jq -e --arg s "$3" '.spines[] | select(.id == $s)' "$1" >/dev/null 2>&1 \
+    || { echo "oss: unknown spine '$3'" >&2; return 7; }
+  local ty src st
+  ty="$(_oss_ledger_field "$1" "$2" type)"; src="$(_oss_ledger_field "$1" "$2" source_spine)"
+  st="$(_oss_ledger_field "$1" "$2" status)"
+  [ "$ty" = user ] || { echo "oss: line '$2' is an $ty: line - only a user: line can close under an escape" >&2; return 2; }
+  [ "$src" = "$3" ] || { echo "oss: line '$2' belongs to spine '$src', not '$3'" >&2; return 2; }
+  case "$st" in active|deferred) ;; *)
+    echo "oss: line '$2' is '$st' - only an active or deferred line can close under an escape" >&2; return 2;; esac
+  [ -n "${4//[[:space:]]/}" ] || { echo "oss: an escape needs the escape clause quoted from SPINE.md" >&2; return 2; }
+  [ -n "${5//[[:space:]]/}" ] || { echo "oss: an escape needs the operator's ruling, in their words" >&2; return 2; }
+  oss_state_mutate "$1" set_demo_line_status \
+    "$(jq -n --arg id "$2" --arg s "$3" --arg c "$4" --arg r "$5" \
+        '{id:$id,status:"escaped",by:$s,reason:$r,clause:$c}')"
+}
+
 oss_ledger_add_patch() { # $1=state $2=commit $3=one-liner $4=repo-key
   local repo
   # #272/#310 Task 5: same if-form default resolution as the nine Task 4

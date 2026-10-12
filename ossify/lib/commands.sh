@@ -146,6 +146,7 @@ oss_cmd_expired_fakes()        { _oss_need 1 expired_fakes "<release>" "$@" || r
 oss_cmd_expired_quarantines()  { _oss_need 1 expired_quarantines "<release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_expired_quarantines "$sf" "$1"; }
 oss_cmd_ledger_defer()      { _oss_need 4 ledger_defer "<line> <spine> <operator-reason> <release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_defer "$sf" "$1" "$2" "$3" "$4"; }
 oss_cmd_expired_deferrals() { _oss_need 1 expired_deferrals "<release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_expired_deferrals "$sf" "$1"; }
+oss_cmd_ledger_escape() { _oss_need 4 ledger_escape "<line> <spine> <escape-clause> <operator-reason>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_escape "$sf" "$1" "$2" "$3" "$4"; }
 oss_cmd_patch_add() { # $1=commit $2=text [$3=repo-key]
   _oss_need 2 patch_add "<commit-sha> <text> [repo-key]" "$@" || return 2;
   local sf repo; sf="$(_oss_resolve_state)" || return $?
