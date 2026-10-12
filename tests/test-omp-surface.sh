@@ -109,7 +109,7 @@ check_module() { # $1=root $2=plugins (spec B §5.1 check 6)
     [ -f "$f" ] || continue
     cmp -s "$f" "$r/omp/bin-path.ts" || echo "module: ${f#"$r"/} differs from omp/bin-path.ts"
   done
-  for p in $2; do
+  for p in $2 $OMP_ONLY; do   # OMP-only plugins are never in $2 but ship bin/ (omp-roles)
     if [ -d "$r/$p/bin" ] && [ ! -f "$r/$p/omp/bin-path.ts" ]; then echo "module: $p has bin/ but ships no omp/bin-path.ts"; fi
   done
 }
@@ -129,7 +129,7 @@ make_fixture() { # $1=dir
     mkdir -p "$d/$p/.claude-plugin"; printf '{"name":"%s","version":"1.0.0"}\n' "$p" > "$d/$p/.claude-plugin/plugin.json"
   done
   for p in $OMP_ONLY; do
-    mkdir -p "$d/$p"; printf '{"name":"%s","version":"0.1.0"}\n' "$p" > "$d/$p/package.json"
+    mkdir -p "$d/$p/bin" "$d/$p/omp"; printf '{"name":"%s","version":"0.1.0"}\n' "$p" > "$d/$p/package.json"
   done
   for p in $OMP_SIX; do
     mkdir -p "$d/$p/.claude-plugin" "$d/$p/skills/$p-s" "$d/$p/commands"
@@ -139,6 +139,7 @@ make_fixture() { # $1=dir
   done
   mkdir -p "$d/omp" "$d/ossify/bin" "$d/ossify/omp"
   printf 'export const VERSION = 1;\n' > "$d/omp/bin-path.ts"; cp "$d/omp/bin-path.ts" "$d/ossify/omp/"
+  for p in $OMP_ONLY; do cp "$d/omp/bin-path.ts" "$d/$p/omp/"; done
 }
 findings() { # $1=root $2=plugins -> all findings of all checks
   check_catalog "$1"; check_wrappers "$1" "$2"; check_descriptions "$1" "$2"; check_names "$1" "$2"; check_paths "$1" "$2"; check_module "$1" "$2"
@@ -170,6 +171,7 @@ control old-ref         "names a moved reference"   'printf "see references/%s/l
 control root-manifest   "root plugin.json present"  'printf "{}\n" > ossify/plugin.json'
 control module-drift    "module: ossify/omp/bin-path.ts differs" 'printf "// drift\n" >> ossify/omp/bin-path.ts'
 control module-missing  "module: ossify has bin/"   'rm ossify/omp/bin-path.ts'
+control module-missing-omp-only "module: omp-roles has bin/" 'rm omp-roles/omp/bin-path.ts'
 
 # The shipped tree. Checks 2-4 apply only to GATED_PLUGINS; checks 1 and 5 always.
 out=$(findings "$ROOT" "$GATED_PLUGINS")
