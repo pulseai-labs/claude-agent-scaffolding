@@ -1,0 +1,28 @@
+#!/usr/bin/env bun
+// omp-seat <role> [--via <command>] [omp args...] — launch an OMP seat with the guard, molt and
+// autonomic extensions pinned by -e. Calls no multiplexer; the launcher sets SEAT_MODS_ROLE etc.
+import { spawnSync } from 'node:child_process'
+import { join, dirname } from 'node:path'
+import { realpathSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { planLaunch, pinWarning, testedVersion } from '../omp/seat'
+import { ompRecordPath } from '../omp/bin-path'
+
+const here = dirname(realpathSync(process.argv[1]))
+const [role, ...rest] = process.argv.slice(2)
+let via = 'omp'
+const args: string[] = []
+for (let i = 0; i < rest.length; i++) {
+  if (rest[i] === '--via' && rest[i + 1] !== undefined) { via = rest[++i]; continue }
+  args.push(rest[i])
+}
+if (role === undefined) { console.error('usage: omp-seat <role> [--via <command>] [omp args...]'); process.exit(2) }
+const home = homedir()
+const plan = planLaunch({ role, via, args, ompRecord: ompRecordPath(home),
+  claudeRecord: join(home, '.claude', 'plugins', 'installed_plugins.json'), rolesDir: join(here, '..', 'roles') })
+if ('error' in plan) { console.error(plan.error); process.exit(2) }
+const v = spawnSync(via, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 15_000 })
+const warn = pinWarning(v.stdout ?? '', testedVersion(join(here, '..', 'package.json')))
+if (warn !== undefined) console.error(warn)
+const r = spawnSync(plan.argv[0], plan.argv.slice(1), { stdio: 'inherit' })
+process.exit(r.status ?? 1)
