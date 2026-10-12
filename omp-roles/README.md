@@ -12,10 +12,12 @@ omp plugin install molt@claude-agent-scaffolding
 omp plugin install autonomic@claude-agent-scaffolding
 ```
 
-Put the launcher on `PATH` (the plugin's `bin/omp-seat` lands with a later task of this pack):
+Put the launcher on `PATH`. `omp plugin list` shows the installed version; the path is in the install record:
 
 ```bash
-ln -s "$(ls -d ~/.omp/plugins/cache/plugins/claude-agent-scaffolding___omp-roles___*/ | tail -n 1)bin/omp-seat" ~/.local/bin/omp-seat
+ln -sf "$(jq -r '.plugins["omp-roles@claude-agent-scaffolding"][0].installPath' ~/.omp/plugins/installed_plugins.json)/bin/omp-seat" ~/.local/bin/omp-seat
 ```
+
+Run it again after an upgrade: the link points at one version's folder. `omp-seat` needs `bun`.
 
 Pinned and tested on omp 18.8.9; an upgrade is a PR.
