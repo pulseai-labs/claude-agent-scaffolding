@@ -3,7 +3,7 @@
 // for the main session and ctx.agent.name for a task child, whose env is its parent's.
 import { realpathSync, existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { dirname, basename, resolve } from 'node:path'
+import { dirname, basename } from 'node:path'
 import {
   parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, placeOf, decide,
   uncheckedRmText, invalidText, statusText,
@@ -26,7 +26,8 @@ export function childRole(name: string | undefined): Role {
 }
 
 export function roleFor(env: string | undefined, agent: Agent): RoleState {
-  if (agent?.kind !== undefined && agent.kind !== 'main') return { kind: 'on', role: childRole(agent.name) }
+  // Only the main session follows the env; anything else, a missing agent included, is a child (fail closed).
+  if (agent?.kind !== 'main') return { kind: 'on', role: childRole(agent?.name) }
   return parseRole(env)
 }
 
@@ -60,7 +61,7 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
   if (state.kind === 'free') return undefined
   if (state.kind === 'invalid') return invalidText(state.value)
   const role = state.role
-  const child = agent?.kind !== undefined && agent.kind !== 'main'
+  const child = agent?.kind !== 'main'
 
   if (toolName === 'task' && child) return spawnDeny(role)
   if (RUNS_CODE.has(toolName) && role === 'reviewer') return runDeny(role, toolName)
@@ -73,7 +74,7 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
         const removals = []
         for (const operand of rmTargets(command)) {
           const [root, allow] = await Promise.all([deps.worktree(), allowOf(deps)])
-          const target = operand.path === undefined ? undefined : await deps.real(resolve(deps.cwd, homeOf(operand.path, deps.env.HOME)))
+          const target = operand.path === undefined ? undefined : await removalPath(deps, operand.path, operand.glob)
           removals.push(removalOf(target, root, allow, operand.glob))
         }
         const deny = decide(role, { kind: 'bash', rules: bashRules(command, texts.join('\n')), removals })
@@ -90,7 +91,7 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
   const [root, allow] = await Promise.all([deps.worktree(), allowOf(deps)])
   if (targets.length === 0) return decide(role, { kind: 'write', place: 'outside' })
   for (const path of targets) {
-    const target = await deps.real(resolve(deps.cwd, path))
+    const target = await deps.real(absolute(deps.cwd, path))
     const place = target === undefined || root === undefined ? 'outside' : placeOf(target, root, allow)
     const deny = decide(role, { kind: 'write', place })
     if (deny !== undefined) return deny
@@ -98,8 +99,25 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
   return undefined
 }
 
-// rmTargets leaves an active leading tilde in place (register.ts removalPath expands it); resolve()
-// would read `~/x` as a folder named `~` under cwd, inside the worktree.
+// The absolute path, NOT normalised: path.resolve collapses `..` before symlinks resolve, so
+// `link/../x` would be checked as `<wt>/x` while the OS writes beside link's target. real() sees
+// the raw path and fails closed on an unresolvable `..` (as register.ts does).
+function absolute(cwd: string, path: string): string {
+  return path.startsWith('/') ? path : `${cwd}/${path}`
+}
+
+// rm's operand placed as register.ts removalPath does: the parent resolves through links and the final
+// component stays literal (rm unlinks a terminal symlink); a glob or a trailing / . .. follows the directory.
+async function removalPath(deps: GuardDeps, operand: string, glob: boolean): Promise<string | undefined> {
+  const path = absolute(deps.cwd, homeOf(operand, deps.env.HOME))
+  if (glob || /\/(?:\.|\.\.)?$/.test(path)) return deps.real(path)
+  const cut = path.lastIndexOf('/')
+  const parent = await deps.real(cut === 0 ? '/' : path.slice(0, cut))
+  return parent === undefined ? undefined : `${parent.replace(/\/$/, '')}/${path.slice(cut + 1)}`
+}
+
+// rmTargets leaves an active leading tilde in place (register.ts removalPath expands it); a bare
+// absolute() would read `~/x` as a folder named `~` under cwd, inside the worktree.
 function homeOf(path: string, home: string | undefined): string {
   if (path !== '~' && !path.startsWith('~/')) return path
   if (home === undefined || !home.startsWith('/')) throw new Error('rm operand needs HOME')
@@ -132,13 +150,13 @@ function depsFor(ctx: any): GuardDeps {
       return realOf(top.status === 0 ? top.stdout.trim() : cwd)
     },
     real: async (p: string) => realOf(p),
-    readFile: async (p: string) => readFileSync(resolve(cwd, p), 'utf8'),
+    readFile: async (p: string) => readFileSync(absolute(cwd, p), 'utf8'),
   }
 }
 
 export default function (pi: any) {
   pi.on('session_start', (_e: any, ctx: any) => {
-    if (ctx.agent?.kind === undefined || ctx.agent.kind === 'main') ctx.ui?.setStatus?.('seat-mods', statusText(roleFor(process.env.SEAT_MODS_ROLE, ctx.agent)))
+    if (ctx.agent?.kind === 'main') ctx.ui?.setStatus?.('seat-mods', statusText(roleFor(process.env.SEAT_MODS_ROLE, ctx.agent)))
   })
   pi.on('tool_call', async (e: any, ctx: any) => {
     // A throw in a tool_call handler blocks the call (fail closed, doc 018).

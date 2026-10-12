@@ -9,7 +9,7 @@ const deps = (over: Partial<Parameters<typeof guard>[0]> = {}) => ({
   readFile: async () => '',
   ...over,
 })
-const child = (name: string) => ({ kind: 'task', name })
+const child = (name: string) => ({ kind: 'sub', name })
 
 describe('roles', () => {
   test('implementer, task and unknown children get the verifier profile (planner decision 1)', () => {
@@ -73,6 +73,25 @@ describe('guard', () => {
     expect(await guard(deps(), 'bash', { command: 'rm ~/x' }, child('implementer'))).toContain('no rm outside')
     expect(await guard(deps({ env: { SEAT_MODS_ROLE: 'coordinator' } }), 'bash', { command: 'rm ~/x' }, child('implementer'))).toContain('could not be checked')
     expect(await guard(deps(), 'bash', { command: 'rm junk.txt' }, child('implementer'))).toBeUndefined()
+  })
+  test('a path whose real() is unresolvable (a .. below a link) is denied for write, edit and rm', async () => {
+    const seen: string[] = []
+    const d = deps({ real: async (p: string) => { seen.push(p); return p.includes('..') ? undefined : p.startsWith('/') ? p : `/repo/wt/${p}` } })
+    expect(await guard(d, 'write', { path: 'link/../x' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(d, 'edit', { paths: ['link/../x'] }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(d, 'bash', { command: 'rm link/../x' }, child('implementer'))).toContain('no rm outside')
+    expect(seen).toContain('/repo/wt/link/../x') // the raw absolute path reaches real(), not a collapsed one
+  })
+  test('rm resolves the parent and keeps the final component literal', async () => {
+    const seen: string[] = []
+    const d = deps({ real: async (p: string) => { seen.push(p); return p === '/repo/wt/sub' ? '/outside' : p } })
+    expect(await guard(d, 'bash', { command: 'rm sub/f' }, child('implementer'))).toContain('no rm outside')
+    expect(seen).toContain('/repo/wt/sub')
+  })
+  test('a missing agent is guarded as a child, whatever SEAT_MODS_ROLE says', async () => {
+    expect(roleFor('coordinator', undefined)).toEqual({ kind: 'on', role: 'verifier' })
+    expect(await guard(deps(), 'bash', { command: 'git push origin HEAD' }, undefined)).toContain('no git push')
+    expect(await guard(deps(), 'bash', { command: 'git push origin HEAD' }, { kind: 'main' })).toBeUndefined()
   })
   test('invalid SEAT_MODS_ROLE blocks every call', async () => {
     expect(await guard(deps({ env: { SEAT_MODS_ROLE: 'bogus' } }), 'read', { path: 'a' }, { kind: 'main' })).toContain('is not a role')
