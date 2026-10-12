@@ -34,7 +34,7 @@ export function roleFor(env: string | undefined, agent: Agent): RoleState {
 const WRITE_TOOLS = new Set(['write', 'edit', 'ast_edit'])
 // Every path a write-class call can touch. omp fills `path`/`paths` from an edit's section headers only, so an
 // edit's other destinations are read from where they live: `rename`, `edits[].path`/`rename`, and the hashline
-// `MV <dest>` lines of `input`.
+// `MV <dest>` lines of `input`, and apply_patch's file and `Move to:` headers.
 export function writeTargets(toolName: string, input: Record<string, unknown>): string[] | undefined {
   if (!WRITE_TOOLS.has(toolName)) return undefined
   const found = new Set<string>()
@@ -46,7 +46,12 @@ export function writeTargets(toolName: string, input: Record<string, unknown>): 
     if (Array.isArray(input.edits))
       for (const e of input.edits) if (e !== null && typeof e === 'object') { add((e as Record<string, unknown>).path); add((e as Record<string, unknown>).rename) }
     if (typeof input.input === 'string')
-      for (const line of input.input.split('\n')) { const t = line.trim(); if (t.startsWith('MV ')) add(t.slice(3).trim()) }
+      for (const line of input.input.split('\n')) {
+        const t = line.trim()
+        if (t.startsWith('MV ')) add(t.slice(3).trim())
+        const patch = /^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$/.exec(t) // apply_patch mode
+        if (patch !== null) add(patch[1].trim())
+      }
   }
   return [...found]
 }

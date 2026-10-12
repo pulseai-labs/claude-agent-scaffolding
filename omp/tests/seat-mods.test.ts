@@ -150,6 +150,10 @@ describe('edit destinations (fix wave 1)', () => {
       .toEqual(['a.ts', '/o/d.ts', '/o/b.ts', '/o/c.ts', '/o/e.ts'])
     expect(writeTargets('write', { path: 'a.ts', rename: '/o/x' })).toEqual(['a.ts'])
   })
+  test("apply_patch input names its files in `*** Add/Update/Delete File:` and `*** Move to:` lines", () => {
+    const input = '*** Begin Patch\n*** Update File: src/a.py\n*** Move to: /o/b.py\n@@\n-x\n+y\n*** Add File: /o/c.py\n+z\n*** Delete File: /o/d.py\n*** End Patch'
+    expect(writeTargets('edit', { input })).toEqual(['src/a.py', '/o/b.py', '/o/c.py', '/o/d.py'])
+  })
   test('an implementer child cannot MV out of the worktree, nor rename through edits[]', async () => {
     expect(await guard(deps(), 'edit', { paths: ['src/a.ts'], input: '[src/a.ts]\nMV /outside/a.ts' }, child('implementer'))).toContain('no writes outside')
     expect(await guard(deps(), 'edit', { path: 'a.ts', edits: [{ path: '/outside/b.ts' }] }, child('implementer'))).toContain('no writes outside')
