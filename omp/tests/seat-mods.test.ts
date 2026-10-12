@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { childRole, roleFor, writeTargets, guard } from '../../seat-mods/omp/extension'
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { childRole, roleFor, writeTargets, guard, realOf } from '../../seat-mods/omp/extension'
 
 const deps = (over: Partial<Parameters<typeof guard>[0]> = {}) => ({
   env: { SEAT_MODS_ROLE: 'coordinator', SEAT_MODS_ALLOW: '/tmp/allow', HOME: '/home/u' } as Record<string, string | undefined>,
@@ -95,5 +98,32 @@ describe('guard', () => {
   })
   test('invalid SEAT_MODS_ROLE blocks every call', async () => {
     expect(await guard(deps({ env: { SEAT_MODS_ROLE: 'bogus' } }), 'read', { path: 'a' }, { kind: 'main' })).toContain('is not a role')
+  })
+})
+
+describe('realOf on a real file system', () => {
+  // bun's realpathSync collapses `..` lexically, before the kernel follows a link: link/.. read as the
+  // link's own folder. (Paths are built with template strings: path.join would collapse the `..` itself.) The live OMP run (omp 18.8.9) let a child write through `link/../x.txt` until realOf walked `..` itself.
+  const fx = realpathSync(mkdtempSync(join(tmpdir(), 'realof-')))
+  mkdirSync(join(fx, 'repo', 'src'), { recursive: true })
+  mkdirSync(join(fx, 'outside'))
+  symlinkSync(join(fx, 'outside'), join(fx, 'repo', 'link'))
+  writeFileSync(join(fx, 'repo', 'a.txt'), 'a')
+  test('.. below a link is read where the kernel lands: beside the link target, not beside the link', () => {
+    expect(realOf(`${fx}/repo/link/../x.txt`)).toBe(join(fx, 'x.txt'))
+    expect(realOf(`${fx}/repo/link/../repo/a.txt`)).toBe(join(fx, 'repo', 'a.txt'))
+  })
+  test('a guard over the real file system denies a child write through link/../x.txt but not src/../x.txt', async () => {
+    const d = deps({ cwd: join(fx, 'repo'), worktree: async () => join(fx, 'repo'), real: async (p: string) => realOf(p), env: { SEAT_MODS_ROLE: 'coordinator' } })
+    expect(await guard(d, 'write', { path: `${fx}/repo/link/../x.txt` }, child('task'))).toContain('no writes outside')
+    expect(await guard(d, 'write', { path: `${fx}/repo/src/../x.txt` }, child('task'))).toBeUndefined()
+  })
+  test('plain paths are unchanged: an existing file, a new file in an existing folder, a link', () => {
+    expect(realOf(join(fx, 'repo', 'a.txt'))).toBe(join(fx, 'repo', 'a.txt'))
+    expect(realOf(join(fx, 'repo', 'src', 'new', 'b.txt'))).toBe(join(fx, 'repo', 'src', 'new', 'b.txt'))
+    expect(realOf(join(fx, 'repo', 'link', 'f.txt'))).toBe(join(fx, 'outside', 'f.txt'))
+  })
+  test('.. below a folder that does not exist cannot be resolved', () => {
+    expect(realOf(`${fx}/repo/nope/../x.txt`)).toBeUndefined()
   })
 })

@@ -130,13 +130,34 @@ async function allowOf(deps: GuardDeps): Promise<string[]> {
 }
 
 // The path itself if it resolves, else its nearest existing ancestor plus the rest (as register.ts realOf).
-function realOf(path: string): string | undefined {
+// Bun's realpathSync collapses `..` lexically before the kernel follows a link, so `link/..` would read as
+// the link's own folder. A path with a `..` component is therefore walked one component at a time: each
+// step is a `..`-free path (safe to realpath), and `..` takes the parent of the already-resolved folder.
+export function realOf(path: string): string | undefined {
+  const parts = path.split('/')
+  if (!path.startsWith('/') || !parts.includes('..')) return plainRealOf(path)
+  let cur = '/'
+  for (const part of parts) {
+    if (part === '' || part === '.') continue
+    if (part === '..') {
+      if (!existsSync(cur)) return undefined // the kernel cannot step up from a folder that does not exist
+      cur = dirname(cur)
+      continue
+    }
+    const next = plainRealOf(`${cur.replace(/\/$/, '')}/${part}`)
+    if (next === undefined) return undefined
+    cur = next
+  }
+  return cur
+}
+
+function plainRealOf(path: string): string | undefined {
   try { return realpathSync(path) } catch {}
   if (existsSync(path)) return undefined // dangling link
   const folder = dirname(path)
   const name = basename(path)
   if (folder === path || name === '..') return undefined
-  const dir = realOf(folder)
+  const dir = plainRealOf(folder)
   return dir === undefined ? undefined : name === '' || name === '.' ? dir : `${dir.replace(/\/$/, '')}/${name}`
 }
 
