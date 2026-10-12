@@ -2,6 +2,44 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.4.0 — 2026-10-12
+
+- **OMP guard.** `omp/extension.ts` applies the shared rules (`hooks/rules.ts`) to OMP's
+  `tool_call`: `bash`, `write`, `edit`, `ast_edit` and `eval`, in the main session and in `task`
+  children. A child is read by agent name: `reviewer` and `scout` get the reviewer rails; `implementer`,
+  `task` and any other name get the verifier rails (no commit, push or PR). It loads only through
+  `omp-roles`' `omp-seat`. Helper calls inside `eval` are a known limit. The Claude hooks module is
+  unchanged.
+  A child may not spawn: the `task` tool, eval `agent()` and workpool workers are all blocked
+  (`before_subagent_spawn`).
+  **An allow list, not a block list.** Under guarded rails a tool call passes only if its name is in
+  `GUARDED_TOOLS`, which sorts every tool omp 18.8.9 can expose (its built-in and hidden registries, the edit
+  tool's `apply_patch` wire name, and the tools outside them); any other name — `browser`, `computer`,
+  `checkpoint`, memory and skill tools, an MCP or extension tool, a tool a later omp adds — is denied with
+  one generic message. `ask`, `goal` and `task` are the top-level session's only. `lsp` passes omp's read-only
+  actions only, for every guarded role. `github` passes omp's read-only ops; `pr_create` and `pr_push`
+  follow the PR and push rails, `pr_checkout` (a worktree and branch outside, `force` resets one) and any
+  other op are denied, and `forceWithLease` is a force-push. `debug` runs a program, so only an implementer
+  may use it, its launch read like `eval`; a reviewer may not run `eval` either.
+  `edit` is placed by every destination it names (`rename`, `edits[]`, hashline `MV`), and
+  `bash` rm operands and `-F` files resolve against the call's own `cwd`. omp's advisor and `/tan` clones
+  report `kind: "sub"`, so they get the verifier rails even under a coordinator.
+  A write target carrying a URL scheme (`local://`, `vault://`, `ssh://`, `xd://<device>`, also `local:/x` and
+  `dir/local://x`) is outside under guarded rails, because omp routes it to a host file the worktree check cannot see;
+  only `write xd://resolve` and `xd://reject`, which apply or discard an `ast_edit` preview already checked, pass.
+  **One omp path reading.** Every write-class target and a `bash` `cwd` go through one normaliser that mirrors
+  omp's `expandPath`/`resolveToCwd`: a leading `:`, `@` before `/abs` or `~`, unicode spaces, `file://`, `~`,
+  `~/x` and `~user`; a target is also read with write.ts's `[path#HHHH]` header unwrap and the hashline
+  quote/tag strip, and an `ast_edit` scope split on `,` `;` and whitespace and placed by its glob's literal
+  folder, the strictest reading winning. A `bash` or `debug` `cwd` that is an omp URL (`local://scratch`) is
+  outside: `rm` there is denied and a `-F` file there cannot be checked. `rm` operands and `git commit -F` files
+  take the same reading in its shell form: a `scheme:/` operand (`rm local://x`) is outside, because omp's
+  embedded coreutils route it to the backing file; a `-F` file with a scheme cannot be checked; an unquoted
+  `-F ~/msg` is read from HOME (and, since the quotes are not reported, also literally).
+  **Known limit:** the guard reads omp's path dialect only as far as listed here. omp's other selectors
+  (a SQLite `file.sqlite:table:row`, and any later one) are read as plain paths, so a selector through a
+  symlink that points outside the worktree is not caught — the same reach bash writes already have.
+
 ## 0.3.2 — 2026-10-09
 
 - **A lone `&` is a command boundary on every `COMMANDS`-split rail** (#723, a fail-open

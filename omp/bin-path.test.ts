@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach, spyOn } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import factory, { apply, resolveBinDirs, ompRecordPath, prependPath, MARKETPLACE } from "./bin-path";
+import factory, { apply, installPaths, resolveBinDirs, ompRecordPath, prependPath, MARKETPLACE } from "./bin-path";
 
 let root: string, ompRecord: string, claudeRecord: string;
 
@@ -87,6 +87,29 @@ describe("resolveBinDirs", () => {
     const user = install("ossify", "1.15.0");
     record(ompRecord, { [id("ossify")]: [{ scope: "project", installPath: proj }, { scope: "user", installPath: user }] });
     expect(run().dirs).toEqual([join(user, "bin")]);
+  });
+});
+
+describe("installPaths", () => {
+  test("the user-scope entry wins, else the first; only this marketplace's entries", () => {
+    const proj = install("ossify", "1.0.0");
+    const user = install("ossify", "1.15.0");
+    const only = install("molt", "0.3.0");
+    const other = install("ossify", "9.9.9");
+    record(ompRecord, {
+      [id("ossify")]: [{ scope: "project", installPath: proj }, { scope: "user", installPath: user }],
+      [id("molt")]: [{ scope: "project", installPath: only }],
+      [id("ossify", "someone-else")]: [{ scope: "user", installPath: other }],
+    });
+    expect(installPaths(ompRecord)).toEqual(new Map([["ossify", user], ["molt", only]]));
+  });
+  test("an absent file gives an empty map", () => {
+    expect(installPaths(ompRecord)).toEqual(new Map());
+  });
+  test("a file that exists but cannot be parsed throws", () => {
+    mkdirSync(join(ompRecord, ".."), { recursive: true });
+    writeFileSync(ompRecord, "{not json");
+    expect(() => installPaths(ompRecord)).toThrow();
   });
 });
 

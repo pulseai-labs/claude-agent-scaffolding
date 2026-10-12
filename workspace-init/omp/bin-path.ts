@@ -44,6 +44,12 @@ function ours(plugins: Plugins | undefined): Map<string, Entry> {
   return m;
 }
 
+// Plugin name -> installPath for this marketplace's entries in one record (the user-scope entry, else
+// the first). An absent file gives an empty map; a file that exists but cannot be read or parsed throws.
+export function installPaths(record: string): Map<string, string> {
+  return new Map([...ours(load(record))].map(([name, e]) => [name, e.installPath!]));
+}
+
 export function resolveBinDirs(opts: ResolveOpts): { dirs: string[]; warnings: string[] } {
   let omp: Plugins | undefined, claude: Plugins | undefined;
   try { omp = load(opts.ompRecord); } catch (e) {
