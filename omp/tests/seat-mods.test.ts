@@ -293,8 +293,11 @@ describe('PR 762 round 1: URL-scheme write targets', () => {
     // adjacent control: the same confirm is not a way to name a file through any other tool or field
     expect(await guard(deps(), 'edit', { path: 'xd://resolve' }, child('implementer'))).toContain('no writes outside')
     expect(await guard(deps(), 'edit', { path: 'a.ts', input: '[a.ts]\nMV xd://resolve' }, child('implementer'))).toContain('no writes outside')
-    // a reviewer stages nothing, so it has nothing to confirm
-    expect(await guard(deps(), 'write', { path: 'xd://resolve', content: 'x' }, child('reviewer'))).toContain('no edits in the worktree')
+    // the confirm names no file: a reviewer whose preview was staged in SEAT_MODS_ALLOW can apply or clear it (PR 762 round 5)
+    for (const path of ['xd://resolve', 'xd://reject'])
+      expect(await guard(deps(), 'write', { path, content: 'x' }, child('reviewer'))).toBeUndefined()
+    expect(await guard(deps(), 'write', { path: 'xd://bash', content: '{}' }, child('reviewer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'write', { path: 'xd://propose', content: 'x' }, child('reviewer'))).toBeDefined()
   })
   test('an ordinary in-worktree write is still allowed, and a coordinator is free to use local://', async () => {
     expect(await guard(deps(), 'write', { path: 'src/a.ts', content: 'x' }, child('implementer'))).toBeUndefined()
@@ -438,5 +441,13 @@ describe('PR 762 round 3: every path from a tool input goes through the one omp 
   })
   test('rm / is not read as the session cwd (omp\'s `/` rule is for its own path arguments, not shell operands)', async () => {
     expect(await guard(deps(), 'bash', { command: 'rm -rf /' }, child('task'))).toContain('no rm outside')
+  })
+})
+
+describe('PR 762 round 5: a glob scope at the filesystem root is the root, not the session cwd', () => {
+  test('an ast_edit scope whose glob starts at / is outside for a task child', async () => {
+    for (const scope of ['/*.ts', '/{etc,home}/**/*.conf', '/*/u/proj/*.ts', '@/*.ts', ':/*.ts'])
+      expect(await guard(deps(), 'ast_edit', { paths: [scope], pattern: 'a', rewrite: 'b' }, child('task'))).toContain('no writes outside')
+    expect(await guard(deps(), 'ast_edit', { paths: ['src/**/*.ts'], pattern: 'a', rewrite: 'b' }, child('task'))).toBeUndefined()
   })
 })

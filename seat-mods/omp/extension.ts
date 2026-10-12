@@ -129,7 +129,8 @@ function globBase(path: string): string | undefined {
   const rest = path.slice(at)
   if (/(?:^|\/)\.\.(?:\/|$)/.test(rest) || /\{[^}]*(?:\/|\.\.)/.test(rest)) return undefined
   const cut = path.lastIndexOf('/', at)
-  return cut < 0 ? '.' : path.slice(0, cut + 1)
+  // `<folder>/.`, never a bare `/`: omp's `/`-means-cwd rule is for a whole path argument, not a glob's folder.
+  return cut < 0 ? '.' : path.slice(0, cut + 1) + '.'
 }
 
 // Best effort (spec §4.2): eval code is not shell, so read its string literals as commands —
@@ -237,7 +238,7 @@ async function writeCheck(deps: GuardDeps, role: Role, toolName: string, input: 
   for (const raw of targets) {
     // `write xd://resolve` / `xd://reject` confirm or discard a preview an earlier, already-checked ast_edit staged.
     const places: Place[] = []
-    if (toolName === 'write' && CONFIRM_ONLY.test(raw)) places.push('worktree')
+    if (toolName === 'write' && CONFIRM_ONLY.test(raw)) continue // names no file; acts on a preview already placed
     else for (const reading of readings(raw, toolName === 'ast_edit')) {
       const path = toolName === 'ast_edit' ? globBase(reading) : reading
       let abs: string | undefined
