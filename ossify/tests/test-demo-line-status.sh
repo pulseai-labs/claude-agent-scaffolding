@@ -166,5 +166,35 @@ t_assert_rc 0 "a planned failing line no longer reddens the run"
 t_assert_contains "$T_OUT" "PASS 1 lines" "only the active line ran"
 t_assert_contains "$T_OUT" "1 pending" "pending count printed beside PASS"
 
+# --- Task 7: every new verb through the real dispatcher (set -euo pipefail there)
+OSS="$HERE/../bin/oss"
+DTMP="$(mktemp -d)"; export OSS_STATE_FILE="$DTMP/state.json"
+mkdir -p "$DTMP/.ossify"
+cat > "$DTMP/.ossify/topology.json" <<JSON
+{"schema_version":1,"repos":{"canonical":{"root":"$DTMP/canon"}},"well_known_paths":{"project_state":"$OSS_STATE_FILE"}}
+JSON
+cd "$DTMP"
+t_capture "$OSS" init line-status-cli
+t_assert_rc 0 "cli init"
+"$OSS" release_add "R" "goal" >/dev/null
+"$OSS" spine_add r0 "s" bone >/dev/null
+t_capture "$OSS" ledger_add_user r0.s1 "send a message and see it delivered" "delivered"
+t_assert_rc 0 "cli add_user"; CL="$T_OUT"
+t_capture "$OSS" get "[.demo_ledger[] | select(.id==\"$CL\")][0].status"
+t_assert_eq "planned" "$T_OUT" "cli default planned"
+t_capture "$OSS" ledger_activate_spine r0.s1
+t_assert_contains "$T_OUT" "activated 1" "cli activate_spine"
+t_capture "$OSS" ledger_defer "$CL" r0.s1 "operator: later" r1
+t_assert_rc 0 "cli defer"
+t_capture "$OSS" expired_deferrals r1
+t_assert_rc 1 "cli expired_deferrals blocks"
+t_capture "$OSS" ledger_activate "$CL"
+t_assert_rc 0 "cli activate"
+t_capture "$OSS" ledger_escape "$CL" r0.s1 "SPINE.md: escape" "operator: accept"
+t_assert_rc 0 "cli escape"
+t_capture "$OSS" ledger_add_auto r0.s1 "x" "true" "exit:0" active
+t_assert_rc 0 "cli add_auto with explicit active"
+cd "$HERE"; rm -rf "$DTMP"; unset OSS_STATE_FILE
+
 cd "$HERE"; rm -rf "$TMP"
 t_summary
