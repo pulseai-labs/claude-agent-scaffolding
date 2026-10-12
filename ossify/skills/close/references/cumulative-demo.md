@@ -277,6 +277,43 @@ its own — but still owed, because the ledger does not care why a line is red.
 
 ---
 
+## 4a. Planned, deferred, escaped — the three lines that are not a walk today
+
+**`PENDING` is not a failure.** The runner prints `PENDING <id> (planned -> <spine>)`
+for every `planned` auto line, with `<n> pending` beside the `PASS` count. Those are
+spines that authored their lines and have not built them yet — usually not this one.
+This close never activates them: waking another spine's line so this run "sees" it
+is how a sibling's regression gets a passing report. Report the count and move on.
+
+**A `user:` line the operator cannot walk now is deferred, not skipped.**
+
+```bash
+"$oss_bin" ledger_defer "<line>" "$spine_id" "<the operator's words, quoted>" "<release it is due at>"
+```
+
+The reason is **the operator's own words**, and a session never supplies them: a
+deferral on the session's judgment is the same failure as walking the line on the
+operator's behalf. The line is not cleared — it is still owed, now against a release,
+and the release close collects it with the operator present (`release-close.md` §5b).
+
+**An escape closes on a negative result the plan declared.** Only when this spine's
+`SPINE.md` declared the time-box escape at plan time:
+
+```bash
+"$oss_bin" ledger_escape "<line>" "$spine_id" "<escape clause quoted from SPINE.md>" "<the operator's ruling, quoted>"
+```
+
+The clause is quoted from that declaration; the ruling is the operator's. An
+`escaped` line is terminal and is not `retired` — the flow did not go away, it failed
+under a pre-declared escape. **With no declared escape, a failed `user:` line halts
+as it always did**; a time-box is written at plan time or not at all.
+
+**Anti-patterns.** Deferring on the session's own judgment. Escaping without a
+declared escape. Activating another spine's line so this close "sees" it
+(`spine-close.md` §4's `activate_spine` is for this spine's own lines only).
+
+---
+
 ## 5. The wall-clock budget
 
 The ledger's cost is bounded by a budget set at release planning:

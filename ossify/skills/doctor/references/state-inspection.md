@@ -78,6 +78,9 @@ sf="${OSS_STATE_FILE:-$("$oss_bin" state_path)}"
 "$oss_bin" doctor "$sf"           # the gate, on the SAME state the reads below use
 "$oss_bin" get '[.demo_ledger[] | select(((.pending_amendments // []) | length) > 0)] | length' "$sf"
 "$oss_bin" get '[.demo_ledger[] | select(.status == "quarantined")] | length' "$sf"
+"$oss_bin" get '[.demo_ledger[] | select(.status == "planned")] | length' "$sf"
+"$oss_bin" get '[.demo_ledger[] | select(.status == "deferred") | "\(.id) due \(.deferred_until_release // "no-release-anchor")"]' "$sf"
+"$oss_bin" get '[.demo_ledger[] | select(.status == "escaped")] | length' "$sf"
 "$oss_bin" get '[.fakes[] | select(.status == "active" or .status == "renewed")] | length' "$sf"
 "$oss_bin" get '.patch_records | length' "$sf"
 ```
@@ -106,7 +109,7 @@ composed session cannot reassign this surface's `sf` or vice versa.
 | Yours | Reads | Emit |
 |---|---|---|
 | `lock` | `<state>.lock` dir | present → `warn: lock - held (a ceremony may be mid-mutation)`, or if the dir is **>30 min old**, `warn: lock - stale lock dir (>30min): rmdir '<state>.lock' if no ceremony is running`. Absent → `ok: lock - free` |
-| `ledger` | `demo_ledger` | **up to two `warn:` lines, counted separately** — see below |
+| `ledger` | `demo_ledger` | **up to two `warn:` lines, counted separately**, plus the counts of the lines that will not run — see below |
 | `fakes` | `fakes` | count > 0 → `warn: fakes - N outstanding fake(s) carrying a replacement trigger and expiry release`. Zero → `ok: fakes - none outstanding` |
 | `patches` | `patch_records` | count > 0 → `warn: patches - N out-of-spine patch record(s) on this project (the registry is append-only and is not reset at spine close)`. Zero → `ok: patches - no out-of-spine patch records` |
 | `worktrees` | **the repos** | see §4 — one line per repo key |
@@ -123,6 +126,14 @@ amendments and quarantined lines are counted and reported *independently*:
   zero.** A clean line while one counter is dirty is the failure the deleted code
   guarded against explicitly, and its test named it: *"the ledger clean line fired
   while one of its two counters was dirty."*
+
+**The three statuses read here too, and none of them is a warning.** A `planned` line
+is authored and not built yet, a `deferred` one is still owed to a named release, an
+`escaped` one closed on a declared negative result — all three are lines the ledger
+carries that will not run, so name the counts, and each deferral's due release beside
+them (`no-release-anchor` when it has none: that row blocks a release close). They
+stay out of the clean line above; a `planned` line is the normal state of a line whose
+spine is still open.
 
 **Unreadable is `skip:`, never a count and never `ok:`.** All three, spelled out —
 note the check name is not the field name, so do not derive one from the other:

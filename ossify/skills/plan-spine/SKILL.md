@@ -346,9 +346,8 @@ and a bad line is re-run forever.
 is there. Read the **verb the user performs** — the ban is on the action, **not on
 the outcome** (rejecting a line because "see" occurs is the false-reject failure
 mode, §11). Full depth in `references/demo-authoring.md` §3: the banned shapes
-(§3.2), the headless/API-consumer surface (§3.2b), that ban's exact scope —
-action, not outcome (§3.3), worked accept/reject pairs in both directions
-(§3.4), the mechanical backstop's exact scope (§3.5).
+(§3.2), the headless/API-consumer surface (§3.2b), the ban's scope (§3.3), worked
+accept/reject pairs (§3.4), the mechanical backstop's scope (§3.5).
 
 ### 8d. Record the accepted lines
 
@@ -358,20 +357,21 @@ action, not outcome (§3.3), worked accept/reject pairs in both directions
 ```
 
 Each call **prints the minted line id** (`d7`, `d8`, …) — capture it; amendments
-(§8e) are keyed by that id, not by the line's text. `ledger_add_auto` validates
-`<expected>` as `exit:<n>` or `contains:<str>` (exit **2** otherwise) and has **no
-comparison form** — a threshold ("p50 under 40ms") lives inside the command, which
-exits non-zero when it is missed; that is how F4's after-number becomes
-machine-checkable.
+(§8e) key by that id, not the text. Both verbs write the line **`planned`** (its code
+not built yet): this spine's close activates it before the demo, `ledger_activate
+<line-id>` moves it early when a round lands it, and `active` at authoring is
+`adopt`'s case only. `ledger_add_auto` validates `<expected>` as `exit:<n>` or
+`contains:<str>` (exit **2** else), no comparison form — a threshold ("p50 under 40ms")
+lives inside the command, which exits non-zero when missed; that is how F4's
+after-number becomes machine-checkable.
 
 **The mechanical floor is a backstop, not the judge.** `"$oss_bin" ledger_add_user`
 rejects **prefix-only** — `inspect `, `view `, or `open ` at the *start* of the
-text, rc 2 — so *"review the generated schema"* or *"confirm the audit table
-exists"* passes the lib and is still an inspector line. **A rc 0 is not a verdict;
-the judgment is yours.** Full depth in `references/demo-authoring.md`: the six
-floors (§1), the backstop's exact scope and its accepted-but-still-inspector list
-(§3.5), the internal-spine admission procedure (§4), F4 before/after evidence
-(§5), F5 runnability + ledger budget (§6), F6's golden-journey rules (§7).
+text, rc 2 — so *"review the generated schema"* or *"confirm the audit table exists"*
+passes the lib and is still an inspector line. **A rc 0 is not a verdict; the
+judgment is yours.** Full depth in `references/demo-authoring.md`: the six floors (§1),
+the backstop's scope and accepted-but-still-inspector list (§3.5), the internal-spine
+admission (§4), F4 evidence (§5), F5 runnability + budget (§6), F6 (§7).
 
 ### 8e. Amendments
 

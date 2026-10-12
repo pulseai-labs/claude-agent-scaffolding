@@ -122,6 +122,7 @@ O	skills/close/references/release-close.md	spines that are not closed	tests/test
 O	skills/close/references/release-close.md	expired_fakes	tests/test-close.sh	the fake-expiry gate blocks on fakes past their expiry release
 O	skills/close/references/release-close.md	expired_quarantines	tests/test-close.sh	the quarantine gate blocks on quarantines that have come due
 D	skills/close/references/release-close.md	1	#138	the ai_workspace path composition for the release retro is unexecuted
+D	skills/close/references/release-close.md	1	#710	the Step 4b deferral-gate block (expired_deferrals + the stray-planned sweep) is operative and unexecuted: its rc contract is covered in tests/test-demo-line-status.sh, which never extracts this block
 O	skills/close/references/release-close.md	git tag	tests/test-close.sh	the #339 release-tag block, round 2 (T1/T2/T8): per hosting repo via oss repo_root + the recovered base branch, remote resolved never assumed origin, annotated always, resumable only when an existing tag matches the base tip locally AND on the remote (R1-R3 in test-close.sh), and an EMPTY tag set halts rather than tagging nothing (F18/R8), with a route out that reopens the item's closed parent spine instead of re-tagging a repo whose work never landed
 I	skills/close/references/release-close.md	6	single-verb calls: demo_user_lines, ledger_retire, release goal read, feature_list, release_status, release_dir (the retro destination became a release_dir call - the verb is test-worktree.sh's)
 O	skills/close/references/patch-lane.md	touch_check	tests/test-close.sh	a patch touching a bone surface must escalate out of the patch lane
@@ -132,7 +133,7 @@ D	skills/close/references/work-item-close.md	4	#138	path resolution (which now r
 I	skills/close/references/work-item-close.md	1	a single <placeholder> assignment showing the report path's origin
 O	skills/close/references/cumulative-demo.md	elapsed=	tests/test-close.sh	D1-D4: the demo measurement block preserves the runner's rc instead of flattening it
 O	skills/close/references/cumulative-demo.md	evd=	tests/test-close.sh	F3a-g: the quarantine-comparison block disposes of its evidence dir on green, differing, halt, failing-command, lookup-failure, and signal-during-diff paths; P5i: the before-checkout reads a line's before-point, else sha^1
-I	skills/close/references/cumulative-demo.md	4	single-verb calls: demo_run, ledger_quarantine, budget read, demo_record
+I	skills/close/references/cumulative-demo.md	6	single-verb calls: demo_run, ledger_quarantine, budget read, demo_record, and the §4a shapes for ledger_defer and ledger_escape (#710, #726)
 O	skills/close/references/impl-check.md	while IFS=	tests/test-close.sh	the halt loop exits nonzero on the first failing AC and names the row
 I	skills/close/references/impl-check.md	2	single-verb calls: verify_acs, report_cross_check (the harvest_dir resolve went with the verb - the bank path is prose-resolved per close/references/harvest.md §7 now)
 O	skills/work-item/references/round-orchestration.md	repo_bases	tests/test-close.sh	R5: failed fresh-arm state read halts with no caller pipefail, before RECORD, and removes owned temps; valid state still RECORDs/cuts (test-reentry-read-guards.sh). Old-Git portability: simulated old Git rc129 falls back, absent refs RECORD/cut and present refs name re-entry (test-spine-inventory.sh). F-V1: physical malformed loose refs halt before real RECORD; true absence still cuts (test-spine-inventory.sh). E5/E6: show-ref/status failures halt before RECORD and cleanup their temp files; fence runs alone in a fresh shell (test-spine-inventory.sh). W2: the fresh arm runs clean under set -u with NOTHING injected, cuts from the branch the hosting repo is PARKED ON and RECORDS that observed base in state (spine_base_set) BEFORE the cut, so the re-entry arm's cut-missing repair (§2b) re-cuts from it (#133). An existing spine branch halts routing the caller to §2b rather than an open issue (W2b); a detached HEAD halts (W2c). Task 8 (#272/#310) turned the once-per-spine cut into a loop over every repo hosting the spine's items; the test exercises the loop body's guards against a single hosting repo, not the multi-repo iteration itself
@@ -163,7 +164,7 @@ I	skills/close/references/fake-expiry.md	2	an active-fakes read and a single fak
 D	skills/close/references/harvest.md	2	#138	the empty-items halt guard and the memory-bank path composition
 D	skills/close/references/routing.md	1	#138	the id_parse scope router - shares its shape with close/SKILL.md #1
 I	skills/close/references/routing.md	1	a single spine_list call
-I	skills/close/references/retrospective.md	1	a single quarantine read
+I	skills/close/references/retrospective.md	2	the quarantine read and the deferred/escaped read beside it (#710, #726)
 D	skills/plan-release/SKILL.md	3	#138	the state-absent refusal, the touch_check rc-capture, and the release_add capture whose $rel feeds spine_add and release_set_meta
 I	skills/plan-release/SKILL.md	7	single-verb calls with <placeholder> args: release_set_meta x4, feature_add, release_add, class_set, the release_dir resolve+mkdir
 D	skills/plan-release/references/bone-touch-judge.md	2	#138	the two-branch if that folds rc 2 into clean, and the rc-capture form that does not - REL-9 flags the first as a copy trap
@@ -222,22 +223,22 @@ H	skills/adopt/SKILL.md	1739936869-205
 H	skills/challenge/references/adversaries.md	2543440762-995
 H	skills/close/SKILL.md	505737925-398
 H	skills/close/references/code-review.md	460889698-1802
-H	skills/close/references/cumulative-demo.md	3161379839-7815
+H	skills/close/references/cumulative-demo.md	4242933890-8079
 H	skills/close/references/fake-expiry.md	3491573094-743
 H	skills/close/references/harvest.md	1931122618-713
 H	skills/close/references/impl-check.md	3998988429-864
 H	skills/close/references/patch-lane.md	1122131773-2611
-H	skills/close/references/release-close.md	2526010048-13100
-H	skills/close/references/retrospective.md	1694933006-117
+H	skills/close/references/release-close.md	3948276928-13878
+H	skills/close/references/retrospective.md	3019208958-263
 H	skills/close/references/routing.md	2855300955-280
-H	skills/close/references/spine-close.md	3512159532-28423
+H	skills/close/references/spine-close.md	2522283233-28530
 H	skills/close/references/work-item-close.md	3705689758-6494
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	1897652786-133
 H	skills/doctor/references/budget-check.md	2942541912-1024
 H	skills/doctor/references/interop-check.md	3316355601-827
 H	skills/doctor/references/spec-validation.md	943999998-7046
-H	skills/doctor/references/state-inspection.md	778749236-5777
+H	skills/doctor/references/state-inspection.md	3376770911-6074
 H	skills/plan-release/SKILL.md	1733167162-2418
 H	skills/plan-release/references/bone-touch-judge.md	3422967488-1278
 H	skills/plan-release/references/class-declaration.md	2145716635-323

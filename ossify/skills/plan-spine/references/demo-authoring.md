@@ -345,6 +345,13 @@ ceiling. A contribution that will not fit forces a prune / parallelize / deepen
 decision — raise it now, with the user, rather than letting the suite grow past
 its budget silently.
 
+**A line is authored `planned`, not `active`.** Its code does not exist yet, so
+nothing runs it until something makes it live: this spine's close activates its own
+lines before the demo, and `"$oss_bin" ledger_activate <line-id>` moves one early — the
+round barrier or the operator does that when a round lands the code the line tests.
+`active` at authoring is `adopt`'s case alone, since adoption's lines test surface
+that already ships.
+
 ---
 
 ## 7. F6 — Release 0's golden-journey `auto:` line
@@ -408,6 +415,9 @@ notices, the `auto:` line catches the regression nobody walks for.
   offering the existing test suite, or a per-layer set of `auto:` lines, as the
   golden-journey line (§7).
 - **Recording a line you intend to fix later.** The ledger is cumulative.
+- **Passing `active` to `ledger_add_auto` / `ledger_add_user` at plan time** (§6).
+  That is adopt's case alone; here the code does not exist yet, and the line would
+  run at a sibling spine's close reporting the plan as a defect.
 - **Authoring demo lines at roadmap time** — the reason they moved here is that
   roadmap time has no implementation context.
 - **Running the demo here.** `close` owns the run; you author the criteria.

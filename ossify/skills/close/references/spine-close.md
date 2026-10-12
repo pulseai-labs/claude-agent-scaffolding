@@ -717,10 +717,11 @@ not a substitute for this.
 
 ---
 
-## 4. Step 3 — apply the pending demo amendments
+## 4. Step 3 — apply the pending demo amendments, then activate this spine's lines
 
 ```bash
 "$oss_bin" ledger_apply_pending "$spine_id"
+"$oss_bin" ledger_activate_spine "$spine_id"   # this spine's planned lines go active: they must pass here
 ```
 
 `supersede` and `retire` are **planning** verbs: they record intent and leave the
@@ -729,6 +730,13 @@ the intent becomes real, and it runs **after the merge and before the demo** so
 the demo measures the amended line set against a product where the replaced flow
 really is gone. Applying it before the merge measures a promise; applying it
 after the demo measures the wrong set.
+
+`activate_spine` is the second half, and it is what makes the demo honest: the lines
+this spine authored at plan time start `planned`, and this is the close that makes
+them live, because **its own lines must pass here**. A line another spine planned
+stays planned and is reported as `PENDING` — activating that one is not this close's
+business. A `deferred` line is left alone too: an operator deferred it, and only the
+release close, with the operator, may undo that (`cumulative-demo.md` §4a).
 
 An unknown spine id is rc 7 with a message, not a silent no-op.
 
