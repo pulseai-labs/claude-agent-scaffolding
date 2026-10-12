@@ -214,3 +214,43 @@ describe('mutating tools (fix wave 5)', () => {
     expect(await guard(deps(), 'lsp', { action: 'rename', file: 'a.ts' }, child('task'))).toBeUndefined()
   })
 })
+
+describe('narrow fix: omp spellings of MV, headers and cwd', () => {
+  test("MV destinations are read as omp's AXo does: a trailing #hhhh is cut, then one pair of matching quotes", () => {
+    const mv = (dest: string) => writeTargets('edit', { input: `[a.ts]\nMV ${dest}` })
+    expect(mv('"../out/m.txt"')).toEqual(['a.ts', '../out/m.txt'])
+    expect(mv("'/outside/m.txt'")).toEqual(['a.ts', '/outside/m.txt'])
+    expect(mv('/outside/m.txt#abcd')).toEqual(['a.ts', '/outside/m.txt'])
+    expect(mv('"/outside/m.txt"#AB12')).toEqual(['a.ts', '/outside/m.txt'])
+    expect(mv('"half')).toEqual(['a.ts', '"half'])
+    expect(mv('x#abc')).toEqual(['a.ts', 'x#abc'])
+  })
+  test('an implementer child cannot MV out through a quoted or hashed destination', async () => {
+    for (const dest of ['"../out/m.txt"', "'/outside/m.txt'", '/outside/m.txt#abcd'])
+      expect(await guard(deps({ real: async (p: string) => resolve(p) }), 'edit', { path: 'a.ts', input: `[a.ts]\nMV ${dest}` }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { path: 'a.ts', input: '[a.ts]\nMV "b.ts"#abcd' }, child('implementer'))).toBeUndefined()
+  })
+  test('hashline [file] and ¶file headers and sloppy *** Edit File: headers are write targets', async () => {
+    expect(writeTargets('edit', { input: '[/o/h.ts]\n 1ab|x\n¶ "/o/p.ts"#abcd\n' })).toEqual(['/o/h.ts', '/o/p.ts'])
+    expect(writeTargets('edit', { input: '*** Edit File: /o/s.ts\n*** Find\nx\n*** Replace\ny' })).toEqual(['/o/s.ts'])
+    expect(await guard(deps(), 'edit', { input: '[/outside/h.ts]\nx' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { input: '*** Edit File: /outside/s.ts\n*** Find\nx' }, child('implementer'))).toContain('no writes outside')
+  })
+  test('a bash cwd is read as omp reads it: ~, ~user, @/abs, file://, a leading :, and / for the session cwd', async () => {
+    const d = () => deps({ real: async (p: string) => resolve(p) })
+    for (const cwd of ['~', '~/x', '~user', '@/outside', 'file:///outside', ':/outside', '/outside'])
+      expect(await guard(d(), 'bash', { command: 'rm -rf x', cwd }, child('implementer'))).toContain('no rm outside')
+    expect(await guard(d(), 'bash', { command: 'rm -rf x', cwd: '/' }, child('implementer'))).toBeUndefined()
+    expect(await guard(d(), 'bash', { command: 'rm -rf x', cwd: 'sub/../..' }, child('implementer'))).toContain('no rm outside')
+    expect(await guard(d(), 'bash', { command: 'rm -rf x', cwd: 'sub' }, child('implementer'))).toBeUndefined()
+  })
+  test('a cwd that needs HOME fails closed when HOME is missing', async () => {
+    expect(await guard(deps({ env: { SEAT_MODS_ROLE: 'coordinator' } }), 'bash', { command: 'rm -rf x', cwd: '~' }, child('implementer'))).toContain('could not be checked')
+  })
+  test('a commit message file is read against the normalised cwd', async () => {
+    const seen: string[] = []
+    const d = deps({ readFile: async (f: string) => { seen.push(f); return '' } })
+    for (const cwd of ['file:///other', '@/other', ':/other', '~/m']) await guard(d, 'bash', { command: 'git commit -F msg.txt', cwd }, child('implementer'))
+    expect(seen).toEqual(['/other/msg.txt', '/other/msg.txt', '/other/msg.txt', '/home/u/m/msg.txt'])
+  })
+})

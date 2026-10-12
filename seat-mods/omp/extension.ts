@@ -3,7 +3,8 @@
 // for the main session and ctx.agent.name for a task child, whose env is its parent's.
 import { realpathSync, existsSync, lstatSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { dirname, basename } from 'node:path'
+import { dirname, basename, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, placeOf, decide,
   uncheckedRmText, invalidText, statusText,
@@ -31,6 +32,16 @@ export function roleFor(env: string | undefined, agent: Agent): RoleState {
   return parseRole(env)
 }
 
+// omp's AXo (hashline paths): trim, cut a trailing `#hhhh`, then one pair of matching quotes. Empty stays empty.
+export function ompPath(raw: string): string {
+  const t = raw.trim()
+  const cut = /#[0-9a-fA-F]{4}$/u.exec(t)?.index
+  const n = cut === undefined ? t : t.slice(0, cut)
+  if (n.length < 2) return n
+  const [o, r] = [n[0], n[n.length - 1]]
+  return (o === '"' || o === "'") && o === r ? n.slice(1, -1) : n
+}
+
 const WRITE_TOOLS = new Set(['write', 'edit', 'ast_edit'])
 // Every path a write-class call can touch. omp fills `path`/`paths` from an edit's section headers only, so an
 // edit's other destinations are read from where they live: `rename`, `edits[].path`/`rename`, and the hashline
@@ -45,13 +56,18 @@ export function writeTargets(toolName: string, input: Record<string, unknown>): 
     add(input.rename)
     if (Array.isArray(input.edits))
       for (const e of input.edits) if (e !== null && typeof e === 'object') { add((e as Record<string, unknown>).path); add((e as Record<string, unknown>).rename) }
-    if (typeof input.input === 'string')
+    if (typeof input.input === 'string') {
       for (const line of input.input.split('\n')) {
-        const t = line.trim()
-        if (t.startsWith('MV ')) add(t.slice(3).trim())
-        const patch = /^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$/.exec(t) // apply_patch mode
-        if (patch !== null) add(patch[1].trim())
+        const raw = line.replace(/\r$/, '')
+        const t = raw.trim()
+        if (t.startsWith('MV ')) add(ompPath(t.slice(3))) // hashline rename
+        const head = raw.trimEnd() // hashline section header: `[file]` (or `¶file`), as omp's parser reads it
+        if (head.startsWith('[')) add(ompPath(head.endsWith(']') ? head.slice(1, -1) : head.slice(1)))
+        else if (head.startsWith('¶')) add(ompPath(head.slice(1)))
+        const patch = /^(?:\*\*\* (?:Add File|Update File|Delete File|Move to|Edit File): ?(.+))$/.exec(t) // apply_patch and sloppy headers
+        if (patch !== null) { add(patch[1].trim()); add(ompPath(patch[1])) }
       }
+    }
   }
   return [...found]
 }
@@ -102,9 +118,9 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
 
   if (toolName === 'bash' || toolName === 'eval') {
     // bash takes its own cwd; rm operands and -F files resolve against it, not the session's.
-    const base = toolName === 'bash' && typeof input.cwd === 'string' && input.cwd !== '' ? absolute(deps.cwd, input.cwd) : deps.cwd
     const commands = toolName === 'bash' ? [String(input.command ?? '')] : evalCommands(String(input.code ?? ''))
     try {
+      const base = toolName === 'bash' && typeof input.cwd === 'string' && input.cwd !== '' ? ompCwd(input.cwd, deps.cwd, deps.env.HOME) : deps.cwd
       for (const command of commands) {
         const texts = await Promise.all(commitMessageFiles(command).map(f => deps.readFile(absolute(base, f)).catch(() => '')))
         const removals = []
@@ -133,6 +149,20 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
     if (deny !== undefined) return deny
   }
   return undefined
+}
+
+// omp's own reading of a tool's `cwd` (Zs over Uv): a leading `:` before a path, `@/abs`, unicode spaces,
+// `file://` URLs and `~` forms are normalised first; `/` alone means the session cwd; an absolute path is kept
+// as written (the kernel resolves it); a relative one is joined and collapsed lexically (path.resolve).
+export function ompCwd(raw: string, sessionCwd: string, home: string | undefined): string {
+  let t = /^:(?=[/\\~]|\.\.?[/\\]|[A-Za-z]:)/.test(raw) ? raw.slice(1) : raw
+  if (t.startsWith('@')) { const r = t.slice(1); if (r.startsWith('/') || r === '~' || r.startsWith('~/')) t = r }
+  t = t.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
+  if (t.toLowerCase().startsWith('file://')) { try { t = fileURLToPath(t) } catch {} }
+  if (t === '~' || t.startsWith('~/')) t = homeOf(t, home)
+  else if (t.startsWith('~')) t = join(homeOf('~', home), t.slice(1)) // omp reads `~user` as <home>/user
+  if (/^\/+$/.test(t)) return sessionCwd
+  return t.startsWith('/') ? t : resolve(sessionCwd, t)
 }
 
 // The absolute path, NOT normalised: path.resolve collapses `..` before symlinks resolve, so
