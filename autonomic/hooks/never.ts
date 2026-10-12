@@ -393,7 +393,29 @@ function resolver(parts: readonly Command[]): Resolve {
 // sed runs shell code through its `e` command and `s///e` flag.
 // sed's arguments as the shell passes them: a quoted script stays one word (`'1p;e cmd'`), and
 // adjacent quoted and bare pieces join into one (`'s/x/y/'e` is `s/x/y/e`; PR #735 round 1).
-const argv = (text: string) => (text.match(/(?:'[^']*'|"(?:\\.|[^"\\])*"|[^\s'"]+)+/g) ?? []).map(clean)
+// 0.5.1 (§2): quotes are removed as the shell removes them. Inside single quotes a backslash is
+// literal (`'s/a\/b/c/'` keeps its `\/`); in double quotes it escapes only $ ` " \ and a newline.
+function unquote(w: string): string {
+  let out = ''
+  let q: string | undefined
+  for (let i = 0; i < w.length; i++) {
+    const c = w[i]!
+    if (q === "'") { if (c === "'") q = undefined; else out += c; continue }
+    if (c === '\\') {
+      const n = w[i + 1]
+      if (n === undefined) break
+      if (q === '"' && !'$`"\\\n'.includes(n)) out += c
+      out += n
+      i++
+      continue
+    }
+    if (q === '"') { if (c === '"') q = undefined; else out += c; continue }
+    if (c === "'" || c === '"') { q = c; continue }
+    out += c
+  }
+  return out
+}
+const argv = (text: string) => (text.match(/(?:'[^']*'|"(?:\\.|[^"\\])*"|[^\s'"]+)+/g) ?? []).map(unquote)
 // 0.5.0 shape B: a wider safe sed. Options from -n -E -r -s -z -u, -e SCRIPT and -i (with a
 // suffix); each script a `;`/newline list of `s<d>re<d>repl<d>[gpiImM0-9]*` or an address plus
 // p, d, q or =. No e, w, W, r, R command or flag; no -i target that is a git control path.
@@ -961,10 +983,12 @@ function rulesOf(words: readonly string[], where: Where, moved: boolean, single:
   }
   if (words.some(w => abbrev(w, '--no-verify', 6)) || (words.some(w => isVerb(w, 'commit')) && anyNamed(short('n')))) found.add('no-verify')
 
+  // 0.5.1 (§4): a variable followed by a path (`$T/x`) is a path; a bare variable may be a flag.
+  const rmFlag = (w: string) => flagLike(w) || (w.startsWith('$') && !w.includes('/'))
   const rm = words.findIndex(w => isVerb(w, 'rm'))
   if (rm >= 0) {
     const after = words.slice(rm + 1)
-    const recursive = after.some(w => /[rR]/.test(letters(w)) || abbrev(w, '--recursive', 3) || anyFlag(w))
+    const recursive = after.some(w => /[rR]/.test(letters(w)) || abbrev(w, '--recursive', 3) || rmFlag(w))
     // Strictly below the root: nothing is below a worktree at /.
     const root = where.root.replace(/\/+$/, '')
     const below = (w: string) => root !== '' && w.startsWith(`${root}/`)

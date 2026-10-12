@@ -1087,3 +1087,15 @@ describe('0.5.1: own words ask, text goes to the fork (spec §1–2)', () => {
     expect(rules('git push -f origin feat/x')).toContain('force-push')
   })
 })
+
+describe('0.5.1: shell words for sed, and rm of a variable path (spec §2, §4)', () => {
+  test('a sed script with an escaped slash is a safe sed, not a runner (cause 5)', () => {
+    expect(levels("sed -i 's/a\\/b/c/' $S/pr.md; git push -q")).toEqual({ ask: [], fork: [] })
+  })
+  test('a variable followed by a path is a path, not a flag (cause 4)', () => {
+    for (const c of ['rm "$T/x"', 'rm -f $W/reports/.seen', 'rm ${OUT}/a.md']) expect([c, rules(c)]).toEqual([c, []])
+  })
+  test('a bare variable or a recursive flag still makes rm recursive', () => {
+    for (const c of ['rm -rf $T', 'rm $F /x', 'rm -rf ../x', 'rm -r ~/x']) expect([c, rules(c)]).toEqual([c, ['rm-outside']])
+  })
+})
