@@ -2,6 +2,30 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.5.1
+
+**The floor asks only on what a command does** (#758: 53 asks in five hours on 2026-10-12, 16 of them
+false positives, 17 inputs never judged).
+
+- **Two levels of finding** (`floorFindings`, `never.ts`). A rule that matches a parsed command's
+  own words — its arguments as Bash passes them, with whitespace inside quotes kept in one word —
+  asks you, as before. A rule that matches only in text the floor cannot read command by command
+  (the whole-text read, words inside a quoted argument, a command read over all words) goes to the
+  fork, with the finding in its prompt. The floor never approves. `neverRules` returns both levels.
+- **The pushed branch, not the session's.** A push that names a remote and only literal destinations
+  other than the default branch, `main` or `master` is no `default-branch-push` on a detached or
+  `main` checkout. `-d`, `--delete`, `-f` and `--force` no longer hide the named destination, and
+  `$SRC:refs/heads/x` is read by its destination.
+- **Merged-branch deletes go to the fork.** `git branch -D x` and `git push origin --delete x` whose
+  every branch is already merged into the default branch (`git merge-base --is-ancestor`, checked
+  before the command runs) are the fork's to judge. An unmerged or unreadable delete still asks.
+- **Long inputs are judged.** The 4000-character stop is gone: the fork sees the input's head and
+  tail and how much was cut, and the floor has read all of it. SubagentHandbacks are judged too.
+- **Smaller fixes.** A sed script keeps a backslash inside single quotes (`'s/a\/b/c/'` is a safe sed);
+  `rm "$T/x"` is not recursive; the pain band shows the command that matched.
+- **Known limits.** A call that merges and then deletes in one command still asks (the branch is not
+  merged when the check runs). A session's first call still asks: there is nothing to fork yet.
+
 ## 0.5.0
 
 **The never-approve list judges each command on its own words** (a replay of three days of
