@@ -124,6 +124,16 @@ during the gate, what the PR loop left owed (tracked deferral issues, or
 merge-bar's out-of-scope issue and `[KL]` lines), quarantined demo lines. Each with the trigger or release that
 retires it. This is the section the next release close reads first.
 
+This spine's own deferred and escaped lines come out in one read:
+
+```bash
+"$oss_bin" get "[.demo_ledger[] | select(.source_spine==\"$spine_id\" and (.status==\"deferred\" or .status==\"escaped\"))]"
+```
+
+A deferred line carries the release it is due at and the operator's words: it is
+still owed, and the release close collects it. An escaped one is finished — this
+spine closed on the negative result its `SPINE.md` declared at plan time.
+
 ### `## 8. What we learned about the work`
 
 The durable lessons — what the estimate missed, which seam turned out to be the
@@ -161,7 +171,8 @@ The `auto:` result and the `user:` walk, same content as the bone set's §3.
 
 Fakes, deferrals and quarantines this spine leaves owed, each with its trigger or
 expiry release. The bone set's §7, unchanged — this one is **not** the section to
-shorten, because it is what the release close needs.
+shorten, because it is what the release close needs. The read under §1's `## 7` returns
+this spine's deferred and escaped lines; list them here too.
 
 ### `## 4. Carried forward`
 

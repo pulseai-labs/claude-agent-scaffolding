@@ -242,7 +242,11 @@ consumes the candidates yet** (#293 wires the first post-adoption spine
 to). Record them in the adoption record anyway — small, end-to-end, from
 the current cut's journey, not a transcription of the test suite: the first
 spine close should exercise the shipped surface, and until that wiring
-exists the vacuous-window risk stands, named rather than hidden.
+exists the vacuous-window risk stands, named rather than hidden. When that
+spine records them as lines, it passes `active` as the last argument:
+adoption's lines test surface that already ships, so the `planned` default
+(§8 of plan-spine) would park them until a close that has nothing to build
+first.
 
 ---
 

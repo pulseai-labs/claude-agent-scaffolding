@@ -40,9 +40,9 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 ladder.** Spines and work items carry a `target_repo`, and Tasks 8/9 (#272/#310)
 made the spine and work-item close layers merge each item's work into that
 item's own repo (`work-item-close.md` §4, `spine-close.md` §3) — so the
-walkthrough (§3) and both blocking gates (§4/§5) below are already repo-general
+walkthrough (§3) and all three blocking gates (§4/§5/§5b) below are already repo-general
 the moment those merges are: they read state `"$oss_bin" demo_user_lines`,
-`"$oss_bin" expired_fakes`, `"$oss_bin" expired_quarantines` write and select from, never a
+`"$oss_bin" expired_fakes`, `"$oss_bin" expired_quarantines`, `"$oss_bin" expired_deferrals` write and select from, never a
 checkout, so a spine that landed across three repos contributes to them exactly
 as one confined to canonical would — nothing in this file has to loop over
 repos for that to be true, because the state it reads already spans however
@@ -234,6 +234,53 @@ spine left to apply it, so retiring here is a **decision recorded for the next
 spine**, not an immediate removal — say so when you take that route rather than
 reporting the ticket cleared. Fixing the line is the other route: the line goes
 back to `active` by the fix landing in a spine, not by an edit here.
+
+---
+
+## 5b. Step 4b — deferrals and stray planned lines
+
+A deferral is a `user:` line an operator could not walk, recorded with their words
+and the release it is **due at** (`cumulative-demo.md` §4a). This close collects it,
+and the same step catches the one other way a `planned` line can be stranded:
+
+```bash
+ed=0; deferrals_due="$("$oss_bin" expired_deferrals "$rel")" || ed=$?
+case "$ed" in
+  0) [ -n "$deferrals_due" ] && printf '%s\n' "$deferrals_due"; echo "deferrals: clean" ;;
+  1) printf '%s\n' "$deferrals_due"
+     echo "close: $rel has deferred user lines due - walk, re-defer or retire each - halt"; exit 1 ;;
+  *) echo "close: expired_deferrals could not run (rc $ed) - INCONCLUSIVE, not clean - halt"; exit 1 ;;
+esac
+stray="$("$oss_bin" get '[.spines[] | select(.status=="closed") | .id] as $c | [.demo_ledger[] | select(.status=="planned" and (.source_spine as $s | $c | index($s)))] | map(.id) | join(" ")')"
+[ -z "$stray" ] || { echo "close: planned lines of closed spines: $stray - spine close step 3 should have activated them - halt"; exit 1; }
+orphan="$("$oss_bin" get '[.spines[] | select(.status=="abandoned") | .id] as $a | [.demo_ledger[] | select(.status=="planned" and (.source_spine as $s | $a | index($s)))] | map(.id) | join(" ")')"
+[ -z "$orphan" ] || echo "close: planned lines of abandoned spines: $orphan - surface each for retire (spine-close.md §4); that spine will never activate them"
+```
+
+Same rc contract as §5's gate — 0 = clean, 1 = blocking, 2 = could-not-check, one TSV
+line per finding — with the two deliberate differences: a deferral names the release
+it is **due at**, so the cut is `<=` where quarantine's is `<`, and a deferral with no
+anchor blocks as `no-release-anchor`.
+
+**Each due line gets one of three unblocks, and all three are real work:**
+
+- **Walk it now.** `"$oss_bin" ledger_activate <line-id>`, then walk it with the operator
+  like any §3 line. A failed walk halts.
+- **Defer it again.** New operator words and a later release — the call
+  `cumulative-demo.md` §4a names, with the operator present.
+- **Retire it.** `"$oss_bin" ledger_retire <line-id> <by-spine> "<why>"` needs a spine that has
+  **not** closed — one of the next release — because retire is a planning verb whose
+  application is a spine close (`spine-close.md` §4). Until that close runs, this gate
+  reports the row as `amendment pending` and does not block. **A retire owned by a
+  closed spine is never applied**, so that line keeps blocking: with no open spine to
+  own it, walk the line or defer it again. Say it as recorded, not as cleared, the
+  same as §5.
+
+**A `planned` line whose spine is `closed` is a halt.** Spine close step 3 activates a
+spine's own planned lines before its demo (`spine-close.md` §4), so one that survives
+into a closed spine is a close that skipped it, and nothing will ever run it. A planned
+line whose spine is **`abandoned`** is surfaced by name for retire: that spine is not
+coming back to activate it.
 
 A line quarantined with **no release anchor** blocks too, marked
 `no-release-anchor`. §6.1's ticket expires against a release, so a ticket
@@ -636,11 +683,14 @@ the retro's aggregation are prose contracts.** A bash script that calls the
 gates in order asserts nothing about the ceremony; it tests a fixture written to
 pass. The harness checks that every `oss` verb this file names resolves.
 
-The mechanical seams **are** covered in `tests/test-close.sh`: both blocking
-gates' full rc contracts driven through the dispatcher under real strict mode,
-the seven expiry/quarantine fixtures that discriminate a correct selector from a
+The mechanical seams **are** covered in `tests/test-close.sh`: the fake-expiry and
+quarantine gates' full rc contracts driven through the dispatcher under real strict
+mode, the seven expiry/quarantine fixtures that discriminate a correct selector from a
 broken one, and the two shipped branch blocks above extracted from this file and
-executed.
+executed. **The deferral gate (§5b) is not among them** — its rc contract is driven at
+the same depth, through the dispatcher and against the boundary (`<=`, the anchorless
+row, the pending-retire rows), in `tests/test-demo-line-status.sh`; its branch block
+above is not executed by any test.
 
 ---
 

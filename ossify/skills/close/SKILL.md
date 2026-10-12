@@ -247,7 +247,9 @@ steps, in **binding order**:
    as one thing, and the only reader that judges craft and fidelity rather than
    whether the ACs passed. Advisory: it yields findings and a per-finding
    decision, never a halt.
-3. **`"$oss_bin" ledger_apply_pending <spine>`** — after the merge, before the demo.
+3. **`"$oss_bin" ledger_apply_pending <spine>`, then `"$oss_bin" ledger_activate_spine <spine>`** — after the
+   merge, before the demo. The second makes this spine's own `planned` lines live: they
+   must pass at this close.
 4. **The cumulative demo**: `"$oss_bin" demo_run` for every active `auto:` line, then
    walk **this spine's own** `user:` lines (`"$oss_bin" demo_user_lines <spine>`) with
    the human. **Halt on the first failure** — no later step runs.
@@ -300,9 +302,11 @@ enforceable at a release boundary). Eight steps, in **binding order**:
 3. **Blocking finding — fake expiry.** `"$oss_bin" expired_fakes "$rel"`, plus the
    judgment pass over each remaining fake's `replacement_trigger` (§6's second
    reference). The only unblocks are replace or explicitly renew.
-4. **Blocking finding — outstanding quarantines.**
+4. **Blocking findings — outstanding quarantines, and deferrals coming due.**
    `"$oss_bin" expired_quarantines "$rel"` — every line quarantined in a **strictly
-   earlier** release is a parking ticket now due.
+   earlier** release is a parking ticket now due. `"$oss_bin" expired_deferrals "$rel"` — every
+   deferred `user:` line due at or before `$rel`, each walked, re-deferred or retired
+   here (a retire owned by a closed spine never applies, so it keeps blocking).
 5. **The release retrospective**, aggregating the spine retros. **Refuses,
    naming the spine, if any lacks `retrospective.md`.**
 6. **Feature-map re-groom + next-release sketch** — the rolling-wave crank, via
@@ -339,7 +343,7 @@ enforceable at a release boundary). Eight steps, in **binding order**:
    closed` and `oss demo_record release <rel> <passed> <line-count>
    "<notes>"` — never after a halt in any step above.
 
-**Both blocking gates are rc 0 = CLEAN / 1 = BLOCKING / 2 = could-not-check —
+**All three blocking gates are rc 0 = CLEAN / 1 = BLOCKING / 2 = could-not-check —
 the opposite polarity from `"$oss_bin" touch_check`, where rc 0 is a hit.** Copying the
 touch-check branch shape inverts the judge and passes exactly the releases the
 gates exist to block. rc 2 halts in both; it is never folded into clean.
@@ -354,7 +358,7 @@ PR through `/ossify:work-pr`), so a release close tags the merged `main` rather
 than gating a merge of its own.
 
 Full step detail — the two-arm spine gate, the walkthrough's scoping and its
-derived feature grouping, both blocking gates' branch blocks, the retro's
+derived feature grouping, all three blocking gates' branch blocks, the retro's
 refusal path and the state writes — in **`references/release-close.md`**.
 
 The fake-expiry finding — its rc contract, why `renewed` is inside the selector,
@@ -390,9 +394,9 @@ A versioned patch — a shipped defect or a can't-fake request — is
   failures are rc 0 and green.
 - **Folding `"$oss_bin" touch_check`'s rc 2 into "clean"**, or reading rc 0 as clean
   (§5).
-- **Copying `touch_check`'s branch shape onto `"$oss_bin" expired_fakes` or
-  `"$oss_bin" expired_quarantines`.** rc 0 is a hit there and CLEAN here, so the copy
-  passes precisely the releases the gates exist to block (§6).
+- **Copying `touch_check`'s branch shape onto `"$oss_bin" expired_fakes`,
+  `"$oss_bin" expired_quarantines` or `"$oss_bin" expired_deferrals`.** rc 0 is a hit there and
+  CLEAN here, so the copy passes precisely the releases the gates exist to block (§6).
 - **Selecting expired fakes on `active` alone**, comparing the expiry for
   identity, or comparing release ids as strings — `"r2" <= "r10"` is false.
   Each one lets a fake outlive its own deadline, silently green (§6).
@@ -426,12 +430,13 @@ A versioned patch — a shipped defect or a can't-fake request — is
   `repo_root`, `release_dir`, `spine_dir`, `spine_list`, `branch_name`, `get`, `verify_acs` (AC parsing),
   `verify_step` (the expectation predicate, including the vacuous-green guard),
   `report_cross_check`, `work_item_status`, `worktree_resolve`,
-  `worktree_remove`, `ledger_apply_pending`, `ledger_quarantine`,
-  `ledger_retire`, `demo_run`, `demo_user_lines`, `demo_record`, `touch_check`
+  `worktree_remove`, `ledger_apply_pending`, `ledger_activate_spine`, `ledger_defer`,
+  `ledger_escape`, `ledger_quarantine`, `ledger_retire`, `demo_run`, `demo_user_lines`,
+  `demo_record`, `touch_check`
   (glob matching — never the meaning of a match), `class_set`, `veto_add`,
   `critic_detect` (a filesystem probe), `spine_status`, `release_status`,
-  `expired_fakes` and `expired_quarantines` (both read-only selectors — they
-  compute *which* records are due, never whether the deferral was reasonable),
+  `expired_fakes`, `expired_quarantines` and `expired_deferrals` (all read-only
+  selectors — they compute *which* records are due, never whether it was reasonable),
   `fake_status`, `feature_list`, `feature_add`, `release_set_meta` and
   `patch_add`. The memory-bank harvest has no verb: the bank is
   manifest-routed and the appends are yours (`references/harvest.md` §7) —

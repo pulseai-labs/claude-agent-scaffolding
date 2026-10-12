@@ -30,8 +30,8 @@ SP="$(oss_entity_add_spine "$S" "$R" "walking skeleton" bone canonical)"
 oss_entity_add_work_item "$S" "$SP" "wire the entry point" >/dev/null
 oss_reg_add_bone "$S" ADR-0002 "domain boundary" "src/domain/**" "" >/dev/null
 oss_reg_add_fake "$S" coach fake "shell for skeleton" "first refinement" r1 >/dev/null
-oss_ledger_add_auto "$S" "$SP" "golden journey" "echo journey-ok" "contains:journey-ok" >/dev/null
-oss_ledger_add_user "$S" "$SP" "Run a backtest from the chat panel" "results visible" >/dev/null
+oss_ledger_add_auto "$S" "$SP" "golden journey" "echo journey-ok" "contains:journey-ok" active >/dev/null
+oss_ledger_add_user "$S" "$SP" "Run a backtest from the chat panel" "results visible" active >/dev/null
 
 t_capture oss_demo_run_auto "$S";  t_assert_rc 0 "fixture demo green"
 t_capture "$OSS" doctor "$S";      t_assert_rc 0 "doctor green on full fixture"
@@ -61,8 +61,8 @@ SPX="$(oss_entity_add_spine "$SX" "$RX" "walking skeleton" bone core)"
 oss_entity_add_work_item "$SX" "$SPX" "wire the entry point" >/dev/null
 oss_reg_add_bone "$SX" ADR-0002 "domain boundary" "src/domain/**" "" >/dev/null
 oss_reg_add_fake "$SX" coach fake "shell for skeleton" "first refinement" r1 >/dev/null
-oss_ledger_add_auto "$SX" "$SPX" "golden journey" "echo journey-ok" "contains:journey-ok" >/dev/null
-oss_ledger_add_user "$SX" "$SPX" "Run a backtest from the chat panel" "results visible" >/dev/null
+oss_ledger_add_auto "$SX" "$SPX" "golden journey" "echo journey-ok" "contains:journey-ok" active >/dev/null
+oss_ledger_add_user "$SX" "$SPX" "Run a backtest from the chat panel" "results visible" active >/dev/null
 
 t_capture oss_demo_run_auto "$SX";  t_assert_rc 0 "topology twin: fixture demo green"
 t_capture "$OSS" doctor "$SX";      t_assert_rc 0 "topology twin: doctor green on full fixture"

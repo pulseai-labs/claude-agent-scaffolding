@@ -100,10 +100,10 @@ t_assert_eq "$WI_BEFORE" "$T_OUT" "no phantom work item after either target-repo
 
 # --- §8d / demo-authoring.md §6: auto: lines bind command + expected, and the
 # expected grammar is exactly exit:<n> | contains:<str>.
-t_capture "$OSS" ledger_add_auto r0.s1 "paper order round-trips" "true" "exit:0"
+t_capture "$OSS" ledger_add_auto r0.s1 "paper order round-trips" "true" "exit:0" active
 t_assert_rc 0 "dispatcher: auto line with exit: expected accepted"
 AUTO1="$T_OUT"
-t_capture "$OSS" ledger_add_auto r0.s1 "bench reports p50" "true" "contains:p50"
+t_capture "$OSS" ledger_add_auto r0.s1 "bench reports p50" "true" "contains:p50" active
 t_assert_rc 0 "dispatcher: auto line with contains: expected accepted"
 AUTO2="$T_OUT"
 t_capture "$OSS" ledger_add_auto r0.s1 "unbound" "true" "under 40ms"
@@ -142,7 +142,7 @@ done
 # Deliberately phrased in a domain no eval fixture uses: this file must never
 # hand the journey-line-floor eval a ready-made answer if the eval's read path
 # ever widens past skills/.
-t_capture "$OSS" ledger_add_user r0.s1 "reschedule a delivery to a later slot and see the tracking page show the new window" "the delivery moves to the chosen slot"
+t_capture "$OSS" ledger_add_user r0.s1 "reschedule a delivery to a later slot and see the tracking page show the new window" "the delivery moves to the chosen slot" active
 t_assert_rc 0 "dispatcher: verb + visible-outcome journey line accepted"
 USER1="$T_OUT"
 
@@ -200,7 +200,7 @@ t_assert_eq "active" "$T_OUT" "apply_pending is scoped to the closing spine only
 # untouched until its own close runs. Under the old single-pending-slot model
 # the second spine's plan would have silently overwritten the first's, and the
 # first spine's amendment would never apply.
-t_capture "$OSS" ledger_add_auto r0.s1 "shared line both spines amend" "true" "exit:0"
+t_capture "$OSS" ledger_add_auto r0.s1 "shared line both spines amend" "true" "exit:0" active
 t_assert_rc 0 "dispatcher: shared line added for the two-spine test"
 SHARED="$T_OUT"
 t_capture "$OSS" ledger_supersede "$SHARED" r0.s1 "r0.s1's reason"
@@ -243,7 +243,7 @@ t_assert_eq "[]" "$T_OUT" "both spines' amendments fully consumed"
 # entry, so the precondition the assertion needs (two entries, unplan one,
 # prove the OTHER survives) never existed. Reuse the same two-entry
 # precondition as the block above, on a fresh line.
-t_capture "$OSS" ledger_add_auto r0.s1 "second shared line for the unplan-scoping test" "true" "exit:0"
+t_capture "$OSS" ledger_add_auto r0.s1 "second shared line for the unplan-scoping test" "true" "exit:0" active
 t_assert_rc 0 "dispatcher: shared line added for the unplan-scoping test"
 SHARED2="$T_OUT"
 t_capture "$OSS" ledger_supersede "$SHARED2" r0.s1 "r0.s1's reason"
@@ -263,7 +263,7 @@ t_assert_eq "r0.s2" "$T_OUT" "the survivor is the OTHER spine, not the one that 
 # amends the SAME line TWICE (supersede, then retire) with no apply in
 # between - an upsert must replace its own prior entry, not append a second
 # one, or a stale amendment survives to be applied alongside the fresh one.
-t_capture "$OSS" ledger_add_auto r0.s1 "line amended twice by the same spine" "true" "exit:0"
+t_capture "$OSS" ledger_add_auto r0.s1 "line amended twice by the same spine" "true" "exit:0" active
 t_assert_rc 0 "dispatcher: line added for the upsert-dedupe test"
 UPSERT="$T_OUT"
 t_capture "$OSS" ledger_supersede "$UPSERT" r0.s1 "first pass: supersede"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Cumulative product demo ledger (spec §3, §6.1) + patch lane records.
 
-oss_ledger_add_auto() { # $1=state $2=spine $3=text $4=command $5=expected
+oss_ledger_add_auto() { # $1=state $2=spine $3=text $4=command $5=expected [$6=planned|active]
   # Validate the spine exists BEFORE anything else: a demo line journaled
   # against a nonexistent spine (typo like r0.s99) is silently skipped at
   # spine close, which filters by source_spine — the line counts as authored
@@ -26,13 +26,20 @@ oss_ledger_add_auto() { # $1=state $2=spine $3=text $4=command $5=expected
     contains:?*) ;;
     *) echo "oss: expected must be 'exit:<n>' or 'contains:<str>'" >&2; return 2 ;;
   esac
+  # #363: a line authored at plan time tests code that does not exist yet, so
+  # it starts `planned` and demo_run reports it as pending until its spine's
+  # close activates it. `active` stays available for the one caller whose lines
+  # test code that already ships (adopt).
+  local st="${6:-planned}"
+  case "$st" in planned|active) ;; *)
+    echo "oss: a new demo line starts planned or active (got '$st') - planned until its code is built (#363)" >&2; return 2;; esac
   oss_state_mutate "$1" add_demo_line \
-    "$(jq -n --arg s "$2" --arg t "$3" --arg c "$4" --arg e "$5" --arg ts "$(_oss_now)" \
-      '{type:"auto",text:$t,command:$c,expected:$e,source_spine:$s,status:"active",status_reason:null,status_by:null,at:$ts}')" \
+    "$(jq -n --arg s "$2" --arg t "$3" --arg c "$4" --arg e "$5" --arg st "$st" --arg ts "$(_oss_now)" \
+      '{type:"auto",text:$t,command:$c,expected:$e,source_spine:$s,status:$st,status_reason:null,status_by:null,at:$ts}')" \
     demo
 }
 
-oss_ledger_add_user() { # $1=state $2=spine $3=text $4=outcome
+oss_ledger_add_user() { # $1=state $2=spine $3=text $4=outcome [$5=planned|active]
   # Same validation as add_auto: an unknown source_spine journals silently
   # and is never run at the close ceremony.
   jq -e --arg s "$2" '.spines[] | select(.id == $s)' "$1" >/dev/null 2>&1 \
@@ -43,9 +50,15 @@ oss_ledger_add_user() { # $1=state $2=spine $3=text $4=outcome
   case "$lower" in inspect\ *|view\ *|open\ *)
     echo "oss: inspector phrasing banned in user journey lines (spec §5.3 floor) - phrase as an action the user performs for value" >&2
     return 2;; esac
+  # Same default and same refusal as add_auto above: a journey line is authored
+  # before the flow exists, so it starts `planned` unless the caller says the
+  # flow already ships.
+  local st="${5:-planned}"
+  case "$st" in planned|active) ;; *)
+    echo "oss: a new demo line starts planned or active (got '$st') - planned until its code is built (#363)" >&2; return 2;; esac
   oss_state_mutate "$1" add_demo_line \
-    "$(jq -n --arg s "$2" --arg t "$3" --arg o "$4" --arg ts "$(_oss_now)" \
-      '{type:"user",text:$t,outcome:$o,source_spine:$s,status:"active",status_reason:null,status_by:null,at:$ts}')" \
+    "$(jq -n --arg s "$2" --arg t "$3" --arg o "$4" --arg st "$st" --arg ts "$(_oss_now)" \
+      '{type:"user",text:$t,outcome:$o,source_spine:$s,status:$st,status_reason:null,status_by:null,at:$ts}')" \
     demo
 }
 
@@ -105,6 +118,56 @@ oss_ledger_unplan() { # $1=state $2=line-id $3=spine
   oss_state_mutate "$1" clear_demo_pending "$(jq -n --arg id "$2" --arg s "$3" '{id:$id,spine:$s}')"
 }
 
+# Read one field of one demo line ("" when absent). The caller has already run
+# _oss_ledger_require_line, so an empty answer means the field is unset.
+_oss_ledger_field() { # $1=state $2=line-id $3=field
+  jq -r --arg id "$2" --arg f "$3" '.demo_ledger[] | select(.id == $id) | .[$f] // ""' "$1"
+}
+
+# #363/#726: a line authored at plan time is `planned` until its code exists.
+# activate is the one way forward; there is deliberately no way back
+# (active -> planned would let a session relabel a regression "not built yet").
+# A deferred line activates too: that is "walk it now" at release close.
+oss_ledger_activate() { # $1=state $2=line-id
+  _oss_ledger_require_line "$1" "$2" || return $?
+  local st; st="$(_oss_ledger_field "$1" "$2" status)"
+  case "$st" in planned|deferred) ;; *)
+    echo "oss: line '$2' is '$st' - only a planned or deferred line can be activated" >&2; return 2;; esac
+  # `from` re-checks the status inside the op, under the lock (#760 F2): the case
+  # above is the readable refusal, this is the one that holds against a writer
+  # landing between that read and this write.
+  oss_state_mutate "$1" set_demo_line_status \
+    "$(jq -n --arg id "$2" '{id:$id,status:"active",by:"activate",reason:null,from:["planned","deferred"]}')"
+}
+
+# Spine close step 3: the closing spine's own planned lines go active before
+# the demo, so they must pass at that close. Deferred lines are left alone -
+# undoing an operator's deferral is not this verb's call.
+oss_ledger_activate_spine() { # $1=state $2=spine
+  jq -e --arg s "$2" '.spines[] | select(.id == $s)' "$1" >/dev/null 2>&1 \
+    || { echo "oss: unknown spine '$2'" >&2; return 7; }
+  local ids id n=0
+  ids="$(jq -r --arg s "$2" '.demo_ledger[] | select(.source_spine == $s and .status == "planned") | .id' "$1")" \
+    || { echo "oss: cannot read the demo ledger from '$1'" >&2; return 2; }
+  for id in $ids; do
+    oss_state_mutate "$1" set_demo_line_status \
+      "$(jq -n --arg id "$id" --arg s "$2" '{id:$id,status:"active",by:("activate_spine:" + $s),reason:null,from:["planned"]}')" \
+      || return $?
+  done
+  # #760 F2: count what the lock actually let through, not what this pass attempted.
+  # The snapshot above is a pre-lock read, so a line deferred (or retired) while the
+  # loop ran is in it and no longer `planned`; the op leaves that line alone, and the
+  # count must not claim it. A successful write stamps this spine's marker, so a line
+  # counts only when it is both active and marked by THIS run.
+  for id in $ids; do
+    if [ "$(_oss_ledger_field "$1" "$id" status)" = active ] \
+       && [ "$(_oss_ledger_field "$1" "$id" status_by)" = "activate_spine:$2" ]; then
+      n=$((n+1))
+    fi
+  done
+  echo "activated $n"
+}
+
 # Quarantine is NOT a planned amendment: it is raised at close/doctor time when a
 # line actually fails for causes unrelated to any open spine, so it applies at
 # once. The release is recorded because §6.1 makes it a parking ticket that
@@ -159,6 +222,97 @@ oss_ledger_expired_quarantines() { # $1=state $2=release ; rc 0 clean, 1 blockin
   [ -n "$out" ] || return 0
   printf '%s\n' "$out"
   return 1
+}
+
+# r<digits> only; the shape check the deferral verbs share. `expired_quarantines`
+# above keeps its own inline form, which does NOT require the leading `r`: measured,
+# it accepts a bare `3` at rc 0 where this one refuses it at rc 2 (all other release
+# spellings agree). Do not read the two gates as sharing one grammar.
+_oss_ledger_release_ok() { # $1=release
+  case "$1" in r[0-9]*) case "${1#r}" in *[!0-9]*) return 1;; esac; return 0;; esac
+  return 1
+}
+
+# #710: a spine's own user: line that cannot be walked now is DEFERRED, still
+# owed, with the operator's words and the release it is due at. Only the
+# owning spine defers it; only user: lines (quarantine parks a failing auto:).
+oss_ledger_defer() { # $1=state $2=line-id $3=spine $4=operator-reason $5=release
+  _oss_ledger_require_line "$1" "$2" || return $?
+  jq -e --arg s "$3" '.spines[] | select(.id == $s)' "$1" >/dev/null 2>&1 \
+    || { echo "oss: unknown spine '$3'" >&2; return 7; }
+  local ty src st
+  ty="$(_oss_ledger_field "$1" "$2" type)"; src="$(_oss_ledger_field "$1" "$2" source_spine)"
+  st="$(_oss_ledger_field "$1" "$2" status)"
+  [ "$ty" = user ] || { echo "oss: line '$2' is an $ty: line - only a user: line can be deferred (a failing auto: line is quarantined)" >&2; return 2; }
+  [ "$src" = "$3" ] || { echo "oss: line '$2' belongs to spine '$src', not '$3' - a spine defers only its own user: lines" >&2; return 2; }
+  case "$st" in active|planned|deferred) ;; *)
+    echo "oss: line '$2' is '$st' - only an active, planned or deferred line can be deferred" >&2; return 2;; esac
+  [ -n "${4//[[:space:]]/}" ] || { echo "oss: a deferral needs the operator's reason, in their words" >&2; return 2; }
+  _oss_ledger_release_ok "$5" || { echo "oss: a deferral is due at a release of the form r<N> (got '$5')" >&2; return 2; }
+  # `from` re-checks the status under the lock (#760 F2): the case above is the
+  # readable refusal, this is the one that holds against a writer landing between
+  # that read and this write.
+  oss_state_mutate "$1" set_demo_line_status \
+    "$(jq -n --arg id "$2" --arg s "$3" --arg r "$4" --arg rel "$5" \
+        '{id:$id,status:"deferred",by:$s,reason:$r,until:$rel,from:["active","planned","deferred"]}')"
+}
+
+# The deferral gate, twin of oss_ledger_expired_quarantines. A deferral names
+# the release it is DUE AT, so the cut is <= (quarantine uses <). Numeric, for
+# the same r2-vs-r10 reason. A due line that already carries a pending retire
+# or supersede OWNED BY A SPINE THAT CAN STILL CLOSE (planned|active) is printed
+# but does not block: that spine's close applies it. An amendment owned by a
+# closed or abandoned spine is never applied, so the line still blocks -
+# otherwise it reads clean at every later release (Codex, PR #127).
+# rc 0 clean (or only amendment-pending rows), 1 blocking, 2 could-not-check.
+oss_ledger_expired_deferrals() { # $1=state $2=release
+  local sf="$1" rel="$2" out
+  _oss_ledger_release_ok "$rel" \
+    || { echo "oss: expired_deferrals needs a release id of the form r<N> (got '$rel')" >&2; return 2; }
+  out="$(jq -r --arg rel "$rel" '
+      ($rel | ltrimstr("r") | tonumber) as $cut
+      | [.spines[] | select(.status == "planned" or .status == "active") | .id] as $open
+      | .demo_ledger[]
+      | select(.status == "deferred")
+      | . as $l
+      | (try (.deferred_until_release | ltrimstr("r") | tonumber) catch null) as $d
+      | select($d == null or $d <= $cut)
+      | (((.pending_amendments // []) | map(select((.status == "retired" or .status == "superseded")
+                                                   and (.by as $b | $open | index($b) != null))))[0]) as $am
+      | [ $l.id,
+          (if $d == null then "no-release-anchor" else $l.deferred_until_release end),
+          (if $am != null then "amendment pending -> " + $am.by else "due" end),
+          ($l.status_reason // "") ] | @tsv' "$sf" 2>/dev/null)" \
+    || { echo "oss: cannot read the demo ledger from '$sf' - the deferral gate is INCONCLUSIVE, not clean" >&2; return 2; }
+  [ -n "$out" ] || return 0
+  printf '%s\n' "$out"
+  printf '%s\n' "$out" | awk -F'\t' '$3 == "due" { f = 1 } END { exit f ? 1 : 0 }'
+}
+
+# #726 part 2: a research spine planned with a time-box escape closes on an
+# honest negative result. The line becomes `escaped` - terminal, never walked
+# again, and distinct from `retired` (the flow is not gone; it failed under a
+# pre-declared escape). The clause is quoted from SPINE.md; the words are the
+# operator's. Only the owning spine, only user: lines.
+oss_ledger_escape() { # $1=state $2=line-id $3=spine $4=escape-clause $5=operator-reason
+  _oss_ledger_require_line "$1" "$2" || return $?
+  jq -e --arg s "$3" '.spines[] | select(.id == $s)' "$1" >/dev/null 2>&1 \
+    || { echo "oss: unknown spine '$3'" >&2; return 7; }
+  local ty src st
+  ty="$(_oss_ledger_field "$1" "$2" type)"; src="$(_oss_ledger_field "$1" "$2" source_spine)"
+  st="$(_oss_ledger_field "$1" "$2" status)"
+  [ "$ty" = user ] || { echo "oss: line '$2' is an $ty: line - only a user: line can close under an escape" >&2; return 2; }
+  [ "$src" = "$3" ] || { echo "oss: line '$2' belongs to spine '$src', not '$3'" >&2; return 2; }
+  case "$st" in active|deferred) ;; *)
+    echo "oss: line '$2' is '$st' - only an active or deferred line can close under an escape" >&2; return 2;; esac
+  [ -n "${4//[[:space:]]/}" ] || { echo "oss: an escape needs the escape clause quoted from SPINE.md" >&2; return 2; }
+  [ -n "${5//[[:space:]]/}" ] || { echo "oss: an escape needs the operator's ruling, in their words" >&2; return 2; }
+  # `from` re-checks the status under the lock (#760 F2): the case above is the
+  # readable refusal, this is the one that holds against a writer landing between
+  # that read and this write.
+  oss_state_mutate "$1" set_demo_line_status \
+    "$(jq -n --arg id "$2" --arg s "$3" --arg c "$4" --arg r "$5" \
+        '{id:$id,status:"escaped",by:$s,reason:$r,clause:$c,from:["active","deferred"]}')"
 }
 
 oss_ledger_add_patch() { # $1=state $2=commit $3=one-liner $4=repo-key

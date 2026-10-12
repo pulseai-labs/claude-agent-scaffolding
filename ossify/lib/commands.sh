@@ -117,13 +117,13 @@ oss_cmd_feature_add() { # $1=name $2=value $3=class-guess $4=source
 oss_cmd_touch_check() { # $@=paths
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_touch_check "$sf" "$@"
 }
-oss_cmd_ledger_add_auto() { # $1=spine $2=text $3=command $4=expected
-  _oss_need 4 ledger_add_auto "<spine> <text> <command> <expected>" "$@" || return 2;
-  local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_add_auto "$sf" "$1" "$2" "$3" "$4"
+oss_cmd_ledger_add_auto() { # $1=spine $2=text $3=command $4=expected [$5=planned|active]
+  _oss_need 4 ledger_add_auto "<spine> <text> <command> <expected> [planned|active]" "$@" || return 2;
+  local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_add_auto "$sf" "$1" "$2" "$3" "$4" "${5:-}"
 }
-oss_cmd_ledger_add_user() { # $1=spine $2=text $3=outcome
-  _oss_need 3 ledger_add_user "<spine> <text> <outcome>" "$@" || return 2;
-  local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_add_user "$sf" "$1" "$2" "$3"
+oss_cmd_ledger_add_user() { # $1=spine $2=text $3=outcome [$4=planned|active]
+  _oss_need 3 ledger_add_user "<spine> <text> <outcome> [planned|active]" "$@" || return 2;
+  local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_add_user "$sf" "$1" "$2" "$3" "${4:-}"
 }
 oss_cmd_ledger_supersede() { # $1=line $2=by-spine $3=reason
   _oss_need 3 ledger_supersede "<line> <by-spine> <reason>" "$@" || return 2;
@@ -136,12 +136,17 @@ oss_cmd_ledger_retire() { # $1=line $2=by-spine $3=reason
 oss_cmd_ledger_quarantine()    { _oss_need 2 ledger_quarantine "<line-id> <reason> [release]" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_quarantine "$sf" "$1" "$2" "${3:-}"; }
 oss_cmd_ledger_apply_pending() { _oss_need 1 ledger_apply_pending "<spine>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_apply_pending "$sf" "$1"; }
 oss_cmd_ledger_unplan()        { _oss_need 2 ledger_unplan "<line> <spine>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_unplan "$sf" "$1" "$2"; }
+oss_cmd_ledger_activate()       { _oss_need 1 ledger_activate "<line>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_activate "$sf" "$1"; }
+oss_cmd_ledger_activate_spine() { _oss_need 1 ledger_activate_spine "<spine>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_activate_spine "$sf" "$1"; }
 oss_cmd_fake_status()          { _oss_need 3 fake_status "<boundary> <active|replaced|renewed> <reason> [new-expiry-release]" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_fake_status "$sf" "$1" "$2" "$3" "${4:-}"; }
 # The two release-close blocking gates (§6.2 steps 3 and 4). Both are rc 0 =
 # CLEAN / 1 = BLOCKING / 2 = could-not-check - the OPPOSITE polarity to
 # `touch_check`, which is 0 = hit. Read-only selectors: no mutation, no op.
 oss_cmd_expired_fakes()        { _oss_need 1 expired_fakes "<release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_expired_fakes "$sf" "$1"; }
 oss_cmd_expired_quarantines()  { _oss_need 1 expired_quarantines "<release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_expired_quarantines "$sf" "$1"; }
+oss_cmd_ledger_defer()      { _oss_need 4 ledger_defer "<line> <spine> <operator-reason> <release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_defer "$sf" "$1" "$2" "$3" "$4"; }
+oss_cmd_expired_deferrals() { _oss_need 1 expired_deferrals "<release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_expired_deferrals "$sf" "$1"; }
+oss_cmd_ledger_escape() { _oss_need 4 ledger_escape "<line> <spine> <escape-clause> <operator-reason>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_escape "$sf" "$1" "$2" "$3" "$4"; }
 oss_cmd_patch_add() { # $1=commit $2=text [$3=repo-key]
   _oss_need 2 patch_add "<commit-sha> <text> [repo-key]" "$@" || return 2;
   local sf repo; sf="$(_oss_resolve_state)" || return $?
@@ -229,14 +234,16 @@ oss_cmd_migrate() { # [$1=state-file]
     return 6
   fi
   # F1 (2026-07-31): `migrate_schema` is version-agnostic (every clause
-  # `has(...)`-guarded, verified against both a v1 and a v2 fixture) and
+  # `has(...)`-guarded, verified against v1, v2 and v3 fixtures) and
   # single-hop by design - it carries every upgrade the registry knows about
-  # in one journaled op, not one op per version. This allowlist is deliberately
-  # exact (1|2), not "< current": a state at some OTHER stale version is a gap
-  # this build does not know how to close and must say so by name, never
-  # guess-migrate it.
+  # in one journaled op, not one op per version. v3 joins the list at 1.16.0,
+  # where the v3->v4 step is a no-op on every field but the version (the bump
+  # exists so an older build refuses the new demo-line statuses rather than
+  # skipping them). This allowlist stays deliberately exact (1|2|3), not
+  # "< current": a state at some OTHER stale version is a gap this build does
+  # not know how to close and must say so by name, never guess-migrate it.
   case "$v" in
-    1|2) ;;
+    1|2|3) ;;
     *) echo "oss: no migration path from v$v to v$OSS_STATE_SCHEMA_VERSION" >&2; return 6 ;;
   esac
   oss_state_mutate "$sf" migrate_schema \

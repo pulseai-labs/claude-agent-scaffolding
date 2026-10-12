@@ -489,7 +489,7 @@ for r in core backend cron ui uilib; do
 done
 
 # --- demo workdir: explicit arg runs; without one under N=5 it refuses ---
-oss_ledger_add_auto "$E5S" "$E5SP" "core seed present" "test -f seed.txt" "exit:0" >/dev/null
+oss_ledger_add_auto "$E5S" "$E5SP" "core seed present" "test -f seed.txt" "exit:0" active >/dev/null
 t_capture oss_demo_workdir "$E5S" "$E5/core"
 t_assert_rc 0 "E2E5: demo workdir with an explicit arg runs"
 t_assert_eq "$E5/core" "$T_OUT" "E2E5: explicit workdir echoed verbatim"

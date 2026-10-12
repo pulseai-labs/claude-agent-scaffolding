@@ -102,9 +102,9 @@ oss_cmd_veto_add r0.s1 "src/domain/order.rs" auto-bone "bone-touch" >/dev/null
 
 # --- plan-spine-shaped writes (L§5.3) ---
 oss_cmd_work_item_add r0.s1 "wire the entry point" canonical >/dev/null
-DA="$(oss_cmd_ledger_add_auto r0.s1 "core loop runs" "bash -c 'exit 0'" "exit:0")"
+DA="$(oss_cmd_ledger_add_auto r0.s1 "core loop runs" "bash -c 'exit 0'" "exit:0" active)"
 t_assert_eq "d1" "$DA" "sourced: auto demo line d1"
-DU="$(oss_cmd_ledger_add_user r0.s1 "place a paper trade and see it in open positions" "position appears")"
+DU="$(oss_cmd_ledger_add_user r0.s1 "place a paper trade and see it in open positions" "position appears" active)"
 t_assert_eq "d2" "$DU" "sourced: user journey line d2"
 # inspector phrasing rejected at authoring time
 t_capture oss_cmd_ledger_add_user r0.s1 "inspect the schema" "schema seen"
@@ -178,9 +178,9 @@ t_assert_rc 0 "dispatcher: auto-bone veto recorded"
 # --- plan-spine-shaped writes ---
 t_capture "$OSS" work_item_add r0.s1 "wire the entry point" canonical
 t_assert_eq "r0.s1.w1" "$T_OUT" "dispatcher: work item minted"
-t_capture "$OSS" ledger_add_auto r0.s1 "core loop runs" "bash -c 'exit 0'" "exit:0"
+t_capture "$OSS" ledger_add_auto r0.s1 "core loop runs" "bash -c 'exit 0'" "exit:0" active
 t_assert_eq "d1" "$T_OUT" "dispatcher: auto demo line d1"
-t_capture "$OSS" ledger_add_user r0.s1 "place a paper trade and see it in open positions" "position appears"
+t_capture "$OSS" ledger_add_user r0.s1 "place a paper trade and see it in open positions" "position appears" active
 t_assert_eq "d2" "$T_OUT" "dispatcher: user journey line d2"
 
 # inspector phrasing rejected at authoring time - AND writes nothing (fail-

@@ -54,19 +54,26 @@ oss_demo_workdir() { # $1=state-file [$2=explicit-workdir]
 }
 
 oss_demo_run_auto() { # $1=state-file [$2=explicit-workdir]
-  local sf="$1" wd n i line id text cmd expected want out rc passed=0
+  local sf="$1" wd n i line id text cmd expected want out rc passed=0 pending=0
   wd="$(oss_demo_workdir "$sf" "${2:-}")" || return 1
   [ -d "$wd" ] || { echo "oss: demo working dir does not exist: $wd" >&2; return 1; }
-  n="$(jq '[.demo_ledger[] | select(.type=="auto" and (.status=="active" or .status=="quarantined"))] | length' "$sf" 2>/dev/null)" \
+  n="$(jq '[.demo_ledger[] | select(.type=="auto" and (.status=="active" or .status=="quarantined" or .status=="planned"))] | length' "$sf" 2>/dev/null)" \
     || { echo "oss: cannot read state $sf" >&2; return 1; }
   i=0
   while [ "$i" -lt "$n" ]; do
-    line="$(jq -c "[.demo_ledger[] | select(.type==\"auto\" and (.status==\"active\" or .status==\"quarantined\"))][$i]" "$sf")"
+    line="$(jq -c "[.demo_ledger[] | select(.type==\"auto\" and (.status==\"active\" or .status==\"quarantined\" or .status==\"planned\"))][$i]" "$sf")"
     id="$(printf '%s' "$line" | jq -r '.id')"
     text="$(printf '%s' "$line" | jq -r '.text')"
     if [ "$(printf '%s' "$line" | jq -r '.status')" = "quarantined" ]; then
       echo "SKIP $id (quarantined) - $text"
       i=$((i+1)); continue
+    fi
+    # #726: a line its spine has not built yet is REPORTED, never run. Running
+    # it would report the plan rather than a defect, and it is the caller's
+    # business (naming the line) whether that pending line is theirs.
+    if [ "$(printf '%s' "$line" | jq -r '.status')" = "planned" ]; then
+      echo "PENDING $id (planned -> $(printf '%s' "$line" | jq -r '.source_spine')) - $text"
+      pending=$((pending+1)); i=$((i+1)); continue
     fi
     cmd="$(printf '%s' "$line" | jq -r '.command')"
     expected="$(printf '%s' "$line" | jq -r '.expected')"
@@ -107,15 +114,18 @@ oss_demo_run_auto() { # $1=state-file [$2=explicit-workdir]
     esac
     passed=$((passed+1)); i=$((i+1))
   done
-  # Vacuous floor: `n` counts active OR quarantined auto lines, so an empty,
-  # user-lines-only, or all-quarantined ledger executes nothing. A run that
-  # executed zero lines is not a pass - same refusal as report_cross_check's
-  # "nothing to cross-check" over a spec that yielded zero ACs.
+  # Vacuous floor: `n` counts active, quarantined or planned auto lines, so an
+  # empty, user-lines-only, or all-quarantined ledger executes nothing. A run
+  # that executed zero lines is not a pass - same refusal as report_cross_check's
+  # "nothing to cross-check" over a spec that yielded zero ACs. An all-planned
+  # ledger is the same verdict, and the message names how many are pending so
+  # the reader is not left asking whether anything was authored at all.
   if [ "$passed" -eq 0 ]; then
-    echo "oss: demo ledger executed zero lines ($n auto lines, all quarantined or none) - a vacuous run is not a pass" >&2
+    echo "oss: demo ledger executed zero lines ($n auto lines: quarantined, planned or none; $pending pending) - a vacuous run is not a pass" >&2
     return 1
   fi
   echo "PASS $passed lines"
+  [ "$pending" -eq 0 ] || echo "$pending pending"
 }
 
 # §6.1 spine close walks the CLOSING SPINE'S OWN user lines; §6.2 release close
