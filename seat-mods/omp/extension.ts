@@ -57,14 +57,16 @@ export function writeTargets(toolName: string, input: Record<string, unknown>): 
     if (Array.isArray(input.edits))
       for (const e of input.edits) if (e !== null && typeof e === 'object') { add((e as Record<string, unknown>).path); add((e as Record<string, unknown>).rename) }
     if (typeof input.input === 'string') {
-      for (const line of input.input.split('\n')) {
+      const text = input.input.startsWith('\uFEFF') ? input.input.slice(1) : input.input // omp's EXo drops one BOM
+      for (const line of text.split('\n')) {
         const raw = line.replace(/\r$/, '')
         const t = raw.trim()
         if (t.startsWith('MV ')) add(ompPath(t.slice(3))) // hashline rename
         const head = raw.trimEnd() // hashline section header: `[file]` (or `¶file`), as omp's parser reads it
         if (head.startsWith('[')) add(ompPath(head.endsWith(']') ? head.slice(1, -1) : head.slice(1)))
         else if (head.startsWith('¶')) add(ompPath(head.slice(1)))
-        const patch = /^(?:\*\*\* (?:Add File|Update File|Delete File|Move to|Edit File): ?(.+))$/.exec(t) // apply_patch and sloppy headers
+        // apply_patch and sloppy headers, as lenient as omp's detector (case-insensitive, any spacing)
+        const patch = /^\*{3}[ \t]+(?:Edit|Add|Update|Delete)[ \t]+File:[ \t]*(.+)$/i.exec(t) ?? /^\*{3}[ \t]+Move[ \t]+to:[ \t]*(.+)$/i.exec(t)
         if (patch !== null) { add(patch[1].trim()); add(ompPath(patch[1])) }
       }
     }

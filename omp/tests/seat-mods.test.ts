@@ -254,3 +254,17 @@ describe('narrow fix: omp spellings of MV, headers and cwd', () => {
     expect(seen).toEqual(['/other/msg.txt', '/other/msg.txt', '/other/msg.txt', '/home/u/m/msg.txt'])
   })
 })
+
+describe('last fix: omp\'s lenient header detection', () => {
+  test('headers match omp case-insensitively with any spacing, and a leading BOM is dropped', async () => {
+    for (const input of ['*** edit file: /outside/x\n*** Find\nx', '***  Edit  File: /outside/x\n*** Find\nx', '*** Update File: a.ts\n*** move to: /outside/y',
+      '*** UPDATE FILE:/outside/x', '\uFEFF[/outside/x]\nbody'])
+      expect(await guard(deps(), 'edit', { input }, child('implementer'))).toContain('no writes outside')
+    expect(writeTargets('edit', { input: '***\tEdit\tFile:\t/o/t.ts' })).toEqual(['/o/t.ts'])
+    expect(writeTargets('edit', { input: '\uFEFF[/o/b.ts]' })).toEqual(['/o/b.ts'])
+  })
+  test('a lower-case header inside the worktree is still allowed', async () => {
+    expect(await guard(deps(), 'edit', { input: '*** edit file: src/a.ts\n*** Find\nx' }, child('implementer'))).toBeUndefined()
+    expect(await guard(deps(), 'edit', { input: '\uFEFF[src/a.ts]\nbody' }, child('implementer'))).toBeUndefined()
+  })
+})
