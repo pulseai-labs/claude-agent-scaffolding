@@ -303,7 +303,9 @@ and the release close collects it with the operator present (`release-close.md` 
 "$oss_bin" ledger_escape "<line>" "$spine_id" "<escape clause quoted from SPINE.md>" "<the operator's ruling, quoted>"
 ```
 
-The clause is quoted from that declaration; the ruling is the operator's. An
+The clause is quoted from that declaration — recorded at plan time in `SPINE.md`'s
+demo contribution (`plan-spine/references/demo-authoring.md` §6, the only place it is
+written); the ruling is the operator's. An
 `escaped` line is terminal and is not `retired` — the flow did not go away, it failed
 under a pre-declared escape. **With no declared escape, a failed `user:` line halts
 as it always did**; a time-box is written at plan time or not at all.

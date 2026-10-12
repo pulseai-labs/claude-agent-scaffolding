@@ -211,7 +211,10 @@ oss_ledger_expired_quarantines() { # $1=state $2=release ; rc 0 clean, 1 blockin
   return 1
 }
 
-# r<digits> only; the shared shape check for every release argument here.
+# r<digits> only; the shape check the deferral verbs share. `expired_quarantines`
+# above keeps its own inline form, which does NOT require the leading `r`: measured,
+# it accepts a bare `3` at rc 0 where this one refuses it at rc 2 (all other release
+# spellings agree). Do not read the two gates as sharing one grammar.
 _oss_ledger_release_ok() { # $1=release
   case "$1" in r[0-9]*) case "${1#r}" in *[!0-9]*) return 1;; esac; return 0;; esac
   return 1

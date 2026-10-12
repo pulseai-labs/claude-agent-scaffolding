@@ -660,6 +660,13 @@ small. The spine's own planned scope keeps its two paths, both unchanged: §7 fi
 replans of a failed round (`plan-spine` SKILL.md §7) and its own demo-line
 amendments (`plan-spine` SKILL.md §8e).
 
+**A round that lands the code a demo line tests may activate that line here.**
+The lines a spine authored are `planned` until its close activates them, so a line
+whose code has just merged is one its own close will run anyway; the barrier may run
+`"$oss_bin" ledger_activate <line-id>` for it early, and the operator may too. Optional
+and never a gate: a line left `planned` is activated by its own close like every
+other, and a line another spine authored is not this barrier's to activate.
+
 **When the final round clears this barrier, the spine is ready for
 `/close <spine-id>`.** That is where this lane ends — hand the baton over
 explicitly rather than stopping silently.

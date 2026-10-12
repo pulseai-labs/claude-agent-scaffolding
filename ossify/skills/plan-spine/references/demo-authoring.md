@@ -339,11 +339,14 @@ setup is required, the command performs it.
 **A line that can't state its command doesn't enter the ledger.** "We'll figure
 out how to test this later" is a rejected line, not a recorded one.
 
-Watch the cost: `"$oss_bin" ledger_active_auto` lists what the ledger already carries,
-and the release's `ledger_budget` (set at `plan-release`) is the wall-clock
-ceiling. A contribution that will not fit forces a prune / parallelize / deepen
-decision — raise it now, with the user, rather than letting the suite grow past
-its budget silently.
+Watch the cost: `"$oss_bin" ledger_active_auto` lists what the ledger already carries —
+**`active` lines only**, and a line authored a moment ago is `planned` until its own
+spine's close, so a read over the planning window that must see the lines this release
+has just authored is `"$oss_bin" get '[.demo_ledger[] | select(.type=="auto" and
+(.status=="planned" or .status=="active"))]'`. The release's `ledger_budget` (set at
+`plan-release`) is the wall-clock ceiling. A contribution that will not fit forces a
+prune / parallelize / deepen decision — raise it now, with the user, rather than
+letting the suite grow past its budget silently.
 
 **A line is authored `planned`, not `active`.** Its code does not exist yet, so
 nothing runs it until something makes it live: this spine's close activates its own
@@ -351,6 +354,12 @@ lines before the demo, and `"$oss_bin" ledger_activate <line-id>` moves one earl
 round barrier or the operator does that when a round lands the code the line tests.
 `active` at authoring is `adopt`'s case alone, since adoption's lines test surface
 that already ships.
+
+**A spine planned under a time-box escape records the clause at plan time.** Its
+`SPINE.md` demo contribution carries the escape verbatim — "if nothing certifies in
+two weeks, close on a written negative result" — because close quotes that clause and
+only it: `"$oss_bin" ledger_escape` takes it as an argument, and with none recorded the
+failed `user:` line halts as it always did. Writing one at close is not a thing.
 
 ---
 
@@ -370,8 +379,9 @@ after the authoring window has already shut.
 
 **Who authors it.** The Release 0 spine that owns the journey's **entry point** —
 in practice the skeleton spine. Any other Release 0 spine satisfies F6 by
-finding the line already in the ledger, or by naming the spine that will author
-it; it does not author a second one.
+finding the line already in the ledger — through §6's `planned`-inclusive read,
+since the line the skeleton spine just authored is not yet `active` — or by
+naming the spine that will author it; it does not author a second one.
 
 ```bash
 "$oss_bin" ledger_active_auto | jq -r '.[] | "\(.id)\t\(.source_spine)\t\(.text)"'

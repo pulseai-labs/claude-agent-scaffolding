@@ -253,6 +253,8 @@ case "$ed" in
 esac
 stray="$("$oss_bin" get '[.spines[] | select(.status=="closed") | .id] as $c | [.demo_ledger[] | select(.status=="planned" and (.source_spine as $s | $c | index($s)))] | map(.id) | join(" ")')"
 [ -z "$stray" ] || { echo "close: planned lines of closed spines: $stray - spine close step 3 should have activated them - halt"; exit 1; }
+orphan="$("$oss_bin" get '[.spines[] | select(.status=="abandoned") | .id] as $a | [.demo_ledger[] | select(.status=="planned" and (.source_spine as $s | $a | index($s)))] | map(.id) | join(" ")')"
+[ -z "$orphan" ] || echo "close: planned lines of abandoned spines: $orphan - surface each for retire (spine-close.md §4); that spine will never activate them"
 ```
 
 Same rc contract as §5's gate — 0 = clean, 1 = blocking, 2 = could-not-check, one TSV

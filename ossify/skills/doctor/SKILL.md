@@ -163,7 +163,8 @@ four stayed deterministic because `close`'s pre-flight refuses to run until
 snapshot to prove it: a rail in front of a mutation, not a read-out.
 
 **Then you read the rest yourself** — `lock`, `ledger` (pending amendments,
-quarantined lines), `fakes`, `patches`, and `worktrees`. They were ~210 lines of
+quarantined lines, and the lines that will not run: planned, deferred, escaped),
+`fakes`, `patches`, and `worktrees`. They were ~210 lines of
 bash that opened files and counted; they gated nothing, since every one emitted
 `warn:` or `skip:` and neither ever touches the rc. Use the same line grammar, and
 **say plainly at the end whether anything failed** — your half has no exit code.

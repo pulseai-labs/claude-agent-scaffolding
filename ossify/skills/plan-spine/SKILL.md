@@ -309,8 +309,8 @@ against the release-close walkthrough. Author accordingly.
   is a standing regression test and not a walkthrough someone performs once
   (`start` derives the skeleton cut against this bar and hands the obligation
   here). The r0 spine owning the journey's entry point authors it; any other r0
-  spine either finds it already in the ledger (`"$oss_bin" ledger_active_auto`) or names
-  the spine that will. Release 0 does not close without it.
+  spine either finds it in the ledger (the `planned`-inclusive read of
+  `demo-authoring.md` §6) or names the spine that will. Release 0 does not close without it.
 
 ### 8b. Emit the floor read-out before you write anything
 
