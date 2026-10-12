@@ -77,5 +77,56 @@ t_assert_rc 7 "unknown spine is rc 7"
 t_capture oss_ledger_activate "$S" "$U1"
 t_assert_rc 0 "a deferred line can be activated (walked now)"
 
+# --- Task 4: deferral
+oss_ledger_add_user "$S" r0.s2 "share a playlist and a friend opens it" "it opens" active >/dev/null; D1="$(oss_state_read "$S" '.demo_ledger[-1].id')"
+t_capture oss_ledger_defer "$S" "$D1" r0.s2 "operator: the share server is down until next week" r2
+t_assert_rc 0 "defer own user line"
+t_capture oss_state_read "$S" "[.demo_ledger[] | select(.id==\"$D1\")][0] | [.status, .deferred_until_release, .status_reason] | join(\"|\")"
+t_assert_eq "deferred|r2|operator: the share server is down until next week" "$T_OUT" "deferral records status, release and the operator's words"
+t_capture oss_ledger_defer "$S" "$D1" r0.s2 "operator: still down" r3
+t_assert_rc 0 "re-defer ok"
+t_capture oss_state_read "$S" "[.demo_ledger[] | select(.id==\"$D1\")][0].deferred_until_release"
+t_assert_eq "r3" "$T_OUT" "re-defer moves the due release (Review Focus 5)"
+t_capture oss_ledger_defer "$S" "$D1" r0.s2 "   " r3
+t_assert_rc 2 "whitespace-only words refused (Review Focus 1)"
+t_capture oss_ledger_defer "$S" "$D1" r0.s2 "" r3
+t_assert_rc 2 "empty words refused"
+for bad in R3 3 r r3x; do t_capture oss_ledger_defer "$S" "$D1" r0.s2 "op" "$bad"; t_assert_rc 2 "release '$bad' refused (Review Focus 2)"; done
+t_capture oss_ledger_defer "$S" "$D1" r0.s2 "op: padded" r03
+t_assert_rc 0 "r03 is r<digits>, accepted"
+t_capture oss_ledger_defer "$S" "$D1" r0.s1 "op" r3
+t_assert_rc 2 "another spine cannot defer this spine's line"
+t_capture oss_ledger_defer "$S" "$P1" r0.s2 "op" r3
+t_assert_rc 2 "an auto line cannot be deferred"
+t_capture oss_ledger_defer "$S" d999 r0.s2 "op" r3
+t_assert_rc 7 "unknown line rc 7"
+t_capture oss_ledger_defer "$S" "$D1" r9.s9 "op" r3
+t_assert_rc 7 "unknown spine rc 7"
+
+# expired_deferrals: due at or before the release (<=), numeric, anchorless blocks
+t_capture oss_ledger_expired_deferrals "$S" r2
+t_assert_rc 0 "D1 due at r3 is not due at r2"
+t_capture oss_ledger_expired_deferrals "$S" r3
+t_assert_rc 1 "due at its own release (<=)"; t_assert_contains "$T_OUT" "$D1" "the due line is named"
+t_capture oss_ledger_expired_deferrals "$S" r10
+t_assert_rc 1 "numeric, not lexicographic: r3 <= r10"
+# a FRESH line: U1 still carries Task 3's deferred_until_release, and the op never clears that key
+oss_ledger_add_user "$S" r0.s2 "pin a playlist and find it pinned" "pinned" active >/dev/null; U2="$(oss_state_read "$S" '.demo_ledger[-1].id')"
+oss_state_mutate "$S" set_demo_line_status "{\"id\":\"$U2\",\"status\":\"deferred\",\"by\":\"r0.s2\",\"reason\":\"no anchor\"}"
+t_capture oss_ledger_expired_deferrals "$S" r0
+t_assert_rc 1 "an anchorless deferral blocks"; t_assert_contains "$T_OUT" "no-release-anchor" "marked no-release-anchor"
+oss_ledger_activate "$S" "$U2" >/dev/null
+oss_ledger_retire "$S" "$D1" r0.s2 "operator: sharing is dropped" >/dev/null
+t_capture oss_ledger_expired_deferrals "$S" r3
+t_assert_rc 0 "a pending retire by an OPEN spine is reported, not blocking"; t_assert_contains "$T_OUT" "amendment pending -> r0.s2" "reported as amendment pending"
+oss_entity_set_spine_status "$S" r0.s2 closed >/dev/null
+t_capture oss_ledger_expired_deferrals "$S" r3
+t_assert_rc 1 "a pending retire owned by a CLOSED spine never applies, so the line still blocks (Codex PR #127)"
+oss_entity_set_spine_status "$S" r0.s2 planned >/dev/null   # later tasks in this file still use r0.s2 as an open spine
+t_capture oss_ledger_expired_deferrals "$S" bogus
+t_assert_rc 2 "a malformed release is could-not-check"
+t_capture oss_state_replay "$S"
+t_assert_rc 0 "replay clean after deferrals"
+
 cd "$HERE"; rm -rf "$TMP"
 t_summary

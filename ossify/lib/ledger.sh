@@ -211,6 +211,65 @@ oss_ledger_expired_quarantines() { # $1=state $2=release ; rc 0 clean, 1 blockin
   return 1
 }
 
+# r<digits> only; the shared shape check for every release argument here.
+_oss_ledger_release_ok() { # $1=release
+  case "$1" in r[0-9]*) case "${1#r}" in *[!0-9]*) return 1;; esac; return 0;; esac
+  return 1
+}
+
+# #710: a spine's own user: line that cannot be walked now is DEFERRED, still
+# owed, with the operator's words and the release it is due at. Only the
+# owning spine defers it; only user: lines (quarantine parks a failing auto:).
+oss_ledger_defer() { # $1=state $2=line-id $3=spine $4=operator-reason $5=release
+  _oss_ledger_require_line "$1" "$2" || return $?
+  jq -e --arg s "$3" '.spines[] | select(.id == $s)' "$1" >/dev/null 2>&1 \
+    || { echo "oss: unknown spine '$3'" >&2; return 7; }
+  local ty src st
+  ty="$(_oss_ledger_field "$1" "$2" type)"; src="$(_oss_ledger_field "$1" "$2" source_spine)"
+  st="$(_oss_ledger_field "$1" "$2" status)"
+  [ "$ty" = user ] || { echo "oss: line '$2' is an $ty: line - only a user: line can be deferred (a failing auto: line is quarantined)" >&2; return 2; }
+  [ "$src" = "$3" ] || { echo "oss: line '$2' belongs to spine '$src', not '$3' - a spine defers only its own user: lines" >&2; return 2; }
+  case "$st" in active|planned|deferred) ;; *)
+    echo "oss: line '$2' is '$st' - only an active, planned or deferred line can be deferred" >&2; return 2;; esac
+  [ -n "${4//[[:space:]]/}" ] || { echo "oss: a deferral needs the operator's reason, in their words" >&2; return 2; }
+  _oss_ledger_release_ok "$5" || { echo "oss: a deferral is due at a release of the form r<N> (got '$5')" >&2; return 2; }
+  oss_state_mutate "$1" set_demo_line_status \
+    "$(jq -n --arg id "$2" --arg s "$3" --arg r "$4" --arg rel "$5" \
+        '{id:$id,status:"deferred",by:$s,reason:$r,until:$rel}')"
+}
+
+# The deferral gate, twin of oss_ledger_expired_quarantines. A deferral names
+# the release it is DUE AT, so the cut is <= (quarantine uses <). Numeric, for
+# the same r2-vs-r10 reason. A due line that already carries a pending retire
+# or supersede OWNED BY A SPINE THAT CAN STILL CLOSE (planned|active) is printed
+# but does not block: that spine's close applies it. An amendment owned by a
+# closed or abandoned spine is never applied, so the line still blocks -
+# otherwise it reads clean at every later release (Codex, PR #127).
+# rc 0 clean (or only amendment-pending rows), 1 blocking, 2 could-not-check.
+oss_ledger_expired_deferrals() { # $1=state $2=release
+  local sf="$1" rel="$2" out
+  _oss_ledger_release_ok "$rel" \
+    || { echo "oss: expired_deferrals needs a release id of the form r<N> (got '$rel')" >&2; return 2; }
+  out="$(jq -r --arg rel "$rel" '
+      ($rel | ltrimstr("r") | tonumber) as $cut
+      | [.spines[] | select(.status == "planned" or .status == "active") | .id] as $open
+      | .demo_ledger[]
+      | select(.status == "deferred")
+      | . as $l
+      | (try (.deferred_until_release | ltrimstr("r") | tonumber) catch null) as $d
+      | select($d == null or $d <= $cut)
+      | (((.pending_amendments // []) | map(select((.status == "retired" or .status == "superseded")
+                                                   and (.by as $b | $open | index($b) != null))))[0]) as $am
+      | [ $l.id,
+          (if $d == null then "no-release-anchor" else $l.deferred_until_release end),
+          (if $am != null then "amendment pending -> " + $am.by else "due" end),
+          ($l.status_reason // "") ] | @tsv' "$sf" 2>/dev/null)" \
+    || { echo "oss: cannot read the demo ledger from '$sf' - the deferral gate is INCONCLUSIVE, not clean" >&2; return 2; }
+  [ -n "$out" ] || return 0
+  printf '%s\n' "$out"
+  printf '%s\n' "$out" | awk -F'\t' '$3 == "due" { f = 1 } END { exit f ? 1 : 0 }'
+}
+
 oss_ledger_add_patch() { # $1=state $2=commit $3=one-liner $4=repo-key
   local repo
   # #272/#310 Task 5: same if-form default resolution as the nine Task 4
