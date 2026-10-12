@@ -10,6 +10,10 @@ set -u
 export LC_ALL=C
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OMP_SIX="ossify merge-bar workspace-init architect-critic code-judo ai-mentor"
+# The three mods (spec C): catalog entries equal their Claude entries; their text is not gated here.
+OMP_MODS="seat-mods molt autonomic"
+# Plugins that exist on OMP only: no Claude-catalog entry, no .claude-plugin/, versioned by package.json.
+OMP_ONLY="omp-roles"
 # Plugins whose text checks 2-4 enforce on the shipped tree. Widened per PR (spec B §4.4).
 GATED_PLUGINS="$OMP_SIX"
 # The (a|b) alternation keeps this line from matching itself in check 5.
@@ -28,17 +32,24 @@ fm_value() { # $1=file $2=key -> the frontmatter value, surrounding quotes remov
 check_catalog() { # $1=root
   local r=$1 o="$1/.omp-plugin/marketplace.json" c="$1/.claude-plugin/marketplace.json" p v
   [ -f "$o" ] || { echo "catalog: .omp-plugin/marketplace.json missing"; return; }
-  [ "$(jq -r '[.plugins[].name] | sort | join(" ")' "$o")" = "$(printf '%s\n' $OMP_SIX | sort | paste -sd' ' -)" ] \
-    || echo "catalog: lists $(jq -c '[.plugins[].name]' "$o"), want exactly the six"
+  [ "$(jq -r '[.plugins[].name] | sort | join(" ")' "$o")" = "$(printf '%s\n' $OMP_SIX $OMP_MODS $OMP_ONLY | sort | paste -sd' ' -)" ] \
+    || echo "catalog: lists $(jq -c '[.plugins[].name]' "$o"), want exactly the six, the three mods and the OMP-only plugins"
   jq -e --slurpfile c "$c" '.name == $c[0].name and .owner == $c[0].owner' "$o" >/dev/null \
     || echo "catalog: name/owner differ from the Claude catalog"
-  for p in $OMP_SIX; do
+  for p in $OMP_SIX $OMP_MODS; do
     jq -e --arg p "$p" --slurpfile c "$c" \
       '[.plugins[] | select(.name == $p)] == [$c[0].plugins[] | select(.name == $p)]' "$o" >/dev/null \
       || echo "catalog: $p entry differs from the Claude catalog entry"
     v=$(jq -r --arg p "$p" '.plugins[] | select(.name == $p) | .version // empty' "$o")
     [ -z "$v" ] || [ "$v" = "$(jq -r .version "$r/$p/.claude-plugin/plugin.json")" ] \
       || echo "catalog: $p version $v differs from its plugin.json"
+  done
+  for p in $OMP_ONLY; do
+    jq -e --arg p "$p" '[.plugins[] | select(.name == $p)] | length == 0' "$c" >/dev/null \
+      || echo "catalog: $p must not be in the Claude catalog"
+    jq -e '(.version // "") != ""' "$r/$p/package.json" >/dev/null 2>&1 \
+      || echo "catalog: $p has no package.json version"
+    [ ! -d "$r/$p/.claude-plugin" ] || echo "catalog: $p must not have .claude-plugin/"
   done
 }
 
@@ -108,10 +119,18 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/omp-surface.XXXXXX")"; trap 'rm -rf "$WORK"' 
 make_fixture() { # $1=dir
   local d=$1 p
   mkdir -p "$d/.claude-plugin" "$d/.omp-plugin"
-  jq -n --arg six "$OMP_SIX" '{name:"m", owner:{name:"o"},
+  jq -n --arg six "$OMP_SIX $OMP_MODS" '{name:"m", owner:{name:"o"},
     plugins: (($six | split(" ")) + ["herdr-crew"] | map({name:., source:("./"+.), description:"d", category:"c"}))}' \
     > "$d/.claude-plugin/marketplace.json"
-  jq '.plugins |= map(select(.name != "herdr-crew"))' "$d/.claude-plugin/marketplace.json" > "$d/.omp-plugin/marketplace.json"
+  jq --arg only "$OMP_ONLY" '.plugins |= map(select(.name != "herdr-crew"))
+    | .plugins += (($only | split(" ")) | map({name:., source:("./"+.), description:"d", category:"c"}))' \
+    "$d/.claude-plugin/marketplace.json" > "$d/.omp-plugin/marketplace.json"
+  for p in $OMP_MODS; do
+    mkdir -p "$d/$p/.claude-plugin"; printf '{"name":"%s","version":"1.0.0"}\n' "$p" > "$d/$p/.claude-plugin/plugin.json"
+  done
+  for p in $OMP_ONLY; do
+    mkdir -p "$d/$p"; printf '{"name":"%s","version":"0.1.0"}\n' "$p" > "$d/$p/package.json"
+  done
   for p in $OMP_SIX; do
     mkdir -p "$d/$p/.claude-plugin" "$d/$p/skills/$p-s" "$d/$p/commands"
     printf '{"name":"%s","version":"1.0.0"}\n' "$p" > "$d/$p/.claude-plugin/plugin.json"
@@ -139,6 +158,9 @@ out=$(findings "$WORK/clean" "$OMP_SIX"); [ -z "$out" ] && pass "clean fixture h
 control catalog-extra   "catalog: lists"            'jq ".plugins += [{name:\"herdr-crew\",source:\"./herdr-crew\",description:\"d\",category:\"c\"}]" .omp-plugin/marketplace.json > t && mv t .omp-plugin/marketplace.json'
 control catalog-drift   "catalog: ossify entry"     'jq "(.plugins[] | select(.name==\"ossify\") | .description) = \"x\"" .omp-plugin/marketplace.json > t && mv t .omp-plugin/marketplace.json'
 control catalog-version "catalog: ossify version"   'for c in .omp-plugin .claude-plugin; do jq "(.plugins[] | select(.name==\"ossify\")) += {version:\"9.9.9\"}" $c/marketplace.json > t && mv t $c/marketplace.json; done'
+control omp-only-in-claude  "catalog: omp-roles must not be in the Claude catalog" 'jq ".plugins += [{\"name\":\"omp-roles\",\"source\":\"./omp-roles\"}]" .claude-plugin/marketplace.json > t && mv t .claude-plugin/marketplace.json'
+control omp-only-no-pkg     "catalog: omp-roles has no package.json version"    'rm omp-roles/package.json'
+control omp-only-claude-dir "catalog: omp-roles must not have .claude-plugin/"   'mkdir -p omp-roles/.claude-plugin'
 control wrapper-ref     "names a non-skill path"    'printf "Read \`\${CLAUDE_PLUGIN_ROOT}/references/x.md\`\n" >> ossify/commands/c.md'
 control wrapper-alias   "lacks skill://ossify-s"    'sed -i.bak "s|skill://ossify-s|skill://zz|" ossify/commands/c.md && rm ossify/commands/c.md.bak'
 control wrapper-none    "names no"                  'printf "Invoke Skill(ossify:ossify-s).\n" > ossify/commands/c.md'
