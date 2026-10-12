@@ -1119,3 +1119,27 @@ describe('0.5.1: the pushed branch, not the session branch (spec §3)', () => {
     }
   })
 })
+
+describe('0.5.1: the deletes a call makes (spec §5)', () => {
+  const del = (c: string, w: Where = W) => floorFindings(c, w).deletes
+  test('a local delete names its repo and branch', () => {
+    expect(del('git branch -D record/x')).toEqual([{ dir: '/repo/sub', branch: 'record/x' }])
+    expect(del('git -C /other branch -D a refs/heads/b')).toEqual([{ dir: '/other', branch: 'a' }, { dir: '/other', branch: 'b' }])
+    expect(del('cd /work/r && git branch -D x')).toEqual([{ dir: '/work/r', branch: 'x' }])
+    expect(del('git -C r branch -D x')).toEqual([{ dir: '/repo/sub/r', branch: 'x' }])
+  })
+  test('a remote delete names its remote', () => {
+    expect(del('git push origin --delete feat/x')).toEqual([{ dir: '/repo/sub', remote: 'origin', branch: 'feat/x' }])
+    expect(del('git push origin :feat/x')).toEqual([{ dir: '/repo/sub', remote: 'origin', branch: 'feat/x' }])
+  })
+  test('a merge-then-delete chain still lists the delete', () => {
+    expect(del('gh pr merge 1 --merge && git branch -D record/x')).toEqual([{ dir: '/repo/sub', branch: 'record/x' }])
+  })
+  test('a delete the floor cannot read exactly gives null', () => {
+    for (const c of ['git branch -D $B', 'cd $D && git branch -D x', 'git push $R --delete x', 'git push origin --prune', 'git push --mirror origin'])
+      expect([c, del(c)]).toEqual([c, null])
+  })
+  test('no branch-delete, no deletes', () => {
+    expect(del('git push -u origin feat/x')).toEqual([])
+  })
+})

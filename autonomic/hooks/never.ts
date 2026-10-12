@@ -854,7 +854,7 @@ function writesConfig(ws: readonly string[]): boolean {
 // decides. `fork`: the match is only in text (the whole bag, words inside a quoted argument, or a
 // command read over all words), and the fork judges with the finding in its prompt.
 export type Finding = { rule: NeverRule; level: 'ask' | 'fork'; focus: string }
-export type Floor = { findings: Finding[] }
+export type Floor = { findings: Finding[]; deletes: Delete[] | null }
 
 export function neverRules(command: string, where: Where, readers: Readers = DEFAULT_READERS): NeverRule[] {
   return [...new Set(floorFindings(command, where, readers).findings.map(f => f.rule))]
@@ -868,7 +868,7 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
     const found = new Set<NeverRule>()
     rulesOf(r.whole, where, moves(r.whole, where), false, found)
     add(found, 'fork', wholeFocus(command))
-    return settle(out)
+    return settle(out, [])
   }
   const all = [...r.groups.flatMap(g => g.words), ...r.values]
   const names = [...new Set([...(where.defaultBranch !== undefined ? [where.defaultBranch] : []), 'main', 'master'])]
@@ -892,6 +892,8 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
   let moved = r.bag.some(w => /^GIT_(?:DIR|WORK_TREE)=/.test(w))
   let config = r.bag.some(w => /^GIT_CONFIG/.test(w))
   let switched = false
+  let dir: string | undefined = where.cwd
+  let deletes: Delete[] | null = []
   r.groups.forEach((g, k) => {
     const { ws, git, move, config: writes, switches } = effects[k]!
     if (lifted.move.has(g.at)) moved = true
@@ -908,16 +910,66 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
     rulesOf((config && git) || verbOpaque(ws) || loose ? all : ws, where, away, true, text, switched)
     add(own, 'ask', g.text)
     add(new Set([...text].filter(x => !own.has(x))), 'fork', g.text)
-    if (move) moved = true
+    if (lifted.move.has(g.at) || moves(ws, where) && !ws.some(w => w === 'cd' || w === '-C')) dir = undefined
+    if (own.has('branch-delete')) {
+      const d = deletesOf(substitute(g.own, r.vars, g.at), dir, where.home)
+      deletes = deletes === null || d === null ? null : [...deletes, ...d]
+    }
+    if (move) { moved = true; dir = ws.some(w => w === 'popd') ? undefined : cdTo(ws, dir, where.home) }
     if (writes) config = true
     if (switches) switched = true
   })
-  return settle(out)
+  return settle(out, deletes)
 }
 // A rule found at both levels is `ask` (§1).
-function settle(found: readonly Finding[]): Floor {
+function settle(found: readonly Finding[], deletes: Delete[] | null): Floor {
   const ask = new Set(found.filter(f => f.level === 'ask').map(f => f.rule))
-  return { findings: found.filter(f => f.level === 'ask' || !ask.has(f.rule)) }
+  return { findings: found.filter(f => f.level === 'ask' || !ask.has(f.rule)), deletes }
+}
+// 0.5.1 (§5): what a git command deletes, read exactly, in the repo `dir`; null when any name, the
+// remote or the directory is opaque, or the push may delete more than it names (--prune, --mirror).
+export type Delete = { dir: string; remote?: string; branch: string }
+const join = (from: string, d: string, home: string) => (d.startsWith('/') ? d : d === '~' || d.startsWith('~/') ? `${home}${d.slice(1)}` : `${from}/${d}`)
+function deletesOf(ws: readonly string[], dir: string | undefined, home: string): Delete[] | null {
+  const g = ws.findIndex(w => isVerb(w, 'git'))
+  if (g < 0 || dir === undefined) return null
+  let at = dir
+  let i = g + 1
+  while (i < ws.length && ws[i]!.startsWith('-')) {
+    if (ws[i] === '-C') { const d = ws[i + 1]; if (d === undefined || opaque(d)) return null; at = join(at, d, home); i += 2; continue }
+    if (/^-c$|^--(?:git-dir|work-tree)/.test(ws[i]!)) return null
+    i++
+  }
+  const sub = ws[i]
+  const rest = ws.slice(i + 1)
+  const strip = (b: string) => b.replace(/^refs\/heads\//, '')
+  if (sub === 'branch') {
+    const names = rest.filter(w => !w.startsWith('-'))
+    if (names.length === 0 || names.some(opaque)) return null
+    return names.map(b => ({ dir: at, branch: strip(b) }))
+  }
+  if (sub !== 'push' || rest.some(w => w.startsWith('-') && !NO_VALUE.test(w))) return null
+  const args = rest.filter(w => !w.startsWith('-'))
+  const remote = args[0]
+  if (remote === undefined || opaque(remote)) return null
+  const all = rest.some(w => w === '--delete' || /^-[uqvnf]*d[uqvndf]*$/.test(w))
+  const out: Delete[] = []
+  for (const a of args.slice(1)) {
+    const name = all ? a : a.startsWith(':') ? a.slice(1) : a.startsWith('+:') ? a.slice(2) : undefined
+    if (name === undefined) continue // a refspec that pushes, not one that deletes
+    if (name === '' || opaque(name)) return null
+    out.push({ dir: at, remote, branch: strip(name) })
+  }
+  return out.length > 0 ? out : null
+}
+// The directory a literal `cd` leads to; undefined when the target is opaque, `-`, or unknown before.
+function cdTo(ws: readonly string[], from: string | undefined, home: string): string | undefined {
+  const i = ws.findIndex(w => w === 'cd' || w === 'pushd')
+  if (i < 0 || from === undefined) return undefined
+  const t = ws.slice(i + 1).find(w => !/^-[LPe@]+$/.test(w))
+  if (t === undefined) return home
+  if (t === '-' || opaque(t)) return undefined
+  return join(from, t, home)
 }
 // A whole-text finding's focus: the first line that holds a verb word (§6).
 function wholeFocus(command: string): string {
