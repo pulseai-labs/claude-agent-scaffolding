@@ -187,7 +187,8 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
       if (role !== 'implementer') return runDeny(role, toolName)
       const argv = [input.program, ...(Array.isArray(input.args) ? input.args : [])].filter(a => typeof a === 'string')
       const commands = [argv.join(' '), ...evalCommands(String(input.expression ?? '')), String(input.command ?? '')]
-      return shellCheck(deps, role, commands.filter(c => c !== ''), () => deps.cwd)
+      const cwd = typeof input.cwd === 'string' && input.cwd !== '' ? input.cwd : undefined // debug.ts: resolveToCwd
+      return shellCheck(deps, role, commands.filter(c => c !== ''), () => cwd === undefined ? deps.cwd : ompPlace(cwd, deps.cwd, deps.env.HOME, 'cwd'))
     }
     case 'shell': {
       if (toolName === 'eval') {
@@ -196,7 +197,7 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
       }
       // bash takes its own cwd; rm operands and -F files resolve against it, not the session's.
       const cwd = typeof input.cwd === 'string' && input.cwd !== '' ? input.cwd : undefined
-      return shellCheck(deps, role, [String(input.command ?? '')], () => cwd === undefined ? deps.cwd : ompPlace(cwd, deps.cwd, deps.env.HOME, true))
+      return shellCheck(deps, role, [String(input.command ?? '')], () => cwd === undefined ? deps.cwd : ompPlace(cwd, deps.cwd, deps.env.HOME, 'cwd'))
     }
     case 'write':
       return writeCheck(deps, role, toolName, input)
@@ -213,7 +214,7 @@ async function shellCheck(deps: GuardDeps, role: Role, commands: string[], baseO
     for (const command of commands) {
       const files = commitMessageFiles(command)
       if (files.length > 0 && base === undefined) throw new Error('commit message file under an omp URL cwd')
-      const texts = await Promise.all(files.map(f => deps.readFile(absolute(base as string, f)).catch(() => '')))
+      const texts = await Promise.all(messagePaths(files, base as string, deps.env.HOME).map(f => deps.readFile(f).catch(() => '')))
       const removals = []
       for (const operand of rmTargets(command)) {
         const [root, allow] = await Promise.all([deps.worktree(), allowOf(deps)])
@@ -240,7 +241,7 @@ async function writeCheck(deps: GuardDeps, role: Role, toolName: string, input: 
     else for (const reading of readings(raw, toolName === 'ast_edit')) {
       const path = toolName === 'ast_edit' ? globBase(reading) : reading
       let abs: string | undefined
-      try { abs = path === undefined ? undefined : ompPlace(path, deps.cwd, deps.env.HOME, false) } catch { abs = undefined }
+      try { abs = path === undefined ? undefined : ompPlace(path, deps.cwd, deps.env.HOME, 'target') } catch { abs = undefined }
       const target = abs === undefined ? undefined : await deps.real(abs)
       places.push(target === undefined || root === undefined ? 'outside' : placeOf(target, root, allow))
     }
@@ -264,9 +265,14 @@ const CONFIRM_ONLY = /^\s*xd:\/\/(?:resolve|reject)\s*$/
 // dropped; unicode spaces become spaces; a `file://` URL becomes its path; `~`, `~/x` and `~user` (read by omp as
 // <home>/user) expand against HOME. Anything still carrying a `scheme:/` belongs to omp's URL router or its
 // embedded shell's filesystem: undefined, which callers place outside. `/` alone is the session cwd; an absolute
-// path is kept; a relative one is joined to the cwd — collapsed (path.resolve) for a cwd, as omp does, and left
-// raw for a write target, so realOf() follows links before `..` as the kernel will.
-export function ompPlace(raw: string, cwd: string, home: string | undefined, collapse: boolean): string | undefined {
+// path is kept; a relative one is joined to the cwd — collapsed (path.resolve) for a `cwd`, as omp does, and left
+// raw for a `target`, so realOf() follows links before `..` as the kernel will.
+// `shell` reads a word the shell hands a program — an rm operand, a `-F` file — whose folder is the command's: it
+// takes omp's spellings too (a false rewrite only denies) and a scheme is outside (omp's embedded coreutils route a
+// URL operand to its backing file), but `/` stays the root and only an active `~` or `~/` is HOME (`~user` throws:
+// that user's home is not known here). rmTargets and commitMessageFiles hand over a quoted `~` as literal.
+export type PlaceMode = 'cwd' | 'target' | 'shell'
+export function ompPlace(raw: string, cwd: string, home: string | undefined, mode: PlaceMode): string | undefined {
   let t = /^:(?=[/\\~]|\.\.?[/\\]|[A-Za-z]:)/.test(raw) ? raw.slice(1) : raw
   if (t.startsWith('@')) { const r = t.slice(1); if (r.startsWith('/') || r === '~' || r.startsWith('~/') || SCHEME.test(r)) t = r }
   t = t.replace(/[  -   　]/g, ' ')
@@ -274,11 +280,15 @@ export function ompPlace(raw: string, cwd: string, home: string | undefined, col
   if (SCHEME.test(t)) return undefined
   if (t.startsWith('~')) {
     if (home === undefined || !home.startsWith('/')) throw new Error('an omp ~ path needs HOME')
-    t = t === '~' ? home : t.startsWith('~/') || t.startsWith('~\\') ? home + t.slice(1) : join(home, t.slice(1))
+    const h = home.replace(/\/+$/, '') || '/'
+    if (t === '~') t = h
+    else if (t.startsWith('~/') || (mode !== 'shell' && t.startsWith('~\\'))) t = h === '/' ? t.slice(1) : h + t.slice(1)
+    else if (mode === 'shell') throw new Error('~user is not read here')
+    else t = join(h, t.slice(1))
   }
-  if (/^\/+$/.test(t)) return cwd
+  if (mode !== 'shell' && /^\/+$/.test(t)) return cwd
   if (t.startsWith('/')) return t
-  return collapse ? resolve(cwd, t) : absolute(cwd, t)
+  return mode === 'cwd' ? resolve(cwd, t) : absolute(cwd, t)
 }
 
 // The absolute path, NOT normalised: path.resolve collapses `..` before symlinks resolve, so
@@ -291,19 +301,27 @@ function absolute(cwd: string, path: string): string {
 // rm's operand placed as register.ts removalPath does: the parent resolves through links and the final
 // component stays literal (rm unlinks a terminal symlink); a glob or a trailing / . .. follows the directory.
 async function removalPath(deps: GuardDeps, base: string, operand: string, glob: boolean): Promise<string | undefined> {
-  const path = absolute(base, homeOf(operand, deps.env.HOME))
+  const path = ompPlace(operand, base, deps.env.HOME, 'shell')
+  if (path === undefined) return undefined
   if (glob || /\/(?:\.|\.\.)?$/.test(path)) return deps.real(path)
   const cut = path.lastIndexOf('/')
   const parent = await deps.real(cut === 0 ? '/' : path.slice(0, cut))
   return parent === undefined ? undefined : `${parent.replace(/\/$/, '')}/${path.slice(cut + 1)}`
 }
 
-// rmTargets leaves an active leading tilde in place (register.ts removalPath expands it); a bare
-// absolute() would read `~/x` as a folder named `~` under cwd, inside the worktree.
-function homeOf(path: string, home: string | undefined): string {
-  if (path !== '~' && !path.startsWith('~/')) return path
-  if (home === undefined || !home.startsWith('/')) throw new Error('rm operand needs HOME')
-  return (home.replace(/\/$/, '') + path.slice(1)) || '/'
+// A `git commit -F` file, read where the shell will open it. commitMessageFiles drops the quotes around a whole
+// value, so `"~/msg"` (literal, under the cwd) and `~/msg` (HOME) arrive alike: a leading `~` is read both ways
+// and the texts are joined, the strictest reading winning. A scheme file, or a `~` file without HOME, throws:
+// the caller reports the command as not checkable.
+function messagePaths(files: string[], base: string, home: string | undefined): string[] {
+  const paths: string[] = []
+  for (const file of files) {
+    const path = ompPlace(file, base, home, 'shell')
+    if (path === undefined) throw new Error('a commit message file under an omp URL')
+    paths.push(path)
+    if (file.startsWith('~')) paths.push(absolute(base, file))
+  }
+  return paths
 }
 
 async function allowOf(deps: GuardDeps): Promise<string[]> {

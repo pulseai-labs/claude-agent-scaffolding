@@ -403,3 +403,40 @@ describe('PR 762 round 2: an allow list of omp tools, and one omp path normalise
     expect(await guard(deps(), 'eval', { language: 'py', code: 'print(1)' }, child('implementer'))).toBeUndefined()
   })
 })
+
+describe('PR 762 round 3: every path from a tool input goes through the one omp reading', () => {
+  const impl = (over = {}) => deps({ env: { SEAT_MODS_ROLE: 'implementer', HOME: '/home/u' }, ...over })
+  test('an rm operand carrying a URL scheme is outside: omp\'s embedded coreutils route it to the backing file', async () => {
+    for (const operand of ['local://x', 'vault://x', 'local://scratch/out', 'local:/x', 'sub/local://x', "'local://x'"]) {
+      expect(await guard(deps(), 'bash', { command: `rm ${operand}` }, child('task'))).toContain('no rm outside')
+      expect(await guard(impl(), 'bash', { command: `rm -rf ${operand}` }, { kind: 'main' })).toContain('no rm outside')
+    }
+    expect(await guard(deps(), 'bash', { command: 'rm build/out.txt' }, child('task'))).toBeUndefined() // control
+  })
+  test('git commit -F ~/msg reads $HOME/msg, so a trailer there is denied for an implementer main session', async () => {
+    const files: Record<string, string> = { '/home/u/msg': 'x\n\nCo-Authored-By: bot <b@x>\n', '/repo/wt/msg': 'clean\n' }
+    const d = impl({ readFile: async (f: string) => files[f] ?? Promise.reject(new Error('ENOENT')) })
+    expect(await guard(d, 'bash', { command: 'git commit -F ~/msg' }, { kind: 'main' })).toContain('no AI trailers')
+    expect(await guard(d, 'bash', { command: 'git commit --file=~/msg' }, { kind: 'main' })).toContain('no AI trailers')
+    expect(await guard(d, 'bash', { command: 'git commit -F msg' }, { kind: 'main' })).toBeUndefined() // control: in-worktree file, clean
+  })
+  test('a quoted "~/msg" is read literally under the cwd (as well as against HOME, the strictest reading winning)', async () => {
+    const seen: string[] = []
+    const d = impl({ readFile: async (f: string) => { seen.push(f); return '' } })
+    expect(await guard(d, 'bash', { command: 'git commit -F "~/msg"' }, { kind: 'main' })).toBeUndefined()
+    expect(seen).toContain('/repo/wt/~/msg')
+  })
+  test('a -F file with a URL scheme, or a ~ file without HOME, cannot be checked', async () => {
+    expect(await guard(impl(), 'bash', { command: 'git commit -F local://msg' }, { kind: 'main' })).toContain('could not be checked')
+    expect(await guard(deps({ env: { SEAT_MODS_ROLE: 'implementer' } }), 'bash', { command: 'git commit -F ~/msg' }, { kind: 'main' })).toContain('could not be checked')
+    expect(await guard(impl(), 'bash', { command: 'git commit -F ~bob/msg' }, { kind: 'main' })).toContain('could not be checked') // another user's home is not known here
+  })
+  test('debug resolves its cwd as omp does, so a launch scanned for rm is placed there', async () => {
+    expect(await guard(impl(), 'debug', { action: 'launch', program: 'rm', args: ['-rf', 'x'], cwd: 'local://s' }, { kind: 'main' })).toContain('no rm outside')
+    expect(await guard(impl(), 'debug', { action: 'launch', program: 'rm', args: ['-rf', 'x'], cwd: '~/w' }, { kind: 'main' })).toContain('no rm outside')
+    expect(await guard(impl(), 'debug', { action: 'launch', program: 'rm', args: ['-rf', 'x'], cwd: 'sub' }, { kind: 'main' })).toBeUndefined()
+  })
+  test('rm / is not read as the session cwd (omp\'s `/` rule is for its own path arguments, not shell operands)', async () => {
+    expect(await guard(deps(), 'bash', { command: 'rm -rf /' }, child('task'))).toContain('no rm outside')
+  })
+})

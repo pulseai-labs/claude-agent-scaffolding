@@ -31,8 +31,11 @@ All notable changes to the `seat-mods` plugin.
   omp's `expandPath`/`resolveToCwd`: a leading `:`, `@` before `/abs` or `~`, unicode spaces, `file://`, `~`,
   `~/x` and `~user`; a target is also read with write.ts's `[path#HHHH]` header unwrap and the hashline
   quote/tag strip, and an `ast_edit` scope split on `,` `;` and whitespace and placed by its glob's literal
-  folder, the strictest reading winning. A `bash` `cwd` that is an omp URL (`local://scratch`) is outside: `rm`
-  there is denied and a `-F` file there cannot be checked.
+  folder, the strictest reading winning. A `bash` or `debug` `cwd` that is an omp URL (`local://scratch`) is
+  outside: `rm` there is denied and a `-F` file there cannot be checked. `rm` operands and `git commit -F` files
+  take the same reading in its shell form: a `scheme:/` operand (`rm local://x`) is outside, because omp's
+  embedded coreutils route it to the backing file; a `-F` file with a scheme cannot be checked; an unquoted
+  `-F ~/msg` is read from HOME (and, since the quotes are not reported, also literally).
 
 ## 0.3.2 — 2026-10-09
 
