@@ -33,5 +33,19 @@ t_assert_eq "false" "$T_OUT" "a quarantine creates neither new key (old-journal 
 t_capture oss_state_replay "$S"
 t_assert_rc 0 "replay clean across the new fields"
 
+# --- Task 2: default planned, explicit active, anything else refused
+t_capture oss_ledger_add_auto "$S" r0.s2 "a planned line" "false" "exit:0"
+t_assert_rc 0 "add_auto with no status ok"; P1="$T_OUT"
+t_capture oss_state_read "$S" "[.demo_ledger[] | select(.id==\"$P1\")][0].status"
+t_assert_eq "planned" "$T_OUT" "a new auto line defaults to planned"
+t_capture oss_ledger_add_user "$S" r0.s2 "cancel an order and see it leave the list" "order gone"
+P2="$T_OUT"
+t_capture oss_state_read "$S" "[.demo_ledger[] | select(.id==\"$P2\")][0].status"
+t_assert_eq "planned" "$T_OUT" "a new user line defaults to planned"
+t_capture oss_ledger_add_auto "$S" r0.s2 "bad status" "true" "exit:0" live
+t_assert_rc 2 "an unknown initial status is refused"
+t_capture oss_ledger_add_user "$S" r0.s2 "x" "y" deferred
+t_assert_rc 2 "a new line cannot start deferred"
+
 cd "$HERE"; rm -rf "$TMP"
 t_summary

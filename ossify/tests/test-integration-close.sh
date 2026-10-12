@@ -145,11 +145,11 @@ t_assert_eq "0000000000000000000000000000000000000001" "$T_OUT" "station 3: base
 t_capture "$OSS" fake_add "broker-api" fake "no sandbox creds yet" "sandbox creds arrive" r0
 t_assert_rc 0 "station 4: fake recorded with expiry r0"
 
-t_capture "$OSS" ledger_add_auto r0.s1 "core loop runs" "bash -c 'exit 0'" "exit:0"
+t_capture "$OSS" ledger_add_auto r0.s1 "core loop runs" "bash -c 'exit 0'" "exit:0" active
 t_assert_eq "d1" "$T_OUT" "station 4: auto line d1"
-t_capture "$OSS" ledger_add_user r0.s1 "place a paper trade and see it in open positions" "position appears"
+t_capture "$OSS" ledger_add_user r0.s1 "place a paper trade and see it in open positions" "position appears" active
 t_assert_eq "d2" "$T_OUT" "station 4: user journey line d2"
-t_capture "$OSS" ledger_add_auto r0.s1 "legacy entry path runs" "bash -c 'exit 0'" "exit:0"
+t_capture "$OSS" ledger_add_auto r0.s1 "legacy entry path runs" "bash -c 'exit 0'" "exit:0" active
 t_assert_eq "d3" "$T_OUT" "station 4: auto line d3 - the one the amendment targets"
 
 # ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ t_capture "$OSS" spine_add r0 "fill recording" flesh
 t_assert_eq "r0.s2" "$T_OUT" "station 10: spine r0.s2"
 t_capture "$OSS" work_item_add r0.s2 "persist the fill"
 t_assert_eq "r0.s2.w1" "$T_OUT" "station 10: work item r0.s2.w1"
-t_capture "$OSS" ledger_add_auto r0.s2 "fill is recorded" "bash -c 'exit 0'" "exit:0"
+t_capture "$OSS" ledger_add_auto r0.s2 "fill is recorded" "bash -c 'exit 0'" "exit:0" active
 t_assert_eq "d4" "$T_OUT" "station 10: auto line d4 from the second spine"
 
 # THE LIVENESS HALF of the release gate. release-close.md §2's selector, run

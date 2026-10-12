@@ -30,12 +30,12 @@ oss_entity_add_release "$S" "demo" "goal" >/dev/null
 oss_entity_add_spine "$S" r0 "demo spine" bone canonical >/dev/null
 oss_entity_add_spine "$S" r0 "second spine" flesh canonical >/dev/null
 
-oss_ledger_add_auto "$S" r0.s1 "always true" "true" "exit:0" >/dev/null
-oss_ledger_add_auto "$S" r0.s1 "greets" "echo hello-world" "contains:hello" >/dev/null
+oss_ledger_add_auto "$S" r0.s1 "always true" "true" "exit:0" active >/dev/null
+oss_ledger_add_auto "$S" r0.s1 "greets" "echo hello-world" "contains:hello" active >/dev/null
 t_capture oss_demo_run_auto "$S"
 t_assert_rc 0 "all green"; t_assert_contains "$T_OUT" "PASS 2" "pass count"
 
-oss_ledger_add_auto "$S" r0.s1 "always false" "false" "exit:0" >/dev/null
+oss_ledger_add_auto "$S" r0.s1 "always false" "false" "exit:0" active >/dev/null
 t_capture oss_demo_run_auto "$S"
 t_assert_rc 1 "halt on first fail"; t_assert_contains "$T_OUT" "FAIL d3" "failing line named"
 
@@ -43,7 +43,7 @@ oss_ledger_quarantine "$S" d3 "flaky env, fix by r1 close" >/dev/null
 t_capture oss_demo_run_auto "$S"
 t_assert_rc 0 "quarantined line skipped"; t_assert_contains "$T_OUT" "SKIP" "skip reported"
 
-oss_ledger_add_auto "$S" r0.s1 "vacuous suite" "echo 'collected 0 items' # pytest" "exit:0" >/dev/null
+oss_ledger_add_auto "$S" r0.s1 "vacuous suite" "echo 'collected 0 items' # pytest" "exit:0" active >/dev/null
 t_capture oss_demo_run_auto "$S"
 t_assert_rc 1 "vacuous green caught"; t_assert_contains "$T_OUT" "vacuous-green" "guard named"
 
@@ -59,7 +59,7 @@ oss_ledger_quarantine "$S" d4 "test cleanup" >/dev/null
 
 # A legitimate demo line that merely mentions a zero-tests phrase in its output —
 # but is NOT a test runner — must NOT be flagged vacuous-green (AND-gate precision).
-oss_ledger_add_auto "$S" r0.s1 "legit zero-passing mention" "echo '0 passing warnings remain'" "contains:0 passing" >/dev/null
+oss_ledger_add_auto "$S" r0.s1 "legit zero-passing mention" "echo '0 passing warnings remain'" "contains:0 passing" active >/dev/null
 t_capture oss_demo_run_auto "$S"
 t_assert_rc 0 "non-runner output mentioning a zero-tests phrase is NOT vacuous-green"
 
@@ -82,7 +82,7 @@ T2="$(mktemp -d)"; S2="$T2/state.json"
 oss_state_init "$S2" demo-malformed >/dev/null
 oss_entity_add_release "$S2" "demo" "goal" >/dev/null
 oss_entity_add_spine "$S2" r0 "demo spine" bone canonical >/dev/null
-oss_ledger_add_auto "$S2" r0.s1 "legacy line, malformed operand" "exit 1" "exit:0" >/dev/null
+oss_ledger_add_auto "$S2" r0.s1 "legacy line, malformed operand" "exit 1" "exit:0" active >/dev/null
 jq '.demo_ledger[0].expected = "exit:0 (tests green)"' "$S2" > "$S2.x" && mv "$S2.x" "$S2"
 t_capture oss_demo_run_auto "$S2"
 t_assert_rc 1 "malformed exit: operand FAILS the line (was: silently counted as PASS)"
@@ -104,7 +104,7 @@ rm -rf "$T2"
 # The runner executes in the COMPOSITION ROOT (canonical when unset), not the
 # caller's cwd. A relative-path demo command is the whole point of the ledger.
 mkdir -p "$TMP/canon"; echo marker > "$TMP/canon/marker.txt"
-t_capture oss_ledger_add_auto "$S" r0.s1 "marker present" "test -f marker.txt" "exit:0"
+t_capture oss_ledger_add_auto "$S" r0.s1 "marker present" "test -f marker.txt" "exit:0" active
 cd "$TMP"   # deliberately NOT the demo working dir
 # Explicit workdir: this suite has no pairing manifest, so the manifest leg
 # cannot resolve. That is the whole reason oss_demo_workdir takes an explicit
@@ -214,13 +214,13 @@ oss_state_mutate "$S" set_composition "$(jq -n '{composition_root:null}')" >/dev
 # silent regardless of scoping - proving nothing. Verified: mutating the guard
 # back to unscoped does NOT red this assertion unless the command string
 # itself matches a runner pattern AND the output shows a zero-tests phrase.
-t_capture oss_ledger_add_auto "$S" r0.s1 "suite fails as expected" "bash -c 'echo 0 passing; exit 1' # pytest" "exit:1"
+t_capture oss_ledger_add_auto "$S" r0.s1 "suite fails as expected" "bash -c 'echo 0 passing; exit 1' # pytest" "exit:1" active
 t_capture oss_demo_run_auto "$S" "$TMP/canon"
 t_assert_rc 0 "a recognized runner legitimately expecting exit:1 is not flagged vacuous"
 
 # user: lines are surfaceable, and scopeable to one spine.
-t_capture oss_ledger_add_user "$S" r0.s1 "reschedule a delivery and see the new window" "the slot moves"
-t_capture oss_ledger_add_user "$S" r0.s2 "cancel an order from the ticket" "the order clears"
+t_capture oss_ledger_add_user "$S" r0.s1 "reschedule a delivery and see the new window" "the slot moves" active
+t_capture oss_ledger_add_user "$S" r0.s2 "cancel an order from the ticket" "the order clears" active
 t_capture oss_demo_user_lines "$S" r0.s1
 t_assert_eq "1" "$(printf '%s' "$T_OUT" | jq 'length')" "user lines scope to one spine (the §6.1 spine-close set)"
 t_capture oss_demo_user_lines "$S"
@@ -255,11 +255,11 @@ t_assert_rc 1 "#269: an EMPTY demo ledger is not a pass"
 case "$T_OUT" in *"PASS 0"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: #269: vacuous 'PASS 0 lines' still emitted";; *) T_PASS=$((T_PASS+1));; esac
 t_assert_contains "$T_OUT" "zero" "...and the verdict names the zero-execution"
 
-oss_ledger_add_user "$SE" r0.s1 "look at the dashboard" "it loads" >/dev/null
+oss_ledger_add_user "$SE" r0.s1 "look at the dashboard" "it loads" active >/dev/null
 t_capture oss_demo_run_auto "$SE" "$TMP/canon"
 t_assert_rc 1 "#269: a user-lines-only ledger still executes zero auto lines"
 
-oss_ledger_add_auto "$SE" r0.s1 "flaky line" "true" "exit:0" >/dev/null
+oss_ledger_add_auto "$SE" r0.s1 "flaky line" "true" "exit:0" active >/dev/null
 # The user line above minted d1, so the auto line is d2 - select by type
 # rather than hardcoding, so the fixture survives an id-scheme change.
 oss_ledger_quarantine "$SE" "$(jq -r '[.demo_ledger[] | select(.type=="auto")][0].id' "$SE")" "quarantined for the fixture" >/dev/null
@@ -299,13 +299,13 @@ oss_state_init "$SD" demo-run-twin >/dev/null
 oss_entity_add_release "$SD" "demo" "goal" >/dev/null
 oss_entity_add_spine "$SD" r0 "demo spine" bone core >/dev/null
 
-oss_ledger_add_auto "$SD" r0.s1 "always true" "true" "exit:0" >/dev/null
-oss_ledger_add_auto "$SD" r0.s1 "greets" "echo hello-world" "contains:hello" >/dev/null
+oss_ledger_add_auto "$SD" r0.s1 "always true" "true" "exit:0" active >/dev/null
+oss_ledger_add_auto "$SD" r0.s1 "greets" "echo hello-world" "contains:hello" active >/dev/null
 t_capture oss_demo_run_auto "$SD"
 t_assert_rc 0 "topology twin: all green"
 t_assert_contains "$T_OUT" "PASS 2" "topology twin: pass count"
 
-oss_ledger_add_auto "$SD" r0.s1 "always false" "false" "exit:0" >/dev/null
+oss_ledger_add_auto "$SD" r0.s1 "always false" "false" "exit:0" active >/dev/null
 t_capture oss_demo_run_auto "$SD"
 t_assert_rc 1 "topology twin: halt on first fail"
 t_assert_contains "$T_OUT" "FAIL d3" "topology twin: failing line named"
@@ -315,7 +315,7 @@ t_capture oss_demo_run_auto "$SD"
 t_assert_rc 0 "topology twin: quarantined line skipped"
 t_assert_contains "$T_OUT" "SKIP" "topology twin: skip reported"
 
-oss_ledger_add_auto "$SD" r0.s1 "vacuous suite" "echo 'collected 0 items' # pytest" "exit:0" >/dev/null
+oss_ledger_add_auto "$SD" r0.s1 "vacuous suite" "echo 'collected 0 items' # pytest" "exit:0" active >/dev/null
 t_capture oss_demo_run_auto "$SD"
 t_assert_rc 1 "topology twin: vacuous green caught"
 t_assert_contains "$T_OUT" "vacuous-green" "topology twin: guard named"
@@ -325,7 +325,7 @@ t_assert_contains "$T_OUT" "vacuous-green" "topology twin: guard named"
 # own d4 before this exact assertion (review round 1, finding 3: the twin
 # had stopped one assertion short of the legacy sequence at :60-64).
 oss_ledger_quarantine "$SD" d4 "test cleanup" >/dev/null
-oss_ledger_add_auto "$SD" r0.s1 "legit zero-passing mention" "echo '0 passing warnings remain'" "contains:0 passing" >/dev/null
+oss_ledger_add_auto "$SD" r0.s1 "legit zero-passing mention" "echo '0 passing warnings remain'" "contains:0 passing" active >/dev/null
 t_capture oss_demo_run_auto "$SD"
 t_assert_rc 0 "topology twin: non-runner output mentioning a zero-tests phrase is NOT vacuous-green (AND-gate precision)"
 

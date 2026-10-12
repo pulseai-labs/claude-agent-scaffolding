@@ -22,12 +22,12 @@ oss_state_init "$S" ledger-demo >/dev/null
 oss_entity_add_release "$S" "demo release" "goal" >/dev/null
 oss_entity_add_spine "$S" r0 "demo spine" bone canonical >/dev/null
 
-t_capture oss_ledger_add_auto "$S" r0.s1 "backtest CLI smoke" "true" "exit:0"
+t_capture oss_ledger_add_auto "$S" r0.s1 "backtest CLI smoke" "true" "exit:0" active
 t_assert_rc 0 "auto line added"; t_assert_eq "d1" "$T_OUT" "counter-minted id"
 t_capture oss_ledger_add_auto "$S" r0.s1 "bad expected" "true" "somehow:fine"
 t_assert_rc 2 "invalid expected grammar rejected"
 
-t_capture oss_ledger_add_user "$S" r0.s1 "Type a strategy idea and run a backtest from the chat panel" "results table visible"
+t_capture oss_ledger_add_user "$S" r0.s1 "Type a strategy idea and run a backtest from the chat panel" "results table visible" active
 t_assert_rc 0 "user journey line added"; t_assert_eq "d2" "$T_OUT" "second id"
 t_capture oss_ledger_add_user "$S" r0.s1 "Inspect the pulse.db schema" "schema visible"
 t_assert_rc 2 "inspector phrasing banned"
@@ -171,7 +171,7 @@ t_assert_rc 2 "leading-space inspector phrasing banned"
 t_capture oss_ledger_add_user "$S" r0.s1 "$(printf '\tInspect the schema')" "schema visible"
 t_assert_rc 2 "leading-tab inspector phrasing banned"
 # ...but the trim must not over-reject a legitimate leading-space journey line.
-t_capture oss_ledger_add_user "$S" r0.s1 " Type a strategy idea and run a backtest" "results visible"
+t_capture oss_ledger_add_user "$S" r0.s1 " Type a strategy idea and run a backtest" "results visible" active
 t_assert_rc 0 "leading-space legitimate journey line still accepted"
 
 # --- Final review finding 1: the `expected` validator was the glob `exit:[0-9]*`
@@ -186,7 +186,7 @@ for bad in "exit:0 (tests green)" "exit:0abc" "exit:0 # x" "exit:0|contains:x" "
   t_assert_rc 2 "malformed exit: operand rejected: '$bad'"
 done
 # ...and the tightening must not over-reject a well-formed multi-digit code.
-t_capture oss_ledger_add_auto "$S" r0.s1 "multi-digit exit code" "true" "exit:127"
+t_capture oss_ledger_add_auto "$S" r0.s1 "multi-digit exit code" "true" "exit:127" active
 t_assert_rc 0 "well-formed multi-digit exit: operand still accepted"
 
 L1=d1   # this file uses literal demo-line ids

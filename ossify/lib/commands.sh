@@ -117,13 +117,13 @@ oss_cmd_feature_add() { # $1=name $2=value $3=class-guess $4=source
 oss_cmd_touch_check() { # $@=paths
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_touch_check "$sf" "$@"
 }
-oss_cmd_ledger_add_auto() { # $1=spine $2=text $3=command $4=expected
-  _oss_need 4 ledger_add_auto "<spine> <text> <command> <expected>" "$@" || return 2;
-  local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_add_auto "$sf" "$1" "$2" "$3" "$4"
+oss_cmd_ledger_add_auto() { # $1=spine $2=text $3=command $4=expected [$5=planned|active]
+  _oss_need 4 ledger_add_auto "<spine> <text> <command> <expected> [planned|active]" "$@" || return 2;
+  local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_add_auto "$sf" "$1" "$2" "$3" "$4" "${5:-}"
 }
-oss_cmd_ledger_add_user() { # $1=spine $2=text $3=outcome
-  _oss_need 3 ledger_add_user "<spine> <text> <outcome>" "$@" || return 2;
-  local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_add_user "$sf" "$1" "$2" "$3"
+oss_cmd_ledger_add_user() { # $1=spine $2=text $3=outcome [$4=planned|active]
+  _oss_need 3 ledger_add_user "<spine> <text> <outcome> [planned|active]" "$@" || return 2;
+  local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_add_user "$sf" "$1" "$2" "$3" "${4:-}"
 }
 oss_cmd_ledger_supersede() { # $1=line $2=by-spine $3=reason
   _oss_need 3 ledger_supersede "<line> <by-spine> <reason>" "$@" || return 2;

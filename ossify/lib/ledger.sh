@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Cumulative product demo ledger (spec §3, §6.1) + patch lane records.
 
-oss_ledger_add_auto() { # $1=state $2=spine $3=text $4=command $5=expected
+oss_ledger_add_auto() { # $1=state $2=spine $3=text $4=command $5=expected [$6=planned|active]
   # Validate the spine exists BEFORE anything else: a demo line journaled
   # against a nonexistent spine (typo like r0.s99) is silently skipped at
   # spine close, which filters by source_spine — the line counts as authored
@@ -26,13 +26,20 @@ oss_ledger_add_auto() { # $1=state $2=spine $3=text $4=command $5=expected
     contains:?*) ;;
     *) echo "oss: expected must be 'exit:<n>' or 'contains:<str>'" >&2; return 2 ;;
   esac
+  # #363: a line authored at plan time tests code that does not exist yet, so
+  # it starts `planned` and demo_run reports it as pending until its spine's
+  # close activates it. `active` stays available for the one caller whose lines
+  # test code that already ships (adopt).
+  local st="${6:-planned}"
+  case "$st" in planned|active) ;; *)
+    echo "oss: a new demo line starts planned or active (got '$st') - planned until its code is built (#363)" >&2; return 2;; esac
   oss_state_mutate "$1" add_demo_line \
-    "$(jq -n --arg s "$2" --arg t "$3" --arg c "$4" --arg e "$5" --arg ts "$(_oss_now)" \
-      '{type:"auto",text:$t,command:$c,expected:$e,source_spine:$s,status:"active",status_reason:null,status_by:null,at:$ts}')" \
+    "$(jq -n --arg s "$2" --arg t "$3" --arg c "$4" --arg e "$5" --arg st "$st" --arg ts "$(_oss_now)" \
+      '{type:"auto",text:$t,command:$c,expected:$e,source_spine:$s,status:$st,status_reason:null,status_by:null,at:$ts}')" \
     demo
 }
 
-oss_ledger_add_user() { # $1=state $2=spine $3=text $4=outcome
+oss_ledger_add_user() { # $1=state $2=spine $3=text $4=outcome [$5=planned|active]
   # Same validation as add_auto: an unknown source_spine journals silently
   # and is never run at the close ceremony.
   jq -e --arg s "$2" '.spines[] | select(.id == $s)' "$1" >/dev/null 2>&1 \
@@ -43,9 +50,15 @@ oss_ledger_add_user() { # $1=state $2=spine $3=text $4=outcome
   case "$lower" in inspect\ *|view\ *|open\ *)
     echo "oss: inspector phrasing banned in user journey lines (spec §5.3 floor) - phrase as an action the user performs for value" >&2
     return 2;; esac
+  # Same default and same refusal as add_auto above: a journey line is authored
+  # before the flow exists, so it starts `planned` unless the caller says the
+  # flow already ships.
+  local st="${5:-planned}"
+  case "$st" in planned|active) ;; *)
+    echo "oss: a new demo line starts planned or active (got '$st') - planned until its code is built (#363)" >&2; return 2;; esac
   oss_state_mutate "$1" add_demo_line \
-    "$(jq -n --arg s "$2" --arg t "$3" --arg o "$4" --arg ts "$(_oss_now)" \
-      '{type:"user",text:$t,outcome:$o,source_spine:$s,status:"active",status_reason:null,status_by:null,at:$ts}')" \
+    "$(jq -n --arg s "$2" --arg t "$3" --arg o "$4" --arg st "$st" --arg ts "$(_oss_now)" \
+      '{type:"user",text:$t,outcome:$o,source_spine:$s,status:$st,status_reason:null,status_by:null,at:$ts}')" \
     demo
 }
 
