@@ -1,7 +1,7 @@
 // seat-mods on OMP: the same rules as hooks/register.ts, read through OMP's extension API.
 // Loaded only by omp-seat with -e (never ambient). Reads SEAT_MODS_ROLE / SEAT_MODS_ALLOW
 // for the main session and ctx.agent.name for a task child, whose env is its parent's.
-import { realpathSync, existsSync, readFileSync } from 'node:fs'
+import { realpathSync, existsSync, lstatSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { dirname, basename } from 'node:path'
 import {
@@ -135,7 +135,8 @@ async function allowOf(deps: GuardDeps): Promise<string[]> {
 // step is a `..`-free path (safe to realpath), and `..` takes the parent of the already-resolved folder.
 export function realOf(path: string): string | undefined {
   const parts = path.split('/')
-  if (!path.startsWith('/') || !parts.includes('..')) return plainRealOf(path)
+  if (!parts.includes('..')) return plainRealOf(path)
+  if (!path.startsWith('/')) return undefined // a relative path with .. would take the lexical collapse; callers pass absolute paths
   let cur = '/'
   for (const part of parts) {
     if (part === '' || part === '.') continue
@@ -153,7 +154,8 @@ export function realOf(path: string): string | undefined {
 
 function plainRealOf(path: string): string | undefined {
   try { return realpathSync(path) } catch {}
-  if (existsSync(path)) return undefined // dangling link
+  // lstat sees the link itself; existsSync follows it, so it is false for a dangling link, which a write would follow.
+  try { lstatSync(path); return undefined } catch {}
   const folder = dirname(path)
   const name = basename(path)
   if (folder === path || name === '..') return undefined

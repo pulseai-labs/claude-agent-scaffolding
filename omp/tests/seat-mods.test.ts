@@ -109,6 +109,8 @@ describe('realOf on a real file system', () => {
   mkdirSync(join(fx, 'outside'))
   symlinkSync(join(fx, 'outside'), join(fx, 'repo', 'link'))
   writeFileSync(join(fx, 'repo', 'a.txt'), 'a')
+  symlinkSync(join(fx, 'outside', 'new.txt'), join(fx, 'repo', 'dl')) // dangling: a write through it creates outside/new.txt
+  symlinkSync(join(fx, 'repo', 'dl'), join(fx, 'repo', 'll')) // a link to the dangling link
   test('.. below a link is read where the kernel lands: beside the link target, not beside the link', () => {
     expect(realOf(`${fx}/repo/link/../x.txt`)).toBe(join(fx, 'x.txt'))
     expect(realOf(`${fx}/repo/link/../repo/a.txt`)).toBe(join(fx, 'repo', 'a.txt'))
@@ -125,5 +127,19 @@ describe('realOf on a real file system', () => {
   })
   test('.. below a folder that does not exist cannot be resolved', () => {
     expect(realOf(`${fx}/repo/nope/../x.txt`)).toBeUndefined()
+  })
+  test('a dangling link as the final component is unresolvable, directly and through another link', () => {
+    expect(realOf(`${fx}/repo/dl`)).toBeUndefined()
+    expect(realOf(`${fx}/repo/ll`)).toBeUndefined()
+    expect(realOf(`${fx}/repo/dl/../x`)).toBeUndefined()
+  })
+  test('a guard over the real file system denies a child write to a dangling link', async () => {
+    const d = deps({ cwd: join(fx, 'repo'), worktree: async () => join(fx, 'repo'), real: async (p: string) => realOf(p), env: { SEAT_MODS_ROLE: 'coordinator' } })
+    expect(await guard(d, 'write', { path: `${fx}/repo/dl` }, child('task'))).toContain('no writes outside')
+    expect(await guard(d, 'write', { path: 'll' }, child('task'))).toContain('no writes outside')
+  })
+  test('a relative path with a .. component is unresolvable (no lexical collapse)', () => {
+    expect(realOf('repo/link/../x.txt')).toBeUndefined()
+    expect(realOf('../x.txt')).toBeUndefined()
   })
 })
