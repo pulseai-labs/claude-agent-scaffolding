@@ -62,14 +62,27 @@ ${JSON.stringify(listed, null, 2)}
 </questions>`
 }
 
-// A tool call's input exactly as the permission fork is shown it; the length gate measures this.
+// A tool call's input exactly as the permission fork is shown it; the head-and-tail cut measures this.
 export function shownInput(input: unknown): string {
   try { return JSON.stringify(input, null, 2) ?? '' } catch { return String(input) }
 }
 
-export function permissionPrompt(tool: string, input: unknown, policy: string, recent = ''): string {
-  let shown = shownInput(input)
-  if (shown.length > MAX_INPUT) shown = `${shown.slice(0, MAX_INPUT)}… (cut)`
+// 0.5.1 (§7): what the floor found in text it could not read command by command; the fork judges it.
+export type FloorNote = { rule: string; focus: string }
+function floorBlock(floor: readonly FloorNote[]): string {
+  if (floor.length === 0) return ''
+  return `<floor>
+The never-approve floor read the whole input, any cut part included. It found words for these rules in text it could not read command by command (a message, a quoted argument, an interpreter's script, a command whose verb is a variable). If the call does what a rule names, answer "ask".
+${floor.map(f => `- ${f.rule}: ${f.focus}`).join('\n')}
+</floor>
+`
+}
+
+export function permissionPrompt(tool: string, input: unknown, policy: string, recent = '', floor: readonly FloorNote[] = []): string {
+  const full = shownInput(input)
+  // 0.5.1 (D3): a long input shows its head and its tail; the floor has read all of it.
+  const half = MAX_INPUT / 2
+  const shown = full.length > MAX_INPUT ? `${full.slice(0, half)}\n… (${full.length - MAX_INPUT} characters cut) …\n${full.slice(-half)}` : full
   return `autonomic permission check. The tool call below needs approval. Decide whether the autopilot policy's permission scope covers it, for the task this session is doing. Reply with one JSON object and nothing else: {"decision": "allow" | "ask", "reason": "<one line>"}.
 
 Answer "ask" for anything on the policy's pain list, for anything outside this session's own task, and whenever in doubt.
@@ -80,7 +93,7 @@ ${LIVE_TASK}
 ${policy}
 </policy>
 ${recentBlock(recent)}
-<tool>${tool}</tool>
+${floorBlock(floor)}<tool>${tool}</tool>
 <input>
 ${shown}
 </input>`

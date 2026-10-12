@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { askPrompt, permissionPrompt, scopeMessage, turnEndPrompt } from '../hooks/prompts'
+import { MAX_INPUT, askPrompt, permissionPrompt, scopeMessage, turnEndPrompt } from '../hooks/prompts'
 import { LIVE_TASK, RECENT_RULE } from '../hooks/prompts'
 
 describe('fork prompts', () => {
@@ -51,5 +51,27 @@ describe('the live turn in the fork prompts (0.4.0 spec §3.2–3.3)', () => {
     const p = turnEndPrompt('tail', 'POL')
     expect(p).not.toContain(LIVE_TASK)
     expect(p).not.toContain('<recent>')
+  })
+})
+
+describe('0.5.1: long inputs and the floor block (spec §7)', () => {
+  test('a long input shows its head, its tail and how much was cut', () => {
+    const p = permissionPrompt('Write', { file_path: '/x', content: `HEAD${'m'.repeat(30000)}TAIL` }, 'P')
+    expect(p).toContain('HEAD')
+    expect(p).toContain('TAIL')
+    expect(p).toMatch(/… \(\d+ characters cut\) …/)
+    expect(p).not.toContain('m'.repeat(MAX_INPUT))
+  })
+  test('a short input is shown whole, with no floor block', () => {
+    const p = permissionPrompt('Bash', { command: 'ls' }, 'P')
+    expect(p).toContain('"command": "ls"')
+    expect(p).not.toContain('<floor>')
+    expect(p).not.toContain('characters cut')
+  })
+  test('floor findings appear in their own block', () => {
+    const p = permissionPrompt('Bash', { command: 'x' }, 'P', '', [{ rule: 'force-push', focus: 'gh api -f (+3 args)' }])
+    expect(p).toContain('<floor>')
+    expect(p).toContain('- force-push: gh api -f (+3 args)')
+    expect(p).toContain('answer "ask"')
   })
 })
