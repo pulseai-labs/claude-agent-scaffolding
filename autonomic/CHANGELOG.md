@@ -26,7 +26,9 @@ false positives, 17 inputs never judged).
 - **Known limits.** A call that merges and then deletes in one command still asks (the branch is not
   merged when the check runs). A session's first call still asks: there is nothing to fork yet. A
   rebase-merged branch is not an ancestor of the default branch, so its delete still asks. A host with
-  no `timeout` command (stock macOS) cannot read a remote's tip, so a remote delete asks there.
+  no `timeout` command (stock macOS) cannot read a remote's tip, so a remote delete asks there. A
+  literal variable that holds spaces, used inside double quotes (`F='push -f'; curl -d "$F" …`), is
+  re-split when the floor reads its value, so it can ask where Bash passes one data argument.
 
 ## 0.5.0
 

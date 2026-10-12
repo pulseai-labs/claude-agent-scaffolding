@@ -73,5 +73,12 @@ describe('0.5.1: long inputs and the floor block (spec §7)', () => {
     expect(p).toContain('<floor>')
     expect(p).toContain('- force-push: gh api -f (+3 args)')
     expect(p).toContain('answer "ask"')
+    expect(p).not.toContain('cleanup')
+  })
+  test('a merged delete is marked, and judged as cleanup (D2)', () => {
+    const p = permissionPrompt('Bash', { command: 'x' }, 'P', '', [{ rule: 'branch-delete', focus: 'git branch -D (+1 args)', merged: true }])
+    expect(p).toContain('- branch-delete (merged): git branch -D (+1 args)')
+    expect(p).toContain('Judge it as cleanup')
+    expect(p).not.toContain('answer "ask"')
   })
 })

@@ -39,7 +39,9 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     w.forks.push(fork({ decision: 'allow', reason: 'merged cleanup' }))
     expect((await $.tool.check(BASH('git branch -D record/x'))).decision).toBe('allow')
     expect(w.runs.some(r => r.join(' ') === 'git -C /repo merge-base --is-ancestor refs/heads/record/x refs/remotes/origin/main')).toBe(true)
-    expect(w.forkPrompts[0]).toContain('- branch-delete:')
+    expect(w.forkPrompts[0]).toContain('- branch-delete (merged):')
+    expect(w.forkPrompts[0]).toContain('Judge it as cleanup')
+    expect(w.forkPrompts[0]).not.toContain('If the call does what such a rule names')
   })
   test('a remote delete reads the tip from the remote, and goes to the fork when that tip is merged', async ($, on) => {
     const w = world(on, { env: AP })
@@ -122,6 +124,15 @@ describe('0.5.1 routing: the bypass floor (spec §6)', () => {
     const w = world(on, { env: AP })
     w.verdict = { decision: 'allow' }
     expect((await $.tool.check(BASH(REPLY))).decision).toBe('ask')
+  })
+  test('a merged delete alone still goes to the fork; its ask becomes an ask (D2)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    w.git.merged = ['refs/heads/record/x']
+    w.forks.push(fork({ decision: 'ask', reason: 'not this task' }))
+    expect((await $.tool.check(BASH('git branch -D record/x'))).decision).toBe('ask')
+    expect(w.forkPrompts).toHaveLength(1)
+    expect(w.forkPrompts[0]).toContain('- branch-delete (merged):')
   })
   test('a command with no finding keeps the allow; no fork', async ($, on) => {
     const w = world(on, { env: AP })

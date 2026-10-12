@@ -310,20 +310,21 @@ async function statusReport($: Engine, id: string): Promise<string> {
 
 // 0.5.1 (§5–6): the floor's findings for a command, only the operator's enabled rules. A
 // branch-delete whose every branch is merged into the default branch moves to the fork (D2).
-type FloorRead = { ask: Finding[]; fork: Finding[] }
+type FloorRead = { ask: Finding[]; fork: Finding[]; merged: Finding[] }
 async function floorOf($: Engine, command: string): Promise<FloorRead> {
   const w = await where($)
   const { findings, deletes } = floorFindings(command, w, cfg.readers)
   const on = new Set(enforced([...new Set(findings.map(f => f.rule))], cfg.neverApprove))
   const live = findings.filter(f => on.has(f.rule))
   let ask = live.filter(f => f.level === 'ask')
-  let fork = live.filter(f => f.level === 'fork')
+  const fork = live.filter(f => f.level === 'fork')
+  let done: Finding[] = []
   if (ask.some(f => f.rule === 'branch-delete') && deletes !== null && deletes.length > 0 &&
     (await Promise.all(deletes.map(d => merged($, d, w.defaultBranch)))).every(Boolean)) {
-    fork = [...fork, ...ask.filter(f => f.rule === 'branch-delete')]
+    done = ask.filter(f => f.rule === 'branch-delete')
     ask = ask.filter(f => f.rule !== 'branch-delete')
   }
-  return { ask, fork }
+  return { ask, fork, merged: done }
 }
 // Checked before the command runs: a branch the same call merges is not merged yet. A remote
 // branch's tip is read from the remote itself, never from a tracking ref that may be older (PR #131
@@ -347,7 +348,10 @@ async function merged($: Engine, d: Delete, originDefault: string | undefined): 
 }
 const rulesIn = (found: readonly Finding[]) => [...new Set(found.map(f => f.rule))]
 // The fork sees each finding's shape, never its text (PR #681 round 8).
-const notesOf = (found: readonly Finding[]) => found.map(f => ({ rule: f.rule, focus: shape(f.focus) }))
+// A merged delete is marked, so the fork judges it as cleanup rather than as an unread delete (D2).
+const notesOf = (f: FloorRead) => [...f.fork.map(x => ({ rule: x.rule, focus: shape(x.focus) })), ...f.merged.map(x => ({ rule: x.rule, focus: shape(x.focus), merged: true }))]
+// The findings the fork judges: text-only ones and merged deletes.
+const forkOf = (f: FloorRead) => [...f.fork, ...f.merged]
 // The pain text leads with the command that matched, so the band shows what tripped (#677 F9; 0.5.1 cause 8).
 function painFocus(found: readonly Finding[], command: string): string {
   const lines = command.split('\n').map(l => l.trim()).filter(Boolean)
@@ -629,9 +633,9 @@ export const register: Register = (on, options) => {
           await log($, `floor error ${String(err)}`)
           return { ...r, decision: 'ask', reason: 'autonomic: the never-approve check failed; this call stays with you' }
         }
-        if (f.ask.length === 0 && f.fork.length === 0) return r
+        if (f.ask.length === 0 && forkOf(f).length === 0) return r
         // Outside autopilot there is no fork: a text-only finding asks too.
-        const stop = f.ask.length > 0 ? f.ask : auto ? [] : f.fork
+        const stop = f.ask.length > 0 ? f.ask : auto ? [] : forkOf(f)
         if (stop.length > 0) {
           try {
             const id = await $.session.id()
@@ -645,14 +649,14 @@ export const register: Register = (on, options) => {
         // 0.5.1 (D2, D4): only findings the fork judges. Its allow keeps the allow; anything else asks.
         try {
           const id = await $.session.id()
-          const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? '', digestOf(id), notesOf(f.fork)), parsePermission)
+          const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? '', digestOf(id), notesOf(f)), parsePermission)
           if ('v' in j && j.v.decision === 'allow' && (await record($, id, 'permission', `${e.tool}: ${shape(raw)}`, 'allow', j.v.reason, j.usage))) return r
           const why = 'v' in j ? j.v.reason : 'fail' in j ? j.fail : 'nothing to judge yet'
-          await pain($, id, 'permission for you', `${e.tool} (${why}; floor: ${rulesIn(f.fork).join(', ')})`)
+          await pain($, id, 'permission for you', `${e.tool} (${why}; floor: ${rulesIn(forkOf(f)).join(', ')})`)
         } catch (err) {
           await log($, `floor fork error ${String(err)}`)
         }
-        return { ...r, decision: 'ask', reason: `autonomic: the fork did not allow — ${rulesIn(f.fork).join(', ')}` }
+        return { ...r, decision: 'ask', reason: `autonomic: the fork did not allow — ${rulesIn(forkOf(f)).join(', ')}` }
       }
       if ((await modeOf($)).mode !== 'autopilot') return r
       const id = await $.session.id()
@@ -675,7 +679,7 @@ export const register: Register = (on, options) => {
           await pain($, id, 'never-approve', painFocus(f.ask, raw))
           return r
         }
-        notes = notesOf(f.fork)
+        notes = notesOf(f)
       }
       // 0.5.1 (D3): every input is judged; a long one shows the fork its head and tail (prompts.ts).
       const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? '', digestOf(id), notes), parsePermission)
