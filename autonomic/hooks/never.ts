@@ -37,6 +37,30 @@ function split(command: string): string[] {
   // NAME=VALUE also shows its value: FLAGS=-rf, alias.p=push, remote.x.push=refs/heads/main.
   return text.split(SPLIT).flatMap(w => (w.indexOf('=') > 0 ? [w, w.slice(w.indexOf('=') + 1)] : [w])).filter(w => w !== '')
 }
+// 0.5.1 (§2): a command's own words, the arguments Bash passes. Whitespace and separators inside
+// quotes stay inside one word, so a quoted message holds no verb; quotes still join pieces
+// (`'git' push`, `pu""sh`). In single quotes `$` is literal too. A substitution or a backtick
+// inside double quotes runs: its text is kept as it is and read as 0.5.0 reads it.
+const hide = (c: string, dollar: boolean) => (/[\s;&|()<>`]/.test(c) || (dollar && c === '$') ? String.fromCharCode(0xe000 + c.charCodeAt(0)) : c)
+function maskQuoted(text: string): string {
+  let out = ''
+  let q: string | undefined
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!
+    if (q === "'") { if (c === "'") { q = undefined; out += c } else out += hide(c, true); continue }
+    if (c === '\\') { out += text.slice(i, i + 2); i++; continue }
+    if (q === '"') {
+      if (c === '$' && text[i + 1] === '(') { const e = closeOf(text, i + 1); const end = e < 0 ? text.length : e; out += text.slice(i, end); i = end - 1; continue }
+      if (c === '`') { let e = i + 1; while (e < text.length && text[e] !== '`') e += text[e] === '\\' ? 2 : 1; out += text.slice(i, e + 1); i = e; continue }
+      if (c === '"') { q = undefined; out += c } else out += hide(c, false)
+      continue
+    }
+    if (c === "'" || c === '"') q = c
+    out += c
+  }
+  return out
+}
+const ownWords = (text: string) => split(maskQuoted(text))
 // Simple commands: split at ; & | && || and newlines outside quotes and escapes. `&` and `|`
 // next to a redirect (`2>&1`, `>&f`, `&>f`, `>|f`) belong to the command. A `#` that starts a
 // word comments out the rest of its line, so a quote or a backslash in a comment opens nothing.
@@ -545,7 +569,7 @@ function splice(text: string): string {
   return text
 }
 type Vars = Map<string, { value: string; at: number }>
-type Judged = { words: string[]; at: number }
+type Judged = { words: string[]; own: string[]; text: string; at: number }
 type Reading = { whole: string[] } | { groups: Judged[]; vars: Vars; bag: string[]; values: string[]; loops: [number, number][] }
 // namesDanger and neverRules read the same command back to back (register.tsx): keep the last
 // reading, keyed by the text and the readers, so a large script is read once, not twice.
@@ -635,15 +659,17 @@ function judge(cmds: readonly Command[], g: readonly Group[], ctx: Ctx, at?: num
       // it is judged with the pipeline's earlier stages (PR #735 round 2).
       let s = i
       while (s > 0 && cmds[s - 1]!.pipe) s--
-      return [{ words: !isInert(c.bare) && s < i ? cmds.slice(s, i + 1).flatMap(x => split(x.text)) : split(c.text), at: k }]
+      const span = !isInert(c.bare) && s < i ? cmds.slice(s, i + 1) : [c]
+      return [{ words: span.flatMap(x => split(x.text)), own: span.flatMap(x => ownWords(x.text)), text: c.text.trim(), at: k }]
     }
     const to = [...targets(c.bare), ...g[i]!.targets, ...sedTargets(c.bare)]
     lt ??= to.length > 0 ? laters(cmds, ctx) : undefined
-    if (to.length > 0 && usedLater(to, lt!.list, ctx, lt!.from[i + 1])) return [{ words: split(c.text), at: k }]
+    if (to.length > 0 && usedLater(to, lt!.list, ctx, lt!.from[i + 1])) return [{ words: split(c.text), own: ownWords(c.text), text: c.text.trim(), at: k }]
     return c.subs.flatMap(s => {
       const inner = commands(s)
       const ig = inner === undefined ? undefined : groups(inner)
-      return inner === undefined || ig === undefined ? [{ words: split(s), at: k }] : judge(inner, ig, ctx, k)
+      // 0.5.1 (§1): a substitution that does not parse is text: it has no own words.
+      return inner === undefined || ig === undefined ? [{ words: split(s), own: [], text: s.trim(), at: k }] : judge(inner, ig, ctx, k)
     })
   })
 }
@@ -753,9 +779,10 @@ function moves(words: readonly string[], where: Where): boolean {
 // Every word a rule may read: the whole bag, or each command's words with its variables read, and
 // the values of assignment-only commands (an opaque verb reads them).
 const allWords = (r: Reading) => ('whole' in r ? r.whole : [...r.groups.flatMap(g => [...g.words, ...substitute(g.words, r.vars, g.at)]), ...r.values])
+const dangerWord = (w: string) => isPush(w) || isVerb(w, 'branch') || isVerb(w, 'commit') || isVerb(w, 'rm') || abbrev(w, '--no-verify', 6)
 // The cheap pre-check: every rule needs one of these words, so a command without one runs no git.
 export const namesDanger = (command: string, readers: Readers = DEFAULT_READERS): boolean =>
-  allWords(wordsOf(command, readers)).some(w => isPush(w) || isVerb(w, 'branch') || isVerb(w, 'commit') || isVerb(w, 'rm') || abbrev(w, '--no-verify', 6))
+  allWords(wordsOf(command, readers)).some(dangerWord)
 
 // Section 1: a group's words with each literal variable assigned before it read as its value.
 function substitute(words: readonly string[], vars: Vars, at: number): string[] {
@@ -799,10 +826,26 @@ function writesConfig(ws: readonly string[]): boolean {
   return !read
 }
 
+// 0.5.1 (§1): each finding has a level. `ask`: a parsed command's own words match, and the operator
+// decides. `fork`: the match is only in text (the whole bag, words inside a quoted argument, or a
+// command read over all words), and the fork judges with the finding in its prompt.
+export type Finding = { rule: NeverRule; level: 'ask' | 'fork'; focus: string }
+export type Floor = { findings: Finding[] }
+
 export function neverRules(command: string, where: Where, readers: Readers = DEFAULT_READERS): NeverRule[] {
+  return [...new Set(floorFindings(command, where, readers).findings.map(f => f.rule))]
+}
+
+export function floorFindings(command: string, where: Where, readers: Readers = DEFAULT_READERS): Floor {
   const r = wordsOf(command, readers)
-  const found = new Set<NeverRule>()
-  if ('whole' in r) { rulesOf(r.whole, where, moves(r.whole, where), false, found); return [...found] }
+  const out: Finding[] = []
+  const add = (found: ReadonlySet<NeverRule>, level: Finding['level'], focus: string) => { for (const rule of found) out.push({ rule, level, focus }) }
+  if ('whole' in r) {
+    const found = new Set<NeverRule>()
+    rulesOf(r.whole, where, moves(r.whole, where), false, found)
+    add(found, 'fork', wholeFocus(command))
+    return settle(out)
+  }
   const all = [...r.groups.flatMap(g => g.words), ...r.values]
   const names = [...new Set([...(where.defaultBranch !== undefined ? [where.defaultBranch] : []), 'main', 'master'])]
   // What a command changes for every later one: a move, a git config write, a branch switch.
@@ -834,12 +877,28 @@ export function neverRules(command: string, where: Where, readers: Readers = DEF
     // cannot read is judged on the whole bag, as 0.4.3 did (`export NV=-n; git commit $NV`).
     const loose = ws.some(w => isVerb(w, 'commit') || isVerb(w, 'branch')) &&
       ws.some(w => [...w.matchAll(/\$\{?([A-Za-z_]\w*)/g)].some(m => bound(m[1]!)))
-    rulesOf((config && git) || verbOpaque(ws) || loose ? all : ws, where, moved || moves(ws, where), true, found, switched)
+    const away = moved || moves(ws, where)
+    const own = new Set<NeverRule>()
+    rulesOf(substitute(g.own, r.vars, g.at), where, away, true, own, switched)
+    const text = new Set<NeverRule>()
+    rulesOf((config && git) || verbOpaque(ws) || loose ? all : ws, where, away, true, text, switched)
+    add(own, 'ask', g.text)
+    add(new Set([...text].filter(x => !own.has(x))), 'fork', g.text)
     if (move) moved = true
     if (writes) config = true
     if (switches) switched = true
   })
-  return [...found]
+  return settle(out)
+}
+// A rule found at both levels is `ask` (§1).
+function settle(found: readonly Finding[]): Floor {
+  const ask = new Set(found.filter(f => f.level === 'ask').map(f => f.rule))
+  return { findings: found.filter(f => f.level === 'ask' || !ask.has(f.rule)) }
+}
+// A whole-text finding's focus: the first line that holds a verb word (§6).
+function wholeFocus(command: string): string {
+  const lines = command.split('\n').map(l => l.trim()).filter(Boolean)
+  return lines.find(l => split(l).some(dangerWord)) ?? lines[0] ?? command
 }
 // Final review C1: a checkout, switch, branch rename or copy, or symbolic-ref that names a
 // default branch name or an opaque word may leave HEAD on the default branch for later pushes.

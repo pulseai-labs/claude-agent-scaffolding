@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { DEFAULT_READERS, namesDanger, neverRules, parseReaders } from '../hooks/never'
+import { DEFAULT_READERS, floorFindings, namesDanger, neverRules, parseReaders } from '../hooks/never'
 import type { Where } from '../hooks/never'
 
 const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x', defaultBranch: 'main' }
@@ -1048,5 +1048,42 @@ describe('0.5.0 PR #735: cp -t names its destination directory', () => {
     ask("cat > pre-commit <<'EOF'\ngit push -f origin main\nEOF\nchmod +x pre-commit; cp -t .git/hooks pre-commit; git commit -m x")
     ask("cat > pre-commit <<'EOF'\ngit push -f origin main\nEOF\ncp --target-directory=.git/hooks pre-commit; git commit -m x")
     silent("cat > notes.md <<'EOF'\nnever git push -f\nEOF\ncp -t docs notes.md; git add docs/notes.md && git commit -m x")
+  })
+})
+
+// 0.5.1 (spec §1–2): the level of each finding.
+const levels = (c: string, w: Where = W) => {
+  const f = floorFindings(c, w).findings
+  const of = (l: string) => [...new Set(f.filter(x => x.level === l).map(x => x.rule))].sort()
+  return { ask: of('ask'), fork: of('fork') }
+}
+describe('0.5.1: own words ask, text goes to the fork (spec §1–2)', () => {
+  test('a parsed command whose own words match asks', () => {
+    for (const c of ['git push -f origin feat/x', "'git' push -f origin feat/x", 'git "push" -f origin feat/x',
+      'git pu""sh -f origin feat/x', 'F=-f; git push $F origin feat/x', '$CMD push -f origin feat/x'])
+      expect([c, levels(c).ask.includes('force-push')]).toEqual([c, true])
+  })
+  test('text the floor cannot read command by command goes to the fork', () => {
+    for (const c of ["python3 -c 'git push -f origin feat/x'", "herdr pane run p 'git push -f origin feat/x'",
+      "tmux send-keys 'git push -f origin feat/x' Enter", "git config alias.p 'push -f'; git p origin feat/x"]) {
+      const l = levels(c)
+      expect([c, l.ask]).toEqual([c, []])
+      expect([c, l.fork.includes('force-push')]).toEqual([c, true])
+    }
+  })
+  test('a quoted message holds no verb: fork, never ask', () => {
+    expect(levels("gh api repos/o/r/pulls/1/comments/2/replies -f body='we do not push here'")).toEqual({ ask: [], fork: ['force-push'] })
+    expect(levels('git commit -m "fix: push the branch"', { ...W, branch: undefined }).ask).toEqual([])
+  })
+  test('a rule found at both levels is ask only', () => {
+    expect(levels("git push -f origin feat/x -o 'push -f'")).toEqual({ ask: ['force-push'], fork: [] })
+  })
+  test('the focus is the command that matched', () => {
+    const f = floorFindings('cd /repo\nnpm test\ngit push -f origin feat/x', W).findings
+    expect(f.find(x => x.rule === 'force-push')?.focus).toBe('git push -f origin feat/x')
+  })
+  test('neverRules is the union of both levels', () => {
+    expect(rules("python3 -c 'git push -f origin feat/x'")).toContain('force-push')
+    expect(rules('git push -f origin feat/x')).toContain('force-push')
   })
 })
