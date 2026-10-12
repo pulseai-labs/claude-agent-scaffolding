@@ -47,5 +47,35 @@ t_assert_rc 2 "an unknown initial status is refused"
 t_capture oss_ledger_add_user "$S" r0.s2 "x" "y" deferred
 t_assert_rc 2 "a new line cannot start deferred"
 
+# --- Task 3: activation
+t_capture oss_ledger_activate "$S" "$P1"
+t_assert_rc 0 "activate a planned line"
+t_capture oss_state_read "$S" "[.demo_ledger[] | select(.id==\"$P1\")][0].status"
+t_assert_eq "active" "$T_OUT" "planned -> active"
+t_capture oss_ledger_activate "$S" "$P1"
+t_assert_rc 2 "activating an active line is refused"
+t_assert_contains "$T_OUT" "active" "the refusal names the current status"
+t_capture oss_ledger_activate "$S" d999
+t_assert_rc 7 "activate an unknown line is rc 7"
+# activate_spine touches only that spine's PLANNED lines; a deferred line stays deferred
+oss_ledger_add_auto "$S" r0.s2 "second planned" "true" "exit:0" >/dev/null
+oss_ledger_add_auto "$S" r0.s1 "other spine planned" "true" "exit:0" >/dev/null; O1="$(oss_state_read "$S" '.demo_ledger[-1].id')"
+oss_ledger_add_user "$S" r0.s2 "rename a playlist and find it by its new name" "found" active >/dev/null; U1="$(oss_state_read "$S" '.demo_ledger[-1].id')"
+oss_state_mutate "$S" set_demo_line_status "{\"id\":\"$U1\",\"status\":\"deferred\",\"by\":\"r0.s2\",\"reason\":\"operator: later\",\"until\":\"r1\"}"
+t_capture oss_ledger_activate_spine "$S" r0.s2
+t_assert_rc 0 "activate_spine ok"; t_assert_contains "$T_OUT" "activated 2" "both planned lines of r0.s2 (P2 and the second planned auto line)"
+t_capture oss_state_read "$S" "[.demo_ledger[] | select(.source_spine==\"r0.s2\" and .status==\"planned\")] | length"
+t_assert_eq "0" "$T_OUT" "no planned line left on r0.s2"
+t_capture oss_state_read "$S" "[.demo_ledger[] | select(.id==\"$O1\")][0].status"
+t_assert_eq "planned" "$T_OUT" "another spine's planned line is untouched"
+t_capture oss_state_read "$S" "[.demo_ledger[] | select(.id==\"$U1\")][0].status"
+t_assert_eq "deferred" "$T_OUT" "a deferred line is not undone by activate_spine (Review Focus 3)"
+t_capture oss_ledger_activate_spine "$S" r0.s2
+t_assert_rc 0 "a second activate_spine is fine"; t_assert_contains "$T_OUT" "activated 0" "zero is not an error"
+t_capture oss_ledger_activate_spine "$S" r9.s9
+t_assert_rc 7 "unknown spine is rc 7"
+t_capture oss_ledger_activate "$S" "$U1"
+t_assert_rc 0 "a deferred line can be activated (walked now)"
+
 cd "$HERE"; rm -rf "$TMP"
 t_summary

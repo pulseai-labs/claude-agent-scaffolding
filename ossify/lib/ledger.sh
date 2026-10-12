@@ -118,6 +118,43 @@ oss_ledger_unplan() { # $1=state $2=line-id $3=spine
   oss_state_mutate "$1" clear_demo_pending "$(jq -n --arg id "$2" --arg s "$3" '{id:$id,spine:$s}')"
 }
 
+# Read one field of one demo line ("" when absent). The caller has already run
+# _oss_ledger_require_line, so an empty answer means the field is unset.
+_oss_ledger_field() { # $1=state $2=line-id $3=field
+  jq -r --arg id "$2" --arg f "$3" '.demo_ledger[] | select(.id == $id) | .[$f] // ""' "$1"
+}
+
+# #363/#726: a line authored at plan time is `planned` until its code exists.
+# activate is the one way forward; there is deliberately no way back
+# (active -> planned would let a session relabel a regression "not built yet").
+# A deferred line activates too: that is "walk it now" at release close.
+oss_ledger_activate() { # $1=state $2=line-id
+  _oss_ledger_require_line "$1" "$2" || return $?
+  local st; st="$(_oss_ledger_field "$1" "$2" status)"
+  case "$st" in planned|deferred) ;; *)
+    echo "oss: line '$2' is '$st' - only a planned or deferred line can be activated" >&2; return 2;; esac
+  oss_state_mutate "$1" set_demo_line_status \
+    "$(jq -n --arg id "$2" '{id:$id,status:"active",by:"activate",reason:null}')"
+}
+
+# Spine close step 3: the closing spine's own planned lines go active before
+# the demo, so they must pass at that close. Deferred lines are left alone -
+# undoing an operator's deferral is not this verb's call.
+oss_ledger_activate_spine() { # $1=state $2=spine
+  jq -e --arg s "$2" '.spines[] | select(.id == $s)' "$1" >/dev/null 2>&1 \
+    || { echo "oss: unknown spine '$2'" >&2; return 7; }
+  local ids id n=0
+  ids="$(jq -r --arg s "$2" '.demo_ledger[] | select(.source_spine == $s and .status == "planned") | .id' "$1")" \
+    || { echo "oss: cannot read the demo ledger from '$1'" >&2; return 2; }
+  for id in $ids; do
+    oss_state_mutate "$1" set_demo_line_status \
+      "$(jq -n --arg id "$id" --arg s "$2" '{id:$id,status:"active",by:("activate_spine:" + $s),reason:null}')" \
+      || return $?
+    n=$((n+1))
+  done
+  echo "activated $n"
+}
+
 # Quarantine is NOT a planned amendment: it is raised at close/doctor time when a
 # line actually fails for causes unrelated to any open spine, so it applies at
 # once. The release is recorded because §6.1 makes it a parking ticket that
