@@ -116,12 +116,19 @@ _oss_apply_op() { # $1=op $2=payload-json
     # re-quarantine with no release arg ("r0" -> ""), destroying §6.1's
     # parking-ticket anchor. One clause fixes both: only ever touch the key
     # when this call is a quarantine AND actually carries a release.
+    # The deferred and escaped clauses use the same guard, for the same replay reason.
     set_demo_line_status)
       jq --argjson p "$payload" '
         (.demo_ledger[] | select(.id == $p.id)) |=
           (.status = $p.status | .status_reason = $p.reason | .status_by = $p.by
            | (if $p.status == "quarantined" and (($p.release // "") != "")
               then .quarantined_in_release = $p.release
+              else . end)
+           | (if $p.status == "deferred" and (($p.until // "") != "")
+              then .deferred_until_release = $p.until
+              else . end)
+           | (if $p.status == "escaped" and (($p.clause // "") != "")
+              then .escape_clause = $p.clause
               else . end))' ;;
     # F1 (user decision, 2026-07-31): a line carries a LIST of pending
     # amendments, one per spine - not a single slot. Two spines each planning
