@@ -8,7 +8,7 @@ import {
   parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, placeOf, decide,
   uncheckedRmText, invalidText, statusText,
 } from '../hooks/rules'
-import type { Role, RoleState } from '../hooks/rules'
+import type { Role, RoleState, RuleId } from '../hooks/rules'
 
 type Agent = { kind?: string; name?: string } | undefined
 export type GuardDeps = {
@@ -32,15 +32,28 @@ export function roleFor(env: string | undefined, agent: Agent): RoleState {
 }
 
 const WRITE_TOOLS = new Set(['write', 'edit', 'ast_edit'])
+// Every path a write-class call can touch. omp fills `path`/`paths` from an edit's section headers only, so an
+// edit's other destinations are read from where they live: `rename`, `edits[].path`/`rename`, and the hashline
+// `MV <dest>` lines of `input`.
 export function writeTargets(toolName: string, input: Record<string, unknown>): string[] | undefined {
   if (!WRITE_TOOLS.has(toolName)) return undefined
-  const paths = Array.isArray(input.paths) ? input.paths.filter((p): p is string => typeof p === 'string') : []
-  if (paths.length > 0) return paths
-  return typeof input.path === 'string' ? [input.path] : []
+  const found = new Set<string>()
+  const add = (v: unknown) => { if (typeof v === 'string' && v !== '') found.add(v) }
+  add(input.path)
+  if (Array.isArray(input.paths)) input.paths.forEach(add)
+  if (toolName === 'edit') {
+    add(input.rename)
+    if (Array.isArray(input.edits))
+      for (const e of input.edits) if (e !== null && typeof e === 'object') { add((e as Record<string, unknown>).path); add((e as Record<string, unknown>).rename) }
+    if (typeof input.input === 'string')
+      for (const line of input.input.split('\n')) { const t = line.trim(); if (t.startsWith('MV ')) add(t.slice(3).trim()) }
+  }
+  return [...found]
 }
 
 // Tools that run code: reviewer rails never run them; implementer rails scan eval's source.
 const RUNS_CODE = new Set(['eval', 'debug'])
+const LSP_WRITES = new Set(['rename', 'rename_file', 'code_actions', 'request'])
 
 // Best effort (spec §4.2): eval code is not shell, so read its string literals as commands —
 // each one alone, and all of them joined, which catches an argv list such as ['git', 'push'].
@@ -51,6 +64,10 @@ export function evalCommands(code: string): string[] {
 
 function spawnDeny(role: Role): string {
   return `seat-mods (${role}): no subagents — this seat may not spawn; report it instead.`
+}
+// before_subagent_spawn fires for task, eval agent() and workpool workers alike. Only the main session may spawn.
+export function spawnDecision(agent: Agent): { block: true; reason: string } | undefined {
+  return agent?.kind === 'main' ? undefined : { block: true, reason: spawnDeny(childRole(agent?.name)) }
 }
 function runDeny(role: Role, tool: string): string {
   return `seat-mods (${role}): no ${tool} — this seat may not run code here; report it instead.`
@@ -66,15 +83,29 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
   if (toolName === 'task' && child) return spawnDeny(role)
   if (RUNS_CODE.has(toolName) && role === 'reviewer') return runDeny(role, toolName)
 
+  if (toolName === 'github') {
+    // pr_create / pr_push are the harness's own gh pr create / git push; a force-with-lease push is a force-push.
+    const rules: RuleId[] = []
+    if (input.op === 'pr_create') rules.push('pr-create')
+    if (input.op === 'pr_push') rules.push('push')
+    if (input.forceWithLease === true || input.forceWithLease === 'true') rules.push('force-push')
+    return rules.length === 0 ? undefined : decide(role, { kind: 'bash', rules })
+  }
+  // lsp edits files (rename, applied code actions) or sends any raw request; a reviewer reads only.
+  if (toolName === 'lsp' && role === 'reviewer' && LSP_WRITES.has(String(input.action)))
+    return decide(role, { kind: 'write', place: 'worktree' })
+
   if (toolName === 'bash' || toolName === 'eval') {
+    // bash takes its own cwd; rm operands and -F files resolve against it, not the session's.
+    const base = toolName === 'bash' && typeof input.cwd === 'string' && input.cwd !== '' ? absolute(deps.cwd, input.cwd) : deps.cwd
     const commands = toolName === 'bash' ? [String(input.command ?? '')] : evalCommands(String(input.code ?? ''))
     try {
       for (const command of commands) {
-        const texts = await Promise.all(commitMessageFiles(command).map(f => deps.readFile(f).catch(() => '')))
+        const texts = await Promise.all(commitMessageFiles(command).map(f => deps.readFile(absolute(base, f)).catch(() => '')))
         const removals = []
         for (const operand of rmTargets(command)) {
           const [root, allow] = await Promise.all([deps.worktree(), allowOf(deps)])
-          const target = operand.path === undefined ? undefined : await removalPath(deps, operand.path, operand.glob)
+          const target = operand.path === undefined ? undefined : await removalPath(deps, base, operand.path, operand.glob)
           removals.push(removalOf(target, root, allow, operand.glob))
         }
         const deny = decide(role, { kind: 'bash', rules: bashRules(command, texts.join('\n')), removals })
@@ -108,8 +139,8 @@ function absolute(cwd: string, path: string): string {
 
 // rm's operand placed as register.ts removalPath does: the parent resolves through links and the final
 // component stays literal (rm unlinks a terminal symlink); a glob or a trailing / . .. follows the directory.
-async function removalPath(deps: GuardDeps, operand: string, glob: boolean): Promise<string | undefined> {
-  const path = absolute(deps.cwd, homeOf(operand, deps.env.HOME))
+async function removalPath(deps: GuardDeps, base: string, operand: string, glob: boolean): Promise<string | undefined> {
+  const path = absolute(base, homeOf(operand, deps.env.HOME))
   if (glob || /\/(?:\.|\.\.)?$/.test(path)) return deps.real(path)
   const cut = path.lastIndexOf('/')
   const parent = await deps.real(cut === 0 ? '/' : path.slice(0, cut))
@@ -181,6 +212,7 @@ export default function (pi: any) {
   pi.on('session_start', (_e: any, ctx: any) => {
     if (ctx.agent?.kind === 'main') ctx.ui?.setStatus?.('seat-mods', statusText(roleFor(process.env.SEAT_MODS_ROLE, ctx.agent)))
   })
+  pi.on('before_subagent_spawn', (_e: any, ctx: any) => spawnDecision(ctx.agent))
   pi.on('tool_call', async (e: any, ctx: any) => {
     // A throw in a tool_call handler blocks the call (fail closed, doc 018).
     const reason = await guard(depsFor(ctx), e.toolName, (e.input ?? {}) as Record<string, unknown>, ctx.agent)

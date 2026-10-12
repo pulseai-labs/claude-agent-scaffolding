@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { childRole, roleFor, writeTargets, guard, realOf } from '../../seat-mods/omp/extension'
+import { join, resolve } from 'node:path'
+import { childRole, roleFor, writeTargets, guard, realOf, spawnDecision } from '../../seat-mods/omp/extension'
 
 const deps = (over: Partial<Parameters<typeof guard>[0]> = {}) => ({
   env: { SEAT_MODS_ROLE: 'coordinator', SEAT_MODS_ALLOW: '/tmp/allow', HOME: '/home/u' } as Record<string, string | undefined>,
@@ -141,5 +141,72 @@ describe('realOf on a real file system', () => {
   test('a relative path with a .. component is unresolvable (no lexical collapse)', () => {
     expect(realOf('repo/link/../x.txt')).toBeUndefined()
     expect(realOf('../x.txt')).toBeUndefined()
+  })
+})
+
+describe('edit destinations (fix wave 1)', () => {
+  test('the target set is the union of path, paths, rename, edits[].path, edits[].rename and every hashline MV line', () => {
+    expect(writeTargets('edit', { path: 'a.ts', edits: [{ path: '/o/b.ts', rename: '/o/c.ts' }, 'junk'], rename: '/o/d.ts', input: '[a.ts]\n  MV /o/e.ts \nnot MV /o/f.ts\n' }))
+      .toEqual(['a.ts', '/o/d.ts', '/o/b.ts', '/o/c.ts', '/o/e.ts'])
+    expect(writeTargets('write', { path: 'a.ts', rename: '/o/x' })).toEqual(['a.ts'])
+  })
+  test('an implementer child cannot MV out of the worktree, nor rename through edits[]', async () => {
+    expect(await guard(deps(), 'edit', { paths: ['src/a.ts'], input: '[src/a.ts]\nMV /outside/a.ts' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { path: 'a.ts', edits: [{ path: '/outside/b.ts' }] }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { path: 'a.ts', edits: [{ path: 'a.ts', rename: '/outside/c.ts' }] }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { path: 'a.ts', input: '[a.ts]\nMV b.ts' }, child('implementer'))).toBeUndefined()
+  })
+  test('a reviewer with a header in SEAT_MODS_ALLOW cannot MV into the worktree', async () => {
+    expect(await guard(deps(), 'edit', { paths: ['/tmp/allow/r.md'], input: '[/tmp/allow/r.md]\nMV src/r.md' }, child('reviewer'))).toContain('no edits in the worktree')
+  })
+})
+
+describe('bash cwd (fix wave 2)', () => {
+  const norm = (over = {}) => deps({ real: async (p: string) => (p.includes('/link') ? resolve(p).replace('/repo/wt/link', '/outside/dir') : resolve(p)), ...over })
+  test('rm resolves against the call cwd, not the session cwd', async () => {
+    expect(await guard(norm(), 'bash', { command: 'rm -rf build', cwd: '/outside' }, child('implementer'))).toContain('no rm outside')
+    expect(await guard(norm(), 'bash', { command: 'rm -rf build', cwd: '/repo/wt/sub' }, child('implementer'))).toBeUndefined()
+    expect(await guard(norm(), 'bash', { command: 'rm ../../x', cwd: 'sub' }, child('implementer'))).toContain('no rm outside')
+  })
+  test('a cwd that is a link out of the worktree is followed', async () => {
+    expect(await guard(norm(), 'bash', { command: 'rm x', cwd: 'link' }, child('implementer'))).toContain('no rm outside')
+  })
+  test('a commit message file is read against the call cwd', async () => {
+    const seen: string[] = []
+    const d = norm({ readFile: async (f: string) => { seen.push(f); return '' } })
+    await guard(d, 'bash', { command: 'git commit -F msg.txt', cwd: '/other' }, child('implementer'))
+    expect(seen).toEqual(['/other/msg.txt'])
+  })
+})
+
+describe('spawn through eval agent() and workpool (fix wave 3)', () => {
+  test('a child spawning is blocked with the spawn text; the main session is not; a missing agent is a child', () => {
+    expect(spawnDecision({ kind: 'sub', name: 'implementer' })).toEqual({ block: true, reason: 'seat-mods (verifier): no subagents — this seat may not spawn; report it instead.' })
+    expect(spawnDecision({ kind: 'sub', name: 'reviewer' })).toMatchObject({ block: true, reason: expect.stringContaining('seat-mods (reviewer)') })
+    expect(spawnDecision(undefined)).toMatchObject({ block: true })
+    expect(spawnDecision({ kind: 'main' })).toBeUndefined()
+  })
+})
+
+describe('mutating tools (fix wave 5)', () => {
+  test('github pr_create and pr_push are denied for verifier and reviewer children, pr_push is free for an implementer main', async () => {
+    expect(await guard(deps(), 'github', { op: 'pr_create', title: 't' }, child('task'))).toContain('no gh pr create')
+    expect(await guard(deps(), 'github', { op: 'pr_push' }, child('task'))).toContain('no git push')
+    expect(await guard(deps(), 'github', { op: 'pr_push' }, child('reviewer'))).toContain('seat-mods (reviewer)')
+    expect(await guard(deps({ env: { SEAT_MODS_ROLE: 'implementer' } }), 'github', { op: 'pr_push' }, { kind: 'main' })).toBeUndefined()
+    expect(await guard(deps(), 'github', { op: 'search_prs', query: 'x' }, child('task'))).toBeUndefined()
+  })
+  test('forceWithLease is denied for every guarded role, and free for a coordinator', async () => {
+    const call = { op: 'pr_push', forceWithLease: true }
+    expect(await guard(deps({ env: { SEAT_MODS_ROLE: 'implementer' } }), 'github', call, { kind: 'main' })).toContain('no force-push')
+    expect(await guard(deps(), 'github', call, child('task'))).toBeDefined()
+    expect(await guard(deps(), 'github', call, { kind: 'main' })).toBeUndefined()
+  })
+  test('lsp write operations are denied under reviewer rails; reads are not; other roles are untouched', async () => {
+    for (const action of ['rename', 'rename_file', 'code_actions', 'request'])
+      expect(await guard(deps(), 'lsp', { action, file: 'a.ts' }, child('reviewer'))).toContain('no edits in the worktree')
+    for (const action of ['hover', 'definition', 'references', 'diagnostics', 'symbols'])
+      expect(await guard(deps(), 'lsp', { action, file: 'a.ts' }, child('reviewer'))).toBeUndefined()
+    expect(await guard(deps(), 'lsp', { action: 'rename', file: 'a.ts' }, child('task'))).toBeUndefined()
   })
 })
