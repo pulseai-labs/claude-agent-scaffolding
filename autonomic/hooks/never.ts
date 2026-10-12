@@ -961,6 +961,8 @@ function cdTo(ws: readonly string[], from: string | undefined, home: string): st
   const t = ws.slice(i + 1).find(w => !/^-[LPe@]+$/.test(w))
   if (t === undefined) return home
   if (t === '-' || opaque(t)) return undefined
+  // A bare relative name (or ~user) may be found through CDPATH: the directory is unknown (PR #763 review).
+  if (!/^(?:\/|~(?:\/|$)|\.\.?(?:\/|$))/.test(t)) return undefined
   return join(from, t, home)
 }
 // 0.5.1 (§5): the top-level commands that surely run: at the start of the text or after `;` or a
@@ -1053,12 +1055,10 @@ function rulesOf(words: readonly string[], where: Where, moved: boolean, single:
   }
   if (words.some(w => abbrev(w, '--no-verify', 6)) || (words.some(w => isVerb(w, 'commit')) && anyNamed(short('n')))) found.add('no-verify')
 
-  // 0.5.1 (§4): a variable followed by a path (`$T/x`) is a path; a bare variable may be a flag.
-  const rmFlag = (w: string) => flagLike(w) || (w.startsWith('$') && !w.includes('/'))
   const rm = words.findIndex(w => isVerb(w, 'rm'))
   if (rm >= 0) {
     const after = words.slice(rm + 1)
-    const recursive = after.some(w => /[rR]/.test(letters(w)) || abbrev(w, '--recursive', 3) || rmFlag(w))
+    const recursive = after.some(w => /[rR]/.test(letters(w)) || abbrev(w, '--recursive', 3) || anyFlag(w))
     // Strictly below the root: nothing is below a worktree at /.
     const root = where.root.replace(/\/+$/, '')
     const below = (w: string) => root !== '' && w.startsWith(`${root}/`)

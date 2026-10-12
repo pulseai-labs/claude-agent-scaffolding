@@ -22,13 +22,16 @@ false positives, 17 inputs never judged).
 - **Long inputs are judged.** The 4000-character stop is gone: the fork sees the input's head and
   tail and how much was cut, and the floor has read all of it. SubagentHandbacks are judged too.
 - **Smaller fixes.** A sed script keeps a backslash inside single quotes (`'s/a\/b/c/'` is a safe sed);
-  `rm "$T/x"` is not recursive; the pain band shows the command that matched.
+  the pain band shows the command that matched.
 - **Known limits.** A call that merges and then deletes in one command still asks (the branch is not
   merged when the check runs). A session's first call still asks: there is nothing to fork yet. A
   rebase-merged branch is not an ancestor of the default branch, so its delete still asks. A host with
   no `timeout` command (stock macOS) cannot read a remote's tip, so a remote delete asks there. A
   literal variable that holds spaces, used inside double quotes (`F='push -f'; curl -d "$F" …`), is
-  re-split when the floor reads its value, so it can ask where Bash passes one data argument.
+  re-split when the floor reads its value, so it can ask where Bash passes one data argument. `rm` of
+  a path that starts with a variable the text does not assign (`rm "$T/x"`) still asks: unquoted, the
+  variable may hold flags. A delete after a bare relative `cd` (which `CDPATH` may resolve elsewhere)
+  asks.
 
 ## 0.5.0
 

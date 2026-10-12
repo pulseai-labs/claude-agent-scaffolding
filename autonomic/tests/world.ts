@@ -92,7 +92,8 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     if (argv[0] === 'timeout' && argv.includes('ls-remote')) {
       const ref = argv[argv.length - 1]!
       const tip = w.git.remoteTips?.[ref]
-      return tip === undefined ? fail() : ok(`${tip}\t${ref}\n`)
+      // `--symref <remote> HEAD`: the live default branch (main) and its tip (c…c) come first.
+      return tip === undefined ? fail() : ok(`ref: refs/heads/main\tHEAD\n${'c'.repeat(40)}\tHEAD\n${tip}\t${ref}\n`)
     }
     if (argv[0] === 'git') {
       const a = argv.join(' ')

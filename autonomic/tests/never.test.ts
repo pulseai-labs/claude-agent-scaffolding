@@ -1092,8 +1092,11 @@ describe('0.5.1: shell words for sed, and rm of a variable path (spec §2, §4)'
   test('a sed script with an escaped slash is a safe sed, not a runner (cause 5)', () => {
     expect(levels("sed -i 's/a\\/b/c/' $S/pr.md; git push -q")).toEqual({ ask: [], fork: [] })
   })
-  test('a variable followed by a path is a path, not a flag (cause 4)', () => {
-    for (const c of ['rm "$T/x"', 'rm -f $W/reports/.seen', 'rm ${OUT}/a.md']) expect([c, rules(c)]).toEqual([c, []])
+  test('an unresolved variable may hold flags even before a path (PR #763 review)', () => {
+    // T='-rf ..' makes `rm $T/x` into `rm -rf ../x`: the floor keeps 0.5.0's reading.
+    for (const c of ['rm $T/x', 'rm -f $W/reports/.seen', 'rm ${OUT}/a.md']) expect([c, rules(c)]).toEqual([c, ['rm-outside']])
+    // A variable the text assigns once to a literal is read as its value.
+    expect(rules('T=/repo/a; rm "$T/x"')).toEqual([])
   })
   test('a bare variable or a recursive flag still makes rm recursive', () => {
     for (const c of ['rm -rf $T', 'rm $F /x', 'rm -rf ../x', 'rm -r ~/x']) expect([c, rules(c)]).toEqual([c, ['rm-outside']])
@@ -1144,6 +1147,12 @@ describe('0.5.1: the deletes a call makes (spec §5)', () => {
       'x=$(cd /other && pwd); git branch -D y', 'for d in a; do cd /other; done; git branch -D x', 'cd /other & git branch -D x'])
       expect([c, del(c)]).toEqual([c, null])
     expect(del('cd /work/r; git branch -D x')).toEqual([{ dir: '/work/r', branch: 'x' }])
+  })
+  test('a bare relative cd may follow CDPATH: the directory is unknown (PR #763 review)', () => {
+    expect(del('cd project; git branch -D x')).toBeNull()
+    expect(del('cd ~bob; git branch -D x')).toBeNull()
+    expect(del('cd ./project; git branch -D x')).toEqual([{ dir: '/repo/sub/./project', branch: 'x' }])
+    expect(del('cd ../r; git branch -D x')).toEqual([{ dir: '/repo/sub/../r', branch: 'x' }])
   })
   test('no branch-delete, no deletes', () => {
     expect(del('git push -u origin feat/x')).toEqual([])

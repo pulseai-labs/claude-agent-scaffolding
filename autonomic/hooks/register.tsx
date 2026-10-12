@@ -332,16 +332,24 @@ async function floorOf($: Engine, command: string): Promise<FloorRead> {
 async function merged($: Engine, d: Delete, originDefault: string | undefined): Promise<boolean> {
   const git = (args: string[]) => $.process.run(['git', '-C', d.dir, ...args])
   try {
-    if (d.remote === undefined)
-      return (await git(['merge-base', '--is-ancestor', `refs/heads/${d.branch}`, `refs/remotes/origin/${originDefault ?? 'main'}`])).exitCode === 0
-    const head = await git(['symbolic-ref', '--short', `refs/remotes/${d.remote}/HEAD`])
-    const named = head.exitCode === 0 ? head.stdout.trim() : ''
-    const def = named.startsWith(`${d.remote}/`) ? named.slice(d.remote.length + 1) : d.remote === 'origin' ? originDefault : undefined
-    if (def === undefined || def === '') return false
-    const tip = await $.process.run(['timeout', '10', 'git', '-C', d.dir, 'ls-remote', d.remote, `refs/heads/${d.branch}`])
-    const sha = tip.exitCode === 0 ? tip.stdout.trim().split(/\s+/)[0] ?? '' : ''
-    if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(sha)) return false
-    return (await git(['merge-base', '--is-ancestor', sha, `refs/remotes/${d.remote}/${def}`])).exitCode === 0
+    if (d.remote === undefined) {
+      const def = originDefault ?? 'main'
+      // Deleting the default branch itself is never cleanup (PR #763 review).
+      if (d.branch === def) return false
+      return (await git(['merge-base', '--is-ancestor', `refs/heads/${d.branch}`, `refs/remotes/origin/${def}`])).exitCode === 0
+    }
+    // One ls-remote reads the remote's live default branch (HEAD's symref and tip) and the branch's
+    // tip, so no tracking ref that may be older than the remote decides (PR #763 review). A default
+    // tip this repo does not hold fails merge-base: not merged.
+    const r = await $.process.run(['timeout', '10', 'git', '-C', d.dir, 'ls-remote', '--symref', d.remote, 'HEAD', `refs/heads/${d.branch}`])
+    if (r.exitCode !== 0) return false
+    const lines = r.stdout.split('\n')
+    const sha = (x: string | undefined) => (x !== undefined && /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(x) ? x : undefined)
+    const def = lines.find(l => l.startsWith('ref: refs/heads/') && l.endsWith('\tHEAD'))?.slice(16, -5)
+    const head = sha(lines.filter(l => l.endsWith('\tHEAD')).map(l => l.split('\t')[0]).find(x => sha(x) !== undefined))
+    const tip = sha(lines.find(l => l.endsWith(`\trefs/heads/${d.branch}`))?.split('\t')[0])
+    if (def === undefined || head === undefined || tip === undefined || d.branch === def) return false
+    return (await git(['merge-base', '--is-ancestor', tip, head])).exitCode === 0
   } catch {
     return false
   }

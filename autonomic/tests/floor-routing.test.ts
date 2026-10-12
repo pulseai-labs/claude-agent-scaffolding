@@ -50,7 +50,9 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     w.git.merged = [tip]
     w.forks.push(fork({ decision: 'allow', reason: 'merged cleanup' }))
     expect((await $.tool.check(BASH('git push origin --delete feat/x'))).decision).toBe('allow')
-    expect(w.runs.some(r => r.join(' ') === 'timeout 10 git -C /repo ls-remote origin refs/heads/feat/x')).toBe(true)
+    expect(w.runs.some(r => r.join(' ') === 'timeout 10 git -C /repo ls-remote --symref origin HEAD refs/heads/feat/x')).toBe(true)
+    // The tip is checked against the remote's live default tip, not a tracking ref (PR #763 review).
+    expect(w.runs.some(r => r.join(' ') === `git -C /repo merge-base --is-ancestor ${tip} ${'c'.repeat(40)}`)).toBe(true)
   })
   test('a stale tracking ref is not trusted: the remote tip decides (PR #131 review)', async ($, on) => {
     const w = world(on, { env: AP })
@@ -63,6 +65,12 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     const w = world(on, { env: AP })
     w.git.merged = ['refs/remotes/origin/feat/x']
     expect((await $.tool.check(BASH('git push origin --delete feat/x'))).decision).toBe('ask')
+    expect(w.forkPrompts).toEqual([])
+  })
+  test('deleting the default branch is never cleanup, even when merged (PR #763 review)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.git.merged = ['refs/heads/main']
+    expect((await $.tool.check(BASH('git branch -D main'))).decision).toBe('ask')
     expect(w.forkPrompts).toEqual([])
   })
   test('an unmerged delete asks; no fork', async ($, on) => {
