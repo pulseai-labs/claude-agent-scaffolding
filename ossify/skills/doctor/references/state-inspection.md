@@ -205,7 +205,7 @@ state file could be resolved`.
 finding.** Read the rest of doctor's line before recommending anything — the
 same four tags cover conditions these verbs cannot repair:
 
-- **A schema version *newer* than this build.** `"$oss_bin" migrate` accepts v1/v2; a
+- **A schema version *newer* than this build.** `"$oss_bin" migrate` accepts v1/v2/v3; a
   future version is an ossify upgrade, not a migration. doctor already says
   *"requires a newer ossify"* in its own line, which is exactly why you echo it.
 - **A corrupt journal, or a missing base snapshot.** `"$oss_bin" state_restore`

@@ -134,7 +134,9 @@ verbs (`ledger_activate`, `ledger_activate_spine`, `ledger_defer`, `ledger_escap
 and one new gate; both new line fields ride the existing `set_demo_line_status`
 operation, so there is no schema bump and an old journal replays unchanged. The
 skills say when to reach for each: plan-spine authors `planned`, the spine close
-activates and walks, release close collects the deferrals.
+activates and walks, release close collects the deferrals. The state schema is now
+**v4**: an existing project runs `oss migrate` once, and an older ossify refuses v4
+state rather than misreading it.
 
 Since 1.15.2, ossify's copy of the template says a review stopping rule is never
 a bar: `working-a-pr` decides when rounds stop, and a finding that meets a

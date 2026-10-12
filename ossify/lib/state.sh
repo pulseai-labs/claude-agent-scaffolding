@@ -2,7 +2,7 @@
 # ossify state engine. §9.2 safety commitments: atomic writes, lock file,
 # schema_version+migrations, append-only mutations journal.
 
-OSS_STATE_SCHEMA_VERSION=3
+OSS_STATE_SCHEMA_VERSION=4
 
 _oss_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
@@ -264,7 +264,7 @@ _oss_apply_op() { # $1=op $2=payload-json
     # the base is never rewritten. Every clause is `has(...)`-guarded, so a
     # v1 state (no close_records, no pending_* at all) and a v2 state (scalar
     # pending_* fields) both land on the same v3 shape in one call, and
-    # calling it again on an already-v3 state is a no-op on every clause.
+    # calling it again on an already-current state is a no-op on every clause.
     #
     # v2->v3 (F1, 2026-07-31): a demo line's pending amendment moves from four
     # scalar fields to a `pending_amendments` LIST, because the scalar shape
@@ -274,6 +274,15 @@ _oss_apply_op() { # $1=op $2=payload-json
     # carrying that spine's amendment; a v2 line with none becomes `[]`. The
     # scalar fields are then removed - the list is the only representation
     # going forward, so nothing reads the old fields once migrated.
+    #
+    # v3->v4 (1.16.0): a NO-OP on every field but the version, and deliberately
+    # so. v4 exists for three demo-line statuses this release adds - `planned`,
+    # `deferred` and `escaped` - which an older build does not know: a 1.15.2
+    # reading v4 state skips a `planned` line silently, because its runner
+    # selects `active` and `quarantined` only, and reports a green demo over the
+    # lines it never ran. Nothing about the v3 SHAPE is wrong, so there is
+    # nothing to translate; the bump is what makes that older build refuse the
+    # state instead (rc 6, naming `oss migrate`) rather than misread it.
     migrate_schema)
       jq --argjson p "$payload" '
         (if has("close_records") then . else . + {close_records:[]} end)

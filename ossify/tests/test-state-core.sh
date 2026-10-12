@@ -6,7 +6,7 @@ TMP="$(mktemp -d)"; S="$TMP/.ossify/project-state.json"
 
 t_capture oss_state_init "$S" demo-project
 t_assert_rc 0 "init succeeds"
-t_capture oss_state_read "$S" '.schema_version';       t_assert_eq "3" "$T_OUT" "schema v3"
+t_capture oss_state_read "$S" '.schema_version';       t_assert_eq "4" "$T_OUT" "schema v4"
 t_capture oss_state_read "$S" '.project.name';         t_assert_eq "demo-project" "$T_OUT" "project name"
 [ -f "$S.base.json" ] && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: base snapshot missing"; }
 

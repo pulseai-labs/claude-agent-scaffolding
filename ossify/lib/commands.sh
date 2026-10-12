@@ -234,14 +234,16 @@ oss_cmd_migrate() { # [$1=state-file]
     return 6
   fi
   # F1 (2026-07-31): `migrate_schema` is version-agnostic (every clause
-  # `has(...)`-guarded, verified against both a v1 and a v2 fixture) and
+  # `has(...)`-guarded, verified against v1, v2 and v3 fixtures) and
   # single-hop by design - it carries every upgrade the registry knows about
-  # in one journaled op, not one op per version. This allowlist is deliberately
-  # exact (1|2), not "< current": a state at some OTHER stale version is a gap
-  # this build does not know how to close and must say so by name, never
-  # guess-migrate it.
+  # in one journaled op, not one op per version. v3 joins the list at 1.16.0,
+  # where the v3->v4 step is a no-op on every field but the version (the bump
+  # exists so an older build refuses the new demo-line statuses rather than
+  # skipping them). This allowlist stays deliberately exact (1|2|3), not
+  # "< current": a state at some OTHER stale version is a gap this build does
+  # not know how to close and must say so by name, never guess-migrate it.
   case "$v" in
-    1|2) ;;
+    1|2|3) ;;
     *) echo "oss: no migration path from v$v to v$OSS_STATE_SCHEMA_VERSION" >&2; return 6 ;;
   esac
   oss_state_mutate "$sf" migrate_schema \

@@ -104,7 +104,7 @@ t_assert_contains "$T_OUT" "no base snapshot" "missing-base message named"
 # green. Live must independently encode the INTENDED result: falling back to
 # clear-every-entry, matching the pre-spine-argument build's actual behavior.
 G1BASE="$TMP/g1base.json"
-jq -n '{schema_version:3,
+jq -n '{schema_version:4,
   project:{name:"g1",posture:null,composition_root:null,overlay_wiring:null},
   counters:{demo_line:1},
   releases:[],spines:[],work_items:[],
@@ -138,7 +138,7 @@ t_assert_contains "$T_OUT" "ok: replay" "dispatcher: oss doctor reports replay c
 # existence produced for a quarantine payload with no `release` key at all -
 # status/status_reason/status_by set, quarantined_in_release never referenced.
 G2BASE="$TMP/g2base.json"
-jq -n '{schema_version:3,
+jq -n '{schema_version:4,
   project:{name:"g2",posture:null,composition_root:null,overlay_wiring:null},
   counters:{demo_line:1},
   releases:[],spines:[],work_items:[],
