@@ -12,9 +12,10 @@ false positives, 17 inputs never judged).
   asks you, as before. A rule that matches only in text the floor cannot read command by command
   (the whole-text read, words inside a quoted argument, a command read over all words) goes to the
   fork, with the finding in its prompt. The floor never approves. `neverRules` returns both levels.
-- **The pushed branch, not the session's.** A push that names a remote and only literal destinations
-  other than the default branch, `main` or `master` is no `default-branch-push` on a detached or
-  `main` checkout. `-d`, `--delete`, `-f` and `--force` no longer hide the named destination, and
+- **The pushed branch, not the session's.** A push to `origin` that names only literal destinations
+  other than its default branch (known from `origin/HEAD`), `main` or `master` is no
+  `default-branch-push` on a detached or `main` checkout; another remote, or an unknown default, keeps
+  0.5.0's reading. `-d`, `--delete`, `-f` and `--force` no longer hide the named destination, and
   `$SRC:refs/heads/x` is read by its destination.
 - **Merged-branch deletes go to the fork.** `git branch -D x` and `git push origin --delete x` whose
   every branch is already merged into the default branch (`git merge-base --is-ancestor`, checked

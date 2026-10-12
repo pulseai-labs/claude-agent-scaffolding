@@ -914,9 +914,11 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
   return settle(out, deletes)
 }
 // A rule found at both levels is `ask` (§1).
+// A rule one command shows at both levels is already `ask` only (the loop above drops its text
+// finding). A text finding in another command stays: a merged delete beside it must not hide it
+// from the fork (PR #763 round 2).
 function settle(found: readonly Finding[], deletes: Delete[] | null): Floor {
-  const ask = new Set(found.filter(f => f.level === 'ask').map(f => f.rule))
-  return { findings: found.filter(f => f.level === 'ask' || !ask.has(f.rule)), deletes }
+  return { findings: [...found], deletes }
 }
 // 0.5.1 (§5): what a git command deletes, read exactly, in the repo `dir`; null when any name, the
 // remote or the directory is opaque, or the push may delete more than it names (--prune, --mirror).
@@ -1003,7 +1005,7 @@ function switchesTo(ws: readonly string[], names: readonly string[]): boolean {
 // ask, whatever the session's branch is.
 // 0.5.1 (§3): -d/--delete and -f/--force take no value either; force-push and branch-delete are read on their own.
 const NO_VALUE = /^(?:-[uqvndf]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin|delete|force))$/
-function namedRefs(words: readonly string[], names: readonly string[]): boolean {
+function namedRefs(words: readonly string[], names: readonly string[], remote?: string): boolean {
   const at = words.findIndex(w => isVerb(w, 'push'))
   if (at < 0) return false
   const args: string[] = []
@@ -1011,7 +1013,7 @@ function namedRefs(words: readonly string[], names: readonly string[]): boolean 
     if (w.startsWith('-')) { if (!NO_VALUE.test(w)) return false; continue }
     args.push(w)
   }
-  if (args.length < 2 || opaque(args[0]!)) return false
+  if (args.length < 2 || opaque(args[0]!) || (remote !== undefined && args[0] !== remote)) return false
   const all = [...new Set([...names, 'main', 'master'])]
   return args.slice(1).every(ref => {
     const r = ref.replace(/^\+/, '')
@@ -1043,7 +1045,9 @@ function rulesOf(words: readonly string[], where: Where, moved: boolean, single:
     const plumbing = words.some(w => isVerb(w, 'send-pack') || isVerb(w, 'http-push'))
     // 0.5.1 (§3): a push that names a remote and only literal non-default destinations, read on one
     // command, is no default-branch push whatever the session's branch is (detached, main, moved).
-    const named = single && namedRefs(words, names)
+    // Outside a move, only a push to origin whose default branch is known (origin/HEAD) is read by its
+    // destination: another remote's default is unknown here (PR #763 round 2). A moved push keeps 0.5.0's reading.
+    const named = single && (moved || switched ? namedRefs(words, names) : where.defaultBranch !== undefined && namedRefs(words, names, 'origin'))
     if (plumbing || (!named && (where.branch === undefined || names.includes(where.branch) || moved || switched ||
       any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))))
       found.add('default-branch-push')

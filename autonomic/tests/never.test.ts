@@ -1114,6 +1114,17 @@ describe('0.5.1: the pushed branch, not the session branch (spec §3)', () => {
       expect(rules('git push origin $C:refs/heads/proof/x', w)).not.toContain('default-branch-push')
     }
   })
+  test('outside a move, the exemption needs origin and a known default branch (PR #763 round 2)', () => {
+    for (const branch of [undefined, 'main']) {
+      expect(rules('git push upstream release', { ...W, branch })).toContain('default-branch-push')
+      expect(rules('git push origin release', { ...W, branch, defaultBranch: undefined })).toContain('default-branch-push')
+      expect(rules('git push -u origin record/x', { ...W, branch })).toEqual([])
+    }
+  })
+  test('a text-only finding survives beside an own-words one in another command (PR #763 round 2)', () => {
+    const f = floorFindings("herdr pane run p 'git branch -D victim'; git branch -D merged", W).findings
+    expect(f.filter(x => x.rule === 'branch-delete').map(x => x.level).sort()).toEqual(['ask', 'fork'])
+  })
   test('the default branch, HEAD, no refspec and an opaque destination still ask', () => {
     for (const branch of [undefined, 'main']) {
       const w = { ...W, branch }

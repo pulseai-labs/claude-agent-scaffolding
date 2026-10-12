@@ -320,7 +320,7 @@ async function floorOf($: Engine, command: string): Promise<FloorRead> {
   const fork = live.filter(f => f.level === 'fork')
   let done: Finding[] = []
   if (ask.some(f => f.rule === 'branch-delete') && deletes !== null && deletes.length > 0 &&
-    (await Promise.all(deletes.map(d => merged($, d, w.defaultBranch)))).every(Boolean)) {
+    (await Promise.all(deletes.map(d => merged($, d)))).every(Boolean)) {
     done = ask.filter(f => f.rule === 'branch-delete')
     ask = ask.filter(f => f.rule !== 'branch-delete')
   }
@@ -329,13 +329,15 @@ async function floorOf($: Engine, command: string): Promise<FloorRead> {
 // Checked before the command runs: a branch the same call merges is not merged yet. A remote
 // branch's tip is read from the remote itself, never from a tracking ref that may be older (PR #131
 // review), and checked against that remote's own default branch. Any failure is "not merged".
-async function merged($: Engine, d: Delete, originDefault: string | undefined): Promise<boolean> {
+async function merged($: Engine, d: Delete): Promise<boolean> {
   const git = (args: string[]) => $.process.run(['git', '-C', d.dir, ...args])
   try {
     if (d.remote === undefined) {
-      const def = originDefault ?? 'main'
+      // The default branch of the repo the delete runs in, not the session's (PR #763 round 2).
+      const h = await git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
+      const def = h.exitCode === 0 && h.stdout.trim().startsWith('origin/') ? h.stdout.trim().slice(7) : ''
       // Deleting the default branch itself is never cleanup (PR #763 review).
-      if (d.branch === def) return false
+      if (def === '' || d.branch === def) return false
       return (await git(['merge-base', '--is-ancestor', `refs/heads/${d.branch}`, `refs/remotes/origin/${def}`])).exitCode === 0
     }
     // One ls-remote reads the remote's live default branch (HEAD's symref and tip) and the branch's

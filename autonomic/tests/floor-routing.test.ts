@@ -67,6 +67,30 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     expect((await $.tool.check(BASH('git push origin --delete feat/x'))).decision).toBe('ask')
     expect(w.forkPrompts).toEqual([])
   })
+  test('a merged delete beside a text-only delete: the fork sees both (PR #763 round 2)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.git.merged = ['refs/heads/merged']
+    w.forks.push(fork({ decision: 'ask', reason: 'victim' }))
+    expect((await $.tool.check(BASH("herdr pane run p 'git branch -D victim'; git branch -D merged"))).decision).toBe('ask')
+    expect(w.forkPrompts[0]).toContain('- branch-delete (merged):')
+    expect(w.forkPrompts[0]).toContain('- branch-delete: ? (+4 args)')
+    expect(w.forkPrompts[0]).toContain('If the call does what such a rule names')
+  })
+  test("a local delete in another repo uses that repo's default branch (PR #763 round 2)", async ($, on) => {
+    const w = world(on, { env: AP })
+    w.git.merged = ['refs/heads/topic']
+    w.forks.push(fork({ decision: 'allow', reason: 'cleanup' }))
+    expect((await $.tool.check(BASH('git -C /other branch -D topic'))).decision).toBe('allow')
+    expect(w.runs.some(r => r.join(' ') === 'git -C /other symbolic-ref --short refs/remotes/origin/HEAD')).toBe(true)
+    expect(w.runs.some(r => r.join(' ') === 'git -C /other merge-base --is-ancestor refs/heads/topic refs/remotes/origin/main')).toBe(true)
+  })
+  test('a local delete whose repo has no known default branch asks (PR #763 round 2)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.git.merged = ['refs/heads/topic']
+    w.git.originHead = undefined
+    expect((await $.tool.check(BASH('git branch -D topic'))).decision).toBe('ask')
+    expect(w.forkPrompts).toEqual([])
+  })
   test('deleting the default branch is never cleanup, even when merged (PR #763 review)', async ($, on) => {
     const w = world(on, { env: AP })
     w.git.merged = ['refs/heads/main']
