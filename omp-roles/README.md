@@ -15,9 +15,11 @@ omp plugin install autonomic@claude-agent-scaffolding
 Put the launcher on `PATH`. `omp plugin list` shows the installed version; the path is in the install record:
 
 ```bash
-ln -sf "$(jq -r '.plugins["omp-roles@claude-agent-scaffolding"][0].installPath' ~/.omp/plugins/installed_plugins.json)/bin/omp-seat" ~/.local/bin/omp-seat
+ln -sf "$(jq -r '.plugins["omp-roles@claude-agent-scaffolding"] | (map(select(.scope == "user")) + .)[0].installPath' ~/.omp/plugins/installed_plugins.json)/bin/omp-seat" ~/.local/bin/omp-seat
 ```
 
 Run it again after an upgrade: the link points at one version's folder. `omp-seat` needs `bun`.
+
+`omp-seat` needs molt 0.3.0 and autonomic 0.6.0, which ship their OMP extensions in the next release; until then it refuses with an "is missing" message.
 
 Pinned and tested on omp 18.8.9; an upgrade is a PR.

@@ -10,6 +10,13 @@ All notable changes to the `seat-mods` plugin.
   `task` and any other name get the verifier rails (no commit, push or PR). It loads only through
   `omp-roles`' `omp-seat`. Helper calls inside `eval` are a known limit. The Claude hooks module is
   unchanged.
+  A child may not spawn: the `task` tool, eval `agent()` and workpool workers are all blocked
+  (`before_subagent_spawn`). A reviewer child may not run `eval` or `debug`, nor use the `lsp`
+  operations that edit (`rename`, `rename_file`, `code_actions`, `request`). The `github` tool's
+  `pr_create` and `pr_push` follow the commit/push/PR rails, and `forceWithLease` is a force-push for every
+  guarded role. `edit` is placed by every destination it names (`rename`, `edits[]`, hashline `MV`), and
+  `bash` rm operands and `-F` files resolve against the call's own `cwd`. omp's advisor and `/tan` clones
+  report `kind: "sub"`, so they get the verifier rails even under a coordinator.
 
 ## 0.3.2 — 2026-10-09
 

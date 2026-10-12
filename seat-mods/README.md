@@ -210,7 +210,7 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 | `implementer`, `task`, any other name | verifier: no commit, push or PR; writes in the worktree and `SEAT_MODS_ALLOW` (an `implementer` child stages and never commits) |
 | `reviewer`, `scout` | reviewer: writes only in `SEAT_MODS_ALLOW`; `eval` and `debug` blocked |
 
-A child may not spawn (`task` blocked). **Known limit:** helper calls inside `eval` fire no `tool_call`, so the guard reads `eval` source as best-effort command text; git hooks stay the rail for the rest.
+A child may not spawn (`task`, eval `agent()` and workpool workers are blocked). omp's advisor and `/tan` clones count as children, so they get the verifier rails even under a coordinator. **Known limit:** helper calls inside `eval` fire no `tool_call`, so the guard reads `eval` source as best-effort command text; git hooks stay the rail for the rest.
 
 ## Tests
 
