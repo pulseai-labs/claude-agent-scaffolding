@@ -210,6 +210,18 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 | `implementer`, `task`, any other name | verifier: no commit, push or PR; writes in the worktree and `SEAT_MODS_ALLOW` (an `implementer` child stages and never commits) |
 | `reviewer`, `scout` | reviewer: writes only in `SEAT_MODS_ALLOW`; `eval` and `debug` blocked |
 
+Under any guarded role, a tool call passes only if its name is on the allow list in `GUARDED_TOOLS` (omp 18.8.9's tools); any other name, an MCP or extension tool included, is denied:
+
+| Tools | Guarded rails |
+|---|---|
+| `read`, `grep`, `glob`, `find`, `ast_grep`, `web_search`, `recall`, `todo`, `wait`, `yield`, `think`, `advise` | allowed |
+| `ask`, `goal`, `task` | the top-level session only; a child is denied |
+| `bash`, `eval` | the command rules; `eval` source read best effort, and blocked for a reviewer |
+| `write`, `edit` (and its `apply_patch` wire name), `ast_edit` | every target placed as omp reads it: a `[path#HHHH]` header unwrapped, `~`, `@/`, `:/` and `file://` expanded, any other `scheme:/` outside |
+| `lsp` | omp's read-only actions only (`diagnostics`, `definition`, `type_definition`, `implementation`, `references`, `hover`, `symbols`, `status`, `capabilities`) |
+| `github` | omp's read-only ops; `pr_create`/`pr_push` follow the PR and push rails; `pr_checkout` and every other op denied; `forceWithLease` is a force-push |
+| `debug` | an implementer only, its launch read like `eval`; denied for a verifier or reviewer |
+
 A child may not spawn (`task`, eval `agent()` and workpool workers are blocked). omp's advisor and `/tan` clones count as children, so they get the verifier rails even under a coordinator. **Known limit:** helper calls inside `eval` fire no `tool_call`, so the guard reads `eval` source as best-effort command text; git hooks stay the rail for the rest.
 
 ## Tests

@@ -211,7 +211,7 @@ describe('mutating tools (fix wave 5)', () => {
       expect(await guard(deps(), 'lsp', { action, file: 'a.ts' }, child('reviewer'))).toContain('no edits in the worktree')
     for (const action of ['hover', 'definition', 'references', 'diagnostics', 'symbols'])
       expect(await guard(deps(), 'lsp', { action, file: 'a.ts' }, child('reviewer'))).toBeUndefined()
-    expect(await guard(deps(), 'lsp', { action: 'rename', file: 'a.ts' }, child('task'))).toBeUndefined()
+    expect(await guard(deps(), 'lsp', { action: 'rename', file: 'a.ts' }, { kind: 'main' })).toBeUndefined() // coordinator
   })
 })
 
@@ -305,5 +305,101 @@ describe('PR 762 round 1: URL-scheme write targets', () => {
   test('an implementer main session (default rails) is guarded the same way', async () => {
     const env = { HOME: '/home/u' } as Record<string, string | undefined>
     expect(await guard(deps({ env }), 'write', { path: 'local://x', content: 'x' }, { kind: 'main' })).toContain('no writes outside')
+  })
+})
+
+describe('PR 762 round 2: an allow list of omp tools, and one omp path normaliser', () => {
+  const coord = { kind: 'main' } // deps() sets SEAT_MODS_ROLE=coordinator
+  const implMain = deps({ env: { SEAT_MODS_ROLE: 'implementer', HOME: '/home/u' } })
+  test('finding 1: a write target is read as omp reads it: hashline [path#hash] unwrapped, ~, @/, :/ and file:// expanded', async () => {
+    for (const path of ['[/outside/x#ABCD]', '[/tmp/out]', '~/x', '~', '~user/x', '@/outside/x', ':/outside/x', 'file:///outside/x', ' [/outside/x#abcd] '])
+      for (const tool of ['write', 'edit', 'ast_edit'])
+        expect(await guard(deps(), tool, { path, content: 'x' }, child('task'))).toContain('no writes outside')
+    // adjacent controls: the same spellings inside the worktree still pass
+    for (const path of ['[src/a.ts#ABCD]', '[src/a.ts]', '@src/a.ts', 'src/a.ts', ':./src/a.ts', 'file:///repo/wt/src/a.ts'])
+      expect(await guard(deps(), 'write', { path, content: 'x' }, child('task'))).toBeUndefined()
+  })
+  test('finding 1: a hashline header or MV destination spelled with ~, @/ or :/ is outside', async () => {
+    expect(await guard(deps(), 'edit', { input: '[~/x.ts]\nbody' }, child('task'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { input: '[a.ts]\nMV @/outside/m.ts' }, child('task'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { input: '*** Add File: :/outside/x\n+z' }, child('task'))).toContain('no writes outside')
+  })
+  test('finding 2: lsp passes only omp\'s read-only actions under guarded rails, verifier included', async () => {
+    for (const action of ['rename_file', 'rename', 'code_actions', 'request', 'reload', 'RENAME_FILE', 'made_up'])
+      for (const who of [child('task'), child('implementer'), child('reviewer')])
+        expect(await guard(deps(), 'lsp', { action, file: 'src/a', new_name: '/tmp/a' }, who)).toBeDefined()
+    for (const action of ['diagnostics', 'definition', 'type_definition', 'implementation', 'references', 'hover', 'symbols', 'status', 'capabilities', 'Hover'])
+      expect(await guard(deps(), 'lsp', { action, file: 'src/a.ts' }, child('task'))).toBeUndefined()
+  })
+  test('finding 3: github pr_checkout and any op outside omp\'s read-only set is denied; reads pass', async () => {
+    expect(await guard(deps(), 'github', { op: 'pr_checkout', pr: '1', force: true }, child('task'))).toContain('no writes outside')
+    expect(await guard(implMain, 'github', { op: 'pr_checkout', pr: '1' }, { kind: 'main' })).toContain('no writes outside')
+    expect(await guard(deps(), 'github', { op: 'issue_close' }, child('task'))).toContain('not allowed for this seat')
+    for (const op of ['repo_view', 'file_read', 'search_issues', 'search_prs', 'search_code', 'search_commits', 'search_repos', 'run_watch'])
+      expect(await guard(deps(), 'github', { op }, child('task'))).toBeUndefined()
+    expect(await guard(deps(), 'github', { op: 'search_prs', forceWithLease: true }, child('task'))).toContain('no force-push')
+  })
+  test('finding 4: apply_patch is the edit tool under its wire name, and is placed the same way', async () => {
+    expect(await guard(deps(), 'apply_patch', { input: '*** Begin Patch\n*** Add File: /outside/x\n+z\n*** End Patch' }, child('task'))).toContain('no writes outside')
+    expect(await guard(deps(), 'apply_patch', { input: '*** Begin Patch\n*** Update File: src/a.ts\n*** Move to: /outside/b.ts\n*** End Patch' }, child('task'))).toContain('no writes outside')
+    // `_input` / `_path` are the forwarded spellings omp's event normaliser reads; a valid `path` beside them keeps the target list non-empty
+    expect(await guard(deps(), 'edit', { path: 'src/a.ts', _input: '*** Begin Patch\n*** Add File: /outside/x\n+z\n*** End Patch' }, child('task'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { path: 'src/a.ts', _path: '/outside/x' }, child('task'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { path: 'src/a.ts', _input: '*** Begin Patch\n*** Add File: src/b.ts\n+z' }, child('task'))).toBeUndefined()
+    expect(await guard(deps(), 'apply_patch', { input: '*** Begin Patch\n*** Add File: src/new.ts\n+z\n*** End Patch' }, child('task'))).toBeUndefined()
+    expect(await guard(deps(), 'apply_patch', { input: 'no headers' }, child('task'))).toContain('no writes outside')
+  })
+  test('finding 5: a bash cwd that is an omp URL is outside: rm in it is denied, a -F file in it cannot be read', async () => {
+    for (const cwd of ['local://scratch', 'local:/scratch', 'vault://n', '@local://x'])
+      expect(await guard(deps(), 'bash', { command: 'rm -rf x', cwd }, child('task'))).toContain('no rm outside')
+    expect(await guard(deps(), 'bash', { command: 'git commit -F msg.txt', cwd: 'local://scratch' }, coord)).toBeUndefined() // control: a coordinator is free
+    expect(await guard(implMain, 'bash', { command: 'git commit -F msg.txt', cwd: 'local://scratch' }, { kind: 'main' })).toContain('could not be checked')
+    expect(await guard(deps(), 'bash', { command: 'ls', cwd: 'local://scratch' }, child('task'))).toBeUndefined()
+  })
+  test('ast_edit scopes are split and globbed as omp reads them', async () => {
+    for (const paths of [['src/a.ts /outside/b.ts'], ['src/a.ts,/outside/b.ts'], ['{src,/outside}/*.ts'], ['src/*/../../../x/*.ts'], ['/outside/**/*.ts'], ['"/outside/b.ts"']])
+      expect(await guard(deps(), 'ast_edit', { paths, pattern: 'a', rewrite: 'b' }, child('task'))).toContain('no writes outside')
+    for (const paths of [['src/**/*.ts'], ['src/a.ts, src/b.ts'], ['{src,test}/*.ts'], ['*.ts']])
+      expect(await guard(deps(), 'ast_edit', { paths, pattern: 'a', rewrite: 'b' }, child('task'))).toBeUndefined()
+  })
+  test('a tool name off the allow list is denied for a child and a guarded main; a coordinator is free', async () => {
+    for (const name of ['browser', 'computer', 'notebook_edit', 'generate_image', 'tts', 'checkpoint', 'rewind', 'manage_skill', 'learn', 'retain',
+      'memory_edit', 'security_scan', 'ida', 'vibe_spawn', 'mcp__srv_tool', 'made_up_tool', 'constructor', '__proto__', 'hasOwnProperty', 'Read']) {
+      expect(await guard(deps(), name, {}, child('task'))).toContain('not allowed for this seat')
+      expect(await guard(implMain, name, {}, { kind: 'main' })).toContain('not allowed for this seat')
+      expect(await guard(deps(), name, {}, coord)).toBeUndefined()
+    }
+  })
+  test('every allow-listed read tool passes for a child of either profile', async () => {
+    for (const name of ['read', 'grep', 'glob', 'find', 'ast_grep', 'web_search', 'recall', 'todo', 'wait', 'yield', 'think', 'advise'])
+      for (const who of [child('task'), child('reviewer')])
+        expect(await guard(deps(), name, { path: '/anywhere' }, who)).toBeUndefined()
+  })
+  test('ask, goal and task are top-level only: a child is denied, a guarded main is not', async () => {
+    for (const name of ['ask', 'goal']) {
+      expect(await guard(deps(), name, {}, child('task'))).toContain('not allowed for this seat')
+      expect(await guard(implMain, name, {}, { kind: 'main' })).toBeUndefined()
+    }
+    expect(await guard(implMain, 'task', { agent: 'implementer' }, { kind: 'main' })).toBeUndefined()
+  })
+  test('debug runs a program: denied under verifier rails; under implementer rails its launch is scanned like eval', async () => {
+    expect(await guard(deps(), 'debug', { action: 'launch', program: 'node' }, child('task'))).toContain('may not run code')
+    expect(await guard(implMain, 'debug', { action: 'launch', program: 'git', args: ['push', '--force'] }, { kind: 'main' })).toContain('no force-push')
+    expect(await guard(implMain, 'debug', { action: 'launch', program: 'node', args: ['x.js'] }, { kind: 'main' })).toBeUndefined()
+  })
+  test('a coordinator is free for every surface above', async () => {
+    expect(await guard(deps(), 'write', { path: '[/outside/x#ABCD]', content: 'x' }, coord)).toBeUndefined()
+    expect(await guard(deps(), 'lsp', { action: 'rename_file', file: 'a', new_name: '/tmp/a' }, coord)).toBeUndefined()
+    expect(await guard(deps(), 'github', { op: 'pr_checkout', force: true }, coord)).toBeUndefined()
+    expect(await guard(deps(), 'apply_patch', { input: '*** Add File: /outside/x' }, coord)).toBeUndefined()
+    expect(await guard(deps(), 'bash', { command: 'rm -rf x', cwd: 'local://scratch' }, coord)).toBeUndefined()
+    expect(await guard(deps(), 'ask', {}, coord)).toBeUndefined()
+  })
+  test('ordinary in-worktree work still passes for a child', async () => {
+    expect(await guard(deps(), 'write', { path: 'src/a.ts', content: 'x' }, child('implementer'))).toBeUndefined()
+    expect(await guard(deps(), 'edit', { path: 'src/a.ts', edits: [{ old_text: 'a', new_text: 'b' }] }, child('implementer'))).toBeUndefined()
+    expect(await guard(deps(), 'edit', { input: '[src/a.ts#ABCD]\n 1ab|x' }, child('implementer'))).toBeUndefined()
+    expect(await guard(deps(), 'bash', { command: 'bun test && rm -rf build', cwd: 'sub' }, child('implementer'))).toBeUndefined()
+    expect(await guard(deps(), 'eval', { language: 'py', code: 'print(1)' }, child('implementer'))).toBeUndefined()
   })
 })

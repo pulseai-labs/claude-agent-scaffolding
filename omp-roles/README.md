@@ -1,6 +1,6 @@
 # omp-roles
 
-The OMP role pack for default mode: coordinator role files, worker agents (`implementer`, `reviewer`), and `omp-seat`, the launcher that pins the `seat-mods`, `molt` and `autonomic` OMP extensions onto a seat. OMP only: it has no `.claude-plugin/` and Claude Code never loads it.
+The OMP role pack for default mode. 0.1.0 ships `omp-seat`, the launcher that pins the `seat-mods`, `molt` and `autonomic` OMP extensions onto a seat, and one role, `worker` (`omp-seat worker`); any other role is refused. The worker agents (`implementer`, `reviewer`) and the coordinator role files arrive in later releases. OMP only: it has no `.claude-plugin/` and Claude Code never loads it.
 
 ## Install
 
