@@ -152,5 +152,19 @@ t_assert_rc 2 "another spine cannot escape this spine's line"
 t_capture oss_demo_user_lines "$S" r0.s2
 t_assert_eq "false" "$(printf '%s' "$T_OUT" | jq --arg e "$E1" 'any(.[]; .id == $e)')" "an escaped line is never walked"
 
+# --- Task 6: demo_run and planned lines
+S2="$TMP/state2.json"; oss_state_init "$S2" run >/dev/null
+oss_entity_add_release "$S2" "r" "g" >/dev/null; oss_entity_add_spine "$S2" r0 "a" bone canonical >/dev/null
+oss_ledger_add_auto "$S2" r0.s1 "not built yet" "false" "exit:0" >/dev/null
+t_capture oss_demo_run_auto "$S2"
+t_assert_rc 1 "all-planned ledger still fails the zero-lines floor (Review Focus 4)"
+t_assert_contains "$T_OUT" "PENDING d1 (planned -> r0.s1)" "the planned line is reported, not run"
+t_assert_contains "$T_OUT" "1 pending" "the floor message names the pending count"
+oss_ledger_add_auto "$S2" r0.s1 "built" "true" "exit:0" active >/dev/null
+t_capture oss_demo_run_auto "$S2"
+t_assert_rc 0 "a planned failing line no longer reddens the run"
+t_assert_contains "$T_OUT" "PASS 1 lines" "only the active line ran"
+t_assert_contains "$T_OUT" "1 pending" "pending count printed beside PASS"
+
 cd "$HERE"; rm -rf "$TMP"
 t_summary
