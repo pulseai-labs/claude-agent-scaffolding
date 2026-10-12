@@ -268,3 +268,42 @@ describe('last fix: omp\'s lenient header detection', () => {
     expect(await guard(deps(), 'edit', { input: '\uFEFF[src/a.ts]\nbody' }, child('implementer'))).toBeUndefined()
   })
 })
+
+describe('PR 762 round 1: URL-scheme write targets', () => {
+  // omp redirects local:// (and vault://, ssh://, cfg://, ...) to backing files outside the worktree, so a scheme
+  // target must never be read as the synthetic path `<cwd>/local:/x` (inside the tree).
+  test('an implementer child cannot write through local://, whichever tool carries it', async () => {
+    expect(await guard(deps(), 'write', { path: 'local://report.md', content: 'x' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { path: 'local://x' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'ast_edit', { path: 'local://x', pattern: 'a', rewrite: 'b' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { path: 'a.ts', input: '[a.ts]\nMV local://x' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { input: '*** Update File: a.ts\n*** Move to: local://x' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { input: '*** Add File: local://x\n+z' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { input: '[local://x]\nbody' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { path: 'a.ts', edits: [{ path: 'a.ts', rename: 'local://x' }] }, child('implementer'))).toContain('no writes outside')
+  })
+  test('every omp writable scheme is outside, and so are the spellings omp normalises to one', async () => {
+    for (const path of ['vault://n.md', 'ssh://host/x', 'cfg://k', 'conflict://1', 'agent://a', 'proc://p', 'xd://bash', 'xd://report_issue', 'xd://propose',
+      'LOCAL://x', 'local:/x', 'sub/local://x', './local://x', '@local://x', ' local://x', 'xd://resolve/x', 'xd://resolve2', 'xd://Resolve'])
+      expect(await guard(deps(), 'write', { path, content: 'x' }, child('implementer'))).toContain('no writes outside')
+  })
+  test('xd://resolve and xd://reject only confirm or discard a preview a guarded call already staged, so the write tool may carry them', async () => {
+    for (const path of ['xd://resolve', 'xd://reject', ' xd://resolve '])
+      expect(await guard(deps(), 'write', { path, content: 'apply the preview' }, child('implementer'))).toBeUndefined()
+    // adjacent control: the same confirm is not a way to name a file through any other tool or field
+    expect(await guard(deps(), 'edit', { path: 'xd://resolve' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { path: 'a.ts', input: '[a.ts]\nMV xd://resolve' }, child('implementer'))).toContain('no writes outside')
+    // a reviewer stages nothing, so it has nothing to confirm
+    expect(await guard(deps(), 'write', { path: 'xd://resolve', content: 'x' }, child('reviewer'))).toContain('no edits in the worktree')
+  })
+  test('an ordinary in-worktree write is still allowed, and a coordinator is free to use local://', async () => {
+    expect(await guard(deps(), 'write', { path: 'src/a.ts', content: 'x' }, child('implementer'))).toBeUndefined()
+    expect(await guard(deps(), 'write', { path: '/repo/wt/src/a.ts', content: 'x' }, child('implementer'))).toBeUndefined()
+    expect(await guard(deps(), 'write', { path: 'local://x', content: 'x' }, { kind: 'main' })).toBeUndefined()
+    expect(await guard(deps(), 'edit', { path: 'local://x' }, { kind: 'main' })).toBeUndefined()
+  })
+  test('an implementer main session (default rails) is guarded the same way', async () => {
+    const env = { HOME: '/home/u' } as Record<string, string | undefined>
+    expect(await guard(deps({ env }), 'write', { path: 'local://x', content: 'x' }, { kind: 'main' })).toContain('no writes outside')
+  })
+})

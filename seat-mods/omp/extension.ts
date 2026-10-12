@@ -145,13 +145,23 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
   const [root, allow] = await Promise.all([deps.worktree(), allowOf(deps)])
   if (targets.length === 0) return decide(role, { kind: 'write', place: 'outside' })
   for (const path of targets) {
-    const target = await deps.real(absolute(deps.cwd, path))
-    const place = target === undefined || root === undefined ? 'outside' : placeOf(target, root, allow)
+    // A URL-scheme target is omp's to route (local:// to a session folder, vault:// ssh:// cfg:// elsewhere), so
+    // `<cwd>/local:/x` says nothing about where it lands: outside, unless it is a confirm of an already-checked preview.
+    const confirm = toolName === 'write' && CONFIRM_ONLY.test(path)
+    const target = confirm || SCHEME.test(path) ? undefined : await deps.real(absolute(deps.cwd, path))
+    const place = confirm ? 'worktree' : target === undefined || root === undefined ? 'outside' : placeOf(target, root, allow)
     const deny = decide(role, { kind: 'write', place })
     if (deny !== undefined) return deny
   }
   return undefined
 }
+
+// A `scheme:/` anywhere in a path. omp routes `scheme://` to a handler (local, vault, ssh, cfg, xd, agent, ...) and
+// normalises `local:/x` and `dir/local://x` to `local://x` too, so the scan is deliberately loose: a false hit only denies.
+const SCHEME = /[A-Za-z][A-Za-z0-9+.-]*:\//
+// `write xd://resolve` / `xd://reject` take a one-sentence reason and apply or discard the preview that an earlier
+// ast_edit call staged with its own (already checked) paths; they name no file. Every other xd:// device is denied.
+const CONFIRM_ONLY = /^\s*xd:\/\/(?:resolve|reject)\s*$/
 
 // omp's own reading of a tool's `cwd` (Zs over Uv): a leading `:` before a path, `@/abs`, unicode spaces,
 // `file://` URLs and `~` forms are normalised first; `/` alone means the session cwd; an absolute path is kept

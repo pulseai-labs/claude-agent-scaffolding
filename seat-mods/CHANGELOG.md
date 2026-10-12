@@ -17,6 +17,9 @@ All notable changes to the `seat-mods` plugin.
   guarded role. `edit` is placed by every destination it names (`rename`, `edits[]`, hashline `MV`), and
   `bash` rm operands and `-F` files resolve against the call's own `cwd`. omp's advisor and `/tan` clones
   report `kind: "sub"`, so they get the verifier rails even under a coordinator.
+  A write target carrying a URL scheme (`local://`, `vault://`, `ssh://`, `xd://<device>`, also `local:/x` and
+  `dir/local://x`) is outside under guarded rails, because omp routes it to a host file the worktree check cannot see;
+  only `write xd://resolve` and `xd://reject`, which apply or discard an `ast_edit` preview already checked, pass.
 
 ## 0.3.2 — 2026-10-09
 
