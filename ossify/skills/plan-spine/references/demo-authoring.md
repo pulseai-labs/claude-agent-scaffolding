@@ -384,7 +384,8 @@ since the line the skeleton spine just authored is not yet `active` — or by
 naming the spine that will author it; it does not author a second one.
 
 ```bash
-"$oss_bin" ledger_active_auto | jq -r '.[] | "\(.id)\t\(.source_spine)\t\(.text)"'
+"$oss_bin" get '[.demo_ledger[] | select(.type=="auto" and (.status=="planned" or .status=="active"))]' \
+  | jq -r '.[] | "\(.id)\t\(.source_spine)\t\(.text)"'
 ```
 
 **What counts.** One command, runnable from the composition root against

@@ -219,7 +219,9 @@ precisely so that exceeding it forces a **prune / parallelize / deepen** decisio
 
 Ask the user for the number; propose one if they have none (a few minutes is a
 sane starting budget for a young ledger). Then check it against reality —
-`"$oss_bin" ledger_active_auto` lists the `auto:` lines the ledger already carries;
+`"$oss_bin" ledger_active_auto` lists the `active` `auto:` lines the ledger already
+carries, and `plan-spine/references/demo-authoring.md` §6's read adds the `planned` ones
+a spine has authored and not yet built — this window is exactly when that matters;
 `"$oss_bin" demo_run` emits no timing of its own, so time it **capturing the runner's
 rc** — `start=$(date +%s); demo_rc=0; "$oss_bin" demo_run || demo_rc=$?; elapsed=$(( $(date +%s) - start ))` —
 a nonzero `demo_rc` is a failing ledger line, and the budget conversation happens
