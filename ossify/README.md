@@ -1,4 +1,4 @@
-# ossify (v1.15.2)
+# ossify (v1.16.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -120,6 +120,21 @@ one-change amendment to `/amend-spec`, a command only `scaffold-onboard` shipped
 (name the section and the edit instead). `/ossify:adopt` still targets
 projects onboarded with the legacy scaffold stack. No state schema, journal
 operation or command changes.
+
+Since 1.16.0, a demo line has three statuses beside `active`: `planned` (#363,
+#726), so a line authored at plan time no longer reddens every sibling spine's
+close before its code exists — `ledger_add_auto` and `ledger_add_user` write
+`planned` unless the caller passes `active`, `demo_run` reports planned lines as
+`PENDING` beside the pass count, and a spine's close activates its own before its
+demo; `deferred` (#710), a spine's own `user:` line the operator cannot walk now,
+owed to a named release and collected by `expired_deferrals` at release close; and
+`escaped` (#726), a research spine's own `user:` line closed on the negative result
+its `SPINE.md` declared at plan time — terminal, and not `retired`. Four new
+verbs (`ledger_activate`, `ledger_activate_spine`, `ledger_defer`, `ledger_escape`)
+and one new gate; both new line fields ride the existing `set_demo_line_status`
+operation, so there is no schema bump and an old journal replays unchanged. The
+skills say when to reach for each: plan-spine authors `planned`, the spine close
+activates and walks, release close collects the deferrals.
 
 Since 1.15.2, ossify's copy of the template says a review stopping rule is never
 a bar: `working-a-pr` decides when rounds stop, and a finding that meets a
