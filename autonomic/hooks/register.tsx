@@ -318,20 +318,29 @@ async function floorOf($: Engine, command: string): Promise<FloorRead> {
   const live = findings.filter(f => on.has(f.rule))
   let ask = live.filter(f => f.level === 'ask')
   let fork = live.filter(f => f.level === 'fork')
-  const def = w.defaultBranch ?? 'main'
   if (ask.some(f => f.rule === 'branch-delete') && deletes !== null && deletes.length > 0 &&
-    (await Promise.all(deletes.map(d => merged($, d, def)))).every(Boolean)) {
+    (await Promise.all(deletes.map(d => merged($, d, w.defaultBranch)))).every(Boolean)) {
     fork = [...fork, ...ask.filter(f => f.rule === 'branch-delete')]
     ask = ask.filter(f => f.rule !== 'branch-delete')
   }
   return { ask, fork }
 }
-// Checked before the command runs: a branch the same call merges is not merged yet.
-async function merged($: Engine, d: Delete, def: string): Promise<boolean> {
-  const remote = d.remote ?? 'origin'
-  const ref = d.remote === undefined ? `refs/heads/${d.branch}` : `refs/remotes/${remote}/${d.branch}`
+// Checked before the command runs: a branch the same call merges is not merged yet. A remote
+// branch's tip is read from the remote itself, never from a tracking ref that may be older (PR #131
+// review), and checked against that remote's own default branch. Any failure is "not merged".
+async function merged($: Engine, d: Delete, originDefault: string | undefined): Promise<boolean> {
+  const git = (args: string[]) => $.process.run(['git', '-C', d.dir, ...args])
   try {
-    return (await $.process.run(['git', '-C', d.dir, 'merge-base', '--is-ancestor', ref, `refs/remotes/${remote}/${def}`])).exitCode === 0
+    if (d.remote === undefined)
+      return (await git(['merge-base', '--is-ancestor', `refs/heads/${d.branch}`, `refs/remotes/origin/${originDefault ?? 'main'}`])).exitCode === 0
+    const head = await git(['symbolic-ref', '--short', `refs/remotes/${d.remote}/HEAD`])
+    const named = head.exitCode === 0 ? head.stdout.trim() : ''
+    const def = named.startsWith(`${d.remote}/`) ? named.slice(d.remote.length + 1) : d.remote === 'origin' ? originDefault : undefined
+    if (def === undefined || def === '') return false
+    const tip = await $.process.run(['timeout', '10', 'git', '-C', d.dir, 'ls-remote', d.remote, `refs/heads/${d.branch}`])
+    const sha = tip.exitCode === 0 ? tip.stdout.trim().split(/\s+/)[0] ?? '' : ''
+    if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(sha)) return false
+    return (await git(['merge-base', '--is-ancestor', sha, `refs/remotes/${d.remote}/${def}`])).exitCode === 0
   } catch {
     return false
   }

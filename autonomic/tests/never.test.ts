@@ -1139,6 +1139,12 @@ describe('0.5.1: the deletes a call makes (spec §5)', () => {
     for (const c of ['git branch -D $B', 'cd $D && git branch -D x', 'git push $R --delete x', 'git push origin --prune', 'git push --mirror origin'])
       expect([c, del(c)]).toEqual([c, null])
   })
+  test('only a cd that surely runs sets the directory (PR #131 review)', () => {
+    for (const c of ['false && cd /other; git branch -D x', 'true || cd /other; git branch -D x', 'if true; then cd /other; fi; git branch -D x',
+      'x=$(cd /other && pwd); git branch -D y', 'for d in a; do cd /other; done; git branch -D x', 'cd /other & git branch -D x'])
+      expect([c, del(c)]).toEqual([c, null])
+    expect(del('cd /work/r; git branch -D x')).toEqual([{ dir: '/work/r', branch: 'x' }])
+  })
   test('no branch-delete, no deletes', () => {
     expect(del('git push -u origin feat/x')).toEqual([])
   })

@@ -24,7 +24,9 @@ false positives, 17 inputs never judged).
 - **Smaller fixes.** A sed script keeps a backslash inside single quotes (`'s/a\/b/c/'` is a safe sed);
   `rm "$T/x"` is not recursive; the pain band shows the command that matched.
 - **Known limits.** A call that merges and then deletes in one command still asks (the branch is not
-  merged when the check runs). A session's first call still asks: there is nothing to fork yet.
+  merged when the check runs). A session's first call still asks: there is nothing to fork yet. A
+  rebase-merged branch is not an ancestor of the default branch, so its delete still asks. A host with
+  no `timeout` command (stock macOS) cannot read a remote's tip, so a remote delete asks there.
 
 ## 0.5.0
 

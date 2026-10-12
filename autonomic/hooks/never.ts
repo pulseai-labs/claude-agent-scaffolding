@@ -593,8 +593,8 @@ function splice(text: string): string {
   return text
 }
 type Vars = Map<string, { value: string; at: number }>
-type Judged = { words: string[]; own: string[]; text: string; at: number }
-type Reading = { whole: string[] } | { groups: Judged[]; vars: Vars; bag: string[]; values: string[]; loops: [number, number][] }
+type Judged = { words: string[]; own: string[]; text: string; at: number; top: boolean }
+type Reading = { whole: string[] } | { groups: Judged[]; vars: Vars; bag: string[]; values: string[]; loops: [number, number][]; sure: boolean[] }
 // namesDanger and neverRules read the same command back to back (register.tsx): keep the last
 // reading, keyed by the text and the readers, so a large script is read once, not twice.
 let last: { command: string; readers: string; r: Reading } | undefined
@@ -668,7 +668,7 @@ function reading(command: string, readers: Readers): Reading {
   const g = cmds === undefined ? undefined : groups(cmds)
   if (cmds === undefined || g === undefined) return { whole: split(text) }
   const ctx: Ctx = { resolve: resolver(cmds), readers, gitRuns: configWritten(text, cmds) }
-  return { groups: judge(cmds, g, ctx), vars: literalVars(command, text, cmds), bag: split(text), values: flat(cmds).filter(c => assignOnly(c.bare)).flatMap(c => split(c.text)), loops: loops(cmds) }
+  return { groups: judge(cmds, g, ctx), vars: literalVars(command, text, cmds), bag: split(text), values: flat(cmds).filter(c => assignOnly(c.bare)).flatMap(c => split(c.text)), loops: loops(cmds), sure: unconditional(text, cmds) }
 }
 // The words of parsed commands, one group per command: a command that is not inert keeps all its
 // words, its substitutions' included; an inert one keeps them only when its output may be run (a
@@ -684,16 +684,16 @@ function judge(cmds: readonly Command[], g: readonly Group[], ctx: Ctx, at?: num
       let s = i
       while (s > 0 && cmds[s - 1]!.pipe) s--
       const span = !isInert(c.bare) && s < i ? cmds.slice(s, i + 1) : [c]
-      return [{ words: span.flatMap(x => split(x.text)), own: span.flatMap(x => ownWords(x.text)), text: c.text.trim(), at: k }]
+      return [{ words: span.flatMap(x => split(x.text)), own: span.flatMap(x => ownWords(x.text)), text: c.text.trim(), at: k, top: at === undefined }]
     }
     const to = [...targets(c.bare), ...g[i]!.targets, ...sedTargets(c.bare)]
     lt ??= to.length > 0 ? laters(cmds, ctx) : undefined
-    if (to.length > 0 && usedLater(to, lt!.list, ctx, lt!.from[i + 1])) return [{ words: split(c.text), own: ownWords(c.text), text: c.text.trim(), at: k }]
+    if (to.length > 0 && usedLater(to, lt!.list, ctx, lt!.from[i + 1])) return [{ words: split(c.text), own: ownWords(c.text), text: c.text.trim(), at: k, top: at === undefined }]
     return c.subs.flatMap(s => {
       const inner = commands(s)
       const ig = inner === undefined ? undefined : groups(inner)
       // 0.5.1 (§1): a substitution that does not parse is text: it has no own words.
-      return inner === undefined || ig === undefined ? [{ words: split(s), own: [], text: s.trim(), at: k }] : judge(inner, ig, ctx, k)
+      return inner === undefined || ig === undefined ? [{ words: split(s), own: [], text: s.trim(), at: k, top: false }] : judge(inner, ig, ctx, k)
     })
   })
 }
@@ -735,21 +735,12 @@ function depths(cmds: readonly Command[]): boolean[] {
 const DYNAMIC = /(?:printf[ \t]+(?:-[A-Za-z]+[ \t]+)*-[A-Za-z]*v[ \t]*|read[ \t]+(?:-[A-Za-z]+[ \t]+(?:\S+[ \t]+)?)*|(?:declare|local|typeset)[ \t]+-[A-Za-z]*n[A-Za-z]*[ \t]+)["']?\$/
 function literalVars(command: string, text: string, cmds: readonly Command[]): Vars {
   if (DYNAMIC.test(command)) return new Map()
-  const inside = depths(cmds)
+  const sure = unconditional(text, cmds)
   const seen = new Map<string, { value: string; at: number; ok: boolean; n: number }>()
   cmds.forEach((c, i) => {
     const m = ASSIGN.exec(c.text)
     if (!m) return
-    const start = c.end - c.text.length
-    // The separator before it, past blanks and empty commands: `a &&\nB=x` follows `&&`. A newline
-    // after `&`, `|` or a backslash continues that command; a lone `&` after it runs it apart.
-    let p = start - 1
-    let line = false
-    while (p >= 0 && /\s/.test(text[p]!)) { if (text[p] === '\n') line = true; p-- }
-    const prev = text[p]
-    const first = p < 0 || (prev === ';' && text[p - 1] !== ';') || (line && !/[&|\\]/.test(prev!))
-    const background = text[c.end] === '&' && text[c.end + 1] !== '&'
-    const ok = first && !background && !c.pipe && !inside[i]!
+    const ok = sure[i]!
     const s = seen.get(m[1]!)
     seen.set(m[1]!, { value: clean(m[2]!), at: i, ok: ok && s === undefined, n: (s?.n ?? 0) + 1 })
   })
@@ -915,7 +906,8 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
       const d = deletesOf(substitute(g.own, r.vars, g.at), dir, where.home)
       deletes = deletes === null || d === null ? null : [...deletes, ...d]
     }
-    if (move) { moved = true; dir = ws.some(w => w === 'popd') ? undefined : cdTo(ws, dir, where.home) }
+    // Only a top-level cd that surely runs moves the directory deletes are read in (PR #131 review).
+    if (move) { moved = true; dir = g.top && r.sure[g.at] && !ws.some(w => w === 'popd') ? cdTo(ws, dir, where.home) : undefined }
     if (writes) config = true
     if (switches) switched = true
   })
@@ -970,6 +962,24 @@ function cdTo(ws: readonly string[], from: string | undefined, home: string): st
   if (t === undefined) return home
   if (t === '-' || opaque(t)) return undefined
   return join(from, t, home)
+}
+// 0.5.1 (§5): the top-level commands that surely run: at the start of the text or after `;` or a
+// newline, not in the background, not piped, not inside a group or a loop. literalVars reads names by
+// the same rule.
+function unconditional(text: string, cmds: readonly Command[]): boolean[] {
+  const inside = depths(cmds)
+  return cmds.map((c, i) => {
+    const start = c.end - c.text.length
+    // The separator before it, past blanks and empty commands: `a &&\nB=x` follows `&&`. A newline
+    // after `&`, `|` or a backslash continues that command; a lone `&` after it runs it apart.
+    let p = start - 1
+    let line = false
+    while (p >= 0 && /\s/.test(text[p]!)) { if (text[p] === '\n') line = true; p-- }
+    const prev = text[p]
+    const first = p < 0 || (prev === ';' && text[p - 1] !== ';') || (line && !/[&|\\]/.test(prev!))
+    const background = text[c.end] === '&' && text[c.end + 1] !== '&'
+    return first && !background && !c.pipe && !inside[i]!
+  })
 }
 // A whole-text finding's focus: the first line that holds a verb word (§6).
 function wholeFocus(command: string): string {

@@ -41,11 +41,27 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     expect(w.runs.some(r => r.join(' ') === 'git -C /repo merge-base --is-ancestor refs/heads/record/x refs/remotes/origin/main')).toBe(true)
     expect(w.forkPrompts[0]).toContain('- branch-delete:')
   })
-  test('a merged remote delete goes to the fork', async ($, on) => {
+  test('a remote delete reads the tip from the remote, and goes to the fork when that tip is merged', async ($, on) => {
     const w = world(on, { env: AP })
-    w.git.merged = ['refs/remotes/origin/feat/x']
+    const tip = 'a'.repeat(40)
+    w.git.remoteTips = { 'refs/heads/feat/x': tip }
+    w.git.merged = [tip]
     w.forks.push(fork({ decision: 'allow', reason: 'merged cleanup' }))
     expect((await $.tool.check(BASH('git push origin --delete feat/x'))).decision).toBe('allow')
+    expect(w.runs.some(r => r.join(' ') === 'timeout 10 git -C /repo ls-remote origin refs/heads/feat/x')).toBe(true)
+  })
+  test('a stale tracking ref is not trusted: the remote tip decides (PR #131 review)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.git.remoteTips = { 'refs/heads/feat/x': 'b'.repeat(40) }
+    w.git.merged = ['refs/remotes/origin/feat/x']
+    expect((await $.tool.check(BASH('git push origin --delete feat/x'))).decision).toBe('ask')
+    expect(w.forkPrompts).toEqual([])
+  })
+  test('a remote that does not answer keeps the delete with the operator', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.git.merged = ['refs/remotes/origin/feat/x']
+    expect((await $.tool.check(BASH('git push origin --delete feat/x'))).decision).toBe('ask')
+    expect(w.forkPrompts).toEqual([])
   })
   test('an unmerged delete asks; no fork', async ($, on) => {
     const w = world(on, { env: AP })
