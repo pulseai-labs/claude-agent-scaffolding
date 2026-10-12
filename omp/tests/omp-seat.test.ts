@@ -4,14 +4,14 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MARKETPLACE } from '../../omp-roles/omp/bin-path'
-import { pinWarning, planLaunch, versionWarning } from '../../omp-roles/omp/seat'
+import { checkExtensions, pinWarning, planLaunch, versionWarning } from '../../omp-roles/omp/seat'
 
 let root: string, ompRecord: string, claudeRecord: string
 
 function install(name: string, withExt = true): string {
   const p = join(root, 'cache', name)
   mkdirSync(join(p, 'omp'), { recursive: true })
-  if (withExt) writeFileSync(join(p, 'omp', 'extension.ts'), '')
+  if (withExt) writeFileSync(join(p, 'omp', 'extension.ts'), 'export default function () {}')
   return p
 }
 function record(path: string, paths: Record<string, string>) {
@@ -33,10 +33,14 @@ describe('planLaunch', () => {
   test('worker pins the three extensions in order, then the caller args, with no system prompt', () => {
     const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
     record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a, 'omp-roles': install('omp-roles', false) })
-    expect(launch()).toEqual({
+    expect(launch()).toMatchObject({
       argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'), '--x'],
       warnings: [],
     })
+  })
+  test('a name from the prototype chain is not a role', () => {
+    expect(launch('toString')).toEqual({ error: expect.stringContaining('unknown role "toString"') })
+    expect(launch('__proto__')).toHaveProperty('error')
   })
   test('an unknown role is an error', () => {
     expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker)' })
@@ -57,7 +61,7 @@ describe('planLaunch', () => {
     const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
     record(ompRecord, { 'seat-mods': s, molt: m })
     record(claudeRecord, { autonomic: a })
-    expect(launch()).toEqual({
+    expect(launch()).toMatchObject({
       argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'), '--x'],
       warnings: [],
     })
@@ -114,6 +118,15 @@ describe('bin/omp-seat with a via that cannot run', () => {
     record(join(home, '.omp', 'plugins', 'installed_plugins.json'), { 'seat-mods': s, molt: m, autonomic: a })
     return spawnSync('bun', [seat, 'worker', '--via', via], { env: { ...process.env, HOME: home }, encoding: 'utf8', timeout: 30_000 })
   }
+  test('an extension that fails to load stops the launch before any omp starts', () => {
+    const home = mkdtempSync(join(tmpdir(), 'seat-home-'))
+    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
+    writeFileSync(join(m, 'omp', 'extension.ts'), 'throw new Error("boom")')
+    record(join(home, '.omp', 'plugins', 'installed_plugins.json'), { 'seat-mods': s, molt: m, autonomic: a })
+    const r = spawnSync('bun', [seat, 'worker', '--via', 'true'], { env: { ...process.env, HOME: home }, encoding: 'utf8', timeout: 30_000 })
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain(`omp-seat: ${join(m, 'omp', 'extension.ts')} did not load: boom`)
+  })
   test('a missing command is named and exits 2, with no pin warning', () => {
     const r = run('/nonexistent/omp-via')
     expect(r.status).toBe(2)
@@ -124,5 +137,27 @@ describe('bin/omp-seat with a via that cannot run', () => {
     const r = run('false')
     expect(r.status).toBe(1)
     expect(r.stderr).not.toContain('not the tested')
+  })
+})
+
+describe('checkExtensions (fix wave 4)', () => {
+  const mod = (name: string, src: string) => { const f = join(root, name); writeFileSync(f, src); return f }
+  test('modules whose default export is a function load', async () => {
+    expect(await checkExtensions([mod('a.ts', 'export default function () {}'), mod('b.ts', 'export default () => {}')])).toBeUndefined()
+  })
+  test('a module that throws on import is named with its error', async () => {
+    const bad = mod('bad.ts', 'throw new Error("boom")')
+    expect(await checkExtensions([bad])).toBe(`omp-seat: ${bad} did not load: boom`)
+  })
+  test('a syntax error, a missing file and a default export that is not a function all fail', async () => {
+    for (const f of [mod('syn.ts', 'export default function ('), join(root, 'missing.ts'), mod('obj.ts', 'export default {}')]) {
+      const e = await checkExtensions([join(root, 'ok.ts') && mod('ok.ts', 'export default () => {}'), f])
+      expect(e).toContain(`omp-seat: ${f} did not load:`)
+    }
+  })
+  test('planLaunch lists the three extension paths it pinned', () => {
+    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
+    record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })
+    expect((launch() as { extensions: string[] }).extensions).toEqual([s, m, a].map((p) => join(p, 'omp/extension.ts')))
   })
 })
