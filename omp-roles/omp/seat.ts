@@ -14,6 +14,13 @@ export function pinWarning(installed: string, tested: string): string | undefine
     : `omp-seat: omp ${v} is not the tested ${tested}; running anyway — an upgrade is a PR (omp-roles README)`
 }
 
+// The `<via> --version` result → a pin warning. A via that cannot run (spawn error, timeout, non-zero exit)
+// says nothing about the version, so it gets no warning; the launch reports its own failure.
+export function versionWarning(v: { error?: Error; status: number | null; stdout?: string | null }, tested: string): string | undefined {
+  if (v.error !== undefined || v.status !== 0) return undefined
+  return pinWarning(v.stdout ?? '', tested)
+}
+
 export function planLaunch(o: { role: string; via: string; args: string[]; ompRecord: string; claudeRecord: string; rolesDir?: string }):
   { argv: string[]; warnings: string[] } | { error: string } {
   if (!(o.role in ROLES)) return { error: `omp-seat: unknown role "${o.role}" (known: ${Object.keys(ROLES).join(', ')})` }
