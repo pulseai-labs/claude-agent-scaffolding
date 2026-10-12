@@ -196,5 +196,41 @@ t_capture "$OSS" ledger_add_auto r0.s1 "x" "true" "exit:0" active
 t_assert_rc 0 "cli add_auto with explicit active"
 cd "$HERE"; rm -rf "$DTMP"; unset OSS_STATE_FILE
 
+# --- F2 (PR #760): the status guard runs inside the journal op, under the lock
+S3="$TMP/state3.json"; oss_state_init "$S3" guard >/dev/null
+oss_entity_add_release "$S3" "r" "g" >/dev/null; oss_entity_add_spine "$S3" r0 "a" bone canonical >/dev/null
+oss_ledger_add_user "$S3" r0.s1 "share a playlist and a friend opens it" "it opens" active >/dev/null; G1="$(oss_state_read "$S3" '.demo_ledger[-1].id')"
+oss_state_mutate "$S3" set_demo_line_status "{\"id\":\"$G1\",\"status\":\"deferred\",\"by\":\"r0.s1\",\"reason\":\"operator: later\",\"until\":\"r1\"}"
+# 1. a from-guarded op whose set does not hold the line's current status changes nothing
+oss_state_mutate "$S3" set_demo_line_status "{\"id\":\"$G1\",\"status\":\"active\",\"by\":\"guard-probe\",\"reason\":null,\"from\":[\"planned\"]}"
+t_capture oss_state_read "$S3" "[.demo_ledger[] | select(.id==\"$G1\")][0] | [.status, .status_by, (.deferred_until_release // \"-\")] | join(\"|\")"
+t_assert_eq "deferred|r0.s1|r1" "$T_OUT" "a from-guarded op leaves a line outside its set byte-identical"
+# ...and one whose set DOES hold it still writes
+oss_state_mutate "$S3" set_demo_line_status "{\"id\":\"$G1\",\"status\":\"deferred\",\"by\":\"r0.s1\",\"reason\":\"operator: still later\",\"until\":\"r2\",\"from\":[\"deferred\"]}"
+t_capture oss_state_read "$S3" "[.demo_ledger[] | select(.id==\"$G1\")][0].deferred_until_release"
+t_assert_eq "r2" "$T_OUT" "a from-guarded op whose set holds the line's status writes"
+# 2. no `from` at all is the pre-1.16 payload shape, and it still writes
+oss_state_mutate "$S3" set_demo_line_status "{\"id\":\"$G1\",\"status\":\"active\",\"by\":\"unconditional\",\"reason\":null}"
+t_capture oss_state_read "$S3" "[.demo_ledger[] | select(.id==\"$G1\")][0].status"
+t_assert_eq "active" "$T_OUT" "an op with no from still writes (old journals replay unchanged)"
+# 3. the race shape: the defer lands after a snapshot that still held the line planned
+oss_state_mutate "$S3" set_demo_line_status "{\"id\":\"$G1\",\"status\":\"deferred\",\"by\":\"r0.s1\",\"reason\":\"operator: later\",\"until\":\"r1\"}"
+oss_ledger_add_auto "$S3" r0.s1 "still planned" "true" "exit:0" >/dev/null
+t_capture oss_ledger_activate_spine "$S3" r0.s1
+t_assert_rc 0 "activate_spine runs over a set holding a deferred line"
+t_assert_contains "$T_OUT" "activated 1" "the count excludes the deferred line and counts the one that went live"
+t_capture oss_state_read "$S3" "[.demo_ledger[] | select(.id==\"$G1\")][0].status"
+t_assert_eq "deferred" "$T_OUT" "the deferred line is not undone by the spine activation"
+t_capture oss_ledger_activate "$S3" "$G1"
+t_assert_rc 0 "a deferred line still activates explicitly (walked now)"
+# ...and a defer-shaped guard cannot move an escaped line (terminal, under the lock)
+oss_state_mutate "$S3" set_demo_line_status "{\"id\":\"$G1\",\"status\":\"escaped\",\"by\":\"r0.s1\",\"reason\":\"op: negative result\",\"clause\":\"SPINE.md: escape\"}"
+oss_state_mutate "$S3" set_demo_line_status "{\"id\":\"$G1\",\"status\":\"deferred\",\"by\":\"r0.s1\",\"reason\":\"op: late\",\"until\":\"r9\",\"from\":[\"active\",\"planned\",\"deferred\"]}"
+t_capture oss_state_read "$S3" "[.demo_ledger[] | select(.id==\"$G1\")][0].status"
+t_assert_eq "escaped" "$T_OUT" "the defer guard leaves an escaped line where it is"
+# 4. replay across the from-guarded writes
+t_capture oss_state_replay "$S3"
+t_assert_rc 0 "replay clean across from-guarded writes"
+
 cd "$HERE"; rm -rf "$TMP"
 t_summary
