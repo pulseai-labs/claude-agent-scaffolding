@@ -1099,3 +1099,23 @@ describe('0.5.1: shell words for sed, and rm of a variable path (spec §2, §4)'
     for (const c of ['rm -rf $T', 'rm $F /x', 'rm -rf ../x', 'rm -r ~/x']) expect([c, rules(c)]).toEqual([c, ['rm-outside']])
   })
 })
+
+describe('0.5.1: the pushed branch, not the session branch (spec §3)', () => {
+  test('a named non-default refspec is no default-branch push on a detached or main checkout', () => {
+    for (const branch of [undefined, 'main']) {
+      const w = { ...W, branch }
+      expect([branch, rules('git push -u origin record/x', w)]).toEqual([branch, []])
+      expect([branch, rules('git push origin HEAD:record/x', w)]).toEqual([branch, []])
+      expect([branch, rules('git -C /other push origin --delete feat/x', w)]).toEqual([branch, ['branch-delete']])
+      expect([branch, rules('git push -f origin feat/x', w)]).toEqual([branch, ['force-push']])
+      expect(rules('git push origin $C:refs/heads/proof/x', w)).not.toContain('default-branch-push')
+    }
+  })
+  test('the default branch, HEAD, no refspec and an opaque destination still ask', () => {
+    for (const branch of [undefined, 'main']) {
+      const w = { ...W, branch }
+      for (const c of ['git push origin main', 'git push origin HEAD', 'git push origin x:main', 'git push', 'git push origin $B', 'git push origin --delete main'])
+        expect([branch, c, rules(c, w).includes('default-branch-push')]).toEqual([branch, c, true])
+    }
+  })
+})

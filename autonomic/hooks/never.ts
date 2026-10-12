@@ -37,10 +37,12 @@ function split(command: string): string[] {
   // NAME=VALUE also shows its value: FLAGS=-rf, alias.p=push, remote.x.push=refs/heads/main.
   return text.split(SPLIT).flatMap(w => (w.indexOf('=') > 0 ? [w, w.slice(w.indexOf('=') + 1)] : [w])).filter(w => w !== '')
 }
-// 0.5.1 (§2): a command's own words, the arguments Bash passes. Whitespace and separators inside
-// quotes stay inside one word, so a quoted message holds no verb; quotes still join pieces
-// (`'git' push`, `pu""sh`). In single quotes `$` is literal too. A substitution or a backtick
-// inside double quotes runs: its text is kept as it is and read as 0.5.0 reads it.
+// 0.5.1 (§2): a command's own words, the arguments Bash passes. A redirect and its target are not
+// words the command is given (`git push >log` passes none), so they are dropped as `command` drops
+// them. Whitespace and separators inside quotes stay inside one word, so a quoted message holds no
+// verb; quotes still join pieces (`'git' push`, `pu""sh`). In single quotes `$` is literal too. A
+// substitution or a backtick inside double quotes runs: its text is kept as it is and read as 0.5.0
+// reads it.
 const hide = (c: string, dollar: boolean) => (/[\s;&|()<>`]/.test(c) || (dollar && c === '$') ? String.fromCharCode(0xe000 + c.charCodeAt(0)) : c)
 function maskQuoted(text: string): string {
   let out = ''
@@ -60,7 +62,7 @@ function maskQuoted(text: string): string {
   }
   return out
 }
-const ownWords = (text: string) => split(maskQuoted(text))
+function ownWords(text: string): string[] { return command(maskQuoted(text)) }
 // Simple commands: split at ; & | && || and newlines outside quotes and escapes. `&` and `|`
 // next to a redirect (`2>&1`, `>&f`, `&>f`, `>|f`) belong to the command. A `#` that starts a
 // word comments out the rest of its line, so a quote or a backslash in a comment opens nothing.
@@ -932,9 +934,11 @@ function switchesTo(ws: readonly string[], names: readonly string[]): boolean {
   return rest.some(w => opaque(w) || names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))))
 }
 
-// Cause 3: a push that names a remote and only literal destinations other than the default
-// branch, main or master (never HEAD, @, empty or opaque) needs no default-branch ask after a move.
-const NO_VALUE = /^(?:-[uqvn]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin))$/
+// Cause 3, extended by 0.5.1 (§3): a push that names a remote and only literal destinations other
+// than the default branch, main or master (never HEAD, @, empty or opaque) needs no default-branch
+// ask, whatever the session's branch is.
+// 0.5.1 (§3): -d/--delete and -f/--force take no value either; force-push and branch-delete are read on their own.
+const NO_VALUE = /^(?:-[uqvndf]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin|delete|force))$/
 function namedRefs(words: readonly string[], names: readonly string[]): boolean {
   const at = words.findIndex(w => isVerb(w, 'push'))
   if (at < 0) return false
@@ -947,8 +951,12 @@ function namedRefs(words: readonly string[], names: readonly string[]): boolean 
   const all = [...new Set([...names, 'main', 'master'])]
   return args.slice(1).every(ref => {
     const r = ref.replace(/^\+/, '')
-    if (opaque(r)) return false
-    const dst = r.includes(':') ? r.slice(r.lastIndexOf(':') + 1) : r
+    // 0.5.1 (§3): an opaque source with a literal destination (`$C:refs/heads/proof/x`) is read by its
+    // destination. A `:` inside a `${…}` expansion (`${BRANCH:-x}`) is no refspec separator, so the
+    // word stays one opaque ref.
+    const at = r.replace(/\$\{[^}]*\}/g, m => 'x'.repeat(m.length)).lastIndexOf(':')
+    const dst = at < 0 ? r : r.slice(at + 1)
+    if (opaque(dst)) return false
     if (dst === '' || dst === 'HEAD' || dst === '@') return false
     return !all.some(n => dst === n || dst.endsWith(`/${n}`) || r === n)
   })
@@ -969,11 +977,11 @@ function rulesOf(words: readonly string[], where: Where, moved: boolean, single:
     const isDefault = (r: string) => { const w = r.replace(/^\+/, ''); return names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))) }
     // send-pack and http-push with no refspec update the matching refs, the default one included.
     const plumbing = words.some(w => isVerb(w, 'send-pack') || isVerb(w, 'http-push'))
-    // 0.5.0 cause 3: only when the floor reads this one command, never the whole bag.
-    // A branch switch earlier in the text (final review C1) is read the same way as a move.
-    const away = (moved || switched) && !(single && namedRefs(words, names))
-    if (plumbing || where.branch === undefined || names.includes(where.branch) || away ||
-      any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))
+    // 0.5.1 (§3): a push that names a remote and only literal non-default destinations, read on one
+    // command, is no default-branch push whatever the session's branch is (detached, main, moved).
+    const named = single && namedRefs(words, names)
+    if (plumbing || (!named && (where.branch === undefined || names.includes(where.branch) || moved || switched ||
+      any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))))
       found.add('default-branch-push')
   }
   // -D, or -d with a force flag; a plain -d refuses an unmerged branch (as seat-mods reads it).
