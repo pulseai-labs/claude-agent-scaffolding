@@ -36,6 +36,9 @@ All notable changes to the `seat-mods` plugin.
   take the same reading in its shell form: a `scheme:/` operand (`rm local://x`) is outside, because omp's
   embedded coreutils route it to the backing file; a `-F` file with a scheme cannot be checked; an unquoted
   `-F ~/msg` is read from HOME (and, since the quotes are not reported, also literally).
+  **Known limit:** the guard reads omp's path dialect only as far as listed here. omp's other selectors
+  (a SQLite `file.sqlite:table:row`, and any later one) are read as plain paths, so a selector through a
+  symlink that points outside the worktree is not caught — the same reach bash writes already have.
 
 ## 0.3.2 — 2026-10-09
 

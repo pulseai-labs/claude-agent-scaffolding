@@ -222,7 +222,7 @@ Under any guarded role, a tool call passes only if its name is on the allow list
 | `github` | omp's read-only ops; `pr_create`/`pr_push` follow the PR and push rails; `pr_checkout` and every other op denied; `forceWithLease` is a force-push |
 | `debug` | an implementer only, its launch read like `eval`; denied for a verifier or reviewer |
 
-A child may not spawn (`task`, eval `agent()` and workpool workers are blocked). omp's advisor and `/tan` clones count as children, so they get the verifier rails even under a coordinator. **Known limit:** helper calls inside `eval` fire no `tool_call`, so the guard reads `eval` source as best-effort command text; git hooks stay the rail for the rest.
+A child may not spawn (`task`, eval `agent()` and workpool workers are blocked). omp's advisor and `/tan` clones count as children, so they get the verifier rails even under a coordinator. **Known limit:** helper calls inside `eval` fire no `tool_call`, so the guard reads `eval` source as best-effort command text; git hooks stay the rail for the rest. **Known limit:** the guard reads omp's path dialect only as far as the table says; omp's other path selectors (a SQLite `file.sqlite:table:row`, and any later one) are read as plain paths, so one routed through a symlink that points outside the worktree is not caught. Bash redirections, `cp`, `mv` and `ln` are not placed either. The guard catches a seat's mistakes; it is not a sandbox.
 
 ## Tests
 
