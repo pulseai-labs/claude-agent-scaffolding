@@ -8,12 +8,16 @@ Under `omp-seat`, the coordinator's launch must list each hosting repo's worktre
 
 ## Install
 
+Coordinator roles need ossify 1.18.0 for `spine-driver` and `close`, and merge-bar for `work-pr`.
+
 ```bash
 omp plugin marketplace add pulseai-labs/claude-agent-scaffolding
 omp plugin install omp-roles@claude-agent-scaffolding
 omp plugin install seat-mods@claude-agent-scaffolding
 omp plugin install molt@claude-agent-scaffolding
 omp plugin install autonomic@claude-agent-scaffolding
+omp plugin install ossify@claude-agent-scaffolding
+omp plugin install merge-bar@claude-agent-scaffolding
 ```
 
 Put the launcher on `PATH`. `omp plugin list` shows the installed version; the path is in the install record:
@@ -22,7 +26,7 @@ Put the launcher on `PATH`. `omp plugin list` shows the installed version; the p
 ln -sf "$(jq -r '.plugins["omp-roles@claude-agent-scaffolding"] | (map(select(.scope == "user")) + .)[0].installPath' ~/.omp/plugins/installed_plugins.json)/bin/omp-seat" ~/.local/bin/omp-seat
 ```
 
-Run it again after an upgrade: the link points at one version's folder. `omp-seat` needs `bun`.
+Run it again after an upgrade: the link points at one version's folder. `omp-seat` needs `bun`; a `--via` wrapper that runs omp under `timeout` needs `--foreground`.
 
 `omp-seat` needs seat-mods 0.4.1 (the first release that maps `seat-reviewer` to the reviewer profile), molt 0.3.0 and autonomic 0.6.0. It refuses an older version or a missing OMP extension, naming the required minimum.
 
