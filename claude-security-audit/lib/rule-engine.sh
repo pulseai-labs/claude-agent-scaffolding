@@ -98,7 +98,10 @@ _csa_target_matches_aspect() {
       return 1
       ;;
     hooks)
-      if [[ "$target" == *.sh || "$target" == */.opencode/bin/* ]]; then
+      # OpenCode code outside bin/ (lib/, plugin/) runs too (#127).
+      if [[ "$target" == *.sh || "$target" == */.opencode/bin/* \
+            || "$target" == */.opencode/*.js || "$target" == */.opencode/*.ts \
+            || "$target" == */.opencode/*.mjs ]]; then
         return 0
       fi
       [[ "$target" == */.claude/hooks/* && -x "$target" ]] && return 0
@@ -122,7 +125,10 @@ _csa_target_matches_aspect() {
       ;;
     secrets)
       # Secrets rules scan text-like files and executable Claude hook handlers.
+      # TOML, YAML and JSONC configs are enumerated, so they are scanned too (#121).
       [[ "$target" == *.md || "$target" == *.json || "$target" == *.sh \
+         || "$target" == *.toml || "$target" == *.yaml || "$target" == *.yml \
+         || "$target" == *.jsonc \
          || "$target" == *.py || "$target" == *.js || "$target" == *.ts \
          || "$target" == */.opencode/bin/* ]] && return 0
       [[ "$target" == */.claude/hooks/* && -x "$target" ]] && return 0

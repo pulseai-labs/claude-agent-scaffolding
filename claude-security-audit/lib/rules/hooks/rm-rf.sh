@@ -26,7 +26,8 @@ detect() {
   [[ -r "$target_file" ]] || return 0
   # Only scan known hook handler and wrapper script surfaces.
   if [[ "$target_file" != */.claude/hooks* && "$target_file" != *.sh \
-        && "$target_file" != */.opencode/bin/* ]]; then
+        && "$target_file" != */.opencode/bin/* && "$target_file" != */.opencode/*.js \
+        && "$target_file" != */.opencode/*.ts && "$target_file" != */.opencode/*.mjs ]]; then
     return 0
   fi
   # Match rm with -rf or -fr flags followed by an absolute path /
