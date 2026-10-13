@@ -27,12 +27,12 @@ citing `SRS-4.2` is citing an artifact ossify does not produce. Catch it here.
 
 Two kinds, and only the first is a command:
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 **Mechanical** — the path exists, the ADR id exists, the quoted signature matches:
 
 ```bash
-"$oss_bin" get '[.bones[].adr]'                                  # the ADR ids that exist
+oss get '[.bones[].adr]'                                  # the ADR ids that exist
 test -f src/app/orders.rs                                 # the path exists
 grep -n 'fn submit_order' src/app/orders.rs || true       # the signature is still there
 ```
@@ -47,9 +47,9 @@ resolve
 from there, not from a remembered rule: file paths and signatures in the work
 item's declared `target_repo` when it carries one, the sole declared repo
 otherwise
-(`"$oss_bin" repo_root <name>`); bone ADRs in whichever declared repo the bone
+(`oss repo_root <name>`); bone ADRs in whichever declared repo the bone
 concerns
-(`start/references/bones-registry.md`); the lean spec wherever `"$oss_bin" spec_path` prints; release
+(`start/references/bones-registry.md`); the lean spec wherever `oss spec_path` prints; release
 increment records under the AI workspace's `docs/specs/<release-id>/`
 (`plan-release/references/release-md-emission.md` §1). A check run from the wrong root reports a false
 citation miss — the path is fine, the cwd was not.
@@ -80,7 +80,7 @@ being executed against architecture that no longer exists. Registered touch
 surfaces make the blast radius findable:
 
 ```bash
-"$oss_bin" get '.bones[] | select(.adr == "ADR-0002") | .touch'
+oss get '.bones[] | select(.adr == "ADR-0002") | .touch'
 ```
 
 ---

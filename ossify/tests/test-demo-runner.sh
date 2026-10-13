@@ -63,6 +63,20 @@ oss_ledger_add_auto "$S" r0.s1 "legit zero-passing mention" "echo '0 passing war
 t_capture oss_demo_run_auto "$S"
 t_assert_rc 0 "non-runner output mentioning a zero-tests phrase is NOT vacuous-green"
 
+# D3: a `contains:` line whose command prints the needle and then exits 127 (not
+# invocable) FAILS - the shell's error text can carry the needle, and a plain
+# `contains:` row reads no exit status at all, so it would pass on a command that
+# never ran. The adjacent control keeps a refusal that exits 1 passing.
+oss_ledger_add_auto "$S" r0.s1 "not invocable" "echo still-there; exit 127" "contains:still-there" active >/dev/null
+t_capture oss_demo_run_auto "$S"
+t_assert_rc 1 "contains: on a command that cannot run (rc 127) fails"
+t_assert_contains "$T_OUT" "not invocable here" "the failure names the rc-127 non-invocability"
+oss_ledger_quarantine "$S" d6 "test cleanup" >/dev/null
+oss_ledger_add_auto "$S" r0.s1 "refusal that exits 1" "echo refused-here; exit 1" "contains:refused-here" active >/dev/null
+t_capture oss_demo_run_auto "$S"
+t_assert_rc 0 "control: a contains: line that prints its needle and exits 1 still passes"
+oss_ledger_quarantine "$S" d7 "test cleanup" >/dev/null
+
 # Fix 3: a missing/unreadable state file must be a guarded rc-1 error, not an
 # unguarded jq exit-2 abort under the dispatcher's `set -e` (which collides
 # with the rc-2 "usage error" convention). Exercised through the real

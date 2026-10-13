@@ -69,10 +69,10 @@ holds two genuinely separable decisions). Four required parts:
 
 ### Recording it
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
-"$oss_bin" bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
+oss bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
 ```
 
 Touch CSV entries follow risk-gates.md §3's grammar — a bare `,` separates entries, `\,` is a literal comma inside one; multiple directories are multiple entries (case-globs do not brace-expand). The whole list is **one** argument: quote it. Space-splitting it does not mint a shorter list and warn — the second word lands in the `[revisit trigger]` slot, so the surface silently shrinks and a glob becomes the bone's durable revisit trigger. The verb cannot tell the two apart for you: its 4th argument is optional, so it will not refuse the call. It does refuse, at rc 2, a list of more than one line, and any entry carrying leading or trailing whitespace or an invisible format character (CR, tab, NBSP, BOM, zero-width space) — which would be journaled as a glob matching no real path, leaving `touch_check` clean on the very code the bone claims to cover.
@@ -80,11 +80,11 @@ Touch CSV entries follow risk-gates.md §3's grammar — a bare `,` separates en
 Worked example:
 
 ```bash
-"$oss_bin" bone_add "ADR-0002" "Hexagonal core with six port traits" \
+oss bone_add "ADR-0002" "Hexagonal core with six port traits" \
   "src/domain/**,src/port.rs,src/adapters/**" \
   "revisit when a second storage backend is needed"
 
-"$oss_bin" bone_add "ADR-0005" "No persistent state at Release 0" \
+oss bone_add "ADR-0005" "No persistent state at Release 0" \
   "not-applicable" \
   "revisit when the first store lands"
 ```
@@ -96,13 +96,13 @@ mechanical checks read.
 ### Repointing a bone's touch surface
 
 When the code a bone governs moves — into a `packages/` tree, a renamed module
-— its registered globs match nothing, and `"$oss_bin" touch_check` goes silently
+— its registered globs match nothing, and `oss touch_check` goes silently
 **clean** for every spine that touches the moved code: the spine is never
 reclassified to `bone`, and nothing reports why. Re-point the surface with a
 corrective append, never by editing state:
 
 ```bash
-"$oss_bin" bone_set_touch "ADR-0002" "packages/core/src/domain/**,packages/core/src/port.rs"
+oss bone_set_touch "ADR-0002" "packages/core/src/domain/**,packages/core/src/port.rs"
 ```
 
 It **replaces** the whole touch list — name every glob the bone should cover,
@@ -123,19 +123,19 @@ the same change, so the index and the decision still agree.
 correction you apply, not a detector: a re-point at a path that does not exist
 is accepted and stays silent, exactly like the stale glob it replaced. Check the
 new list yourself before relying on the repair — feed the moved code's real
-paths (list them with `git ls-files`) to `"$oss_bin" touch_check`, whose rc 0/1
+paths (list them with `git ls-files`) to `oss touch_check`, whose rc 0/1
 is the hit/clean verdict and is read per
 `plan-release/references/bone-touch-judge.md` §2. A re-point that still reads
 clean on the code it was meant to cover has repaired nothing.
 
 ### Authoring the ADR file
 
-`"$oss_bin" bone_add` writes **the index row only**. Nothing writes the ADR file, and
+`oss bone_add` writes **the index row only**. Nothing writes the ADR file, and
 ossify ships no `/adr` utility — that is a settled decision, not a pending
 gap — so **this section is the convention, permanently**:
 
 **Where:** each declared repo's `docs/adr/` — resolve the repo the decision
-concerns with `"$oss_bin" repo_root <name>` (the sole declared repo when there is
+concerns with `oss repo_root <name>` (the sole declared repo when there is
 only one; under more than one, the repo the bone's touch-glob actually
 covers — ask if that is not obvious from the surface named). Bones are
 decisions about the *product's* architecture, so they live with the product,
@@ -176,7 +176,7 @@ minted **width** from *its* series: the file must not be the odd one out in its
 own directory. Read it, do not guess:
 
 Execute this entire fence in one fresh shell invocation. It is self-contained:
-`repos` is every declared repo name, one per line; `oss_bin` resolves their roots.
+`repos` is every declared repo name, one per line; `oss` resolves their roots.
 The default `adr_scan_mode=mint` also requires `dest_repo` and prints the next
 reference. Adoption C3 sets `adr_scan_mode=inventory` and captures `<repo-name><TAB><ADR-filename>` lines
 printed to stdout (one line per directory entry; empty directories emit none), with no destination and no mint. Each invocation owns its
@@ -212,7 +212,7 @@ trap 'if [ -n "$scan" ]; then rm -f -- "$scan"; fi; if [ -n "$dest" ]; then rm -
 scan="$(mktemp)"; dest="$(mktemp)"
 while IFS= read -r name; do
   [ -n "$name" ] || continue
-  root="$("$oss_bin" repo_root "$name")" || { echo "the numbering scan could not resolve a root for repo '$name'" >&2; exit 1; }
+  root="$(oss repo_root "$name")" || { echo "the numbering scan could not resolve a root for repo '$name'" >&2; exit 1; }
   if ! mkdir -p "$root/docs/adr"; then
     echo "the numbering scan could not create $root/docs/adr - an incomplete inventory is not an empty series" >&2
     exit 1
@@ -300,7 +300,7 @@ What was chosen, stated in the present tense.
 What this makes easy, what it makes hard, and what it forecloses.
 ```
 
-Mint the number **before** `"$oss_bin" bone_add`, so the index reference and the file
+Mint the number **before** `oss bone_add`, so the index reference and the file
 agree. An index row pointing at a file that was never written is the failure
 this section exists to prevent: the mechanical checks read the index and pass,
 while the prose the decision actually lives in does not exist.
@@ -310,7 +310,7 @@ while the prose the decision actually lives in does not exist.
 ## 4. Touch-surface glob semantics
 
 Touch surfaces are matched with **bash `case` glob semantics**, evaluated by
-`"$oss_bin" touch_check <path>...`:
+`oss touch_check <path>...`:
 
 - `*` matches **any characters including `/`**. So `src/domain/**` behaves as a
   plain prefix wildcard: it matches `src/domain/order.rs` *and*
@@ -319,7 +319,7 @@ Touch surfaces are matched with **bash `case` glob semantics**, evaluated by
 - `?` matches one character; `[abc]` matches a character class.
 - Paths are matched as written in the spine plan — keep them repo-relative and
   consistent with how plans list changed paths.
-- `"$oss_bin" touch_check` returns **rc 0 when a path matched** (a hit) and **rc 1 when
+- `oss touch_check` returns **rc 0 when a path matched** (a hit) and **rc 1 when
   clean** — the inversion is deliberate and callers depend on it. It prints
   `bone <adr>` / `risk_gate <name>` per match. **rc 2 is a third answer, not a
   clean one**: no paths were given, or the state could not be read. It says why

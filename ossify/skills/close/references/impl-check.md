@@ -29,17 +29,17 @@ burns time, and buries it.
 
 ## 2. Layer 1 — `auto:` ACs, halt-on-first-fail
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
-"$oss_bin" verify_acs "$spec"    # TSV: label <tab> command <tab> expectation, in declared order
+oss verify_acs "$spec"    # TSV: label <tab> command <tab> expectation, in declared order
 ```
 
 Then, per row, in the order it printed. The fields are tab-separated (commands
 contain spaces), and the rows are consumed by **redirection, never by a pipe**:
 
 ```bash
-rows="$("$oss_bin" verify_acs "$spec")" \
+rows="$(oss verify_acs "$spec")" \
   || { echo "[AC] cannot read the spec '$spec' - the gate would otherwise pass by reading nothing"; exit 2; }
 [ -n "$rows" ] \
   || { echo "[AC] the spec '$spec' yields zero auto: ACs - verify the spec path and the AC grammar"; exit 2; }
@@ -47,7 +47,7 @@ rows="$("$oss_bin" verify_acs "$spec")" \
 rc=0
 while IFS="$(printf '\t')" read -r label cmd exp; do
   [ -n "$label" ] || continue
-  "$oss_bin" verify_step "$wt" "$cmd" "$exp" || rc=$?
+  oss verify_step "$wt" "$cmd" "$exp" || rc=$?
   [ "$rc" -eq 0 ] || { echo "[AC] $label \`$cmd\` did not satisfy '$exp' (rc $rc)"; break; }
 done <<EOF
 $rows
@@ -66,13 +66,13 @@ reported **green having read nothing**. A gate that passes when it is blind is
 worse than no gate. Capture the rows first, fail closed on an unreadable spec,
 and treat "zero auto ACs" as a defect to surface rather than a vacuous pass.
 
-**`|| rc=$?`, never `if ! "$oss_bin" verify_step …; then rc=$?`.** After a negated test
+**`|| rc=$?`, never `if ! oss verify_step …; then rc=$?`.** After a negated test
 `$?` is the *negation's* status — zero — so `rc` records a pass, the halt check
 below never fires, and the loop runs every remaining AC before falling into layer
 2. The `||` form captures the command's own rc, and as an OR-list it is
 errexit-exempt.
 
-**`"$oss_bin" verify_acs … | while …` is the other trap.** The last element of a pipeline runs
+**`oss verify_acs … | while …` is the other trap.** The last element of a pipeline runs
 in a **subshell**: `rc` is set in a child and lost, `break` leaves only the
 subshell, and the ceremony sails past the halt into layer 2 with a failing AC
 behind it — at rc 0. Feeding the loop from the captured `$rows` by heredoc (as
@@ -89,9 +89,9 @@ Both nonzero codes halt, and they mean different things, so say which:
 | 1 | the AC failed | `[AC]` |
 | 2 | the expectation is malformed or unrecognized | `[AC]`, and name the criterion, not the code |
 
-An rc 2 is a **criterion** defect: the expectation grammar is `exit <n>` or
-`output contains <str>`, and anything else fails closed rather than passing
-silently. That routes to the third recovery option (re-author the AC), never to
+An rc 2 is a **criterion** defect: the expectation grammar is `exit <n>`,
+`output contains <str>`, or `exit <n> and output contains <str>`, and anything
+else fails closed rather than passing silently. That routes to the third recovery option (re-author the AC), never to
 "re-dispatch the implementer" — the code is not what is wrong.
 
 **`verify_step` already applies the zero-tests guard for you.** A command naming
@@ -107,7 +107,7 @@ directions bite:
 
 `user:` rows are not parsed here at all — and no ossify gate parses them
 anywhere. The human-walked half of acceptance lives in the demo ledger
-(`"$oss_bin" ledger_add_user`, keyed by spine), walked at the cumulative demo; a
+(`oss ledger_add_user`, keyed by spine), walked at the cumulative demo; a
 spec's `user:` line is documentation for the implementer only.
 
 ---
@@ -115,7 +115,7 @@ spec's `user:` line is documentation for the implementer only.
 ## 3. Layer 2 — report cross-check
 
 ```bash
-"$oss_bin" report_cross_check "$report" "$spec"    # 0 accounted-for | 1 missing | 2 report not found
+oss report_cross_check "$report" "$spec"    # 0 accounted-for | 1 missing | 2 report not found
 ```
 
 Every `auto:` AC in the spec must appear in the report's AC table

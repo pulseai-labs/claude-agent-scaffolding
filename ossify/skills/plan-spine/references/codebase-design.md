@@ -81,11 +81,11 @@ independently" is the architecture astrology this bar exists to refuse, and
 a seam cut cleanly today can be deployed separately later at far lower cost
 than an unwind.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 When the evidence is absent, **say so and keep the single deployable**; the
 split becomes a feature-map entry, not a rejection to re-litigate. **The map
-has no trigger field** — `"$oss_bin" feature_add` takes exactly `name`, `value`,
+has no trigger field** — `oss feature_add` takes exactly `name`, `value`,
 `class_guess`, `source` — a fifth argument is accepted and silently dropped —
 and there is no update verb to add one later. Encode both halves in the `value` line —
 *"<the value the split unlocks> — admitted when <the evidence>"* — because a

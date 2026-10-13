@@ -20,7 +20,7 @@ room, open the check that enforces the budget you mean.**
 | **SKILL.md body** | line count, per file, cap 500 | `check 6` — a red test | **none** |
 | **Agent listing** | `agents/*.md` descriptions | **nothing** | **none** |
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Dispatcher invocations below are `"$oss_bin" …` — THIS fence resolves `oss` itself and checks that what answers is ossify's own dispatcher before using it, so nothing here depends on an earlier Bash call._
 
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"

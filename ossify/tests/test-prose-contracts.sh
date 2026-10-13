@@ -13,6 +13,7 @@
 # disagreeing.
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/harness.sh"
+. "$HERE/lib/pin.sh"
 WI="$HERE/../skills/work-item"
 
 # The TEMPLATE line, not the worked example: both files also carry a filled-in
@@ -40,13 +41,17 @@ done
 # The other half of Gate 1's Constraints requirement. handoff-contract.md must
 # carry the literal the callee looks for - a paraphrase ("stage, do not commit")
 # reads fine to a human and fails the gate.
-for f in "$WI/SKILL.md" "$WI/references/pre-flight.md" "$WI/references/handoff-contract.md"; do
-  if grep -Fq 'git_policy: STAGE-not-commit' "$f"; then
-    T_PASS=$((T_PASS+1))
-  else
-    T_FAIL=$((T_FAIL+1)); echo "FAIL: $(basename "$f") does not carry the literal 'git_policy: STAGE-not-commit'"
-  fi
-done
+#
+# D4 (#747): a `grep -Fq` presence check is blind to the deletion it guards when
+# the words recur - SKILL.md states the literal twice, so deleting the
+# requirement row left it green. `pin` requires EXACTLY one occurrence, and the
+# needle is lengthened onto the guarded row until it is unique.
+pin "$WI/SKILL.md" '`git_policy: STAGE-not-commit` **and** the return JSON shape' \
+  "work-item SKILL.md's Constraints row still names the 'git_policy: STAGE-not-commit' literal Gate 1 reads"
+pin "$WI/references/pre-flight.md" 'git_policy: STAGE-not-commit' \
+  "pre-flight.md carries the 'git_policy: STAGE-not-commit' literal Gate 1 reads"
+pin "$WI/references/handoff-contract.md" 'git_policy: STAGE-not-commit' \
+  "handoff-contract.md carries the 'git_policy: STAGE-not-commit' literal Gate 1 reads"
 
 # ---------------------------------------------------------------------------
 # Memory-bank harvest contracts. The harvest has no verb since the conversion
@@ -60,14 +65,14 @@ CLOSE="$HERE/../skills/close"
 # The §9 heading is matched by EXACT STRING at harvest time. If the contract
 # that pins it and the ceremony that greps it ever disagree, every report reads
 # as "no suggestions" and the harvest is silently empty at "wrote 0".
+# D4: report-contract.md states the heading four times (template, definition
+# row, a second example, the rename note), so the pin goes on the row that
+# DEFINES it - the one a reader acts on - and the needle is unique there.
 _H9='## 9. Suggestions for memory bank'
-for f in "$WI/references/report-contract.md" "$CLOSE/references/harvest.md"; do
-  if grep -Fq -- "$_H9" "$f"; then
-    T_PASS=$((T_PASS+1))
-  else
-    T_FAIL=$((T_FAIL+1)); echo "FAIL: $(basename "$f") does not carry the byte-exact heading '$_H9'"
-  fi
-done
+pin "$WI/references/report-contract.md" '| `## 9. Suggestions for memory bank` | Patterns or invariants worth keeping.' \
+  "report-contract.md's section table does not define the byte-exact heading '## 9. Suggestions for memory bank'"
+pin "$CLOSE/references/harvest.md" "$_H9" \
+  "harvest.md does not carry the byte-exact heading '$_H9'"
 
 # Step 9 of the spine-close checklist must still route to the ceremony's only
 # copy — a step that names no reference is a caller that does not call.
@@ -78,14 +83,13 @@ else
 fi
 
 # The two-file allowlist the apply holds in prose must name the same two files
-# the ceremony tells the reader to choose between.
-for tok in '09-known-issues.md' '10-decisions-log.md'; do
-  if grep -Fq -- "$tok" "$CLOSE/references/harvest.md"; then
-    T_PASS=$((T_PASS+1))
-  else
-    T_FAIL=$((T_FAIL+1)); echo "FAIL: harvest.md does not name the allowlisted target '$tok'"
-  fi
-done
+# the ceremony tells the reader to choose between. D4: each name recurs four
+# times in harvest.md, so the pin lands on the allowlist ROW itself (the name
+# followed by the table's closing pipe), where it occurs once.
+pin "$CLOSE/references/harvest.md" '`09-known-issues.md` |' \
+  "harvest.md's allowlist does not name the allowlisted target '09-known-issues.md'"
+pin "$CLOSE/references/harvest.md" '`10-decisions-log.md` |' \
+  "harvest.md's allowlist does not name the allowlisted target '10-decisions-log.md'"
 
 
 # --- The manifest refusal: one string, three hardcoded copies -----------------
@@ -265,11 +269,11 @@ for tok in 'bare `,` separates entries' 'literal comma inside an entry' \
     T_FAIL=$((T_FAIL+1)); echo "FAIL: risk-gates.md no longer carries grammar token '$tok'"
   fi
 done
-if /usr/bin/grep -Fq 'risk_gate_set_controls' "$OSSSK/lib/commands.sh"; then
-  T_PASS=$((T_PASS+1))
-else
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: risk-gates.md names risk_gate_set_controls but the dispatcher has no such verb - the prose promises a repair path that does not exist"
-fi
+# D4: the verb name recurs (its definition and its usage string), so pin the
+# DEFINITION - `oss <verb>` dispatches to `oss_cmd_<verb>`, which is exactly what
+# the prose promises the reader can call.
+pin "$OSSSK/lib/commands.sh" 'oss_cmd_risk_gate_set_controls()' \
+  "risk-gates.md names risk_gate_set_controls but the dispatcher defines no oss_cmd_risk_gate_set_controls - the prose promises a repair path that does not exist"
 
 # --- /adopt authors a topology too (PR #345 round 6) --------------------------
 #
@@ -278,15 +282,15 @@ fi
 # stopped at the failed probe - the promise was unhonoured, not merely
 # undocumented. The mechanical half of that is a three-document parity fact: if
 # someone narrows the claim, all three must move together.
-for f in "$OSSSK/.claude-plugin/plugin.json" \
-         "$OSSSK/skills/start/SKILL.md" \
-         "$OSSSK/skills/adopt/SKILL.md"; do
-  if grep -q 'adopt' "$f" && grep -qi 'author' "$f"; then
-    T_PASS=$((T_PASS+1))
-  else
-    T_FAIL=$((T_FAIL+1)); echo "FAIL: $(basename "$f") no longer pairs /adopt with topology authoring - the other two still promise it"
-  fi
-done
+# D4 (#747): the loop's needles were the bare words `adopt` and `author`, which
+# recur 39 and 13 times in adopt/SKILL.md alone - losing the promise kept the
+# check green. Each document's own pairing sentence is pinned instead, once.
+pin "$OSSSK/.claude-plugin/plugin.json" '/ossify:start and /ossify:adopt author .ossify/topology.json themselves' \
+  "plugin.json's description no longer promises that /ossify:adopt authors .ossify/topology.json - the other two still promise it"
+pin "$OSSSK/skills/start/SKILL.md" '/ossify:start and /ossify:adopt author one (.ossify/topology.json)' \
+  "start/SKILL.md's topology refusal no longer promises that /ossify:adopt authors one - the other two still promise it"
+pin "$OSSSK/skills/adopt/SKILL.md" '**A1 — topology declaration resolves, or is authored here.**' \
+  "adopt/SKILL.md's A1 no longer says the topology declaration resolves, or is authored here"
 
 # --- phase 2: the abandoned carve-out's own claims, held mechanically --------
 #
@@ -454,16 +458,16 @@ fi
 # The INVOCATION form, not the word: the block's own comment explains what the
 # oracle is, so a word-grep passes on the comment while the recipe no longer
 # calls it - measured by mutation.
-if grep -Fq '"$oss_bin" touch_check' "$_SW" && grep -Fq 'ls-files' "$_SW"; then
+if grep -Fq 'oss touch_check' "$_SW" && grep -Fq 'ls-files' "$_SW"; then
   T_PASS=$((T_PASS+1))
 else
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep recipe does not INVOKE both the oracle (\"\$oss_bin\" touch_check) and the corpus (git ls-files)"
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep recipe does not INVOKE both the oracle (oss touch_check) and the corpus (git ls-files)"
 fi
-if grep -Fq 'not-applicable' "$SI"; then
-  T_PASS=$((T_PASS+1))
-else
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: state-inspection.md's surface sweep does not name 'not-applicable' - every deliberate placeholder becomes a false finding"
-fi
+# D4: `not-applicable` occurs three times in the file (a comment and two prose
+# paragraphs), so the pin lands on the paragraph that states the exclusion - the
+# one a reader acts on (state-inspection.md §5's shape rules).
+pin "$SI" 'a surface whose list carries `not-applicable`' \
+  "state-inspection.md's surface sweep does not name 'not-applicable' - every deliberate placeholder becomes a false finding"
 
 
 # (d) the §5 sweep must RUN, and must not read a failure as an absence (#523).
@@ -477,11 +481,12 @@ fi
 # That is what moves its ledger row from I to O.
 #
 # Run with NOTHING injected that the caller does not genuinely supply
-# (tests/lib/blocks.sh): `oss_bin`, `repos` and `sf` ARE the caller's — the last
+# (tests/lib/blocks.sh): `oss` on `$PATH`, `repos` and `sf` ARE the caller's — the last
 # because §2 resolves it once for the whole read-out and §5 consumes it, never
 # re-deriving the precedence (#561 round 1, R14). Everything else the block must
 # establish itself.
 OSS="$HERE/../bin/oss"
+OSSDIR="$(dirname "$OSS")"   # the extracted blocks call `oss` by name, so the dispatcher goes on PATH
 SWWS="$_PC_TMP/sweepws"; mkdir -p "$SWWS/.ossify" "$SWWS/canon"
 SWS="$SWWS/state.json"
 # The state is ROUTED at $SWS and also exported as $OSS_STATE_FILE - the same
@@ -500,7 +505,7 @@ printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"},"gone":{"root":"%
 # T_FAIL globals, and a subshell's mutations never propagate (test-manifest.sh
 # documents the vacuous-green trap this avoids).
 cd "$SWWS"
-t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" sf="$SWS" repos="$(printf 'canonical\ngone')" bash -c \
+t_capture env OSS_STATE_FILE="$SWS" "PATH=$OSSDIR:$PATH" sf="$SWS" repos="$(printf 'canonical\ngone')" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'SKIPPED[%s]\n' \"\$skipped\"; printf 'ROSTER%s\n' \"\$roster\"; printf 'KINDS%s\n' \"\$(printf '%s' \"\$roster\" | jq -r '[.[].kind]|join(\",\")')\"; printf 'INHITS%s\n' \"\$(grep -c ADR-9092 \"\$hits\" 2>/dev/null || true)\""
 cd "$HERE"
 t_assert_rc 0 "(d) the sweep COMPLETES with a declared repo unreadable - it reports the skip rather than exiting the whole run"
@@ -525,12 +530,12 @@ t_assert_contains "$T_OUT" "KINDSbone,bone,risk_gate" "(d) ... and the KIND of e
 # the route resolves: this arm is about the corpus loop, and the foreign-state
 # gate above would refuse first from a directory with no manifest (round 1, R1).
 cd "$SWWS"
-t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" sf="$SWS" repos="gone" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_capture env OSS_STATE_FILE="$SWS" "PATH=$OSSDIR:$PATH" sf="$SWS" repos="gone" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 t_assert_rc 0 "(d) a read set that came back EMPTY does not abort the sweep"
 t_assert_contains "$T_OUT" "no declared repo could be read" "(d) ... it reports that the sweep inspected nothing, rather than reporting every healthy surface as unmatched"
 # The corpus arm: `repos` UNSET under strict mode. This is the shipped defect
 # (an unassigned variable), so it is run with NOTHING injected.
-t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" sf="$SWS" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_capture env OSS_STATE_FILE="$SWS" "PATH=$OSSDIR:$PATH" sf="$SWS" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 t_assert_rc 0 "(d) an unset \$repos does not abort the sweep under strict mode"
 t_assert_contains "$T_OUT" "skip: touch - the declared repo keys could not be read" "(d) ... it says the sweep did not run, instead of sweeping an empty corpus and reporting every surface"
 cd "$HERE"
@@ -544,7 +549,7 @@ printf '%s\n' '{"schema_version":2}' > "$SWBRK/broken-state.json"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"project_state":"%s/broken-state.json"}}\n' \
   "$SWBRK" "$SWBRK" > "$SWBRK/.ossify/topology.json"
 cd "$SWBRK"
-t_capture env -u OSS_STATE_FILE oss_bin="$OSS" sf="$SWBRK/broken-state.json" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_capture env -u OSS_STATE_FILE "PATH=$OSSDIR:$PATH" sf="$SWBRK/broken-state.json" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 cd "$HERE"
 t_assert_rc 0 "(d) an unreadable registry does not abort the sweep"
 t_assert_contains "$T_OUT" "registry could not be read" "(d) ... it reports the registry failure, so an empty \$hits is not read as every surface matching nothing"
@@ -555,7 +560,7 @@ SWBR="$_PC_TMP/badroute"; mkdir -p "$SWBR/.ossify"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"}},"well_known_paths":{"project_state":"${repos.nosuch.root}/ps.json"}}\n' \
   "$SWBR/canon" > "$SWBR/.ossify/topology.json"
 cd "$SWBR"
-t_capture env -u OSS_STATE_FILE oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_capture env -u OSS_STATE_FILE "PATH=$OSSDIR:$PATH" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 cd "$HERE"
 t_assert_rc 0 "(d) an unresolvable state route does not abort the sweep"
 t_assert_contains "$T_OUT" "state could not be resolved or read" "(d) ... it reports that instead of an absence, even though touch_check's rc 1 there looks exactly like clean"
@@ -570,7 +575,7 @@ printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_know
   "$SWF" "$SWF" > "$SWF/.ossify/topology.json"
 ( cd "$SWF" && env -u OSS_STATE_FILE bash "$OSS" init foreign >/dev/null && env -u OSS_STATE_FILE bash "$OSS" bone_add ADR-7777 "a foreign-only surface" "foreign/only/**" ) >/dev/null 2>&1
 cd "$SWWS"
-t_capture env OSS_STATE_FILE="$SWF/state.json" oss_bin="$OSS" sf="$SWF/state.json" repos="canonical" bash -c \
+t_capture env OSS_STATE_FILE="$SWF/state.json" "PATH=$OSSDIR:$PATH" sf="$SWF/state.json" repos="canonical" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS[%s]\n' \"\${hits:-unset}\"; printf 'ROSTER[%s]\n' \"\${roster:-unset}\""
 cd "$HERE"
 t_assert_rc 0 "#561: a foreign state does not abort the sweep"
@@ -579,14 +584,14 @@ t_assert_contains "$T_OUT" "HITS[unset]" "#561 ... and nothing was swept: \$hits
 t_assert_contains "$T_OUT" "ROSTER[unset]" "#561 ... and no foreign registry was read, so no warn line can be composed from it"
 # ROUND 1, R1: the gate must not be bypassed by a route that resolves to
 # NOTHING. A topology whose `project_state` value is relative makes
-# `"$oss_bin" state_path` refuse, and the old gate read that empty answer as
+# `oss state_path` refuse, and the old gate read that empty answer as
 # consent (its `[ -n "$routed" ] &&` guard) and swept a foreign registry against
 # this directory's repos. "Cannot be compared" is not "the same project".
 SWREL="$_PC_TMP/relroute"; mkdir -p "$SWREL/.ossify" "$SWREL/canon"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"project_state":"./state.json"}}\n' \
   "$SWREL" > "$SWREL/.ossify/topology.json"
 cd "$SWREL"
-t_capture env OSS_STATE_FILE="$SWF/state.json" oss_bin="$OSS" sf="$SWF/state.json" repos="canonical" bash -c \
+t_capture env OSS_STATE_FILE="$SWF/state.json" "PATH=$OSSDIR:$PATH" sf="$SWF/state.json" repos="canonical" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS[%s]\n' \"\${hits:-unset}\""
 cd "$HERE"
 t_assert_rc 0 "#561 R1: an unresolvable route does not abort the sweep"
@@ -596,7 +601,7 @@ t_assert_contains "$T_OUT" "HITS[unset]" "#561 R1 ... and nothing was swept agai
 # CONTROL: with NO override the same fixture still sweeps - the gate refuses a
 # foreign state, not every run, and the routed state's roster still fills.
 cd "$SWWS"
-t_capture env -u OSS_STATE_FILE oss_bin="$OSS" sf="$SWS" repos="canonical" bash -c \
+t_capture env -u OSS_STATE_FILE "PATH=$OSSDIR:$PATH" sf="$SWS" repos="canonical" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'KINDS%s\n' \"\$(printf '%s' \"\$roster\" | jq -r '[.[].kind]|join(\",\")')\""
 cd "$HERE"
 t_assert_contains "$T_OUT" "bone ADR-9091" "#561 control: no override, so the routed state sweeps its corpus"
@@ -660,7 +665,7 @@ _e_spec() { # $1=ws ; remaining args = section-4 table rows
     printf '\n## 5. Journeys\nx\n'
   } > "$ws/docs/MASTER-SPEC.md"
 }
-_e_run() { ( cd "$1" && oss_bin="$OSS" bash -c "set -euo pipefail; . '$_E_SV'" ); }
+_e_run() { ( cd "$1" && PATH="$OSSDIR:$PATH" bash -c "set -euo pipefail; . '$_E_SV'" ); }
 # The fixture's own shape: the two counts the OLD rule compared are EQUAL here,
 # so a regression back to cardinality reads this fixture as clean and fails (e1).
 _e_spec "$_E_WS" '| ADR-9999 | the hand-written row |'
@@ -947,7 +952,7 @@ if localedef -i tr_TR -f UTF-8 "$_A_LOCALE/tr_TR.UTF-8" >"$_PC_TMP/localedef.log
   jq '.bones = [{adr:"adr-i",title:"locale",touch:["x"]}]' "$_E_WS/.ossify/project-state.json" > "$_E_WS/locale.json"
   mv "$_E_WS/locale.json" "$_E_WS/.ossify/project-state.json"
   _e_spec "$_E_WS"
-  t_capture env LOCPATH="$_A_LOCALE" LC_ALL=tr_TR.UTF-8 oss_bin="$OSS" bash -c '
+  t_capture env LOCPATH="$_A_LOCALE" LC_ALL=tr_TR.UTF-8 "PATH=$OSSDIR:$PATH" bash -c '
     set -euo pipefail
     cd "$1"; . "$2"
     printf "CALLER_LOCALE=%s\n" "$LC_ALL"
@@ -957,7 +962,7 @@ if localedef -i tr_TR -f UTF-8 "$_A_LOCALE/tr_TR.UTF-8" >"$_PC_TMP/localedef.log
   t_assert_contains "$T_OUT" 'registry entry with no index row: adr-i' "A2 fail line names the original identifier under Turkish locale"
   t_assert_contains "$T_OUT" 'CALLER_LOCALE=tr_TR.UTF-8' "A1 locale remains scoped to the fence"
   _e_spec "$_E_WS" '| ADR-I | paired |'
-  t_capture env LOCPATH="$_A_LOCALE" LC_ALL=tr_TR.UTF-8 oss_bin="$OSS" bash -c 'set -euo pipefail; cd "$1"; . "$2"' fresh "$_E_WS" "$_E_SV"
+  t_capture env LOCPATH="$_A_LOCALE" LC_ALL=tr_TR.UTF-8 "PATH=$OSSDIR:$PATH" bash -c 'set -euo pipefail; cd "$1"; . "$2"' fresh "$_E_WS" "$_E_SV"
   t_assert_contains "$T_OUT" '1 entries, 1 rows' "A1 Turkish clean case-insensitive pair control"
 else
   T_FAIL=$((T_FAIL+1)); echo 'FAIL: A2 locale pin unavailable: localedef could not build tr_TR.UTF-8'
@@ -1021,7 +1026,7 @@ _o_ws() { # $1=name ; echoes a workspace whose canonical repo has an empty docs/
   printf '%s\n' "$d"
 }
 _o_next2() { # $1=dir $2=repos $3=destination repo (the block consumes both)
-  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo -u adr_scan_mode oss_bin="$OSS" repos="$2" bash -c '
+  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo -u adr_scan_mode "PATH=$OSSDIR:$PATH" repos="$2" bash -c '
     set -euo pipefail
     if [ "$2" != "[unset]" ]; then dest_repo="$2"; fi
     if [ "$3" != "[unset]" ]; then adr_scan_mode="$3"; fi
@@ -1033,7 +1038,7 @@ _o_fresh() { # $1=workspace $2=mode $3=repos or [unset] $4=destination $5=invoca
   local temp="$_PC_TMP/fresh-$2-$5-$RANDOM" rc
   mkdir -p "$temp"
   ( cd "$1" && env -u OSS_STATE_FILE -u repos -u dest_repo TMPDIR="$temp" \
-    oss_bin="$OSS" adr_scan_mode="$2" bash -c '
+    "PATH=$OSSDIR:$PATH" adr_scan_mode="$2" bash -c '
       set -euo pipefail
       if [ "$2" != "[unset]" ]; then repos="$2"; fi
       if [ "$3" != "[unset]" ]; then dest_repo="$3"; fi
@@ -1085,7 +1090,7 @@ DESTINATIONS
 _SI="$_PC_TMP/adr-inventory.sh"
 oss_block_extract "$_AD" 'scan=' "$_SI"
 _o_adopt_scan() {
-  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo oss_bin="$OSS" adr_scan_mode=inventory repos="$2" bash -c \
+  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo "PATH=$OSSDIR:$PATH" adr_scan_mode=inventory repos="$2" bash -c \
     "set -euo pipefail; . '$_SI' | LC_ALL=C sort" )
 }
 t_capture _o_adopt_scan "$_O_U" canonical
@@ -1170,8 +1175,8 @@ SH
   chmod +x "$_O_BIN/$failure"
   for mode in mint inventory; do
     _O_TEMP="$_PC_TMP/failure-$failure-$mode"; mkdir -p "$_O_TEMP"
-    t_capture env -u OSS_STATE_FILE TMPDIR="$_O_TEMP" PATH="$_O_BIN:$PATH" real_mktemp="$_O_REAL_MKTEMP" \
-      oss_bin="$OSS" repos=canonical dest_repo=canonical adr_scan_mode="$mode" bash -c \
+    t_capture env -u OSS_STATE_FILE TMPDIR="$_O_TEMP" PATH="$_O_BIN:$OSSDIR:$PATH" real_mktemp="$_O_REAL_MKTEMP" \
+      repos=canonical dest_repo=canonical adr_scan_mode="$mode" bash -c \
       "cd '$_O_U'; set -euo pipefail; . '$_SF'"
     t_assert_rc 1 "S2 $mode $failure failure refuses"
     _left="$(find "$_O_TEMP" -type f ! -name allocated | wc -l | tr -d ' ')"
@@ -1402,8 +1407,10 @@ _pin "$_r" "release-close.md fetches patch tags from an unnamed <remote> - a mul
 
 # #619 round 3 (operator-approved) - two findings this PR introduced.
 # (2b) spine-close: a repo-agnostic limit goes on a repo that OPENS a PR - a local-arm repo has none.
-_r=1; grep -Fq 'first hosting repo that opens a PR' "$_SC" && _r=0
-_pin "$_r" "spine-close.md routes repo-agnostic Known limits to the first hosting repo, which may take the local arm and open no PR - the limit never reaches the ledger"
+# D4: the phrase recurs (the resume-arm reconciliation rule states it too), so
+# the pin is the guarded sentence itself.
+pin "$_SC" 'goes on the first hosting repo that opens a PR, and on that PR alone' \
+  "spine-close.md routes repo-agnostic Known limits to the first hosting repo, which may take the local arm and open no PR - the limit never reaches the ledger"
 # (4b) release-close: skip the PR lookup where origin is not a GitHub repository.
 _r=1; grep -Fq 'skip the `gh pr list` call where `gh repo view` cannot resolve `origin`' "$_RC" && _r=0
 _pin "$_r" "release-close.md runs gh pr list against a non-GitHub origin in a declared repo - patch discovery fails on a supported topology"
@@ -1486,7 +1493,7 @@ _pin "$_r" "occupied-destinations.md does not resolve the AI workspace or allows
 # (#266) doctor's and close's fail: state remedy names the ceremonies that own init.
 _r=0
 for _f in "$_OSSR/skills/doctor/references/state-inspection.md" "$_OSSR/skills/close/SKILL.md"; do
-  grep -Fq '`"$oss_bin" init <name>`' "$_f" && { _r=1; echo "  (#266 site: $(basename "$_f"))"; }
+  grep -Fq '`oss init <name>`' "$_f" && { _r=1; echo "  (#266 site: $(basename "$_f"))"; }
   grep -F '| `fail: state` |' "$_f" | grep -Fq '/ossify:start' || { _r=1; echo "  (#266 no /ossify:start in: $(basename "$_f"))"; }
   grep -F '| `fail: state` |' "$_f" | grep -Fq 'on Codex the `start`/`adopt` skills' || { _r=1; echo "  (#636 no Codex route in: $(basename "$_f"))"; }
 done
@@ -1541,7 +1548,7 @@ _pin "$_r" "occupied-destinations leaves the private inventory among the outputs
 # instead of arguing a third time.
 _r=1; [ "$(grep -v '^[[:space:]]*#' "$_SW" | grep -c 'state_path')" = 1 ] && ! grep -Fq 'sf="${OSS_STATE_FILE:-}"' "$_SW" && grep -Fq 'consumed, never re-derived' "$_SW" && _r=0
 _pin "$_r" "state-inspection §5 re-derives the state path (a second precedence spelling, or more than one state_path call) instead of consuming §2's \$sf"
-_r=1; grep -Fq 'sv_state' "$_SV4" && grep -Fq 'not `sf`' "$_SV4" && grep -Fq 'sv_state' "$_SI4" && _r=0
+_r=1; grep -Fq 'names it **`sv_state`** and not `sf`' "$_SV4" && grep -Fq 'sv_state' "$_SI4" && _r=0
 _pin "$_r" "spec-validation §3 names its manifest-routed state \$sf - the same name state-inspection §2 uses for the override-first path, so one surface can reassign the other's state"
 _r=1; grep -Fq 'owned by the prose under this fence' "$_SW" && [ "$(grep -c 'as written' "$_SI4")" = 1 ] && _r=0
 _pin "$_r" "state-inspection's foreign-gate rationale is argued in more than one place (or the block comment no longer points at its owner) - three independently-worded copies drift"
@@ -1560,7 +1567,7 @@ _pin "$_r" "occupied-destinations checks the inventory at the convention path on
 # `dependency-inventory.md` / `asset-inventory.md`, so the check probes contents
 # for §7's moat columns and names a name-only match to the operator as a
 # POSSIBLE inventory instead of equating it (which would suppress the real one).
-_r=1; grep -Fq 'A name is not' "$_OD4" && grep -Fq 'the moat columns' "$_OD4" && grep -Fq 'is a' "$_OD4" && grep -Fq '**possible** inventory' "$_OD4" && grep -Fq 'never write the inventory past an unanswered candidate' "$_OD4" && ! grep -Fq 'A match under' "$_OD4" && _r=0
+_r=1; grep -Fq 'A name is not' "$_OD4" && grep -Fq 'the moat columns' "$_OD4" && grep -Fq '**possible** inventory' "$_OD4" && grep -Fq 'never write the inventory past an unanswered candidate' "$_OD4" && ! grep -Fq 'A match under' "$_OD4" && _r=0
 _pin "$_r" "occupied-destinations equates a filename match with the inventory - a docs/dependency-inventory.md is presented as the destination and keeping it suppresses the real moat inventory (round 1, C5)"
 # (R4) the eval rubric admits adoption as the third legal source, in both directions.
 _R4="$_OSSR/tests/eval/rubrics/harvest-apply-integrity.md"
@@ -1578,15 +1585,15 @@ _HC="$HERE/../skills/work-item/references/handoff-contract.md"
 _WC="$HERE/../skills/close/references/work-item-close.md"
 _SA="$HERE/../skills/plan-spine/references/spec-authoring.md"
 _RS="$HERE/../skills/run-spine/SKILL.md"
-for _pair in "$_RO|spine_inventory" "$_RO|The count lives in state" "$_RO|halt:out-of-order" \
-             "$_EX|staged result" "$_EX|work_item_dispatched" "$_HC|spine_base_get" \
+for _pair in "$_RO|halt: spine_inventory could not read the spine" "$_RO|The count lives in state" "$_RO|halt:out-of-order" \
+             "$_EX|## 2a. Re-entry — counting, and a staged result at request time" "$_EX|The lane counts each request it issues" "$_HC|; it is the evidence." \
              "$_SA|re-entering" "$_RS|resumes"; do
   _f="${_pair%%|*}"; _lit="${_pair#*|}"
   _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
   _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.14.0 re-entry)"
 done
 # 1.15.0 - the run-spine grammar rails moved with the body into the skill (Rule 2).
-for _lit in 'Exactly two command shapes are accepted' 'before the spine-branch cut' 'refuse rather than guess'; do
+for _lit in 'Exactly two command shapes are accepted' 'refuse before the spine-branch cut, naming' 'refuse rather than guess'; do
   _r=1; grep -Fq -- "$_lit" "$_RS" && _r=0
   _pin "$_r" "skills/run-spine/SKILL.md does not state '$_lit' (1.15.0 grammar rails)"
 done
@@ -1672,26 +1679,38 @@ _pin "$_r" "round-orchestration.md §2's arm selector does not halt on recorded 
 # C3/K1/L1/B2: the finish-merge row carries its repo-root recovery, the gate
 # RE-RUN (the report-presence gate is gone - a present report proves nothing),
 # and the tip recovery.
+# D4: the halt name recurs (the halt table defines the row too), so the pin is
+# the finish-merge cell's own decision.
+pin "$_RO" 'Red → `halt:unverified-merge`, naming the item' \
+  "round-orchestration.md's finish-merge row does not halt with halt:unverified-merge when its RE-RUN of close §2 comes back RED (#673 K1)"
 _r=1; grep -Fq 'refs/heads/$wi_branch' "$_RO" \
-  && grep -Fq 'halt:unverified-merge' "$_RO" \
   && grep -Fq 'RE-RUN close §2' "$_RO" \
-  && grep -Fq 'repo_root="$("$oss_bin" repo_root "$target_repo")"' "$_RO" \
+  && grep -Fq 'repo_root="$(oss repo_root "$target_repo")"' "$_RO" \
   && ! grep -Fq 'as gate evidence' "$_RO" \
   && grep -Fq 'the row reads `wt=present` but state holds no `worktree_path` yet' "$_RO" && _r=0
 _pin "$_r" "round-orchestration.md §2b's finish-merge row drops its repo-root recovery, the §2 gate re-run, or the tip recovery (C3/K1/L1), still claims report.md is gate evidence, or the adopt row leaves \$wt undefined again (B2)"
 # C2: the rejection is durable and its route is named.
-_r=1; grep -Fq 'halt:close-rejected' "$_RO" \
-  && grep -Fq 'durable rejection record' "$_IC" \
+# D4: halt:close-rejected recurs (two inline mentions plus the table row), so
+# the pin is the row that defines it.
+pin "$_RO" '| `halt:close-rejected` | the result' \
+  "round-orchestration.md's halt table no longer defines halt:close-rejected for a recorded [fidelity] rejection (#673 C2)"
+_r=1; grep -Fq 'durable rejection record' "$_IC" \
   && grep -Fq 'is recorded durably' "$_WC" && _r=0
-_pin "$_r" "the C2 rejection record is not named where it is written (impl-check/work-item-close) or where it routes (round-orchestration)"
+_pin "$_r" "the C2 rejection record is not named where it is written (impl-check/work-item-close)"
 # D1: the correction route is named in the lane, and the setter validates.
-_r=1; grep -Fq 'spine_base_reset' "$_RO" \
-  && grep -Fq 'must EXIST locally' "$_RO" && _r=0
-_pin "$_r" "round-orchestration.md no longer names spine_base_reset for a wrong recorded base, or drops the setter's branch-exists validation note (D1)"
+# D4: spine_base_reset recurs (the prose above and the halt row), so the pin is
+# the halt row's own repair sentence.
+pin "$_RO" 'record the new name with `oss spine_base_reset' \
+  "round-orchestration.md's halt:base-unresolved row no longer names spine_base_reset for a wrong recorded base (#673 D1)"
+_r=1; grep -Fq 'must EXIST locally' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md drops the setter's branch-exists validation note (D1)"
 # F2: close §3 reads the RECORDED base; the old false claim is gone.
-_r=1; grep -Fq 'spine_base_get' "$_SC" \
-  && ! grep -Fq 'The two facts this step needs are not in state' "$_SC" && _r=0
-_pin "$_r" "spine-close.md §3 does not read the recorded base (spine_base_get), or still claims both facts are absent from state (F2)"
+# D4: spine_base_get recurs three times inside §3, so the pin is the sentence
+# that tells the reader to read it.
+pin "$_SC" 'the checkout where a base is recorded for it (`oss spine_base_get' \
+  "spine-close.md §3 does not read the recorded base (spine_base_get) (F2)"
+_r=1; ! grep -Fq 'The two facts this step needs are not in state' "$_SC" && _r=0
+_pin "$_r" "spine-close.md §3 still claims both facts are absent from state (F2)"
 # F3: both 'was this item dispatched' enumerations carry the count.
 _r=1; grep -Fq 'a `dispatches` count above zero' "$_WC" \
   && grep -Fq 'positive `dispatches` count' "$_SI" && _r=0
@@ -1699,13 +1718,16 @@ _pin "$_r" "the abandoned-item drift enumerations (close §1, doctor §5) omit t
 # Fix round 2 (G2/G3/H1/I1/I2/J1): one pin per new fail-closed claim the
 # round's findings named. Each literal is a distinct row or clause a reader
 # acts on; drop any one and the corresponding behavior loses its contract.
-_r=1; grep -Fq 'halt:base-unresolved' "$_RO" \
-  && grep -Fq 'a `verify.md` rejection record' "$_RO" \
+# D4: halt:base-unresolved recurs (the §2a prose and the halt table), so the pin
+# is the row that defines it.
+pin "$_RO" '| `halt:base-unresolved` — a repo row' \
+  "round-orchestration.md's halt table no longer defines halt:base-unresolved for a recorded base that will not resolve (G2/G3)"
+_r=1; grep -Fq 'a `verify.md` rejection record' "$_RO" \
   && grep -Fq 'a completed item'"'"'s dirty worktree halts here too' "$_RO" \
   && grep -Fq 'a history rewrite, never a landing' "$_RO" \
   && grep -Fq 'validation precedes every removal' "$_RO" \
   && grep -Fq 'a recorded rejection is never re-landed by a merge' "$_RO" && _r=0
-_pin "$_r" "round-orchestration.md drops a fix-round-2 fail-closed claim (base-unresolved row; the verify.md read; the dirty complete-item halt; the rewrite-is-no-landing clause; reattach's validate-before-remove; the merge-arm rejection gate) (G2/G3/H1/I1/I2/J1)"
+_pin "$_r" "round-orchestration.md drops a fix-round-2 fail-closed claim (the verify.md read; the dirty complete-item halt; the rewrite-is-no-landing clause; reattach's validate-before-remove; the merge-arm rejection gate) (G2/G3/H1/I1/I2/J1)"
 # Fix round 3 (L2/L3/L4): the guards the round added are contract claims too.
 _r=1; grep -Fq 'halt:branch-unknown' "$_RO" \
   && grep -Fq 'no branch ever recorded' "$_RO" \
@@ -1764,4 +1786,15 @@ fi
 t_assert_eq "" "$(grep -n '/amend-spec' "$SKILLS/start/SKILL.md")" 'E2 start names no /amend-spec command'
 
 rm -rf "$_PC_TMP"
+
+# D7 (#749): the check-before-write block is fixed text, exactly once, in each
+# skill whose actor edits files by its own steps. `pin` is the contract here: a
+# hard wrap inside the block, or a second copy, is a FAIL.
+CBW='**Check before you write.** Check every precondition before the first write: each file you edit exists and each text you replace is there exactly once; each file you create does not exist yet. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.'
+for f in work-item/SKILL.md patch/SKILL.md close/references/harvest.md adopt/SKILL.md plan-spine/SKILL.md; do
+  pin "$HERE/../skills/$f" "$CBW" "check-before-write block, verbatim and once, in $f"
+done
+# D5: the can-it-fail review step lives once, in work-item §6.
+pin "$WI/SKILL.md" '**Can each test fail?**' "work-item §6 carries the can-it-fail review step"
+
 t_summary

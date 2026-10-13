@@ -65,15 +65,13 @@ spec?"*
 
 All ossify lib calls go through the `oss` dispatcher (`ossify/bin/oss`):
 `oss <subcommand>` → `oss_cmd_<subcommand>` under a forced bash shebang —
-never `source` the libs (zsh leaves `BASH_SOURCE` unset). Resolve `oss` once
-into `oss_bin` (`command -v oss`); every `oss` below and in
-references is `"$oss_bin"` — `"$oss_bin" help` for discovery.
+never `source` the libs (zsh leaves `BASH_SOURCE` unset). Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next. `oss help` for discovery.
 
 **Topology probe (resolves, authors, or refuses fail-closed).** ossify's state lives in
 the AI workspace: walk up for `.ossify/topology.json`, then `.workspace/pairing.json`:
 
 ```bash
-if probe="$("$oss_bin" state_path 2>&1)"; then
+if probe="$(oss state_path 2>&1)"; then
   printf '%s\n' "topology: resolved - author nothing, proceed to the journey map"
 else
   printf '%s\n' "$probe"   # the verb's OWN diagnostic, never swallowed
@@ -90,17 +88,17 @@ alternatives and the Codex surface. To author: `.ossify/topology.json` at the
 AI-workspace root, schema v1 `{schema_version, repos:{<name>:{root}},
 well_known_paths:{}}`, names `[a-z][a-z0-9_-]*`, roots absolute, from the repo
 set the journey-map station asks about next (`canonical` only if that is
-genuinely the name). Then re-probe `"$oss_bin" state_path` and `"$oss_bin" repo_root <name>`
+genuinely the name). Then re-probe `oss state_path` and `oss repo_root <name>`
 for every declared repo, halting only if one still refuses.
 
 **Canonical-content gate (refuses fail-fast).** `/start` is pre-code ceremony:
-establish whether any declared repo (`"$oss_bin" repo_root <name>` per name) already
+establish whether any declared repo (`oss repo_root <name>` per name) already
 carries the product's own source or its own history — either alone refuses,
 and a bare pairing scaffold is neither. If so, author nothing and refuse,
 naming what you found and routing to **`/ossify:adopt`** — the adopt-forward
 path for a project that already has code (native `adopt` on Codex).
 Those tokens are load-bearing too. Past both gates, settle every occupied destination
-(`references/occupied-destinations.md`), then `"$oss_bin" init "<project-name>"`, which refuses
+(`references/occupied-destinations.md`), then `oss init "<project-name>"`, which refuses
 if ossify state already exists — the "already onboarded" signal; route per §2, never force past it.
 
 **Wayfinder pre-flight.** If a map exists for this repo, its resolved decisions
@@ -121,7 +119,7 @@ demotion is deliberate: in the predecessor stack the vision fed a multi-year
 roadmap that was obsolete within a sprint and then quietly ignored.
 
 Its only structured descendants are feature-map entries harvested from the
-conversation (`"$oss_bin" feature_add ... spec`).
+conversation (`oss feature_add ... spec`).
 
 While you are here, you are also choosing **which questions to ask at all**.
 Upfront: vision, domain model + data ownership, security/trust boundaries +
@@ -160,7 +158,7 @@ developer with a debugger.
 candidate spine:
 
 ```bash
-"$oss_bin" feature_add "<name>" "<one-line user value>" "<bone|flesh>" journey-map
+oss feature_add "<name>" "<one-line user value>" "<bone|flesh>" journey-map
 ```
 
 Full grammar + worked example in `references/journey-map.md`.
@@ -213,7 +211,7 @@ Each answered category becomes **an ADR from birth** (default status protocol:
 date.
 
 ```bash
-"$oss_bin" bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
+oss bone_add "<ADR-ref>" "<title>" "<touch-glob-csv>" "<revisit trigger>"
 ```
 
 Touch surfaces use bash `case` glob semantics (`*` matches `/`, so
@@ -235,7 +233,7 @@ Record each hazard whose harm a test failure cannot undo — **money**,
 touch surface and **the controls its family attaches**:
 
 ```bash
-"$oss_bin" risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"
+oss risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"
 ```
 
 Control menu: paper/sandbox env · human confirm (naming the concrete effect) ·
@@ -325,17 +323,17 @@ With a clear, non-conflicting intent the posture reads off the value set
 `fully-private` | `source-available` | `open-core` | `fully-open`:
 
 ```bash
-"$oss_bin" posture_set "<posture>"
+oss posture_set "<posture>"
 ```
 
 Revenue intent (`none|license|saas`) is not its own field — it seeds the posture
 bone's revisit trigger. On a `data-overlay` channel, record the seam:
 
 ```bash
-"$oss_bin" overlay_set '<seam>'      # e.g. '$PULSE_PROMPT_DIR'
+oss overlay_set '<seam>'      # e.g. '$PULSE_PROMPT_DIR'
 ```
 
-Then, per posture-block §5-§10: register the posture as a bone (`"$oss_bin" bone_add`;
+Then, per posture-block §5-§10: register the posture as a bone (`oss bone_add`;
 touch surface = private-side modules + the seam files + composition root,
 revisit trigger from the revenue intent); author `PUBLIC_BOUNDARY.md` at **each
 public repo root** — **no moat item is ever named there**, and even a
@@ -344,7 +342,7 @@ fully-private project authors it; route the **private boundary inventory** (item
 deferred to Plan D: never call `add-private-core`, never edit the pairing
 manifest (ossify writes `project-state.json`; workspace-init owns the manifest).
 Set `project.composition_root` — **required and absolute** when more than one repo is declared, optional when exactly one is (posture-block §10)
-and the root is unambiguous (then `"$oss_bin" composition_set "<root>"`).
+and the root is unambiguous (then `oss composition_set "<root>"`).
 
 ---
 
@@ -406,7 +404,7 @@ Full minima in `references/lean-spec-schema.md`.
 | EXECUTIVE-SUMMARY | per manifest routing |
 | Memory bank (14 files) + `CLAUDE.md` | AI workspace |
 | Bones-registry ADRs | the project's ADR directory |
-| Seed feature map | `project-state.json` (already written via `"$oss_bin" feature_add`) |
+| Seed feature map | `project-state.json` (already written via `oss feature_add`) |
 | `PUBLIC_BOUNDARY.md` | **each public repo root** |
 | Private boundary inventory | AI workspace — `docs/private-boundary-inventory.md` |
 
@@ -420,7 +418,7 @@ Full derivation brief in `references/memory-bank-brief.md`; section schema in `r
 Before handing off, run the state gate and surface anything it reports:
 
 ```bash
-"$oss_bin" doctor
+oss doctor
 ```
 
 **That is the gate, not a sweep** — `state`, `schema`, `replay`, `shape`, and
@@ -442,7 +440,7 @@ natural language) nothing exports it; read the name from the invocation text.
 **Parse `$ARGUMENTS` in bash; never reference `$1`/`$2`/`$N`** — Claude Code
 substitutes positionals at render time and corrupts them.
 
-The only argument is an optional project name, passed to `"$oss_bin" init`. When it is
+The only argument is an optional project name, passed to `oss init`. When it is
 absent, ask for it before initializing — the name is the project's identity in
 state and is awkward to change later.
 
@@ -483,7 +481,7 @@ state and is awkward to change later.
   `not-applicable`, whether an uncertainty deserves a spike, which posture the
   intent signal supports, how to triage a critic challenge.
 - **`oss`** (the dispatcher over `lib/*.sh`) handles mechanical state only —
-  the verbs `"$oss_bin" help` lists: state CRUD, registry adds, and probes. It holds
+  the verbs `oss help` lists: state CRUD, registry adds, and probes. It holds
   no judgment and never should.
 - **`challenge` (audit mode)** is ossify's own critic. As a ceremony caller
   it hands back every consolidated finding unwalked — no internal rebuttal —

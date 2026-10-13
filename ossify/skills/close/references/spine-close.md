@@ -46,14 +46,14 @@ known gap rather than papered over.
 
 `$spine_id` is the id `/close` was invoked with, carried from §2's routing.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
-open="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"complete\" and .status != \"abandoned\") | .id] | join(\", \")")"
+open="$(oss get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"complete\" and .status != \"abandoned\") | .id] | join(\", \")")"
 [ -z "$open" ] \
   || { echo "close: $spine_id has work items that are not complete: $open - halt"; exit 1; }
-withdrawn="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status == \"abandoned\") | .id] | join(\", \")")"
-live="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .id] | join(\", \")")"
+withdrawn="$(oss get "[.work_items[] | select(.spine==\"$spine_id\" and .status == \"abandoned\") | .id] | join(\", \")")"
+live="$(oss get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .id] | join(\", \")")"
 # A spine with NO work items ran nothing, exactly like a fully-withdrawn one: it
 # was never decomposed into rounds, so there is nothing to land, review, demo or
 # harvest: a spine whose branch changed nothing halts at step 5's changed-path
@@ -61,15 +61,15 @@ live="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .statu
 # a zero-line ledger, and the harvest is step 9 - eight steps on, not five. Its own message, because its cause and its next action differ: the
 # plan was never filled, rather than filled and then emptied.
 [ -n "$live" ] || [ -n "$withdrawn" ] \
-  || { echo "close: $spine_id has no work items - there is nothing to land, review, demo or harvest, and a spine that ran nothing is retired rather than closed. Decompose it with \"$oss_bin\" work_item_add $spine_id <title> <target-repo> - the repo is required once more than one is declared, because the verb refuses to guess a default, or retire it with \"$oss_bin\" spine_status $spine_id abandoned - halt"; exit 1; }
+  || { echo "close: $spine_id has no work items - there is nothing to land, review, demo or harvest, and a spine that ran nothing is retired rather than closed. Decompose it with \"oss\" work_item_add $spine_id <title> <target-repo> - the repo is required once more than one is declared, because the verb refuses to guess a default, or retire it with \"oss\" spine_status $spine_id abandoned - halt"; exit 1; }
 [ -n "$live" ] \
-  || { echo "close: $spine_id records only withdrawn work items ($withdrawn) - there is nothing to land, review, demo or harvest, and a spine that ran nothing is retired rather than closed. Retire it with \"$oss_bin\" spine_status $spine_id abandoned, AFTER the two obligations the retirement carries: (1) the demo ledger - an amendment this spine planned is still pending, so clear it with \"$oss_bin\" ledger_unplan <line-id> $spine_id, and an ordinary ACTIVE line whose only implementation was withdrawn is retired or replaced with \"$oss_bin\" ledger_retire <line-id> <spine-id> <reason> or \"$oss_bin\" ledger_supersede <line-id> <spine-id> <reason> - keyed to a spine that will CLOSE, never $spine_id, which is the spine being retired here: both are planning verbs whose amendment is applied by the close of the spine named there, so naming the retiring spine leaves the line active and the amendment pending forever, silently (demo-amendments.md §3) (ledger_unplan answers rc 7 for an active line, so it is not the tool for that case either); (2) any repo ARMED for this spine - restore its checkout, or record it as parked in SPINE.md, where the base-branch table and the withdrawal's own reason both already live: this halt writes no close record, because it exits before §9's state writes. To reverse the withdrawal instead: \"$oss_bin\" work_item_status <wi-id> planned - which restores the STATUS, and the item can run only where the lane can still take it: round-orchestration.md §2's re-entry arm would route the un-withdrawn item onto the spine branch close has already landed in every hosting repo, a branch nothing merges again. Carry the item into a NEW spine (decomposition.md §1's whole-spine arm). The account is split: plan-spine/references/decomposition.md §1 owns the demo-ledger half, and §3 below owns the armed-repo half this halt exits before reaching - halt"; exit 1; }
+  || { echo "close: $spine_id records only withdrawn work items ($withdrawn) - there is nothing to land, review, demo or harvest, and a spine that ran nothing is retired rather than closed. Retire it with \"oss\" spine_status $spine_id abandoned, AFTER the two obligations the retirement carries: (1) the demo ledger - an amendment this spine planned is still pending, so clear it with \"oss\" ledger_unplan <line-id> $spine_id, and an ordinary ACTIVE line whose only implementation was withdrawn is retired or replaced with \"oss\" ledger_retire <line-id> <spine-id> <reason> or \"oss\" ledger_supersede <line-id> <spine-id> <reason> - keyed to a spine that will CLOSE, never $spine_id, which is the spine being retired here: both are planning verbs whose amendment is applied by the close of the spine named there, so naming the retiring spine leaves the line active and the amendment pending forever, silently (demo-amendments.md §3) (ledger_unplan answers rc 7 for an active line, so it is not the tool for that case either); (2) any repo ARMED for this spine - restore its checkout, or record it as parked in SPINE.md, where the base-branch table and the withdrawal's own reason both already live: this halt writes no close record, because it exits before §9's state writes. To reverse the withdrawal instead: \"oss\" work_item_status <wi-id> planned - which restores the STATUS, and the item can run only where the lane can still take it: round-orchestration.md §2's re-entry arm would route the un-withdrawn item onto the spine branch close has already landed in every hosting repo, a branch nothing merges again. Carry the item into a NEW spine (decomposition.md §1's whole-spine arm). The account is split: plan-spine/references/decomposition.md §1 owns the demo-ledger half, and §3 below owns the armed-repo half this halt exits before reaching - halt"; exit 1; }
 [ -z "$withdrawn" ] \
   || echo "close: $spine_id withdrew work items before dispatch: $withdrawn - SPINE.md records why; they contribute nothing to this close"
 ```
 
-**Test the output, never the rc.** `"$oss_bin" get` is `jq -r` without `-e`: a `select`
-matching nothing exits **0** with an empty string, so `"$oss_bin" get … || halt` never
+**Test the output, never the rc.** `oss get` is `jq -r` without `-e`: a `select`
+matching nothing exits **0** with an empty string, so `oss get … || halt` never
 fires and a spine with three unfinished items closes clean (`routing.md` §4).
 
 `complete` means "this item's work is on the spine branch" — §4 sets it *last*,
@@ -88,7 +88,7 @@ review scope, step 9's harvest — so a spine with nothing live would halt at
 whichever of them runs first, on a message saying *no work items found* when the
 items are on record and merely withdrawn. Refusing at the gate keeps that from
 reading as a gap in the record, and it is the honest verdict anyway: a spine that
-ran nothing is **retired**, not closed — `"$oss_bin" spine_status <spine-id>
+ran nothing is **retired**, not closed — `oss spine_status <spine-id>
 abandoned`, the whole-spine arm `plan-spine/references/decomposition.md` §1
 already names.
 
@@ -138,7 +138,7 @@ that withdrawal is valid precisely because the item itself was never dispatched.
 The landing set above excludes the repo, correctly (there is nothing to land),
 so nothing in this loop switches it back and no cleanup removes the branch. The
 tell is mechanical: **the spine branch still resolves in that repo**. Restore
-the checkout where a base is recorded for it (`"$oss_bin" spine_base_get
+the checkout where a base is recorded for it (`oss spine_base_get
 <spine-id> <repo>`, `SPINE.md`'s base-branch table, or a handoff's
 `base_branch:` line), and where none is, say so in the close record
 and name the repo as parked — never report a repo as landed on its base branch
@@ -176,7 +176,7 @@ One of the two facts this step needs is not in state; the other is:
   (`work-item/references/round-orchestration.md` §2). Nothing persists a slug,
   and it is the same slug in every repo.
 - **`base_branch`, once per hosting repo — recorded in state since 1.14.0.**
-  Read `"$oss_bin" spine_base_get <spine-id> <repo>`: the lane recorded there
+  Read `oss spine_base_get <spine-id> <repo>`: the lane recorded there
   the branch *that repo* was ACTUALLY parked on when it cut the spine branch
   (`spine_base_set`), and a recorded base is evidence, never a preference. The
   cross-check is `SPINE.md`'s spine-context **base-branch table**
@@ -255,10 +255,10 @@ them, and name the PR in the close's report.
 # DERIVE the spine branch; never read it off HEAD. HEAD is durable git state
 # that a session boundary, a hotfix or a halted close can move. One value for
 # every hosting repo - the branch name carries no repo in it.
-spine_branch="$("$oss_bin" branch_name "$spine_id" "$spine_slug")"
+spine_branch="$(oss branch_name "$spine_id" "$spine_slug")"
 
 # $repo_base_branches is NOT ambient either: one "<repo>:<base_branch>" pair per
-# line, one line per hosting repo, recovered above - `"$oss_bin" spine_base_get
+# line, one line per hosting repo, recovered above - `oss spine_base_get
 # <spine-id> <repo>` (the recorded base; handoffs only as the pre-1.14.0
 # fallback when rc 1) cross-checked against SPINE.md's planned row - and hoisted
 # once, same as the slug. Branch names cannot contain ":" (git refuses it), so
@@ -267,7 +267,7 @@ spine_branch="$("$oss_bin" branch_name "$spine_id" "$spine_slug")"
 # THE REPO SET IS READ AS AN ASSIGNMENT, never from a process substitution
 # (round 5 sweep): a selector failure inside `< <(...)` is invisible - the
 # loop receives zero repos and the pass succeeds having landed nothing.
-landing_repos="$("$oss_bin" get ".work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .target_repo" | sort -u)" \
+landing_repos="$(oss get ".work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .target_repo" | sort -u)" \
   || { echo "close: the hosting-repo set could not be read from state - halt"; exit 1; }
 
 merge_shas=""
@@ -275,7 +275,7 @@ pr_lines=""
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue
 
-  repo_root="$("$oss_bin" repo_root "$repo")" \
+  repo_root="$(oss repo_root "$repo")" \
     || { echo "close: $spine_id names undeclared repo '$repo' - halt"; exit 1; }
   _bases="$(printf '%s\n' "$repo_base_branches" | awk -F: -v r="$repo" '$1==r{print $2}' | sort -u)"
   _nbases="$(printf '%s\n' "$_bases" | awk 'END{print NR}')"
@@ -528,7 +528,7 @@ gets exactly the same verification a work-pr-driven one does.
 # PR that had one fix round.
 while IFS=: read -r repo pr_num; do
   [ -n "$repo" ] || continue
-  repo_root="$("$oss_bin" repo_root "$repo")" \
+  repo_root="$(oss repo_root "$repo")" \
     || { echo "close: pr_lines names undeclared repo '$repo' - halt"; exit 1; }
   _bases="$(printf '%s\n' "$repo_base_branches" | awk -F: -v r="$repo" '$1==r{print $2}' | sort -u)"
   _nbases="$(printf '%s\n' "$_bases" | awk 'END{print NR}')"
@@ -720,8 +720,8 @@ not a substitute for this.
 ## 4. Step 3 — apply the pending demo amendments, then activate this spine's lines
 
 ```bash
-"$oss_bin" ledger_apply_pending "$spine_id"
-"$oss_bin" ledger_activate_spine "$spine_id"   # this spine's planned lines go active: they must pass here
+oss ledger_apply_pending "$spine_id"
+oss ledger_activate_spine "$spine_id"   # this spine's planned lines go active: they must pass here
 ```
 
 `supersede` and `retire` are **planning** verbs: they record intent and leave the
@@ -744,8 +744,8 @@ An unknown spine id is rc 7 with a message, not a silent no-op.
 
 ## 5. Step 4 — the cumulative demo
 
-`"$oss_bin" demo_run` for every active `auto:` line, then walk
-`"$oss_bin" demo_user_lines "$spine_id"` — **this spine's own `user:` lines only** — with
+`oss demo_run` for every active `auto:` line, then walk
+`oss demo_user_lines "$spine_id"` — **this spine's own `user:` lines only** — with
 the human. Full detail, the §6.1-vs-§6.2 scoping, quarantine handling and the
 ledger's wall-clock budget in **`references/cumulative-demo.md`**.
 
@@ -780,7 +780,7 @@ rebase lands several commits, so its first parent would see only the last).
 paths="$(mktemp)"; : > "$paths"
 while IFS=: read -r repo sha before; do
   [ -n "$repo" ] || continue
-  root="$("$oss_bin" repo_root "$repo")" \
+  root="$(oss repo_root "$repo")" \
     || { echo "close: \$merge_shas names undeclared repo '$repo' - the changed-path list would be INCOMPLETE - halt"; exit 1; }
   # The before-point §3 proved: a squash's or rebase's, else the merge's first parent.
   git -C "$root" diff --name-only "${before:-$sha^1}" "$sha" >> "$paths" \
@@ -798,7 +798,7 @@ done < "$paths"
 [ "$#" -gt 0 ] \
   || { echo "close: the merge changed no paths in any hosting repo - the touch check is INCONCLUSIVE, not clean - halt"; exit 1; }
 
-tc=0; touch_hits="$("$oss_bin" touch_check "$@")" || tc=$?
+tc=0; touch_hits="$(oss touch_check "$@")" || tc=$?
 case "$tc" in
   0) printf '%s\n' "$touch_hits" ;;          # HIT - §7 and §8 act on these lines
   1) echo "touch check: clean" ;;            # clean - change nothing, record nothing
@@ -814,7 +814,7 @@ so a bone is never MISSED, only spuriously hit, and a spurious hit routes the
 spine to extra scrutiny rather than past it. When a hit looks wrong for the
 spine at hand, check which repo actually changed the path before acting on it.
 
-**One `"$oss_bin" touch_check` call over the union of every repo's paths, never one call
+**One `oss touch_check` call over the union of every repo's paths, never one call
 per repo.** A bone or a risk gate is a project-wide surface, not a per-repo one,
 and `touch_check`'s own rc contract (0 = HIT, 1 = clean, 2 = could-not-check) has
 no way to combine three separate verdicts into one close decision. Calling it
@@ -827,7 +827,7 @@ the same discipline §3's loop already established for the merge itself.
 `repo:sha[:before]` list, one line per repo — exactly what §3 built, one line appended
 per repo at that repo's own merge. A single `while IFS=: read -r repo sha before` loop
 splits each line on its colons (git ref names cannot contain `:`, so the
-split is unambiguous) and calls `"$oss_bin" repo_root` fresh for each — there is no
+split is unambiguous) and calls `oss repo_root` fresh for each — there is no
 `$merge_sha_by_repo[$repo]`-style lookup anywhere in this file, because bash 3.2
 has no associative arrays to hold one. The outer `while IFS= read -r p` loop is
 unchanged from the single-repo form: it still collects one path per line into
@@ -876,7 +876,7 @@ close-time check).
 ### 6.1 On a bone hit — reclassify mid-flight
 
 ```bash
-"$oss_bin" class_set "$spine_id" bone "bone-touch at close: <ADR-ref> (<matched surface>)"
+oss class_set "$spine_id" bone "bone-touch at close: <ADR-ref> (<matched surface>)"
 ```
 
 **Three arguments; the reason is required** and is the audit trail for a class
@@ -899,7 +899,7 @@ for a gate. A gate hit escalates to the bone path **plus that gate's controls**,
 one-liner inside a guarded surface is still a Risk event.
 
 ```bash
-"$oss_bin" get '.risk_gates[] | select(.name=="<name>") | .controls'
+oss get '.risk_gates[] | select(.name=="<name>") | .controls'
 ```
 
 Those are the `controls` recorded when the gate was registered. **Walk each one
@@ -923,15 +923,15 @@ and nothing here blocks the close on an adversary that is not configured.
 - **flesh** — the light host-only pass: the same reference, shallow depth.
 
 The artifact is the spine's `SPINE.md` under
-`"$oss_bin" spine_dir "<release-id>" "<spine-id>" "<slug>"` — the same artifact
+`oss spine_dir "<release-id>" "<spine-id>" "<slug>"` — the same artifact
 `plan-spine` hands the audit (`plan-spine/references/spec-authoring.md` §6).
 That verb returns a **relative** path, so prefix it with
-`"$oss_bin" repo_root ai_workspace`; the audit wants one absolute path.
+`oss repo_root ai_workspace`; the audit wants one absolute path.
 
 The findings come back as **disposition rows**, and this is where spec §6.1's
 triage policy applies: spec-aligned recommendations auto-apply, and only
 load-bearing escalations reach the user. Record a class-moving disposition with
-`"$oss_bin" veto_add "$spine_id" "<finding>" auto-bone|override|escalate "<reason>"`.
+`oss veto_add "$spine_id" "<finding>" auto-bone|override|escalate "<reason>"`.
 
 ---
 
@@ -960,7 +960,7 @@ honest, not a failure to re-run) and where the outcomes are recorded — is in
 **Step 10 — worktree + branch cleanup, per work item, and only now:**
 
 ```bash
-"$oss_bin" worktree_remove "$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .target_repo")" "$wi"
+oss worktree_remove "$(oss get ".work_items[] | select(.id==\"$wi\") | .target_repo")" "$wi"
 ```
 
 **Skip `abandoned` items.** Withdrawn before dispatch, an abandoned item never
@@ -980,8 +980,8 @@ argument, and the false one it is often confused with, are in `harvest.md` §1.
 **Step 11 — state updates:**
 
 ```bash
-"$oss_bin" spine_status "$spine_id" closed
-"$oss_bin" demo_record spine "$spine_id" "<true|false>" "<line-count>" "<notes>"
+oss spine_status "$spine_id" closed
+oss demo_record spine "$spine_id" "<true|false>" "<line-count>" "<notes>"
 ```
 
 `demo_record` takes `passed` as the literal `true` or `false` and rejects
@@ -1018,7 +1018,7 @@ clean, and an unreadable registry.
 ## 11. Anti-patterns
 
 - **Reading the spine branch off HEAD** instead of deriving it with
-  `"$oss_bin" branch_name` and asserting the match (§3).
+  `oss branch_name` and asserting the match (§3).
 - **Merging without switching back** — the spine merges into itself at rc 0.
 - **Trusting the checkout's rc alone.** A tracked file name checks out clean and
   leaves HEAD where it was (§3).
@@ -1035,7 +1035,7 @@ clean, and an unreadable registry.
   risk gate is a project-wide surface; the touch check judges the union, not a
   repo at a time (§6).
 - **Folding `touch_check`'s rc 2 into clean**, or reading rc 0 as clean (§6).
-- **Calling `"$oss_bin" class_set` with two arguments.** The reason is required, and a
+- **Calling `oss class_set` with two arguments.** The reason is required, and a
   missing one is a crash, not a default (§6.1).
 - **Assuming a touch hit is a bone.** Read the printed prefix (§6.2).
 - **Carrying close depth onto the flesh path** — the light host-only pass is

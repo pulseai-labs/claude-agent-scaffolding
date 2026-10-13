@@ -20,10 +20,10 @@ the existing boundary through `fake_status` (§3) instead:
 - it **keeps** the fake → `renewed`, with a new expiry release if the deadline moves;
 - it **built the real one** → `replaced`.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
-"$oss_bin" fake_add "<boundary>" "<real|fake|deferred>" "<reason>" "<replacement trigger>" "<expiry release>"
+oss fake_add "<boundary>" "<real|fake|deferred>" "<reason>" "<replacement trigger>" "<expiry release>"
 ```
 
 | Field | Meaning |
@@ -44,7 +44,7 @@ all yet, where the product currently goes without.
 
 A consumer never waits on a provider project. When this spine needs something
 another project owns and has not shipped, build the glue here and record it as a
-fake like any other — `"$oss_bin" fake_add` with channel `fake`, a **reason** that
+fake like any other — `oss fake_add` with channel `fake`, a **reason** that
 names the provider and the request (`PulseDB #160 — batch reads; looped single
 gets until then`), a **replacement trigger** of the form "`<provider>` `<version
 or issue>` ships" (`PulseDB 0.9.0 ships`), and an **expiry release** that is the
@@ -92,7 +92,7 @@ trigger, and it is the one that will actually fire.
 ## 3. Changing a fake's status later
 
 ```bash
-"$oss_bin" fake_status "<boundary>" "<active|replaced|renewed>" "<reason>" ["<new-expiry-release>"]
+oss fake_status "<boundary>" "<active|replaced|renewed>" "<reason>" ["<new-expiry-release>"]
 ```
 
 An unknown boundary exits **7**; a status outside `active|replaced|renewed`
@@ -127,7 +127,7 @@ So the replacement competes for selection like everything else, rather than livi
 only inside a fake record nobody re-reads:
 
 ```bash
-"$oss_bin" feature_add "replace the <boundary> fake" "<the value the real one unlocks>" "<bone|flesh>" fake-replacement
+oss feature_add "replace the <boundary> fake" "<the value the real one unlocks>" "<bone|flesh>" fake-replacement
 ```
 
 Write the **value**, not the task: *"real fills so P&L is trustworthy"* earns

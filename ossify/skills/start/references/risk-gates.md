@@ -54,10 +54,10 @@ the column is ceremony inflation.
 
 ## 3. Recording a gate
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
-"$oss_bin" risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"   # refuses a duplicate name (#305); refuses a contaminated or multi-line list at rc 2
+oss risk_gate_add "<name>" "<touch-glob-csv>" "<controls-csv>"   # refuses a duplicate name (#305); refuses a contaminated or multi-line list at rc 2
 ```
 
 Both lists are **one** argument each: quote them. This verb is fixed arity, so a
@@ -71,11 +71,11 @@ phrase that matches nothing real, leaving the gate silently blind.
 Worked example:
 
 ```bash
-"$oss_bin" risk_gate_add "live-order-execution" \
+oss risk_gate_add "live-order-execution" \
   "src/exec/**,src/broker/**" \
   "paper env,human confirm,kill switch,audit trail: record symbol\, side\, qty and outcome per order,progressive exposure"
 
-"$oss_bin" risk_gate_add "user-data-deletion" \
+oss risk_gate_add "user-data-deletion" \
   "src/admin/purge.rs" \
   "paper env,human confirm,audit trail,progressive exposure"
 ```
@@ -96,17 +96,17 @@ gate would never fire. A gate minted before you knew the grammar is
 repaired NOT by editing state but by a corrective append:
 
 ```bash
-"$oss_bin" risk_gate_set_controls "<name>" "<controls-csv>"   # refuses unknown names; refuses duplicate names (#305); refuses an empty, contaminated or multi-line list at rc 2 (risk-gates §6)
+oss risk_gate_set_controls "<name>" "<controls-csv>"   # refuses unknown names; refuses duplicate names (#305); refuses an empty, contaminated or multi-line list at rc 2 (risk-gates §6)
 ```
 
 **Repointing a gate's touch surface.** When the code a gate covers moves, its
-globs match nothing and `"$oss_bin" touch_check` goes silently clean on it: no
+globs match nothing and `oss touch_check` goes silently clean on it: no
 spine near the moved code reclassifies, and the release-close docs trigger
 never fires. Re-point it the same way — a corrective append that **replaces**
 the whole touch list and leaves the controls alone:
 
 ```bash
-"$oss_bin" risk_gate_set_touch "<name>" "<touch-csv>"   # refuses unknown and duplicate names (#305), a list with no glob in it, and a contaminated or multi-line list at rc 2
+oss risk_gate_set_touch "<name>" "<touch-csv>"   # refuses unknown and duplicate names (#305), a list with no glob in it, and a contaminated or multi-line list at rc 2
 ```
 
 Same caveat as a bone's (`bones-registry.md`): the verb applies the correction
@@ -120,7 +120,7 @@ re-point yourself before relying on it.
 A risk gate behaves like a bone with an attached checklist:
 
 - A spine whose plan touches a gate's surface **auto-reclassifies to `bone`**
-  (same mechanical check as bones, `"$oss_bin" touch_check`), *and* inherits that
+  (same mechanical check as bones, `oss touch_check`), *and* inherits that
   gate's control checklist as required work in the spine's plan.
 - The gate's exposure is a **docs trigger** at release close: the first release
   where a gate's surface becomes reachable requires threat/failure notes plus an

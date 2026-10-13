@@ -1,8 +1,8 @@
 # The TDD loop, per AC
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
-Depth for SKILL.md §5. One AC at a time, in the order `"$oss_bin" verify_acs` printed
+Depth for SKILL.md §5. One AC at a time, in the order `oss verify_acs` printed
 them, each driven RED→GREEN before the next one starts.
 
 ---
@@ -10,7 +10,7 @@ them, each driven RED→GREEN before the next one starts.
 ## 1. Worked walk-through
 
 A work item on a Markdown table-of-contents generator. Its spec declares four
-`auto:` ACs, and `"$oss_bin" verify_acs` prints them in this order:
+`auto:` ACs, and `oss verify_acs` prints them in this order:
 
 ```
 AC-1  pytest tests/test_slugify.py::test_ascii_slug        exit 0
@@ -22,10 +22,10 @@ AC-4  pytest tests/                                        exit 0
 ### RED gate first (SKILL.md §4)
 
 ```bash
-"$oss_bin" redgate "<worktree-abs>" "pytest tests/test_slugify.py::test_ascii_slug" "exit 0"
+oss redgate "<worktree-abs>" "pytest tests/test_slugify.py::test_ascii_slug" "exit 0"
 # rc 2 — tests/test_slugify.py does not exist yet. ADVISORY. Recorded, proceed.
 
-"$oss_bin" redgate "<worktree-abs>" "python -m tocgen sample.md" "output contains - [Install](#install)"
+oss redgate "<worktree-abs>" "python -m tocgen sample.md" "output contains - [Install](#install)"
 # rc 0 — RED. The generator runs but emits no anchor links yet. Proceed.
 ```
 
@@ -105,10 +105,10 @@ the report**, and both need the same sanity check first.
    passes on first run because the production code already handled the case (a
    library default, a framework behaviour).
 
-**The sanity check, in both cases:** break the production code deliberately,
-re-run the test, confirm it goes red, then restore. A test that passes both with
-and without the behaviour is testing nothing, and a vacuous green here is worse
-than a failure — it ships as evidence.
+**The sanity check, in both cases:** run SKILL.md §6's "Can each test fail?" step
+on this test now, not at the end. A test that passes both with and without the
+behaviour is testing nothing, and a vacuous green here is worse than a failure —
+it ships as evidence.
 
 Anything else that goes green on the first run is a third case, and it is not
 legitimate — but **"the work item was already done" is usually the wrong
@@ -152,7 +152,7 @@ gaps-mode return is a stranded work item.
   reads as a pass:
 
   ```bash
-  cd "<worktree-abs>" && pytest tests/ 2>&1 | "$oss_bin" zero_tests_guard "pytest tests/"
+  cd "<worktree-abs>" && pytest tests/ 2>&1 | oss zero_tests_guard "pytest tests/"
   # rc 0 = VACUOUS — the command is a test runner and it ran nothing
   # rc 1 = a real run
   ```

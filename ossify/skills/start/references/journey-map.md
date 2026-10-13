@@ -105,13 +105,13 @@ Steps 1-4 are the thinnest coherent path: a trader gets a real, judged answer to
 
 ## 5. Harvest: unmarked/`next`/`later` steps become feature-map entries
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 Every step NOT marked `skeleton` is recorded as a candidate spine before you
 leave this block — this is what stops the vision conversation from evaporating:
 
 ```bash
-"$oss_bin" feature_add "<name>" "<one-line user value>" "<bone|flesh>" journey-map
+oss feature_add "<name>" "<one-line user value>" "<bone|flesh>" journey-map
 ```
 
 - `<name>` — short, the step's action ("save a named strategy").

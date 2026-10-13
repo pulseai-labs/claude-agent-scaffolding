@@ -50,7 +50,7 @@ For each other open request, record exactly one disposition:
 - **pulled in** — into this spine, as a named work item or an AC, only while the
   spine's first round has not started (SKILL.md §2). At release planning,
   pulled in means onto the feature map:
-  `"$oss_bin" feature_add "<name>" "<value>" "<bone|flesh>" intake`.
+  `oss feature_add "<name>" "<value>" "<bone|flesh>" intake`.
 - **deferred** — with the reason, and what would admit it later.
 - **routed to `/ossify:patch`** — a defect in shipped behaviour, or a small
   request the requester cannot fake (`plan-spine/references/fake-ledger-discipline.md` §1).
@@ -84,7 +84,7 @@ after a merge, to the AI workspace's `.claude/memory-bank/tech-debt.md`:
 - [TD] <area/path> — <defect> → #N
 ```
 
-Read it from the AI workspace: `"$oss_bin" repo_root ai_workspace` on an ossify
+Read it from the AI workspace: `oss repo_root ai_workspace` on an ossify
 project. Outside one, use the paired workspace next to the repo — a sibling
 directory whose `.workspace/pairing.json` names this repo as canonical, commonly
 `<repo>-ai`.

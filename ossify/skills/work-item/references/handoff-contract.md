@@ -75,7 +75,7 @@ was parked on when it cut the spine branch (`round-orchestration.md` §2a,
 cross-checking against `SPINE.md`'s planned base and halting on disagreement
 (`close/references/spine-close.md` §3). A value copied from the plan instead of
 the recorded base hides the very mismatch that halt exists to catch. Copy it from
-`"$oss_bin" spine_base_get <spine-id> <repo>`; it is the evidence.
+`oss spine_base_get <spine-id> <repo>`; it is the evidence.
 
 ### `## 3. Work item identifiers`
 
@@ -90,16 +90,16 @@ branch:         work/r1.s2.w1-toc-anchors
 spec_path:      /abs/path/to/ai-workspace/docs/specs/r1/r1.s2-toc/work-r1.s2.w1/spec.md
 ```
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 **`spec_path` is not optional and lives nowhere else.** Pre-flight's Gate 2 runs
-`"$oss_bin" verify_acs "<abs spec path>"` against it and the whole TDD loop works the
+`oss verify_acs "<abs spec path>"` against it and the whole TDD loop works the
 ordered rows that come back. A handoff whose only mention of the spec is a
 sentence like "see the spec in this directory" is malformed at Gate 1.
 
 `branch` must be the branch that is **actually checked out** in the worktree —
 read it back with `git -C "$wt" rev-parse --abbrev-ref HEAD` rather than
-re-deriving it, and record the same value into state with `"$oss_bin" work_item_exec`.
+re-deriving it, and record the same value into state with `oss work_item_exec`.
 
 ### `## 4. Pre-flight calibration`
 
@@ -141,7 +141,7 @@ what it was for" without re-reading the whole spine plan.
 An orientation aid **and the prose must say so, in the heading and in the body.**
 
 The worker never takes its ACs from here. It reads the spec end to end and parses
-the ordered `auto:` rows out of it with `"$oss_bin" verify_acs`, and *that* TSV order is
+the ordered `auto:` rows out of it with `oss verify_acs`, and *that* TSV order is
 the binding working order for the RED gate and the loop. Titling this section as
 if it were authoritative creates a second source of truth that nothing reads and
 that drifts from the spec the moment either is edited.
@@ -156,7 +156,7 @@ the same grammar the ACs use, because the worker runs them through the same
 predicate:
 
 ```bash
-"$oss_bin" verify_step "<worktree-abs>" "<command>" "<expectation>"
+oss verify_step "<worktree-abs>" "<command>" "<expectation>"
 ```
 
 State that these run **without halting on first fail** — all of them, every time,
@@ -246,7 +246,7 @@ are both evidence, and the retrospective reads them.
 - **Omitting `spec_path`** because the spec is "obviously" beside the handoff.
   Gate 1 does not infer paths; every dispatch returns gaps and no work starts.
 - **Copying `SPINE.md`'s planned base into `base_branch`** instead of copying
-  the base the lane recorded for that repo (`"$oss_bin" spine_base_get <spine-id>
+  the base the lane recorded for that repo (`oss spine_base_get <spine-id>
   <repo>`). The cross-check then compares a value against itself.
 - **A §2 `repo:` that does not match §3's `target_repo`.** They record the same
   fact twice on purpose — one as spine-context, one as a work-item identifier —

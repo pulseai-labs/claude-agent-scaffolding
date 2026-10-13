@@ -18,12 +18,12 @@ derived from the lean spec and is off limits here.
 Step 8 authors the retrospective. **Step 9 is this.** Step 10 is worktree +
 branch cleanup. The harvest runs **before cleanup, always**.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 **The reason is that cleanup is terminal, not that the inputs live in the
 worktree.** They do not: `report.md` and `handoff.md` sit beside `spec.md` in the
 work item's docs directory under the AI workspace (`work-item/SKILL.md` §7), which
-worktree removal never touches. `"$oss_bin" worktree_remove` runs `git branch -d`, refuses
+worktree removal never touches. `oss worktree_remove` runs `git branch -d`, refuses
 an unmerged branch at rc 8 and a **dirty** worktree at rc 8 rather than forcing
 (an rc 8 there is a real signal, never something to force past), and once it
 succeeds the branch is gone — so every step
@@ -44,11 +44,11 @@ harvest". Resolve the paths deliberately.
 **The work items come from state:**
 
 ```bash
-items="$("$oss_bin" get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .id] | join(\" \")")"
+items="$(oss get "[.work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .id] | join(\" \")")"
 [ -n "$items" ] || { echo "close: no work items recorded for $spine_id - halt"; exit 1; }
 ```
 
-**Test the output, never the rc.** `"$oss_bin" get` is `jq -r` without `-e`: a `select`
+**Test the output, never the rc.** `oss get` is `jq -r` without `-e`: a `select`
 matching nothing exits **0** with an empty string (`routing.md` §4).
 
 **`abandoned` items are left out.** Withdrawn before dispatch, they have no
@@ -62,9 +62,9 @@ state holds a spine slug, so the spine directory is recovered exactly as
 which is the part that matters:
 
 ```bash
-parts="$("$oss_bin" id_parse "$spine_id")" || parts=""
+parts="$(oss id_parse "$spine_id")" || parts=""
 rel_id="r$(printf '%s\n' "$parts" | awk '{print $2}')"
-rel_dir="$("$oss_bin" release_dir "$rel_id")"   # ABSOLUTE, ai_workspace-rooted
+rel_dir="$(oss release_dir "$rel_id")"   # ABSOLUTE, ai_workspace-rooted
 
 matches="$(find "$rel_dir" -maxdepth 1 -type d -name "$spine_id-*" 2>/dev/null)"
 n="$(printf '%s\n' "$matches" | grep -c . || true)"
@@ -81,9 +81,9 @@ item's paths:
 <spine_dir_abs>/work-<wi-id>/handoff.md
 ```
 
-`"$oss_bin" spine_dir "<release-id>" "<spine-id>" "<slug>"` re-composes the same path
+`oss spine_dir "<release-id>" "<spine-id>" "<slug>"` re-composes the same path
 **relatively** once the glob has recovered the slug, which makes it a useful
-cross-check against `$spine_dir_abs`. Prefix it with `"$oss_bin" repo_root ai_workspace`;
+cross-check against `$spine_dir_abs`. Prefix it with `oss repo_root ai_workspace`;
 it is never the way in.
 
 A work item whose `report.md` is missing is **named, not skipped silently** — a
@@ -141,6 +141,8 @@ machine-checkable rules surface, and authoring one is `/ossify:doctor`'s
 surface (`doctor/SKILL.md` §6). Record the referral in the close summary and
 hand the pattern there; do not smuggle it into `09` as prose; a rule filed as a
 caveat reads as advice and is enforced by nobody.
+
+**Check before you write.** Check every precondition before the first write: each file you edit exists and each text you replace is there exactly once; each file you create does not exist yet. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
 
 **Everything else in the bank is derived from the lean spec and is off limits.**
 The apply (§7) refuses the **entire accepted set** if any item names a target
@@ -277,7 +279,7 @@ names the destination instead of leaving it to be inferred.
 - **Cleaning up before the harvest.** Step 10 is terminal (§1).
 - **Justifying that order with "the report is in the worktree".** It is not (§1).
 - **Enumerating from the directory tree instead of from state**, or trusting
-  `"$oss_bin" get`'s rc instead of its output (§2).
+  `oss get`'s rc instead of its output (§2).
 - **Re-globbing the spine directory per work item**, or `head -1`-ing an
   ambiguous glob instead of halting (§2).
 - **Hunting for session handoffs.** They are not harvest inputs (§3).
