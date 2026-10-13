@@ -399,6 +399,20 @@ describe('a molt and the session it starts', () => {
     expect(w.logs.filter(l => l.endsWith('no clear route in print mode'))).toHaveLength(1)
   })
 
+  test('unroutable at one handoff, then /molt-arm saves a route: the next handoff clears the session', async () => {
+    const { w, m } = world({ files: { '/h/h.md': 'h' } })
+    w.route = false
+    w.percent = 66
+    w.branch = marked('/h/h.md')
+    await m.onSessionStop()
+    expect(w.seeds).toEqual([])
+    expect(w.notes.some(x => x.includes('cannot be cleared here'))).toBe(true)
+    w.route = true                                  // /molt-arm ran: the command ctx is saved
+    await m.onSessionStop()
+    expect(w.seeds).toHaveLength(1)
+    expect(w.seeds[0]).toContain('/h/h.md')
+  })
+
   test('the arm rewrite applies to the first plain operator prompt only', async () => {
     const { w, m } = world()
     w.route = false

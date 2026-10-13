@@ -531,7 +531,11 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
           return { decision: 'block', reason }
         }
       }
-      if (unroutable.has(id)) return undefined
+      // The flag holds only while there is still no route: a later /molt-arm saves one (route() reads it live).
+      if (unroutable.has(id)) {
+        if (!io.route()) return undefined
+        unroutable.delete(id)
+      }
       let handoff = pickHandoff(resolved, lastMd.get(id))
       if (handoff !== undefined && !(await isReadable(handoff.path))) {
         await log(`handoff path missing session=${id} path=${handoff.path}`)
