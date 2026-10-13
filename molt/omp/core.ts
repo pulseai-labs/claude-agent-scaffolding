@@ -153,10 +153,14 @@ function credited(staged: Shape[][], toolName: string, input: unknown, details: 
 // molt goes on detached). The brief has its own deadline inside that, whether or not the host honours the abort signal.
 export const FALLBACK_BRIEF_MS = 25_000
 
-function within<T>(p: Promise<T>, ms: number): Promise<T> {
+function within<T>(p: Promise<T>, ms: number, signal?: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`no brief within ${ms} ms`)), ms)
-    p.then(v => { clearTimeout(timer); resolve(v) }, e => { clearTimeout(timer); reject(e) })
+    const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort) }
+    const abort = () => { cleanup(); reject(signal?.reason ?? new Error('stop aborted')) }
+    const timer = setTimeout(() => { cleanup(); reject(new Error(`no brief within ${ms} ms`)) }, ms)
+    signal?.addEventListener('abort', abort, { once: true })
+    if (signal?.aborted) abort()
+    p.then(v => { cleanup(); resolve(v) }, e => { cleanup(); reject(e) })
   })
 }
 
@@ -401,25 +405,29 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     await log(`handed off session=${id} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent}`)
   }
 
-  async function fallbackBrief(id: string): Promise<string> {
+  async function fallbackBrief(id: string, signal?: AbortSignal): Promise<string | undefined> {
+    if (signal?.aborted) return undefined
     const messages = messagesOf(io.branch())
     const facts = extractFacts(messages)
     let summary: string | undefined
     try {
-      const reply = await within(io.ephemeral(briefPrompt(messages, facts)), briefMs)
+      const reply = await within(io.ephemeral(briefPrompt(messages, facts)), briefMs, signal)
       if (reply !== undefined && isUsableSummary(reply)) summary = reply
       else await log(`ephemeral brief unusable session=${id} reason=${reply === undefined ? 'no reply' : 'no Next step section'}`)
     } catch (err) {
       await log(`ephemeral brief error session=${id} ${String(err)}`)
     }
+    if (signal?.aborted) return undefined
     const path = fallbackPath(home(), id)
     await io.writeText(path, factsBrief(facts, { sessionId: id, percent: lastPercent, summary }))
+    if (signal?.aborted) { await io.remove(path); return undefined }
     return path
   }
 
-  async function molt(id: string, handoff: Handoff) {
+  async function molt(id: string, handoff: Handoff, signal?: AbortSignal) {
     const record = parseAutonomic(await io.readText(autonomicPath(home(), id)))
     const own = parseLineage(await io.readText(lineagePath(home(), id)))
+    if (signal?.aborted) return
     if (record.mode === 'manual' && unattended >= cfg.manualMaxMolts)
       return pause(id, `molt paused: ${unattended} molts in a row with no message from you. Send a message to resume; the handoff is at ${handoff.path}.`, undefined)
     // /molt now is the operator asking for this molt: it is not a loop, whatever the progress.
@@ -438,6 +446,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     let result: ClearResult | undefined
     try {
       const seed = await template(cfg.seedTemplate, DEFAULT_SEED)
+      if (signal?.aborted) { pending = undefined; inFlight = false; return }
       // session_switch fires inside this call and consumes `pending`.
       result = await io.newSessionAndSeed(fill(seed, { path: handoff.path }))
     } catch (err) {
@@ -607,7 +616,8 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
   }
 
   // classic.Stop (block up to twice) and turn.complete (handoff, molt, fallback) share this one event.
-  async function onSessionStop(e: { last_assistant_message?: unknown } = {}): Promise<{ decision: 'block'; reason: string } | undefined> {
+  async function onSessionStop(e: { last_assistant_message?: unknown; signal?: AbortSignal } = {}): Promise<{ decision: 'block'; reason: string } | undefined> {
+    if (e.signal?.aborted) return undefined
     await load()
     const id = io.sessionId()
     try {
@@ -650,10 +660,13 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       if (handoff === undefined) {
         // A warned session may hand off at a point it chose; nothing is asked of it yet.
         if (!atLeast(stage, 'command')) return undefined
-        handoff = { path: await fallbackBrief(id), source: 'fallback' }
+        const path = await fallbackBrief(id, e.signal)
+        if (path === undefined) return undefined
+        handoff = { path, source: 'fallback' }
       }
+      if (e.signal?.aborted) return undefined
       if (io.isChild) await handOff(id, handoff)
-      else await molt(id, handoff)
+      else await molt(id, handoff, e.signal)
     } catch (err) {
       await log(`session_stop error ${String(err)}`)
     }

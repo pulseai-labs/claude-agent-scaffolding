@@ -59,7 +59,7 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     },
     branch: () => w.branch,
   }
-  return { w, m: createMolt(io, over.briefMs) }
+  return { w, io, m: createMolt(io, over.briefMs) }
 }
 
 const result = (name: string, input: unknown = {}, isError = false) => ({ toolName: name, input, isError })
@@ -860,4 +860,46 @@ describe('round 2 handoff targets and facts', () => {
       })
     }
   }
+})
+
+// Round 3: cancellation belongs to the stop, not molt's brief deadline.
+describe('round 3 stop cancellation', () => {
+  for (const child of [false, true]) {
+    for (const when of ['before', 'during', 'after'] as const) {
+      test(`cancel ${when} brief (${child ? 'child' : 'root'}): no fallback or handoff`, async () => {
+        const { w, io, m } = world({ env: child ? { MOLT_HANDOFF: 'parent', MOLT_STATUS_PATH: '/s/status' } : {} })
+        w.percent = 81
+        w.branch = unmarked
+        await m.onSessionStop()
+        await m.onSessionStop()
+        const controller = new AbortController()
+        if (when === 'before') controller.abort()
+        io.ephemeral = async () => {
+          w.ephemerals.push('brief')
+          if (when === 'during') { controller.abort(); throw new Error('cancelled') }
+          controller.abort()
+          return '## Next step\ngo'
+        }
+        expect(await m.onSessionStop({ signal: controller.signal })).toBeUndefined()
+        expect(w.files.has(fallbackPath(HOME, 'S1'))).toBe(false)
+        expect(w.seeds).toEqual([])
+        expect(w.files.get('/s/status') ?? '').not.toContain('handed-off')
+        if (when === 'before') expect(w.ephemerals).toEqual([])
+      })
+    }
+  }
+  test('cancellation releases a brief even when the host ignores its signal', async () => {
+    const { w, m } = world({ hang: true, briefMs: 1000 })
+    w.percent = 81
+    w.branch = unmarked
+    await m.onSessionStop()
+    await m.onSessionStop()
+    const controller = new AbortController()
+    const stopped = m.onSessionStop({ signal: controller.signal })
+    setTimeout(() => controller.abort(), 5)
+    const outcome = await Promise.race([stopped.then(() => 'returned'), new Promise(resolve => setTimeout(() => resolve('stuck'), 100))])
+    expect(outcome).toBe('returned')
+    expect(w.files.has(fallbackPath(HOME, 'S1'))).toBe(false)
+    expect(w.seeds).toEqual([])
+  })
 })
