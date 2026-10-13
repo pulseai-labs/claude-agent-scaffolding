@@ -18,6 +18,7 @@ round barrier (`work-item/references/round-orchestration.md` §7).
 |---|---|---|
 | impl-check per work item | **core** (already run, per item, at §4) | **core** |
 | Cumulative product demo | **core** | **core** |
+| Bone registration (the bones this spine's plan declares) | **core** (§5b) | **core** (§5b, a no-op when the plan declares `None.`) |
 | Bone-touch check | **core** | **core**, and a hit reclassifies the spine mid-flight |
 | Memory-bank harvest | **core** | **core** |
 | Handoff / state updates | **core** | **core** |
@@ -36,9 +37,11 @@ checklist rather than a judgment call.
 **Two of those rows have no step in the checklist below, and saying so beats a
 row that reads as executed.** *Grill gates* are planning-time offers owned by
 `plan-spine`; nothing here re-offers one, and a close is the wrong moment to. The
-standalone *ADR check* row is **not shipped in this release**: on the bone path
-the ADR obligation currently rides on step 5's reclassification reason and step
-7's critic pass, which is weaker than its own checklist row. Recorded here as a
+standalone *ADR check* row is **not shipped in this release**: the registration
+step (§5b) enforces the ADR file for the bones the plan **declares**, and nothing
+enforces one for a bone the spine **changes or adds** mid-flight — on the bone path
+that obligation still rides on step 5's reclassification reason and step 7's
+critic pass, which is weaker than its own checklist row. Recorded here as a
 known gap rather than papered over.
 
 ---

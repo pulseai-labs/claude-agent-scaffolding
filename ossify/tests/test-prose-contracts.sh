@@ -1838,5 +1838,15 @@ pin "$_SCB" 'declares no bones - registering none' \
   "spine-close.md's no-bones arm says so in one line and never halts (#497)"
 pin "$_SCB" 'the spine never wrote it' \
   "spine-close.md halts on a declared bone whose ADR file is missing (#497)"
+# §1's ceremony table, and the note that keeps it honest. The registration is a
+# CORE row in both columns (§5b runs in both; on a flesh spine with `None.` it is
+# a no-op), and the note must still refuse to claim the standalone ADR check this
+# release does not ship - registering the DECLARED bones is not that check.
+pin "$_SCB" '| Bone registration' \
+  "spine-close.md §1's ceremony table carries the registration row (#497)"
+pin "$_SCB" '**core** (§5b) | **core** (§5b, a no-op when the plan declares `None.`) |' \
+  "spine-close.md §1 makes the registration core in BOTH columns (#497)"
+pin "$_SCB" '*ADR check* row is **not shipped in this release**' \
+  "spine-close.md §1 still refuses to claim the standalone ADR check (§3.3)"
 
 t_summary
