@@ -321,6 +321,19 @@ describe('yielding to molt', () => {
 })
 
 describe('the loop guard', () => {
+  test('a context rebuild restarts the no-change loop count before a covered turn end', async () => {
+    const { w, a } = world({ files: autopilot(), replies: [COVERED, COVERED, COVERED, COVERED] })
+    for (let i = 0; i < 2; i++) expect((await a.onSessionStop({ last_assistant_message: 'x' }))?.decision).toBe('block')
+    a.onContextRebuild()
+    expect((await a.onSessionStop({ last_assistant_message: 'x' }))?.decision).toBe('block')
+    expect(w.prompts).toHaveLength(3)
+    expect(ledger(w).at(-1)).toContain('covered')
+    expect(w.notes).toEqual([])
+    expect((await a.onSessionStop({ last_assistant_message: 'x' }))?.decision).toBe('block')
+    expect(w.notes).toEqual([])
+    expect(await a.onCommand('status')).toContain('pushes in a row with no change: 2 of 3')
+  })
+
   test('loopMax pushes with no change: the next turn end passes with an autopilot loop pain', async () => {
     const { w, a } = world({ files: autopilot(), replies: [STALLED, STALLED, STALLED, STALLED] })
     for (let i = 0; i < 3; i++) expect((await a.onSessionStop({ last_assistant_message: 'x' }))?.decision).toBe('block')
@@ -617,6 +630,18 @@ describe('before_agent_start', () => {
     expect((await a.onBeforeAgentStart({ systemPrompt: ['BASE'] }))?.systemPrompt).toEqual(['BASE', 'TEST POLICY'])
   })
 
+  test('a context rebuild re-announces a committed scope at the next agent start', async () => {
+    const { a } = world({ files: { [REC()]: JSON.stringify({ mode: 'autopilot', scope: ['/spec.md'], source: 'command' }) } })
+    const prepare = () => a.onBeforeAgentStart({ systemPrompt: ['BASE'] })
+    expect((await prepare())?.systemPrompt[2]).toContain('- /spec.md')
+    a.onAgentStart()
+    expect((await prepare())?.systemPrompt).toEqual(['BASE', 'TEST POLICY'])
+    a.onContextRebuild()
+    expect((await prepare())?.systemPrompt[2]).toContain('- /spec.md')
+    a.onAgentStart()
+    expect((await prepare())?.systemPrompt).toEqual(['BASE', 'TEST POLICY'])
+  })
+
   test('autopilot with no policy on disk refuses: manual, no policy added', async () => {
     const { w, a } = world({ files: autopilot(), noPolicy: true })
     expect(await a.onBeforeAgentStart({ systemPrompt: 'BASE' })).toBeUndefined()
@@ -770,7 +795,8 @@ describe('the omp wiring', () => {
         await b.handlers.get('tool_result')!({ toolName: 'write', input: { path: '/branch-a.txt' }, content: [{ type: 'text', text: 'SECRET-A' }], isError: false }, c)
         if (event === 'rewind') await b.handlers.get('tool_result')!({ toolName: 'rewind', input: { report: 'kept findings' }, content: [{ type: 'text', text: 'Rewind requested.' }], details: { report: 'kept findings', rewound: true }, isError: false }, c)
         else await b.handlers.get(event)?.({}, c)
-        expect(await stop()).toBeUndefined() // stale changed would reset the exhausted loop
+        for (let i = 0; i < 3; i++) expect((await stop())?.decision).toBe('block')
+        expect(await stop()).toBeUndefined() // no branch A change may reset the new loop
         const rec = JSON.parse(readFileSync(sessionPath(b.home, 'W1'), 'utf8'))
         expect(rec.mode).toBe('autopilot')
         expect(rec.scope).toEqual([scope])

@@ -409,6 +409,8 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     digests.delete(id)
     changed.delete(id)
     pendingScope.delete(id)
+    announced.delete(id)
+    pushes.delete(id)
   }
 
   // before_agent_start: in autopilot the policy joins the system prompt, and a carried scope is announced once.
