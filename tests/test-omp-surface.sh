@@ -127,7 +127,7 @@ check_agents() { # $1=root $2=plugins whose skills may be autoloaded
   done
   f="$r/omp-roles/agents/implementer.md"
   [ -f "$f" ] || return 0
-  tools=$(fm_value "$f" tools)
+  tools=$(fm_value "$f" tools | tr '[:upper:]' '[:lower:]')
   for k in task ask; do
     printf '%s\n' "$tools" | tr ',[]\"\047' '     ' | awk -v k="$k" '{for (i=1;i<=NF;i++) if ($i==k) found=1} END {exit !found}' \
       && echo "agent: omp-roles/agents/implementer.md grants $k"
@@ -216,6 +216,8 @@ done
 for tool in task ask; do
   control "agent-tool-$tool" "agent: omp-roles/agents/implementer.md grants $tool" "sed -i.bak 's/^tools: .*/tools: read, $tool, write/' omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak"
 done
+control agent-grants-Task "agent: omp-roles/agents/implementer.md grants task" 'sed -i.bak "s/^tools: .*/tools: read, Task, write/" omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak'
+control agent-grants-ASK "agent: omp-roles/agents/implementer.md grants ask" 'sed -i.bak "s/^tools: .*/tools: read, ASK, write/" omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak'
 control agent-autoload-missing "autoloadSkills must contain one bare name" 'sed -i.bak "/^autoloadSkills:/d" omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak'
 control agent-autoload-qualified "autoloadSkills must contain one bare name" 'sed -i.bak "s/\[ossify-s\]/[ossify:ossify-s]/" omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak'
 control agent-autoload-unknown "autoloadSkills missing-s is not a skill in a gated plugin" 'sed -i.bak "s/\[ossify-s\]/[missing-s]/" omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak'
