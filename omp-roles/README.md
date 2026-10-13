@@ -1,6 +1,8 @@
 # omp-roles
 
-The OMP role pack for default mode. 0.1.0 ships `omp-seat`, the launcher that pins the `seat-mods`, `molt` and `autonomic` OMP extensions onto a seat, and one role, `worker` (`omp-seat worker`); any other role is refused. The worker agents (`implementer`, `reviewer`) and the coordinator role files arrive in later releases. OMP only: it has no `.claude-plugin/` and Claude Code never loads it.
+The OMP role pack for default mode. 0.2.0 ships `omp-seat`, the launcher that pins the `seat-mods`, `molt` and `autonomic` OMP extensions onto a seat, and the `implementer` and `reviewer` agents. The launcher accepts `worker` (`omp-seat worker`); coordinator role files arrive in a later release. OMP only: it has no `.claude-plugin/` and Claude Code never loads it.
+
+The `implementer` autoloads ossify's `work-item` skill and returns its JSON after staging, without committing. Install ossify 1.17.0 for `run-spine`'s OMP dispatch by agent name. Under `omp-seat`, implementer children use seat-mods' verifier profile, which denies commit, push and PR creation. The `reviewer` reads a diff and writes only the report path its brief names; its first line records the reviewed HEAD, followed by findings or `Findings: none`.
 
 ## Install
 
