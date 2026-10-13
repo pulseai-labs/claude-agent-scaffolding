@@ -12,6 +12,8 @@ All notable changes to the `autonomic` plugin.
   stays unchanged for Claude Code and in-process readers. OMP bash children keep the environment from
   session start, so OMP launchers read `cat "$AUTONOMIC_MODE_FILE"` and mark autopilot only on that exact value.
 
+- **OMP limit:** A process that dies without `session_shutdown` (SIGKILL, crash, shutdown budget) leaves `mode/<pid>`; nothing sweeps these files; a reused pid clears its own at first load, and only children of the dead process could read it.
+
 ## 0.6.1
 
 - **The bell is not awaited on the pain path** (#718). `pain()` awaited `ring` with no `timeoutMs`, so a hung bell held the

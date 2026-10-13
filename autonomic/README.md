@@ -474,6 +474,7 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
   with `forceWithLease`; `eval`, `debug` and scripts are not read, and a subagent's calls are covered by seat-mods' child rails.
 - There is no band: a turn-end pain lists its options, numbered, in the notice, the bell and the pain file. The ask judge sees what
   the session has read, so a scope document answers an ask only after the session has read it.
+- A process that dies without `session_shutdown` (SIGKILL, crash, shutdown budget) leaves `mode/<pid>`; nothing sweeps these files; a reused pid clears its own at first load, and only children of the dead process could read it.
 - Main limit: if writing the OMP mode file fails AND removing it fails, a stale file can remain. The notice says
   not to let a launcher trust it in this session. A missing file reads manual.
 
