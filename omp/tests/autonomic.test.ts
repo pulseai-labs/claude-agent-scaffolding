@@ -17,8 +17,10 @@ const STALLED = turn({ case: 'stalled', next_step: 'run the tests', reason: 'pla
 const COVERED = turn({ case: 'covered', question: 'Shall I proceed?', answer: 'Proceed with the plan.', reason: 'the plan decides' })
 
 // A fake AutonomicIO: an in-memory file system, scripted side-turn replies, and a record of every side effect.
-// A reply that is an Error is thrown; undefined means the host has no ephemeral turn.
-function world(over: { env?: Record<string, string>; files?: Record<string, string>; noPolicy?: boolean; replies?: Array<string | Error | undefined>; failAppend?: RegExp; failTouch?: boolean; failWrite?: RegExp } = {}) {
+// A reply that is an Error is thrown; undefined means the host has no ephemeral turn; HANG never settles (a host that
+// ignores the abort signal).
+const HANG: Promise<never> = new Promise(() => {})
+function world(over: { env?: Record<string, string>; files?: Record<string, string>; noPolicy?: boolean; budgetMs?: number; replies?: Array<string | Error | undefined | Promise<never>>; failAppend?: RegExp; failTouch?: boolean; failWrite?: RegExp } = {}) {
   const files = new Map<string, string>([...(over.noPolicy ? [] : [[POLICY, 'TEST POLICY\n'] as [string, string]]), ...Object.entries(over.files ?? {})])
   const w = {
     id: 'S1',
@@ -71,7 +73,7 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     status: t => { w.statuses.push(t) },
     bell: async (c, m) => { w.bells.push([c, m]) },
   }
-  const a = createAutonomic(io)
+  const a = createAutonomic(io, over.budgetMs)
   return { w, a, files, env }
 }
 
@@ -155,6 +157,29 @@ describe('the ask reflex', () => {
     expect(w.budgets).toHaveLength(2)
     expect(w.budgets[0]!).toBeLessThanOrEqual(25_000)
     expect(w.budgets[1]!).toBeLessThanOrEqual(w.budgets[0]!)
+  })
+
+  test('a hung ephemeral turn (a host that ignores the abort signal) is a failed attempt: the ask passes with pain and a pain ledger line', async () => {
+    const { w, a } = world({ files: autopilot(), replies: [HANG], budgetMs: 1_000 })
+    const t0 = Date.now()
+    expect(await a.onToolCall(ask(Q))).toBeUndefined()
+    expect(Date.now() - t0).toBeLessThan(5_000)  // the deadline, not omp's 30 s
+    expect(w.prompts).toHaveLength(1)
+    expect(w.notes).toHaveLength(1)
+    expect(w.notes[0]).toContain('question for you')
+    expect(w.notes[0]).toContain('the fork failed twice')
+    expect(ledger(w).join('\n')).toContain(' · pain · ')
+  })
+
+  test('a reply inside the deadline is still taken (control for the hung-turn race)', async () => {
+    const { a } = world({ files: autopilot(), replies: [answered({ 'Which plan?': 'Plan A' })], budgetMs: 60 })
+    expect((await a.onToolCall(ask(Q)))?.reason).toContain('autonomic answered')
+  })
+
+  test('a hung turn at the turn end is the same failed attempt: the stop passes with pain', async () => {
+    const { w, a } = world({ files: autopilot(), replies: [HANG], budgetMs: 1_000 })
+    expect(await a.onSessionStop({ last_assistant_message: 'Shall I proceed?' })).toBeUndefined()
+    expect(w.notes.join('\n')).toContain('autopilot:')
   })
 
   test('a host with no ephemeral turn has nothing to judge with: the ask passes with pain', async () => {

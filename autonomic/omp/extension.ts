@@ -60,6 +60,14 @@ const USAGE_TEXT = 'usage: /autopilot on [scope doc …] | off | status'
 export const JUDGE_BUDGET_MS = 25_000
 const MIN_ATTEMPT_MS = 1_000
 
+// The deadline must not depend on the host honouring the abort signal: a turn that never settles is a failed attempt.
+function within<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`no reply within ${ms} ms`)), ms)
+    p.then(v => { clearTimeout(timer); resolve(v) }, e => { clearTimeout(timer); reject(e) })
+  })
+}
+
 // omp 18.8.9's built-in tools (the binary's tool registry, the same enumeration molt/omp/core.ts records), each
 // decided once. Read-only, so a turn of these alone is no progress for the loop guard:
 //   read, grep, glob, find, ast_grep, lsp, web_search, fetch, ls, ask, todo, wait, think, recall, reflect
@@ -97,7 +105,7 @@ export function questionsOf(input: unknown): Question[] {
 
 type Judged<T> = { v: T } | { skip: true } | { fail: string }
 
-export function createAutonomic(io: AutonomicIO) {
+export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_BUDGET_MS) {
   let cfg: AutonomicConfig = DEFAULTS
   let ready: Promise<void> | undefined
   const live = new Map<string, Live>()       // each session's resolved record
@@ -246,12 +254,13 @@ export function createAutonomic(io: AutonomicIO) {
 
   // One side turn, one retry (spec §4), both inside one deadline. No ephemeral turn lets the event pass.
   async function judge<T>(kind: 'turn-end' | 'ask', prompt: string, parse: (text: string) => T | undefined): Promise<Judged<T>> {
-    const deadline = Date.now() + JUDGE_BUDGET_MS
+    const deadline = Date.now() + judgeBudgetMs
     for (let attempt = 0; attempt < 2; attempt++) {
       const left = deadline - Date.now()
       if (attempt > 0 && left < MIN_ATTEMPT_MS) break
       let text: string | undefined
-      try { text = await io.ephemeral(prompt, Math.max(left, MIN_ATTEMPT_MS)) } catch (err) {
+      const ms = Math.max(left, MIN_ATTEMPT_MS)
+      try { text = await within(io.ephemeral(prompt, ms), ms) } catch (err) {
         await log(`fork failed attempt=${attempt + 1} ${String(err)}`)
         continue
       }
