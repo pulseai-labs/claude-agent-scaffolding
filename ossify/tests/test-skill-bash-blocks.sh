@@ -483,6 +483,9 @@ check_9_shadowed_tokens() { # $1=ossify-root
 # (`if cmd; then rc=0; else rc=$?; fi`), an explicit `||`/`&&` chain
 # (`rc=0; cmd || rc=$?`), or a comment documenting the form - a comment cannot
 # abort. Any other line reading `$?` is a capture that cannot survive errexit.
+# A second arm sits beside the guard: a status read in the `then`/`else` arm of
+# an `if !`, or after `! cmd ||`, reads the NEGATION's status, which is 0 when
+# the command failed (pulse360 `verify-step-halt-swallowed-false-pass`).
 # ---------------------------------------------------------------------------
 check_10_errexit_captures() { # $1=blocks-dir holding blk-N.sh + manifest.tsv
   local w="$1" n f fence line ln
@@ -501,6 +504,30 @@ check_10_errexit_captures() { # $1=blocks-dir holding blk-N.sh + manifest.tsv
       [[ "$stripped" =~ =[[:space:]]*\$\? ]] || continue
       echo "$f:$((fence + ln)): unguarded '=\$?' status read - under set -e the command aborts before the read runs; use if/else or 'rc=0; cmd || rc=\$?'"
     done < <({ grep -nE '=[[:space:]]*\$\?' "$w/blk-$n.sh" || true; } | { grep -vE '^[0-9]+:[[:space:]]*#' || true; })
+    # A status read in the arm of an `if !`, or after `! cmd ||`, reads the
+    # negation's status (0 when the command failed), not the command's - so the
+    # `else rc=$?` spelling this check's own message prescribes is exactly the
+    # one that lies here (pulse360 `verify-step-halt-swallowed-false-pass`).
+    # Negation is tracked across the block's lines: a line ending in `then` or
+    # `else` arms the NEXT line as that arm's first statement; `fi` closes it.
+    awk -v f="$f" -v fence="$fence" '
+      /^[[:space:]]*#/ { next }
+      {
+        line = $0
+        if (line ~ /(^|[;&|[:space:]])if[[:space:]]+![[:space:]]/) { neg = 1; arm = 0 }
+        if (neg) {
+          # the read is the first statement of a then/else arm: same line, or the next line
+          if (line ~ /(then|else)[[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[[:space:]]*\$\?/ ||
+              (arm && line ~ /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=[[:space:]]*\$\?/)) {
+            printf "%s:%d: '"'"'=$?'"'"' read after a negated condition reads the negation'"'"'s status, not the command'"'"'s; use '"'"'rc=0; cmd || rc=$?'"'"'\n", f, fence + NR
+          }
+          arm = (line ~ /(then|else)[[:space:]]*$/) ? 1 : 0
+          if (line ~ /(^|[;[:space:]])fi([;[:space:]]|$)/) { neg = 0; arm = 0 }
+        }
+        if (line ~ /(^|[;&[:space:]])![[:space:]][^;|&]*\|\|[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=[[:space:]]*\$\?/) {
+          printf "%s:%d: '"'"'=$?'"'"' read after a negated condition reads the negation'"'"'s status, not the command'"'"'s; use '"'"'rc=0; cmd || rc=$?'"'"'\n", f, fence + NR
+        }
+      }' "$w/blk-$n.sh"
   done < "$w/manifest.tsv"
 }
 
@@ -793,5 +820,29 @@ check_1_parse "$FIX10" "$WORK/fix10" >/dev/null
 F10="$(check_10_errexit_captures "$WORK/fix10/blocks")"
 t_assert_eq 1 "$(_count "$F10")" "self-test: check 10 finds exactly its 1 planted unguarded read - the else-arm, the || chain, and the comment do not fire${F10:+ -- $F10}"
 t_assert_contains "$F10" "c10/SKILL.md:5" "self-test: check 10 names the planted file and line"
+
+# --- check 10's negated-condition plant: its OWN ROOT again - the shared
+# fixture cannot host it without inflating fix1's exact block count, and FIX10
+# cannot either (its exact-count assertion is the control for THIS check's
+# other arm). Four negated captures must fire; the two controls beside them
+# must not, and the exact count is what proves that.
+FIX10N="$WORK/fixture10n"; mkdir -p "$FIX10N/skills/c10n/references"
+cat > "$FIX10N/skills/c10n/references/neg.md" <<'EOF'
+# c10n negated captures
+```bash
+if ! "$x" verify_step a b c; then rc=$?; fi
+if ! false; then
+  rc2=$?
+fi
+if ! true; then echo no; else rc3=$?; fi
+rc4=0; ! false || rc4=$?
+if false; then rc5=0; else rc5=$?; fi
+if ! true; then echo ok; fi; rc6=0; true || rc6=$?
+```
+EOF
+
+check_1_parse "$FIX10N" "$WORK/fix10n" >/dev/null
+F10N="$(check_10_errexit_captures "$WORK/fix10n/blocks" | { grep -F 'after a negated condition' || true; })"
+t_assert_eq 4 "$(_count "$F10N")" "self-test: check 10 flags each status read after a negated condition (if !…then, then-on-next-line, else arm, ! …||) and neither control${F10N:+ -- $F10N}"
 
 t_summary
