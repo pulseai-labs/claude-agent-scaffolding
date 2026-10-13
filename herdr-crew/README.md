@@ -220,7 +220,8 @@ has one fixed path.
   `run.json`: dagr's producer contract resolves that validator *before* anything is
   written, and with none available the run starts no run file — not an unvalidated one.
 - autonomic 0.4.0 for autopilot children: an older autonomic sets no `AUTONOMIC_EFFECTIVE_MODE`, so
-  every child starts manual.
+  every child starts manual. An OMP launcher needs autonomic 0.7.0 for autopilot children: an older
+  autonomic writes no mode file, so the launcher reads manual.
 - `jq` on PATH for the context-ceiling hook; without it the hook reports the figure as
   unavailable.
 - The agents named in `~/.claude/herdr-crew/agents.md` resolvable where their pane
