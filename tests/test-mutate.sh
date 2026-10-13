@@ -43,4 +43,21 @@ bash "$M" "$T/s" 'k=1' 'k=2' -- sleep 30 >/dev/null 2>&1 & mp=$!
 for _ in $(seq 1 50); do grep -q 'k=2' "$T/s" 2>/dev/null && break; sleep 0.1; done
 kill -TERM "$mp"; wait "$mp" 2>/dev/null
 cmp -s "$T/s" "$T/s.orig" && ok || bad "TERM during the suite still restores"
+# A DESCENDANT that outlives the suite must not write the target after the
+# restore: killing only the direct child leaves the background `sleep 1; echo
+# late >> "$F"` alive, and it appends a line to a file the caller believes is
+# restored.
+printf 'd=1\n' > "$T/d"; cp "$T/d" "$T/d.orig"
+F="$T/d" bash "$M" "$T/d" 'd=1' 'd=2' -- bash -c '(sleep 1; echo late >> "$F") & sleep 30' >/dev/null 2>&1 & mp=$!
+for _ in $(seq 1 50); do grep -q 'd=2' "$T/d" 2>/dev/null && break; sleep 0.1; done
+kill -TERM "$mp"; wait "$mp" 2>/dev/null
+sleep 2
+cmp -s "$T/d" "$T/d.orig" && ok || bad "a descendant that outlives the suite still leaves the target restored"
+# An unlaunchable suite is NO VERDICT - never SURVIVED (rc 1), which reads as
+# "the test did not notice the mutation" when in fact nothing ran at all.
+printf 'u=1\n' > "$T/u"; cp "$T/u" "$T/u.orig"
+out="$(bash "$M" "$T/u" 'u=1' 'u=2' -- no-such-command-zz 2>&1)"; rc=$?
+eq 2 "$rc" "an unlaunchable suite -> rc 2, no verdict"
+case "$out" in *'could not run'*) ok;; *) bad "the unlaunchable suite is reported";; esac
+cmp -s "$T/u" "$T/u.orig" && ok || bad "file restored after an unlaunchable suite"
 echo "pass=$pass fail=$fail"; [ "$fail" -eq 0 ]

@@ -11,7 +11,9 @@
 #
 #   rc 0  KILLED    the suite failed on the mutant - the test can fail
 #   rc 1  SURVIVED  the suite passed on the mutant - the test did not notice
-#   rc 2  refused   bad arguments, <from> not exactly once, or no change; file untouched
+#   rc 2  refused or no verdict - bad arguments, <from> not exactly once, or no
+#         change (file untouched); or the suite could not run at all (rc 126/127,
+#         file restored)
 #   rc 3  restore failed - the original is at the printed backup path
 #
 # It cannot check the third mutation condition: that the mutated line RUNS on
@@ -46,7 +48,14 @@ on_exit() {
   if restore; then rm -rf "$bak_dir"
   else echo "mutate: RESTORE FAILED - the original is at $bak" >&2; fi
 }
-on_signal() { [ -n "$child" ] && kill "$child" 2>/dev/null; exit "$1"; }
+on_signal() {
+  if [ -n "$child" ]; then
+    kill -TERM -- "-$child" 2>/dev/null
+    wait "$child" 2>/dev/null
+    kill -KILL -- "-$child" 2>/dev/null
+  fi
+  exit "$1"
+}
 trap on_exit EXIT
 trap 'on_signal 130' INT
 trap 'on_signal 143' TERM
@@ -61,12 +70,27 @@ cmp -s "$bak" "$file" && die "the file did not change"
 ln="$(cat "$bak_dir/line")"
 echo "mutate: $file:$ln: $(sed -n "${ln}p" "$file")"
 
+# `set -m` gives the suite its OWN process group (a job-control background job,
+# pgid == $child), so the signal path and the normal path can kill everything the
+# suite started. Without it a descendant survives the direct child: `(sleep 1;
+# echo late >> "$F") &` still holds the file and appends to it AFTER the restore,
+# into a file the caller believes is restored (PR #772 round 1).
+set -m
 "$@" & child=$!
+set +m
 wait "$child"; suite_rc=$?
+# Nothing the suite started may write after the restore.
+kill -KILL -- "-$child" 2>/dev/null
 child=""
 
 if restore; then restored=1; rm -rf "$bak_dir"
 else restored=1; echo "mutate: RESTORE FAILED - the original is at $bak" >&2; exit 3; fi
+
+# A suite that could not run is NO VERDICT. Left on the normal path, a missing
+# suite command reports 127 - nonzero, so the run would be reported as KILLED,
+# "the test can fail", from a suite that never started.
+case "$suite_rc" in 126|127)
+  echo "mutate: the suite could not run (rc $suite_rc) - no verdict" >&2; exit 2 ;; esac
 
 if [ "$suite_rc" -ne 0 ]; then echo "KILLED (suite rc $suite_rc): $file:$ln"; exit 0; fi
 echo "SURVIVED: $file:$ln - the suite passed with the mutation in place"; exit 1
