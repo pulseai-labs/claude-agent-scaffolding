@@ -1590,12 +1590,17 @@ for _lit in 'Exactly two command shapes are accepted' 'before the spine-branch c
   _r=1; grep -Fq -- "$_lit" "$_RS" && _r=0
   _pin "$_r" "skills/run-spine/SKILL.md does not state '$_lit' (1.15.0 grammar rails)"
 done
-# 1.15.0 final review: run-spine outside the slash command (I2) and on a harness without
-# the nested implementer (I3), and the spine close hand-off to work-pr on every surface (I1).
-for _lit in 'arrive as tokens in the request' 'a harness without it (OMP, Codex) refuse it before the spine-branch cut'; do
+# run-spine outside the slash command (I2), OMP's explicit implementer dispatch
+# (#744), and the adjacent Codex refusal control (I3).
+for _lit in 'arrive as tokens in the request' \
+  'On OMP with `omp-roles` installed, dispatch each item with `task` and `agent: "implementer"` (name it; not `task`).' \
+  'On a harness with neither (Codex), refuse before the spine-branch cut, naming `--external-executor`.'; do
   _r=1; tr '\n' ' ' < "$_RS" | tr -s ' ' | grep -Fq -- "$_lit" && _r=0
   _pin "$_r" "skills/run-spine/SKILL.md does not state '$_lit' (1.15.0 final review)"
 done
+# The OMP alias belongs beside the actual default dispatch call.
+_r=1; grep -Fq '(OMP: task with agent "implementer" — same handoff path in, same JSON out)' "$_RO" && _r=0
+_pin "$_r" 'round-orchestration.md does not name the OMP implementer dispatch alias (#744)'
 _CL="$HERE/../skills/close/SKILL.md"
 _SCL="$HERE/../skills/close/references/spine-close.md"
 for _f in "$_CL" "$_SCL"; do
