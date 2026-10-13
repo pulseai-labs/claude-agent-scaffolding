@@ -16,7 +16,7 @@ All notable changes to the `molt` plugin.
   the session wrote, and the fallback brief), a child's status file, a manual-mode pause. Known limits: no `-p` handoff; the clear
   is measured in rpc mode only (TUI unmeasured); omp 18.8.9's sendUserMessage returns nothing, so a
   seed the host rejects after newSession() is not seen (the handoff file stays on disk and its path is in molt's log);
-  the no-progress count is one per process, as in the Claude Code mod, not per session. The Claude Code mod is unchanged.
+  the no-progress count is one per process, as in the Claude Code mod, not per session; the pause is one per process, as in the Claude Code mod. The Claude Code mod is unchanged.
 
 ## 0.2.5 — 2026-10-09
 
