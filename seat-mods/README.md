@@ -208,7 +208,7 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 | Child agent | Rails |
 |---|---|
 | `implementer`, `task`, any other name | verifier: no commit, push or PR; writes in the worktree and `SEAT_MODS_ALLOW` (an `implementer` child stages and never commits) |
-| `reviewer`, `scout` | reviewer: writes only in `SEAT_MODS_ALLOW`; `eval` and `debug` blocked |
+| `seat-reviewer`, `reviewer`, `scout` | reviewer: writes only in `SEAT_MODS_ALLOW`; `eval` and `debug` blocked |
 
 Under any guarded role, a tool call passes only if its name is on the allow list in `GUARDED_TOOLS` (omp 18.8.9's tools); any other name, an MCP or extension tool included, is denied:
 

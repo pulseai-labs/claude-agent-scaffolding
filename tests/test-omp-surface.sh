@@ -114,6 +114,38 @@ check_module() { # $1=root $2=plugins (spec B §5.1 check 6)
   done
 }
 
+check_agents() { # $1=root $2=plugins whose skills may be autoloaded
+  local r=$1 f k tools skill p found
+  for k in implementer seat-reviewer; do
+    [ -f "$r/omp-roles/agents/$k.md" ] || echo "agent: omp-roles/agents/$k.md missing"
+  done
+  for f in "$r/omp-roles"/agents/*.md; do
+    [ -f "$f" ] || continue
+    for k in name description tools; do
+      [ -n "$(fm_value "$f" "$k")" ] || echo "agent: ${f#"$r"/} lacks frontmatter $k"
+    done
+  done
+  f="$r/omp-roles/agents/implementer.md"
+  [ -f "$f" ] || return 0
+  tools=$(fm_value "$f" tools)
+  for k in task ask; do
+    printf '%s\n' "$tools" | tr ',[]\"\047' '     ' | awk -v k="$k" '{for (i=1;i<=NF;i++) if ($i==k) found=1} END {exit !found}' \
+      && echo "agent: omp-roles/agents/implementer.md grants $k"
+  done
+  skill=$(fm_value "$f" autoloadSkills)
+  # OMP's inline list must contain one bare skill name, never a plugin:name alias.
+  if ! printf '%s\n' "$skill" | grep -Eq '^\[[[:space:]]*[a-zA-Z0-9_-]+[[:space:]]*\]$'; then
+    echo "agent: omp-roles/agents/implementer.md autoloadSkills must contain one bare name"
+    return 0
+  fi
+  skill=$(printf '%s' "$skill" | tr -d '[][:space:]')
+  found=false
+  for p in $2; do
+    [ -f "$r/$p/skills/$skill/SKILL.md" ] && found=true
+  done
+  $found || echo "agent: omp-roles/agents/implementer.md autoloadSkills $skill is not a skill in a gated plugin"
+}
+
 # --- fixture: a minimal valid tree; each control plants one defect into a copy ---
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/omp-surface.XXXXXX")"; trap 'rm -rf "$WORK"' EXIT
 make_fixture() { # $1=dir
@@ -140,9 +172,13 @@ make_fixture() { # $1=dir
   mkdir -p "$d/omp" "$d/ossify/bin" "$d/ossify/omp"
   printf 'export const VERSION = 1;\n' > "$d/omp/bin-path.ts"; cp "$d/omp/bin-path.ts" "$d/ossify/omp/"
   for p in $OMP_ONLY; do cp "$d/omp/bin-path.ts" "$d/$p/omp/"; done
+  mkdir -p "$d/omp-roles/agents"
+  printf -- '---\nname: implementer\ndescription: Execute one work item.\ntools: read, write, bash\nautoloadSkills: [ossify-s]\n---\nBody.\n' > "$d/omp-roles/agents/implementer.md"
+  printf -- '---\nname: seat-reviewer\ndescription: Review a diff.\ntools: read, grep, glob, bash, write\n---\nBody.\n' > "$d/omp-roles/agents/seat-reviewer.md"
 }
 findings() { # $1=root $2=plugins -> all findings of all checks
   check_catalog "$1"; check_wrappers "$1" "$2"; check_descriptions "$1" "$2"; check_names "$1" "$2"; check_paths "$1" "$2"; check_module "$1" "$2"
+  check_agents "$1" "$2"
 }
 control() { # $1=label $2=expected finding prefix $3=planting command (run in the fixture dir)
   local d="$WORK/$1" out
@@ -172,6 +208,18 @@ control root-manifest   "root plugin.json present"  'printf "{}\n" > ossify/plug
 control module-drift    "module: ossify/omp/bin-path.ts differs" 'printf "// drift\n" >> ossify/omp/bin-path.ts'
 control module-missing  "module: ossify has bin/"   'rm ossify/omp/bin-path.ts'
 control module-missing-omp-only "module: omp-roles has bin/" 'rm omp-roles/omp/bin-path.ts'
+control agent-missing-implementer "agent: omp-roles/agents/implementer.md missing" 'rm omp-roles/agents/implementer.md'
+control agent-missing-seat-reviewer "agent: omp-roles/agents/seat-reviewer.md missing" 'rm omp-roles/agents/seat-reviewer.md'
+for key in name description tools; do
+  control "agent-frontmatter-$key" "agent: omp-roles/agents/seat-reviewer.md lacks frontmatter $key" "sed -i.bak '/^$key:/d' omp-roles/agents/seat-reviewer.md && rm omp-roles/agents/seat-reviewer.md.bak"
+done
+for tool in task ask; do
+  control "agent-tool-$tool" "agent: omp-roles/agents/implementer.md grants $tool" "sed -i.bak 's/^tools: .*/tools: read, $tool, write/' omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak"
+done
+control agent-autoload-missing "autoloadSkills must contain one bare name" 'sed -i.bak "/^autoloadSkills:/d" omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak'
+control agent-autoload-qualified "autoloadSkills must contain one bare name" 'sed -i.bak "s/\[ossify-s\]/[ossify:ossify-s]/" omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak'
+control agent-autoload-unknown "autoloadSkills missing-s is not a skill in a gated plugin" 'sed -i.bak "s/\[ossify-s\]/[missing-s]/" omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak'
+control agent-autoload-ungated "autoloadSkills mod-s is not a skill in a gated plugin" 'mkdir -p seat-mods/skills/mod-s && cp ossify/skills/ossify-s/SKILL.md seat-mods/skills/mod-s/ && sed -i.bak "s/\[ossify-s\]/[mod-s]/" omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak'
 
 # The shipped tree. Checks 2-4 apply only to GATED_PLUGINS; checks 1 and 5 always.
 out=$(findings "$ROOT" "$GATED_PLUGINS")

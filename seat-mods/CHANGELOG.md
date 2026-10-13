@@ -2,6 +2,11 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.4.1 — 2026-10-13
+
+- Map OMP's `seat-reviewer` child to the reviewer profile, confining its write tool to
+  `SEAT_MODS_ALLOW`. Keep the bundled `reviewer` and `scout` mappings.
+
 ## 0.4.0 — 2026-10-12
 
 - **OMP guard.** `omp/extension.ts` applies the shared rules (`hooks/rules.ts`) to OMP's

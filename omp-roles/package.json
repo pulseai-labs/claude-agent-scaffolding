@@ -1,6 +1,6 @@
 {
   "name": "omp-roles",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "OMP role pack for default mode. OMP only.",
   "private": true,
   "license": "MIT",
