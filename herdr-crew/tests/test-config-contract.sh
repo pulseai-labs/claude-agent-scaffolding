@@ -23,7 +23,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_MD="$PLUGIN_ROOT/skills/orchestrate/references/config.md"
-REF_BUDGET=200
+REF_BUDGET=202
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

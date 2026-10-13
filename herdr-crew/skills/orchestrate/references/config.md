@@ -106,8 +106,10 @@ a session launches nothing with its own profile.
 | OMP seat (omp-roles spine-driver), default lane | the role file carries the procedure by `skill://`; the brief's `/ossify:run-spine` reaches it as text | `subagents` |
 | spine session, external-executor lane | `/ossify:run-spine` | `slash-commands` |
 | close session | `/ossify:close` | `slash-commands` |
+| OMP seat (omp-roles close), close session | the role file carries the procedure by `skill://close`; the brief's `/ossify:close` reaches it as text | — |
 | work-PR session | `/ossify:work-pr` | `slash-commands` |
 | doctor session | `/ossify:doctor` | `slash-commands` |
+| OMP seat (omp-seat worker), doctor session | the brief's `/ossify:doctor` reaches it as text; the seat follows ossify's `doctor` skill by name | — |
 | PR-fix seat inside work-PR | none — the clause is removed | — |
 | close-review writer | no command | — |
 | an operator-defined role | whatever its `brief:` invokes | as declared |

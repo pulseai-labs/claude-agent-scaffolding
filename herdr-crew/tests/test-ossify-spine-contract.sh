@@ -534,7 +534,7 @@ pin "$CONFIG_MD" 'spine session, external-executor lane' \
 
 # Round 3, finding 4: every dispatched command resolves to a role the project
 # file can fill — doctor gets its own seat.
-n_eq "$CONFIG_MD" 'doctor session' 2 \
+n_eq "$CONFIG_MD" 'doctor session' 3 \
   "doctor session is a project-file role and in the capability table"
 pin "$ROLES_MD" 'doctor session' \
   "the seat budget grants a doctor session"
