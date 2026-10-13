@@ -222,6 +222,7 @@ override:
 
 Discipline:
 
+- **Check before you write.** Check every precondition before the first write: each file exists, and each text you replace is there exactly once. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
 - **Absolute paths only.** Your cwd is the caller's, never the worktree. Git ops
   use `git -C "<worktree-abs>" …`; other commands use
   `cd "<worktree-abs>" && <cmd>` in a single invocation (each Bash call is a fresh
@@ -262,6 +263,8 @@ oss verify_step "<worktree-abs>" "<command>" "<expectation>"   # 0 pass | 1 fail
 ```
 
 Capture, per command: exit code, a short output excerpt, and pass/fail.
+
+**Can each test fail?** A green run proves nothing about a test that cannot go red. Before the report, judge every test you wrote or changed: would it fail if the behaviour it guards were gone? When you are not sure, mutate the production code it guards and hold three conditions — the mutation is semantic (not a syntax error), it applied (echo the changed line back), and it runs on the path the test exercises. Confirm red, then restore from a copy you saved first, never from git (`git checkout` also drops your uncommitted work). A text pin binds to text this change writes and matches it exactly once; a phrase that also occurs elsewhere in the file keeps the pin green when the guarded line is deleted. Record each test's answer in report §5.
 
 **Explicitly NOT halt-on-first-fail** — the deliberate opposite of the
 orchestrator-side gate in `close`. Run all of them even after one fails. The

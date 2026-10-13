@@ -65,6 +65,8 @@ again on an ossify project. Treat a new line or a new hit exactly as above.
 
 ## 3. Fix it — by kind
 
+**Check before you write.** Check every precondition before the first write: each file exists, and each text you replace is there exactly once. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
+
 **Cut the branch first (§4), and do all of this section inside it.** When the
 repo's checkout is parked on a spine or work-item branch, that means the separate
 worktree §4 creates — the reproduction and the fix are never written into a

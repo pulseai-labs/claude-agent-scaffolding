@@ -102,6 +102,8 @@ Demo contribution — <spine-id> "<name>"   [user-facing | internal]
   says "faster", "more reliable", "cheaper" anywhere is claiming one.
 - **F6 `n/a`** only for a spine outside Release 0.
 
+`n/a` is never a way to skip a floor that applies.
+
 **REJECT ⇒ no ledger call.** The remedy is always to fix the contribution, never
 to record it and plan a follow-up: re-phrase (F2), name a consumer or send the
 spine back to the feature map (F3), measure (F4), state the command (F5), author

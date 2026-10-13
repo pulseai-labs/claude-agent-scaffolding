@@ -142,6 +142,8 @@ surface (`doctor/SKILL.md` §6). Record the referral in the close summary and
 hand the pattern there; do not smuggle it into `09` as prose; a rule filed as a
 caveat reads as advice and is enforced by nobody.
 
+**Check before you write.** Check every precondition before the first write: each file exists, and each text you replace is there exactly once. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
+
 **Everything else in the bank is derived from the lean spec and is off limits.**
 The apply (§7) refuses the **entire accepted set** if any item names a target
 outside `09-known-issues.md` / `10-decisions-log.md` — no partial write, no

@@ -314,6 +314,8 @@ against the release-close walkthrough. Author accordingly.
 
 ### 8b. Emit the floor read-out before you write anything
 
+**Check before you write.** Check every precondition before the first write: each file exists, and each text you replace is there exactly once. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
+
 Judge the spine's whole contribution once, out loud, against all six floors, and
 name the floor that decides the verdict:
 
@@ -328,10 +330,7 @@ Demo contribution — <spine-id> "<name>"   [user-facing | internal]
   Verdict: ACCEPT | REJECT — <the floor that decided it>
 ```
 
-`n/a` is legitimate and specific: **F2** is `n/a` only for an admitted internal
-spine; **F3** only for a user-facing spine; **F4** only for a spine claiming no
-measured quality; **F6** only for a spine outside Release 0. `n/a` is never a way
-to skip a floor that applies.
+`n/a` is legitimate and specific per floor, and never a way to skip one that applies (`references/demo-authoring.md` §2).
 
 **A REJECT means no `ledger_add_*` call happens.** The contribution goes back:
 re-phrase (F2), name a consumer or return the spine to the feature map (F3), add
