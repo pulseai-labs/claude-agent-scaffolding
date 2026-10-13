@@ -58,7 +58,7 @@ A seat's readiness path is never a field here: it follows from herdr's own answe
 to whether the pane is detected (`herdr-mechanics.md`) — so a detection manifest
 landing later moves a seat onto the typed path with no edit anywhere.
 
-**OMP coordinator seats.** Put `omp-seat` on PATH with the symlink in [omp-roles' Install step](../../../../omp-roles/README.md#install); an OMP seat is a coordinator or a worker (`omp-seat worker --via <wrapper>`), never the orchestrator top or its rotation successor: the launcher's autopilot mode read needs Claude's live env (#769).
+**OMP coordinator seats.** Put `omp-seat` on PATH with the symlink in [omp-roles' Install step](../../../../omp-roles/README.md#install); an OMP seat fills only the lane driver (default-lane spine session), close, doctor or worker seats (`omp-seat worker --via <wrapper>`), never the orchestrator top, its rotation successor, a work-PR session or an activated spine session until #769 gives OMP a live mode route.
 ```markdown
 ### omp-spine-deepseek
 command: omp-seat spine-driver --via omp-deepseek-go
@@ -67,7 +67,7 @@ effort: max
 model_shows: screen
 brief_delivery: inject
 can: subagents
-note: OMP coordinator (omp-roles). seat-mods, molt and autonomic run as OMP extensions; mark the pane SEAT_MODS_ROLE=coordinator (herdr-mechanics.md step 2) and add SEAT_MODS_ALLOW=<each hosting repo>/.worktrees (colon-separated roots) to its export: omp task children (implementer, seat-reviewer) inherit the env, and the implementer must write the item worktree.
+note: OMP coordinator (omp-roles). seat-mods, molt and autonomic run as OMP extensions; mark the pane SEAT_MODS_ROLE=coordinator (herdr-mechanics.md step 2) and add SEAT_MODS_ALLOW=<each hosting repo>/.worktrees (colon-separated roots) to its export: omp task children (implementer, seat-reviewer) inherit the env, and the implementer must write the item worktree; herdr-restore relaunches the --via wrapper without omp-seat, its three extensions or its exports — release a restored OMP seat and relaunch through omp-seat.
 ```
 
 ## What a resolved profile carries
@@ -93,8 +93,7 @@ A resolved profile renders as one row wherever it travels:
 A brief's record of its own seat's launch is the row's first three values only —
 a session launches nothing with its own profile.
 
-`can:` is checked where a seat is approved — the project-file approval, the spine-seat approval, the PR-transition ask, the close-review halt ask — never at dispatch. The requirement is per role: a role whose shipped or declared brief invokes a slash command needs
-`can: slash-commands` on the agent that fills it.
+`can:` is checked where a seat is approved — the project-file approval, the spine-seat approval, the PR-transition ask, the close-review halt ask — never at dispatch. The requirement is per role: a role whose shipped or declared brief invokes a slash command needs `can: slash-commands` on the agent that fills it.
 
 | role | its brief invokes | needs |
 |---|---|---|
@@ -104,6 +103,7 @@ a session launches nothing with its own profile.
 | ossify item implementer | `/ossify:work-item` | `slash-commands` |
 | item verifier | no command | — |
 | spine session, default lane | `/ossify:run-spine`; spawns `ossify:implementer-agent` subagents through the `Agent` tool | `slash-commands, subagents` |
+| OMP seat (omp-roles spine-driver), default lane | the role file carries the procedure by `skill://`; the brief's `/ossify:run-spine` reaches it as text | `subagents` |
 | spine session, external-executor lane | `/ossify:run-spine` | `slash-commands` |
 | close session | `/ossify:close` | `slash-commands` |
 | work-PR session | `/ossify:work-pr` | `slash-commands` |

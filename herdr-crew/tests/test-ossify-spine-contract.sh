@@ -482,7 +482,7 @@ pin "$LIFECYCLE_MD" 'resolved coordinator' \
 # can: is a per-role approval check, not a reviewer-only one.
 pin "$CONFIG_MD" 'a role whose shipped or declared brief invokes a slash command' \
   "the can: requirement is per role, checked at approval"
-n_eq "$CONFIG_MD" '/ossify:run-spine' 2 \
+n_eq "$CONFIG_MD" '/ossify:run-spine' 3 \
   "the capability table names the spine session's command"
 # The effort cell names a seat choice, never a runtime override.
 pin "$ROLES_MD" 'the machine entry is the only source of effort' \
@@ -525,7 +525,7 @@ absent "$EXEC_MD" 'OPERATOR_ROLES' \
 
 # Round 3, finding 3: the approval check covers every capability a role's
 # shipped brief needs — the default run-spine lane spawns subagents.
-n_eq "$CONFIG_MD" 'subagents' 4 \
+n_eq "$CONFIG_MD" 'subagents' 5 \
   "the can: vocabulary covers the default lane's Agent tool"
 pin "$CONFIG_MD" 'spine session, default lane' \
   "the capability table names the default lane's need"
