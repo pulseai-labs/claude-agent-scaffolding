@@ -14,10 +14,10 @@ gate (§4) do not exist yet.
 
 ## 1. The field
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
-"$oss_bin" work_item_add "$spine" "<title>" [target_repo]     # defaults to the sole declared repo
+oss work_item_add "$spine" "<title>" [target_repo]     # defaults to the sole declared repo
 ```
 
 `target_repo` is stored on the work item and defaults to the sole declared
@@ -30,7 +30,7 @@ the execution engine reads, because the item is what gets a worktree.
 Read them back:
 
 ```bash
-"$oss_bin" get '[.work_items[] | select(.spine == "r1.s2") | {id, title, status, target_repo}]'
+oss get '[.work_items[] | select(.spine == "r1.s2") | {id, title, status, target_repo}]'
 ```
 
 **`status` is in the projection on purpose.** An `abandoned` item was withdrawn
@@ -94,7 +94,7 @@ what the plan must contain:
   ```bash
   # The override is staged in the worktree the ITEM executes in, not in
   # canonical - read the path the execution lane journaled for that item.
-  wt="$("$oss_bin" get '.work_items[] | select(.id=="<wi-id>") | .worktree_path')"
+  wt="$(oss get '.work_items[] | select(.id=="<wi-id>") | .worktree_path')"
   # oss get is jq -r: an absent or JSON-null field prints the four bytes
   # `null`, which is non-empty and passes a bare [ -n ] test.
   [ -n "$wt" ] && [ "$wt" != "null" ] && [ -d "$wt" ] \

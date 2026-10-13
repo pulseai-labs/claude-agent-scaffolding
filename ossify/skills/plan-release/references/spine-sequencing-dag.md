@@ -52,10 +52,10 @@ Interrogate every proposed edge with §1's three-way test, out loud, once each.
 
 ## 3. The recorded shape
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
-"$oss_bin" release_set_meta "$rel" '{"spine_dag":[["r1.s1",[]],["r1.s2",["r1.s1"]],["r1.s3",[]],["r1.s4",["r1.s2","r1.s3"]]]}'
+oss release_set_meta "$rel" '{"spine_dag":[["r1.s1",[]],["r1.s2",["r1.s1"]],["r1.s3",[]],["r1.s4",["r1.s2","r1.s3"]]]}'
 ```
 
 `[[<spine-id>,[<dep-id>,…]],…]` — an array of `[node, deps]` pairs.
@@ -77,7 +77,7 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 ## 4. Deriving the order
 
 1. **List the spines** the release selected
-   (`"$oss_bin" get '.spines | map(select(.release == "'"$rel"'")) | map(.id)'` —
+   (`oss get '.spines | map(select(.release == "'"$rel"'")) | map(.id)'` —
    `spine_list` itself returns every spine in the project).
 2. **For each pair, ask §1's test.** Record only the edges that pass.
 3. **Find the roots** — spines with `[]`. The release starts with all of them; if
@@ -101,7 +101,7 @@ the wrong place.
 Fix it by re-cutting, not by deleting an edge to make the graph acyclic:
 
 - **Merge** them into one spine if the journey is genuinely one journey — and
-  `"$oss_bin" spine_status "<orphaned-sid>" abandoned` the half that no longer exists;
+  `oss spine_status "<orphaned-sid>" abandoned` the half that no longer exists;
   or
 - **Re-cut** so the shared seam lands entirely inside the first spine; or
 - **Extract** the shared seam — and if the extraction has no actor-to-outcome

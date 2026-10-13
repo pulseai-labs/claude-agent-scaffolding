@@ -82,8 +82,8 @@ else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: could not extract the tracker ladder block - every assertion below is vacuous"
 fi
 
-# The block invokes the dispatcher as "$oss_bin" — bind it to the real `oss`
-# so the extracted code runs the actual dispatcher rather than a stub.
+# The block invokes the dispatcher as `oss` by name — bind that name to the real
+# dispatcher so the extracted code runs the actual one rather than a stub.
 SHIM="$TMP/shim"
 mkdir -p "$SHIM"
 printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$OSS" > "$SHIM/oss"
@@ -106,7 +106,7 @@ git -C "$WS" config user.name t
 _run_ladder() { # $1=origin ; sets T_OUT to "$OWNER_REPO $OWNER $REPO", T_RC to the block's rc
   git -C "$WS" remote remove origin >/dev/null 2>&1 || true
   git -C "$WS" remote add origin "$1"
-  t_capture env "PATH=$SHIM:$PATH" "oss_bin=$SHIM/oss" bash -c "cd '$WS' && set -euo pipefail && . '$LADDER' && printf '%s %s %s' \"\$OWNER_REPO\" \"\$OWNER\" \"\$REPO\""
+  t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$WS' && set -euo pipefail && . '$LADDER' && printf '%s %s %s' \"\$OWNER_REPO\" \"\$OWNER\" \"\$REPO\""
 }
 
 # The three spellings the prose already claimed - unchanged behaviour, proving

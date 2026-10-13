@@ -15,13 +15,13 @@ Regenerating an existing file is opt-in, per file, and always confirmed.
 
 The ceremony writes before §13: bones ADRs at §7, `PUBLIC_BOUNDARY.md` at §10,
 the lean MASTER-SPEC at §11. So the check runs in §3, past both gates and
-before `"$oss_bin" init` — an operator who stops here is left with nothing
+before `oss init` — an operator who stops here is left with nothing
 written, not with state that the next `/start` refuses.
 
 Resolve the path of every output in §13's table (`memory-bank-brief.md` §4 —
 `oss repo_root ai_workspace` for the workspace; a loop over declared repos
 never reaches it) and check whether a file already exists there: the
-MASTER-SPEC at `"$oss_bin" spec_path`, the EXECUTIVE-SUMMARY, each memory-bank
+MASTER-SPEC at `oss spec_path`, the EXECUTIVE-SUMMARY, each memory-bank
 file where the bank lives (`close/references/harvest.md`, "Where the bank is"),
 `CLAUDE.md`, each `PUBLIC_BOUNDARY.md`, and the private boundary inventory —
 checked **both** at `posture-block.md` §7's convention,

@@ -49,11 +49,10 @@ Name the repo the fix goes into and the paths it will touch. Then:
 - **The ledger.** Read the tech-debt ledger lines overlapping those paths and give
   each a disposition (`plan-spine/references/intake-and-ledger.md` §2). A line
   this patch resolves is pulled in as one of its ACs.
-- **Bones and risk gates**, on an ossify project — a topology resolves; resolve
-  `oss_bin` with `command -v oss`. Run
-  `"$oss_bin" touch_check` with the paths, one argument per path: rc 0 is a hit
+- **Bones and risk gates**, on an ossify project — a topology resolves; call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next. Run
+  `oss touch_check` with the paths, one argument per path: rc 0 is a hit
   (stdout names it), rc 1 is clean, rc 2 could not check and is never clean. A
-  `risk_gate` hit makes that gate's controls (`"$oss_bin" get '.risk_gates'`)
+  `risk_gate` hit makes that gate's controls (`oss get '.risk_gates'`)
   required ACs of this patch. A `bone` hit is allowed only when the fix keeps the
   decision the bone's ADR records; a fix that changes that decision is a spine —
   refuse it as §1's large arm. On rc 2, say so and ask the operator before going on.

@@ -9,13 +9,13 @@ repair half was scaffold-onboard's own extension and is not shipped here. This
 surface reports and names the fix. It does not edit the manifest and does not
 touch `AGENTS.md`.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 **You perform this check by reading. There is no dispatcher verb for it** — the
 `interop_check` subcommand was removed. It was 175 lines of bash that opened
 files and described what it found, which is work a model does directly and
-better. What remains deterministic is *path resolution* (`"$oss_bin" repo_root`,
-`"$oss_bin" state_path`), because every mutating verb routes through it and two
+better. What remains deterministic is *path resolution* (`oss repo_root`,
+`oss state_path`), because every mutating verb routes through it and two
 spellings of one path is a real defect class. Deciding whether what you read is
 healthy is yours.
 
@@ -31,7 +31,7 @@ Everything below is a way that question comes out **no**.
 ### Output grammar — match it exactly
 
 One line per check, `ok:` or `fail:`, then the check name, then a dash and the
-detail. Same grammar as `"$oss_bin" doctor`, because a single read-out should not carry
+detail. Same grammar as `oss doctor`, because a single read-out should not carry
 two vocabularies:
 
 ```
@@ -76,7 +76,7 @@ ceremony read it?** If nothing reads it, its absence is not a finding.
 Walk up from `$PWD` for `.ossify/topology.json` **first**, then for
 `.workspace/pairing.json` if no topology file turns up — the identical order
 `oss_topology_discover` resolves through (`lib/manifest.sh`), which is what
-every mutating verb and `"$oss_bin" manifest_require` itself already routes on. When
+every mutating verb and `oss manifest_require` itself already routes on. When
 both exist on the walk-up, topology wins; read whichever file you actually
 found. That walk is a
 few directory checks; do it yourself.
@@ -89,7 +89,7 @@ would STOP here — before that loop ever runs — on every project `/start`'s A
 topology probe onboarded the normal way, which is `.ossify/topology.json` with
 no pairing manifest at all.
 
-`"$oss_bin" manifest_require` is the *refusal*, not the finder — it returns rc 1 and
+`oss manifest_require` is the *refusal*, not the finder — it returns rc 1 and
 prints the project's canonical refusal text to **stderr** (already worded for
 both manifest kinds — `/ossify:start`/`/ossify:adopt` for a topology
 declaration, `/init-workspace`/`/pair-workspace` for a pairing manifest), and
@@ -131,8 +131,8 @@ manifest, translated the same way `_oss_topology_shape` does). Emit one
 `ok:`/`fail:` line per key, tagged with that key.
 
 ```bash
-"$oss_bin" repo_root ai_workspace
-"$oss_bin" repo_root "<repo-key>"            # once per declared repo
+oss repo_root ai_workspace
+oss repo_root "<repo-key>"            # once per declared repo
 ```
 
 Use the verb, not the raw JSON value. It substitutes `${...}` tokens and refuses
@@ -156,7 +156,7 @@ renamed or moved.
 Probe each:
 
 ```bash
-root="$("$oss_bin" repo_root "<repo-key>")"
+root="$(oss repo_root "<repo-key>")"
 # `-P` because git resolves symlinks in --show-toplevel; comparing an
 # unresolved manifest root against a resolved toplevel reports drift that
 # is not there.
@@ -193,7 +193,7 @@ git subprocesses behind every state read. Doctor is the surface that already
 walks the roots. A declared repo whose
 root is an ordinary directory (`.git` removed, the manifest hand-edited) fails the
 probe outright; a **bare repository or a `.git` directory** answers rc 0 to
-weaker probes like `--git-dir` — and even *survives* `"$oss_bin" worktree_add`, since
+weaker probes like `--git-dir` — and even *survives* `oss worktree_add`, since
 git happily adds worktrees from a bare repo — so the first break comes later
 and worse: spine close's checkouts and merges run against the root itself and
 need a work tree there. A probe that certifies switch-ready and defers the
@@ -212,7 +212,7 @@ The state file's path must resolve, and the session must not be quietly driving
 a different project's state.
 
 ```bash
-"$oss_bin" state_path      # the manifest's answer; ignores the environment
+oss state_path      # the manifest's answer; ignores the environment
 if [ -n "${OSS_STATE_FILE+set}" ]; then printf 'set: [%s]\n' "$OSS_STATE_FILE"; else printf 'unset\n'; fi
 ```
 
@@ -231,7 +231,7 @@ false `ok:`:
 value literally. The brackets in `[%s]` make a trailing space or an empty value
 visible too.
 
-**Resolution first.** If `"$oss_bin" state_path` fails, that is
+**Resolution first.** If `oss state_path` fails, that is
 `fail: state_path - the state path does not resolve to an absolute location (an
 unresolved ${...} token, a relative routed value, or no ai_workspace.root)`.
 
@@ -251,7 +251,7 @@ another project's state. That is the interop failure in its purest form.
 1. **Not set, or set but empty** → no override. `_oss_resolve_state` guards on
    `[ -n "${OSS_STATE_FILE:-}" ]`, so an empty value falls through to the manifest
    exactly as an unset one does. `ok: state_path - <routed>`.
-2. **Set and byte-identical to `"$oss_bin" state_path`** → `ok: state_path - <routed>`.
+2. **Set and byte-identical to `oss state_path`** → `ok: state_path - <routed>`.
 3. **Anything else** → `fail: state_path - $OSS_STATE_FILE is set to '<env>' but
    the manifest routes state to '<routed>'. If these name the same file, unset the
    variable — the manifest already routes there. If they do not, this session's

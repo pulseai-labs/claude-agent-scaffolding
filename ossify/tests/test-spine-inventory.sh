@@ -672,11 +672,11 @@ mkshim() { # $1=shim dir
   chmod +x "$1/oss"
 }
 F="$TMP/b1"; fx "$F" 1; mkshim "$TMP/shim-b"
-T_OUT="$(cd "$F/ws" && env "oss_bin=$TMP/shim-b/oss" bash -c "set -euo pipefail; . '$B_INV'" 2>&1)"; T_RC=$?
+T_OUT="$(cd "$F/ws" && env "PATH=$TMP/shim-b:$PATH" bash -c "set -euo pipefail; . '$B_INV'" 2>&1)"; T_RC=$?
 t_assert_rc 0 "B1: the read-out block passes a healthy spine"
 t_assert_contains "$T_OUT" "$(printf 'item\tr0.s1.w1\tplanned\tspawn')" "B1: ...and PRINTS the inventory before anything else"
 echo dirt > "$F/core/f"
-T_OUT="$(cd "$F/ws" && env "oss_bin=$TMP/shim-b/oss" bash -c "set -euo pipefail; . '$B_INV'" 2>&1)"; T_RC=$?
+T_OUT="$(cd "$F/ws" && env "PATH=$TMP/shim-b:$PATH" bash -c "set -euo pipefail; . '$B_INV'" 2>&1)"; T_RC=$?
 t_assert_rc 1 "B1: a halt row halts the lane"
 t_assert_contains "$T_OUT" "nothing was changed" "B1: ...saying nothing was mutated"
 F="$TMP/b2"; mkfix "$F"; oss_in "$F" work_item_add r0.s1 One core >/dev/null; oss_in "$F" work_item_add r0.s1 Two ui >/dev/null
@@ -690,7 +690,7 @@ oss_in "$F" spine_base_set r0.s1 core main >/dev/null
 git -C "$F/ui" checkout -q -b ui-parked
 echo p > "$F/ui/p"; git -C "$F/ui" add p; git -C "$F/ui" commit -qm parked
 oss_in "$F" spine_base_set r0.s1 ui main >/dev/null
-T_OUT="$(cd "$F/ws" && env "oss_bin=$TMP/shim-b/oss" bash -c "set -euo pipefail; . '$B_CUT'" 2>&1)"; T_RC=$?
+T_OUT="$(cd "$F/ws" && env "PATH=$TMP/shim-b:$PATH" bash -c "set -euo pipefail; . '$B_CUT'" 2>&1)"; T_RC=$?
 t_assert_rc 0 "B2: the cut-missing repair runs"
 t_assert_eq "spine/r0.s1-demo" "$(git -C "$F/ui" rev-parse --abbrev-ref HEAD)" "B2: ...cuts AND checks out the spine branch in the missing repo"
 t_assert_eq "$(git -C "$F/ui" rev-parse main)" "$(git -C "$F/ui" rev-parse spine/r0.s1-demo)" "B2: ...from the RECORDED base"
@@ -774,7 +774,7 @@ esac
 SH
 chmod +x "$TMP/e-bin/git" "$TMP/e-bin/oss"
 _e_fence() {
-  env FAIL_GIT="$2" PATH="$TMP/e-bin:$PATH" E_ROOT="$F/core" E_RECORD="$TMP/e-record" TMPDIR="$TMP/e-temporaries" oss_bin="$TMP/e-bin/oss" bash -c 'set -euo pipefail; . "$1"' fresh "$1"
+  env FAIL_GIT="$2" PATH="$TMP/e-bin:$PATH" E_ROOT="$F/core" E_RECORD="$TMP/e-record" TMPDIR="$TMP/e-temporaries" bash -c 'set -euo pipefail; . "$1"' fresh "$1"
 }
 for fence in "$E_ENTER" "$E_FRESH"; do
   mkfix "$F"; rm -f "$TMP/e-record"
@@ -796,7 +796,7 @@ FV_ENTER="$TMP/fv-enter.sh"; FV_FRESH="$TMP/fv-fresh.sh"
 sed 's/<spine-id>/r0.s1/g; s/<spine-slug>/demo/g' "$E_ENTER" > "$FV_ENTER"
 sed 's/<spine-id>/r0.s1/g; s/<spine-slug>/demo/g' "$E_FRESH" > "$FV_FRESH"
 _fv1_real_fence() {
-  ( cd "$F/ws" && env -u OSS_STATE_FILE TMPDIR="$TMP/e-temporaries" oss_bin="$OSS" \
+  ( cd "$F/ws" && env -u OSS_STATE_FILE TMPDIR="$TMP/e-temporaries" "PATH=$(dirname "$OSS"):$PATH" \
     bash -c 'set -euo pipefail; . "$1"' fresh "$1" )
 }
 for fence in "$FV_ENTER" "$FV_FRESH"; do

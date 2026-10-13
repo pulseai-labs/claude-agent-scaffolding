@@ -454,10 +454,10 @@ fi
 # The INVOCATION form, not the word: the block's own comment explains what the
 # oracle is, so a word-grep passes on the comment while the recipe no longer
 # calls it - measured by mutation.
-if grep -Fq '"$oss_bin" touch_check' "$_SW" && grep -Fq 'ls-files' "$_SW"; then
+if grep -Fq 'oss touch_check' "$_SW" && grep -Fq 'ls-files' "$_SW"; then
   T_PASS=$((T_PASS+1))
 else
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep recipe does not INVOKE both the oracle (\"\$oss_bin\" touch_check) and the corpus (git ls-files)"
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep recipe does not INVOKE both the oracle (oss touch_check) and the corpus (git ls-files)"
 fi
 if grep -Fq 'not-applicable' "$SI"; then
   T_PASS=$((T_PASS+1))
@@ -477,11 +477,12 @@ fi
 # That is what moves its ledger row from I to O.
 #
 # Run with NOTHING injected that the caller does not genuinely supply
-# (tests/lib/blocks.sh): `oss_bin`, `repos` and `sf` ARE the caller's — the last
+# (tests/lib/blocks.sh): `oss` on `$PATH`, `repos` and `sf` ARE the caller's — the last
 # because §2 resolves it once for the whole read-out and §5 consumes it, never
 # re-deriving the precedence (#561 round 1, R14). Everything else the block must
 # establish itself.
 OSS="$HERE/../bin/oss"
+OSSDIR="$(dirname "$OSS")"   # the extracted blocks call `oss` by name, so the dispatcher goes on PATH
 SWWS="$_PC_TMP/sweepws"; mkdir -p "$SWWS/.ossify" "$SWWS/canon"
 SWS="$SWWS/state.json"
 # The state is ROUTED at $SWS and also exported as $OSS_STATE_FILE - the same
@@ -500,7 +501,7 @@ printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"},"gone":{"root":"%
 # T_FAIL globals, and a subshell's mutations never propagate (test-manifest.sh
 # documents the vacuous-green trap this avoids).
 cd "$SWWS"
-t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" sf="$SWS" repos="$(printf 'canonical\ngone')" bash -c \
+t_capture env OSS_STATE_FILE="$SWS" "PATH=$OSSDIR:$PATH" sf="$SWS" repos="$(printf 'canonical\ngone')" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'SKIPPED[%s]\n' \"\$skipped\"; printf 'ROSTER%s\n' \"\$roster\"; printf 'KINDS%s\n' \"\$(printf '%s' \"\$roster\" | jq -r '[.[].kind]|join(\",\")')\"; printf 'INHITS%s\n' \"\$(grep -c ADR-9092 \"\$hits\" 2>/dev/null || true)\""
 cd "$HERE"
 t_assert_rc 0 "(d) the sweep COMPLETES with a declared repo unreadable - it reports the skip rather than exiting the whole run"
@@ -525,12 +526,12 @@ t_assert_contains "$T_OUT" "KINDSbone,bone,risk_gate" "(d) ... and the KIND of e
 # the route resolves: this arm is about the corpus loop, and the foreign-state
 # gate above would refuse first from a directory with no manifest (round 1, R1).
 cd "$SWWS"
-t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" sf="$SWS" repos="gone" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_capture env OSS_STATE_FILE="$SWS" "PATH=$OSSDIR:$PATH" sf="$SWS" repos="gone" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 t_assert_rc 0 "(d) a read set that came back EMPTY does not abort the sweep"
 t_assert_contains "$T_OUT" "no declared repo could be read" "(d) ... it reports that the sweep inspected nothing, rather than reporting every healthy surface as unmatched"
 # The corpus arm: `repos` UNSET under strict mode. This is the shipped defect
 # (an unassigned variable), so it is run with NOTHING injected.
-t_capture env OSS_STATE_FILE="$SWS" oss_bin="$OSS" sf="$SWS" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_capture env OSS_STATE_FILE="$SWS" "PATH=$OSSDIR:$PATH" sf="$SWS" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 t_assert_rc 0 "(d) an unset \$repos does not abort the sweep under strict mode"
 t_assert_contains "$T_OUT" "skip: touch - the declared repo keys could not be read" "(d) ... it says the sweep did not run, instead of sweeping an empty corpus and reporting every surface"
 cd "$HERE"
@@ -544,7 +545,7 @@ printf '%s\n' '{"schema_version":2}' > "$SWBRK/broken-state.json"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"project_state":"%s/broken-state.json"}}\n' \
   "$SWBRK" "$SWBRK" > "$SWBRK/.ossify/topology.json"
 cd "$SWBRK"
-t_capture env -u OSS_STATE_FILE oss_bin="$OSS" sf="$SWBRK/broken-state.json" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_capture env -u OSS_STATE_FILE "PATH=$OSSDIR:$PATH" sf="$SWBRK/broken-state.json" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 cd "$HERE"
 t_assert_rc 0 "(d) an unreadable registry does not abort the sweep"
 t_assert_contains "$T_OUT" "registry could not be read" "(d) ... it reports the registry failure, so an empty \$hits is not read as every surface matching nothing"
@@ -555,7 +556,7 @@ SWBR="$_PC_TMP/badroute"; mkdir -p "$SWBR/.ossify"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s"}},"well_known_paths":{"project_state":"${repos.nosuch.root}/ps.json"}}\n' \
   "$SWBR/canon" > "$SWBR/.ossify/topology.json"
 cd "$SWBR"
-t_capture env -u OSS_STATE_FILE oss_bin="$OSS" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
+t_capture env -u OSS_STATE_FILE "PATH=$OSSDIR:$PATH" repos="canonical" bash -c "set -euo pipefail; . '$_SW'; echo DONE"
 cd "$HERE"
 t_assert_rc 0 "(d) an unresolvable state route does not abort the sweep"
 t_assert_contains "$T_OUT" "state could not be resolved or read" "(d) ... it reports that instead of an absence, even though touch_check's rc 1 there looks exactly like clean"
@@ -570,7 +571,7 @@ printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_know
   "$SWF" "$SWF" > "$SWF/.ossify/topology.json"
 ( cd "$SWF" && env -u OSS_STATE_FILE bash "$OSS" init foreign >/dev/null && env -u OSS_STATE_FILE bash "$OSS" bone_add ADR-7777 "a foreign-only surface" "foreign/only/**" ) >/dev/null 2>&1
 cd "$SWWS"
-t_capture env OSS_STATE_FILE="$SWF/state.json" oss_bin="$OSS" sf="$SWF/state.json" repos="canonical" bash -c \
+t_capture env OSS_STATE_FILE="$SWF/state.json" "PATH=$OSSDIR:$PATH" sf="$SWF/state.json" repos="canonical" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS[%s]\n' \"\${hits:-unset}\"; printf 'ROSTER[%s]\n' \"\${roster:-unset}\""
 cd "$HERE"
 t_assert_rc 0 "#561: a foreign state does not abort the sweep"
@@ -579,14 +580,14 @@ t_assert_contains "$T_OUT" "HITS[unset]" "#561 ... and nothing was swept: \$hits
 t_assert_contains "$T_OUT" "ROSTER[unset]" "#561 ... and no foreign registry was read, so no warn line can be composed from it"
 # ROUND 1, R1: the gate must not be bypassed by a route that resolves to
 # NOTHING. A topology whose `project_state` value is relative makes
-# `"$oss_bin" state_path` refuse, and the old gate read that empty answer as
+# `oss state_path` refuse, and the old gate read that empty answer as
 # consent (its `[ -n "$routed" ] &&` guard) and swept a foreign registry against
 # this directory's repos. "Cannot be compared" is not "the same project".
 SWREL="$_PC_TMP/relroute"; mkdir -p "$SWREL/.ossify" "$SWREL/canon"
 printf '{"schema_version":1,"repos":{"canonical":{"root":"%s/canon"}},"well_known_paths":{"project_state":"./state.json"}}\n' \
   "$SWREL" > "$SWREL/.ossify/topology.json"
 cd "$SWREL"
-t_capture env OSS_STATE_FILE="$SWF/state.json" oss_bin="$OSS" sf="$SWF/state.json" repos="canonical" bash -c \
+t_capture env OSS_STATE_FILE="$SWF/state.json" "PATH=$OSSDIR:$PATH" sf="$SWF/state.json" repos="canonical" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS[%s]\n' \"\${hits:-unset}\""
 cd "$HERE"
 t_assert_rc 0 "#561 R1: an unresolvable route does not abort the sweep"
@@ -596,7 +597,7 @@ t_assert_contains "$T_OUT" "HITS[unset]" "#561 R1 ... and nothing was swept agai
 # CONTROL: with NO override the same fixture still sweeps - the gate refuses a
 # foreign state, not every run, and the routed state's roster still fills.
 cd "$SWWS"
-t_capture env -u OSS_STATE_FILE oss_bin="$OSS" sf="$SWS" repos="canonical" bash -c \
+t_capture env -u OSS_STATE_FILE "PATH=$OSSDIR:$PATH" sf="$SWS" repos="canonical" bash -c \
   "set -euo pipefail; . '$_SW'; printf 'HITS%s\n' \"\$(cat \"\$hits\")\"; printf 'KINDS%s\n' \"\$(printf '%s' \"\$roster\" | jq -r '[.[].kind]|join(\",\")')\""
 cd "$HERE"
 t_assert_contains "$T_OUT" "bone ADR-9091" "#561 control: no override, so the routed state sweeps its corpus"
@@ -660,7 +661,7 @@ _e_spec() { # $1=ws ; remaining args = section-4 table rows
     printf '\n## 5. Journeys\nx\n'
   } > "$ws/docs/MASTER-SPEC.md"
 }
-_e_run() { ( cd "$1" && oss_bin="$OSS" bash -c "set -euo pipefail; . '$_E_SV'" ); }
+_e_run() { ( cd "$1" && PATH="$OSSDIR:$PATH" bash -c "set -euo pipefail; . '$_E_SV'" ); }
 # The fixture's own shape: the two counts the OLD rule compared are EQUAL here,
 # so a regression back to cardinality reads this fixture as clean and fails (e1).
 _e_spec "$_E_WS" '| ADR-9999 | the hand-written row |'
@@ -947,7 +948,7 @@ if localedef -i tr_TR -f UTF-8 "$_A_LOCALE/tr_TR.UTF-8" >"$_PC_TMP/localedef.log
   jq '.bones = [{adr:"adr-i",title:"locale",touch:["x"]}]' "$_E_WS/.ossify/project-state.json" > "$_E_WS/locale.json"
   mv "$_E_WS/locale.json" "$_E_WS/.ossify/project-state.json"
   _e_spec "$_E_WS"
-  t_capture env LOCPATH="$_A_LOCALE" LC_ALL=tr_TR.UTF-8 oss_bin="$OSS" bash -c '
+  t_capture env LOCPATH="$_A_LOCALE" LC_ALL=tr_TR.UTF-8 "PATH=$OSSDIR:$PATH" bash -c '
     set -euo pipefail
     cd "$1"; . "$2"
     printf "CALLER_LOCALE=%s\n" "$LC_ALL"
@@ -957,7 +958,7 @@ if localedef -i tr_TR -f UTF-8 "$_A_LOCALE/tr_TR.UTF-8" >"$_PC_TMP/localedef.log
   t_assert_contains "$T_OUT" 'registry entry with no index row: adr-i' "A2 fail line names the original identifier under Turkish locale"
   t_assert_contains "$T_OUT" 'CALLER_LOCALE=tr_TR.UTF-8' "A1 locale remains scoped to the fence"
   _e_spec "$_E_WS" '| ADR-I | paired |'
-  t_capture env LOCPATH="$_A_LOCALE" LC_ALL=tr_TR.UTF-8 oss_bin="$OSS" bash -c 'set -euo pipefail; cd "$1"; . "$2"' fresh "$_E_WS" "$_E_SV"
+  t_capture env LOCPATH="$_A_LOCALE" LC_ALL=tr_TR.UTF-8 "PATH=$OSSDIR:$PATH" bash -c 'set -euo pipefail; cd "$1"; . "$2"' fresh "$_E_WS" "$_E_SV"
   t_assert_contains "$T_OUT" '1 entries, 1 rows' "A1 Turkish clean case-insensitive pair control"
 else
   T_FAIL=$((T_FAIL+1)); echo 'FAIL: A2 locale pin unavailable: localedef could not build tr_TR.UTF-8'
@@ -1021,7 +1022,7 @@ _o_ws() { # $1=name ; echoes a workspace whose canonical repo has an empty docs/
   printf '%s\n' "$d"
 }
 _o_next2() { # $1=dir $2=repos $3=destination repo (the block consumes both)
-  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo -u adr_scan_mode oss_bin="$OSS" repos="$2" bash -c '
+  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo -u adr_scan_mode "PATH=$OSSDIR:$PATH" repos="$2" bash -c '
     set -euo pipefail
     if [ "$2" != "[unset]" ]; then dest_repo="$2"; fi
     if [ "$3" != "[unset]" ]; then adr_scan_mode="$3"; fi
@@ -1033,7 +1034,7 @@ _o_fresh() { # $1=workspace $2=mode $3=repos or [unset] $4=destination $5=invoca
   local temp="$_PC_TMP/fresh-$2-$5-$RANDOM" rc
   mkdir -p "$temp"
   ( cd "$1" && env -u OSS_STATE_FILE -u repos -u dest_repo TMPDIR="$temp" \
-    oss_bin="$OSS" adr_scan_mode="$2" bash -c '
+    "PATH=$OSSDIR:$PATH" adr_scan_mode="$2" bash -c '
       set -euo pipefail
       if [ "$2" != "[unset]" ]; then repos="$2"; fi
       if [ "$3" != "[unset]" ]; then dest_repo="$3"; fi
@@ -1085,7 +1086,7 @@ DESTINATIONS
 _SI="$_PC_TMP/adr-inventory.sh"
 oss_block_extract "$_AD" 'scan=' "$_SI"
 _o_adopt_scan() {
-  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo oss_bin="$OSS" adr_scan_mode=inventory repos="$2" bash -c \
+  ( cd "$1" && env -u OSS_STATE_FILE -u dest_repo "PATH=$OSSDIR:$PATH" adr_scan_mode=inventory repos="$2" bash -c \
     "set -euo pipefail; . '$_SI' | LC_ALL=C sort" )
 }
 t_capture _o_adopt_scan "$_O_U" canonical
@@ -1170,8 +1171,8 @@ SH
   chmod +x "$_O_BIN/$failure"
   for mode in mint inventory; do
     _O_TEMP="$_PC_TMP/failure-$failure-$mode"; mkdir -p "$_O_TEMP"
-    t_capture env -u OSS_STATE_FILE TMPDIR="$_O_TEMP" PATH="$_O_BIN:$PATH" real_mktemp="$_O_REAL_MKTEMP" \
-      oss_bin="$OSS" repos=canonical dest_repo=canonical adr_scan_mode="$mode" bash -c \
+    t_capture env -u OSS_STATE_FILE TMPDIR="$_O_TEMP" PATH="$_O_BIN:$OSSDIR:$PATH" real_mktemp="$_O_REAL_MKTEMP" \
+      repos=canonical dest_repo=canonical adr_scan_mode="$mode" bash -c \
       "cd '$_O_U'; set -euo pipefail; . '$_SF'"
     t_assert_rc 1 "S2 $mode $failure failure refuses"
     _left="$(find "$_O_TEMP" -type f ! -name allocated | wc -l | tr -d ' ')"
@@ -1486,7 +1487,7 @@ _pin "$_r" "occupied-destinations.md does not resolve the AI workspace or allows
 # (#266) doctor's and close's fail: state remedy names the ceremonies that own init.
 _r=0
 for _f in "$_OSSR/skills/doctor/references/state-inspection.md" "$_OSSR/skills/close/SKILL.md"; do
-  grep -Fq '`"$oss_bin" init <name>`' "$_f" && { _r=1; echo "  (#266 site: $(basename "$_f"))"; }
+  grep -Fq '`oss init <name>`' "$_f" && { _r=1; echo "  (#266 site: $(basename "$_f"))"; }
   grep -F '| `fail: state` |' "$_f" | grep -Fq '/ossify:start' || { _r=1; echo "  (#266 no /ossify:start in: $(basename "$_f"))"; }
   grep -F '| `fail: state` |' "$_f" | grep -Fq 'on Codex the `start`/`adopt` skills' || { _r=1; echo "  (#636 no Codex route in: $(basename "$_f"))"; }
 done
@@ -1670,7 +1671,7 @@ _pin "$_r" "round-orchestration.md §2's arm selector does not halt on recorded 
 _r=1; grep -Fq 'refs/heads/$wi_branch' "$_RO" \
   && grep -Fq 'halt:unverified-merge' "$_RO" \
   && grep -Fq 'RE-RUN close §2' "$_RO" \
-  && grep -Fq 'repo_root="$("$oss_bin" repo_root "$target_repo")"' "$_RO" \
+  && grep -Fq 'repo_root="$(oss repo_root "$target_repo")"' "$_RO" \
   && ! grep -Fq 'as gate evidence' "$_RO" \
   && grep -Fq 'the row reads `wt=present` but state holds no `worktree_path` yet' "$_RO" && _r=0
 _pin "$_r" "round-orchestration.md §2b's finish-merge row drops its repo-root recovery, the §2 gate re-run, or the tip recovery (C3/K1/L1), still claims report.md is gate evidence, or the adopt row leaves \$wt undefined again (B2)"

@@ -65,12 +65,12 @@ is **`fully-private`**, and the public repo is a migration task, not a posture.
 | `open-core` | The core is open; specific **intelligence** stays private. | `license` (e.g. AGPL + commercial dual-license) |
 | `fully-open` | All code open; no functionality moat. Doc routing may still tighten. | `none` |
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 Record it:
 
 ```bash
-"$oss_bin" posture_set "<fully-private|source-available|open-core|fully-open>"
+oss posture_set "<fully-private|source-available|open-core|fully-open>"
 ```
 
 **Revenue intent → revisit trigger.** Revenue intent is not stored as its own
@@ -130,7 +130,7 @@ configuration, not manual repair).
 Record the seam:
 
 ```bash
-"$oss_bin" overlay_set '<seam>'      # e.g. oss overlay_set '$PULSE_PROMPT_DIR'
+oss overlay_set '<seam>'      # e.g. oss overlay_set '$PULSE_PROMPT_DIR'
 ```
 
 Also record, in the private inventory: the overlay location, the loader file
@@ -160,7 +160,7 @@ the **primary** protected value.
 Register it in the bones registry (category 9, cross-cutting):
 
 ```bash
-"$oss_bin" bone_add "<ADR-ref>" "Privacy posture: <posture> via <channel>" \
+oss bone_add "<ADR-ref>" "Privacy posture: <posture> via <channel>" \
   "<seam files, private modules, composition root globs>" \
   "<revisit trigger seeded from revenue intent>"
 ```
@@ -241,7 +241,7 @@ The second artifact, routed to the **AI workspace** (private). A table:
 
 Plus the composition root and the overlay wiring. **It lives at
 `<ai-workspace>/docs/private-boundary-inventory.md`** — `docs/` beneath the root
-`"$oss_bin" repo_root ai_workspace` answers, beside the MASTER-SPEC. That address is
+`oss repo_root ai_workspace` answers, beside the MASTER-SPEC. That address is
 a **convention, not a route**: no `well_known_paths` key and no
 `project-state.json` field records it and no verb writes it, which is why the
 release-close boundary audit locates it by this path and reports INCONCLUSIVE
@@ -342,16 +342,16 @@ The rule used to read the other way round — set it only when Release 0 is
 "trivially single-repo" — which is exactly backwards: one declared repo is the
 case the demo runner already defaults correctly, and N>1 is the case where it
 cannot. The cumulative demo is a mandatory gate at spine and release close and
-it is invoked as a bare `"$oss_bin" demo_run`, so a multi-repo project onboarded under
+it is invoked as a bare `oss demo_run`, so a multi-repo project onboarded under
 the old rule could not close at all.
 
 ```bash
-"$oss_bin" composition_set "/abs/path/to/composition/root"   # N>1: required, absolute
-"$oss_bin" composition_set "<repo-relative composition root>" # exactly one repo: optional
+oss composition_set "/abs/path/to/composition/root"   # N>1: required, absolute
+oss composition_set "<repo-relative composition root>" # exactly one repo: optional
 ```
 
 **The value is a PATH, not a repo key** — the working directory the cumulative
-demo runs from, which `"$oss_bin" demo_run` refuses when it does not exist: the
+demo runs from, which `oss demo_run` refuses when it does not exist: the
 repo root when the binary sits at it, or the crate/workspace directory *inside*
 the repo that holds it (`crates/app`). For a Rust workspace those differ, and this
 field names the directory, never the repo.
@@ -369,7 +369,7 @@ not the safe choice, it is the one that blocks the close.
 ## 11. Release-0 minimum
 
 The posture block may be as small as: *"default-private, revisit at MVP"* — one
-`"$oss_bin" posture_set fully-private`, an empty moat inventory, a `PUBLIC_BOUNDARY.md`
+`oss posture_set fully-private`, an empty moat inventory, a `PUBLIC_BOUNDARY.md`
 with the standard secrets rules, and one bone with a revisit trigger. That is a
 complete Release-0 posture block.
 

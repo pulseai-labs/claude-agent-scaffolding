@@ -76,7 +76,7 @@ seam. The disposable spike plus a lean Release 0 covers both tracks without it.
 
 ## 4. Running one
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 1. Write the contract (§2). Show it to the user; get an explicit go.
 2. Create a scratch branch or throwaway worktree, clearly named
@@ -88,7 +88,7 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
    the decision, the evidence links.
 6. **Delete the code.** Fold the decision into the bone's ADR (and, if it
    changed the plan, into the lean MASTER-SPEC).
-7. If the spike surfaced work, `"$oss_bin" feature_add "<name>" "<value>" "<class>" spec`.
+7. If the spike surfaced work, `oss feature_add "<name>" "<value>" "<class>" spec`.
 
 ### Where the contract and the note are written
 

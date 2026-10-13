@@ -39,12 +39,12 @@ must still cross the product end to end; a split that leaves one half unable to
 reach an outcome has produced an `internal-enabler`, which is a different
 conversation (`plan-release/references/class-declaration.md` §4).
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
-Concretely, on the spine already in state: `"$oss_bin" spine_status <spine> abandoned`,
-then `"$oss_bin" spine_add` each half at `plan-release` with its own class and DAG
+Concretely, on the spine already in state: `oss spine_status <spine> abandoned`,
+then `oss spine_add` each half at `plan-release` with its own class and DAG
 position; carry any ledger line already planned against the old spine with
-`"$oss_bin" ledger_unplan <line-id> <old-spine>` first (`demo-amendments.md` §6). The old spine stays in
+`oss ledger_unplan <line-id> <old-spine>` first (`demo-amendments.md` §6). The old spine stays in
 state, abandoned, so the release close can report it
 (`close/references/release-close.md` §2 names abandoned spines explicitly).
 
@@ -55,7 +55,7 @@ What **not** to do, in order of how tempting each is:
   neither cleanly.
 - **Do not defer the sixth item to "a follow-up spine" without planning it.** An
   unplanned follow-up is a deferral with no record; if it is real work, it
-  belongs on the feature map (`"$oss_bin" feature_add`).
+  belongs on the feature map (`oss feature_add`).
 - **Do not quietly ship six.** The bound exists so this conversation happens.
 
 The signal is reliable in practice: a six-item decomposition almost always has a
@@ -66,7 +66,7 @@ deliver another. That seam is the spine boundary you are looking for.
 
 A work item already in state that the decomposition no longer wants — folded
 into a sibling, found unnecessary, moved to another spine — is **withdrawn**:
-`"$oss_bin" work_item_status <wi-id> abandoned`. It is **never deleted** (the
+`oss work_item_status <wi-id> abandoned`. It is **never deleted** (the
 journal is append-only, so there is no delete) and **never marked `complete`**
 (`complete` records a merge onto the spine branch, which for a withdrawn item
 never happened). Left `planned`, it blocks spine close forever
@@ -82,7 +82,7 @@ admitted on its own and the round walk creates the worktree before it journals
 the dispatch (`work-item/references/round-orchestration.md` §3). The round walk,
 spine close and release close all skip an `abandoned` item, so withdrawing any of
 those would strand its work. A withdrawal made by mistake is reversed with
-`"$oss_bin" work_item_status <wi-id> planned`; an `active` item takes that route
+`oss work_item_status <wi-id> planned`; an `active` item takes that route
 too, once its round was abandoned without a landing. Either reversal holds
 only while its spine is still open: inside a closed spine, a planned item lands
 its repo at the next release close, so carry the work into a new spine instead
@@ -93,13 +93,13 @@ this spine planned a `ledger_supersede` or `ledger_retire`, that amendment is
 still pending and keyed to this spine — `close` would consume it and deactivate
 a line whose replacement never landed, which is the silent-coverage loss
 `demo-amendments.md` §6 exists to prevent. Clear it with
-`"$oss_bin" ledger_unplan <line-id> <spine-id>` in the same pass, exactly as the
+`oss ledger_unplan <line-id> <spine-id>` in the same pass, exactly as the
 whole-spine arm above already does. Any demo line the withdrawn item alone was
 going to add is a **different case, and `ledger_unplan` is not the tool for it**:
 that verb clears a pending amendment and answers **rc 7 for an ordinary active
 line**, which this one still is. Retire or replace it instead —
-`"$oss_bin" ledger_retire <line-id> <spine-id> <reason>` or
-`"$oss_bin" ledger_supersede <line-id> <spine-id> <reason>` — and confirm
+`oss ledger_retire <line-id> <spine-id> <reason>` or
+`oss ledger_supersede <line-id> <spine-id> <reason>` — and confirm
 afterwards that the spine still contributes valid coverage. Both take the spine as
 the **second** argument (a two-argument form exits 2 and plans nothing), and both
 are *planning* verbs: the amendment they record is applied by the close of the
@@ -124,8 +124,8 @@ than coverage.
 | **Rationale** | Why this item, at this size. One line |
 
 ```bash
-w1="$("$oss_bin" work_item_add "$spine" "order-ticket form + validation")"
-w2="$("$oss_bin" work_item_add "$spine" "paper-fill adapter" private_core)"   # dispatchable since #272/#310 Task 9 (cross-repo.md's banner); shown for the field's shape only
+w1="$(oss work_item_add "$spine" "order-ticket form + validation")"
+w2="$(oss work_item_add "$spine" "paper-fill adapter" private_core)"   # dispatchable since #272/#310 Task 9 (cross-repo.md's banner); shown for the field's shape only
 ```
 
 Each call prints the minted id (`r1.s2.w1`, …); capture it. An unknown spine id
@@ -171,7 +171,7 @@ real path set exists, so run the check again over the union of every item's
 expected paths:
 
 ```bash
-if "$oss_bin" touch_check src/ui/book/cancel.rs src/app/orders.rs src/app/positions.rs; then
+if oss touch_check src/ui/book/cancel.rs src/app/orders.rs src/app/positions.rs; then
   : # rc 0 = MATCHED — capture stdout: "bone <adr>" / "risk_gate <name>" per match
 else
   : # rc 1 = clean — but rc 2 lands here too, and it is NOT clean (see below)
@@ -191,7 +191,7 @@ did not include this path. Do not shrug it off because "the critic was clean at
 release planning" — different judges, and this one is mechanical.
 
 ```bash
-"$oss_bin" class_set "$spine" bone "bone-touch at decomposition: ADR-0002 (src/domain/**)"
+oss class_set "$spine" bone "bone-touch at decomposition: ADR-0002 (src/domain/**)"
 ```
 
 Then tell the user what changed and what it costs: a reclassified spine picks up
@@ -199,7 +199,7 @@ the bone close path (full audit with the external adversary, full retro, an ADR)
 and the §7 grill-me gate now applies.
 
 A **risk-gate** hit does the same *and* attaches that gate's controls
-(`"$oss_bin" get '.risk_gates'`) to the spine's close path as required work — paper/
+(`oss get '.risk_gates'`) to the spine's close path as required work — paper/
 sandbox env, human confirm, kill switch, audit trail, progressive exposure, as the
 gate lists them. A one-line flesh change inside the live-order path is still a
 Risk event.

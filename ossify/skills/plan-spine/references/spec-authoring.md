@@ -20,10 +20,10 @@ Ids are used **verbatim**. ossify's ID grammar has one owner (spec §9.2): relea
 keys all derive from it without transformation — no re-shaping, no `VS-` forms, no
 zero-padding a work-item number to look tidy.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 The kebab slug comes from the spine's recorded name
-(`"$oss_bin" get '.spines[] | select(.id=="…") | .name'`). If it sanitizes to empty, stop
+(`oss get '.spines[] | select(.id=="…") | .name'`). If it sanitizes to empty, stop
 and fix the spine's name in state rather than inventing a directory slug.
 
 ### Authoring `SPINE.md` — the step that is easy to skip
@@ -87,7 +87,7 @@ zero-ACs class of bugs.
 
 ### The AC grammar — exact, because a parser reads it
 
-`"$oss_bin" verify_acs` parses these lines at the worker's pre-flight Gate 2. A line
+`oss verify_acs` parses these lines at the worker's pre-flight Gate 2. A line
 that does not match yields **no row**, and a spec whose ACs all miss the grammar
 reaches the worker as a spec with zero ACs. An `auto:` line whose command is
 missing, has only one backtick, or is empty between its backticks is different:
@@ -115,7 +115,7 @@ no colon.** This is the one to get wrong, because §8's ledger lines take the
 batch of ledger lines will carry the habit straight into the spec. They are
 different grammars read by different parsers:
 
-| | Spec AC (`"$oss_bin" verify_acs`) | Ledger line (`"$oss_bin" ledger_add_auto`) |
+| | Spec AC (`oss verify_acs`) | Ledger line (`oss ledger_add_auto`) |
 |---|---|---|
 | Expectation | `expected: exit 0` | `exit:0` |
 | Arrow | `→` required | no arrow |
@@ -164,7 +164,7 @@ actually landed, and only then does the lane spawn round *K*.
 
 **How the lane knows to pause.** It checks, rather than assuming. Before spawning
 a round, the spec each work item names must exist and parse — that is the same
-`"$oss_bin" verify_acs` the worker's Gate 2 runs, just run one step earlier where the
+`oss verify_acs` the worker's Gate 2 runs, just run one step earlier where the
 recovery is cheap. A missing or unparseable spec is **not** a gap for the worker
 to surface: it means the round was dispatched before it was planned. Halt and
 re-enter `plan-spine` for that round.
@@ -185,7 +185,7 @@ the cumulative ledger with per-item scaffolding:
 | Scope | One work item | The whole product |
 | Lifetime | Until the item merges | Forever, until superseded/retired |
 | Run by | `close`'s work-item gate (`close/references/impl-check.md`) | The cumulative demo, at every future spine close |
-| Authored in | `spec.md` (§2) | `"$oss_bin" ledger_add_auto` / `ledger_add_user` (§8) |
+| Authored in | `spec.md` (§2) | `oss ledger_add_auto` / `ledger_add_user` (§8) |
 
 An item AC that asserts an internal helper returns the right shape is a good AC
 and a terrible ledger line. Promote to the ledger only what states something

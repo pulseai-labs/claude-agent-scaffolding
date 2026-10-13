@@ -45,13 +45,13 @@ So check it here, at every spine on a public-routed posture:
 A ledger line has no `kind` field (`lib/ledger.sh`'s `add_demo_line` payload), so the
 marker is a **required text prefix**: the line's `text` begins with `[community-edition]`.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
-posture="$("$oss_bin" get '.project.posture')"
+posture="$(oss get '.project.posture')"
 case "$posture" in
   open-core|fully-open)
-    "$oss_bin" get '[.demo_ledger[] | select(.status=="active" and (.text|startswith("[community-edition]")))] | length' ;;
+    oss get '[.demo_ledger[] | select(.status=="active" and (.text|startswith("[community-edition]")))] | length' ;;
   *) echo "n/a - posture is $posture" ;;
 esac
 ```
@@ -59,7 +59,7 @@ esac
 **If the posture is public-routed and the count is 0, this spine authors it:**
 
 ```bash
-"$oss_bin" ledger_add_auto "<spine-id>" \
+oss ledger_add_auto "<spine-id>" \
   "[community-edition] clone the public repo fresh, build it standalone, and smoke-run it" \
   "<the clone+build+run command>" "exit:0"
 ```
@@ -197,7 +197,7 @@ nobody can actually walk.
 
 ### 3.5 The mechanical backstop and its exact scope
 
-`"$oss_bin" ledger_add_user <spine> <text> <outcome>` lowercases `<text>`, trims leading
+`oss ledger_add_user <spine> <text> <outcome>` lowercases `<text>`, trims leading
 whitespace, and rejects it **only if it begins with** `inspect `, `view `, or
 `open ` — exit **2**, nothing written.
 
@@ -231,7 +231,7 @@ recording the admission in the `class_set` reason. **Read that, do not recall it
 
 ```bash
 case "$name" in "[internal]"*) echo "internal — auto: lines only" ;; esac
-"$oss_bin" get ".class_overrides[] | select(.spine == \"$spine\") | .reason"   # the admission record
+oss get ".class_overrides[] | select(.spine == \"$spine\") | .reason"   # the admission record
 ```
 
 You may be re-entered in a session that never saw the planning conversation. The
@@ -252,8 +252,8 @@ Check both against state, not against recollection (`$rel` is the spine's releas
 resolved at SKILL.md §3):
 
 ```bash
-"$oss_bin" spine_list | jq -r '.[] | "\(.id)\t\(.release)\t\(.name)"'          # every planned spine
-"$oss_bin" get ".releases[] | select(.id == \"$rel\") | .next_sketch"          # next release's candidates
+oss spine_list | jq -r '.[] | "\(.id)\t\(.release)\t\(.name)"'          # every planned spine
+oss get ".releases[] | select(.id == \"$rel\") | .next_sketch"          # next release's candidates
 ```
 
 A consumer named among the current release's spines, or in the current release's
@@ -271,7 +271,7 @@ one, the answer is *not admitted* — do not assume a consumer exists because on
 plausibly could. Send it back:
 
 ```bash
-"$oss_bin" feature_add "<name>" "<the value it would enable>" bone feature-map-return
+oss feature_add "<name>" "<the value it would enable>" bone feature-map-return
 ```
 
 If the consuming spine is later **dropped**, the internal spine returns to the
@@ -308,7 +308,7 @@ the comparison and exits non-zero when the bound is missed.
 
 ```bash
 # before: recorded in the spine plan — `hyperfine ./target/release/app --json` → cold start 4.2s
-"$oss_bin" ledger_add_auto "$spine" "cold start ≤ 2.0s (was 4.2s)" "bash scripts/bench-coldstart.sh --max 2.0" "exit:0"
+oss ledger_add_auto "$spine" "cold start ≤ 2.0s (was 4.2s)" "bash scripts/bench-coldstart.sh --max 2.0" "exit:0"
 ```
 
 | Proposed contribution | Verdict |
@@ -327,7 +327,7 @@ spine that wants to keep its claim owes one.
 ## 6. F5 — `auto:` line binding
 
 ```bash
-"$oss_bin" ledger_add_auto "$spine" "<text>" "<command>" "exit:0|contains:<str>"
+oss ledger_add_auto "$spine" "<text>" "<command>" "exit:0|contains:<str>"
 ```
 
 `<expected>` is validated as `exit:<n>` or `contains:<str>`; anything else exits
@@ -339,10 +339,10 @@ setup is required, the command performs it.
 **A line that can't state its command doesn't enter the ledger.** "We'll figure
 out how to test this later" is a rejected line, not a recorded one.
 
-Watch the cost: `"$oss_bin" ledger_active_auto` lists what the ledger already carries —
+Watch the cost: `oss ledger_active_auto` lists what the ledger already carries —
 **`active` lines only**, and a line authored a moment ago is `planned` until its own
 spine's close, so a read over the planning window that must see the lines this release
-has just authored is `"$oss_bin" get '[.demo_ledger[] | select(.type=="auto" and
+has just authored is `oss get '[.demo_ledger[] | select(.type=="auto" and
 (.status=="planned" or .status=="active"))]'`. The release's `ledger_budget` (set at
 `plan-release`) is the wall-clock ceiling. A contribution that will not fit forces a
 prune / parallelize / deepen decision — raise it now, with the user, rather than
@@ -350,7 +350,7 @@ letting the suite grow past its budget silently.
 
 **A line is authored `planned`, not `active`.** Its code does not exist yet, so
 nothing runs it until something makes it live: this spine's close activates its own
-lines before the demo, and `"$oss_bin" ledger_activate <line-id>` moves one early — the
+lines before the demo, and `oss ledger_activate <line-id>` moves one early — the
 round barrier or the operator does that when a round lands the code the line tests.
 `active` at authoring is `adopt`'s case alone, since adoption's lines test surface
 that already ships.
@@ -358,7 +358,7 @@ that already ships.
 **A spine planned under a time-box escape records the clause at plan time.** Its
 `SPINE.md` demo contribution carries the escape verbatim — "if nothing certifies in
 two weeks, close on a written negative result" — because close quotes that clause and
-only it: `"$oss_bin" ledger_escape` takes it as an argument, and with none recorded the
+only it: `oss ledger_escape` takes it as an argument, and with none recorded the
 failed `user:` line halts as it always did. Writing one at close is not a thing.
 
 ---
@@ -384,7 +384,7 @@ since the line the skeleton spine just authored is not yet `active` — or by
 naming the spine that will author it; it does not author a second one.
 
 ```bash
-"$oss_bin" get '[.demo_ledger[] | select(.type=="auto" and (.status=="planned" or .status=="active"))]' \
+oss get '[.demo_ledger[] | select(.type=="auto" and (.status=="planned" or .status=="active"))]' \
   | jq -r '.[] | "\(.id)\t\(.source_spine)\t\(.text)"'
 ```
 
@@ -394,7 +394,7 @@ through the layers the journey crosses, to the observable outcome — and exits
 non-zero if any leg breaks:
 
 ```bash
-"$oss_bin" ledger_add_auto "$spine" "the golden journey: <actor> <action> → <outcome>" \
+oss ledger_add_auto "$spine" "the golden journey: <actor> <action> → <outcome>" \
   "bash scripts/golden-journey.sh" "exit:0"
 ```
 

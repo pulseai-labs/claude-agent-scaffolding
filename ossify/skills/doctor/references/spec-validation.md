@@ -13,20 +13,20 @@ schema is*; this one is the authority on *how a validation run reports*.
 
 ## 1. Routing to the file
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 The spec is manifest-routed, not conventionally placed:
 
 ```bash
-"$oss_bin" spec_path
+oss spec_path
 ```
 
-**Use that verb; do not compose the path from `"$oss_bin" repo_root ai_workspace`.**
+**Use that verb; do not compose the path from `oss repo_root ai_workspace`.**
 workspace-init writes `.well_known_paths.master_spec` into the manifest — its
 default is `${ai_workspace.root}/docs/MASTER-SPEC.md`, but a project may route
 it anywhere. Resolving only the workspace root and then guessing (or searching)
 misses a customized destination, and the symptom is this surface reporting *"no
-MASTER-SPEC.md"* for a properly initialised project. `"$oss_bin" spec_path` reads the
+MASTER-SPEC.md"* for a properly initialised project. `oss spec_path` reads the
 routed key, expands its `${...}` tokens, falls back to the same convention when
 the key is absent, and refuses a value that is not absolute.
 
@@ -109,14 +109,14 @@ export LC_ALL=C
 # REFUSES rather than reading an empty index set, because an unreadable half is
 # not an empty one. Only each row's FIRST cell counts, so an ADR reference
 # inside a row's prose ("supersedes ADR-0001") is not a row.
-sv_state="$("$oss_bin" state_path 2>/dev/null)" || sv_state=""
-spec="$("$oss_bin" spec_path 2>/dev/null)" || spec=""
+sv_state="$(oss state_path 2>/dev/null)" || sv_state=""
+spec="$(oss spec_path 2>/dev/null)" || spec=""
 state_rc=0
 adr_re='^[Aa][Dd][Rr]-[A-Za-z0-9]+$'
 if [ -n "$sv_state" ]; then
   # Keep each .adr structured until its WHOLE value has been trimmed and
   # validated. Raw multiline values must not become several registry records.
-  reg_raw="$("$oss_bin" get '.bones | map(.adr)' "$sv_state" 2>/dev/null | jq -r --arg ref "$adr_re" '
+  reg_raw="$(oss get '.bones | map(.adr)' "$sv_state" 2>/dev/null | jq -r --arg ref "$adr_re" '
     .[] | if type == "string" then gsub("^[[:space:]]+|[[:space:]]+$"; "") else tojson end
     | if test($ref) and (test("[[:space:]]") | not) then "OK " + .
       else "BAD " + (if . == "" then "[empty]" else gsub("[\r\n]"; " ") end) end')" || state_rc=$?
@@ -214,10 +214,10 @@ fi
 )
 ```
 
-**Pass the state path explicitly.** A bare `"$oss_bin" get` honours an exported
+**Pass the state path explicitly.** A bare `oss get` honours an exported
 `$OSS_STATE_FILE`, so with an override in play this would read *another
-project's* bones while `"$oss_bin" spec_path` read this one's spec — reporting drift
-between two unrelated projects. `"$oss_bin" state_path` is the manifest-routed answer
+project's* bones while `oss spec_path` read this one's spec — reporting drift
+between two unrelated projects. `oss state_path` is the manifest-routed answer
 regardless of the override, which binds both halves of the comparison to the
 same project — which is why this block names it **`sv_state`** and not `sf`:
 state-inspection.md §2 owns `sf` for the override-first path the rest of a
