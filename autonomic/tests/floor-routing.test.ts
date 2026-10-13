@@ -33,72 +33,12 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     expect((await $.tool.check(BASH('git push -u origin record/x'))).decision).toBe('allow')
     expect(w.forkPrompts[0]).not.toContain('<floor>')
   })
-  test('a merged local delete goes to the fork', async ($, on) => {
+  test('a branch delete asks, merged or not: merged-delete routing is #764 (PR #763 round 5)', async ($, on) => {
     const w = world(on, { env: AP })
-    w.git.merged = ['refs/heads/record/x']
-    w.forks.push(fork({ decision: 'allow', reason: 'merged cleanup' }))
-    expect((await $.tool.check(BASH('git branch -D record/x'))).decision).toBe('allow')
-    expect(w.runs.some(r => r.join(' ') === 'git -C /repo merge-base --is-ancestor refs/heads/record/x refs/remotes/origin/main')).toBe(true)
-    expect(w.forkPrompts[0]).toContain('- branch-delete (merged):')
-    expect(w.forkPrompts[0]).toContain('Judge it as cleanup')
-    expect(w.forkPrompts[0]).not.toContain('If the call does what such a rule names')
-  })
-  test('a remote delete asks, merged or not, and contacts no remote (PR #763 round 3)', async ($, on) => {
-    const w = world(on, { env: AP })
-    w.git.merged = ['refs/remotes/origin/feat/x', 'refs/heads/feat/x']
-    expect((await $.tool.check(BASH('git push origin --delete feat/x'))).decision).toBe('ask')
-    expect(w.forkPrompts).toEqual([])
-    expect(w.runs.some(r => r.includes('ls-remote') || r.includes('merge-base'))).toBe(false)
-  })
-  test('a merged delete beside any other command asks: it is not the whole call (PR #763 rounds 2 and 4)', async ($, on) => {
-    const w = world(on, { env: AP })
-    w.git.merged = ['refs/heads/merged', 'refs/heads/victim']
-    for (const c of ["herdr pane run p 'git branch -D victim'; git branch -D merged", 'git branch -f victim feature; git branch -D victim'])
+    for (const c of ['git branch -D record/x', 'git push origin --delete feat/x'])
       expect([c, (await $.tool.check(BASH(c))).decision]).toEqual([c, 'ask'])
     expect(w.forkPrompts).toEqual([])
-  })
-  test('a merged delete after a move, or with -C, asks (PR #763 round 3)', async ($, on) => {
-    const w = world(on, { env: AP })
-    w.git.merged = ['refs/heads/topic']
-    for (const c of ['git -C /other branch -D topic', 'cd /other && git branch -D topic'])
-      expect([c, (await $.tool.check(BASH(c))).decision]).toEqual([c, 'ask'])
-    expect(w.forkPrompts).toEqual([])
-  })
-  test("a local delete reads the repo's own default branch (PR #763 round 2)", async ($, on) => {
-    const w = world(on, { env: AP })
-    w.git.merged = ['refs/heads/topic']
-    w.forks.push(fork({ decision: 'allow', reason: 'cleanup' }))
-    expect((await $.tool.check(BASH('git branch -D topic'))).decision).toBe('allow')
-    expect(w.runs.some(r => r.join(' ') === 'git -C /repo symbolic-ref --short refs/remotes/origin/HEAD')).toBe(true)
-  })
-  test('a local delete whose repo has no known default branch asks (PR #763 round 2)', async ($, on) => {
-    const w = world(on, { env: AP })
-    w.git.merged = ['refs/heads/topic']
-    w.git.originHead = undefined
-    expect((await $.tool.check(BASH('git branch -D topic'))).decision).toBe('ask')
-    expect(w.forkPrompts).toEqual([])
-  })
-  test('deleting the default branch is never cleanup, even when merged (PR #763 review)', async ($, on) => {
-    const w = world(on, { env: AP })
-    w.git.merged = ['refs/heads/main']
-    expect((await $.tool.check(BASH('git branch -D main'))).decision).toBe('ask')
-    expect(w.forkPrompts).toEqual([])
-  })
-  test('an unmerged delete asks; no fork', async ($, on) => {
-    const w = world(on, { env: AP })
-    expect((await $.tool.check(BASH('git branch -D record/x'))).decision).toBe('ask')
-    expect(w.forkPrompts).toEqual([])
-  })
-  test('merge and delete in one call still asks: the branch is not merged yet (Known limit)', async ($, on) => {
-    const w = world(on, { env: AP })
-    expect((await $.tool.check(BASH('gh pr merge 1 --merge && git branch -D record/x'))).decision).toBe('ask')
-    expect(w.forkPrompts).toEqual([])
-  })
-  test('one unmerged branch keeps the whole delete with the operator', async ($, on) => {
-    const w = world(on, { env: AP })
-    w.git.merged = ['refs/heads/a']
-    expect((await $.tool.check(BASH('git branch -D a b'))).decision).toBe('ask')
-    expect(w.forkPrompts).toEqual([])
+    expect(w.runs.some(r => r.includes('merge-base') || r.includes('ls-remote'))).toBe(false)
   })
   test('a long Write is judged on its head and tail', async ($, on) => {
     const w = world(on, { env: AP })
@@ -143,15 +83,6 @@ describe('0.5.1 routing: the bypass floor (spec §6)', () => {
     const w = world(on, { env: AP })
     w.verdict = { decision: 'allow' }
     expect((await $.tool.check(BASH(REPLY))).decision).toBe('ask')
-  })
-  test('a merged delete alone still goes to the fork; its ask becomes an ask (D2)', async ($, on) => {
-    const w = world(on, { env: AP })
-    w.verdict = { decision: 'allow' }
-    w.git.merged = ['refs/heads/record/x']
-    w.forks.push(fork({ decision: 'ask', reason: 'not this task' }))
-    expect((await $.tool.check(BASH('git branch -D record/x'))).decision).toBe('ask')
-    expect(w.forkPrompts).toHaveLength(1)
-    expect(w.forkPrompts[0]).toContain('- branch-delete (merged):')
   })
   test('a command with no finding keeps the allow; no fork', async ($, on) => {
     const w = world(on, { env: AP })

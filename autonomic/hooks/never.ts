@@ -845,7 +845,7 @@ function writesConfig(ws: readonly string[]): boolean {
 // decides. `fork`: the match is only in text (the whole bag, words inside a quoted argument, or a
 // command read over all words), and the fork judges with the finding in its prompt.
 export type Finding = { rule: NeverRule; level: 'ask' | 'fork'; focus: string }
-export type Floor = { findings: Finding[]; deletes: Delete[] | null }
+export type Floor = { findings: Finding[] }
 
 export function neverRules(command: string, where: Where, readers: Readers = DEFAULT_READERS): NeverRule[] {
   return [...new Set(floorFindings(command, where, readers).findings.map(f => f.rule))]
@@ -859,7 +859,7 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
     const found = new Set<NeverRule>()
     rulesOf(r.whole, where, moves(r.whole, where), false, found)
     add(found, 'fork', wholeFocus(command))
-    return settle(out, [])
+    return settle(out)
   }
   const all = [...r.groups.flatMap(g => g.words), ...r.values]
   const names = [...new Set([...(where.defaultBranch !== undefined ? [where.defaultBranch] : []), 'main', 'master'])]
@@ -883,13 +883,6 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
   let moved = r.bag.some(w => /^GIT_(?:DIR|WORK_TREE)=/.test(w))
   let config = r.bag.some(w => /^GIT_CONFIG/.test(w))
   let switched = false
-  // 0.5.1 (§5, narrowed at PR #763's round-3 stop): a delete is read only in the session's own repo,
-  // in a call with no move at all (cd, pushd, popd, -C, --git-dir, GIT_DIR, `cd` even as a word), and
-  // only when it is the whole call: the merge is checked before the call runs, so no other command may
-  // move a ref first (`git branch -f x y; git branch -D x`, PR #763 round 4).
-  const still = !moved && !r.groups.some((_, k) => effects[k]!.move || lifted.move.has(r.groups[k]!.at)) &&
-    commands(command.trim())?.length === 1
-  let deletes: Delete[] | null = []
   r.groups.forEach((g, k) => {
     const { ws, git, move, config: writes, switches } = effects[k]!
     if (lifted.move.has(g.at)) moved = true
@@ -906,34 +899,18 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
     rulesOf((config && git) || verbOpaque(ws) || loose ? all : ws, where, away, true, text, switched)
     add(own, 'ask', g.text)
     add(new Set([...text].filter(x => !own.has(x))), 'fork', g.text)
-    if (own.has('branch-delete')) {
-      const d = still && !away ? deletesOf(substitute(g.own, r.vars, g.at), where.cwd) : null
-      deletes = deletes === null || d === null ? null : [...deletes, ...d]
-    }
     if (move) moved = true
     if (writes) config = true
     if (switches) switched = true
   })
-  return settle(out, deletes)
+  return settle(out)
 }
 // A rule one command shows at both levels is already `ask` only (the loop above drops its text
-// finding). A text finding in another command stays: a merged delete beside it must not hide it
-// from the fork (PR #763 round 2).
-function settle(found: readonly Finding[], deletes: Delete[] | null): Floor {
-  return { findings: [...found], deletes }
+// finding). A text finding in another command stays beside it (PR #763 round 2).
+function settle(found: readonly Finding[]): Floor {
+  return { findings: [...found] }
 }
-// 0.5.1 (§5, narrowed at PR #763's round-3 stop): the local branches `git branch -d|-D <name>…` deletes
-// in `dir`, read exactly; null for any global option before `branch` (-C, -c, --git-dir …), an opaque
-// name, or any other command. A remote delete is never read: proving it merged would contact the remote.
-export type Delete = { dir: string; branch: string }
-function deletesOf(ws: readonly string[], dir: string): Delete[] | null {
-  const g = ws.findIndex(w => isVerb(w, 'git'))
-  if (g < 0 || ws[g + 1] !== 'branch') return null
-  const names = ws.slice(g + 2).filter(w => !w.startsWith('-'))
-  if (names.length === 0 || names.some(opaque)) return null
-  return names.map(b => ({ dir, branch: b.replace(/^refs\/heads\//, '') }))
-}
-// 0.5.1 (§5): the top-level commands that surely run: at the start of the text or after `;` or a
+// The top-level commands that surely run: at the start of the text or after `;` or a
 // newline, not in the background, not piped, not inside a group or a loop. literalVars reads names by
 // the same rule.
 function unconditional(text: string, cmds: readonly Command[]): boolean[] {

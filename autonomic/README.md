@@ -101,9 +101,8 @@ you, and the bell rings.
 deny"; a deny from a plugin beneath autonomic's `tool.call` hook, such as a seat guard, rings the
 same way). On an `ask` verdict, first, in code, the **never-approve list** keeps the ask with you
 and rings when a command's own words match a rule. Since 0.5.1 a match found only in text (a message,
-a quoted argument, an interpreter's script, a command whose verb is a variable) and a local
-`git branch -D` run alone in the session's own repo, of a branch already merged into
-the repo's default branch go to the fork instead, with the finding in its prompt.
+a quoted argument, an interpreter's script, a command whose verb is a variable) goes to the fork
+instead, with the finding in its prompt.
 On an `allow` verdict — bypass permissions, or a settings allow rule — a command that
 matches the list becomes an `ask`, so you get the normal permission dialog, and it rings (the
 **bypass floor**; see "Permission modes").
@@ -268,7 +267,7 @@ The turn-end fork does not get it.
   permission fork never runs and no "nothing to judge yet" ring occurs. In autopilot, a command
   whose own words match an enabled `neverApprove` rule still reaches you as a permission dialog with
   the reason `autonomic: never-approve — <rules>`, and the pain signal names the line that matched.
-  A text-only match or a merged-branch delete goes to the fork: its `allow` keeps the allow, anything
+  A text-only match goes to the fork: its `allow` keeps the allow, anything
   else reaches you. This is the floor that makes autopilot safe under bypass.
 - **Auto or default.** Claude Code asks, and the ask path above applies. The first ask after a
   clear rings "nothing to judge yet": the fork has no request to copy until the session's first

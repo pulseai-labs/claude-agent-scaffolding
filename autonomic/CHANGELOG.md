@@ -17,20 +17,13 @@ false positives, 17 inputs never judged).
   `default-branch-push` on a detached or `main` checkout; another remote, or an unknown default, keeps
   0.5.0's reading. `-d`, `--delete`, `-f` and `--force` no longer hide the named destination, and
   `$SRC:refs/heads/x` is read by its destination.
-- **Merged local deletes go to the fork.** `git branch -D x` run alone (the whole call, so no other
-  command can move a ref first) in the session's own repo, with no `-C` or other option before
-  `branch`, whose every branch is already merged into the repo's
-  default branch (`origin/HEAD`; `git merge-base --is-ancestor`, checked before the command runs), is
-  the fork's to judge. A remote delete, a delete chained with any other command, and an unmerged or
-  unreadable delete still ask.
 - **Long inputs are judged.** The 4000-character stop is gone: the fork sees the input's head and
   tail and how much was cut, and the floor has read all of it. SubagentHandbacks are judged too.
 - **Smaller fixes.** A sed script keeps a backslash inside single quotes (`'s/a\/b/c/'` is a safe sed);
   the pain band shows the command that matched.
-- **Known limits.** A delete chained with any other command still asks, the common
-  merge-then-delete included: run the cleanup as its own call. A session's first call still asks: there is nothing to fork yet. A
-  rebase-merged branch is not an ancestor of the default branch, so its delete still asks. A remote
-  delete always asks: proving it merged would contact the remote before the call is approved (#764). A
+- **Known limits.** Every branch delete still asks, an already-merged one included: #758's decision
+  to send merged deletes to the fork is #764 (proving a branch merged before the call runs kept
+  meeting new shapes in review). A session's first call still asks: there is nothing to fork yet. A
   literal variable that holds spaces, used inside double quotes (`F='push -f'; curl -d "$F" …`), is
   re-split when the floor reads its value, so it can ask where Bash passes one data argument. `rm` of
   a path that starts with a variable the text does not assign (`rm "$T/x"`) still asks: unquoted, the

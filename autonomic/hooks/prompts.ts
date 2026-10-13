@@ -68,17 +68,12 @@ export function shownInput(input: unknown): string {
 }
 
 // 0.5.1 (§7): what the floor found in text it could not read command by command; the fork judges it.
-// A merged note is a branch-delete whose every branch the floor found already merged (D2).
-export type FloorNote = { rule: string; focus: string; merged?: boolean }
+export type FloorNote = { rule: string; focus: string }
 function floorBlock(floor: readonly FloorNote[]): string {
   if (floor.length === 0) return ''
-  const said = [
-    floor.some(f => f.merged !== true) ? `It found words for the rules below in text it could not read command by command (a message, a quoted argument, an interpreter's script, a command whose verb is a variable). If the call does what such a rule names, answer "ask".` : '',
-    floor.some(f => f.merged === true) ? 'A branch-delete marked merged is a delete the floor read exactly: every branch it deletes is already merged into its default branch. Judge it as cleanup against the policy and the task.' : '',
-  ].filter(Boolean).join(' ')
   return `<floor>
-The never-approve floor read the whole input, any cut part included. ${said}
-${floor.map(f => `- ${f.rule}${f.merged === true ? ' (merged)' : ''}: ${f.focus}`).join('\n')}
+The never-approve floor read the whole input, any cut part included. It found words for these rules in text it could not read command by command (a message, a quoted argument, an interpreter's script, a command whose verb is a variable). If the call does what such a rule names, answer "ask".
+${floor.map(f => `- ${f.rule}: ${f.focus}`).join('\n')}
 </floor>
 `
 }

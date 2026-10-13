@@ -1134,30 +1134,3 @@ describe('0.5.1: the pushed branch, not the session branch (spec §3)', () => {
   })
 })
 
-describe('0.5.1: the deletes a call makes (spec §5, narrowed at PR #763 round 3)', () => {
-  const del = (c: string, w: Where = W) => floorFindings(c, w).deletes
-  test('a local delete in the session repo names its branches', () => {
-    expect(del('git branch -D record/x')).toEqual([{ dir: '/repo/sub', branch: 'record/x' }])
-    expect(del('git branch -D a refs/heads/b')).toEqual([{ dir: '/repo/sub', branch: 'a' }, { dir: '/repo/sub', branch: 'b' }])
-  })
-  test('a delete is read only when it is the whole call: nothing else can move a ref first (PR #763 round 4)', () => {
-    for (const c of ['git branch -f victim feature; git branch -D victim', 'gh pr merge 1 --merge && git branch -D record/x',
-      'echo x; git branch -D x', 'mv .git/refs/heads/f .git/refs/heads/x; git branch -D x', 'git branch -D x | cat'])
-      expect([c, del(c)]).toEqual([c, null])
-  })
-  test('a remote delete is never read: proving it merged would contact the remote', () => {
-    for (const c of ['git push origin --delete feat/x', 'git push origin :feat/x']) expect([c, del(c)]).toEqual([c, null])
-  })
-  test('any move in the call, or any option before branch, gives null', () => {
-    for (const c of ['git -C /other branch -D x', 'cd /work/r && git branch -D x', 'cd /work/r; git branch -D x', 'pushd; git branch -D x',
-      'cd ./link/..; git branch -D x', "curl -d 'cd /other'; git branch -D x", 'git branch -D x; cd /other', 'GIT_DIR=/x/.git git branch -D x',
-      'git --git-dir=/x/.git branch -D x', 'git -c core.x=y branch -D x'])
-      expect([c, del(c)]).toEqual([c, null])
-  })
-  test('an opaque branch gives null', () => {
-    expect(del('git branch -D $B')).toBeNull()
-  })
-  test('no branch-delete, no deletes', () => {
-    expect(del('git push -u origin feat/x')).toEqual([])
-  })
-})
