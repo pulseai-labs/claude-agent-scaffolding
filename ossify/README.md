@@ -1,4 +1,4 @@
-# ossify (v1.17.0)
+# ossify (v1.18.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -28,7 +28,7 @@ same `complete` shape, and Layer 4 runs inline there as it does everywhere.
 **On Claude Code, `/ossify:run-spine <spine-id>` with no flag is
 completely unchanged** and still dispatches `ossify:implementer-agent`.
 
-Since 1.17.0, `/ossify:run-spine` dispatches OMP work items via omp-roles' `implementer` agent.
+Since 1.18.0, `/ossify:run-spine` dispatches OMP work items via omp-roles' `implementer` agent.
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo
