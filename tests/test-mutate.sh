@@ -60,4 +60,13 @@ out="$(bash "$M" "$T/u" 'u=1' 'u=2' -- no-such-command-zz 2>&1)"; rc=$?
 eq 2 "$rc" "an unlaunchable suite -> rc 2, no verdict"
 case "$out" in *'could not run'*) ok;; *) bad "the unlaunchable suite is reported";; esac
 cmp -s "$T/u" "$T/u.orig" && ok || bad "file restored after an unlaunchable suite"
+# PR #772 round 2: a suite that ignores TERM is still stopped and the file restored.
+printf 'i=1\n' > "$T/i"; cp "$T/i" "$T/i.orig"
+bash "$M" "$T/i" 'i=1' 'i=2' -- bash -c 'trap "" TERM; sleep 30' >/dev/null 2>&1 & mp=$!
+for _ in $(seq 1 50); do grep -q 'i=2' "$T/i" 2>/dev/null && break; sleep 0.1; done
+kill -TERM "$mp"
+for _ in $(seq 1 100); do kill -0 "$mp" 2>/dev/null || break; sleep 0.1; done
+if kill -0 "$mp" 2>/dev/null; then bad "a TERM-ignoring suite still hangs the harness after 10 s"; kill -KILL "$mp" 2>/dev/null; else ok; fi
+wait "$mp" 2>/dev/null
+cmp -s "$T/i" "$T/i.orig" && ok || bad "a TERM-ignoring suite: file restored"
 echo "pass=$pass fail=$fail"; [ "$fail" -eq 0 ]

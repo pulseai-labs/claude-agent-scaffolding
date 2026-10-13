@@ -50,9 +50,12 @@ on_exit() {
 }
 on_signal() {
   if [ -n "$child" ]; then
+    # Bounded: a suite that traps or ignores TERM must not hold the restore
+    # hostage - wait up to 5 s, then KILL the group, THEN reap (PR #772 round 2).
     kill -TERM -- "-$child" 2>/dev/null
-    wait "$child" 2>/dev/null
+    i=0; while [ "$i" -lt 50 ] && kill -0 "$child" 2>/dev/null; do sleep 0.1; i=$((i+1)); done
     kill -KILL -- "-$child" 2>/dev/null
+    wait "$child" 2>/dev/null
   fi
   exit "$1"
 }
