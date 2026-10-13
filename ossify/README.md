@@ -1,4 +1,4 @@
-# ossify (v1.18.0)
+# ossify (v1.19.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -29,6 +29,14 @@ same `complete` shape, and Layer 4 runs inline there as it does everywhere.
 completely unchanged** and still dispatches `ossify:implementer-agent`.
 
 Since 1.18.0, `/ossify:run-spine` dispatches OMP work items via omp-roles' `implementer` agent.
+
+Since 1.19.0, `close` registers the bones a spine's plan **declares**: each row of
+`SPINE.md`'s `## Bones this spine registers` enters the bones registry at step 4b,
+before the touch check, so the registry `touch_check` reads next matches the plan
+that declared it — an already-registered ref is skipped, and a row whose ADR file
+the spine never wrote halts naming the ref (#497). The landing pass also stores the
+PR's **number** where `gh pr create` prints its URL, halting when what it printed is
+not a PR URL (#716).
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo
