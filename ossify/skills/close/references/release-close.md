@@ -34,15 +34,15 @@ here**, and each is named rather than left to read as executed:
 A missing step and a step that silently does nothing are indistinguishable to
 every later reader, which is why they are a table rather than an omission.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 **Every step here is per-repo except the boundary audit and the release
 ladder.** Spines and work items carry a `target_repo`, and Tasks 8/9 (#272/#310)
 made the spine and work-item close layers merge each item's work into that
 item's own repo (`work-item-close.md` §4, `spine-close.md` §3) — so the
 walkthrough (§3) and all three blocking gates (§4/§5/§5b) below are already repo-general
-the moment those merges are: they read state `"$oss_bin" demo_user_lines`,
-`"$oss_bin" expired_fakes`, `"$oss_bin" expired_quarantines`, `"$oss_bin" expired_deferrals` write and select from, never a
+the moment those merges are: they read state `oss demo_user_lines`,
+`oss expired_fakes`, `oss expired_quarantines`, `oss expired_deferrals` write and select from, never a
 checkout, so a spine that landed across three repos contributes to them exactly
 as one confined to canonical would — nothing in this file has to loop over
 repos for that to be true, because the state it reads already spans however
@@ -70,8 +70,8 @@ how many repos the closing release actually touched.
 `$rel` is the id `/close` was invoked with, carried from SKILL.md §2's routing.
 
 ```bash
-open_spines="$("$oss_bin" get "[.spines[] | select(.release==\"$rel\" and .status != \"closed\" and .status != \"abandoned\") | \"\(.id) (\(.status))\"] | join(\", \")")"
-abandoned="$("$oss_bin" get "[.spines[] | select(.release==\"$rel\" and .status == \"abandoned\") | .id] | join(\", \")")"
+open_spines="$(oss get "[.spines[] | select(.release==\"$rel\" and .status != \"closed\" and .status != \"abandoned\") | \"\(.id) (\(.status))\"] | join(\", \")")"
+abandoned="$(oss get "[.spines[] | select(.release==\"$rel\" and .status == \"abandoned\") | .id] | join(\", \")")"
 
 [ -z "$open_spines" ] \
   || { echo "close: $rel has spines that are not closed: $open_spines - halt"; exit 1; }
@@ -85,8 +85,8 @@ command, so under `set -euo pipefail` the clean case — no abandoned spines —
 would abort the ceremony at the gate it just passed. The `|| echo` form returns 0
 on both arms.
 
-**Test the output, never the rc.** `"$oss_bin" get` is `jq -r` without `-e`: a `select`
-matching nothing exits **0** with an empty string, so `"$oss_bin" get … || halt` never
+**Test the output, never the rc.** `oss get` is `jq -r` without `-e`: a `select`
+matching nothing exits **0** with an empty string, so `oss get … || halt` never
 fires and a release with three open spines closes clean. This is the same trap
 `spine-close.md` §2 documents for the work-item gate, one scope out.
 
@@ -115,7 +115,7 @@ are still live records, and steps 3 and 4 below pick them up on their own terms.
 ## 3. Step 2 — the full cumulative walkthrough
 
 ```bash
-"$oss_bin" demo_user_lines            # NO argument - every active user: line, all spines
+oss demo_user_lines            # NO argument - every active user: line, all spines
 ```
 
 **The no-argument call is the whole difference from spine close.** With a spine
@@ -126,14 +126,14 @@ first place anyone notices a regression in an older journey.
 
 **Against the amended set, and the amendments are already applied.** `supersede`
 and `retire` are planning verbs that leave the line live until a spine close runs
-`"$oss_bin" ledger_apply_pending` (`spine-close.md` §4). Step 1 above has just proven
+`oss ledger_apply_pending` (`spine-close.md` §4). Step 1 above has just proven
 every spine closed, so every planned amendment in this release has been applied
 by the spine that planned it. **This layer never applies amendments itself** — an
 apply here would be applying a spine's intent after that spine closed, and
-`"$oss_bin" demo_user_lines` already returns only `status == "active"` lines, so a
+`oss demo_user_lines` already returns only `status == "active"` lines, so a
 superseded line is gone from the walk without any action here.
 
-The `auto:` half runs the same way it does at spine close — `"$oss_bin" demo_run`, every
+The `auto:` half runs the same way it does at spine close — `oss demo_run`, every
 accumulated line, halt on the first failure. Everything in `cumulative-demo.md`
 §2-§5 applies unchanged: never edit a line to make it pass, a `user:` mismatch is
 a failure and not a note, the wall-clock budget is surfaced and never silently
@@ -142,7 +142,7 @@ pruned.
 ### Grouping by feature is yours to derive, not a field to sort on
 
 Spec §6.1 groups the release walkthrough by feature. **Demo-ledger lines carry no
-feature field** — `"$oss_bin" ledger_add_user` writes
+feature field** — `oss ledger_add_user` writes
 `{type,text,outcome,source_spine,status,status_reason,status_by,at}` and nothing
 else (the payload `oss_ledger_add_user` builds in `lib/ledger.sh`). There is no
 `.feature` to `group_by`, and a block of
@@ -150,7 +150,7 @@ prose implying one would send every reader looking for a lookup that does not
 exist.
 
 The grouping is **the agent's, derived**: read the feature map with
-`"$oss_bin" feature_list`, read each line's `source_spine`, and map spine → feature
+`oss feature_list`, read each line's `source_spine`, and map spine → feature
 through the map's own entries. Say out loud which grouping you used before you
 start the walk, so the human can correct it — a wrong grouping changes the order
 of the walk, not its coverage, and every line is walked either way.
@@ -178,7 +178,7 @@ in **`references/fake-expiry.md`**. The branch this step runs — the shipped
 copy (`fake-expiry.md` §2), executed from here:
 
 ```bash
-ef=0; fakes_due="$("$oss_bin" expired_fakes "$rel")" || ef=$?
+ef=0; fakes_due="$(oss expired_fakes "$rel")" || ef=$?
 case "$ef" in
   0) echo "fake expiry: clean" ;;
   1) printf '%s\n' "$fakes_due"
@@ -187,7 +187,7 @@ case "$ef" in
 esac
 ```
 
-**rc 0 is CLEAN here, and rc 0 is a HIT in `"$oss_bin" touch_check`** — three arms
+**rc 0 is CLEAN here, and rc 0 is a HIT in `oss touch_check`** — three arms
 always, with rc 2 halting rather than degrading to clean. The polarity trap, and
 what copying the touch-check branch shape passes: `fake-expiry.md` §2.
 
@@ -200,7 +200,7 @@ or retired by the next release close**. So every line quarantined in a release
 **strictly earlier** than this one is a blocking finding.
 
 ```bash
-eq=0; quarantines_due="$("$oss_bin" expired_quarantines "$rel")" || eq=$?
+eq=0; quarantines_due="$(oss expired_quarantines "$rel")" || eq=$?
 case "$eq" in
   0) echo "quarantines: clean" ;;
   1) printf '%s\n' "$quarantines_due"
@@ -225,7 +225,7 @@ project has the most owed tickets.
 **The two unblocks are fix or retire**, and both are real work:
 
 ```bash
-"$oss_bin" ledger_retire "<line-id>" "<by-spine>" "<why it is no longer owed>"
+oss ledger_retire "<line-id>" "<by-spine>" "<why it is no longer owed>"
 ```
 
 `retire` is a *planning* verb: it records intent and the line stays live until a
@@ -244,16 +244,16 @@ and the release it is **due at** (`cumulative-demo.md` §4a). This close collect
 and the same step catches the one other way a `planned` line can be stranded:
 
 ```bash
-ed=0; deferrals_due="$("$oss_bin" expired_deferrals "$rel")" || ed=$?
+ed=0; deferrals_due="$(oss expired_deferrals "$rel")" || ed=$?
 case "$ed" in
   0) [ -n "$deferrals_due" ] && printf '%s\n' "$deferrals_due"; echo "deferrals: clean" ;;
   1) printf '%s\n' "$deferrals_due"
      echo "close: $rel has deferred user lines due - walk, re-defer or retire each - halt"; exit 1 ;;
   *) echo "close: expired_deferrals could not run (rc $ed) - INCONCLUSIVE, not clean - halt"; exit 1 ;;
 esac
-stray="$("$oss_bin" get '[.spines[] | select(.status=="closed") | .id] as $c | [.demo_ledger[] | select(.status=="planned" and (.source_spine as $s | $c | index($s)))] | map(.id) | join(" ")')"
+stray="$(oss get '[.spines[] | select(.status=="closed") | .id] as $c | [.demo_ledger[] | select(.status=="planned" and (.source_spine as $s | $c | index($s)))] | map(.id) | join(" ")')"
 [ -z "$stray" ] || { echo "close: planned lines of closed spines: $stray - spine close step 3 should have activated them - halt"; exit 1; }
-orphan="$("$oss_bin" get '[.spines[] | select(.status=="abandoned") | .id] as $a | [.demo_ledger[] | select(.status=="planned" and (.source_spine as $s | $a | index($s)))] | map(.id) | join(" ")')"
+orphan="$(oss get '[.spines[] | select(.status=="abandoned") | .id] as $a | [.demo_ledger[] | select(.status=="planned" and (.source_spine as $s | $a | index($s)))] | map(.id) | join(" ")')"
 [ -z "$orphan" ] || echo "close: planned lines of abandoned spines: $orphan - surface each for retire (spine-close.md §4); that spine will never activate them"
 ```
 
@@ -264,11 +264,11 @@ anchor blocks as `no-release-anchor`.
 
 **Each due line gets one of three unblocks, and all three are real work:**
 
-- **Walk it now.** `"$oss_bin" ledger_activate <line-id>`, then walk it with the operator
+- **Walk it now.** `oss ledger_activate <line-id>`, then walk it with the operator
   like any §3 line. A failed walk halts.
 - **Defer it again.** New operator words and a later release — the call
   `cumulative-demo.md` §4a names, with the operator present.
-- **Retire it.** `"$oss_bin" ledger_retire <line-id> <by-spine> "<why>"` needs a spine that has
+- **Retire it.** `oss ledger_retire <line-id> <by-spine> "<why>"` needs a spine that has
   **not** closed — one of the next release — because retire is a planning verb whose
   application is a spine close (`spine-close.md` §4). Until that close runs, this gate
   reports the row as `amendment pending` and does not block. **A retire owned by a
@@ -284,7 +284,7 @@ coming back to activate it.
 
 A line quarantined with **no release anchor** blocks too, marked
 `no-release-anchor`. §6.1's ticket expires against a release, so a ticket
-carrying none can never come due — and `"$oss_bin" ledger_quarantine`'s release argument
+carrying none can never come due — and `oss ledger_quarantine`'s release argument
 is optional, so an anchorless ticket is one omitted argument away.
 
 ---
@@ -309,14 +309,14 @@ Resolving it needs the slug, which **nothing persists** — recover it from the
 directory name the way the work-item layer does (`work-item-close.md` §1), then:
 
 ```bash
-ai_root="$("$oss_bin" repo_root ai_workspace)"
-spine_rel="$("$oss_bin" spine_dir "$rel" "<spine-id>" "<spine-slug>")"   # RELATIVE
+ai_root="$(oss repo_root ai_workspace)"
+spine_rel="$(oss spine_dir "$rel" "<spine-id>" "<spine-slug>")"   # RELATIVE
 [ -f "$ai_root/$spine_rel/retrospective.md" ] \
   || { echo "close: $rel - spine <spine-id> has no retrospective.md - halt"; exit 1; }
 ```
 
-**`"$oss_bin" spine_dir` returns a relative path**; prefix it with
-`"$oss_bin" repo_root ai_workspace`. Feeding the relative path straight to `[ -f ... ]`
+**`oss spine_dir` returns a relative path**; prefix it with
+`oss repo_root ai_workspace`. Feeding the relative path straight to `[ -f ... ]`
 resolves it against `$PWD` and answers "absent" for every spine, which is a
 refusal that looks exactly like a real finding.
 
@@ -324,11 +324,11 @@ The release retro itself lands beside them, in the release directory — the
 **parent** of what `spine_dir` returns:
 
 ```bash
-rel_dir="$("$oss_bin" release_dir "$rel")"   # ABSOLUTE, ai_workspace-rooted
+rel_dir="$(oss release_dir "$rel")"   # ABSOLUTE, ai_workspace-rooted
 # e.g. docs/specs/r0/ — the retro is "$rel_dir/release-retrospective.md"
 ```
 
-`"$oss_bin" release_dir` resolves the manifest root for you, so the
+`oss release_dir` resolves the manifest root for you, so the
 `docs/specs/r0/` in the comment above is relative to that resolved root —
 a workspace **shape** is never something to paste into a command.
 
@@ -345,7 +345,7 @@ not appear above it**, the same rule the spine retro's §9 states.
 **"What the release set out to do" has a source — read it, do not recall it:**
 
 ```bash
-"$oss_bin" get ".releases[] | select(.id==\"$rel\") | {goal, exit_criteria}"
+oss get ".releases[] | select(.id==\"$rel\") | {goal, exit_criteria}"
 ```
 
 The goal is the one recorded at `release_add`; `exit_criteria` is what
@@ -358,7 +358,7 @@ exists to make.
 **Patches shipped during the release come from git, not state** — `/ossify:patch`
 writes none. Read every non-AI repo the resolved topology declares — the declared
 repos `references/boundary-audit.md` §2 enumerates, each resolved with
-`"$oss_bin" repo_root <repo>` — not only the repos this release's spines
+`oss repo_root <repo>` — not only the repos this release's spines
 landed in: a patch can ship in a repo no spine touched. Determine each root's
 shape as that §2 does, and skip a root that is not a git repository (its
 filesystem-only policy): it holds no tags and no PRs, so no patch. In each git
@@ -367,7 +367,7 @@ first from `origin`, the only remote `/ossify:patch` pushes to —
 `git -C "<repo-root>" fetch --tags origin`, so a tag pushed from another clone is
 counted — then list the tags created since
 the release opened (its `created_at`:
-`"$oss_bin" get ".releases[] | select(.id==\"$rel\") | .created_at"`) with
+`oss get ".releases[] | select(.id==\"$rel\") | .created_at"`) with
 `git -C "<repo-root>" for-each-ref --sort=creatordate --format='%(creatordate:iso-strict) %(refname:short)' refs/tags`,
 and, on origin's repository, the merged PRs whose head branch starts `fix/` with
 `gh pr list --repo "<owner/repo>" --state merged --search "merged:>=<release-opened date>" --limit 1000 --json number,title,headRefName,mergedAt,url,closingIssuesReferences`.
@@ -411,9 +411,9 @@ The rolling-wave crank, and the reason this ceremony is a planning input rather
 than only an accounting one.
 
 ```bash
-"$oss_bin" feature_list                                    # the map, as JSON
-"$oss_bin" feature_add "<name>" "<the value it unlocks>" "<bone|flesh>" release-retro
-"$oss_bin" release_set_meta "$rel" '{"next_sketch":{"goal":"<one line>","candidates":["<spine>","<spine>"]}}'
+oss feature_list                                    # the map, as JSON
+oss feature_add "<name>" "<the value it unlocks>" "<bone|flesh>" release-retro
+oss release_set_meta "$rel" '{"next_sketch":{"goal":"<one line>","candidates":["<spine>","<spine>"]}}'
 ```
 
 Re-groom against what the release actually taught: the walkthrough's friction,
@@ -463,9 +463,9 @@ overridden close reports under the audit's third verdict, never as `clean`
 
 **A halt here is not free, and steps 1-6 are not free to repeat.** A re-close
 re-runs the full cumulative walkthrough — this ceremony's most expensive step —
-and two of the steps it re-runs already wrote state. `"$oss_bin" feature_add` appends
+and two of the steps it re-runs already wrote state. `oss feature_add` appends
 **unconditionally**, so re-running §7 blind duplicates every feature it added:
-read `"$oss_bin" feature_list` first and add only what is missing; and `oss
+read `oss feature_list` first and add only what is missing; and `oss
 release_set_meta` has already stored a `next_sketch` for a release that is now
 not closing. And `release-retrospective.md` is already on disk with a "what is
 still standing" section written before the finding existed — **amend it** so the
@@ -502,7 +502,7 @@ whichever repo that happens to be:
 # failure in a process substitution is invisible, the loop tags NOTHING and
 # the pass still returns 0. jq variables crossing a shell double-quoted
 # string need the backslash (\$root, \$s); $rel is shell-expanded on purpose.
-tag_repos="$("$oss_bin" get ". as \$root | .work_items[] | select(.status != \"abandoned\") | select(.spine as \$s | any(\$root.spines[]; .id == \$s and .status == \"closed\" and .release == \"$rel\")) | .target_repo" | sort -u)" \
+tag_repos="$(oss get ". as \$root | .work_items[] | select(.status != \"abandoned\") | select(.spine as \$s | any(\$root.spines[]; .id == \$s and .status == \"closed\" and .release == \"$rel\")) | .target_repo" | sort -u)" \
   || { echo "close: the release-tag repo set could not be read from state - halt"; exit 1; }
 # AN EMPTY SET IS NOT A CLEAN SET. The assignment above cannot fail and still
 # return nothing, but it can SUCCEED with nothing: every closed spine of this
@@ -514,11 +514,11 @@ tag_repos="$("$oss_bin" get ". as \$root | .work_items[] | select(.status != \"a
 # release published while no tag exists anywhere, which is the audit-trail break
 # this section exists to prevent.
 [ -n "$tag_repos" ] \
-  || { echo "close: $rel has no repo to tag - its closed spines hold no non-abandoned work item, so there is no landed line to publish. A withdrawal made by mistake returns with \"$oss_bin\" work_item_status <wi-id> planned - but that ALONE re-tags a repo whose work never landed: the selector above takes any non-abandoned item whose spine is closed, and this one's spine is closed by construction here, so a planned item is exactly what it wants. Nothing else stops it either - work_item_status keeps no parent-spine guard. Reopening the spine does NOT re-enable it, so land the work in a NEW spine instead (\"$oss_bin\" spine_add <release> <name> <class> <target-repo>, then the item there) and re-run this close: work-item/references/round-orchestration.md §2's re-entry arm would route the un-withdrawn item onto the branch spine close has already landed in every hosting repo - a branch nothing merges again; a release with nothing to publish is the operator's decision (there is no release-retirement status), so this ceremony stops here rather than deciding for them - halt"; exit 1; }
+  || { echo "close: $rel has no repo to tag - its closed spines hold no non-abandoned work item, so there is no landed line to publish. A withdrawal made by mistake returns with \"oss\" work_item_status <wi-id> planned - but that ALONE re-tags a repo whose work never landed: the selector above takes any non-abandoned item whose spine is closed, and this one's spine is closed by construction here, so a planned item is exactly what it wants. Nothing else stops it either - work_item_status keeps no parent-spine guard. Reopening the spine does NOT re-enable it, so land the work in a NEW spine instead (\"oss\" spine_add <release> <name> <class> <target-repo>, then the item there) and re-run this close: work-item/references/round-orchestration.md §2's re-entry arm would route the un-withdrawn item onto the branch spine close has already landed in every hosting repo - a branch nothing merges again; a release with nothing to publish is the operator's decision (there is no release-retirement status), so this ceremony stops here rather than deciding for them - halt"; exit 1; }
 
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue
-  repo_root="$("$oss_bin" repo_root "$repo")" \
+  repo_root="$(oss repo_root "$repo")" \
     || { echo "close: $rel names undeclared repo '$repo' - halt"; exit 1; }
   # The base must be UNAMBIGUOUS per repo: two closed spines recording
   # different bases in the same repo is a halt, not a first-wins pick - the
@@ -646,8 +646,8 @@ and halts like any other blocked landing: never `--force`, never
 delete-and-retag.
 
 ```bash
-"$oss_bin" release_status "$rel" closed
-"$oss_bin" demo_record release "$rel" "<true|false>" "<line-count>" "<notes>"
+oss release_status "$rel" closed
+oss demo_record release "$rel" "<true|false>" "<line-count>" "<notes>"
 ```
 
 **`demo_record` takes five arguments after the scope word**, not two: scope, id,
@@ -704,9 +704,9 @@ above is not executed by any test.
 - **Re-tagging, force-pushing, or delete-and-retagging a published release
   tag.** An existing tag halts; rewriting a published ref is the operator's
   call, made explicitly (§9).
-- **Testing the rc of `"$oss_bin" get` instead of its output.** An empty `select` exits
+- **Testing the rc of `oss get` instead of its output.** An empty `select` exits
   0 (§2).
-- **Passing a spine id to `"$oss_bin" demo_user_lines` here.** The release walk takes no
+- **Passing a spine id to `oss demo_user_lines` here.** The release walk takes no
   argument (§3).
 - **Applying demo amendments at release close.** The spines already did (§3).
 - **Implying a `.feature` field on demo lines.** There is none; the grouping is
@@ -721,7 +721,7 @@ above is not executed by any test.
 - **Blocking on a quarantine raised during this release.** Strictly earlier (§5).
 - **Reporting a retired line as cleared.** `retire` records intent; a spine
   applies it (§5).
-- **Feeding `"$oss_bin" spine_dir`'s relative path to a file test unprefixed** — every
+- **Feeding `oss spine_dir`'s relative path to a file test unprefixed** — every
   spine then looks retro-less (§6).
 - **Trusting `release_set_meta` silently.** A disallowed key is dropped at rc 0
   (§7).

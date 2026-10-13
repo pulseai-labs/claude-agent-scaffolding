@@ -14,11 +14,11 @@ shrugged off.
 
 ## 1. Two halves, two different scopes
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
-"$oss_bin" demo_run                        # every ACTIVE auto: line, from every spine
-"$oss_bin" demo_user_lines "$spine_id"     # THIS spine's own user: lines
+oss demo_run                        # every ACTIVE auto: line, from every spine
+oss demo_user_lines "$spine_id"     # THIS spine's own user: lines
 ```
 
 **The `auto:` half is cumulative; the `user:` half is scoped.** That asymmetry is
@@ -30,7 +30,7 @@ the spec's, not an optimization:
 | `user:` lines | **this spine's own contribution only** | **every** accumulated line, grouped by feature |
 | Who drives the `user:` half | the human, here, now | the human, at the release gate |
 
-One verb serves both: `"$oss_bin" demo_user_lines` **with** a spine argument filters to
+One verb serves both: `oss demo_user_lines` **with** a spine argument filters to
 `source_spine == <spine>`; **without** one it returns every active `user:` line.
 Passing no argument at spine close silently turns a spine gate into a release
 walkthrough — the run gets longer and longer, and the release gate stops being
@@ -48,7 +48,7 @@ re-points every later state read (SKILL.md §3).
 
 ## 2. Halt on the first failure, and the halt is terminal
 
-`"$oss_bin" demo_run` stops at the first failing line and returns non-zero. It prints
+`oss demo_run` stops at the first failing line and returns non-zero. It prints
 the failing line's id and text, why it failed, and the **last five lines of that
 command's output**:
 
@@ -81,7 +81,7 @@ close halted meanwhile.
 
 ## 3. The `user:` walk
 
-`"$oss_bin" demo_user_lines "$spine_id"` returns a JSON array; each element carries the
+`oss demo_user_lines "$spine_id"` returns a JSON array; each element carries the
 line's `id`, its `text` (the journey, phrased as something a user does for value)
 and its `outcome` (what they should observe).
 
@@ -102,7 +102,7 @@ visible to a person using the thing.
 A line that fails for causes **unrelated to any open spine** may be quarantined:
 
 ```bash
-"$oss_bin" ledger_quarantine "<line-id>" "<why it is unrelated to this spine>" "<release-id>"
+oss ledger_quarantine "<line-id>" "<why it is unrelated to this spine>" "<release-id>"
 ```
 
 The runner then prints `SKIP <line-id> (quarantined) - <text>` and continues; the
@@ -137,12 +137,12 @@ declared repo's root when exactly one is):
 # without it BOTH runs did `cd ""`, failed identically, and the matching output
 # read as "already broken" - manufacturing the quarantine evidence. Bind it
 # from the same resolution the runner uses before either invocation.
-wd="$("$oss_bin" demo_workdir)" \
+wd="$(oss demo_workdir)" \
   || { echo "halt: cannot resolve the demo working directory - see cumulative-demo.md section 1; the comparison is void without it"; exit 1; }
 [ -d "$wd" ] || { echo "halt: resolved demo workdir '$wd' does not exist"; exit 1; }
 
 # same command, both trees, and diff the OUTPUT before believing the rc
-cmd="$("$oss_bin" get ".demo_ledger[] | select(.id==\"<line-id>\") | .command")" \
+cmd="$(oss get ".demo_ledger[] | select(.id==\"<line-id>\") | .command")" \
   || { echo "halt: cannot resolve the demo command for <line-id> - the comparison is void without it"; exit 1; }
 # Per-invocation evidence dir - a fixed /tmp path collides across concurrent
 # closes, and a close that diffs ANOTHER invocation's head against its own
@@ -208,7 +208,7 @@ echo "head rc=$head_rc"
 # broken" and "this spine broke it" - come back looking like evidence.
 while IFS=: read -r repo sha before; do
   [ -n "$repo" ] || continue
-  root="$("$oss_bin" repo_root "$repo")" \
+  root="$(oss repo_root "$repo")" \
     || { echo "halt: \$merge_shas names undeclared repo '$repo'"; exit 1; }
   # Record the branch BEFORE detaching. `git checkout -` cannot restore N repos:
   # it is per-repo and only remembers one step, and a second detach in the same
@@ -288,7 +288,7 @@ is how a sibling's regression gets a passing report. Report the count and move o
 **A `user:` line the operator cannot walk now is deferred, not skipped.**
 
 ```bash
-"$oss_bin" ledger_defer "<line>" "$spine_id" "<the operator's words, quoted>" "<release it is due at>"
+oss ledger_defer "<line>" "$spine_id" "<the operator's words, quoted>" "<release it is due at>"
 ```
 
 The reason is **the operator's own words**, and a session never supplies them: a
@@ -300,7 +300,7 @@ and the release close collects it with the operator present (`release-close.md` 
 `SPINE.md` declared the time-box escape at plan time:
 
 ```bash
-"$oss_bin" ledger_escape "<line>" "$spine_id" "<escape clause quoted from SPINE.md>" "<the operator's ruling, quoted>"
+oss ledger_escape "<line>" "$spine_id" "<escape clause quoted from SPINE.md>" "<the operator's ruling, quoted>"
 ```
 
 The clause is quoted from that declaration — recorded at plan time in `SPINE.md`'s
@@ -321,7 +321,7 @@ declared escape. Activating another spine's line so this close "sees" it
 The ledger's cost is bounded by a budget set at release planning:
 
 ```bash
-"$oss_bin" get ".releases[] | select(.id==\"<release-id>\") | .ledger_budget"
+oss get ".releases[] | select(.id==\"<release-id>\") | .ledger_budget"
 ```
 
 Exceeding it forces a **prune / parallelize / deepen** decision at release
@@ -330,15 +330,15 @@ is to *notice and say so*: surface an overshoot with the close's result and poin
 at `plan-release`. Do not prune the ledger to fit; dropping a line is a coverage
 decision with an owner, and that owner is not the close ceremony.
 
-**Measure it — `"$oss_bin" demo_run` emits no timing of its own.** There is no verb for
+**Measure it — `oss demo_run` emits no timing of its own.** There is no verb for
 this and none is needed; the shell already has one, so "visibly overshoots" does
 not have to mean "felt slow":
 
 ```bash
-budget="$("$oss_bin" get ".releases[] | select(.id==\"<release-id>\") | .ledger_budget")"
+budget="$(oss get ".releases[] | select(.id==\"<release-id>\") | .ledger_budget")"
 start=$(date +%s)
 demo_rc=0
-"$oss_bin" demo_run || demo_rc=$?
+oss demo_run || demo_rc=$?
 elapsed=$(( $(date +%s) - start ))
 secs="${budget%s}"
 case "$secs" in
@@ -352,7 +352,7 @@ esac
 ```
 
 **Capture the runner's status and re-raise it last.** Timing is advisory; the
-demo result is the **gate**. Written as a bare `"$oss_bin" demo_run` with the budget
+demo result is the **gate**. Written as a bare `oss demo_run` with the budget
 report after it, the block's exit status becomes the status of that trailing
 `echo` — so in any shell without `errexit` a **failing** cumulative demo returns
 **0** and the close walks straight past the one gate it must not. `|| demo_rc=$?`
@@ -375,7 +375,7 @@ The demo's outcome is written at **step 11**, not here, and only if every step
 between reached the end:
 
 ```bash
-"$oss_bin" demo_record spine "$spine_id" "<true|false>" "<line-count>" "<notes>"
+oss demo_record spine "$spine_id" "<true|false>" "<line-count>" "<notes>"
 ```
 
 `passed` is the literal `true` or `false` — anything else is rc 2. Because a
@@ -387,7 +387,7 @@ records nothing at all.
 
 ## 7. Anti-patterns
 
-- **Calling `"$oss_bin" demo_user_lines` with no spine argument at spine close.** That
+- **Calling `oss demo_user_lines` with no spine argument at spine close.** That
   is the release scope (§1).
 - **Running only this spine's `auto:` lines.** The cumulative half is the point;
   a spine that passes its own lines and breaks an older one has broken the

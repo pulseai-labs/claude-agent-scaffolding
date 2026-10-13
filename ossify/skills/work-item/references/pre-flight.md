@@ -43,12 +43,12 @@ is then equally suspect.
 
 ### Gate 2 — the spec reads and its ACs parse
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 Read the spec end to end (Read tool, absolute path), then:
 
 ```bash
-"$oss_bin" verify_acs "<abs spec path>"
+oss verify_acs "<abs spec path>"
 ```
 
 One TSV row per `auto:` AC — `label <tab> command <tab> expectation` — in
@@ -70,20 +70,37 @@ Two malformations still produce a row: an ASCII `->` where the grammar wants
 unusable. Check every row:
 
 ```bash
-"$oss_bin" verify_acs "<abs spec path>" | while IFS=$'\t' read -r label cmd exp; do
+bad_exit() { # $1 = the text after 'exit ' ; returns 0 when it is NOT a usable 0-255 status
+  local w="$1" m
+  case "$w" in ''|*[!0-9]*) return 0;; esac
+  m="${w#"${w%%[!0]*}"}"; m="${m:-0}"
+  if [ "${#m}" -gt 3 ] || [ "$m" -gt 255 ]; then return 0; fi
+  return 1
+}
+acs_rc=0; acs="$(oss verify_acs "<abs spec path>")" || acs_rc=$?
+[ "$acs_rc" -eq 0 ] || echo "GAP: verify_acs exited $acs_rc - the spec did not parse"
+printf '%s\n' "$acs" | while IFS=$'\t' read -r label cmd exp; do
+  [ -n "$label" ] || continue
   case "$exp" in
-    "exit "*)            case "${exp#exit }" in ''|*[!0-9]*) echo "GAP $label: 'exit' takes digits only, got '$exp'";; esac ;;
+    "exit "*" and output contains "?*)
+      w="${exp#exit }"; w="${w%% and output contains *}"
+      if bad_exit "$w"; then echo "GAP $label: 'exit' takes 0-255, got '$exp'"; fi ;;
+    "exit "*)            if bad_exit "${exp#exit }"; then echo "GAP $label: 'exit' takes 0-255, got '$exp'"; fi ;;
     "output contains "?*) ;;
-    *) echo "GAP $label: expectation '$exp' is not 'exit <n>' or 'output contains <str>'" ;;
+    *) echo "GAP $label: expectation '$exp' is not 'exit <n>', 'output contains <str>' or 'exit <n> and output contains <str>'" ;;
   esac
 done
 ```
 
+The read happens **before** the loop: `verify_acs … | while …` would run the
+loop in a subshell that cannot see `verify_acs`'s own rc, so a spec that failed
+to parse at all would look like a spec with zero rows.
+
 **Any `GAP` line is a blocking gap — return gaps-mode.** Do not "fix" the AC by
 reading past the garbage: the spec is what the close gate reads too, so an AC
 that is wrong here is wrong there. Left alone it costs the whole TDD loop —
-`"$oss_bin" redgate` answers rc 2 (malformed) rather than rc 0 (RED), so the loop
-cannot even start honestly, and `"$oss_bin" verify_step` rejects the same row at rc 2
+`oss redgate` answers rc 2 (malformed) rather than rc 0 (RED), so the loop
+cannot even start honestly, and `oss verify_step` rejects the same row at rc 2
 two ceremonies later at the close gate, where recovery option 1 ("re-dispatch
 the implementer — the default when the code is wrong") points at code that was
 never the problem.
@@ -107,7 +124,7 @@ Three ways this fails, all gaps:
 3. **Dirty** — *any* line of `--porcelain` output counts: modified, staged, or
    untracked alike.
 
-`"$oss_bin" work_item_branch "<work-item-id>" "<slug>"` prints the branch name the id
+`oss work_item_branch "<work-item-id>" "<slug>"` prints the branch name the id
 grammar implies, which is a cheap cross-check on what the handoff declared.
 
 **Never clean it yourself.** No `git stash`, no `git reset`, no `git checkout --`.
@@ -168,7 +185,7 @@ into the RED gate.
 The announcement is worse than noise. In Mode B it lands in the orchestrator's
 transcript as a status update it did not ask for and cannot act on; in Mode A it
 trains the user to skim your output. The evidence that pre-flight ran is the
-tool-call log — two Reads, the `"$oss_bin" verify_acs` parse with its row-shape check,
+tool-call log — two Reads, the `oss verify_acs` parse with its row-shape check,
 and two `git -C` probes, in order.
 
 ---

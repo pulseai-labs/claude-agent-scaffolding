@@ -60,7 +60,7 @@ contaminated by the other.
 
 ### Getting the diff
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
 # $spine_branch and $repo_base_branches (one "<repo>:<base_branch>" pair per
@@ -75,12 +75,12 @@ _Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolve
 # A cross-repo spine's diff spans every one of them, and reading
 # only one repo's diff reviews PART of the spine dressed up as the whole of
 # it — which is worse than skipping the review, because it reads as done.
-hosting_repos="$("$oss_bin" get ".work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .target_repo" | sort -u)"
+hosting_repos="$(oss get ".work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .target_repo" | sort -u)"
 [ -n "$hosting_repos" ] \
   || { echo "code-review: no work items found for $spine_id - halt, cannot scope the diff"; exit 1; }
 while IFS= read -r repo; do
   [ -n "$repo" ] || continue
-  repo_root="$("$oss_bin" repo_root "$repo")" \
+  repo_root="$(oss repo_root "$repo")" \
     || { echo "code-review: $spine_id names undeclared repo '$repo' - halt"; exit 1; }
   base_branch="$(printf '%s\n' "$repo_base_branches" | awk -F: -v r="$repo" '$1==r{print $2; exit}')"
   [ -n "$base_branch" ] \
@@ -239,7 +239,7 @@ negotiable. What it produces is a decision for the operator, on each finding:
 
 - **fix now**, before the merge — the default when the finding is small and the
   spine is still open;
-- **file it** (`"$oss_bin" feature_add "<name>" "<value>" "<bone|flesh>" feature-map-return`) — when it
+- **file it** (`oss feature_add "<name>" "<value>" "<bone|flesh>" feature-map-return`) — when it
   is real but not this spine's job;
 - **accept it**, recorded in the retro's §8 with the reason.
 

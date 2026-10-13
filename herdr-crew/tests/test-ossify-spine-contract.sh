@@ -66,9 +66,9 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=232          # A3: the budget equals the longest budgeted reference (232, ossify-briefs.md); 0.2.9 raised the number from 214 for the spine brief's 1.14.0 caller rules and re-entry seat rule.
+REF_BUDGET=231          # A3: the budget equals the longest budgeted reference (231, ossify-briefs.md); 0.2.9 raised the number from 214 for the spine brief's 1.14.0 caller rules and re-entry seat rule.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking clause
-                        # each launch site gained; the files' own maximum is 232
+                        # each launch site gained; the files' own maximum is 231
                         # (`ossify-briefs.md`), and the budget section's adjacent
                         # control holds the gate at that minimum — one line over the
                         # longest budgeted reference is still refused.
@@ -77,6 +77,9 @@ REF_BUDGET=232          # A3: the budget equals the longest budgeted reference (
                         # 0.2.11 (#663): raised from 230 for the two launch-site citing clauses
                         # (ossify-briefs.md's item-verifier intro takes the two lines, 232); it
                         # still equals the maximum.
+                        # 0.2.16: the §8a caller rule lost its "(run-spine's resolved
+                        # dispatcher)" parenthetical (every fence calls `oss` by name),
+                        # which took ossify-briefs.md back to 231 — the budget follows.
 
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
@@ -2283,7 +2286,7 @@ pin "$BRIEFS_MD" 'A worktree staged by a result you rejected in this session is 
 pin "$BRIEFS_MD" 'you count each execution the lane did not request — a correction, or a replacement'"'"'s fresh pair' \
   "spine brief: the caller counts a correction and a caller-driven replacement (a2, PR #679 r2)" flat
 absent "$BRIEFS_MD" 'you count only a correction' "spine brief: a replacement is never left uncounted (PR #679 r2)" flat
-pin "$BRIEFS_MD" 'run `"$oss_bin" work_item_dispatched <wi-id>` (run-spine'"'"'s resolved dispatcher), then send the correction or launch the fresh pair' \
+pin "$BRIEFS_MD" 'run `oss work_item_dispatched <wi-id>`, then send the correction or launch the fresh pair' \
   "spine brief: the caller counts before it sends (a2)" flat
 pin "$BRIEFS_MD" 'Never count a request the lane issued, or it is counted twice' "spine brief: no double count (a2)" flat
 pin "$BRIEFS_MD" 'an `adopt` item reaches you as an ordinary request' "spine brief: adopt is a redispatch (a3)" flat

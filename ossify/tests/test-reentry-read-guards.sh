@@ -184,7 +184,7 @@ esac
 OSS
   chmod +x "$TMP/shim/oss"
   fresh() {
-    env FAIL_GET="$1" FIXTURE_ROOT="$F/core" RECORD="$TMP/record" oss_bin="$TMP/shim/oss" TMPDIR="$TMP/temporaries" \
+    env FAIL_GET="$1" FIXTURE_ROOT="$F/core" RECORD="$TMP/record" PATH="$TMP/shim:$PATH" TMPDIR="$TMP/temporaries" \
       bash -c 'set -eu; set +o pipefail; . "$1"' fresh "$TMP/fresh.sh"
   }
   # No caller pipefail: the fence owns the state-read rc itself.

@@ -32,8 +32,7 @@ and has its own contract):
   invocation block naming the handoff path>)`. This body is that subagent's
   binding contract; `agents/implementer-agent.md` is the registration that points
   at it. The dispatcher is **not** `plan-spine` — it authors your
-  spec and the spine's demo lines and stops there. Resolve `oss` into `oss_bin`
-  (`command -v oss`); every `oss` call below is `"$oss_bin"`.
+  spec and the spine's demo lines and stops there. Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next.
 
 **On Claude Code, `ossify:implementer-agent` is the only worker ossify itself
 dispatches**, and it is the default. The one exception is opt-in and belongs to the lane, not to
@@ -123,7 +122,7 @@ licence to supply the field yourself.
 Then read the spec end to end and extract the ordered `auto:` AC list:
 
 ```bash
-"$oss_bin" verify_acs "<abs spec path>"      # TSV: label <tab> command <tab> expectation
+oss verify_acs "<abs spec path>"      # TSV: label <tab> command <tab> expectation
 ```
 
 Each row is `(AC-N, command, expectation)` in **declared order** — that order is
@@ -134,7 +133,7 @@ cumulative demo; they are `close`'s to run, and you skip them here.
 
 1. **Handoff complete** — the fields above resolve, Constraints carry both
    required items.
-2. **Spec readable and its ACs parse** — an empty `"$oss_bin" verify_acs` result on a
+2. **Spec readable and its ACs parse** — an empty `oss verify_acs` result on a
    spec that visibly has ACs means the AC grammar is malformed; that is a gap, not
    a licence to hand-parse.
 3. **Worktree exists, is clean, and is on the declared branch:**
@@ -145,7 +144,7 @@ cumulative demo; they are `close`'s to run, and you skip them here.
    ```
 
    Any line of `--porcelain` output — modified, staged, or untracked — is dirty,
-   and dirty is a gap. **Never auto-clean** (§10). `"$oss_bin" work_item_branch "<work-item-id>" "<slug>"`
+   and dirty is a gap. **Never auto-clean** (§10). `oss work_item_branch "<work-item-id>" "<slug>"`
    prints the branch the id grammar implies, if you want to cross-check what the
    handoff declared.
 4. **No blocking ambiguity in the spec.** The bar is exactly: *"can a competent
@@ -170,13 +169,13 @@ Runs on the success path out of §3, before any implementation. Its job: prove t
 work item is genuinely unstarted, so completing it is a real RED→GREEN flip rather
 than a no-op or an implementation with tests written afterwards.
 
-Every row `"$oss_bin" verify_acs` returned carries a command — a spec line without one
+Every row `oss verify_acs` returned carries a command — a spec line without one
 was already a Gate 2 gap. So run the probe on all of them, in declared order. An
 AC whose command is a non-invocable probe (a `test -f`, a `! grep`) is not a
 special case; the rc table below covers it. Per AC:
 
 ```bash
-"$oss_bin" redgate "<worktree-abs>" "<command>" "<expectation>"
+oss redgate "<worktree-abs>" "<command>" "<expectation>"
 ```
 
 **Read the return code the right way round:**
@@ -213,7 +212,7 @@ override:
 
 1. Write a failing test whose **failure mode matches the AC's expectation** — an
    `exit <n>` AC gets a test asserting that exit code, an `output contains <str>`
-   AC gets a test asserting that substring.
+   AC that substring, and a combined `exit <n> and output contains <str>` AC both.
 2. **Run it and watch it fail.** A test that passes on first run is either
    tautological or the behaviour already existed; both are report-worthy
    (`references/tdd-loop.md`).
@@ -223,6 +222,7 @@ override:
 
 Discipline:
 
+- **Check before you write.** Check every precondition before the first write: each file you edit exists and each text you replace is there exactly once; each file you create does not exist yet. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
 - **Absolute paths only.** Your cwd is the caller's, never the worktree. Git ops
   use `git -C "<worktree-abs>" …`; other commands use
   `cd "<worktree-abs>" && <cmd>` in a single invocation (each Bash call is a fresh
@@ -255,14 +255,16 @@ list are in `references/tdd-loop.md`.
 ## 6. Verification
 
 After the loop, run **every** verification command embedded in the handoff, in the
-worktree. `"$oss_bin" verify_step` applies the same expectation predicate the ACs were
+worktree. `oss verify_step` applies the same expectation predicate the ACs were
 parsed with, and fails closed on a malformed expectation:
 
 ```bash
-"$oss_bin" verify_step "<worktree-abs>" "<command>" "<expectation>"   # 0 pass | 1 fail | 2 malformed
+oss verify_step "<worktree-abs>" "<command>" "<expectation>"   # 0 pass | 1 fail | 2 malformed
 ```
 
 Capture, per command: exit code, a short output excerpt, and pass/fail.
+
+**Can each test fail?** A green run proves nothing about a test that cannot go red. Before the report, judge every test you wrote or changed: would it fail if the behaviour it guards were gone? When you are not sure, mutate the production code it guards and hold three conditions — the mutation is semantic (not a syntax error), it applied (echo the changed line back), and it runs on the path the test exercises. Confirm red, then restore from a copy you saved first, never from git (`git checkout` also drops your uncommitted work). A text pin binds to text this change writes and matches it exactly once; a phrase that also occurs elsewhere in the file keeps the pin green when the guarded line is deleted. Record each test's answer in report §5.
 
 **Explicitly NOT halt-on-first-fail** — the deliberate opposite of the
 orchestrator-side gate in `close`. Run all of them even after one fails. The
@@ -353,7 +355,7 @@ gaps-mode is *not* for are in `references/returns.md`.
 **These bind you as the implementer — §3 through §9.** In orchestrator mode (§2)
 you are not executing a work item; `references/round-orchestration.md` is your
 contract and owns its own boundaries, including the `Task` dispatch and the
-`"$oss_bin" work_item_exec`/`work_item_status` state writes the two items below forbid
+`oss work_item_exec`/`work_item_status` state writes the two items below forbid
 you here.
 - **`git commit`, `git push`, `git pull`, `git fetch` — anywhere in your tool-call
   log**, including inside a Bash comment, a heredoc body, or a piped subcommand.

@@ -26,12 +26,12 @@ External mode replaces **one step** of the lane: the dispatch in
 `round-orchestration.md` §5. Everything on either side of that step is the same
 document it was.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 | Still owned by the lane, unchanged | Handed to the caller |
 |---|---|
 | the spine-branch cut and checkout (§2) | executing one work item against its handoff |
-| the per-item worktree, `"$oss_bin" work_item_exec`, `"$oss_bin" work_item_status` (§3) | |
+| the per-item worktree, `oss work_item_exec`, `oss work_item_status` (§3) | |
 | authoring every `handoff.md` (§4) | |
 | the return contract it accepts back (`references/returns.md`) | |
 | the close, the commit, the merge, the round barrier (§7) | |
@@ -70,7 +70,7 @@ serial is everything after the returns — see §5a.
 
 ## 2a. Re-entry — counting, and a staged result at request time
 
-**The lane counts each request it issues** (`"$oss_bin" work_item_dispatched
+**The lane counts each request it issues** (`oss work_item_dispatched
 <wi-id>`, `round-orchestration.md` §5), except a `close-finished` item's; the
 §5b gaps replacement is one of those requests, so the lane counts it too. **The
 caller counts each execution the lane did not request** — a correction — with

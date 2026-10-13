@@ -18,16 +18,16 @@ at each groom rather than in state (§2). Each entry:
 | `class_guess` | `bone` or `flesh` — a **guess**, made before any plan existed |
 | `source` | `journey-map` · `spec` · `release-retro` · `deferral` · `real-use` · `fake-replacement` · `feature-map-return` · `intake` |
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
-"$oss_bin" feature_list                                   # the whole map, as JSON
-"$oss_bin" feature_add "<name>" "<value>" "<bone|flesh>" "<source>"
+oss feature_list                                   # the whole map, as JSON
+oss feature_add "<name>" "<value>" "<bone|flesh>" "<source>"
 ```
 
 `class_guess` is **not** the class. It ranks and warns; the class ladder
 (`references/class-declaration.md`) re-derives the real class from the actual
-plan at declaration time. Never carry the guess through to `"$oss_bin" spine_add`
+plan at declaration time. Never carry the guess through to `oss spine_add`
 without re-running the ladder.
 
 The map is groomed at **every** release close (and again here at planning). It is
@@ -66,7 +66,7 @@ map is a map nobody reads.
 ### What the ranking and the prune actually *are*
 
 **Both are conversational. Neither writes to state, and no verb exists for
-either** — the map has exactly two: `"$oss_bin" feature_add` and `"$oss_bin" feature_list`.
+either** — the map has exactly two: `oss feature_add` and `oss feature_list`.
 There is no rank field, no reorder, and no remove. Read that as the design, not
 as a missing feature:
 

@@ -20,40 +20,40 @@ this layer most easily goes silently wrong.
 
 **The worktree is the easy one**: state holds it, written by the execution lane.
 
-_Dispatcher invocations below are `"$oss_bin" …` — the calling skill resolves `oss_bin` once (`command -v oss`; the plugin loader puts `bin/` on `$PATH`); if it is unset in your context, resolve it that way first._
+_Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
 wi="<work-item id>"
-st="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .status")"
+st="$(oss get ".work_items[] | select(.id==\"$wi\") | .status")"
 if [ "$st" = "abandoned" ]; then
   # The dispatched-item evidence is FOUR fields, not three (#673 F3): branch,
   # worktree_path, base_sha - AND the dispatches count. An item whose dispatch
   # was counted and then died before work_item_exec records no exec field at
   # all, so a three-field read called it a clean withdrawal; the count is the
   # surviving proof it was dispatched.
-  rec="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | [.branch, .worktree_path, .base_sha, (if ((.dispatches // 0) > 0) then (\"dispatches=\" + (.dispatches | tostring)) else null end)] | map(select(. != null) | tostring) | join(\", \")")"
+  rec="$(oss get ".work_items[] | select(.id==\"$wi\") | [.branch, .worktree_path, .base_sha, (if ((.dispatches // 0) > 0) then (\"dispatches=\" + (.dispatches | tostring)) else null end)] | map(select(. != null) | tostring) | join(\", \")")"
   if [ -n "$rec" ]; then
-    echo "close: $wi is abandoned AND records a dispatch field ($rec) - that pair is the drift doctor's §5 bullet reports, not a clean withdrawal, and it is NOT the skipped-work_item_exec case below: the worktree the record names may hold real work, so nothing here may skip the item as 'nothing to close'. The withdrawal is the half that is wrong, so repair the RECORD and let the work land: \"$oss_bin\" work_item_status $wi planned, then resume the round the record describes (work-item/references/round-orchestration.md §2/§3) so it lands or reports its own halt - and where it cannot run, carry the work into a NEW spine: \"$oss_bin\" spine_add <release> <name> <class> <target-repo>, then \"$oss_bin\" work_item_add it there (plan-spine/references/decomposition.md §1's whole-spine arm) - halt"
+    echo "close: $wi is abandoned AND records a dispatch field ($rec) - that pair is the drift doctor's §5 bullet reports, not a clean withdrawal, and it is NOT the skipped-work_item_exec case below: the worktree the record names may hold real work, so nothing here may skip the item as 'nothing to close'. The withdrawal is the half that is wrong, so repair the RECORD and let the work land: \"oss\" work_item_status $wi planned, then resume the round the record describes (work-item/references/round-orchestration.md §2/§3) so it lands or reports its own halt - and where it cannot run, carry the work into a NEW spine: \"oss\" spine_add <release> <name> <class> <target-repo>, then \"oss\" work_item_add it there (plan-spine/references/decomposition.md §1's whole-spine arm) - halt"
     exit 1
   fi
-  echo "close: $wi is abandoned and records no dispatch field at all, which is what 'withdrawn before any dispatch' means in state - there is nothing to close. This is NOT the skipped-work_item_exec case below, and nothing should be reconstructed for it: spine close skips an abandoned item, and the withdrawal's own two obligations live in DIFFERENT owners: the demo-ledger amendment it owes is plan-spine/references/decomposition.md §1, and the repo armed for its spine - restore its checkout, or record it as parked - is spine-close.md §3, which this standalone route never reaches. To reverse the withdrawal: \"$oss_bin\" work_item_status $wi planned - but if this item's spine is ALREADY closed, that alone is not the recovery: un-withdrawing leaves a planned item inside a closed spine, and release close's tag selector takes any non-abandoned item whose spine is closed, so a later release close would tag a repo whose work was never dispatched or landed. Reopening the spine does NOT re-enable it: spine close has already landed that spine's branch in every hosting repo, and round-orchestration.md §2's re-entry arm would route the un-withdrawn item onto a branch nothing merges again. Carry the work into a NEW spine instead - \"$oss_bin\" spine_add <release> <name> <class> <target-repo>, then \"$oss_bin\" work_item_add it there (plan-spine/references/decomposition.md §1's whole-spine arm) - halt"
+  echo "close: $wi is abandoned and records no dispatch field at all, which is what 'withdrawn before any dispatch' means in state - there is nothing to close. This is NOT the skipped-work_item_exec case below, and nothing should be reconstructed for it: spine close skips an abandoned item, and the withdrawal's own two obligations live in DIFFERENT owners: the demo-ledger amendment it owes is plan-spine/references/decomposition.md §1, and the repo armed for its spine - restore its checkout, or record it as parked - is spine-close.md §3, which this standalone route never reaches. To reverse the withdrawal: \"oss\" work_item_status $wi planned - but if this item's spine is ALREADY closed, that alone is not the recovery: un-withdrawing leaves a planned item inside a closed spine, and release close's tag selector takes any non-abandoned item whose spine is closed, so a later release close would tag a repo whose work was never dispatched or landed. Reopening the spine does NOT re-enable it: spine close has already landed that spine's branch in every hosting repo, and round-orchestration.md §2's re-entry arm would route the un-withdrawn item onto a branch nothing merges again. Carry the work into a NEW spine instead - \"oss\" spine_add <release> <name> <class> <target-repo>, then \"oss\" work_item_add it there (plan-spine/references/decomposition.md §1's whole-spine arm) - halt"
   exit 1
 fi
-wt="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .worktree_path")"
+wt="$(oss get ".work_items[] | select(.id==\"$wi\") | .worktree_path")"
 [ -n "$wt" ] && [ "$wt" != "null" ] && [ -d "$wt" ] \
   || { echo "close: no recorded worktree for $wi - halt"; exit 1; }
 ```
 
-**Test for `null`, not just emptiness.** `"$oss_bin" get` is `jq -r`: a field that is
+**Test for `null`, not just emptiness.** `oss get` is `jq -r`: a field that is
 absent or JSON-null prints the four characters `null`, which is non-empty and
 passes `[ -n … ]`. Every state read in this layer is guarded that way, and the
 merge target in step 4 is the one where it matters most — `git merge null`
 resolves nothing and the guard that was supposed to catch it already passed.
 
-A missing `worktree_path` means the lane skipped `"$oss_bin" work_item_exec` — or
+A missing `worktree_path` means the lane skipped `oss work_item_exec` — or
 recorded a half-write, `work_item_exec <wi> "" "" <sha>`, which journals `base_sha`
 alone and names no worktree either. Both are a
-halt, not something to reconstruct: `"$oss_bin" worktree_resolve <target_repo> <wi>`
+halt, not something to reconstruct: `oss worktree_resolve <target_repo> <wi>`
 will happily echo a conventional path whether or not it is the one this item was
 built in. **The block tests one other cause first**: an item withdrawn before any
 dispatch is `abandoned`, and *that* is why it has no worktree — it was never
@@ -100,16 +100,16 @@ byte-identical, because a drift between them has no runtime signal:
 ```
 
 The release and spine ids come out of
-`"$oss_bin" id_parse`'s numeric components (`routing.md` §2); the **spine slug** does
+`oss id_parse`'s numeric components (`routing.md` §2); the **spine slug** does
 not — nothing persists one (spines store `name`, work items store `title`), so it
 is recovered by globbing the spine directory, exactly as the execution lane
 recovers it for the spine branch.
 
 ```bash
-parts="$("$oss_bin" id_parse "$wi")" || parts=""
+parts="$(oss id_parse "$wi")" || parts=""
 rel_id="r$(printf '%s\n' "$parts" | awk '{print $2}')"
 spine_id="$rel_id.s$(printf '%s\n' "$parts" | awk '{print $3}')"
-rel_dir="$("$oss_bin" release_dir "$rel_id")"   # ABSOLUTE, ai_workspace-rooted
+rel_dir="$(oss release_dir "$rel_id")"   # ABSOLUTE, ai_workspace-rooted
 
 matches="$(find "$rel_dir" -maxdepth 1 -type d -name "$spine_id-*" 2>/dev/null)"
 n="$(printf '%s\n' "$matches" | grep -c . || true)"
@@ -124,7 +124,7 @@ report="$wi_dir/report.md"
 
 Three things that look like shortcuts and are not:
 
-- **`"$oss_bin" spine_dir` returns a RELATIVE path** — `docs/specs/<rel>/<spine>-<slug>`
+- **`oss spine_dir` returns a RELATIVE path** — `docs/specs/<rel>/<spine>-<slug>`
   — and it takes the slug as an argument, so it cannot *find* the directory. Once
   the glob has recovered the slug it re-composes the same relative path, which
   makes it a useful cross-check against `$spine_dir_abs`; it is never the way in.
@@ -140,7 +140,7 @@ Three things that look like shortcuts and are not:
 [ -f "$spec" ] || { echo "close: no spec.md for $wi at $spec - halt"; exit 1; }
 ```
 
-**A missing or wrong spec path is a halt, named.** `"$oss_bin" verify_acs` returns rc 2
+**A missing or wrong spec path is a halt, named.** `oss verify_acs` returns rc 2
 on a spec it cannot find, and a silently wrong path therefore fails the gate for
 the wrong reason — the run reports a verification problem when what it has is a
 path problem, and the recovery menu sends someone to fix code that is fine.
@@ -236,7 +236,7 @@ commits. The merge is what actually moves the work onto the spine.
 # host items across several declared repos (round-orchestration.md §2 cuts the
 # spine branch in every one of them); this layer closes ONE item, so it targets
 # exactly the repo that item recorded at work_item_add time.
-target_repo="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .target_repo")"
+target_repo="$(oss get ".work_items[] | select(.id==\"$wi\") | .target_repo")"
 # `ai_workspace` BEFORE the resolver, because the resolver SUCCEEDS on it: it is
 # the reserved alias for the process workspace, so treating resolution as proof
 # of a hosting repo would route this close's commit and merge into the AI
@@ -244,16 +244,16 @@ target_repo="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .target_re
 # written before that guard - or hand-edited state - still reaches here.
 [ "$target_repo" != "ai_workspace" ] \
   || { echo "close: $wi targets 'ai_workspace', which is the process workspace, not a hosting repo - no ceremony governs that repo and nothing may be merged into it - halt"; exit 1; }
-repo_root="$("$oss_bin" repo_root "$target_repo")" || { echo "close: $wi targets undeclared repo '$target_repo' - halt"; exit 1; }
+repo_root="$(oss repo_root "$target_repo")" || { echo "close: $wi targets undeclared repo '$target_repo' - halt"; exit 1; }
 
 # The merge target comes from STATE, written by the execution lane.
-wi_branch="$("$oss_bin" get ".work_items[] | select(.id==\"$wi\") | .branch")"
+wi_branch="$(oss get ".work_items[] | select(.id==\"$wi\") | .branch")"
 [ -n "$wi_branch" ] && [ "$wi_branch" != "null" ] \
   || { echo "close: no recorded branch for $wi - halt"; exit 1; }
 
 # The spine branch: in the round flow it is already in scope; standalone,
 # recompose it from the slug step 1 recovered.
-spine_branch="$("$oss_bin" branch_name "$spine_id" "$spine_slug")"
+spine_branch="$(oss branch_name "$spine_id" "$spine_slug")"
 head_branch="$(git -C "$repo_root" rev-parse --abbrev-ref HEAD)"
 [ "$head_branch" = "$spine_branch" ] \
   || { echo "close: $target_repo is on '$head_branch', not '$spine_branch' - halt"; exit 1; }
@@ -265,14 +265,14 @@ git -C "$repo_root" merge --no-ff "$wi_branch" -m "merge $wi" || { echo "close: 
 git -C "$repo_root" merge-base --is-ancestor "$wi_sha" HEAD \
   || { echo "close: merge reported success but $wi_sha is not reachable from HEAD - halt"; exit 1; }
 
-"$oss_bin" work_item_status "$wi" complete
+oss work_item_status "$wi" complete
 ```
 
 **Read the branch from state; never re-derive it from a slug.** This layer is
 invoked with an id only and derives its scope from the id's shape — it has no
 work-item slug, and none is persisted. The execution lane writes the branch it
 actually created into `work_items[].branch` precisely so this step can read it
-back. `"$oss_bin" work_item_branch "$wi" "$slug"` needs a `$slug` that does not exist
+back. `oss work_item_branch "$wi" "$slug"` needs a `$slug` that does not exist
 here; it is the id grammar's name generator, not a lookup.
 
 **Verify the merge target before merging.** `git merge` lands on whatever
@@ -302,7 +302,7 @@ re-running the layer: the commit already landed on the work-item branch, so a
 re-run halts at step 3 with an empty index and reports the wrong problem.
 
 **This merge is not optional bookkeeping.** Without it the commits live only on a
-branch that spine close cannot delete — `"$oss_bin" worktree_remove` refuses an unmerged
+branch that spine close cannot delete — `oss worktree_remove` refuses an unmerged
 branch (rc 8) — so the round halts at cleanup, *after* the cumulative demo has
 already reported green against a tree in `$target_repo` that never received the
 work.
@@ -331,6 +331,6 @@ costs and different blast radii.
 It happens at **spine close, as the last step**, and the reason is the branch —
 not the report.
 
-`"$oss_bin" worktree_remove` refuses an unmerged branch at **rc 8**, so cleanup can
+`oss worktree_remove` refuses an unmerged branch at **rc 8**, so cleanup can
 only succeed after step 4's merge — the full ordering argument, and the false
 one it is often confused with, are in `harvest.md` §1.
