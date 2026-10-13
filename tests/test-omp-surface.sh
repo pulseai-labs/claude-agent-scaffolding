@@ -116,7 +116,7 @@ check_module() { # $1=root $2=plugins (spec B §5.1 check 6)
 
 check_agents() { # $1=root $2=plugins whose skills may be autoloaded
   local r=$1 f k tools skill p found
-  for k in implementer reviewer; do
+  for k in implementer seat-reviewer; do
     [ -f "$r/omp-roles/agents/$k.md" ] || echo "agent: omp-roles/agents/$k.md missing"
   done
   for f in "$r/omp-roles"/agents/*.md; do
@@ -174,7 +174,7 @@ make_fixture() { # $1=dir
   for p in $OMP_ONLY; do cp "$d/omp/bin-path.ts" "$d/$p/omp/"; done
   mkdir -p "$d/omp-roles/agents"
   printf -- '---\nname: implementer\ndescription: Execute one work item.\ntools: read, write, bash\nautoloadSkills: [ossify-s]\n---\nBody.\n' > "$d/omp-roles/agents/implementer.md"
-  printf -- '---\nname: reviewer\ndescription: Review a diff.\ntools: read, grep, glob, bash, write\n---\nBody.\n' > "$d/omp-roles/agents/reviewer.md"
+  printf -- '---\nname: seat-reviewer\ndescription: Review a diff.\ntools: read, grep, glob, bash, write\n---\nBody.\n' > "$d/omp-roles/agents/seat-reviewer.md"
 }
 findings() { # $1=root $2=plugins -> all findings of all checks
   check_catalog "$1"; check_wrappers "$1" "$2"; check_descriptions "$1" "$2"; check_names "$1" "$2"; check_paths "$1" "$2"; check_module "$1" "$2"
@@ -209,9 +209,9 @@ control module-drift    "module: ossify/omp/bin-path.ts differs" 'printf "// dri
 control module-missing  "module: ossify has bin/"   'rm ossify/omp/bin-path.ts'
 control module-missing-omp-only "module: omp-roles has bin/" 'rm omp-roles/omp/bin-path.ts'
 control agent-missing-implementer "agent: omp-roles/agents/implementer.md missing" 'rm omp-roles/agents/implementer.md'
-control agent-missing-reviewer "agent: omp-roles/agents/reviewer.md missing" 'rm omp-roles/agents/reviewer.md'
+control agent-missing-seat-reviewer "agent: omp-roles/agents/seat-reviewer.md missing" 'rm omp-roles/agents/seat-reviewer.md'
 for key in name description tools; do
-  control "agent-frontmatter-$key" "agent: omp-roles/agents/reviewer.md lacks frontmatter $key" "sed -i.bak '/^$key:/d' omp-roles/agents/reviewer.md && rm omp-roles/agents/reviewer.md.bak"
+  control "agent-frontmatter-$key" "agent: omp-roles/agents/seat-reviewer.md lacks frontmatter $key" "sed -i.bak '/^$key:/d' omp-roles/agents/seat-reviewer.md && rm omp-roles/agents/seat-reviewer.md.bak"
 done
 for tool in task ask; do
   control "agent-tool-$tool" "agent: omp-roles/agents/implementer.md grants $tool" "sed -i.bak 's/^tools: .*/tools: read, $tool, write/' omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak"
