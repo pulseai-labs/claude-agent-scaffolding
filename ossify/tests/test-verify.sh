@@ -49,6 +49,31 @@ t_capture oss_verify_auto_step "$TMP" "false" "exit 1";          t_assert_rc 0 "
 t_capture oss_verify_auto_step "$TMP" "echo 42 passed" "output contains 42 passed"; t_assert_rc 0 "contains expectation passes"
 t_capture oss_verify_auto_step "$TMP" "echo nope" "output contains 42 passed";      t_assert_rc 1 "contains expectation fails"
 t_assert_contains "$T_OUT" "output missing '42 passed'" "a failing contains expectation names what was missing, not a silent dump"
+
+# D3: the combined form checks both halves (four cells) and malformed forms are rc 2.
+t_capture oss_verify_auto_step "$TMP" "echo needle"           "exit 0 and output contains needle"; t_assert_rc 0 "combined: exit ok + needle -> pass"
+t_capture oss_verify_auto_step "$TMP" "echo needle; exit 3"   "exit 0 and output contains needle"; t_assert_rc 1 "combined: wrong exit + needle -> fail"
+t_capture oss_verify_auto_step "$TMP" "echo nope"             "exit 0 and output contains needle"; t_assert_rc 1 "combined: exit ok + no needle -> fail"
+t_capture oss_verify_auto_step "$TMP" "echo nope; exit 3"     "exit 0 and output contains needle"; t_assert_rc 1 "combined: both wrong -> fail"
+t_capture oss_verify_auto_step "$TMP" "echo refused; exit 2"  "exit 2 and output contains refused"; t_assert_rc 0 "combined: a nonzero wanted exit + needle -> pass"
+t_capture oss_verify_auto_step "$TMP" "true"                  "exit x and output contains y";      t_assert_rc 2 "combined: non-digit exit -> malformed"
+t_capture oss_verify_auto_step "$TMP" "true"                  "exit 0 and output contains ";       t_assert_rc 2 "combined: empty needle -> malformed"
+# D3: a command that cannot run never passes an output check; a refusal that exits 1 still does.
+t_capture oss_verify_auto_step "$TMP" "echo needle; exit 127" "output contains needle"; t_assert_rc 1 "output contains: rc 127 after printing the needle -> fail"
+t_capture oss_verify_auto_step "$TMP" "echo needle; exit 126" "output contains needle"; t_assert_rc 1 "output contains: rc 126 -> fail"
+t_capture oss_verify_auto_step "$TMP" "echo needle; exit 1"   "output contains needle"; t_assert_rc 0 "control: output contains still passes a refusal that exits 1"
+# The zero-tests guard applies to the combined form when it wants exit 0.
+t_capture oss_verify_auto_step "$TMP" "bash fake-test.sh; echo 'pass=0 fail=0'" "exit 0 and output contains pass=0"; t_assert_rc 1 "combined exit 0: a recognized runner that ran zero tests is vacuous"
+
+# The RED gate takes the combined form through auto_step's three-valued rc.
+t_capture oss_verify_redgate "$TMP" "echo nope" "exit 0 and output contains needle"; t_assert_rc 0 "redgate: combined form not yet satisfied -> RED (proceed)"
+t_capture oss_verify_redgate "$TMP" "echo needle" "exit 0 and output contains needle"; t_assert_rc 1 "redgate: combined form already satisfied -> already-GREEN"
+
+# parse_acs must hand the combined expectation through whole - the parse is the
+# only place the two halves could be split before auto_step ever sees them.
+printf -- '- [ ] AC-1 auto: `echo hi` → expected: exit 0 and output contains hi\n' > "$TMP/comb.md"
+t_capture oss_verify_parse_acs "$TMP/comb.md"
+t_assert_eq "$(printf 'AC-1\techo hi\texit 0 and output contains hi')" "$T_OUT" "parse_acs keeps the combined expectation whole"
 # An embedded U+2192 arrow inside the command/expectation text itself (not
 # just the grammar's separator arrow) must not confuse the greedy `.*→` split
 # (named risk #3).

@@ -70,14 +70,24 @@ Two malformations still produce a row: an ASCII `->` where the grammar wants
 unusable. Check every row:
 
 ```bash
-oss verify_acs "<abs spec path>" | while IFS=$'\t' read -r label cmd exp; do
+acs_rc=0; acs="$(oss verify_acs "<abs spec path>")" || acs_rc=$?
+[ "$acs_rc" -eq 0 ] || echo "GAP: verify_acs exited $acs_rc - the spec did not parse"
+printf '%s\n' "$acs" | while IFS=$'\t' read -r label cmd exp; do
+  [ -n "$label" ] || continue
   case "$exp" in
+    "exit "*" and output contains "?*)
+      w="${exp#exit }"; w="${w%% and output contains *}"
+      case "$w" in ''|*[!0-9]*) echo "GAP $label: 'exit' takes digits only, got '$exp'";; esac ;;
     "exit "*)            case "${exp#exit }" in ''|*[!0-9]*) echo "GAP $label: 'exit' takes digits only, got '$exp'";; esac ;;
     "output contains "?*) ;;
-    *) echo "GAP $label: expectation '$exp' is not 'exit <n>' or 'output contains <str>'" ;;
+    *) echo "GAP $label: expectation '$exp' is not 'exit <n>', 'output contains <str>' or 'exit <n> and output contains <str>'" ;;
   esac
 done
 ```
+
+The read happens **before** the loop: `verify_acs … | while …` would run the
+loop in a subshell that cannot see `verify_acs`'s own rc, so a spec that failed
+to parse at all would look like a spec with zero rows.
 
 **Any `GAP` line is a blocking gap — return gaps-mode.** Do not "fix" the AC by
 reading past the garbage: the spec is what the close gate reads too, so an AC

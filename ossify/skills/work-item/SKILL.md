@@ -212,7 +212,7 @@ override:
 
 1. Write a failing test whose **failure mode matches the AC's expectation** — an
    `exit <n>` AC gets a test asserting that exit code, an `output contains <str>`
-   AC gets a test asserting that substring.
+   AC that substring, and a combined `exit <n> and output contains <str>` AC both.
 2. **Run it and watch it fail.** A test that passes on first run is either
    tautological or the behaviour already existed; both are report-worthy
    (`references/tdd-loop.md`).

@@ -60,14 +60,23 @@ oss_verify_parse_acs() { # $1=spec-file ; TSV label \t command \t expectation
 # malformed expectation is rc 2, never a pass. This is the ledger.sh lesson -
 # a `case` with no default arm counted an unknown expectation as green.
 oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail, 2 malformed
-  local dir="$1" cmd="$2" exp="$3" out rc want
+  local dir="$1" cmd="$2" exp="$3" out rc want="" needle=""
+  # THREE forms, and the combined one is matched FIRST: `?*` demands at least one
+  # character of needle, so `exit 0 and output contains ` (empty needle) falls
+  # through to `exit *` and fails the digits check at rc 2 - the intended verdict.
   case "$exp" in
+    exit\ *\ and\ output\ contains\ ?*)
+      want="${exp#exit }"; want="${want%% and output contains *}"
+      needle="${exp#* and output contains }" ;;
     exit\ *)
-      want="${exp#exit }"
-      case "$want" in ''|*[!0-9]*)
-        echo "oss: malformed expectation '$exp' ('exit' takes digits only)" >&2; return 2;; esac ;;
-    output\ contains\ ?*) ;;
-    *) echo "oss: unrecognized expectation '$exp' (grammar: 'exit <n>' | 'output contains <str>')" >&2; return 2 ;;
+      want="${exp#exit }" ;;
+    output\ contains\ ?*)
+      needle="${exp#output contains }" ;;
+    *) echo "oss: unrecognized expectation '$exp' (grammar: 'exit <n>' | 'output contains <str>' | 'exit <n> and output contains <str>')" >&2; return 2 ;;
+  esac
+  case "$exp" in exit\ *)
+    case "$want" in ''|*[!0-9]*)
+      echo "oss: malformed expectation '$exp' ('exit' takes digits only)" >&2; return 2;; esac ;;
   esac
   # errexit guard, and it is on the NORMAL path — this function exists to run
   # commands that are EXPECTED to exit nonzero (a failing AC is the ordinary
@@ -77,38 +86,47 @@ oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail
   # form is used rather than demo.sh's `set +e; …; set -e` toggle, which the
   # A→B handoff's gotcha list explicitly warns against as fragile.
   if out="$(cd "$dir" && bash -c "$cmd" 2>&1)"; then rc=0; else rc=$?; fi
-  case "$exp" in
-    exit\ *)
-      # A silent `[ "$rc" -eq "$want" ] || { …; return 1; }` with no message
-      # dumps only the (often-empty) captured output — a failing `false`
-      # against `exit 0` produces no diagnostic at all, which reads as a
-      # silent dispatcher death rather than a reported failure. Name the
-      # actual vs. wanted rc explicitly, matching demo.sh's sibling arm.
-      if [ "$rc" -ne "$want" ]; then
-        echo "oss: rc=$rc, wanted $want" >&2
-        printf '%s\n' "$out" | tail -5
-        return 1
-      fi ;;
-    output\ contains\ ?*)
-      # `if ! grep -Fq … <<<"$out"` — NOT `pipeline | { … return 1; }`. See the
-      # idiom note below: a `return` inside the brace group would exit only the
-      # subshell, and this function would fall through to `return 0`, passing a
-      # demo line whose output does not contain the expected string. The
-      # herestring also removes the second hazard: `printf … | grep -q` under
-      # the dispatcher's pipefail lets grep exit on the first match while the
-      # producer still has bytes to write, the producer takes SIGPIPE, and the
-      # pipeline reports 141 — a TRUE match read as no match past ~64 KiB.
-      if ! grep -Fq -- "${exp#output contains }" <<<"$out"; then
-        echo "oss: output missing '${exp#output contains }'" >&2
-        printf '%s\n' "$out" | tail -5
-        return 1
-      fi ;;
-  esac
-  # Vacuous green: only meaningful for a success expectation. Scoping matters -
-  # a line legitimately expecting `exit 1` from a recognized runner is not
-  # vacuous, and the unscoped form in demo.sh fails exactly that case.
-  if [ "$exp" = "exit 0" ] && printf '%s' "$out" | oss_verify_zero_tests_guard "$cmd"; then
-    echo "vacuous green: '$cmd' is a recognized test runner and executed zero tests" >&2
+  # The exit half, whenever the form names one. A silent `[ "$rc" -eq "$want" ]
+  # || { …; return 1; }` with no message dumps only the (often-empty) captured
+  # output — a failing `false` against `exit 0` produces no diagnostic at all,
+  # which reads as a silent dispatcher death rather than a reported failure.
+  # Name the actual vs. wanted rc explicitly, matching demo.sh's sibling arm.
+  if [ -n "$want" ] && [ "$rc" -ne "$want" ]; then
+    echo "oss: rc=$rc, wanted $want" >&2
+    printf '%s\n' "$out" | tail -5
+    return 1
+  fi
+  if [ -n "$needle" ]; then
+    # A command that could not run (126 not executable, 127 not found) never
+    # passes an output check: its error text can contain the needle, and a plain
+    # `output contains` row reads no exit status at all (pulse360
+    # `verify-step-halt-swallowed-false-pass`). Any other nonzero exit is left
+    # alone - an AC may expect a refusal message from `exit 1`.
+    case "$rc" in 126|127)
+      echo "oss: '$cmd' is not invocable here (rc $rc); an output check never passes on it" >&2
+      printf '%s\n' "$out" | tail -5
+      return 1 ;;
+    esac
+    # `if ! grep -Fq … <<<"$out"` — NOT `pipeline | { … return 1; }`. See the
+    # idiom note below: a `return` inside the brace group would exit only the
+    # subshell, and this function would fall through to `return 0`, passing a
+    # demo line whose output does not contain the expected string. The
+    # herestring also removes the second hazard: `printf … | grep -q` under
+    # the dispatcher's pipefail lets grep exit on the first match while the
+    # producer still has bytes to write, the producer takes SIGPIPE, and the
+    # pipeline reports 141 — a TRUE match read as no match past ~64 KiB.
+    if ! grep -Fq -- "$needle" <<<"$out"; then
+      echo "oss: output missing '$needle'" >&2
+      printf '%s\n' "$out" | tail -5
+      return 1
+    fi
+  fi
+  # Vacuous green: only for a success expectation - `exit 0` alone, or the
+  # combined form asking for exit 0. Scoping matters: a line legitimately
+  # expecting `exit 1` from a recognized runner is not vacuous, and the unscoped
+  # form in demo.sh fails exactly that case.
+  if [ "$want" = "0" ] && printf '%s' "$out" | oss_verify_zero_tests_guard "$cmd"; then
+    echo "vacuous green: '$cmd' is a recognized runner and executed zero tests" >&2
     return 1
   fi
   return 0
@@ -215,7 +233,7 @@ oss_verify_redgate() { # $1=workdir $2=command $3=expectation
   local step=0
   oss_verify_auto_step "$dir" "$cmd" "$exp" >/dev/null 2>&1 || step=$?
   if [ "$step" -eq 2 ]; then
-    echo "red-gate: malformed expectation '$exp' - not a RED (grammar: 'exit <n>' | 'output contains <str>')" >&2
+    echo "red-gate: malformed expectation '$exp' - not a RED (grammar: 'exit <n>' | 'output contains <str>' | 'exit <n> and output contains <str>')" >&2
     return 2
   fi
   if [ "$step" -eq 0 ]; then

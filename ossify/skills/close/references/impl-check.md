@@ -89,9 +89,9 @@ Both nonzero codes halt, and they mean different things, so say which:
 | 1 | the AC failed | `[AC]` |
 | 2 | the expectation is malformed or unrecognized | `[AC]`, and name the criterion, not the code |
 
-An rc 2 is a **criterion** defect: the expectation grammar is `exit <n>` or
-`output contains <str>`, and anything else fails closed rather than passing
-silently. That routes to the third recovery option (re-author the AC), never to
+An rc 2 is a **criterion** defect: the expectation grammar is `exit <n>`,
+`output contains <str>`, or `exit <n> and output contains <str>`, and anything
+else fails closed rather than passing silently. That routes to the third recovery option (re-author the AC), never to
 "re-dispatch the implementer" — the code is not what is wrong.
 
 **`verify_step` already applies the zero-tests guard for you.** A command naming

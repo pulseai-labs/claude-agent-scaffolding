@@ -96,6 +96,7 @@ missing, has only one backtick, or is empty between its backticks is different:
 ```text
 - [ ] AC-<N> auto: `<command>` → expected: exit <n>
 - [ ] AC-<N> auto: `<command>` → expected: output contains <string>
+- [ ] AC-<N> auto: `<command>` → expected: exit <n> and output contains <string>
 - [ ] AC-<N> user: <a step a human performs>  — documentation for the implementer only; not parsed, not gated
 ```
 
@@ -109,8 +110,9 @@ Five parts, each load-bearing:
 | `` `<command>` `` | **Backticked**, before the `→` | No pair of backticks there, a lone backtick, or an empty command: `verify_acs` names the AC and exits **3** — the gate halts. A backticked word in the expectation is never taken as the command |
 | `→ expected: ` | U+2192, then the literal word | An ASCII `->`, or a missing `expected:`, lands the whole tail in the expectation field: a row is emitted and it is **unusable** |
 
-**The expectation grammar is `exit <n>` or `output contains <str>` — space-form,
-no colon.** This is the one to get wrong, because §8's ledger lines take the
+**The expectation grammar has three space-form rows — `exit <n>`,
+`output contains <str>`, or `exit <n> and output contains <str>` — and no colon
+anywhere.** This is the one to get wrong, because §8's ledger lines take the
 **colon-form** (`exit:0`, `contains:ready`), and an agent that just authored a
 batch of ledger lines will carry the habit straight into the spec. They are
 different grammars read by different parsers:
@@ -120,6 +122,11 @@ different grammars read by different parsers:
 | Expectation | `expected: exit 0` | `exit:0` |
 | Arrow | `→` required | no arrow |
 | Checkbox + label | required | none |
+
+A plain `output contains` row reads no exit status (only a command that cannot
+run, rc 126 or 127, fails it); when the exit matters, name it:
+`exit 0 and output contains <str>`. The combined form is a spec-AC form only —
+the ledger's `contains:` has no exit half (a follow-up issue tracks it).
 
 `close/references/impl-check.md` §2 owns the runtime side of this grammar; when
 the two disagree, it is authoritative. The worker's Gate 2 also shape-checks the

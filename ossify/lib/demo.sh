@@ -107,6 +107,13 @@ oss_demo_run_auto() { # $1=state-file [$2=explicit-workdir]
           echo "FAIL $id - $text (vacuous-green: recognized runner executed zero tests)"; return 1
         fi ;;
       contains:?*)
+        # A command that could not run (126 not executable, 127 not found) never
+        # passes an output check: the shell's own error text can carry the needle,
+        # and this arm reads no exit status at all (pulse360
+        # `verify-step-halt-swallowed-false-pass`). Any other nonzero exit is left
+        # alone - a line may expect a refusal message from `exit 1`.
+        case "$rc" in 126|127)
+          echo "FAIL $id - $text (rc=$rc: the command is not invocable here; an output check never passes on it)"; printf '%s\n' "$out" | tail -5; return 1;; esac
         case "$out" in *"${expected#contains:}"*) ;; *)
           echo "FAIL $id - $text (output missing '${expected#contains:}')"; printf '%s\n' "$out" | tail -5; return 1;; esac ;;
       *)
