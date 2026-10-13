@@ -100,7 +100,10 @@ you, and the bell rings.
 **Permission asks.** A `deny` is never changed (a deny rings once per tool and reason, as "hard
 deny"; a deny from a plugin beneath autonomic's `tool.call` hook, such as a seat guard, rings the
 same way). On an `ask` verdict, first, in code, the **never-approve list** keeps the ask with you
-and rings. On an `allow` verdict — bypass permissions, or a settings allow rule — a command that
+and rings when a command's own words match a rule. Since 0.5.1 a match found only in text (a message,
+a quoted argument, an interpreter's script, a command whose verb is a variable) goes to the fork
+instead, with the finding in its prompt.
+On an `allow` verdict — bypass permissions, or a settings allow rule — a command that
 matches the list becomes an `ask`, so you get the normal permission dialog, and it rings (the
 **bypass floor**; see "Permission modes").
 
@@ -247,7 +250,7 @@ is the fork's to judge on an ask, and is left alone on an allow. A repo whose de
 direct pushes by design removes `default-branch-push`.
 
 When no rule matches, the fork judges the call against the policy's
-permission scope and the live turn: `allow` is recorded and the tool runs; anything else leaves the ask and rings. The list applies to any tool whose input has a `command` (Bash, Monitor). A call whose input is longer than the fork is shown (4000 characters) stays an ask and rings. `AskUserQuestion` and `ExitPlanMode` are never approved here: their permission prompt is your own dialog.
+permission scope and the live turn: `allow` is recorded and the tool runs; anything else leaves the ask and rings. The list applies to any tool whose input has a `command` (Bash, Monitor). A call whose input is longer than the fork is shown (64,000 characters since 0.5.1; 4000 before) stays an ask and rings: no call is allowed with a part the fork did not see. `AskUserQuestion` and `ExitPlanMode` are never approved here: their permission prompt is your own dialog.
 
 **The live turn.** The permission and ask forks also get the turn digest: the session's last 12
 prompts and main-thread tool results since the fork's transcript was sent, one line each (a
@@ -262,9 +265,10 @@ The turn-end fork does not get it.
 
 - **Bypass permissions** (`--dangerously-skip-permissions`). Claude Code never asks, so the
   permission fork never runs and no "nothing to judge yet" ring occurs. In autopilot, a command
-  that matches an enabled `neverApprove` rule still reaches you as a permission dialog with the
-  reason `autonomic: never-approve — <rules>`, and the pain signal names the line that matched.
-  This is the floor that makes autopilot safe under bypass.
+  whose own words match an enabled `neverApprove` rule still reaches you as a permission dialog with
+  the reason `autonomic: never-approve — <rules>`, and the pain signal names the line that matched.
+  A text-only match goes to the fork: its `allow` keeps the allow, anything
+  else reaches you. This is the floor that makes autopilot safe under bypass.
 - **Auto or default.** Claude Code asks, and the ask path above applies. The first ask after a
   clear rings "nothing to judge yet": the fork has no request to copy until the session's first
   response.

@@ -22,6 +22,32 @@ All notable changes to the `autonomic` plugin.
   `/autopilot off` or a fall to manual is not, so do not drive herdr-crew launches from an OMP top until PR 4); the `ask` tool exists in
   `rpc-ui` and the TUI only; an ask is answered only from what the session has read. The Claude Code mod is unchanged.
 
+## 0.5.1
+
+**The floor asks only on what a command does** (#758: 53 asks in five hours on 2026-10-12, 16 of them
+false positives, 17 inputs never judged).
+
+- **Two levels of finding** (`floorFindings`, `never.ts`). A rule that matches a parsed command's
+  own words — its arguments as Bash passes them, with whitespace inside quotes kept in one word —
+  asks you, as before. A rule that matches only in text the floor cannot read command by command
+  (the whole-text read, words inside a quoted argument, a command read over all words) goes to the
+  fork, with the finding in its prompt. The floor never approves. `neverRules` returns both levels.
+- **Long inputs are judged.** The fork now sees an input whole up to 64,000 characters (was 4000),
+  SubagentHandbacks included; a longer input still asks, so no call is allowed with a part the fork
+  did not see.
+- **Smaller fixes.** A sed script keeps a backslash inside single quotes (`'s/a\/b/c/'` is a safe sed);
+  the pain band shows the command that matched.
+- **Known limits.** A push from a detached or `main` checkout still asks `default-branch-push`, even to
+  a named feature branch (#758 cause 1): every way to read the real destination from the text alone
+  met a new route around it in review (another remote, inline or earlier config, `HOME`). It is #766.
+  Every branch delete still asks, an already-merged one included: #758's decision
+  to send merged deletes to the fork is #764 (proving a branch merged before the call runs kept
+  meeting new shapes in review). A session's first call still asks: there is nothing to fork yet. A
+  literal variable that holds spaces, used inside double quotes (`F='push -f'; curl -d "$F" …`), is
+  re-split when the floor reads its value, so it can ask where Bash passes one data argument. `rm` of
+  a path that starts with a variable the text does not assign (`rm "$T/x"`) still asks: unquoted, the
+  variable may hold flags.
+
 ## 0.5.0
 
 **The never-approve list judges each command on its own words** (a replay of three days of

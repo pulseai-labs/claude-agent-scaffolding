@@ -11,10 +11,10 @@ import { DEFAULT_POLICY, POLICY_ID, expandHome } from './policy'
 import { scopeMessage } from './prompts'
 import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from './records'
 import type { SessionRecord } from './records'
-import { DEFAULT_READERS, namesDanger, neverRules } from './never'
+import { DEFAULT_READERS, floorFindings, namesDanger } from './never'
 import { enforced } from './enforce'
 import { inputShape, shape } from './shape'
-import type { NeverRule, Where } from './never'
+import type { Finding, Where } from './never'
 import { permissionPrompt } from './prompts'
 import { parsePermission } from './verdict'
 import { MAX_INPUT, askPrompt, shownInput } from './prompts'
@@ -308,12 +308,21 @@ async function statusReport($: Engine, id: string): Promise<string> {
   return lines.join('\n')
 }
 
-// The pain text leads with the line that names a danger, so the band shows what tripped (#677 F9).
-function painFocus(rules: readonly string[], command: string): string {
+// 0.5.1 (§6): the floor's findings for a command, only the operator's enabled rules.
+type FloorRead = { ask: Finding[]; fork: Finding[] }
+async function floorOf($: Engine, command: string): Promise<FloorRead> {
+  const { findings } = floorFindings(command, await where($), cfg.readers)
+  const on = new Set(enforced([...new Set(findings.map(f => f.rule))], cfg.neverApprove))
+  const live = findings.filter(f => on.has(f.rule))
+  return { ask: live.filter(f => f.level === 'ask'), fork: live.filter(f => f.level === 'fork') }
+}
+const rulesIn = (found: readonly Finding[]) => [...new Set(found.map(f => f.rule))]
+// The fork sees each finding's shape, never its text (PR #681 round 8).
+const notesOf = (f: FloorRead) => f.fork.map(x => ({ rule: x.rule, focus: shape(x.focus) }))
+// The pain text leads with the command that matched, so the band shows what tripped (#677 F9; 0.5.1 cause 8).
+function painFocus(found: readonly Finding[], command: string): string {
   const lines = command.split('\n').map(l => l.trim()).filter(Boolean)
-  const hit = lines.find(l => namesDanger(l)) ?? lines[0] ?? command
-  // The shape, never the text: no credential reaches a pain signal (PR #681 round 8).
-  return `${rules.join(', ')} — ${shape(hit)}${lines.length > 1 ? ` (+${lines.length - 1} more lines)` : ''}`
+  return `${rulesIn(found).join(', ')} — ${shape(found[0]!.focus)}${lines.length > 1 ? ` (+${lines.length - 1} more lines)` : ''}`
 }
 
 // Tools that change nothing: a turn of these alone is no progress for the loop guard.
@@ -572,32 +581,54 @@ export const register: Register = (on, options) => {
     const r = await next(e)
     try {
       if (r.decision === 'allow') {
-        // The bypass floor (0.1.1 §3.1): in autopilot a never-approve match reaches the
-        // operator whatever allowed it. Manual mode never touches an allow.
+        // The bypass floor (0.1.1 §3.1): in autopilot a never-approve match in a command's own
+        // words reaches the operator whatever allowed it. Manual mode never touches an allow.
         const raw = (e.input as { command?: unknown } | undefined)?.command
         if (typeof raw !== 'string' || !namesDanger(raw, cfg.readers)) return r
         // From here every failure keeps the call with the operator (final review I1): an
         // unneeded ask costs one dialog, a missed one a force push.
-        let rules: NeverRule[]
+        let f: FloorRead
+        let auto: boolean
         try {
           // A session that left autopilot through a failure (ledger, record, policy) keeps the
           // floor: under bypass, manual means no asks at all (PR #681). /autopilot off clears it.
           const m = await modeOf($)
           if (m.mode !== 'autopilot' && m.problem === undefined) return r
-          rules = enforced(neverRules(raw, await where($), cfg.readers), cfg.neverApprove)
+          auto = m.mode === 'autopilot'
+          f = await floorOf($, raw)
         } catch (err) {
           await log($, `floor error ${String(err)}`)
           return { ...r, decision: 'ask', reason: 'autonomic: the never-approve check failed; this call stays with you' }
         }
-        if (rules.length === 0) return r
+        if (f.ask.length === 0 && f.fork.length === 0) return r
+        // Outside autopilot there is no fork: a text-only finding asks too.
+        const stop = f.ask.length > 0 ? f.ask : auto ? [] : f.fork
+        if (stop.length > 0) {
+          try {
+            const id = await $.session.id()
+            await record($, id, 'permission', `${e.tool}: ${shape(raw)}`, 'ask the operator', `never-approve: ${rulesIn(stop).join(', ')}`)
+            await pain($, id, 'never-approve', painFocus(stop, raw))
+          } catch (err) {
+            await log($, `floor signal error ${String(err)}`)
+          }
+          return { ...r, decision: 'ask', reason: `autonomic: never-approve — ${rulesIn(stop).join(', ')}` }
+        }
+        // 0.5.1 (D4): only findings the fork judges. Its allow keeps the allow; anything else asks.
         try {
           const id = await $.session.id()
-          await record($, id, 'permission', `${e.tool}: ${shape(raw)}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
-          await pain($, id, 'never-approve', painFocus(rules, raw))
+          // No call is allowed with a part the fork did not see (PR #763).
+          if (shownInput(e.input).length > MAX_INPUT) {
+            await pain($, id, 'permission for you', `${e.tool} (input too long to judge; floor: ${rulesIn(f.fork).join(', ')})`)
+            return { ...r, decision: 'ask', reason: `autonomic: too long for the fork to judge — ${rulesIn(f.fork).join(', ')}` }
+          }
+          const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? '', digestOf(id), notesOf(f)), parsePermission)
+          if ('v' in j && j.v.decision === 'allow' && (await record($, id, 'permission', `${e.tool}: ${shape(raw)}`, 'allow', j.v.reason, j.usage))) return r
+          const why = 'v' in j ? j.v.reason : 'fail' in j ? j.fail : 'nothing to judge yet'
+          await pain($, id, 'permission for you', `${e.tool} (${why}; floor: ${rulesIn(f.fork).join(', ')})`)
         } catch (err) {
-          await log($, `floor signal error ${String(err)}`)
+          await log($, `floor fork error ${String(err)}`)
         }
-        return { ...r, decision: 'ask', reason: `autonomic: never-approve — ${rules.join(', ')}` }
+        return { ...r, decision: 'ask', reason: `autonomic: the fork did not allow — ${rulesIn(f.fork).join(', ')}` }
       }
       if ((await modeOf($)).mode !== 'autopilot') return r
       const id = await $.session.id()
@@ -612,21 +643,23 @@ export const register: Register = (on, options) => {
       // A tool whose permission prompt is the operator's own dialog is never approved (final review C1).
       if (USER_DIALOG.has(e.tool)) return r
       const raw = (e.input as { command?: unknown } | undefined)?.command
+      let notes: { rule: string; focus: string }[] = []
       if (typeof raw === 'string') {
-        const command = raw
-        const rules = enforced(neverRules(command, await where($), cfg.readers), cfg.neverApprove)
-        if (rules.length > 0) {
-          await record($, id, 'permission', `${e.tool}: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
-          await pain($, id, 'never-approve', painFocus(rules, command))
+        const f = await floorOf($, raw)
+        if (f.ask.length > 0) {
+          await record($, id, 'permission', `${e.tool}: ${shape(raw)}`, 'ask the operator', `never-approve: ${rulesIn(f.ask).join(', ')}`)
+          await pain($, id, 'never-approve', painFocus(f.ask, raw))
           return r
         }
+        notes = notesOf(f)
       }
-      // The fork sees at most MAX_INPUT characters: a longer call stays with the operator (final review I6).
+      // The fork sees at most MAX_INPUT characters, whole: a longer call stays with the operator
+      // (final review I6; 64k since 0.5.1, PR #763 — no call is allowed with an unseen part).
       if (shownInput(e.input).length > MAX_INPUT) {
         await pain($, id, 'permission for you', `${e.tool} (input too long to judge)`)
         return r
       }
-      const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? '', digestOf(id)), parsePermission)
+      const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? '', digestOf(id), notes), parsePermission)
       if ('v' in j && j.v.decision === 'allow') {
         if (await record($, id, 'permission', `${e.tool}: ${inputShape(e.input)}`, 'allow', j.v.reason, j.usage))
           return { ...r, decision: 'allow', reason: `autonomic: ${j.v.reason}` }
