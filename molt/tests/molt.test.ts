@@ -184,7 +184,7 @@ describe('no handoff', () => {
     const w = world(on)
     at(w, 81)
     await $.turn.complete(TURN('done'))
-    expect(w.files.get('/home/u/.claude/state/molt/briefs/s1.md')).toContain('## Files written or edited')
+    expect(w.files.get('/home/u/.claude/state/molt/briefs/s1.md')).toContain('## Files the session wrote or tried to write')
     expect(w.clears).toBe(1)
   })
 })
