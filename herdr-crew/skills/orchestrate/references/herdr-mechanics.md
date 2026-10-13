@@ -67,7 +67,10 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    a digit, `.`, `_`, `/` or `-`; any other is not passed on: the child gets
    `<run dir>/autonomic-ledger.md` instead. `<run dir>` and `REPORT_PATH` are herdr-crew's own
    choice and keep to the same characters. The launcher's mode is autonomic's live mode, read at each
-   launch — `printf %s "$AUTONOMIC_EFFECTIVE_MODE"`, set by autonomic 0.4.0 on every mode change. It is
+   launch — on Claude Code, `printf %s "$AUTONOMIC_EFFECTIVE_MODE"`, set by autonomic 0.4.0 on every mode change.
+   An OMP launcher (an `omp-seat` coordinator) reads `cat "$AUTONOMIC_MODE_FILE"` (autonomic 0.7.0), because
+   omp's bash children keep the environment from session start. Exactly `autopilot` marks the child; anything
+   else (unset, missing file, older autonomic) does not. It is
    never `$AUTONOMIC_MODE`, the spawn's input: the top may be in autopilot by `/autopilot on` or a
    molt's lineage, which that never shows, or may have been refused it. It is never the record file
    either: one that failed to write can still read `autopilot` after a fall to manual. `autopilot`

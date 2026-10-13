@@ -65,7 +65,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=357  # 0.2.13: lowered from 360 when the dsh carve-out left step 2 and the heartbeat. 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
+REF_BUDGET=360  # 0.2.18: +3 lines for the OMP mode-file read; adjacent over-budget control retained. 0.2.13: lowered from 360 when the dsh carve-out left step 2 and the heartbeat. 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -217,7 +217,9 @@ pin "$REF" 'MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger>
 pin "$REF" '`AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot' \
   "autopilot is passed down, never set on a manual launcher's child" flat
 pin "$REF" 'printf %s "$AUTONOMIC_EFFECTIVE_MODE"' \
-  "the launcher's mode is autonomic's live mode (0.2.10)" flat
+  "Claude Code reads the live environment mode (0.2.10)" flat
+pin "$REF" 'cat "$AUTONOMIC_MODE_FILE"' \
+  "OMP reads the live mode file (autonomic 0.7.0)" flat
 pin "$REF" 'never `$AUTONOMIC_MODE`' "the mode is never read from the spawn's input" flat
 pin "$REF" 'never the record file' "the record file is never the signal (it can be stale)" flat
 pin "$REF" 'unset included' "an unset signal marks no child (D2)" flat
