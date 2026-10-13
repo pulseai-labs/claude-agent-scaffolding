@@ -2377,6 +2377,38 @@ t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_i
 t_assert_rc 0 "B5: a SPINE.md with no bones section (pre-1.19.0 plan) does not halt"
 t_assert_eq "1" "$(cd "$B4WS" && bash "$OSS" get '.bones | length')" "B5: ...and registers nothing"
 
+# B6. A row that is not FOUR cells is the failure this step exists to prevent, one
+# shape in: it would drop out of the read without a word while SPINE.md still says
+# the bone exists, so the registry and the plan disagree and only the file is read
+# by a human. Halt and name the row - never skip it.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0042 | a row missing its revisit column and its trailing pipe | src/short/**\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "B6: a row that is not four cells halts"
+t_assert_contains "$T_OUT" "ADR-0042" "B6: ...naming the row"
+t_assert_contains "$T_OUT" "not four cells" "B6: ...for its own reason, not as a missing ADR file: the repairs differ"
+t_assert_eq "0" "$(cd "$B4WS" && bash "$OSS" get '[.bones[] | select(.adr=="ADR-0042")] | length')" \
+  "B6: ...and registering nothing for it"
+
+# B7. THE SHIFTED CELL. A row whose Touch surface cell is EMPTY and whose revisit
+# column is not: `read` with IFS=$'\t' treats tab as IFS *whitespace*, so an empty
+# middle cell collapses and the revisit text shifts one slot left, into the touch
+# surface. Both the loop's guard and `oss bone_add` then see a non-empty value, the
+# row registers, and a prose phrase becomes the glob set that decides every later
+# touch_check - silently. The cells are validated where their boundaries are known
+# (in the reader over the table), not after the shift.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0051 | a row with no touch surface | | a second storage backend |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+# Its ADR file EXISTS, so the missing-file halt cannot mask the shift: the only
+# thing standing between this row and a registered bone is the row's own shape.
+printf 'the shifted-cell fixture ADR\n' > "$B4CANON/docs/adr/adr-0051-a-broken-row.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "B7: a row with an empty touch cell halts"
+t_assert_contains "$T_OUT" "ADR-0051" "B7: ...naming the row"
+t_assert_contains "$T_OUT" "not four cells" "B7: ...as a malformed row, which is what it is"
+t_assert_eq "0" "$(cd "$B4WS" && bash "$OSS" get '[.bones[] | select(.adr=="ADR-0051")] | length')" \
+  "B7: ...and registering nothing - the revisit text never lands in the touch slot"
+
 cd /; rm -rf "$TMP"
 
 # A FLOOR ON THE ASSERTION COUNT. Every check in test-block-ledger.sh proves
@@ -2384,9 +2416,11 @@ cd /; rm -rf "$TMP"
 # behavioural assertions around that being deleted, and a file whose assertions
 # are gone reports pass=0 fail=0 and exits 0. The floor is what makes wholesale
 # removal loud. Raise it when the file grows; never lower it to make a run go
-# green. (Codex P2 round 3 on PR #144.)
-if [ "$T_PASS" -lt 220 ]; then
-  echo "FAIL: test-close.sh ran only $T_PASS assertions (floor 220) - assertions were removed, not just skipped"
+# green. (Codex P2 round 3 on PR #144.) Raised 220 -> 430 with the B-series
+# (#497): the floor tracks the file's size, and 430 still leaves room for an
+# ordinary edit to drop or fold a handful of assertions without a false alarm.
+if [ "$T_PASS" -lt 430 ]; then
+  echo "FAIL: test-close.sh ran only $T_PASS assertions (floor 430) - assertions were removed, not just skipped"
   T_FAIL=$((T_FAIL+1))
 fi
 t_summary

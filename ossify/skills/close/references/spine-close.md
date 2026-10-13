@@ -791,7 +791,10 @@ parts="$(oss id_parse "$spine_id")" || parts=""
 rel_id="r$(printf '%s\n' "$parts" | awk '{print $2}')"
 rel_dir="$(oss release_dir "$rel_id")" \
   || { echo "close: cannot resolve the release directory for $spine_id - halt"; exit 1; }
-spine_dirs="$(find "$rel_dir" -maxdepth 1 -type d -name "$spine_id-*" 2>/dev/null)"
+# `|| true`, so an unreadable $rel_dir reaches the guard below and is NAMED there:
+# a bare failing substitution aborts the ceremony with no output at all, which is
+# the one failure shape this block cannot report.
+spine_dirs="$(find "$rel_dir" -maxdepth 1 -type d -name "$spine_id-*" 2>/dev/null || true)"
 n_spine_dirs="$(printf '%s\n' "$spine_dirs" | awk 'NF{n++} END{print n+0}')"
 [ "$n_spine_dirs" -eq 1 ] \
   || { echo "close: expected exactly one spine dir for $spine_id, found $n_spine_dirs - halt"; exit 1; }
@@ -803,15 +806,24 @@ spine_md="$spine_dirs/SPINE.md"
 # heading, rows only (the header cell and the |---|---| separator are not rows, and
 # a `None.` line is not one either). One tab-separated record per row, cells
 # trimmed, so a title's spaces and a touch list's commas survive; the four fields
-# are `oss bone_add`'s four arguments in its order.
+# are `oss bone_add`'s four arguments in its order. A line that starts a table row
+# inside the section and is NOT four cells with a ref, a title and a touch surface
+# is emitted as a `!` record, and the loop HALTS on it: dropping it silently is the
+# defect this step exists to prevent - SPINE.md would still say the bone exists
+# while the registry never hears of it, and only the file is read by a human. The
+# cells are validated HERE, where their boundaries are known: `read` treats a tab as
+# IFS whitespace, so an empty middle cell collapses and the next cell's text shifts
+# one slot left, into a slot the loop's own guards then read as present.
 rows="$(awk '
   /^## Bones this spine registers[[:space:]]*$/ { insec = 1; next }
-  insec && /^##/ { exit }
+  insec && /^##[^#]/ { exit }
   insec && /^[[:space:]]*\|/ {
-    if (split($0, c, "|") < 6) next
-    for (i = 2; i <= 5; i++) gsub(/^[[:space:]]+|[[:space:]]+$/, "", c[i])
-    if (c[2] ~ /^[-: ]*$/ || tolower(c[2]) == "adr") next
-    printf "%s\t%s\t%s\t%s\n", c[2], c[3], c[4], c[5]
+    n = split($0, c, "|")
+    for (i = 2; i <= n - 1; i++) gsub(/^[[:space:]]+|[[:space:]]+$/, "", c[i])
+    if (c[2] != "" && c[2] ~ /^[-: ]+$/) next      # the |---|---| separator row
+    if (tolower(c[2]) == "adr") next               # the header row
+    if (n != 6 || c[2] == "" || c[3] == "" || c[4] == "" || index(c[2] c[3] c[4] c[5], "\t") > 0) { printf "!\t%s\n", $0; next }
+    printf "+\t%s\t%s\t%s\t%s\n", c[2], c[3], c[4], c[5]
   }' "$spine_md")" \
   || { echo "close: cannot read $spine_md - halt"; exit 1; }
 
@@ -838,8 +850,13 @@ $root/docs/adr"
 $hosting_repos
 EOF
 
-  while IFS="$(printf '\t')" read -r adr title touch revisit; do
-    [ -n "$adr" ] || continue
+  while IFS="$(printf '\t')" read -r kind adr title touch revisit; do
+    [ -n "$kind" ] || continue
+    if [ "$kind" = "!" ]; then
+      echo "close: the bones table in $spine_md has a row that is not four cells (ADR | Title | Touch surface | Revisit when): '$adr' - halt"; exit 1
+    fi
+    [ -n "$adr" ] \
+      || { echo "close: a bones row in $spine_md carries no ADR ref, and a row without a ref is not a row - halt"; exit 1; }
     [ -n "$title" ] && [ -n "$touch" ] \
       || { echo "close: the bones row '$adr' carries no title or no touch surface, and both are bone_add arguments - halt"; exit 1; }
     # A ref with no number is not one this project mints: a row is a bone the
@@ -895,8 +912,11 @@ fi
 **The touch check that follows sees these bones, and that is the point.** A flesh
 spine whose changes touch a bone it just registered is reclassified by step 5's
 normal path: creating a bone is a bone decision, and the glob it wrote covers the
-code it wrote. A spine already `bone` records no `class_set` at all — §6.1's
-re-read is for a spine that *became* bone there.
+code it wrote. A spine already `bone` is classed the same either way, but §6.1
+still runs on its hit — that section's `class_set` has no current-class guard, and
+`oss class_set` accepts `to == from` — so it appends a `bone`→`bone` entry to
+`class_overrides`. That is a weakness of §6.1, not of this step; guarding it is a
+separate change.
 
 **What this step is not.** It does not repair older entries, re-point a stale
 surface, or check that the ADR's own text says what the row says (the ADR check's
