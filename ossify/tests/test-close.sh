@@ -2279,6 +2279,104 @@ t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
 t_assert_rc 1 "P18: a two-remote (fork-shaped) repo halts the landing pass"
 t_assert_contains "$T_OUT" "several remotes" "P18: ...naming them, never silently preferring origin"
 
+# ---------------------------------------------------------------------------
+# B-series — step 4b, the bones this spine's plan declares (#497). The block is
+# EXTRACTED FROM THE SHIPPED PROSE and executed against a real scratch ossify
+# state, like the E- and P-series above: the registry it writes is what
+# `touch_check` reads and what a later spine's class declaration rides, so an arm
+# that quietly registers nothing is invisible twice over. The spine directory is
+# the one the ceremony's own glob recovers (SPINE.md lives there), and the ADR
+# files sit in the hosting repo's docs/adr, the registry's own location.
+# ---------------------------------------------------------------------------
+B4WS="$TMP/b4ws"; B4CANON="$TMP/b4canon"
+mkdir -p "$B4WS/.workspace" "$B4CANON/docs/adr"
+printf '{"schema_version":"1.0","ai_workspace":{"root":"%s"},"canonical":{"root":"%s"},"well_known_paths":{}}\n' \
+  "$B4WS" "$B4CANON" > "$B4WS/.workspace/pairing.json"
+git -C "$B4CANON" init -q
+git -C "$B4CANON" config user.email t@t; git -C "$B4CANON" config user.name t
+echo seed > "$B4CANON/seed.txt"; git -C "$B4CANON" add seed.txt; git -C "$B4CANON" commit -qm seed
+( cd "$B4WS" && bash "$OSS" init "bones fixtures" >/dev/null )
+B4REL="$(cd "$B4WS" && bash "$OSS" release_add "the bones arm" "fixtures")"
+B4SP="$(cd "$B4WS" && bash "$OSS" spine_add "$B4REL" "registers its bones" flesh)"
+( cd "$B4WS" && bash "$OSS" work_item_add "$B4SP" "the item" canonical >/dev/null )
+B4DIR="$B4WS/docs/specs/$B4REL/$B4SP-registers-its-bones"; mkdir -p "$B4DIR"
+B4_BLOCK="$TMP/spine-bones.sh"
+_extract_block "$SPINE_CLOSE" 'Bones this spine registers' "$B4_BLOCK"
+if [ -s "$B4_BLOCK" ] && grep -Fq 'Bones this spine registers' "$B4_BLOCK"; then
+  T_PASS=$((T_PASS+1))
+else
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: could not extract the bones registration block from spine-close.md - the assertions below are vacuous"
+fi
+# The hosting repo owns the ADR the row promises; the file joins the series, so it
+# is found by NUMBER and not by a name the row would have to guess.
+printf 'the bones fixture ADR\n' > "$B4CANON/docs/adr/adr-0024-the-touch-check-surface.md"
+# SPINE.md: the plan's own file, with the section the row is read from.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Decomposition\n\nw1 the item\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0024 | the touch-check surface | src/domain/**,src/port.rs | a second storage backend |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+
+# B1. A row whose ADR file exists and whose ref is not yet registered: the four
+# columns land as bone_add's four arguments, in that order - a swapped pair
+# registers the title as the touch surface and nothing reports it.
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 0 "B1: a declared bone with its ADR file registered cleanly"
+t_assert_contains "$T_OUT" "ADR-0024" "B1: ...saying which bone it registered"
+t_assert_eq "ADR-0024" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0024") | .adr')" \
+  "B1: the ref reached the registry"
+t_assert_eq "the touch-check surface" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0024") | .title')" \
+  "B1: ...with the row's TITLE in the title slot, not the touch surface"
+t_assert_eq "src/domain/**, src/port.rs" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0024") | .touch | join(", ")')" \
+  "B1: ...and the row's glob csv as the touch list"
+t_assert_eq "a second storage backend" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0024") | .revisit_trigger')" \
+  "B1: ...and its revisit trigger"
+
+# B2. RESUME: a halted close re-runs this step with its earlier rows already
+# registered. bone_add refuses the duplicate at rc 7 (#305), so without the skip
+# the ceremony could never be resumed past its own earlier work.
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 0 "B2: re-running the step over a registered ref does not halt"
+t_assert_contains "$T_OUT" "bone ADR-0024 already registered - skipping" "B2: ...it skips it in one line, as the ceremony promises"
+t_assert_eq "1" "$(cd "$B4WS" && bash "$OSS" get '[.bones[] | select(.adr=="ADR-0024")] | length')" \
+  "B2: ...and the registry still holds exactly one record for the ref"
+
+# B3. THE PROMISE: the row names an ADR this spine never wrote. Registering the
+# index entry anyway points the registry at a decision no file records, and
+# touch_check then reports a surface whose reasoning nobody can read.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0031 | a decision with no ADR file | src/other/** | |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "B3: a row whose ADR file is missing halts the close"
+t_assert_contains "$T_OUT" "ADR-0031" "B3: ...naming the ref the plan declared"
+t_assert_eq "0" "$(cd "$B4WS" && bash "$OSS" get '[.bones[] | select(.adr=="ADR-0031")] | length')" \
+  "B3: ...and registering nothing for it"
+
+# B3b. ADJACENT CONTROL, the other non-file: a ref this step cannot resolve to a
+# file at all (an ADOPTED, letters-bearing identifier - a bone the plan only
+# CITES, which is not a row). Halting on it is what keeps a cited bone out of the
+# spine's own registry record; a step that treated it as a row would add a second
+# record for a decision this spine did not make.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-A17 | an adopted identifier | src/other/** | |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "B3b: a row that is not a ref this project mints halts"
+t_assert_contains "$T_OUT" "ADR-A17" "B3b: ...naming it"
+t_assert_contains "$T_OUT" "not a numeric ADR ref" "B3b: ...as a row that is not a bone the spine creates, not as a missing file: the two halts have different repairs"
+
+# B4/B5. NOTHING TO REGISTER, two ways: `None.` (the plan looked and found none)
+# and no section at all (a spine planned before 1.19.0). Both register nothing,
+# say so in one line, and NEVER halt - a spine that creates no bone is normal.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Demo contribution\n\n- a line\n\n## Bones this spine registers\n\nNone.\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 0 "B4: a plan declaring None. registers nothing and does not halt"
+t_assert_contains "$T_OUT" "declares no bones" "B4: ...saying so in one line"
+t_assert_eq "1" "$(cd "$B4WS" && bash "$OSS" get '.bones | length')" \
+  "B4: ...with the registry unchanged (the B1 record alone)"
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Demo contribution\n\n- a line\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 0 "B5: a SPINE.md with no bones section (pre-1.19.0 plan) does not halt"
+t_assert_eq "1" "$(cd "$B4WS" && bash "$OSS" get '.bones | length')" "B5: ...and registers nothing"
+
 cd /; rm -rf "$TMP"
 
 # A FLOOR ON THE ASSERTION COUNT. Every check in test-block-ledger.sh proves

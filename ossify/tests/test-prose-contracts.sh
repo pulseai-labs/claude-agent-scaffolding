@@ -1821,4 +1821,22 @@ pin "$_PS_SPEC" 'the single line `None.`' \
 pin "$_PS_SPEC" 'A row is a bone this spine *creates*' \
   "spec-authoring.md tells the author a cited ADR is not a row (#497)"
 
+# The reader half: spine-close's registration step, between the demo and the
+# touch check. Its arms are EXECUTED against a scratch state in test-close.sh's
+# B-series; these pins hold the interface the two files share - one section name,
+# one column order - and the three messages the ceremony promises by name.
+_SCB="$SKILLS/close/references/spine-close.md"
+pin "$_SCB" '## 5b. Step 4b — register the bones this spine' \
+  "spine-close.md carries the registration step between the demo (#5) and the touch check (#6) (#497)"
+pin "$_SCB" '`## Bones this spine registers` table' \
+  "spine-close.md reads the same section name plan-spine writes (#497)"
+pin "$_SCB" 'four arguments in its order' \
+  "spine-close.md names the four columns as bone_add's arguments, in its order (#497)"
+pin "$_SCB" 'already registered - skipping' \
+  "spine-close.md's already-registered arm skips with its one line (#497)"
+pin "$_SCB" 'declares no bones - registering none' \
+  "spine-close.md's no-bones arm says so in one line and never halts (#497)"
+pin "$_SCB" 'the spine never wrote it' \
+  "spine-close.md halts on a declared bone whose ADR file is missing (#497)"
+
 t_summary

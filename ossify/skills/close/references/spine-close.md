@@ -1,9 +1,10 @@
 # Spine close — the middle layer
 
-Depth for SKILL.md §5. Eleven steps in **binding order**: each step's output is
-the next one's input, and the order is the whole content of the ceremony — the
-demo measures a tree the merge assembled, the touch check reads the merge's own
-diff, cleanup deletes branches the merge made deletable.
+Depth for SKILL.md §5. Eleven steps in **binding order** — plus **step 4b**, the
+bones registration, inserted between the demo and the touch check. Each step's
+output is the next one's input, and the order is the whole content of the
+ceremony — the demo measures a tree the merge assembled, the touch check reads
+the merge's own diff, cleanup deletes branches the merge made deletable.
 
 This layer is reached as `/close <spine-id>`, deliberately, once. The execution
 lane never routes here: it hands work items to §4 one at a time and stops at the
@@ -763,6 +764,141 @@ ledger's wall-clock budget in **`references/cumulative-demo.md`**.
 critic, no retro, no harvest, no cleanup, no status write. A demo failure is the
 product telling you the spine is not closeable; recording it closed anyway is how
 the cumulative ledger stops meaning anything.
+
+---
+
+## 5b. Step 4b — register the bones this spine's plan declares
+
+**A spine that creates a bone registers it here, before the touch check**, because
+the registry is what `touch_check` matches against and what every later spine's
+class declaration rides. An ADR this spine wrote whose registry row never lands is
+invisible to each mechanical check that follows, while `SPINE.md` says the bone
+exists — the two records disagree, and only the file is read by a human. The
+declaration is `SPINE.md`'s `## Bones this spine registers` table
+(`plan-spine/references/spec-authoring.md` §1): the bones this spine **creates**,
+never the ones it merely rides. A spine planned before 1.19.0 has no such section;
+a spine that creates no bone writes `None.` — both register nothing, and that is a
+complete answer, not a failure.
+
+```bash
+# $spine_id is the ceremony's. The spine directory is recovered exactly as
+# harvest.md §2 recovers it - one glob, one ambiguity guard - so the two steps
+# cannot disagree about where the plan lives.
+parts="$(oss id_parse "$spine_id")" || parts=""
+rel_id="r$(printf '%s\n' "$parts" | awk '{print $2}')"
+rel_dir="$(oss release_dir "$rel_id")" \
+  || { echo "close: cannot resolve the release directory for $spine_id - halt"; exit 1; }
+spine_dirs="$(find "$rel_dir" -maxdepth 1 -type d -name "$spine_id-*" 2>/dev/null)"
+n_spine_dirs="$(printf '%s\n' "$spine_dirs" | awk 'NF{n++} END{print n+0}')"
+[ "$n_spine_dirs" -eq 1 ] \
+  || { echo "close: expected exactly one spine dir for $spine_id, found $n_spine_dirs - halt"; exit 1; }
+spine_md="$spine_dirs/SPINE.md"
+[ -f "$spine_md" ] \
+  || { echo "close: no SPINE.md at $spine_md - the plan's bones section is unreadable there, and so is the base-branch cross-check §3 reads - halt"; exit 1; }
+
+# THE SECTION'S TABLE BODY ONLY: from `## Bones this spine registers` to the next
+# heading, rows only (the header cell and the |---|---| separator are not rows, and
+# a `None.` line is not one either). One tab-separated record per row, cells
+# trimmed, so a title's spaces and a touch list's commas survive; the four fields
+# are `oss bone_add`'s four arguments in its order.
+rows="$(awk '
+  /^## Bones this spine registers[[:space:]]*$/ { insec = 1; next }
+  insec && /^##/ { exit }
+  insec && /^[[:space:]]*\|/ {
+    if (split($0, c, "|") < 6) next
+    for (i = 2; i <= 5; i++) gsub(/^[[:space:]]+|[[:space:]]+$/, "", c[i])
+    if (c[2] ~ /^[-: ]*$/ || tolower(c[2]) == "adr") next
+    printf "%s\t%s\t%s\t%s\n", c[2], c[3], c[4], c[5]
+  }' "$spine_md")" \
+  || { echo "close: cannot read $spine_md - halt"; exit 1; }
+
+if [ -z "$rows" ]; then
+  echo "close: $spine_id's plan declares no bones - registering none"
+else
+  # WHERE THE ADR FILE IS. A bone is a decision about the product code this spine
+  # changed, so its ADR lives in a hosting repo's `docs/adr/`
+  # (start/references/bones-registry.md §3) - and the registry keeps ONE
+  # project-wide sequence across every declared repo, so a row is matched to its
+  # file by NUMBER, in either series form and at any width, never by a name the
+  # row would have to guess. Read the hosting set as an assignment, as §3 does: a
+  # selector failure inside a process substitution is invisible.
+  hosting_repos="$(oss get ".work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .target_repo" | sort -u)" \
+    || { echo "close: the hosting-repo set could not be read from state - halt"; exit 1; }
+  adr_dirs=""
+  while IFS= read -r repo; do
+    [ -n "$repo" ] || continue
+    root="$(oss repo_root "$repo")" \
+      || { echo "close: $spine_id names undeclared repo '$repo' - halt"; exit 1; }
+    adr_dirs="$adr_dirs
+$root/docs/adr"
+  done <<EOF
+$hosting_repos
+EOF
+
+  while IFS="$(printf '\t')" read -r adr title touch revisit; do
+    [ -n "$adr" ] || continue
+    [ -n "$title" ] && [ -n "$touch" ] \
+      || { echo "close: the bones row '$adr' carries no title or no touch surface, and both are bone_add arguments - halt"; exit 1; }
+    # A ref with no number is not one this project mints: a row is a bone the
+    # spine CREATES, and the only refs it creates continue the numeric sequence.
+    # An adopted, letters-bearing ref is a bone the plan CITES - already
+    # registered elsewhere, and not this spine's to add.
+    want="$(printf '%s' "$adr" | sed -n 's/^[Aa][Dd][Rr]-0*\([0-9][0-9]*\)$/\1/p')"
+    [ -n "$want" ] \
+      || { echo "close: the bones row '$adr' is not a numeric ADR ref this project mints - a row is a bone the spine creates (plan-spine/references/spec-authoring.md §1) - halt"; exit 1; }
+
+    # THE ADR FILE MUST EXIST: the row is a promise that this spine wrote the
+    # decision, and register only the index leaves the registry citing a file
+    # nobody wrote. An UNREADABLE directory refuses too - it is not an empty one.
+    adr_file=""
+    while IFS= read -r d; do
+      [ -n "$d" ] || continue
+      [ -d "$d" ] || continue
+      listing="$(ls -1 "$d" 2>/dev/null)" \
+        || { echo "close: cannot read $d - an unreadable ADR directory is not an empty one - halt"; exit 1; }
+      while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        n="$(printf '%s' "$f" | sed -n -e 's/^[Aa][Dd][Rr]-0*\([0-9][0-9]*\)-.*\.md$/\1/p' -e 's/^0*\([0-9][0-9]*\)-.*\.md$/\1/p')"
+        if [ "$n" = "$want" ]; then adr_file="$d/$f"; break; fi
+      done <<EOF2
+$listing
+EOF2
+      [ -n "$adr_file" ] && break
+    done <<EOF3
+$adr_dirs
+EOF3
+    [ -n "$adr_file" ] \
+      || { echo "close: the plan declares bone $adr, but no ADR file carries $want in the hosting repos' docs/adr ($(printf '%s' "$adr_dirs" | tr '\n' ' '))- the spine never wrote it - halt"; exit 1; }
+
+    # ALREADY REGISTERED? A halted close re-runs this step with its earlier rows
+    # already recorded, and bone_add refuses a duplicate at rc 7 (#305) - so this
+    # skip is the resume path, not a convenience.
+    if [ -n "$(oss get ".bones[] | select(.adr == \"$adr\") | .adr")" ]; then
+      echo "close: bone $adr already registered - skipping"
+      continue
+    fi
+
+    # The verb's own message is the halt's: it names the offending argument and
+    # the repair better than a wrapper can.
+    oss bone_add "$adr" "$title" "$touch" "$revisit" \
+      || { echo "close: oss bone_add refused the row $adr from $spine_md - halt"; exit 1; }
+    echo "close: registered bone $adr \"$title\""
+  done <<EOF4
+$rows
+EOF4
+fi
+```
+
+**The touch check that follows sees these bones, and that is the point.** A flesh
+spine whose changes touch a bone it just registered is reclassified by step 5's
+normal path: creating a bone is a bone decision, and the glob it wrote covers the
+code it wrote. A spine already `bone` records no `class_set` at all — §6.1's
+re-read is for a spine that *became* bone there.
+
+**What this step is not.** It does not repair older entries, re-point a stale
+surface, or check that the ADR's own text says what the row says (the ADR check's
+standalone row is still not shipped, §1). It registers what the plan declares and
+refuses to register what the plan only cites.
 
 ---
 
