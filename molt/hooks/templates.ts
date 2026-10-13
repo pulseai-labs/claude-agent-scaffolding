@@ -40,3 +40,26 @@ export function fill(template: string, values: Readonly<Record<string, string | 
 export function expandHome(path: string, home: string): string {
   return path.startsWith('~/') ? `${home}/${path.slice(2)}` : path
 }
+
+// Shared operator notices and status records, used by both host glues.
+export const SESSION_OFF = "molt is off for this session. The crew context-ceiling hooks speak again here."
+export const SESSION_ON = "molt is on for this session."
+export const COMMAND_USAGE = "usage: /molt now | off | on | status"
+export const STATUS_OFF = "molt: off"
+export const STATUS_PAUSED = "molt: paused"
+export const HANDOFF_REQUIRED = "handoff required"
+export const HANDED_OFF = "handed-off {{path}}"
+export const PARENT_HANDOFF = "molt: handed off to the parent — {{path}}"
+export const HANDING_OFF = "molt: handing off at {{percent}}% — {{path}}"
+export const RESUMED = "molt: resumed from {{path}}"
+export const SEED_REJECTED = "molt: the seed was rejected. Resume by hand from {{path}}."
+export const CONFIG_PROBLEMS = "molt: {{problems}}"
+export const SETTINGS_PROBLEMS = "settings: {{problems}}"
+export const SESSION_STATUS = "molt is {{state}} for this session."
+export const FILL_STATUS = "fill: {{percent}} — warnings {{warn}}% and {{warnAgain}}%, handoff {{command}}%, block {{block}}%, fallback {{fallback}}%"
+export const MODE_STATUS = "mode (autonomic's record): {{mode}}"
+export const WARNED = "warned {{percent}}"
+export const PAUSED_UNATTENDED = "molt paused: {{count}} molts in a row with no message from you. Send a message to resume; the handoff is at {{path}}."
+export const PAUSED_NO_PROGRESS = "molt paused: no progress since the last molt (no Write, Edit or commit). Autopilot stops here; the handoff is at {{path}}."
+export const MISSING_HANDOFF = "molt: the MOLT-HANDOFF line names {{path}}, but {{path}} does not exist or is not a readable file. Write the handoff file, then end your reply with MOLT-HANDOFF: <its absolute path>."
+export const STATUS_METER = "molt {{percent}}%/{{command}}%"

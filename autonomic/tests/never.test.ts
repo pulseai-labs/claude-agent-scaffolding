@@ -757,9 +757,26 @@ describe('0.5.0 §3.1 each command on its own words', () => {
     ask('echo ok\r\ngit push -f origin feat/x\r\n')
     silent('')
     const big = Array.from({ length: 2000 }, (_, i) => `echo line ${i}; git status --short`).join('\n')
-    const t0 = Date.now()
     silent(big)
-    expect(Date.now() - t0 < 2000).toEqual(true)
+    // The timed pair stays small: the runner stops a test at 5000 ms, and CI is slower than a desktop.
+    const small = Array.from({ length: 200 }, (_, i) => `echo line ${i}; git status --short`).join('\n')
+    const large = Array.from({ length: 800 }, (_, i) => `echo line ${i}; git status --short`).join('\n')
+    const elapsed = (text: string) => {
+      const start = performance.now()
+      rules(text)
+      return performance.now() - start
+    }
+    // Warm both sizes, then pair samples so startup and transient host load do not set the bound.
+    elapsed(small)
+    elapsed(large)
+    const smallTimes: number[] = [], largeTimes: number[] = []
+    for (let run = 0; run < 3; run++) {
+      smallTimes.push(elapsed(small))
+      largeTimes.push(elapsed(large))
+    }
+    const median = (times: number[]) => times.sort((a, b) => a - b)[1]
+    // 4x the lines should cost about 4x, not quadratic's 16x. A 1 ms floor absorbs timer noise.
+    expect(median(largeTimes)).toBeLessThan(8 * Math.max(median(smallTimes), 1))
   })
 })
 

@@ -25,4 +25,5 @@ if ! jq -e '[.userConfig | (.commandPercent, .blockPercent, .softPercent, .hardP
   printf 'molt: commandPercent, blockPercent, softPercent and hardPercent must declare no default in plugin.json\n' >&2
   exit 1
 fi
+bash "$SCRIPT_DIR/tests/shared-glue.test.sh" || exit 1
 claude plugin test "$SCRIPT_DIR"
