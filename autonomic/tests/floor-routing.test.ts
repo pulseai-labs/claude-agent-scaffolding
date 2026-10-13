@@ -50,14 +50,12 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     expect(w.forkPrompts).toEqual([])
     expect(w.runs.some(r => r.includes('ls-remote') || r.includes('merge-base'))).toBe(false)
   })
-  test('a merged delete beside a text-only delete: the fork sees both (PR #763 round 2)', async ($, on) => {
+  test('a merged delete beside any other command asks: it is not the whole call (PR #763 rounds 2 and 4)', async ($, on) => {
     const w = world(on, { env: AP })
-    w.git.merged = ['refs/heads/merged']
-    w.forks.push(fork({ decision: 'ask', reason: 'victim' }))
-    expect((await $.tool.check(BASH("herdr pane run p 'git branch -D victim'; git branch -D merged"))).decision).toBe('ask')
-    expect(w.forkPrompts[0]).toContain('- branch-delete (merged):')
-    expect(w.forkPrompts[0]).toContain('- branch-delete: ? (+4 args)')
-    expect(w.forkPrompts[0]).toContain('If the call does what such a rule names')
+    w.git.merged = ['refs/heads/merged', 'refs/heads/victim']
+    for (const c of ["herdr pane run p 'git branch -D victim'; git branch -D merged", 'git branch -f victim feature; git branch -D victim'])
+      expect([c, (await $.tool.check(BASH(c))).decision]).toEqual([c, 'ask'])
+    expect(w.forkPrompts).toEqual([])
   })
   test('a merged delete after a move, or with -C, asks (PR #763 round 3)', async ($, on) => {
     const w = world(on, { env: AP })

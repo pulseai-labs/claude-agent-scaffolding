@@ -102,7 +102,7 @@ deny"; a deny from a plugin beneath autonomic's `tool.call` hook, such as a seat
 same way). On an `ask` verdict, first, in code, the **never-approve list** keeps the ask with you
 and rings when a command's own words match a rule. Since 0.5.1 a match found only in text (a message,
 a quoted argument, an interpreter's script, a command whose verb is a variable) and a local
-`git branch -D` in the session's own repo, with no move in the call, of a branch already merged into
+`git branch -D` run alone in the session's own repo, of a branch already merged into
 the repo's default branch go to the fork instead, with the finding in its prompt.
 On an `allow` verdict — bypass permissions, or a settings allow rule — a command that
 matches the list becomes an `ask`, so you get the normal permission dialog, and it rings (the

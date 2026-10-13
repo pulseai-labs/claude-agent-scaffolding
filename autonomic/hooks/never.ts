@@ -884,8 +884,11 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
   let config = r.bag.some(w => /^GIT_CONFIG/.test(w))
   let switched = false
   // 0.5.1 (§5, narrowed at PR #763's round-3 stop): a delete is read only in the session's own repo,
-  // in a call with no move at all (cd, pushd, popd, -C, --git-dir, GIT_DIR, `cd` even as a word).
-  const still = !moved && !r.groups.some((_, k) => effects[k]!.move || lifted.move.has(r.groups[k]!.at))
+  // in a call with no move at all (cd, pushd, popd, -C, --git-dir, GIT_DIR, `cd` even as a word), and
+  // only when it is the whole call: the merge is checked before the call runs, so no other command may
+  // move a ref first (`git branch -f x y; git branch -D x`, PR #763 round 4).
+  const still = !moved && !r.groups.some((_, k) => effects[k]!.move || lifted.move.has(r.groups[k]!.at)) &&
+    commands(command.trim())?.length === 1
   let deletes: Delete[] | null = []
   r.groups.forEach((g, k) => {
     const { ws, git, move, config: writes, switches } = effects[k]!

@@ -1139,7 +1139,11 @@ describe('0.5.1: the deletes a call makes (spec §5, narrowed at PR #763 round 3
   test('a local delete in the session repo names its branches', () => {
     expect(del('git branch -D record/x')).toEqual([{ dir: '/repo/sub', branch: 'record/x' }])
     expect(del('git branch -D a refs/heads/b')).toEqual([{ dir: '/repo/sub', branch: 'a' }, { dir: '/repo/sub', branch: 'b' }])
-    expect(del('gh pr merge 1 --merge && git branch -D record/x')).toEqual([{ dir: '/repo/sub', branch: 'record/x' }])
+  })
+  test('a delete is read only when it is the whole call: nothing else can move a ref first (PR #763 round 4)', () => {
+    for (const c of ['git branch -f victim feature; git branch -D victim', 'gh pr merge 1 --merge && git branch -D record/x',
+      'echo x; git branch -D x', 'mv .git/refs/heads/f .git/refs/heads/x; git branch -D x', 'git branch -D x | cat'])
+      expect([c, del(c)]).toEqual([c, null])
   })
   test('a remote delete is never read: proving it merged would contact the remote', () => {
     for (const c of ['git push origin --delete feat/x', 'git push origin :feat/x']) expect([c, del(c)]).toEqual([c, null])
