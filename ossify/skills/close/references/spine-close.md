@@ -917,6 +917,9 @@ EOF
       while IFS= read -r f; do
         [ -n "$f" ] || continue
         n="$(printf '%s' "$f" | sed -n -e 's/^[Aa][Dd][Rr]-0*\([0-9][0-9]*\)-.*\.md$/\1/p' -e 's/^0*\([0-9][0-9]*\)-.*\.md$/\1/p')"
+        # The same digits AS SPELLED (leading zeros kept): the canonical ref is taken
+        # from the file, never from the plan row, or two spellings mint two bones.
+        fd="$(printf '%s' "$f" | sed -n -e 's/^[Aa][Dd][Rr]-\([0-9][0-9]*\)-.*\.md$/\1/p' -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p')"
         if [ "$n" = "$want" ]; then
           # TRACKED IN ITS REPO. A row is a promise that this spine wrote the
           # decision, and a path the registry cites must be one history holds: an
@@ -942,25 +945,33 @@ EOF3
     [ -n "$adr_file" ] \
       || { echo "close: the plan declares bone $adr, but no ADR file carries $want in the hosting repos' docs/adr ($(printf '%s' "$adr_dirs" | tr '\n' ' '))- the spine never wrote it - halt"; exit 1; }
 
-    # ONE REF, ONE SPELLING. `adr-0024` and `ADR-0024` are one bone: the registry
-    # keys on the string it was given and the minted form is the upper-case prefix
-    # (start/references/bones-registry.md §3), so a plan row in another case would
-    # mint a SECOND bone for one decision - and no check could tell the two apart.
-    ref="$(printf '%s' "$adr" | sed 's/^[Aa][Dd][Rr]-/ADR-/')"
+    # ONE NUMBER, ONE BONE. The canonical ref is `ADR-` plus the digits EXACTLY as
+    # the matched ADR file spells them, so `ADR-24` and `ADR-0024` cannot become two
+    # registry rows for one decision: the registry keys on the string it was given,
+    # and two rows for one number then drive the touch check independently.
+    ref="ADR-$fd"
 
     # ALREADY REGISTERED? A halted close re-runs this step with its earlier rows
     # already recorded, and bone_add refuses a duplicate at rc 7 (#305) - so the
-    # skip is the resume path, not a convenience. But the REF is not the row: a plan
-    # that changed a column after the bone was registered would skip in silence,
-    # leaving the registry describing a surface - or a title, or a trigger - the
-    # plan no longer declares. Compare the fields; all equal -> skip; any differ ->
-    # halt naming both sides, because which of the two is right is not this step's
-    # call, and the registry row is never written over.
-    if [ -n "$(oss get ".bones[] | select(.adr == \"$ref\") | .adr")" ]; then
-      reg_title="$(oss get ".bones[] | select(.adr == \"$ref\") | .title")" \
-        || { echo "close: cannot read the registered row for $ref - halt"; exit 1; }
-      reg_revisit="$(oss get ".bones[] | select(.adr == \"$ref\") | .revisit_trigger // \"\"")" \
-        || { echo "close: cannot read the registered row for $ref - halt"; exit 1; }
+    # skip is the resume path, not a convenience. The lookup is by NUMBER, not by
+    # string (one number is one bone in any spelling). And the REF is not the row:
+    # a plan that changed a column after the bone was registered would skip in
+    # silence, leaving the registry describing a surface - or a title, or a trigger -
+    # the plan no longer declares. Compare the fields; all equal -> skip; any differ
+    # -> halt naming both sides, because which of the two is right is not this
+    # step's call, and the registry row is never written over.
+    reg_refs="$(oss get ".bones[] | select((.adr | sub(\"^[Aa][Dd][Rr]-\"; \"\") | sub(\"^0+\"; \"\") | if . == \"\" then \"0\" else . end) == \"$want\") | .adr")" \
+      || { echo "close: cannot read the registry for ADR number $want - halt"; exit 1; }
+    reg_n="$(printf '%s\n' "$reg_refs" | awk 'NF{n++} END{print n+0}')"
+    if [ "$reg_n" -gt 1 ]; then
+      echo "close: the registry holds $reg_n rows for ADR number $want ($(printf '%s' "$reg_refs" | tr '\n' ' '))- one number is one bone, and which of them is right is not this step's call - halt"; exit 1
+    fi
+    if [ -n "$reg_refs" ]; then
+      reg_ref="$reg_refs"
+      reg_title="$(oss get ".bones[] | select(.adr == \"$reg_ref\") | .title")" \
+        || { echo "close: cannot read the registered row for $reg_ref - halt"; exit 1; }
+      reg_revisit="$(oss get ".bones[] | select(.adr == \"$reg_ref\") | .revisit_trigger // \"\"")" \
+        || { echo "close: cannot read the registered row for $reg_ref - halt"; exit 1; }
       # The plan's csv, parsed by the REGISTRY'S OWN grammar (`\,` is a literal
       # comma, entries trimmed, empties dropped - _oss_csv_to_json), then compared
       # as a set: the check matches one glob at a time, so the order two spellings
@@ -970,9 +981,9 @@ EOF3
           n = split(s, e, ",")
           for (i = 1; i <= n; i++) { gsub(/\001/, ",", e[i]); gsub(/^ +| +$/, "", e[i]); if (e[i] != "") printf "%s\n", e[i] }
         }' | sort)" \
-        || { echo "close: cannot read the bones row $ref's touch surface ('$touch') - halt"; exit 1; }
-      reg_touch="$(oss get ".bones[] | select(.adr == \"$ref\") | .touch[]" | sort)" \
-        || { echo "close: cannot read the registered row for $ref - halt"; exit 1; }
+        || { echo "close: cannot read the bones row $reg_ref's touch surface ('$touch') - halt"; exit 1; }
+      reg_touch="$(oss get ".bones[] | select(.adr == \"$reg_ref\") | .touch[]" | sort)" \
+        || { echo "close: cannot read the registered row for $reg_ref - halt"; exit 1; }
       diffs=""
       [ "$reg_title" = "$title" ] \
         || diffs="$diffs
@@ -984,11 +995,11 @@ EOF3
         || diffs="$diffs
   revisit trigger: registry '$reg_revisit' vs plan '$revisit'"
       if [ -z "$diffs" ]; then
-        echo "close: bone $ref already registered - skipping"
+        echo "close: bone $reg_ref already registered - skipping"
         continue
       fi
-      echo "close: bone $ref is already registered and the plan's row differs from the registry's -$diffs
-  Nothing was written. Where the SURFACE differs, repair the registry with 'oss bone_set_touch \"$ref\" \"<touch-csv>\"'; where the title or the trigger differs, correct SPINE.md. Which of the two is right is the operator's call, never this step's - halt"
+      echo "close: bone $reg_ref is already registered and the plan's row differs from the registry's -$diffs
+  Nothing was written. Where the SURFACE differs, repair the registry with 'oss bone_set_touch \"$reg_ref\" \"<touch-csv>\"'; where the title or the trigger differs, correct SPINE.md. Which of the two is right is the operator's call, never this step's - halt"
       exit 1
     fi
 

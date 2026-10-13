@@ -2591,6 +2591,37 @@ t_assert_eq "Postgres | SQLite" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | sel
 t_assert_eq "src/esc/**" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0002") | .touch | join(", ")')" \
   "A7: ...and the touch surface unsplit"
 
+# ---------------------------------------------------------------------------
+# B13-B14 (PR #792 round 2, review item 3): one ADR NUMBER is one registry key.
+# `ADR-24` and `ADR-0024` name one decision, and the registry keys on a string -
+# so a plan row spelled differently minted a second bone for it, and the two then
+# drove touch_check independently. The canonical ref is `ADR-` plus the digits
+# exactly as the matched ADR FILE spells them; a registry row whose number equals
+# the row's number under another spelling is the same bone.
+# ---------------------------------------------------------------------------
+# B13. The plan row is unpadded; the file (and the registry) spell it `0024`.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-24 | the touch-check surface | src/domain/**,src/port.rs | a second storage backend |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 0 "B13: an unpadded ref naming a registered bone is that bone"
+t_assert_contains "$T_OUT" "bone ADR-0024 already registered - skipping" "B13: ...skipped under the registry's spelling"
+t_assert_eq "1" "$(cd "$B4WS" && bash "$OSS" get '[.bones[] | select((.adr | sub("^[Aa][Dd][Rr]-0*"; "")) == "24")] | length')" \
+  "B13: ...with one bone for the number, not two spellings of it"
+
+# B14. The other direction: the REGISTRY holds the short spelling, the file spells
+# `0040`, and the plan writes the file's spelling. Seeded directly, because the
+# canonical form now comes from the file and only an older registry can be short.
+( cd "$B4WS" && bash "$OSS" bone_add "ADR-40" "the short-form bone" "src/short-form/**" "revisit at 2.0" >/dev/null )
+printf 'the short-form fixture ADR\n' > "$B4CANON/docs/adr/adr-0040-a-short-form.md"
+git -C "$B4CANON" add docs/adr/adr-0040-a-short-form.md
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0040 | the short-form bone | src/short-form/** | revisit at 2.0 |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 0 "B14: a padded ref naming a registry row spelled short is that bone"
+t_assert_contains "$T_OUT" "bone ADR-40 already registered - skipping" "B14: ...skipped under the registry's spelling"
+t_assert_eq "1" "$(cd "$B4WS" && bash "$OSS" get '[.bones[] | select((.adr | sub("^[Aa][Dd][Rr]-0*"; "")) == "40")] | length')" \
+  "B14: ...with one bone for the number"
+
 cd /; rm -rf "$TMP"
 
 # A FLOOR ON THE ASSERTION COUNT. Every check in test-block-ledger.sh proves
