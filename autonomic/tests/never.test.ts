@@ -1126,6 +1126,15 @@ describe('0.5.1: the pushed branch, not the session branch (spec §3)', () => {
         'git --config-env=remote.origin.url=V push origin release', 'GIT_CONFIG_COUNT=1 git push origin release'])
         expect([branch, c, rules(c, { ...W, branch }).includes('default-branch-push')]).toEqual([branch, c, true])
   })
+  test('a git config write earlier in the call voids the named exemption (PR #763 round 7)', () => {
+    for (const branch of [undefined, 'main']) {
+      for (const c of ['git config include.path /tmp/other; git push origin release', 'echo x > .git/config; git push origin release',
+        'git config remote.origin.pushurl /o && git push origin release'])
+        expect([branch, c, rules(c, { ...W, branch }).includes('default-branch-push')]).toEqual([branch, c, true])
+      // A config read is not a write.
+      expect(rules('git config --get user.name; git push -u origin record/x', { ...W, branch })).toEqual([])
+    }
+  })
   test('outside a move, the exemption needs origin and a known default branch (PR #763 round 2)', () => {
     for (const branch of [undefined, 'main']) {
       expect(rules('git push upstream release', { ...W, branch })).toContain('default-branch-push')

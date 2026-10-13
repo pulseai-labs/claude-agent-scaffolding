@@ -896,9 +896,11 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
       ws.some(w => [...w.matchAll(/\$\{?([A-Za-z_]\w*)/g)].some(m => bound(m[1]!)))
     const away = moved || moves(ws, where)
     const own = new Set<NeverRule>()
-    rulesOf(substitute(g.own, r.vars, g.at), where, away, true, own, switched)
+    // After a git config write in the call (or GIT_CONFIG* in it), origin may point anywhere: no named
+    // exemption, so `single` is false (PR #763 round 7).
+    rulesOf(substitute(g.own, r.vars, g.at), where, away, !config, own, switched)
     const text = new Set<NeverRule>()
-    rulesOf((config && git) || verbOpaque(ws) || loose ? all : ws, where, away, true, text, switched)
+    rulesOf((config && git) || verbOpaque(ws) || loose ? all : ws, where, away, !config, text, switched)
     add(own, 'ask', g.text)
     add(new Set([...text].filter(x => !own.has(x))), 'fork', g.text)
     if (move) moved = true
