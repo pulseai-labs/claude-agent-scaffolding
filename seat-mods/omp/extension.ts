@@ -154,34 +154,38 @@ function toolDeny(role: Role, tool: string): string {
   return `seat-mods (${role}): no ${tool.slice(0, 80)} — this tool is not allowed for this seat; report it instead.`
 }
 
-export async function guard(deps: GuardDeps, toolName: string, input: Record<string, unknown>, agent: Agent): Promise<string | undefined> {
+// JSON objects and arrays can contain expansion-triggering keys at any depth.
+function hasExpandableKey(args: object): boolean {
+  const pending = [args]
+  while (pending.length > 0) {
+    for (const [key, value] of Object.entries(pending.pop()!)) {
+      if (key.includes('[') || key.includes('.')) return true
+      if (value !== null && typeof value === 'object') pending.push(value)
+    }
+  }
+  return false
+}
+
+export async function guard(deps: GuardDeps, toolName: string, input: Record<string, unknown>, agent: Agent, label = ''): Promise<string | undefined> {
   const state = roleFor(deps.env.SEAT_MODS_ROLE, agent)
   if (state.kind === 'free') return undefined
   if (state.kind === 'invalid') return invalidText(state.value)
   const role = state.role
   const child = agent?.kind !== 'main'
 
-  // omp dispatches device writes directly: tool_call sees only this outer write.
+  // Transport args are raw: omp coerces values and expands keys before the inner tool runs.
+  // Only these three devices are checked here; every other name keeps write placement.
   if (toolName === 'write' && typeof input.path === 'string') {
     const path = input.path.trim()
     const name = /^xd:\/\//i.test(path) ? path.slice(5) : undefined
-    // These names keep their existing placement/confirmation behaviour, even for docs content.
-    if (name !== undefined && name !== '' && !/[/?#]/.test(name) &&
-        !['resolve', 'reject', 'report_issue', 'propose'].includes(name)) {
-      if (name === 'write') return toolDeny(role, `xd://${name}`) // no nested transport
+    if (name === 'lsp' || name === 'ast_grep' || name === 'github') {
       if (typeof input.content !== 'string') return toolDeny(role, `xd://${name}`)
       if (/^\s*(\?|help)?\s*$/i.test(input.content)) return undefined // docs run nothing
       let args: unknown
       try { args = JSON.parse(input.content) } catch { return toolDeny(role, `xd://${name}`) }
       if (args === null || typeof args !== 'object' || Array.isArray(args)) return toolDeny(role, `xd://${name}`)
-      const reason = await guard(deps, name, args as Record<string, unknown>, agent)
-      // Only tool-deny/run-deny texts name the tool; shared rule and placement texts stay intact.
-      const prefix = `seat-mods (${role}): no `
-      for (const suffix of [toolDeny(role, '').slice(prefix.length), runDeny(role, '').slice(prefix.length)]) {
-        if (reason?.startsWith(prefix) && reason.endsWith(suffix))
-          return prefix + ('xd://' + reason.slice(prefix.length, -suffix.length)).slice(0, 80) + suffix
-      }
-      return reason
+      if (hasExpandableKey(args)) return toolDeny(role, `xd://${name}`)
+      return guard(deps, name, args as Record<string, unknown>, agent, 'xd://')
     }
   }
 
@@ -189,27 +193,30 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
     case 'pass':
       return undefined
     case 'top':
-      return !child ? undefined : toolName === 'task' ? spawnDeny(role) : toolDeny(role, toolName)
+      return !child ? undefined : toolName === 'task' ? spawnDeny(role) : toolDeny(role, label + toolName)
     case 'lsp': {
       const action = typeof input.action === 'string' ? input.action.toLowerCase() : ''
       if (LSP_READS.has(action)) return undefined
       // rename, rename_file and applied code actions edit files the language server picks; request is raw.
-      return role === 'reviewer' ? decide(role, { kind: 'write', place: 'worktree' }) : toolDeny(role, `lsp ${action}`)
+      return role === 'reviewer' ? decide(role, { kind: 'write', place: 'worktree' }) : toolDeny(role, `${label}lsp ${action}`)
     }
     case 'github': {
       // pr_create / pr_push are the harness's own gh pr create / git push; a force-with-lease push is a force-push.
       const op = String(input.op)
-      const rules: RuleId[] = input.forceWithLease === true || input.forceWithLease === 'true' ? ['force-push'] : []
+      const forced = label === 'xd://'
+        ? ['forceWithLease', 'force'].some(key => Object.hasOwn(input, key) && input[key] !== false)
+        : input.forceWithLease === true || input.forceWithLease === 'true'
+      const rules: RuleId[] = forced ? ['force-push'] : []
       if (op === 'pr_create') rules.push('pr-create')
       else if (op === 'pr_push') rules.push('push')
       // pr_checkout makes a worktree and branch outside this one (default ~/.omp/wt); `force` resets a branch.
       else if (op === 'pr_checkout') return decide(role, { kind: 'write', place: 'outside' })
-      else if (!GITHUB_READS.has(op)) return toolDeny(role, `github ${op}`)
+      else if (!GITHUB_READS.has(op)) return toolDeny(role, `${label}github ${op}`)
       return rules.length === 0 ? undefined : decide(role, { kind: 'bash', rules })
     }
     case 'debug': {
       // debug launches a program, evaluates expressions and sends raw DAP requests: it runs code and can write.
-      if (role !== 'implementer') return runDeny(role, toolName)
+      if (role !== 'implementer') return runDeny(role, label + toolName)
       const argv = [input.program, ...(Array.isArray(input.args) ? input.args : [])].filter(a => typeof a === 'string')
       const commands = [argv.join(' '), ...evalCommands(String(input.expression ?? '')), String(input.command ?? '')]
       const cwd = typeof input.cwd === 'string' && input.cwd !== '' ? input.cwd : undefined // debug.ts: resolveToCwd
@@ -217,7 +224,7 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
     }
     case 'shell': {
       if (toolName === 'eval') {
-        if (role === 'reviewer') return runDeny(role, toolName)
+        if (role === 'reviewer') return runDeny(role, label + toolName)
         return shellCheck(deps, role, evalCommands(String(input.code ?? '')), () => deps.cwd)
       }
       // bash takes its own cwd; rm operands and -F files resolve against it, not the session's.
@@ -227,7 +234,7 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
     case 'write':
       return writeCheck(deps, role, toolName, input)
     default:
-      return toolDeny(role, toolName)
+      return toolDeny(role, label + toolName)
   }
 }
 
@@ -282,8 +289,9 @@ async function writeCheck(deps: GuardDeps, role: Role, toolName: string, input: 
 // normalises `local:/x` and `dir/local://x` to `local://x` too, so the scan is deliberately loose: a false hit only denies.
 const SCHEME = /[A-Za-z][A-Za-z0-9+.-]*:\//
 // `write xd://resolve` / `xd://reject` take a one-sentence reason and apply or discard the preview that an earlier
-// ast_edit call staged with its own (already checked) paths; they name no file. Other device writes are checked
-// as their inner tool in guard(); special names and malformed device URLs still fail placement.
+// ast_edit call staged with its own (already checked) paths; they name no file. Only lsp, ast_grep and github
+// device writes are checked as their inner tool in guard(), with raw-arg key and force-flag guards. Every other
+// device name (docs included), special name and malformed device URL still fails placement.
 const CONFIRM_ONLY = /^\s*xd:\/\/(?:resolve|reject)\s*$/
 
 // The one reading of an omp path argument — a write-class target or a bash `cwd` — as omp's expandPath and
