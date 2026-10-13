@@ -593,8 +593,8 @@ function splice(text: string): string {
   return text
 }
 type Vars = Map<string, { value: string; at: number }>
-type Judged = { words: string[]; own: string[]; text: string; at: number; top: boolean }
-type Reading = { whole: string[] } | { groups: Judged[]; vars: Vars; bag: string[]; values: string[]; loops: [number, number][]; sure: boolean[] }
+type Judged = { words: string[]; own: string[]; text: string; at: number }
+type Reading = { whole: string[] } | { groups: Judged[]; vars: Vars; bag: string[]; values: string[]; loops: [number, number][] }
 // namesDanger and neverRules read the same command back to back (register.tsx): keep the last
 // reading, keyed by the text and the readers, so a large script is read once, not twice.
 let last: { command: string; readers: string; r: Reading } | undefined
@@ -668,7 +668,7 @@ function reading(command: string, readers: Readers): Reading {
   const g = cmds === undefined ? undefined : groups(cmds)
   if (cmds === undefined || g === undefined) return { whole: split(text) }
   const ctx: Ctx = { resolve: resolver(cmds), readers, gitRuns: configWritten(text, cmds) }
-  return { groups: judge(cmds, g, ctx), vars: literalVars(command, text, cmds), bag: split(text), values: flat(cmds).filter(c => assignOnly(c.bare)).flatMap(c => split(c.text)), loops: loops(cmds), sure: unconditional(text, cmds) }
+  return { groups: judge(cmds, g, ctx), vars: literalVars(command, text, cmds), bag: split(text), values: flat(cmds).filter(c => assignOnly(c.bare)).flatMap(c => split(c.text)), loops: loops(cmds) }
 }
 // The words of parsed commands, one group per command: a command that is not inert keeps all its
 // words, its substitutions' included; an inert one keeps them only when its output may be run (a
@@ -684,16 +684,16 @@ function judge(cmds: readonly Command[], g: readonly Group[], ctx: Ctx, at?: num
       let s = i
       while (s > 0 && cmds[s - 1]!.pipe) s--
       const span = !isInert(c.bare) && s < i ? cmds.slice(s, i + 1) : [c]
-      return [{ words: span.flatMap(x => split(x.text)), own: span.flatMap(x => ownWords(x.text)), text: c.text.trim(), at: k, top: at === undefined }]
+      return [{ words: span.flatMap(x => split(x.text)), own: span.flatMap(x => ownWords(x.text)), text: c.text.trim(), at: k }]
     }
     const to = [...targets(c.bare), ...g[i]!.targets, ...sedTargets(c.bare)]
     lt ??= to.length > 0 ? laters(cmds, ctx) : undefined
-    if (to.length > 0 && usedLater(to, lt!.list, ctx, lt!.from[i + 1])) return [{ words: split(c.text), own: ownWords(c.text), text: c.text.trim(), at: k, top: at === undefined }]
+    if (to.length > 0 && usedLater(to, lt!.list, ctx, lt!.from[i + 1])) return [{ words: split(c.text), own: ownWords(c.text), text: c.text.trim(), at: k }]
     return c.subs.flatMap(s => {
       const inner = commands(s)
       const ig = inner === undefined ? undefined : groups(inner)
       // 0.5.1 (§1): a substitution that does not parse is text: it has no own words.
-      return inner === undefined || ig === undefined ? [{ words: split(s), own: [], text: s.trim(), at: k, top: false }] : judge(inner, ig, ctx, k)
+      return inner === undefined || ig === undefined ? [{ words: split(s), own: [], text: s.trim(), at: k }] : judge(inner, ig, ctx, k)
     })
   })
 }
@@ -883,7 +883,9 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
   let moved = r.bag.some(w => /^GIT_(?:DIR|WORK_TREE)=/.test(w))
   let config = r.bag.some(w => /^GIT_CONFIG/.test(w))
   let switched = false
-  let dir: string | undefined = where.cwd
+  // 0.5.1 (§5, narrowed at PR #763's round-3 stop): a delete is read only in the session's own repo,
+  // in a call with no move at all (cd, pushd, popd, -C, --git-dir, GIT_DIR, `cd` even as a word).
+  const still = !moved && !r.groups.some((_, k) => effects[k]!.move || lifted.move.has(r.groups[k]!.at))
   let deletes: Delete[] | null = []
   r.groups.forEach((g, k) => {
     const { ws, git, move, config: writes, switches } = effects[k]!
@@ -901,71 +903,32 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
     rulesOf((config && git) || verbOpaque(ws) || loose ? all : ws, where, away, true, text, switched)
     add(own, 'ask', g.text)
     add(new Set([...text].filter(x => !own.has(x))), 'fork', g.text)
-    if (lifted.move.has(g.at) || moves(ws, where) && !ws.some(w => w === 'cd' || w === '-C')) dir = undefined
     if (own.has('branch-delete')) {
-      const d = deletesOf(substitute(g.own, r.vars, g.at), dir, where.home)
+      const d = still && !away ? deletesOf(substitute(g.own, r.vars, g.at), where.cwd) : null
       deletes = deletes === null || d === null ? null : [...deletes, ...d]
     }
-    // Only a top-level cd that surely runs moves the directory deletes are read in (PR #131 review).
-    if (move) { moved = true; dir = g.top && r.sure[g.at] && !ws.some(w => w === 'popd') ? cdTo(ws, dir, where.home) : undefined }
+    if (move) moved = true
     if (writes) config = true
     if (switches) switched = true
   })
   return settle(out, deletes)
 }
-// A rule found at both levels is `ask` (§1).
 // A rule one command shows at both levels is already `ask` only (the loop above drops its text
 // finding). A text finding in another command stays: a merged delete beside it must not hide it
 // from the fork (PR #763 round 2).
 function settle(found: readonly Finding[], deletes: Delete[] | null): Floor {
   return { findings: [...found], deletes }
 }
-// 0.5.1 (§5): what a git command deletes, read exactly, in the repo `dir`; null when any name, the
-// remote or the directory is opaque, or the push may delete more than it names (--prune, --mirror).
-export type Delete = { dir: string; remote?: string; branch: string }
-const join = (from: string, d: string, home: string) => (d.startsWith('/') ? d : d === '~' || d.startsWith('~/') ? `${home}${d.slice(1)}` : `${from}/${d}`)
-function deletesOf(ws: readonly string[], dir: string | undefined, home: string): Delete[] | null {
+// 0.5.1 (§5, narrowed at PR #763's round-3 stop): the local branches `git branch -d|-D <name>…` deletes
+// in `dir`, read exactly; null for any global option before `branch` (-C, -c, --git-dir …), an opaque
+// name, or any other command. A remote delete is never read: proving it merged would contact the remote.
+export type Delete = { dir: string; branch: string }
+function deletesOf(ws: readonly string[], dir: string): Delete[] | null {
   const g = ws.findIndex(w => isVerb(w, 'git'))
-  if (g < 0 || dir === undefined) return null
-  let at = dir
-  let i = g + 1
-  while (i < ws.length && ws[i]!.startsWith('-')) {
-    if (ws[i] === '-C') { const d = ws[i + 1]; if (d === undefined || opaque(d)) return null; at = join(at, d, home); i += 2; continue }
-    if (/^-c$|^--(?:git-dir|work-tree)/.test(ws[i]!)) return null
-    i++
-  }
-  const sub = ws[i]
-  const rest = ws.slice(i + 1)
-  const strip = (b: string) => b.replace(/^refs\/heads\//, '')
-  if (sub === 'branch') {
-    const names = rest.filter(w => !w.startsWith('-'))
-    if (names.length === 0 || names.some(opaque)) return null
-    return names.map(b => ({ dir: at, branch: strip(b) }))
-  }
-  if (sub !== 'push' || rest.some(w => w.startsWith('-') && !NO_VALUE.test(w))) return null
-  const args = rest.filter(w => !w.startsWith('-'))
-  const remote = args[0]
-  if (remote === undefined || opaque(remote)) return null
-  const all = rest.some(w => w === '--delete' || /^-[uqvnf]*d[uqvndf]*$/.test(w))
-  const out: Delete[] = []
-  for (const a of args.slice(1)) {
-    const name = all ? a : a.startsWith(':') ? a.slice(1) : a.startsWith('+:') ? a.slice(2) : undefined
-    if (name === undefined) continue // a refspec that pushes, not one that deletes
-    if (name === '' || opaque(name)) return null
-    out.push({ dir: at, remote, branch: strip(name) })
-  }
-  return out.length > 0 ? out : null
-}
-// The directory a literal `cd` leads to; undefined when the target is opaque, `-`, or unknown before.
-function cdTo(ws: readonly string[], from: string | undefined, home: string): string | undefined {
-  const i = ws.findIndex(w => w === 'cd' || w === 'pushd')
-  if (i < 0 || from === undefined) return undefined
-  const t = ws.slice(i + 1).find(w => !/^-[LPe@]+$/.test(w))
-  if (t === undefined) return home
-  if (t === '-' || opaque(t)) return undefined
-  // A bare relative name (or ~user) may be found through CDPATH: the directory is unknown (PR #763 review).
-  if (!/^(?:\/|~(?:\/|$)|\.\.?(?:\/|$))/.test(t)) return undefined
-  return join(from, t, home)
+  if (g < 0 || ws[g + 1] !== 'branch') return null
+  const names = ws.slice(g + 2).filter(w => !w.startsWith('-'))
+  if (names.length === 0 || names.some(opaque)) return null
+  return names.map(b => ({ dir, branch: b.replace(/^refs\/heads\//, '') }))
 }
 // 0.5.1 (§5): the top-level commands that surely run: at the start of the text or after `;` or a
 // newline, not in the background, not piped, not inside a group or a loop. literalVars reads names by

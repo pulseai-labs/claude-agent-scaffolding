@@ -43,29 +43,12 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     expect(w.forkPrompts[0]).toContain('Judge it as cleanup')
     expect(w.forkPrompts[0]).not.toContain('If the call does what such a rule names')
   })
-  test('a remote delete reads the tip from the remote, and goes to the fork when that tip is merged', async ($, on) => {
+  test('a remote delete asks, merged or not, and contacts no remote (PR #763 round 3)', async ($, on) => {
     const w = world(on, { env: AP })
-    const tip = 'a'.repeat(40)
-    w.git.remoteTips = { 'refs/heads/feat/x': tip }
-    w.git.merged = [tip]
-    w.forks.push(fork({ decision: 'allow', reason: 'merged cleanup' }))
-    expect((await $.tool.check(BASH('git push origin --delete feat/x'))).decision).toBe('allow')
-    expect(w.runs.some(r => r.join(' ') === 'timeout 10 git -C /repo ls-remote --symref origin HEAD refs/heads/feat/x')).toBe(true)
-    // The tip is checked against the remote's live default tip, not a tracking ref (PR #763 review).
-    expect(w.runs.some(r => r.join(' ') === `git -C /repo merge-base --is-ancestor ${tip} ${'c'.repeat(40)}`)).toBe(true)
-  })
-  test('a stale tracking ref is not trusted: the remote tip decides (PR #131 review)', async ($, on) => {
-    const w = world(on, { env: AP })
-    w.git.remoteTips = { 'refs/heads/feat/x': 'b'.repeat(40) }
-    w.git.merged = ['refs/remotes/origin/feat/x']
+    w.git.merged = ['refs/remotes/origin/feat/x', 'refs/heads/feat/x']
     expect((await $.tool.check(BASH('git push origin --delete feat/x'))).decision).toBe('ask')
     expect(w.forkPrompts).toEqual([])
-  })
-  test('a remote that does not answer keeps the delete with the operator', async ($, on) => {
-    const w = world(on, { env: AP })
-    w.git.merged = ['refs/remotes/origin/feat/x']
-    expect((await $.tool.check(BASH('git push origin --delete feat/x'))).decision).toBe('ask')
-    expect(w.forkPrompts).toEqual([])
+    expect(w.runs.some(r => r.includes('ls-remote') || r.includes('merge-base'))).toBe(false)
   })
   test('a merged delete beside a text-only delete: the fork sees both (PR #763 round 2)', async ($, on) => {
     const w = world(on, { env: AP })
@@ -76,13 +59,19 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     expect(w.forkPrompts[0]).toContain('- branch-delete: ? (+4 args)')
     expect(w.forkPrompts[0]).toContain('If the call does what such a rule names')
   })
-  test("a local delete in another repo uses that repo's default branch (PR #763 round 2)", async ($, on) => {
+  test('a merged delete after a move, or with -C, asks (PR #763 round 3)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.git.merged = ['refs/heads/topic']
+    for (const c of ['git -C /other branch -D topic', 'cd /other && git branch -D topic'])
+      expect([c, (await $.tool.check(BASH(c))).decision]).toEqual([c, 'ask'])
+    expect(w.forkPrompts).toEqual([])
+  })
+  test("a local delete reads the repo's own default branch (PR #763 round 2)", async ($, on) => {
     const w = world(on, { env: AP })
     w.git.merged = ['refs/heads/topic']
     w.forks.push(fork({ decision: 'allow', reason: 'cleanup' }))
-    expect((await $.tool.check(BASH('git -C /other branch -D topic'))).decision).toBe('allow')
-    expect(w.runs.some(r => r.join(' ') === 'git -C /other symbolic-ref --short refs/remotes/origin/HEAD')).toBe(true)
-    expect(w.runs.some(r => r.join(' ') === 'git -C /other merge-base --is-ancestor refs/heads/topic refs/remotes/origin/main')).toBe(true)
+    expect((await $.tool.check(BASH('git branch -D topic'))).decision).toBe('allow')
+    expect(w.runs.some(r => r.join(' ') === 'git -C /repo symbolic-ref --short refs/remotes/origin/HEAD')).toBe(true)
   })
   test('a local delete whose repo has no known default branch asks (PR #763 round 2)', async ($, on) => {
     const w = world(on, { env: AP })

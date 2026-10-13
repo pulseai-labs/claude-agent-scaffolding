@@ -17,22 +17,23 @@ false positives, 17 inputs never judged).
   `default-branch-push` on a detached or `main` checkout; another remote, or an unknown default, keeps
   0.5.0's reading. `-d`, `--delete`, `-f` and `--force` no longer hide the named destination, and
   `$SRC:refs/heads/x` is read by its destination.
-- **Merged-branch deletes go to the fork.** `git branch -D x` and `git push origin --delete x` whose
-  every branch is already merged into the default branch (`git merge-base --is-ancestor`, checked
-  before the command runs) are the fork's to judge. An unmerged or unreadable delete still asks.
+- **Merged local deletes go to the fork.** `git branch -D x` in the session's own repo, in a call with
+  no move (`cd`, `pushd`, `-C`, `--git-dir`), whose every branch is already merged into the repo's
+  default branch (`origin/HEAD`; `git merge-base --is-ancestor`, checked before the command runs), is
+  the fork's to judge. A remote delete, a delete after a move, and an unmerged or unreadable delete
+  still ask.
 - **Long inputs are judged.** The 4000-character stop is gone: the fork sees the input's head and
   tail and how much was cut, and the floor has read all of it. SubagentHandbacks are judged too.
 - **Smaller fixes.** A sed script keeps a backslash inside single quotes (`'s/a\/b/c/'` is a safe sed);
   the pain band shows the command that matched.
 - **Known limits.** A call that merges and then deletes in one command still asks (the branch is not
   merged when the check runs). A session's first call still asks: there is nothing to fork yet. A
-  rebase-merged branch is not an ancestor of the default branch, so its delete still asks. A host with
-  no `timeout` command (stock macOS) cannot read a remote's tip, so a remote delete asks there. A
+  rebase-merged branch is not an ancestor of the default branch, so its delete still asks. A remote
+  delete always asks: proving it merged would contact the remote before the call is approved (#764). A
   literal variable that holds spaces, used inside double quotes (`F='push -f'; curl -d "$F" …`), is
   re-split when the floor reads its value, so it can ask where Bash passes one data argument. `rm` of
   a path that starts with a variable the text does not assign (`rm "$T/x"`) still asks: unquoted, the
-  variable may hold flags. A delete after a bare relative `cd` (which `CDPATH` may resolve elsewhere)
-  asks.
+  variable may hold flags.
 
 ## 0.5.0
 

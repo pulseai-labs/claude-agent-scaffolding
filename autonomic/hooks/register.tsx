@@ -326,32 +326,17 @@ async function floorOf($: Engine, command: string): Promise<FloorRead> {
   }
   return { ask, fork, merged: done }
 }
-// Checked before the command runs: a branch the same call merges is not merged yet. A remote
-// branch's tip is read from the remote itself, never from a tracking ref that may be older (PR #131
-// review), and checked against that remote's own default branch. Any failure is "not merged".
+// Checked before the command runs: a branch the same call merges is not merged yet. Only a local
+// branch in the session's own repo is checked (narrowed at PR #763's round-3 stop): nothing here
+// contacts a remote before the call is approved. Any failure is "not merged".
 async function merged($: Engine, d: Delete): Promise<boolean> {
   const git = (args: string[]) => $.process.run(['git', '-C', d.dir, ...args])
   try {
-    if (d.remote === undefined) {
-      // The default branch of the repo the delete runs in, not the session's (PR #763 round 2).
-      const h = await git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
-      const def = h.exitCode === 0 && h.stdout.trim().startsWith('origin/') ? h.stdout.trim().slice(7) : ''
-      // Deleting the default branch itself is never cleanup (PR #763 review).
-      if (def === '' || d.branch === def) return false
-      return (await git(['merge-base', '--is-ancestor', `refs/heads/${d.branch}`, `refs/remotes/origin/${def}`])).exitCode === 0
-    }
-    // One ls-remote reads the remote's live default branch (HEAD's symref and tip) and the branch's
-    // tip, so no tracking ref that may be older than the remote decides (PR #763 review). A default
-    // tip this repo does not hold fails merge-base: not merged.
-    const r = await $.process.run(['timeout', '10', 'git', '-C', d.dir, 'ls-remote', '--symref', d.remote, 'HEAD', `refs/heads/${d.branch}`])
-    if (r.exitCode !== 0) return false
-    const lines = r.stdout.split('\n')
-    const sha = (x: string | undefined) => (x !== undefined && /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(x) ? x : undefined)
-    const def = lines.find(l => l.startsWith('ref: refs/heads/') && l.endsWith('\tHEAD'))?.slice(16, -5)
-    const head = sha(lines.filter(l => l.endsWith('\tHEAD')).map(l => l.split('\t')[0]).find(x => sha(x) !== undefined))
-    const tip = sha(lines.find(l => l.endsWith(`\trefs/heads/${d.branch}`))?.split('\t')[0])
-    if (def === undefined || head === undefined || tip === undefined || d.branch === def) return false
-    return (await git(['merge-base', '--is-ancestor', tip, head])).exitCode === 0
+    // The repo's own default branch (PR #763 round 2); deleting it is never cleanup (PR #763 review).
+    const h = await git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
+    const def = h.exitCode === 0 && h.stdout.trim().startsWith('origin/') ? h.stdout.trim().slice(7) : ''
+    if (def === '' || d.branch === def) return false
+    return (await git(['merge-base', '--is-ancestor', `refs/heads/${d.branch}`, `refs/remotes/origin/${def}`])).exitCode === 0
   } catch {
     return false
   }

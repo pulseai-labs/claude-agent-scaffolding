@@ -1134,36 +1134,24 @@ describe('0.5.1: the pushed branch, not the session branch (spec §3)', () => {
   })
 })
 
-describe('0.5.1: the deletes a call makes (spec §5)', () => {
+describe('0.5.1: the deletes a call makes (spec §5, narrowed at PR #763 round 3)', () => {
   const del = (c: string, w: Where = W) => floorFindings(c, w).deletes
-  test('a local delete names its repo and branch', () => {
+  test('a local delete in the session repo names its branches', () => {
     expect(del('git branch -D record/x')).toEqual([{ dir: '/repo/sub', branch: 'record/x' }])
-    expect(del('git -C /other branch -D a refs/heads/b')).toEqual([{ dir: '/other', branch: 'a' }, { dir: '/other', branch: 'b' }])
-    expect(del('cd /work/r && git branch -D x')).toEqual([{ dir: '/work/r', branch: 'x' }])
-    expect(del('git -C r branch -D x')).toEqual([{ dir: '/repo/sub/r', branch: 'x' }])
-  })
-  test('a remote delete names its remote', () => {
-    expect(del('git push origin --delete feat/x')).toEqual([{ dir: '/repo/sub', remote: 'origin', branch: 'feat/x' }])
-    expect(del('git push origin :feat/x')).toEqual([{ dir: '/repo/sub', remote: 'origin', branch: 'feat/x' }])
-  })
-  test('a merge-then-delete chain still lists the delete', () => {
+    expect(del('git branch -D a refs/heads/b')).toEqual([{ dir: '/repo/sub', branch: 'a' }, { dir: '/repo/sub', branch: 'b' }])
     expect(del('gh pr merge 1 --merge && git branch -D record/x')).toEqual([{ dir: '/repo/sub', branch: 'record/x' }])
   })
-  test('a delete the floor cannot read exactly gives null', () => {
-    for (const c of ['git branch -D $B', 'cd $D && git branch -D x', 'git push $R --delete x', 'git push origin --prune', 'git push --mirror origin'])
+  test('a remote delete is never read: proving it merged would contact the remote', () => {
+    for (const c of ['git push origin --delete feat/x', 'git push origin :feat/x']) expect([c, del(c)]).toEqual([c, null])
+  })
+  test('any move in the call, or any option before branch, gives null', () => {
+    for (const c of ['git -C /other branch -D x', 'cd /work/r && git branch -D x', 'cd /work/r; git branch -D x', 'pushd; git branch -D x',
+      'cd ./link/..; git branch -D x', "curl -d 'cd /other'; git branch -D x", 'git branch -D x; cd /other', 'GIT_DIR=/x/.git git branch -D x',
+      'git --git-dir=/x/.git branch -D x', 'git -c core.x=y branch -D x'])
       expect([c, del(c)]).toEqual([c, null])
   })
-  test('only a cd that surely runs sets the directory (PR #131 review)', () => {
-    for (const c of ['false && cd /other; git branch -D x', 'true || cd /other; git branch -D x', 'if true; then cd /other; fi; git branch -D x',
-      'x=$(cd /other && pwd); git branch -D y', 'for d in a; do cd /other; done; git branch -D x', 'cd /other & git branch -D x'])
-      expect([c, del(c)]).toEqual([c, null])
-    expect(del('cd /work/r; git branch -D x')).toEqual([{ dir: '/work/r', branch: 'x' }])
-  })
-  test('a bare relative cd may follow CDPATH: the directory is unknown (PR #763 review)', () => {
-    expect(del('cd project; git branch -D x')).toBeNull()
-    expect(del('cd ~bob; git branch -D x')).toBeNull()
-    expect(del('cd ./project; git branch -D x')).toEqual([{ dir: '/repo/sub/./project', branch: 'x' }])
-    expect(del('cd ../r; git branch -D x')).toEqual([{ dir: '/repo/sub/../r', branch: 'x' }])
+  test('an opaque branch gives null', () => {
+    expect(del('git branch -D $B')).toBeNull()
   })
   test('no branch-delete, no deletes', () => {
     expect(del('git push -u origin feat/x')).toEqual([])

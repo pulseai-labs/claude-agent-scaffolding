@@ -40,7 +40,7 @@
     "neverApprove": {
       "type": "string",
       "title": "Never-approve rules",
-      "description": "In autopilot, a command whose own words match one of these always reaches you, even under bypass permissions; a match found only in text (a message, a quoted argument, an interpreter's script) and a delete of an already-merged branch go to the fork with the finding. Remove a name to let the fork judge it. Known: force-push default-branch-push branch-delete rm-outside no-verify unreadable (unreadable matches nothing since 0.2.0). Empty: none.",
+      "description": "In autopilot, a command whose own words match one of these always reaches you, even under bypass permissions; a match found only in text (a message, a quoted argument, an interpreter's script) and a local delete of an already-merged branch go to the fork with the finding. Remove a name to let the fork judge it. Known: force-push default-branch-push branch-delete rm-outside no-verify unreadable (unreadable matches nothing since 0.2.0). Empty: none.",
       "default": "force-push default-branch-push branch-delete rm-outside no-verify unreadable"
     },
     "readers": {

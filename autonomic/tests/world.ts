@@ -19,8 +19,7 @@ export type World = {
   hasBox: boolean
   session: { id: string; cwd: string }
   // merged: refs or SHAs merge-base --is-ancestor reports as merged (0.5.1 §5)
-  // remoteTips: ls-remote's answer per refs/heads/<name>; none: the remote fails
-  git: { top?: string; branch?: string; originHead?: string; merged?: string[]; remoteTips?: Record<string, string> }
+  git: { top?: string; branch?: string; originHead?: string; merged?: string[] }
   forks: Fork[]                // the fork's replies, in order; none left means empty-reply
   forkPrompts: string[]
   verdict: { decision: 'allow' | 'ask' | 'deny'; reason?: string }
@@ -89,12 +88,6 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     w.runs.push(argv)
     const ok = (stdout = '') => ({ value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false } }) as never
     const fail = () => ({ value: { exitCode: 1, stdout: '', stderr: 'failed', isStdoutTruncated: false } }) as never
-    if (argv[0] === 'timeout' && argv.includes('ls-remote')) {
-      const ref = argv[argv.length - 1]!
-      const tip = w.git.remoteTips?.[ref]
-      // `--symref <remote> HEAD`: the live default branch (main) and its tip (c…c) come first.
-      return tip === undefined ? fail() : ok(`ref: refs/heads/main\tHEAD\n${'c'.repeat(40)}\tHEAD\n${tip}\t${ref}\n`)
-    }
     if (argv[0] === 'git') {
       const a = argv.join(' ')
       if (a.includes('--show-toplevel')) return w.git.top === undefined ? fail() : ok(`${w.git.top}\n`)
