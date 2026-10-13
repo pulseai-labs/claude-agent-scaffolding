@@ -434,9 +434,19 @@ $repo:$merge_sha"
 pushed-tip: $pre${pr_fields:+
 
 $pr_fields}"
-      pr_num="$( (cd "$repo_root" && gh --repo "$pr_slug" pr create --base "$base_branch" --head "$spine_branch" \
+      # gh prints the PR's URL, never its number, and every step after this one
+      # uses the NUMBER: the `$repo:$pr_num` lines the record pass reads, `gh pr
+      # view "$pr_num"`, the messages. Capturing the URL as `pr_num` stored a
+      # value whose failure surfaced far from here, in a guard that could not
+      # name the cause. Keep the URL whole for the messages, take the last path
+      # segment, and refuse anything that is not all digits (#716).
+      pr_url="$( (cd "$repo_root" && gh --repo "$pr_slug" pr create --base "$base_branch" --head "$spine_branch" \
         --title "merge $spine_id" --body "$pr_body") 2>&1 )" \
-        || { echo "close: gh cannot open the PR in $repo ($pr_num) - fix gh (auth, host) or record an operator-decided local merge - never a silent local fall-through - halt"; exit 1; }
+        || { echo "close: gh cannot open the PR in $repo ($pr_url) - fix gh (auth, host) or record an operator-decided local merge - never a silent local fall-through - halt"; exit 1; }
+      pr_num="${pr_url##*/}"
+      case "$pr_num" in
+        ''|*[!0-9]*) echo "close: gh pr create in $repo printed '$pr_url', not a PR URL - halt"; exit 1;;
+      esac
       echo "close: $repo PR #$pr_num opened against $base_branch - hand it to /ossify:work-pr"
     fi
     pr_lines="$pr_lines

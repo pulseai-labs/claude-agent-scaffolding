@@ -1261,8 +1261,17 @@ case "$1" in
         printf '%s\n' "$*" > "$st/create_args"
         body=""; while [ $# -gt 0 ]; do case "$1" in --body) body="$2"; shift 2 ;; *) shift ;; esac; done
         printf '%s\n' "$body" | awk '/^pushed-tip: /{print $2}' > "$st/pushed_tip"
-        printf '7 OPEN\n' > "$st/pr"
-        echo 7 ;;
+        n="$(cat "$st/create_number" 2>/dev/null || printf '7')"
+        printf '%s %s\n' "$n" OPEN > "$st/pr"
+        # The REAL gh prints the PR's URL, never its number (#716). Printing the
+        # number here let the ceremony's `pr_num=` capture pass on a shape gh
+        # never produces, so the whole P-series was blind to the URL. `$st/create_number`
+        # picks the number the URL carries; `$st/create_prints` stages any other
+        # stdout verbatim, for outputs that are not PR URLs at all. The stdout is
+        # kept in $st/create_out so a test can assert the SHAPE it staged.
+        if [ -f "$st/create_prints" ]; then cat "$st/create_prints" > "$st/create_out"
+        else printf 'https://github.com/owner/repo/pull/%s\n' "$n" > "$st/create_out"; fi
+        cat "$st/create_out" ;;
       view)
         s="$(awk '{print $2}' "$st/pr")"
         m="$(cat "$st/merge_commit" 2>/dev/null || true)"
@@ -1333,6 +1342,16 @@ t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
 t_assert_rc 0 "P1: the PR-arm pass runs clean on a repo with a remote"
 t_assert_contains "$T_OUT" "PR #7 opened against main" "P1: ...announcing the PR it opened for /ossify:work-pr"
 t_assert_contains "$T_OUT" "canonical:7" "P1: ...and recording repo:pr pairs for the record pass"
+# #716: the pair and the message must carry the NUMBER. gh prints a URL, and the
+# old `pr_num="$(gh pr create …)"` kept it whole - so every later step that uses
+# `$pr_num` as a number (`$repo:$pr_num` lines, `gh pr view "$pr_num"`, the record
+# pass's messages) received `https://github.com/owner/repo/pull/7`.
+t_assert_eq 1 "$(grep -c '^https://github.com/.*/pull/7$' "$PR_STATE/create_out")" \
+  "P1: the fixture is non-vacuous - gh's create really printed the URL shape (#716)"
+case "$T_OUT" in
+  *github.com*) T_FAIL=$((T_FAIL+1)); echo "FAIL: P1: the URL gh printed reached the close's own output - \$pr_num was never reduced to the number";;
+  *) T_PASS=$((T_PASS+1));;
+esac
 _pr_main_unreached "P1: no local merge"
 if git --git-dir="$PR_ORIGIN" rev-parse --verify -q "refs/heads/$PR_BRANCH" >/dev/null; then
   t_assert_eq "$(git --git-dir="$PR_ORIGIN" rev-parse "refs/heads/$PR_BRANCH")" "$(git -C "$PR_REPO" rev-parse "$PR_BRANCH")" \
@@ -1372,6 +1391,50 @@ t_assert_contains "$T_OUT" "no merge-bar fields file for canonical" "P1c: ...nam
 t_assert_eq 0 "$( [ -f "$PR_STATE/create_args" ] && echo 1 || echo 0 )" "P1c: ...and no PR is opened"
 t_assert_eq 0 "$(git --git-dir="$PR_ORIGIN" rev-parse --verify -q "refs/heads/$PR_BRANCH" >/dev/null && echo 1 || echo 0)" \
   "P1c: ...and the spine branch never reaches origin - the halt has no remote side effect"
+
+# P1d/P1e/P1f. #716: `pr_num` is a NUMBER. P1 above asserts the URL never reaches
+# the close's output on the number 7; these three pin the extraction itself and
+# both halt arms, each on its own fixture (the PR-existence probe reads `$st/pr`,
+# which create writes - a second run on a used fixture takes the resume arm).
+# P1d: the number the URL carries is what lands in the pair, whatever it is.
+_pr_fixture p1d
+printf '123\n' > "$PR_STATE/create_number"
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+  "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'; printf 'PRLINES%s\n' \"\$pr_lines\""
+t_assert_rc 0 "P1d: a PR URL with 123 in it does not halt the close"
+t_assert_eq 1 "$(grep -c '^https://github.com/.*/pull/123$' "$PR_STATE/create_out")" \
+  "P1d: the fixture is non-vacuous - gh printed .../pull/123"
+t_assert_contains "$T_OUT" "canonical:123" "P1d: the arm stores the NUMBER the URL carries"
+t_assert_contains "$T_OUT" "PR #123 opened against main" "P1d: ...in the message /ossify:work-pr is handed"
+case "$T_OUT" in
+  *github.com*) T_FAIL=$((T_FAIL+1)); echo "FAIL: P1d: the URL reached the close's own output";;
+  *) T_PASS=$((T_PASS+1));;
+esac
+
+# P1e. An output that is no URL at all must HALT, naming what gh printed: the
+# old arm stored it as `pr_num` and the close carried on to steps that use the
+# number (`gh pr view`, the record pass), failing there, obscurely and late.
+_pr_fixture p1e
+printf '%s\n' 'gh: could not create pull request: the branch is not on the remote' > "$PR_STATE/create_prints"
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+  "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'; printf 'PRLINES%s\n' \"\$pr_lines\""
+t_assert_rc 1 "P1e: an output with no trailing digits halts the close"
+t_assert_contains "$T_OUT" "not a PR URL" "P1e: ...naming the shape it required"
+t_assert_contains "$T_OUT" "could not create pull request" "P1e: ...and quoting what gh printed, whole"
+case "$T_OUT" in
+  *"PRLINES"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: P1e: the close recorded a repo:pr pair from a non-URL";;
+  *) T_PASS=$((T_PASS+1));;
+esac
+
+# P1f. A URL whose LAST segment is not a number (gh prints `.../pull/123/files`
+# when a wrapper appends the changed-files path) is the same arm, one shape in:
+# "not all digits" is the test, not "does not start with https".
+_pr_fixture p1f
+printf '%s\n' 'https://github.com/owner/repo/pull/123/files' > "$PR_STATE/create_prints"
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+  "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; . '$MERGE_BLOCK'"
+t_assert_rc 1 "P1f: a PR URL with a trailing non-numeric segment halts"
+t_assert_contains "$T_OUT" "pull/123/files" "P1f: ...quoting the URL it refused"
 
 # P2. THE THIRD LEG (A1): gh cannot operate on the remote — fail closed. The
 # probe runs before any push, and the halt never falls through to a local merge.
