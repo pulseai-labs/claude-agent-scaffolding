@@ -525,7 +525,7 @@ absent "$EXEC_MD" 'OPERATOR_ROLES' \
 
 # Round 3, finding 3: the approval check covers every capability a role's
 # shipped brief needs — the default run-spine lane spawns subagents.
-n_eq "$CONFIG_MD" 'subagents' 3 \
+n_eq "$CONFIG_MD" 'subagents' 4 \
   "the can: vocabulary covers the default lane's Agent tool"
 pin "$CONFIG_MD" 'spine session, default lane' \
   "the capability table names the default lane's need"

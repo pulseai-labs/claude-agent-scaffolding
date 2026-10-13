@@ -58,6 +58,18 @@ A seat's readiness path is never a field here: it follows from herdr's own answe
 to whether the pane is detected (`herdr-mechanics.md`) — so a detection manifest
 landing later moves a seat onto the typed path with no edit anywhere.
 
+**OMP coordinator seats.** An OMP seat is a coordinator or a worker (`omp-seat worker --via <wrapper>`), never the orchestrator top or its rotation successor: the launcher's autopilot mode read needs Claude's live env (#769).
+```markdown
+### omp-spine-deepseek
+command: omp-seat spine-driver --via omp-deepseek-go
+expected_model: DeepSeek V4.1 Flash (OpenCode Go)
+effort: max
+model_shows: screen
+brief_delivery: inject
+can: subagents
+note: OMP coordinator (omp-roles). seat-mods, molt and autonomic run as OMP extensions; mark the pane SEAT_MODS_ROLE=coordinator (herdr-mechanics.md step 2) and add SEAT_MODS_ALLOW=<each hosting repo>/.worktrees (colon-separated roots) to its export: omp task children (implementer, seat-reviewer) inherit the env, and the implementer must write the item worktree.
+```
+
 ## What a resolved profile carries
 
 An agent name resolves through the machine file to a **profile** — the values a
