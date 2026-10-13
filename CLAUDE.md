@@ -60,6 +60,8 @@ test, mutation-test it, and hold all three conditions:
    mutation per branch. A mutation on a line the fixtures never reach proves nothing, and
    reads as "this test is vacuous" when the test is fine.
 
+`tests/lib/mutate.sh <file> <from> <to> -- <suite>` checks conditions 1 and 2 for you and restores from a saved copy; condition 3 stays your judgment.
+
 Other ways a green test lies: round-trip tautologies (the verifier re-derives its expected
 value from what the code just wrote); fixtures coupled through shared state; a grep-based
 check that passes on its own comment; a justifying comment treated as verified behaviour.

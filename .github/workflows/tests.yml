@@ -104,6 +104,12 @@ jobs:
         # ossify's fallback PR-body template must match merge-bar's (ossify 1.13.0).
         run: bash tests/test-merge-bar-template-parity.sh
 
+      - name: Mutation harness contract
+        # tests/lib/mutate.sh: the shared mutation-test harness - one literal
+        # replacement, the mutated line echoed, the suite run from the caller's
+        # cwd, and the file restored from a saved copy (never from git).
+        run: bash tests/test-mutate.sh
+
       - name: Install Bun 1.4.2
         run: npm install --global bun@1.4.2 && bun --version
 
