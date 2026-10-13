@@ -2,6 +2,13 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.17
+
+**OMP coordinator and worker seats.** The machine-file example launches `omp-seat`
+with the three OMP extensions. OMP coordinators add each hosting repo's `.worktrees`
+root to `SEAT_MODS_ALLOW` for their task children; OMP seats never fill the orchestrator
+top or its rotation successor, whose autopilot mode read needs Claude's live env (#769).
+
 ## 0.2.16
 
 **The spine brief calls `oss` by name.** §8a's caller rule loses its "(run-spine's resolved
