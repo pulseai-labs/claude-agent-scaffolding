@@ -33,11 +33,46 @@ const SKILL_URL = /^skill:\/\/([^/\s]+)((?:\/[^\s]*)?)$/i
 
 const stringsOf = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x !== '') : [])
 
-function writePaths(input: Record<string, unknown>): string[] {
+// omp's edit tool has five variants (edit.mode: hashline, apply_patch, sloppy, patch, replace). replace and patch name their
+// file in `path` (patch may add a `rename`); hashline, apply_patch and sloppy carry their targets in the `input` text (or
+// `_input`): hashline as `[file]` / `¶file` section headers (a `#hhhh` tag and one pair of quotes follow the name) and
+// `MV <dest>` lines, apply_patch and sloppy as `*** Update|Add|Delete|Edit File: <file>` and `*** Move to: <file>`.
+// seat-mods/omp/extension.ts reads the same spellings for its guard; this is the best-effort copy molt's facts and
+// lastMd need (no mod imports another), not a safety rail.
+const EDIT_TOOLS = new Set(['edit', 'apply_patch'])
+
+function targetName(raw: string): string {
+  const t = raw.trim()
+  const n = t.replace(/#[0-9a-fA-F]{4}$/, '')
+  return n.length >= 2 && (n[0] === '"' || n[0] === "'") && n[n.length - 1] === n[0] ? n.slice(1, -1) : n
+}
+
+function textTargets(body: string): string[] {
+  const out: string[] = []
+  for (const line of (body.startsWith('\uFEFF') ? body.slice(1) : body).split('\n')) {
+    const raw = line.replace(/\r$/, '')
+    const t = raw.trim()
+    const head = raw.trimEnd()
+    const patch = /^\*{3}[ \t]+(?:Edit|Add|Update|Delete)[ \t]+File:[ \t]*(.+)$/i.exec(t) ?? /^\*{3}[ \t]+Move[ \t]+to:[ \t]*(.+)$/i.exec(t)
+    if (patch !== null) out.push(targetName(patch[1] as string))
+    else if (t.startsWith('MV ')) out.push(targetName(t.slice(3)))
+    else if (head.startsWith('[') && head.endsWith(']')) out.push(targetName(head.slice(1, -1)))
+    else if (head.startsWith('\u00B6')) out.push(targetName(head.slice(1)))
+  }
+  return out.filter(p => p !== '')
+}
+
+function writePaths(toolName: string, input: Record<string, unknown>): string[] {
   const found = new Set<string>(stringsOf(input.paths))
   for (const v of [input.path, input.file_path]) if (typeof v === 'string' && v !== '') found.add(v)
   if (Array.isArray(input.edits))
     for (const e of input.edits) if (e !== null && typeof e === 'object') for (const p of stringsOf([(e as Record<string, unknown>).path])) found.add(p)
+  if (EDIT_TOOLS.has(toolName)) {
+    for (const v of [input._path, input.rename]) if (typeof v === 'string' && v !== '') found.add(v)
+    if (Array.isArray(input.edits))
+      for (const e of input.edits) if (e !== null && typeof e === 'object') for (const p of stringsOf([(e as Record<string, unknown>).rename])) found.add(p)
+    for (const body of [input.input, input._input]) if (typeof body === 'string') for (const p of textTargets(body)) found.add(p)
+  }
   return [...found]
 }
 
@@ -63,7 +98,7 @@ export function claudeShapes(toolName: string, input: unknown): Shape[] {
   if (toolName === 'bash') return [{ tool: 'Bash', args: { command: args.command } }]
   if (WRITE_TOOLS.has(toolName)) {
     const tool = toolName === 'write' ? 'Write' : 'Edit'
-    const paths = writePaths(args)
+    const paths = writePaths(toolName, args)
     return paths.length === 0 ? [{ tool, args: {} }] : paths.map(file_path => ({ tool, args: { file_path } }))
   }
   if (toolName === 'read' && typeof args.path === 'string') {

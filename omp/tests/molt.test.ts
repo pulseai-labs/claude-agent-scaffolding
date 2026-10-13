@@ -364,6 +364,29 @@ describe('an ast_edit preview is not a change until it is resolved', () => {
   })
 })
 
+describe('the files a session changed, read from its edit payload text', () => {
+  test('a hashline edit of the handoff .md is the handoff once the blocks are spent, and the file is in the brief facts', async () => {
+    const { w, m } = world({ files: { '/repo/handoff.md': 'h' } })
+    w.percent = 66
+    const input = '[/repo/handoff.md]\n= 1|# Handoff'
+    w.branch = [msg('user', 'go'), { type: 'message', message: { role: 'assistant', content: [{ type: 'toolCall', id: 'c1', name: 'edit', arguments: { input } }] } }]
+    await m.onToolCall({ toolName: 'edit', input: { input } })
+    await m.onToolResult(result('edit', { input }))
+    await m.onSessionStop()
+    await m.onSessionStop()
+    await m.onSessionStop()
+    expect(w.ephemerals).toEqual([])
+    expect(w.seeds[0]).toContain('/repo/handoff.md')
+    expect(extractFacts(messagesOf(w.branch)).files).toEqual(['/repo/handoff.md'])
+  })
+
+  test('an apply_patch over two files lists both', () => {
+    const input = '*** Begin Patch\n*** Update File: /r/a.ts\n@@\n-x\n+y\n*** Update File: /r/b.ts\n@@\n-1\n+2\n*** End Patch'
+    const branch = [{ type: 'message', message: { role: 'assistant', content: [{ type: 'toolCall', id: 'c1', name: 'apply_patch', arguments: { input } }] } }]
+    expect(extractFacts(messagesOf(branch)).files).toEqual(['/r/a.ts', '/r/b.ts'])
+  })
+})
+
 describe('a child (MOLT_HANDOFF=parent)', () => {
   const env = { MOLT_HANDOFF: 'parent', MOLT_STATUS_PATH: '/s/status' }
   test('warnings and the hand-off are appended to the status file, and the session is never cleared', async () => {
@@ -602,6 +625,24 @@ describe('the omp-to-Claude tool shapes', () => {
     expect(claudeShape('grep', { pattern: 'x' }).tool).toBe('grep')
     expect(claudeShape('Write', {}).tool).toBe('omp:Write')
     expect(claudeShape('bash', null).args).toEqual({ command: undefined })
+  })
+
+  test('edit variants that carry their targets in the input text: hashline headers and MV, apply_patch and sloppy headers', () => {
+    const files = (tool: string, input: Record<string, unknown>) => claudeShapes(tool, input).map(s => s.args.file_path)
+    // hashline: `[file]` and `¶file` section headers (a `#hhhh` tag and one pair of quotes are dropped), `MV <dest>`
+    expect(files('edit', { input: '[/r/a.md]\n= 3|x\n[/r/b.ts#1a2b]\n= 1|y' })).toEqual(['/r/a.md', '/r/b.ts'])
+    expect(files('edit', { input: '¶/r/a.md\n= 3|x\nMV /r/moved.md' })).toEqual(['/r/a.md', '/r/moved.md'])
+    expect(files('edit', { _input: '["/r/q q.md"]\n= 1|x' })).toEqual(['/r/q q.md'])
+    // apply_patch and its sloppy form: `*** Update|Add|Delete|Edit File:` and `*** Move to:`, case and spacing as omp reads them
+    const patch = '*** Begin Patch\n*** Update File: /r/a.md\n@@\n-x\n+y\n*** Add File: /r/b.md\n+z\n*** Move to: /r/c.md\n*** End Patch'
+    expect(files('apply_patch', { input: patch })).toEqual(['/r/a.md', '/r/b.md', '/r/c.md'])
+    expect(files('edit', { input: '*** delete file:   /r/gone.md' })).toEqual(['/r/gone.md'])
+    // the replace and patch variants carry `path` (and patch a `rename`); the headers are not read from anything else
+    expect(files('edit', { path: '/r/a.md', rename: '/r/b.md', diff: '@@' })).toEqual(['/r/a.md', '/r/b.md'])
+    expect(files('edit', { edits: [{ path: '/r/a.md', rename: '/r/n.md' }] })).toEqual(['/r/a.md', '/r/n.md'])
+    // a path already named is listed once; text that is not a header is not a target
+    expect(files('edit', { path: '/r/a.md', input: '[/r/a.md]\n= 1|[not a header] x\n+ [1, 2]' })).toEqual(['/r/a.md'])
+    expect(files('write', { path: '/r/a.md', input: '[/r/b.md]' })).toEqual(['/r/a.md'])
   })
 
   test('a transcript becomes the Message shape handoff.ts reads, tool calls included', () => {
