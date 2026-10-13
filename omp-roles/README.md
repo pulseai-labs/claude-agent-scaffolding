@@ -10,6 +10,8 @@ Under `omp-seat`, a coordinator role's launch must export `SEAT_MODS_ROLE=coordi
 
 Coordinator roles need ossify 1.18.0 for `spine-driver` and `close`, and merge-bar for `work-pr`.
 
+OMP does not put a plugin's `bin/` on `PATH`, so a coordinator role also needs the `plugin-bin-path.ts` loader from the root README's OMP section, installed once per machine; without it `oss` is not found. `omp-seat` does not pass `--no-extensions`, so the loader in your user extension folder still loads.
+
 ```bash
 omp plugin marketplace add pulseai-labs/claude-agent-scaffolding
 omp plugin install omp-roles@claude-agent-scaffolding
