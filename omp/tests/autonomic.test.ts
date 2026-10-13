@@ -360,12 +360,45 @@ describe('changed tracking', () => {
   })
 
   test('every other tool, and an unknown one, counts as a change', async () => {
-    for (const t of ['bash', 'write', 'edit', 'ast_edit', 'eval', 'task', 'github', 'notebook', 'memory_edit', 'some_new_tool', 'mcp__x__y'])
+    for (const t of ['bash', 'write', 'edit', 'eval', 'task', 'github', 'notebook', 'memory_edit', 'some_new_tool', 'mcp__x__y'])
       expect([t, await changes(t)]).toEqual([t, true])
   })
 
   test('a failed call is not a change', async () => {
     expect(await changes('bash', true)).toBe(false)
+  })
+
+  // After three pushes with no change, one more stop blocks only if the call in between counted as a change.
+  async function changesBy(...results: Array<{ toolName: string; input: unknown; isError?: boolean }>): Promise<boolean> {
+    const { a } = world({ files: autopilot(), replies: Array(8).fill(STALLED) })
+    for (let i = 0; i < 3; i++) await a.onSessionStop({ last_assistant_message: 'x' })
+    for (const r of results) await a.onToolResult({ isError: false, ...r })
+    return (await a.onSessionStop({ last_assistant_message: 'x' }))?.decision === 'block'
+  }
+  const AST = { toolName: 'ast_edit', input: { ops: [{ pat: 'a', out: 'b' }], paths: ['src/a.ts'] } }
+  const RESOLVE = { toolName: 'write', input: { path: 'xd://resolve', content: 'the preview is right' } }
+  const REJECT = { toolName: 'write', input: { path: 'xd://reject', content: 'wrong files' } }
+
+  test('an ast_edit result is a preview: a change only once it is resolved', async () => {
+    expect(await changesBy(AST)).toBe(false)
+    expect(await changesBy(AST, REJECT)).toBe(false)
+    expect(await changesBy(AST, RESOLVE)).toBe(true)
+    expect(await changesBy(AST, { ...RESOLVE, isError: true })).toBe(false)
+    expect(await changesBy(AST, { toolName: 'resolve', input: { action: 'apply', reason: 'ok' } })).toBe(true)
+    expect(await changesBy(AST, { toolName: 'resolve', input: { action: 'discard', reason: 'no' } })).toBe(false)
+    expect(await changesBy(AST, { toolName: 'reject', input: { reason: 'no' } })).toBe(false)
+    expect(await changesBy({ toolName: 'write', input: { path: 'xd://propose', content: 'my-plan' } })).toBe(false)
+  })
+
+  test('lsp: a rename or rename_file applies by default and is a change; apply:false is a preview; code_actions apply only on apply:true', async () => {
+    const lsp = (input: Record<string, unknown>) => ({ toolName: 'lsp', input })
+    expect(await changesBy(lsp({ action: 'rename', file: 'a.ts', new_name: 'b' }))).toBe(true)
+    expect(await changesBy(lsp({ action: 'rename_file', file: 'a.ts', new_name: 'b.ts' }))).toBe(true)
+    expect(await changesBy(lsp({ action: 'rename', file: 'a.ts', new_name: 'b', apply: false }))).toBe(false)
+    expect(await changesBy(lsp({ action: 'code_actions', file: 'a.ts', query: 'fix', apply: true }))).toBe(true)
+    expect(await changesBy(lsp({ action: 'code_actions', file: 'a.ts' }))).toBe(false)
+    for (const action of ['diagnostics', 'definition', 'references', 'hover', 'symbols', 'reload', 'status'])
+      expect([action, await changesBy(lsp({ action, file: 'a.ts' }))]).toEqual([action, false])
   })
 })
 

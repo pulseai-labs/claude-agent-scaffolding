@@ -71,11 +71,46 @@ function within<T>(p: Promise<T>, ms: number): Promise<T> {
 
 // omp 18.8.9's built-in tools (the binary's tool registry, the same enumeration molt/omp/core.ts records), each
 // decided once. Read-only, so a turn of these alone is no progress for the loop guard:
-//   read, grep, glob, find, ast_grep, lsp, web_search, fetch, ls, ask, todo, wait, think, recall, reflect
-// Everything else counts as a change: bash, write, edit, apply_patch, ast_edit, eval, js, python, notebook, github,
+//   read, grep, glob, find, ast_grep, web_search, fetch, ls, ask, todo, wait, think, recall, reflect
+// Everything else counts as a change: bash, write, edit, apply_patch, eval, js, python, notebook, github,
 // browser, puppeteer, computer, debug, ida, task, checkpoint, rewind, context_notes, new_context, memory_edit,
 // retain, learn, manage_skill, generate_image, tts, vibe_*, mcp__* and extension tools. An unknown tool is a change.
-const READ_ONLY = new Set(['read', 'grep', 'glob', 'find', 'ast_grep', 'lsp', 'web_search', 'fetch', 'ls', 'ask', 'todo', 'wait', 'think', 'recall', 'reflect'])
+// Three tools are decided by their call (changedBy): ast_edit's own result is a preview and changes nothing (omp stages
+// a pending action that a later `write xd://resolve` applies and `xd://reject` discards); lsp edits files only through
+// rename and rename_file (unless apply is false) and code_actions with apply true.
+const READ_ONLY = new Set(['read', 'grep', 'glob', 'find', 'ast_grep', 'web_search', 'fetch', 'ls', 'ask', 'todo', 'wait', 'think', 'recall', 'reflect'])
+const RESOLUTION_DEVICE = /^\s*xd:\/\/(resolve|reject|propose)\s*$/i
+
+// A call that confirms (`resolve`), discards (`reject`) or proposes a plan (`propose`) for a staged action: the xd:// device
+// written through `write`, or omp's own tool of that name (which takes action apply | discard).
+function resolutionOf(toolName: string, input: unknown): 'resolve' | 'reject' | 'propose' | undefined {
+  const args = input !== null && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+  if (toolName === 'write') {
+    const path = typeof args.path === 'string' ? args.path : typeof args.file_path === 'string' ? args.file_path : ''
+    const kind = RESOLUTION_DEVICE.exec(path)?.[1]?.toLowerCase()
+    return kind === 'resolve' || kind === 'reject' || kind === 'propose' ? kind : undefined
+  }
+  if (toolName === 'resolve') return args.action === 'discard' ? 'reject' : 'resolve'
+  if (toolName === 'reject' || toolName === 'propose') return toolName
+  return undefined
+}
+
+const flag = (v: unknown): boolean | undefined => (v === true || v === 'true' ? true : v === false || v === 'false' ? false : undefined)
+
+// Whether a call whose result succeeded changed something.
+function changedBy(toolName: string, input: unknown): boolean {
+  if (toolName === 'ast_edit') return false
+  const kind = resolutionOf(toolName, input)
+  if (kind !== undefined) return kind === 'resolve'
+  if (toolName === 'lsp') {
+    const args = input !== null && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+    const action = typeof args.action === 'string' ? args.action.toLowerCase() : ''
+    const apply = flag(args.apply)
+    if (action === 'rename' || action === 'rename_file') return apply !== false
+    return action === 'code_actions' && apply === true
+  }
+  return !READ_ONLY.has(toolName)
+}
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v : undefined)
 
@@ -477,7 +512,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
       const id = io.sessionId()
       const name = String(e?.toolName ?? '')
       note(id, toolEntry(name, e.input, { text: textOf(e.content), ...(e.isError === true ? { isError: true as const } : {}) }))
-      if (e.isError !== true && !READ_ONLY.has(name)) changed.add(id)
+      if (e.isError !== true && changedBy(name, e.input)) changed.add(id)
     } catch {}
   }
 

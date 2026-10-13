@@ -16,6 +16,7 @@ export type Shape = { tool: string; args: Record<string, unknown> }
 // omp 18.8.9's built-in tools (the binary's BUILTIN_TOOLS registry plus think, yield, goal, the edit tool's
 // `apply_patch` wire name, and the tools registered outside it), each decided once:
 //   write, edit, apply_patch, ast_edit   -> Write / Edit: the handoff's own file tools; progress and lastMd count them
+//                                           (ast_edit once its preview is resolved: see `credited`)
 //   bash                                 -> Bash {command}: only git add / git commit segments pass the gate
 //   read of skill://<name>[/file]        -> Skill: the handoff instruction names a handoff skill
 //   everything else keeps its omp name and falls to gateAllows' default, refused past `block`:
@@ -40,6 +41,22 @@ function writePaths(input: Record<string, unknown>): string[] {
   return [...found]
 }
 
+const RESOLUTION_DEVICE = /^\s*xd:\/\/(resolve|reject|propose)\s*$/i
+
+// A call that confirms (`resolve`), discards (`reject`) or proposes a plan (`propose`) for a staged action: the xd:// device
+// written through `write`, or omp's own tool of that name (which takes action apply | discard).
+function resolutionOf(toolName: string, input: unknown): 'resolve' | 'reject' | 'propose' | undefined {
+  const args = input !== null && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+  if (toolName === 'write') {
+    const path = typeof args.path === 'string' ? args.path : typeof args.file_path === 'string' ? args.file_path : ''
+    const kind = RESOLUTION_DEVICE.exec(path)?.[1]?.toLowerCase()
+    return kind === 'resolve' || kind === 'reject' || kind === 'propose' ? kind : undefined
+  }
+  if (toolName === 'resolve') return args.action === 'discard' ? 'reject' : 'resolve'
+  if (toolName === 'reject' || toolName === 'propose') return toolName
+  return undefined
+}
+
 // Every Claude-shaped call one omp call stands for: a write-class call is one Write or Edit per target path.
 export function claudeShapes(toolName: string, input: unknown): Shape[] {
   const args = input !== null && typeof input === 'object' ? (input as Record<string, unknown>) : {}
@@ -59,6 +76,23 @@ export function claudeShapes(toolName: string, input: unknown): Shape[] {
 
 export function claudeShape(toolName: string, input: unknown): Shape {
   return claudeShapes(toolName, input)[0] as Shape
+}
+
+// The Claude-shaped calls one finished omp call actually changed. ast_edit's own result is a preview: omp stages a pending
+// action that a later `write xd://resolve` applies (the last one staged) and `xd://reject` discards, so the preview's
+// shapes wait in `staged` and are credited by the resolve that applies them. A preview with no replacement stages
+// nothing, and a resolve that failed leaves its preview staged. Every other call is credited as itself.
+function credited(staged: Shape[][], toolName: string, input: unknown, details: unknown, ok: boolean): Shape[] {
+  if (toolName === 'ast_edit') {
+    const none = (details as { totalReplacements?: unknown } | null | undefined)?.totalReplacements === 0
+    if (ok && !none) staged.push(claudeShapes(toolName, input))
+    return []
+  }
+  const kind = resolutionOf(toolName, input)
+  if (kind === undefined) return claudeShapes(toolName, input)
+  if (!ok || kind === 'propose') return []
+  const preview = staged.pop()
+  return kind === 'resolve' && preview !== undefined ? preview : []
 }
 
 // The fallback brief runs inside session_stop, whose handlers get 30 s in omp 18.8.9 (a longer one is dropped while the
@@ -109,10 +143,18 @@ const textOf = (content: unknown): string => {
   return content.filter(b => b?.type === 'text' && typeof b.text === 'string').map(b => b.text as string).join('\n')
 }
 
-// getBranch() entries -> the Message shape handoff.ts reads. Tool calls are `toolCall` blocks (name, arguments).
+// getBranch() entries -> the Message shape handoff.ts reads. Tool calls are `toolCall` blocks (id, name, arguments); their
+// results are `toolResult` messages carrying toolCallId, isError and details, which tell a failed call from a done one.
 export function messagesOf(branch: readonly unknown[]): Message[] {
+  type Entry = { type?: string; message?: { role?: string; content?: unknown; toolCallId?: unknown; isError?: unknown; details?: unknown } }
+  const results = new Map<string, { ok: boolean; details: unknown }>()
+  for (const entry of branch as Entry[]) {
+    const m = entry?.type === 'message' ? entry.message : undefined
+    if (m?.role === 'toolResult' && typeof m.toolCallId === 'string') results.set(m.toolCallId, { ok: m.isError !== true, details: m.details })
+  }
+  const staged: Shape[][] = []
   const out: Message[] = []
-  for (const entry of branch as Array<{ type?: string; message?: { role?: string; content?: unknown } }>) {
+  for (const entry of branch as Entry[]) {
     const m = entry?.type === 'message' ? entry.message : undefined
     if (m?.role === 'user') out.push({ role: 'user', text: textOf(m.content), toolUses: [] })
     else if (m?.role === 'assistant') {
@@ -120,7 +162,10 @@ export function messagesOf(branch: readonly unknown[]): Message[] {
       out.push({
         role: 'assistant',
         text: textOf(m.content),
-        toolUses: calls.flatMap(b => claudeShapes(String(b.name), b.arguments).map(s => ({ tool: s.tool, input: s.args }))),
+        toolUses: calls.flatMap(b => {
+          const r = typeof b.id === 'string' ? results.get(b.id) : undefined
+          return credited(staged, String(b.name), b.arguments, r?.details, r?.ok ?? true).map(s => ({ tool: s.tool, input: s.args }))
+        }),
       })
     }
   }
@@ -147,6 +192,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
   const nudged = new Set<string>()
   const stopBlocks = new Map<string, number>()
   const lastMd = new Map<string, string>()
+  const staged = new Map<string, Shape[][]>()  // ast_edit previews omp holds pending, last staged last
   const forced = new Set<string>()          // /molt now: the command stage whatever the fill
   let unattended = 0                        // molts since the operator last sent a prompt
   let pending: Pending | undefined
@@ -358,7 +404,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     stage = 'below'
     lastPercent = undefined
     for (const set of [nudged, commandNoted]) set.delete(id)
-    for (const map of [warned, stopBlocks, lastMd, published]) map.delete(id)
+    for (const map of [warned, stopBlocks, lastMd, published, staged]) map.delete(id)
   }
 
   async function onSessionStart() {
@@ -469,7 +515,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     return undefined
   }
 
-  async function onToolResult(e: { toolName: string; input?: unknown; isError?: boolean }) {
+  async function onToolResult(e: { toolName: string; input?: unknown; isError?: boolean; details?: unknown }) {
     await load()
     const id = io.sessionId()
     try {
@@ -477,7 +523,9 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       // Counted against the stage the call was gated at: past the first warning the session may write and
       // commit its handoff, which would make every molt look like progress to the autopilot loop guard.
       if (e.isError !== true) {
-        const shapes = claudeShapes(e.toolName, e.input)
+        const stack = staged.get(id) ?? []
+        staged.set(id, stack)
+        const shapes = credited(stack, e.toolName, e.input, e.details, true)
         if (!atLeast(stage, 'warn') && shapes.some(s => isProgress(s.tool, s.args))) progress += 1
         const md = shapes.find(s => (s.tool === 'Write' || s.tool === 'Edit') && typeof s.args.file_path === 'string' && s.args.file_path.endsWith('.md'))
         if (md !== undefined && atLeast(stage, 'command')) lastMd.set(id, md.args.file_path as string)

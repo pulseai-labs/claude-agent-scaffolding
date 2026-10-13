@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import ompExtension, { FALLBACK_BRIEF_MS, claudeShape, claudeShapes, createMolt, messagesOf } from '../../molt/omp/extension'
 import type { ClearResult, MoltIO } from '../../molt/omp/extension'
-import { activePath, fallbackPath, lineagePath, stagePath } from '../../molt/hooks/records'
+import { activePath, autonomicPath, fallbackPath, lineagePath, stagePath } from '../../molt/hooks/records'
+import { extractFacts } from '../../molt/hooks/handoff'
 import { DEFAULT_SEED, fill } from '../../molt/hooks/templates'
 
 const HOME = '/home/u'
@@ -279,6 +280,87 @@ describe('a stop at the handoff stage', () => {
     await m.onSessionStop()
     await m.onSessionStop()
     expect(w.ephemerals).toHaveLength(1)
+  })
+})
+
+describe('an ast_edit preview is not a change until it is resolved', () => {
+  const ast = (path: string) => result('ast_edit', { ops: [{ pat: 'a', out: 'b' }], paths: [path] })
+  const resolve = (isError = false) => result('write', { path: 'xd://resolve', content: 'the preview is right' }, isError)
+  const reject = () => result('write', { path: 'xd://reject', content: 'wrong files' })
+
+  // A stop at the handoff stage after the given tool results, no marker: the .md the session last changed is the handoff.
+  async function handoffAfter(...results: Array<ReturnType<typeof result>>) {
+    const { w, m } = world({ files: { '/repo/notes.md': 'n', '/repo/old.md': 'o' } })
+    w.percent = 66
+    w.branch = unmarked
+    for (const r of results) await m.onToolResult(r)
+    await m.onSessionStop()
+    await m.onSessionStop()
+    await m.onSessionStop()
+    return w
+  }
+
+  test('a previewed .md is not the handoff: a reject, or no resolve, leaves the fallback brief', async () => {
+    for (const results of [[ast('/repo/notes.md')], [ast('/repo/notes.md'), reject()], [ast('/repo/notes.md'), resolve(true)]]) {
+      const w = await handoffAfter(...results)
+      expect(w.ephemerals).toHaveLength(1)
+      expect(w.seeds[0]).not.toContain('/repo/notes.md')
+    }
+  })
+
+  test('a resolved preview credits its paths: the .md is the handoff', async () => {
+    const w = await handoffAfter(ast('/repo/notes.md'), resolve())
+    expect(w.ephemerals).toEqual([])
+    expect(w.seeds[0]).toContain('/repo/notes.md')
+  })
+
+  test('a resolve applies the last staged preview, a reject discards it', async () => {
+    const w = await handoffAfter(ast('/repo/old.md'), ast('/repo/notes.md'), reject(), resolve())
+    expect(w.seeds[0]).toContain('/repo/old.md')
+    expect(w.seeds[0]).not.toContain('/repo/notes.md')
+  })
+
+  test('a preview with no replacements stages nothing, so a later resolve credits nothing of it', async () => {
+    const empty = { ...ast('/repo/notes.md'), details: { totalReplacements: 0 } }
+    const w = await handoffAfter(empty, resolve())
+    expect(w.ephemerals).toHaveLength(1)
+  })
+
+  // The autopilot loop guard: a second molt with no progress since the first one is paused.
+  async function secondMoltAfter(...results: Array<ReturnType<typeof result>>) {
+    const { w, m } = world({ files: { '/h/a.md': 'a', '/h/b.md': 'b', [autonomicPath(HOME, 'S2')]: '{"mode":"autopilot"}' } })
+    w.percent = 66
+    w.branch = marked('/h/a.md')
+    w.onClear = async () => { w.id = 'S2'; await m.onSessionSwitch('new') }
+    await m.onSessionStop()
+    w.percent = 10
+    await m.onInput({ text: 'carry on', source: 'rpc' })
+    for (const r of results) await m.onToolResult(r)
+    w.percent = 90
+    w.branch = marked('/h/b.md')
+    await m.onSessionStop()
+    return w
+  }
+
+  test('progress: a preview, or a rejected one, does not count; a resolved one does', async () => {
+    expect((await secondMoltAfter()).seeds).toHaveLength(1)
+    expect((await secondMoltAfter(ast('/repo/a.ts'))).seeds).toHaveLength(1)
+    expect((await secondMoltAfter(ast('/repo/a.ts'), reject())).seeds).toHaveLength(1)
+    expect((await secondMoltAfter(ast('/repo/a.ts'), resolve())).seeds).toHaveLength(2)
+    expect((await secondMoltAfter(result('write', { path: '/repo/a.ts' }))).seeds).toHaveLength(2)
+  })
+
+  test('a transcript lists the files of a resolved preview only', () => {
+    const call = (id: string, name: string, args: unknown) => ({ type: 'toolCall', id, name, arguments: args })
+    const turn = (...calls: unknown[]) => ({ type: 'message', message: { role: 'assistant', content: calls } })
+    const done = (id: string, isError = false) => ({ type: 'message', message: { role: 'toolResult', toolCallId: id, isError, content: [{ type: 'text', text: 'ok' }] } })
+    const filesOf = (branch: unknown[]) => extractFacts(messagesOf(branch)).files
+    const staged = [turn(call('1', 'ast_edit', { paths: ['/r/a.ts'] })), done('1')]
+    expect(filesOf(staged)).toEqual([])
+    expect(filesOf([...staged, turn(call('2', 'write', { path: 'xd://reject', content: 'no' })), done('2')])).toEqual([])
+    expect(filesOf([...staged, turn(call('2', 'write', { path: 'xd://resolve', content: 'yes' })), done('2')])).toEqual(['/r/a.ts'])
+    expect(filesOf([...staged, turn(call('2', 'write', { path: 'xd://resolve', content: 'yes' })), done('2', true)])).toEqual([])
+    expect(filesOf([...staged, turn(call('2', 'resolve', { action: 'apply', reason: 'yes' })), done('2')])).toEqual(['/r/a.ts'])
   })
 })
 
