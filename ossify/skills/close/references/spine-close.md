@@ -913,10 +913,9 @@ fi
 spine whose changes touch a bone it just registered is reclassified by step 5's
 normal path: creating a bone is a bone decision, and the glob it wrote covers the
 code it wrote. A spine already `bone` is classed the same either way, but §6.1
-still runs on its hit — that section's `class_set` has no current-class guard, and
-`oss class_set` accepts `to == from` — so it appends a `bone`→`bone` entry to
-`class_overrides`. That is a weakness of §6.1, not of this step; guarding it is a
-separate change.
+runs on its hit and changes nothing: §6.1 reads the spine's class first, because
+`oss class_set` accepts `to == from` and would append a `bone`→`bone` entry to
+`class_overrides`.
 
 **What this step is not.** It does not repair older entries, re-point a stale
 surface, or check that the ADR's own text says what the row says (the ADR check's
@@ -1045,7 +1044,16 @@ close-time check).
 ### 6.1 On a bone hit — reclassify mid-flight
 
 ```bash
-oss class_set "$spine_id" bone "bone-touch at close: <ADR-ref> (<matched surface>)"
+# A spine already bone keeps its class: `oss class_set` accepts to == from and
+# would journal a bone->bone transition that never happened - which the step
+# before this one makes routine, since a bone spine's diff hits the bones it
+# just registered. Test the output, never the rc (an unknown id prints "").
+class="$(oss get ".spines[] | select(.id == \"$spine_id\") | .class")"
+case "$class" in
+  bone) echo "close: $spine_id is already bone - no class change" ;;
+  flesh) oss class_set "$spine_id" bone "bone-touch at close: <ADR-ref> (<matched surface>)" ;;
+  *) echo "close: cannot read $spine_id's class ('$class') - halt"; exit 1 ;;
+esac
 ```
 
 **Three arguments; the reason is required** and is the audit trail for a class
