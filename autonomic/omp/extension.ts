@@ -248,12 +248,11 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
       io.writeMode(temp, mode)
       io.rename(temp, modeFile)
     } catch {
-      try {
-        io.remove(modeFile)
-        io.notify(`autonomic: the mode file ${modeFile} could not be updated to ${mode}; it was removed, so a launcher reads manual.`)
-      } catch {
-        io.notify(`autonomic: the mode file ${modeFile} could not be updated to ${mode} or removed; do not let a launcher trust it in this session.`)
-      }
+      let removed = true
+      try { io.remove(modeFile) } catch { removed = false }
+      io.notify(removed
+        ? `autonomic: the mode file ${modeFile} could not be updated to ${mode}; it was removed, so a launcher reads manual.`
+        : `autonomic: the mode file ${modeFile} could not be updated to ${mode} or removed; do not let a launcher trust it in this session.`)
     } finally {
       try { io.remove(temp) } catch {}
     }

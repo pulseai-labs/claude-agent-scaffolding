@@ -152,6 +152,22 @@ describe('OMP live mode file', () => {
     }
   }
 
+  test('a throwing removal notice does not falsely report a failed removal', async () => {
+    const { a, files, io, w } = world()
+    await a.onCommand('on')
+    expect(files.get(MODE_FILE)).toBe('autopilot')
+    io.writeMode = () => { throw new Error('write denied') }
+    io.notify = text => {
+      w.notes.push(text)
+      if (text.includes('it was removed')) throw new Error('notify failed')
+    }
+    await a.onSessionStart()
+    expect(files.has(MODE_FILE)).toBe(false)
+    expect(w.notes).toHaveLength(1)
+    expect(w.notes[0]).toContain('it was removed, so a launcher reads manual')
+    expect(w.notes.join('\n')).not.toContain('or removed; do not let a launcher trust it')
+  })
+
   test('shutdown removes the file silently, even when removal fails', async () => {
     const { a, files, io, w } = world()
     await a.onCommand('on')
