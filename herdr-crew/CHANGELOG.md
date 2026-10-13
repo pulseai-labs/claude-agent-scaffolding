@@ -2,11 +2,21 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.18
+
+**OMP launcher mode follows the live file** (#769). An `omp-seat` coordinator reads
+`cat "$AUTONOMIC_MODE_FILE"` (autonomic 0.7.0), because omp's bash children keep the
+session-start environment; only an exact `autopilot` marks a child. Unset, a missing
+file or older autonomic leaves the child manual. Claude Code keeps its live
+`AUTONOMIC_EFFECTIVE_MODE` read. OMP seat placement stays narrow until a live OMP
+seat-launching run lifts it (#788). The mechanics suite pins both reads and its
+reference budget rises from 357 to 360 lines for the OMP route.
+
 ## 0.2.17
 
 **OMP coordinator and worker seats.** The machine-file example launches `omp-seat`
 with the three OMP extensions. OMP coordinators add each hosting repo's `.worktrees`
-root to `SEAT_MODS_ALLOW` for their task children; OMP seats fill only the lane driver (default-lane spine session), close, doctor or worker seats, never the orchestrator top, its rotation successor, a work-PR session or an activated spine session until #769 gives OMP a live mode route.
+root to `SEAT_MODS_ALLOW` for their task children; OMP seats fill only the lane driver (default-lane spine session), close, doctor or worker seats, never the orchestrator top, its rotation successor, a work-PR session or an activated spine session until a live OMP seat-launching run lifts it (#788).
 
 ## 0.2.16
 

@@ -384,12 +384,18 @@ options.
 
 ## For launchers
 
-autonomic sets `AUTONOMIC_EFFECTIVE_MODE` (`autopilot` or `manual`) in its own process each time a
+On Claude Code, autonomic sets `AUTONOMIC_EFFECTIVE_MODE` (`autopilot` or `manual`) in its own process each time a
 session's mode changes, so every later Bash call the session runs sees the live mode. Read it there
 to decide whether a child starts in autopilot: `autopilot` marks the child; anything else, unset
 included, does not. It is in memory and cannot go stale the way the session record can after a
 failed write. When the host refuses the value, autonomic tries to unset the variable and shows a
 toast; a launcher reads no stale mode only when the unset works (see "Limits"). autonomic never reads it: `AUTONOMIC_MODE` stays the spawn's input.
+
+On OMP, `AUTONOMIC_EFFECTIVE_MODE` in a `bash` child is the session-start value: omp's bash helper
+keeps that environment. Since autonomic 0.7.0, read `cat "$AUTONOMIC_MODE_FILE"` instead. The extension
+sets the absolute per-process path at load, removes any old file there only on the first load per process, atomically writes the mode on
+every change, and removes it at shutdown. Mark a child for autopilot only when the read is exactly
+`autopilot`; a missing variable or file, or anything else, is manual.
 
 ## Environment
 
@@ -401,6 +407,7 @@ toast; a launcher reads no stale mode only when the unset works (see "Limits"). 
 | `AUTONOMIC_PAIN_PATH` | the pain file |
 | `MOLT_STATUS_PATH` | molt's child status file (the floor) |
 | `AUTONOMIC_EFFECTIVE_MODE` | never read: autonomic sets it for launchers (above) |
+| `AUTONOMIC_MODE_FILE` | never read: on OMP, autonomic sets the live mode file path at load for launchers |
 
 ## Settings
 
@@ -467,8 +474,9 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
   with `forceWithLease`; `eval`, `debug` and scripts are not read, and a subagent's calls are covered by seat-mods' child rails.
 - There is no band: a turn-end pain lists its options, numbered, in the notice, the bell and the pain file. The ask judge sees what
   the session has read, so a scope document answers an ask only after the session has read it.
-- Main limit: `AUTONOMIC_EFFECTIVE_MODE` is set in omp's own process, but omp's `bash` tool children keep the value from session start. A stale
-  `manual` is safe; a stale `autopilot` after `/autopilot off`, or after a fall to manual, is not. Do not drive herdr-crew launches from an OMP top until PR 4.
+- A process that dies without `session_shutdown` (SIGKILL, crash, shutdown budget) leaves `mode/<pid>`; nothing sweeps these files; a reused pid clears its own at first load, and only children of the dead process could read it.
+- Main limit: if writing the OMP mode file fails AND removing it fails, a stale file can remain. The notice says
+  not to let a launcher trust it in this session. A missing file reads manual.
 
 ## Tests
 

@@ -2,6 +2,15 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.4.2 — 2026-10-14
+
+- **The rm rail follows a link before the `..` after it** (#781). Claude Code's path resolve collapses `..` before it
+  follows a symlink, so `rm -f <worktree>/link/../x` was placed inside the worktree while the kernel removed `x`
+  beside the link's target. Probed live: a guarded implementer removed a file outside its worktree this way. The rm
+  rail now walks such a path part by part, as the OMP guard does since 0.4.0 (#762); a `..` above a folder that does
+  not exist stays unresolvable and is denied. Write and Edit are unchanged: those tools collapse `..` themselves, so
+  the guard's placement already matches where they write.
+
 ## 0.4.1 — 2026-10-13
 
 - Map OMP's `seat-reviewer` child to the reviewer profile, confining its write tool to

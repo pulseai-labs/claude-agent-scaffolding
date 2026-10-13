@@ -5,11 +5,12 @@ import { join } from 'node:path'
 import ompExtension, { createAutonomic, questionsOf } from '../../autonomic/omp/extension'
 import type { AutonomicIO } from '../../autonomic/omp/extension'
 import { DEFAULT_POLICY } from '../../autonomic/hooks/policy'
-import { sessionPath, stagePath } from '../../autonomic/hooks/records'
+import { modeFilePath, sessionPath, stagePath } from '../../autonomic/hooks/records'
 
 const HOME = '/home/u'
 const POLICY = `${HOME}/.claude/autonomic/policy.md`
 const LEDGER = '/repo/.autonomic/ledger.md'
+const MODE_FILE = `${HOME}/.claude/state/autonomic/mode/42`
 const REC = (id = 'S1') => sessionPath(HOME, id)
 
 const turn = (v: object) => JSON.stringify(v)
@@ -20,7 +21,7 @@ const COVERED = turn({ case: 'covered', question: 'Shall I proceed?', answer: 'P
 // A reply that is an Error is thrown; undefined means the host has no ephemeral turn; HANG never settles (a host that
 // ignores the abort signal).
 const HANG: Promise<never> = new Promise(() => {})
-function world(over: { env?: Record<string, string>; files?: Record<string, string>; noPolicy?: boolean; budgetMs?: number; replies?: Array<string | Error | undefined | Promise<never>>; failAppend?: RegExp; failTouch?: boolean; failWrite?: RegExp } = {}) {
+function world(over: { env?: Record<string, string>; files?: Record<string, string>; noPolicy?: boolean; budgetMs?: number; replies?: Array<string | Error | undefined | Promise<never>>; failAppend?: RegExp; failTouch?: boolean; failWrite?: RegExp; failRename?: boolean; failRemove?: boolean } = {}) {
   const files = new Map<string, string>([...(over.noPolicy ? [] : [[POLICY, 'TEST POLICY\n'] as [string, string]]), ...Object.entries(over.files ?? {})])
   const w = {
     id: 'S1',
@@ -41,6 +42,10 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
   }
   const env: Record<string, string | undefined> = { HOME, ...over.env }
   const io: AutonomicIO = {
+    pid: 42,
+    remove: p => { if (over.failRemove) throw new Error('remove denied'); files.delete(p) },
+    writeMode: (p, t) => { if (over.failWrite?.test(p)) throw new Error('read-only'); files.set(p, t) },
+    rename: (from, to) => { if (over.failRename) throw new Error('rename denied'); files.set(to, files.get(from)!); files.delete(from) },
     sessionId: () => w.id,
     cwd: '/repo',
     env,
@@ -86,6 +91,108 @@ const ask = (questions: unknown) => ({ toolName: 'ask', input: { questions } })
 const OPTS = [{ label: 'Plan A' }, { label: 'Plan B' }]
 const Q = [{ id: 'q1', question: 'Which plan?', options: OPTS }]
 const answered = (a: Record<string, string>) => turn({ covered: true, answers: a, reason: 'the plan names Plan A' })
+
+describe('OMP live mode file', () => {
+  test('load sets the absolute process path and removes a reused pid file synchronously', () => {
+    const { files, env } = world({ files: { [MODE_FILE]: 'autopilot' } })
+    expect(env.AUTONOMIC_MODE_FILE).toBe(MODE_FILE)
+    expect(modeFilePath(HOME, 42)).toBe(MODE_FILE)
+    expect(files.has(MODE_FILE)).toBe(false)
+  })
+
+  test('on and off atomically publish the live mode', async () => {
+    const { a, files, env, io } = world()
+    const renames: Array<[string, string, string | undefined]> = []
+    const rename = io.rename
+    io.rename = (from, to) => {
+      renames.push([from, to, files.get(from)])
+      expect(from).not.toBe(to)
+      expect(join(from, '..')).toBe(join(to, '..'))
+      rename(from, to)
+    }
+    await a.onCommand('on')
+    expect(files.get(MODE_FILE)).toBe('autopilot')
+    expect(env.AUTONOMIC_EFFECTIVE_MODE).toBe('autopilot')
+    await a.onCommand('off')
+    expect(files.get(MODE_FILE)).toBe('manual')
+    expect(env.AUTONOMIC_EFFECTIVE_MODE).toBe('manual')
+    expect(renames.map(r => r[2])).toContain('autopilot')
+    expect(renames.at(-1)?.[2]).toBe('manual')
+    expect([...files.keys()].filter(p => p.startsWith(MODE_FILE) && p !== MODE_FILE)).toEqual([])
+  })
+
+  for (const reason of ['no policy', 'ledger not writable', 'record not writable']) {
+    test(`a fall to manual publishes manual: ${reason}`, async () => {
+      const { a, files, io } = world({ replies: [STALLED] })
+      await a.onCommand('on')
+      expect(files.get(MODE_FILE)).toBe('autopilot')
+      if (reason === 'no policy') files.delete(POLICY)
+      if (reason === 'ledger not writable') io.appendLine = async () => false
+      if (reason === 'record not writable') io.writeText = async () => { throw new Error('read-only') }
+      if (reason === 'record not writable') await a.onCommand('on')
+      else await a.onSessionStop({ last_assistant_message: 'x' })
+      expect(files.get(MODE_FILE)).toBe('manual')
+    })
+  }
+
+  for (const operation of ['write', 'rename']) {
+    for (const removalFails of [false, true]) {
+      test(`failed ${operation}, removal fails=${removalFails}: warns and fails toward manual`, async () => {
+        const { a, files, io, w } = world()
+        await a.onCommand('on')
+        expect(files.get(MODE_FILE)).toBe('autopilot')
+        if (operation === 'write') io.writeMode = () => { throw new Error('write denied') }
+        else io.rename = () => { throw new Error('rename denied') }
+        if (removalFails) io.remove = () => { throw new Error('remove denied') }
+        await a.onCommand('off')
+        expect(files.get(MODE_FILE)).toBe(removalFails ? 'autopilot' : undefined)
+        if (removalFails) expect(w.notes).toContain(`autonomic: the mode file ${MODE_FILE} could not be updated to manual or removed; do not let a launcher trust it in this session.`)
+        else expect(w.notes).toContain(`autonomic: the mode file ${MODE_FILE} could not be updated to manual; it was removed, so a launcher reads manual.`)
+      })
+    }
+  }
+
+  test('/autopilot off publishes manual even when the mode write and notice fail', async () => {
+    const { a, files, env, io } = world()
+    await a.onCommand('on')
+    expect(env.AUTONOMIC_EFFECTIVE_MODE).toBe('autopilot')
+    expect(files.get(MODE_FILE)).toBe('autopilot')
+    io.writeMode = () => { throw new Error('write denied') }
+    io.notify = () => { throw new Error('notify failed') }
+    const result = await a.onCommand('off')
+    expect(env.AUTONOMIC_EFFECTIVE_MODE).toBe('manual')
+    expect(files.has(MODE_FILE)).toBe(false)
+    expect(result).toContain('autopilot is off')
+  })
+
+  test('a throwing removal notice does not falsely report a failed removal', async () => {
+    const { a, files, io, w } = world()
+    await a.onCommand('on')
+    expect(files.get(MODE_FILE)).toBe('autopilot')
+    io.writeMode = () => { throw new Error('write denied') }
+    io.notify = text => {
+      w.notes.push(text)
+      if (text.includes('it was removed')) throw new Error('notify failed')
+    }
+    await a.onSessionStart()
+    expect(files.has(MODE_FILE)).toBe(false)
+    expect(w.notes).toHaveLength(1)
+    expect(w.notes[0]).toContain('it was removed, so a launcher reads manual')
+    expect(w.notes.join('\n')).not.toContain('or removed; do not let a launcher trust it')
+  })
+
+  test('shutdown removes the file silently, even when removal fails', async () => {
+    const { a, files, io, w } = world()
+    await a.onCommand('on')
+    a.onSessionShutdown()
+    expect(files.has(MODE_FILE)).toBe(false)
+    await a.onCommand('on')
+    io.remove = () => { throw new Error('remove denied') }
+    expect(() => a.onSessionShutdown()).not.toThrow()
+    expect(files.get(MODE_FILE)).toBe('autopilot')
+    expect(w.notes).toEqual([])
+  })
+})
 
 describe('manual mode', () => {
   test('ask and session_stop pass, no ledger line, no fork, no pain', async () => {
@@ -730,11 +837,11 @@ describe('the omp wiring', () => {
   const tmp = mkdtempSync(join(tmpdir(), 'autonomic-omp-'))
   afterAll(() => rmSync(tmp, { recursive: true, force: true }))
 
-  function boot(opts: { env?: Record<string, string | undefined>; reply?: string | Error; mode?: 'autopilot' } = {}) {
+  function boot(opts: { env?: Record<string, string | undefined>; reply?: string | Error; mode?: 'autopilot'; staleMode?: boolean } = {}) {
     const home = mkdtempSync(join(tmp, 'h-'))
     const ledgerFile = join(home, 'ledger.md')
     const saved: Record<string, string | undefined> = {}
-    for (const [k, v] of Object.entries({ HOME: home, AUTONOMIC_MODE: opts.mode, AUTONOMIC_LEDGER: ledgerFile, AUTONOMIC_BELL: undefined, AUTONOMIC_PAIN_PATH: undefined, AUTONOMIC_EFFECTIVE_MODE: undefined, MOLT_STATUS_PATH: undefined, ...opts.env })) {
+    for (const [k, v] of Object.entries({ HOME: home, AUTONOMIC_MODE: opts.mode, AUTONOMIC_LEDGER: ledgerFile, AUTONOMIC_BELL: undefined, AUTONOMIC_PAIN_PATH: undefined, AUTONOMIC_EFFECTIVE_MODE: undefined, AUTONOMIC_MODE_FILE: undefined, MOLT_STATUS_PATH: undefined, ...opts.env })) {
       saved[k] = process.env[k]
       if (v === undefined) delete process.env[k]
       else process.env[k] = v
@@ -763,10 +870,55 @@ describe('the omp wiring', () => {
         return { replyText: opts.reply ?? STALLED }
       },
     })
+    const modeFile = join(home, '.claude/state/autonomic/mode', String(process.pid))
+    if (opts.staleMode) { mkdirSync(join(modeFile, '..'), { recursive: true }); writeFileSync(modeFile, 'autopilot') }
     ompExtension(pi)
     const restore = () => { for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v } }
-    return { home, ledgerFile, handlers, commands, execs, state, ctxFor, restore }
+    return { home, ledgerFile, handlers, commands, execs, state, ctxFor, restore, pi }
   }
+
+  test('factory publishes the path and removes a stale file before a session event; shutdown is wired', async () => {
+    const b = boot({ staleMode: true, mode: 'autopilot' })
+    try {
+      const path = join(b.home, '.claude/state/autonomic/mode', String(process.pid))
+      expect(process.env.AUTONOMIC_MODE_FILE).toBe(path)
+      expect(existsSync(path)).toBe(false)
+      await b.handlers.get('session_start')!({}, b.ctxFor())
+      expect(readFileSync(path, 'utf8')).toBe('autopilot')
+      await b.handlers.get('session_shutdown')?.({}, b.ctxFor())
+      expect(existsSync(path)).toBe(false)
+    } finally { b.restore() }
+  })
+
+  test('a task child factory rebind preserves the main session live mode file', async () => {
+    const b = boot()
+    try {
+      const path = join(b.home, '.claude/state/autonomic/mode', String(process.pid))
+      await b.handlers.get('session_start')!({}, b.ctxFor())
+      await b.commands.get('autopilot')!.handler('on', b.ctxFor())
+      expect(readFileSync(path, 'utf8')).toBe('autopilot')
+      ompExtension(b.pi)
+      expect(readFileSync(path, 'utf8')).toBe('autopilot')
+      await b.handlers.get('session_start')!({}, b.ctxFor('sub'))
+      expect(readFileSync(path, 'utf8')).toBe('autopilot')
+    } finally { b.restore() }
+  })
+
+  test('session_switch from autopilot to a known manual session publishes manual', async () => {
+    const b = boot()
+    try {
+      const path = join(b.home, '.claude/state/autonomic/mode', String(process.pid))
+      await b.handlers.get('session_start')!({}, b.ctxFor())
+      expect(readFileSync(path, 'utf8')).toBe('manual')
+      b.state.id = 'W2'
+      await b.handlers.get('session_switch')!({}, b.ctxFor())
+      await b.commands.get('autopilot')!.handler('on', b.ctxFor())
+      expect(readFileSync(path, 'utf8')).toBe('autopilot')
+      b.state.id = 'W1'
+      await b.handlers.get('session_switch')!({}, b.ctxFor())
+      expect(readFileSync(path, 'utf8')).toBe('manual')
+    } finally { b.restore() }
+  })
 
   test('input wiring resets only the current main session on operator input', async () => {
     const b = boot({ mode: 'autopilot' })
@@ -880,11 +1032,11 @@ describe('the omp wiring', () => {
     expect(src).not.toMatch(/@oh-my-pi|@sinclair|claude-code/)
   })
 
-  test('registers /autopilot and the seven event handlers', () => {
+  test('registers /autopilot and the event handlers', () => {
     const b = boot()
     try {
       expect([...b.commands.keys()]).toEqual(['autopilot'])
-      expect([...b.handlers.keys()].sort()).toEqual(['agent_start', 'before_agent_start', 'input', 'session_compact', 'session_start', 'session_stop', 'session_switch', 'session_tree', 'tool_call', 'tool_result'])
+      expect([...b.handlers.keys()].sort()).toEqual(['agent_start', 'before_agent_start', 'input', 'session_compact', 'session_shutdown', 'session_start', 'session_stop', 'session_switch', 'session_tree', 'tool_call', 'tool_result'])
     } finally { b.restore() }
   })
 
