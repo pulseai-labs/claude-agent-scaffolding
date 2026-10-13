@@ -2,6 +2,15 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.6.1
+
+- **The bell is not awaited on the pain path** (#718). `pain()` awaited `ring` with no `timeoutMs`, so a hung bell held the
+  turn-end hook for the engine's 30 s bound while the operator waited. `BELL_TIMEOUT_MS` and `ring` are now molt's own,
+  byte for byte (including its comment block), and `ring` is called as `void ring(…)`: it still rings with the pain text,
+  and a non-zero exit and a rejection are each logged once. `tests/test-mod-shell-parity.sh` gained a second pair over the
+  two files — `molt/hooks/register.tsx` as the source, `autonomic/hooks/register.tsx` as the copy — so a copy that drifts
+  fails CI. No other behaviour changes.
+
 ## 0.6.0
 
 **autonomic on OMP** (omp 18.8.9).

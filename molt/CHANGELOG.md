@@ -2,6 +2,23 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.3.1 — 2026-10-13
+
+- **The autopilot progress count survives a module reload** (#713). `/reload-plugins` reloads `hooks/register.tsx`, so the
+  count fell to 0 and the next autopilot molt paused as "no progress" although the session had written files. The count is
+  kept on disk too, per session (`~/.claude/state/molt/progress/<id>`, best-effort, a failed write logged once): the loop
+  guard reads the session's file when the module count is 0, `seed` removes the outgoing session's file, and `session.end`
+  removes the ending session's. A `/compact` keeps the file, as it keeps the count.
+- **A failed notice write never aborts a pause** (#665). A refused notice write (another mod, or the state store) threw out
+  of `pause()` before its toast, status line, bell and log, so the operator learned nothing. `setNotice` is best-effort now,
+  logged once per process.
+- **`/molt status` measures before it reports** while molt is on (off, it shows the last fill measured), and the seed redraws the status line for the session it seeded (#665).
+- **A `.md` written while `/molt off` is not a handoff candidate**, and a **compact returns a seeded session to the plain
+  ladder** instead of keeping the thresholds its start fill raised (#665).
+- **The fallback brief claims only what the transcript shows** (#665): its headings are now "Files the session wrote or
+  tried to write" and "Commit commands the session tried to run" — the transcript carries a Write's arguments and a Bash command,
+  never their results.
+
 ## 0.3.0 — 2026-10-13
 
 - **molt on OMP** (omp 18.8.9). `omp/extension.ts` maps omp's events onto the same ladder: `omp/core.ts` runs molt's pure modules

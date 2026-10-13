@@ -191,9 +191,21 @@ async function recordAll($: Engine, id: string, lines: readonly string[]): Promi
   return false
 }
 
+// One copy in two files: molt's register.tsx and autonomic's; tests/test-mod-shell-parity.sh holds the two identical.
+// The engine kills a `process.run` child at 30 s when no bound is given — the same bound
+// molt-v0.2.2's awaited bell therefore ran under. Stated explicitly, and never tightened:
+// a slow bell (a remote notify curl) that completed on 0.2.2 must still complete, while a
+// hung one stays bounded. Nothing waits on it (see `pause`), so this is only a backstop.
+const BELL_TIMEOUT_MS = 30_000
+
+// Rung once and left to finish: the bell never gates the hook that paused the session. A bell
+// that cannot start, throws, or is killed at BELL_TIMEOUT_MS rejects; one that runs and exits
+// non-zero resolves. Both are failures and both are logged once — `log` never throws, so this
+// promise always resolves and nothing is left unhandled (#665 item 4).
 async function ring($: Engine, bell: string, message: string): Promise<void> {
   try {
-    await $.process.run(['sh', '-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${bell}`, 'sh', message])
+    const r = await $.process.run(['sh', '-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${bell}`, 'sh', message], { timeoutMs: BELL_TIMEOUT_MS })
+    if (r.exitCode !== 0) await log($, `bell failed exit=${r.exitCode}`)
   } catch (err) {
     await log($, `bell failed ${String(err)}`)
   }
@@ -220,7 +232,9 @@ async function pain($: Engine, id: string, reason: string, detail: string, optio
   try { await update($, notice, () => value) } catch {}
   $.ui.toast(text)
   const bell = live.get(id)?.bell
-  if (bell !== undefined) await ring($, bell, listed)
+  // Not awaited: the bell never gates the hook that paused the session — a hung bell would
+  // stall the turn end for the engine's bound (#718). It still rings, and still logs a failure.
+  if (bell !== undefined) void ring($, bell, listed)
   const path = ((await $.env.get('AUTONOMIC_PAIN_PATH')) ?? '').trim()
   if (path !== '' && !(await appendLine($, path, `${new Date().toISOString()} pain ${listed}`))) await log($, `pain file append failed ${path}`)
   await log($, `pain session=${id} ${listed}`)

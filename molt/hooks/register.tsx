@@ -11,7 +11,7 @@ import type { Handoff, Message } from './handoff'
 import { fallbackPath, lineagePath, parseLineage } from './records'
 import type { Lineage } from './records'
 import type { Stage, Thresholds } from './measure'
-import { activePath, autonomicPath, logPath, parseAutonomic, safeSessionId, stagePath } from './records'
+import { activePath, autonomicPath, logPath, parseAutonomic, progressPath, safeSessionId, stagePath } from './records'
 import { BLOCK_NOTE, CHILD_NOTE, CHILD_WARNING, DEFAULT_INSTRUCTIONS, DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome, fill } from './templates'
 
 // molt: in-place context handoff (spec §2). Module variables survive /clear, which is
@@ -29,6 +29,7 @@ let paused: string | undefined
 let seeded: { session: string; startPercent?: number } | undefined
 
 const MAX_STOP_BLOCKS = 2
+// One copy in two files: molt's register.tsx and autonomic's; tests/test-mod-shell-parity.sh holds the two identical.
 // The engine kills a `process.run` child at 30 s when no bound is given — the same bound
 // molt-v0.2.2's awaited bell therefore ran under. Stated explicitly, and never tightened:
 // a slow bell (a remote notify curl) that completed on 0.2.2 must still complete, while a
@@ -85,6 +86,37 @@ async function dropActive($: Engine, sessionId: string): Promise<void> {
   try { await $.process.run(['rm', '-f', activePath(await home($), sessionId)]) } catch {}
 }
 
+// The session's progress, kept beside the module count: /reload-plugins reloads this
+// module and the count falls to 0, while the file the session wrote survives it — which
+// is what the next autopilot molt reads (#713). Best-effort, logged once per process.
+let progressFailed = false
+async function markProgress($: Engine, sessionId: string): Promise<void> {
+  if (!safeSessionId(sessionId)) return
+  try {
+    await $.fs.write(progressPath(await home($), sessionId), `${new Date().toISOString()}\n`)
+  } catch (err) {
+    if (progressFailed) return
+    progressFailed = true
+    await log($, `progress write failed session=${sessionId} ${String(err)}`)
+  }
+}
+
+async function dropProgress($: Engine, sessionId: string): Promise<void> {
+  if (!safeSessionId(sessionId)) return
+  try { await $.process.run(['rm', '-f', progressPath(await home($), sessionId)]) } catch {}
+}
+
+// Above 0 the module count has it; at 0 — after a reload — the session's own file still
+// does. A file that cannot be read counts as no file: the guard keeps its older behaviour.
+async function hasProgress($: Engine, h: string, sessionId: string): Promise<boolean> {
+  if (progress > 0) return true
+  try {
+    return await $.fs.exists(progressPath(h, sessionId))
+  } catch {
+    return false
+  }
+}
+
 // The stage file (0.2.1): molt's stage and effective thresholds, for autonomic's turn-end
 // floor. Rewritten only when the stage or a threshold changes; best-effort, logged once.
 const published = new Map<string, string>()
@@ -109,8 +141,17 @@ async function publishStage($: Engine, sessionId: string): Promise<void> {
   }
 }
 
+// Best effort: a notice that cannot be written never aborts the step that wanted it. A
+// pause writes its toast, status, bell and log whether or not the band took the text (#665).
+let noticeFailed = false
 async function setNotice($: Engine, value: Notice): Promise<void> {
-  await update($, notice, () => value)
+  try {
+    await update($, notice, () => value)
+  } catch (err) {
+    if (noticeFailed) return
+    noticeFailed = true
+    await log($, `notice write failed ${String(err)}`)
+  }
 }
 
 function currentThresholds(sessionId: string): Thresholds {
@@ -258,7 +299,7 @@ async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<voi
       `Send a message to resume; the handoff is at ${handoff.path}.`, undefined)
   }
   // /molt now is the operator asking for this molt: it is not a loop, whatever the progress.
-  if (record.mode === 'autopilot' && own !== undefined && progress === 0 && !forced.has(sessionId)) {
+  if (record.mode === 'autopilot' && own !== undefined && !forced.has(sessionId) && !(await hasProgress($, h, sessionId))) {
     return pause($, sessionId, 'molt paused: no progress since the last molt (no Write, Edit or commit). ' +
       `Autopilot stops here; the handoff is at ${handoff.path}.`, record.bell)
   }
@@ -293,6 +334,9 @@ async function seed($: Engine, sessionId: string, p: NonNullable<typeof pending>
   // a molt for the loop guards.
   unattended += 1
   progress = 0
+  // The file belonged to the session that made the progress; a molt starts a new session
+  // id, whose count starts at 0 like today's (#713).
+  await dropProgress($, p.oldSession)
   forced.delete(p.oldSession)
   seeded = { session: sessionId }
   let text = fill(DEFAULT_SEED, { path: p.handoff })
@@ -309,6 +353,9 @@ async function seed($: Engine, sessionId: string, p: NonNullable<typeof pending>
     await setNotice($, { text: `molt: resumed from ${p.handoff}`, tone: 'info' })
     if (rejected) await setNotice($, warning)
   } catch {}
+  // The status line still reads the session that molted; the new one has nothing measured
+  // yet, and only a redraw says so (#665).
+  showStatus($, sessionId)
   try {
     const lineage: Lineage = { from: p.oldSession, chain: p.chain, depth: p.depth, handoff: p.handoff }
     await $.fs.write(lineagePath(await home($), sessionId), `${JSON.stringify(lineage, null, 2)}\n`)
@@ -349,6 +396,9 @@ async function writeMissingTemplates($: Engine): Promise<void> {
 }
 
 async function status($: Engine, sessionId: string): Promise<string> {
+  // The fill shown is the fill now, not the last one a hook happened to measure (#665).
+  // A measure that fails keeps the cached figure.
+  if (!off.has(sessionId) && !inFlight) try { await measure($, sessionId) } catch {}
   const usage = await $.session.usage({ breakdown: 'summary' })
   const t = currentThresholds(sessionId)
   const record = parseAutonomic(await readText($, autonomicPath(await home($), sessionId)))
@@ -388,6 +438,7 @@ export const register: Register = (on, options) => {
 
   on('session.end', async ($, e, next) => {
     await dropActive($, e.sessionId)
+    await dropProgress($, e.sessionId)
     return next(e)
   })
 
@@ -408,6 +459,9 @@ export const register: Register = (on, options) => {
       stopBlocks.delete(e.session_id)
       lastMd.delete(e.session_id)
       published.delete(e.session_id)
+      // A compact gives this session a new window: a ladder raised by the fill the seed
+      // landed in belongs to the old one, and the new window gets the plain ladder (#665).
+      if (e.source === 'compact' && seeded?.session === e.session_id) seeded = undefined
       if (p === undefined) try { await publishStage($, e.session_id) } catch {}
     }
     if (p !== undefined) {
@@ -490,10 +544,16 @@ export const register: Register = (on, options) => {
     if (r.deny === undefined && r.isError === undefined && !staged) {
       // Below the first warning only: past it the session may write and commit its handoff, which
       // would make every molt look like progress to the autopilot loop guard.
-      if (isProgress(e.tool, args) && !atLeast(stage, 'warn')) progress += 1
+      if (isProgress(e.tool, args) && !atLeast(stage, 'warn')) {
+        progress += 1
+        // On disk too, so a module reloaded mid-session does not lose the count (#713).
+        if (sessionId !== '') await markProgress($, sessionId)
+      }
       const path = args.file_path
+      // A file written while molt is off is not this session's handoff: /molt on does not
+      // turn it into one (#665).
       if ((e.tool === 'Write' || e.tool === 'Edit') && typeof path === 'string' && path.endsWith('.md')
-        && sessionId !== '' && atLeast(stage, 'command')) lastMd.set(sessionId, path)
+        && sessionId !== '' && !off.has(sessionId) && atLeast(stage, 'command')) lastMd.set(sessionId, path)
     }
     return r
   })
