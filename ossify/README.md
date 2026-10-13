@@ -25,8 +25,10 @@ supplies the procedure. Everything on either side of that one step is unchanged
 merges, the round barrier, the 3-dispatch cap. The mode adds no return mode: a
 rejected item is repaired through a correction continuation that returns the
 same `complete` shape, and Layer 4 runs inline there as it does everywhere.
-**`/ossify:run-spine <spine-id>` with no flag is
+**On Claude Code, `/ossify:run-spine <spine-id>` with no flag is
 completely unchanged** and still dispatches `ossify:implementer-agent`.
+
+Since 1.17.0, `/ossify:run-spine` dispatches OMP work items via omp-roles' `implementer` agent.
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo
