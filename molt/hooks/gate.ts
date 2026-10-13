@@ -14,12 +14,38 @@ export function gateAllows(tool: string, args: Readonly<Record<string, unknown>>
   return subs.length > 0 && subs.every(sub => sub !== undefined && GIT_ALLOWED.has(sub))
 }
 
+// The flags that make a commit no commit: git-commit(1)'s --dry-run, and the status forms
+// --short, --porcelain and --long, which it gives that same meaning ("when doing a
+// dry-run") — each of the three implies one (#665).
+const DRY_RUN = new Set(['--dry-run', '--short', '--porcelain', '--long'])
+
+// shell.ts is a byte-parity copy of seat-mods/hooks/rules.ts and hands back one segment's
+// subcommand, never its tokens, so a commit's own arguments are read here. The split and
+// the blanking are the boundary set those readers use (`COMMANDS`, `QUOTED`); a flag
+// inside a quoted message is text there and here both.
+const SEGMENTS = /;|&&|(?<![&<>])&(?![&>])|\|\||\||\n|\(|\)/
+const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/g
+
+function commitIsDryRun(segment: string): boolean {
+  const tokens = segment.replace(QUOTED, ' ').trim().split(/\s+/).filter(Boolean)
+  const at = tokens.indexOf('commit')
+  return at >= 0 && tokens.slice(at + 1).some(token => DRY_RUN.has(token))
+}
+
 // Progress, for the autopilot loop guard (spec §2): a file written or a commit made.
 // A commit counts only where the line runs it — bare, or behind `time`; behind `{`
 // (a brace-group body reads the same as a function definition's), `if`, `then`,
 // `elif`, `else` or `!` it may not run, and counting it would hide a stalled loop
-// from the guard (review R2/RR1).
+// from the guard (review R2/RR1) — and only where its own arguments make it a commit
+// rather than a dry run (#665).
 export function isProgress(tool: string, args: Readonly<Record<string, unknown>>): boolean {
   if (tool === 'Write' || tool === 'Edit' || tool === 'NotebookEdit') return true
-  return tool === 'Bash' && typeof args.command === 'string' && gitSubcommandsThatRun(args.command).includes('commit')
+  if (tool !== 'Bash' || typeof args.command !== 'string') return false
+  const command = args.command
+  // The whole command decides first, as it always has: a commit that only shows in a
+  // heredoc body or a quoted string is not one, and the segment reader below can only
+  // take commits away from that count, never add one.
+  if (!gitSubcommandsThatRun(command).includes('commit')) return false
+  return command.split(SEGMENTS).some(segment =>
+    gitSubcommandsThatRun(segment).includes('commit') && !commitIsDryRun(segment))
 }
