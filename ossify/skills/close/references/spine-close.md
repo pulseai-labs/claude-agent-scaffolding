@@ -826,10 +826,16 @@ recs="$(awk '
   insec && /^[[:space:]]*$/ { next }
   insec && /^[[:space:]]*None\.[[:space:]]*$/ { printf "N\n"; next }
   insec && /^[[:space:]]*\|/ {
-    n = split($0, c, "|")
-    for (i = 2; i <= n - 1; i++) gsub(/^[[:space:]]+|[[:space:]]+$/, "", c[i])
-    if (c[2] != "" && c[2] ~ /^[-: ]+$/) next      # the |---|---| separator row
-    if (tolower(c[2]) == "adr") next               # the header row
+    t = $0
+    gsub(/\\\|/, "\001", t)                        # `\|` is cell TEXT, not a boundary
+    n = split(t, c, "|")
+    for (i = 2; i <= n - 1; i++) { gsub(/\001/, "|", c[i]); gsub(/^[[:space:]]+|[[:space:]]+$/, "", c[i]) }
+    # THE TEMPLATE ROW, EXACTLY: all four cells the header carries (case-folded), or
+    # every cell nothing but `-`/`:`. Anything else is a DATA row and is validated -
+    # a row whose ref happens to read `ADR` is not a header to skip.
+    sep = (n == 6); for (i = 2; i <= n - 1; i++) if (c[i] !~ /^[-:]+$/) sep = 0
+    hdr = (n == 6 && tolower(c[2]) == "adr" && tolower(c[3]) == "title" && tolower(c[4]) == "touch surface (glob csv)" && tolower(c[5]) == "revisit when")
+    if (sep || hdr) next
     if (n != 6 || c[2] == "" || c[3] == "" || c[4] == "" || index(c[2] c[3] c[4] c[5], "\t") > 0) { printf "!\t%s\n", $0; next }
     printf "+\t%s\t%s\t%s\t%s\n", c[2], c[3], c[4], c[5]; next
   }

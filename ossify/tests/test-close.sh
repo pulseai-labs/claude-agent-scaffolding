@@ -2560,6 +2560,37 @@ t_assert_rc 0 "C2: the same row registers once its ADR file is tracked"
 t_assert_eq "ADR-0070" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0070") | .adr')" \
   "C2: ...into the registry"
 
+# ---------------------------------------------------------------------------
+# A6-A7 (PR #792 round 2, review items 2a/2b): the parser skips only the TEMPLATE.
+# Any row whose first cell read `ADR` was taken as the header, so a real data row
+# that happened to spell its ref that way vanished - and an escaped `\|` inside a
+# cell was read as a cell boundary, splitting one title into two cells and shifting
+# every column after it. A row is the header only when all four cells are the
+# template's; a row is the separator only when every cell is `-`/`:`; a `\|` is cell
+# text.
+# ---------------------------------------------------------------------------
+# A6. A data row whose ref is literally `ADR`, beside a valid one: the row is not
+# the header, so it is validated - and `ADR` is not a ref this project mints.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0024 | the touch-check surface | src/domain/**,src/port.rs | a second storage backend |\n| ADR | a row that is not the header | src/beside/** | |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "A6: a data row whose ref cell reads ADR halts"
+t_assert_contains "$T_OUT" "is not a numeric ADR ref" "A6: ...as a bad ref, not as the header to skip"
+
+# A7. An ESCAPED PIPE is cell text. The title cell carries `Postgres \| SQLite`; the
+# registry must store the title with one pipe and the touch surface must stay one
+# glob, not the half of a split line.
+printf 'the escaped-pipe fixture ADR\n' > "$B4CANON/docs/adr/adr-0002-postgres-or-sqlite.md"
+git -C "$B4CANON" add docs/adr/adr-0002-postgres-or-sqlite.md
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0002 | Postgres \\| SQLite | src/esc/** | |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 0 "A7: a title carrying an escaped pipe registers"
+t_assert_eq "Postgres | SQLite" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0002") | .title')" \
+  "A7: ...with the pipe as cell text, not as a boundary"
+t_assert_eq "src/esc/**" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0002") | .touch | join(", ")')" \
+  "A7: ...and the touch surface unsplit"
+
 cd /; rm -rf "$TMP"
 
 # A FLOOR ON THE ASSERTION COUNT. Every check in test-block-ledger.sh proves
