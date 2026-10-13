@@ -66,10 +66,11 @@ describe('the permission reflex (spec §3.3)', () => {
     expect(w.forkPrompts).toHaveLength(before)
     expect(w.statuses.at(-1)).toBe('autopilot: no policy')
   })
-  test('the length gate measures what the fork is shown (PR #672 round 2)', async ($, on) => {
+  test('the length gate measures what the fork is shown (PR #672 round 2; 64k since 0.5.1)', async ($, on) => {
     const w = world(on, { env: AP })
-    const input = { file_path: '/repo/x', list: Array.from({ length: 1500 }, () => 0) }
-    expect(JSON.stringify(input).length).toBeLessThan(4000)
+    w.forks.push(fork({ decision: 'allow', reason: 'r' }))
+    const input = { file_path: '/repo/x', list: Array.from({ length: 24000 }, () => 0) }
+    expect(JSON.stringify(input).length).toBeLessThan(64000)
     expect((await $.tool.check({ tool: 'Edit', input } as never)).decision).toBe('ask')
     expect(w.forkPrompts).toEqual([])
   })

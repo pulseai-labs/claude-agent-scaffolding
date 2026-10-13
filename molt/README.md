@@ -207,7 +207,20 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   still shows the old session's fill.
 - **Background waits survive the clear** (probe P6). A root that molts keeps every wait it armed;
   its handoff must list them so the resumed session does not arm them again.
-- Claude Code only. Codex has no mod runtime.
+- The Claude Code mod needs Claude Code; on OMP see the OMP section. Codex has no mod runtime.
+
+## OMP
+
+- Since 0.3.0 molt also ships `omp/extension.ts` for omp 18.8.9: the same ladder, texts, gate and handoff rules over `../hooks`, so
+  it needs no other install. Only `omp-seat` (the `omp-roles` plugin) loads it, with `-e`; a plain `omp` session is unchanged.
+- A root session is cleared with `newSession()` and seeded with the handoff. The first operator prompt is rewritten to an internal
+  `/molt-arm` command, which saves the command context that can clear; measured for two cycles in rpc mode. A child
+  (`MOLT_HANDOFF=parent`) appends its `warned` and `handed-off` lines to `MOLT_STATUS_PATH` and is never cleared.
+- There is no manifest UI on OMP: `~/.omp/agent/molt.json` holds the same keys as the settings table below, and a file that is not valid
+  JSON falls back to the defaults with a notice. The state files (`~/.claude/state/molt/`) are the ones `autonomic` reads.
+- Past the block threshold only `write`, `edit`, `apply_patch`, `ast_edit`, a `skill://` read and `git add` / `git commit` run.
+- Main limit: there is no handoff in `-p` mode (no command context to arm, so the session keeps going, gated). The clear is measured
+  in rpc mode only (two cycles); the TUI is unmeasured.
 
 ## Tests
 

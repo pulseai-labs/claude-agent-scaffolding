@@ -2,6 +2,52 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.6.0
+
+**autonomic on OMP** (omp 18.8.9).
+
+- `omp/extension.ts` ports the turn-end reflex, the `ask` reflex and the never-approve floor over the same `hooks/` modules (policy,
+  pain list, ledger, verdict parsing); loaded only by `omp-seat` (`omp-roles`) with `-e`, never ambient.
+- OMP seats run `--approval-mode yolo`, so there is no permission fork: a never-approve match in autopilot blocks the `bash` call,
+  writes a `permission` ledger line and raises a pain signal. The floor reads `bash` (the command, judged in the call's own `cwd`) and `github` `pr_push` with `forceWithLease`.
+- The `ask` reflex judges inside one 25 s deadline that no longer depends on omp honouring the abort signal: each attempt races the
+  deadline, so a hung side turn is a failed attempt and the ask passes to the operator with a pain signal and a `pain` ledger line.
+- No band on OMP: a turn-end pain lists its options, numbered, in the notice, the bell and the pain file.
+- Settings come from `~/.omp/agent/autonomic.json` (same keys as `userConfig`). The policy joins the system prompt on every turn, as a block
+  of its own after omp's blocks (omp 18.8.9 hands `before_agent_start` the prompt as a list of blocks).
+- The floor judges a `bash` call in the call's own `cwd` (resolved as omp resolves it) and treats `github` `pr_push` with `forceWithLease`
+  as a force push of the branch the call names.
+- Known limits: the floor does not read `eval`, `debug` or scripts, and a subagent's calls are covered by seat-mods' child rails; omp's
+  `bash` tool children keep the `AUTONOMIC_EFFECTIVE_MODE` value from session start (a stale `manual` is safe; a stale `autopilot` after
+  `/autopilot off` or a fall to manual is not, so do not drive herdr-crew launches from an OMP top until PR 4); the `ask` tool exists in
+  `rpc-ui` and the TUI only; an ask is answered only from what the session has read. The Claude Code mod is unchanged.
+
+## 0.5.1
+
+**The floor asks only on what a command does** (#758: 53 asks in five hours on 2026-10-12, 16 of them
+false positives, 17 inputs never judged).
+
+- **Two levels of finding** (`floorFindings`, `never.ts`). A rule that matches a parsed command's
+  own words — its arguments as Bash passes them, with whitespace inside quotes kept in one word —
+  asks you, as before. A rule that matches only in text the floor cannot read command by command
+  (the whole-text read, words inside a quoted argument, a command read over all words) goes to the
+  fork, with the finding in its prompt. The floor never approves. `neverRules` returns both levels.
+- **Long inputs are judged.** The fork now sees an input whole up to 64,000 characters (was 4000),
+  SubagentHandbacks included; a longer input still asks, so no call is allowed with a part the fork
+  did not see.
+- **Smaller fixes.** A sed script keeps a backslash inside single quotes (`'s/a\/b/c/'` is a safe sed);
+  the pain band shows the command that matched.
+- **Known limits.** A push from a detached or `main` checkout still asks `default-branch-push`, even to
+  a named feature branch (#758 cause 1): every way to read the real destination from the text alone
+  met a new route around it in review (another remote, inline or earlier config, `HOME`). It is #766.
+  Every branch delete still asks, an already-merged one included: #758's decision
+  to send merged deletes to the fork is #764 (proving a branch merged before the call runs kept
+  meeting new shapes in review). A session's first call still asks: there is nothing to fork yet. A
+  literal variable that holds spaces, used inside double quotes (`F='push -f'; curl -d "$F" …`), is
+  re-split when the floor reads its value, so it can ask where Bash passes one data argument. `rm` of
+  a path that starts with a variable the text does not assign (`rm "$T/x"`) still asks: unquoted, the
+  variable may hold flags.
+
 ## 0.5.0
 
 **The never-approve list judges each command on its own words** (a replay of three days of
