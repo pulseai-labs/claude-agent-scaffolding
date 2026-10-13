@@ -757,7 +757,7 @@ describe('the omp wiring', () => {
     } finally { b.restore() }
   })
 
-  for (const event of ['session_tree', 'session_compact']) {
+  for (const event of ['session_tree', 'session_compact', 'rewind']) {
     test(`round 3 ${event} clears branch A digest and changed flag, preserves mode and scope`, async () => {
       const b = boot({ mode: 'autopilot' })
       try {
@@ -768,7 +768,8 @@ describe('the omp wiring', () => {
         const stop = () => b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, c)
         for (let i = 0; i < 3; i++) await stop()
         await b.handlers.get('tool_result')!({ toolName: 'write', input: { path: '/branch-a.txt' }, content: [{ type: 'text', text: 'SECRET-A' }], isError: false }, c)
-        await b.handlers.get(event)?.({}, c)
+        if (event === 'rewind') await b.handlers.get('tool_result')!({ toolName: 'rewind', input: { report: 'kept findings' }, content: [{ type: 'text', text: 'Rewind requested.' }], details: { report: 'kept findings', rewound: true }, isError: false }, c)
+        else await b.handlers.get(event)?.({}, c)
         expect(await stop()).toBeUndefined() // stale changed would reset the exhausted loop
         const rec = JSON.parse(readFileSync(sessionPath(b.home, 'W1'), 'utf8'))
         expect(rec.mode).toBe('autopilot')
@@ -782,6 +783,38 @@ describe('the omp wiring', () => {
       } finally { b.restore() }
     })
   }
+
+  test('checkpoint, failed rewind, child rewind and another session rewind preserve digest and changed', async () => {
+    const b = boot({ mode: 'autopilot' })
+    try {
+      const c = b.ctxFor()
+      const stop = () => b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, c)
+      for (let i = 0; i < 3; i++) await stop()
+      await b.handlers.get('tool_result')!({ toolName: 'write', input: { path: '/kept.txt' }, content: [{ type: 'text', text: 'KEPT-FACT' }], isError: false }, c)
+      const tool = (name: string, isError = false, ctx = c) => b.handlers.get('tool_result')!({ toolName: name, input: { report: 'findings' }, content: [{ type: 'text', text: 'checkpoint result' }], isError }, ctx)
+      await tool('checkpoint')
+      await tool('rewind', true)
+      await tool('rewind', false, b.ctxFor('task'))
+      b.state.id = 'W2'
+      await tool('rewind')
+      b.state.id = 'W1'
+      await b.handlers.get('tool_call')!(ask(Q), c)
+      expect(b.state.ephemerals.at(-1).promptText).toContain('KEPT-FACT')
+      expect((await stop())?.decision).toBe('block') // retained change resets the exhausted loop
+    } finally { b.restore() }
+  })
+
+  test('successful rewind keeps subsequent retained changes for the stop loop guard', async () => {
+    const b = boot({ mode: 'autopilot' })
+    try {
+      const c = b.ctxFor()
+      const stop = () => b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, c)
+      for (let i = 0; i < 3; i++) await stop()
+      await b.handlers.get('tool_result')!({ toolName: 'rewind', input: { report: 'findings' }, content: [{ type: 'text', text: 'Rewind requested.' }], isError: false }, c)
+      await b.handlers.get('tool_result')!({ toolName: 'write', input: { path: '/kept.txt' }, content: [{ type: 'text', text: 'KEPT-CHANGE' }], isError: false }, c)
+      expect((await stop())?.decision).toBe('block')
+    } finally { b.restore() }
+  })
 
   test('round 3 discarded prompt repeats scope until main agent_start accepts it', async () => {
     const b = boot({ mode: 'autopilot' })

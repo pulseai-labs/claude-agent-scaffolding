@@ -716,37 +716,80 @@ describe('the omp wiring', () => {
     return { home, handlers, commands, sent, order, state, ctxFor, restore }
   }
 
-  test('round 3 tree resets branch A reminders, stop blocks, lastMd and staged previews', async () => {
+  for (const event of ['session_tree', 'rewind']) {
+    test(`round 3 ${event} resets branch A reminders, stop blocks, lastMd and staged previews`, async () => {
+      const b = boot({ percent: 81 })
+      try {
+        const c = b.ctxFor()
+        b.state.branch = unmarked
+        const old = join(b.home, 'branch-a.md')
+        writeFileSync(old, 'abandoned handoff')
+        const tool = (name: string, input: object) => b.handlers.get('tool_result')!(result(name, input), c)
+        await tool('write', { path: old })
+        await tool('ast_edit', { paths: [old] })
+        b.state.percent = 42
+        await tool('read', {})
+        b.state.percent = 81
+        await tool('read', {})
+        // A missing explicit marker spends both stop blocks even though lastMd exists.
+        for (let i = 0; i < 2; i++) await b.handlers.get('session_stop')!({ last_assistant_message: 'MOLT-HANDOFF: /missing.md' }, c)
+        if (event === 'rewind') await tool('rewind', { report: 'kept findings' })
+        else await b.handlers.get(event)?.({ oldLeafId: 'A', newLeafId: 'B' }, c)
+        expect(JSON.parse(readFileSync(stagePath(b.home, 'W1'), 'utf8')).stage).toBe('below')
+        const before = b.sent.length
+        b.state.percent = 42
+        await tool('read', {})
+        expect(b.sent.length).toBe(before + 1)
+        b.state.percent = 81
+        await tool('write', { path: 'xd://resolve' })
+        expect(b.sent.length).toBe(before + 2)
+        await b.commands.get('molt-arm')!.handler('', c)
+        for (let i = 0; i < 2; i++) expect((await b.handlers.get('session_stop')!({}, c))?.decision).toBe('block')
+        await b.handlers.get('session_stop')!({}, c)
+        expect(b.state.newSessions).toBe(1)
+        expect(b.sent.at(-1)?.text).toContain(fallbackPath(b.home, 'W1'))
+        expect(b.sent.at(-1)?.text).not.toContain(old)
+      } finally { b.restore() }
+    })
+  }
+
+  test('checkpoint, failed rewind, child rewind and another session rewind preserve current fill state', async () => {
     const b = boot({ percent: 81 })
     try {
       const c = b.ctxFor()
-      b.state.branch = unmarked
-      const old = join(b.home, 'branch-a.md')
-      writeFileSync(old, 'abandoned handoff')
-      const tool = (name: string, input: object) => b.handlers.get('tool_result')!(result(name, input), c)
-      await tool('write', { path: old })
-      await tool('ast_edit', { paths: [old] })
-      b.state.percent = 42
-      await tool('read', {})
-      b.state.percent = 81
-      await tool('read', {})
-      // A missing explicit marker spends both stop blocks even though lastMd exists.
-      for (let i = 0; i < 2; i++) await b.handlers.get('session_stop')!({ last_assistant_message: 'MOLT-HANDOFF: /missing.md' }, c)
-      await b.handlers.get('session_tree')?.({ oldLeafId: 'A', newLeafId: 'B' }, c)
-      expect(JSON.parse(readFileSync(stagePath(b.home, 'W1'), 'utf8')).stage).toBe('below')
-      const before = b.sent.length
-      b.state.percent = 42
-      await tool('read', {})
-      expect(b.sent.length).toBe(before + 1)
-      b.state.percent = 81
-      await tool('write', { path: 'xd://resolve' })
-      expect(b.sent.length).toBe(before + 2)
-      await b.commands.get('molt-arm')!.handler('', c)
+      const tool = (name: string, isError = false, ctx = c) => b.handlers.get('tool_result')!({ ...result(name, {}), isError }, ctx)
+      await tool('read')
       for (let i = 0; i < 2; i++) expect((await b.handlers.get('session_stop')!({}, c))?.decision).toBe('block')
-      await b.handlers.get('session_stop')!({}, c)
+      const before = b.sent.length
+      await tool('checkpoint')
+      await tool('rewind', true)
+      await tool('rewind', false, b.ctxFor('task'))
+      expect(b.sent.length).toBe(before)
+      b.state.id = 'W2'
+      await tool('rewind')
+      b.state.id = 'W1'
+      const afterOtherSession = b.sent.length
+      await tool('read')
+      expect(b.sent.length).toBe(afterOtherSession)
+      expect(JSON.parse(readFileSync(stagePath(b.home, 'W1'), 'utf8')).stage).toBe('fallback')
+      expect(await b.handlers.get('session_stop')!({}, c)).toBeUndefined()
+    } finally { b.restore() }
+  })
+
+  test('successful rewind keeps a subsequent retained handoff available to the stop', async () => {
+    const b = boot({ percent: 81 })
+    try {
+      const c = b.ctxFor()
+      const handoff = join(b.home, 'kept.md')
+      writeFileSync(handoff, '# kept findings')
+      await b.commands.get('molt-arm')!.handler('', c)
+      await b.handlers.get('tool_result')!(result('rewind', { report: 'kept findings' }), c)
+      await b.handlers.get('tool_result')!(result('read', {}), c)
+      await b.handlers.get('tool_result')!(result('write', { path: handoff }), c)
+      b.state.branch = unmarked
+      for (let i = 0; i < 3; i++) await b.handlers.get('session_stop')!({}, c)
       expect(b.state.newSessions).toBe(1)
-      expect(b.sent.at(-1)?.text).toContain(fallbackPath(b.home, 'W1'))
-      expect(b.sent.at(-1)?.text).not.toContain(old)
+      expect(b.sent.at(-1)?.text).toContain(handoff)
     } finally { b.restore() }
   })
 

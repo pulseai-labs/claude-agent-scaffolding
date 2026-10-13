@@ -712,6 +712,11 @@ export default function (pi: any) {
   pi.on('agent_start', (_e: any, c: any) => main(c) ? autonomic.onAgentStart() : undefined)
   pi.on('before_agent_start', (e: any, c: any) => main(c) ? autonomic.onBeforeAgentStart(e) : undefined)
   pi.on('tool_call', (e: any, c: any) => main(c) ? autonomic.onToolCall(e) : undefined)
-  pi.on('tool_result', (e: any, c: any) => main(c) ? autonomic.onToolResult(e) : undefined)
+  pi.on('tool_result', (e: any, c: any) => {
+    if (!main(c)) return
+    // Rewind rebuilds at turn end without an event. Reset now so later retained tools keep their state.
+    if (e?.toolName === 'rewind' && e.isError !== true) return autonomic.onContextRebuild()
+    return autonomic.onToolResult(e)
+  })
   pi.on('session_stop', (e: any, c: any) => main(c) ? autonomic.onSessionStop(e) : undefined)
 }

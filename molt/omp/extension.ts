@@ -89,6 +89,11 @@ export default function (pi: any) {
   pi.on('session_shutdown', (_e: any, c: any) => main(c) ? molt.onSessionShutdown() : undefined)
   pi.on('input', (e: any, c: any) => main(c) ? molt.onInput(e) : undefined)
   pi.on('tool_call', (e: any, c: any) => main(c) ? molt.onToolCall(e) : undefined)
-  pi.on('tool_result', (e: any, c: any) => main(c) ? molt.onToolResult(e) : undefined)
+  pi.on('tool_result', (e: any, c: any) => {
+    if (!main(c)) return
+    // Rewind rebuilds at turn end without an event. Reset now so later retained tools keep their state.
+    if (e?.toolName === 'rewind' && e.isError !== true) return molt.onSessionCompact()
+    return molt.onToolResult(e)
+  })
   pi.on('session_stop', (e: any, c: any) => main(c) ? molt.onSessionStop(e) : undefined)
 }
