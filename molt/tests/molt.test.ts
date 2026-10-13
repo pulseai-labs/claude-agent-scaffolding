@@ -271,6 +271,19 @@ describe('loop guards', () => {
     expect(w.clears).toBe(0)
     expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
   })
+  test('a notice write that fails never aborts the pause (#665)', async ($, on) => {
+    // A refused notice write (another mod, or the state store) used to throw out of
+    // pause() before its toast, status and bell: the operator learned nothing.
+    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, ...NO_PROGRESS } })
+    w.failNotices = true
+    at(w, 67)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(0)
+    expect(w.toasts.at(-1)).toContain('molt paused')
+    expect(w.statuses.at(-1)).toBe('molt: paused')
+    expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
+    expect(w.runs.some(argv => argv.join(' ').includes('pause session='))).toBe(true)
+  })
   test('autopilot: a reload after progress still counts it (#713)', async ($, on) => {
     // /reload-plugins reloads the module, so the in-memory count is back at 0 while the
     // session has written files. The session's own progress file is what survives it.

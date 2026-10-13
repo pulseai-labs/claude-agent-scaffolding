@@ -141,8 +141,17 @@ async function publishStage($: Engine, sessionId: string): Promise<void> {
   }
 }
 
+// Best effort: a notice that cannot be written never aborts the step that wanted it. A
+// pause writes its toast, status, bell and log whether or not the band took the text (#665).
+let noticeFailed = false
 async function setNotice($: Engine, value: Notice): Promise<void> {
-  await update($, notice, () => value)
+  try {
+    await update($, notice, () => value)
+  } catch (err) {
+    if (noticeFailed) return
+    noticeFailed = true
+    await log($, `notice write failed ${String(err)}`)
+  }
 }
 
 function currentThresholds(sessionId: string): Thresholds {
