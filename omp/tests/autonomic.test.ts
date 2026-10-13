@@ -613,6 +613,7 @@ describe('before_agent_start', () => {
     expect(first?.systemPrompt[2]).toContain('autonomic: autopilot is on. Read these documents now')
     expect(first?.systemPrompt[2]).toContain('- /spec.md')
     expect(JSON.parse(fs.get(REC('S1'))!).source).toBe('lineage')
+    a.onAgentStart()
     expect((await a.onBeforeAgentStart({ systemPrompt: ['BASE'] }))?.systemPrompt).toEqual(['BASE', 'TEST POLICY'])
   })
 
@@ -782,6 +783,28 @@ describe('the omp wiring', () => {
     })
   }
 
+  test('round 3 discarded prompt repeats scope until main agent_start accepts it', async () => {
+    const b = boot({ mode: 'autopilot' })
+    try {
+      const c = b.ctxFor()
+      const scope = join(b.home, 'scope.md')
+      writeFileSync(scope, 'scope')
+      await b.commands.get('autopilot')!.handler(`on ${scope}`, c)
+      const prepare = () => b.handlers.get('before_agent_start')!({ systemPrompt: ['BASE'] }, c)
+      expect((await prepare()).systemPrompt.join('\n')).toContain(`- ${scope}`)
+      await b.handlers.get('agent_start')?.({}, b.ctxFor('task'))
+      expect((await prepare()).systemPrompt.join('\n')).toContain(`- ${scope}`)
+      await b.handlers.get('agent_start')?.({}, c)
+      expect((await prepare()).systemPrompt).toEqual(['BASE', 'WIRING POLICY'])
+    } finally { b.restore() }
+  })
+
+  test('round 3 agent_start without a prepared scope does not consume it', async () => {
+    const { a } = world({ files: { [REC()]: JSON.stringify({ mode: 'autopilot', scope: ['/spec.md'], source: 'command' }) } })
+    a.onAgentStart()
+    expect((await a.onBeforeAgentStart({ systemPrompt: ['BASE'] }))?.systemPrompt.join('\n')).toContain('- /spec.md')
+  })
+
   test('the default export is a function and imports under plain bun', () => {
     expect(typeof ompExtension).toBe('function')
     const path = join(import.meta.dir, '../../autonomic/omp/extension.ts')
@@ -802,7 +825,7 @@ describe('the omp wiring', () => {
     const b = boot()
     try {
       expect([...b.commands.keys()]).toEqual(['autopilot'])
-      expect([...b.handlers.keys()].sort()).toEqual(['before_agent_start', 'input', 'session_compact', 'session_start', 'session_stop', 'session_switch', 'session_tree', 'tool_call', 'tool_result'])
+      expect([...b.handlers.keys()].sort()).toEqual(['agent_start', 'before_agent_start', 'input', 'session_compact', 'session_start', 'session_stop', 'session_switch', 'session_tree', 'tool_call', 'tool_result'])
     } finally { b.restore() }
   })
 

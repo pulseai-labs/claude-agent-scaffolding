@@ -172,6 +172,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   const pushes = new Map<string, number>()   // covered or stalled turn ends in a row with no change
   const changed = new Set<string>()          // sessions that changed something since their last turn end
   const announced = new Set<string>()        // sessions whose carried scope has been announced
+  const pendingScope = new Set<string>()     // prepared scope, committed only at agent_start
   const digests = new Map<string, string[]>()
   const note = (id: string, entry: string): void => { digests.set(id, pushEntry(digests.get(id) ?? [], entry)) }
   const digestOf = (id: string): string => renderDigest(digests.get(id) ?? [])
@@ -407,12 +408,15 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     const id = io.sessionId()
     digests.delete(id)
     changed.delete(id)
+    pendingScope.delete(id)
   }
 
   // before_agent_start: in autopilot the policy joins the system prompt, and a carried scope is announced once.
   // omp 18.8.9 passes the prompt as a list of blocks (and wraps a string we return into one block), so the policy and the
   // scope notice are blocks of their own and omp's blocks go back byte for byte.
   async function onBeforeAgentStart(e: { systemPrompt?: string | string[] }): Promise<{ systemPrompt: string[] } | undefined> {
+    const id = io.sessionId()
+    pendingScope.delete(id)
     try {
       const rec = await modeOf()
       if (rec.mode !== 'autopilot') return undefined
@@ -420,17 +424,23 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
       if (policy === undefined) return undefined
       const base = blocksOf(e?.systemPrompt) ?? blocksOf(io.systemPrompt())
       if (base === undefined) return void (await log('before_agent_start carried no system prompt: the policy was not added'))
-      const id = io.sessionId()
       const add: string[] = base.some(b => b.includes(policy)) ? [] : [policy]
       if (rec.scope.length > 0 && rec.source !== 'env' && !announced.has(id)) {
-        announced.add(id)
-        add.push(scopeMessage(rec.scope))
+        const scope = scopeMessage(rec.scope)
+        if (!base.some(b => b.includes(scope))) add.push(scope)
+        pendingScope.add(id)
       }
       return add.length === 0 ? undefined : { systemPrompt: [...base, ...add] }
     } catch (err) {
       await log(`before_agent_start error ${String(err)}`)
       return undefined
     }
+  }
+
+  // omp emits agent_start after committing the prepared system-prompt override.
+  function onAgentStart(): void {
+    const id = io.sessionId()
+    if (pendingScope.delete(id)) announced.add(id)
   }
 
   // An ask that reaches the operator is on the record as well as on the screen (Review Focus 5).
@@ -606,6 +616,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (c.kind === 'status') return statusReport(id)
     const prev = await modeOf()
     if (c.kind === 'off') {
+      pendingScope.delete(id)
       const off = await save(id, { ...prev, mode: 'manual', source: 'command', problem: undefined, invalid: undefined })
       pushes.delete(id)
       if (off.problem === 'record not writable')
@@ -626,6 +637,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     }
     pushes.delete(id)
     announced.delete(id)
+    pendingScope.delete(id)
     if (scope.length === 0) return 'autopilot is on. The scope is what this session has already read.'
     return 'autopilot is on. The next prompt you send carries the scope.'
   }
@@ -635,7 +647,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (e.source !== 'extension') pushes.delete(io.sessionId())
   }
 
-  return { onInput, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
+  return { onInput, onAgentStart, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
 }
 
 // omp's real ctx behind AutonomicIO. Each handler points `cur` at the event's ctx first.
@@ -697,6 +709,7 @@ export default function (pi: any) {
   pi.on('session_compact', (_e: any, c: any) => main(c) ? autonomic.onContextRebuild() : undefined)
   pi.on('session_switch', (_e: any, c: any) => main(c) ? autonomic.onSessionStart() : undefined)
   pi.on('input', (e: any, c: any) => main(c) ? autonomic.onInput(e) : undefined)
+  pi.on('agent_start', (_e: any, c: any) => main(c) ? autonomic.onAgentStart() : undefined)
   pi.on('before_agent_start', (e: any, c: any) => main(c) ? autonomic.onBeforeAgentStart(e) : undefined)
   pi.on('tool_call', (e: any, c: any) => main(c) ? autonomic.onToolCall(e) : undefined)
   pi.on('tool_result', (e: any, c: any) => main(c) ? autonomic.onToolResult(e) : undefined)
