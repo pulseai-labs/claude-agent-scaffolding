@@ -37,7 +37,7 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    report directory and its scratch directory in its `SEAT_MODS_ALLOW`. A coordinator seat —
    the spine, close or work-PR session, the doctor session, the lane driver — exports
    `SEAT_MODS_ROLE=coordinator` with the molt marking below; the top's rotation successor exports
-   `SEAT_MODS_ROLE=orchestrator`; neither free role gets `SEAT_MODS_ALLOW`. The operator's
+   `SEAT_MODS_ROLE=orchestrator`; neither free role gets `SEAT_MODS_ALLOW` except for an OMP coordinator, which adds each hosting repo's `.worktrees` root (colon-separated roots). The operator's
    own first top is not launched here — the operator starts it through a `claude-orch` alias
    that sets `orchestrator`. The scratch directory, created first, is
    `<run dir>/scratch/<role>-<n>` — `<run dir>` the directory holding the run's `run.json`,

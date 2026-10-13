@@ -58,7 +58,7 @@ A seat's readiness path is never a field here: it follows from herdr's own answe
 to whether the pane is detected (`herdr-mechanics.md`) — so a detection manifest
 landing later moves a seat onto the typed path with no edit anywhere.
 
-**OMP coordinator seats.** An OMP seat is a coordinator or a worker (`omp-seat worker --via <wrapper>`), never the orchestrator top or its rotation successor: the launcher's autopilot mode read needs Claude's live env (#769).
+**OMP coordinator seats.** Put `omp-seat` on PATH with the symlink in [omp-roles' Install step](../../../../omp-roles/README.md#install); an OMP seat is a coordinator or a worker (`omp-seat worker --via <wrapper>`), never the orchestrator top or its rotation successor: the launcher's autopilot mode read needs Claude's live env (#769).
 ```markdown
 ### omp-spine-deepseek
 command: omp-seat spine-driver --via omp-deepseek-go
