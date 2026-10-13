@@ -8,7 +8,9 @@ export const MODS = ['seat-mods', 'molt', 'autonomic'] as const
 // Minimum supported versions: seat-mods must map seat-reviewer to the reviewer profile;
 // molt and autonomic must ship their OMP extensions.
 const MIN_VERSION: Record<(typeof MODS)[number], string> = { 'seat-mods': '0.4.1', molt: '0.3.0', autonomic: '0.6.0' }
-export const ROLES: Record<string, string | undefined> = { worker: undefined }   // role → roles/<file>.md
+export const ROLES: Record<string, string | undefined> = {
+  worker: undefined, 'spine-driver': 'spine-driver.md', close: 'close.md', 'work-pr': 'work-pr.md',
+}   // role → roles/<file>.md
 
 export function pinWarning(installed: string, tested: string): string | undefined {
   const v = installed.replace(/^omp\//, '').trim()

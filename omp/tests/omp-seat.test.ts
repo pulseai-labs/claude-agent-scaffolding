@@ -45,8 +45,27 @@ describe('planLaunch', () => {
     expect(launch('__proto__')).toHaveProperty('error')
   })
   test('an unknown role is an error', () => {
-    expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker)' })
+    expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker, spine-driver, close, work-pr)' })
   })
+  for (const role of ['spine-driver', 'close', 'work-pr']) {
+    test(`${role} appends its shipped role file after the extensions and before passthrough args`, () => {
+      const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
+      record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })
+      const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
+      expect(planLaunch({ role, via: 'omp-glm', args: ['--model', 'test model', 'Begin.'], ompRecord, claudeRecord, rolesDir })).toMatchObject({
+        argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'),
+          '--append-system-prompt', join(rolesDir, `${role}.md`), '--model', 'test model', 'Begin.'],
+        warnings: [],
+      })
+    })
+    test(`${role} refuses a missing role file instead of launching without its procedure`, () => {
+      record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt'), autonomic: install('autonomic') })
+      const rolesDir = join(root, 'missing roles')
+      expect(planLaunch({ role, via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir })).toEqual({
+        error: `omp-seat: role file ${join(rolesDir, `${role}.md`)} is missing`,
+      })
+    })
+  }
   test('a mod missing from both records names the mod and both records', () => {
     record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt') })
     const r = launch()
