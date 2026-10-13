@@ -459,10 +459,12 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
 - `~/.omp/agent/autonomic.json` holds the same keys as the settings table below; the policy file, `/autopilot`, `AUTONOMIC_MODE`
   and the molt hand-over (a lineage file, a stage file) are the ones above. The `ask` tool exists in `rpc-ui` and the TUI only.
 - OMP seats run `--approval-mode yolo`, so there is no permission fork: a never-approve match in autopilot blocks the `bash` call, writes
-  a `permission` ledger line and raises a pain signal. The floor reads `bash` commands only; `eval` or a script that pushes is not seen.
+  a `permission` ledger line and raises a pain signal. The floor reads `bash` (the command, judged in the call's own `cwd`) and `github` `pr_push`
+  with `forceWithLease`; `eval`, `debug` and scripts are not read, and a subagent's calls are covered by seat-mods' child rails.
 - There is no band: a turn-end pain lists its options, numbered, in the notice, the bell and the pain file. The ask judge sees what
   the session has read, so a scope document answers an ask only after the session has read it.
-- Main limit: `AUTONOMIC_EFFECTIVE_MODE` is set in omp's own process, but omp's `bash` tool children keep the value from session start.
+- Main limit: `AUTONOMIC_EFFECTIVE_MODE` is set in omp's own process, but omp's `bash` tool children keep the value from session start. A stale
+  `manual` is safe; a stale `autopilot` after `/autopilot off`, or after a fall to manual, is not. Do not drive herdr-crew launches from an OMP top until PR 4.
 
 ## Tests
 

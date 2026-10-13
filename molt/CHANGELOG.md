@@ -9,7 +9,8 @@ All notable changes to the `molt` plugin.
   (`omp-roles`) with `-e`; the manifest declares no `omp.extensions`, so a plain `omp` session is unchanged.
 - A root session is cleared with `newSession()` and seeded with the handoff (the `session_stop` trigger; the first operator prompt
   arms the route through an internal `/molt-arm` command). A child (`MOLT_HANDOFF=parent`) appends `warned` and `handed-off`
-  lines to `MOLT_STATUS_PATH`. The fallback brief runs an ephemeral turn from `session_stop`.
+  lines to `MOLT_STATUS_PATH`. The fallback brief runs an ephemeral turn from `session_stop` under a 25 s deadline (omp gives that
+  handler 30 s); a slow or hung turn falls to the facts-only brief.
 - Settings come from `~/.omp/agent/molt.json` (same keys as `userConfig`; invalid JSON falls back to the defaults with a notice).
 - Live evidence on omp 18.8.9 with DeepSeek V4.1 Flash: all four stages, two clear-and-seed cycles in one process (a handoff
   the session wrote, and the fallback brief), a child's status file, a manual-mode pause. Known limits: no `-p` handoff; the clear
