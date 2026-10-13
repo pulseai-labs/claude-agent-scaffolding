@@ -896,11 +896,9 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
       ws.some(w => [...w.matchAll(/\$\{?([A-Za-z_]\w*)/g)].some(m => bound(m[1]!)))
     const away = moved || moves(ws, where)
     const own = new Set<NeverRule>()
-    // After a git config write in the call (or GIT_CONFIG* in it), origin may point anywhere: no named
-    // exemption, so `single` is false (PR #763 round 7).
-    rulesOf(substitute(g.own, r.vars, g.at), where, away, !config, own, switched)
+    rulesOf(substitute(g.own, r.vars, g.at), where, away, true, own, switched)
     const text = new Set<NeverRule>()
-    rulesOf((config && git) || verbOpaque(ws) || loose ? all : ws, where, away, !config, text, switched)
+    rulesOf((config && git) || verbOpaque(ws) || loose ? all : ws, where, away, true, text, switched)
     add(own, 'ask', g.text)
     add(new Set([...text].filter(x => !own.has(x))), 'fork', g.text)
     if (move) moved = true
@@ -947,12 +945,10 @@ function switchesTo(ws: readonly string[], names: readonly string[]): boolean {
   return rest.some(w => opaque(w) || names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))))
 }
 
-// Cause 3, extended by 0.5.1 (§3): a push that names a remote and only literal destinations other
-// than the default branch, main or master (never HEAD, @, empty or opaque) needs no default-branch
-// ask, whatever the session's branch is.
-// 0.5.1 (§3): -d/--delete and -f/--force take no value either; force-push and branch-delete are read on their own.
-const NO_VALUE = /^(?:-[uqvndf]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin|delete|force))$/
-function namedRefs(words: readonly string[], names: readonly string[], remote?: string): boolean {
+// Cause 3: a push that names a remote and only literal destinations other than the default
+// branch, main or master (never HEAD, @, empty or opaque) needs no default-branch ask after a move.
+const NO_VALUE = /^(?:-[uqvn]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin))$/
+function namedRefs(words: readonly string[], names: readonly string[]): boolean {
   const at = words.findIndex(w => isVerb(w, 'push'))
   if (at < 0) return false
   const args: string[] = []
@@ -960,16 +956,12 @@ function namedRefs(words: readonly string[], names: readonly string[], remote?: 
     if (w.startsWith('-')) { if (!NO_VALUE.test(w)) return false; continue }
     args.push(w)
   }
-  if (args.length < 2 || opaque(args[0]!) || (remote !== undefined && args[0] !== remote)) return false
+  if (args.length < 2 || opaque(args[0]!)) return false
   const all = [...new Set([...names, 'main', 'master'])]
   return args.slice(1).every(ref => {
     const r = ref.replace(/^\+/, '')
-    // 0.5.1 (§3): an opaque source with a literal destination (`$C:refs/heads/proof/x`) is read by its
-    // destination. A `:` inside a `${…}` expansion (`${BRANCH:-x}`) is no refspec separator, so the
-    // word stays one opaque ref.
-    const at = r.replace(/\$\{[^}]*\}/g, m => 'x'.repeat(m.length)).lastIndexOf(':')
-    const dst = at < 0 ? r : r.slice(at + 1)
-    if (opaque(dst)) return false
+    if (opaque(r)) return false
+    const dst = r.includes(':') ? r.slice(r.lastIndexOf(':') + 1) : r
     if (dst === '' || dst === 'HEAD' || dst === '@') return false
     return !all.some(n => dst === n || dst.endsWith(`/${n}`) || r === n)
   })
@@ -990,15 +982,11 @@ function rulesOf(words: readonly string[], where: Where, moved: boolean, single:
     const isDefault = (r: string) => { const w = r.replace(/^\+/, ''); return names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))) }
     // send-pack and http-push with no refspec update the matching refs, the default one included.
     const plumbing = words.some(w => isVerb(w, 'send-pack') || isVerb(w, 'http-push'))
-    // 0.5.1 (§3): a push that names a remote and only literal non-default destinations, read on one
-    // command, is no default-branch push whatever the session's branch is (detached, main, moved).
-    // Outside a move, only a push to origin whose default branch is known (origin/HEAD) is read by its
-    // destination: another remote's default is unknown here (PR #763 round 2). A moved push keeps 0.5.0's reading.
-    // A command that sets git config inline may retarget the remote origin/HEAD describes (PR #763 round 6).
-    const inline = words.some(w => w === '-c' || /^-c\S/.test(w) || /^--config-env/.test(w) || /^GIT_CONFIG/.test(w) || /^(?:remote|url)\./.test(w))
-    const named = single && !inline && (moved || switched ? namedRefs(words, names) : where.defaultBranch !== undefined && namedRefs(words, names, 'origin'))
-    if (plumbing || (!named && (where.branch === undefined || names.includes(where.branch) || moved || switched ||
-      any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))))
+    // 0.5.0 cause 3: only when the floor reads this one command, never the whole bag.
+    // A branch switch earlier in the text (final review C1) is read the same way as a move.
+    const away = (moved || switched) && !(single && namedRefs(words, names))
+    if (plumbing || where.branch === undefined || names.includes(where.branch) || away ||
+      any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))
       found.add('default-branch-push')
   }
   // -D, or -d with a force flag; a plain -d refuses an unmerged branch (as seat-mods reads it).

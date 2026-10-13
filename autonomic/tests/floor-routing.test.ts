@@ -26,12 +26,11 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     expect((await $.tool.check(BASH(REPLY))).decision).toBe('ask')
     expect(JSON.stringify(w.notices.at(-1))).toContain('permission for you')
   })
-  test('detached HEAD: a push to a named feature branch reaches the fork with no floor block', async ($, on) => {
+  test('detached HEAD: a push to a named branch still asks, as in 0.5.0 (#766)', async ($, on) => {
     const w = world(on, { env: AP })
     w.git.branch = undefined
-    w.forks.push(fork({ decision: 'allow', reason: 'own branch' }))
-    expect((await $.tool.check(BASH('git push -u origin record/x'))).decision).toBe('allow')
-    expect(w.forkPrompts[0]).not.toContain('<floor>')
+    expect((await $.tool.check(BASH('git push -u origin record/x'))).decision).toBe('ask')
+    expect(w.forkPrompts).toEqual([])
   })
   test('a branch delete asks, merged or not: merged-delete routing is #764 (PR #763 round 5)', async ($, on) => {
     const w = world(on, { env: AP })
@@ -87,7 +86,6 @@ describe('0.5.1 routing: the bypass floor (spec §6)', () => {
   test('a command with no finding keeps the allow; no fork', async ($, on) => {
     const w = world(on, { env: AP })
     w.verdict = { decision: 'allow' }
-    w.git.branch = undefined
     expect((await $.tool.check(BASH('git push -u origin record/x'))).decision).toBe('allow')
     expect(w.forkPrompts).toEqual([])
   })

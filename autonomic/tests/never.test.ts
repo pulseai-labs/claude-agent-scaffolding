@@ -1109,39 +1109,7 @@ describe('0.5.1: shell words for sed, and rm of a variable path (spec §2, §4)'
   })
 })
 
-describe('0.5.1: the pushed branch, not the session branch (spec §3)', () => {
-  test('a named non-default refspec is no default-branch push on a detached or main checkout', () => {
-    for (const branch of [undefined, 'main']) {
-      const w = { ...W, branch }
-      expect([branch, rules('git push -u origin record/x', w)]).toEqual([branch, []])
-      expect([branch, rules('git push origin HEAD:record/x', w)]).toEqual([branch, []])
-      expect([branch, rules('git -C /other push origin --delete feat/x', w)]).toEqual([branch, ['branch-delete']])
-      expect([branch, rules('git push -f origin feat/x', w)]).toEqual([branch, ['force-push']])
-      expect(rules('git push origin $C:refs/heads/proof/x', w)).not.toContain('default-branch-push')
-    }
-  })
-  test('a push that sets git config inline gets no named exemption (PR #763 round 6)', () => {
-    for (const branch of [undefined, 'main'])
-      for (const c of ['git -c remote.origin.pushurl=/other push origin release', 'git -c url.x.pushInsteadOf=y push origin release',
-        'git --config-env=remote.origin.url=V push origin release', 'GIT_CONFIG_COUNT=1 git push origin release'])
-        expect([branch, c, rules(c, { ...W, branch }).includes('default-branch-push')]).toEqual([branch, c, true])
-  })
-  test('a git config write earlier in the call voids the named exemption (PR #763 round 7)', () => {
-    for (const branch of [undefined, 'main']) {
-      for (const c of ['git config include.path /tmp/other; git push origin release', 'echo x > .git/config; git push origin release',
-        'git config remote.origin.pushurl /o && git push origin release'])
-        expect([branch, c, rules(c, { ...W, branch }).includes('default-branch-push')]).toEqual([branch, c, true])
-      // A config read is not a write.
-      expect(rules('git config --get user.name; git push -u origin record/x', { ...W, branch })).toEqual([])
-    }
-  })
-  test('outside a move, the exemption needs origin and a known default branch (PR #763 round 2)', () => {
-    for (const branch of [undefined, 'main']) {
-      expect(rules('git push upstream release', { ...W, branch })).toContain('default-branch-push')
-      expect(rules('git push origin release', { ...W, branch, defaultBranch: undefined })).toContain('default-branch-push')
-      expect(rules('git push -u origin record/x', { ...W, branch })).toEqual([])
-    }
-  })
+describe('0.5.1: the session branch still decides a push (0.5.0 reading; #766)', () => {
   test('a text-only finding survives beside an own-words one in another command (PR #763 round 2)', () => {
     const f = floorFindings("herdr pane run p 'git branch -D victim'; git branch -D merged", W).findings
     expect(f.filter(x => x.rule === 'branch-delete').map(x => x.level).sort()).toEqual(['ask', 'fork'])

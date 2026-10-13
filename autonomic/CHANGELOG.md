@@ -12,16 +12,14 @@ false positives, 17 inputs never judged).
   asks you, as before. A rule that matches only in text the floor cannot read command by command
   (the whole-text read, words inside a quoted argument, a command read over all words) goes to the
   fork, with the finding in its prompt. The floor never approves. `neverRules` returns both levels.
-- **The pushed branch, not the session's.** A push to `origin` that names only literal destinations
-  other than its default branch (known from `origin/HEAD`), `main` or `master` is no
-  `default-branch-push` on a detached or `main` checkout; another remote, or an unknown default, keeps
-  0.5.0's reading. `-d`, `--delete`, `-f` and `--force` no longer hide the named destination, and
-  `$SRC:refs/heads/x` is read by its destination.
 - **Long inputs are judged.** The 4000-character stop is gone: the fork sees the input's head and
   tail and how much was cut, and the floor has read all of it. SubagentHandbacks are judged too.
 - **Smaller fixes.** A sed script keeps a backslash inside single quotes (`'s/a\/b/c/'` is a safe sed);
   the pain band shows the command that matched.
-- **Known limits.** Every branch delete still asks, an already-merged one included: #758's decision
+- **Known limits.** A push from a detached or `main` checkout still asks `default-branch-push`, even to
+  a named feature branch (#758 cause 1): every way to read the real destination from the text alone
+  met a new route around it in review (another remote, inline or earlier config, `HOME`). It is #766.
+  Every branch delete still asks, an already-merged one included: #758's decision
   to send merged deletes to the fork is #764 (proving a branch merged before the call runs kept
   meeting new shapes in review). A session's first call still asks: there is nothing to fork yet. A
   literal variable that holds spaces, used inside double quotes (`F='push -f'; curl -d "$F" …`), is
