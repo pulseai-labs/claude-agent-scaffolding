@@ -2,6 +2,14 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.16
+
+**The spine brief calls `oss` by name.** §8a's caller rule loses its "(run-spine's resolved
+dispatcher)" parenthetical: ossify's fences call `oss` by name now, and the plugin loader
+puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so there is no resolved-dispatcher
+variable left to refer to. The contract pin follows the sentence, and the suite's reference
+budget follows the file down one line (232 → 231).
+
 ## 0.2.15
 
 **Implementer PRs open on merge-bar's template.** The planned and fast implementer briefs
