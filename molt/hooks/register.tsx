@@ -29,6 +29,7 @@ let paused: string | undefined
 let seeded: { session: string; startPercent?: number } | undefined
 
 const MAX_STOP_BLOCKS = 2
+// One copy in two files: molt's register.tsx and autonomic's; tests/test-mod-shell-parity.sh holds the two identical.
 // The engine kills a `process.run` child at 30 s when no bound is given — the same bound
 // molt-v0.2.2's awaited bell therefore ran under. Stated explicitly, and never tightened:
 // a slow bell (a remote notify curl) that completed on 0.2.2 must still complete, while a

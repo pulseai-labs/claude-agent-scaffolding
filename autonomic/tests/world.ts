@@ -10,6 +10,12 @@ export type Fork = { isAnswered: true; text: string } | { isAnswered: false; rea
 export type World = {
   files: Map<string, string>
   runs: string[][]
+  runInits: Array<{ timeoutMs?: number } | undefined>  // what each run was given, in step with runs
+  bellRuns: string[][]         // every autopilot bell's argv, in order
+  bellDelayMs?: number         // a bell answers after this long instead of at once
+  failBell?: boolean           // the bell process rejects
+  bellExit?: number            // a bell that runs answers with this exit status
+  bellFinished: boolean        // a bell answered (after its delay, if any)
   toasts: string[]
   statuses: Array<string | undefined>
   notices: unknown[]
@@ -43,6 +49,9 @@ export type World = {
 
 const USAGE = { input_tokens: 900, output_tokens: 40, cache_read_input_tokens: 50_000, cache_creation_input_tokens: 100 }
 
+// The test runtime has timers; the engine's types declare none, so reach it through globalThis.
+const sleep = (globalThis as unknown as { setTimeout: (f: (v?: unknown) => void, ms: number) => unknown }).setTimeout
+
 export const REC = (id = 's1') => `/home/u/.claude/state/autonomic/sessions/${id}.json`
 export const LEDGER = '/repo/.autonomic/ledger.md'
 export const POLICY = '/home/u/.claude/autonomic/policy.md'
@@ -51,7 +60,7 @@ export const POLICY = '/home/u/.claude/autonomic/policy.md'
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string>; noPolicy?: boolean } = {}): World {
   const w: World = {
     files: new Map([...(opts.noPolicy ? [] : [[POLICY, 'TEST POLICY\n'] as [string, string]]), ...Object.entries(opts.files ?? {})]),
-    runs: [], toasts: [], statuses: [], notices: [], fills: [], envSets: [], submits: [], hasBox: true,
+    runs: [], runInits: [], bellRuns: [], bellFinished: false, toasts: [], statuses: [], notices: [], fills: [], envSets: [], submits: [], hasBox: true,
     session: { id: 's1', cwd: '/repo' },
     git: { top: '/repo', branch: 'feat/x', originHead: 'origin/main' },
     forks: [], forkPrompts: [],
@@ -82,11 +91,26 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     return { value: undefined } as never
   })
   on('fs.exists', (_$, e) => ({ value: w.files.has(e.path) }) as never)
-  on('process.run', (_$, e) => {
+  on('process.run', async (_$, e) => {
     const argv = [...e.argv]
     w.runs.push(argv)
+    w.runInits.push(e.init)
     const ok = (stdout = '') => ({ value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false } }) as never
     const fail = () => ({ value: { exitCode: 1, stdout: '', stderr: 'failed', isStdoutTruncated: false } }) as never
+    // The autopilot bell, `sh -c 'AUTONOMIC_MESSAGE="$1"; …'`. It is answered here, never by
+    // the engine, so the bound `ring` passes is observable only through runInits. A delay
+    // stands in for a bell that has not answered yet; a delay past the bound it was given
+    // rejects, as the engine kills it (here at once — waiting the bound out in real time
+    // would only slow the suite). bellExit answers with a non-zero exit instead.
+    if (typeof argv[2] === 'string' && argv[2].includes('AUTONOMIC_MESSAGE')) {
+      w.bellRuns.push(argv)
+      if (w.failBell) return { deny: 'bell refused' } as never
+      const bound = e.init?.timeoutMs ?? 30_000
+      if ((w.bellDelayMs ?? 0) > bound) return { deny: `timed out after ${bound}ms` } as never
+      if (w.bellDelayMs !== undefined) await new Promise(resolve => sleep(resolve, w.bellDelayMs))
+      w.bellFinished = true
+      return { value: { exitCode: w.bellExit ?? 0, stdout: '', stderr: '', isStdoutTruncated: false } } as never
+    }
     if (argv[0] === 'git') {
       const a = argv.join(' ')
       if (a.includes('--show-toplevel')) return w.git.top === undefined ? fail() : ok(`${w.git.top}\n`)
