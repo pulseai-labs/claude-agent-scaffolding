@@ -2640,6 +2640,73 @@ t_assert_contains "$T_OUT" "bone ADR-40 already registered - skipping" "B14: ...
 t_assert_eq "1" "$(cd "$B4WS" && bash "$OSS" get '[.bones[] | select((.adr | sub("^[Aa][Dd][Rr]-0*"; "")) == "40")] | length')" \
   "B14: ...with one bone for the number"
 
+# ---------------------------------------------------------------------------
+# R-series (PR #792 round 2, review item R): registering a bone IS a bone decision.
+# 5b's own premise says so, and the touch check below only catches it when the new
+# surface happens to hit this diff - a `not-applicable` or future-facing glob never
+# does. So a flesh spine that registered at least one NEW bone is reclassified at the
+# end of this step; a `bone` spine gets no call, and a run that only skipped
+# registered rows changes nothing.
+# ---------------------------------------------------------------------------
+_b4_other_spine() { # $1=name $2=class $3=the bones-section body ; sets OSP/OD
+  OSP="$(cd "$B4WS" && bash "$OSS" spine_add "$B4REL" "$1" "$2")"
+  ( cd "$B4WS" && bash "$OSS" work_item_add "$OSP" "the item" canonical >/dev/null )
+  OD="$B4WS/docs/specs/$B4REL/$OSP-$(printf '%s' "$1" | tr ' ' '-')"
+  mkdir -p "$OD"
+  printf '# %s - %s\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n%s' \
+    "$OSP" "$1" "$3" > "$OD/SPINE.md"
+}
+_b4_run_other() { # 5b, for OSP, with 3's merge_shas injected
+  t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$OSP'; merge_shas='canonical:$(_b4_sha)'; . '$B4_BLOCK'"
+}
+_B4_TABLE='| ADR | Title | Touch surface (glob csv) | Revisit when |
+|---|---|---|---|
+'
+
+# R1. FLESH + A NEW BONE whose surface MISSES this diff: the class moves anyway, once,
+# with the refs in the reason.
+printf 'the registration fixture ADR\n' > "$B4CANON/docs/adr/adr-0090-registration-is-a-decision.md"
+git -C "$B4CANON" add docs/adr/adr-0090-registration-is-a-decision.md
+git -C "$B4CANON" commit -qm "fixture: the registration ADR"
+_b4_other_spine "flesh registers a bone" flesh "$_B4_TABLE| ADR-0090 | registration is a decision | src/missed/** | |
+"
+t_assert_eq "flesh" "$(cd "$B4WS" && bash "$OSS" get ".spines[] | select(.id==\"$OSP\") | .class")" \
+  "R1: the fixture spine really is flesh (the guard's precondition)"
+_b4_run_other
+t_assert_rc 0 "R1: a flesh spine registering a bone closes the step cleanly"
+t_assert_eq "ADR-0090" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0090") | .adr')" \
+  "R1: ...the bone is registered"
+t_assert_eq "bone" "$(cd "$B4WS" && bash "$OSS" get ".spines[] | select(.id==\"$OSP\") | .class")" \
+  "R1: ...and the spine is reclassified, though the glob missed the diff"
+t_assert_eq "bone registered at close: ADR-0090" \
+  "$(cd "$B4WS" && bash "$OSS" get ".class_overrides[] | select(.spine==\"$OSP\") | .reason")" \
+  "R1: ...with the refs in the reason"
+t_assert_eq "1" "$(cd "$B4WS" && bash "$OSS" get "[.class_overrides[] | select(.spine==\"$OSP\")] | length")" \
+  "R1: ...once, not twice"
+
+# R2. CONTROL: a `bone` spine gets no call - the same read 6.1 uses for its own.
+printf 'the bone-spine fixture ADR\n' > "$B4CANON/docs/adr/adr-0091-a-bone-spine-row.md"
+git -C "$B4CANON" add docs/adr/adr-0091-a-bone-spine-row.md
+git -C "$B4CANON" commit -qm "fixture: the bone-spine ADR"
+_b4_other_spine "already bone" bone "$_B4_TABLE| ADR-0091 | a bone spine row | src/also/** | |
+"
+_b4_run_other
+t_assert_rc 0 "R2: a bone spine registering a bone closes the step cleanly"
+t_assert_eq "ADR-0091" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0091") | .adr')" \
+  "R2: ...the bone is still registered"
+t_assert_eq "0" "$(cd "$B4WS" && bash "$OSS" get "[.class_overrides[] | select(.spine==\"$OSP\")] | length")" \
+  "R2: ...and no class_set entry - a bone spine has nothing to change"
+
+# R3. CONTROL, the other side: a flesh spine whose only row SKIPPED (already
+# registered, fields equal) is not reclassified - the class moves on a NEW bone, not
+# on seeing the section.
+_b4_other_spine "flesh skips only" flesh "$_B4_TABLE| ADR-0024 | the touch-check surface | src/domain/**,src/port.rs | a second storage backend |
+"
+_b4_run_other
+t_assert_rc 0 "R3: a flesh spine whose row was skipped closes the step cleanly"
+t_assert_eq "flesh" "$(cd "$B4WS" && bash "$OSS" get ".spines[] | select(.id==\"$OSP\") | .class")" \
+  "R3: ...and stays flesh - nothing was created"
+
 cd /; rm -rf "$TMP"
 
 # A FLOOR ON THE ASSERTION COUNT. Every check in test-block-ledger.sh proves

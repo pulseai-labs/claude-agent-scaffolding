@@ -891,6 +891,7 @@ $repo	$root/docs/adr"
 $hosting_repos
 EOF
 
+  registered_refs=""
   while IFS="$(printf '\t')" read -r kind adr title touch revisit; do
     [ -n "$kind" ] || continue
     if [ "$kind" = "!" ]; then
@@ -1021,18 +1022,36 @@ EOF3
     # spelling is what every later read keys on.
     oss bone_add "$ref" "$title" "$touch" "$revisit" \
       || { echo "close: oss bone_add refused the row $adr from $spine_md - halt"; exit 1; }
+    registered_refs="$registered_refs $ref"
     echo "close: registered bone $ref \"$title\""
   done <<EOF4
 $rows
 EOF4
+
+  if [ -n "$registered_refs" ]; then
+    # REGISTERING A BONE IS A BONE DECISION - this step's own premise - so the class
+    # moves HERE, from the registry write. The touch check below catches the same
+    # spine only when the new surface happens to hit this diff, and a
+    # `not-applicable` or future-facing glob never does. Read the class and test the
+    # OUTPUT, never the rc (an unknown id prints ""), exactly as §6.1's guard does
+    # for its own call.
+    class="$(oss get ".spines[] | select(.id == \"$spine_id\") | .class")" \
+      || { echo "close: cannot read $spine_id's class - halt"; exit 1; }
+    case "$class" in
+      bone) : ;;   # already bone: nothing to change, and no bone->bone entry
+      flesh) oss class_set "$spine_id" bone "bone registered at close:$registered_refs" \
+               || { echo "close: oss class_set refused the reclassification of $spine_id for$registered_refs - halt"; exit 1; } ;;
+      *) { echo "close: cannot read $spine_id's class ('$class') - halt"; exit 1; } ;;
+    esac
+  fi
 fi
 ```
 
-**The touch check that follows sees these bones, and that is the point.** A flesh
-spine whose changes touch a bone it just registered is reclassified by step 5's
-normal path: creating a bone is a bone decision, and the glob it wrote covers the
-code it wrote. A spine already `bone` is classed the same either way, but §6.1
-runs on its hit and changes nothing: §6.1 reads the spine's class first, because
+**Registering a bone is a bone decision, so the class moves here.** A flesh spine
+that registered at least one NEW bone is reclassified to `bone` as the step ends —
+not by the touch check below, which sees the new surface only when it happens to hit
+this diff: a `not-applicable` or future-facing glob never does. A spine already
+`bone` gets no call, for the same reason §6.1 reads the class before its own:
 `oss class_set` accepts `to == from` and would append a `bone`→`bone` entry to
 `class_overrides`.
 
