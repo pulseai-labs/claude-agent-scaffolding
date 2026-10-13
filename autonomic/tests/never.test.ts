@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { DEFAULT_READERS, namesDanger, neverRules, parseReaders } from '../hooks/never'
+import { DEFAULT_READERS, floorFindings, namesDanger, neverRules, parseReaders } from '../hooks/never'
 import type { Where } from '../hooks/never'
 
 const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x', defaultBranch: 'main' }
@@ -1050,3 +1050,76 @@ describe('0.5.0 PR #735: cp -t names its destination directory', () => {
     silent("cat > notes.md <<'EOF'\nnever git push -f\nEOF\ncp -t docs notes.md; git add docs/notes.md && git commit -m x")
   })
 })
+
+// 0.5.1 (spec §1–2): the level of each finding.
+const levels = (c: string, w: Where = W) => {
+  const f = floorFindings(c, w).findings
+  const of = (l: string) => [...new Set(f.filter(x => x.level === l).map(x => x.rule))].sort()
+  return { ask: of('ask'), fork: of('fork') }
+}
+describe('0.5.1: own words ask, text goes to the fork (spec §1–2)', () => {
+  test('a parsed command whose own words match asks', () => {
+    for (const c of ['git push -f origin feat/x', "'git' push -f origin feat/x", 'git "push" -f origin feat/x',
+      'git pu""sh -f origin feat/x', 'F=-f; git push $F origin feat/x', '$CMD push -f origin feat/x'])
+      expect([c, levels(c).ask.includes('force-push')]).toEqual([c, true])
+  })
+  test('text the floor cannot read command by command goes to the fork', () => {
+    for (const c of ["python3 -c 'git push -f origin feat/x'", "herdr pane run p 'git push -f origin feat/x'",
+      "tmux send-keys 'git push -f origin feat/x' Enter", "git config alias.p 'push -f'; git p origin feat/x"]) {
+      const l = levels(c)
+      expect([c, l.ask]).toEqual([c, []])
+      expect([c, l.fork.includes('force-push')]).toEqual([c, true])
+    }
+  })
+  test('a quoted message holds no verb: fork, never ask', () => {
+    expect(levels("gh api repos/o/r/pulls/1/comments/2/replies -f body='we do not push here'")).toEqual({ ask: [], fork: ['force-push'] })
+    expect(levels('git commit -m "fix: push the branch"', { ...W, branch: undefined }).ask).toEqual([])
+  })
+  test('an escaped character is part of its word, as Bash passes it (PR #763 round 6)', () => {
+    expect(levels('git push \\> -f origin feat/x').ask).toContain('force-push')
+    expect(levels('curl --data git\\ push\\ -f https://x').ask).toEqual([])
+    // A line continuation still joins: `pu\<newline>sh` is push.
+    expect(levels('git pu\\\nsh -f origin feat/x').ask).toContain('force-push')
+  })
+  test('a rule found at both levels is ask only', () => {
+    expect(levels("git push -f origin feat/x -o 'push -f'")).toEqual({ ask: ['force-push'], fork: [] })
+  })
+  test('the focus is the command that matched', () => {
+    const f = floorFindings('cd /repo\nnpm test\ngit push -f origin feat/x', W).findings
+    expect(f.find(x => x.rule === 'force-push')?.focus).toBe('git push -f origin feat/x')
+  })
+  test('neverRules is the union of both levels', () => {
+    expect(rules("python3 -c 'git push -f origin feat/x'")).toContain('force-push')
+    expect(rules('git push -f origin feat/x')).toContain('force-push')
+  })
+})
+
+describe('0.5.1: shell words for sed, and rm of a variable path (spec §2, §4)', () => {
+  test('a sed script with an escaped slash is a safe sed, not a runner (cause 5)', () => {
+    expect(levels("sed -i 's/a\\/b/c/' $S/pr.md; git push -q")).toEqual({ ask: [], fork: [] })
+  })
+  test('an unresolved variable may hold flags even before a path (PR #763 review)', () => {
+    // T='-rf ..' makes `rm $T/x` into `rm -rf ../x`: the floor keeps 0.5.0's reading.
+    for (const c of ['rm $T/x', 'rm -f $W/reports/.seen', 'rm ${OUT}/a.md']) expect([c, rules(c)]).toEqual([c, ['rm-outside']])
+    // A variable the text assigns once to a literal is read as its value.
+    expect(rules('T=/repo/a; rm "$T/x"')).toEqual([])
+  })
+  test('a bare variable or a recursive flag still makes rm recursive', () => {
+    for (const c of ['rm -rf $T', 'rm $F /x', 'rm -rf ../x', 'rm -r ~/x']) expect([c, rules(c)]).toEqual([c, ['rm-outside']])
+  })
+})
+
+describe('0.5.1: the session branch still decides a push (0.5.0 reading; #766)', () => {
+  test('a text-only finding survives beside an own-words one in another command (PR #763 round 2)', () => {
+    const f = floorFindings("herdr pane run p 'git branch -D victim'; git branch -D merged", W).findings
+    expect(f.filter(x => x.rule === 'branch-delete').map(x => x.level).sort()).toEqual(['ask', 'fork'])
+  })
+  test('the default branch, HEAD, no refspec and an opaque destination still ask', () => {
+    for (const branch of [undefined, 'main']) {
+      const w = { ...W, branch }
+      for (const c of ['git push origin main', 'git push origin HEAD', 'git push origin x:main', 'git push', 'git push origin $B', 'git push origin --delete main'])
+        expect([branch, c, rules(c, w).includes('default-branch-push')]).toEqual([branch, c, true])
+    }
+  })
+})
+

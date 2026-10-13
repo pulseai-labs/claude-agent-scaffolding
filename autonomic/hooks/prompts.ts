@@ -3,7 +3,8 @@ import type { Question } from './verdict'
 // The fork's questions. Each carries the policy text, so a fork that does not see the
 // system prompt's policy section still judges against it (probe P13).
 
-export const MAX_INPUT = 4000
+// 0.5.1 (D3, PR #763): the fork sees an input whole, up to this size; a longer one stays with the operator.
+export const MAX_INPUT = 64000
 
 export function turnEndPrompt(tail: string, policy: string): string {
   return `autonomic turn-end check. You are not continuing the work now. Classify how your last reply ended, judged against the autopilot policy below and the scope this session has read (its spec, plan, grill record or brief). Reply with one JSON object and nothing else.
@@ -67,8 +68,20 @@ export function shownInput(input: unknown): string {
   try { return JSON.stringify(input, null, 2) ?? '' } catch { return String(input) }
 }
 
-export function permissionPrompt(tool: string, input: unknown, policy: string, recent = ''): string {
+// 0.5.1 (§7): what the floor found in text it could not read command by command; the fork judges it.
+export type FloorNote = { rule: string; focus: string }
+function floorBlock(floor: readonly FloorNote[]): string {
+  if (floor.length === 0) return ''
+  return `<floor>
+The never-approve floor read the whole input, any cut part included. It found words for these rules in text it could not read command by command (a message, a quoted argument, an interpreter's script, a command whose verb is a variable). If the call does what such a rule names, answer "ask".
+${floor.map(f => `- ${f.rule}: ${f.focus}`).join('\n')}
+</floor>
+`
+}
+
+export function permissionPrompt(tool: string, input: unknown, policy: string, recent = '', floor: readonly FloorNote[] = []): string {
   let shown = shownInput(input)
+  // register.tsx never judges a longer input; the cut is a guard, not a view.
   if (shown.length > MAX_INPUT) shown = `${shown.slice(0, MAX_INPUT)}… (cut)`
   return `autonomic permission check. The tool call below needs approval. Decide whether the autopilot policy's permission scope covers it, for the task this session is doing. Reply with one JSON object and nothing else: {"decision": "allow" | "ask", "reason": "<one line>"}.
 
@@ -80,7 +93,7 @@ ${LIVE_TASK}
 ${policy}
 </policy>
 ${recentBlock(recent)}
-<tool>${tool}</tool>
+${floorBlock(floor)}<tool>${tool}</tool>
 <input>
 ${shown}
 </input>`
