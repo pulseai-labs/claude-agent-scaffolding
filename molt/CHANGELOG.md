@@ -15,11 +15,6 @@ All notable changes to the `molt` plugin.
 - **`/molt status` measures before it reports** while molt is on (off, it shows the last fill measured), and the seed redraws the status line for the session it seeded (#665).
 - **A `.md` written while `/molt off` is not a handoff candidate**, and a **compact returns a seeded session to the plain
   ladder** instead of keeping the thresholds its start fill raised (#665).
-- **A dry-run commit is no progress** (#665). `git commit --dry-run` makes no commit, and git-commit(1) gives `--short`,
-  `--porcelain` and `--long` the same meaning ("when doing a dry-run"), so a commit segment carrying any of the four as an
-  option no longer counts for the autopilot loop guard. An option's value (`-m --short`), a quoted string and a word
-  after `--` are data, not flags. `hooks/shell.ts` is a byte-parity copy and is untouched: the segment reader
-  is local to `hooks/gate.ts`.
 - **The fallback brief claims only what the transcript shows** (#665): its headings are now "Files the session wrote or
   tried to write" and "Commit commands the session tried to run" — the transcript carries a Write's arguments and a Bash command,
   never their results.

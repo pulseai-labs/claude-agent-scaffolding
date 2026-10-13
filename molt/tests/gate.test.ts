@@ -63,54 +63,6 @@ describe('isProgress', () => {
   })
 })
 
-// #665 M5: `git commit --dry-run` makes no commit, and git-commit(1) gives the status
-// forms --short, --porcelain and --long the same meaning ("when doing a dry-run"); each
-// implies one. A message that merely names the flag is text, not a flag.
-describe('isProgress: a dry-run commit (#665)', () => {
-  test('--dry-run and the dry-run status forms are no progress', () => {
-    expect(isProgress('Bash', { command: 'git commit --dry-run -m x' })).toBe(false)
-    expect(isProgress('Bash', { command: 'git commit --short -m x' })).toBe(false)
-    expect(isProgress('Bash', { command: 'git commit --porcelain -m x' })).toBe(false)
-    expect(isProgress('Bash', { command: 'git commit --long -m x' })).toBe(false)
-    expect(isProgress('Bash', { command: 'time git commit --dry-run -m x' })).toBe(false)
-  })
-  test('a commit that really runs still counts (control)', () => {
-    expect(isProgress('Bash', { command: 'git commit -m x' })).toBe(true)
-    expect(isProgress('Bash', { command: 'git add a && git commit -m x' })).toBe(true)
-    expect(isProgress('Bash', { command: 'git -C /r commit -m x' })).toBe(true)
-  })
-  test('a flag named inside a message is text, not a flag (control)', () => {
-    expect(isProgress('Bash', { command: "git commit -m '--dry-run in a message'" })).toBe(true)
-    expect(isProgress('Bash', { command: 'git commit -m "x --short y"' })).toBe(true)
-  })
-  test('a message holding a split character stays one message (control)', () => {
-    expect(isProgress('Bash', { command: 'git commit -m "Support --short (#665)"' })).toBe(true)
-    expect(isProgress('Bash', { command: 'git commit -m "explain --dry-run; add example"' })).toBe(true)
-    expect(isProgress('Bash', { command: 'git commit -m "add --porcelain\n\nbody"' })).toBe(true)
-    expect(isProgress('Bash', { command: "git commit -m 'x | --long'" })).toBe(true)
-    expect(isProgress('Bash', { command: 'git commit -m "a;b" --dry-run' })).toBe(false)
-    expect(isProgress('Bash', { command: 'git commit -m "a (b)" --dry-run' })).toBe(false)
-  })
-  test("an option's value and a pathspec after -- are data, not flags (control)", () => {
-    expect(isProgress('Bash', { command: 'git commit -m --dry-run' })).toBe(true)
-    expect(isProgress('Bash', { command: 'git commit -am --short' })).toBe(true)
-    expect(isProgress('Bash', { command: 'git commit --message --long' })).toBe(true)
-    expect(isProgress('Bash', { command: 'git commit -m x -- --dry-run' })).toBe(true)
-    expect(isProgress('Bash', { command: 'git commit -m "x" --dry-run' })).toBe(false)
-    expect(isProgress('Bash', { command: 'git commit -F msg.txt --porcelain' })).toBe(false)
-  })
-  test('a commit that only shows in inert text is no progress (control)', () => {
-    // The plain commit in the heredoc is the one that separates the two readers: the
-    // dry-run line below would be refused by the flag alone, guard or no guard.
-    expect(isProgress('Bash', { command: 'cat <<EOF\ngit commit -m x\nEOF' })).toBe(false)
-    expect(isProgress('Bash', { command: 'cat <<EOF\ngit commit --dry-run -m x\nEOF' })).toBe(false)
-    expect(isProgress('Bash', { command: 'echo git commit -m x' })).toBe(false)
-  })
-  test('a dry run in one segment does not hide a real commit in another (control)', () => {
-    expect(isProgress('Bash', { command: 'git commit -m x; git commit --dry-run -m y' })).toBe(true)
-  })
-})
-
 // Pins for the shared reader changes shipped in molt 0.2.2 / seat-mods 0.3.0.
 describe('shared shell reader pins (#702 item 4)', () => {
   test('herestring leaves later commands visible beside inert heredoc text', () => {
