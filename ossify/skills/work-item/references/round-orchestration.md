@@ -529,6 +529,8 @@ every clarification re-dispatch and every broken-envelope retry.
 Task(subagent_type="ossify:implementer-agent", prompt=<invocation block naming the absolute handoff path>)
 ```
 
+(OMP: task with agent "implementer" — same handoff path in, same JSON out)
+
 **Never pass the Task tool's `isolation: "worktree"`.** The worktree already
 exists — you created it in §3, in a different repo, at a path the handoff names.
 Letting the harness make its own would run the item somewhere the merge never

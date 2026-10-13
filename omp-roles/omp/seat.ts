@@ -1,11 +1,13 @@
 // omp-seat's logic: where the three extensions are installed, and the omp command line for a role.
 import { existsSync, readFileSync } from 'node:fs'
+import { semver } from 'bun'
 import { join } from 'node:path'
 import { installPaths } from './bin-path'
 
 export const MODS = ['seat-mods', 'molt', 'autonomic'] as const
-// The first version of each mod that ships omp/extension.ts.
-const FIRST_OMP: Record<(typeof MODS)[number], string> = { 'seat-mods': '0.4.0', molt: '0.3.0', autonomic: '0.6.0' }
+// Minimum supported versions: seat-mods must map seat-reviewer to the reviewer profile;
+// molt and autonomic must ship their OMP extensions.
+const MIN_VERSION: Record<(typeof MODS)[number], string> = { 'seat-mods': '0.4.1', molt: '0.3.0', autonomic: '0.6.0' }
 export const ROLES: Record<string, string | undefined> = { worker: undefined }   // role → roles/<file>.md
 
 export function pinWarning(installed: string, tested: string): string | undefined {
@@ -40,7 +42,15 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
     const root = omp.get(mod) ?? claude.get(mod)
     if (root === undefined) return { error: `omp-seat: ${mod} is not installed (looked in ${o.ompRecord} and ${o.claudeRecord})` }
     const ext = join(root, 'omp', 'extension.ts')
-    if (!existsSync(ext)) return { error: `omp-seat: ${ext} is missing — install ${mod} ${FIRST_OMP[mod]} or later` }
+    if (!existsSync(ext)) return { error: `omp-seat: ${ext} is missing — install ${mod} ${MIN_VERSION[mod]} or later` }
+    const manifest = join(root, '.claude-plugin', 'plugin.json')
+    let version: unknown
+    try { version = JSON.parse(readFileSync(manifest, 'utf8')).version } catch (e) {
+      return { error: `omp-seat: unreadable version at ${manifest} (${(e as Error).message}) — install ${mod} ${MIN_VERSION[mod]} or later` }
+    }
+    if (typeof version !== 'string' || !semver.satisfies(version, `>=${MIN_VERSION[mod]}`)) {
+      return { error: `omp-seat: ${mod} ${version ?? '[unset]'} is unsupported — install ${mod} ${MIN_VERSION[mod]} or later` }
+    }
     argv.push('-e', ext)
     extensions.push(ext)
   }
