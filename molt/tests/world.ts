@@ -29,6 +29,7 @@ export type World = {
   haiku: { isAnswered: true; text: string } | { isAnswered: false; reason: 'empty-reply' }
   modelCalls: number
   toolText: string             // what every tool call's result text is
+  stepUsage: { input_tokens: number; output_tokens?: number }   // what one turn.step reports
   failWrites?: RegExp          // fs.write to a matching path is refused (a read-only or full disk)
   failReads?: RegExp           // fs.read of a matching path is refused though the file exists (no read permission)
   rejectSeeds?: boolean        // a plugin's prompt.submit is refused
@@ -58,6 +59,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     haiku: { isAnswered: false, reason: 'empty-reply' },
     modelCalls: 0,
     toolText: 'ok',
+    stepUsage: { input_tokens: 0 },
   }
   mock.env(on, { HOME: '/home/u', ...(opts.env ?? {}) })
   mock.store(on)
@@ -145,6 +147,12 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     return {}
   })
   on('turn.complete', (_$, e) => ({ text: e.answer }))
+  // A response streams; the chain's result is what a hook after `yield* next(e)` reads. The
+  // step it answers for is the one it was handed, and `stepUsage` is what it reports.
+  on('turn.step', async function* (_$, e) {
+    const s = e as unknown as { turnId?: string; index?: number }
+    return { turnId: s.turnId, index: s.index, answer: '', toolUses: [], usage: { ...w.stepUsage } } as never
+  })
   on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
   on('session.end', (_$, e) => ({ sessionId: e.sessionId }) as never)
   return w

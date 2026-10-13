@@ -12,6 +12,10 @@ const NO_PROGRESS = { '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0
 // The progress file's own path, written out: the tests below pin the file the
 // implementation must write, read and remove, without importing the helper they test.
 const PROGRESS = (id = 's1') => `/home/u/.claude/state/molt/progress/${id}`
+const STAGE = (id = 's1') => `/home/u/.claude/state/molt/stage/${id}`
+const RUN = (args: string) =>
+  ({ command: 'molt', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } }) as never
+const STEP = { turnId: 't1', index: 0, model: 'claude-opus-5-5' } as never
 
 describe('a molt from a marker', () => {
   test('clears, writes lineage, seeds the new session with the handoff', async ($, on) => {
@@ -390,6 +394,61 @@ describe('loop guards', () => {
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(0)
     expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
+  })
+})
+
+// The mechanical residuals of #665, each one line of the operator's path: a status the
+// seed leaves stale, a cached fill in /molt status, a handoff candidate picked up while
+// molt is off, and a ladder a compact keeps raised.
+describe('the mechanical residuals (#665)', () => {
+  test('the seed redraws the status for the new session', async ($, on) => {
+    const w = world(on, { files: { [H]: '#' } })
+    w.clearTo.push('s2')
+    at(w, 67)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.statuses.at(-1)).toBe('molt 67%/65%')    // the session that molted
+    w.session.id = 's2'
+    await $.classic.SessionStart(CLEAR('s2'))
+    expect(w.statuses.at(-1)).toBe('molt')            // the new one, nothing measured yet
+  })
+
+  test('/molt status measures the fill first', async ($, on) => {
+    const w = world(on)
+    at(w, 10)
+    await $.turn.complete(TURN('done'))               // measures, and caches 10%
+    at(w, 72)
+    const r = await $.command.run(RUN('status'))
+    expect(r.text).toContain('fill: 72%')
+  })
+
+  test('while /molt is off, a .md write is not remembered as the handoff', async ($, on) => {
+    const w = world(on, { files: { '/repo/old.md': '# old' } })
+    at(w, 67)
+    await $.turn.complete(TURN('done'))               // measures: the stage is at the command
+    await $.command.run(RUN('off'))
+    await $.tool.call({ tool: 'Write', file_path: '/repo/old.md', content: '# old' })
+    await $.command.run(RUN('on'))
+    await $.turn.complete(TURN('done'))
+    expect(w.clears).toBe(0)                          // nothing molts on a file written while off
+    expect((await $.classic.Stop(STOP)).block).toContain('MOLT-HANDOFF:')
+  })
+
+  test('a compact drops a seeded session back to the plain ladder', async ($, on) => {
+    const w = world(on, { files: { [H]: '#' } })
+    w.clearTo.push('s2')
+    at(w, 67)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    w.session.id = 's2'
+    await $.classic.SessionStart(CLEAR('s2'))
+    // The seeded session's first response measures its starting fill: 40%, which raises
+    // its whole ladder by minRoom (15) points.
+    w.stepUsage = { input_tokens: 400_000, output_tokens: 10 }
+    const step = ($ as never as { turn: { step: (e: unknown) => AsyncIterable<unknown> } }).turn.step
+    for await (const _chunk of step(STEP)) { /* the chain yields chunks and returns the result */ }
+    expect(JSON.parse(w.files.get(STAGE('s2')) ?? '{}')).toMatchObject({ command: 80, block: 90, fallback: 95 })
+    // A compact keeps the session id but gives it a new window: the ladder is the plain one.
+    await $.classic.SessionStart({ source: 'compact', session_id: 's2' } as never)
+    expect(JSON.parse(w.files.get(STAGE('s2')) ?? '{}')).toMatchObject({ command: 65, block: 75, fallback: 80 })
   })
 })
 

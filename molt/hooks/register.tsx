@@ -353,6 +353,9 @@ async function seed($: Engine, sessionId: string, p: NonNullable<typeof pending>
     await setNotice($, { text: `molt: resumed from ${p.handoff}`, tone: 'info' })
     if (rejected) await setNotice($, warning)
   } catch {}
+  // The status line still reads the session that molted; the new one has nothing measured
+  // yet, and only a redraw says so (#665).
+  showStatus($, sessionId)
   try {
     const lineage: Lineage = { from: p.oldSession, chain: p.chain, depth: p.depth, handoff: p.handoff }
     await $.fs.write(lineagePath(await home($), sessionId), `${JSON.stringify(lineage, null, 2)}\n`)
@@ -393,6 +396,9 @@ async function writeMissingTemplates($: Engine): Promise<void> {
 }
 
 async function status($: Engine, sessionId: string): Promise<string> {
+  // The fill shown is the fill now, not the last one a hook happened to measure (#665).
+  // A measure that fails keeps the cached figure.
+  if (!off.has(sessionId) && !inFlight) try { await measure($, sessionId) } catch {}
   const usage = await $.session.usage({ breakdown: 'summary' })
   const t = currentThresholds(sessionId)
   const record = parseAutonomic(await readText($, autonomicPath(await home($), sessionId)))
@@ -453,6 +459,9 @@ export const register: Register = (on, options) => {
       stopBlocks.delete(e.session_id)
       lastMd.delete(e.session_id)
       published.delete(e.session_id)
+      // A compact gives this session a new window: a ladder raised by the fill the seed
+      // landed in belongs to the old one, and the new window gets the plain ladder (#665).
+      if (e.source === 'compact' && seeded?.session === e.session_id) seeded = undefined
       if (p === undefined) try { await publishStage($, e.session_id) } catch {}
     }
     if (p !== undefined) {
@@ -541,8 +550,10 @@ export const register: Register = (on, options) => {
         if (sessionId !== '') await markProgress($, sessionId)
       }
       const path = args.file_path
+      // A file written while molt is off is not this session's handoff: /molt on does not
+      // turn it into one (#665).
       if ((e.tool === 'Write' || e.tool === 'Edit') && typeof path === 'string' && path.endsWith('.md')
-        && sessionId !== '' && atLeast(stage, 'command')) lastMd.set(sessionId, path)
+        && sessionId !== '' && !off.has(sessionId) && atLeast(stage, 'command')) lastMd.set(sessionId, path)
     }
     return r
   })
