@@ -237,10 +237,8 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (safeSessionId(id)) {
       try { await io.writeText(sessionPath(home(), id), serializeRecord(rec)) } catch (err) {
         await log(`record write failed session=${id} ${String(err)}`)
-        if (rec.mode === 'autopilot' || live.get(id)?.mode === 'autopilot') {
-          out = { ...rec, mode: 'manual', problem: 'record not writable' }
-          io.notify(`autonomic: the session record could not be saved (${sessionPath(home(), id)}); this session is manual.`)
-        }
+        out = { ...rec, mode: 'manual', problem: 'record not writable' }
+        io.notify(`autonomic: the session record could not be saved (${sessionPath(home(), id)}); this session is manual.`)
       }
     }
     live.set(id, out)
@@ -306,7 +304,11 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     const listed = plain === undefined ? numbered : `${numbered} · in plain text: ${plain}`
     io.notify(listed)
     const bell = live.get(id)?.bell
-    if (bell !== undefined) { try { await io.bell(bell, listed) } catch (err) { await log(`bell failed ${String(err)}`) } }
+    // The bell has its own timeout; it must not consume the event handler's budget.
+    if (bell !== undefined) {
+      try { void io.bell(bell, listed).catch(err => log(`bell failed ${String(err)}`)) }
+      catch (err) { void log(`bell failed ${String(err)}`) }
+    }
     const path = (io.env.AUTONOMIC_PAIN_PATH ?? '').trim()
     if (path !== '' && !(await io.appendLine(path, `${new Date().toISOString()} pain ${listed}`))) await log(`pain file append failed ${path}`)
     await log(`pain session=${id} ${listed}`)
@@ -621,7 +623,12 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     return 'autopilot is on. The next prompt you send carries the scope.'
   }
 
-  return { onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
+  // Claude's composer/bridge prompt reset: OMP notices have no persistent pain band to dismiss.
+  function onInput(e: { source?: string }): void {
+    if (e.source !== 'extension') pushes.delete(io.sessionId())
+  }
+
+  return { onInput, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
 }
 
 // omp's real ctx behind AutonomicIO. Each handler points `cur` at the event's ctx first.
@@ -680,6 +687,7 @@ export default function (pi: any) {
   })
   pi.on('session_start', (_e: any, c: any) => main(c) ? autonomic.onSessionStart() : undefined)
   pi.on('session_switch', (_e: any, c: any) => main(c) ? autonomic.onSessionStart() : undefined)
+  pi.on('input', (e: any, c: any) => main(c) ? autonomic.onInput(e) : undefined)
   pi.on('before_agent_start', (e: any, c: any) => main(c) ? autonomic.onBeforeAgentStart(e) : undefined)
   pi.on('tool_call', (e: any, c: any) => main(c) ? autonomic.onToolCall(e) : undefined)
   pi.on('tool_result', (e: any, c: any) => main(c) ? autonomic.onToolResult(e) : undefined)

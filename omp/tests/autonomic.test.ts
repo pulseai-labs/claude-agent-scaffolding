@@ -77,7 +77,7 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     bell: async (c, m) => { w.bells.push([c, m]) },
   }
   const a = createAutonomic(io, over.budgetMs)
-  return { w, a, files, env }
+  return { w, a, files, env, io }
 }
 
 const autopilot = (id = 'S1') => ({ [REC(id)]: JSON.stringify({ mode: 'autopilot', scope: [], source: 'command' }) })
@@ -742,6 +742,20 @@ describe('the omp wiring', () => {
     return { home, ledgerFile, handlers, commands, execs, state, ctxFor, restore }
   }
 
+  test('input wiring resets only the current main session on operator input', async () => {
+    const b = boot({ mode: 'autopilot' })
+    try {
+      const stop = () => b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, b.ctxFor())
+      for (let i = 0; i < 3; i++) await stop()
+      await b.handlers.get('input')?.({ source: 'extension' }, b.ctxFor())
+      await b.handlers.get('input')?.({ source: 'user' }, b.ctxFor('task'))
+      expect(await stop()).toBeUndefined()
+      for (let i = 0; i < 3; i++) await stop()
+      await b.handlers.get('input')?.({ source: 'user' }, b.ctxFor())
+      expect((await stop())?.decision).toBe('block')
+    } finally { b.restore() }
+  })
+
   test('the default export is a function and imports under plain bun', () => {
     expect(typeof ompExtension).toBe('function')
     const path = join(import.meta.dir, '../../autonomic/omp/extension.ts')
@@ -758,11 +772,11 @@ describe('the omp wiring', () => {
     expect(src).not.toMatch(/@oh-my-pi|@sinclair|claude-code/)
   })
 
-  test('registers /autopilot and the six event handlers', () => {
+  test('registers /autopilot and the seven event handlers', () => {
     const b = boot()
     try {
       expect([...b.commands.keys()]).toEqual(['autopilot'])
-      expect([...b.handlers.keys()].sort()).toEqual(['before_agent_start', 'session_start', 'session_stop', 'session_switch', 'tool_call', 'tool_result'])
+      expect([...b.handlers.keys()].sort()).toEqual(['before_agent_start', 'input', 'session_start', 'session_stop', 'session_switch', 'tool_call', 'tool_result'])
     } finally { b.restore() }
   })
 
@@ -836,5 +850,49 @@ describe('the omp wiring', () => {
       const bare = { ...b.ctxFor(), runEphemeralTurn: undefined }
       expect(await b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, bare)).toBeUndefined()
     } finally { b.restore() }
+  })
+})
+
+describe('round 2 autonomic parity', () => {
+  test('operator input resets exhausted continuations; extension input does not', async () => {
+    const { w, a } = world({ files: autopilot(), replies: Array(7).fill(STALLED) })
+    for (let i = 0; i < 3; i++) await a.onSessionStop({ last_assistant_message: 'x' })
+    await a.onInput({ source: 'extension' })
+    expect(await a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
+    expect(w.notes.at(-1)).toContain('autopilot loop')
+    for (let i = 0; i < 3; i++) await a.onSessionStop({ last_assistant_message: 'x' })
+    await a.onInput({ source: 'user' })
+    expect((await a.onSessionStop({ last_assistant_message: 'new request' }))?.decision).toBe('block')
+    expect(w.prompts).toHaveLength(7)
+  })
+
+  test('repeated off preserves the unwritable record warning and stale disk mode', async () => {
+    const { w, a } = world({ files: autopilot(), failWrite: /sessions/ })
+    await a.onSessionStart()
+    for (let i = 0; i < 2; i++) {
+      expect(await a.onCommand('off')).toContain('record could not be saved')
+      expect(await a.onCommand('status')).toContain('record not writable')
+    }
+    expect(JSON.parse(w.files.get(REC())!).mode).toBe('autopilot')
+    expect(w.notes.filter(n => n.includes('session record could not be saved'))).toHaveLength(3)
+  })
+
+  test('a bell that never resolves does not hold an ask pain open', async () => {
+    const { w, a, io } = world({ files: { [REC()]: JSON.stringify({ mode: 'autopilot', scope: [], source: 'command', bell: 'ring' }) } })
+    io.bell = () => HANG
+    const outcome = await Promise.race([
+      a.onToolCall(ask([{ question: 'Your text?' }])).then(() => 'returned'),
+      new Promise(resolve => setTimeout(() => resolve('blocked'), 50)),
+    ])
+    expect(outcome).toBe('returned')
+    expect([...w.files.values()].join('')).toContain('pain session=S1')
+  })
+
+  test('a rejected bell is logged without losing the pain record', async () => {
+    const { w, a, io } = world({ files: { [REC()]: JSON.stringify({ mode: 'autopilot', scope: [], source: 'command', bell: 'ring' }) } })
+    io.bell = async () => { throw new Error('bell broken') }
+    await a.onToolCall(ask([{ question: 'Your text?' }]))
+    expect([...w.files.values()].join('')).toContain('bell failed Error: bell broken')
+    expect([...w.files.values()].join('')).toContain('pain session=S1')
   })
 })
