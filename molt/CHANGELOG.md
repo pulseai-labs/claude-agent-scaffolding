@@ -2,6 +2,8 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.3.2 — internal: MAX_STOP_BLOCKS and the shared notice texts live in the pure modules (#783). No behaviour change.
+
 ## 0.3.1 — 2026-10-13
 
 - **The autopilot progress count survives a module reload** (#713). `/reload-plugins` reloads `hooks/register.tsx`, so the
