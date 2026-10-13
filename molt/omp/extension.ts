@@ -4,11 +4,11 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { dirname } from 'node:path'
-import { createMolt } from './core'
+import { FALLBACK_BRIEF_MS, createMolt } from './core'
 import type { MoltIO } from './core'
 import { logPath } from '../hooks/records'
 
-export { claudeShape, claudeShapes, createMolt, messagesOf } from './core'
+export { FALLBACK_BRIEF_MS, claudeShape, claudeShapes, createMolt, messagesOf } from './core'
 export type { ClearResult, MoltIO, Shape } from './core'
 
 // omp's real ctx behind MoltIO. Each handler points `cur` at the event's ctx first; the saved command ctx is
@@ -39,7 +39,7 @@ function ioFor(pi: any, cur: () => any, route: () => any): MoltIO {
     ephemeral: async prompt => {
       const run = cur().runEphemeralTurn
       if (typeof run !== 'function') return undefined
-      const r = await run.call(cur(), { promptText: prompt, tools: false, signal: AbortSignal.timeout(60_000) })
+      const r = await run.call(cur(), { promptText: prompt, tools: false, signal: AbortSignal.timeout(FALLBACK_BRIEF_MS) })
       return typeof r?.replyText === 'string' ? r.replyText : undefined
     },
     route: () => route() !== undefined,

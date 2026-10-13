@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import ompExtension, { claudeShape, claudeShapes, createMolt, messagesOf } from '../../molt/omp/extension'
+import ompExtension, { FALLBACK_BRIEF_MS, claudeShape, claudeShapes, createMolt, messagesOf } from '../../molt/omp/extension'
 import type { ClearResult, MoltIO } from '../../molt/omp/extension'
 import { activePath, fallbackPath, lineagePath, stagePath } from '../../molt/hooks/records'
 import { DEFAULT_SEED, fill } from '../../molt/hooks/templates'
@@ -11,7 +11,7 @@ const HOME = '/home/u'
 const msg = (role: 'user' | 'assistant', text: string) => ({ type: 'message', message: { role, content: [{ type: 'text', text }] } })
 
 // A fake MoltIO: scripted percent, an in-memory file system, and a record of every side effect.
-function world(over: { env?: Record<string, string>; files?: Record<string, string> } = {}) {
+function world(over: { env?: Record<string, string>; files?: Record<string, string>; briefMs?: number; hang?: boolean } = {}) {
   const files = new Map<string, string>(Object.entries(over.files ?? {}))
   const w = {
     percent: undefined as number | undefined,
@@ -47,7 +47,7 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     status: () => {},
     notify: t => { w.notes.push(t) },
     bell: async (_c, m) => { w.bells.push(m) },
-    ephemeral: async p => { w.ephemerals.push(p); return w.ephemeralReply },
+    ephemeral: async p => { w.ephemerals.push(p); return over.hang ? new Promise<string | undefined>(() => {}) : w.ephemeralReply },
     route: () => w.route,
     printMode: () => w.printMode,
     newSessionAndSeed: async seed => {
@@ -58,7 +58,7 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     },
     branch: () => w.branch,
   }
-  return { w, m: createMolt(io) }
+  return { w, m: createMolt(io, over.briefMs) }
 }
 
 const result = (name: string, input: unknown = {}, isError = false) => ({ toolName: name, input, isError })
@@ -220,6 +220,27 @@ describe('a stop at the handoff stage', () => {
     expect(w.files.get(fallbackPath(HOME, 'S1'))).toContain('## Last request')
     expect(w.files.get(fallbackPath(HOME, 'S1'))).not.toContain('no sections here')
     expect(w.seeds).toHaveLength(1)
+  })
+
+  test('a fallback brief that never settles (a host that ignores the abort signal) ends at the deadline: the facts-only brief, the molt, a log line', async () => {
+    const { w, m } = world({ hang: true, briefMs: 60 })
+    w.branch = [msg('user', 'fix #12'), msg('assistant', 'still working')]
+    w.percent = 81
+    await m.onSessionStop()
+    await m.onSessionStop()
+    const t0 = Date.now()
+    expect(await m.onSessionStop()).toBeUndefined()
+    expect(Date.now() - t0).toBeLessThan(2_000)
+    expect(w.ephemerals).toHaveLength(1)
+    const path = fallbackPath(HOME, 'S1')
+    expect(w.files.get(path)).toContain('#12')
+    expect(w.files.get(path)).not.toContain('Work in progress')
+    expect(w.seeds).toEqual([fill(DEFAULT_SEED, { path })])
+    expect(w.logs.join('\n')).toContain('ephemeral brief error session=S1')
+  })
+
+  test('the brief deadline sits inside omp\'s 30 s session_stop budget', () => {
+    expect(FALLBACK_BRIEF_MS).toBeLessThanOrEqual(25_000)
   })
 
   test('a child at 81% follows the same order: two blocks, then the fallback brief and the hand-off, never a clear', async () => {

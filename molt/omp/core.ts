@@ -61,6 +61,17 @@ export function claudeShape(toolName: string, input: unknown): Shape {
   return claudeShapes(toolName, input)[0] as Shape
 }
 
+// The fallback brief runs inside session_stop, whose handlers get 30 s in omp 18.8.9 (a longer one is dropped while the
+// molt goes on detached). The brief has its own deadline inside that, whether or not the host honours the abort signal.
+export const FALLBACK_BRIEF_MS = 25_000
+
+function within<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`no brief within ${ms} ms`)), ms)
+    p.then(v => { clearTimeout(timer); resolve(v) }, e => { clearTimeout(timer); reject(e) })
+  })
+}
+
 export type ClearResult = 'cleared' | 'cancelled' | 'no-route' | 'seed-rejected'
 
 // Every side effect, so a test drives the ladder with fakes.
@@ -124,7 +135,7 @@ function answerOf(e: { last_assistant_message?: unknown }, branch: readonly unkn
   return [...messagesOf(branch)].reverse().find(x => x.role === 'assistant')?.text ?? ''
 }
 
-export function createMolt(io: MoltIO) {
+export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
   let cfg: MoltConfig = DEFAULTS
   let stage: Stage = 'below'
   let lastPercent: number | undefined
@@ -294,7 +305,7 @@ export function createMolt(io: MoltIO) {
     const facts = extractFacts(messages)
     let summary: string | undefined
     try {
-      const reply = await io.ephemeral(briefPrompt(messages, facts))
+      const reply = await within(io.ephemeral(briefPrompt(messages, facts)), briefMs)
       if (reply !== undefined && isUsableSummary(reply)) summary = reply
       else await log(`ephemeral brief unusable session=${id} reason=${reply === undefined ? 'no reply' : 'no Next step section'}`)
     } catch (err) {
