@@ -845,7 +845,7 @@ describe('the omp wiring', () => {
     if (opts.staleMode) { mkdirSync(join(modeFile, '..'), { recursive: true }); writeFileSync(modeFile, 'autopilot') }
     ompExtension(pi)
     const restore = () => { for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v } }
-    return { home, ledgerFile, handlers, commands, execs, state, ctxFor, restore }
+    return { home, ledgerFile, handlers, commands, execs, state, ctxFor, restore, pi }
   }
 
   test('factory publishes the path and removes a stale file before a session event; shutdown is wired', async () => {
@@ -858,6 +858,20 @@ describe('the omp wiring', () => {
       expect(readFileSync(path, 'utf8')).toBe('autopilot')
       await b.handlers.get('session_shutdown')?.({}, b.ctxFor())
       expect(existsSync(path)).toBe(false)
+    } finally { b.restore() }
+  })
+
+  test('a task child factory rebind preserves the main session live mode file', async () => {
+    const b = boot()
+    try {
+      const path = join(b.home, '.claude/state/autonomic/mode', String(process.pid))
+      await b.handlers.get('session_start')!({}, b.ctxFor())
+      await b.commands.get('autopilot')!.handler('on', b.ctxFor())
+      expect(readFileSync(path, 'utf8')).toBe('autopilot')
+      ompExtension(b.pi)
+      expect(readFileSync(path, 'utf8')).toBe('autopilot')
+      await b.handlers.get('session_start')!({}, b.ctxFor('sub'))
+      expect(readFileSync(path, 'utf8')).toBe('autopilot')
     } finally { b.restore() }
   })
 

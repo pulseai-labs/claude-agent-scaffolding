@@ -393,7 +393,7 @@ toast; a launcher reads no stale mode only when the unset works (see "Limits"). 
 
 On OMP, `AUTONOMIC_EFFECTIVE_MODE` in a `bash` child is the session-start value: omp's bash helper
 keeps that environment. Since autonomic 0.7.0, read `cat "$AUTONOMIC_MODE_FILE"` instead. The extension
-sets the absolute per-process path at load, removes any old file there, atomically writes the mode on
+sets the absolute per-process path at load, removes any old file there only on the first load per process, atomically writes the mode on
 every change, and removes it at shutdown. Mark a child for autopilot only when the read is exactly
 `autopilot`; a missing variable or file, or anything else, is manual.
 

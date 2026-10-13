@@ -5,7 +5,8 @@ All notable changes to the `autonomic` plugin.
 ## 0.7.0
 
 - **A live mode route for OMP launchers** (#769). At extension load, `AUTONOMIC_MODE_FILE` names an absolute
-  per-process file under autonomic's state folder and any reused-pid file is removed. Every mode publish
+  per-process file under autonomic's state folder; only the first load per process removes any reused-pid file,
+  so task child factory rebinds preserve the live mode. Every mode publish
   atomically replaces it with `autopilot` or `manual`; shutdown removes it. A failed update removes the file
   so a launcher reads manual, or warns not to trust it when removal also fails. `AUTONOMIC_EFFECTIVE_MODE`
   stays unchanged for Claude Code and in-process readers. OMP bash children keep the environment from

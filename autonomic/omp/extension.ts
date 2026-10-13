@@ -167,6 +167,9 @@ export function bashCwd(raw: string, session: string, home: string): string | un
   return t.startsWith('/') ? t : resolve(session, t)
 }
 
+// omp rebinds factories for task children in the same process; only the first load clears a reused pid.
+const claimedModeFiles = new Set<string>()
+
 type Judged<T> = { v: T } | { skip: true } | { fail: string }
 
 export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_BUDGET_MS) {
@@ -185,7 +188,10 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   // omp's bash helper captures the environment after extension load. The path stays fixed for this process.
   const modeFile = modeFilePath(resolve(home() || '/'), io.pid)
   io.setEnv('AUTONOMIC_MODE_FILE', modeFile)
-  try { io.remove(modeFile) } catch {} // a reused pid must not inherit a previous process's mode
+  if (!claimedModeFiles.has(modeFile)) {
+    claimedModeFiles.add(modeFile)
+    try { io.remove(modeFile) } catch {} // a reused pid must not inherit a previous process's mode
+  }
 
   function onSessionShutdown(): void {
     try { io.remove(modeFile) } catch {}
