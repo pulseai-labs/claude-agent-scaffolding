@@ -2,7 +2,7 @@ import { describe, test, expect } from 'claude-code/testing'
 import * as templates from '../hooks/templates'
 import * as gate from '../hooks/gate'
 
-// Catch a rule copied back into either runtime glue, and pin the emitted bytes.
+// Pin the shared texts' exact bytes and the Stop cap. shared-glue.test.sh checks that neither glue keeps a copy.
 const texts: Record<string, string> = {
   "SESSION_OFF": "molt is off for this session. The crew context-ceiling hooks speak again here.",
   "SESSION_ON": "molt is on for this session.",

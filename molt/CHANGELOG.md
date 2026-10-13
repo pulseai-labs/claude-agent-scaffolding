@@ -2,7 +2,10 @@
 
 All notable changes to the `molt` plugin.
 
-## 0.3.2 — internal: MAX_STOP_BLOCKS and the shared notice texts live in the pure modules (#783). No behaviour change.
+## 0.3.2 — 2026-10-14
+
+- **Internal: one copy of each shared rule** (#783). `MAX_STOP_BLOCKS` and the shared notice texts live in the pure
+  modules (`hooks/gate.ts`, `hooks/templates.ts`), and both glues import them. No behaviour change.
 
 ## 0.3.1 — 2026-10-13
 

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # A glue-local rule copy is a regression even when today's emitted bytes agree.
+# The probes match each text's distinguishing literal as the glues spelled it; a copy re-added in another
+# spelling (other quotes, string concatenation) is not caught. shared-glue.test.ts pins the exported bytes.
 set -euo pipefail
+command -v python3 >/dev/null 2>&1 || { printf 'molt: python3 not found; tests/shared-glue.test.sh needs it\n' >&2; exit 1; }
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 python3 - "$root" <<'PY'
 import re
