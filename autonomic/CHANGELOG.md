@@ -2,6 +2,10 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.7.1
+
+- tests: the reader's size check uses a relative time bound (#782). No behaviour change.
+
 ## 0.7.0
 
 - **A live mode route for OMP launchers** (#769). At extension load, `AUTONOMIC_MODE_FILE` names an absolute

@@ -757,9 +757,24 @@ describe('0.5.0 §3.1 each command on its own words', () => {
     ask('echo ok\r\ngit push -f origin feat/x\r\n')
     silent('')
     const big = Array.from({ length: 2000 }, (_, i) => `echo line ${i}; git status --short`).join('\n')
-    const t0 = Date.now()
     silent(big)
-    expect(Date.now() - t0 < 2000).toEqual(true)
+    const small = Array.from({ length: 500 }, (_, i) => `echo line ${i}; git status --short`).join('\n')
+    const elapsed = (text: string) => {
+      const start = performance.now()
+      rules(text)
+      return performance.now() - start
+    }
+    // Warm both sizes, then pair samples so startup and transient host load do not set the bound.
+    elapsed(small)
+    elapsed(big)
+    const smallTimes: number[] = [], bigTimes: number[] = []
+    for (let run = 0; run < 5; run++) {
+      smallTimes.push(elapsed(small))
+      bigTimes.push(elapsed(big))
+    }
+    const median = (times: number[]) => times.sort((a, b) => a - b)[2]
+    // 4x the lines should cost about 4x, not quadratic's 16x. A 1 ms floor absorbs timer noise.
+    expect(median(bigTimes)).toBeLessThan(8 * Math.max(median(smallTimes), 1))
   })
 })
 
