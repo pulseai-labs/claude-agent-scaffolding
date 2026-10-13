@@ -222,7 +222,8 @@ method in `references/dag-rounds.md`, repo dimension in `references/cross-repo.m
 
 **Draft `SPINE.md` now; finish it at §9.** Nothing in state holds the rounds.
 Context/decomposition/rounds settle here, but **Demo contribution and Fakes are
-not decided until §8-§9** — so complete it there (`spec-authoring.md` §1).
+not decided until §8-§9**, and the **bones section is written last** — so complete
+it there (`spec-authoring.md` §1).
 
 ---
 
@@ -398,6 +399,12 @@ license speculative interfaces around unrelated internal algorithms.
 
 Full list with the reasoning and worked cases in
 `references/fake-ledger-discipline.md`.
+
+**`SPINE.md` is finished here, and its last section is `## Bones this spine registers`** — the
+ADR bones this spine **creates**, one table row each (an ADR the plan only *cites* is not a row),
+or the single line `None.` when it creates none. The columns, in `oss bone_add`'s order, and the
+rule that close registers these rows before its touch check — halting on a row whose ADR file is
+missing, so a row is a promise — are `spec-authoring.md` §1 and `close/references/spine-close.md` §5b.
 
 ---
 

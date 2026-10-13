@@ -1797,4 +1797,28 @@ done
 # D5: the can-it-fail review step lives once, in work-item §6.
 pin "$WI/SKILL.md" '**Can each test fail?**' "work-item §6 carries the can-it-fail review step"
 
+# ---------------------------------------------------------------------------
+# 1.19.0 (#497): the bones a spine's PLAN declares. plan-spine writes SPINE.md's
+# `## Bones this spine registers` — the table whose columns are `oss bone_add`'s
+# four arguments in its order, or the single line `None.` — and spine-close
+# registers those rows before its touch check (that reader half is pinned with
+# the close-side contracts above). The two surfaces must name the same section
+# and the same column ORDER: bone_add is positional, so a swapped column
+# registers the title where the touch surface belongs, silently.
+# ---------------------------------------------------------------------------
+_PS_SPINE="$SKILLS/plan-spine/SKILL.md"
+_PS_SPEC="$SKILLS/plan-spine/references/spec-authoring.md"
+pin "$_PS_SPINE" 'its last section is `## Bones this spine registers`' \
+  "plan-spine SKILL.md finishes SPINE.md with the bones section (#497)"
+pin "$_PS_SPINE" 'an ADR the plan only *cites* is not a row' \
+  "plan-spine SKILL.md says a row is a bone the spine CREATES (#497)"
+pin "$_PS_SPEC" '## Bones this spine registers' \
+  "spec-authoring.md's pinned-sections list carries the bones section (#497)"
+pin "$_PS_SPEC" '| ADR | Title | Touch surface (glob csv) | Revisit when |' \
+  "spec-authoring.md pins the bones table's four columns in oss bone_add's order (#497)"
+pin "$_PS_SPEC" 'the single line `None.`' \
+  "spec-authoring.md states the no-bones answer, the single line None. (#497)"
+pin "$_PS_SPEC" 'A row is a bone this spine *creates*' \
+  "spec-authoring.md tells the author a cited ADR is not a row (#497)"
+
 t_summary
