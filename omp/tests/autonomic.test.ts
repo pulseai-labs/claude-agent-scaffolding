@@ -25,7 +25,7 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
   const w = {
     id: 'S1',
     percent: undefined as number | undefined,
-    system: undefined as string | undefined,
+    system: undefined as string | string[] | undefined,
     replies: [...(over.replies ?? [])],
     prompts: [] as string[],
     budgets: [] as number[],
@@ -420,19 +420,39 @@ describe('the never-approve floor', () => {
 describe('before_agent_start', () => {
   test('autopilot appends the policy to the system prompt; manual returns nothing', async () => {
     const on = world({ files: autopilot() })
-    expect(await on.a.onBeforeAgentStart({ systemPrompt: 'BASE' })).toEqual({ systemPrompt: 'BASE\n\nTEST POLICY' })
-    expect(await world().a.onBeforeAgentStart({ systemPrompt: 'BASE' })).toBeUndefined()
+    // omp 18.8.9 hands the event the prompt as a list of blocks (a string would be wrapped into one block): the policy
+    // is one more block, and omp's own blocks stay byte for byte as they were.
+    expect(await on.a.onBeforeAgentStart({ systemPrompt: ['BASE A', 'BASE B'] })).toEqual({ systemPrompt: ['BASE A', 'BASE B', 'TEST POLICY'] })
+    expect(await world().a.onBeforeAgentStart({ systemPrompt: ['BASE A', 'BASE B'] })).toBeUndefined()
+  })
+
+  test('a string prompt is read as one block', async () => {
+    const on = world({ files: autopilot() })
+    expect(await on.a.onBeforeAgentStart({ systemPrompt: 'BASE' })).toEqual({ systemPrompt: ['BASE', 'TEST POLICY'] })
+  })
+
+  test('the blocks are never joined into a string (the comma bug)', async () => {
+    const r = await world({ files: autopilot() }).a.onBeforeAgentStart({ systemPrompt: ['You are omp.', '# Tools'] })
+    expect(Array.isArray(r?.systemPrompt)).toBe(true)
+    expect(r?.systemPrompt).toHaveLength(3)
   })
 
   test('a prompt that already holds the policy is not stacked', async () => {
     const { a } = world({ files: autopilot() })
+    expect(await a.onBeforeAgentStart({ systemPrompt: ['BASE', 'TEST POLICY'] })).toBeUndefined()
+    // in any block, even one that carries other text
+    expect(await a.onBeforeAgentStart({ systemPrompt: ['BASE', 'x\n\nTEST POLICY'] })).toBeUndefined()
     expect(await a.onBeforeAgentStart({ systemPrompt: 'BASE\n\nTEST POLICY' })).toBeUndefined()
+    // a control: a block that merely resembles it does not stand in for it
+    expect(await a.onBeforeAgentStart({ systemPrompt: ['BASE', 'TEST POLIC'] })).toEqual({ systemPrompt: ['BASE', 'TEST POLIC', 'TEST POLICY'] })
   })
 
   test('without a system prompt on the event it falls back to ctx.getSystemPrompt, and without that adds nothing', async () => {
     const { w, a } = world({ files: autopilot() })
+    w.system = ['FROM-CTX A', 'FROM-CTX B']
+    expect(await a.onBeforeAgentStart({})).toEqual({ systemPrompt: ['FROM-CTX A', 'FROM-CTX B', 'TEST POLICY'] })
     w.system = 'FROM-CTX'
-    expect(await a.onBeforeAgentStart({})).toEqual({ systemPrompt: 'FROM-CTX\n\nTEST POLICY' })
+    expect(await a.onBeforeAgentStart({})).toEqual({ systemPrompt: ['FROM-CTX', 'TEST POLICY'] })
     const none = world({ files: autopilot() })
     expect(await none.a.onBeforeAgentStart({})).toBeUndefined()
   })
@@ -440,11 +460,15 @@ describe('before_agent_start', () => {
   test('a molt successor in autopilot announces its carried scope once', async () => {
     const files = { [REC('P1')]: JSON.stringify({ mode: 'autopilot', scope: ['/spec.md'], source: 'command' }), [`${HOME}/.claude/state/molt/lineage/S1.json`]: JSON.stringify({ from: 'P1' }) }
     const { a, files: fs } = world({ files })
-    const first = await a.onBeforeAgentStart({ systemPrompt: 'BASE' })
-    expect(first?.systemPrompt).toContain('autonomic: autopilot is on. Read these documents now')
-    expect(first?.systemPrompt).toContain('- /spec.md')
+    const first = await a.onBeforeAgentStart({ systemPrompt: ['BASE'] })
+    // the scope notice is a block of its own, after the policy
+    expect(first?.systemPrompt).toHaveLength(3)
+    expect(first?.systemPrompt[0]).toBe('BASE')
+    expect(first?.systemPrompt[1]).toBe('TEST POLICY')
+    expect(first?.systemPrompt[2]).toContain('autonomic: autopilot is on. Read these documents now')
+    expect(first?.systemPrompt[2]).toContain('- /spec.md')
     expect(JSON.parse(fs.get(REC('S1'))!).source).toBe('lineage')
-    expect((await a.onBeforeAgentStart({ systemPrompt: 'BASE' }))?.systemPrompt).toBe('BASE\n\nTEST POLICY')
+    expect((await a.onBeforeAgentStart({ systemPrompt: ['BASE'] }))?.systemPrompt).toEqual(['BASE', 'TEST POLICY'])
   })
 
   test('autopilot with no policy on disk refuses: manual, no policy added', async () => {
@@ -494,7 +518,7 @@ describe('mode, record and command', () => {
     const { a, files } = world({ files: { '/repo/spec.md': 'spec' } })
     expect(await a.onCommand('on spec.md')).toBe('autopilot is on. The next prompt you send carries the scope.')
     expect(JSON.parse(files.get(REC())!).scope).toEqual(['/repo/spec.md'])
-    expect((await a.onBeforeAgentStart({ systemPrompt: 'B' }))?.systemPrompt).toContain('- /repo/spec.md')
+    expect((await a.onBeforeAgentStart({ systemPrompt: ['B'] }))?.systemPrompt.join('\n')).toContain('- /repo/spec.md')
     expect(await world().a.onCommand('on nope.md')).toBe('autopilot stays manual: cannot read /repo/nope.md.')
   })
 
@@ -629,7 +653,7 @@ describe('the omp wiring', () => {
       expect(b.state.ephemerals[0]).toMatchObject({ tools: false })
       expect(b.state.ephemerals[0].promptText).toContain('autonomic turn-end check')
       expect(b.state.ephemerals[0].signal).toBeInstanceOf(AbortSignal)
-      expect(await b.handlers.get('before_agent_start')!({ systemPrompt: 'BASE' }, b.ctxFor())).toEqual({ systemPrompt: 'BASE\n\nWIRING POLICY' })
+      expect(await b.handlers.get('before_agent_start')!({ systemPrompt: 'BASE' }, b.ctxFor())).toEqual({ systemPrompt: ['BASE', 'WIRING POLICY'] })
     } finally { b.restore() }
   })
 

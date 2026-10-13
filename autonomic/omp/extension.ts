@@ -46,7 +46,7 @@ export type AutonomicIO = {
   // host has no ephemeral turn, so there is nothing to judge with.
   ephemeral(prompt: string, timeoutMs: number): Promise<string | undefined>
   usage(): number | undefined                                    // ctx.getContextUsage().percent
-  systemPrompt(): string | undefined
+  systemPrompt(): string | string[] | undefined
   notify(text: string): void
   status(text: string): void
   bell(command: string, message: string): Promise<void>
@@ -102,6 +102,10 @@ export function questionsOf(input: unknown): Question[] {
   }
   return out
 }
+
+// A system prompt as a list of blocks: omp 18.8.9 hands the event and ctx.getSystemPrompt() a string[]; a lone string is one block.
+const blocksOf = (v: unknown): string[] | undefined =>
+  typeof v === 'string' ? [v] : Array.isArray(v) && v.every(b => typeof b === 'string') ? (v as string[]) : undefined
 
 type Judged<T> = { v: T } | { skip: true } | { fail: string }
 
@@ -342,21 +346,23 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   }
 
   // before_agent_start: in autopilot the policy joins the system prompt, and a carried scope is announced once.
-  async function onBeforeAgentStart(e: { systemPrompt?: string }): Promise<{ systemPrompt: string } | undefined> {
+  // omp 18.8.9 passes the prompt as a list of blocks (and wraps a string we return into one block), so the policy and the
+  // scope notice are blocks of their own and omp's blocks go back byte for byte.
+  async function onBeforeAgentStart(e: { systemPrompt?: string | string[] }): Promise<{ systemPrompt: string[] } | undefined> {
     try {
       const rec = await modeOf()
       if (rec.mode !== 'autopilot') return undefined
       const policy = await policyText()
       if (policy === undefined) return undefined
-      const base = e?.systemPrompt ?? io.systemPrompt()
+      const base = blocksOf(e?.systemPrompt) ?? blocksOf(io.systemPrompt())
       if (base === undefined) return void (await log('before_agent_start carried no system prompt: the policy was not added'))
       const id = io.sessionId()
-      let add = base.includes(policy) ? '' : `\n\n${policy}`
+      const add: string[] = base.some(b => b.includes(policy)) ? [] : [policy]
       if (rec.scope.length > 0 && rec.source !== 'env' && !announced.has(id)) {
         announced.add(id)
-        add += `\n\n${scopeMessage(rec.scope)}`
+        add.push(scopeMessage(rec.scope))
       }
-      return add === '' ? undefined : { systemPrompt: base + add }
+      return add.length === 0 ? undefined : { systemPrompt: [...base, ...add] }
     } catch (err) {
       await log(`before_agent_start error ${String(err)}`)
       return undefined
@@ -569,7 +575,7 @@ function ioFor(pi: any, cur: () => any): AutonomicIO {
       return typeof r?.replyText === 'string' ? r.replyText : ''
     },
     usage: () => { const p = cur().getContextUsage?.()?.percent; return typeof p === 'number' && Number.isFinite(p) ? p : undefined },
-    systemPrompt: () => { try { const s = cur().getSystemPrompt?.(); return typeof s === 'string' ? s : undefined } catch { return undefined } },
+    systemPrompt: () => { try { return blocksOf(cur().getSystemPrompt?.()) } catch { return undefined } },
     notify: text => { cur().ui?.notify?.(text, 'warning') },
     status: text => { cur().ui?.setStatus?.('autonomic', text) },
     // Nothing waits on the bell beyond 30 s.
