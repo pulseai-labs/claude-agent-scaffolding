@@ -2,6 +2,21 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.6.0
+
+**autonomic on OMP** (omp 18.8.9).
+
+- `omp/extension.ts` ports the turn-end reflex, the `ask` reflex and the never-approve floor over the same `hooks/` modules (policy,
+  pain list, ledger, verdict parsing); loaded only by `omp-seat` (`omp-roles`) with `-e`, never ambient.
+- OMP seats run `--approval-mode yolo`, so there is no permission fork: a never-approve match in autopilot blocks the `bash` call,
+  writes a `permission` ledger line and raises a pain signal. The floor reads `bash` commands only.
+- The `ask` reflex judges inside one 25 s deadline that no longer depends on omp honouring the abort signal: each attempt races the
+  deadline, so a hung side turn is a failed attempt and the ask passes to the operator with a pain signal and a `pain` ledger line.
+- No band on OMP: a turn-end pain lists its options, numbered, in the notice, the bell and the pain file.
+- Settings come from `~/.omp/agent/autonomic.json` (same keys as `userConfig`). The policy joins the system prompt on every turn.
+- Known limits: omp's `bash` tool children keep the `AUTONOMIC_EFFECTIVE_MODE` value from session start; the `ask` tool exists in
+  `rpc-ui` and the TUI only; an ask is answered only from what the session has read. The Claude Code mod is unchanged.
+
 ## 0.5.0
 
 **The never-approve list judges each command on its own words** (a replay of three days of
