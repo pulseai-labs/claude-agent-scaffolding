@@ -2,6 +2,15 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.7.0
+
+- **A live mode route for OMP launchers** (#769). At extension load, `AUTONOMIC_MODE_FILE` names an absolute
+  per-process file under autonomic's state folder and any reused-pid file is removed. Every mode publish
+  atomically replaces it with `autopilot` or `manual`; shutdown removes it. A failed update removes the file
+  so a launcher reads manual, or warns not to trust it when removal also fails. `AUTONOMIC_EFFECTIVE_MODE`
+  stays unchanged for Claude Code and in-process readers. OMP bash children keep the environment from
+  session start, so OMP launchers read `cat "$AUTONOMIC_MODE_FILE"` and mark autopilot only on that exact value.
+
 ## 0.6.1
 
 - **The bell is not awaited on the pain path** (#718). `pain()` awaited `ring` with no `timeoutMs`, so a hung bell held the
