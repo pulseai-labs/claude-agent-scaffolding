@@ -2470,6 +2470,65 @@ t_assert_contains "$T_OUT" "None." "A5: ...naming the contradiction"
 t_assert_eq "0" "$(cd "$B4WS" && bash "$OSS" get '[.bones[] | select(.adr=="ADR-0061")] | length')" \
   "A5: ...and picking neither side"
 
+# ---------------------------------------------------------------------------
+# B8-B12 (PR #792 round 1, review item 3): `already registered` is a SKIP only when
+# the row matches. The ref alone is not the row: a plan that changed a column after
+# its bone was registered would skip in silence, leaving the registry describing a
+# surface the plan no longer declares. And a ref is one ref in any case -
+# `adr-0024` is `ADR-0024` - or one decision mints a second bone that no check can
+# tell from the first. The registry row these fixtures test against is B1's.
+# ---------------------------------------------------------------------------
+# B8. CONTROL: the same row in lower case is the same bone.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| adr-0024 | the touch-check surface | src/domain/**,src/port.rs | a second storage backend |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 0 "B8: a lower-case ref that names a registered bone is that bone"
+t_assert_contains "$T_OUT" "bone ADR-0024 already registered - skipping" "B8: ...skipped under the registry's own spelling"
+t_assert_eq "1" "$(cd "$B4WS" && bash "$OSS" get '[.bones[] | select(.adr=="ADR-0024")] | length')" \
+  "B8: ...with one record, not a second bone for the same decision"
+
+# B9. CONTROL: the same surface written in the other order is the same surface.
+# `touch_check` matches globs one by one, so the order is not part of it.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0024 | the touch-check surface | src/port.rs,src/domain/** | a second storage backend |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 0 "B9: a reordered touch list is the same surface and skips"
+t_assert_contains "$T_OUT" "already registered - skipping" "B9: ...with the skip line"
+
+# B10. A DIFFERENT SURFACE halts: the plan and the registry disagree about the code
+# this bone governs, and the surface is what every later touch_check reads.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0024 | the touch-check surface | src/OTHER/** | a second storage backend |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "B10: a row whose touch surface differs from the registered one halts"
+t_assert_contains "$T_OUT" "ADR-0024" "B10: ...naming the ref"
+t_assert_contains "$T_OUT" "touch surface" "B10: ...the field that differs"
+t_assert_contains "$T_OUT" "src/OTHER/**" "B10: ...the plan's value"
+t_assert_contains "$T_OUT" "src/domain/**" "B10: ...and the registry's, so the two can be compared"
+t_assert_contains "$T_OUT" "bone_set_touch" "B10: ...with the repair named"
+t_assert_eq "src/domain/**, src/port.rs" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0024") | .touch | join(", ")')" \
+  "B10: ...and the registry row is untouched"
+
+# B11. A different TITLE halts - the adjacent control, one field over.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0024 | a renamed title | src/domain/**,src/port.rs | a second storage backend |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "B11: a row whose title differs from the registered one halts"
+t_assert_contains "$T_OUT" "title" "B11: ...naming the field"
+t_assert_contains "$T_OUT" "a renamed title" "B11: ...the plan's value"
+t_assert_eq "the touch-check surface" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0024") | .title')" \
+  "B11: ...and the registry row is untouched"
+
+# B12. An EMPTY plan cell against a stored trigger is a difference, not "no
+# trigger": the registry would keep a revisit condition the plan dropped.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0024 | the touch-check surface | src/domain/**,src/port.rs | |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "B12: a plan row that dropped the revisit trigger halts"
+t_assert_contains "$T_OUT" "revisit" "B12: ...naming the field"
+t_assert_eq "a second storage backend" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0024") | .revisit_trigger')" \
+  "B12: ...and the registry row is untouched"
+
 cd /; rm -rf "$TMP"
 
 # A FLOOR ON THE ASSERTION COUNT. Every check in test-block-ledger.sh proves

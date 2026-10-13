@@ -922,19 +922,62 @@ EOF3
     [ -n "$adr_file" ] \
       || { echo "close: the plan declares bone $adr, but no ADR file carries $want in the hosting repos' docs/adr ($(printf '%s' "$adr_dirs" | tr '\n' ' '))- the spine never wrote it - halt"; exit 1; }
 
+    # ONE REF, ONE SPELLING. `adr-0024` and `ADR-0024` are one bone: the registry
+    # keys on the string it was given and the minted form is the upper-case prefix
+    # (start/references/bones-registry.md §3), so a plan row in another case would
+    # mint a SECOND bone for one decision - and no check could tell the two apart.
+    ref="$(printf '%s' "$adr" | sed 's/^[Aa][Dd][Rr]-/ADR-/')"
+
     # ALREADY REGISTERED? A halted close re-runs this step with its earlier rows
-    # already recorded, and bone_add refuses a duplicate at rc 7 (#305) - so this
-    # skip is the resume path, not a convenience.
-    if [ -n "$(oss get ".bones[] | select(.adr == \"$adr\") | .adr")" ]; then
-      echo "close: bone $adr already registered - skipping"
-      continue
+    # already recorded, and bone_add refuses a duplicate at rc 7 (#305) - so the
+    # skip is the resume path, not a convenience. But the REF is not the row: a plan
+    # that changed a column after the bone was registered would skip in silence,
+    # leaving the registry describing a surface - or a title, or a trigger - the
+    # plan no longer declares. Compare the fields; all equal -> skip; any differ ->
+    # halt naming both sides, because which of the two is right is not this step's
+    # call, and the registry row is never written over.
+    if [ -n "$(oss get ".bones[] | select(.adr == \"$ref\") | .adr")" ]; then
+      reg_title="$(oss get ".bones[] | select(.adr == \"$ref\") | .title")" \
+        || { echo "close: cannot read the registered row for $ref - halt"; exit 1; }
+      reg_revisit="$(oss get ".bones[] | select(.adr == \"$ref\") | .revisit_trigger // \"\"")" \
+        || { echo "close: cannot read the registered row for $ref - halt"; exit 1; }
+      # The plan's csv, parsed by the REGISTRY'S OWN grammar (`\,` is a literal
+      # comma, entries trimmed, empties dropped - _oss_csv_to_json), then compared
+      # as a set: the check matches one glob at a time, so the order two spellings
+      # of one surface are written in is not part of the surface.
+      plan_touch="$(awk -v s="$touch" 'BEGIN {
+          gsub(/\\,/, "\001", s)
+          n = split(s, e, ",")
+          for (i = 1; i <= n; i++) { gsub(/\001/, ",", e[i]); gsub(/^ +| +$/, "", e[i]); if (e[i] != "") printf "%s\n", e[i] }
+        }' | sort)" \
+        || { echo "close: cannot read the bones row $ref's touch surface ('$touch') - halt"; exit 1; }
+      reg_touch="$(oss get ".bones[] | select(.adr == \"$ref\") | .touch[]" | sort)" \
+        || { echo "close: cannot read the registered row for $ref - halt"; exit 1; }
+      diffs=""
+      [ "$reg_title" = "$title" ] \
+        || diffs="$diffs
+  title: registry '$reg_title' vs plan '$title'"
+      [ "$reg_touch" = "$plan_touch" ] \
+        || diffs="$diffs
+  touch surface: registry [$(printf '%s' "$reg_touch" | tr '\n' ' ')] vs plan [$(printf '%s' "$plan_touch" | tr '\n' ' ')]"
+      [ "$reg_revisit" = "$revisit" ] \
+        || diffs="$diffs
+  revisit trigger: registry '$reg_revisit' vs plan '$revisit'"
+      if [ -z "$diffs" ]; then
+        echo "close: bone $ref already registered - skipping"
+        continue
+      fi
+      echo "close: bone $ref is already registered and the plan's row differs from the registry's -$diffs
+  Nothing was written. Where the SURFACE differs, repair the registry with 'oss bone_set_touch \"$ref\" \"<touch-csv>\"'; where the title or the trigger differs, correct SPINE.md. Which of the two is right is the operator's call, never this step's - halt"
+      exit 1
     fi
 
     # The verb's own message is the halt's: it names the offending argument and
-    # the repair better than a wrapper can.
-    oss bone_add "$adr" "$title" "$touch" "$revisit" \
+    # the repair better than a wrapper can. `$ref`, not `$adr`: the registry's
+    # spelling is what every later read keys on.
+    oss bone_add "$ref" "$title" "$touch" "$revisit" \
       || { echo "close: oss bone_add refused the row $adr from $spine_md - halt"; exit 1; }
-    echo "close: registered bone $adr \"$title\""
+    echo "close: registered bone $ref \"$title\""
   done <<EOF4
 $rows
 EOF4
