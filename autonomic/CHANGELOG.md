@@ -2,6 +2,26 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.6.0
+
+**autonomic on OMP** (omp 18.8.9).
+
+- `omp/extension.ts` ports the turn-end reflex, the `ask` reflex and the never-approve floor over the same `hooks/` modules (policy,
+  pain list, ledger, verdict parsing); loaded only by `omp-seat` (`omp-roles`) with `-e`, never ambient.
+- OMP seats run `--approval-mode yolo`, so there is no permission fork: a never-approve match in autopilot blocks the `bash` call,
+  writes a `permission` ledger line and raises a pain signal. The floor reads `bash` (the command, judged in the call's own `cwd`) and `github` `pr_push` with `forceWithLease`.
+- The `ask` reflex judges inside one 25 s deadline that no longer depends on omp honouring the abort signal: each attempt races the
+  deadline, so a hung side turn is a failed attempt and the ask passes to the operator with a pain signal and a `pain` ledger line.
+- No band on OMP: a turn-end pain lists its options, numbered, in the notice, the bell and the pain file.
+- Settings come from `~/.omp/agent/autonomic.json` (same keys as `userConfig`). The policy joins the system prompt on every turn, as a block
+  of its own after omp's blocks (omp 18.8.9 hands `before_agent_start` the prompt as a list of blocks).
+- The floor judges a `bash` call in the call's own `cwd` (resolved as omp resolves it) and treats `github` `pr_push` with `forceWithLease`
+  as a force push of the branch the call names.
+- Known limits: the floor does not read `eval`, `debug` or scripts, and a subagent's calls are covered by seat-mods' child rails; omp's
+  `bash` tool children keep the `AUTONOMIC_EFFECTIVE_MODE` value from session start (a stale `manual` is safe; a stale `autopilot` after
+  `/autopilot off` or a fall to manual is not, so do not drive herdr-crew launches from an OMP top until PR 4); the `ask` tool exists in
+  `rpc-ui` and the TUI only; an ask is answered only from what the session has read. The Claude Code mod is unchanged.
+
 ## 0.5.1
 
 **The floor asks only on what a command does** (#758: 53 asks in five hours on 2026-10-12, 16 of them

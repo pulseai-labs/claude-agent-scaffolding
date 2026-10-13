@@ -454,7 +454,21 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
 - A host that refuses every `env.set` leaves `AUTONOMIC_EFFECTIVE_MODE` at its previous value; a toast
   says it may be stale.
 - A deny from a plugin that runs above autonomic is not seen; the turn-end check reports it.
-- Claude Code only: Codex has no mod runtime.
+- The Claude Code mod needs Claude Code; on OMP see the OMP section. Codex has no mod runtime.
+
+## OMP
+
+- Since 0.6.0 autonomic also ships `omp/extension.ts` for omp 18.8.9: the turn-end reflex, the `ask` reflex and the never-approve
+  floor over the same policy, pain list and ledger in `../hooks`. Only `omp-seat` (the `omp-roles` plugin) loads it, with `-e`.
+- `~/.omp/agent/autonomic.json` holds the same keys as the settings table below; the policy file, `/autopilot`, `AUTONOMIC_MODE`
+  and the molt hand-over (a lineage file, a stage file) are the ones above. The `ask` tool exists in `rpc-ui` and the TUI only.
+- OMP seats run `--approval-mode yolo`, so there is no permission fork: a never-approve match in autopilot blocks the `bash` call, writes
+  a `permission` ledger line and raises a pain signal. The floor reads `bash` (the command, judged in the call's own `cwd`) and `github` `pr_push`
+  with `forceWithLease`; `eval`, `debug` and scripts are not read, and a subagent's calls are covered by seat-mods' child rails.
+- There is no band: a turn-end pain lists its options, numbered, in the notice, the bell and the pain file. The ask judge sees what
+  the session has read, so a scope document answers an ask only after the session has read it.
+- Main limit: `AUTONOMIC_EFFECTIVE_MODE` is set in omp's own process, but omp's `bash` tool children keep the value from session start. A stale
+  `manual` is safe; a stale `autopilot` after `/autopilot off`, or after a fall to manual, is not. Do not drive herdr-crew launches from an OMP top until PR 4.
 
 ## Tests
 
