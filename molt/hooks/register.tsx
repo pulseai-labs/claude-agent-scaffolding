@@ -4,7 +4,7 @@ import type { Notice } from '../types'
 import { DEFAULTS, parseConfig } from './config'
 import type { MoltConfig } from './config'
 import { CHARS_PER_TOKEN, atLeast, projectedPercent, stageOf, thresholdsFor } from './measure'
-import { gateAllows, isProgress } from './gate'
+import { MAX_STOP_BLOCKS, gateAllows, isProgress } from './gate'
 import { markerPath } from './handoff'
 import { briefPrompt, extractFacts, factsBrief, isUsableSummary, pickHandoff, resolvePath } from './handoff'
 import type { Handoff, Message } from './handoff'
@@ -12,7 +12,15 @@ import { fallbackPath, lineagePath, parseLineage } from './records'
 import type { Lineage } from './records'
 import type { Stage, Thresholds } from './measure'
 import { activePath, autonomicPath, logPath, parseAutonomic, progressPath, safeSessionId, stagePath } from './records'
-import { BLOCK_NOTE, CHILD_NOTE, CHILD_WARNING, DEFAULT_INSTRUCTIONS, DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome, fill } from './templates'
+import {
+  SESSION_OFF, SESSION_ON, COMMAND_USAGE, STATUS_OFF, STATUS_PAUSED,
+  HANDOFF_REQUIRED, HANDED_OFF, PARENT_HANDOFF, HANDING_OFF, RESUMED,
+  SEED_REJECTED, CONFIG_PROBLEMS, SETTINGS_PROBLEMS, SESSION_STATUS, FILL_STATUS,
+  MODE_STATUS, WARNED, PAUSED_UNATTENDED, PAUSED_NO_PROGRESS, MISSING_HANDOFF,
+  STATUS_METER, BLOCK_NOTE, CHILD_NOTE, CHILD_WARNING, DEFAULT_INSTRUCTIONS,
+  DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome,
+  fill,
+} from './templates'
 
 // molt: in-place context handoff (spec §2). Module variables survive /clear, which is
 // what a molt needs to carry across; $.state does not, and holds only the band.
@@ -28,7 +36,6 @@ const off = new Set<string>()
 let paused: string | undefined
 let seeded: { session: string; startPercent?: number } | undefined
 
-const MAX_STOP_BLOCKS = 2
 // One copy in two files: molt's register.tsx and autonomic's; tests/test-mod-shell-parity.sh holds the two identical.
 // The engine kills a `process.run` child at 30 s when no bound is given — the same bound
 // molt-v0.2.2's awaited bell therefore ran under. Stated explicitly, and never tightened:
@@ -46,10 +53,8 @@ let unattended = 0                        // molts since the operator last sent 
 let pending: { oldSession: string; handoff: string; chain: string; depth: number } | undefined
 const warned = new Map<string, number>()   // warnings delivered per session: 0, 1 or 2
 const handedOff = new Set<string>()        // child sessions that have named their handoff
-const commandNoted = new Set<string>()     // child sessions whose status file says 'handoff required'
+const commandNoted = new Set<string>()     // child sessions whose status file says HANDOFF_REQUIRED
 let statusFailed = false                   // the status-file failure is logged once per process
-
-const USAGE = 'usage: /molt now | off | on | status'
 
 async function home($: Engine): Promise<string> {
   return (await $.env.get('HOME')) ?? ''
@@ -218,7 +223,7 @@ async function appendStatus($: Engine, event: string): Promise<void> {
 async function noteCommand($: Engine, sessionId: string): Promise<void> {
   if (commandNoted.has(sessionId)) return
   commandNoted.add(sessionId)
-  await appendStatus($, 'handoff required')
+  await appendStatus($, HANDOFF_REQUIRED)
 }
 
 function warnedAt(sessionId: string, which: 1 | 2): number {
@@ -229,8 +234,8 @@ function warnedAt(sessionId: string, which: 1 | 2): number {
 // A child is never cleared: its parent replaces it (spec §1.3).
 async function handOff($: Engine, sessionId: string, handoff: Handoff): Promise<void> {
   handedOff.add(sessionId)
-  await appendStatus($, `handed-off ${handoff.path}`)
-  try { await setNotice($, { text: `molt: handed off to the parent — ${handoff.path}`, tone: 'info' }) } catch {}
+  await appendStatus($, fill(HANDED_OFF, { path: handoff.path }))
+  try { await setNotice($, { text: fill(PARENT_HANDOFF, { path: handoff.path }), tone: 'info' }) } catch {}
   await log($, `handed off session=${sessionId} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent}`)
 }
 
@@ -295,18 +300,16 @@ async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<voi
   const record = parseAutonomic(await readText($, autonomicPath(h, sessionId)))
   const own = parseLineage(await readText($, lineagePath(h, sessionId)))
   if (record.mode === 'manual' && unattended >= cfg.manualMaxMolts) {
-    return pause($, sessionId, `molt paused: ${unattended} molts in a row with no message from you. ` +
-      `Send a message to resume; the handoff is at ${handoff.path}.`, undefined)
+    return pause($, sessionId, fill(PAUSED_UNATTENDED, { count: unattended, path: handoff.path }), undefined)
   }
   // /molt now is the operator asking for this molt: it is not a loop, whatever the progress.
   if (record.mode === 'autopilot' && own !== undefined && !forced.has(sessionId) && !(await hasProgress($, h, sessionId))) {
-    return pause($, sessionId, 'molt paused: no progress since the last molt (no Write, Edit or commit). ' +
-      `Autopilot stops here; the handoff is at ${handoff.path}.`, record.bell)
+    return pause($, sessionId, fill(PAUSED_NO_PROGRESS, { path: handoff.path }), record.bell)
   }
   inFlight = true
   pending = { oldSession: sessionId, handoff: handoff.path, chain: own?.chain ?? sessionId, depth: (own?.depth ?? 0) + 1 }
   // Best-effort: inFlight and pending are set, so nothing between here and /clear may throw.
-  try { await setNotice($, { text: `molt: handing off at ${Math.round(lastPercent ?? 0)}% — ${handoff.path}`, tone: 'info' }) } catch {}
+  try { await setNotice($, { text: fill(HANDING_OFF, { percent: Math.round(lastPercent ?? 0), path: handoff.path }), tone: 'info' }) } catch {}
   await log($, `molt session=${sessionId} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent}`)
   const p = pending
   $.command.run({ command: 'clear' }).then(async () => {
@@ -341,7 +344,7 @@ async function seed($: Engine, sessionId: string, p: NonNullable<typeof pending>
   seeded = { session: sessionId }
   let text = fill(DEFAULT_SEED, { path: p.handoff })
   try { text = fill(await template($, cfg.seedTemplate, DEFAULT_SEED), { path: p.handoff }) } catch {}
-  const warning = { text: `molt: the seed was rejected. Resume by hand from ${p.handoff}.`, tone: 'warn' } as const
+  const warning = { text: fill(SEED_REJECTED, { path: p.handoff }), tone: 'warn' } as const
   let rejected = false
   // Not awaited: the seed's turn cannot start until this hook returns.
   $.prompt.submit({ text }).catch(async (err: unknown) => {
@@ -350,7 +353,7 @@ async function seed($: Engine, sessionId: string, p: NonNullable<typeof pending>
     await log($, `seed rejected session=${sessionId} ${String(err)}`)
   })
   try {
-    await setNotice($, { text: `molt: resumed from ${p.handoff}`, tone: 'info' })
+    await setNotice($, { text: fill(RESUMED, { path: p.handoff }), tone: 'info' })
     if (rejected) await setNotice($, warning)
   } catch {}
   // The status line still reads the session that molted; the new one has nothing measured
@@ -366,10 +369,10 @@ async function seed($: Engine, sessionId: string, p: NonNullable<typeof pending>
 }
 
 function showStatus($: Engine, sessionId: string): void {
-  if (off.has(sessionId)) return $.ui.status('molt: off')
-  if (paused === sessionId) return $.ui.status('molt: paused')
+  if (off.has(sessionId)) return $.ui.status(STATUS_OFF)
+  if (paused === sessionId) return $.ui.status(STATUS_PAUSED)
   const t = currentThresholds(sessionId)
-  $.ui.status(lastPercent === undefined ? 'molt' : `molt ${Math.round(lastPercent)}%/${Math.round(t.command)}%`)
+  $.ui.status(lastPercent === undefined ? 'molt' : fill(STATUS_METER, { percent: Math.round(lastPercent), command: Math.round(t.command) }))
 }
 
 async function template($: Engine, path: string, fallback: string): Promise<string> {
@@ -403,9 +406,10 @@ async function status($: Engine, sessionId: string): Promise<string> {
   const t = currentThresholds(sessionId)
   const record = parseAutonomic(await readText($, autonomicPath(await home($), sessionId)))
   const lines = [
-    `molt is ${off.has(sessionId) ? 'off' : paused === sessionId ? 'paused' : 'on'} for this session.`,
-    `fill: ${lastPercent === undefined ? 'not measured yet' : `${Math.round(lastPercent)}%`} — warnings ${Math.round(t.warn)}% and ${Math.round(t.warnAgain)}%, handoff ${Math.round(t.command)}%, block ${Math.round(t.block)}%, fallback ${Math.round(t.fallback)}%`,
-    `mode (autonomic's record): ${record.mode}`,
+    fill(SESSION_STATUS, { state: off.has(sessionId) ? 'off' : paused === sessionId ? 'paused' : 'on' }),
+    fill(FILL_STATUS, { percent: lastPercent === undefined ? 'not measured yet' : `${Math.round(lastPercent)}%`,
+      warn: Math.round(t.warn), warnAgain: Math.round(t.warnAgain), command: Math.round(t.command), block: Math.round(t.block), fallback: Math.round(t.fallback) }),
+    fill(MODE_STATUS, { mode: record.mode }),
   ]
   const b = usage.context.breakdown
   if (b === undefined || b.rawMaxTokens <= 0) lines.push('auto-compact threshold not readable on this build.')
@@ -416,7 +420,7 @@ async function status($: Engine, sessionId: string): Promise<string> {
       ? `WARNING: auto-compact runs at ${Math.round(at)}%, at or below molt's block threshold (${Math.round(t.block)}%). Raise auto-compact or lower molt's thresholds, or auto-compact acts first.`
       : `auto-compact at ${Math.round(at)}%: above molt's block threshold.`)
   }
-  if (cfg.problems.length) lines.push(`settings: ${cfg.problems.join('; ')}`)
+  if (cfg.problems.length) lines.push(fill(SETTINGS_PROBLEMS, { problems: cfg.problems.join('; ') }))
   return lines.join('\n')
 }
 
@@ -429,7 +433,7 @@ export const register: Register = (on, options) => {
       const sessionId = await $.session.id()
       await touchActive($, sessionId)
       showStatus($, sessionId)
-      if (cfg.problems.length) $.ui.toast(`molt: ${cfg.problems.join('; ')}`)
+      if (cfg.problems.length) $.ui.toast(fill(CONFIG_PROBLEMS, { problems: cfg.problems.join('; ') }))
     } catch (err) {
       await log($, `session.start error ${String(err)}`)
     }
@@ -516,7 +520,7 @@ export const register: Register = (on, options) => {
     // A prompt refused beneath molt carried no warning: the next prompt that enters does.
     if (r.drop === undefined) {
       warned.set(warning.sessionId, warning.due)
-      await appendStatus($, `warned ${warnedAt(warning.sessionId, warning.due)}`)
+      await appendStatus($, fill(WARNED, { percent: warnedAt(warning.sessionId, warning.due) }))
     }
     return r
   })
@@ -575,7 +579,7 @@ export const register: Register = (on, options) => {
       const due = dueWarning(sessionId)
       if (due === undefined) return r
       warned.set(sessionId, due)
-      await appendStatus($, `warned ${warnedAt(sessionId, due)}`)
+      await appendStatus($, fill(WARNED, { percent: warnedAt(sessionId, due) }))
       return { ...r, additionalContext: [...(r.additionalContext ?? []), await warningText($, sessionId, due)] }
     } catch (err) {
       await log($, `PostToolUse error ${String(err)}`)
@@ -603,7 +607,7 @@ export const register: Register = (on, options) => {
       await noteCommand($, sessionId)
       const text = missing === undefined
         ? await instruction($, sessionId)
-        : `molt: the MOLT-HANDOFF line names ${missing}, but ${missing} does not exist or is not a readable file. Write the handoff file, then end your reply with MOLT-HANDOFF: <its absolute path>.`
+        : fill(MISSING_HANDOFF, { path: missing })
       return { ...r, block: r.block === undefined ? text : `${r.block}\n\n${text}` }
     } catch (err) {
       await log($, `Stop error ${String(err)}`)
@@ -675,14 +679,14 @@ export const register: Register = (on, options) => {
       await dropActive($, sessionId)
       await publishStage($, sessionId)
       showStatus($, sessionId)
-      return { text: 'molt is off for this session. The crew context-ceiling hooks speak again here.' }
+      return { text: SESSION_OFF }
     }
     if (arg === 'on') {
       off.delete(sessionId)
       await touchActive($, sessionId)
       await publishStage($, sessionId)
       showStatus($, sessionId)
-      return { text: 'molt is on for this session.' }
+      return { text: SESSION_ON }
     }
     if (arg === 'now') {
       off.delete(sessionId)
@@ -700,7 +704,7 @@ export const register: Register = (on, options) => {
       return { text: 'molt: the next prompt you send carries the handoff request.', context: [text] }
     }
     if (arg === 'status') return { text: await status($, sessionId) }
-    return { text: USAGE }
+    return { text: COMMAND_USAGE }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
