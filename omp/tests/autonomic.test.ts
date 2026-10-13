@@ -875,6 +875,22 @@ describe('the omp wiring', () => {
     } finally { b.restore() }
   })
 
+  test('session_switch from autopilot to a known manual session publishes manual', async () => {
+    const b = boot()
+    try {
+      const path = join(b.home, '.claude/state/autonomic/mode', String(process.pid))
+      await b.handlers.get('session_start')!({}, b.ctxFor())
+      expect(readFileSync(path, 'utf8')).toBe('manual')
+      b.state.id = 'W2'
+      await b.handlers.get('session_switch')!({}, b.ctxFor())
+      await b.commands.get('autopilot')!.handler('on', b.ctxFor())
+      expect(readFileSync(path, 'utf8')).toBe('autopilot')
+      b.state.id = 'W1'
+      await b.handlers.get('session_switch')!({}, b.ctxFor())
+      expect(readFileSync(path, 'utf8')).toBe('manual')
+    } finally { b.restore() }
+  })
+
   test('input wiring resets only the current main session on operator input', async () => {
     const b = boot({ mode: 'autopilot' })
     try {
