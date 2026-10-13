@@ -14,7 +14,9 @@ All notable changes to the `molt` plugin.
 - Settings come from `~/.omp/agent/molt.json` (same keys as `userConfig`; invalid JSON falls back to the defaults with a notice).
 - Live evidence on omp 18.8.9 with DeepSeek V4.1 Flash: all four stages, two clear-and-seed cycles in one process (a handoff
   the session wrote, and the fallback brief), a child's status file, a manual-mode pause. Known limits: no `-p` handoff; the clear
-  is measured in rpc mode only (TUI unmeasured). The Claude Code mod is unchanged.
+  is measured in rpc mode only (TUI unmeasured); omp 18.8.9's sendUserMessage returns nothing, so a
+  seed the host rejects after newSession() is not seen (the handoff file stays on disk and its path is in molt's log);
+  the no-progress count is one per process, as in the Claude Code mod, not per session. The Claude Code mod is unchanged.
 
 ## 0.2.5 — 2026-10-09
 
