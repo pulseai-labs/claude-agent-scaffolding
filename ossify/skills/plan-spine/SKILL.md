@@ -314,7 +314,7 @@ against the release-close walkthrough. Author accordingly.
 
 ### 8b. Emit the floor read-out before you write anything
 
-**Check before you write.** Check every precondition before the first write: each file exists, and each text you replace is there exactly once. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
+**Check before you write.** Check every precondition before the first write: each file you edit exists and each text you replace is there exactly once; each file you create does not exist yet. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
 
 Judge the spine's whole contribution once, out loud, against all six floors, and
 name the floor that decides the verdict:

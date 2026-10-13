@@ -225,7 +225,7 @@ input — the one thing it lacks after a retroactively-closed Release 0.
 **No destination is opened for writing until it has been read.** Adoption has
 no blank destinations — an adopted project is all occupied surface.
 
-**Check before you write.** Check every precondition before the first write: each file exists, and each text you replace is there exactly once. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
+**Check before you write.** Check every precondition before the first write: each file you edit exists and each text you replace is there exactly once; each file you create does not exist yet. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
 
 | Destination | Action |
 |---|---|

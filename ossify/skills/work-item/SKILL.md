@@ -222,7 +222,7 @@ override:
 
 Discipline:
 
-- **Check before you write.** Check every precondition before the first write: each file exists, and each text you replace is there exactly once. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
+- **Check before you write.** Check every precondition before the first write: each file you edit exists and each text you replace is there exactly once; each file you create does not exist yet. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
 - **Absolute paths only.** Your cwd is the caller's, never the worktree. Git ops
   use `git -C "<worktree-abs>" …`; other commands use
   `cd "<worktree-abs>" && <cmd>` in a single invocation (each Bash call is a fresh

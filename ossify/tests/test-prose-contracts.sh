@@ -1785,7 +1785,7 @@ rm -rf "$_PC_TMP"
 # D7 (#749): the check-before-write block is fixed text, exactly once, in each
 # skill whose actor edits files by its own steps. `pin` is the contract here: a
 # hard wrap inside the block, or a second copy, is a FAIL.
-CBW='**Check before you write.** Check every precondition before the first write: each file exists, and each text you replace is there exactly once. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.'
+CBW='**Check before you write.** Check every precondition before the first write: each file you edit exists and each text you replace is there exactly once; each file you create does not exist yet. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.'
 for f in work-item/SKILL.md patch/SKILL.md close/references/harvest.md adopt/SKILL.md plan-spine/SKILL.md; do
   pin "$HERE/../skills/$f" "$CBW" "check-before-write block, verbatim and once, in $f"
 done
