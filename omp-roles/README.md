@@ -4,7 +4,7 @@ The OMP role pack for default mode. 0.3.0 ships `omp-seat`, the launcher that pi
 
 The `implementer` autoloads ossify's `work-item` skill and returns its JSON after staging, without committing. Install ossify 1.18.0 for `run-spine`'s OMP dispatch by agent name. Under `omp-seat`, implementer children use seat-mods' verifier profile, which denies commit, push and PR creation. Its writes are allowed in the coordinator's checkout and under `SEAT_MODS_ALLOW`; the guard does not keep it out of the checkout. The `seat-reviewer` reads a diff and writes only the report path its brief names; its first line records the reviewed HEAD, followed by findings or `Findings: none`.
 
-Under `omp-seat`, the coordinator's launch must list each hosting repo's worktree root in `SEAT_MODS_ALLOW` (e.g. `SEAT_MODS_ALLOW=/path/to/repo/.worktrees`).
+Under `omp-seat`, a coordinator role's launch must export `SEAT_MODS_ROLE=coordinator` (unset, seat-mods guards the session as an implementer, which denies the commits, pushes and merges the procedures need) and list each hosting repo's worktree root in `SEAT_MODS_ALLOW` (e.g. `SEAT_MODS_ROLE=coordinator SEAT_MODS_ALLOW=/path/to/repo/.worktrees omp-seat spine-driver`).
 
 ## Install
 
