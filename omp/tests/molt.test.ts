@@ -205,15 +205,34 @@ describe('a stop at the handoff stage', () => {
     expect(w.seeds).toEqual([fill(DEFAULT_SEED, { path })])
   })
 
-  test('at the fallback stage the molt supersedes the block, and an unusable brief still yields the facts file', async () => {
+  test('81% with no marker: the first two stops block (no brief, no clear); the third runs the fallback brief and the molt', async () => {
     const { w, m } = world()
     w.branch = unmarked
     w.percent = 81
     w.ephemeralReply = 'no sections here'
+    expect((await m.onSessionStop())?.decision).toBe('block')
+    expect((await m.onSessionStop())?.decision).toBe('block')
+    expect(w.ephemerals).toEqual([])
+    expect(w.seeds).toEqual([])
     expect(await m.onSessionStop()).toBeUndefined()
+    expect(w.ephemerals).toHaveLength(1)
+    // an unusable brief still yields the facts file
     expect(w.files.get(fallbackPath(HOME, 'S1'))).toContain('## Last request')
     expect(w.files.get(fallbackPath(HOME, 'S1'))).not.toContain('no sections here')
     expect(w.seeds).toHaveLength(1)
+  })
+
+  test('a child at 81% follows the same order: two blocks, then the fallback brief and the hand-off, never a clear', async () => {
+    const { w, m } = world({ env: { MOLT_HANDOFF: 'parent', MOLT_STATUS_PATH: '/s/status' } })
+    w.branch = unmarked
+    w.percent = 81
+    expect((await m.onSessionStop())?.decision).toBe('block')
+    expect((await m.onSessionStop())?.decision).toBe('block')
+    expect(w.ephemerals).toEqual([])
+    expect(await m.onSessionStop()).toBeUndefined()
+    expect(w.ephemerals).toHaveLength(1)
+    expect(w.files.get('/s/status')).toContain(`handed-off ${fallbackPath(HOME, 'S1')}`)
+    expect(w.seeds).toEqual([])
   })
 
   test('a .md written past the handoff stage stands in for a missing marker once the blocks are spent', async () => {

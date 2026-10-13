@@ -507,8 +507,9 @@ export function createMolt(io: MoltIO) {
       const marker = markerPath(answer)
       const resolved = marker === undefined ? undefined : resolvePath(marker, io.cwd, home())
       const n = stopBlocks.get(id) ?? 0
-      // The Stop reflex: ask again, up to the cap. At the fallback stage the molt below supersedes it.
-      if (atLeast(stage, 'command') && !atLeast(stage, 'fallback') && n < MAX_STOP_BLOCKS) {
+      // The Stop reflex, as in the Claude glue: ask again at every stage from `command` up, until the cap is
+      // spent. A block makes the model continue; the next session_stop re-enters and, once spent, molts.
+      if (atLeast(stage, 'command') && n < MAX_STOP_BLOCKS) {
         const missing = resolved !== undefined && !(await isReadable(resolved)) ? resolved : undefined
         if (resolved === undefined || missing !== undefined) {
           stopBlocks.set(id, n + 1)
