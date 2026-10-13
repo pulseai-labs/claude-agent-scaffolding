@@ -80,6 +80,13 @@ t_capture oss_verify_auto_step "$TMP" "bash fake-test.sh; echo 'pass=0 fail=0'" 
 # The RED gate takes the combined form through auto_step's three-valued rc.
 t_capture oss_verify_redgate "$TMP" "echo nope" "exit 0 and output contains needle"; t_assert_rc 0 "redgate: combined form not yet satisfied -> RED (proceed)"
 t_capture oss_verify_redgate "$TMP" "echo needle" "exit 0 and output contains needle"; t_assert_rc 1 "redgate: combined form already satisfied -> already-GREEN"
+# PR #772 round 2: a status the AC NAMES is an ordinary status, not "not invocable".
+t_capture oss_verify_redgate "$TMP" "echo x; exit 127" "exit 127 and output contains x"; t_assert_rc 1 "redgate: a named exit 127 already satisfied -> already-GREEN, not advisory"
+t_capture oss_verify_redgate "$TMP" "echo x; exit 126" "exit 0126";                    t_assert_rc 1 "redgate: a named exit 126 (leading zero) already satisfied -> already-GREEN"
+t_capture oss_verify_redgate "$TMP" "echo x; exit 127" "exit 0 and output contains x";  t_assert_rc 2 "control: an unnamed 127 stays advisory"
+# PR #772 round 2: a zero exit written with leading zeros still gets the vacuous-green guard.
+t_capture oss_verify_auto_step "$TMP" "bash fake-test.sh; echo 'pass=0 fail=0'" "exit 000 and output contains pass=0"; t_assert_rc 1 "combined exit 000: zero tests run is vacuous"
+t_capture oss_verify_auto_step "$TMP" "bash fake-test.sh; echo 'pass=0 fail=0'" "exit 00"; t_assert_rc 1 "exit 00: zero tests run is vacuous"
 
 # parse_acs must hand the combined expectation through whole - the parse is the
 # only place the two halves could be split before auto_step ever sees them.

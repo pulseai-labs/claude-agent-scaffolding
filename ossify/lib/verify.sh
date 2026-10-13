@@ -87,7 +87,10 @@ oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail
     mag="${want#"${want%%[!0]*}"}"; mag="${mag:-0}"
     if [ "${#mag}" -gt 3 ] || [ "$mag" -gt 255 ]; then
       echo "oss: malformed expectation '$exp' ('exit' takes 0-255)" >&2; return 2
-    fi ;;
+    fi
+    # Compare on the normalized value from here on: `exit 000` is exit 0, and the
+    # vacuous-green guard below keys on "0" (PR #772 round 2).
+    want="$mag" ;;
   esac
   # errexit guard, and it is on the NORMAL path — this function exists to run
   # commands that are EXPECTED to exit nonzero (a failing AC is the ordinary
@@ -234,7 +237,19 @@ oss_verify_redgate() { # $1=workdir $2=command $3=expectation
   # Same errexit guard, same reason — a RED gate probe expects failure, so the
   # nonzero exit IS the success case and must not kill the dispatcher.
   if ( cd "$dir" && bash -c "$cmd" ) >/dev/null 2>&1; then rc=0; else rc=$?; fi
-  case "$rc" in 126|127) echo "red-gate: '$cmd' is not invocable here (rc $rc) - advisory, not a block" >&2; return 2 ;; esac
+  # A status the expectation NAMES (`exit 127`, `exit 127 and output contains x`)
+  # is an ordinary status, so auto_step below decides it; only an unnamed 126/127
+  # is "not invocable" (PR #772 round 2).
+  local named=""
+  case "$exp" in exit\ *)
+    named="${exp#exit }"; named="${named%% and output contains *}"
+    named="${named#"${named%%[!0]*}"}"; named="${named:-0}" ;;
+  esac
+  case "$rc" in 126|127)
+    if [ "$named" != "$rc" ]; then
+      echo "red-gate: '$cmd' is not invocable here (rc $rc) - advisory, not a block" >&2; return 2
+    fi ;;
+  esac
   # auto_step's rc is THREE-valued and this gate must not flatten it: 0 = the
   # expectation is already satisfied, 1 = legitimately not satisfied (a real
   # RED), 2 = the expectation could not be PARSED. Folding 2 in with 1 answers
