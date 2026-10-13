@@ -13,9 +13,10 @@ describe('fork prompts', () => {
     for (const s of ['POL', 'Which colour?', '"Red"', '"Blue"']) expect(p).toContain(s)
   })
   test('the permission prompt names the tool and caps the input', () => {
-    const p = permissionPrompt('Bash', { command: 'x'.repeat(10_000) }, 'POL')
+    // 0.5.1: the cap is MAX_INPUT (64k); register.tsx never judges a longer input.
+    const p = permissionPrompt('Bash', { command: 'x'.repeat(100_000) }, 'POL')
     expect(p).toContain('<tool>Bash</tool>')
-    expect(p.length).toBeLessThan(6000)
+    expect(p.length).toBeLessThan(MAX_INPUT + 2000)
   })
   test('the scope message lists each doc', () => {
     expect(scopeMessage(['/a.md', '/b.md'])).toContain('- /a.md\n- /b.md')
@@ -55,12 +56,11 @@ describe('the live turn in the fork prompts (0.4.0 spec §3.2–3.3)', () => {
 })
 
 describe('0.5.1: long inputs and the floor block (spec §7)', () => {
-  test('a long input shows its head, its tail and how much was cut', () => {
+  test('the fork is shown up to 64k characters, whole (PR #763: no unseen middle)', () => {
+    expect(MAX_INPUT).toBe(64000)
     const p = permissionPrompt('Write', { file_path: '/x', content: `HEAD${'m'.repeat(30000)}TAIL` }, 'P')
-    expect(p).toContain('HEAD')
-    expect(p).toContain('TAIL')
-    expect(p).toMatch(/… \(\d+ characters cut\) …/)
-    expect(p).not.toContain('m'.repeat(MAX_INPUT))
+    expect(p).toContain(`HEAD${'m'.repeat(30000)}TAIL`)
+    expect(p).not.toContain('cut')
   })
   test('a short input is shown whole, with no floor block', () => {
     const p = permissionPrompt('Bash', { command: 'ls' }, 'P')

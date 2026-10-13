@@ -39,12 +39,27 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     expect(w.forkPrompts).toEqual([])
     expect(w.runs.some(r => r.includes('merge-base') || r.includes('ls-remote'))).toBe(false)
   })
-  test('a long Write is judged on its head and tail', async ($, on) => {
+  test('a 30k Write is judged whole', async ($, on) => {
     const w = world(on, { env: AP })
     w.forks.push(fork({ decision: 'allow', reason: 'report write' }))
     const r = await $.tool.check({ tool: 'Write', input: { file_path: '/repo/r.md', content: 'x'.repeat(30000) } } as never)
     expect(r.decision).toBe('allow')
-    expect(w.forkPrompts[0]).toMatch(/characters cut/)
+    expect(w.forkPrompts[0]).toContain('x'.repeat(30000))
+  })
+  test('an input over 64k asks: no call is allowed with an unseen part (PR #763)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(fork({ decision: 'allow', reason: 'r' }))
+    expect((await $.tool.check({ tool: 'Write', input: { file_path: '/repo/r.md', content: 'x'.repeat(70000) } } as never)).decision).toBe('ask')
+    expect(w.forkPrompts).toEqual([])
+    expect(JSON.stringify(w.notices.at(-1))).toContain('input too long to judge')
+  })
+  test('bypass: a text-only finding in an input over 64k asks; no fork (PR #763)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    w.forks.push(fork({ decision: 'allow', reason: 'r' }))
+    const command = `gh api x -f body='do not push -f' && echo ${'y'.repeat(70000)}`
+    expect((await $.tool.check(BASH(command))).decision).toBe('ask')
+    expect(w.forkPrompts).toEqual([])
   })
   test('a long SubagentHandback is judged', async ($, on) => {
     const w = world(on, { env: AP })

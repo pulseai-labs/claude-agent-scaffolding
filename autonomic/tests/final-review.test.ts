@@ -59,13 +59,13 @@ describe('I5: the model reads that autonomic answered, and why', () => {
   })
 })
 
-describe('I6 (0.5.1 D3): a command too long to show whole is judged on its head and tail', () => {
-  test('the fork judges; its prompt names the cut', async ($, on) => {
+describe('I6 (0.5.1 D3): a long command up to 64k characters is judged whole', () => {
+  test('the fork judges; its prompt holds the whole command', async ($, on) => {
     const w = world(on, { env: AP })
     w.forks.push(fork({ decision: 'allow', reason: 'r' }))
     const command = `git commit -F msg ${'x'.repeat(5000)} && gh pr merge 1`
     expect((await $.tool.check({ tool: 'Bash', input: { command } } as never)).decision).toBe('allow')
-    expect(w.forkPrompts[0]).toMatch(/characters cut/)
+    expect(w.forkPrompts[0]).toContain('x'.repeat(5000))
   })
 })
 

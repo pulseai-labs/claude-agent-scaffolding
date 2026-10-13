@@ -250,7 +250,7 @@ is the fork's to judge on an ask, and is left alone on an allow. A repo whose de
 direct pushes by design removes `default-branch-push`.
 
 When no rule matches, the fork judges the call against the policy's
-permission scope and the live turn: `allow` is recorded and the tool runs; anything else leaves the ask and rings. The list applies to any tool whose input has a `command` (Bash, Monitor). A call whose input is longer than 4000 characters is judged on its head and tail, with the number of characters cut; the never-approve list has read all of it (0.5.1). `AskUserQuestion` and `ExitPlanMode` are never approved here: their permission prompt is your own dialog.
+permission scope and the live turn: `allow` is recorded and the tool runs; anything else leaves the ask and rings. The list applies to any tool whose input has a `command` (Bash, Monitor). A call whose input is longer than the fork is shown (64,000 characters since 0.5.1; 4000 before) stays an ask and rings: no call is allowed with a part the fork did not see. `AskUserQuestion` and `ExitPlanMode` are never approved here: their permission prompt is your own dialog.
 
 **The live turn.** The permission and ask forks also get the turn digest: the session's last 12
 prompts and main-thread tool results since the fork's transcript was sent, one line each (a

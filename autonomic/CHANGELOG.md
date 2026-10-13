@@ -12,8 +12,9 @@ false positives, 17 inputs never judged).
   asks you, as before. A rule that matches only in text the floor cannot read command by command
   (the whole-text read, words inside a quoted argument, a command read over all words) goes to the
   fork, with the finding in its prompt. The floor never approves. `neverRules` returns both levels.
-- **Long inputs are judged.** The 4000-character stop is gone: the fork sees the input's head and
-  tail and how much was cut, and the floor has read all of it. SubagentHandbacks are judged too.
+- **Long inputs are judged.** The fork now sees an input whole up to 64,000 characters (was 4000),
+  SubagentHandbacks included; a longer input still asks, so no call is allowed with a part the fork
+  did not see.
 - **Smaller fixes.** A sed script keeps a backslash inside single quotes (`'s/a\/b/c/'` is a safe sed);
   the pain band shows the command that matched.
 - **Known limits.** A push from a detached or `main` checkout still asks `default-branch-push`, even to

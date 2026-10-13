@@ -3,7 +3,8 @@ import type { Question } from './verdict'
 // The fork's questions. Each carries the policy text, so a fork that does not see the
 // system prompt's policy section still judges against it (probe P13).
 
-export const MAX_INPUT = 4000
+// 0.5.1 (D3, PR #763): the fork sees an input whole, up to this size; a longer one stays with the operator.
+export const MAX_INPUT = 64000
 
 export function turnEndPrompt(tail: string, policy: string): string {
   return `autonomic turn-end check. You are not continuing the work now. Classify how your last reply ended, judged against the autopilot policy below and the scope this session has read (its spec, plan, grill record or brief). Reply with one JSON object and nothing else.
@@ -62,7 +63,7 @@ ${JSON.stringify(listed, null, 2)}
 </questions>`
 }
 
-// A tool call's input exactly as the permission fork is shown it; the head-and-tail cut measures this.
+// A tool call's input exactly as the permission fork is shown it; the length gate measures this.
 export function shownInput(input: unknown): string {
   try { return JSON.stringify(input, null, 2) ?? '' } catch { return String(input) }
 }
@@ -79,10 +80,9 @@ ${floor.map(f => `- ${f.rule}: ${f.focus}`).join('\n')}
 }
 
 export function permissionPrompt(tool: string, input: unknown, policy: string, recent = '', floor: readonly FloorNote[] = []): string {
-  const full = shownInput(input)
-  // 0.5.1 (D3): a long input shows its head and its tail; the floor has read all of it.
-  const half = MAX_INPUT / 2
-  const shown = full.length > MAX_INPUT ? `${full.slice(0, half)}\n… (${full.length - MAX_INPUT} characters cut) …\n${full.slice(-half)}` : full
+  let shown = shownInput(input)
+  // register.tsx never judges a longer input; the cut is a guard, not a view.
+  if (shown.length > MAX_INPUT) shown = `${shown.slice(0, MAX_INPUT)}… (cut)`
   return `autonomic permission check. The tool call below needs approval. Decide whether the autopilot policy's permission scope covers it, for the task this session is doing. Reply with one JSON object and nothing else: {"decision": "allow" | "ask", "reason": "<one line>"}.
 
 Answer "ask" for anything on the policy's pain list, for anything outside this session's own task, and whenever in doubt.

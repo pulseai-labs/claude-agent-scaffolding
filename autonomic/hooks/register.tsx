@@ -17,7 +17,7 @@ import { inputShape, shape } from './shape'
 import type { Finding, Where } from './never'
 import { permissionPrompt } from './prompts'
 import { parsePermission } from './verdict'
-import { askPrompt } from './prompts'
+import { MAX_INPUT, askPrompt, shownInput } from './prompts'
 import { parseAsk } from './verdict'
 import type { Question } from './verdict'
 import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields } from './floor'
@@ -616,6 +616,11 @@ export const register: Register = (on, options) => {
         // 0.5.1 (D4): only findings the fork judges. Its allow keeps the allow; anything else asks.
         try {
           const id = await $.session.id()
+          // No call is allowed with a part the fork did not see (PR #763).
+          if (shownInput(e.input).length > MAX_INPUT) {
+            await pain($, id, 'permission for you', `${e.tool} (input too long to judge; floor: ${rulesIn(f.fork).join(', ')})`)
+            return { ...r, decision: 'ask', reason: `autonomic: too long for the fork to judge — ${rulesIn(f.fork).join(', ')}` }
+          }
           const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? '', digestOf(id), notesOf(f)), parsePermission)
           if ('v' in j && j.v.decision === 'allow' && (await record($, id, 'permission', `${e.tool}: ${shape(raw)}`, 'allow', j.v.reason, j.usage))) return r
           const why = 'v' in j ? j.v.reason : 'fail' in j ? j.fail : 'nothing to judge yet'
@@ -648,7 +653,12 @@ export const register: Register = (on, options) => {
         }
         notes = notesOf(f)
       }
-      // 0.5.1 (D3): every input is judged; a long one shows the fork its head and tail (prompts.ts).
+      // The fork sees at most MAX_INPUT characters, whole: a longer call stays with the operator
+      // (final review I6; 64k since 0.5.1, PR #763 — no call is allowed with an unseen part).
+      if (shownInput(e.input).length > MAX_INPUT) {
+        await pain($, id, 'permission for you', `${e.tool} (input too long to judge)`)
+        return r
+      }
       const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? '', digestOf(id), notes), parsePermission)
       if ('v' in j && j.v.decision === 'allow') {
         if (await record($, id, 'permission', `${e.tool}: ${inputShape(e.input)}`, 'allow', j.v.reason, j.usage))
