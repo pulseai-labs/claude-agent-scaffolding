@@ -270,6 +270,24 @@ describe('a stop at the handoff stage', () => {
     expect(w.seeds[0]).toContain('/repo/notes.md')
   })
 
+  test('a notes.md write gated at 64% is not a handoff after a sibling advances to 66%', async () => {
+    const { w, m } = world({ files: { '/repo/notes.md': 'n' } })
+    w.percent = 64
+    w.branch = unmarked
+    const write = { toolCallId: 'notes', toolName: 'write', input: { path: '/repo/notes.md' } }
+    const sibling = { toolCallId: 'sibling', toolName: 'read', input: {} }
+    await m.onToolCall(write)
+    await m.onToolCall(sibling)
+    w.percent = 66
+    await m.onToolResult({ ...sibling, isError: false })
+    await m.onToolResult({ ...write, isError: false })
+    await m.onSessionStop()
+    await m.onSessionStop()
+    await m.onSessionStop()
+    expect(w.ephemerals).toHaveLength(1)
+    expect(w.seeds[0]).not.toContain('/repo/notes.md')
+  })
+
   test('a failed write is not a handoff', async () => {
     const { w, m } = world({ files: { '/repo/notes.md': 'n' } })
     w.percent = 66

@@ -251,6 +251,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
   const nudged = new Set<string>()
   const stopBlocks = new Map<string, number>()
   const lastMd = new Map<string, string>()
+  const gateStages = new Map<string, Map<string, Stage>>()
   const staged = new Map<string, Shape[][]>()  // ast_edit previews omp holds pending, last staged last
   const forced = new Set<string>()          // /molt now: the command stage whatever the fill
   let unattended = 0                        // molts since the operator last sent a prompt
@@ -468,7 +469,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     stage = 'below'
     lastPercent = undefined
     for (const set of [nudged, commandNoted]) set.delete(id)
-    for (const map of [warned, stopBlocks, lastMd, published, staged]) map.delete(id)
+    for (const map of [warned, stopBlocks, lastMd, published, staged, gateStages]) map.delete(id)
   }
 
   async function onSessionStart() {
@@ -559,7 +560,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
   }
 
   // The gate: past `block` only the handoff's own tools run.
-  async function onToolCall(e: { toolName: string; input?: unknown }): Promise<{ block: true; reason: string } | undefined> {
+  async function onToolCall(e: { toolCallId?: string; toolName: string; input?: unknown }): Promise<{ block: true; reason: string } | undefined> {
     await load()
     const id = io.sessionId()
     try {
@@ -576,12 +577,21 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     } catch (err) {
       await log(`tool_call gate error ${String(err)}`)
     }
+    if (e.toolCallId !== undefined) {
+      const calls = gateStages.get(id) ?? new Map<string, Stage>()
+      calls.set(e.toolCallId, stage)
+      gateStages.set(id, calls)
+    }
     return undefined
   }
 
-  async function onToolResult(e: { toolName: string; input?: unknown; isError?: boolean; details?: unknown }) {
+  async function onToolResult(e: { toolCallId?: string; toolName: string; input?: unknown; isError?: boolean; details?: unknown }) {
     await load()
     const id = io.sessionId()
+    const calls = gateStages.get(id)
+    const gateStage = e.toolCallId === undefined ? stage : calls?.get(e.toolCallId) ?? stage
+    if (e.toolCallId !== undefined) calls?.delete(e.toolCallId)
+    if (calls?.size === 0) gateStages.delete(id)
     try {
       if (off.has(id) || inFlight || handedOff.has(id)) return
       // Counted against the stage the call was gated at: past the first warning the session may write and
@@ -590,8 +600,8 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
         const stack = staged.get(id) ?? []
         staged.set(id, stack)
         const shapes = credited(stack, e.toolName, e.input, e.details, true)
-        if (!atLeast(stage, 'warn') && shapes.some(s => isProgress(s.tool, s.args))) progress += 1
-        if (atLeast(stage, 'command')) for (const s of shapes) {
+        if (!atLeast(gateStage, 'warn') && shapes.some(s => isProgress(s.tool, s.args))) progress += 1
+        if (atLeast(gateStage, 'command')) for (const s of shapes) {
           if ((s.tool !== 'Write' && s.tool !== 'Edit') || typeof s.args.file_path !== 'string') continue
           const path = handoffPath(s.args.file_path, io.cwd, home())
           if (path?.endsWith('.md')) lastMd.set(id, path)
