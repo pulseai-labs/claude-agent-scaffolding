@@ -2,6 +2,15 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.4.3 — 2026-10-14
+
+- **OMP device transport** (#780). Only `write xd://lsp`, `xd://ast_grep` and `xd://github` are checked
+  as the inner tool's own call, giving guarded seats their reads and docs. Parsed args with `[` or `.`
+  in any key at any depth are denied before dispatch. Transported github `forceWithLease` and `force`
+  flags add the force-push rule whenever present with a value other than JSON `false`; direct calls
+  are unchanged. Other tools stay denied through `xd://` by outside-write placement. Malformed
+  payloads fail closed; `xd://resolve` and `xd://reject` keep their preview-confirmation behaviour.
+
 ## 0.4.2 — 2026-10-14
 
 - **The rm rail follows a link before the `..` after it** (#781). Claude Code's path resolve collapses `..` before it
