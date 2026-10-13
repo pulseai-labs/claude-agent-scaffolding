@@ -9,7 +9,8 @@
 // seat guard blocks emits no tool_result, so there is nothing to observe).
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
-import { dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { DEFAULTS, parseConfig } from '../hooks/config'
 import type { AutonomicConfig } from '../hooks/config'
 import { toolEntry, pushEntry, renderDigest } from '../hooks/digest'
@@ -106,6 +107,26 @@ export function questionsOf(input: unknown): Question[] {
 // A system prompt as a list of blocks: omp 18.8.9 hands the event and ctx.getSystemPrompt() a string[]; a lone string is one block.
 const blocksOf = (v: unknown): string[] | undefined =>
   typeof v === 'string' ? [v] : Array.isArray(v) && v.every(b => typeof b === 'string') ? (v as string[]) : undefined
+
+// A bash call's own `cwd`, read as omp's resolveToCwd reads it (the same reading as seat-mods/omp/extension.ts ompPlace,
+// 'cwd' mode; copied, as no mod imports another): a leading `:` before a path shape and an `@` before `/abs`, `~` or a URL
+// are dropped, unicode spaces become spaces, `file://` becomes its path, `~` and `~/x` are HOME, `/` alone and a relative path
+// are the session folder's. A path still carrying a `scheme:/` belongs to omp's URL router: undefined.
+const SCHEME = /[A-Za-z][A-Za-z0-9+.-]*:\//
+export function bashCwd(raw: string, session: string, home: string): string | undefined {
+  let t = /^:(?=[/\\~]|\.\.?[/\\]|[A-Za-z]:)/.test(raw) ? raw.slice(1) : raw
+  if (t.startsWith('@')) { const r = t.slice(1); if (r.startsWith('/') || r === '~' || r.startsWith('~/') || SCHEME.test(r)) t = r }
+  t = t.replace(/[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/g, ' ')
+  if (t.toLowerCase().startsWith('file://')) { try { t = fileURLToPath(t) } catch {} }
+  if (SCHEME.test(t)) return undefined
+  if (t.startsWith('~')) {
+    if (!home.startsWith('/')) throw new Error('an omp ~ path needs HOME')
+    const h = home.replace(/\/+$/, '') || '/'
+    t = t === '~' ? h : t.startsWith('~/') || t.startsWith('~\\') ? (h === '/' ? t.slice(1) : h + t.slice(1)) : resolve(h, t.slice(1))
+  }
+  if (/^\/+$/.test(t)) return session
+  return t.startsWith('/') ? t : resolve(session, t)
+}
 
 type Judged<T> = { v: T } | { skip: true } | { fail: string }
 
@@ -287,7 +308,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     }
   }
 
-  async function where(): Promise<Where> {
+  async function where(cwd: string = io.cwd): Promise<Where> {
     const out = async (argv: string[]): Promise<string | undefined> => {
       try {
         const r = await io.run(argv)
@@ -296,7 +317,6 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
         return undefined
       }
     }
-    const { cwd } = io
     const root = (await out(['git', '-C', cwd, 'rev-parse', '--show-toplevel'])) ?? cwd
     const branch = await out(['git', '-C', cwd, 'rev-parse', '--abbrev-ref', 'HEAD'])
     const originHead = await out(['git', '-C', cwd, 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
@@ -402,14 +422,19 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
 
   // The never-approve floor (planner decision 7): in autopilot a match blocks the bash call and rings. A session that
   // left autopilot through a failure (ledger, record, policy) keeps the floor: under yolo, manual means no asks at all.
-  async function floor(command: string): Promise<{ block: true; reason: string } | undefined> {
+  // `cwd` is the bash call's own folder (omp's bash tool takes one); the command is judged where it will run.
+  async function floor(command: string, from?: { tool?: 'bash' | 'github'; cwd?: unknown }): Promise<{ block: true; reason: string } | undefined> {
     if (!namesDanger(command, cfg.readers)) return undefined
+    const tool = from?.tool ?? 'bash'
     // From here every failure keeps the call blocked: an unneeded block costs one operator decision, a missed one a force push.
     let rules: ReturnType<typeof neverRules>
     try {
       const m = await modeOf()
       if (m.mode !== 'autopilot' && m.problem === undefined) return undefined
-      rules = enforced(neverRules(command, await where(), cfg.readers), cfg.neverApprove)
+      const raw = typeof from?.cwd === 'string' && from.cwd.trim() !== '' ? from.cwd : undefined
+      const dir = raw === undefined ? io.cwd : bashCwd(raw, io.cwd, home())
+      if (dir === undefined) throw new Error(`cwd ${raw} is not a folder the floor can read`)
+      rules = enforced(neverRules(command, await where(dir), cfg.readers), cfg.neverApprove)
     } catch (err) {
       await log(`floor error ${String(err)}`)
       return { block: true, reason: 'autonomic: the never-approve check failed; this call stays with the operator' }
@@ -417,9 +442,9 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (rules.length === 0) return undefined
     try {
       const id = io.sessionId()
-      await record(id, 'permission', `Bash: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
+      await record(id, 'permission', tool === 'github' ? `github pr_push: ${shape(command)}` : `Bash: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
       await pain(id, 'never-approve', painFocus(rules, command))
-      note(id, toolEntry('bash', { command }, { deny: `never-approve: ${rules.join(', ')}` }))
+      note(id, toolEntry(tool, { command }, { deny: `never-approve: ${rules.join(', ')}` }))
     } catch (err) {
       await log(`floor signal error ${String(err)}`)
     }
@@ -432,8 +457,16 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
       try { return await askReflex(e.input) } catch (err) { await log(`ask reflex error ${String(err)}`); return undefined }
     }
     if (e?.toolName === 'bash') {
-      const command = (e.input as { command?: unknown } | undefined)?.command
-      return typeof command === 'string' ? floor(command) : undefined
+      const input = e.input as { command?: unknown; cwd?: unknown } | undefined
+      return typeof input?.command === 'string' ? floor(input.command, { cwd: input.cwd }) : undefined
+    }
+    // omp's own push tool: github pr_push with forceWithLease is a force push of the branch the call names (default: HEAD).
+    if (e?.toolName === 'github') {
+      const input = e.input as { op?: unknown; branch?: unknown; forceWithLease?: unknown } | undefined
+      if (input?.op !== 'pr_push' || (input.forceWithLease !== true && input.forceWithLease !== 'true')) return undefined
+      // Never the raw name in a command line: only a plain ref name is passed on.
+      const ref = typeof input.branch === 'string' && /^[\w./-]+$/.test(input.branch) ? input.branch : 'HEAD'
+      return floor(`git push --force-with-lease origin ${ref}`, { tool: 'github' })
     }
     return undefined
   }

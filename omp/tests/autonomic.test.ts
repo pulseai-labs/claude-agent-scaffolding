@@ -36,6 +36,8 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     envSets: [] as Array<[string, string | undefined]>,
     files,
     git: { top: '/repo', branch: 'feat/x', originHead: 'origin/main' },
+    // a folder that is its own checkout (git -C <dir>): the floor asks about the bash call's cwd
+    gitBy: {} as Record<string, { top: string; branch: string; originHead: string }>,
   }
   const env: Record<string, string | undefined> = { HOME, ...over.env }
   const io: AutonomicIO = {
@@ -55,9 +57,10 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     run: async argv => {
       w.runs.push(argv)
       const a = argv.join(' ')
-      if (a.endsWith('rev-parse --show-toplevel')) return { exitCode: 0, stdout: `${w.git.top}\n` }
-      if (a.endsWith('rev-parse --abbrev-ref HEAD')) return { exitCode: 0, stdout: `${w.git.branch}\n` }
-      if (a.endsWith('symbolic-ref --short refs/remotes/origin/HEAD')) return { exitCode: 0, stdout: `${w.git.originHead}\n` }
+      const g = w.gitBy[argv[2] ?? ''] ?? w.git
+      if (a.endsWith('rev-parse --show-toplevel')) return { exitCode: 0, stdout: `${g.top}\n` }
+      if (a.endsWith('rev-parse --abbrev-ref HEAD')) return { exitCode: 0, stdout: `${g.branch}\n` }
+      if (a.endsWith('symbolic-ref --short refs/remotes/origin/HEAD')) return { exitCode: 0, stdout: `${g.originHead}\n` }
       return { exitCode: 1, stdout: '' }
     },
     ephemeral: async (prompt, ms) => {
@@ -393,6 +396,81 @@ describe('the never-approve floor', () => {
     expect(await a.onToolCall({ toolName: 'write', input: { path: '/x', content: 'git push --force' } })).toBeUndefined()
     expect(await a.onToolCall({ toolName: 'bash', input: {} })).toBeUndefined()
     expect(w.notes).toEqual([])
+  })
+
+  // omp's bash tool takes its own `cwd`; the floor judges the command where it will run (final review I2).
+  describe('the bash call\'s own cwd', () => {
+    const at = (command: string, cwd: string) => ({ toolName: 'bash', input: { command, cwd } })
+    const MAIN = { top: '/other', branch: 'main', originHead: 'origin/main' }
+
+    test('git push with a cwd on main is flagged; with no cwd (the session is on feat/x) and with a cwd on a feature branch it is not', async () => {
+      const { w, a } = world({ files: autopilot() })
+      w.gitBy['/other'] = MAIN
+      w.gitBy['/feat'] = { top: '/feat', branch: 'feat/y', originHead: 'origin/main' }
+      const r = await a.onToolCall(at('git push', '/other'))
+      expect(r?.reason).toMatch(/^autonomic: never-approve — .*default-branch-push/)
+      expect(ledger(w)[0]).toContain(' · permission · ')
+      expect(await a.onToolCall(bash('git push'))).toBeUndefined()
+      expect(await a.onToolCall(at('git push', '/feat'))).toBeUndefined()
+    })
+
+    test('rm -rf is judged against the folder it runs in, not the session\'s worktree', async () => {
+      const { w, a } = world({ files: autopilot() })
+      w.gitBy['/elsewhere'] = { top: '/elsewhere', branch: 'feat/z', originHead: 'origin/main' }
+      expect((await a.onToolCall(at('rm -rf /repo/x', '/elsewhere')))?.reason).toContain('rm-outside')
+      expect(await a.onToolCall(bash('rm -rf /repo/x'))).toBeUndefined()
+      expect(await a.onToolCall(at('rm -rf /elsewhere/x', '/elsewhere'))).toBeUndefined()
+    })
+
+    test('a relative cwd is read against the session folder, ~ against HOME, and an empty one is no cwd', async () => {
+      const { w, a } = world({ files: autopilot() })
+      w.gitBy['/repo/sub'] = MAIN
+      w.gitBy[`${HOME}/co`] = MAIN
+      expect((await a.onToolCall(at('git push', 'sub')))?.block).toBe(true)
+      expect((await a.onToolCall(at('git push', '/repo/sub')))?.block).toBe(true)
+      expect((await a.onToolCall(at('git push', '~/co')))?.block).toBe(true)
+      expect((await a.onToolCall(at('git push', `file://${HOME}/co`)))?.block).toBe(true)
+      expect(await a.onToolCall(at('git push', ''))).toBeUndefined()
+    })
+
+    test('a cwd the floor cannot place (an omp URL) keeps a dangerous command blocked and lets a safe one through', async () => {
+      const { a } = world({ files: autopilot() })
+      expect((await a.onToolCall(at('git push', 'sftp://host/x')))?.reason).toBe('autonomic: the never-approve check failed; this call stays with the operator')
+      expect(await a.onToolCall(at('ls', 'sftp://host/x'))).toBeUndefined()
+    })
+  })
+
+  // omp's own push tool (final review I3): github pr_push with forceWithLease is a force push.
+  describe('github pr_push', () => {
+    const push = (input: Record<string, unknown>) => ({ toolName: 'github', input: { op: 'pr_push', ...input } })
+
+    test('forceWithLease is blocked as a force push, with a permission ledger line and a pain signal', async () => {
+      const { w, a } = world({ files: autopilot() })
+      const r = await a.onToolCall(push({ branch: 'feat/x', forceWithLease: true }))
+      expect(r?.reason).toMatch(/^autonomic: never-approve — .*force-push.*; the operator decides$/)
+      expect(ledger(w)[0]).toContain(' · permission · Q: github pr_push: ')
+      expect(w.notes[0]).toContain('autopilot: never-approve')
+      expect((await a.onToolCall(push({ forceWithLease: 'true' })))?.block).toBe(true)
+    })
+
+    test('the push target the call names counts: a forced push of main is also a default-branch push', async () => {
+      const { a } = world({ files: autopilot() })
+      expect((await a.onToolCall(push({ branch: 'main', forceWithLease: true })))?.reason).toContain('default-branch-push')
+    })
+
+    test('a plain pr_push, forceWithLease false, other github ops and manual mode pass (controls)', async () => {
+      const { a } = world({ files: autopilot() })
+      expect(await a.onToolCall(push({ branch: 'feat/x' }))).toBeUndefined()
+      expect(await a.onToolCall(push({ branch: 'feat/x', forceWithLease: false }))).toBeUndefined()
+      expect(await a.onToolCall({ toolName: 'github', input: { op: 'pr_view', forceWithLease: true } })).toBeUndefined()
+      expect(await world().a.onToolCall(push({ forceWithLease: true }))).toBeUndefined()
+    })
+
+    test('a branch name is never read as shell: a hostile one still gets the force-push block and nothing else runs', async () => {
+      const { w, a } = world({ files: autopilot() })
+      expect((await a.onToolCall(push({ branch: 'x; rm -rf /', forceWithLease: true })))?.reason).toContain('force-push')
+      expect(w.runs.every(r => r[0] === 'git')).toBe(true)
+    })
   })
 
   test('a rule the operator switched off in autonomic.json passes', async () => {
