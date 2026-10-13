@@ -2,6 +2,22 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.3.0 — 2026-10-13
+
+- **molt on OMP** (omp 18.8.9). `omp/extension.ts` maps omp's events onto the same ladder: `omp/core.ts` runs molt's pure modules
+  over a `MoltIO` seam, so every threshold, text and rule stays in `hooks/` (one copy). Loaded only by `omp-seat`
+  (`omp-roles`) with `-e`; the manifest declares no `omp.extensions`, so a plain `omp` session is unchanged.
+- A root session is cleared with `newSession()` and seeded with the handoff (the `session_stop` trigger; the first operator prompt
+  arms the route through an internal `/molt-arm` command). A child (`MOLT_HANDOFF=parent`) appends `warned` and `handed-off`
+  lines to `MOLT_STATUS_PATH`. The fallback brief runs an ephemeral turn from `session_stop` under a 25 s deadline (omp gives that
+  handler 30 s); a slow or hung turn falls to the facts-only brief.
+- Settings come from `~/.omp/agent/molt.json` (same keys as `userConfig`; invalid JSON falls back to the defaults with a notice).
+- Live evidence on omp 18.8.9 with DeepSeek V4.1 Flash: all four stages, two clear-and-seed cycles in one process (a handoff
+  the session wrote, and the fallback brief), a child's status file, a manual-mode pause. Known limits: no `-p` handoff; the clear
+  is measured in rpc mode only (TUI unmeasured); omp 18.8.9's sendUserMessage returns nothing, so a
+  seed the host rejects after newSession() is not seen (the handoff file stays on disk and its path is in molt's log);
+  the no-progress count is one per process, as in the Claude Code mod, not per session; the pause is one per process, as in the Claude Code mod. The Claude Code mod is unchanged.
+
 ## 0.2.5 — 2026-10-09
 
 - **The interim lone-`&` split moved into the shared reader** (#723). The `LONE_AMP`

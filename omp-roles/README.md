@@ -20,6 +20,6 @@ ln -sf "$(jq -r '.plugins["omp-roles@claude-agent-scaffolding"] | (map(select(.s
 
 Run it again after an upgrade: the link points at one version's folder. `omp-seat` needs `bun`.
 
-`omp-seat` needs molt 0.3.0 and autonomic 0.6.0, which ship their OMP extensions in the next release; until then it refuses with an "is missing" message.
+`omp-seat` needs molt 0.3.0 and autonomic 0.6.0, the first releases that ship their OMP extensions; with an older install it refuses with an "is missing" message.
 
 Pinned and tested on omp 18.8.9; an upgrade is a PR.
