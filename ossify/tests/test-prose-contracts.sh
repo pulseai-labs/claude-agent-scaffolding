@@ -1593,7 +1593,7 @@ done
 # run-spine outside the slash command (I2), OMP's explicit implementer dispatch
 # (#744), and the adjacent Codex refusal control (I3).
 for _lit in 'arrive as tokens in the request' \
-  'On OMP with `omp-roles` installed, dispatch each item with `task` and `agent: "implementer"` (name it; not `task`).' \
+  'On OMP with `omp-roles` installed, dispatch each item with `task`, setting `agent: "implementer"` in every `tasks[]` entry (never `task`).' \
   'On a harness with neither (Codex), refuse before the spine-branch cut, naming `--external-executor`.'; do
   _r=1; tr '\n' ' ' < "$_RS" | tr -s ' ' | grep -Fq -- "$_lit" && _r=0
   _pin "$_r" "skills/run-spine/SKILL.md does not state '$_lit' (1.15.0 final review)"

@@ -14,7 +14,7 @@ description: Use when told to run the rounds, execute the spine or dispatch the 
 Outside the slash command (Codex, `skill://run-spine`, natural language) the spine
 id and flag arrive as tokens in the request; the same two shapes and refusals
 apply. The default shape dispatches Claude Code's `ossify:implementer-agent`. On OMP with `omp-roles`
-installed, dispatch each item with `task` and `agent: "implementer"` (name it; not `task`). On a harness
+installed, dispatch each item with `task`, setting `agent: "implementer"` in every `tasks[]` entry (never `task`). On a harness
 with neither (Codex), refuse before the spine-branch cut, naming `--external-executor`.
 
 Anything else is a refusal, and the refusal comes **before the spine-branch cut,
