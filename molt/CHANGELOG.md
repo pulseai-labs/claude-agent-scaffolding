@@ -12,15 +12,16 @@ All notable changes to the `molt` plugin.
 - **A failed notice write never aborts a pause** (#665). A refused notice write (another mod, or the state store) threw out
   of `pause()` before its toast, status line, bell and log, so the operator learned nothing. `setNotice` is best-effort now,
   logged once per process.
-- **`/molt status` measures before it reports**, and the seed redraws the status line for the session it seeded (#665).
+- **`/molt status` measures before it reports** while molt is on (off, it shows the last fill measured), and the seed redraws the status line for the session it seeded (#665).
 - **A `.md` written while `/molt off` is not a handoff candidate**, and a **compact returns a seeded session to the plain
   ladder** instead of keeping the thresholds its start fill raised (#665).
 - **A dry-run commit is no progress** (#665). `git commit --dry-run` makes no commit, and git-commit(1) gives `--short`,
-  `--porcelain` and `--long` the same meaning ("when doing a dry-run"), so a commit segment carrying any of the four no
-  longer counts for the autopilot loop guard. `hooks/shell.ts` is a byte-parity copy and is untouched: the segment reader
+  `--porcelain` and `--long` the same meaning ("when doing a dry-run"), so a commit segment carrying any of the four as an
+  option no longer counts for the autopilot loop guard. An option's value (`-m --short`), a quoted string and a word
+  after `--` are data, not flags. `hooks/shell.ts` is a byte-parity copy and is untouched: the segment reader
   is local to `hooks/gate.ts`.
 - **The fallback brief claims only what the transcript shows** (#665): its headings are now "Files the session wrote or
-  tried to write" and "Commit commands the session ran" — the transcript carries a Write's arguments and a Bash command,
+  tried to write" and "Commit commands the session tried to run" — the transcript carries a Write's arguments and a Bash command,
   never their results.
 
 ## 0.3.0 — 2026-10-13

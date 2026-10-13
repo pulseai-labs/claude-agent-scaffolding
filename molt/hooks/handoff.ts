@@ -66,7 +66,7 @@ export function factsBrief(
     '',
     ...(meta.summary !== undefined ? [meta.summary.trim(), ''] : []),
     '## Files the session wrote or tried to write', list(facts.files), '',
-    '## Commit commands the session ran', list(facts.commits), '',
+    '## Commit commands the session tried to run', list(facts.commits), '',
     '## Issues mentioned', list(facts.issues), '',
     '## Last request', facts.lastRequest || '(none recorded)', '',
     '## Next step',

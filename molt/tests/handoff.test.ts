@@ -65,7 +65,7 @@ describe('factsBrief', () => {
     expect(text).toContain('# molt fallback handoff — session s1')
     expect(text).toContain('71%')
     expect(text).toContain('check every claim')
-    for (const h of ['## Files the session wrote or tried to write', '## Commit commands the session ran', '## Issues mentioned', '## Last request', '## Next step'])
+    for (const h of ['## Files the session wrote or tried to write', '## Commit commands the session tried to run', '## Issues mentioned', '## Last request', '## Next step'])
       expect(text).toContain(h)
   })
   test('the headings claim only what the transcript shows (#665)', () => {
@@ -73,7 +73,7 @@ describe('factsBrief', () => {
     // "written" and "made" claim more than it can show.
     const text = factsBrief(extractFacts(MESSAGES), { sessionId: 's1', percent: 71.4 })
     expect(text).toContain('## Files the session wrote or tried to write')
-    expect(text).toContain('## Commit commands the session ran')
+    expect(text).toContain('## Commit commands the session tried to run')
     expect(text).not.toContain('## Files written or edited')
     expect(text).not.toContain('## Commits made')
   })

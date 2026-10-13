@@ -26,10 +26,22 @@ const DRY_RUN = new Set(['--dry-run', '--short', '--porcelain', '--long'])
 const SEGMENTS = /;|&&|(?<![&<>])&(?![&>])|\|\||\||\n|\(|\)/
 const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/g
 
+// The options that take the next word as their value (git-commit(1)), alone or ending a
+// short cluster (`-am`). A value is data, and so is every word after `--`: neither is a flag.
+const TAKES_VALUE = new Set(['--message', '--file', '--reuse-message', '--reedit-message', '--template',
+  '--author', '--date', '--fixup', '--squash', '--cleanup', '--trailer', '--pathspec-from-file'])
+const SHORT_TAKES_VALUE = /^-[A-Za-z]*[mFCct]$/
+
 function commitIsDryRun(segment: string): boolean {
-  const tokens = segment.replace(QUOTED, ' ').trim().split(/\s+/).filter(Boolean)
-  const at = tokens.indexOf('commit')
-  return at >= 0 && tokens.slice(at + 1).some(token => DRY_RUN.has(token))
+  // A quoted string is one word of data, so it stays one word here.
+  const tokens = segment.replace(QUOTED, ' Q ').trim().split(/\s+/).filter(Boolean)
+  for (let i = tokens.indexOf('commit') + 1; i > 0 && i < tokens.length; i += 1) {
+    const token = tokens[i]
+    if (token === '--') return false
+    if (DRY_RUN.has(token)) return true
+    if (TAKES_VALUE.has(token) || SHORT_TAKES_VALUE.test(token)) i += 1
+  }
+  return false
 }
 
 // Progress, for the autopilot loop guard (spec §2): a file written or a commit made.

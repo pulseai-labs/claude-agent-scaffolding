@@ -91,6 +91,14 @@ describe('isProgress: a dry-run commit (#665)', () => {
     expect(isProgress('Bash', { command: 'git commit -m "a;b" --dry-run' })).toBe(false)
     expect(isProgress('Bash', { command: 'git commit -m "a (b)" --dry-run' })).toBe(false)
   })
+  test("an option's value and a pathspec after -- are data, not flags (control)", () => {
+    expect(isProgress('Bash', { command: 'git commit -m --dry-run' })).toBe(true)
+    expect(isProgress('Bash', { command: 'git commit -am --short' })).toBe(true)
+    expect(isProgress('Bash', { command: 'git commit --message --long' })).toBe(true)
+    expect(isProgress('Bash', { command: 'git commit -m x -- --dry-run' })).toBe(true)
+    expect(isProgress('Bash', { command: 'git commit -m "x" --dry-run' })).toBe(false)
+    expect(isProgress('Bash', { command: 'git commit -F msg.txt --porcelain' })).toBe(false)
+  })
   test('a commit that only shows in inert text is no progress (control)', () => {
     // The plain commit in the heredoc is the one that separates the two readers: the
     // dry-run line below would be refused by the flag alone, guard or no guard.
