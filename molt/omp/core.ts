@@ -1,5 +1,6 @@
 // molt on OMP, the logic: the ladder of hooks/register.tsx over MoltIO, with no omp import and no side effect
 // of its own (extension.ts wires it to omp). Every rule, threshold and text comes from ../hooks.
+import { fileURLToPath } from 'node:url'
 import { DEFAULTS, parseConfig } from '../hooks/config'
 import type { MoltConfig } from '../hooks/config'
 import { atLeast, stageOf, thresholdsFor } from '../hooks/measure'
@@ -45,6 +46,24 @@ function targetName(raw: string): string {
   const t = raw.trim()
   const n = t.replace(/#[0-9a-fA-F]{4}$/, '')
   return n.length >= 2 && (n[0] === '"' || n[0] === "'") && n[n.length - 1] === n[0] ? n.slice(1, -1) : n
+}
+
+// OMP target spellings at the handoff lookup boundary; other URL devices are not files.
+function handoffPath(raw: string, cwd: string, home: string): string | undefined {
+  let t = raw.trim()
+  if (t.startsWith('[') && t.endsWith(']')) t = t.slice(1, -1)
+  t = targetName(t)
+  if (/^:(?=[/\\~]|\.\.?[/\\]|[A-Za-z]:)/.test(t)) t = t.slice(1)
+  if (t.startsWith('@')) {
+    const rest = t.slice(1)
+    if (rest.startsWith('/') || rest === '~' || rest.startsWith('~/') || /^[a-z][a-z0-9+.-]*:\//i.test(rest)) t = rest
+  }
+  if (/^file:\/\//i.test(t)) {
+    try { t = fileURLToPath(t) } catch { return undefined }
+  }
+  if (/^[a-z][a-z0-9+.-]*:\//i.test(t) && !/^[A-Za-z]:[/\\]/.test(t)) return undefined
+  if (t === '') return undefined
+  return t === '~' ? home : resolvePath(t, cwd, home)
 }
 
 function textTargets(body: string): string[] {
@@ -199,7 +218,8 @@ export function messagesOf(branch: readonly unknown[]): Message[] {
         text: textOf(m.content),
         toolUses: calls.flatMap(b => {
           const r = typeof b.id === 'string' ? results.get(b.id) : undefined
-          return credited(staged, String(b.name), b.arguments, r?.details, r?.ok ?? true).map(s => ({ tool: s.tool, input: s.args }))
+          if (r?.ok !== true) return []
+          return credited(staged, String(b.name), b.arguments, r.details, true).map(s => ({ tool: s.tool, input: s.args }))
         }),
       })
     }
@@ -562,8 +582,11 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
         staged.set(id, stack)
         const shapes = credited(stack, e.toolName, e.input, e.details, true)
         if (!atLeast(stage, 'warn') && shapes.some(s => isProgress(s.tool, s.args))) progress += 1
-        const md = shapes.find(s => (s.tool === 'Write' || s.tool === 'Edit') && typeof s.args.file_path === 'string' && s.args.file_path.endsWith('.md'))
-        if (md !== undefined && atLeast(stage, 'command')) lastMd.set(id, md.args.file_path as string)
+        if (atLeast(stage, 'command')) for (const s of shapes) {
+          if ((s.tool !== 'Write' && s.tool !== 'Edit') || typeof s.args.file_path !== 'string') continue
+          const path = handoffPath(s.args.file_path, io.cwd, home())
+          if (path?.endsWith('.md')) lastMd.set(id, path)
+        }
       }
       await measure(id)
       if (atLeast(stage, 'command')) {
@@ -599,7 +622,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       if (!atLeast(stage, 'warn')) return undefined
       const answer = answerOf(e, io.branch())
       const marker = markerPath(answer)
-      const resolved = marker === undefined ? undefined : resolvePath(marker, io.cwd, home())
+      const resolved = marker === undefined ? undefined : handoffPath(marker, io.cwd, home())
       const n = stopBlocks.get(id) ?? 0
       // The Stop reflex, as in the Claude glue: ask again at every stage from `command` up, until the cap is
       // spent. A block makes the model continue; the next session_stop re-enters and, once spent, molts.

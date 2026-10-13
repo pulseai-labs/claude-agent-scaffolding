@@ -370,6 +370,7 @@ describe('the files a session changed, read from its edit payload text', () => {
     w.percent = 66
     const input = '[/repo/handoff.md]\n= 1|# Handoff'
     w.branch = [msg('user', 'go'), { type: 'message', message: { role: 'assistant', content: [{ type: 'toolCall', id: 'c1', name: 'edit', arguments: { input } }] } }]
+    w.branch.push({ type: 'message', message: { role: 'toolResult', toolCallId: 'c1', isError: false } })
     await m.onToolCall({ toolName: 'edit', input: { input } })
     await m.onToolResult(result('edit', { input }))
     await m.onSessionStop()
@@ -382,7 +383,8 @@ describe('the files a session changed, read from its edit payload text', () => {
 
   test('an apply_patch over two files lists both', () => {
     const input = '*** Begin Patch\n*** Update File: /r/a.ts\n@@\n-x\n+y\n*** Update File: /r/b.ts\n@@\n-1\n+2\n*** End Patch'
-    const branch = [{ type: 'message', message: { role: 'assistant', content: [{ type: 'toolCall', id: 'c1', name: 'apply_patch', arguments: { input } }] } }]
+    const branch: unknown[] = [{ type: 'message', message: { role: 'assistant', content: [{ type: 'toolCall', id: 'c1', name: 'apply_patch', arguments: { input } }] } }]
+    branch.push({ type: 'message', message: { role: 'toolResult', toolCallId: 'c1', isError: false } })
     expect(extractFacts(messagesOf(branch)).files).toEqual(['/r/a.ts', '/r/b.ts'])
   })
 })
@@ -650,10 +652,11 @@ describe('the omp-to-Claude tool shapes', () => {
       { type: 'message', message: { role: 'user', content: 'fix #7' } },
       { type: 'message', message: { role: 'assistant', content: [
         { type: 'text', text: 'on it' },
-        { type: 'toolCall', name: 'write', arguments: { path: '/r/a.md' } },
-        { type: 'toolCall', name: 'bash', arguments: { command: 'git commit -m x' } },
+        { type: 'toolCall', id: 'write1', name: 'write', arguments: { path: '/r/a.md' } },
+        { type: 'toolCall', id: 'commit1', name: 'bash', arguments: { command: 'git commit -m x' } },
       ] } },
-      { type: 'message', message: { role: 'toolResult', content: [{ type: 'text', text: 'ok' }] } },
+      { type: 'message', message: { role: 'toolResult', toolCallId: 'write1', isError: false } },
+      { type: 'message', message: { role: 'toolResult', toolCallId: 'commit1', isError: false } },
       { type: 'custom_message', content: 'ignored' },
     ]
     expect(messagesOf(branch)).toEqual([
@@ -788,4 +791,73 @@ describe('the omp wiring', () => {
       expect(b.state.notices.join('\n')).toContain('molt is on')
     } finally { b.restore() }
   })
+})
+
+describe('round 2 handoff targets and facts', () => {
+  for (const toolName of ['edit', 'apply_patch']) {
+    test(`${toolName} selects the last Markdown target`, async () => {
+      const { w, m } = world({ files: { '/repo/README.md': '# readme', '/repo/handoff.md': '# handoff' } })
+      w.percent = 70
+      await m.onToolResult(result('read'))
+      await m.onToolResult(result(toolName, { input: '*** Update File: /repo/README.md\n*** Add File: /repo/handoff.md' }))
+      for (let i = 0; i < 3; i++) await m.onSessionStop()
+      expect(w.seeds[0]).toContain('/repo/handoff.md')
+      expect(w.seeds[0]).not.toContain('/repo/README.md')
+    })
+  }
+
+  test('facts omit missing and error results, including unresolved previews and denied commits', () => {
+    const call = (id: string, name: string, args: unknown) => ({ type: 'toolCall', id, name, arguments: args })
+    const branch = [
+      { type: 'message', message: { role: 'assistant', content: [
+        call('denied', 'write', { path: '/repo/denied.md' }),
+        call('commit', 'bash', { command: 'git commit -F msg' }),
+        call('error', 'edit', { path: '/repo/error.md' }),
+        call('ok', 'write', { path: '/repo/ok.md' }),
+        call('preview', 'ast_edit', { path: '/repo/preview.md' }),
+        call('resolve', 'write', { path: 'xd://resolve' }),
+      ] } },
+      ...['ok', 'error', 'resolve'].map(toolCallId => ({ type: 'message', message: { role: 'toolResult', toolCallId, isError: toolCallId === 'error' } })),
+    ]
+    const facts = extractFacts(messagesOf(branch))
+    expect(facts.files).toEqual(['/repo/ok.md'])
+    expect(facts.commits).toEqual([])
+  })
+
+  const spellings = [
+    ['~/h.md', `${HOME}/h.md`], ['file:///tmp/h.md', '/tmp/h.md'],
+    ['@/tmp/h.md', '/tmp/h.md'], [':/tmp/h.md', '/tmp/h.md'],
+    ['[/tmp/h.md#AB12]', '/tmp/h.md'], ['/tmp/h.md#AB12', '/tmp/h.md'],
+    ['["/tmp/h.md"#AB12]', '/tmp/h.md'], ['relative.md', '/repo/relative.md'],
+    ['~', HOME],
+  ]
+  for (const [raw, path] of spellings) {
+    for (const source of ['marker', 'write']) {
+      if (source === 'write' && raw === '~') continue
+      test(`${source} normalizes ${raw} before validating and seeding`, async () => {
+        const { w, m } = world({ files: { [path!]: '# h' } })
+        w.percent = 70
+        await m.onToolResult(result('read'))
+        if (source === 'marker') w.branch = marked(raw!)
+        else await m.onToolResult(result('write', { path: raw }))
+        for (let i = 0; i < (source === 'marker' ? 1 : 3); i++) await m.onSessionStop()
+        expect(w.seeds[0]).toContain(fill(DEFAULT_SEED, { path: path! }))
+        expect(w.ephemerals).toHaveLength(0)
+      })
+    }
+  }
+  for (const raw of ['local://h.md', 'xd://h.md', 'https://example.com/h.md']) {
+    for (const source of ['marker', 'write']) {
+      test(`${source} rejects non-file URL ${raw}`, async () => {
+        const { w, m } = world({ files: { [raw]: '# fake', [`/repo/${raw}`]: '# fake' } })
+        w.percent = 70
+        await m.onToolResult(result('read'))
+        if (source === 'marker') w.branch = marked(raw)
+        else await m.onToolResult(result('write', { path: raw }))
+        for (let i = 0; i < 3; i++) await m.onSessionStop()
+        expect(w.seeds[0]).toContain(fallbackPath(HOME, 'S1'))
+        expect(w.ephemerals).toHaveLength(1)
+      })
+    }
+  }
 })
