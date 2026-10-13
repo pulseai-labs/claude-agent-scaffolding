@@ -1,5 +1,11 @@
 # claude-security-audit changelog
 
+## 0.1.5 (2026-10-13)
+
+### Fixed
+- **Secrets in TOML, YAML and JSONC configs** (#121). The target enumerator lists `.toml`, `.yaml`, `.yml` and `.jsonc` files (an OpenCode `settings.toml`, `~/.codex/config.toml`), but the `secrets` aspect gate dropped them before any detector ran, so a plaintext key there reported clean. The gate now passes all four.
+- **Hook rules read OpenCode code outside `bin/`** (#127). The `hooks` aspect gate and the guard each hook rule repeats (HOOK-001 to HOOK-004) matched only `*.sh` and `.opencode/bin/*`, so `.opencode/lib/runtime.js` and `.opencode/plugin/*.ts` were never inspected. Both now pass `.js`, `.ts` and `.mjs` files under `.opencode/`.
+
 ## 0.1.4 (2026-09-04)
 
 ### Fixed
