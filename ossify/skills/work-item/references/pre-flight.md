@@ -70,6 +70,13 @@ Two malformations still produce a row: an ASCII `->` where the grammar wants
 unusable. Check every row:
 
 ```bash
+bad_exit() { # $1 = the text after 'exit ' ; returns 0 when it is NOT a usable 0-255 status
+  local w="$1" m
+  case "$w" in ''|*[!0-9]*) return 0;; esac
+  m="${w#"${w%%[!0]*}"}"; m="${m:-0}"
+  if [ "${#m}" -gt 3 ] || [ "$m" -gt 255 ]; then return 0; fi
+  return 1
+}
 acs_rc=0; acs="$(oss verify_acs "<abs spec path>")" || acs_rc=$?
 [ "$acs_rc" -eq 0 ] || echo "GAP: verify_acs exited $acs_rc - the spec did not parse"
 printf '%s\n' "$acs" | while IFS=$'\t' read -r label cmd exp; do
@@ -77,8 +84,8 @@ printf '%s\n' "$acs" | while IFS=$'\t' read -r label cmd exp; do
   case "$exp" in
     "exit "*" and output contains "?*)
       w="${exp#exit }"; w="${w%% and output contains *}"
-      case "$w" in ''|*[!0-9]*) echo "GAP $label: 'exit' takes digits only, got '$exp'";; esac ;;
-    "exit "*)            case "${exp#exit }" in ''|*[!0-9]*) echo "GAP $label: 'exit' takes digits only, got '$exp'";; esac ;;
+      if bad_exit "$w"; then echo "GAP $label: 'exit' takes 0-255, got '$exp'"; fi ;;
+    "exit "*)            if bad_exit "${exp#exit }"; then echo "GAP $label: 'exit' takes 0-255, got '$exp'"; fi ;;
     "output contains "?*) ;;
     *) echo "GAP $label: expectation '$exp' is not 'exit <n>', 'output contains <str>' or 'exit <n> and output contains <str>'" ;;
   esac

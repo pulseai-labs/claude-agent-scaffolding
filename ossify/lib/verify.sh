@@ -60,7 +60,7 @@ oss_verify_parse_acs() { # $1=spec-file ; TSV label \t command \t expectation
 # malformed expectation is rc 2, never a pass. This is the ledger.sh lesson -
 # a `case` with no default arm counted an unknown expectation as green.
 oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail, 2 malformed
-  local dir="$1" cmd="$2" exp="$3" out rc want="" needle=""
+  local dir="$1" cmd="$2" exp="$3" out rc want="" needle="" mag
   # THREE forms, and the combined one is matched FIRST: `?*` demands at least one
   # character of needle, so `exit 0 and output contains ` (empty needle) falls
   # through to `exit *` and fails the digits check at rc 2 - the intended verdict.
@@ -74,9 +74,20 @@ oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail
       needle="${exp#output contains }" ;;
     *) echo "oss: unrecognized expectation '$exp' (grammar: 'exit <n>' | 'output contains <str>' | 'exit <n> and output contains <str>')" >&2; return 2 ;;
   esac
+  # An exit status is 0-255, and BOTH checks are load-bearing. The digits test
+  # alone left `exit 99999999999999999999 and output contains x` PASSING: `[ "$rc"
+  # -ne "$want" ]` errors on a value past the integer range, and the `if` reads
+  # that error as false, so the row counted as satisfied (PR #772 round 1). The
+  # magnitude is compared only after the leading zeros are stripped, because a
+  # 4-digit string can still be small (`exit 0001`) while `[ -le ]` overflows on
+  # a 20-digit one.
   case "$exp" in exit\ *)
     case "$want" in ''|*[!0-9]*)
-      echo "oss: malformed expectation '$exp' ('exit' takes digits only)" >&2; return 2;; esac ;;
+      echo "oss: malformed expectation '$exp' ('exit' takes 0-255)" >&2; return 2;; esac
+    mag="${want#"${want%%[!0]*}"}"; mag="${mag:-0}"
+    if [ "${#mag}" -gt 3 ] || [ "$mag" -gt 255 ]; then
+      echo "oss: malformed expectation '$exp' ('exit' takes 0-255)" >&2; return 2
+    fi ;;
   esac
   # errexit guard, and it is on the NORMAL path — this function exists to run
   # commands that are EXPECTED to exit nonzero (a failing AC is the ordinary
@@ -98,15 +109,18 @@ oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail
   fi
   if [ -n "$needle" ]; then
     # A command that could not run (126 not executable, 127 not found) never
-    # passes an output check: its error text can contain the needle, and a plain
-    # `output contains` row reads no exit status at all (pulse360
-    # `verify-step-halt-swallowed-false-pass`). Any other nonzero exit is left
-    # alone - an AC may expect a refusal message from `exit 1`.
-    case "$rc" in 126|127)
-      echo "oss: '$cmd' is not invocable here (rc $rc); an output check never passes on it" >&2
-      printf '%s\n' "$out" | tail -5
-      return 1 ;;
-    esac
+    # passes a PLAIN `output contains` row: its error text can contain the
+    # needle, and that row reads no exit status at all (pulse360
+    # `verify-step-halt-swallowed-false-pass`). A row that NAMES the exit has
+    # read a status - 126/127 are ordinary statuses there and the exit half above
+    # has already decided - so the stop is scoped to the unnamed form.
+    if [ -z "$want" ]; then
+      case "$rc" in 126|127)
+        echo "oss: '$cmd' is not invocable here (rc $rc); an output check never passes on it" >&2
+        printf '%s\n' "$out" | tail -5
+        return 1 ;;
+      esac
+    fi
     # `if ! grep -Fq … <<<"$out"` — NOT `pipeline | { … return 1; }`. See the
     # idiom note below: a `return` inside the brace group would exit only the
     # subshell, and this function would fall through to `return 0`, passing a

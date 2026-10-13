@@ -62,6 +62,18 @@ t_capture oss_verify_auto_step "$TMP" "true"                  "exit 0 and output
 t_capture oss_verify_auto_step "$TMP" "echo needle; exit 127" "output contains needle"; t_assert_rc 1 "output contains: rc 127 after printing the needle -> fail"
 t_capture oss_verify_auto_step "$TMP" "echo needle; exit 126" "output contains needle"; t_assert_rc 1 "output contains: rc 126 -> fail"
 t_capture oss_verify_auto_step "$TMP" "echo needle; exit 1"   "output contains needle"; t_assert_rc 0 "control: output contains still passes a refusal that exits 1"
+# Round 1 (#772): the 126/127 stop exists only because a PLAIN `output contains`
+# row reads no exit status. A row that names the exit has read one, and 126/127
+# are ordinary statuses there - the exit half decides.
+t_capture oss_verify_auto_step "$TMP" "echo x; exit 127" "exit 127 and output contains x"; t_assert_rc 0 "combined: a named exit 127 passes"
+t_capture oss_verify_auto_step "$TMP" "echo x; exit 126" "exit 126 and output contains x"; t_assert_rc 0 "combined: a named exit 126 passes"
+t_capture oss_verify_auto_step "$TMP" "echo x; exit 127" "exit 0 and output contains x";  t_assert_rc 1 "combined: exit 0 against rc 127 fails on the exit half"
+# An exit status is 0-255. Past that the row is malformed, not merely failing:
+# unchecked, `[ "$rc" -ne 99999999999999999999 ]` ERRORS on the overflow and the
+# `if` reads the error as false, so the row passed as satisfied.
+t_capture oss_verify_auto_step "$TMP" "true" "exit 256"; t_assert_rc 2 "exit 256 -> malformed"
+t_capture oss_verify_auto_step "$TMP" "echo x" "exit 99999999999999999999 and output contains x"; t_assert_rc 2 "combined: an exit past 255 -> malformed, never a pass through [ -ne ] overflow"
+t_capture oss_verify_auto_step "$TMP" "exit 255" "exit 255"; t_assert_rc 0 "control: 255 is the boundary and still passes"
 # The zero-tests guard applies to the combined form when it wants exit 0.
 t_capture oss_verify_auto_step "$TMP" "bash fake-test.sh; echo 'pass=0 fail=0'" "exit 0 and output contains pass=0"; t_assert_rc 1 "combined exit 0: a recognized runner that ran zero tests is vacuous"
 
