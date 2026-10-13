@@ -83,6 +83,14 @@ describe('isProgress: a dry-run commit (#665)', () => {
     expect(isProgress('Bash', { command: "git commit -m '--dry-run in a message'" })).toBe(true)
     expect(isProgress('Bash', { command: 'git commit -m "x --short y"' })).toBe(true)
   })
+  test('a message holding a split character stays one message (control)', () => {
+    expect(isProgress('Bash', { command: 'git commit -m "Support --short (#665)"' })).toBe(true)
+    expect(isProgress('Bash', { command: 'git commit -m "explain --dry-run; add example"' })).toBe(true)
+    expect(isProgress('Bash', { command: 'git commit -m "add --porcelain\n\nbody"' })).toBe(true)
+    expect(isProgress('Bash', { command: "git commit -m 'x | --long'" })).toBe(true)
+    expect(isProgress('Bash', { command: 'git commit -m "a;b" --dry-run' })).toBe(false)
+    expect(isProgress('Bash', { command: 'git commit -m "a (b)" --dry-run' })).toBe(false)
+  })
   test('a commit that only shows in inert text is no progress (control)', () => {
     // The plain commit in the heredoc is the one that separates the two readers: the
     // dry-run line below would be refused by the flag alone, guard or no guard.

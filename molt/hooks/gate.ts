@@ -46,6 +46,9 @@ export function isProgress(tool: string, args: Readonly<Record<string, unknown>>
   // heredoc body or a quoted string is not one, and the segment reader below can only
   // take commits away from that count, never add one.
   if (!gitSubcommandsThatRun(command).includes('commit')) return false
-  return command.split(SEGMENTS).some(segment =>
+  // A quoted message can hold a split character (`;`, `(`, a newline): blank those inside
+  // each quoted string first, so the split never cuts a message open (PR #775 review).
+  const unsplit = command.replace(QUOTED, quoted => quoted.replace(/[;&|()\n]/g, ' '))
+  return unsplit.split(SEGMENTS).some(segment =>
     gitSubcommandsThatRun(segment).includes('commit') && !commitIsDryRun(segment))
 }
