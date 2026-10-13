@@ -229,6 +229,7 @@ describe('rm placement: R1-R7', () => {
       ['ancestor of allow', 'rm -rf /', 'rm -f /reports/x.log'],
       ['ancestor inside worktree', 'rm -rf /w/build', 'rm -f /w/build/reports/x.log'],
       ['parent symlink outside', 'rm -f /w/outside/x', `rm -f ${inside}/x`],
+      ['link then dotdot (#781)', 'rm -f /w/outside/../x', inside === '/reports' ? 'rm -f /reports/x.log' : 'rm -f /w/inside/../build/x'],
       ['terminal symlink outside', 'rm -rf /w/outside/', 'rm -f /reports/outside'],
       ['double slash root', 'rm -rf /reports///', 'rm -f /reports//x.log'],
       ['dot root', 'rm -rf /reports/.', 'rm -f /reports/./x.log'],

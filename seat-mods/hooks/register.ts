@@ -36,6 +36,30 @@ async function allowOf($: any): Promise<string[]> {
   return real.filter((dir): dir is string => dir !== undefined)
 }
 
+// Where the kernel lands a path: each link followed before the `..` after it. The
+// engine's resolve collapses `..` first, so `link/../x` would land beside the link,
+// not beside its target (#781). Write and Edit collapse `..` themselves, so only rm,
+// which runs in a shell, needs this walk.
+async function physicalOf($: any, path: string): Promise<string | undefined> {
+  const parts = path.split('/')
+  if (!parts.includes('..')) return realOf($, path)
+  if (!path.startsWith('/')) return undefined
+  let cur = '/'
+  for (const part of parts) {
+    if (part === '' || part === '.') continue
+    if (part === '..') {
+      // The kernel cannot step up from a folder that does not exist.
+      if (!(await $.fs.stat(cur).then(() => true, () => false))) return undefined
+      cur = cur.slice(0, cur.lastIndexOf('/')) || '/'
+      continue
+    }
+    const next = await realOf($, `${cur.replace(/\/$/, '')}/${part}`)
+    if (next === undefined) return undefined
+    cur = next
+  }
+  return cur
+}
+
 // Resolve rm's parent through links, keeping the final component literal: rm
 // unlinks a terminal symlink. A trailing slash (or . / ..) follows the directory.
 async function removalPath($: any, operand: string, cwd: string, home: string | undefined, glob: boolean): Promise<string | undefined> {
@@ -45,9 +69,9 @@ async function removalPath($: any, operand: string, cwd: string, home: string | 
     path = (home.replace(/\/$/, '') + path.slice(1)) || '/'
   }
   if (!path.startsWith('/')) path = `${cwd}/${path}`
-  if (glob || /\/(?:\.|\.\.)?$/.test(path)) return realOf($, path)
+  if (glob || /\/(?:\.|\.\.)?$/.test(path)) return physicalOf($, path)
   const cut = path.lastIndexOf('/')
-  const parent = await realOf($, cut === 0 ? '/' : path.slice(0, cut))
+  const parent = await physicalOf($, cut === 0 ? '/' : path.slice(0, cut))
   return parent === undefined ? undefined : `${parent.replace(/\/$/, '')}/${path.slice(cut + 1)}`
 }
 
