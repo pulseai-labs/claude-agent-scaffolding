@@ -802,33 +802,65 @@ spine_md="$spine_dirs/SPINE.md"
 [ -f "$spine_md" ] \
   || { echo "close: no SPINE.md at $spine_md - the plan's bones section is unreadable there, and so is the base-branch cross-check §3 reads - halt"; exit 1; }
 
-# THE SECTION'S TABLE BODY ONLY: from `## Bones this spine registers` to the next
-# heading, rows only (the header cell and the |---|---| separator are not rows, and
-# a `None.` line is not one either). One tab-separated record per row, cells
-# trimmed, so a title's spaces and a touch list's commas survive; the four fields
-# are `oss bone_add`'s four arguments in its order. A line that starts a table row
-# inside the section and is NOT four cells with a ref, a title and a touch surface
-# is emitted as a `!` record, and the loop HALTS on it: dropping it silently is the
-# defect this step exists to prevent - SPINE.md would still say the bone exists
+# THE SECTION'S TABLE BODY, AND WHAT ELSE THE SECTION MAY SAY. Inside
+# `## Bones this spine registers` (any case: the heading is matched case-folded,
+# because `## Bones This Spine Registers` is the same section) a PRESENT section is
+# either the single line `None.` or a table: `F` marks it found, `N` is that line,
+# `X` is any other non-blank line (which HALTS, below - reading only `|` lines made
+# `TBD`, a placeholder, or a table written without its outer pipes report "declares
+# no bones", a false statement about a plan that declares one), and `+` / `!` are
+# table rows. Rows only from the table: the header cell and the |---|---| separator
+# are not rows. One tab-separated record per row, cells trimmed, so a title's spaces
+# and a touch list's commas survive; the four fields are `oss bone_add`'s four arguments in its order.
+# A row that is not four cells with a ref, a title and a touch surface is emitted as
+# `!`, and the loop HALTS on it: dropping it silently is
+# the defect this step exists to prevent - SPINE.md would still say the bone exists
 # while the registry never hears of it, and only the file is read by a human. The
 # cells are validated HERE, where their boundaries are known: `read` treats a tab as
 # IFS whitespace, so an empty middle cell collapses and the next cell's text shifts
 # one slot left, into a slot the loop's own guards then read as present.
-rows="$(awk '
-  /^## Bones this spine registers[[:space:]]*$/ { insec = 1; next }
+recs="$(awk '
+  { low = tolower($0) }
+  low ~ /^## bones this spine registers[[:space:]]*$/ { insec = 1; found = 1; next }
   insec && /^##[^#]/ { exit }
+  insec && /^[[:space:]]*$/ { next }
+  insec && /^[[:space:]]*None\.[[:space:]]*$/ { printf "N\n"; next }
   insec && /^[[:space:]]*\|/ {
     n = split($0, c, "|")
     for (i = 2; i <= n - 1; i++) gsub(/^[[:space:]]+|[[:space:]]+$/, "", c[i])
     if (c[2] != "" && c[2] ~ /^[-: ]+$/) next      # the |---|---| separator row
     if (tolower(c[2]) == "adr") next               # the header row
     if (n != 6 || c[2] == "" || c[3] == "" || c[4] == "" || index(c[2] c[3] c[4] c[5], "\t") > 0) { printf "!\t%s\n", $0; next }
-    printf "+\t%s\t%s\t%s\t%s\n", c[2], c[3], c[4], c[5]
-  }' "$spine_md")" \
+    printf "+\t%s\t%s\t%s\t%s\n", c[2], c[3], c[4], c[5]; next
+  }
+  insec { printf "X\t%s\n", $0 }
+  END { if (found) printf "F\n" }
+' "$spine_md")" \
   || { echo "close: cannot read $spine_md - halt"; exit 1; }
 
-if [ -z "$rows" ]; then
-  echo "close: $spine_id's plan declares no bones - registering none"
+has_section="$(printf '%s\n' "$recs" | awk -F'\t' '$1=="F"{n++} END{print n+0}')"
+content_line="$(printf '%s\n' "$recs" | awk -F'\t' '$1=="X"{print $2; exit}')"
+none_lines="$(printf '%s\n' "$recs" | awk -F'\t' '$1=="N"{n++} END{print n+0}')"
+row_count="$(printf '%s\n' "$recs" | awk -F'\t' '$1=="+" || $1=="!"{n++} END{print n+0}')"
+rows="$(printf '%s\n' "$recs" | awk -F'\t' '$1=="+" || $1=="!"')"
+# One string, two ways to be boneless (no section at all, or an explicit `None.`):
+# both must print the same ONE line, and the prose pin that holds it counts
+# occurrences, so it lives here once.
+no_bones_line="close: $spine_id's plan declares no bones - registering none"
+
+if [ "$has_section" -eq 0 ]; then
+  # ABSENT is the legacy no-op: a spine planned before 1.19.0 has no section, and
+  # that is a complete answer, not a failure (B5). `None.` is the same answer said
+  # out loud, and prints the same one line.
+  echo "$no_bones_line"
+elif [ -n "$content_line" ]; then
+  echo "close: the bones section in $spine_md carries a line that is neither a table row nor the single None.: '$content_line' - halt"; exit 1
+elif [ "$none_lines" -gt 0 ] && [ "$row_count" -gt 0 ]; then
+  echo "close: the bones section in $spine_md carries None. AND a table - None. is the whole answer, so one of the two is wrong, and this step will not pick - halt"; exit 1
+elif [ "$none_lines" -eq 0 ] && [ "$row_count" -eq 0 ]; then
+  echo "close: the bones section in $spine_md is present but empty - write the table or the single line None. - halt"; exit 1
+elif [ "$none_lines" -gt 0 ]; then
+  echo "$no_bones_line"
 else
   # WHERE THE ADR FILE IS. A bone is a decision about the product code this spine
   # changed, so its ADR lives in a hosting repo's `docs/adr/`

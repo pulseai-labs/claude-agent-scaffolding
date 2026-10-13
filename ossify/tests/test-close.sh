@@ -2409,6 +2409,67 @@ t_assert_contains "$T_OUT" "not four cells" "B7: ...as a malformed row, which is
 t_assert_eq "0" "$(cd "$B4WS" && bash "$OSS" get '[.bones[] | select(.adr=="ADR-0051")] | length')" \
   "B7: ...and registering nothing - the revisit text never lands in the touch slot"
 
+# ---------------------------------------------------------------------------
+# A-series (PR #792 round 1, review item 1): a PRESENT section that is not a table
+# is not "no bones". Only lines starting with `|` were read, so `TBD`, a placeholder
+# or a table written without its outer pipes yielded zero rows and the step said
+# "declares no bones - registering none" - a false statement about a plan that does
+# declare one, which is #497's own defect wearing a green light. Inside a PRESENT
+# section every non-blank line is either the exact `None.` (and then it is the only
+# content line) or a table line starting with `|`; anything else halts naming the
+# line. An absent section stays the legacy no-op (B5).
+# ---------------------------------------------------------------------------
+# A1. A table written without its outer pipes: a table to a human, and to no reader.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\nADR-0024 | the touch-check surface | src/domain/** | a second backend\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "A1: a row written without its outer pipes halts"
+t_assert_contains "$T_OUT" "ADR-0024" "A1: ...naming the line"
+t_assert_contains "$T_OUT" "neither a table row nor the single None." "A1: ...as neither a table row nor None."
+case "$T_OUT" in
+  *"declares no bones"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: A1: a present section was reported as declaring no bones";;
+  *) T_PASS=$((T_PASS+1));;
+esac
+
+# A2. A placeholder where the table belongs.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\nTBD\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "A2: a placeholder line in a present section halts"
+t_assert_contains "$T_OUT" "TBD" "A2: ...naming it"
+
+# A3. A present section with an empty body: neither the table nor `None.` was
+# written, so the plan is unfinished, not boneless.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "A3: a present but empty section halts"
+t_assert_contains "$T_OUT" "present but empty" "A3: ...as an unfinished section, not as a boneless plan"
+case "$T_OUT" in
+  *"declares no bones"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: A3: an empty present section was reported as declaring no bones";;
+  *) T_PASS=$((T_PASS+1));;
+esac
+
+# A4. CONTROL: the section is the same section in any case. `## Bones This Spine
+# Registers` is read, and its row registers.
+printf 'the case-folded fixture ADR\n' > "$B4CANON/docs/adr/adr-0060-a-case-folded-heading.md"
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones This Spine Registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0060 | a case-folded heading | src/fold/** | |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 0 "A4: a case-different heading is the same section and is read"
+t_assert_eq "ADR-0060" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0060") | .adr')" \
+  "A4: ...its row reached the registry"
+
+# A5. `None.` AND a table: `None.` is the whole answer, so one of the two is wrong
+# and neither the step nor the registry may pick one silently.
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\nNone.\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0061 | a row beside None. | src/beside/** | |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "A5: None. beside a table halts"
+t_assert_contains "$T_OUT" "None." "A5: ...naming the contradiction"
+t_assert_eq "0" "$(cd "$B4WS" && bash "$OSS" get '[.bones[] | select(.adr=="ADR-0061")] | length')" \
+  "A5: ...and picking neither side"
+
 cd /; rm -rf "$TMP"
 
 # A FLOOR ON THE ASSERTION COUNT. Every check in test-block-ledger.sh proves
