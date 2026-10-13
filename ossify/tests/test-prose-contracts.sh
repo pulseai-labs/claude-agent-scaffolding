@@ -13,6 +13,7 @@
 # disagreeing.
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/harness.sh"
+. "$HERE/lib/pin.sh"
 WI="$HERE/../skills/work-item"
 
 # The TEMPLATE line, not the worked example: both files also carry a filled-in
@@ -40,13 +41,17 @@ done
 # The other half of Gate 1's Constraints requirement. handoff-contract.md must
 # carry the literal the callee looks for - a paraphrase ("stage, do not commit")
 # reads fine to a human and fails the gate.
-for f in "$WI/SKILL.md" "$WI/references/pre-flight.md" "$WI/references/handoff-contract.md"; do
-  if grep -Fq 'git_policy: STAGE-not-commit' "$f"; then
-    T_PASS=$((T_PASS+1))
-  else
-    T_FAIL=$((T_FAIL+1)); echo "FAIL: $(basename "$f") does not carry the literal 'git_policy: STAGE-not-commit'"
-  fi
-done
+#
+# D4 (#747): a `grep -Fq` presence check is blind to the deletion it guards when
+# the words recur - SKILL.md states the literal twice, so deleting the
+# requirement row left it green. `pin` requires EXACTLY one occurrence, and the
+# needle is lengthened onto the guarded row until it is unique.
+pin "$WI/SKILL.md" '`git_policy: STAGE-not-commit` **and** the return JSON shape' \
+  "work-item SKILL.md's Constraints row still names the 'git_policy: STAGE-not-commit' literal Gate 1 reads"
+pin "$WI/references/pre-flight.md" 'git_policy: STAGE-not-commit' \
+  "pre-flight.md carries the 'git_policy: STAGE-not-commit' literal Gate 1 reads"
+pin "$WI/references/handoff-contract.md" 'git_policy: STAGE-not-commit' \
+  "handoff-contract.md carries the 'git_policy: STAGE-not-commit' literal Gate 1 reads"
 
 # ---------------------------------------------------------------------------
 # Memory-bank harvest contracts. The harvest has no verb since the conversion
@@ -60,14 +65,14 @@ CLOSE="$HERE/../skills/close"
 # The §9 heading is matched by EXACT STRING at harvest time. If the contract
 # that pins it and the ceremony that greps it ever disagree, every report reads
 # as "no suggestions" and the harvest is silently empty at "wrote 0".
+# D4: report-contract.md states the heading four times (template, definition
+# row, a second example, the rename note), so the pin goes on the row that
+# DEFINES it - the one a reader acts on - and the needle is unique there.
 _H9='## 9. Suggestions for memory bank'
-for f in "$WI/references/report-contract.md" "$CLOSE/references/harvest.md"; do
-  if grep -Fq -- "$_H9" "$f"; then
-    T_PASS=$((T_PASS+1))
-  else
-    T_FAIL=$((T_FAIL+1)); echo "FAIL: $(basename "$f") does not carry the byte-exact heading '$_H9'"
-  fi
-done
+pin "$WI/references/report-contract.md" '| `## 9. Suggestions for memory bank` | Patterns or invariants worth keeping.' \
+  "report-contract.md's section table does not define the byte-exact heading '## 9. Suggestions for memory bank'"
+pin "$CLOSE/references/harvest.md" "$_H9" \
+  "harvest.md does not carry the byte-exact heading '$_H9'"
 
 # Step 9 of the spine-close checklist must still route to the ceremony's only
 # copy — a step that names no reference is a caller that does not call.
@@ -78,14 +83,13 @@ else
 fi
 
 # The two-file allowlist the apply holds in prose must name the same two files
-# the ceremony tells the reader to choose between.
-for tok in '09-known-issues.md' '10-decisions-log.md'; do
-  if grep -Fq -- "$tok" "$CLOSE/references/harvest.md"; then
-    T_PASS=$((T_PASS+1))
-  else
-    T_FAIL=$((T_FAIL+1)); echo "FAIL: harvest.md does not name the allowlisted target '$tok'"
-  fi
-done
+# the ceremony tells the reader to choose between. D4: each name recurs four
+# times in harvest.md, so the pin lands on the allowlist ROW itself (the name
+# followed by the table's closing pipe), where it occurs once.
+pin "$CLOSE/references/harvest.md" '`09-known-issues.md` |' \
+  "harvest.md's allowlist does not name the allowlisted target '09-known-issues.md'"
+pin "$CLOSE/references/harvest.md" '`10-decisions-log.md` |' \
+  "harvest.md's allowlist does not name the allowlisted target '10-decisions-log.md'"
 
 
 # --- The manifest refusal: one string, three hardcoded copies -----------------
@@ -265,11 +269,11 @@ for tok in 'bare `,` separates entries' 'literal comma inside an entry' \
     T_FAIL=$((T_FAIL+1)); echo "FAIL: risk-gates.md no longer carries grammar token '$tok'"
   fi
 done
-if /usr/bin/grep -Fq 'risk_gate_set_controls' "$OSSSK/lib/commands.sh"; then
-  T_PASS=$((T_PASS+1))
-else
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: risk-gates.md names risk_gate_set_controls but the dispatcher has no such verb - the prose promises a repair path that does not exist"
-fi
+# D4: the verb name recurs (its definition and its usage string), so pin the
+# DEFINITION - `oss <verb>` dispatches to `oss_cmd_<verb>`, which is exactly what
+# the prose promises the reader can call.
+pin "$OSSSK/lib/commands.sh" 'oss_cmd_risk_gate_set_controls()' \
+  "risk-gates.md names risk_gate_set_controls but the dispatcher defines no oss_cmd_risk_gate_set_controls - the prose promises a repair path that does not exist"
 
 # --- /adopt authors a topology too (PR #345 round 6) --------------------------
 #
@@ -278,15 +282,15 @@ fi
 # stopped at the failed probe - the promise was unhonoured, not merely
 # undocumented. The mechanical half of that is a three-document parity fact: if
 # someone narrows the claim, all three must move together.
-for f in "$OSSSK/.claude-plugin/plugin.json" \
-         "$OSSSK/skills/start/SKILL.md" \
-         "$OSSSK/skills/adopt/SKILL.md"; do
-  if grep -q 'adopt' "$f" && grep -qi 'author' "$f"; then
-    T_PASS=$((T_PASS+1))
-  else
-    T_FAIL=$((T_FAIL+1)); echo "FAIL: $(basename "$f") no longer pairs /adopt with topology authoring - the other two still promise it"
-  fi
-done
+# D4 (#747): the loop's needles were the bare words `adopt` and `author`, which
+# recur 39 and 13 times in adopt/SKILL.md alone - losing the promise kept the
+# check green. Each document's own pairing sentence is pinned instead, once.
+pin "$OSSSK/.claude-plugin/plugin.json" '/ossify:start and /ossify:adopt author .ossify/topology.json themselves' \
+  "plugin.json's description no longer promises that /ossify:adopt authors .ossify/topology.json - the other two still promise it"
+pin "$OSSSK/skills/start/SKILL.md" '/ossify:start and /ossify:adopt author one (.ossify/topology.json)' \
+  "start/SKILL.md's topology refusal no longer promises that /ossify:adopt authors one - the other two still promise it"
+pin "$OSSSK/skills/adopt/SKILL.md" '**A1 — topology declaration resolves, or is authored here.**' \
+  "adopt/SKILL.md's A1 no longer says the topology declaration resolves, or is authored here"
 
 # --- phase 2: the abandoned carve-out's own claims, held mechanically --------
 #
@@ -459,11 +463,11 @@ if grep -Fq 'oss touch_check' "$_SW" && grep -Fq 'ls-files' "$_SW"; then
 else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: the §5 sweep recipe does not INVOKE both the oracle (oss touch_check) and the corpus (git ls-files)"
 fi
-if grep -Fq 'not-applicable' "$SI"; then
-  T_PASS=$((T_PASS+1))
-else
-  T_FAIL=$((T_FAIL+1)); echo "FAIL: state-inspection.md's surface sweep does not name 'not-applicable' - every deliberate placeholder becomes a false finding"
-fi
+# D4: `not-applicable` occurs three times in the file (a comment and two prose
+# paragraphs), so the pin lands on the paragraph that states the exclusion - the
+# one a reader acts on (state-inspection.md §5's shape rules).
+pin "$SI" 'a surface whose list carries `not-applicable`' \
+  "state-inspection.md's surface sweep does not name 'not-applicable' - every deliberate placeholder becomes a false finding"
 
 
 # (d) the §5 sweep must RUN, and must not read a failure as an absence (#523).
@@ -1403,8 +1407,10 @@ _pin "$_r" "release-close.md fetches patch tags from an unnamed <remote> - a mul
 
 # #619 round 3 (operator-approved) - two findings this PR introduced.
 # (2b) spine-close: a repo-agnostic limit goes on a repo that OPENS a PR - a local-arm repo has none.
-_r=1; grep -Fq 'first hosting repo that opens a PR' "$_SC" && _r=0
-_pin "$_r" "spine-close.md routes repo-agnostic Known limits to the first hosting repo, which may take the local arm and open no PR - the limit never reaches the ledger"
+# D4: the phrase recurs (the resume-arm reconciliation rule states it too), so
+# the pin is the guarded sentence itself.
+pin "$_SC" 'goes on the first hosting repo that opens a PR, and on that PR alone' \
+  "spine-close.md routes repo-agnostic Known limits to the first hosting repo, which may take the local arm and open no PR - the limit never reaches the ledger"
 # (4b) release-close: skip the PR lookup where origin is not a GitHub repository.
 _r=1; grep -Fq 'skip the `gh pr list` call where `gh repo view` cannot resolve `origin`' "$_RC" && _r=0
 _pin "$_r" "release-close.md runs gh pr list against a non-GitHub origin in a declared repo - patch discovery fails on a supported topology"
@@ -1542,7 +1548,7 @@ _pin "$_r" "occupied-destinations leaves the private inventory among the outputs
 # instead of arguing a third time.
 _r=1; [ "$(grep -v '^[[:space:]]*#' "$_SW" | grep -c 'state_path')" = 1 ] && ! grep -Fq 'sf="${OSS_STATE_FILE:-}"' "$_SW" && grep -Fq 'consumed, never re-derived' "$_SW" && _r=0
 _pin "$_r" "state-inspection §5 re-derives the state path (a second precedence spelling, or more than one state_path call) instead of consuming §2's \$sf"
-_r=1; grep -Fq 'sv_state' "$_SV4" && grep -Fq 'not `sf`' "$_SV4" && grep -Fq 'sv_state' "$_SI4" && _r=0
+_r=1; grep -Fq 'names it **`sv_state`** and not `sf`' "$_SV4" && grep -Fq 'sv_state' "$_SI4" && _r=0
 _pin "$_r" "spec-validation §3 names its manifest-routed state \$sf - the same name state-inspection §2 uses for the override-first path, so one surface can reassign the other's state"
 _r=1; grep -Fq 'owned by the prose under this fence' "$_SW" && [ "$(grep -c 'as written' "$_SI4")" = 1 ] && _r=0
 _pin "$_r" "state-inspection's foreign-gate rationale is argued in more than one place (or the block comment no longer points at its owner) - three independently-worded copies drift"
@@ -1561,7 +1567,7 @@ _pin "$_r" "occupied-destinations checks the inventory at the convention path on
 # `dependency-inventory.md` / `asset-inventory.md`, so the check probes contents
 # for §7's moat columns and names a name-only match to the operator as a
 # POSSIBLE inventory instead of equating it (which would suppress the real one).
-_r=1; grep -Fq 'A name is not' "$_OD4" && grep -Fq 'the moat columns' "$_OD4" && grep -Fq 'is a' "$_OD4" && grep -Fq '**possible** inventory' "$_OD4" && grep -Fq 'never write the inventory past an unanswered candidate' "$_OD4" && ! grep -Fq 'A match under' "$_OD4" && _r=0
+_r=1; grep -Fq 'A name is not' "$_OD4" && grep -Fq 'the moat columns' "$_OD4" && grep -Fq '**possible** inventory' "$_OD4" && grep -Fq 'never write the inventory past an unanswered candidate' "$_OD4" && ! grep -Fq 'A match under' "$_OD4" && _r=0
 _pin "$_r" "occupied-destinations equates a filename match with the inventory - a docs/dependency-inventory.md is presented as the destination and keeping it suppresses the real moat inventory (round 1, C5)"
 # (R4) the eval rubric admits adoption as the third legal source, in both directions.
 _R4="$_OSSR/tests/eval/rubrics/harvest-apply-integrity.md"
@@ -1579,15 +1585,15 @@ _HC="$HERE/../skills/work-item/references/handoff-contract.md"
 _WC="$HERE/../skills/close/references/work-item-close.md"
 _SA="$HERE/../skills/plan-spine/references/spec-authoring.md"
 _RS="$HERE/../skills/run-spine/SKILL.md"
-for _pair in "$_RO|spine_inventory" "$_RO|The count lives in state" "$_RO|halt:out-of-order" \
-             "$_EX|staged result" "$_EX|work_item_dispatched" "$_HC|spine_base_get" \
+for _pair in "$_RO|halt: spine_inventory could not read the spine" "$_RO|The count lives in state" "$_RO|halt:out-of-order" \
+             "$_EX|## 2a. Re-entry — counting, and a staged result at request time" "$_EX|The lane counts each request it issues" "$_HC|; it is the evidence." \
              "$_SA|re-entering" "$_RS|resumes"; do
   _f="${_pair%%|*}"; _lit="${_pair#*|}"
   _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
   _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.14.0 re-entry)"
 done
 # 1.15.0 - the run-spine grammar rails moved with the body into the skill (Rule 2).
-for _lit in 'Exactly two command shapes are accepted' 'before the spine-branch cut' 'refuse rather than guess'; do
+for _lit in 'Exactly two command shapes are accepted' 'refuse it before the spine-branch cut, naming' 'refuse rather than guess'; do
   _r=1; grep -Fq -- "$_lit" "$_RS" && _r=0
   _pin "$_r" "skills/run-spine/SKILL.md does not state '$_lit' (1.15.0 grammar rails)"
 done
@@ -1668,26 +1674,38 @@ _pin "$_r" "round-orchestration.md §2's arm selector does not halt on recorded 
 # C3/K1/L1/B2: the finish-merge row carries its repo-root recovery, the gate
 # RE-RUN (the report-presence gate is gone - a present report proves nothing),
 # and the tip recovery.
+# D4: the halt name recurs (the halt table defines the row too), so the pin is
+# the finish-merge cell's own decision.
+pin "$_RO" 'Red → `halt:unverified-merge`, naming the item' \
+  "round-orchestration.md's finish-merge row does not halt with halt:unverified-merge when its RE-RUN of close §2 comes back RED (#673 K1)"
 _r=1; grep -Fq 'refs/heads/$wi_branch' "$_RO" \
-  && grep -Fq 'halt:unverified-merge' "$_RO" \
   && grep -Fq 'RE-RUN close §2' "$_RO" \
   && grep -Fq 'repo_root="$(oss repo_root "$target_repo")"' "$_RO" \
   && ! grep -Fq 'as gate evidence' "$_RO" \
   && grep -Fq 'the row reads `wt=present` but state holds no `worktree_path` yet' "$_RO" && _r=0
 _pin "$_r" "round-orchestration.md §2b's finish-merge row drops its repo-root recovery, the §2 gate re-run, or the tip recovery (C3/K1/L1), still claims report.md is gate evidence, or the adopt row leaves \$wt undefined again (B2)"
 # C2: the rejection is durable and its route is named.
-_r=1; grep -Fq 'halt:close-rejected' "$_RO" \
-  && grep -Fq 'durable rejection record' "$_IC" \
+# D4: halt:close-rejected recurs (two inline mentions plus the table row), so
+# the pin is the row that defines it.
+pin "$_RO" '| `halt:close-rejected` | the result' \
+  "round-orchestration.md's halt table no longer defines halt:close-rejected for a recorded [fidelity] rejection (#673 C2)"
+_r=1; grep -Fq 'durable rejection record' "$_IC" \
   && grep -Fq 'is recorded durably' "$_WC" && _r=0
-_pin "$_r" "the C2 rejection record is not named where it is written (impl-check/work-item-close) or where it routes (round-orchestration)"
+_pin "$_r" "the C2 rejection record is not named where it is written (impl-check/work-item-close)"
 # D1: the correction route is named in the lane, and the setter validates.
-_r=1; grep -Fq 'spine_base_reset' "$_RO" \
-  && grep -Fq 'must EXIST locally' "$_RO" && _r=0
-_pin "$_r" "round-orchestration.md no longer names spine_base_reset for a wrong recorded base, or drops the setter's branch-exists validation note (D1)"
+# D4: spine_base_reset recurs (the prose above and the halt row), so the pin is
+# the halt row's own repair sentence.
+pin "$_RO" 'record the new name with `oss spine_base_reset' \
+  "round-orchestration.md's halt:base-unresolved row no longer names spine_base_reset for a wrong recorded base (#673 D1)"
+_r=1; grep -Fq 'must EXIST locally' "$_RO" && _r=0
+_pin "$_r" "round-orchestration.md drops the setter's branch-exists validation note (D1)"
 # F2: close §3 reads the RECORDED base; the old false claim is gone.
-_r=1; grep -Fq 'spine_base_get' "$_SC" \
-  && ! grep -Fq 'The two facts this step needs are not in state' "$_SC" && _r=0
-_pin "$_r" "spine-close.md §3 does not read the recorded base (spine_base_get), or still claims both facts are absent from state (F2)"
+# D4: spine_base_get recurs three times inside §3, so the pin is the sentence
+# that tells the reader to read it.
+pin "$_SC" 'the checkout where a base is recorded for it (`oss spine_base_get' \
+  "spine-close.md §3 does not read the recorded base (spine_base_get) (F2)"
+_r=1; ! grep -Fq 'The two facts this step needs are not in state' "$_SC" && _r=0
+_pin "$_r" "spine-close.md §3 still claims both facts are absent from state (F2)"
 # F3: both 'was this item dispatched' enumerations carry the count.
 _r=1; grep -Fq 'a `dispatches` count above zero' "$_WC" \
   && grep -Fq 'positive `dispatches` count' "$_SI" && _r=0
@@ -1695,13 +1713,16 @@ _pin "$_r" "the abandoned-item drift enumerations (close §1, doctor §5) omit t
 # Fix round 2 (G2/G3/H1/I1/I2/J1): one pin per new fail-closed claim the
 # round's findings named. Each literal is a distinct row or clause a reader
 # acts on; drop any one and the corresponding behavior loses its contract.
-_r=1; grep -Fq 'halt:base-unresolved' "$_RO" \
-  && grep -Fq 'a `verify.md` rejection record' "$_RO" \
+# D4: halt:base-unresolved recurs (the §2a prose and the halt table), so the pin
+# is the row that defines it.
+pin "$_RO" '| `halt:base-unresolved` — a repo row' \
+  "round-orchestration.md's halt table no longer defines halt:base-unresolved for a recorded base that will not resolve (G2/G3)"
+_r=1; grep -Fq 'a `verify.md` rejection record' "$_RO" \
   && grep -Fq 'a completed item'"'"'s dirty worktree halts here too' "$_RO" \
   && grep -Fq 'a history rewrite, never a landing' "$_RO" \
   && grep -Fq 'validation precedes every removal' "$_RO" \
   && grep -Fq 'a recorded rejection is never re-landed by a merge' "$_RO" && _r=0
-_pin "$_r" "round-orchestration.md drops a fix-round-2 fail-closed claim (base-unresolved row; the verify.md read; the dirty complete-item halt; the rewrite-is-no-landing clause; reattach's validate-before-remove; the merge-arm rejection gate) (G2/G3/H1/I1/I2/J1)"
+_pin "$_r" "round-orchestration.md drops a fix-round-2 fail-closed claim (the verify.md read; the dirty complete-item halt; the rewrite-is-no-landing clause; reattach's validate-before-remove; the merge-arm rejection gate) (G2/G3/H1/I1/I2/J1)"
 # Fix round 3 (L2/L3/L4): the guards the round added are contract claims too.
 _r=1; grep -Fq 'halt:branch-unknown' "$_RO" \
   && grep -Fq 'no branch ever recorded' "$_RO" \
