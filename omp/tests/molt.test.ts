@@ -716,6 +716,40 @@ describe('the omp wiring', () => {
     return { home, handlers, commands, sent, order, state, ctxFor, restore }
   }
 
+  test('round 3 tree resets branch A reminders, stop blocks, lastMd and staged previews', async () => {
+    const b = boot({ percent: 81 })
+    try {
+      const c = b.ctxFor()
+      b.state.branch = unmarked
+      const old = join(b.home, 'branch-a.md')
+      writeFileSync(old, 'abandoned handoff')
+      const tool = (name: string, input: object) => b.handlers.get('tool_result')!(result(name, input), c)
+      await tool('write', { path: old })
+      await tool('ast_edit', { paths: [old] })
+      b.state.percent = 42
+      await tool('read', {})
+      b.state.percent = 81
+      await tool('read', {})
+      // A missing explicit marker spends both stop blocks even though lastMd exists.
+      for (let i = 0; i < 2; i++) await b.handlers.get('session_stop')!({ last_assistant_message: 'MOLT-HANDOFF: /missing.md' }, c)
+      await b.handlers.get('session_tree')?.({ oldLeafId: 'A', newLeafId: 'B' }, c)
+      expect(JSON.parse(readFileSync(stagePath(b.home, 'W1'), 'utf8')).stage).toBe('below')
+      const before = b.sent.length
+      b.state.percent = 42
+      await tool('read', {})
+      expect(b.sent.length).toBe(before + 1)
+      b.state.percent = 81
+      await tool('write', { path: 'xd://resolve' })
+      expect(b.sent.length).toBe(before + 2)
+      await b.commands.get('molt-arm')!.handler('', c)
+      for (let i = 0; i < 2; i++) expect((await b.handlers.get('session_stop')!({}, c))?.decision).toBe('block')
+      await b.handlers.get('session_stop')!({}, c)
+      expect(b.state.newSessions).toBe(1)
+      expect(b.sent.at(-1)?.text).toContain(fallbackPath(b.home, 'W1'))
+      expect(b.sent.at(-1)?.text).not.toContain(old)
+    } finally { b.restore() }
+  })
+
   test('the default export is a function and imports under plain bun', () => {
     expect(typeof ompExtension).toBe('function')
     const path = join(import.meta.dir, '../../molt/omp/extension.ts')

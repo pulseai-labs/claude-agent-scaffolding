@@ -402,6 +402,13 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (cfg.problems.length > 0) io.notify(`autonomic: ${cfg.problems.join('; ')}`)
   }
 
+  // In-file navigation/compaction abandons branch facts, never the operator's mode or scope.
+  function onContextRebuild(): void {
+    const id = io.sessionId()
+    digests.delete(id)
+    changed.delete(id)
+  }
+
   // before_agent_start: in autopilot the policy joins the system prompt, and a carried scope is announced once.
   // omp 18.8.9 passes the prompt as a list of blocks (and wraps a string we return into one block), so the policy and the
   // scope notice are blocks of their own and omp's blocks go back byte for byte.
@@ -628,7 +635,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (e.source !== 'extension') pushes.delete(io.sessionId())
   }
 
-  return { onInput, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
+  return { onInput, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
 }
 
 // omp's real ctx behind AutonomicIO. Each handler points `cur` at the event's ctx first.
@@ -686,6 +693,8 @@ export default function (pi: any) {
     },
   })
   pi.on('session_start', (_e: any, c: any) => main(c) ? autonomic.onSessionStart() : undefined)
+  pi.on('session_tree', (_e: any, c: any) => main(c) ? autonomic.onContextRebuild() : undefined)
+  pi.on('session_compact', (_e: any, c: any) => main(c) ? autonomic.onContextRebuild() : undefined)
   pi.on('session_switch', (_e: any, c: any) => main(c) ? autonomic.onSessionStart() : undefined)
   pi.on('input', (e: any, c: any) => main(c) ? autonomic.onInput(e) : undefined)
   pi.on('before_agent_start', (e: any, c: any) => main(c) ? autonomic.onBeforeAgentStart(e) : undefined)

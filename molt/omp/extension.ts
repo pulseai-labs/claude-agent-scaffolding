@@ -84,6 +84,7 @@ export default function (pi: any) {
   })
   pi.on('session_start', (_e: any, c: any) => main(c) ? molt.onSessionStart() : undefined)
   pi.on('session_switch', (e: any, c: any) => main(c) ? molt.onSessionSwitch(String(e?.reason ?? '')) : undefined)
+  pi.on('session_tree', (_e: any, c: any) => main(c) ? molt.onSessionCompact() : undefined)
   pi.on('session_compact', (_e: any, c: any) => main(c) ? molt.onSessionCompact() : undefined)
   pi.on('session_shutdown', (_e: any, c: any) => main(c) ? molt.onSessionShutdown() : undefined)
   pi.on('input', (e: any, c: any) => main(c) ? molt.onInput(e) : undefined)

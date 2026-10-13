@@ -756,6 +756,32 @@ describe('the omp wiring', () => {
     } finally { b.restore() }
   })
 
+  for (const event of ['session_tree', 'session_compact']) {
+    test(`round 3 ${event} clears branch A digest and changed flag, preserves mode and scope`, async () => {
+      const b = boot({ mode: 'autopilot' })
+      try {
+        const c = b.ctxFor()
+        const scope = join(b.home, 'scope.md')
+        writeFileSync(scope, 'scope')
+        await b.commands.get('autopilot')!.handler(`on ${scope}`, c)
+        const stop = () => b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, c)
+        for (let i = 0; i < 3; i++) await stop()
+        await b.handlers.get('tool_result')!({ toolName: 'write', input: { path: '/branch-a.txt' }, content: [{ type: 'text', text: 'SECRET-A' }], isError: false }, c)
+        await b.handlers.get(event)?.({}, c)
+        expect(await stop()).toBeUndefined() // stale changed would reset the exhausted loop
+        const rec = JSON.parse(readFileSync(sessionPath(b.home, 'W1'), 'utf8'))
+        expect(rec.mode).toBe('autopilot')
+        expect(rec.scope).toEqual([scope])
+        await b.handlers.get('tool_result')!({ toolName: 'read', input: { path: '/branch-b.txt' }, content: [{ type: 'text', text: 'FACT-B' }], isError: false }, c)
+        await b.handlers.get('tool_call')!(ask(Q), c)
+        const prompt = b.state.ephemerals.at(-1).promptText
+        expect(prompt).toContain('FACT-B')
+        expect(prompt).not.toContain('SECRET-A')
+        expect(prompt).not.toContain('/branch-a.txt')
+      } finally { b.restore() }
+    })
+  }
+
   test('the default export is a function and imports under plain bun', () => {
     expect(typeof ompExtension).toBe('function')
     const path = join(import.meta.dir, '../../autonomic/omp/extension.ts')
@@ -776,7 +802,7 @@ describe('the omp wiring', () => {
     const b = boot()
     try {
       expect([...b.commands.keys()]).toEqual(['autopilot'])
-      expect([...b.handlers.keys()].sort()).toEqual(['before_agent_start', 'input', 'session_start', 'session_stop', 'session_switch', 'tool_call', 'tool_result'])
+      expect([...b.handlers.keys()].sort()).toEqual(['before_agent_start', 'input', 'session_compact', 'session_start', 'session_stop', 'session_switch', 'session_tree', 'tool_call', 'tool_result'])
     } finally { b.restore() }
   })
 
