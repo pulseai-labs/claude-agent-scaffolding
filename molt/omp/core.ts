@@ -5,12 +5,20 @@ import { DEFAULTS, parseConfig } from '../hooks/config'
 import type { MoltConfig } from '../hooks/config'
 import { atLeast, stageOf, thresholdsFor } from '../hooks/measure'
 import type { Stage, Thresholds } from '../hooks/measure'
-import { gateAllows, isProgress } from '../hooks/gate'
+import { MAX_STOP_BLOCKS, gateAllows, isProgress } from '../hooks/gate'
 import { briefPrompt, extractFacts, factsBrief, isUsableSummary, markerPath, pickHandoff, resolvePath } from '../hooks/handoff'
 import type { Handoff, Message } from '../hooks/handoff'
 import { activePath, autonomicPath, fallbackPath, lineagePath, logPath, parseAutonomic, parseLineage, safeSessionId, stagePath } from '../hooks/records'
 import type { Lineage } from '../hooks/records'
-import { BLOCK_NOTE, CHILD_NOTE, CHILD_WARNING, DEFAULT_INSTRUCTIONS, DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome, fill } from '../hooks/templates'
+import {
+  SESSION_OFF, SESSION_ON, COMMAND_USAGE, STATUS_OFF, STATUS_PAUSED,
+  HANDOFF_REQUIRED, HANDED_OFF, PARENT_HANDOFF, HANDING_OFF, RESUMED,
+  SEED_REJECTED, CONFIG_PROBLEMS, SETTINGS_PROBLEMS, SESSION_STATUS, FILL_STATUS,
+  MODE_STATUS, WARNED, PAUSED_UNATTENDED, PAUSED_NO_PROGRESS, MISSING_HANDOFF,
+  STATUS_METER, BLOCK_NOTE, CHILD_NOTE, CHILD_WARNING, DEFAULT_INSTRUCTIONS,
+  DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome,
+  fill,
+} from '../hooks/templates'
 
 export type Shape = { tool: string; args: Record<string, unknown> }
 
@@ -191,8 +199,6 @@ export type MoltIO = {
 }
 
 type Pending = { oldSession: string; handoff: string; chain: string; depth: number }
-const MAX_STOP_BLOCKS = 2
-const USAGE = 'usage: /molt now | off | on | status'
 const CONFIG_PATH = '.omp/agent/molt.json'
 
 const textOf = (content: unknown): string => {
@@ -333,9 +339,9 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
 
   function showStatus(id: string) {
     try {
-      if (off.has(id)) return io.status('molt: off')
-      if (paused === id) return io.status('molt: paused')
-      io.status(lastPercent === undefined ? 'molt' : `molt ${Math.round(lastPercent)}%/${Math.round(thresholds(id).command)}%`)
+      if (off.has(id)) return io.status(STATUS_OFF)
+      if (paused === id) return io.status(STATUS_PAUSED)
+      io.status(lastPercent === undefined ? 'molt' : fill(STATUS_METER, { percent: Math.round(lastPercent), command: Math.round(thresholds(id).command) }))
     } catch {}
   }
 
@@ -384,7 +390,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
   async function noteCommand(id: string) {
     if (commandNoted.has(id)) return
     commandNoted.add(id)
-    await appendStatus('handoff required')
+    await appendStatus(HANDOFF_REQUIRED)
   }
 
   const warnedAt = (id: string, which: 1 | 2) => Math.round(which === 1 ? thresholds(id).warn : thresholds(id).warnAgain)
@@ -401,8 +407,8 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
   // A child is never cleared: its parent replaces it.
   async function handOff(id: string, handoff: Handoff) {
     handedOff.add(id)
-    await appendStatus(`handed-off ${handoff.path}`)
-    notify(`molt: handed off to the parent — ${handoff.path}`, 'info')
+    await appendStatus(fill(HANDED_OFF, { path: handoff.path }))
+    notify(fill(PARENT_HANDOFF, { path: handoff.path }), 'info')
     await log(`handed off session=${id} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent}`)
   }
 
@@ -430,10 +436,10 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     const own = parseLineage(await io.readText(lineagePath(home(), id)))
     if (signal?.aborted) return
     if (record.mode === 'manual' && unattended >= cfg.manualMaxMolts)
-      return pause(id, `molt paused: ${unattended} molts in a row with no message from you. Send a message to resume; the handoff is at ${handoff.path}.`, undefined)
+      return pause(id, fill(PAUSED_UNATTENDED, { count: unattended, path: handoff.path }), undefined)
     // /molt now is the operator asking for this molt: it is not a loop, whatever the progress.
     if (record.mode === 'autopilot' && own !== undefined && progress === 0 && !forced.has(id))
-      return pause(id, `molt paused: no progress since the last molt (no Write, Edit or commit). Autopilot stops here; the handoff is at ${handoff.path}.`, record.bell)
+      return pause(id, fill(PAUSED_NO_PROGRESS, { path: handoff.path }), record.bell)
     if (!io.route()) {
       unroutable.add(id)
       await log(io.printMode() ? 'no clear route in print mode' : 'no clear route: no command context is armed yet')
@@ -442,7 +448,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     inFlight = true
     const p: Pending = { oldSession: id, handoff: handoff.path, chain: own?.chain ?? id, depth: (own?.depth ?? 0) + 1 }
     pending = p
-    notify(`molt: handing off at ${Math.round(lastPercent ?? 0)}% — ${handoff.path}`, 'info')
+    notify(fill(HANDING_OFF, { percent: Math.round(lastPercent ?? 0), path: handoff.path }), 'info')
     await log(`molt session=${id} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent}`)
     let result: ClearResult | undefined
     try {
@@ -459,7 +465,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       notify(`molt: the session was not cleared (${result ?? 'rejected'}); it keeps going. The handoff is at ${handoff.path}.`, 'warn')
       await log(`clear did not clear session=${id} result=${result}`)
     } else if (result === 'seed-rejected') {
-      notify(`molt: the seed was rejected. Resume by hand from ${handoff.path}.`, 'warn')
+      notify(fill(SEED_REJECTED, { path: handoff.path }), 'warn')
       await log(`seed rejected session=${io.sessionId()}`)
     }
   }
@@ -478,7 +484,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       const id = io.sessionId()
       await touchActive(id)
       showStatus(id)
-      if (cfg.problems.length) notify(`molt: ${cfg.problems.join('; ')}`, 'warn')
+      if (cfg.problems.length) notify(fill(CONFIG_PROBLEMS, { problems: cfg.problems.join('; ') }), 'warn')
     } catch (err) {
       await log(`session_start error ${String(err)}`)
     }
@@ -499,7 +505,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       progress = 0
       forced.delete(p.oldSession)
       seeded = { session: id }
-      notify(`molt: resumed from ${p.handoff}`, 'info')
+      notify(fill(RESUMED, { path: p.handoff }), 'info')
       try {
         const lineage: Lineage = { from: p.oldSession, chain: p.chain, depth: p.depth, handoff: p.handoff }
         await io.writeText(lineagePath(home(), id), `${JSON.stringify(lineage, null, 2)}\n`)
@@ -546,7 +552,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
         if (due !== undefined && !handedOff.has(id)) {
           io.warnNext(await warningText(id, due))
           warned.set(id, due)
-          await appendStatus(`warned ${warnedAt(id, due)}`)
+          await appendStatus(fill(WARNED, { percent: warnedAt(id, due) }))
         }
       }
     } catch (err) {
@@ -618,7 +624,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       const due = dueWarning(id)
       if (due === undefined) return
       warned.set(id, due)
-      await appendStatus(`warned ${warnedAt(id, due)}`)
+      await appendStatus(fill(WARNED, { percent: warnedAt(id, due) }))
       io.steer(await warningText(id, due))
     } catch (err) {
       await log(`tool_result error ${String(err)}`)
@@ -653,7 +659,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
           await noteCommand(id)
           const reason = missing === undefined
             ? await instruction(id)
-            : `molt: the MOLT-HANDOFF line names ${missing}, but ${missing} does not exist or is not a readable file. Write the handoff file, then end your reply with MOLT-HANDOFF: <its absolute path>.`
+            : fill(MISSING_HANDOFF, { path: missing })
           return { decision: 'block', reason }
         }
       }
@@ -687,12 +693,13 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     const t = thresholds(id)
     const record = parseAutonomic(await io.readText(autonomicPath(home(), id)))
     const lines = [
-      `molt is ${off.has(id) ? 'off' : paused === id ? 'paused' : 'on'} for this session.`,
-      `fill: ${lastPercent === undefined ? 'not measured yet' : `${Math.round(lastPercent)}%`} — warnings ${Math.round(t.warn)}% and ${Math.round(t.warnAgain)}%, handoff ${Math.round(t.command)}%, block ${Math.round(t.block)}%, fallback ${Math.round(t.fallback)}%`,
-      `mode (autonomic's record): ${record.mode}`,
+      fill(SESSION_STATUS, { state: off.has(id) ? 'off' : paused === id ? 'paused' : 'on' }),
+      fill(FILL_STATUS, { percent: lastPercent === undefined ? 'not measured yet' : `${Math.round(lastPercent)}%`,
+        warn: Math.round(t.warn), warnAgain: Math.round(t.warnAgain), command: Math.round(t.command), block: Math.round(t.block), fallback: Math.round(t.fallback) }),
+      fill(MODE_STATUS, { mode: record.mode }),
       io.route() ? 'clear route: armed.' : io.printMode() ? 'clear route: none (print mode).' : 'clear route: not armed yet (the next prompt you send arms it).',
     ]
-    if (cfg.problems.length) lines.push(`settings: ${cfg.problems.join('; ')}`)
+    if (cfg.problems.length) lines.push(fill(SETTINGS_PROBLEMS, { problems: cfg.problems.join('; ') }))
     return lines.join('\n')
   }
 
@@ -705,14 +712,14 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       await dropActive(id)
       await publishStage(id)
       showStatus(id)
-      return 'molt is off for this session. The crew context-ceiling hooks speak again here.'
+      return SESSION_OFF
     }
     if (arg === 'on') {
       off.delete(id)
       await touchActive(id)
       await publishStage(id)
       showStatus(id)
-      return 'molt is on for this session.'
+      return SESSION_ON
     }
     if (arg === 'now') {
       off.delete(id)
@@ -724,7 +731,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       return 'molt: the handoff request is sent. The session acts on it at its next step.'
     }
     if (arg === 'status') return status(id)
-    return USAGE
+    return COMMAND_USAGE
   }
 
   return { onSessionStart, onSessionSwitch, onSessionCompact, onSessionShutdown, onInput, onToolCall, onToolResult, onSessionStop, onCommand }
