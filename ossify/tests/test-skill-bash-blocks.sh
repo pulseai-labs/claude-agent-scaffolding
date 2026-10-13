@@ -516,11 +516,25 @@ check_10_errexit_captures() { # $1=blocks-dir holding blk-N.sh + manifest.tsv
       /^[[:space:]]*#/ { next }
       {
         line = $0
-        if (line ~ /(^|[;&|[:space:]])if[[:space:]]+![[:space:]]/) { neg = 1; arm = 0 }
+        # A status read belongs to the `if !` that OWNS it. Everything after the
+        # first `fi` on the line is a different command - `if ! a; then :; fi; if b;
+        # then :; else rc=$?; fi` reports a read that belongs to the un-negated
+        # second if (PR #772 round 1). Cut at that `fi` and look for the arm read
+        # only inside the segment; the multi-line state arms only when this `if !`
+        # is still open at end of line.
+        if (match(line, /(^|[;&|[:space:]])if[[:space:]]+![[:space:]]/)) {
+          seg = substr(line, RSTART)
+          closed = match(seg, /(^|[;[:space:]])fi([;[:space:]]|$)/)
+          if (closed) seg = substr(seg, 1, RSTART - 1)
+          if (seg ~ /(then|else)[[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[[:space:]]*\$\?/) {
+            printf "%s:%d: '"'"'=$?'"'"' read after a negated condition reads the negation'"'"'s status, not the command'"'"'s; use '"'"'rc=0; cmd || rc=$?'"'"'\n", f, fence + NR
+          }
+          if (closed) { neg = 0; arm = 0 }
+          else { neg = 1; arm = (seg ~ /(then|else)[[:space:]]*$/) ? 1 : 0 }
+        }
         if (neg) {
-          # the read is the first statement of a then/else arm: same line, or the next line
-          if (line ~ /(then|else)[[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[[:space:]]*\$\?/ ||
-              (arm && line ~ /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=[[:space:]]*\$\?/)) {
+          # the read is the first statement of the then/else arm: the next line
+          if (arm && line ~ /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=[[:space:]]*\$\?/) {
             printf "%s:%d: '"'"'=$?'"'"' read after a negated condition reads the negation'"'"'s status, not the command'"'"'s; use '"'"'rc=0; cmd || rc=$?'"'"'\n", f, fence + NR
           }
           arm = (line ~ /(then|else)[[:space:]]*$/) ? 1 : 0
@@ -546,7 +560,10 @@ check_11_oss_bin_assigned() { # $1=blocks-dir holding blk-N.sh + manifest.tsv
   while IFS=$'\t' read -r n f fence; do
     [ -n "$n" ] || continue
     body="$(grep -vE '^[[:space:]]*#' "$w/blk-$n.sh" || true)"
-    grep -qE '\$\{?oss_bin' <<<"$body" || continue
+    # The WHOLE name: `$oss_bin`, `"$oss_bin"`, `${oss_bin}` and `${oss_bin:-…}`
+    # are reads of the variable; `$oss_binary` is a different variable and is not
+    # a finding (PR #772 round 1).
+    grep -qE '\$(oss_bin([^A-Za-z0-9_]|$)|\{oss_bin[}:#%/^,@-])' <<<"$body" || continue
     grep -qE '(^|[;&[:space:]])oss_bin=' <<<"$body" && continue
     echo "$f:$((fence + 1)): fence reads \$oss_bin but never assigns it - a fresh shell runs \"\" (rc 127); call 'oss' by name"
   done < "$w/manifest.tsv"
@@ -559,14 +576,24 @@ check_11_oss_bin_assigned() { # $1=blocks-dir holding blk-N.sh + manifest.tsv
 # it. Comment lines are skipped: citing a function in a comment is not a call.
 # ---------------------------------------------------------------------------
 check_12_no_lib_calls() { # $1=ossify-root $2=blocks-dir
-  local r="$1" w="$2" n f fence names hit
+  local r="$1" w="$2" n f fence names hit own body fn
   names="$({ grep -hoE '^[A-Za-z_][A-Za-z0-9_]*\(\)' "$r"/lib/*.sh 2>/dev/null || true; } | sed 's/()$//' | sort -u)"
   [ -n "$names" ] || { echo "check 12: no lib functions found under $r/lib - extractor broken"; return; }
-  local own
+  # COMMAND POSITION, not a mere mention. A name handed to another command as an
+  # argument (`printf '%s\n' oss_verify_parse_acs`) or quoted into a message is not
+  # a call, and flagging it teaches the reader to ignore the check (PR #772 round 1).
+  local pos='(^|[;&|({]|\$\(|`|(then|do|else|if|while|until|time|!)[[:space:]]+)'
   while IFS=$'\t' read -r n f fence; do
     [ -n "$n" ] || continue
-    hit="$(grep -vE '^[[:space:]]*#' "$w/blk-$n.sh" | grep -owFf <(printf '%s\n' "$names") | sort -u || true)"
+    body="$(grep -vE '^[[:space:]]*#' "$w/blk-$n.sh" || true)"
+    hit=""
+    while IFS= read -r fn; do
+      [ -n "$fn" ] || continue
+      grep -Eq "${pos}[[:space:]]*${fn}([[:space:]]|;|\)|$)" <<<"$body" || continue
+      hit="$hit$fn"$'\n'
+    done <<<"$names"
     [ -n "$hit" ] || continue
+    hit="$(printf '%s' "$hit" | sort -u)"
     # A fence may define its own function that shares a lib name; calling it is fine.
     own="$({ grep -oE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*\(\)' "$w/blk-$n.sh" || true; } | sed -E 's/^[[:space:]]*//; s/\(\)$//' | sort -u)"
     [ -z "$own" ] || hit="$(grep -vxFf <(printf '%s\n' "$own") <<<"$hit" || true)"
@@ -892,12 +919,14 @@ if ! true; then echo no; else rc3=$?; fi
 rc4=0; ! false || rc4=$?
 if false; then rc5=0; else rc5=$?; fi
 if ! true; then echo ok; fi; rc6=0; true || rc6=$?
+if ! false; then :; fi; if false; then :; else rc7=$?; fi
 ```
 EOF
 
 check_1_parse "$FIX10N" "$WORK/fix10n" >/dev/null
 F10N="$(check_10_errexit_captures "$WORK/fix10n/blocks" | { grep -F 'after a negated condition' || true; })"
 t_assert_eq 4 "$(_count "$F10N")" "self-test: check 10 flags each status read after a negated condition (if !…then, then-on-next-line, else arm, ! …||) and neither control${F10N:+ -- $F10N}"
+case "$F10N" in *"neg.md:9"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: self-test: check 10 attributes a read to the if ! that owns it - line 9's else-arm belongs to a DIFFERENT, un-negated if";; *) T_PASS=$((T_PASS+1));; esac
 
 # --- checks 11 and 12 plants: one more dedicated root. Four fences, one plant
 # each plus the control that must stay quiet - the assigned `oss_bin` read
@@ -923,14 +952,22 @@ oss_verify_parse_acs spec.md
 # oss_verify_parse_acs is cited here
 oss verify_acs spec.md
 ```
+
+```bash
+"$oss_binary" help
+```
+
+```bash
+printf '%s\n' oss_verify_parse_acs
+```
 EOF
 
 check_1_parse "$FIX11" "$WORK/fix11" >/dev/null
 C11F="$(check_11_oss_bin_assigned "$WORK/fix11/blocks")"
-t_assert_eq 1 "$(_count "$C11F")" "self-test: check 11 fires on the unassigned \$oss_bin read and not on the assigned control${C11F:+ -- $C11F}"
+t_assert_eq 1 "$(_count "$C11F")" "self-test: check 11 fires on the unassigned \$oss_bin read and not on the assigned control or \$oss_binary${C11F:+ -- $C11F}"
 t_assert_contains "$C11F" "c11/SKILL.md:4" "self-test: check 11 names the unassigned read"
 C12F="$(check_12_no_lib_calls "$OSSIFY" "$WORK/fix11/blocks")"
-t_assert_eq 1 "$(_count "$C12F")" "self-test: check 12 fires on the bare lib call and not on the commented citation or the oss verb${C12F:+ -- $C12F}"
+t_assert_eq 1 "$(_count "$C12F")" "self-test: check 12 fires on the bare lib call and not on the commented citation, the oss verb, or a NAME passed as an argument${C12F:+ -- $C12F}"
 t_assert_contains "$C12F" "c11/SKILL.md:12" "self-test: check 12 names the bare lib call"
 
 t_summary
