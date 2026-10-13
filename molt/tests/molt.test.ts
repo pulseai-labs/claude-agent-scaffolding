@@ -8,6 +8,10 @@ const STOP = { stop_hook_active: false, last_assistant_message: 'done', session_
 const CLEAR = (id: string) => ({ source: 'clear', session_id: id }) as never
 const H = '/repo/docs/handoff.md'
 const AUTOPILOT = { '/home/u/.claude/state/autonomic/sessions/s1.json': '{"mode":"autopilot","bell":"ring-me"}' }
+const NO_PROGRESS = { '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' }
+// The progress file's own path, written out: the tests below pin the file the
+// implementation must write, read and remove, without importing the helper they test.
+const PROGRESS = (id = 's1') => `/home/u/.claude/state/molt/progress/${id}`
 
 describe('a molt from a marker', () => {
   test('clears, writes lineage, seeds the new session with the handoff', async ($, on) => {
@@ -266,6 +270,43 @@ describe('loop guards', () => {
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(0)
     expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
+  })
+  test('autopilot: a reload after progress still counts it (#713)', async ($, on) => {
+    // /reload-plugins reloads the module, so the in-memory count is back at 0 while the
+    // session has written files. The session's own progress file is what survives it.
+    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, ...NO_PROGRESS, [PROGRESS()]: '2026-01-01T00:00:00.000Z\n' } })
+    at(w, 67)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(1)
+    expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(false)
+  })
+  test("autopilot: the first progress below the warning writes the session's progress file", async ($, on) => {
+    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, ...NO_PROGRESS } })
+    at(w, 10)
+    await $.tool.call({ tool: 'Write', file_path: '/repo/x.ts', content: 'x' })
+    expect(w.files.has(PROGRESS())).toBe(true)
+  })
+  test('autopilot: progress past the warning writes no progress file (control)', async ($, on) => {
+    // Past the warning the session writes and commits its handoff, which must stay no
+    // progress (#711): a file written there would make every autopilot molt look live.
+    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, ...NO_PROGRESS } })
+    at(w, 67)
+    await $.tool.call({ tool: 'Write', file_path: H, content: '# h' })
+    expect(w.files.has(PROGRESS())).toBe(false)
+  })
+  test("a molt's seed removes the old session's progress file", async ($, on) => {
+    const w = world(on, { files: { [H]: '#', [PROGRESS()]: '2026-01-01T00:00:00.000Z\n' } })
+    w.clearTo.push('s2')
+    at(w, 67)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    w.session.id = 's2'
+    await $.classic.SessionStart(CLEAR('s2'))
+    expect(w.runs.some(argv => argv[0] === 'rm' && argv[2] === PROGRESS('s1'))).toBe(true)
+  })
+  test("session.end removes the session's progress file", async ($, on) => {
+    const w = world(on, { files: { [PROGRESS()]: '2026-01-01T00:00:00.000Z\n' } })
+    await $.session.end({ reason: 'exit', sessionId: 's1' } as never)
+    expect(w.runs.some(argv => argv[0] === 'rm' && argv[2] === PROGRESS('s1'))).toBe(true)
   })
   test('autopilot: /molt now lifts a no-progress pause and the molt goes ahead', async ($, on) => {
     const w = world(on, { files: { [H]: '#', ...AUTOPILOT, '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })

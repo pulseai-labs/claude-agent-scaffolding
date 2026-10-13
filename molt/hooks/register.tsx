@@ -11,7 +11,7 @@ import type { Handoff, Message } from './handoff'
 import { fallbackPath, lineagePath, parseLineage } from './records'
 import type { Lineage } from './records'
 import type { Stage, Thresholds } from './measure'
-import { activePath, autonomicPath, logPath, parseAutonomic, safeSessionId, stagePath } from './records'
+import { activePath, autonomicPath, logPath, parseAutonomic, progressPath, safeSessionId, stagePath } from './records'
 import { BLOCK_NOTE, CHILD_NOTE, CHILD_WARNING, DEFAULT_INSTRUCTIONS, DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome, fill } from './templates'
 
 // molt: in-place context handoff (spec §2). Module variables survive /clear, which is
@@ -83,6 +83,37 @@ async function touchActive($: Engine, sessionId: string): Promise<void> {
 async function dropActive($: Engine, sessionId: string): Promise<void> {
   if (!safeSessionId(sessionId)) return
   try { await $.process.run(['rm', '-f', activePath(await home($), sessionId)]) } catch {}
+}
+
+// The session's progress, kept beside the module count: /reload-plugins reloads this
+// module and the count falls to 0, while the file the session wrote survives it — which
+// is what the next autopilot molt reads (#713). Best-effort, logged once per process.
+let progressFailed = false
+async function markProgress($: Engine, sessionId: string): Promise<void> {
+  if (!safeSessionId(sessionId)) return
+  try {
+    await $.fs.write(progressPath(await home($), sessionId), `${new Date().toISOString()}\n`)
+  } catch (err) {
+    if (progressFailed) return
+    progressFailed = true
+    await log($, `progress write failed session=${sessionId} ${String(err)}`)
+  }
+}
+
+async function dropProgress($: Engine, sessionId: string): Promise<void> {
+  if (!safeSessionId(sessionId)) return
+  try { await $.process.run(['rm', '-f', progressPath(await home($), sessionId)]) } catch {}
+}
+
+// Above 0 the module count has it; at 0 — after a reload — the session's own file still
+// does. A file that cannot be read counts as no file: the guard keeps its older behaviour.
+async function hasProgress($: Engine, h: string, sessionId: string): Promise<boolean> {
+  if (progress > 0) return true
+  try {
+    return await $.fs.exists(progressPath(h, sessionId))
+  } catch {
+    return false
+  }
 }
 
 // The stage file (0.2.1): molt's stage and effective thresholds, for autonomic's turn-end
@@ -258,7 +289,7 @@ async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<voi
       `Send a message to resume; the handoff is at ${handoff.path}.`, undefined)
   }
   // /molt now is the operator asking for this molt: it is not a loop, whatever the progress.
-  if (record.mode === 'autopilot' && own !== undefined && progress === 0 && !forced.has(sessionId)) {
+  if (record.mode === 'autopilot' && own !== undefined && !forced.has(sessionId) && !(await hasProgress($, h, sessionId))) {
     return pause($, sessionId, 'molt paused: no progress since the last molt (no Write, Edit or commit). ' +
       `Autopilot stops here; the handoff is at ${handoff.path}.`, record.bell)
   }
@@ -293,6 +324,9 @@ async function seed($: Engine, sessionId: string, p: NonNullable<typeof pending>
   // a molt for the loop guards.
   unattended += 1
   progress = 0
+  // The file belonged to the session that made the progress; a molt starts a new session
+  // id, whose count starts at 0 like today's (#713).
+  await dropProgress($, p.oldSession)
   forced.delete(p.oldSession)
   seeded = { session: sessionId }
   let text = fill(DEFAULT_SEED, { path: p.handoff })
@@ -388,6 +422,7 @@ export const register: Register = (on, options) => {
 
   on('session.end', async ($, e, next) => {
     await dropActive($, e.sessionId)
+    await dropProgress($, e.sessionId)
     return next(e)
   })
 
@@ -490,7 +525,11 @@ export const register: Register = (on, options) => {
     if (r.deny === undefined && r.isError === undefined && !staged) {
       // Below the first warning only: past it the session may write and commit its handoff, which
       // would make every molt look like progress to the autopilot loop guard.
-      if (isProgress(e.tool, args) && !atLeast(stage, 'warn')) progress += 1
+      if (isProgress(e.tool, args) && !atLeast(stage, 'warn')) {
+        progress += 1
+        // On disk too, so a module reloaded mid-session does not lose the count (#713).
+        if (sessionId !== '') await markProgress($, sessionId)
+      }
       const path = args.file_path
       if ((e.tool === 'Write' || e.tool === 'Edit') && typeof path === 'string' && path.endsWith('.md')
         && sessionId !== '' && atLeast(stage, 'command')) lastMd.set(sessionId, path)
