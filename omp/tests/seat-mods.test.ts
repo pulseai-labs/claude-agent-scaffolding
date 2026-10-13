@@ -25,6 +25,11 @@ describe('roles', () => {
     expect(childRole('reviewer')).toBe('reviewer')
     expect(childRole('scout')).toBe('reviewer')
   })
+  test('seat-reviewer child gets the reviewer profile and confines writes to SEAT_MODS_ALLOW', async () => {
+    expect(childRole('seat-reviewer')).toBe('reviewer')
+    expect(await guard(deps(), 'write', { path: '/tmp/allow/report.md' }, child('seat-reviewer'))).toBeUndefined()
+    expect(await guard(deps(), 'write', { path: 'src/x.ts' }, child('seat-reviewer'))).toContain('no edits in the worktree')
+  })
   test('the main session follows SEAT_MODS_ROLE', () => {
     expect(roleFor('coordinator', { kind: 'main' })).toEqual({ kind: 'free', role: 'coordinator' })
     expect(roleFor(undefined, { kind: 'main' })).toEqual({ kind: 'default', role: 'implementer' })

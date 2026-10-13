@@ -20,7 +20,7 @@ export type GuardDeps = {
   readFile: (path: string) => Promise<string>
 }
 
-const CHILD_ROLE: Record<string, Role> = { reviewer: 'reviewer', scout: 'reviewer' }
+const CHILD_ROLE: Record<string, Role> = { 'seat-reviewer': 'reviewer', reviewer: 'reviewer', scout: 'reviewer' }
 // Planner decision 1: an implementer child stages and never commits, so it gets the verifier profile.
 export function childRole(name: string | undefined): Role {
   return CHILD_ROLE[name ?? ''] ?? 'verifier'
