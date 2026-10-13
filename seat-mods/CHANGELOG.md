@@ -2,6 +2,10 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.4.3 — 2026-10-14
+
+0.4.3 — OMP: a `write xd://<tool>` call is checked as that tool's own call, so guarded seats get lsp, ast_grep and github reads through omp's default xd:// devices (#780).
+
 ## 0.4.2 — 2026-10-14
 
 - **The rm rail follows a link before the `..` after it** (#781). Claude Code's path resolve collapses `..` before it
@@ -38,9 +42,11 @@ All notable changes to the `seat-mods` plugin.
   `edit` is placed by every destination it names (`rename`, `edits[]`, hashline `MV`), and
   `bash` rm operands and `-F` files resolve against the call's own `cwd`. omp's advisor and `/tan` clones
   report `kind: "sub"`, so they get the verifier rails even under a coordinator.
-  A write target carrying a URL scheme (`local://`, `vault://`, `ssh://`, `xd://<device>`, also `local:/x` and
+  A write target carrying a URL scheme (`local://`, `vault://`, `ssh://`, also `local:/x` and
   `dir/local://x`) is outside under guarded rails, because omp routes it to a host file the worktree check cannot see;
-  only `write xd://resolve` and `xd://reject`, which apply or discard an `ast_edit` preview already checked, pass.
+  `write xd://resolve` and `xd://reject`, which apply or discard an `ast_edit` preview already checked, pass.
+  Since 0.4.3, `write xd://<tool>` is checked as the inner tool's own call; docs content runs nothing and passes.
+  Malformed payloads, unknown tools and nested `xd://write` calls fail closed.
   **One omp path reading.** Every write-class target and a `bash` `cwd` go through one normaliser that mirrors
   omp's `expandPath`/`resolveToCwd`: a leading `:`, `@` before `/abs` or `~`, unicode spaces, `file://`, `~`,
   `~/x` and `~user`; a target is also read with write.ts's `[path#HHHH]` header unwrap and the hashline

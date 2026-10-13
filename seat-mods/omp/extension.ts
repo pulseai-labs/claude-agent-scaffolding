@@ -161,6 +161,30 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
   const role = state.role
   const child = agent?.kind !== 'main'
 
+  // omp dispatches device writes directly: tool_call sees only this outer write.
+  if (toolName === 'write' && typeof input.path === 'string') {
+    const path = input.path.trim()
+    const name = /^xd:\/\//i.test(path) ? path.slice(5) : undefined
+    // These names keep their existing placement/confirmation behaviour, even for docs content.
+    if (name !== undefined && name !== '' && !/[/?#]/.test(name) &&
+        !['resolve', 'reject', 'report_issue', 'propose'].includes(name)) {
+      if (name === 'write') return toolDeny(role, `xd://${name}`) // no nested transport
+      if (typeof input.content !== 'string') return toolDeny(role, `xd://${name}`)
+      if (/^\s*(\?|help)?\s*$/i.test(input.content)) return undefined // docs run nothing
+      let args: unknown
+      try { args = JSON.parse(input.content) } catch { return toolDeny(role, `xd://${name}`) }
+      if (args === null || typeof args !== 'object' || Array.isArray(args)) return toolDeny(role, `xd://${name}`)
+      const reason = await guard(deps, name, args as Record<string, unknown>, agent)
+      // Only tool-deny/run-deny texts name the tool; shared rule and placement texts stay intact.
+      const prefix = `seat-mods (${role}): no `
+      for (const suffix of [toolDeny(role, '').slice(prefix.length), runDeny(role, '').slice(prefix.length)]) {
+        if (reason?.startsWith(prefix) && reason.endsWith(suffix))
+          return prefix + ('xd://' + reason.slice(prefix.length, -suffix.length)).slice(0, 80) + suffix
+      }
+      return reason
+    }
+  }
+
   switch (GUARDED_TOOLS.get(toolName)) {
     case 'pass':
       return undefined
@@ -258,7 +282,8 @@ async function writeCheck(deps: GuardDeps, role: Role, toolName: string, input: 
 // normalises `local:/x` and `dir/local://x` to `local://x` too, so the scan is deliberately loose: a false hit only denies.
 const SCHEME = /[A-Za-z][A-Za-z0-9+.-]*:\//
 // `write xd://resolve` / `xd://reject` take a one-sentence reason and apply or discard the preview that an earlier
-// ast_edit call staged with its own (already checked) paths; they name no file. Every other xd:// device is denied.
+// ast_edit call staged with its own (already checked) paths; they name no file. Other device writes are checked
+// as their inner tool in guard(); special names and malformed device URLs still fail placement.
 const CONFIRM_ONLY = /^\s*xd:\/\/(?:resolve|reject)\s*$/
 
 // The one reading of an omp path argument — a write-class target or a bash `cwd` — as omp's expandPath and

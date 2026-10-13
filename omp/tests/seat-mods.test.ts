@@ -288,8 +288,8 @@ describe('PR 762 round 1: URL-scheme write targets', () => {
     expect(await guard(deps(), 'edit', { path: 'a.ts', edits: [{ path: 'a.ts', rename: 'local://x' }] }, child('implementer'))).toContain('no writes outside')
   })
   test('every omp writable scheme is outside, and so are the spellings omp normalises to one', async () => {
-    for (const path of ['vault://n.md', 'ssh://host/x', 'cfg://k', 'conflict://1', 'agent://a', 'proc://p', 'xd://bash', 'xd://report_issue', 'xd://propose',
-      'LOCAL://x', 'local:/x', 'sub/local://x', './local://x', '@local://x', ' local://x', 'xd://resolve/x', 'xd://resolve2', 'xd://Resolve'])
+    for (const path of ['vault://n.md', 'ssh://host/x', 'cfg://k', 'conflict://1', 'agent://a', 'proc://p', 'xd://report_issue', 'xd://propose',
+      'LOCAL://x', 'local:/x', 'sub/local://x', './local://x', '@local://x', ' local://x', 'xd://resolve/x'])
       expect(await guard(deps(), 'write', { path, content: 'x' }, child('implementer'))).toContain('no writes outside')
   })
   test('xd://resolve and xd://reject only confirm or discard a preview a guarded call already staged, so the write tool may carry them', async () => {
@@ -301,7 +301,7 @@ describe('PR 762 round 1: URL-scheme write targets', () => {
     // the confirm names no file: a reviewer whose preview was staged in SEAT_MODS_ALLOW can apply or clear it (PR 762 round 5)
     for (const path of ['xd://resolve', 'xd://reject'])
       expect(await guard(deps(), 'write', { path, content: 'x' }, child('reviewer'))).toBeUndefined()
-    expect(await guard(deps(), 'write', { path: 'xd://bash', content: '{}' }, child('reviewer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'write', { path: 'xd://bash', content: '{"command":"git push"}' }, child('reviewer'))).toContain('no git push')
     expect(await guard(deps(), 'write', { path: 'xd://propose', content: 'x' }, child('reviewer'))).toBeDefined()
   })
   test('an ordinary in-worktree write is still allowed, and a coordinator is free to use local://', async () => {
@@ -454,5 +454,67 @@ describe('PR 762 round 5: a glob scope at the filesystem root is the root, not t
     for (const scope of ['/*.ts', '/{etc,home}/**/*.conf', '/*/u/proj/*.ts', '@/*.ts', ':/*.ts'])
       expect(await guard(deps(), 'ast_edit', { paths: [scope], pattern: 'a', rewrite: 'b' }, child('task'))).toContain('no writes outside')
     expect(await guard(deps(), 'ast_edit', { paths: ['src/**/*.ts'], pattern: 'a', rewrite: 'b' }, child('task'))).toBeUndefined()
+  })
+})
+
+describe('write xd:// transport (#780)', () => {
+  const main = { kind: 'main' }
+  for (const role of ['implementer', 'reviewer']) {
+    const d = deps({ env: { SEAT_MODS_ROLE: role, SEAT_MODS_ALLOW: '/tmp/allow' } })
+    const via = (name: string, args: Record<string, unknown>, agent = main) =>
+      guard(d, 'write', { path: `xd://${name}`, content: JSON.stringify(args) }, agent)
+    test(`${role}: device reads pass, mutations retain their own rails`, async () => {
+      for (const [name, args] of [
+        ['lsp', { action: 'hover' }], ['ast_grep', { pattern: 'x' }], ['github', { op: 'repo_view' }],
+      ] as const) expect(await via(name, args)).toBeUndefined()
+      for (const [name, args, deny] of [
+        ['lsp', { action: 'rename' }, role === 'reviewer' ? 'no edits in the worktree' : 'no xd://lsp rename'],
+        ['github', { op: 'pr_create' }, role === 'reviewer' ? 'no gh pr create' : undefined],
+        ['bash', { command: 'git push -f origin x' }, role === 'reviewer' ? 'no git push' : 'no force-push'],
+        ['edit', { path: '/outside/x' }, 'no writes outside'],
+        ['ast_edit', { paths: ['/outside/x'], rewrite: 'x' }, 'no writes outside'],
+        ['eval', { code: '"git push -f origin x"' }, role === 'reviewer' ? 'no xd://eval' : 'no force-push'],
+      ] as const) {
+        const result = await via(name, args)
+        const direct = await guard(d, name, args, main)
+        expect(result).toBe(direct?.replace(`no ${name}`, `no xd://${name}`))
+        if (deny === undefined) expect(result).toBeUndefined()
+        else expect(result).toContain(deny)
+      }
+      expect(await via('edit', { path: '/tmp/allow/report.md' })).toBeUndefined()
+      expect(await via('task', {}, child(role))).toContain('may not spawn')
+      expect(await via('task', {}, child(role))).toBe(await guard(d, 'task', {}, child(role)))
+      expect(await via('ask', {}, child(role))).toContain('no xd://ask')
+      expect(await via('task', {})).toBeUndefined()
+    })
+    test(`${role}: URL parsing, docs, special names and malformed payloads fail closed`, async () => {
+      for (const path of ['XD://lsp', '  xD://lsp  '])
+        expect(await guard(d, 'write', { path, content: '{"action":"hover"}' }, main)).toBeUndefined()
+      for (const content of ['?', ' help ', 'HeLP', '', '  \n '])
+        expect(await guard(d, 'write', { path: 'xd://lsp', content }, main)).toBeUndefined()
+      for (const content of ['not json', 'null', '[]', '42', '"help"', 'true', undefined, { command: 'ls' }])
+        expect(await guard(d, 'write', { path: 'xd://bash', content }, main)).toContain('no xd://bash — this tool is not allowed')
+      for (const name of ['lsp/x', 'lsp?x', 'lsp#x', 'report_issue', 'propose', ''])
+        for (const content of ['{}', '?'])
+          expect(await guard(d, 'write', { path: `xd://${name}`, content }, main)).toContain('no writes outside')
+      expect(await via('github', { op: 'issue_close' })).toContain('no xd://github issue_close')
+      expect(await guard(d, 'write', { path: 'xd://made_up_tool', content: '?' }, main)).toBeUndefined()
+      for (const name of ['write', 'made_up_tool', 'LSP', 'resolve2', 'Resolve'])
+        expect(await via(name, { path: 'xd://lsp', content: '{"action":"hover"}' })).toContain(`no xd://${name} — this tool is not allowed`)
+      for (const name of ['resolve', 'reject'])
+        expect(await guard(d, 'write', { path: `xd://${name}`, content: 'reason' }, main)).toBeUndefined()
+      expect(await guard(d, 'write', { path: 'XD://resolve', content: 'reason' }, main)).toContain('no writes outside')
+      expect(await guard(d, 'write', { path: 'src/a.ts', content: '?' }, main))
+        .toBe(role === 'implementer' ? undefined : await guard(d, 'edit', { path: 'src/a.ts' }, main))
+    })
+  }
+  test('free main roles bypass even malformed and nested device writes; children remain guarded', async () => {
+    for (const role of ['coordinator', 'orchestrator']) {
+      const d = deps({ env: { SEAT_MODS_ROLE: role } })
+      for (const path of ['xd://bash', 'xd://write', 'xd://report_issue'])
+        expect(await guard(d, 'write', { path, content: 'not json' }, main)).toBeUndefined()
+      expect(await guard(d, 'write', { path: 'xd://lsp', content: '{"action":"hover"}' }, child('implementer'))).toBeUndefined()
+      expect(await guard(d, 'write', { path: 'xd://bash', content: '{"command":"git push"}' }, child('task'))).toContain('no git push')
+    }
   })
 })
