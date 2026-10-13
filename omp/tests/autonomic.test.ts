@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import ompExtension, { createAutonomic, questionsOf } from '../../autonomic/omp/extension'
 import type { AutonomicIO } from '../../autonomic/omp/extension'
 import { DEFAULT_POLICY } from '../../autonomic/hooks/policy'
-import { sessionPath, stagePath } from '../../autonomic/hooks/records'
+import { modeFilePath, sessionPath, stagePath } from '../../autonomic/hooks/records'
 
 const HOME = '/home/u'
 const POLICY = `${HOME}/.claude/autonomic/policy.md`
@@ -96,6 +96,7 @@ describe('OMP live mode file', () => {
   test('load sets the absolute process path and removes a reused pid file synchronously', () => {
     const { files, env } = world({ files: { [MODE_FILE]: 'autopilot' } })
     expect(env.AUTONOMIC_MODE_FILE).toBe(MODE_FILE)
+    expect(modeFilePath(HOME, 42)).toBe(MODE_FILE)
     expect(files.has(MODE_FILE)).toBe(false)
   })
 
@@ -154,10 +155,10 @@ describe('OMP live mode file', () => {
   test('shutdown removes the file silently, even when removal fails', async () => {
     const { a, files, io, w } = world()
     await a.onCommand('on')
-    a.onSessionShutdown?.()
+    a.onSessionShutdown()
     expect(files.has(MODE_FILE)).toBe(false)
     io.remove = () => { throw new Error('remove denied') }
-    expect(() => a.onSessionShutdown?.()).not.toThrow()
+    expect(() => a.onSessionShutdown()).not.toThrow()
     expect(w.notes).toEqual([])
   })
 })

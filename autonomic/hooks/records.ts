@@ -3,6 +3,7 @@
 
 const STATE = '.claude/state'
 
+export const modeFilePath = (home: string, pid: number) => `${home}/${STATE}/autonomic/mode/${pid}`
 export const sessionPath = (home: string, id: string) => `${home}/${STATE}/autonomic/sessions/${id}.json`
 export const lineagePath = (home: string, id: string) => `${home}/${STATE}/molt/lineage/${id}.json`
 // molt's stage file (molt 0.2.1). The path must match molt/hooks/records.ts stagePath.

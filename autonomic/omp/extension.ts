@@ -7,7 +7,7 @@
 // options are listed in the notice and the pain file), the permission fork (OMP seats run --approval-mode yolo,
 // so no permission prompt exists; the floor is a tool_call block instead), and the hard-deny ring (a call that a
 // seat guard blocks emits no tool_result, so there is nothing to observe).
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -23,7 +23,7 @@ import { DEFAULT_READERS, namesDanger, neverRules } from '../hooks/never'
 import type { Where } from '../hooks/never'
 import { DEFAULT_POLICY, expandHome } from '../hooks/policy'
 import { askPrompt, scopeMessage, turnEndPrompt } from '../hooks/prompts'
-import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from '../hooks/records'
+import { lineagePath, logPath, modeFilePath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from '../hooks/records'
 import type { SessionRecord } from '../hooks/records'
 import { shape } from '../hooks/shape'
 import { parseAsk, parseTurn } from '../hooks/verdict'
@@ -33,6 +33,10 @@ type Live = SessionRecord & { problem?: string; invalid?: string }
 
 // Every side effect, so a test drives the reflexes with fakes.
 export type AutonomicIO = {
+  pid: number
+  remove(path: string): void                                 // synchronous; missing is success
+  writeMode(path: string, mode: string): void                  // synchronous; creates the folder
+  rename(from: string, to: string): void                      // synchronous; atomic sibling replacement
   sessionId(): string
   cwd: string
   env: Readonly<Record<string, string | undefined>>
@@ -178,6 +182,14 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   const digestOf = (id: string): string => renderDigest(digests.get(id) ?? [])
 
   const home = (): string => io.env.HOME ?? ''
+  // omp's bash helper captures the environment after extension load. The path stays fixed for this process.
+  const modeFile = modeFilePath(resolve(home() || '/'), io.pid)
+  io.setEnv('AUTONOMIC_MODE_FILE', modeFile)
+  try { io.remove(modeFile) } catch {} // a reused pid must not inherit a previous process's mode
+
+  function onSessionShutdown(): void {
+    try { io.remove(modeFile) } catch {}
+  }
 
   // ~/.omp/agent/autonomic.json holds autonomic's userConfig keys; absent is DEFAULTS, unreadable is DEFAULTS plus a problem.
   const load = (): Promise<void> => (ready ??= (async () => {
@@ -223,8 +235,22 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     return clean
   }
 
-  // The live mode for launchers, in memory so it cannot go stale as a record that failed to write can.
+  // Keep the in-process/Claude signal and atomically replace the live file OMP launchers read.
   function publish(mode: Live['mode']): void {
+    const temp = `${modeFile}.tmp`
+    try {
+      io.writeMode(temp, mode)
+      io.rename(temp, modeFile)
+    } catch {
+      try {
+        io.remove(modeFile)
+        io.notify(`autonomic: the mode file ${modeFile} could not be updated to ${mode}; it was removed, so a launcher reads manual.`)
+      } catch {
+        io.notify(`autonomic: the mode file ${modeFile} could not be updated to ${mode} or removed; do not let a launcher trust it in this session.`)
+      }
+    } finally {
+      try { io.remove(temp) } catch {}
+    }
     try { io.setEnv('AUTONOMIC_EFFECTIVE_MODE', mode) } catch {
       // A value that cannot be set is unset, so a launcher reads no stale mode.
       try { io.setEnv('AUTONOMIC_EFFECTIVE_MODE', undefined) } catch {}
@@ -649,12 +675,16 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (e.source !== 'extension') pushes.delete(io.sessionId())
   }
 
-  return { onInput, onAgentStart, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
+  return { onSessionShutdown, onInput, onAgentStart, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
 }
 
 // omp's real ctx behind AutonomicIO. Each handler points `cur` at the event's ctx first.
 function ioFor(pi: any, cur: () => any): AutonomicIO {
   return {
+    pid: process.pid,
+    remove: path => { rmSync(path, { force: true }) },
+    writeMode: (path, mode) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, mode) },
+    rename: (from, to) => { renameSync(from, to) },
     sessionId: () => cur().sessionManager.getSessionId(),
     get cwd() { return cur().cwd },
     env: process.env,
@@ -706,6 +736,7 @@ export default function (pi: any) {
       c.ui?.notify?.(await autonomic.onCommand(args ?? ''), 'info')
     },
   })
+  pi.on('session_shutdown', (_e: any, c: any) => main(c) ? autonomic.onSessionShutdown() : undefined)
   pi.on('session_start', (_e: any, c: any) => main(c) ? autonomic.onSessionStart() : undefined)
   pi.on('session_tree', (_e: any, c: any) => main(c) ? autonomic.onContextRebuild() : undefined)
   pi.on('session_compact', (_e: any, c: any) => main(c) ? autonomic.onContextRebuild() : undefined)
