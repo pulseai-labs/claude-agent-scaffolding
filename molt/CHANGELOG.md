@@ -2,6 +2,11 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.3.2 — 2026-10-14
+
+- **Internal: one copy of each shared rule** (#783). `MAX_STOP_BLOCKS` and the shared notice texts live in the pure
+  modules (`hooks/gate.ts`, `hooks/templates.ts`), and both glues import them. No behaviour change.
+
 ## 0.3.1 — 2026-10-13
 
 - **The autopilot progress count survives a module reload** (#713). `/reload-plugins` reloads `hooks/register.tsx`, so the

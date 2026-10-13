@@ -1,5 +1,8 @@
 import { gitSubcommands, gitSubcommandsThatRun } from './shell'
 
+// The Stop reflex asks for the handoff at most twice before falling back.
+export const MAX_STOP_BLOCKS = 2
+
 // Past the hard threshold only the handoff's own tools run: the file tools that write
 // it, Skill (the instruction names a handoff skill), and Bash made only of git add and
 // git commit segments. Everything else, reads included, is refused: a read is what
