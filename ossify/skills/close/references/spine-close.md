@@ -877,13 +877,16 @@ else
   # selector failure inside a process substitution is invisible.
   hosting_repos="$(oss get ".work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .target_repo" | sort -u)" \
     || { echo "close: the hosting-repo set could not be read from state - halt"; exit 1; }
+  # One `<repo><TAB><root>/docs/adr` line per hosting repo: the repo KEY is what
+  # §3's $merge_shas pairs are keyed by (the landed commit), and the directory is
+  # what the file search walks.
   adr_dirs=""
   while IFS= read -r repo; do
     [ -n "$repo" ] || continue
     root="$(oss repo_root "$repo")" \
       || { echo "close: $spine_id names undeclared repo '$repo' - halt"; exit 1; }
     adr_dirs="$adr_dirs
-$root/docs/adr"
+$repo	$root/docs/adr"
   done <<EOF
 $hosting_repos
 EOF
@@ -909,7 +912,7 @@ EOF
     # decision, and register only the index leaves the registry citing a file
     # nobody wrote. An UNREADABLE directory refuses too - it is not an empty one.
     adr_file=""
-    while IFS= read -r d; do
+    while IFS="$(printf '\t')" read -r adr_repo d; do
       [ -n "$d" ] || continue
       [ -d "$d" ] || continue
       listing="$(ls -1 "$d" 2>/dev/null)" \
@@ -930,10 +933,20 @@ EOF
           gtc=0
           git -C "${d%/docs/adr}" ls-files --error-unmatch -- "docs/adr/$f" >/dev/null 2>&1 || gtc=$?
           case "$gtc" in
-            0) adr_file="$d/$f"; break ;;
+            0) : ;;
             1) { echo "close: the ADR file $d/$f is not tracked in ${d%/docs/adr} - the registry would cite a path that is not in history; add it to git - halt"; exit 1; } ;;
             *) { echo "close: cannot ask git whether $d/$f is tracked (git rc $gtc) - halt"; exit 1; } ;;
           esac
+          # AND IN THE COMMIT THIS CLOSE LANDED. The index is not a tree: a path
+          # staged and never committed passes the check above, and so does one
+          # committed on some other branch - neither is readable from §3's landed
+          # merge, which is the tree the record promises.
+          landed="$(printf '%s\n' "${merge_shas:-}" | awk -F: -v r="$adr_repo" '$1==r{print $2; exit}')"
+          [ -n "$landed" ] \
+            || { echo "close: no landed commit for repo '$adr_repo' in \$merge_shas - cannot check that $d/$f is in the landed tree - halt"; exit 1; }
+          git -C "${d%/docs/adr}" cat-file -e "$landed:docs/adr/$f" >/dev/null 2>&1 \
+            || { echo "close: the ADR file $d/$f is not in $adr_repo's landed commit $landed - the registry would cite a path this close's own merge tree does not carry; commit it (or carry it in the spine) and re-run - halt"; exit 1; }
+          adr_file="$d/$f"; break
         fi
       done <<EOF2
 $listing
@@ -943,7 +956,7 @@ EOF2
 $adr_dirs
 EOF3
     [ -n "$adr_file" ] \
-      || { echo "close: the plan declares bone $adr, but no ADR file carries $want in the hosting repos' docs/adr ($(printf '%s' "$adr_dirs" | tr '\n' ' '))- the spine never wrote it - halt"; exit 1; }
+      || { echo "close: the plan declares bone $adr, but no ADR file carries $want in the hosting repos' docs/adr ($(printf '%s' "$adr_dirs" | awk -F'\t' '{print $2}' | tr '\n' ' '))- the spine never wrote it - halt"; exit 1; }
 
     # ONE NUMBER, ONE BONE. The canonical ref is `ADR-` plus the digits EXACTLY as
     # the matched ADR file spells them, so `ADR-24` and `ADR-0024` cannot become two
