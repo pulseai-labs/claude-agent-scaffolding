@@ -482,10 +482,18 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   }
 
   // session_stop: the turn-end reflex (spec §3.1). Yield to molt first, then the loop guard, then classify.
-  async function onSessionStop(e: { last_assistant_message?: unknown }): Promise<{ decision: 'block'; reason: string } | undefined> {
+  async function onSessionStop(e: { last_assistant_message?: unknown; session_id?: unknown }): Promise<{ decision: 'block'; reason: string } | undefined> {
     try {
       await load()
       const id = io.sessionId()
+      // omp runs the handlers in extension order and molt's has already cleared the session when it molted: the event is
+      // the predecessor's and the live id is the successor's. Judging it would write the predecessor's turn under the
+      // successor's id and move the successor's loop count and mode.
+      const own = e?.session_id
+      if (typeof own === 'string' && own !== id) {
+        await log(`session_stop skipped: the event is session ${own}, the live session is ${id}`)
+        return undefined
+      }
       if ((await modeOf()).mode !== 'autopilot') return undefined
       const m = e?.last_assistant_message
       const answer = typeof m === 'string' ? m : m !== null && typeof m === 'object' ? textOf((m as { content?: unknown }).content) : ''

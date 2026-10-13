@@ -369,6 +369,40 @@ describe('changed tracking', () => {
   })
 })
 
+describe('a session_stop whose session a molt already replaced', () => {
+  // omp runs session_stop handlers in extension order (seat-mods, molt, autonomic); molt's newSession() has already
+  // made the live id the successor's when this handler runs. The event carries its own session_id.
+  test('the event names another session than the live one: no ledger line, no fork, no state change, no block', async () => {
+    const { w, a, files } = world({ files: autopilot('S2'), replies: [STALLED, STALLED] })
+    w.id = 'S2'                       // the successor, as io.sessionId() reads it after molt's newSession()
+    expect(await a.onSessionStop({ session_id: 'S1', last_assistant_message: 'working' } as any)).toBeUndefined()
+    expect(w.prompts).toEqual([])
+    expect(files.has(LEDGER)).toBe(false)
+    expect(w.notes).toEqual([])
+    // no loop-count change: the successor's count is still zero, so its first real stop is judged and blocked
+    expect((await a.onSessionStop({ session_id: 'S2', last_assistant_message: 'working' } as any))?.decision).toBe('block')
+    expect(w.prompts).toHaveLength(1)
+  })
+
+  test('a stale stop leaves the successor\'s change mark and its judge budget alone', async () => {
+    const { w, a } = world({ files: autopilot('S2'), replies: Array(8).fill(STALLED) })
+    w.id = 'S2'
+    for (let i = 0; i < 3; i++) await a.onSessionStop({ session_id: 'S2', last_assistant_message: 'x' })
+    await a.onToolResult({ toolName: 'write', input: { path: 'a' }, isError: false })
+    expect(await a.onSessionStop({ session_id: 'S1', last_assistant_message: 'x' } as any)).toBeUndefined()
+    expect(w.prompts).toHaveLength(3)
+    // the successor's `changed` mark is still there: this stop resets its count to zero, not to three
+    expect((await a.onSessionStop({ session_id: 'S2', last_assistant_message: 'x' }))?.decision).toBe('block')
+    expect(w.notes).toEqual([])
+  })
+
+  test('the event\'s own session: handled as before', async () => {
+    const { w, a } = world({ files: autopilot(), replies: [STALLED] })
+    expect((await a.onSessionStop({ session_id: 'S1', last_assistant_message: 'x' }))?.decision).toBe('block')
+    expect(w.prompts).toHaveLength(1)
+  })
+})
+
 describe('the never-approve floor', () => {
   const bash = (command: string) => ({ toolName: 'bash', input: { command } })
 
