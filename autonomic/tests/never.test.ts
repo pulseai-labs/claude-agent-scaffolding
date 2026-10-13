@@ -1075,6 +1075,12 @@ describe('0.5.1: own words ask, text goes to the fork (spec §1–2)', () => {
     expect(levels("gh api repos/o/r/pulls/1/comments/2/replies -f body='we do not push here'")).toEqual({ ask: [], fork: ['force-push'] })
     expect(levels('git commit -m "fix: push the branch"', { ...W, branch: undefined }).ask).toEqual([])
   })
+  test('an escaped character is part of its word, as Bash passes it (PR #763 round 6)', () => {
+    expect(levels('git push \\> -f origin feat/x').ask).toContain('force-push')
+    expect(levels('curl --data git\\ push\\ -f https://x').ask).toEqual([])
+    // A line continuation still joins: `pu\<newline>sh` is push.
+    expect(levels('git pu\\\nsh -f origin feat/x').ask).toContain('force-push')
+  })
   test('a rule found at both levels is ask only', () => {
     expect(levels("git push -f origin feat/x -o 'push -f'")).toEqual({ ask: ['force-push'], fork: [] })
   })
@@ -1113,6 +1119,12 @@ describe('0.5.1: the pushed branch, not the session branch (spec §3)', () => {
       expect([branch, rules('git push -f origin feat/x', w)]).toEqual([branch, ['force-push']])
       expect(rules('git push origin $C:refs/heads/proof/x', w)).not.toContain('default-branch-push')
     }
+  })
+  test('a push that sets git config inline gets no named exemption (PR #763 round 6)', () => {
+    for (const branch of [undefined, 'main'])
+      for (const c of ['git -c remote.origin.pushurl=/other push origin release', 'git -c url.x.pushInsteadOf=y push origin release',
+        'git --config-env=remote.origin.url=V push origin release', 'GIT_CONFIG_COUNT=1 git push origin release'])
+        expect([branch, c, rules(c, { ...W, branch }).includes('default-branch-push')]).toEqual([branch, c, true])
   })
   test('outside a move, the exemption needs origin and a known default branch (PR #763 round 2)', () => {
     for (const branch of [undefined, 'main']) {

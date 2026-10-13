@@ -50,7 +50,9 @@ function maskQuoted(text: string): string {
   for (let i = 0; i < text.length; i++) {
     const c = text[i]!
     if (q === "'") { if (c === "'") { q = undefined; out += c } else out += hide(c, true); continue }
-    if (c === '\\') { out += text.slice(i, i + 2); i++; continue }
+    // An escaped character is part of its word (`git\ push`, `\>`), masked as quoted text is; a
+    // line continuation stays for split() to join (PR #763 round 6).
+    if (c === '\\') { const n = text[i + 1]; out += n === undefined || n === '\n' ? text.slice(i, i + 2) : `\\${hide(n, true)}`; i++; continue }
     if (q === '"') {
       if (c === '$' && text[i + 1] === '(') { const e = closeOf(text, i + 1); const end = e < 0 ? text.length : e; out += text.slice(i, end); i = end - 1; continue }
       if (c === '`') { let e = i + 1; while (e < text.length && text[e] !== '`') e += text[e] === '\\' ? 2 : 1; out += text.slice(i, e + 1); i = e; continue }
@@ -990,7 +992,9 @@ function rulesOf(words: readonly string[], where: Where, moved: boolean, single:
     // command, is no default-branch push whatever the session's branch is (detached, main, moved).
     // Outside a move, only a push to origin whose default branch is known (origin/HEAD) is read by its
     // destination: another remote's default is unknown here (PR #763 round 2). A moved push keeps 0.5.0's reading.
-    const named = single && (moved || switched ? namedRefs(words, names) : where.defaultBranch !== undefined && namedRefs(words, names, 'origin'))
+    // A command that sets git config inline may retarget the remote origin/HEAD describes (PR #763 round 6).
+    const inline = words.some(w => w === '-c' || /^-c\S/.test(w) || /^--config-env/.test(w) || /^GIT_CONFIG/.test(w) || /^(?:remote|url)\./.test(w))
+    const named = single && !inline && (moved || switched ? namedRefs(words, names) : where.defaultBranch !== undefined && namedRefs(words, names, 'origin'))
     if (plumbing || (!named && (where.branch === undefined || names.includes(where.branch) || moved || switched ||
       any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))))
       found.add('default-branch-push')
