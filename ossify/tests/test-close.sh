@@ -2308,8 +2308,11 @@ else
   T_FAIL=$((T_FAIL+1)); echo "FAIL: could not extract the bones registration block from spine-close.md - the assertions below are vacuous"
 fi
 # The hosting repo owns the ADR the row promises; the file joins the series, so it
-# is found by NUMBER and not by a name the row would have to guess.
+# is found by NUMBER and not by a name the row would have to guess. TRACKED in git,
+# which the registration step requires (C-series): a file only this filesystem can
+# see is not a record.
 printf 'the bones fixture ADR\n' > "$B4CANON/docs/adr/adr-0024-the-touch-check-surface.md"
+git -C "$B4CANON" add docs/adr/adr-0024-the-touch-check-surface.md
 # SPINE.md: the plan's own file, with the section the row is read from.
 printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Decomposition\n\nw1 the item\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0024 | the touch-check surface | src/domain/**,src/port.rs | a second storage backend |\n' \
   "$B4SP" > "$B4DIR/SPINE.md"
@@ -2453,6 +2456,7 @@ esac
 # A4. CONTROL: the section is the same section in any case. `## Bones This Spine
 # Registers` is read, and its row registers.
 printf 'the case-folded fixture ADR\n' > "$B4CANON/docs/adr/adr-0060-a-case-folded-heading.md"
+git -C "$B4CANON" add docs/adr/adr-0060-a-case-folded-heading.md
 printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones This Spine Registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0060 | a case-folded heading | src/fold/** | |\n' \
   "$B4SP" > "$B4DIR/SPINE.md"
 t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
@@ -2528,6 +2532,33 @@ t_assert_rc 1 "B12: a plan row that dropped the revisit trigger halts"
 t_assert_contains "$T_OUT" "revisit" "B12: ...naming the field"
 t_assert_eq "a second storage backend" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0024") | .revisit_trigger')" \
   "B12: ...and the registry row is untouched"
+
+# ---------------------------------------------------------------------------
+# C1-C2 (PR #792 round 1, review item 4): the ADR file must be TRACKED. Any
+# directory entry with the right number passed, so a draft nobody added, or a file
+# an accident created, satisfied "the spine wrote the ADR" while git had never seen
+# it - and the registry cited a path no clone can read. Whether the SPINE introduced
+# the file is not required (a decision can be recorded in an older commit); being in
+# history is.
+# ---------------------------------------------------------------------------
+# C1. The file exists here and is not tracked.
+printf 'the untracked fixture ADR\n' > "$B4CANON/docs/adr/adr-0070-never-added.md"
+printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0070 | a decision nobody added | src/untracked/** | |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 1 "C1: an ADR file that is not tracked in git halts"
+t_assert_contains "$T_OUT" "adr-0070-never-added.md" "C1: ...naming the path the registry would have cited"
+t_assert_contains "$T_OUT" "not tracked" "C1: ...and why it is not a record"
+t_assert_eq "0" "$(cd "$B4WS" && bash "$OSS" get '[.bones[] | select(.adr=="ADR-0070")] | length')" \
+  "C1: ...and registering nothing"
+
+# C2. CONTROL: the same row, the same file, once git knows it. Being tracked is the
+# requirement; being NEW is not.
+git -C "$B4CANON" add docs/adr/adr-0070-never-added.md
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; . '$B4_BLOCK'"
+t_assert_rc 0 "C2: the same row registers once its ADR file is tracked"
+t_assert_eq "ADR-0070" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0070") | .adr')" \
+  "C2: ...into the registry"
 
 cd /; rm -rf "$TMP"
 

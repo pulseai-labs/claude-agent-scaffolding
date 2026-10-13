@@ -911,7 +911,21 @@ EOF
       while IFS= read -r f; do
         [ -n "$f" ] || continue
         n="$(printf '%s' "$f" | sed -n -e 's/^[Aa][Dd][Rr]-0*\([0-9][0-9]*\)-.*\.md$/\1/p' -e 's/^0*\([0-9][0-9]*\)-.*\.md$/\1/p')"
-        if [ "$n" = "$want" ]; then adr_file="$d/$f"; break; fi
+        if [ "$n" = "$want" ]; then
+          # TRACKED IN ITS REPO. A row is a promise that this spine wrote the
+          # decision, and a path the registry cites must be one history holds: an
+          # untracked draft satisfies "the file exists" on this machine only, and
+          # a clone - or the next session - reads a citation to nothing. Whether
+          # THIS spine introduced the file is not the question (a decision can be
+          # recorded in an older commit); being in the index is.
+          gtc=0
+          git -C "${d%/docs/adr}" ls-files --error-unmatch -- "docs/adr/$f" >/dev/null 2>&1 || gtc=$?
+          case "$gtc" in
+            0) adr_file="$d/$f"; break ;;
+            1) { echo "close: the ADR file $d/$f is not tracked in ${d%/docs/adr} - the registry would cite a path that is not in history; add it to git - halt"; exit 1; } ;;
+            *) { echo "close: cannot ask git whether $d/$f is tracked (git rc $gtc) - halt"; exit 1; } ;;
+          esac
+        fi
       done <<EOF2
 $listing
 EOF2
