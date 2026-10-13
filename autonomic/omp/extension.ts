@@ -243,6 +243,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
 
   // Keep the in-process/Claude signal and atomically replace the live file OMP launchers read.
   function publish(mode: Live['mode']): void {
+    const say = (text: string): void => { try { io.notify(text) } catch {} }
     const temp = `${modeFile}.tmp`
     try {
       io.writeMode(temp, mode)
@@ -250,7 +251,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     } catch {
       let removed = true
       try { io.remove(modeFile) } catch { removed = false }
-      io.notify(removed
+      say(removed
         ? `autonomic: the mode file ${modeFile} could not be updated to ${mode}; it was removed, so a launcher reads manual.`
         : `autonomic: the mode file ${modeFile} could not be updated to ${mode} or removed; do not let a launcher trust it in this session.`)
     } finally {
@@ -259,7 +260,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     try { io.setEnv('AUTONOMIC_EFFECTIVE_MODE', mode) } catch {
       // A value that cannot be set is unset, so a launcher reads no stale mode.
       try { io.setEnv('AUTONOMIC_EFFECTIVE_MODE', undefined) } catch {}
-      io.notify(`autonomic: AUTONOMIC_EFFECTIVE_MODE could not be set to ${mode}; a launcher starts no child in autopilot.`)
+      say(`autonomic: AUTONOMIC_EFFECTIVE_MODE could not be set to ${mode}; a launcher starts no child in autopilot.`)
     }
   }
 

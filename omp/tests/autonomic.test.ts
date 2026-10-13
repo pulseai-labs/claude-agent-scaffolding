@@ -152,6 +152,19 @@ describe('OMP live mode file', () => {
     }
   }
 
+  test('/autopilot off publishes manual even when the mode write and notice fail', async () => {
+    const { a, files, env, io } = world()
+    await a.onCommand('on')
+    expect(env.AUTONOMIC_EFFECTIVE_MODE).toBe('autopilot')
+    expect(files.get(MODE_FILE)).toBe('autopilot')
+    io.writeMode = () => { throw new Error('write denied') }
+    io.notify = () => { throw new Error('notify failed') }
+    const result = await a.onCommand('off')
+    expect(env.AUTONOMIC_EFFECTIVE_MODE).toBe('manual')
+    expect(files.has(MODE_FILE)).toBe(false)
+    expect(result).toContain('autopilot is off')
+  })
+
   test('a throwing removal notice does not falsely report a failed removal', async () => {
     const { a, files, io, w } = world()
     await a.onCommand('on')
