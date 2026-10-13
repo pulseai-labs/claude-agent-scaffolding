@@ -129,7 +129,7 @@ describe('OMP live mode file', () => {
       if (reason === 'no policy') files.delete(POLICY)
       if (reason === 'ledger not writable') io.appendLine = async () => false
       if (reason === 'record not writable') io.writeText = async () => { throw new Error('read-only') }
-      if (reason === 'record not writable') await a.onCommand('off')
+      if (reason === 'record not writable') await a.onCommand('on')
       else await a.onSessionStop({ last_assistant_message: 'x' })
       expect(files.get(MODE_FILE)).toBe('manual')
     })
@@ -157,8 +157,10 @@ describe('OMP live mode file', () => {
     await a.onCommand('on')
     a.onSessionShutdown()
     expect(files.has(MODE_FILE)).toBe(false)
+    await a.onCommand('on')
     io.remove = () => { throw new Error('remove denied') }
     expect(() => a.onSessionShutdown()).not.toThrow()
+    expect(files.get(MODE_FILE)).toBe('autopilot')
     expect(w.notes).toEqual([])
   })
 })
