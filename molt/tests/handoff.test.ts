@@ -65,8 +65,17 @@ describe('factsBrief', () => {
     expect(text).toContain('# molt fallback handoff — session s1')
     expect(text).toContain('71%')
     expect(text).toContain('check every claim')
-    for (const h of ['## Files written or edited', '## Commits made', '## Issues mentioned', '## Last request', '## Next step'])
+    for (const h of ['## Files the session wrote or tried to write', '## Commit commands the session tried to run', '## Issues mentioned', '## Last request', '## Next step'])
       expect(text).toContain(h)
+  })
+  test('the headings claim only what the transcript shows (#665)', () => {
+    // The transcript carries a Write's arguments and a Bash command, never its result:
+    // "written" and "made" claim more than it can show.
+    const text = factsBrief(extractFacts(MESSAGES), { sessionId: 's1', percent: 71.4 })
+    expect(text).toContain('## Files the session wrote or tried to write')
+    expect(text).toContain('## Commit commands the session tried to run')
+    expect(text).not.toContain('## Files written or edited')
+    expect(text).not.toContain('## Commits made')
   })
   test('with a summary: the summary is included', () => {
     const text = factsBrief(extractFacts([]), { sessionId: 's1', percent: undefined, summary: '## Next step\nship it' })
