@@ -141,7 +141,7 @@ into the state it creates. Nothing hand-authors `project-state.json`.
 - **Risk gates — derive from existing constraints** (`/start` §8 owns the
   families and the control menu); mint with `oss risk_gate_add`.
 - **Smoke — narrowed** (`/start` §9) to **unverified external pins** —
-  shipped tests already cover the code's own claims.
+  shipped tests already cover the code's own claims. A repo with no test suite has no such cover: run `/start` §9 in full.
 - **Spike — unchanged** (`/start` §9a). Rarely fires on an adopted project.
 - **Posture — unchanged** (`/start` §10 + `references/posture-block.md`): a
   genuine open decision, unaffected by prior code.

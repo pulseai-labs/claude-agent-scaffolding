@@ -2024,6 +2024,8 @@ pin "$_AD" 'runs workspace-init'"'"'s `/pair-workspace` first' \
   "adopt A1 routes a sibling AI workspace through /pair-workspace, which creates it (#536, PR #804 r3)"
 pin "$_AD" 'adoption uses the repo itself as the AI workspace' \
   "adopt A1 places the AI workspace on a plain repo (#536)"
+pin "$_AD" 'A repo with no test suite has no such cover: run `/start` §9 in full' \
+  "adopt's smoke station is narrowed only where tests cover the code (#536, PR #804 r4)"
 _c="$(grep -c 'out of scope today' "$_AD" || true)"
 _pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt still declares a stackless project out of scope (#536)"
 
