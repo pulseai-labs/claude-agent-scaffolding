@@ -130,6 +130,7 @@ O	skills/close/references/patch-lane.md	touch_check	tests/test-close.sh	a patch 
 D	skills/close/references/patch-lane.md	1	#138	the patch commit's branch placement block - CL-1 says the target branch is unspecified, so executing it needs the design decision first. #272/#310 Task 9 keyed the block to a `repo_key` (any declared repo, not only canonical); the underlying CL-1 gap is unchanged
 I	skills/close/references/patch-lane.md	1	single patch_add call with <placeholder> args
 O	skills/close/references/work-item-close.md	abbrev-ref	tests/test-close.sh	W1: the merge guard fires when the item's own repo (target_repo, not always canonical since #272/#310 Task 9) is parked on the wrong branch
+O	skills/close/references/work-item-close.md	hash-object	tests/test-close.sh	the spec-identity check (#434): spec.md's blob must equal the spec_oid handoff §3 recorded at dispatch, on both execution paths. An edited spec halts naming both blobs and the replan route; a reverted edit passes; a handoff with no spec_oid (pre-1.21.2) closes with a note; a duplicated, empty, abbreviated or placeholder spec_oid halts as malformed; only §3 is read, so a Clarifications line does not count; the raw bytes are hashed, so a clean filter neither fails an unchanged spec nor hides an edit; a missing handoff halts named (S1-S11)
 D	skills/close/references/work-item-close.md	4	#138	path resolution (which now reads .status and refuses an `abandoned` item BEFORE diagnosing a missing worktree, #531) - and that arm's route out reopens an already-closed parent spine, since un-withdrawing alone leaves a planned item inside a closed spine that release close's tag selector then accepts, the spec-exists halt, the staged-changes read, and the Route A/B close sequence
 I	skills/close/references/work-item-close.md	1	a single <placeholder> assignment showing the report path's origin
 O	skills/close/references/cumulative-demo.md	elapsed=	tests/test-close.sh	D1-D4: the demo measurement block preserves the runner's rc instead of flattening it
@@ -233,7 +234,7 @@ H	skills/close/references/release-close.md	143548614-14087
 H	skills/close/references/retrospective.md	3602587869-249
 H	skills/close/references/routing.md	261804248-259
 H	skills/close/references/spine-close.md	4161585388-46221
-H	skills/close/references/work-item-close.md	1799353906-6394
+H	skills/close/references/work-item-close.md	499686647-8424
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	630905567-126
 H	skills/doctor/references/budget-check.md	2942541912-1024

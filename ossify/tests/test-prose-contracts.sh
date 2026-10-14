@@ -1979,4 +1979,18 @@ _pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt C6 still says no ceremony con
 pin "$SKILLS/adopt/SKILL.md" 'Record what the pass did as the adoption record'"'"'s C2 result line (§6, #367)' \
   "adopt C2 points the station at its result line (#367)"
 
+# ---------------------------------------------------------------------------
+# The spec is the one dispatched (#434). The authoring side records the blob,
+# the handoff contract names the field, and the external path says close - not
+# the executor's own declaration - is what compares it. test-close.sh S1-S7 run
+# the comparing block itself.
+pin "$SKILLS/work-item/references/handoff-contract.md" 'spec_oid:       ' \
+  "handoff-contract §3's identifiers block carries the spec_oid line (#434)"
+pin "$SKILLS/work-item/references/round-orchestration.md" 'Record the spec'"'"'s blob id in §3 (#434)' \
+  "round-orchestration §4 records the dispatch-time spec blob when it authors the handoff (#434)"
+pin "$SKILLS/work-item/references/round-orchestration.md" '**First run close §1'"'"'s spec-identity block (`work-item-close.md` §1, #434)**' \
+  "round-orchestration's finish-merge row runs close §1's spec check before its gate re-run (#434, PR #811 round 1)"
+pin "$SKILLS/work-item/references/external-executor.md" 'the `spec_oid` the handoff recorded at authoring (#434)' \
+  "external-executor names close's dispatch-time comparison, not the declared spec_oid, as the spec check (#434)"
+
 t_summary
