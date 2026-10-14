@@ -260,7 +260,11 @@ pin "$LIFE" 'a launch command for each host' "the rotation handoff records both 
 pin "$LIFE" 'a resolved profile beside a launch command for each host' "the rotation handoff records each host's resolved profile"
 pin "$LIFE" 'using the destination host'"'"'s recorded profile for the readiness path and model read' "the successor uses its destination host's profile" flat
 
-pin "$LIFE" 'The new top first closes the pane `run.orchestrator` names (`herdr pane close <pane>`, through its machine when remote), ending that process and every wait it armed' "a hard-stop resume stands the dead top down" flat
+pin "$LIFE" 'it reads the pane `run.orchestrator` names and closes it (`herdr pane close <pane>`), which ends that process and every wait it armed' "a hard-stop resume stands the dead top down before its first write" flat
+pin "$LIFE" 'without it, the path as its first instruction on either' "a cross-host resume keeps the no-ossify route" flat
+pin "$LIFE" 'Before the brief is sent, the attempt this dispatch writes' "the attempt is durable before the brief goes out"
+pin "$LIFE" 'a detected coordinator'"'"'s companion included' "a new top re-arms a coordinator's companion wait" flat
+pin "$LIFE" 'resumes as a rotation'"'"'s new top does (above)' "a hard-stop resume reuses the rotation's resume" flat
 pin "$REF" '`timeout: 0`, which disables omp' "OMP async waits disable the command deadline" flat
 
 section "budget"

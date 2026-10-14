@@ -82,7 +82,7 @@ Every command's syntax comes from `herdr --skill`.
    otherwise the sentinel `none` — so an eligible worker's ping comes back here; a coordinator
    fills its children's slot the same way, and an operator's `brief:` is sent as a copy carrying
    the slot and the ping step, never edited in place (`briefs.md`).
-   The attempt this dispatch writes to `run.json` records the seat's report path beside its pane —
+   Before the brief is sent, the attempt this dispatch writes to `run.json` records the seat's report path beside its pane —
    `"locator": {"pane": "<pane>", "report": "<REPORT_PATH>", "machine": "<label, remote seats only>", "seen": "<hash> <identity>"}` —
    `machine` names a seat not on this machine; each time the top consumes a report it records the hash and
    identity (inode or mtime) it read in `locator.seen`, so a new top can find every live report and its last consumed generation.
@@ -323,12 +323,12 @@ successor's next message to a retained worker carries its own pane id as the new
 `NOTIFY_PANE`, the worker keeps pinging this pane, and the successor's heartbeat covers the
 interval. Then tell the
 operator which tab to use and that this one can close.
-A successor on the other host takes that host's form: `skill://handoff-resume <path>` to an OMP top,
-`/ossify:handoff-resume <path>` to a Claude Code top.
+A successor on the other host takes that host's form: with ossify, `skill://handoff-resume <path>` to an OMP top
+and `/ossify:handoff-resume <path>` to a Claude Code top; without it, the path as its first instruction on either.
 The new top resumes by naming the parent's `run.json` path — there is no CLI call —
 rebinding `run.orchestrator` to its own pane as its first write, and then, before the
-step the handoff named, issues one fresh bounded background
-wait per live pane the handoff listed, through the machine the handoff names for a
+step the handoff named, re-arms each live pane the handoff listed with the waits step 5 states (a detected
+coordinator's companion included), through the machine the handoff names for a
 remote one, which every later operation on that pane carries too (`herdr-mechanics.md`,
 Machines): a new session's first wait, not a re-entry,
 which re-arms what the `run.json` cannot — and it can re-arm them because the
@@ -358,11 +358,11 @@ notification for that generation retires nothing. With `/molt off` the marker go
 speaks again, and the rotation above applies.
 
 **Resume after a hard stop.** When the top died without a handoff (a usage limit), the operator starts a new top
-and names the run's `run.json`. That top reads the newest handoff, `run.json` and `herdr agent list`. Each attempt
-still `working` gives its pane, report path and remote machine (`locator`); every operation on that pane uses
-`locator.machine` when present. The new top first closes the pane `run.orchestrator` names
-(`herdr pane close <pane>`, through its machine when remote), ending that process and every wait it armed,
-so a top that wakes after the reset cannot act on the same report. A report whose hash and identity equal
-`locator.seen` is not new; any other is read once and recorded there; a task already marked done is never acted on again. Then it
-rebinds `run.orchestrator`, sends each live worker its own pane as the new `NOTIFY_PANE`, and arms one fresh wait
-per live pane and the heartbeat.
+and names the run's `run.json`. Before its first write — step 1's rebind — it reads the pane `run.orchestrator`
+names and closes it (`herdr pane close <pane>`), which ends that process and every wait it armed, so a top that
+wakes after the reset cannot act on the same report; a pane missing from this server's `herdr pane list` is on
+another server, so it asks the operator to close it there and waits for that answer. Each attempt still `working`
+is a live dispatch: `locator` gives its pane, report path, machine (remote seats) and `seen`. A report whose hash
+and identity equal `locator.seen` is not new; any other is read once and recorded there; a task already marked
+done is never acted on again. From there it resumes as a rotation's new top does (above), with these attempts as
+the handoff's list of live dispatches.
