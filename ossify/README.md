@@ -1,4 +1,4 @@
-# ossify (v1.19.2)
+# ossify (v1.19.3)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -48,6 +48,11 @@ Since 1.19.2, wayfinder's claim re-read runs the frontier query again, so an
 assignment that landed after the first read is seen at claim time (#336), and a
 `spike` ticket is dispatched only after the operator approves its contract,
 which the dispatching session writes before the fan-out (#332).
+
+Since 1.19.3, the dispatched `ossify:implementer-agent` is granted `Skill`, so it
+composes `superpowers:test-driven-development` and
+`superpowers:verification-before-completion` as the work-item body says, on both
+invocation paths (#281).
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo

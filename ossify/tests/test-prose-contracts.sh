@@ -1903,4 +1903,23 @@ pin "$_WF/ticket-types.md" 'the *Decision it enables* field names the map decisi
 pin "$_WF/ticket-types.md" 'is neither claimed nor dispatched: it stays on the frontier' \
   "ticket-types.md §3 leaves a spike with no go unclaimed, so it stays on the frontier (#332)"
 
+# ---------------------------------------------------------------------------
+# #281: the dispatched implementer registration grants `Skill`, so the body's
+# composition note holds on both invocation paths. The OpenCode adapter that
+# pinned a six-tool set was retired (31eb6b9e); these pins hold the three places
+# that state the grant, and the "Until #281" wording must be gone.
+_AG="$HERE/../agents/implementer-agent.md"
+pin "$_AG" 'tools: Bash, Read, Write, Edit, Glob, Grep, Skill' \
+  "implementer-agent.md's registration grants Skill (#281)"
+pin "$_AG" '`Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`, `Skill` — `Skill` only to compose' \
+  "implementer-agent.md's binding allowlist names Skill and its one use (#281)"
+pin "$WI/SKILL.md" 'the dispatched registration grants it since 1.19.3 (#281)' \
+  "work-item SKILL.md §12 says the dispatched path composes too (#281)"
+pin "$WI/SKILL.md" 'or either skill is not installed, §5 and §6→§8 of this body are the' \
+  "work-item SKILL.md §12 falls back to the body when a composed skill is not installed (#281)"
+pin "$WI/SKILL.md" 'Where a composed skill and this body disagree, this body wins:' \
+  "work-item SKILL.md §12 says the body wins over a composed skill (#281)"
+t_assert_eq 0 "$(awk 'index($0, "Until #281") {n++} END {print n+0}' "$WI/SKILL.md")" \
+  "work-item SKILL.md no longer says 'Until #281' (#281)"
+
 t_summary
