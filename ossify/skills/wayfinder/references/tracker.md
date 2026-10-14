@@ -295,8 +295,10 @@ printf '%s' "$MAP_JSON" | jq -r '
         and ([.blockedBy.nodes[]|select(.state=="OPEN")]|length)==0))
   | .[] | "\(.title)  [\([.labels.nodes[].name | select(startswith("wayfinder:"))] | .[0] // "no-type")]  #\(.number)"'
 
-# The UNFILTERED nodes - the named-ticket check, the claim re-read and the
-# terminal check all read these, and none of them can use the view above.
+# The UNFILTERED nodes - the named-ticket check and the terminal check read
+# these from $MAP_JSON. The claim re-read reads them from a FRESH run of the
+# query above, made immediately before assigning (#336). None of the three can
+# use the view above.
 printf '%s' "$MAP_JSON" | jq -r '.data.repository.issue.subIssues.nodes'
 
 # One named ticket's node, for §1's four checks
@@ -318,7 +320,10 @@ printf '%s' "$MAP_JSON" | jq -r '.data.viewer.login'
 only the result, so putting the frontier filter there would throw away the
 unfiltered nodes and `pageInfo` — the very things the three readers named
 below need. One call, four views; a second round trip for facts the first
-response already carried is the N+1 this query exists to avoid.
+response already carried is the N+1 this query exists to avoid. The one
+exception is the claim re-read: it runs the query again immediately before
+assigning, because an assignment made after the first response is the fact it
+must see (#336).
 
 `$MAP` is the map's issue number, resolved once — from the name or URL the
 operator gave — and never asked for again. The bracket in each output line is
