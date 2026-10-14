@@ -291,7 +291,7 @@ machine label where the seat is not on this machine, the pane `run.orchestrator`
 writing, and, per live dispatch, its
 `REPORT_PATH`, the hash last noted, and the file's identity noted beside that hash — inode
 or mtime — and, per live seat, its molt status path recorded at launch and the last status
-line noted, its autonomic pain path and the last pain line noted, and your own resolved profile, and a launch command for each host — this top's and the other host's
+line noted, its autonomic pain path and the last pain line noted, and a resolved profile beside a launch command for each host — this top's and the other host's
 (Claude Code and OMP: `omp-seat orchestrator --via omp-glm`), so the operator's "fall back to OMP" or
 "hand back to Claude" picks one
 — `/ossify:handoff` with ossify installed, the same file by hand without it. Open a new tab
@@ -300,8 +300,8 @@ did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSP
 which herdr sets in every pane it hosts (as it does `HERDR_PANE_ID`), the top's own
 workspace, never the run's, which closes last. **Launch it as the seat launch
 `herdr-mechanics.md` states** — marked `orchestrator` before its command (`herdr-mechanics.md`
-step 2) — the readiness path, the model read against the profile the
-handoff recorded, then the second detection ask — and send its resume on the route that
+step 2) — using the destination host's recorded profile for the readiness path and model read,
+then the second detection ask — and send its resume on the route that
 ask fixes: a successor is a seat like any other, and one sent its resume before its TUI
 accepts input never binds the run. The file's `run.orchestrator` block — where dagr
 routes the operator's messages — is the successor's first write: A session that binds an

@@ -257,6 +257,8 @@ pin "$REF" 'herdr-crew'"'"'s `hooks.json` does not run on omp' "the ceiling noti
 pin "$LIFE" '"locator": {"pane": "<pane>", "report": "<REPORT_PATH>"}' "an attempt records its report path"
 pin "$LIFE" '**Resume after a hard stop.**' "lifecycle states the hard-stop resume"
 pin "$LIFE" 'a launch command for each host' "the rotation handoff records both hosts' launch commands"
+pin "$LIFE" 'a resolved profile beside a launch command for each host' "the rotation handoff records each host's resolved profile"
+pin "$LIFE" 'using the destination host'"'"'s recorded profile for the readiness path and model read' "the successor uses its destination host's profile" flat
 
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"

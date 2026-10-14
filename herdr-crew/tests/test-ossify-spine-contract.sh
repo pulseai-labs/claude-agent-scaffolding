@@ -2328,7 +2328,7 @@ pin "$PRBRIEFS_MD" 'If molt'"'"'s handoff command arrives mid-round, still finis
 pin "$CHANGELOG_MD" '## 0.2.8' "CHANGELOG has 0.2.8"
 pin "$CHANGELOG_MD" '## 0.2.9' "CHANGELOG has 0.2.9"
 pin "$LIFECYCLE_MD" 'and its autonomic pain path' "lifecycle step 13: the top's handoff carries each seat's pain path" flat
-pin "$LIFECYCLE_MD" 'its autonomic pain path and the last pain line noted, and your own resolved profile' \
+pin "$LIFECYCLE_MD" 'its autonomic pain path and the last pain line noted, and a resolved profile beside' \
   "lifecycle: the top's own rotation handoff carries each seat's pain path" flat
 
 section "reference line budgets"
