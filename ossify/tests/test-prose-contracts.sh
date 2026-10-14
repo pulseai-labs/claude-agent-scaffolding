@@ -1934,4 +1934,15 @@ pin "$SKILLS/start/SKILL.md" 'declares under its `tooling_repo` key is not the p
 pin "$SKILLS/start/SKILL.md" '`.ossify/topology.json` every key is just a repo name, so every declared repo there is checked.' \
   "start §3 limits the tooling-repo exemption to the pairing manifest (#553)"
 
+# ---------------------------------------------------------------------------
+# Adoption's horizon reaches Release 1 (#302). It is not in state; plan-release
+# reads it from ADOPTION.md by pointer (skill-first: a reader of prose stays prose).
+_FMG="$SKILLS/plan-release/references/feature-map-grooming.md"
+pin "$_FMG" '## 8. Release 1 after an adoption (#302)' \
+  "feature-map-grooming.md carries the Release-1-after-adoption section"
+pin "$_FMG" 'Groom the `next` entries as this release'"'"'s candidates' \
+  "feature-map-grooming.md §8 grooms next and later apart (#302)"
+pin "$SKILLS/plan-release/SKILL.md" '`ADOPTION.md` first (its §8, #302)' \
+  "plan-release §5a points Release 1 at ADOPTION.md"
+
 t_summary

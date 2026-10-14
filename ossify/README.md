@@ -1,4 +1,4 @@
-# ossify (v1.19.4)
+# ossify (v1.20.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -58,6 +58,10 @@ Since 1.19.4, `/ossify:adopt`'s A3–A5 refusals also name how to close a legacy
 slice by hand when scaffold-dev is no longer installed (#732), and
 `/ossify:start`'s content gate no longer refuses a fresh project because its
 declared tooling repo carries history of its own (#553).
+
+Since 1.20.0, Release 1 after an adoption reads `ADOPTION.md` before it grooms:
+C1's `next` entries are this release's candidates and the `later` ones stay on
+the map, deferred (#302).
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo
