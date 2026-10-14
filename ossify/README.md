@@ -1,4 +1,4 @@
-# ossify (v1.21.1)
+# ossify (v1.21.2)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -70,6 +70,10 @@ once, `active`, prefixed `[adoption-seed]`, and outside each spine's own floors
 Since 1.21.1, `/ossify:adopt`'s completion floor refuses a record with no C2
 result line per declared repo: "no C2 gaps" from a clean-checkout pass that
 never ran no longer closes (#367).
+
+Since 1.21.2, work-item close compares `spec.md` to the blob the handoff recorded
+at dispatch and halts on a difference, on the nested and the external path: an
+implementer that edits its own acceptance criteria no longer passes the gate (#434).
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo

@@ -514,6 +514,13 @@ line in the item's spec, write a recorded override into the handoff's §4: the A
 spec's reason. The RED gate then honours it at dispatch 1, not after a clarification
 dispatch.
 
+**Record the spec's blob id in §3 (#434).** Write `spec_oid:` with the full id
+`git -C "<work-item dir>" hash-object -- "<abs spec path>"` prints, once, when the
+handoff is authored. Close compares the spec to it on both execution paths
+(`close/references/work-item-close.md` §1). Never re-record it to match a spec that
+changed after dispatch: that change is a replan, and the orchestrator re-records it
+only as part of one.
+
 **Do not pre-place a `report.md`.** The implementer authors it, and its own
 contract tells it there is no placeholder to fill and to prefer Edit over Write on
 a file that already exists. An orchestrator-created empty file puts the worker in

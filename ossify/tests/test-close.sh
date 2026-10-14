@@ -2707,6 +2707,83 @@ t_assert_rc 0 "R3: a flesh spine whose row was skipped closes the step cleanly"
 t_assert_eq "flesh" "$(cd "$B4WS" && bash "$OSS" get ".spines[] | select(.id==\"$OSP\") | .class")" \
   "R3: ...and stays flesh - nothing was created"
 
+# ---------------------------------------------------------------------------
+# S-series (#434): close compares spec.md to the blob the handoff recorded at
+# dispatch. An implementer that edits spec.md - on the nested path, or on the
+# external path where it also declares the edited blob as spec_oid - must not be
+# gated against acceptance criteria it rewrote. The block runs in work-item-close
+# §1, so both paths reach it before the gate.
+# ---------------------------------------------------------------------------
+SID_BLK="$TMP/spec-identity.sh"
+_extract_block "$WIC" 'hash-object' "$SID_BLK"
+t_assert_eq "0" "$?" "S0: work-item-close.md §1 carries exactly one spec-identity block (anchor hash-object)"
+SID="$TMP/sid/work-r1.s1.w1"; mkdir -p "$SID"
+_sid_handoff() { # $1=spec_oid line(s) to write into §3 ('' writes none)
+  {
+    printf '## 3. Work item identifiers\n\n```text\nwork_item_id:   r1.s1.w1\n'
+    printf 'spec_path:      %s\n' "$SID/spec.md"
+    [ -n "$1" ] && printf '%s\n' "$1"
+    printf '```\n\n## Clarifications\n'
+  } > "$SID/handoff.md"
+}
+# Run under the dispatcher's strict mode, as the W-series does: a block that only
+# works unstrict would pass here and abort in a strict caller.
+_sid_run() { t_capture bash -c "set -euo pipefail; wi='r1.s1.w1'; spec='$SID/spec.md'; . '$SID_BLK'; echo SID-PASSED"; }
+printf '## AC-1\nauto: true -> exit 0\n' > "$SID/spec.md"
+SID_OID="$(git hash-object "$SID/spec.md")"
+
+# S1. The spec is the one dispatched: the block passes through.
+_sid_handoff "spec_oid:       $SID_OID"
+_sid_run
+t_assert_rc 0 "S1: an unchanged spec passes the identity check"
+t_assert_contains "$T_OUT" "SID-PASSED" "S1: ...and control continues past the block"
+
+# S2. The implementer edited spec.md after dispatch: halt, naming both blobs.
+printf '## AC-1\nauto: false -> exit 0\n' > "$SID/spec.md"
+_sid_run
+t_assert_rc 1 "S2: a spec edited since dispatch halts close"
+t_assert_contains "$T_OUT" "changed since dispatch" "S2: ...naming the cause"
+t_assert_contains "$T_OUT" "$SID_OID" "S2: ...and the recorded dispatch-time blob"
+t_assert_contains "$T_OUT" "re-record spec_oid" "S2: ...and the replan route out"
+case "$T_OUT" in *SID-PASSED*) T_FAIL=$((T_FAIL+1)); echo "FAIL: S2: control continued past a spec-identity halt";; *) T_PASS=$((T_PASS+1));; esac
+
+# S3. CONTROL: the edit reverted is the same blob again - identity is content, not mtime.
+printf '## AC-1\nauto: true -> exit 0\n' > "$SID/spec.md"
+_sid_run
+t_assert_rc 0 "S3: a spec restored to its dispatched bytes passes again"
+
+# S4. A handoff authored before 1.21.2 records no spec_oid: valid input, never refused.
+_sid_handoff ""
+_sid_run
+t_assert_rc 0 "S4: a handoff with no spec_oid line still closes (pre-1.21.2 in-flight items)"
+t_assert_contains "$T_OUT" "records no spec_oid" "S4: ...and says the dispatch-time check did not run"
+
+# S5. Two spec_oid lines: ambiguous, halt.
+_sid_handoff "spec_oid:       $SID_OID
+spec_oid:       $SID_OID"
+_sid_run
+t_assert_rc 1 "S5: a handoff recording spec_oid twice halts"
+t_assert_contains "$T_OUT" "more than once" "S5: ...naming why"
+
+# S6. A malformed value (not a full hex blob id): halt, not a silent mismatch.
+_sid_handoff "spec_oid:       ${SID_OID%????????}"
+_sid_run
+t_assert_rc 1 "S6: an abbreviated spec_oid halts"
+t_assert_contains "$T_OUT" "not a full blob id" "S6: ...as malformed, not as a changed spec"
+_sid_handoff "spec_oid:       <blob id>"
+_sid_run
+t_assert_rc 1 "S6b: a template placeholder left in spec_oid halts"
+_sid_handoff "spec_oid:       $(printf 'g%.0s' $(seq 1 ${#SID_OID}))"
+_sid_run
+t_assert_rc 1 "S6c: a full-length spec_oid that is not hex halts"
+t_assert_contains "$T_OUT" "not a full blob id" "S6c: ...as malformed, not as a changed spec"
+
+# S7. No handoff at all: halt, named (the same message §2 used to own).
+rm -f "$SID/handoff.md"
+_sid_run
+t_assert_rc 1 "S7: a missing handoff.md halts at the identity check"
+t_assert_contains "$T_OUT" "no handoff.md for r1.s1.w1" "S7: ...with the named halt"
+
 cd /; rm -rf "$TMP"
 
 # A FLOOR ON THE ASSERTION COUNT. Every check in test-block-ledger.sh proves

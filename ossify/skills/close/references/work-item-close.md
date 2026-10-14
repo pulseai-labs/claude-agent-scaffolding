@@ -145,6 +145,42 @@ on a spec it cannot find, and a silently wrong path therefore fails the gate for
 the wrong reason — the run reports a verification problem when what it has is a
 path problem, and the recovery menu sends someone to fix code that is fine.
 
+### The spec is the one dispatched (#434)
+
+The gate judges the work against `spec.md` as it is now. An implementer that
+edited it would be judged against criteria it wrote, so compare the spec's blob
+to the `spec_oid` the handoff's §3 recorded when it was authored
+(`work-item/references/round-orchestration.md` §4). Both execution paths reach
+this block: on the external path the executor's own declared `spec_oid` only
+proves the record agrees with the tree it edited.
+
+```bash
+handoff="$(dirname "$spec")/handoff.md"
+[ -f "$handoff" ] && [ -r "$handoff" ] || { echo "close: no handoff.md for $wi at $handoff - halt"; exit 1; }
+want="$(awk '/^[[:space:]]*spec_oid:/ { n++; v = $2 } END { if (n > 1) print "MANY"; else print v }' "$handoff")"
+have="$(git -C "$(dirname "$spec")" hash-object -- "$spec")" \
+  || { echo "close: cannot hash $spec - halt"; exit 1; }
+case "$want" in
+  "")
+    echo "close: $handoff records no spec_oid (authored before ossify 1.21.2, or round-orchestration.md §4 skipped it) - spec.md is gated as found at close; its dispatch-time blob was never recorded" ;;
+  MANY)
+    echo "close: $handoff records spec_oid more than once - keep the one round-orchestration.md §4 wrote - halt"; exit 1 ;;
+  *[!0-9a-f]*)
+    echo "close: spec_oid '$want' in $handoff is not a full blob id - halt"; exit 1 ;;
+  "$have") ;;
+  *)
+    if [ "${#want}" -ne "${#have}" ]; then
+      echo "close: spec_oid '$want' in $handoff is not a full blob id - halt"; exit 1
+    fi
+    echo "close: spec.md for $wi changed since dispatch (handoff spec_oid $want, now $have) - the gate would judge the work against criteria it was not dispatched with. A spec that needed changing is a replan (work-item/SKILL.md): if the orchestrator made this change, re-record spec_oid in handoff §3 as git hash-object prints it and re-run close; otherwise restore the dispatched spec.md (blob $want) - halt"
+    exit 1 ;;
+esac
+```
+
+A handoff with **no** `spec_oid` line is valid input: items dispatched before
+1.21.2 are still in flight, and close says the check did not run rather than
+refusing them.
+
 Carry `$spec`, `$report` and `$wt` forward as absolute paths. Nothing below
 re-derives them, and nothing anywhere in this layer `cd`s (SKILL.md §3).
 
@@ -158,9 +194,9 @@ gate invoked on `<spec path>` runs against a file called `<spec path>`.
 
 **Layer 4 needs one input Layers 1–3 never touch: `handoff.md`.** `$spec`,
 `$report` and `$wt` are already proven to exist by step 1 and Layer 1/2's own
-reads; `handoff.md` (`$(dirname "$spec")/handoff.md`) is not, and nothing below
-validates it before use. Check it exists and is readable **before** running the
-lenses — a missing or unreadable handoff is a halt, named
+reads; `handoff.md` (`$(dirname "$spec")/handoff.md`) is proven only by step 1's
+spec-identity block. Keep that order: the handoff must exist and be readable **before**
+running the lenses — a missing or unreadable handoff is a halt, named
 (`close: no handoff.md for $wi at <path> - halt`), not a silent empty-findings
 result from a pass that never opened the file. Skipping this check does not
 fail loudly: a read that never happened still produces a clean-looking

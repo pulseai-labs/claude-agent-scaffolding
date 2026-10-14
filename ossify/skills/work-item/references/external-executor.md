@@ -159,6 +159,12 @@ four-part identity: no close reference computes it
 (`close/references/work-item-close.md` §2 is the implementation gate, and it
 compares no identity).
 
+The declared `spec_oid` proves only that the record agrees with the tree. Whether
+the spec is the one dispatched is close's check: `work-item-close.md` §1 compares
+`spec.md` to the `spec_oid` the handoff recorded at authoring (#434), so an executor
+that edits the spec and declares the edited blob passes §5a and halts at close. The
+request (§3) therefore carries no `spec_oid`, and its key set is unchanged.
+
 ---
 
 ## 5a. A complete result
