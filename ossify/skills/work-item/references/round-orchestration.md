@@ -393,7 +393,10 @@ planning decision (`oss work_item_status <wi-id> planned`), made in
 
 **On re-entry, follow the item's route.** `spawn` takes the path below
 unchanged. `redispatch` reuses the recorded worktree and its existing handoff
-(author it now if it is missing), runs §3's dependency step again, and then goes to §5. An `adopt` item that
+(author it now if it is missing), runs §3's dependency step again, and then goes to §5.
+Run that step in the recorded worktree: set
+`wt="$(oss get '.work_items[] | select(.id=="<wi-id>") | .worktree_path')"` first, and halt
+naming the item if it is empty or `git -C "$wt" rev-parse --is-inside-work-tree` fails. An `adopt` item that
 §2b step 4 just repaired is in exactly that shape — active, clean, at its
 recorded base — so it takes the `redispatch` path too, authoring the handoff
 first when it is missing. A `reattach` item takes whatever route the re-run

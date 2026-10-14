@@ -1861,6 +1861,8 @@ pin "$_RO" "Never link the primary checkout's copy:" \
   "round-orchestration.md §3 installs per worktree and never links the primary checkout's tree (#714)"
 pin "$_RO" "runs §3's dependency step again, and then goes to §5" \
   "round-orchestration.md re-entry repeats the dependency step on redispatch and adopt (#714)"
+pin "$_RO" 'Run that step in the recorded worktree: set' \
+  "round-orchestration.md re-entry sets \$wt from the recorded worktree_path before the dependency step (#714)"
 pin "$_RO" '**Carry the spec'"'"'s start-GREEN lines into §4 (#715).**' \
   "round-orchestration.md §4 copies the spec's start-GREEN lines into the handoff at dispatch 1 (#715)"
 pin "$SKILLS/plan-spine/references/spec-authoring.md" 'Expected GREEN at start: AC-<N> — <why it passes before the work>' \
