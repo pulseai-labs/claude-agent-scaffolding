@@ -483,6 +483,15 @@ removing a worktree and reversing two state mutations.
   the specs, and the spine's merge step then looks for a branch in the target
   repo that was never cut there.
 
+**Prepare the worktree's dependencies before the handoff (#714).** A new worktree holds
+only tracked files: no `node_modules/`, no virtualenv, no build output. An `auto:` command
+that needs them fails in the worktree while it passes in the primary checkout. When the
+item's commands need installed dependencies, install them in the worktree with the
+project's own install command (for example `npm ci`). Link to the primary checkout's copy
+only where `git -C "$wt" check-ignore -q <name>` exits 0: a `node_modules/` rule does not
+match a symlink, and an untracked link fails pre-flight Gate 3. Then
+`git -C "$wt" status --porcelain` must print nothing. Name the set-up in the handoff's §4.
+
 ---
 
 ## 4. Author the handoff
@@ -495,6 +504,11 @@ rendering. It goes in the work item's own directory, beside the `spec.md`
 ```text
 <ai-workspace>/docs/specs/<release-id>/<spine-id>-<spine-slug>/work-<wi-id>/handoff.md
 ```
+
+**Carry the spec's start-GREEN lines into §4 (#715).** For each `Expected GREEN at start:`
+line in the item's spec, write a recorded override into the handoff's §4: the AC and the
+spec's reason. The RED gate then honours it at dispatch 1, not after a clarification
+dispatch.
 
 **Do not pre-place a `report.md`.** The implementer authors it, and its own
 contract tells it there is no placeholder to fill and to prefer Edit over Write on

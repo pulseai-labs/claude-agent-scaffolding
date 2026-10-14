@@ -147,6 +147,16 @@ the two disagree, it is authoritative. The worker's Gate 2 also shape-checks the
 parsed rows (`work-item/references/pre-flight.md`), so a malformed AC is a
 blocking gap **at pre-flight** rather than a confusing failure at the close gate.
 
+**An AC expected GREEN at start.** A regression guard, or a deletion check whose state the
+spine starts in, passes before the work, and the RED gate stops on it
+(`work-item/SKILL.md` §4). Declare each such AC below the ACs, one line each:
+
+```text
+Expected GREEN at start: AC-<N> — <why it passes before the work>
+```
+
+`/run-spine` copies each line into the handoff's §4, so dispatch 1 honours it (#715).
+
 ---
 
 ## 3. Per-round authoring, full-plan visibility

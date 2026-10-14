@@ -68,7 +68,7 @@ per command-bearing AC: `oss redgate "<worktree-abs>" "<command>" "<expectation>
 | rc | Meaning | What you do |
 |---|---|---|
 | **0** | RED — not implemented yet | **Proceed.** The expected case. |
-| **1** | Already GREEN before any work | **The ONLY hard block.** Return gaps-mode with a concrete skip-escape question naming the AC. Never auto-skip. |
+| **1** | Already GREEN before any work | **The ONLY hard block** — unless the handoff's §4 records an override for that AC (honour it, per SKILL.md §4). Otherwise return gaps-mode with a concrete skip-escape question naming the AC. Never auto-skip. |
 | **2** | Errored / uninvocable | **Advisory.** Record it in the report and proceed. |
 
 **Then, in order:** the TDD loop per AC in declared order → every embedded

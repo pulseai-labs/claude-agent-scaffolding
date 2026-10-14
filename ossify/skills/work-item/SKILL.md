@@ -198,10 +198,11 @@ expected to pass at the start — a deletion AC whose verification is "the symbo
 gone", a state the spine deliberately starts in. You do not get to make that call:
 return gaps-mode with a concrete skip-escape question naming the AC and the
 observed outcome (*"AC-3's command already exits 0 — is this the deletion AC's
-expected starting state, and may it be skipped?"*). If the orchestrator
-re-dispatches with an explicit recorded override in the handoff, **honour it**,
-exclude that AC from §5, and record the override in the report's
-blockers-and-advisories section. **Never auto-skip.**
+expected starting state, and may it be skipped?"*). If the handoff's §4 carries an
+explicit recorded override for the AC — declared in the spec at dispatch 1 or granted on a re-dispatch —
+**honour it**, exclude that AC from §5, and record the override in the report's
+blockers-and-advisories section. An override AC whose probe returns rc 0 is not
+GREEN: work it in §5 as usual and say so in the report. **Never auto-skip.**
 
 ---
 
