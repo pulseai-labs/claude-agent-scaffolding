@@ -183,7 +183,7 @@ oss redgate "<worktree-abs>" "<command>" "<expectation>"
 | rc | Meaning | What you do |
 |---|---|---|
 | **0** | RED — the behaviour is not implemented yet | **Proceed.** This is the expected case. |
-| **1** | Already GREEN before any work | **The only hard block.** Stop and return gaps-mode. |
+| **1** | Already GREEN before any work | **The only hard block** — unless the handoff's §4 records an override for that AC (below). Otherwise stop and return gaps-mode. |
 | **2** | Errored / uninvocable | **Advisory.** Record it and proceed. |
 
 rc 2 is advisory on purpose: most often the test file simply is not authored yet,
@@ -201,15 +201,15 @@ observed outcome (*"AC-3's command already exits 0 — is this the deletion AC's
 expected starting state, and may it be skipped?"*). If the handoff's §4 carries an
 explicit recorded override for the AC — declared in the spec at dispatch 1 or granted on a re-dispatch —
 **honour it**, exclude that AC from §5, and record the override in the report's
-blockers-and-advisories section. An override AC whose probe returns rc 0 is not
-GREEN: work it in §5 as usual and say so in the report. **Never auto-skip.**
+blockers-and-advisories section. An override applies only when the AC's probe returns rc 1;
+on rc 0 or rc 2, work the AC in §5 as usual and say so in the report. **Never auto-skip.**
 
 ---
 
 ## 5. The TDD loop
 
-Per AC, **in declared order**, excluding any AC carrying a recorded skip-escape
-override:
+Per AC, **in declared order**, excluding any AC whose recorded override §4 honoured
+(its probe returned rc 1):
 
 1. Write a failing test whose **failure mode matches the AC's expectation** — an
    `exit <n>` AC gets a test asserting that exit code, an `output contains <str>`
