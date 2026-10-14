@@ -1998,10 +1998,18 @@ pin "$_AD" 'A declared repo with no commit has no baseline SHA' \
   "adopt names a zero-commit declared repo before rev-parse fails (#536)"
 pin "$_AD" 'A plain repo has no roadmap to start from' \
   "adopt C1 elicits the journey on a plain repo (#536)"
-pin "$_AD" 'On a plain repo the legacy artifacts are absent' \
+pin "$_AD" 'On a plain repo, read each one on its own' \
   "adopt C5 authors what a plain repo lacks (#536)"
-pin "$_AD" 'Commit the declaration A1 authored before A3 runs' \
-  "adopt A1 commits its own declaration so A3 does not refuse it (#536)"
+pin "$_AD" 'A3 exempts only an uncommitted declaration A1 authored' \
+  "adopt A1's own declaration passes A3 and is committed only after every gate (#536, PR #804 r1)"
+pin "$_AD" 'every later Bash call starts with `cd <ai-workspace>`' \
+  "adopt A1 keeps a sibling AI workspace findable for oss (#536, PR #804 r1)"
+pin "$_AD" 'carries its code or its own history' \
+  "adopt A1 accepts a history-only repo, as start routes it (#536, PR #804 r1)"
+pin "$_AD" '`git -C <repo-root> worktree list`' \
+  "adopt A4 finds linked worktrees outside .worktrees (#536, PR #804 r1)"
+pin "$_AD" 'An answer with no ADR behind it is a decision the code already carries' \
+  "adopt C3 authors an ADR for an answered category with none (#536, PR #804 r1)"
 pin "$_AD" 'A plain repo has no written vision to read back' \
   "adopt's vision station elicits on a plain repo (#536)"
 pin "$_AD" 'ask the operator where it lives — a sibling git' \

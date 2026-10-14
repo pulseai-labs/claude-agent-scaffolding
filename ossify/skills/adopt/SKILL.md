@@ -72,12 +72,15 @@ finishes or drops it in the repo it touched, then re-runs.
   file. **Where the repo set comes from differs from `/start`:** `/start` reads
   it from the journey-map station it is about to run, and adoption has no such
   station, so ask the operator which repos hold the product and confirm each
-  root against a checkout that actually carries its code — every gate below,
+  root against a checkout that actually carries its code or its own history — every gate below,
   and C3's project-wide ADR scan, iterates exactly this set. A plain repo may
   have no AI workspace yet: ask the operator where it lives — a sibling git
   checkout, as workspace-init lays it out, or the repo itself — and author the
-  declaration there. Commit the declaration A1 authored before A3 runs: A3 refuses
-  any untracked file, adoption's own included.
+  declaration there. `oss` finds it by walking up from the current directory,
+  so with a sibling, every later Bash call starts with `cd <ai-workspace>`.
+  A3 exempts only an uncommitted declaration A1 authored — in this run or in an
+  earlier run that a gate refused; commit it once A0–A5 pass, before the
+  baseline SHAs are recorded.
 - **A2 — no ossify state at the routed path.** State exists: already
   onboarded → route to `doctor`, full stop — every `/start` project has
   state and no adoption record, so the record's absence distinguishes
@@ -85,8 +88,8 @@ finishes or drops it in the repo it touched, then re-runs.
 - **A3 — every tree adoption will edit is clean, tracked and untracked.**
   Sweep every repo the topology declares (A1 only confirms it resolves) plus
   the AI workspace: `git -C "$(oss repo_root <name>)" status --porcelain`
-  each. Any line, in any one, is work in flight; refuse, naming the legacy
-  stack's slice close. Each declared repo, never the AI workspace, must also
+  each. Any line, in any one — apart from that uncommitted declaration A1
+  authored — is work in flight; refuse, naming the legacy stack's slice close. Each declared repo, never the AI workspace, must also
   be on its default branch — require it where the manifest declares one
   (`boundary-audit.md`'s own precedent); else name the checked-out branch and
   get the operator's confirmation before proceeding.
@@ -106,6 +109,10 @@ finishes or drops it in the repo it touched, then re-runs.
   the conventional path everywhere too.
   Then `find <dir> -mindepth 1 -maxdepth 1` per repo: any directory means a
   slice is open (a plain probe; the oss verb needs the state A2 just forbade).
+  In every declared repo, also run `git -C <repo-root> worktree list`: `git
+  worktree add` takes any path, so a linked worktree can sit outside that
+  directory. Name each one besides the main checkout, and get the operator's
+  confirmation that none holds work in flight before proceeding.
 - **A5 — legacy position is on a boundary.** The live position is the
   manifest-routed memory bank's `05-active-context.md` cursor (the roadmap
   file is inventory, not position). An active slice there refuses and
@@ -220,7 +227,10 @@ a list of no gaps is not evidence that the pass ran.
    that exercise. Minting shipped decisions as Proposed misstates the record.
 5. **Categories with no ADR still get the forced-enumeration question.** The
    failure mode `/start` §7 guards is unasked questions; adoption does not
-   change that. Answer, or `not-applicable` with a reason.
+   change that. Answer, or `not-applicable` with a reason. An answer with no ADR behind it is a decision the code already carries:
+   author its ADR in the repo it governs, as `/start` §7 does — the next number
+   in that repo's series (`bones-registry.md` §3) — and mint it `Accepted`, as
+   step 4 says.
 
 An ADR that no longer describes the code is a **finding** for the read-out,
 not a bone to write.
@@ -244,9 +254,10 @@ input — the one thing it lacks after a retroactively-closed Release 0.
 ### C5 — Reconcile artifacts; read the destination before writing it
 
 **No destination is opened for writing until it has been read.** On a legacy
-stack every destination is occupied surface. On a plain repo the legacy artifacts are absent
-(`MASTER-SPEC.md`, `CLAUDE.md`, the memory bank): confirm each is absent, then
-author it as `/start` does.
+stack every destination is occupied surface. On a plain repo, read each one on its own:
+a destination that exists — a hand-authored `CLAUDE.md`, a spec — is reconciled
+by the table below; one that does not (often `MASTER-SPEC.md` and the memory
+bank) is authored as `/start` authors it.
 
 **Check before you write.** Check every precondition before the first write: each file you edit exists and each text you replace is there exactly once; each file you create does not exist yet. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
 
