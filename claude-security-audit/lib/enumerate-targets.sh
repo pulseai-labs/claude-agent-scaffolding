@@ -59,15 +59,19 @@ csa_enum_opencode_project_targets() {
   done
 }
 
-# _csa_enum_extensionless_hook_handlers <project-root>
-# Emit safe extensionless executable handlers or reject newline-containing ones.
-_csa_enum_extensionless_hook_handlers() {
+# _csa_enum_unlisted_hook_handlers <project-root>
+# Emit every executable regular file under .claude/hooks/ whose suffix the main
+# pass below does not list (extensionless, hidden, or an unlisted dotted suffix
+# such as `preflight.tool`, #426), or reject newline-containing ones. Listed
+# suffixes are skipped here so the main pass emits them exactly once: keep this
+# case list equal to its -name list.
+_csa_enum_unlisted_hook_handlers() {
   local root="$1" hooks="$1/.claude/hooks"
   [[ -d "$hooks" ]] || return 0
 
   find "$hooks" -type f -print0 2>/dev/null | while IFS= read -r -d '' handler; do
     case "${handler##*/}" in
-      *.*) : ;;
+      *.md|*.json|*.sh|*.py|*.js|*.ts) : ;;
       *) if [[ -x "$handler" ]]; then
            if [[ "$handler" == *$'\n'* || "$handler" == *$'\t'* ]]; then
              printf 'refusing newline-or-tab-containing executable hook handler\n' >&2
@@ -85,7 +89,7 @@ _csa_enum_extensionless_hook_handlers() {
 csa_enum_project_targets() {
   local root="$1"
   if [[ -d "$root/.claude" ]]; then
-    if ! _csa_enum_extensionless_hook_handlers "$root"; then
+    if ! _csa_enum_unlisted_hook_handlers "$root"; then
       return 2
     fi
     # Exclude .claude/audits/ — it holds audit state/reports and must not be scanned.
