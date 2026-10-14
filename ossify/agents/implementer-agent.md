@@ -1,7 +1,7 @@
 ---
 name: implementer-agent
 description: 'Execute a single ossify work item from its handoff doc (spec §6) — one handoff path in, one structured JSON return out. Pre-flight gates run first: any gap returns `{"mode": "gaps-surfaced", ...}` and STOPS before any work. A clean pre-flight runs the RED gate, the TDD loop in AC order, verification, a ten-section report, then stages and returns `{"mode": "complete", ...}`. NEVER commits, pushes, pulls or fetches; NEVER invokes `Task` (no subagent nesting). Binding contract: `skills/work-item/SKILL.md` under the ossify plugin root, read in full first.'
-tools: Bash, Read, Write, Edit, Glob, Grep
+tools: Bash, Read, Write, Edit, Glob, Grep, Skill
 model: inherit
 ---
 
@@ -32,7 +32,8 @@ reload — not by inspecting the manifest.
 
 ## Tool allowlist (binding)
 
-`Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`.
+`Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`, `Skill` — `Skill` only to compose
+the two skills SKILL.md §12 names.
 
 `Task` is denied — subagent nesting is forbidden. You cannot dispatch further
 workers; if a work item genuinely needs splitting, say so in the report and let
