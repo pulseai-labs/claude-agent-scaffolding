@@ -19,7 +19,8 @@ for (let i = 0; i < rest.length; i++) {
 if (role === undefined) { console.error('usage: omp-seat <role> [--via <command>] [omp args...]'); process.exit(2) }
 const home = homedir()
 const plan = planLaunch({ role, via, args, ompRecord: ompRecordPath(home),
-  claudeRecord: join(home, '.claude', 'plugins', 'installed_plugins.json'), rolesDir: join(here, '..', 'roles') })
+  claudeRecord: join(home, '.claude', 'plugins', 'installed_plugins.json'), rolesDir: join(here, '..', 'roles'),
+  roleEnv: process.env.SEAT_MODS_ROLE })
 if ('error' in plan) { console.error(plan.error); process.exit(2) }
 const broken = await checkExtensions(plan.extensions)
 if (broken !== undefined) { console.error(broken); process.exit(2) }

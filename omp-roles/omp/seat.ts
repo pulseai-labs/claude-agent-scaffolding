@@ -32,9 +32,13 @@ export function versionWarning(v: { error?: Error; status: number | null; stdout
   return pinWarning(v.stdout ?? '', tested)
 }
 
-export function planLaunch(o: { role: string; via: string; args: string[]; ompRecord: string; claudeRecord: string; rolesDir?: string }):
+export function planLaunch(o: { role: string; via: string; args: string[]; ompRecord: string; claudeRecord: string; rolesDir?: string; roleEnv?: string }):
   { argv: string[]; warnings: string[]; extensions: string[] } | { error: string } {
   if (!Object.hasOwn(ROLES, o.role)) return { error: `omp-seat: unknown role "${o.role}" (known: ${Object.keys(ROLES).join(', ')})` }
+  // seat-mods' no-subagent rail (#798) keys on the session's SEAT_MODS_ROLE, which the launcher sets: refuse a top
+  // the rail would not cover.
+  if (o.role === 'orchestrator' && o.roleEnv?.trim() !== 'orchestrator')
+    return { error: `omp-seat: the orchestrator role needs SEAT_MODS_ROLE=orchestrator (got "${o.roleEnv ?? ''}"); seat-mods' no-subagent rail keys on it` }
   // A record that exists but cannot be read must stop the launch: guessing would start an unguarded seat.
   const read = (record: string): Map<string, string> | { error: string } => {
     try { return installPaths(record) } catch (e) {

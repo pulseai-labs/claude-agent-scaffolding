@@ -51,18 +51,18 @@ describe('planLaunch', () => {
     const [s, m, a] = [install('seat-mods', true, '0.4.4'), install('molt'), install('autonomic', true, '0.7.0')]
     record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a, 'herdr-crew': install('herdr-crew', false, '0.2.19') })
     const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
-    expect(planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir })).toMatchObject({
+    expect(planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir })).toMatchObject({
       argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'),
         '--append-system-prompt', join(rolesDir, 'orchestrator.md')],
     })
   })
   test('orchestrator refuses seat-mods 0.4.3, naming the 0.4.4 minimum (no top without the #798 rail)', () => {
     record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.3'), molt: install('molt'), autonomic: install('autonomic', true, '0.7.0'), 'herdr-crew': install('herdr-crew', false, '0.2.19') })
-    const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
+    const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
     expect(r).toEqual({ error: expect.stringContaining('seat-mods 0.4.3') })
     expect((r as { error: string }).error).toContain('0.4.4')
   })
-  const orch = () => planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
+  const orch = () => planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
   const orchMods = (autonomic = '0.7.0') => ({ 'seat-mods': install('seat-mods', true, '0.4.4'), molt: install('molt'), autonomic: install('autonomic', true, autonomic) })
   test('orchestrator refuses autonomic 0.6.0, naming the 0.7.0 minimum (children inherit autopilot through the mode file)', () => {
     record(ompRecord, { ...orchMods('0.6.0'), 'herdr-crew': install('herdr-crew', false, '0.2.19') })
@@ -85,6 +85,17 @@ describe('planLaunch', () => {
     record(ompRecord, orchMods())
     record(claudeRecord, { 'herdr-crew': install('herdr-crew', false, '0.2.19') })
     expect(orch()).toHaveProperty('argv')
+  })
+  for (const env of [undefined, '', 'coordinator', 'implementer']) {
+    test(`orchestrator refuses SEAT_MODS_ROLE=${JSON.stringify(env)}: the #798 rail keys on "orchestrator"`, () => {
+      record(ompRecord, { ...orchMods(), 'herdr-crew': install('herdr-crew', false, '0.2.19') })
+      const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir: join(import.meta.dir, '../../omp-roles/roles'), roleEnv: env })
+      expect((r as { error: string }).error).toContain('needs SEAT_MODS_ROLE=orchestrator')
+    })
+  }
+  test('control: worker launches with SEAT_MODS_ROLE unset', () => {
+    record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt'), autonomic: install('autonomic') })
+    expect(launch('worker')).toHaveProperty('argv')
   })
   test('control: worker needs neither herdr-crew nor autonomic 0.7.0', () => {
     record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt'), autonomic: install('autonomic') })
