@@ -2002,8 +2002,8 @@ pin "$_AD" 'On a plain repo, read each one on its own' \
   "adopt C5 authors what a plain repo lacks (#536)"
 pin "$_AD" 'A3 exempts only an uncommitted declaration A1 authored' \
   "adopt A1's own declaration passes A3 and is committed only after every gate (#536, PR #804 r1)"
-pin "$_AD" 'every later Bash call starts with `cd <ai-workspace>`' \
-  "adopt A1 keeps a sibling AI workspace findable for oss (#536, PR #804 r1)"
+_c="$(grep -c 'cd <ai-workspace>' "$_AD" || true)"
+_pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt A1 still offers a sibling AI workspace it never creates (#536, PR #804 r3 narrowed)"
 pin "$_AD" 'carries its code or its own history' \
   "adopt A1 accepts a history-only repo, as start routes it (#536, PR #804 r1)"
 pin "$_AD" '`git -C <repo-root> worktree list`' \
@@ -2020,7 +2020,9 @@ pin "$_AD" 'A `<dir>` that does not exist holds no worktree' \
   "adopt A4 reads an absent worktree directory as empty (#536, PR #804 r2)"
 pin "$_AD" 'A plain repo has no written vision to read back' \
   "adopt's vision station elicits on a plain repo (#536)"
-pin "$_AD" 'ask the operator where it lives — a sibling git' \
+pin "$_AD" 'runs workspace-init'"'"'s `/pair-workspace` first' \
+  "adopt A1 routes a sibling AI workspace through /pair-workspace, which creates it (#536, PR #804 r3)"
+pin "$_AD" 'adoption uses the repo itself as the AI workspace' \
   "adopt A1 places the AI workspace on a plain repo (#536)"
 _c="$(grep -c 'out of scope today' "$_AD" || true)"
 _pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt still declares a stackless project out of scope (#536)"

@@ -74,11 +74,10 @@ finishes or drops it in the repo it touched, then re-runs.
   station, so ask the operator which repos hold the product and confirm each
   root against a checkout that actually carries its code or its own history — every gate below,
   and C3's project-wide ADR scan, iterates exactly this set. A plain repo may
-  have no AI workspace yet: ask the operator where it lives — a sibling git
-  checkout, as workspace-init lays it out, or the repo itself — and author the
-  declaration there. `oss` finds it by walking up from the current directory,
-  so with a sibling, every later Bash call starts with `cd <ai-workspace>`.
-  A3 exempts only an uncommitted declaration A1 authored — in this run or in an
+  have no AI workspace yet: adoption uses the repo itself as the AI workspace and
+  authors the declaration at its root. For a sibling layout, the operator runs workspace-init's `/pair-workspace` first,
+  which creates the sibling and its pairing manifest, and starts `/adopt` there;
+  A1 then resolves that manifest and authors nothing. A3 exempts only an uncommitted declaration A1 authored — in this run or in an
   earlier run that a gate refused; commit it once A0–A5 pass, before the
   baseline SHAs are recorded.
 - **A2 — no ossify state at the routed path.** State exists: already
