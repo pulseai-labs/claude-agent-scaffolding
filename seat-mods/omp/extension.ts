@@ -143,9 +143,16 @@ export function evalCommands(code: string): string[] {
 function spawnDeny(role: Role): string {
   return `seat-mods (${role}): no subagents — this seat may not spawn; report it instead.`
 }
-// before_subagent_spawn fires for task, eval agent() and workpool workers alike. Only the main session may spawn.
-export function spawnDecision(agent: Agent): { block: true; reason: string } | undefined {
-  return agent?.kind === 'main' ? undefined : { block: true, reason: spawnDeny(childRole(agent?.name)) }
+// #798: GLM 5.3 dispatched "agent":"task" against its role file. herdr-crew's top dispatches herdr seats, never subagents.
+function orchestratorSpawnDeny(): string {
+  return 'seat-mods (orchestrator): no subagents — dispatch a herdr seat instead (herdr-crew orchestrate; #798).'
+}
+// before_subagent_spawn fires for task, eval agent() and workpool workers alike. Only the main session may spawn,
+// and not when it is the orchestrator (#798).
+export function spawnDecision(agent: Agent, roleEnv?: string): { block: true; reason: string } | undefined {
+  if (agent?.kind !== 'main') return { block: true, reason: spawnDeny(childRole(agent?.name)) }
+  const s = parseRole(roleEnv)
+  return s.kind === 'free' && s.role === 'orchestrator' ? { block: true, reason: orchestratorSpawnDeny() } : undefined
 }
 function runDeny(role: Role, tool: string): string {
   return `seat-mods (${role}): no ${tool} — this seat may not run code here; report it instead.`
@@ -168,7 +175,7 @@ function hasExpandableKey(args: object): boolean {
 
 export async function guard(deps: GuardDeps, toolName: string, input: Record<string, unknown>, agent: Agent, label = ''): Promise<string | undefined> {
   const state = roleFor(deps.env.SEAT_MODS_ROLE, agent)
-  if (state.kind === 'free') return undefined
+  if (state.kind === 'free') return state.role === 'orchestrator' && toolName === 'task' ? orchestratorSpawnDeny() : undefined
   if (state.kind === 'invalid') return invalidText(state.value)
   const role = state.role
   const child = agent?.kind !== 'main'
@@ -415,7 +422,7 @@ export default function (pi: any) {
   pi.on('session_start', (_e: any, ctx: any) => {
     if (ctx.agent?.kind === 'main') ctx.ui?.setStatus?.('seat-mods', statusText(roleFor(process.env.SEAT_MODS_ROLE, ctx.agent)))
   })
-  pi.on('before_subagent_spawn', (_e: any, ctx: any) => spawnDecision(ctx.agent))
+  pi.on('before_subagent_spawn', (_e: any, ctx: any) => spawnDecision(ctx.agent, process.env.SEAT_MODS_ROLE))
   pi.on('tool_call', async (e: any, ctx: any) => {
     // A throw in a tool_call handler blocks the call (fail closed, doc 018).
     const reason = await guard(depsFor(ctx), e.toolName, (e.input ?? {}) as Record<string, unknown>, ctx.agent)

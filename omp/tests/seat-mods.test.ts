@@ -572,3 +572,28 @@ describe('write xd:// transport (#780)', () => {
     }
   })
 })
+
+describe('orchestrator: no subagents (#798)', () => {
+  const orch = () => deps({ env: { SEAT_MODS_ROLE: 'orchestrator' } })
+  test('the task tool is blocked for an orchestrator main session, naming #798', async () => {
+    const r = await guard(orch(), 'task', { agent: 'task' }, { kind: 'main' })
+    expect(r).toContain('seat-mods (orchestrator): no subagents')
+    expect(r).toContain('#798')
+  })
+  test('every other tool stays free for the orchestrator', async () => {
+    expect(await guard(orch(), 'bash', { command: 'gh pr merge 1' }, { kind: 'main' })).toBeUndefined()
+    expect(await guard(orch(), 'write', { path: '/var/x' }, { kind: 'main' })).toBeUndefined()
+  })
+  test('control: a coordinator main session still spawns', async () => {
+    expect(await guard(deps(), 'task', { agent: 'implementer' }, { kind: 'main' })).toBeUndefined()
+    expect(spawnDecision({ kind: 'main' }, 'coordinator')).toBeUndefined()
+  })
+  test('eval agent() and workpool spawns from an orchestrator are blocked too', () => {
+    expect(spawnDecision({ kind: 'main' }, 'orchestrator')).toMatchObject({ block: true, reason: expect.stringContaining('#798') })
+  })
+  test('control: an unset role and a one-argument call keep their behaviour', () => {
+    expect(spawnDecision({ kind: 'main' }, undefined)).toBeUndefined()
+    expect(spawnDecision({ kind: 'main' })).toBeUndefined()
+    expect(spawnDecision({ kind: 'sub', name: 'implementer' })).toMatchObject({ block: true })
+  })
+})

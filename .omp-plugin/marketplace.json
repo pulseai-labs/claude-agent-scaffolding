@@ -42,7 +42,7 @@
     },
     {
       "name": "seat-mods",
-      "description": "Role guards for worker seats as a Claude Code mod: SEAT_MODS_ROLE on a seat's spawn turns on that role's tool-call rails; unset or empty, it guards as an implementer by default, and orchestrator and coordinator are explicit unguarded roles.",
+      "description": "Role guards for worker seats as a Claude Code mod: SEAT_MODS_ROLE on a seat's spawn turns on that role's tool-call rails; unset or empty, it guards as an implementer by default, and orchestrator and coordinator are explicit unguarded roles, except that on OMP an orchestrator may not spawn subagents.",
       "category": "workflow",
       "source": "./seat-mods"
     },
@@ -60,7 +60,7 @@
     },
     {
       "name": "omp-roles",
-      "description": "OMP role pack for default mode. 0.3.1 ships omp-seat, the launcher that pins the seat-mods, molt and autonomic OMP extensions onto a seat, plus the implementer and seat-reviewer agents and the spine-driver, close and work-pr coordinator roles, launched with omp-seat <role>. OMP only.",
+      "description": "OMP role pack for default mode. 0.3.2 ships omp-seat, the launcher that pins the seat-mods, molt and autonomic OMP extensions onto a seat, plus the implementer and seat-reviewer agents and the spine-driver, close and work-pr coordinator roles, launched with omp-seat <role>. OMP only.",
       "category": "workflow",
       "source": "./omp-roles"
     },
