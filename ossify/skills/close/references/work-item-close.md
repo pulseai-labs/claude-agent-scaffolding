@@ -157,14 +157,20 @@ proves the record agrees with the tree it edited.
 ```bash
 handoff="$(dirname "$spec")/handoff.md"
 [ -f "$handoff" ] && [ -r "$handoff" ] || { echo "close: no handoff.md for $wi at $handoff - halt"; exit 1; }
-want="$(awk '/^[[:space:]]*spec_oid:/ { n++; v = $2 } END { if (n > 1) print "MANY"; else print v }' "$handoff")"
-have="$(git -C "$(dirname "$spec")" hash-object -- "$spec")" \
+# Only §3's identifiers count: Clarifications may quote a spec_oid line.
+want="$(awk '/^##[[:space:]]/ { in3 = ($0 ~ /^##[[:space:]]+3\./) }
+  in3 && /^[[:space:]]*spec_oid:/ { n++; v = $2 }
+  END { if (n > 1) print "MANY"; else if (n == 1 && v == "") print "EMPTY"; else print v }' "$handoff")"
+# --no-filters: hash the bytes the gate reads, not what .gitattributes makes of them.
+have="$(git -C "$(dirname "$spec")" hash-object --no-filters -- "$spec")" \
   || { echo "close: cannot hash $spec - halt"; exit 1; }
 case "$want" in
   "")
     echo "close: $handoff records no spec_oid (authored before ossify 1.21.2, or round-orchestration.md §4 skipped it) - spec.md is gated as found at close; its dispatch-time blob was never recorded" ;;
   MANY)
-    echo "close: $handoff records spec_oid more than once - keep the one round-orchestration.md §4 wrote - halt"; exit 1 ;;
+    echo "close: $handoff records spec_oid more than once in §3 - keep the one round-orchestration.md §4 wrote - halt"; exit 1 ;;
+  EMPTY)
+    echo "close: spec_oid in $handoff §3 has no value, so it is not a full blob id - halt"; exit 1 ;;
   *[!0-9a-f]*)
     echo "close: spec_oid '$want' in $handoff is not a full blob id - halt"; exit 1 ;;
   "$have") ;;
@@ -172,12 +178,13 @@ case "$want" in
     if [ "${#want}" -ne "${#have}" ]; then
       echo "close: spec_oid '$want' in $handoff is not a full blob id - halt"; exit 1
     fi
-    echo "close: spec.md for $wi changed since dispatch (handoff spec_oid $want, now $have) - the gate would judge the work against criteria it was not dispatched with. A spec that needed changing is a replan (work-item/SKILL.md): if the orchestrator made this change, re-record spec_oid in handoff §3 as git hash-object prints it and re-run close; otherwise restore the dispatched spec.md (blob $want) - halt"
+    echo "close: spec.md for $wi changed since dispatch (handoff spec_oid $want, now $have) - the gate would judge the work against criteria it was not dispatched with. A spec that needed changing is a replan (work-item/SKILL.md): if the orchestrator made this change, re-record spec_oid in handoff §3 as git -C <spec dir> hash-object --no-filters -- <spec> prints it and re-run close; otherwise restore the dispatched spec.md (blob $want) - halt"
     exit 1 ;;
 esac
 ```
 
-A handoff with **no** `spec_oid` line is valid input: items dispatched before
+Only §3 is read, so a Clarifications answer that quotes a `spec_oid:` line does not
+count. A handoff with **no** `spec_oid` line in §3 is valid input: items dispatched before
 1.21.2 are still in flight, and close says the check did not run rather than
 refusing them.
 

@@ -2718,19 +2718,22 @@ SID_BLK="$TMP/spec-identity.sh"
 _extract_block "$WIC" 'hash-object' "$SID_BLK"
 t_assert_eq "0" "$?" "S0: work-item-close.md §1 carries exactly one spec-identity block (anchor hash-object)"
 SID="$TMP/sid/work-r1.s1.w1"; mkdir -p "$SID"
-_sid_handoff() { # $1=spec_oid line(s) to write into §3 ('' writes none)
+_sid_handoff() { # $1=spec_oid line(s) to write into §3 ('' writes none) [$2=Clarifications body] [$3=dir]
+  local d="${3:-$SID}"
   {
     printf '## 3. Work item identifiers\n\n```text\nwork_item_id:   r1.s1.w1\n'
-    printf 'spec_path:      %s\n' "$SID/spec.md"
+    printf 'spec_path:      %s\n' "$d/spec.md"
     [ -n "$1" ] && printf '%s\n' "$1"
     printf '```\n\n## Clarifications\n'
-  } > "$SID/handoff.md"
+    [ -n "${2:-}" ] && printf '%s\n' "$2"
+  } > "$d/handoff.md"
+  return 0
 }
 # Run under the dispatcher's strict mode, as the W-series does: a block that only
 # works unstrict would pass here and abort in a strict caller.
-_sid_run() { t_capture bash -c "set -euo pipefail; wi='r1.s1.w1'; spec='$SID/spec.md'; . '$SID_BLK'; echo SID-PASSED"; }
+_sid_run() { t_capture bash -c "set -euo pipefail; wi='r1.s1.w1'; spec='${1:-$SID}/spec.md'; . '$SID_BLK'; echo SID-PASSED"; }
 printf '## AC-1\nauto: true -> exit 0\n' > "$SID/spec.md"
-SID_OID="$(git hash-object "$SID/spec.md")"
+SID_OID="$(git hash-object --no-filters "$SID/spec.md")"
 
 # S1. The spec is the one dispatched: the block passes through.
 _sid_handoff "spec_oid:       $SID_OID"
@@ -2777,6 +2780,35 @@ _sid_handoff "spec_oid:       $(printf 'g%.0s' $(seq 1 ${#SID_OID}))"
 _sid_run
 t_assert_rc 1 "S6c: a full-length spec_oid that is not hex halts"
 t_assert_contains "$T_OUT" "not a full blob id" "S6c: ...as malformed, not as a changed spec"
+
+# S8. A Clarifications answer that quotes a spec_oid line is not a second field
+# (PR #811 round 1): only §3 is read.
+_sid_handoff "spec_oid:       $SID_OID" "### Dispatch 2
+A: the result record carries
+spec_oid: 0000000000000000000000000000000000000000"
+_sid_run
+t_assert_rc 0 "S8: a spec_oid line under Clarifications does not count as a second field"
+
+# S9. An empty spec_oid in §3 is malformed, not the legacy no-field case (PR #811 round 1).
+_sid_handoff "spec_oid:"
+_sid_run
+t_assert_rc 1 "S9: an empty spec_oid halts"
+t_assert_contains "$T_OUT" "has no value" "S9: ...as malformed, never as a handoff that predates the field"
+
+# S10-S11. A clean filter in the AI workspace must not change the hash (PR #811
+# round 1): authoring records the raw bytes, so close hashes the raw bytes too.
+SIDF="$TMP/sidf/work-r1.s1.w1"; mkdir -p "$SIDF"
+git -C "$SIDF" init -q
+git -C "$SIDF" config filter.up.clean 'tr a-z A-Z'
+printf 'spec.md filter=up\n' > "$SIDF/.gitattributes"
+printf '## AC-1\nauto: true -> exit 0\n' > "$SIDF/spec.md"
+_sid_handoff "spec_oid:       $(git hash-object --no-filters "$SIDF/spec.md")" "" "$SIDF"
+_sid_run "$SIDF"
+t_assert_rc 0 "S10: under a clean filter, an unchanged spec still passes"
+printf '## AC-1\nAUTO: TRUE -> EXIT 0\n' > "$SIDF/spec.md"
+_sid_run "$SIDF"
+t_assert_rc 1 "S11: an edit the clean filter would normalise away still halts"
+t_assert_contains "$T_OUT" "changed since dispatch" "S11: ...as a changed spec"
 
 # S7. No handoff at all: halt, named (the same message §2 used to own).
 rm -f "$SID/handoff.md"

@@ -1988,6 +1988,8 @@ pin "$SKILLS/work-item/references/handoff-contract.md" 'spec_oid:       ' \
   "handoff-contract §3's identifiers block carries the spec_oid line (#434)"
 pin "$SKILLS/work-item/references/round-orchestration.md" 'Record the spec'"'"'s blob id in §3 (#434)' \
   "round-orchestration §4 records the dispatch-time spec blob when it authors the handoff (#434)"
+pin "$SKILLS/work-item/references/round-orchestration.md" '**First run close §1'"'"'s spec-identity block (`work-item-close.md` §1, #434)**' \
+  "round-orchestration's finish-merge row runs close §1's spec check before its gate re-run (#434, PR #811 round 1)"
 pin "$SKILLS/work-item/references/external-executor.md" 'the `spec_oid` the handoff recorded at authoring (#434)' \
   "external-executor names close's dispatch-time comparison, not the declared spec_oid, as the spec check (#434)"
 
