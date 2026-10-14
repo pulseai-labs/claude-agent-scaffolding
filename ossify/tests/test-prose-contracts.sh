@@ -1857,14 +1857,22 @@ pin "$_SCB" '*ADR check* row is **not shipped in this release**' \
 _RO="$WI/references/round-orchestration.md"
 pin "$_RO" "**Prepare the worktree's dependencies before the handoff (#714).**" \
   "round-orchestration.md §3 prepares the item worktree's dependencies before the handoff (#714)"
-pin "$_RO" 'git -C "$wt" check-ignore -q <name>' \
-  "round-orchestration.md §3 allows a link only where git ignores it, so Gate 3 stays clean (#714)"
+pin "$_RO" "Never link the primary checkout's copy:" \
+  "round-orchestration.md §3 installs per worktree and never links the primary checkout's tree (#714)"
+pin "$_RO" "runs §3's dependency step again, and then goes to §5" \
+  "round-orchestration.md re-entry repeats the dependency step on redispatch and adopt (#714)"
 pin "$_RO" '**Carry the spec'"'"'s start-GREEN lines into §4 (#715).**' \
   "round-orchestration.md §4 copies the spec's start-GREEN lines into the handoff at dispatch 1 (#715)"
 pin "$SKILLS/plan-spine/references/spec-authoring.md" 'Expected GREEN at start: AC-<N> — <why it passes before the work>' \
   "spec-authoring.md declares the start-GREEN line the lane copies (#715)"
 pin "$WI/references/handoff-contract.md" 'one the spec declares as `Expected GREEN at start:`' \
   "handoff-contract.md §4 carries spec-declared overrides from dispatch 1 (#715)"
+pin "$WI/SKILL.md" 'unless the handoff'"'"'s §4 records an override for that AC (below)' \
+  "work-item SKILL.md's rc table defers rc 1 to a recorded override (#715)"
+pin "$WI/SKILL.md" 'An override applies only when the AC'"'"'s probe returns rc 1;' \
+  "work-item SKILL.md §4 honours an override only on rc 1 (#715)"
+pin "$WI/SKILL.md" 'excluding any AC whose recorded override §4 honoured' \
+  "work-item SKILL.md §5 excludes only an override §4 honoured (#715)"
 pin "$WI/SKILL.md" 'declared in the spec at dispatch 1 or granted on a re-dispatch' \
   "work-item SKILL.md §4 honours a spec-declared override at dispatch 1 (#715)"
 pin "$HERE/../agents/implementer-agent.md" 'unless the handoff'"'"'s §4 records an override for that AC' \

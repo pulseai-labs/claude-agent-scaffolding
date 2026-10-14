@@ -393,7 +393,7 @@ planning decision (`oss work_item_status <wi-id> planned`), made in
 
 **On re-entry, follow the item's route.** `spawn` takes the path below
 unchanged. `redispatch` reuses the recorded worktree and its existing handoff
-(author it now if it is missing) and goes straight to §5. An `adopt` item that
+(author it now if it is missing), runs §3's dependency step again, and then goes to §5. An `adopt` item that
 §2b step 4 just repaired is in exactly that shape — active, clean, at its
 recorded base — so it takes the `redispatch` path too, authoring the handoff
 first when it is missing. A `reattach` item takes whatever route the re-run
@@ -487,10 +487,11 @@ removing a worktree and reversing two state mutations.
 only tracked files: no `node_modules/`, no virtualenv, no build output. An `auto:` command
 that needs them fails in the worktree while it passes in the primary checkout. When the
 item's commands need installed dependencies, install them in the worktree with the
-project's own install command (for example `npm ci`). Link to the primary checkout's copy
-only where `git -C "$wt" check-ignore -q <name>` exits 0: a `node_modules/` rule does not
-match a symlink, and an untracked link fails pre-flight Gate 3. Then
+project's own install command (for example `npm ci`). Never link the primary checkout's copy:
+a virtualenv with an editable install points the worktree's tests back at the primary
+checkout's source, and concurrent items would share one writable tree. Then
 `git -C "$wt" status --porcelain` must print nothing. Name the set-up in the handoff's §4.
+The step is safe to repeat, and re-entry repeats it (below).
 
 ---
 
