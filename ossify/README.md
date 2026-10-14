@@ -1,4 +1,4 @@
-# ossify (v1.19.1)
+# ossify (v1.19.2)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -43,6 +43,11 @@ the handoff, so a suite that needs `node_modules/` runs there as it does in the
 primary checkout (#714). A spec can declare an AC `Expected GREEN at start:`; the
 lane copies that line into the handoff, and the RED gate honours it at dispatch 1
 instead of after a clarification dispatch (#715).
+
+Since 1.19.2, wayfinder's claim re-read runs the frontier query again, so an
+assignment that landed after the first read is seen at claim time (#336), and a
+`spike` ticket is dispatched only after the operator approves its contract,
+which the dispatching session writes before the fan-out (#332).
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo

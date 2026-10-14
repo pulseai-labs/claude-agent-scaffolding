@@ -380,14 +380,15 @@ collapse into one boolean, frontier-eligible or not.
 **The filter is a view, not the query.** `subIssues.nodes` holds *every* sub-issue
 of the map with all three facts on it; the `--jq` above narrows that to the
 eligible set and formats it for a human to pick from. Three callers need the
-**unfiltered** nodes instead, and each reads them from this same single call
-rather than issuing another:
+**unfiltered** nodes instead. Two read them from this same single call rather
+than issuing another; the claim re-read runs the query again (#336):
 
 - a **named ticket** — its node is read directly and the predicate applied to
   it, and its presence in the list is the parent check
   (`references/working.md` §1);
-- the **claim re-read** — that node's `assignees`, immediately before
-  assigning (`references/working.md` §1);
+- the **claim re-read** — that node's `assignees`, from a **fresh** run of this query immediately before assigning,
+  because the captured response cannot show an assignment that landed after it
+  (`references/working.md` §1);
 - the **terminal check** — an empty eligible set is ambiguous on its own, so
   §5's two cases are told apart by the unfiltered nodes: all closed, or some
   open but blocked or claimed (`references/working.md` §5).

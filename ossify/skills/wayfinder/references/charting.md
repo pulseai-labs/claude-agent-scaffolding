@@ -34,7 +34,7 @@ that is work mode's job, once the map exists, not this one's.
    wire any forward blocking reference in a second pass** — a ticket
    cannot name a blocker the map has not created yet.
 6. **Fire the AFK tickets that nothing open blocks** (`research`,
-   `smoke-test`, `spike`) in parallel, then **stop**. Charting hand-resolves
+   `smoke-test`, and a `spike` whose contract the operator approved) in parallel, then **stop**. Charting hand-resolves
    nothing. `references/ticket-types.md` §3 has the fan-out mechanics, the
    `caffeinate` discipline, and the rule that the **dispatching session**
    writes every Decisions-so-far line the batch produces; this step only
