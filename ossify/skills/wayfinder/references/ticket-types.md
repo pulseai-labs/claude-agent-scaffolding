@@ -102,9 +102,12 @@ reverses that.
 before any code, and an unattended worker cannot get one. So the dispatching
 session writes each spike's contract (that file's §2, six fields) where §1 puts
 the spike's record, shows it to the operator, and dispatches the spike only on an
-explicit go, with the approved contract in the worker's prompt. A spike with no
-go is not dispatched: it stays open on the frontier, and the session says which
-and why. `research` and `smoke-test` have no approval gate and dispatch as they are.
+explicit go, with the approved contract in the worker's prompt. On a map with no
+bones, the *Decision it enables* field names the map decision the spike unblocks.
+An explicit no is the operator's answer to the ticket: record it and close the
+ticket as `references/working.md` §1 step 4 closes any ticket. A spike still
+waiting for an answer is not dispatched: it stays open on the frontier, and the
+session says which and why. `research` and `smoke-test` have no approval gate and dispatch as they are.
 
 **`Task` (Claude Code) and `task` (OMP) are subagent tools, and wayfinder ships on
 surfaces that have neither.** The Codex manifest registers no agent and no tool, and

@@ -1894,5 +1894,13 @@ pin "$_WF/ticket-types.md" '| `spike` | AFK once its contract has a go (§3) |' 
   "ticket-types.md §1 qualifies spike's AFK mode by the contract's go (#332)"
 pin "$_WF/charting.md" 'a `spike` whose contract the operator approved' \
   "charting.md step 6 fires only an approved spike (#332)"
+pin "$_WF/tracker.md" 'The claim re-read reads them from a FRESH run of the' \
+  "tracker.md §2's query recipe sends the claim re-read to a fresh run (#336)"
+pin "$_WF/tracker.md" 'exception is the claim re-read: it runs the query again immediately before' \
+  "tracker.md §2's one-call explanation names the claim re-read as its exception (#336)"
+pin "$_WF/ticket-types.md" 'the *Decision it enables* field names the map decision the spike unblocks' \
+  "ticket-types.md §3 adapts the contract's bone field for maps with no bones (#332)"
+pin "$_WF/ticket-types.md" 'An explicit no is the operator'"'"'s answer to the ticket: record it and close the' \
+  "ticket-types.md §3 closes a declined spike instead of leaving it on the frontier (#332)"
 
 t_summary
