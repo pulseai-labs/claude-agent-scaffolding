@@ -289,7 +289,8 @@ writing, and, per live dispatch, its
 `REPORT_PATH`, the hash last noted, and the file's identity noted beside that hash — inode
 or mtime — and, per live seat, its molt status path recorded at launch and the last status
 line noted, its autonomic pain path and the last pain line noted, and a resolved profile beside a launch command for each host — this top's and the other host's
-(Claude Code and OMP: `omp-seat orchestrator --via omp-glm`), so the operator's "fall back to OMP" or
+(Claude Code and OMP: `omp-seat orchestrator --via omp-glm`), the other host's profile resolved from its machine-file
+entry like any seat's (`config.md`) — ask the operator once when there is none — so the operator's "fall back to OMP" or
 "hand back to Claude" picks one
 — `/ossify:handoff` with ossify installed (`skill://handoff` on OMP), the same file by hand without it. Open a new tab
 and pane with the launch command the handoff recorded — ask the operator once when none

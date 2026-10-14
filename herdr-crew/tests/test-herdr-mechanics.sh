@@ -260,6 +260,7 @@ pin "$LIFE" 'using the destination host'"'"'s recorded profile for the readiness
 
 pin "$LIFE" 'without it, the path as its first instruction on either' "a cross-host resume keeps the no-ossify route" flat
 pin "$LIFE" '(`skill://handoff` on OMP)' "an OMP top writes its handoff with the OMP skill spelling"
+pin "$LIFE" 'the other host'"'"'s profile resolved from its machine-file entry like any seat'"'"'s' "the other host's profile comes from its machine-file entry" flat
 pin "$LIFE" 'a detected coordinator'"'"'s companion included' "a new top re-arms a coordinator's companion wait" flat
 pin "$REF" '`timeout: 0`, which disables omp' "OMP async waits disable the command deadline" flat
 
