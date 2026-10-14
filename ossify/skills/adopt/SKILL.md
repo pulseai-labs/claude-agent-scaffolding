@@ -1,12 +1,15 @@
 ---
 name: adopt
-description: Use when onboarding a project that already has code, tests, history and ADRs, which /ossify:start refuses — six fail-closed gates, six conversions, Release 0 closed retroactively, an adoption record
+description: Use when onboarding a project that already has code — its own source or history, with or without a scaffold-dev legacy stack — which /ossify:start refuses — six fail-closed gates, six conversions, Release 0 closed retroactively, an adoption record
 ---
 
 # adopt
 
 You are the conductor of ossify's **adoption** — the on-ramp for a project
-that already has code; `/start` refuses it on its content gate.
+that already has code; `/start` refuses it on its content gate. It takes two
+inputs: a project onboarded with the scaffold-dev legacy stack (roadmap state,
+active-context cursor, legacy spec), or a plain existing-source repo — its own source or history, none of the legacy stack (#536).
+Where a station reads the legacy stack, it says what it does on a plain repo.
 
 **Thin by design, not under budget pressure** — §4's pointers are
 do-not-restate pointers, and §7 states the self-cap.
@@ -33,9 +36,6 @@ Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on C
 **Do NOT auto-invoke when:**
 
 - The project is greenfield — that is `/start`.
-- The project has no scaffold-dev legacy stack — no roadmap state, no
-  active-context cursor, no legacy spec. This version adopts THAT stack;
-  anything else is out of scope today.
 - Ossify state already exists at the routed path — route to `doctor`.
 - The ask is state-schema migration — `oss migrate` is a dispatcher concern,
   not a ceremony.
@@ -53,6 +53,8 @@ the operator finishes or abandons the slice until the state A3–A5 check holds 
 every declared repo and the AI workspace clean and each declared repo on its
 default branch, no live legacy worktree in any declared repo, the active-context
 cursor on a boundary — with every change committed in the repo it touched. Then re-run.
+On a plain repo, the refusal names the work in flight instead: the operator commits,
+finishes or drops it in the repo it touched, then re-runs.
 
 - **A0 — no inherited state override.** If `OSS_STATE_FILE` is set, stop:
   `_oss_resolve_state` lets it override the manifest for every verb below —
@@ -71,7 +73,11 @@ cursor on a boundary — with every change committed in the repo it touched. The
   it from the journey-map station it is about to run, and adoption has no such
   station, so ask the operator which repos hold the product and confirm each
   root against a checkout that actually carries its code — every gate below,
-  and C3's project-wide ADR scan, iterates exactly this set.
+  and C3's project-wide ADR scan, iterates exactly this set. A plain repo may
+  have no AI workspace yet: ask the operator where it lives — a sibling git
+  checkout, as workspace-init lays it out, or the repo itself — and author the
+  declaration there. Commit the declaration A1 authored before A3 runs: A3 refuses
+  any untracked file, adoption's own included.
 - **A2 — no ossify state at the routed path.** State exists: already
   onboarded → route to `doctor`, full stop — every `/start` project has
   state and no adoption record, so the record's absence distinguishes
@@ -96,15 +102,21 @@ cursor on a boundary — with every change committed in the repo it touched. The
   under: **that repo is the only one it addresses.** Probe every other declared
   repo at `<repo-root>/.worktrees`. A routed value under no declared repo's root
   is itself a finding — name it, and probe the conventional path everywhere.
+  With no routed value — a native `.ossify/topology.json` carries none — probe
+  the conventional path everywhere too.
   Then `find <dir> -mindepth 1 -maxdepth 1` per repo: any directory means a
   slice is open (a plain probe; the oss verb needs the state A2 just forbade).
 - **A5 — legacy position is on a boundary.** The live position is the
   manifest-routed memory bank's `05-active-context.md` cursor (the roadmap
   file is inventory, not position). An active slice there refuses and
-  names it.
+  names it. A plain repo has no cursor: record `A5: no legacy stack` among
+  the gates passed. A partial stack — some legacy artifact present, no
+  cursor — asks the operator whether a slice is open, and records the answer.
 
 Once all six pass, **record a baseline SHA per declared repo** — `git -C
-"$(oss repo_root <name>)" rev-parse HEAD` for each; the adoption record
+"$(oss repo_root <name>)" rev-parse HEAD` for each. A declared repo with no commit has no baseline SHA:
+stop and name it. It holds none of the product yet (A1), so the operator drops
+it from the declaration — it joins when it has code — then re-runs; the adoption record
 cites a **baseline table**, not one SHA, and everything downstream is
 relative to each repo's own baseline. Then `oss init "<project-name>"` —
 its state-exists refusal is A2 made mechanical, and every verb below mints
@@ -117,6 +129,7 @@ into the state it creates. Nothing hand-authors `project-state.json`.
 **Do not restate these — read the pointer, work it against the project.**
 
 - **Vision — confirm, do not elicit** (`/start` §4): read it back for correction.
+  A plain repo has no written vision to read back: elicit it as `/start` §4 does.
 - **Risk gates — derive from existing constraints** (`/start` §8 owns the
   families and the control menu); mint with `oss risk_gate_add`.
 - **Smoke — narrowed** (`/start` §9) to **unverified external pins** —
@@ -141,6 +154,8 @@ vocabulary change: `skeleton` presupposes unbuilt. Re-mark every step:
 <actor action>  |  <system responsibility>  |  <observable evidence>   [shipped|next|later]
 ```
 
+A plain repo has no roadmap to start from: elicit the steps with the operator,
+as `/start` §5 does, then mark each against the checkout.
 `shipped` means the step passes the clean-checkout test at the baseline commit
 **today** — not "code exists for it." Harvest `next`/`later` to the feature map
 as `/start` §5 does; `shipped` steps are the baseline, not candidates.
@@ -213,7 +228,7 @@ not a bone to write.
 ### C4 — The adopted baseline is Release 0, retroactively closed
 
 ```bash
-oss release_add "Release 0" "adopted baseline: everything shipped under <legacy-stack> through <baseline-sha-per-declared-repo>"
+oss release_add "Release 0" "adopted baseline: everything shipped through <baseline-sha-per-declared-repo>"
 oss release_status "<release-id>" closed
 ```
 
@@ -228,8 +243,10 @@ input — the one thing it lacks after a retroactively-closed Release 0.
 
 ### C5 — Reconcile artifacts; read the destination before writing it
 
-**No destination is opened for writing until it has been read.** Adoption has
-no blank destinations — an adopted project is all occupied surface.
+**No destination is opened for writing until it has been read.** On a legacy
+stack every destination is occupied surface. On a plain repo the legacy artifacts are absent
+(`MASTER-SPEC.md`, `CLAUDE.md`, the memory bank): confirm each is absent, then
+author it as `/start` does.
 
 **Check before you write.** Check every precondition before the first write: each file you edit exists and each text you replace is there exactly once; each file you create does not exist yet. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
 

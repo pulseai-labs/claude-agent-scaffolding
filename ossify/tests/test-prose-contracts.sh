@@ -1979,4 +1979,34 @@ _pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt C6 still says no ceremony con
 pin "$SKILLS/adopt/SKILL.md" 'Record what the pass did as the adoption record'"'"'s C2 result line (§6, #367)' \
   "adopt C2 points the station at its result line (#367)"
 
+# ---------------------------------------------------------------------------
+# adopt takes a plain existing-source repo (#536, operator ruling 2026-10-12).
+# start routes that input here, so every station that read the legacy stack
+# says what it does when there is none - a removed refusal needs a route that runs.
+_AD="$SKILLS/adopt/SKILL.md"
+pin "$_AD" 'with or without a scaffold-dev legacy stack' \
+  "adopt's description admits a plain existing-source repo (#536)"
+pin "$_AD" 'a plain existing-source repo — its own source or history, none of the legacy stack (#536)' \
+  "adopt states its two inputs (#536)"
+pin "$_AD" 'On a plain repo, the refusal names the work in flight instead' \
+  "adopt A3-A4: a plain repo's refusal names its own work in flight (#536)"
+pin "$_AD" 'With no routed value — a native `.ossify/topology.json` carries none — probe' \
+  "adopt A4 probes the conventional path when nothing is routed (#536)"
+pin "$_AD" '`A5: no legacy stack`' \
+  "adopt A5 records a plain repo's absent cursor instead of refusing (#536)"
+pin "$_AD" 'A declared repo with no commit has no baseline SHA' \
+  "adopt names a zero-commit declared repo before rev-parse fails (#536)"
+pin "$_AD" 'A plain repo has no roadmap to start from' \
+  "adopt C1 elicits the journey on a plain repo (#536)"
+pin "$_AD" 'On a plain repo the legacy artifacts are absent' \
+  "adopt C5 authors what a plain repo lacks (#536)"
+pin "$_AD" 'Commit the declaration A1 authored before A3 runs' \
+  "adopt A1 commits its own declaration so A3 does not refuse it (#536)"
+pin "$_AD" 'A plain repo has no written vision to read back' \
+  "adopt's vision station elicits on a plain repo (#536)"
+pin "$_AD" 'ask the operator where it lives — a sibling git' \
+  "adopt A1 places the AI workspace on a plain repo (#536)"
+_c="$(grep -c 'out of scope today' "$_AD" || true)"
+_pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt still declares a stackless project out of scope (#536)"
+
 t_summary
