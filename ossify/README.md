@@ -1,4 +1,4 @@
-# ossify (v1.21.1)
+# ossify (v1.22.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -70,6 +70,14 @@ once, `active`, prefixed `[adoption-seed]`, and outside each spine's own floors
 Since 1.21.1, `/ossify:adopt`'s completion floor refuses a record with no C2
 result line per declared repo: "no C2 gaps" from a clean-checkout pass that
 never ran no longer closes (#367).
+
+Since 1.22.0, `/ossify:adopt` takes a plain existing-source repo — its own
+source, no scaffold-dev legacy stack — so `/ossify:start`'s route for that
+input lands (#536). The repo gets its AI workspace first (`/pair-workspace`,
+or a new `git init` directory), and `/adopt` runs there. Each station that read the legacy stack says what
+it does without one: A5 records `no legacy stack`, C1 elicits the journey with
+the operator, C5 authors the absent spec, `CLAUDE.md` and memory bank, and a
+declared repo with no commit is named before its baseline is read.
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo
@@ -160,8 +168,8 @@ longer cites `scaffold-onboard` files as live: the interop-repair deferral calls
 that repair the retired plugin's, the budget check cites only the upstream issue,
 rule authoring no longer names a paired stack, and `start` no longer routes a
 one-change amendment to `/amend-spec`, a command only `scaffold-onboard` shipped
-(name the section and the edit instead). `/ossify:adopt` still targets
-projects onboarded with the legacy scaffold stack. No state schema, journal
+(name the section and the edit instead). `/ossify:adopt` still targeted
+projects onboarded with the legacy scaffold stack until 1.22.0. No state schema, journal
 operation or command changes.
 
 Since 1.16.0, a demo line has three statuses beside `active`: `planned` (#363,

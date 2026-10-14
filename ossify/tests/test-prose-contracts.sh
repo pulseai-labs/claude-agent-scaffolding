@@ -1979,4 +1979,54 @@ _pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt C6 still says no ceremony con
 pin "$SKILLS/adopt/SKILL.md" 'Record what the pass did as the adoption record'"'"'s C2 result line (§6, #367)' \
   "adopt C2 points the station at its result line (#367)"
 
+# ---------------------------------------------------------------------------
+# adopt takes a plain existing-source repo (#536, operator ruling 2026-10-12).
+# start routes that input here, so every station that read the legacy stack
+# says what it does when there is none - a removed refusal needs a route that runs.
+_AD="$SKILLS/adopt/SKILL.md"
+pin "$_AD" 'with or without a scaffold-dev legacy stack' \
+  "adopt's description admits a plain existing-source repo (#536)"
+pin "$_AD" 'a plain existing-source repo — its own source, none of the legacy stack (#536)' \
+  "adopt states its two inputs (#536)"
+pin "$_AD" 'On a plain repo, the refusal names the work in flight instead' \
+  "adopt A3-A4: a plain repo's refusal names its own work in flight (#536)"
+pin "$_AD" 'With no routed value — a native `.ossify/topology.json` carries none — probe' \
+  "adopt A4 probes the conventional path when nothing is routed (#536)"
+pin "$_AD" '`A5: no legacy stack`' \
+  "adopt A5 records a plain repo's absent cursor instead of refusing (#536)"
+pin "$_AD" 'A declared repo with no commit has no baseline SHA' \
+  "adopt names a zero-commit declared repo before rev-parse fails (#536)"
+pin "$_AD" 'A plain repo has no legacy roadmap: read whatever plan it carries' \
+  "adopt C1 elicits the journey on a plain repo (#536)"
+pin "$_AD" 'On a plain repo, read each one on its own' \
+  "adopt C5 authors what a plain repo lacks (#536)"
+pin "$_AD" 'A3 exempts only an uncommitted declaration A1 authored' \
+  "adopt A1's own declaration passes A3 and is committed only after every gate (#536, PR #804 r1)"
+_c="$(grep -c 'cd <ai-workspace>' "$_AD" || true)"
+_pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt A1 still offers a sibling AI workspace it never creates (#536, PR #804 r3 narrowed)"
+_c="$(grep -c 'or its own history' "$_AD" || true)"
+_pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt A1 admits a history-only repo whose empty baseline C4 would close (#536, PR #804 r5 cut)"
+pin "$_AD" '`git -C <repo-root> worktree list`' \
+  "adopt A4 finds linked worktrees outside .worktrees (#536, PR #804 r1)"
+pin "$_AD" 'An answer with no ADR behind it is a decision the code already carries' \
+  "adopt C3 authors an ADR for an answered category with none (#536, PR #804 r1)"
+pin "$_AD" 'mint scan with `dest_repo` set to that repo' \
+  "adopt C3 numbers an authored ADR project-wide, not per repo (#536, PR #804 r2)"
+pin "$_AD" 'status --porcelain --untracked-files=all' \
+  "adopt A3 lists untracked files one by one, so the exemption is exact (#536, PR #804 r2)"
+pin "$_AD" 'apart from the exact path `.ossify/topology.json`' \
+  "adopt A3 exempts only the declaration's own path (#536, PR #804 r2)"
+pin "$_AD" 'A `<dir>` that does not exist holds no worktree' \
+  "adopt A4 reads an absent worktree directory as empty (#536, PR #804 r2)"
+pin "$_AD" 'A plain repo has no written vision to read back' \
+  "adopt's vision station elicits on a plain repo (#536)"
+pin "$_AD" 'workspace-init'"'"'s `/pair-workspace` creates one as a sibling' \
+  "adopt A1 routes a sibling AI workspace through /pair-workspace, which creates it (#536, PR #804 r3)"
+pin "$_AD" 'Adoption never makes the product repo its own AI workspace' \
+  "adopt A1 keeps private artifacts out of the product repo (#536, PR #804 r5 cut)"
+pin "$_AD" 'A repo with no test suite has no such cover: run `/start` §9 in full' \
+  "adopt's smoke station is narrowed only where tests cover the code (#536, PR #804 r4)"
+_c="$(grep -c 'out of scope today' "$_AD" || true)"
+_pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt still declares a stackless project out of scope (#536)"
+
 t_summary
