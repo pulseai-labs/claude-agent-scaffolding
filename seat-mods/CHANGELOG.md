@@ -2,6 +2,10 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.4.4
+
+- **OMP: no subagents from an orchestrator** (#798). Under `SEAT_MODS_ROLE=orchestrator` the omp guard blocks the `task` tool and every `before_subagent_spawn` (eval `agent()`, workpool). Other tools stay free; coordinator and every guarded role are unchanged. The Claude Code hook is unchanged.
+
 ## 0.4.3 — 2026-10-14
 
 - **OMP device transport** (#780). Only `write xd://lsp`, `xd://ast_grep` and `xd://github` are checked
