@@ -87,9 +87,9 @@ finishes or drops it in the repo it touched, then re-runs.
   nothing.
 - **A3 — every tree adoption will edit is clean, tracked and untracked.**
   Sweep every repo the topology declares (A1 only confirms it resolves) plus
-  the AI workspace: `git -C "$(oss repo_root <name>)" status --porcelain`
-  each. Any line, in any one — apart from that uncommitted declaration A1
-  authored — is work in flight; refuse, naming the legacy stack's slice close. Each declared repo, never the AI workspace, must also
+  the AI workspace: `git -C "$(oss repo_root <name>)" status --porcelain --untracked-files=all`
+  each. Any line, in any one — apart from the exact path `.ossify/topology.json`
+  when A1 authored it uncommitted — is work in flight; refuse, naming the legacy stack's slice close. Each declared repo, never the AI workspace, must also
   be on its default branch — require it where the manifest declares one
   (`boundary-audit.md`'s own precedent); else name the checked-out branch and
   get the operator's confirmation before proceeding.
@@ -109,6 +109,8 @@ finishes or drops it in the repo it touched, then re-runs.
   the conventional path everywhere too.
   Then `find <dir> -mindepth 1 -maxdepth 1` per repo: any directory means a
   slice is open (a plain probe; the oss verb needs the state A2 just forbade).
+  A `<dir>` that does not exist holds no worktree; one that exists but cannot
+  be read refuses, naming it.
   In every declared repo, also run `git -C <repo-root> worktree list`: `git
   worktree add` takes any path, so a linked worktree can sit outside that
   directory. Name each one besides the main checkout, and get the operator's
@@ -161,8 +163,9 @@ vocabulary change: `skeleton` presupposes unbuilt. Re-mark every step:
 <actor action>  |  <system responsibility>  |  <observable evidence>   [shipped|next|later]
 ```
 
-A plain repo has no roadmap to start from: elicit the steps with the operator,
-as `/start` §5 does, then mark each against the checkout.
+A plain repo has no legacy roadmap: read whatever plan it carries (a roadmap,
+a planning doc), then elicit the steps with the operator as `/start` §5 does,
+and mark each against the checkout.
 `shipped` means the step passes the clean-checkout test at the baseline commit
 **today** — not "code exists for it." Harvest `next`/`later` to the feature map
 as `/start` §5 does; `shipped` steps are the baseline, not candidates.
@@ -228,9 +231,10 @@ a list of no gaps is not evidence that the pass ran.
 5. **Categories with no ADR still get the forced-enumeration question.** The
    failure mode `/start` §7 guards is unasked questions; adoption does not
    change that. Answer, or `not-applicable` with a reason. An answer with no ADR behind it is a decision the code already carries:
-   author its ADR in the repo it governs, as `/start` §7 does — the next number
-   in that repo's series (`bones-registry.md` §3) — and mint it `Accepted`, as
-   step 4 says.
+   author its ADR in the repo it governs, as `/start` §7 does, numbered by
+   `bones-registry.md` §3's mint scan with `dest_repo` set to that repo — the
+   next number across every declared repo, which keeps the bare reference
+   unique — and mint it `Accepted`, as step 4 says.
 
 An ADR that no longer describes the code is a **finding** for the read-out,
 not a bone to write.

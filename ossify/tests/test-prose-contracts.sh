@@ -1996,7 +1996,7 @@ pin "$_AD" '`A5: no legacy stack`' \
   "adopt A5 records a plain repo's absent cursor instead of refusing (#536)"
 pin "$_AD" 'A declared repo with no commit has no baseline SHA' \
   "adopt names a zero-commit declared repo before rev-parse fails (#536)"
-pin "$_AD" 'A plain repo has no roadmap to start from' \
+pin "$_AD" 'A plain repo has no legacy roadmap: read whatever plan it carries' \
   "adopt C1 elicits the journey on a plain repo (#536)"
 pin "$_AD" 'On a plain repo, read each one on its own' \
   "adopt C5 authors what a plain repo lacks (#536)"
@@ -2010,6 +2010,14 @@ pin "$_AD" '`git -C <repo-root> worktree list`' \
   "adopt A4 finds linked worktrees outside .worktrees (#536, PR #804 r1)"
 pin "$_AD" 'An answer with no ADR behind it is a decision the code already carries' \
   "adopt C3 authors an ADR for an answered category with none (#536, PR #804 r1)"
+pin "$_AD" 'mint scan with `dest_repo` set to that repo' \
+  "adopt C3 numbers an authored ADR project-wide, not per repo (#536, PR #804 r2)"
+pin "$_AD" 'status --porcelain --untracked-files=all' \
+  "adopt A3 lists untracked files one by one, so the exemption is exact (#536, PR #804 r2)"
+pin "$_AD" 'apart from the exact path `.ossify/topology.json`' \
+  "adopt A3 exempts only the declaration's own path (#536, PR #804 r2)"
+pin "$_AD" 'A `<dir>` that does not exist holds no worktree' \
+  "adopt A4 reads an absent worktree directory as empty (#536, PR #804 r2)"
 pin "$_AD" 'A plain repo has no written vision to read back' \
   "adopt's vision station elicits on a plain repo (#536)"
 pin "$_AD" 'ask the operator where it lives — a sibling git' \
