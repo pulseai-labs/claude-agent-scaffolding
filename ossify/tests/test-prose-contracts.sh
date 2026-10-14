@@ -1922,4 +1922,14 @@ pin "$WI/SKILL.md" 'Where a composed skill and this body disagree, this body win
 t_assert_eq 0 "$(awk 'index($0, "Until #281") {n++} END {print n+0}' "$WI/SKILL.md")" \
   "work-item SKILL.md no longer says 'Until #281' (#281)"
 
+# ---------------------------------------------------------------------------
+# Refusals that need a route that runs (#732, #553). adopt's A3-A5 named only
+# scaffold-dev's slice close, which no longer ships; /start's content gate
+# refused a declared tooling repo for carrying its own history.
+_AD="$SKILLS/adopt/SKILL.md"
+pin "$_AD" 'or, where scaffold-dev is no longer installed, close the slice by hand (#732):' \
+  "adopt §3's A3-A5 refusals name a by-hand route when scaffold-dev is gone (#732)"
+pin "$SKILLS/start/SKILL.md" 'A repo declared under the `tooling_repo` key is not the product (#553)' \
+  "start §3's content gate does not count a declared tooling repo as product content (#553)"
+
 t_summary

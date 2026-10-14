@@ -1,4 +1,4 @@
-# ossify (v1.19.3)
+# ossify (v1.19.4)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -53,6 +53,11 @@ Since 1.19.3, the dispatched `ossify:implementer-agent` is granted `Skill`, so i
 composes `superpowers:test-driven-development` and
 `superpowers:verification-before-completion` as the work-item body says, on both
 invocation paths (#281).
+
+Since 1.19.4, `/ossify:adopt`'s A3–A5 refusals also name how to close a legacy
+slice by hand when scaffold-dev is no longer installed (#732), and
+`/ossify:start`'s content gate no longer refuses a fresh project because its
+declared tooling repo carries history of its own (#553).
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo

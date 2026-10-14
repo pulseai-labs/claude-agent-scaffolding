@@ -47,7 +47,11 @@ Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on C
 
 Each gate refuses fail-closed. A1 reuses `/start`'s exact refusal contract;
 A3–A5's refusals name the **legacy stack's** close ceremony — scaffold-dev's
-slice close, then re-run — never "clean your tree", which fixes a symptom.
+slice close, then re-run — never "clean your tree", which fixes a symptom;
+or, where scaffold-dev is no longer installed, close the slice by hand (#732):
+commit the slice's work on its branch, or revert it if the operator abandons it
+(A3); merge or abandon each legacy worktree's branch, then `git worktree remove`
+it (A4); move the active-context cursor back to a boundary (A5). Then re-run.
 
 - **A0 — no inherited state override.** If `OSS_STATE_FILE` is set, stop:
   `_oss_resolve_state` lets it override the manifest for every verb below —
