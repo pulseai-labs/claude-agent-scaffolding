@@ -1947,4 +1947,28 @@ pin "$SKILLS/plan-release/SKILL.md" '`ADOPTION.md` first (its §8, #302)' \
 pin "$_FMG" '`"$(oss repo_root ai_workspace)/ADOPTION.md"`' \
   "feature-map-grooming.md §8 resolves ADOPTION.md at the AI-workspace root (#302)"
 
+# ---------------------------------------------------------------------------
+# Adoption's seed candidates reach the ledger (#293). plan-spine owns demo lines,
+# so Release 1's spines mint them: once (a re-plan finds them by command), active,
+# and outside the spine's own floors, like the community-edition line.
+_DA="$SKILLS/plan-spine/references/demo-authoring.md"
+pin "$_DA" "### Adoption's seed lines — Release 1 mints them once, outside F1 (#293)" \
+  "demo-authoring.md §1 carries the adoption seed-line section (#293)"
+pin "$_DA" 'is already the `text` of a ledger line — on any spine, in any status — is done' \
+  "demo-authoring.md: a seed candidate already in the ledger by text is never minted again (#293)"
+pin "$_DA" 'A seed line never counts toward this spine'"'"'s F1, F3 or F6' \
+  "demo-authoring.md: seed lines are excluded from the minting spine's floors (#293)"
+pin "$_DA" 'records it under its `SPINE.md` demo contribution as unmintable, with the reason' \
+  "demo-authoring.md: an unmintable seed candidate goes to SPINE.md, not RELEASE.md (#293)"
+pin "$_DA" '"[adoption-seed] <the candidate, verbatim>"' \
+  "demo-authoring.md: seed lines carry the [adoption-seed] text prefix (#293)"
+pin "$_DA" 'F1 counts neither `[community-edition]` nor `[adoption-seed]` lines' \
+  "demo-authoring.md §2: the read-out's F1 count excludes standing lines (#293)"
+pin "$SKILLS/plan-spine/SKILL.md" 'mints adoption'"'"'s C6 seed candidates once (`references/demo-authoring.md` §1, #293)' \
+  "plan-spine §8a points Release 1 at the seed-line section (#293)"
+pin "$SKILLS/adopt/SKILL.md" 'Release 1'"'"'s spines mint them (`plan-spine/references/demo-authoring.md` §1, #293)' \
+  "adopt C6 names the ceremony that mints its candidates (#293)"
+_c="$(grep -c 'no ceremony' "$SKILLS/adopt/SKILL.md" || true)"
+_pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt C6 still says no ceremony consumes the seed candidates (#293)"
+
 t_summary

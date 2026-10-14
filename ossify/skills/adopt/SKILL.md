@@ -244,16 +244,12 @@ no blank destinations — an adopted project is all occupied surface.
 ### C6 — Record the demo-ledger seed candidates
 
 The only ledger verb, `oss ledger_add_auto`, keys every line to a spine, and
-C4 deliberately creates none — adoption cannot mint them, and **no ceremony
-consumes the candidates yet** (#293 wires the first post-adoption spine
-to). Record them in the adoption record anyway — small, end-to-end, from
-the current cut's journey, not a transcription of the test suite: the first
-spine close should exercise the shipped surface, and until that wiring
-exists the vacuous-window risk stands, named rather than hidden. When that
-spine records them as lines, it passes `active` as the last argument:
-adoption's lines test surface that already ships, so the `planned` default
-(§8 of plan-spine) would park them until a close that has nothing to build
-first.
+C4 deliberately creates none, so adoption cannot mint them. Release 1's spines mint them (`plan-spine/references/demo-authoring.md` §1, #293):
+once, `active`, since they test surface that already ships, and outside each
+spine's own floors. Record them in the adoption record — small, end-to-end, from
+the current cut's journey, not a transcription of the test suite, each with the
+command that runs it where you know one: the first spine close should exercise
+the shipped surface.
 
 ---
 

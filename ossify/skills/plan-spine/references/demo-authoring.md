@@ -77,6 +77,41 @@ Author it once; later spines find it and move on. It is a standing line, so it
 never belongs to a single spine's contribution and never counts toward F1. (If a
 typed field is ever added, it supersedes the prefix.)
 
+### Adoption's seed lines — Release 1 mints them once, outside F1 (#293)
+
+Adoption records demo-ledger seed candidates in `"$(oss repo_root ai_workspace)/ADOPTION.md"`
+(its C6) and mints none: a ledger line keys to a spine, and adoption creates no
+spine. Demo lines are this skill's, so Release 1's spines mint them.
+
+**The end state, at every Release 1 spine's planning while that file exists:** each
+candidate is a ledger line or is recorded as unmintable. The line's text is the
+same prefix rule as above, `[adoption-seed] ` plus the candidate's own words. A
+candidate whose prefixed text is already the `text` of a ledger line — on any spine, in any status — is done.
+So a resumed or amended plan, or a sibling spine planned later, mints nothing
+twice, and a seed line someone retired or superseded stays that way. A candidate
+that another Release 1 spine's `SPINE.md` (`spec-authoring.md` §1) records as
+unmintable is done too.
+
+```bash
+oss get '[.demo_ledger[] | select(.text | startswith("[adoption-seed]")) | .text]'
+```
+
+Mint each remaining candidate that binds under F5 (§6) `active`, since it tests
+surface that already ships:
+
+```bash
+oss ledger_add_auto "$spine" "[adoption-seed] <the candidate, verbatim>" "<its command>" "<its expected>" active
+```
+
+For a candidate that cannot state a runnable command and expected, this spine
+records it under its `SPINE.md` demo contribution as unmintable, with the reason.
+`RELEASE.md` carries no demo lines, so it is not the place.
+
+A seed line never counts toward this spine's F1, F3 or F6. It tests what the
+adoption shipped, not what this spine builds, so the spine still owes its own
+lines — the same exclusion as the community-edition line. It does count against
+the release's `ledger_budget` (§6), like any line.
+
 ---
 
 ## 2. The read-out
@@ -93,6 +128,9 @@ Demo contribution — <spine-id> "<name>"   [user-facing | internal]
   F6  r0 golden-journey auto:  pass|fail|n/a   <command> drives <actor> → <outcome>
   Verdict: ACCEPT | REJECT — <the floor that decided it>
 ```
+
+F1 counts neither `[community-edition]` nor `[adoption-seed]` lines: both are
+standing lines, not this spine's contribution (§1).
 
 `n/a` is specific, never a dodge:
 
@@ -354,8 +392,8 @@ letting the suite grow past its budget silently.
 nothing runs it until something makes it live: this spine's close activates its own
 lines before the demo, and `oss ledger_activate <line-id>` moves one early — the
 round barrier or the operator does that when a round lands the code the line tests.
-`active` at authoring is `adopt`'s case alone, since adoption's lines test surface
-that already ships.
+`active` at authoring is the adoption seed lines' case alone (§1), since they test
+surface that already ships.
 
 **A spine planned under a time-box escape records the clause at plan time.** Its
 `SPINE.md` demo contribution carries the escape verbatim — "if nothing certifies in
@@ -429,7 +467,7 @@ notices, the `auto:` line catches the regression nobody walks for.
   golden-journey line (§7).
 - **Recording a line you intend to fix later.** The ledger is cumulative.
 - **Passing `active` to `ledger_add_auto` / `ledger_add_user` at plan time** (§6).
-  That is adopt's case alone; here the code does not exist yet, and the line would
+  That is the adoption seed lines' case alone (§1); here the code does not exist yet, and the line would
   run at a sibling spine's close reporting the plan as a defect.
 - **Authoring demo lines at roadmap time** — the reason they moved here is that
   roadmap time has no implementation context.

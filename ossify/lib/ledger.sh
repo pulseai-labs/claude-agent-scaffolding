@@ -29,7 +29,8 @@ oss_ledger_add_auto() { # $1=state $2=spine $3=text $4=command $5=expected [$6=p
   # #363: a line authored at plan time tests code that does not exist yet, so
   # it starts `planned` and demo_run reports it as pending until its spine's
   # close activates it. `active` stays available for the one caller whose lines
-  # test code that already ships (adopt).
+  # test code that already ships (adoption's seed lines, which Release 1's
+  # spines mint).
   local st="${6:-planned}"
   case "$st" in planned|active) ;; *)
     echo "oss: a new demo line starts planned or active (got '$st') - planned until its code is built (#363)" >&2; return 2;; esac
