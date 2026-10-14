@@ -164,7 +164,8 @@ pick the spines that fit. Prefer breadth-first thin spines; a deepening pass is
 selected when it is *earned* (evidence from the real-use findings), not because
 polish feels overdue. A candidate that is one architectural layer is not a spine
 — split it along a journey or leave it on the map. Full method in
-`references/feature-map-grooming.md`.
+`references/feature-map-grooming.md`; after an adoption, Release 1 also reads
+`ADOPTION.md` first (its §8, #302).
 
 **5b. Phrase the exit criteria as user journeys.** One line per criterion, in the
 form:

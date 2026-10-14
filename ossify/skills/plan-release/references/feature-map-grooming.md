@@ -180,3 +180,14 @@ nobody can finish is the old sprint failure mode with new vocabulary.
 - **Grooming without the intake queue.** A request another project filed is real
   use arriving from outside; it gets a disposition at every groom, not when
   someone remembers it.
+
+## 8. Release 1 after an adoption (#302)
+
+When `"$(oss repo_root ai_workspace)/ADOPTION.md"` exists — adoption writes it at
+the AI-workspace root, whatever directory this runs from — and this is the first release planned
+after the adopted Release 0, adoption's horizon feeds this planning. No state
+field carries it; read it from the record. Adoption's C1 table marks each
+journey step `shipped`, `next` or `later`, and the feature map holds one entry
+per `next` or `later` step. Groom the `next` entries as this release's candidates. Keep the `later`
+entries on the map, deferred: they are not peers of the `next` ones, and
+selecting one is the operator's choice.
