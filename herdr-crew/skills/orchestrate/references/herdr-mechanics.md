@@ -149,6 +149,16 @@ with `herdr pane read <pane>`, put it to the operator (herdr's guide says to ask
 give the answer with `herdr agent send-keys <pane> <keys>`, then one fresh bounded wait. A
 question written to the report file is not a dialog; it rings that doorbell (Completion).
 
+## Host: OMP
+
+An OMP top (`omp-seat orchestrator --via omp-glm`, omp-roles 0.4.0) runs this skill as written, with these
+substitutions. Background call: omp's bash async job (`async.enabled`, on by default); an async-job wait states
+its own timeout on the call, since omp's default async bash timeout is 300 s; its result returns to the
+session as a turn, so every readiness and completion wait, and the heartbeat, runs as one. A send's slash command
+is text on omp: `/<plugin>:<skill>` becomes `skill://<skill>`, except a send to a Claude Code seat. herdr-crew's
+`hooks.json` does not run on omp: the context-ceiling notice comes from molt's omp extension. No `Agent` tool
+means no `task`, `eval` `agent()` or workpool: seat-mods 0.4.4 blocks them for `SEAT_MODS_ROLE=orchestrator` (#798).
+
 ## Sending a seat a message
 
 This is the one statement of how the orchestrator sends a seat anything; other files say "send" and mean this.

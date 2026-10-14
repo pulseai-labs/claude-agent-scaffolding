@@ -82,6 +82,9 @@ Every command's syntax comes from `herdr --skill`.
    otherwise the sentinel `none` — so an eligible worker's ping comes back here; a coordinator
    fills its children's slot the same way, and an operator's `brief:` is sent as a copy carrying
    the slot and the ping step, never edited in place (`briefs.md`).
+   The attempt this dispatch writes to `run.json` records the seat's report path beside its pane —
+   `"locator": {"pane": "<pane>", "report": "<REPORT_PATH>"}` — so a top that never saw this session's handoff
+   can still find every live report.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes or the plan's
@@ -288,7 +291,9 @@ machine label where the seat is not on this machine, the pane `run.orchestrator`
 writing, and, per live dispatch, its
 `REPORT_PATH`, the hash last noted, and the file's identity noted beside that hash — inode
 or mtime — and, per live seat, its molt status path recorded at launch and the last status
-line noted, its autonomic pain path and the last pain line noted, and your own resolved profile
+line noted, its autonomic pain path and the last pain line noted, and your own resolved profile, and a launch command for each host — this top's and the other host's
+(Claude Code and OMP: `omp-seat orchestrator --via omp-glm`), so the operator's "fall back to OMP" or
+"hand back to Claude" picks one
 — `/ossify:handoff` with ossify installed, the same file by hand without it. Open a new tab
 and pane with the launch command the handoff recorded — ask the operator once when none
 did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`,
@@ -317,6 +322,8 @@ successor's next message to a retained worker carries its own pane id as the new
 `NOTIFY_PANE`, the worker keeps pinging this pane, and the successor's heartbeat covers the
 interval. Then tell the
 operator which tab to use and that this one can close.
+A successor on the other host takes that host's form: `skill://handoff-resume <path>` to an OMP top,
+`/ossify:handoff-resume <path>` to a Claude Code top.
 The new top resumes by naming the parent's `run.json` path — there is no CLI call —
 rebinding `run.orchestrator` to its own pane as its first write, and then, before the
 step the handoff named, issues one fresh bounded background
@@ -348,3 +355,10 @@ dispatch against the hash and identity the handoff noted, a carried wake include
 that landed across the clear is acted on once and retires its listed wait by id; the later
 notification for that generation retires nothing. With `/molt off` the marker goes, the hook
 speaks again, and the rotation above applies.
+
+**Resume after a hard stop.** When the top died without a handoff (a usage limit), the operator starts a new top
+and names the run's `run.json`. That top reads the newest handoff, `run.json` and `herdr agent list`. Each attempt
+still `working` gives its pane and its report path (`locator`). A report that exists for a task `run.json` does not
+mark done is read once, as a wake with no prior hash; a task already marked done is never acted on again. Then it
+rebinds `run.orchestrator`, sends each live worker its own pane as the new `NOTIFY_PANE`, and arms one fresh wait
+per live pane and the heartbeat.

@@ -1964,7 +1964,8 @@ pin "$MECHANICS_MD" 'the top'"'"'s rotation successor exports `SEAT_MODS_ROLE=or
   "step 2 marks the top's rotation successor orchestrator" flat
 pin "$MECHANICS_MD" '`SEAT_MODS_ROLE=coordinator`' \
   "step 2 names the coordinator seat's export once"
-pin "$MECHANICS_MD" '`SEAT_MODS_ROLE=orchestrator`' \
+# 0.2.19: scope to the launch export; Host: OMP also names the role's rail.
+pin "$MECHANICS_MD" '`SEAT_MODS_ROLE=orchestrator`; neither free role gets' \
   "step 2 names the successor's export once"
 pin "$MECHANICS_MD" 'The operator'"'"'s own first top is not launched here' \
   "step 2 says the operator launches its own top" flat

@@ -17,6 +17,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
+LIFE="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 # 235, raised from 204 during T3 (2026-09-22): the pilot measured eight mechanics the file
 # had wrong or missing — the two detection events, the worktree path's workspace label and
 # `result.root_pane.pane_id` and its source-repo `--cwd`, the source-repo workspace that
@@ -65,7 +66,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=360  # 0.2.18: +3 lines for the OMP mode-file read; adjacent over-budget control retained. 0.2.13: lowered from 360 when the dsh carve-out left step 2 and the heartbeat. 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
+REF_BUDGET=370  # 0.2.19: +10 lines for "Host: OMP" (spec D); 2026-10-15: 0.2.18: +3 lines for the OMP mode-file read; adjacent over-budget control retained. 0.2.13: lowered from 360 when the dsh carve-out left step 2 and the heartbeat. 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -249,6 +250,13 @@ pin "$REF" '**A child'"'"'s pain.**' "Completion has the child-pain paragraph" f
 pin "$REF" 'The heartbeat, per tick, per live seat, reads it too' "the heartbeat reads each child's pain file" flat
 pin "$REF" 'it is never a failed task' "a pain line is an ask, not a failure" flat
 pin "$REF" 'seat-mods refuses the call before autonomic sees it' "a seat-mods deny rings no pain of its own (F7)" flat
+
+section "OMP top (0.2.19)"
+pin "$REF" '## Host: OMP' "herdr-mechanics carries the OMP host mapping"
+pin "$REF" 'herdr-crew'"'"'s `hooks.json` does not run on omp' "the ceiling notice on omp comes from molt" flat
+pin "$LIFE" '"locator": {"pane": "<pane>", "report": "<REPORT_PATH>"}' "an attempt records its report path"
+pin "$LIFE" '**Resume after a hard stop.**' "lifecycle states the hard-stop resume"
+pin "$LIFE" 'a launch command for each host' "the rotation handoff records both hosts' launch commands"
 
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"
