@@ -43,7 +43,13 @@ no N/A.
    row requires refuses: the four verb-call COUNTS (`feature_add`,
    `bone_add`, `risk_gate_add`, `posture_set` — counts, with values
    recorded beside them where they exist), all nine C3 category
-   dispositions, critic `ran|skip`, and smoke verified/unverified counts.
+   dispositions, critic `ran|skip`, smoke verified/unverified counts, and a
+   C2 result line per declared repo (the baseline SHA its clean checkout ran
+   at, the `shipped` steps exercised of the total and how, the gaps found;
+   #367). "No C2 gaps" with no C2 result line refuses — a clean-checkout
+   pass that never ran reads exactly like one that found nothing — and so
+   does a line that exercised fewer `shipped` steps than C1 marks without
+   naming why.
    Within the lines: not-applicables must be operator-ruled on the record —
    conductor-self-certified `not-applicable` answers do not satisfy it,
    whatever their reasons say; a `critic skip` attributes the operator's

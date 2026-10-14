@@ -157,7 +157,8 @@ The current cut is the union of the `shipped` journey steps. Validating it is
 the one place to be slow — it is the only step that establishes what is
 actually true rather than what a document claims. **Where checkout and legacy
 spec disagree, the checkout wins, and the gap is a recorded finding** — never a
-silent re-mark.
+silent re-mark. Record what the pass did as the adoption record's C2 result line (§6, #367):
+a list of no gaps is not evidence that the pass ran.
 
 ### C3 — Bones back-derived from every repo's ADR directory, aggregated
 
@@ -262,7 +263,7 @@ the shipped surface.
 | Bones / risk gates / feature map / posture / Release 0 closed | `project-state.json` | `oss` verbs — into §3's init state |
 | `PUBLIC_BOUNDARY.md` | each public repo root | author |
 | Stub retrospective | `"$(oss release_dir r0)/release-retrospective.md"` | author — records the adoption |
-| **Adoption record** | `<ai-workspace>/ADOPTION.md` | author — baseline table, gates passed, merged-vs-authored, **every C2 gap**, the C6 seed candidates, and the per-station lines the floor requires: `feature_add`/`bone_add`/`risk_gate_add`/`posture_set` counts; each C3 category `answered` (bone ref) or `not-applicable` **operator-ruled** with its reason; critic `ran\|skip`, a skip being the operator's typed bypass; smoke verified/unverified counts; **a zero names what produced it** — the §8 family walk behind `risk_gate_add: 0`, the empty external-pin inventory behind `smoke 0/0` |
+| **Adoption record** | `<ai-workspace>/ADOPTION.md` | author — baseline table, gates passed, merged-vs-authored, **every C2 gap**, a C2 result line per declared repo (the baseline SHA its clean checkout ran at; the `shipped` steps exercised of the total, and how — the command run, or the walk the operator watched; the gaps found), the C6 seed candidates, and the per-station lines the floor requires: `feature_add`/`bone_add`/`risk_gate_add`/`posture_set` counts; each C3 category `answered` (bone ref) or `not-applicable` **operator-ruled** with its reason; critic `ran\|skip`, a skip being the operator's typed bypass; smoke verified/unverified counts; **a zero names what produced it** — the §8 family walk behind `risk_gate_add: 0`, the empty external-pin inventory behind `smoke 0/0`, the C2 result line behind no C2 gaps |
 
 The adoption record is the point: the only artifact saying what adoption
 did; `doctor` consults it when spec and state disagree (doctor §1).
@@ -283,6 +284,10 @@ Refuse to declare completion, naming the station that never ran, when:
 - the adoption record lacks the per-station lines its row requires — a zero
   must be visible and answered, never unasked (`/start` §12: thin succeeds
   provided every category was asked).
+- the adoption record has no C2 result line for a declared repo, or one that
+  exercised fewer `shipped` steps than C1 marks without naming why — a
+  clean-checkout pass that never ran reads as "no C2 gaps", and Release 1
+  inherits an unverified baseline (#367).
 
 Close with `oss doctor` (the state gate: `state`, `schema`, `replay`,
 `shape`) and name the next step: **`/plan-release`** for Release 1.

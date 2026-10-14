@@ -1,4 +1,4 @@
-# ossify (v1.21.0)
+# ossify (v1.21.1)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -66,6 +66,10 @@ the map, deferred (#302).
 Since 1.21.0, Release 1's spines mint adoption's C6 seed candidates as demo lines:
 once, `active`, prefixed `[adoption-seed]`, and outside each spine's own floors
 (#293).
+
+Since 1.21.1, `/ossify:adopt`'s completion floor refuses a record with no C2
+result line per declared repo: "no C2 gaps" from a clean-checkout pass that
+never ran no longer closes (#367).
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo
