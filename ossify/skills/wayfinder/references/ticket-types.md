@@ -19,7 +19,7 @@ carries no uncertainty at all and just wants doing.
 |---|---|---|---|
 | `research` | AFK | `start/references/research.md` | factual, read-shaped |
 | `smoke-test` | AFK | `start/references/smoke-test-pass.md` | factual, script-shaped |
-| `spike` | AFK | `start/references/spike-contract.md` | technical — build a falsifier |
+| `spike` | AFK once its contract has a go (§3) | `start/references/spike-contract.md` | technical — build a falsifier |
 | `prototype` | HITL | `start/references/prototype.md` | experiential — a person chooses |
 | `grilling` | HITL | `challenge` interview + `start/references/domain-modeling.md` | none; it is the grill |
 | `task` | either | no instrument | none; manual work unblocking a decision |
@@ -70,7 +70,7 @@ picked up solo while the operator is elsewhere. `research`, `smoke-test`,
 and `spike` are AFK because each one's instrument resolves against
 something that does not need a person watching — sources that say what
 they say, a script that exits 0 or doesn't, a falsifier that fires or
-doesn't.
+doesn't. A `spike` needs a person once, before it starts: its contract's go (§3).
 
 **HITL** — human-in-the-loop, and not negotiable. `prototype` and
 `grilling` are HITL because the thing under resolution *is* a person's
@@ -96,6 +96,18 @@ Fan `research`, `smoke-test`, and `spike` tickets out through the `Task` tool (O
 directly, not `superpowers:dispatching-parallel-agents` — Batch S ossified
 `challenge` in-tree to drop plugin dependencies, and taking one back
 reverses that.
+
+**A `spike` is dispatched only with an approved contract (#332).**
+`start/references/spike-contract.md` §4 step 1 needs the operator's explicit go
+before any code, and an unattended worker cannot get one. So the dispatching
+session writes each spike's contract (that file's §2, six fields) where §1 puts
+the spike's record, shows it to the operator, and dispatches the spike only on an
+explicit go, with the approved contract in the worker's prompt. On a map with no
+bones, the *Decision it enables* field names the map decision the spike unblocks.
+Get the go before the claim below. A spike with no go — declined or unanswered —
+is neither claimed nor dispatched: it stays on the frontier, the session says
+which and why, and a later work-mode session takes it single-file, where the
+contract's own step 1 asks for the go again. `research` and `smoke-test` have no approval gate and dispatch as they are.
 
 **`Task` (Claude Code) and `task` (OMP) are subagent tools, and wayfinder ships on
 surfaces that have neither.** The Codex manifest registers no agent and no tool, and

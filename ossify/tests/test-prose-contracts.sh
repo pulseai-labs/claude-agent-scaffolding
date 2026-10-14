@@ -1880,4 +1880,27 @@ pin "$WI/SKILL.md" 'declared in the spec at dispatch 1 or granted on a re-dispat
 pin "$HERE/../agents/implementer-agent.md" 'unless the handoff'"'"'s §4 records an override for that AC' \
   "implementer-agent.md's RED-gate row honours a recorded override (#715)"
 
+# ---------------------------------------------------------------------------
+# wayfinder's claim re-read and spike approval (#336, #332). Both were two
+# shipped files contradicting each other; these pins hold the side each fix chose.
+_WF="$SKILLS/wayfinder/references"
+pin "$_WF/tracker.md" 'the claim re-read runs the query again (#336)' \
+  "tracker.md §2 no longer lists the claim re-read as a reader of the captured response (#336)"
+pin "$_WF/tracker.md" 'from a **fresh** run of this query immediately before assigning' \
+  "tracker.md §2's claim re-read reads a fresh response, as working.md §1 says (#336)"
+pin "$_WF/ticket-types.md" '**A `spike` is dispatched only with an approved contract (#332).**' \
+  "ticket-types.md §3 writes and approves a spike's contract before the fan-out (#332)"
+pin "$_WF/ticket-types.md" '| `spike` | AFK once its contract has a go (§3) |' \
+  "ticket-types.md §1 qualifies spike's AFK mode by the contract's go (#332)"
+pin "$_WF/charting.md" 'a `spike` whose contract the operator approved' \
+  "charting.md step 6 fires only an approved spike (#332)"
+pin "$_WF/tracker.md" 'The claim re-read reads them from a FRESH run of the' \
+  "tracker.md §2's query recipe sends the claim re-read to a fresh run (#336)"
+pin "$_WF/tracker.md" 'exception is the claim re-read: it runs the query again immediately before' \
+  "tracker.md §2's one-call explanation names the claim re-read as its exception (#336)"
+pin "$_WF/ticket-types.md" 'the *Decision it enables* field names the map decision the spike unblocks' \
+  "ticket-types.md §3 adapts the contract's bone field for maps with no bones (#332)"
+pin "$_WF/ticket-types.md" 'is neither claimed nor dispatched: it stays on the frontier' \
+  "ticket-types.md §3 leaves a spike with no go unclaimed, so it stays on the frontier (#332)"
+
 t_summary
