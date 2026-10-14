@@ -1900,7 +1900,7 @@ pin "$_WF/tracker.md" 'exception is the claim re-read: it runs the query again i
   "tracker.md §2's one-call explanation names the claim re-read as its exception (#336)"
 pin "$_WF/ticket-types.md" 'the *Decision it enables* field names the map decision the spike unblocks' \
   "ticket-types.md §3 adapts the contract's bone field for maps with no bones (#332)"
-pin "$_WF/ticket-types.md" 'An explicit no is the operator'"'"'s answer to the ticket: record it and close the' \
-  "ticket-types.md §3 closes a declined spike instead of leaving it on the frontier (#332)"
+pin "$_WF/ticket-types.md" 'is neither claimed nor dispatched: it stays on the frontier' \
+  "ticket-types.md §3 leaves a spike with no go unclaimed, so it stays on the frontier (#332)"
 
 t_summary
