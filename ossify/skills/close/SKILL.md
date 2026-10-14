@@ -225,7 +225,7 @@ recommendation.
 ## 5. Spine close
 
 The middle scope, and the one the ceremony is named for (spec §6.1). Eleven
-steps, in **binding order**:
+steps in **binding order**, plus **4b** (the bones registration, `spine-close.md` §5b):
 
 1. **Every work item `complete`** — or `abandoned`, withdrawn before dispatch —
    else refuse and **name the offender**. Test the *output* of the
@@ -253,6 +253,9 @@ steps, in **binding order**:
 4. **The cumulative demo**: `oss demo_run` for every active `auto:` line, then
    walk **this spine's own** `user:` lines (`oss demo_user_lines <spine>`) with
    the human. **Halt on the first failure** — no later step runs.
+4b. **Register the bones this spine's plan declares** (`spine-close.md` §5b):
+   `SPINE.md`'s `## Bones this spine registers` rows enter the bones registry via
+   `oss bone_add`. A missing ADR file halts naming the ref; `None.` or no section is a no-op.
 5. **The changed-path list, then `oss touch_check`.** The list is the merge's own
    diff. **rc 0 = hit, rc 1 = clean, rc 2 = could-not-check, and rc 2 is not
    clean.** A bone hit reclassifies the spine mid-flight via `oss class_set`

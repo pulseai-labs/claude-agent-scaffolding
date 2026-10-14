@@ -9,7 +9,7 @@ rather than all upfront.
 
 ```text
 <ai-workspace>/docs/specs/<release-id>/<spine-id>-<kebab-slug>/
-├── SPINE.md                       # the spine plan: items, rounds, demo contribution, fakes
+├── SPINE.md                       # the spine plan: items, rounds, demo contribution, fakes, bones
 └── work-<work-id>/
     └── spec.md                    # one per work item
 ```
@@ -56,6 +56,11 @@ Pinned sections, in this order:
 ## Rounds                 Round 1: w1, w2 (parallel) / Round 2: w3 (depends on w1)
 ## Demo contribution      the ledger lines this spine adds (§4's ledger half)
 ## Fakes                  each fake with its replacement trigger and expiry release
+## Bones this spine registers
+                         the ADR bones this spine CREATES, one row each, or the
+                         single line `None.`; the columns are `oss bone_add`'s
+                         four arguments, in its order:
+                           | ADR | Title | Touch surface (glob csv) | Revisit when |
 ```
 
 `base_branch` is the branch the spine cuts from and merges back to, **per
@@ -66,6 +71,15 @@ handoff-recorded base against the planned value **for that repo**
 (`close/references/spine-close.md` §3), so a single planned value makes every
 repo whose base differs a halt. Record the table at planning time, because at
 close the checkout has moved and there is nothing left to derive it from.
+
+**A row is a bone this spine *creates*; an ADR the plan only *cites* is not a row.**
+Close registers every row into the bones registry before its touch check, and halts
+naming the ref when the ADR file is missing — so a row is also a promise that this
+spine writes that ADR (`close/references/spine-close.md` §5b). When the spine
+creates none, write the single line `None.` — a complete answer, not a gap, which
+close reports in one line. `Revisit when` may be empty. The other three columns are
+`oss bone_add`'s required arguments, in its order — the verb is positional, so a
+swapped column registers the title where the touch surface belongs, silently.
 
 ---
 

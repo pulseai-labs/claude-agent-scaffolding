@@ -122,7 +122,7 @@ state file makes `oss get` itself fail — which is what probes 2 and 3 above ca
 
 `class` is `bone`/`flesh` as `plan-release` recorded it — §7 reads it and nothing
 here re-derives it. `rel` is the spine's release (§8 reads its ledger budget).
-`name` carries the `[internal]` marker `.class` cannot express — §8b F3 reads it.
+`name` carries the `[internal]` marker `.class` cannot express — §8a F3 reads it.
 
 The probes resolve differently, and only the first is manifest-proof:
 `oss state_path` reads the manifest and nothing else, so an exported
@@ -222,7 +222,8 @@ method in `references/dag-rounds.md`, repo dimension in `references/cross-repo.m
 
 **Draft `SPINE.md` now; finish it at §9.** Nothing in state holds the rounds.
 Context/decomposition/rounds settle here, but **Demo contribution and Fakes are
-not decided until §8-§9** — so complete it there (`spec-authoring.md` §1).
+not decided until §8-§9**, and the **bones section is written last** — so complete
+it there (`spec-authoring.md` §1).
 
 ---
 
@@ -316,37 +317,11 @@ against the release-close walkthrough. Author accordingly.
 
 **Check before you write.** Check every precondition before the first write: each file you edit exists and each text you replace is there exactly once; each file you create does not exist yet. Give every check a message that names what failed. A script that asserts after it writes leaves the edit half-applied.
 
-Judge the spine's whole contribution once, out loud, against all six floors, and
-name the floor that decides the verdict:
-
-```text
-Demo contribution — <spine-id> "<name>"   [user-facing | internal]
-  F1  at least one line        pass|fail       <n> lines
-  F2  user: journey line       pass|fail|n/a   "<the line>"
-  F3  enabler names consumer   pass|fail|n/a   <consumer spine-id> in <release-id>
-  F4  measured-quality proof   pass|fail|n/a   before <x> → after <y>, via <command>
-  F5  auto: lines bind         pass|fail       <command> → exit:<n>|contains:<str>
-  F6  r0 golden-journey auto:  pass|fail|n/a   <command> drives <actor> → <outcome>
-  Verdict: ACCEPT | REJECT — <the floor that decided it>
-```
-
-`n/a` is legitimate and specific per floor, and never a way to skip one that applies (`references/demo-authoring.md` §2).
-
-**A REJECT means no `ledger_add_*` call happens.** The contribution goes back:
-re-phrase (F2), name a consumer or return the spine to the feature map (F3), add
-the measurement (F4), state the command (F5), or author the golden-journey line
-(F6). Do not record a line and plan to fix it later — the ledger is cumulative,
-and a bad line is re-run forever.
+The read-out template, its per-floor `n/a` rules, and the rule that a REJECT stops every `ledger_add_*` call, are **`references/demo-authoring.md` §2**: emit the read-out there, against all six floors, out loud, before the first write.
 
 ### 8c. Judging a `user:` line
 
-**The test: who performs this action, and why?** A user acts *for the value*
-(places a trade, exports a report); a developer inspects an artifact to check it
-is there. Read the **verb the user performs** — the ban is on the action, **not on
-the outcome** (rejecting a line because "see" occurs is the false-reject failure
-mode, §11). Full depth in `references/demo-authoring.md` §3: the banned shapes
-(§3.2), the headless/API-consumer surface (§3.2b), the ban's scope (§3.3), worked
-accept/reject pairs (§3.4), the mechanical backstop's scope (§3.5).
+The test (who performs the action, and why), the banned shapes, the headless-consumer surface, the ban's scope, worked accept/reject pairs, the mechanical backstop's scope, and the false-reject failure mode that reading the ban as a word-list causes (§11): **`references/demo-authoring.md` §3**.
 
 ### 8d. Record the accepted lines
 
@@ -425,6 +400,12 @@ license speculative interfaces around unrelated internal algorithms.
 Full list with the reasoning and worked cases in
 `references/fake-ledger-discipline.md`.
 
+**`SPINE.md` is finished here, and its last section is `## Bones this spine registers`** — the
+ADR bones this spine **creates**, one table row each (an ADR the plan only *cites* is not a row),
+or the single line `None.` when it creates none. The columns, in `oss bone_add`'s order, and the
+rule that close registers these rows before its touch check — halting on a row whose ADR file is
+missing, so a row is a promise — are `spec-authoring.md` §1 and `close/references/spine-close.md` §5b.
+
 ---
 
 ## 10. Slash-command interaction
@@ -446,8 +427,8 @@ one — never pick for the user, never infer a spine from a name when the id mis
   "open the generated file". The lib catches the prefix case only; you catch the
   rest (§8d).
 - **Rejecting a valid journey line because its outcome is visible.** The ban is on
-  the action, not the outcome (§8c). False rejects push authors toward lines with
-  no observable half at all.
+  the action, not the outcome (`references/demo-authoring.md` §3.3). False rejects
+  push authors toward lines with no observable half at all.
 - **Applying a 4-5 item floor.** 1-5 is a bound. A 2-item spine is a normal spine,
   not an under-planned one.
 - **Offering grill-me on a flesh spine.** Bone only, plus fix-up replans (§7).

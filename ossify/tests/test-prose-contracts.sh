@@ -1797,4 +1797,56 @@ done
 # D5: the can-it-fail review step lives once, in work-item §6.
 pin "$WI/SKILL.md" '**Can each test fail?**' "work-item §6 carries the can-it-fail review step"
 
+# ---------------------------------------------------------------------------
+# 1.19.0 (#497): the bones a spine's PLAN declares. plan-spine writes SPINE.md's
+# `## Bones this spine registers` — the table whose columns are `oss bone_add`'s
+# four arguments in its order, or the single line `None.` — and spine-close
+# registers those rows before its touch check (that reader half is pinned with
+# the close-side contracts above). The two surfaces must name the same section
+# and the same column ORDER: bone_add is positional, so a swapped column
+# registers the title where the touch surface belongs, silently.
+# ---------------------------------------------------------------------------
+_PS_SPINE="$SKILLS/plan-spine/SKILL.md"
+_PS_SPEC="$SKILLS/plan-spine/references/spec-authoring.md"
+pin "$_PS_SPINE" 'its last section is `## Bones this spine registers`' \
+  "plan-spine SKILL.md finishes SPINE.md with the bones section (#497)"
+pin "$_PS_SPINE" 'an ADR the plan only *cites* is not a row' \
+  "plan-spine SKILL.md says a row is a bone the spine CREATES (#497)"
+pin "$_PS_SPEC" '## Bones this spine registers' \
+  "spec-authoring.md's pinned-sections list carries the bones section (#497)"
+pin "$_PS_SPEC" '| ADR | Title | Touch surface (glob csv) | Revisit when |' \
+  "spec-authoring.md pins the bones table's four columns in oss bone_add's order (#497)"
+pin "$_PS_SPEC" 'the single line `None.`' \
+  "spec-authoring.md states the no-bones answer, the single line None. (#497)"
+pin "$_PS_SPEC" 'A row is a bone this spine *creates*' \
+  "spec-authoring.md tells the author a cited ADR is not a row (#497)"
+
+# The reader half: spine-close's registration step, between the demo and the
+# touch check. Its arms are EXECUTED against a scratch state in test-close.sh's
+# B-series; these pins hold the interface the two files share - one section name,
+# one column order - and the three messages the ceremony promises by name.
+_SCB="$SKILLS/close/references/spine-close.md"
+pin "$_SCB" '## 5b. Step 4b — register the bones this spine' \
+  "spine-close.md carries the registration step between the demo (#5) and the touch check (#6) (#497)"
+pin "$_SCB" '`## Bones this spine registers` table' \
+  "spine-close.md reads the same section name plan-spine writes (#497)"
+pin "$_SCB" 'four arguments in its order' \
+  "spine-close.md names the four columns as bone_add's arguments, in its order (#497)"
+pin "$_SCB" 'already registered - skipping' \
+  "spine-close.md's already-registered arm skips with its one line (#497)"
+pin "$_SCB" 'declares no bones - registering none' \
+  "spine-close.md's no-bones arm says so in one line and never halts (#497)"
+pin "$_SCB" 'the spine never wrote it' \
+  "spine-close.md halts on a declared bone whose ADR file is missing (#497)"
+# §1's ceremony table, and the note that keeps it honest. The registration is a
+# CORE row in both columns (§5b runs in both; on a flesh spine with `None.` it is
+# a no-op), and the note must still refuse to claim the standalone ADR check this
+# release does not ship - registering the DECLARED bones is not that check.
+pin "$_SCB" '| Bone registration' \
+  "spine-close.md §1's ceremony table carries the registration row (#497)"
+pin "$_SCB" '**core** (§5b) | **core** (§5b, a no-op when the plan declares `None.`) |' \
+  "spine-close.md §1 makes the registration core in BOTH columns (#497)"
+pin "$_SCB" '*ADR check* row is **not shipped in this release**' \
+  "spine-close.md §1 still refuses to claim the standalone ADR check (§3.3)"
+
 t_summary

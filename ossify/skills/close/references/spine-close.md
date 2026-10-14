@@ -1,9 +1,10 @@
 # Spine close — the middle layer
 
-Depth for SKILL.md §5. Eleven steps in **binding order**: each step's output is
-the next one's input, and the order is the whole content of the ceremony — the
-demo measures a tree the merge assembled, the touch check reads the merge's own
-diff, cleanup deletes branches the merge made deletable.
+Depth for SKILL.md §5. Eleven steps in **binding order** — plus **step 4b**, the
+bones registration, inserted between the demo and the touch check. Each step's
+output is the next one's input, and the order is the whole content of the
+ceremony — the demo measures a tree the merge assembled, the touch check reads
+the merge's own diff, cleanup deletes branches the merge made deletable.
 
 This layer is reached as `/close <spine-id>`, deliberately, once. The execution
 lane never routes here: it hands work items to §4 one at a time and stops at the
@@ -17,6 +18,7 @@ round barrier (`work-item/references/round-orchestration.md` §7).
 |---|---|---|
 | impl-check per work item | **core** (already run, per item, at §4) | **core** |
 | Cumulative product demo | **core** | **core** |
+| Bone registration (the bones this spine's plan declares) | **core** (§5b) | **core** (§5b, a no-op when the plan declares `None.`) |
 | Bone-touch check | **core** | **core**, and a hit reclassifies the spine mid-flight |
 | Memory-bank harvest | **core** | **core** |
 | Handoff / state updates | **core** | **core** |
@@ -35,9 +37,11 @@ checklist rather than a judgment call.
 **Two of those rows have no step in the checklist below, and saying so beats a
 row that reads as executed.** *Grill gates* are planning-time offers owned by
 `plan-spine`; nothing here re-offers one, and a close is the wrong moment to. The
-standalone *ADR check* row is **not shipped in this release**: on the bone path
-the ADR obligation currently rides on step 5's reclassification reason and step
-7's critic pass, which is weaker than its own checklist row. Recorded here as a
+standalone *ADR check* row is **not shipped in this release**: the registration
+step (§5b) enforces the ADR file for the bones the plan **declares**, and nothing
+enforces one for a bone the spine **changes or adds** mid-flight — on the bone path
+that obligation still rides on step 5's reclassification reason and step 7's
+critic pass, which is weaker than its own checklist row. Recorded here as a
 known gap rather than papered over.
 
 ---
@@ -434,9 +438,19 @@ $repo:$merge_sha"
 pushed-tip: $pre${pr_fields:+
 
 $pr_fields}"
-      pr_num="$( (cd "$repo_root" && gh --repo "$pr_slug" pr create --base "$base_branch" --head "$spine_branch" \
+      # gh prints the PR's URL, never its number, and every step after this one
+      # uses the NUMBER: the `$repo:$pr_num` lines the record pass reads, `gh pr
+      # view "$pr_num"`, the messages. Capturing the URL as `pr_num` stored a
+      # value whose failure surfaced far from here, in a guard that could not
+      # name the cause. Keep the URL whole for the messages, take the last path
+      # segment, and refuse anything that is not all digits (#716).
+      pr_url="$( (cd "$repo_root" && gh --repo "$pr_slug" pr create --base "$base_branch" --head "$spine_branch" \
         --title "merge $spine_id" --body "$pr_body") 2>&1 )" \
-        || { echo "close: gh cannot open the PR in $repo ($pr_num) - fix gh (auth, host) or record an operator-decided local merge - never a silent local fall-through - halt"; exit 1; }
+        || { echo "close: gh cannot open the PR in $repo ($pr_url) - fix gh (auth, host) or record an operator-decided local merge - never a silent local fall-through - halt"; exit 1; }
+      pr_num="${pr_url##*/}"
+      case "$pr_num" in
+        ''|*[!0-9]*) echo "close: gh pr create in $repo printed '$pr_url', not a PR URL - halt"; exit 1;;
+      esac
       echo "close: $repo PR #$pr_num opened against $base_branch - hand it to /ossify:work-pr"
     fi
     pr_lines="$pr_lines
@@ -756,6 +770,298 @@ the cumulative ledger stops meaning anything.
 
 ---
 
+## 5b. Step 4b — register the bones this spine's plan declares
+
+**A spine that creates a bone registers it here, before the touch check**, because
+the registry is what `touch_check` matches against and what every later spine's
+class declaration rides. An ADR this spine wrote whose registry row never lands is
+invisible to each mechanical check that follows, while `SPINE.md` says the bone
+exists — the two records disagree, and only the file is read by a human. The
+declaration is `SPINE.md`'s `## Bones this spine registers` table
+(`plan-spine/references/spec-authoring.md` §1): the bones this spine **creates**,
+never the ones it merely rides. A spine planned before 1.19.0 has no such section;
+a spine that creates no bone writes `None.` — both register nothing, and that is a
+complete answer, not a failure.
+
+```bash
+# $spine_id is the ceremony's. The spine directory is recovered exactly as
+# harvest.md §2 recovers it - one glob, one ambiguity guard - so the two steps
+# cannot disagree about where the plan lives.
+parts="$(oss id_parse "$spine_id")" || parts=""
+rel_id="r$(printf '%s\n' "$parts" | awk '{print $2}')"
+rel_dir="$(oss release_dir "$rel_id")" \
+  || { echo "close: cannot resolve the release directory for $spine_id - halt"; exit 1; }
+# `|| true`, so an unreadable $rel_dir reaches the guard below and is NAMED there:
+# a bare failing substitution aborts the ceremony with no output at all, which is
+# the one failure shape this block cannot report.
+spine_dirs="$(find "$rel_dir" -maxdepth 1 -type d -name "$spine_id-*" 2>/dev/null || true)"
+n_spine_dirs="$(printf '%s\n' "$spine_dirs" | awk 'NF{n++} END{print n+0}')"
+[ "$n_spine_dirs" -eq 1 ] \
+  || { echo "close: expected exactly one spine dir for $spine_id, found $n_spine_dirs - halt"; exit 1; }
+spine_md="$spine_dirs/SPINE.md"
+[ -f "$spine_md" ] \
+  || { echo "close: no SPINE.md at $spine_md - the plan's bones section is unreadable there, and so is the base-branch cross-check §3 reads - halt"; exit 1; }
+
+# THE SECTION'S TABLE BODY, AND WHAT ELSE THE SECTION MAY SAY. Inside
+# `## Bones this spine registers` (any case: the heading is matched case-folded,
+# because `## Bones This Spine Registers` is the same section) a PRESENT section is
+# either the single line `None.` or a table: `F` marks it found, `N` is that line,
+# `X` is any other non-blank line (which HALTS, below - reading only `|` lines made
+# `TBD`, a placeholder, or a table written without its outer pipes report "declares
+# no bones", a false statement about a plan that declares one), and `+` / `!` are
+# table rows. Rows only from the table: the header cell and the |---|---| separator
+# are not rows. One tab-separated record per row, cells trimmed, so a title's spaces
+# and a touch list's commas survive; the four fields are `oss bone_add`'s four arguments in its order.
+# A row that is not four cells with a ref, a title and a touch surface is emitted as
+# `!`, and the loop HALTS on it: dropping it silently is
+# the defect this step exists to prevent - SPINE.md would still say the bone exists
+# while the registry never hears of it, and only the file is read by a human. The
+# cells are validated HERE, where their boundaries are known: `read` treats a tab as
+# IFS whitespace, so an empty middle cell collapses and the next cell's text shifts
+# one slot left, into a slot the loop's own guards then read as present.
+recs="$(awk '
+  { low = tolower($0) }
+  low ~ /^## bones this spine registers[[:space:]]*$/ { insec = 1; found = 1; next }
+  insec && /^##[^#]/ { exit }
+  insec && /^[[:space:]]*$/ { next }
+  insec && /^[[:space:]]*None\.[[:space:]]*$/ { printf "N\n"; next }
+  insec && /^[[:space:]]*\|/ {
+    t = $0
+    gsub(/\\\|/, "\001", t)                        # `\|` is cell TEXT, not a boundary
+    n = split(t, c, "|")
+    for (i = 2; i <= n - 1; i++) { gsub(/\001/, "|", c[i]); gsub(/^[[:space:]]+|[[:space:]]+$/, "", c[i]) }
+    # THE TEMPLATE ROW, EXACTLY: all four cells the header carries (case-folded), or
+    # every cell nothing but `-`/`:`. Anything else is a DATA row and is validated -
+    # a row whose ref happens to read `ADR` is not a header to skip.
+    sep = (n == 6); for (i = 2; i <= n - 1; i++) if (c[i] !~ /^[-:]+$/) sep = 0
+    hdr = (n == 6 && tolower(c[2]) == "adr" && tolower(c[3]) == "title" && tolower(c[4]) == "touch surface (glob csv)" && tolower(c[5]) == "revisit when")
+    if (sep || hdr) next
+    if (n != 6 || c[2] == "" || c[3] == "" || c[4] == "" || index(c[2] c[3] c[4] c[5], "\t") > 0) { printf "!\t%s\n", $0; next }
+    printf "+\t%s\t%s\t%s\t%s\n", c[2], c[3], c[4], c[5]; next
+  }
+  insec { printf "X\t%s\n", $0 }
+  END { if (found) printf "F\n" }
+' "$spine_md")" \
+  || { echo "close: cannot read $spine_md - halt"; exit 1; }
+
+has_section="$(printf '%s\n' "$recs" | awk -F'\t' '$1=="F"{n++} END{print n+0}')"
+content_line="$(printf '%s\n' "$recs" | awk -F'\t' '$1=="X"{print $2; exit}')"
+none_lines="$(printf '%s\n' "$recs" | awk -F'\t' '$1=="N"{n++} END{print n+0}')"
+row_count="$(printf '%s\n' "$recs" | awk -F'\t' '$1=="+" || $1=="!"{n++} END{print n+0}')"
+rows="$(printf '%s\n' "$recs" | awk -F'\t' '$1=="+" || $1=="!"')"
+# One string, two ways to be boneless (no section at all, or an explicit `None.`):
+# both must print the same ONE line, and the prose pin that holds it counts
+# occurrences, so it lives here once.
+no_bones_line="close: $spine_id's plan declares no bones - registering none"
+
+if [ "$has_section" -eq 0 ]; then
+  # ABSENT is the legacy no-op: a spine planned before 1.19.0 has no section, and
+  # that is a complete answer, not a failure (B5). `None.` is the same answer said
+  # out loud, and prints the same one line.
+  echo "$no_bones_line"
+elif [ -n "$content_line" ]; then
+  echo "close: the bones section in $spine_md carries a line that is neither a table row nor the single None.: '$content_line' - halt"; exit 1
+elif [ "$none_lines" -gt 0 ] && [ "$row_count" -gt 0 ]; then
+  echo "close: the bones section in $spine_md carries None. AND a table - None. is the whole answer, so one of the two is wrong, and this step will not pick - halt"; exit 1
+elif [ "$none_lines" -eq 0 ] && [ "$row_count" -eq 0 ]; then
+  echo "close: the bones section in $spine_md is present but empty - write the table or the single line None. - halt"; exit 1
+elif [ "$none_lines" -gt 0 ]; then
+  echo "$no_bones_line"
+else
+  # WHERE THE ADR FILE IS. A bone is a decision about the product code this spine
+  # changed, so its ADR lives in a hosting repo's `docs/adr/`
+  # (start/references/bones-registry.md §3) - and the registry keeps ONE
+  # project-wide sequence across every declared repo, so a row is matched to its
+  # file by NUMBER, in either series form and at any width, never by a name the
+  # row would have to guess. Read the hosting set as an assignment, as §3 does: a
+  # selector failure inside a process substitution is invisible.
+  hosting_repos="$(oss get ".work_items[] | select(.spine==\"$spine_id\" and .status != \"abandoned\") | .target_repo" | sort -u)" \
+    || { echo "close: the hosting-repo set could not be read from state - halt"; exit 1; }
+  # One `<repo><TAB><root>/docs/adr` line per hosting repo: the repo KEY is what
+  # §3's $merge_shas pairs are keyed by (the landed commit), and the directory is
+  # what the file search walks.
+  adr_dirs=""
+  while IFS= read -r repo; do
+    [ -n "$repo" ] || continue
+    root="$(oss repo_root "$repo")" \
+      || { echo "close: $spine_id names undeclared repo '$repo' - halt"; exit 1; }
+    adr_dirs="$adr_dirs
+$repo	$root/docs/adr"
+  done <<EOF
+$hosting_repos
+EOF
+
+  registered_refs=""
+  while IFS="$(printf '\t')" read -r kind adr title touch revisit; do
+    [ -n "$kind" ] || continue
+    if [ "$kind" = "!" ]; then
+      echo "close: the bones table in $spine_md has a row that is not four cells (ADR | Title | Touch surface | Revisit when): '$adr' - halt"; exit 1
+    fi
+    [ -n "$adr" ] \
+      || { echo "close: a bones row in $spine_md carries no ADR ref, and a row without a ref is not a row - halt"; exit 1; }
+    [ -n "$title" ] && [ -n "$touch" ] \
+      || { echo "close: the bones row '$adr' carries no title or no touch surface, and both are bone_add arguments - halt"; exit 1; }
+    # A ref with no number is not one this project mints: a row is a bone the
+    # spine CREATES, and the only refs it creates continue the numeric sequence.
+    # An adopted, letters-bearing ref is a bone the plan CITES - already
+    # registered elsewhere, and not this spine's to add.
+    want="$(printf '%s' "$adr" | sed -n 's/^[Aa][Dd][Rr]-0*\([0-9][0-9]*\)$/\1/p')"
+    [ -n "$want" ] \
+      || { echo "close: the bones row '$adr' is not a numeric ADR ref this project mints - a row is a bone the spine creates (plan-spine/references/spec-authoring.md §1) - halt"; exit 1; }
+
+    # THE ADR FILE MUST EXIST: the row is a promise that this spine wrote the
+    # decision, and register only the index leaves the registry citing a file
+    # nobody wrote. An UNREADABLE directory refuses too - it is not an empty one.
+    adr_file=""
+    while IFS="$(printf '\t')" read -r adr_repo d; do
+      [ -n "$d" ] || continue
+      [ -d "$d" ] || continue
+      listing="$(ls -1 "$d" 2>/dev/null)" \
+        || { echo "close: cannot read $d - an unreadable ADR directory is not an empty one - halt"; exit 1; }
+      while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        n="$(printf '%s' "$f" | sed -n -e 's/^[Aa][Dd][Rr]-0*\([0-9][0-9]*\)-.*\.md$/\1/p' -e 's/^0*\([0-9][0-9]*\)-.*\.md$/\1/p')"
+        # The same digits AS SPELLED (leading zeros kept): the canonical ref is taken
+        # from the file, never from the plan row, or two spellings mint two bones.
+        fd="$(printf '%s' "$f" | sed -n -e 's/^[Aa][Dd][Rr]-\([0-9][0-9]*\)-.*\.md$/\1/p' -e 's/^\([0-9][0-9]*\)-.*\.md$/\1/p')"
+        if [ "$n" = "$want" ]; then
+          # TRACKED IN ITS REPO. A row is a promise that this spine wrote the
+          # decision, and a path the registry cites must be one history holds: an
+          # untracked draft satisfies "the file exists" on this machine only, and
+          # a clone - or the next session - reads a citation to nothing. Whether
+          # THIS spine introduced the file is not the question (a decision can be
+          # recorded in an older commit); being in the index is.
+          gtc=0
+          git -C "${d%/docs/adr}" ls-files --error-unmatch -- "docs/adr/$f" >/dev/null 2>&1 || gtc=$?
+          case "$gtc" in
+            0) : ;;
+            1) { echo "close: the ADR file $d/$f is not tracked in ${d%/docs/adr} - the registry would cite a path that is not in history; add it to git - halt"; exit 1; } ;;
+            *) { echo "close: cannot ask git whether $d/$f is tracked (git rc $gtc) - halt"; exit 1; } ;;
+          esac
+          # AND IN THE COMMIT THIS CLOSE LANDED. The index is not a tree: a path
+          # staged and never committed passes the check above, and so does one
+          # committed on some other branch - neither is readable from §3's landed
+          # merge, which is the tree the record promises.
+          landed="$(printf '%s\n' "${merge_shas:-}" | awk -F: -v r="$adr_repo" '$1==r{print $2; exit}')"
+          [ -n "$landed" ] \
+            || { echo "close: no landed commit for repo '$adr_repo' in \$merge_shas - cannot check that $d/$f is in the landed tree - halt"; exit 1; }
+          git -C "${d%/docs/adr}" cat-file -e "$landed:docs/adr/$f" >/dev/null 2>&1 \
+            || { echo "close: the ADR file $d/$f is not in $adr_repo's landed commit $landed - the registry would cite a path this close's own merge tree does not carry; commit it (or carry it in the spine) and re-run - halt"; exit 1; }
+          adr_file="$d/$f"; break
+        fi
+      done <<EOF2
+$listing
+EOF2
+      [ -n "$adr_file" ] && break
+    done <<EOF3
+$adr_dirs
+EOF3
+    [ -n "$adr_file" ] \
+      || { echo "close: the plan declares bone $adr, but no ADR file carries $want in the hosting repos' docs/adr ($(printf '%s' "$adr_dirs" | awk -F'\t' '{print $2}' | tr '\n' ' '))- the spine never wrote it - halt"; exit 1; }
+
+    # ONE NUMBER, ONE BONE. The canonical ref is `ADR-` plus the digits EXACTLY as
+    # the matched ADR file spells them, so `ADR-24` and `ADR-0024` cannot become two
+    # registry rows for one decision: the registry keys on the string it was given,
+    # and two rows for one number then drive the touch check independently.
+    ref="ADR-$fd"
+
+    # ALREADY REGISTERED? A halted close re-runs this step with its earlier rows
+    # already recorded, and bone_add refuses a duplicate at rc 7 (#305) - so the
+    # skip is the resume path, not a convenience. The lookup is by NUMBER, not by
+    # string (one number is one bone in any spelling). And the REF is not the row:
+    # a plan that changed a column after the bone was registered would skip in
+    # silence, leaving the registry describing a surface - or a title, or a trigger -
+    # the plan no longer declares. Compare the fields; all equal -> skip; any differ
+    # -> halt naming both sides, because which of the two is right is not this
+    # step's call, and the registry row is never written over.
+    reg_refs="$(oss get ".bones[] | select((.adr | sub(\"^[Aa][Dd][Rr]-\"; \"\") | sub(\"^0+\"; \"\") | if . == \"\" then \"0\" else . end) == \"$want\") | .adr")" \
+      || { echo "close: cannot read the registry for ADR number $want - halt"; exit 1; }
+    reg_n="$(printf '%s\n' "$reg_refs" | awk 'NF{n++} END{print n+0}')"
+    if [ "$reg_n" -gt 1 ]; then
+      echo "close: the registry holds $reg_n rows for ADR number $want ($(printf '%s' "$reg_refs" | tr '\n' ' '))- one number is one bone, and which of them is right is not this step's call - halt"; exit 1
+    fi
+    if [ -n "$reg_refs" ]; then
+      reg_ref="$reg_refs"
+      reg_title="$(oss get ".bones[] | select(.adr == \"$reg_ref\") | .title")" \
+        || { echo "close: cannot read the registered row for $reg_ref - halt"; exit 1; }
+      reg_revisit="$(oss get ".bones[] | select(.adr == \"$reg_ref\") | .revisit_trigger // \"\"")" \
+        || { echo "close: cannot read the registered row for $reg_ref - halt"; exit 1; }
+      # The plan's csv, parsed by the REGISTRY'S OWN grammar (`\,` is a literal
+      # comma, entries trimmed, empties dropped - _oss_csv_to_json), then compared
+      # as a set: the check matches one glob at a time, so the order two spellings
+      # of one surface are written in is not part of the surface.
+      plan_touch="$(awk -v s="$touch" 'BEGIN {
+          gsub(/\\,/, "\001", s)
+          n = split(s, e, ",")
+          for (i = 1; i <= n; i++) { gsub(/\001/, ",", e[i]); gsub(/^ +| +$/, "", e[i]); if (e[i] != "") printf "%s\n", e[i] }
+        }' | sort)" \
+        || { echo "close: cannot read the bones row $reg_ref's touch surface ('$touch') - halt"; exit 1; }
+      reg_touch="$(oss get ".bones[] | select(.adr == \"$reg_ref\") | .touch[]" | sort)" \
+        || { echo "close: cannot read the registered row for $reg_ref - halt"; exit 1; }
+      diffs=""
+      [ "$reg_title" = "$title" ] \
+        || diffs="$diffs
+  title: registry '$reg_title' vs plan '$title'"
+      [ "$reg_touch" = "$plan_touch" ] \
+        || diffs="$diffs
+  touch surface: registry [$(printf '%s' "$reg_touch" | tr '\n' ' ')] vs plan [$(printf '%s' "$plan_touch" | tr '\n' ' ')]"
+      [ "$reg_revisit" = "$revisit" ] \
+        || diffs="$diffs
+  revisit trigger: registry '$reg_revisit' vs plan '$revisit'"
+      if [ -z "$diffs" ]; then
+        echo "close: bone $reg_ref already registered - skipping"
+        continue
+      fi
+      echo "close: bone $reg_ref is already registered and the plan's row differs from the registry's -$diffs
+  Nothing was written. Where the SURFACE differs, repair the registry with 'oss bone_set_touch \"$reg_ref\" \"<touch-csv>\"'; where the title or the trigger differs, correct SPINE.md. Which of the two is right is the operator's call, never this step's - halt"
+      exit 1
+    fi
+
+    # The verb's own message is the halt's: it names the offending argument and
+    # the repair better than a wrapper can. `$ref`, not `$adr`: the registry's
+    # spelling is what every later read keys on.
+    oss bone_add "$ref" "$title" "$touch" "$revisit" \
+      || { echo "close: oss bone_add refused the row $adr from $spine_md - halt"; exit 1; }
+    registered_refs="$registered_refs $ref"
+    echo "close: registered bone $ref \"$title\""
+  done <<EOF4
+$rows
+EOF4
+
+  if [ -n "$registered_refs" ]; then
+    # REGISTERING A BONE IS A BONE DECISION - this step's own premise - so the class
+    # moves HERE, from the registry write. The touch check below catches the same
+    # spine only when the new surface happens to hit this diff, and a
+    # `not-applicable` or future-facing glob never does. Read the class and test the
+    # OUTPUT, never the rc (an unknown id prints ""), exactly as §6.1's guard does
+    # for its own call.
+    class="$(oss get ".spines[] | select(.id == \"$spine_id\") | .class")" \
+      || { echo "close: cannot read $spine_id's class - halt"; exit 1; }
+    case "$class" in
+      bone) : ;;   # already bone: nothing to change, and no bone->bone entry
+      flesh) oss class_set "$spine_id" bone "bone registered at close:$registered_refs" \
+               || { echo "close: oss class_set refused the reclassification of $spine_id for$registered_refs - halt"; exit 1; } ;;
+      *) { echo "close: cannot read $spine_id's class ('$class') - halt"; exit 1; } ;;
+    esac
+  fi
+fi
+```
+
+**Registering a bone is a bone decision, so the class moves here.** A flesh spine
+that registered at least one NEW bone is reclassified to `bone` as the step ends —
+not by the touch check below, which sees the new surface only when it happens to hit
+this diff: a `not-applicable` or future-facing glob never does. A spine already
+`bone` gets no call, for the same reason §6.1 reads the class before its own:
+`oss class_set` accepts `to == from` and would append a `bone`→`bone` entry to
+`class_overrides`.
+
+**What this step is not.** It does not repair older entries, re-point a stale
+surface, or check that the ADR's own text says what the row says (the ADR check's
+standalone row is still not shipped, §1). It registers what the plan declares and
+refuses to register what the plan only cites.
+
+---
+
 ## 6. Step 5 — the changed-path list, then the touch check
 
 **Compute the path list first — it is every hosting repo's own first-parent
@@ -876,7 +1182,16 @@ close-time check).
 ### 6.1 On a bone hit — reclassify mid-flight
 
 ```bash
-oss class_set "$spine_id" bone "bone-touch at close: <ADR-ref> (<matched surface>)"
+# A spine already bone keeps its class: `oss class_set` accepts to == from and
+# would journal a bone->bone transition that never happened - which the step
+# before this one makes routine, since a bone spine's diff hits the bones it
+# just registered. Test the output, never the rc (an unknown id prints "").
+class="$(oss get ".spines[] | select(.id == \"$spine_id\") | .class")"
+case "$class" in
+  bone) echo "close: $spine_id is already bone - no class change" ;;
+  flesh) oss class_set "$spine_id" bone "bone-touch at close: <ADR-ref> (<matched surface>)" ;;
+  *) echo "close: cannot read $spine_id's class ('$class') - halt"; exit 1 ;;
+esac
 ```
 
 **Three arguments; the reason is required** and is the audit trail for a class
