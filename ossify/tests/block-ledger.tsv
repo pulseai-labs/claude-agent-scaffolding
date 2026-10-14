@@ -185,7 +185,7 @@ I	skills/plan-spine/references/cross-repo.md	2	a work_item_add shape and a work-
 D	skills/plan-spine/references/decomposition.md	1	#138	the bone-touch re-check at decomposition
 I	skills/plan-spine/references/decomposition.md	2	a work_item_add return and a single class_set call
 D	skills/plan-spine/references/demo-authoring.md	2	#138	the posture read that gates the community-edition line, and the [internal] spine case guard
-I	skills/plan-spine/references/demo-authoring.md	7	worked ledger_add_auto examples and single-verb reads
+I	skills/plan-spine/references/demo-authoring.md	9	worked ledger_add_auto examples and single-verb reads (the two #293 seed-line blocks are one of each)
 I	skills/plan-spine/references/demo-amendments.md	3	single-verb calls: supersede, ledger read, quarantine
 I	skills/plan-spine/references/fake-ledger-discipline.md	3	single-verb calls: fake_add, fake_status, feature_add
 I	skills/plan-spine/references/citation-foldin.md	2	two ADR reads used to check citations by eye
@@ -254,7 +254,7 @@ H	skills/plan-spine/references/citation-foldin.md	3602525984-347
 H	skills/plan-spine/references/cross-repo.md	760526739-899
 H	skills/plan-spine/references/decomposition.md	904324617-642
 H	skills/plan-spine/references/demo-amendments.md	3004605912-329
-H	skills/plan-spine/references/demo-authoring.md	1287504627-1622
+H	skills/plan-spine/references/demo-authoring.md	3981354988-1862
 H	skills/plan-spine/references/fake-ledger-discipline.md	3569334562-372
 H	skills/plan-spine/references/intake-and-ledger.md	3936310853-289
 H	skills/patch/SKILL.md	2505586866-556

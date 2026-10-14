@@ -156,7 +156,7 @@ Don't run `/grill-me` and `/council` in the same session — different interacti
 ├── ai-mentor/                         # ai-mentor plugin (v2.5.0)
 ├── architect-critic/                  # architect-critic plugin (v0.8.0)
 ├── claude-security-audit/             # security-audit plugin (v0.1.5)
-├── ossify/                            # skeleton-first delivery lifecycle (v1.20.0)
+├── ossify/                            # skeleton-first delivery lifecycle (v1.21.0)
 ├── code-judo/                         # code-judo plugin (v0.2.0)
 ├── herdr-crew/                        # herdr-crew plugin (v0.2.18)
 ├── merge-bar/                         # merge-bar plugin (v0.3.0)

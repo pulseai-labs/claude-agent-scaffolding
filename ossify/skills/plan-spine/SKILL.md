@@ -312,6 +312,8 @@ against the release-close walkthrough. Author accordingly.
   here). The r0 spine owning the journey's entry point authors it; any other r0
   spine either finds it in the ledger (the `planned`-inclusive read of
   `demo-authoring.md` §6) or names the spine that will. Release 0 does not close without it.
+- **Release 1 after an adoption** also mints adoption's C6 seed candidates once (`references/demo-authoring.md` §1, #293):
+  `active`, prefixed `[adoption-seed]`, and outside this spine's own floors.
 
 ### 8b. Emit the floor read-out before you write anything
 
@@ -334,7 +336,7 @@ Each call **prints the minted line id** (`d7`, `d8`, …) — capture it; amendm
 (§8e) key by that id, not the text. Both verbs write the line **`planned`** (its code
 not built yet): this spine's close activates it before the demo, `ledger_activate
 <line-id>` moves it early when a round lands it, and `active` at authoring is
-`adopt`'s case only. `ledger_add_auto` validates `<expected>` as `exit:<n>` or
+the adoption seed lines' case only. `ledger_add_auto` validates `<expected>` as `exit:<n>` or
 `contains:<str>` (exit **2** else), no comparison form — a threshold ("p50 under 40ms")
 lives inside the command, which exits non-zero when missed; that is how F4's
 after-number becomes machine-checkable.
