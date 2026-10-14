@@ -1964,7 +1964,8 @@ pin "$MECHANICS_MD" 'the top'"'"'s rotation successor exports `SEAT_MODS_ROLE=or
   "step 2 marks the top's rotation successor orchestrator" flat
 pin "$MECHANICS_MD" '`SEAT_MODS_ROLE=coordinator`' \
   "step 2 names the coordinator seat's export once"
-pin "$MECHANICS_MD" '`SEAT_MODS_ROLE=orchestrator`' \
+# 0.2.19: scope to the launch export; Host: OMP also names the role's rail.
+pin "$MECHANICS_MD" '`SEAT_MODS_ROLE=orchestrator`; neither free role gets' \
   "step 2 names the successor's export once"
 pin "$MECHANICS_MD" 'The operator'"'"'s own first top is not launched here' \
   "step 2 says the operator launches its own top" flat
@@ -2327,7 +2328,7 @@ pin "$PRBRIEFS_MD" 'If molt'"'"'s handoff command arrives mid-round, still finis
 pin "$CHANGELOG_MD" '## 0.2.8' "CHANGELOG has 0.2.8"
 pin "$CHANGELOG_MD" '## 0.2.9' "CHANGELOG has 0.2.9"
 pin "$LIFECYCLE_MD" 'and its autonomic pain path' "lifecycle step 13: the top's handoff carries each seat's pain path" flat
-pin "$LIFECYCLE_MD" 'its autonomic pain path and the last pain line noted, and your own resolved profile' \
+pin "$LIFECYCLE_MD" 'its autonomic pain path and the last pain line noted, and a resolved profile beside' \
   "lifecycle: the top's own rotation handoff carries each seat's pain path" flat
 
 section "reference line budgets"

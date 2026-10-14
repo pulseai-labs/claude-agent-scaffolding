@@ -58,7 +58,7 @@ A seat's readiness path is never a field here: it follows from herdr's own answe
 to whether the pane is detected (`herdr-mechanics.md`) — so a detection manifest
 landing later moves a seat onto the typed path with no edit anywhere.
 
-**OMP coordinator seats.** Put `omp-seat` on PATH with the symlink in [omp-roles' Install step](../../../../omp-roles/README.md#install); an OMP seat fills only the lane driver (default-lane spine session), close, doctor or worker seats (`omp-seat worker --via <wrapper>`), never the orchestrator top, its rotation successor, a work-PR session or an activated spine session until a live OMP seat-launching run lifts it (#788).
+**OMP coordinator seats.** Put `omp-seat` on PATH with the symlink in [omp-roles' Install step](../../../../omp-roles/README.md#install); an OMP seat fills the lane driver (default-lane spine session), close, doctor or worker seats (`omp-seat worker --via <wrapper>`), and, since 0.2.19, the orchestrator top and its rotation successor (`omp-seat orchestrator --via omp-glm`; omp-roles 0.4.0, seat-mods 0.4.4) — never a work-PR session or an activated spine session until a live OMP seat-launching run lifts it (#788).
 ```markdown
 ### omp-spine-deepseek
 command: omp-seat spine-driver --via omp-deepseek-go

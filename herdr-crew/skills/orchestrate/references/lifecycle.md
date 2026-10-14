@@ -288,15 +288,18 @@ machine label where the seat is not on this machine, the pane `run.orchestrator`
 writing, and, per live dispatch, its
 `REPORT_PATH`, the hash last noted, and the file's identity noted beside that hash — inode
 or mtime — and, per live seat, its molt status path recorded at launch and the last status
-line noted, its autonomic pain path and the last pain line noted, and your own resolved profile
-— `/ossify:handoff` with ossify installed, the same file by hand without it. Open a new tab
+line noted, its autonomic pain path and the last pain line noted, and a resolved profile beside a launch command for each host — this top's and the other host's
+(Claude Code and OMP: `omp-seat orchestrator --via omp-glm`), the other host's profile resolved from its machine-file
+entry like any seat's (`config.md`) — ask the operator once when there is none — so the operator's "fall back to OMP" or
+"hand back to Claude" picks one
+— `/ossify:handoff` with ossify installed (`skill://handoff` on OMP), the same file by hand without it. Open a new tab
 and pane with the launch command the handoff recorded — ask the operator once when none
 did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`,
 which herdr sets in every pane it hosts (as it does `HERDR_PANE_ID`), the top's own
 workspace, never the run's, which closes last. **Launch it as the seat launch
 `herdr-mechanics.md` states** — marked `orchestrator` before its command (`herdr-mechanics.md`
-step 2) — the readiness path, the model read against the profile the
-handoff recorded, then the second detection ask — and send its resume on the route that
+step 2) — using the destination host's recorded profile for the readiness path and model read,
+then the second detection ask — and send its resume on the route that
 ask fixes: a successor is a seat like any other, and one sent its resume before its TUI
 accepts input never binds the run. The file's `run.orchestrator` block — where dagr
 routes the operator's messages — is the successor's first write: A session that binds an
@@ -317,10 +320,12 @@ successor's next message to a retained worker carries its own pane id as the new
 `NOTIFY_PANE`, the worker keeps pinging this pane, and the successor's heartbeat covers the
 interval. Then tell the
 operator which tab to use and that this one can close.
+A successor on the other host takes that host's form: with ossify, `skill://handoff-resume <path>` to an OMP top
+and `/ossify:handoff-resume <path>` to a Claude Code top; without it, the path as its first instruction on either.
 The new top resumes by naming the parent's `run.json` path — there is no CLI call —
 rebinding `run.orchestrator` to its own pane as its first write, and then, before the
-step the handoff named, issues one fresh bounded background
-wait per live pane the handoff listed, through the machine the handoff names for a
+step the handoff named, re-arms each live pane the handoff listed with the waits step 5 states (a detected
+coordinator's companion included), through the machine the handoff names for a
 remote one, which every later operation on that pane carries too (`herdr-mechanics.md`,
 Machines): a new session's first wait, not a re-entry,
 which re-arms what the `run.json` cannot — and it can re-arm them because the
