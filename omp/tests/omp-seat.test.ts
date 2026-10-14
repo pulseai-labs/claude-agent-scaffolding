@@ -47,9 +47,9 @@ describe('planLaunch', () => {
   test('an unknown role is an error', () => {
     expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker, spine-driver, close, work-pr, orchestrator)' })
   })
-  test('orchestrator appends its role file when seat-mods is 0.4.4 or later', () => {
-    const [s, m, a] = [install('seat-mods', true, '0.4.4'), install('molt'), install('autonomic')]
-    record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })
+  test('orchestrator appends its role file when seat-mods is 0.4.4, autonomic 0.7.0 and herdr-crew 0.2.19 or later', () => {
+    const [s, m, a] = [install('seat-mods', true, '0.4.4'), install('molt'), install('autonomic', true, '0.7.0')]
+    record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a, 'herdr-crew': install('herdr-crew', false, '0.2.19') })
     const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
     expect(planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir })).toMatchObject({
       argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'),
@@ -57,10 +57,38 @@ describe('planLaunch', () => {
     })
   })
   test('orchestrator refuses seat-mods 0.4.3, naming the 0.4.4 minimum (no top without the #798 rail)', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.3'), molt: install('molt'), autonomic: install('autonomic') })
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.3'), molt: install('molt'), autonomic: install('autonomic', true, '0.7.0'), 'herdr-crew': install('herdr-crew', false, '0.2.19') })
     const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
     expect(r).toEqual({ error: expect.stringContaining('seat-mods 0.4.3') })
     expect((r as { error: string }).error).toContain('0.4.4')
+  })
+  const orch = () => planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
+  const orchMods = (autonomic = '0.7.0') => ({ 'seat-mods': install('seat-mods', true, '0.4.4'), molt: install('molt'), autonomic: install('autonomic', true, autonomic) })
+  test('orchestrator refuses autonomic 0.6.0, naming the 0.7.0 minimum (children inherit autopilot through the mode file)', () => {
+    record(ompRecord, { ...orchMods('0.6.0'), 'herdr-crew': install('herdr-crew', false, '0.2.19') })
+    const r = orch() as { error: string }
+    expect(r.error).toContain('autonomic 0.6.0')
+    expect(r.error).toContain('0.7.0')
+  })
+  test('orchestrator refuses a host with no herdr-crew, naming the plugin and both records', () => {
+    record(ompRecord, orchMods())
+    const r = orch() as { error: string }
+    expect(r.error).toContain('orchestrator needs herdr-crew 0.2.19 or later')
+    expect(r.error).toContain(ompRecord)
+    expect(r.error).toContain(claudeRecord)
+  })
+  test('orchestrator refuses herdr-crew 0.2.18 (no "Host: OMP")', () => {
+    record(ompRecord, { ...orchMods(), 'herdr-crew': install('herdr-crew', false, '0.2.18') })
+    expect((orch() as { error: string }).error).toContain('herdr-crew 0.2.18 is unsupported for orchestrator')
+  })
+  test("orchestrator accepts herdr-crew from Claude Code's record", () => {
+    record(ompRecord, orchMods())
+    record(claudeRecord, { 'herdr-crew': install('herdr-crew', false, '0.2.19') })
+    expect(orch()).toHaveProperty('argv')
+  })
+  test('control: worker needs neither herdr-crew nor autonomic 0.7.0', () => {
+    record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt'), autonomic: install('autonomic') })
+    expect(launch('worker')).toHaveProperty('argv')
   })
   test('control: worker still accepts seat-mods 0.4.1', () => {
     record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.1'), molt: install('molt'), autonomic: install('autonomic') })

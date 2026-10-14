@@ -12,8 +12,12 @@ export const ROLES: Record<string, string | undefined> = {
   worker: undefined, 'spine-driver': 'spine-driver.md', close: 'close.md', 'work-pr': 'work-pr.md',
   orchestrator: 'orchestrator.md',
 }   // role → roles/<file>.md
-// A role that relies on a newer mod than the floor: the orchestrator needs seat-mods' no-subagent rail (#798).
-const ROLE_MIN: Record<string, Partial<Record<(typeof MODS)[number], string>>> = { orchestrator: { 'seat-mods': '0.4.4' } }
+// A role that relies on a newer mod than the floor: the orchestrator needs seat-mods' no-subagent rail (#798) and
+// autonomic's live mode file, so the herdr seats it launches inherit autopilot.
+const ROLE_MIN: Record<string, Partial<Record<(typeof MODS)[number], string>>> = { orchestrator: { 'seat-mods': '0.4.4', autonomic: '0.7.0' } }
+// A role whose procedure is another plugin's skill: the orchestrator follows herdr-crew's orchestrate skill, whose
+// "Host: OMP" section ships in 0.2.19. Installed for omp or for Claude Code, since omp reads both skill stores.
+const ROLE_SKILL: Record<string, { plugin: string; min: string }> = { orchestrator: { plugin: 'herdr-crew', min: '0.2.19' } }
 
 export function pinWarning(installed: string, tested: string): string | undefined {
   const v = installed.replace(/^omp\//, '').trim()
@@ -65,6 +69,19 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
     const path = join(o.rolesDir ?? '', file)
     if (!existsSync(path)) return { error: `omp-seat: role file ${path} is missing` }
     argv.push('--append-system-prompt', path)
+  }
+  if (Object.hasOwn(ROLE_SKILL, o.role)) {
+    const { plugin, min } = ROLE_SKILL[o.role]
+    const root = omp.get(plugin) ?? claude.get(plugin)
+    if (root === undefined) return { error: `omp-seat: ${o.role} needs ${plugin} ${min} or later for its procedure (looked in ${o.ompRecord} and ${o.claudeRecord})` }
+    const manifest = join(root, '.claude-plugin', 'plugin.json')
+    let version: unknown
+    try { version = JSON.parse(readFileSync(manifest, 'utf8')).version } catch (e) {
+      return { error: `omp-seat: unreadable version at ${manifest} (${(e as Error).message}) — install ${plugin} ${min} or later` }
+    }
+    if (typeof version !== 'string' || !semver.satisfies(version, `>=${min}`)) {
+      return { error: `omp-seat: ${plugin} ${version ?? '[unset]'} is unsupported for ${o.role} — install ${plugin} ${min} or later` }
+    }
   }
   return { argv: [...argv, ...o.args], warnings: [], extensions }
 }
