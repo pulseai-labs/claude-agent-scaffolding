@@ -1944,5 +1944,7 @@ pin "$_FMG" 'Groom the `next` entries as this release'"'"'s candidates' \
   "feature-map-grooming.md §8 grooms next and later apart (#302)"
 pin "$SKILLS/plan-release/SKILL.md" '`ADOPTION.md` first (its §8, #302)' \
   "plan-release §5a points Release 1 at ADOPTION.md"
+pin "$_FMG" '`"$(oss repo_root ai_workspace)/ADOPTION.md"`' \
+  "feature-map-grooming.md §8 resolves ADOPTION.md at the AI-workspace root (#302)"
 
 t_summary
