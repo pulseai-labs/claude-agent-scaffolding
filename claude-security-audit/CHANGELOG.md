@@ -1,5 +1,10 @@
 # claude-security-audit changelog
 
+## 0.1.6 (2026-10-15)
+
+### Fixed
+- **Executable hook handlers with any suffix** (#426). The enumerator added extensionless executables under `.claude/hooks/` but skipped every dotted name, so an executable handler such as `preflight.tool` or a hidden `.guard` was never scanned. Every executable regular file there is now a target whatever its suffix; listed suffixes still come from the main pass, once. Non-executable files and symlinks stay out, as before.
+
 ## 0.1.5 (2026-10-13)
 
 ### Fixed
