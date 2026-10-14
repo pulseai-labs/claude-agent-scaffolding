@@ -254,11 +254,14 @@ pin "$REF" 'seat-mods refuses the call before autonomic sees it' "a seat-mods de
 section "OMP top (0.2.19)"
 pin "$REF" '## Host: OMP' "herdr-mechanics carries the OMP host mapping"
 pin "$REF" 'herdr-crew'"'"'s `hooks.json` does not run on omp' "the ceiling notice on omp comes from molt" flat
-pin "$LIFE" '"locator": {"pane": "<pane>", "report": "<REPORT_PATH>"}' "an attempt records its report path"
+pin "$LIFE" '"locator": {"pane": "<pane>", "report": "<REPORT_PATH>", "machine": "<label, remote seats only>", "seen": "<hash> <identity>"}' "an attempt records its report path, remote machine and consumed generation"
 pin "$LIFE" '**Resume after a hard stop.**' "lifecycle states the hard-stop resume"
 pin "$LIFE" 'a launch command for each host' "the rotation handoff records both hosts' launch commands"
 pin "$LIFE" 'a resolved profile beside a launch command for each host' "the rotation handoff records each host's resolved profile"
 pin "$LIFE" 'using the destination host'"'"'s recorded profile for the readiness path and model read' "the successor uses its destination host's profile" flat
+
+pin "$LIFE" 'The new top first closes the pane `run.orchestrator` names (`herdr pane close <pane>`, through its machine when remote), ending that process and every wait it armed' "a hard-stop resume stands the dead top down" flat
+pin "$REF" '`timeout: 0`, which disables omp' "OMP async waits disable the command deadline" flat
 
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"

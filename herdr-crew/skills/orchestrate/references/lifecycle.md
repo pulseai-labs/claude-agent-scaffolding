@@ -83,8 +83,9 @@ Every command's syntax comes from `herdr --skill`.
    fills its children's slot the same way, and an operator's `brief:` is sent as a copy carrying
    the slot and the ping step, never edited in place (`briefs.md`).
    The attempt this dispatch writes to `run.json` records the seat's report path beside its pane —
-   `"locator": {"pane": "<pane>", "report": "<REPORT_PATH>"}` — so a top that never saw this session's handoff
-   can still find every live report.
+   `"locator": {"pane": "<pane>", "report": "<REPORT_PATH>", "machine": "<label, remote seats only>", "seen": "<hash> <identity>"}` —
+   `machine` names a seat not on this machine; each time the top consumes a report it records the hash and
+   identity (inode or mtime) it read in `locator.seen`, so a new top can find every live report and its last consumed generation.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes or the plan's
@@ -358,7 +359,10 @@ speaks again, and the rotation above applies.
 
 **Resume after a hard stop.** When the top died without a handoff (a usage limit), the operator starts a new top
 and names the run's `run.json`. That top reads the newest handoff, `run.json` and `herdr agent list`. Each attempt
-still `working` gives its pane and its report path (`locator`). A report that exists for a task `run.json` does not
-mark done is read once, as a wake with no prior hash; a task already marked done is never acted on again. Then it
+still `working` gives its pane, report path and remote machine (`locator`); every operation on that pane uses
+`locator.machine` when present. The new top first closes the pane `run.orchestrator` names
+(`herdr pane close <pane>`, through its machine when remote), ending that process and every wait it armed,
+so a top that wakes after the reset cannot act on the same report. A report whose hash and identity equal
+`locator.seen` is not new; any other is read once and recorded there; a task already marked done is never acted on again. Then it
 rebinds `run.orchestrator`, sends each live worker its own pane as the new `NOTIFY_PANE`, and arms one fresh wait
 per live pane and the heartbeat.

@@ -152,9 +152,9 @@ question written to the report file is not a dialog; it rings that doorbell (Com
 ## Host: OMP
 
 An OMP top (`omp-seat orchestrator --via omp-glm`, omp-roles 0.4.0) runs this skill as written, with these
-substitutions. Background call: omp's bash async job (`async.enabled`, on by default); an async-job wait states
-its own timeout on the call, since omp's default async bash timeout is 300 s; its result returns to the
-session as a turn, so every readiness and completion wait, and the heartbeat, runs as one. A send's slash command
+substitutions. Background call: omp's bash async job (`async.enabled`, on by default); the async job passes
+`timeout: 0`, which disables omp's command deadline (a nonzero value is clamped), so herdr's `--timeout` bounds
+the wait; its result returns to the session as a turn, so every readiness and completion wait, and the heartbeat, runs as one. A send's slash command
 is text on omp: `/<plugin>:<skill>` becomes `skill://<skill>`, except a send to a Claude Code seat. herdr-crew's
 `hooks.json` does not run on omp: the context-ceiling notice comes from molt's omp extension. No `Agent` tool
 means no `task`, `eval` `agent()` or workpool: seat-mods 0.4.4 blocks them for `SEAT_MODS_ROLE=orchestrator` (#798).
