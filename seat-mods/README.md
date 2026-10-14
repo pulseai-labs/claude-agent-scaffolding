@@ -203,6 +203,8 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 
 ## OMP
 
+Under `SEAT_MODS_ROLE=orchestrator`, the OMP guard blocks the `task` tool and every `before_subagent_spawn` (eval `agent()`, workpool) with a #798 denial directing the top to dispatch a herdr seat; other tools stay free, coordinator and every guarded role are unchanged, and the Claude Code hook is unchanged.
+
 `omp/extension.ts` is the same guard for OMP, over the same `hooks/rules.ts`. It loads only through `omp-roles`' `omp-seat` (`-e`, never ambient), so a plain `omp` session stays unguarded. The main session follows `SEAT_MODS_ROLE`; a `task` child inherits its parent's env, so the guard reads the child's agent name:
 
 | Child agent | Rails |
