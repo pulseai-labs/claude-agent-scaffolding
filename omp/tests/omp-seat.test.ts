@@ -45,7 +45,26 @@ describe('planLaunch', () => {
     expect(launch('__proto__')).toHaveProperty('error')
   })
   test('an unknown role is an error', () => {
-    expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker, spine-driver, close, work-pr)' })
+    expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker, spine-driver, close, work-pr, orchestrator)' })
+  })
+  test('orchestrator appends its role file when seat-mods is 0.4.4 or later', () => {
+    const [s, m, a] = [install('seat-mods', true, '0.4.4'), install('molt'), install('autonomic')]
+    record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })
+    const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
+    expect(planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir })).toMatchObject({
+      argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'),
+        '--append-system-prompt', join(rolesDir, 'orchestrator.md')],
+    })
+  })
+  test('orchestrator refuses seat-mods 0.4.3, naming the 0.4.4 minimum (no top without the #798 rail)', () => {
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.3'), molt: install('molt'), autonomic: install('autonomic') })
+    const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
+    expect(r).toEqual({ error: expect.stringContaining('seat-mods 0.4.3') })
+    expect((r as { error: string }).error).toContain('0.4.4')
+  })
+  test('control: worker still accepts seat-mods 0.4.1', () => {
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.1'), molt: install('molt'), autonomic: install('autonomic') })
+    expect(launch('worker')).toHaveProperty('argv')
   })
   for (const role of ['spine-driver', 'close', 'work-pr']) {
     test(`${role} appends its shipped role file after the extensions and before passthrough args`, () => {

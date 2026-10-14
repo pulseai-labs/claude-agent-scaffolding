@@ -10,7 +10,10 @@ export const MODS = ['seat-mods', 'molt', 'autonomic'] as const
 const MIN_VERSION: Record<(typeof MODS)[number], string> = { 'seat-mods': '0.4.1', molt: '0.3.0', autonomic: '0.6.0' }
 export const ROLES: Record<string, string | undefined> = {
   worker: undefined, 'spine-driver': 'spine-driver.md', close: 'close.md', 'work-pr': 'work-pr.md',
+  orchestrator: 'orchestrator.md',
 }   // role → roles/<file>.md
+// A role that relies on a newer mod than the floor: the orchestrator needs seat-mods' no-subagent rail (#798).
+const ROLE_MIN: Record<string, Partial<Record<(typeof MODS)[number], string>>> = { orchestrator: { 'seat-mods': '0.4.4' } }
 
 export function pinWarning(installed: string, tested: string): string | undefined {
   const v = installed.replace(/^omp\//, '').trim()
@@ -43,15 +46,16 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
   for (const mod of MODS) {
     const root = omp.get(mod) ?? claude.get(mod)
     if (root === undefined) return { error: `omp-seat: ${mod} is not installed (looked in ${o.ompRecord} and ${o.claudeRecord})` }
+    const min = (Object.hasOwn(ROLE_MIN, o.role) ? ROLE_MIN[o.role][mod] : undefined) ?? MIN_VERSION[mod]
     const ext = join(root, 'omp', 'extension.ts')
-    if (!existsSync(ext)) return { error: `omp-seat: ${ext} is missing — install ${mod} ${MIN_VERSION[mod]} or later` }
+    if (!existsSync(ext)) return { error: `omp-seat: ${ext} is missing — install ${mod} ${min} or later` }
     const manifest = join(root, '.claude-plugin', 'plugin.json')
     let version: unknown
     try { version = JSON.parse(readFileSync(manifest, 'utf8')).version } catch (e) {
-      return { error: `omp-seat: unreadable version at ${manifest} (${(e as Error).message}) — install ${mod} ${MIN_VERSION[mod]} or later` }
+      return { error: `omp-seat: unreadable version at ${manifest} (${(e as Error).message}) — install ${mod} ${min} or later` }
     }
-    if (typeof version !== 'string' || !semver.satisfies(version, `>=${MIN_VERSION[mod]}`)) {
-      return { error: `omp-seat: ${mod} ${version ?? '[unset]'} is unsupported — install ${mod} ${MIN_VERSION[mod]} or later` }
+    if (typeof version !== 'string' || !semver.satisfies(version, `>=${min}`)) {
+      return { error: `omp-seat: ${mod} ${version ?? '[unset]'} is unsupported — install ${mod} ${min} or later` }
     }
     argv.push('-e', ext)
     extensions.push(ext)
