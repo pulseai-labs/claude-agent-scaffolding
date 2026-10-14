@@ -163,7 +163,7 @@ Don't run `/grill-me` and `/council` in the same session — different interacti
 ├── seat-mods/                         # seat-mods plugin (v0.4.3)
 ├── molt/                              # molt plugin (v0.3.2)
 ├── autonomic/                         # autonomic plugin (v0.7.1)
-├── omp-roles/                         # OMP role pack: omp-seat launcher, agents and coordinator roles (v0.3.1, OMP only)
+├── omp-roles/                         # OMP role pack: omp-seat launcher, agents and coordinator roles (v0.3.2, OMP only)
 ├── docs/
 │   ├── SPEC-ai-mentor.md              # ai-mentor spec (v1.1 amendments)
 │   └── archive/SPEC-v1.md             # historical 5-plugin design (pre-pivot)
