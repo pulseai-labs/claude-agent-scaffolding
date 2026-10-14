@@ -1915,6 +1915,10 @@ pin "$_AG" '`Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`, `Skill` — `Skill`
   "implementer-agent.md's binding allowlist names Skill and its one use (#281)"
 pin "$WI/SKILL.md" 'the dispatched registration grants it since 1.19.3 (#281)' \
   "work-item SKILL.md §12 says the dispatched path composes too (#281)"
+pin "$WI/SKILL.md" 'or either skill is not installed, §5 and §6→§8 of this body are the' \
+  "work-item SKILL.md §12 falls back to the body when a composed skill is not installed (#281)"
+pin "$WI/SKILL.md" 'Where a composed skill and this body disagree, this body wins:' \
+  "work-item SKILL.md §12 says the body wins over a composed skill (#281)"
 t_assert_eq 0 "$(awk 'index($0, "Until #281") {n++} END {print n+0}' "$WI/SKILL.md")" \
   "work-item SKILL.md no longer says 'Until #281' (#281)"
 

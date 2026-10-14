@@ -424,9 +424,13 @@ command's to emit, not this body's.
   your discipline plus the orchestrator's log audit, not a sandbox.
 - **Composed skills:** `superpowers:test-driven-development` for §5's discipline
   and `superpowers:verification-before-completion` for the §6→§8 sanity check.
-  Compose them when your harness grants `Skill` — the dispatched registration grants it since 1.19.3 (#281);
-  do not restate their bodies here. Where a harness grants no `Skill`, §5 and
-  §6→§8 of this body are the whole discipline.
+  Compose them when your harness grants `Skill` — the dispatched registration grants it since 1.19.3 (#281) —
+  and both are installed; do not restate their bodies here. Where a harness grants
+  no `Skill`, or either skill is not installed, §5 and §6→§8 of this body are the
+  whole discipline. Where a composed skill and this body disagree, this body wins:
+  a first-run GREEN that `references/tdd-loop.md` §2 accepts (a cascade from a
+  sibling AC, or an rc-2 AC whose behaviour was already there) is recorded, never
+  rewritten to manufacture a RED.
 - **The orchestrator** owns everything after your return: the per-work-item gate,
   the clarification loop on a gaps return, the commit, the merge, the cleanup. You
   never advance past the return, and you never run your own gate.
