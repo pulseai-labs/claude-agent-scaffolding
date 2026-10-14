@@ -1849,4 +1849,35 @@ pin "$_SCB" '**core** (§5b) | **core** (§5b, a no-op when the plan declares `N
 pin "$_SCB" '*ADR check* row is **not shipped in this release**' \
   "spine-close.md §1 still refuses to claim the standalone ADR check (§3.3)"
 
+# ---------------------------------------------------------------------------
+# Item worktree set-up (#714, #715). A new item worktree holds only tracked
+# files, and a spec's start-GREEN ACs reached the handoff only after a wasted
+# dispatch. Both contracts are prose across four files; these pins hold the
+# lines that carry each half from the spec, through the lane, to the worker.
+_RO="$WI/references/round-orchestration.md"
+pin "$_RO" "**Prepare the worktree's dependencies before the handoff (#714).**" \
+  "round-orchestration.md §3 prepares the item worktree's dependencies before the handoff (#714)"
+pin "$_RO" "Never link the primary checkout's copy:" \
+  "round-orchestration.md §3 installs per worktree and never links the primary checkout's tree (#714)"
+pin "$_RO" "runs §3's dependency step again, and then goes to §5" \
+  "round-orchestration.md re-entry repeats the dependency step on redispatch and adopt (#714)"
+pin "$_RO" 'Run that step in the recorded worktree: set' \
+  "round-orchestration.md re-entry sets \$wt from the recorded worktree_path before the dependency step (#714)"
+pin "$_RO" '**Carry the spec'"'"'s start-GREEN lines into §4 (#715).**' \
+  "round-orchestration.md §4 copies the spec's start-GREEN lines into the handoff at dispatch 1 (#715)"
+pin "$SKILLS/plan-spine/references/spec-authoring.md" 'Expected GREEN at start: AC-<N> — <why it passes before the work>' \
+  "spec-authoring.md declares the start-GREEN line the lane copies (#715)"
+pin "$WI/references/handoff-contract.md" 'one the spec declares as `Expected GREEN at start:`' \
+  "handoff-contract.md §4 carries spec-declared overrides from dispatch 1 (#715)"
+pin "$WI/SKILL.md" 'unless the handoff'"'"'s §4 records an override for that AC (below)' \
+  "work-item SKILL.md's rc table defers rc 1 to a recorded override (#715)"
+pin "$WI/SKILL.md" 'An override applies only when the AC'"'"'s probe returns rc 1;' \
+  "work-item SKILL.md §4 honours an override only on rc 1 (#715)"
+pin "$WI/SKILL.md" 'excluding any AC whose recorded override §4 honoured' \
+  "work-item SKILL.md §5 excludes only an override §4 honoured (#715)"
+pin "$WI/SKILL.md" 'declared in the spec at dispatch 1 or granted on a re-dispatch' \
+  "work-item SKILL.md §4 honours a spec-declared override at dispatch 1 (#715)"
+pin "$HERE/../agents/implementer-agent.md" 'unless the handoff'"'"'s §4 records an override for that AC' \
+  "implementer-agent.md's RED-gate row honours a recorded override (#715)"
+
 t_summary

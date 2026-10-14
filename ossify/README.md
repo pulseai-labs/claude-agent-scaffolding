@@ -1,4 +1,4 @@
-# ossify (v1.19.0)
+# ossify (v1.19.1)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -37,6 +37,12 @@ that declared it — an already-registered ref is skipped, and a row whose ADR f
 the spine never wrote halts naming the ref (#497). The landing pass also stores the
 PR's **number** where `gh pr create` prints its URL, halting when what it printed is
 not a PR URL (#716).
+
+Since 1.19.1, `/ossify:run-spine` prepares each item worktree's dependencies before
+the handoff, so a suite that needs `node_modules/` runs there as it does in the
+primary checkout (#714). A spec can declare an AC `Expected GREEN at start:`; the
+lane copies that line into the handoff, and the RED gate honours it at dispatch 1
+instead of after a clarification dispatch (#715).
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo

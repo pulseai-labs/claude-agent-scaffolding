@@ -109,9 +109,11 @@ touched since, and the branch above is checked out. State that **any**
 `git status --porcelain` output means something ran in between — that is a gap to
 report, never dirt to tidy.
 
-If a previous dispatch left a recorded override (an AC that is legitimately
-already GREEN, per SKILL.md §4), it goes here, named by AC and by the reason it
-was granted. An override that lives only in the conversation does not survive the
+A recorded override (an AC that is legitimately already GREEN, per SKILL.md §4)
+goes here, named by AC and by its reason: one the spec declares as `Expected GREEN at start:`,
+from dispatch 1, and one a previous dispatch granted. Name any dependency set-up
+the lane did in the worktree (`round-orchestration.md` §3) here too, so pre-flight
+expects it. An override that lives only in the conversation does not survive the
 next dispatch.
 
 ### `## 5. What's already merged`

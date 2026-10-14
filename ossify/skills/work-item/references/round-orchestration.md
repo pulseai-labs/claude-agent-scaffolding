@@ -393,7 +393,10 @@ planning decision (`oss work_item_status <wi-id> planned`), made in
 
 **On re-entry, follow the item's route.** `spawn` takes the path below
 unchanged. `redispatch` reuses the recorded worktree and its existing handoff
-(author it now if it is missing) and goes straight to §5. An `adopt` item that
+(author it now if it is missing), runs §3's dependency step again, and then goes to §5.
+Run that step in the recorded worktree: set
+`wt="$(oss get '.work_items[] | select(.id=="<wi-id>") | .worktree_path')"` first, and halt
+naming the item if it is empty or `git -C "$wt" rev-parse --is-inside-work-tree` fails. An `adopt` item that
 §2b step 4 just repaired is in exactly that shape — active, clean, at its
 recorded base — so it takes the `redispatch` path too, authoring the handoff
 first when it is missing. A `reattach` item takes whatever route the re-run
@@ -483,6 +486,16 @@ removing a worktree and reversing two state mutations.
   the specs, and the spine's merge step then looks for a branch in the target
   repo that was never cut there.
 
+**Prepare the worktree's dependencies before the handoff (#714).** A new worktree holds
+only tracked files: no `node_modules/`, no virtualenv, no build output. An `auto:` command
+that needs them fails in the worktree while it passes in the primary checkout. When the
+item's commands need installed dependencies, install them in the worktree with the
+project's own install command (for example `npm ci`). Never link the primary checkout's copy:
+a virtualenv with an editable install points the worktree's tests back at the primary
+checkout's source, and concurrent items would share one writable tree. Then
+`git -C "$wt" status --porcelain` must print nothing. Name the set-up in the handoff's §4.
+The step is safe to repeat, and re-entry repeats it (below).
+
 ---
 
 ## 4. Author the handoff
@@ -495,6 +508,11 @@ rendering. It goes in the work item's own directory, beside the `spec.md`
 ```text
 <ai-workspace>/docs/specs/<release-id>/<spine-id>-<spine-slug>/work-<wi-id>/handoff.md
 ```
+
+**Carry the spec's start-GREEN lines into §4 (#715).** For each `Expected GREEN at start:`
+line in the item's spec, write a recorded override into the handoff's §4: the AC and the
+spec's reason. The RED gate then honours it at dispatch 1, not after a clarification
+dispatch.
 
 **Do not pre-place a `report.md`.** The implementer authors it, and its own
 contract tells it there is no placeholder to fill and to prefer Edit over Write on
