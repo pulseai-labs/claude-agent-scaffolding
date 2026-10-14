@@ -94,7 +94,9 @@ for every declared repo, halting only if one still refuses.
 **Canonical-content gate (refuses fail-fast).** `/start` is pre-code ceremony:
 establish whether any declared repo (`oss repo_root <name>` per name) already
 carries the product's own source or its own history — either alone refuses,
-and a bare pairing scaffold is neither. If so, author nothing and refuse,
+and a bare pairing scaffold is neither. A repo the pairing manifest (`.workspace/pairing.json`) declares under its `tooling_repo` key is not the product (#553):
+it carries its own history by nature, so this gate skips it. In a native
+`.ossify/topology.json` every key is just a repo name, so every declared repo there is checked. If so, author nothing and refuse,
 naming what you found and routing to **`/ossify:adopt`** — the adopt-forward
 path for a project that already has code (native `adopt` on Codex).
 Those tokens are load-bearing too. Past both gates, settle every occupied destination

@@ -47,7 +47,12 @@ Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on C
 
 Each gate refuses fail-closed. A1 reuses `/start`'s exact refusal contract;
 A3–A5's refusals name the **legacy stack's** close ceremony — scaffold-dev's
-slice close, then re-run — never "clean your tree", which fixes a symptom.
+slice close, then re-run — never "clean your tree", which fixes a symptom;
+or, where scaffold-dev is no longer installed, close the slice by hand (#732):
+the operator finishes or abandons the slice until the state A3–A5 check holds —
+every declared repo and the AI workspace clean and each declared repo on its
+default branch, no live legacy worktree in any declared repo, the active-context
+cursor on a boundary — with every change committed in the repo it touched. Then re-run.
 
 - **A0 — no inherited state override.** If `OSS_STATE_FILE` is set, stop:
   `_oss_resolve_state` lets it override the manifest for every verb below —
