@@ -178,7 +178,7 @@ case "$want" in
     if [ "${#want}" -ne "${#have}" ]; then
       echo "close: spec_oid '$want' in $handoff is not a full blob id - halt"; exit 1
     fi
-    echo "close: spec.md for $wi changed since dispatch (handoff spec_oid $want, now $have) - the gate would judge the work against criteria it was not dispatched with. A spec that needed changing is a replan (work-item/SKILL.md): if the orchestrator made this change, re-record spec_oid in handoff §3 as git -C <spec dir> hash-object --no-filters -- <spec> prints it and re-run close; otherwise restore the dispatched spec.md (blob $want) - halt"
+    echo "close: spec.md for $wi changed since dispatch (handoff spec_oid $want, now $have) - the gate would judge the work against criteria it was not dispatched with. A spec that needed changing is a replan (work-item/SKILL.md): if the orchestrator made this change as a replan, re-record spec_oid in handoff §3 as git -C <spec dir> hash-object --no-filters -- <spec> prints it and re-dispatch the item (round-orchestration.md §4-§5) so the work is built against the new criteria, then close that result; otherwise restore the dispatched spec.md (blob $want) and re-run close - halt"
     exit 1 ;;
 esac
 ```

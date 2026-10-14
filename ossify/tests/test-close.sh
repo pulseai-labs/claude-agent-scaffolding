@@ -2748,6 +2748,7 @@ t_assert_rc 1 "S2: a spec edited since dispatch halts close"
 t_assert_contains "$T_OUT" "changed since dispatch" "S2: ...naming the cause"
 t_assert_contains "$T_OUT" "$SID_OID" "S2: ...and the recorded dispatch-time blob"
 t_assert_contains "$T_OUT" "re-record spec_oid" "S2: ...and the replan route out"
+t_assert_contains "$T_OUT" "re-dispatch the item" "S2: ...which re-dispatches, never re-records and re-closes the same result (PR #811 round 2)"
 case "$T_OUT" in *SID-PASSED*) T_FAIL=$((T_FAIL+1)); echo "FAIL: S2: control continued past a spec-identity halt";; *) T_PASS=$((T_PASS+1));; esac
 
 # S3. CONTROL: the edit reverted is the same blob again - identity is content, not mtime.
