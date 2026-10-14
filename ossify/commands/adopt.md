@@ -1,5 +1,5 @@
 ---
-description: Adopt an existing project into ossify — for a codebase that already has its own source or history, with or without a scaffold-dev legacy stack — six fail-closed gates, six conversions, Release 0 closed retroactively. Use when onboarding a project that already shipped; /ossify:start refuses it.
+description: Adopt an existing project into ossify — for a codebase that already has its own source, with or without a scaffold-dev legacy stack — six fail-closed gates, six conversions, Release 0 closed retroactively. Use when onboarding a project that already shipped; /ossify:start refuses it.
 argument-hint: "[project-name]"
 allowed-tools: Bash(bash:*), Read, Write, Edit, Glob, Grep, Skill
 ---

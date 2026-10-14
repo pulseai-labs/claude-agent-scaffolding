@@ -72,8 +72,9 @@ result line per declared repo: "no C2 gaps" from a clean-checkout pass that
 never ran no longer closes (#367).
 
 Since 1.22.0, `/ossify:adopt` takes a plain existing-source repo — its own
-source or history, no scaffold-dev legacy stack — so `/ossify:start`'s route
-for that input lands (#536). Each station that read the legacy stack says what
+source, no scaffold-dev legacy stack — so `/ossify:start`'s route for that
+input lands (#536). The repo gets its AI workspace first (`/pair-workspace`,
+or a new `git init` directory), and `/adopt` runs there. Each station that read the legacy stack says what
 it does without one: A5 records `no legacy stack`, C1 elicits the journey with
 the operator, C5 authors the absent spec, `CLAUDE.md` and memory bank, and a
 declared repo with no commit is named before its baseline is read.

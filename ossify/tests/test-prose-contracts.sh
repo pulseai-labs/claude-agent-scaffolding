@@ -1986,7 +1986,7 @@ pin "$SKILLS/adopt/SKILL.md" 'Record what the pass did as the adoption record'"'
 _AD="$SKILLS/adopt/SKILL.md"
 pin "$_AD" 'with or without a scaffold-dev legacy stack' \
   "adopt's description admits a plain existing-source repo (#536)"
-pin "$_AD" 'a plain existing-source repo — its own source or history, none of the legacy stack (#536)' \
+pin "$_AD" 'a plain existing-source repo — its own source, none of the legacy stack (#536)' \
   "adopt states its two inputs (#536)"
 pin "$_AD" 'On a plain repo, the refusal names the work in flight instead' \
   "adopt A3-A4: a plain repo's refusal names its own work in flight (#536)"
@@ -2004,8 +2004,8 @@ pin "$_AD" 'A3 exempts only an uncommitted declaration A1 authored' \
   "adopt A1's own declaration passes A3 and is committed only after every gate (#536, PR #804 r1)"
 _c="$(grep -c 'cd <ai-workspace>' "$_AD" || true)"
 _pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt A1 still offers a sibling AI workspace it never creates (#536, PR #804 r3 narrowed)"
-pin "$_AD" 'carries its code or its own history' \
-  "adopt A1 accepts a history-only repo, as start routes it (#536, PR #804 r1)"
+_c="$(grep -c 'or its own history' "$_AD" || true)"
+_pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt A1 admits a history-only repo whose empty baseline C4 would close (#536, PR #804 r5 cut)"
 pin "$_AD" '`git -C <repo-root> worktree list`' \
   "adopt A4 finds linked worktrees outside .worktrees (#536, PR #804 r1)"
 pin "$_AD" 'An answer with no ADR behind it is a decision the code already carries' \
@@ -2020,10 +2020,10 @@ pin "$_AD" 'A `<dir>` that does not exist holds no worktree' \
   "adopt A4 reads an absent worktree directory as empty (#536, PR #804 r2)"
 pin "$_AD" 'A plain repo has no written vision to read back' \
   "adopt's vision station elicits on a plain repo (#536)"
-pin "$_AD" 'runs workspace-init'"'"'s `/pair-workspace` first' \
+pin "$_AD" 'workspace-init'"'"'s `/pair-workspace` creates one as a sibling' \
   "adopt A1 routes a sibling AI workspace through /pair-workspace, which creates it (#536, PR #804 r3)"
-pin "$_AD" 'adoption uses the repo itself as the AI workspace' \
-  "adopt A1 places the AI workspace on a plain repo (#536)"
+pin "$_AD" 'Adoption never makes the product repo its own AI workspace' \
+  "adopt A1 keeps private artifacts out of the product repo (#536, PR #804 r5 cut)"
 pin "$_AD" 'A repo with no test suite has no such cover: run `/start` §9 in full' \
   "adopt's smoke station is narrowed only where tests cover the code (#536, PR #804 r4)"
 _c="$(grep -c 'out of scope today' "$_AD" || true)"

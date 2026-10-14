@@ -1,6 +1,6 @@
 ---
 name: adopt
-description: Use when onboarding a project that already has code — its own source or history, with or without a scaffold-dev legacy stack — which /ossify:start refuses — six fail-closed gates, six conversions, Release 0 closed retroactively, an adoption record
+description: Use when onboarding a project that already has code — its own source, with or without a scaffold-dev legacy stack — which /ossify:start refuses — six fail-closed gates, six conversions, Release 0 closed retroactively, an adoption record
 ---
 
 # adopt
@@ -8,7 +8,7 @@ description: Use when onboarding a project that already has code — its own sou
 You are the conductor of ossify's **adoption** — the on-ramp for a project
 that already has code; `/start` refuses it on its content gate. It takes two
 inputs: a project onboarded with the scaffold-dev legacy stack (roadmap state,
-active-context cursor, legacy spec), or a plain existing-source repo — its own source or history, none of the legacy stack (#536).
+active-context cursor, legacy spec), or a plain existing-source repo — its own source, none of the legacy stack (#536).
 Where a station reads the legacy stack, it says what it does on a plain repo.
 
 **Thin by design, not under budget pressure** — §4's pointers are
@@ -72,12 +72,14 @@ finishes or drops it in the repo it touched, then re-runs.
   file. **Where the repo set comes from differs from `/start`:** `/start` reads
   it from the journey-map station it is about to run, and adoption has no such
   station, so ask the operator which repos hold the product and confirm each
-  root against a checkout that actually carries its code or its own history — every gate below,
+  root against a checkout that actually carries its code — every gate below,
   and C3's project-wide ADR scan, iterates exactly this set. A plain repo may
-  have no AI workspace yet: adoption uses the repo itself as the AI workspace and
-  authors the declaration at its root. For a sibling layout, the operator runs workspace-init's `/pair-workspace` first,
-  which creates the sibling and its pairing manifest, and starts `/adopt` there;
-  A1 then resolves that manifest and authors nothing. A3 exempts only an uncommitted declaration A1 authored — in this run or in an
+  have no AI workspace yet: the operator makes one before `/adopt` runs —
+  workspace-init's `/pair-workspace` creates one as a sibling, with its pairing manifest;
+  by hand, it is a new directory with `git init` — and starts `/adopt` from it.
+  Adoption never makes the product repo its own AI workspace: the AI workspace
+  holds private artifacts (`posture-block.md`'s boundary inventory among them).
+  A3 exempts only an uncommitted declaration A1 authored — in this run or in an
   earlier run that a gate refused; commit it once A0–A5 pass, before the
   baseline SHAs are recorded.
 - **A2 — no ossify state at the routed path.** State exists: already
