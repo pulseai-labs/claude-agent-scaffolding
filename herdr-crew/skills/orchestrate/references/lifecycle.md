@@ -82,10 +82,6 @@ Every command's syntax comes from `herdr --skill`.
    otherwise the sentinel `none` — so an eligible worker's ping comes back here; a coordinator
    fills its children's slot the same way, and an operator's `brief:` is sent as a copy carrying
    the slot and the ping step, never edited in place (`briefs.md`).
-   Before the brief is sent, the attempt this dispatch writes to `run.json` records the seat's report path beside its pane —
-   `"locator": {"pane": "<pane>", "report": "<REPORT_PATH>", "machine": "<label, remote seats only>", "seen": "<hash> <identity>"}` —
-   `machine` names a seat not on this machine; each time the top consumes a report it records the hash and
-   identity (inode or mtime) it read in `locator.seen`, so a new top can find every live report and its last consumed generation.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes or the plan's
@@ -295,7 +291,7 @@ or mtime — and, per live seat, its molt status path recorded at launch and the
 line noted, its autonomic pain path and the last pain line noted, and a resolved profile beside a launch command for each host — this top's and the other host's
 (Claude Code and OMP: `omp-seat orchestrator --via omp-glm`), so the operator's "fall back to OMP" or
 "hand back to Claude" picks one
-— `/ossify:handoff` with ossify installed, the same file by hand without it. Open a new tab
+— `/ossify:handoff` with ossify installed (`skill://handoff` on OMP), the same file by hand without it. Open a new tab
 and pane with the launch command the handoff recorded — ask the operator once when none
 did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`,
 which herdr sets in every pane it hosts (as it does `HERDR_PANE_ID`), the top's own
@@ -356,13 +352,3 @@ dispatch against the hash and identity the handoff noted, a carried wake include
 that landed across the clear is acted on once and retires its listed wait by id; the later
 notification for that generation retires nothing. With `/molt off` the marker goes, the hook
 speaks again, and the rotation above applies.
-
-**Resume after a hard stop.** When the top died without a handoff (a usage limit), the operator starts a new top
-and names the run's `run.json`. Before its first write — step 1's rebind — it reads the pane `run.orchestrator`
-names and closes it (`herdr pane close <pane>`), which ends that process and every wait it armed, so a top that
-wakes after the reset cannot act on the same report; a pane missing from this server's `herdr pane list` is on
-another server, so it asks the operator to close it there and waits for that answer. Each attempt still `working`
-is a live dispatch: `locator` gives its pane, report path, machine (remote seats) and `seen`. A report whose hash
-and identity equal `locator.seen` is not new; any other is read once and recorded there; a task already marked
-done is never acted on again. From there it resumes as a rotation's new top does (above), with these attempts as
-the handoff's list of live dispatches.
