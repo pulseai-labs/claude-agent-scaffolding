@@ -244,7 +244,8 @@ fi
 for tok in 'The completion floor comes first' 'journey table is absent' \
            'per step it marks' 'operator-confirmed' 'the posture bone is absent' \
            'outside its four' 'no closed `Release 0`' 'its stub retrospective absent' \
-           'lacks the per-station lines'; do
+           'lacks the per-station lines' 'no C2 result line for a declared repo' \
+           'a C2 result line per declared repo'; do
   case "$_adopt6" in
     *"$tok"*) T_PASS=$((T_PASS+1)) ;;
     *) T_FAIL=$((T_FAIL+1)); echo "FAIL: adopt §6 no longer carries floor token '$tok'" ;;
@@ -1970,5 +1971,12 @@ pin "$SKILLS/adopt/SKILL.md" 'Release 1'"'"'s spines mint them (`plan-spine/refe
   "adopt C6 names the ceremony that mints its candidates (#293)"
 _c="$(grep -c 'no ceremony' "$SKILLS/adopt/SKILL.md" || true)"
 _pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt C6 still says no ceremony consumes the seed candidates (#293)"
+
+# ---------------------------------------------------------------------------
+# A skipped clean-checkout pass must not read as "no C2 gaps" (#367). The C2
+# station says what it records; the §6 floor tokens above pin the row and the
+# refusal.
+pin "$SKILLS/adopt/SKILL.md" 'Record what the pass did as the adoption record'"'"'s C2 result line (§6, #367)' \
+  "adopt C2 points the station at its result line (#367)"
 
 t_summary

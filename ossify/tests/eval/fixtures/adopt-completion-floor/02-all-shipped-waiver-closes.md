@@ -21,4 +21,6 @@ that walk named. The record carries its per-station lines (`feature_add: 0 waive
 `bone_add: 3`, `risk_gate_add: 0` with the family walk named,
 `posture_set: 1 (fully-private)`, critic `skip` logged as the operator's
 typed bypass, smoke 4 verified / 0 unverified with the external-pin
-inventory it classified), and `oss doctor` is green.
+inventory it classified). Its C2 result line reads: clean checkout at the
+baseline SHA `4e1c9a2`, 4 of 4 `shipped` steps exercised by
+`make e2e-journey`, 0 gaps. `oss doctor` is green.
