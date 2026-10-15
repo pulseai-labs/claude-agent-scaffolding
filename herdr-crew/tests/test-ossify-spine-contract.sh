@@ -1838,12 +1838,14 @@ pin "$LIFECYCLE_MD" 'A resume the operator started is a hard stop, even with an 
   "an operator-started resume takes the hard-stop path despite an old handoff" flat
 pin "$LIFECYCLE_MD" 'brief not delivered before the top stopped' \
   "a recorded attempt with no delivery is settled and relaunched" flat
-pin "$LIFECYCLE_MD" 'relaunched from its seat row as a new attempt with `cause: followup`' \
-  "an undelivered attempt is relaunched with followup cause" flat
+pin "$LIFECYCLE_MD" 'relaunched from its seat row as a new attempt with `cause: {type: followup, ref: <the settled attempt'"'"'s id>}`' \
+  "an undelivered attempt is relaunched with followup cause referencing the settled attempt" flat
 pin "$LIFECYCLE_MD" 'If `run.question` is present, it asks it once again' \
   "the resume re-asks an open operator question" flat
 pin "$LIFECYCLE_MD" 'A `done` task is never re-run' \
   "the resume never re-runs a done task" flat
+pin "$LIFECYCLE_MD" 'with no handoff, at the first task whose deps are done, that is not itself done and has no live attempt.' \
+  "resume step 7 selects a ready unfinished task without a live attempt" flat
 pin "$LIFECYCLE_MD" 'The handoff restates no operator gate' \
   "the rotation handoff restates no operator gate (#819)" flat
 pin "$LIFECYCLE_MD" 'step 12 and `run.merge_word`' \

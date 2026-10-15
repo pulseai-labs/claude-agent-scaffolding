@@ -328,13 +328,13 @@ A resume the operator started is a hard stop, even with an old handoff present.
 4. If `run.question` is present, it asks it once again.
 5. Per working attempt: `phase: recorded` — one `herdr pane read`; a pane showing the worker on this task is set
    `delivered`, any other is settled `failed` ("brief not delivered before the top stopped"), released, and relaunched
-   from its seat row as a new attempt with `cause: followup`. `phase: delivered` — the generation check against `locator.seen`, a new
+   from its seat row as a new attempt with `cause: {type: followup, ref: <the settled attempt's id>}`. `phase: delivered` — the generation check against `locator.seen`, a new
    generation read once, recorded and acted on; then step 5's waits re-armed on the pane (a detected coordinator's
    companion included) through `locator.machine`;
    every later operation on that pane carries `locator.machine` (`herdr-mechanics.md`, Machines).
 6. It arms one fresh heartbeat.
-7. It continues at the step the handoff names; with no handoff, at the first task whose deps are done and that is not
-   itself done. A `done` task is never re-run.
+7. It continues at the step the handoff names; with no handoff, at the first task whose deps are done, that is not
+   itself done and has no live attempt. A `done` task is never re-run.
 
 A run file older than 0.2.21 lacks these fields: an attempt with no `phase` counts as `delivered`; with no `seen`, an
 existing report for a task that is not done is read once; with no `locator.report`, the path comes from a handoff, or

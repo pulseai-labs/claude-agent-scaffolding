@@ -9,6 +9,7 @@ All notable changes to the `herdr-crew` plugin.
 - The outgoing top's write/dispatch ban starts at the handoff, including wakes during successor launch.
 - At `phase: recorded`, every dispatch saves an existing report's generation in the new attempt's `locator.seen`, so a retained seat's previous report is not consumed again after a resume or molt.
 - Orient sends a takeover through the resume before rebinding; an operator-started resume is a hard stop even with an old handoff, and restarting in the old pane never closes the new top itself.
+- An undelivered attempt's relaunch uses dagr's followup object with the settled attempt's id; resume task selection skips tasks that already have a live attempt.
 
 ## 0.2.21
 
