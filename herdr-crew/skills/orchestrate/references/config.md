@@ -132,8 +132,8 @@ Three sections. `## Seats` is a table of role, agent name and when:
 ```
 
 `## My roles` holds the operator's own roles as blocks (next section). `## Conditions`
-is free text: conditions are sentences the coordinator reads when it picks a seat, and
-nothing parses them. The plugin ships the role list — orchestrator, implementer,
+is free text: sentences the coordinator reads when it picks a seat (a stalled seat's
+fallback and bound among them, `herdr-mechanics.md`), and nothing parses them. The plugin ships the role list — orchestrator, implementer,
 verifier, reviewer and the coordinator seats (spine session,
 close session, work-PR session), plus a `doctor session` for `/ossify:doctor`
 dispatches; the project file fills them and does not define new

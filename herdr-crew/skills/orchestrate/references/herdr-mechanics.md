@@ -134,7 +134,8 @@ The set is stated here; `roles.md` and `lifecycle.md` step 5 carry the same comm
 It is herdr's default set, written out rather than inherited; `--until` narrows: without
 `blocked`, a wait sleeps through a dialog to its timeout, and only `idle`, `done` and
 `blocked` are proved settled — `done` fires for a Claude Code pane as `idle` does.
-`--timeout` bounds it; a timeout is the checkpoint Completion states.
+`--timeout` bounds it; a timeout is the checkpoint Completion states (a doorbell
+companion's excepted: it lapses).
 
 **Every readiness and completion wait runs in the background:** one shell call the host
 wakes the session on when it exits (Claude Code: the Bash tool's `run_in_background`), so
@@ -212,7 +213,8 @@ For a detected seat that is not a coordinator (below), the wake is the typed wai
 - `idle` or `done`, and nothing new: the false wake below, one `herdr pane read`.
 - `blocked`: a dialog, handled as above. A timeout: the checkpoint below.
 
-**The two dead ends.** *A timeout is a checkpoint*: one `herdr pane read` — the seat's
+**The two dead ends.** *A timeout is a checkpoint* (but a doorbell companion's, which lapses;
+below): one `herdr pane read` — the seat's
 observed state, stopped, at a dialog or still at work, reported to the operator (a
 coordinator: to the top, in its report file), and a further wait is the operator's decision,
 never the orchestrator's own re-entry. *A false wake* — its own `pane read` showing the seat
@@ -237,7 +239,10 @@ above would sleep to its timeout. Add one bounded wait beside it,
 `herdr agent wait <pane> --until blocked --timeout <ms>`; that `blocked` wake is the dialog
 above, handled as any `blocked` wake is, and it ends the doorbell.
 The doorbell's return — a new report or its timeout — ends the companion, so a dispatch
-leaves at most one armed wait. An answered dialog re-arms the pair: the fresh bounded wait
+leaves at most one armed wait. The companion's own timeout, while the doorbell is still
+armed, is no checkpoint: it lapses silently, with no `pane read` and no report, and the
+doorbell (and the heartbeat, where armed) covers the rest of the dispatch.
+An answered dialog re-arms the pair: the fresh bounded wait
 after the answer is the doorbell and its companion again, not one wait.
 
 The worker's ping is its brief's line (`briefs.md`): after every report rename, one send, no
@@ -265,8 +270,18 @@ record, else one `herdr pane read`; an errored read is unreadable, not crashed).
 silent but for the tick's one line; blocked takes the dialog procedure above, its own
 diagnostic read included; idle, done with no new report, `unknown` or an unreadable seat is
 surfaced once per dispatch, not per tick, as observed state and uncertainty — never a failed
-task, never a retry. Killed when the last dispatch settles, at teardown and at stand-down,
-where the successor arms a fresh one.
+task, never a retry. **A stall** is the one exception to a silent `working`: a seat read
+`working` at two consecutive ticks with no new report generation takes the next tick's one
+check as `herdr pane read`, and a read showing only provider errors and retries (API errors,
+request timeouts, rate-limit waits), nothing else advancing, is a seat failure, not a failed
+task — named in the tick's line and the handoff. Settle its dispatch first (kill its
+report-file wait and companion), then launch the fallback the project file's `## Conditions`
+names for that seat as a fresh seat is launched (below), from the fallback's row, its brief
+re-sent whole, with `RESUME FROM:` the seat's last report when it wrote one. A seat a fresh
+session cannot resume (the cuts the molt paragraph below lists) gets no fallback; it, and a
+stall with no fallback named, is reported to the operator once. `## Conditions` may set another
+bound. The heartbeat is killed when the last
+dispatch settles, at teardown and at stand-down, where the successor arms a fresh one.
 
 **A child past molt's warnings.** A seat marked a molt child (step 2) is never cleared by molt.
 At each of molt's two warnings it sends one ping, `MOLT WARNING <pct> <task id>`, to its
