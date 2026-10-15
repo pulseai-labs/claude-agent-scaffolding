@@ -20,8 +20,8 @@ Every command's syntax comes from `herdr --skill`.
    binds an existing `run.json` rewrites `run.orchestrator` to its own
    `$HERDR_PANE_ID` — dagr's stable-agent fallback otherwise — in the same producer
    loop every other write takes.
-   Every bind writes `run.orchestrator.machine` beside its pane. A `machine` is a remote server's
-   `herdr machine list` label; the top's own server is its `hostname -s`.
+   Every creation and every bind writes `run.orchestrator.machine` beside its pane — this server's
+   machine, per `herdr-mechanics.md`, Machines.
 1b. **Ossify spine planned here?** If this session just completed `/ossify:plan-spine`
    against a concrete spine directory with a run bound, step 2 is replaced by
    `references/ossify-execution.md`: agree one implementer/verifier seat per work

@@ -300,7 +300,13 @@ n_eq "$PRBRIEFS_MD" 'NOTIFY_RUN=' 2 \
   "the close and work-PR briefs carry the run file the ping reads"
 pin "$WRITER_MD" 'NOTIFY_RUN=' \
   "the close-review writer's brief carries the run file the ping reads"
-for f in "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" "$GENERIC_BRIEFS_MD" "$MECHANICS_MD" "$LIFECYCLE_MD" "$SKILL_MD" "$CONFIG_MD" "$PLUGIN_README_MD"; do
+n_eq "$BRIEFS_MD" 'NOTIFY_MACHINE=' 3 \
+  "all three spine briefs carry the worker's machine"
+n_eq "$PRBRIEFS_MD" 'NOTIFY_MACHINE=' 2 \
+  "the close and work-PR briefs carry the worker's machine"
+pin "$WRITER_MD" 'NOTIFY_MACHINE=' \
+  "the close-review writer's brief carries the worker's machine"
+for f in "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" "$GENERIC_BRIEFS_MD" "$MECHANICS_MD" "$LIFECYCLE_MD" "$SKILL_MD" "$CONFIG_MD" "$PLUGIN_README_MD" "$EXEC_MD" "$NESTED_MD" "$ROLES_MD"; do
   absent "$f" 'NOTIFY_PANE' "${f##*/} names no fixed ping target"
 done
 # #816: the ping goes only to a pane on the worker's own server. The comparison is
@@ -1779,8 +1785,18 @@ section "the run file carries the live facts (#810, #816, #819)"
 # Spec §3/§5: each fact a successor needs is written at the step that learns it.
 pin "$LIFECYCLE_MD" '`run.merge_word` — `standing` unless the brief or the operator sets a merge gate for this run, then `operator`' \
   "step 1 writes the run's merge authority at creation" flat
-pin "$LIFECYCLE_MD" '`run.orchestrator.machine` beside its pane' \
-  "every bind writes the top's machine" flat
+pin "$LIFECYCLE_MD" 'Every creation and every bind writes `run.orchestrator.machine` beside its pane' \
+  "step 1 writes the top's machine on creation and binding" flat
+pin "$MECHANICS_MD" 'A `machine` is a remote server'"'"'s `herdr machine list` label; this server'"'"'s machine is its `hostname -s`' \
+  "every coordinator can read the shared machine-label rule" flat
+for f in "$BRIEFS_MD" "$PRBRIEFS_MD"; do
+  pin "$f" 'On creation and on continue/rebind, write `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per MECHANICS' \
+    "${f##*/} writes its machine on creation and continuation" flat
+done
+pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `herdr-mechanics.md`' \
+  "the nested spine successor writes its machine on rebind" flat
+pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `herdr-mechanics.md`' \
+  "the nested work-PR dispatch writes its machine on creation and continuation" flat
 pin "$LIFECYCLE_MD" 'with `phase: recorded` and its full locator before the brief goes' \
   "step 3 records the attempt before the send" flat
 pin "$LIFECYCLE_MD" '`phase: delivered` once the send is confirmed' \

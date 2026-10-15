@@ -374,8 +374,8 @@ and workspace too, and a target already gone is information, not failure.
 
 ## Machines
 
-A seat runs on the orchestrator's own machine. The config contract declares no machine: a
-seat goes elsewhere only when the operator names one, enabled in `herdr machine list`; a
+A `machine` is a remote server's `herdr machine list` label; this server's machine is its `hostname -s`.
+A seat runs on the orchestrator's own machine. The config contract declares no machine: a seat goes elsewhere only when the operator names one, enabled in `herdr machine list`; a
 machine that list does not show halts the run, never a guess. Every command for that seat
 then carries `herdr --machine <label>`, with its ids discovered there: ids and agent names
 are scoped to one server, and `--current` reaches no remote pane. Never consume a path from
