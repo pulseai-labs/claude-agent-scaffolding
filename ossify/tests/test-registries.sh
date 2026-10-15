@@ -612,5 +612,54 @@ t_capture env OSS_STATE_FILE="$SB" bash "$OSS" bone_set_revisit ADR-0005
 t_assert_rc 2 "305: bone_set_revisit refuses a missing trigger (clear it with \"\")"
 t_assert_eq "$NB1" "$(jq '.mutations | length' "$SB")" "305: none of the refusals journaled"
 
+# --- #631: feature_add records the intake issue on the feature entry ---------
+# Operator rulings of 2026-10-12 and 2026-10-15: an optional 5th argument, stored
+# as payload key `issue` (a JSON number). `N` and `#N` are accepted and normalised
+# to N; anything else is refused at rc 2 before any write. Empty, or not given, is
+# absent - no `issue` key at all - so a journal written before 1.23.0 replays
+# byte-identical.
+TF="$(mktemp -d)"; SF="$TF/state.json"
+oss_state_init "$SF" intake-demo >/dev/null
+t_capture oss_reg_add_feature "$SF" "export csv" "export a run as csv" flesh intake 42
+t_assert_rc 0 "631: feature_add accepts an issue number"
+t_assert_eq '["add_feature",{"name":"export csv","value":"export a run as csv","class_guess":"flesh","source":"intake","issue":42}]' \
+  "$(jq -c '.mutations[-1] | [.op, (.payload | del(.at))]' "$SF")" "631: journaled as add_feature with issue as a number"
+t_capture oss_reg_add_feature "$SF" "import csv" "import a run" flesh intake "#7"
+t_assert_rc 0 "631: feature_add accepts #N"
+t_assert_eq "7" "$(jq -c '.feature_map[-1].issue' "$SF")" "631: #N is normalised to N"
+t_capture oss_reg_add_feature "$SF" "plain" "no issue" flesh journey-map
+t_assert_rc 0 "631: feature_add without an issue still works"
+t_assert_eq "false" "$(jq -c '.feature_map[-1] | has("issue")' "$SF")" "631: no issue argument leaves no issue key"
+t_capture oss_reg_add_feature "$SF" "plain2" "empty issue" flesh journey-map ""
+t_assert_rc 0 "631: an empty issue argument is accepted as absent"
+t_assert_eq "false" "$(jq -c '.feature_map[-1] | has("issue")' "$SF")" "631: an empty issue leaves no issue key"
+NF1="$(jq '.mutations | length' "$SF")"
+for bad in 0 -3 05 abc 4a "#" "##4" "4 5" " 4" "1.5"; do
+  t_capture oss_reg_add_feature "$SF" "bad" "bad issue" flesh intake "$bad"
+  t_assert_rc 2 "631: feature_add refuses issue '$bad' at rc 2"
+done
+t_assert_contains "$T_OUT" "issue" "631: the refusal names the issue argument"
+t_assert_eq "$NF1" "$(jq '.mutations | length' "$SF")" "631: no refused issue journaled"
+# The dispatcher path runs under set -euo pipefail; the same contract holds there.
+t_capture env OSS_STATE_FILE="$SF" bash "$OSS" feature_add "cli" "a cli" flesh intake "#12"
+t_assert_rc 0 "631: oss feature_add takes the issue as its 5th argument"
+t_assert_eq "12" "$(jq -c '.feature_map[-1].issue' "$SF")" "631: the dispatcher records it normalised"
+t_capture env OSS_STATE_FILE="$SF" bash "$OSS" feature_add "cli2" "a cli" flesh intake abc
+t_assert_rc 2 "631: oss feature_add refuses a bad issue at rc 2"
+t_capture env OSS_STATE_FILE="$SF" bash "$OSS" feature_add "cli3" "a cli" flesh intake 3 extra
+t_assert_rc 2 "631: oss feature_add refuses a 6th argument rather than dropping it"
+t_capture env OSS_STATE_FILE="$SF" bash "$OSS" feature_list
+t_assert_eq "[42,7,null,null,12]" "$(printf '%s' "$T_OUT" | jq -c '[.[].issue]')" "631: feature_list shows the issue on each entry"
+t_capture oss_state_replay "$SF"
+t_assert_rc 0 "631: replay is clean with issue-bearing and issue-less entries"
+# Upgrade input class: a journal written by 1.22.0 - add_feature with no issue key.
+TL="$(mktemp -d)"; SL="$TL/state.json"
+oss_state_init "$SL" legacy-demo >/dev/null
+oss_state_mutate "$SL" add_feature '{"name":"legacy","value":"v","class_guess":"flesh","source":"intake","at":"2026-01-01T00:00:00Z"}' >/dev/null
+t_capture oss_state_replay "$SL"
+t_assert_rc 0 "631: a pre-1.23.0 add_feature (no issue key) replays clean"
+t_assert_eq "false" "$(jq -c '.feature_map[0] | has("issue")' "$SL")" "631: ...and gains no issue key"
+rm -rf "$TF" "$TL"
+
 rm -rf "$TMP"
 t_summary

@@ -675,8 +675,24 @@ EOF
 
 **Then close the intake requests this spine pulled in** — on every install, with
 or without merge-bar, and only once every hosting repo is recorded landed (pass
-one's local merges and the record pass above): for each,
-`gh issue close <n> --repo "<owner/repo>" --comment "<spine-id> landed: <PR URLs or merge SHAs>"`.
+one's local merges and the record pass above). A request closes only at the last
+spine that carries it (#631). For each request, read its comments with
+`gh issue view <n> --repo "<owner/repo>" --json comments --jq '.comments[].body'`.
+Collect every spine id that a `pulled in — <spine id>` comment names, and drop
+each one that a later `withdrawn — <spine id>` comment names. A release-level
+`pulled in — r<n>` names no spine and does not count. Then:
+
+- **Every collected spine other than this one is `closed`** in state
+  (`oss spine_list`): close it with
+  `gh issue close <n> --repo "<owner/repo>" --comment "<spine-id> landed: <PR URLs or merge SHAs>"`.
+- **Otherwise, leave it open** and say why in one comment:
+  `gh issue comment <n> --repo "<owner/repo>" --body "<spine-id> landed: <PR URLs or merge SHAs>; the request stays open for <spine ids not yet closed>"`.
+  Tell the operator too. A spine that was retired or replanned without the
+  feature holds the request open until someone posts `withdrawn — <spine id>`
+  for it (`plan-spine/references/intake-and-ledger.md` §1).
+- **The comments cannot be read, or a collected id is not in state:** leave the
+  request open, and tell the operator what could not be read. Never close a
+  request on a list you could not read.
 No PR carries a `Closes` line for them: with several hosting repos, the first PR
 to merge would close a request while the rest are still open.
 

@@ -306,10 +306,26 @@ oss_reg_add_fake() { # $1=state $2=boundary $3=channel $4=reason $5=trigger $6=e
     "" _oss_reg_uniq_fake
 }
 
-oss_reg_add_feature() { # $1=state $2=name $3=value $4=class-guess $5=source
+# $6 (1.23.0, #631): the intake issue this entry came from, so spine planning
+# reads the request from the entry instead of matching titles. `N` or `#N`,
+# normalised to the number N; empty or absent writes no `issue` key at all, so a
+# journal written before 1.23.0 replays byte-identical. Anything else is refused
+# at rc 2 before any write.
+oss_reg_add_feature() { # $1=state $2=name $3=value $4=class-guess $5=source [$6=intake-issue]
+  local issue="${6:-}"
+  issue="${issue#\#}"
+  case "${6:-}" in
+    "") ;;
+    *)
+      case "$issue" in
+        ""|0*|*[!0-9]*)
+          echo "oss: feature_add's intake issue must be a positive issue number (N or #N), got '$6'" >&2
+          return 2 ;;
+      esac ;;
+  esac
   oss_state_mutate "$1" add_feature \
-    "$(jq -n --arg n "$2" --arg v "$3" --arg cg "$4" --arg s "$5" --arg ts "$(_oss_now)" \
-      '{name:$n,value:$v,class_guess:$cg,source:$s,at:$ts}')"
+    "$(jq -n --arg n "$2" --arg v "$3" --arg cg "$4" --arg s "$5" --arg i "$issue" --arg ts "$(_oss_now)" \
+      '{name:$n,value:$v,class_guess:$cg,source:$s} + (if $i == "" then {} else {issue:($i|tonumber)} end) + {at:$ts}')"
 }
 
 # Touch-surface matching: bones/risk_gates store touch:[glob,...]. Matches

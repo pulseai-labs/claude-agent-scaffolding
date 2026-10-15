@@ -1979,4 +1979,21 @@ _pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt C6 still says no ceremony con
 pin "$SKILLS/adopt/SKILL.md" 'Record what the pass did as the adoption record'"'"'s C2 result line (§6, #367)' \
   "adopt C2 points the station at its result line (#367)"
 
+# #631 (1.23.0): an intake request closes at its LAST carrying spine, read from the
+# request's own comments; a release-level pull-in records the issue on the entry.
+pin "$SKILLS/close/references/spine-close.md" 'spine that carries it (#631).' \
+  "spine close closes an intake request only at its last carrying spine (#631)"
+pin "$SKILLS/close/references/spine-close.md" 'request on a list you could not read.' \
+  "spine close leaves a request open when its comments or a named spine cannot be read (#631)"
+pin "$SKILLS/close/references/spine-close.md" 'each one that a later `withdrawn — <spine id>` comment names' \
+  "spine close honours a withdrawn disposition (#631)"
+pin "$SKILLS/plan-spine/references/intake-and-ledger.md" '`oss feature_add "<name>" "<value>" "<bone|flesh>" intake <issue-number>`' \
+  "a release-level pull-in records the request's issue on the feature entry (#631)"
+pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'never by matching titles' \
+  "spine planning reads the request from the feature entry's issue (#631)"
+pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'until the comment is posted' \
+  "intake §1 names the replanned-spine limit where the operator meets it (#631)"
+pin "$SKILLS/plan-spine/references/decomposition.md" 'comment `withdrawn — <old-spine>`' \
+  "a whole-spine split posts withdrawn on the old spine's intake request (#631)"
+
 t_summary

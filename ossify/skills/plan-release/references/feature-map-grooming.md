@@ -17,12 +17,13 @@ at each groom rather than in state (§2). Each entry:
 | `value` | one line: why the actor wants it. A deferred entry may carry a trailing `— admitted when <condition>`, because there is no trigger field to hold it (§2) |
 | `class_guess` | `bone` or `flesh` — a **guess**, made before any plan existed |
 | `source` | `journey-map` · `spec` · `release-retro` · `deferral` · `real-use` · `fake-replacement` · `feature-map-return` · `intake` |
+| `issue` | an `intake` entry only: the request's issue number, given as `feature_add`'s fifth argument (1.23.0). Absent on every other entry |
 
 _Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
 ```bash
 oss feature_list                                   # the whole map, as JSON
-oss feature_add "<name>" "<value>" "<bone|flesh>" "<source>"
+oss feature_add "<name>" "<value>" "<bone|flesh>" "<source>" [<intake-issue>]
 ```
 
 `class_guess` is **not** the class. It ranks and warns; the class ladder
