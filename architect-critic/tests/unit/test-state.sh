@@ -456,4 +456,212 @@ assert_eq "arc lock_acquire returns 0" "0" "$?"
 assert_file_missing "$lock_file"
 
 # ---------------------------------------------------------------------------
+# T23 (#486): ac_state_init refuses every non-empty file that is not exactly
+# one JSON object — a multi-document stream and valid non-object JSON, not
+# only a file no parser accepts (T19) — and leaves each byte-identical.
+# ---------------------------------------------------------------------------
+echo "T23: ac_state_init refuses multi-document and non-object JSON (#486)"
+for body in '{}{}' '[]' 'null'; do
+  setup_tmp_repo > /dev/null
+  mkdir -p "$(ac_data_dir)"
+  state_file="$(ac_state_path)"
+  printf '%s\n' "$body" > "$state_file"
+  t23_before="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+  ac_state_init 2>/dev/null
+  T23_RC=$?
+  [[ "$T23_RC" -ne 0 ]]
+  assert_eq "ac_state_init refuses $body (rc != 0)" "0" "$?"
+  assert_eq "$body left byte-identical" "$t23_before" "$(shasum -a 256 "$state_file" | awk '{print $1}')"
+done
+
+# ---------------------------------------------------------------------------
+# T24 (#485): a whitespace-only state.json holds nothing to lose, like a
+# 0-byte one (T17), so ac_state_init re-seeds it — and releases the lock.
+# ---------------------------------------------------------------------------
+echo "T24: ac_state_init re-seeds a whitespace-only state.json (#485)"
+for ws in $'\n' '   ' $'\r\n' $'\n\t \n'; do
+  setup_tmp_repo > /dev/null
+  mkdir -p "$(ac_data_dir)"
+  state_file="$(ac_state_path)"
+  lock_file="$(ac_data_dir)/state.lock"
+  printf '%s' "$ws" > "$state_file"
+  ac_state_init 2>/dev/null
+  assert_eq "whitespace-only file re-seeded (rc 0)" "0" "$?"
+  assert_eq "re-seeded file is schema v3" "3" "$(jq -r '.schema_version' "$state_file" 2>/dev/null)"
+  assert_file_missing "$lock_file"
+done
+
+# T25 (control, #485): whitespace around non-JSON content is still content —
+# refused, byte-identical (the loosening above must not reach it).
+echo "T25: whitespace around garbage is still refused (#485 control)"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+state_file="$(ac_state_path)"
+printf '  x\n' > "$state_file"
+t25_before="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+ac_state_init 2>/dev/null
+T25_RC=$?
+[[ "$T25_RC" -ne 0 ]]
+assert_eq "whitespace plus garbage refused (rc != 0)" "0" "$?"
+assert_eq "whitespace plus garbage byte-identical" "$t25_before" "$(shasum -a 256 "$state_file" | awk '{print $1}')"
+
+# T25b (control, #485): a state.json the blank check cannot READ is not blank.
+# grep exits 2 on a read error; reading that as "no content" would re-seed, and
+# the atomic replace would destroy the unread document.
+echo "T25b: an unreadable state.json is refused, never re-seeded (#485 control)"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+state_file="$(ac_state_path)"
+printf '{"schema_version":3,"runs":[{"id":"keep"}]}\n' > "$state_file"
+t25b_before="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+chmod 000 "$state_file"
+if [[ -r "$state_file" ]]; then
+  echo "  skip: running as a user that can read a mode-000 file"
+else
+  ac_state_init 2>/dev/null
+  T25B_RC=$?
+  chmod 600 "$state_file"
+  [[ "$T25B_RC" -ne 0 ]]
+  assert_eq "unreadable state.json refused (rc != 0)" "0" "$?"
+  assert_eq "unreadable state.json not re-seeded" "$t25b_before" "$(shasum -a 256 "$state_file" | awk '{print $1}')"
+fi
+chmod 600 "$state_file" 2>/dev/null
+
+# T26 (#485): the re-seed takes state.lock. With a lock held by another owner,
+# a 0-byte or whitespace-only file is NOT re-seeded (acquire times out), and
+# the foreign lock survives.
+echo "T26: the re-seed waits for state.lock (#485)"
+for ws in '' $'\n'; do
+  setup_tmp_repo > /dev/null
+  mkdir -p "$(ac_data_dir)"
+  state_file="$(ac_state_path)"
+  lock_file="$(ac_data_dir)/state.lock"
+  printf '%s' "$ws" > "$state_file"
+  t26_before="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+  printf 'foreign-owner-token' > "$lock_file"
+  ac_state_init 2>/dev/null
+  T26_RC=$?
+  [[ "$T26_RC" -ne 0 ]]
+  assert_eq "re-seed under a foreign lock refused (rc != 0)" "0" "$?"
+  assert_eq "empty file untouched while the lock is held" "$t26_before" "$(shasum -a 256 "$state_file" | awk '{print $1}')"
+  [[ -f "$lock_file" && "$(cat "$lock_file")" == "foreign-owner-token" ]]
+  assert_eq "foreign lock survives the refused re-seed" "0" "$?"
+  rm -f "$lock_file"
+done
+
+# T27 (#485): emptiness is re-checked under the lock. Another owner holds the
+# lock, writes a real document, then releases; the waiting re-seed must see
+# the document and keep it, not overwrite it with the seed.
+echo "T27: the re-seed re-checks emptiness under the lock (#485)"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+state_file="$(ac_state_path)"
+lock_file="$(ac_data_dir)/state.lock"
+printf '' > "$state_file"
+printf 'foreign-owner-token' > "$lock_file"
+( sleep 0.5
+  printf '%s\n' '{"schema_version":3,"recent_runs":[{"request_id":"kept"}],"external_runs":[],"principle_promotions":[]}' > "$state_file"
+  rm -f "$lock_file" ) &
+t27_bg=$!
+ac_state_init 2>/dev/null
+assert_eq "ac_state_init after the other owner's write (rc 0)" "0" "$?"
+wait "$t27_bg"
+assert_eq "the other owner's document is kept" "kept" "$(jq -r '.recent_runs[0].request_id' "$state_file" 2>/dev/null)"
+assert_file_missing "$lock_file"
+
+# ---------------------------------------------------------------------------
+# T28 (#489): the lock's EXIT handler hands a chained, earlier EXIT trap the
+# real exit status — `rc=$?; ...; exit $rc` must not read the handler's own
+# [[ ]] status.
+# ---------------------------------------------------------------------------
+echo "T28: a chained EXIT trap sees the real exit status (#489)"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+lock_file="$(ac_data_dir)/state.lock"
+t28_out="$TMP_DIR/t28.out"
+bash -c '
+  source "'"$LIB_DIR"'/_helpers.sh"
+  trap '"'"'rc=$?; printf "prior-saw:%s" "$rc" > "'"$t28_out"'"; exit $rc'"'"' EXIT
+  ac_lock_acquire "'"$lock_file"'"
+  exit 7
+' 2>/dev/null
+T28_RC=$?
+assert_eq "process exit status kept" "7" "$T28_RC"
+assert_eq "chained trap read the real status" "prior-saw:7" "$(cat "$t28_out" 2>/dev/null)"
+assert_file_missing "$lock_file"
+# Same under errexit (bin/arc runs `set -e`): restoring the status must not be a
+# failing simple command that aborts the handler before the chained trap runs
+# (Codex on PR #823). The success path (rc 0) must still run it too.
+for t28e_rc in 7 0; do
+  rm -f "$t28_out"
+  bash -c '
+    set -euo pipefail
+    source "'"$LIB_DIR"'/_helpers.sh"
+    trap '"'"'rc=$?; printf "prior-saw:%s" "$rc" > "'"$t28_out"'"; exit $rc'"'"' EXIT
+    ac_lock_acquire "'"$lock_file"'"
+    exit '"$t28e_rc"'
+  ' 2>/dev/null
+  T28E_RC=$?
+  assert_eq "errexit: process exit status kept ($t28e_rc)" "$t28e_rc" "$T28E_RC"
+  assert_eq "errexit: chained trap ran and read the real status ($t28e_rc)" "prior-saw:$t28e_rc" "$(cat "$t28_out" 2>/dev/null)"
+  assert_file_missing "$lock_file"
+done
+
+# ---------------------------------------------------------------------------
+# T29 (#489): a lock acquired inside a subshell is released when that subshell
+# exits — whether or not the parent already installed the handler.
+# ---------------------------------------------------------------------------
+echo "T29: a lock acquired in a subshell does not leak (#489)"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+lock_file="$(ac_data_dir)/state.lock"
+other_lock="$(ac_data_dir)/other.lock"
+t29="$(bash -c '
+  source "'"$LIB_DIR"'/_helpers.sh"
+  ( ac_lock_acquire "'"$lock_file"'"; false )
+  [[ -f "'"$lock_file"'" ]] && echo leaked-fresh || echo clean-fresh
+  ac_lock_acquire "'"$other_lock"'"
+  ( ac_lock_acquire "'"$lock_file"'"; false )
+  [[ -f "'"$lock_file"'" ]] && echo leaked-installed || echo clean-installed
+' 2>/dev/null)"
+assert_eq "subshell lock released (no handler in the parent yet)" "0" "$([[ "$t29" == *clean-fresh* ]]; echo $?)"
+assert_eq "subshell lock released (parent handler already installed)" "0" "$([[ "$t29" == *clean-installed* ]]; echo $?)"
+assert_file_missing "$lock_file"
+assert_file_missing "$other_lock"
+
+# T30 (control, #489): a lock the parent holds survives a subshell's exit and a
+# command substitution, then is released when the parent exits.
+echo "T30: a parent's lock survives its subshells (#489 control)"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+lock_file="$(ac_data_dir)/state.lock"
+other_lock="$(ac_data_dir)/other.lock"
+t30="$(bash -c '
+  source "'"$LIB_DIR"'/_helpers.sh"
+  ac_lock_acquire "'"$lock_file"'"
+  ( true )
+  x="$(echo hi)"
+  ( ac_lock_acquire "'"$other_lock"'"; true )
+  [[ -f "'"$lock_file"'" ]] && echo held || echo lost
+' 2>/dev/null)"
+assert_eq "parent lock held after its subshells exit" "held" "$t30"
+assert_file_missing "$lock_file"
+assert_file_missing "$other_lock"
+
+# T31 (#489): a subshell's lock handler never runs the PARENT's EXIT trap —
+# `trap -p` in a subshell still reports it, but bash would not run it there.
+echo "T31: a subshell lock does not run the parent's EXIT trap (#489)"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+lock_file="$(ac_data_dir)/state.lock"
+t31_out="$TMP_DIR/t31.out"
+bash -c '
+  source "'"$LIB_DIR"'/_helpers.sh"
+  trap '"'"'echo parent-trap >> "'"$t31_out"'"'"'"' EXIT
+  ( ac_lock_acquire "'"$lock_file"'"; true )
+' 2>/dev/null
+assert_eq "parent EXIT trap ran exactly once" "1" "$(grep -c parent-trap "$t31_out" 2>/dev/null)"
+assert_file_missing "$lock_file"
+
+# ---------------------------------------------------------------------------
 report_results

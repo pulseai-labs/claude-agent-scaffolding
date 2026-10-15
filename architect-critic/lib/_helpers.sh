@@ -46,12 +46,19 @@ ac_guarded_jq_write() {
 #     matches what we hold and its content matches our token — so a second
 #     release, or a release after another owner replaced the file, is a no-op;
 #   - the EXIT trap installed on first acquire releases a still-held lock when
-#     the owning process exits for any reason. It runs only at subshell depth
-#     0 so a command substitution inside a locked region cannot release the
-#     parent's lock, and it chains any EXIT trap that predates ours.
+#     the owning process exits for any reason. It releases only at the subshell
+#     depth the lock was acquired at, so a command substitution inside a locked
+#     region cannot release the parent's lock, while a lock taken inside a
+#     subshell is released when that subshell exits (#489). bash does not carry
+#     an EXIT trap into a subshell, so the trap is installed once per depth.
+#   - at depth 0 it chains any EXIT trap that predates ours, handing it the
+#     real exit status (#489). In a subshell `trap -p` still reports the
+#     parent's inactive trap, so nothing is chained there.
 AC_HELD_LOCK=""
 _AC_LOCK_TOKEN=""
 _AC_LOCK_TRAP_INSTALLED=""
+_AC_LOCK_TRAP_DEPTH=""
+_AC_LOCK_DEPTH=0
 _AC_PRIOR_EXIT_TRAP=""
 _AC_IN_EXIT_TRAP=""
 
@@ -64,6 +71,7 @@ ac_lock_acquire() {
     if ( set -o noclobber; printf '%s' "$token" > "$lock" ) 2>/dev/null; then
       AC_HELD_LOCK="$lock"
       _AC_LOCK_TOKEN="$token"
+      _AC_LOCK_DEPTH="${BASH_SUBSHELL:-0}"
       _ac_lock_install_trap
       return 0
     fi
@@ -86,33 +94,50 @@ ac_lock_release() {
   return 0
 }
 
-# EXIT-trap handler: release the lock iff this process still holds it and we
-# are exiting the top-level shell (a command substitution must not release
-# the parent's lock), then run any EXIT trap that predates ours.
+# EXIT-trap handler: capture the exit status first, release the lock iff this
+# process still holds it and we are exiting at the depth it was acquired at (a
+# command substitution must not release the parent's lock), then run any EXIT
+# trap that predates ours with that status restored as its $?.
 _ac_lock_on_exit() {
+  local rc=$?
   if [[ -n "$_AC_IN_EXIT_TRAP" ]]; then
-    return 0
+    return "$rc"
   fi
   _AC_IN_EXIT_TRAP=1
-  if [[ ${BASH_SUBSHELL:-0} -eq 0 && -n "$AC_HELD_LOCK" ]]; then
+  if [[ -n "$AC_HELD_LOCK" && ${BASH_SUBSHELL:-0} -eq ${_AC_LOCK_DEPTH:-0} ]]; then
     ac_lock_release "$AC_HELD_LOCK"
   fi
   if [[ -n "$_AC_PRIOR_EXIT_TRAP" ]]; then
-    eval "$_AC_PRIOR_EXIT_TRAP"
+    # Restore $? for the chained trap without a failing simple command: under
+    # errexit a bare `_ac_return 7` would exit here and skip the chained trap.
+    # The left side of `||` is exempt from errexit, and `$?` on the right is
+    # its status.
+    if [[ "$rc" -eq 0 ]]; then
+      eval "$_AC_PRIOR_EXIT_TRAP"
+    else
+      _ac_return "$rc" || eval "$_AC_PRIOR_EXIT_TRAP"
+    fi
   fi
+  return "$rc"
 }
 
-# Install the EXIT trap once, preserving whatever trap the caller set before
-# us (bin/arc sets none today; the chain keeps that promise if it ever does).
+_ac_return() { return "$1"; }
+
+# Install the EXIT trap once per subshell depth, preserving at depth 0
+# whatever trap the caller set before us (bin/arc sets none today; the chain
+# keeps that promise if it ever does).
 _ac_lock_install_trap() {
-  local prior
-  if [[ -z "$_AC_LOCK_TRAP_INSTALLED" ]]; then
-    prior="$(trap -p EXIT | sed -n "s/^trap -- '\(.*\)' EXIT\$/\1/p")"
-    if [[ "$prior" == "_ac_lock_on_exit" ]]; then
-      prior=""
+  local prior="" depth="${BASH_SUBSHELL:-0}"
+  if [[ -z "$_AC_LOCK_TRAP_INSTALLED" || "$_AC_LOCK_TRAP_DEPTH" != "$depth" ]]; then
+    if [[ "$depth" -eq 0 ]]; then
+      prior="$(trap -p EXIT | sed -n "s/^trap -- '\(.*\)' EXIT\$/\1/p")"
+      if [[ "$prior" == "_ac_lock_on_exit" ]]; then
+        prior=""
+      fi
     fi
     _AC_PRIOR_EXIT_TRAP="$prior"
     trap '_ac_lock_on_exit' EXIT
     _AC_LOCK_TRAP_INSTALLED=1
+    _AC_LOCK_TRAP_DEPTH="$depth"
   fi
 }
