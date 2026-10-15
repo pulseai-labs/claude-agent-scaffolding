@@ -30,18 +30,18 @@ truncation and parse half a report. No tool here documents an atomic rename, so 
 requirement is the writer's, not the tool's. A plan, a question and a final report all
 replace the file the same way.
 
-Every report-producing brief names its parent's pane as `NOTIFY_PANE`, beside its report path:
-the dispatcher fills it with its own `$HERDR_PANE_ID` only when herdr detects that pane and the
-seat shares its server — otherwise the sentinel `none`, never a target and never sent to — and
-the worker's step after every rename is one `agent prompt` send there, no `--wait` and no retry,
-only when the target is not `none`, naming the file it actually renamed over. The message is one
-single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay
-literal). The ping only wakes the parent — a parent undetected or on another server keeps the
-report-file wait and the run's heartbeat, no push promised — and a failed send is left as it is.
-An operator's own `brief:` is dispatched as a copy carrying the same envelope, the leaf
-templates' `MOLT:` line included; the stored file is
-never edited, and a stored brief whose fixed target differs from the run's is surfaced, not
-overridden; an equal target is no conflict, kept as it is.
+Every report-producing brief names its dispatcher's run file as `NOTIFY_RUN` and the worker's
+machine as `NOTIFY_MACHINE`, beside its report path. The dispatcher fills `NOTIFY_RUN` only when
+herdr detects its pane and the seat is on its machine — otherwise the sentinel `none`, never read
+and never sent to. After every rename the worker reads `run.orchestrator` from that file and sends
+one `agent prompt` to its pane, no `--wait` and no retry, only when its machine is the worker's,
+naming the file it actually renamed over. Reading the file at ping time makes every rebind
+redirect every ping: a successor top needs no message to a live worker. The message is one
+single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal).
+The ping only wakes the parent — a parent undetected or on another server keeps the report-file wait
+and the run's heartbeat, no push promised — and a failed send is left as it is. An operator's own `brief:`
+is dispatched as a copy carrying the same envelope, the leaf templates' `MOLT:` line included; the stored file is
+never edited, and a stored brief whose fixed run file or fixed machine differs from the run's is surfaced, not overridden; equal values are no conflict, kept as they are.
 
 ## A template is a whole contract
 
@@ -78,8 +78,8 @@ filled into its brief by the coordinator, and `ossify-briefs.md` does not restat
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 PR_BODY_TEMPLATE=<the installed merge-bar's `skills/opening-a-pr/references/pr-body.md`, pasted verbatim; ossify's `skills/work-pr/references/pr-body.md` where only ossify is installed; `none` only where neither is>
 ROLE: implementer. State the model you are running in your first reply, then continue.
@@ -109,7 +109,7 @@ Then write your report file with this body:
   Open: <issue or finding ids, one per line>
   Files: <paths touched, plus any separate file holding longer narrative>
 
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: merge, delete a branch, force-push, edit files outside the worktree, or run any
 subagent — your report file at REPORT_PATH and files under SCRATCH_DIR are the exceptions
 outside it, as the ossify
@@ -124,8 +124,8 @@ If a tool or policy refuses you, report it verbatim and stop that step.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 PR_BODY_TEMPLATE=<the installed merge-bar's `skills/opening-a-pr/references/pr-body.md`, pasted verbatim; ossify's `skills/work-pr/references/pr-body.md` where only ossify is installed; `none` only where neither is>
 ROLE: implementer. State the model you are running in your first reply, then continue.
@@ -146,7 +146,7 @@ results) — and open the PR from the worktree with `gh pr create --repo <owner/
 PR>. Then write your report file with this body:
   Changed / Evidence / PR / Open / Files as ids, SHAs, counts and a report path.
 
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: merge, delete a branch, force-push, edit files outside the worktree, or run any
 subagent — your report file at REPORT_PATH and files under SCRATCH_DIR are the exceptions
 outside it. When blocked,
@@ -160,8 +160,8 @@ stop; report refusals verbatim.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 ROLE: reviewer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path> checked out at PR <number>'s head <sha>.
@@ -181,7 +181,7 @@ without it.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: edit any file other than your report file, post anything to GitHub, or run a second
 review. Your findings
 travel only in your report file. If `/code-review` refuses or errors, report its output
@@ -195,8 +195,8 @@ escalation goes there too, then stop.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: verifier, read-only. State the model you are running in your first reply, then
 continue.
@@ -217,7 +217,7 @@ DONE: write your report file, one line per claim, then the caveats:
   `Cannot determine` counts as fail; the suite on the head is not a claim (its
   check-runs were read before dispatch). Caveats: <what the check could not see>
 
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: commit or push, or edit a tracked file outside the mutation check. That check
 may temporarily edit one — in the disposable worktree, reverted before the report.
 Scratch output is fine — write it under SCRATCH_DIR=<the seat's scratch directory>, never
@@ -235,8 +235,8 @@ part of it is rebuilt from another template's.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 SCRATCH_DIR=<this seat's scratch directory: scratch output and commit-message files go here>
 ROLE: implementer, fix round. State the model you are running in your first reply, then
 continue.
@@ -269,7 +269,7 @@ DONE: commit with a message written to a file under SCRATCH_DIR and `git commit 
 branch. Then write your report file with this body:
   Changed / Evidence / PR / Open / Files as ids, SHAs, counts and a report path.
 
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: merge, delete a branch, force-push, edit files outside the worktree, or run any
 subagent — your report file at REPORT_PATH and files under SCRATCH_DIR are the exceptions
 outside it. When blocked,
@@ -292,8 +292,8 @@ of item pairs: the default lane creates none.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 ROLE: lane driver for ossify spine <spine id> — ossify's orchestrator for that spine, not an
 implementer. State the model you are running in your first reply, then continue.
 
@@ -310,7 +310,7 @@ DONE: write your report file with this body:
   Barrier: <the barrier's result>
   Merged: <the SHAs you merged, one per line>
 
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: run a second review — ossify's own gates are the lane's review; edit ossify's
 contract or any other plugin; work an item yourself. Running this lane's subagents and
 merging at the barrier are this seat's job, not forbidden ones. When blocked, write the
@@ -328,8 +328,8 @@ adjudicate it: the brief states only what the seat returns.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 ROLE: doctor session. State the model you are running in your first reply, then continue.
 
 PLACEMENT: <the tree the dispatch runs from — abs path>.
@@ -339,7 +339,7 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
 DONE: write your report file carrying that dispatch's own result, verbatim. Never a
 `commit …; push; open the PR` line: this dispatch's result is its own.
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: commit, push, open a PR, or merge. Questions and escalations go in your report
 file, not to the operator: when blocked, write the question there and wait; when stuck,
 write an escalation there and stop; report refusals verbatim.
@@ -356,8 +356,8 @@ seat — its report, scratch and handoff directories in `SEAT_MODS_ALLOW` (`herd
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 ROLE: implementer, direct work item. State the model you are running in your first reply,
 then continue.
 
@@ -371,7 +371,7 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
 DONE: write your report file carrying that work item's own result, verbatim — its
 structured return. Never a commit, push or PR line.
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: commit, push, open a PR, or merge; edit files outside this worktree; or run any
 subagent. The two exceptions to that scope are this item's own report.md, which the
 work-item contract has you author beside the handoff and spec, and your report file at
@@ -391,8 +391,8 @@ command (`herdr-mechanics.md` step 2).
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 ROLE: close session. State the model you are running in your first reply, then continue.
 
 PLACEMENT: <the tree the close runs from — abs path>.
@@ -410,7 +410,7 @@ repo, and hiding those PRs strands them. After the result, carry the close's own
 verbatim — the message the ceremony ends with — because the result alone is a protocol
 token, and the report file is all the parent's contract reads. Never a `commit …; push;
 open the PR` line of your own.
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: create a seat, merge on your own authority, re-invoke `/ossify:close`, or open a PR
 of your own — a halt settles this dispatch, and a remediated one is a fresh session the
 orchestrator dispatches.

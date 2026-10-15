@@ -147,11 +147,11 @@ never a re-entry after an empty timeout. A round of N parallel items is N such w
 per pane, each waking the session when it exits; the round's barrier closes when every
 item's report file is in hand.
 
-**A worker also pings.** Every brief names its parent's pane as `NOTIFY_PANE` — the
-dispatcher's own pane id only when herdr detects it and the seat shares its server, otherwise
+**A worker also pings.** Every brief names `NOTIFY_RUN` (the run file whose `run.orchestrator` the worker pings) — the
+dispatcher's own run file only when herdr detects its pane and the seat shares its machine, otherwise
 the sentinel `none` — and after every atomic report rename the worker sends one literal
-`REPORT READY: <task> <kind> <path>` line there, single-quoted as one argument and skipped
-when the target is `none`: one send, no `--wait`, no retry, and a failed send leaves the report
+`REPORT READY: <task> <kind> <path>` line to the pane read then, single-quoted as one argument and skipped
+when the run file is `none`, its read fails or its machine differs from `NOTIFY_MACHINE`: one send, no `--wait`, no retry, and a failed send leaves the report
 intact. A parent herdr cannot target keeps the report-file wait and this heartbeat, no push
 promised. The parent consumes a given hash/identity generation once and retires that
 dispatch's wait when it does; a ping naming a path other than the briefed report path is
