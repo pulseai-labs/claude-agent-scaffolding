@@ -20,6 +20,14 @@ const ROLE_MIN: Record<string, Partial<Record<(typeof MODS)[number], string>>> =
 // plugin unless its claude-plugins provider is enabled.
 const ROLE_SKILL: Record<string, { plugin: string; min: string }> = { orchestrator: { plugin: 'herdr-crew', min: '0.2.19' } }
 
+// `orc`: the operator's one-word OMP top. It names the orchestrator role, marks the session for the #798 rail when
+// nothing else did (another role is kept, so planLaunch refuses it), and runs GLM 5.3 unless --via names a wrapper.
+export function expandRole(role: string, via: string | undefined, roleEnv: string | undefined):
+  { role: string; via: string; roleEnv: string | undefined } {
+  if (role !== 'orc') return { role, via: via ?? 'omp', roleEnv }
+  return { role: 'orchestrator', via: via ?? 'omp-glm', roleEnv: roleEnv === undefined || roleEnv === '' ? 'orchestrator' : roleEnv }
+}
+
 export function pinWarning(installed: string, tested: string): string | undefined {
   const v = installed.replace(/^omp\//, '').trim()
   return v === tested ? undefined
