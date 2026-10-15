@@ -108,8 +108,15 @@ _ac_lock_on_exit() {
     ac_lock_release "$AC_HELD_LOCK"
   fi
   if [[ -n "$_AC_PRIOR_EXIT_TRAP" ]]; then
-    _ac_return "$rc"
-    eval "$_AC_PRIOR_EXIT_TRAP"
+    # Restore $? for the chained trap without a failing simple command: under
+    # errexit a bare `_ac_return 7` would exit here and skip the chained trap.
+    # The left side of `||` is exempt from errexit, and `$?` on the right is
+    # its status.
+    if [[ "$rc" -eq 0 ]]; then
+      eval "$_AC_PRIOR_EXIT_TRAP"
+    else
+      _ac_return "$rc" || eval "$_AC_PRIOR_EXIT_TRAP"
+    fi
   fi
   return "$rc"
 }

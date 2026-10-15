@@ -589,6 +589,23 @@ T28_RC=$?
 assert_eq "process exit status kept" "7" "$T28_RC"
 assert_eq "chained trap read the real status" "prior-saw:7" "$(cat "$t28_out" 2>/dev/null)"
 assert_file_missing "$lock_file"
+# Same under errexit (bin/arc runs `set -e`): restoring the status must not be a
+# failing simple command that aborts the handler before the chained trap runs
+# (Codex on PR #823). The success path (rc 0) must still run it too.
+for t28e_rc in 7 0; do
+  rm -f "$t28_out"
+  bash -c '
+    set -euo pipefail
+    source "'"$LIB_DIR"'/_helpers.sh"
+    trap '"'"'rc=$?; printf "prior-saw:%s" "$rc" > "'"$t28_out"'"; exit $rc'"'"' EXIT
+    ac_lock_acquire "'"$lock_file"'"
+    exit '"$t28e_rc"'
+  ' 2>/dev/null
+  T28E_RC=$?
+  assert_eq "errexit: process exit status kept ($t28e_rc)" "$t28e_rc" "$T28E_RC"
+  assert_eq "errexit: chained trap ran and read the real status ($t28e_rc)" "prior-saw:$t28e_rc" "$(cat "$t28_out" 2>/dev/null)"
+  assert_file_missing "$lock_file"
+done
 
 # ---------------------------------------------------------------------------
 # T29 (#489): a lock acquired inside a subshell is released when that subshell
