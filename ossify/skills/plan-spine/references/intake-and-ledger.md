@@ -2,8 +2,9 @@
 
 Depth for SKILL.md §3's last step, and read from two other places: `plan-release`
 §4 reads §1 at release grooming, and the `patch` skill reads §2 for a patch's
-paths. One procedure, three callers. Nothing here writes ossify state: the issue
-tracker is the queue, and the ledger is a file in the AI workspace.
+paths. One procedure, three callers. The issue tracker is the queue, and the
+ledger is a file in the AI workspace. The one state write is the feature-map
+entry a release-level pull-in adds, which carries the request's issue number.
 
 ---
 
@@ -32,25 +33,34 @@ requester.
 prints `1000`, raise the limit and list again. A truncated page drops requests
 silently. A closed issue is not in the queue.
 
-A request stays open until the spine that pulled it in lands, so the queue can
+A request stays open until the operator closes it, so the queue can
 return one an earlier planning already took. Read its comments
 (`gh issue view <n> --repo "<owner/repo>" --json comments`): one carrying a
 `pulled in — <spine id>` disposition is already assigned — list it as
-such, and never add it to the feature map or a spine again. A spine id has the
+such, and never add it to the feature map again or pull it into a spine as new
+work. A spine id has the
 `r<n>.s<m>` shape. A `pulled in — <release id>` request (`r<n>`) is on the feature
 map and not yet in any spine. At release planning, list it as already pulled in.
-At spine planning, when this spine takes the feature it came from, re-disposition it:
+At spine planning, when this spine takes the feature it came from — whether the
+request reads `pulled in` to the release or to an earlier spine — re-disposition it:
 `pulled in` to this spine, recorded in `SPINE.md`'s Context and commented on the
-issue as below, so spine close (`close/references/spine-close.md`) closes it when
-the spine lands. If this spine does not take that feature, leave the request as
-it is.
+issue as below. Find the request from the feature entry's `issue` field
+(`oss feature_list`), never by matching titles. An entry with no `issue` (one
+added before 1.23.0) came from a request you must confirm with the operator. If
+this spine does not take that feature, leave the request as it is.
+
+**The operator closes a request.** Several spines can take one feature, and each
+posts its own `pulled in — <spine id>` comment. Spine close never closes the
+request: it comments that its spine landed and tells the operator, who closes the
+request by hand once the work it asked for has landed
+(`close/references/spine-close.md` §3).
 
 For each other open request, record exactly one disposition:
 
 - **pulled in** — into this spine, as a named work item or an AC, only while the
   spine's first round has not started (SKILL.md §2). At release planning,
-  pulled in means onto the feature map:
-  `oss feature_add "<name>" "<value>" "<bone|flesh>" intake`.
+  pulled in means onto the feature map, with the request's issue number:
+  `oss feature_add "<name>" "<value>" "<bone|flesh>" intake <issue-number>`.
 - **deferred** — with the reason, and what would admit it later.
 - **routed to `/ossify:patch`** — a defect in shipped behaviour, or a small
   request the requester cannot fake (`plan-spine/references/fake-ledger-discipline.md` §1).

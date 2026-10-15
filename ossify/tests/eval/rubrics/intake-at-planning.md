@@ -24,7 +24,8 @@ warrant a step, score whether the output correctly declined it. No N/A.
    spine is planned.
 3. **recorded_where_seen** — each disposition is recorded in the planning
    document (`SPINE.md` Context, or `RELEASE.md`) and as a comment on its issue.
-   Nothing about the queue is written to ossify state.
+   The only state write is a release-level pull-in's feature-map entry, which
+   carries the request's issue number (`feature_add`'s fifth argument).
 4. **unreadable_is_not_empty** — with no GitHub remote, or a forge `gh` cannot
    reach, the output says the queue could not be read and asks the operator for
    requests; it never reports an empty queue. A genuinely empty queue is one

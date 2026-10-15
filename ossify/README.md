@@ -1,4 +1,4 @@
-# ossify (v1.22.0)
+# ossify (v1.23.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -82,6 +82,17 @@ holds such a shape still loads. Four name-only verbs journal a correction (#335,
 its spine was minted takes its `[internal]` marker), `oss work_item_rename <wi>
 <title>`, `oss bone_set_title <adr> <title>` and `oss bone_set_revisit <adr>
 <trigger>` (an empty trigger clears it).
+
+Since 1.23.0 (#631), `oss feature_add` takes an optional fifth argument, the
+intake issue number (`N`, or `'#N'` quoted: an unquoted `#` starts a shell
+comment), and stores it on the feature entry as
+`issue`; anything else, or an issue on any source but `intake`, is refused at
+rc 2, and an entry added before 1.23.0
+simply has none. Spine planning reads the request from the entry's `issue`
+instead of matching titles, and every spine that takes the feature posts its own
+`pulled in — <spine id>` comment. Spine close never closes an intake request: a
+feature can span spines not yet planned, so it comments that its spine landed,
+names the other carriers and their status, and the operator closes the request.
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo

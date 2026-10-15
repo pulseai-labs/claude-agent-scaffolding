@@ -85,8 +85,9 @@ _Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on 
 
 When the evidence is absent, **say so and keep the single deployable**; the
 split becomes a feature-map entry, not a rejection to re-litigate. **The map
-has no trigger field** — `oss feature_add` takes exactly `name`, `value`,
-`class_guess`, `source` — a fifth argument is accepted and silently dropped —
+has no trigger field** — `oss feature_add` takes `name`, `value`,
+`class_guess`, `source`, and a fifth argument only for an intake request's issue
+number, so it refuses a trigger passed there —
 and there is no update verb to add one later. Encode both halves in the `value` line —
 *"<the value the split unlocks> — admitted when <the evidence>"* — because a
 condition recorded nowhere is a deferral that cannot be evaluated at the next

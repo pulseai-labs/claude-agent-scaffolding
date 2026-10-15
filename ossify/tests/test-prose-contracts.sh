@@ -1979,4 +1979,38 @@ _pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt C6 still says no ceremony con
 pin "$SKILLS/adopt/SKILL.md" 'Record what the pass did as the adoption record'"'"'s C2 result line (§6, #367)' \
   "adopt C2 points the station at its result line (#367)"
 
+# #631 (1.23.0): the feature entry carries its intake issue, so spine planning
+# reads the request from the entry; a release-level pull-in records the issue.
+pin "$SKILLS/plan-spine/references/intake-and-ledger.md" '`oss feature_add "<name>" "<value>" "<bone|flesh>" intake <issue-number>`' \
+  "a release-level pull-in records the request's issue on the feature entry (#631)"
+pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'never by matching titles' \
+  "spine planning reads the request from the feature entry's issue (#631)"
+# Codex round 1 on PR #821: a later spine that takes the same feature posts its
+# own pulled in, so the request's comments name every carrier planned so far.
+pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'or to an earlier spine' \
+  "a later spine that takes the same feature posts its own pulled in (#631)"
+# Operator ruling at PR #821's round-5 review stop: spine close never closes an
+# intake request. No spine knows when a request is done - a feature can span
+# spines not yet planned, and a spine can land without the item that carried it -
+# so spine close comments that it landed and the operator closes the request.
+pin "$SKILLS/close/references/spine-close.md" 'Spine close never closes an intake request' \
+  "spine close never closes an intake request; the operator does (#631)"
+pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'The operator closes a request' \
+  "intake §1 says the operator closes a request (#631)"
+for _f in "$SKILLS/close/references/spine-close.md" "$SKILLS/plan-spine/references/intake-and-ledger.md" "$SKILLS/plan-spine/references/decomposition.md" "$HERE/../README.md" "$HERE/../../README.md"; do
+  _r=1; ! grep -Fq 'gh issue close <n>' "$_f" && ! grep -Fq 'withdrawn — <' "$_f" && ! grep -Fq '/permission' "$_f" && ! grep -Fq 'last carrying spine' "$_f" && ! grep -Fq 'closes an intake request only' "$_f" && _r=0
+  _pin "$_r" "$(basename "$_f") still says spine close closes an intake request, or names withdrawn or a permission check (#631)"
+done
+# ...and the advertised '#N' form is quoted: an unquoted # starts a shell comment.
+for _f in "$HERE/../README.md" "$HERE/../../README.md"; do
+  _r=1; grep -Fq "'#N'" "$_f" && ! grep -Fq '`N` or `#N`' "$_f" && _r=0
+  _pin "$_r" "$_f advertises an unquoted #N - the shell drops it as a comment and feature_add records no issue (#631)"
+done
+# CodeRabbit round 6 on PR #821: a split's halves landing is not the close
+# condition - another spine may carry the feature too.
+pin "$SKILLS/plan-spine/references/decomposition.md" 'and any other spine that carries the feature' \
+  "a whole-spine split's close guidance counts every carrier, not only the halves (#631)"
+_r=1; ! grep -Fq 'accepted and silently dropped' "$SKILLS/plan-spine/references/codebase-design.md" && grep -Fq 'only for an intake request' "$SKILLS/plan-spine/references/codebase-design.md" && _r=0
+_pin "$_r" "codebase-design.md still says a fifth feature_add argument is dropped - a planner's split trigger is now refused at rc 2 (#631)"
+
 t_summary

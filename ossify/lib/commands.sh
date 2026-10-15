@@ -118,9 +118,11 @@ oss_cmd_fake_add() { # $1=boundary $2=channel $3=reason $4=trigger $5=expiry-rel
   _oss_need 5 fake_add "<boundary> <channel> <reason> <trigger> <expiry-release>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_add_fake "$sf" "$1" "$2" "$3" "$4" "$5"
 }
-oss_cmd_feature_add() { # $1=name $2=value $3=class-guess $4=source
-  _oss_need 4 feature_add "<name> <value> <class-guess> <source>" "$@" || return 2;
-  local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_add_feature "$sf" "$1" "$2" "$3" "$4"
+oss_cmd_feature_add() { # $1=name $2=value $3=class-guess $4=source [$5=intake-issue]
+  _oss_need 4 feature_add "<name> <value> <class-guess> <source> [intake-issue]" "$@" || return 2;
+  [ "$#" -le 5 ] || {
+    echo "oss: feature_add takes at most 5 arguments - usage: oss feature_add <name> <value> <class-guess> <source> [intake-issue]; quote a value that contains spaces" >&2; return 2; }
+  local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_add_feature "$sf" "$1" "$2" "$3" "$4" "${5:-}"
 }
 oss_cmd_touch_check() { # $@=paths
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_touch_check "$sf" "$@"
