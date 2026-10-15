@@ -1818,6 +1818,14 @@ pin "$MECHANICS_MD" '`{hash, identity}`' \
 section "one resume procedure from run state (#810, #819)"
 pin "$LIFECYCLE_MD" 'Two entries lead into one resume: a rotation, and a hard stop' \
   "the rotation section names both entries" flat
+pin "$LIFECYCLE_MD" 'From the handoff on, this session writes nothing to the run file and takes no dispatch action; a wake that reaches it before it stands down is handed to the successor, never acted on.' \
+  "the outgoing top stops writing and dispatching at handoff and relays every intervening wake" flat
+pin "$LIFECYCLE_MD" 'On a hard stop only, it stands the old top down' \
+  "only a hard-stop resume stands the old top down" flat
+pin "$LIFECYCLE_MD" 'write nothing more to the run file and take no dispatch action' \
+  "stand-down keeps the outgoing top from writing or dispatching" flat
+pin "$LIFECYCLE_MD" 'It writes `run.orchestrator.machine` beside the pane.' \
+  "resume step 3 writes the successor's machine beside its pane" flat
 pin "$LIFECYCLE_MD" 'notes the old `run.orchestrator` pane and machine before any write' \
   "the resume reads the dead top's address before the rebind" flat
 pin "$LIFECYCLE_MD" 'never closes a pane it cannot identify' \

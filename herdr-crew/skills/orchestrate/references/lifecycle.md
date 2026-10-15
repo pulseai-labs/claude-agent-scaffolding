@@ -304,7 +304,9 @@ workspace, never the run's. **Launch it as the seat launch `herdr-mechanics.md` 
 before its command (`herdr-mechanics.md` step 2) — using the destination host's recorded profile for the readiness
 path and model read, then the second detection ask, and send its resume on the route that ask fixes: with ossify,
 `skill://handoff-resume <path>` to an OMP top and `/ossify:handoff-resume <path>` to a Claude Code top; without it,
-the path as its first instruction on either. Confirm its turn started, then **stand down**: kill this session's armed
+the path as its first instruction on either. From the handoff on, this session writes nothing to the run file and
+takes no dispatch action; a wake that reaches it before it stands down is handed to the successor, never acted on.
+Confirm its turn started, then **stand down**: kill this session's armed
 background waits and its heartbeat, write nothing more to the run file and take no dispatch action. One report must
 wake one top. A worker pings whichever pane `run.orchestrator` names, so after the rebind a worker on the successor's machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.
 Then tell the operator which tab to use and that this one can close.
