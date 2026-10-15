@@ -152,7 +152,7 @@ Don't run `/grill-me` and `/council` in the same session — different interacti
 .
 ├── .claude-plugin/marketplace.json    # Claude Code marketplace manifest
 ├── .agents/plugins/marketplace.json   # Codex v0 marketplace manifest
-├── workspace-init/                    # workspace-init plugin (v0.8.0)
+├── workspace-init/                    # workspace-init plugin (v0.10.0)
 ├── ai-mentor/                         # ai-mentor plugin (v2.5.0)
 ├── architect-critic/                  # architect-critic plugin (v0.8.1)
 ├── claude-security-audit/             # security-audit plugin (v0.1.8)

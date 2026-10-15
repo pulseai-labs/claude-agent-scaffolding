@@ -529,6 +529,38 @@ test_marker_string_matches_across_surfaces() {
   done
 }
 
+test_layout_tree_versions_match_manifests() {
+  # D7: the root README's Layout tree carries a hand-maintained `(vX.Y.Z)` per
+  # plugin, and workspace-init's had drifted to v0.8.0 two releases behind. The
+  # catalog row above is read from the manifest; this tree was not. Pin every
+  # label to its own manifest so the next bump cannot leave a stale one.
+  local layout n=0 d v m
+  # Fence-aware: `sed -n '/^## Layout$/,/^```$/p'` closes on the OPENING fence
+  # and returns three lines. Enter on the heading, then skip one fence, then
+  # collect until the fence that closes the block.
+  layout="$(awk '
+    /^## Layout$/ { inblock=1; next }
+    inblock && /^```/ { if (fence++) exit; next }
+    inblock { print }
+  ' "$ROOT_README")"
+  [[ -n "$layout" ]] || { echo "    Layout block not found in the root README"; return 1; }
+  while IFS= read -r line; do
+    case "$line" in
+      *'plugin (v'*|*'lifecycle (v'*|*'roles'*'orchestrator (v'*) ;;
+      *) continue ;;
+    esac
+    d="$(printf '%s' "$line" | sed -E 's/^[^ ]+ ([a-z-]+)\/.*/\1/')"
+    [[ -d "$REPO_ROOT/$d" ]] || { echo "    Layout names a missing dir: $d"; return 1; }
+    v="$(printf '%s' "$line" | grep -oE '\(v[0-9.]+' | sed 's/(v//')"
+    m="$(jq -r .version "$REPO_ROOT/$d/.claude-plugin/plugin.json" 2>/dev/null)"
+    [[ -n "$m" && "$m" != null ]] || m="$(jq -r .version "$REPO_ROOT/$d/package.json" 2>/dev/null)"
+    [[ "$v" == "$m" ]] || { echo "    $d: Layout says v$v, manifest says $m"; return 1; }
+    n=$((n + 1))
+  done <<<"$layout"
+  # Adjacent control: the scan must have found the rows, not passed vacuously.
+  [[ "$n" -ge 10 ]] || { echo "    only $n version labels found in the Layout tree"; return 1; }
+}
+
 test_existing_dual_scans_both_instruction_files() {
   local s="$WI_PLUGIN_ROOT/skills/pairing-existing-dual/SKILL.md"
   grep -Fq '`${ai_root}/AGENTS.md`' "$s" && grep -Fq '`${ai_root}/CLAUDE.md`' "$s" || { echo "    scan list must name both files"; return 1; }
@@ -564,6 +596,7 @@ wi_test_run test_no_claude_md_stub_on_any_surface
 wi_test_run test_claude_md_stub_scan_fails_on_an_empty_surface
 wi_test_run test_marker_string_matches_across_surfaces
 wi_test_run test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c
+wi_test_run test_layout_tree_versions_match_manifests
 wi_test_run test_existing_dual_scans_both_instruction_files
 
 wi_test_summary
