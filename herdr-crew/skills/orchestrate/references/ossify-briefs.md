@@ -22,8 +22,8 @@ running in your first reply, then continue.
 PLACEMENT: <abs path of the repo or worktree the lane runs from>.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
 MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
 SPINE_ID=<spine id>
@@ -121,7 +121,7 @@ do the same teardown, write `/ossify:handoff`, and write `rotate: <handoff path>
 report file with the path of RUN_JSON and the pane `run.orchestrator` names at writing,
 then stand down your own armed waits before you return — one report must wake one session.
 Never stop mid-round.
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <SPINE_ID>'` (never to `none`), and ROTATE at the next round barrier; molt never clears this session. End the reply that writes `rotate:` with `MOLT-HANDOFF: <handoff path>`. If molt's handoff command arrives mid-round, still finish the round: a round molt's block cuts short is re-entered by a fresh spine session's re-run of step 3's command, never finished by hand. A wake or message after the handoff is written is added to it verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <SPINE_ID>'` (read as PING says; never when NOTIFY_RUN is `none`), and ROTATE at the next round barrier; molt never clears this session. End the reply that writes `rotate:` with `MOLT-HANDOFF: <handoff path>`. If molt's handoff command arrives mid-round, still finish the round: a round molt's block cuts short is re-entered by a fresh spine session's re-run of step 3's command, never finished by hand. A wake or message after the handoff is written is added to it verbatim, never acted on.
 
 NEVER: record an item task in the top's run.json; run a Claude subagent for a work item;
 fall back to the default lane when an item launch fails; restart the lane; select the
@@ -139,8 +139,8 @@ running in your first reply, then continue.
 
 PLACEMENT: worktree <abs path>, branch <branch>, base <base-branch>. Use git -C
 for every git command; cd does not persist.
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 Everything you say upward (plan, question, escalation, report) goes in that file.
 
 BEFORE ANY EDIT, in this order:
@@ -163,7 +163,7 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 DONE: write your report file, carrying the work-item return verbatim, plus:
   Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: commit, push, merge, edit outside this worktree, run a subagent, or work
 a second work item. The two exceptions to that scope are this item's own
 report.md, which the work-item contract has you author beside the handoff and
@@ -187,8 +187,8 @@ The session that launches the seat marks it in the pane, before its command, as
 ROLE: verifier for <work-item-id>, read-only, in worktree <abs path>, at the accepted result's
 `head_oid`, staged tree `tree_oid`. State the model you are running; EXPECTED_MODEL below is the
 value to match — a mismatch is a failed launch to report and stop.
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 EXPECTED_MODEL=<this item's SEATS row names it — fill this line; a coordinator never sends it blank>
 
 CLAIMS: <the numbered list the coordinator fills from this item's spec, from the verifier body
@@ -199,7 +199,7 @@ DONE: write your report file with one line per claim — pass | fail | cannot
 determine, with commands and output verbatim — then the caveats. `Cannot
 determine` counts as fail.
 
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: commit, push, or edit a tracked file outside the mutation check. Leave `HEAD`, the
 staged tree and `git status --porcelain` exactly as found before you write your report file;
 scratch goes under SCRATCH_DIR=<the seat's scratch directory>, never the worktree. Do not verify a second

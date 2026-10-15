@@ -294,12 +294,19 @@ pin "$WRITER_MD" 'REPORT_PATH=' \
 # The ping target rides the report-path slot line, one per report-producing
 # template: three spine-layer sessions, two PR-layer, one writer. A template
 # missing its slot lowers the count, which is what makes the count the check.
-n_eq "$BRIEFS_MD" 'NOTIFY_PANE=' 3 \
-  "all three spine briefs carry the ping target"
-n_eq "$PRBRIEFS_MD" 'NOTIFY_PANE=' 2 \
-  "the close and work-PR briefs carry the ping target"
-pin "$WRITER_MD" 'NOTIFY_PANE=' \
-  "the close-review writer's brief carries the ping target"
+n_eq "$BRIEFS_MD" 'NOTIFY_RUN=' 3 \
+  "all three spine briefs carry the run file the ping reads"
+n_eq "$PRBRIEFS_MD" 'NOTIFY_RUN=' 2 \
+  "the close and work-PR briefs carry the run file the ping reads"
+pin "$WRITER_MD" 'NOTIFY_RUN=' \
+  "the close-review writer's brief carries the run file the ping reads"
+for f in "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" "$GENERIC_BRIEFS_MD" "$MECHANICS_MD" "$LIFECYCLE_MD" "$SKILL_MD" "$CONFIG_MD" "$PLUGIN_README_MD"; do
+  absent "$f" 'NOTIFY_PANE' "${f##*/} names no fixed ping target"
+done
+# #816: the ping goes only to a pane on the worker's own server. The comparison is
+# the rule that keeps a cross-host rotation from pinging a pane id from another server.
+pin "$MECHANICS_MD" 'only when `run.orchestrator.machine` equals `NOTIFY_MACHINE`' \
+  "the ping compares the top's machine with the worker's" flat
 for id in RUN_JSON MECHANICS; do
   pin "$PRBRIEFS_MD" "$id=" "the work-PR brief injects $id exactly once"
 done
@@ -399,9 +406,9 @@ section "one mechanic, one statement"
 # brief file every `herdr agent ` occurrence IS the ping line — counted both
 # ways, so any other agent command breaks the equality. The adjacent control
 # below proves the equality still flags one. 0.2.8: a leaf template's MOLT line states the
-# worker's second own ping, `MOLT WARNING`, to the same NOTIFY_PANE, for the same reason —
+# worker's second own ping, `MOLT WARNING`, read from NOTIFY_RUN, for the same reason —
 # so each count below adds one per MOLT line in that file.
-PING_CMD='herdr agent prompt <NOTIFY_PANE>'
+PING_CMD='herdr agent prompt <that pane>'
 agent_commands_are_pings() { # <file> <expected ping lines>
   _a="$(count_of "$1" 'herdr agent ')" || return 1
   _p="$(count_of "$1" "$PING_CMD")" || return 1
@@ -2244,7 +2251,7 @@ pin "$NESTED_MD" 'A spine session that rotated on a molt warning returns the sam
 pin "$NESTED_MD" 'one cut mid-round returns none and is respawned the same way' \
   "nested-run §4: a mid-round cut is respawned under ossify 1.14.0 (#674)" flat
 absent "$NESTED_MD" 'returns none and goes to the operator' "nested-run §4: the pre-1.14.0 relay is gone (#674)"
-MOLT_LINE='MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> '"'"'MOLT WARNING <pct> <task id>'"'"'` (never to `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
+MOLT_LINE='MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> '"'"'MOLT WARNING <pct> <task id>'"'"'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
 # One pin per template, labelled by name, so a miss names its site (0.2.5 and 0.2.7 were
 # both caught on unnamed launch sites). The span is the Nth ```text fence of the file.
 molt_in_template() { # <file> <fence n> <template name>
@@ -2272,7 +2279,7 @@ n_eq "$GENERIC_BRIEFS_MD" "$MOLT_LINE" 9 "briefs.md carries the MOLT line 9 time
 n_eq "$BRIEFS_MD" "$MOLT_LINE" 2 "ossify-briefs.md carries the leaf MOLT line twice (item pair only)"
 pin "$BRIEFS_MD" 'ROTATE instead once the context-ceiling notice or a molt warning has fired' \
   "spine brief: a molt warning triggers the existing ROTATE" flat
-pin "$BRIEFS_MD" 'MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> '"'"'MOLT WARNING <pct> <SPINE_ID>'"'"'` (never to `none`), and ROTATE at the next round barrier' \
+pin "$BRIEFS_MD" 'MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> '"'"'MOLT WARNING <pct> <SPINE_ID>'"'"'` (read as PING says; never when NOTIFY_RUN is `none`), and ROTATE at the next round barrier' \
   "spine brief: the MOLT line" flat
 pin "$BRIEFS_MD" 'End the reply that writes `rotate:` with `MOLT-HANDOFF: <handoff path>`' \
   "spine brief: the rotate reply names the handoff for molt (D5)" flat

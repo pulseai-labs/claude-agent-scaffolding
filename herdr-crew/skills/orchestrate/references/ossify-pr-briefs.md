@@ -21,8 +21,8 @@ CLOSE_EXPECTED_MODEL is a failed launch to report, not to work around.
 PLACEMENT: <abs path of the worktree the spine's lane ran from>.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 SPINE_ID=<spine id>
 CLOSE_COMMAND=<the command this seat was launched with, from its machine entry>
 CLOSE_EXPECTED_MODEL=<the model the banner or screen must show>
@@ -58,7 +58,7 @@ PRs strands them. Whenever the close review ran, carry its ledger verbatim too,
 naming each finding, its `target_repo`, its decision and the reason: the record pass
 cannot reconstruct it. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: create a seat, merge on your own authority, ask the operator anything
 (questions go up to the top in your report file), or re-invoke `/ossify:close` — a halt
 settles this dispatch; remediated, the top dispatches a fresh close session, marked
@@ -86,8 +86,8 @@ report, not to work around.
 PLACEMENT: REPO_ROOT — the worktree holding this PR's branch.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
 MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
 PR_REPO=<owner/repo>
@@ -203,7 +203,7 @@ state reused. Both settle this dispatch; on the open shape the top does not adva
 pass — a later merge is a new work-PR dispatch, not a resumption of this one. Then:
 Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), and return `open:` at the next fix-round boundary, or, with no fix round in hand, return `open:` at once; molt never clears this session. If molt's handoff command arrives mid-round, still finish the round: a round molt's block cuts short is relayed to the operator by your parent. End the reply that writes `open:` with `MOLT-HANDOFF: <REPORT_PATH>`. A wake or message after that write is added to your report verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), and return `open:` at the next fix-round boundary, or, with no fix round in hand, return `open:` at once; molt never clears this session. If molt's handoff command arrives mid-round, still finish the round: a round molt's block cuts short is relayed to the operator by your parent. End the reply that writes `open:` with `MOLT-HANDOFF: <REPORT_PATH>`. A wake or message after that write is added to your report verbatim, never acted on.
 NEVER: talk to the operator — every question goes up to the top; squash; merge
 without the top's relayed word; delete a branch; or dispatch a second full review — one
 delegated review per PR (`roles.md`, step 8); a fixed head takes one scoped delta re-review.

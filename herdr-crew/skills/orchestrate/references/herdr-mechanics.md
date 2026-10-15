@@ -246,12 +246,12 @@ An answered dialog re-arms the pair: the fresh bounded wait
 after the answer is the doorbell and its companion again, not one wait.
 
 The worker's ping is its brief's line (`briefs.md`): after every report rename, one send, no
-`--wait`, no retry, and only when the target is not the `none` sentinel — `herdr agent prompt
-<NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`: one single-quoted literal argument, so
-`$` and backticks in the data stay literal (a single quote in it is written `'\''`), `<path>` the
-file actually renamed over, and only a parent herdr detects on the worker's server is a target —
-every other dispatch carries `none` and keeps the report-file wait and this session's heartbeat as
-the whole of its push bound. A failed send changes nothing.
+`--wait`, no retry, and only when `NOTIFY_RUN` is not `none` — it reads `run.orchestrator` from
+that file at that moment and sends `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind>
+<path>>'` only when `run.orchestrator.machine` equals `NOTIFY_MACHINE`: pane ids are server-scoped.
+One single-quoted literal argument (a single quote in it is written `'\''`), `<path>` the file
+actually renamed over. Every other dispatch keeps the report-file wait and this session's heartbeat
+as the whole of its push bound. A failed read or send changes nothing.
 
 A ping is one way a report announces itself, beside a `Completion` wake and a heartbeat tick,
 and the generation check governs all three: a new generation is read, noted, acted on once by
@@ -284,8 +284,8 @@ bound. The heartbeat is killed when the last
 dispatch settles, at teardown and at stand-down, where the successor arms a fresh one.
 
 **A child past molt's warnings.** A seat marked a molt child (step 2) is never cleared by molt.
-At each of molt's two warnings it sends one ping, `MOLT WARNING <pct> <task id>`, to its
-`NOTIFY_PANE` — not a report ping: it names no path, opens no report and gets no correction
+At each of molt's two warnings it sends one ping, `MOLT WARNING <pct> <task id>`, to the pane
+read from `NOTIFY_RUN` as PING says — not a report ping: it names no path, opens no report and gets no correction
 request. molt appends `warned <n>`, `handoff required` and `handed-off <path>` to the status
 file the seat was launched with — molt's own writes, never the seat's. Record that path per
 seat at launch: molt reads `MOLT_STATUS_PATH` once, so no later brief of a retained seat moves
@@ -323,7 +323,7 @@ rotation applies.
 **A child's pain.** Record each child's `AUTONOMIC_PAIN_PATH` at launch, beside its status
 file. The heartbeat, per tick, per live seat, reads it too, and so does the read before a
 retained seat's next unit. A non-empty file holding a line not yet noted is the seat asking
-upward: autonomic stopped it on its pain list, never resumes it and never pings `NOTIFY_PANE`,
+upward: autonomic stopped it on its pain list, never resumes it and never pings through `NOTIFY_RUN`,
 so that line is the only signal that reaches you. Its herdr state is `blocked` — an ask left
 at its dialog, which the dialog procedure above takes — or idle or done with no new report, a
 turn-end pain. Read the line and the seat's last report, then answer the seat or take it to

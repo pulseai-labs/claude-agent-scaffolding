@@ -116,10 +116,10 @@ state its model in its first reply: a model that is not `SEAT_EXPECTED_MODEL` is
 failed launch the worker reports and stops on rather than works around, and that
 report reaches you in its report file, like everything else it says — and that file is
 the wait's own wake, so a brief naming no `REPORT_PATH` gives the wait for it nothing.
-Every brief also carries the pane the worker pings after each report rename — `NOTIFY_PANE`,
-filled with the dispatching session's own `$HERDR_PANE_ID` only when herdr detects that pane and
-the seat shares its server, otherwise the sentinel `none` (never a target, never sent to); a
-coordinator fills its children's with its own pane id the same way, and an operator's custom brief
+Every brief also carries `NOTIFY_RUN` (the run file whose `run.orchestrator` the worker pings),
+filled with the dispatching session's own `run.json` only when herdr detects that pane and
+the seat shares its machine, otherwise the sentinel `none` (never read, never sent to); a
+coordinator fills its children's with its own nested `run.json` and `NOTIFY_MACHINE` with the child's machine the same way, and an operator's custom brief
 gains the same envelope in the dispatched copy, never in the stored file. This session's own check is
 the launch's banner read (`references/roles.md`), made
 before dispatch.
