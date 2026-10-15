@@ -1836,6 +1836,10 @@ pin "$LIFECYCLE_MD" 'Binding a run another top drove — a rotation'"'"'s resume
   "Orient routes takeover through the resume before rebinding the old top's address" flat
 pin "$LIFECYCLE_MD" 'A resume the operator started is a hard stop, even with an old handoff present.' \
   "an operator-started resume takes the hard-stop path despite an old handoff" flat
+pin "$LIFECYCLE_MD" 'On a hard stop with no fresh handoff, it takes the head SHA from the PR the run tracks (`gh pr view <PR> --json headRefOid`), or else from the last settled attempt'"'"'s receipt.' \
+  "a hard stop without a fresh handoff reconstructs the head from the tracked PR or last settled receipt" flat
+pin "$LIFECYCLE_MD" 'On a hard stop with no fresh handoff, it counts every molt-status and pain line already present at resume as noted.' \
+  "a hard stop without a fresh handoff baselines all existing molt-status and pain lines" flat
 pin "$LIFECYCLE_MD" 'brief not delivered before the top stopped' \
   "a recorded attempt with no delivery is settled and relaunched" flat
 pin "$LIFECYCLE_MD" 'relaunched from its seat row as a new attempt with `cause: {type: followup, ref: <the settled attempt'"'"'s id>}`' \
@@ -1858,8 +1862,10 @@ pin "$LIFECYCLE_MD" 'If `run.question` is present, it asks it once again' \
   "the resume re-asks an open operator question" flat
 pin "$LIFECYCLE_MD" 'A `done` task is never re-run' \
   "the resume never re-runs a done task" flat
-pin "$LIFECYCLE_MD" 'with no handoff, at the first task whose deps are done, that is not itself done and has no live attempt.' \
-  "resume step 7 selects a ready unfinished task without a live attempt" flat
+pin "$LIFECYCLE_MD" 'On a rotation, it continues at the fresh handoff'"'"'s next step.' \
+  "a rotation continues at its fresh handoff's next step" flat
+pin "$LIFECYCLE_MD" 'On a hard stop, it continues from `run.json` at the first task whose deps are done, that is not itself done and has no live attempt; an old handoff is context only, never its next step.' \
+  "a hard stop selects a ready unfinished task without a live attempt from run.json and never follows an old handoff's next step" flat
 pin "$LIFECYCLE_MD" 'and the next step, the head SHA, and, per live seat, the last molt status line noted and the last autonomic pain line noted.' \
   "step 13 preserves the head SHA and each live seat's status and pain cursors" flat
 pin "$LIFECYCLE_MD" 'The run file holds those files’ paths, not the read cursors.' \

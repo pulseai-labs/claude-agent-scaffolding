@@ -320,6 +320,9 @@ A resume the operator started is a hard stop, even with an old handoff present.
 
 **The resume.** The new top resumes by naming the parent's `run.json` path — there is no CLI call:
 1. It reads the file and notes the old `run.orchestrator` pane and machine before any write.
+   On a hard stop with no fresh handoff, it takes the head SHA from the PR the run tracks
+   (`gh pr view <PR> --json headRefOid`), or else from the last settled attempt's receipt.
+   On a hard stop with no fresh handoff, it counts every molt-status and pain line already present at resume as noted.
 2. On a hard stop only, it stands the old top down. A pane that is this session's own `$HERDR_PANE_ID` is never
    closed: the old top is already gone. Otherwise, when `herdr agent list` on that machine shows an agent session in
    that pane, it closes the pane (`herdr pane close`), which ends the session with its armed waits and heartbeat. It
@@ -340,8 +343,9 @@ A resume the operator started is a hard stop, even with an old handoff present.
    settles that dispatch, so it gets no wait. The waits are on the pane (a detected coordinator's companion included)
    through `locator.machine`; every later operation on that pane carries `locator.machine` (`herdr-mechanics.md`, Machines).
 6. It arms one fresh heartbeat only if at least one dispatch is still live.
-7. It continues at the step the handoff names; with no handoff, at the first task whose deps are done, that is not
-   itself done and has no live attempt. A `done` task is never re-run.
+7. On a rotation, it continues at the fresh handoff's next step. On a hard stop, it continues from `run.json` at
+   the first task whose deps are done, that is not itself done and has no live attempt;
+   an old handoff is context only, never its next step. A `done` task is never re-run.
 
 A run file older than 0.2.21 lacks these fields: an attempt with no `phase` counts as `delivered`; with no `seen`, an
 existing report for a task that is not done is read once; with no `locator.report`, the path comes from a handoff, or
