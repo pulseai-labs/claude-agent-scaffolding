@@ -1860,6 +1860,12 @@ pin "$LIFECYCLE_MD" 'A `done` task is never re-run' \
   "the resume never re-runs a done task" flat
 pin "$LIFECYCLE_MD" 'with no handoff, at the first task whose deps are done, that is not itself done and has no live attempt.' \
   "resume step 7 selects a ready unfinished task without a live attempt" flat
+pin "$LIFECYCLE_MD" 'and the next step, the head SHA, and, per live seat, the last molt status line noted and the last autonomic pain line noted.' \
+  "step 13 preserves the head SHA and each live seat's status and pain cursors" flat
+pin "$LIFECYCLE_MD" 'The run file holds those files’ paths, not the read cursors.' \
+  "handoff distinguishes durable status and pain paths from their last-noted lines" flat
+pin "$LIFECYCLE_MD" 'Write the handoff step 13 states, plus a resolved profile beside a launch command for each host' \
+  "rotation inherits step 13's head SHA and live-seat cursors" flat
 pin "$LIFECYCLE_MD" 'The handoff restates no operator gate' \
   "the rotation handoff restates no operator gate (#819)" flat
 pin "$LIFECYCLE_MD" 'step 12 and `run.merge_word`' \

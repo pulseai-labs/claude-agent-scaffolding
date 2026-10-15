@@ -246,7 +246,9 @@ Every command's syntax comes from `herdr --skill`.
     recorded in each hosting repo — and waits for no record pass.
 13. **Handoff.** If the run outlives the session, write a handoff naming the run's
     `run.json` path, the pane `run.orchestrator` names at writing, and the next step,
-    plus what the run file cannot hold — why a choice was made, what the operator said.
+    the head SHA, and, per live seat, the last molt status line noted and the last autonomic pain line noted.
+    The run file holds those files’ paths, not the read cursors.
+    Also carry what the run file cannot hold — why a choice was made, what the operator said.
     Every seat's pane, machine, report path, last consumed generation and molt and pain
     paths are in `run.json` (steps 1, 3 and 5), so the handoff does not copy them. On an
     activated ossify spine, also the spine's approved `SEATS` block, the resolved coordinator
