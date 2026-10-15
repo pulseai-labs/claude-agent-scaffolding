@@ -4,10 +4,14 @@
 The one instruction file for this AI workspace. Claude Code 2.1.277 or later loads it when the
 workspace has no `CLAUDE.md`; an older Claude Code reads only `CLAUDE.md` and sees none of this.
 Codex, OMP and other agents read `AGENTS.md` directly.
-This is a temporary stub: ossify 1.24.0 or later replaces a file that starts with the marker above.
-An older ossify reads it as an existing file and asks you to keep it or move it aside, and writes a
-`CLAUDE.md` — install 1.24.0 or later before you run `/ossify:start` if you want the one-file result.
-Put lasting notes in it only after `/ossify:start` has run.
+This is a temporary stub. ossify 1.24.0 or later replaces a file that starts with the marker
+above, with no question. An older ossify does not: its `/ossify:start` checks only the destinations
+it writes (`CLAUDE.md`, the memory bank, the spec) and never looks for `AGENTS.md`, so it writes a
+fresh `CLAUDE.md` beside this file and leaves the stub in place — and a `CLAUDE.md` shadows
+`AGENTS.md` in Claude Code. Nothing in that ossify offers a repair: its `doctor` interop check reads
+`AGENTS.md` for the word `ossify` and never opens `CLAUDE.md`. Install 1.24.0 or later before you run
+`/ossify:start`, or merge by hand first — see the adopt route below.
+Put lasting notes in this file only after `/ossify:start` has run.
 
 This is the AI workspace half of a dual-repo project.
 Paired canonical repo: `${CANONICAL_ROOT}`.

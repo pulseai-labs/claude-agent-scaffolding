@@ -512,14 +512,14 @@ test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c() {
   assert_not_contains 'Specs, the memory bank and process records belong here.' "$tmpl" || return 1
   # D5: the §4 scan must name the `.claude/` copy too, which step 3 covers.
   assert_contains '- `${ai_root}/.claude/CLAUDE.md`' "$dual" || return 1
-  # D19: adopt routes legacy projects, and an older ossify's adopt merges its loop
-  # section into CLAUDE.md — so the same version condition applies there, and the
-  # by-hand merge must be named on every surface that routes to adopt.
+  # D19/D21: adopt routes legacy projects, and an older ossify's adopt merges its
+  # loop section into CLAUDE.md — so the same version condition applies there, and
+  # the by-hand merge must be named on every surface that routes to adopt.
   assert_contains 'adopt merges its loop section into' "$tmpl" || return 1
-  assert_contains 'adopt merges it into `CLAUDE.md`' "$dual" || return 1
+  assert_contains 'it merges that section into' "$dual" || return 1
   # The by-hand route itself, not just the diagnosis: removing it SURVIVED until
   # this line existed.
-  assert_contains 'merge it into `AGENTS.md` by hand afterwards, then remove `CLAUDE.md`' "$dual" || return 1
+  assert_contains 'merge it into `AGENTS.md` by hand' "$dual" || return 1
   local pair
   pair="$(cat "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md")"
   # Assert the version, not just the sentence: the bare "adopt merges its loop
@@ -529,9 +529,45 @@ test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c() {
   local init_s
   init_s="$(cat "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md")"
   assert_contains 'adopt merges its loop section into AGENTS.md on ossify 1.24.0 or later' "$init_s" || return 1
-  # Adjacent control: the unconditional claim that adopt targets CLAUDE.md alone
-  # must be gone from the stub.
-  assert_not_contains 'adopt merges that section into `CLAUDE.md` instead' "$tmpl" || return 1
+  # D21: every older-ossify statement must describe 1.23.0's real behaviour. The
+  # round-1 wording ("treats it as an existing file and asks you to keep it or
+  # move it aside") was wrong — occupied-destinations.md has no AGENTS.md entry at
+  # all, so /start writes CLAUDE.md beside an untouched stub with no question.
+  assert_not_contains 'asks you to keep it or move it aside' "$tmpl" || return 1
+  assert_not_contains 'asks you to keep it or move it aside' "$init_s" || return 1
+  assert_not_contains 'asks you to keep it or move it aside' "$pair" || return 1
+  # …and the real behaviour is stated: /start never looks for AGENTS.md, and the
+  # interop check never opens CLAUDE.md.
+  assert_contains 'never looks for `AGENTS.md`' "$tmpl" || return 1
+  assert_contains 'never looks for `AGENTS.md`' "$init_s" || return 1
+  assert_contains 'never looks for `AGENTS.md`' "$pair" || return 1
+  assert_contains 'never opens `CLAUDE.md`' "$tmpl" || return 1
+  assert_contains 'never opens `CLAUDE.md`' "$init_s" || return 1
+  assert_contains 'never opens `CLAUDE.md`' "$pair" || return 1
+  # D21, the sites the round-1 pins did not reach (all three SURVIVED mutation
+  # until these lines existed): Scenario C's step 3 premise, its step-4 start-arm
+  # shadowing warning, and the README template's unconditioned "until ossify
+  # authors" clause.
+  assert_contains 'never opens `CLAUDE.md`' "$dual" || return 1
+  # The precedence rule itself: the SURVIVED mutation removed exactly this clause
+  # while the other `never opens` occurrence satisfied the line above.
+  assert_contains 'Claude Code loads `CLAUDE.md` and ignores `AGENTS.md` whenever both exist' "$dual" || return 1
+  assert_contains 'it writes a `CLAUDE.md` beside the stub, which then shadows' "$dual" || return 1
+  local rtmpl
+  rtmpl="$(cat "$WI_PLUGIN_ROOT/templates/README.md.tmpl")"
+  assert_contains 'until ossify 1.24.0 or later replaces it' "$rtmpl" || return 1
+  # The three next-steps blocks route to `/ossify:start`, which is the arm that
+  # actually shadows — the round-1 text warned only on the adopt arm. The example
+  # must mirror its skill: the mirror test's grep (`/ossify`, `ossify skill`)
+  # does not reach these comment lines, so a mutation dropping one SURVIVED here
+  # until this line existed.
+  local warn='on ossify 1.24.0 or later this replaces the marked AGENTS.md stub; on an older'
+  assert_contains "$warn" "$init_s" || return 1
+  assert_contains "$warn" "$(cat "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/examples/fresh-bootstrap.md")" || return 1
+  # Adjacent control: the unconditioned clause and the round-1 misstatement are
+  # gone from the shipped surfaces.
+  assert_not_contains 'until ossify authors project-specific guidance' "$rtmpl" || return 1
+  assert_not_contains 'treats it as an existing file' "$dual" || return 1
 }
 
 test_marker_string_matches_across_surfaces() {

@@ -220,8 +220,12 @@ loads it when the workspace has no `CLAUDE.md`; an older Claude Code reads only
 `CLAUDE.md` and sees none of it. Codex and OMP read it directly. Its first
 line is the marker `<!-- workspace-init stub: ossify:start replaces this file -->`;
 ossify 1.24.0 or later replaces a file that starts with it, with no question.
-An older ossify treats it as an existing file and asks you to keep it or move it
-aside, and writes a `CLAUDE.md`. workspace-init writes no `CLAUDE.md`.
+An older ossify's `/ossify:start` checks only the destinations it writes —
+`CLAUDE.md`, the memory bank, the spec — and never looks for `AGENTS.md`, so it
+writes a fresh `CLAUDE.md` beside the untouched stub, and that file shadows
+`AGENTS.md` in Claude Code. Its `doctor` interop check reads `AGENTS.md` for the
+word `ossify` and never opens `CLAUDE.md`, and neither offers a repair.
+workspace-init writes no `CLAUDE.md`.
 
 ```
 "$wi_bin" stub_agents_md "$ai_root" "$name"
