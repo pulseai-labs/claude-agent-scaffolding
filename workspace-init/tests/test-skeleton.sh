@@ -4,6 +4,7 @@
 #   P. Preflight  (12) — name validation + writable parent + target absence + pair-with/wrapper modes
 #   R. Root pair  (2) — standard + non-empty wrapper preservation
 #   A. AI-only    (1) — wi_skeleton_create_root_ai_only
+#   E. Existing   (3) — an existing root is refused, never logged as MKDIR
 #   S. Seed       (4) — subdirs + .gitkeep + .gitignore content + idempotency
 
 source "$(dirname "$0")/_helpers.sh"
@@ -263,6 +264,48 @@ test_A1_create_root_ai_only_creates_only_ai() {
 }
 
 # ---------------------------------------------------------------------------
+# E. Existing roots (3 tests) — PR #829: a root that already exists is refused,
+# never logged as MKDIR (rollback answers MKDIR with `rm -rf`).
+# ---------------------------------------------------------------------------
+
+# _wi_existing_root_kept <root> <log> — the sentinel survives and no MKDIR line
+# names <root>.
+_wi_existing_root_kept() {
+  local root="$1" log="$2"
+  assert_file_exists "$root/KEEP" || return 1
+  if [[ -f "$log" ]] && awk -F '\t' -v p="$root" '$1 == "MKDIR" && $2 == p { found = 1 } END { exit !found }' "$log"; then
+    echo "    existing root logged as MKDIR: $root"; return 1
+  fi
+}
+
+test_E1_create_root_ai_only_refuses_existing_ai_root() {
+  local parent="$_WI_TMP/e1" rc=0
+  mkdir -p "$parent/foo-ai/.workspace"
+  printf 'user data\n' > "$parent/foo-ai/KEEP"
+  wi_skeleton_create_root_ai_only "$parent" "foo" >/dev/null 2>&1 || rc=$?
+  [[ "$rc" -ne 0 ]] || { echo "    create_root_ai_only accepted an existing AI root"; return 1; }
+  _wi_existing_root_kept "$parent/foo-ai" "$parent/foo-ai/.workspace/init-log"
+}
+
+test_E2_create_root_pair_refuses_existing_ai_root() {
+  local parent="$_WI_TMP/e2" rc=0
+  mkdir -p "$parent/foo-ai/.workspace"
+  printf 'user data\n' > "$parent/foo-ai/KEEP"
+  wi_skeleton_create_root_pair "$parent" "foo" >/dev/null 2>&1 || rc=$?
+  [[ "$rc" -ne 0 ]] || { echo "    create_root_pair accepted an existing AI root"; return 1; }
+  _wi_existing_root_kept "$parent/foo-ai" "$parent/foo-ai/.workspace/init-log"
+}
+
+test_E3_create_root_pair_refuses_existing_canonical_root() {
+  local parent="$_WI_TMP/e3" rc=0
+  mkdir -p "$parent/foo"
+  printf 'user data\n' > "$parent/foo/KEEP"
+  wi_skeleton_create_root_pair "$parent" "foo" >/dev/null 2>&1 || rc=$?
+  [[ "$rc" -ne 0 ]] || { echo "    create_root_pair accepted an existing canonical root"; return 1; }
+  _wi_existing_root_kept "$parent/foo" "$parent/foo-ai/.workspace/init-log"
+}
+
+# ---------------------------------------------------------------------------
 # S. Seed subdirs (4 tests)
 # ---------------------------------------------------------------------------
 
@@ -387,6 +430,10 @@ wi_test_run test_R1_create_root_pair_creates_both_and_logs
 wi_test_run test_R2_create_root_pair_preserves_wrapper_contents
 
 wi_test_run test_A1_create_root_ai_only_creates_only_ai
+
+wi_test_run test_E1_create_root_ai_only_refuses_existing_ai_root
+wi_test_run test_E2_create_root_pair_refuses_existing_ai_root
+wi_test_run test_E3_create_root_pair_refuses_existing_canonical_root
 
 wi_test_run test_S1_seed_subdirs_creates_all_with_gitkeep_and_gitignore
 wi_test_run test_S2_gitignore_preserves_compat_entries_drops_dead_onboarding_state
