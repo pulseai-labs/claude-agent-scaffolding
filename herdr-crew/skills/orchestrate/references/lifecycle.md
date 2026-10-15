@@ -246,9 +246,6 @@ Every command's syntax comes from `herdr --skill`.
     activated ossify spine, also the spine's approved `SEATS` block, the resolved coordinator
     profiles and the accumulated close-review ledger (oldest first). With
     ossify installed, that is `/ossify:handoff`.
-    The former “Write the handoff, recording every seat's pane id, with its machine label where the seat is not on this machine, and,”
-    inventory is read from `run.json`, not copied. Neither “per live seat, the molt status path recorded at its launch and the last status line noted”
-    nor “per live seat, its molt status path recorded at launch and the last status line noted” is copied into the handoff.
 
 ## Roles of the operator's own
 
@@ -321,9 +318,9 @@ A hard stop has no outgoing top: the operator starts a top and names the run's `
 4. If `run.question` is present, it asks it once again.
 5. Per working attempt: `phase: recorded` — one `herdr pane read`; a pane showing the worker on this task is set
    `delivered`, any other is settled `failed` ("brief not delivered before the top stopped"), released, and relaunched
-   from its seat row as a new attempt. `phase: delivered` — the generation check against `locator.seen`, a new
+   from its seat row as a new attempt with `cause: followup`. `phase: delivered` — the generation check against `locator.seen`, a new
    generation read once, recorded and acted on; then step 5's waits re-armed on the pane (a detected coordinator's
-   companion included) through `locator.machine`, rather than through the machine the handoff names for a remote one;
+   companion included) through `locator.machine`;
    every later operation on that pane carries `locator.machine` (`herdr-mechanics.md`, Machines).
 6. It arms one fresh heartbeat.
 7. It continues at the step the handoff names; with no handoff, at the first task whose deps are done and that is not

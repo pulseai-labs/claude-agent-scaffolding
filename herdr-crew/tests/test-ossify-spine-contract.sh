@@ -1824,6 +1824,8 @@ pin "$LIFECYCLE_MD" 'never closes a pane it cannot identify' \
   "the hard-stop stand-down closes only an identified agent pane" flat
 pin "$LIFECYCLE_MD" 'brief not delivered before the top stopped' \
   "a recorded attempt with no delivery is settled and relaunched" flat
+pin "$LIFECYCLE_MD" 'relaunched from its seat row as a new attempt with `cause: followup`' \
+  "an undelivered attempt is relaunched with followup cause" flat
 pin "$LIFECYCLE_MD" 'If `run.question` is present, it asks it once again' \
   "the resume re-asks an open operator question" flat
 pin "$LIFECYCLE_MD" 'A `done` task is never re-run' \
@@ -1974,12 +1976,9 @@ pin "$PLUGIN_README_MD" 'Nine dispatched brief templates — the generic five (p
 # `flat` because the file breaks its line inside the clause today.
 pin "$LIFECYCLE_MD" 'creates it again first and binds the id that call returns' \
   "a launch whose run workspace is gone recreates it and rebinds the returned id"
-pin "$LIFECYCLE_MD" 'its machine label where the seat is not on this machine, and,' \
-  "step 13's handoff records each live seat's machine label"
-pin "$LIFECYCLE_MD" 'Write the handoff, recording every seat'"'"'s pane id, with its' \
-  "the rotation's own handoff records each live seat's machine label"
-pin "$LIFECYCLE_MD" 'through the machine the handoff names for a remote one' \
-  "a resumed top re-arms each remote pane through the machine it names" flat
+# 0.2.22 (#810): the handoff no longer lists per-seat panes, machines, molt or pain lines — run.json holds them (steps 1, 3, 5); pins retired.
+pin "$LIFECYCLE_MD" 'through `locator.machine`' \
+  "a resumed top re-arms each remote pane through locator.machine" flat
 
 # T4 G3 and the P3 it drew. "`mv`, which this command allows" is a CROSS-FILE
 # truth: the dagr write's own sentence and the top's command allowlist are two
@@ -2374,10 +2373,7 @@ pin "$PRBRIEFS_MD" 'End the reply that writes `open:` with `MOLT-HANDOFF: <REPOR
 pin "$SKILL_MD" 'Where molt runs, its warnings replace the notice' "SKILL.md names the molt path" flat
 pin "$ROLES_MD" 'a warned seat gets no new unit' "roles.md: a warned retained seat is replaced, not reused" flat
 # PR #671 round 1.
-pin "$LIFECYCLE_MD" 'per live seat, the molt status path recorded at its launch and the last status line noted' \
-  "lifecycle step 13: the top's handoff carries each seat's status path" flat
-pin "$LIFECYCLE_MD" 'per live seat, its molt status path recorded at launch and the last status line noted' \
-  "lifecycle: the top's own rotation handoff carries each seat's status path" flat
+# 0.2.22 (#810): the handoff no longer lists per-seat panes, machines, molt or pain lines — run.json holds them (steps 1, 3, 5); pins retired.
 pin "$GENERIC_BRIEFS_MD" 'the leaf templates'"'"' `MOLT:` line included' \
   "briefs.md: an operator brief's envelope carries the MOLT line" flat
 pin "$BRIEFS_MD" 'a `correct` decision on it first launches the item'"'"'s implementer in that worktree' \
