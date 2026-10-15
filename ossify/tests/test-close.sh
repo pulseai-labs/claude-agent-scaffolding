@@ -2796,6 +2796,13 @@ _sid_run
 t_assert_rc 1 "S9: an empty spec_oid halts"
 t_assert_contains "$T_OUT" "has no value" "S9: ...as malformed, never as a handoff that predates the field"
 
+# S12. A handoff with CRLF line endings (an eol=crlf checkout) is valid input
+# (PR #811 round 3): the trailing CR is not part of the blob id.
+_sid_handoff "spec_oid:       $SID_OID"
+sed -i 's/$/\r/' "$SID/handoff.md"
+_sid_run
+t_assert_rc 0 "S12: a CRLF handoff with the dispatched spec_oid passes"
+
 # S10-S11. A clean filter in the AI workspace must not change the hash (PR #811
 # round 1): authoring records the raw bytes, so close hashes the raw bytes too.
 SIDF="$TMP/sidf/work-r1.s1.w1"; mkdir -p "$SIDF"

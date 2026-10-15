@@ -157,8 +157,9 @@ proves the record agrees with the tree it edited.
 ```bash
 handoff="$(dirname "$spec")/handoff.md"
 [ -f "$handoff" ] && [ -r "$handoff" ] || { echo "close: no handoff.md for $wi at $handoff - halt"; exit 1; }
-# Only §3's identifiers count: Clarifications may quote a spec_oid line.
-want="$(awk '/^##[[:space:]]/ { in3 = ($0 ~ /^##[[:space:]]+3\./) }
+# Only §3's identifiers count (Clarifications may quote a spec_oid line); CRLF lines read as LF.
+want="$(awk '{ sub(/\r$/, "") }
+  /^##[[:space:]]/ { in3 = ($0 ~ /^##[[:space:]]+3\./) }
   in3 && /^[[:space:]]*spec_oid:/ { n++; v = $2 }
   END { if (n > 1) print "MANY"; else if (n == 1 && v == "") print "EMPTY"; else print v }' "$handoff")"
 # --no-filters: hash the bytes the gate reads, not what .gitattributes makes of them.
