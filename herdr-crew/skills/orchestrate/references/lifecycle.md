@@ -100,7 +100,7 @@ Every command's syntax comes from `herdr --skill`.
    file is the contract. A `blocked` wake is a dialog, and a blocked seat rejects
    `herdr agent prompt`: `herdr pane read <pane>` for it, answer it as
    `herdr-mechanics.md` says, then one fresh bounded wait on the answer.
-   A timeout is that file's checkpoint, and a wake with nothing new in the report while the
+   A timeout is that file's checkpoint (a doorbell companion's lapses instead), and a wake with nothing new in the report while the
    seat still works is its false wake. Each licenses one `herdr pane read`: the timeout's
    observed state — stopped, at a dialog, or still at work — is reported to the operator,
    and the false wake follows the doorbell rule that file states for the rest of that
