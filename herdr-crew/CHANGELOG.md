@@ -2,6 +2,10 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.22
+
+**One resume from run state** (#810, #819). A rotation and a resume after a hard stop (the top died with no handoff) run one procedure from `run.json`: read the old `run.orchestrator` pane and machine before any write; on a hard stop, close the old top's pane only when `herdr agent list` shows an agent session in it; rebind; re-ask an open `run.question`; settle a `recorded` attempt whose brief never arrived and relaunch it; run the generation check against `locator.seen` and re-arm each delivered attempt's waits; arm one heartbeat; continue at the first ready task, never re-running a done one. The rotation handoff shrinks to the run path, the next step and the context the run file cannot hold, and restates no operator gate: for the merge it points at step 12 and `run.merge_word`, which step 12 now reads. Legacy run files resume with stated defaults. A molted top reads `locator.seen`. A brief sent to a seat already running now opens its attempt with phase and locator like a launch.
+
 ## 0.2.21
 
 **The ping follows the top; the run file carries the live facts** (#816, groundwork for #810 and #819). Every report-producing brief replaces `NOTIFY_PANE` with `NOTIFY_RUN` (the dispatcher's `run.json`) and `NOTIFY_MACHINE`: at each ping the worker reads `run.orchestrator` and pings that pane only when its machine is the worker's, so a successor top's rebind redirects every live worker's ping with no message to it. The top now writes `run.merge_word` at creation, `run.orchestrator.machine` at each bind, `run.question` around each operator ask, and per attempt `phase` (`recorded` before the brief, `delivered` after the confirmed send) and `locator` `machine`, `report`, `status`, `pain` and `seen` (the consumed report generation). `dagr check --strict` accepts every field. A live worker dispatched under 0.2.20 or earlier keeps pinging its fixed pane until its dispatch ends.
