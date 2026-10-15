@@ -131,6 +131,24 @@ test_A5_dispatcher_path_renders_marker() {
     echo "    stub_claude_md still dispatches"; return 1; fi
 }
 
+test_A6_ampersand_in_canonical_root_survives_render() {
+  # D3/#768: a canonical path with `&` (or `\`) used to be mangled by the
+  # ${var//pat/repl} splice under bash 5.2+ patsub_replacement, leaving the
+  # literal ${CANONICAL_ROOT} in the one instruction file every agent reads.
+  # End-to-end through the dispatcher, which is where the real path arrives.
+  local ai_root="$_WI_TMP/a6-ai" canonical_root="$_WI_TMP/a6/R&D"
+  mkdir -p "$ai_root" "$canonical_root"
+  _setup_manifest "$ai_root" "$canonical_root" || return 1
+  "$WI_PLUGIN_ROOT/bin/wi" stub_agents_md "$ai_root" "p" >/dev/null 2>&1 || { echo "    dispatcher failed"; return 1; }
+
+  local content; content="$(cat "$ai_root/AGENTS.md")"
+  assert_contains "$canonical_root" "$content" || return 1
+  assert_not_contains '${CANONICAL_ROOT}' "$content" || return 1
+  # Adjacent control: the render still substitutes the other var, so the fix
+  # did not disable substitution wholesale.
+  assert_contains 'p — AI workspace' "$content" || return 1
+}
+
 # ---------------------------------------------------------------------------
 # R. README.md (3 tests)
 # ---------------------------------------------------------------------------
@@ -237,6 +255,7 @@ wi_test_run test_A2_agents_md_fallback_to_manifest_name
 wi_test_run test_A3_agents_md_idempotent
 wi_test_run test_A4_no_claude_md_written
 wi_test_run test_A5_dispatcher_path_renders_marker
+wi_test_run test_A6_ampersand_in_canonical_root_survives_render
 
 echo ""
 echo "R. README.md"
