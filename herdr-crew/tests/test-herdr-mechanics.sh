@@ -66,7 +66,7 @@ LIFE="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=370  # 0.2.19: +10 lines for "Host: OMP" (spec D); 2026-10-15: 0.2.18: +3 lines for the OMP mode-file read; adjacent over-budget control retained. 0.2.13: lowered from 360 when the dsh carve-out left step 2 and the heartbeat. 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
+REF_BUDGET=380  # 0.2.20: +10 lines for #651 B (a companion timeout lapses silently) and D (the heartbeat's stall rule); 0.2.19: +10 lines for "Host: OMP" (spec D); 2026-10-15: 0.2.18: +3 lines for the OMP mode-file read; adjacent over-budget control retained. 0.2.13: lowered from 360 when the dsh carve-out left step 2 and the heartbeat. 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -144,6 +144,13 @@ pin "$REF" 'a different hash or identity' \
   "the typed wake's novelty is the same hash-or-identity generation (#650 R1-1)" flat
 
 # #575: the pair is re-armed, not restarted, after a dialog the operator answered.
+pin "$REF" "The companion's own timeout, while the doorbell is still armed, is no checkpoint" \
+  "a companion timeout under a live doorbell lapses silently (#651 B)" flat
+pin "$REF" '**A stall** is the one exception to a silent `working`' \
+  "the heartbeat names the stall rule (#651 D)" flat
+pin "$REF" 'is a seat failure, not a failed task' "a stall is a seat failure, never a task failure (#651 D)" flat
+pin "$REF" "Launch the fallback the project file's" "a stall launches the declared fallback (#651 D)" flat
+pin "$REF" 'with none named, report it to the operator once' "no declared fallback goes to the operator (#651 D)" flat
 pin "$REF" 'An answered dialog re-arms the pair' \
   "an answered dialog re-arms the pair (#575)"
 pin "$REF" 'the doorbell and its companion again, not one wait' \
