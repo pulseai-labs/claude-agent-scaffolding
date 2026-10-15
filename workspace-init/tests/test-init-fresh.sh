@@ -52,7 +52,6 @@ _run_bootstrap() {
   [[ -z "$default_branch" ]] && default_branch="main"
 
   wi_manifest_write "$ai_root" "$canonical_root" "$project_type" --default-branch "$default_branch" || return 1
-  wi_stub_claude_md "$ai_root" "$name" || return 1
   wi_stub_agents_md "$ai_root" "$name" || return 1
   wi_stub_readme "$ai_root" "$name" || return 1
   # Reproduce the issue environment: system/global git defaults to `master`.
@@ -108,6 +107,15 @@ test_H5_manifest_passes_validate() {
     echo "    wi_manifest_validate failed"
     return 1
   fi
+}
+
+test_H6_no_claude_md() {
+  # #768: workspace-init writes one instruction file, AGENTS.md. A CLAUDE.md
+  # at the AI-workspace root would shadow it in Claude Code's default load.
+  local parent="$_WI_TMP/h6"; mkdir -p "$parent"
+  _run_bootstrap "$parent" "alpha" personal >/dev/null 2>&1
+  [[ ! -e "$parent/alpha-ai/CLAUDE.md" ]] || { echo "    CLAUDE.md was written"; return 1; }
+  assert_file_exists "$parent/alpha-ai/AGENTS.md" || return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -316,7 +324,7 @@ test_F2_invalid_name_aborts_no_dirs() {
 }
 
 # ---------------------------------------------------------------------------
-# Run all (18 tests)
+# Run all (19 tests)
 # ---------------------------------------------------------------------------
 
 wi_test_run test_H1_bootstrap_succeeds_exit_zero
@@ -324,6 +332,7 @@ wi_test_run test_H2_ai_workspace_dir_exists
 wi_test_run test_H3_canonical_dir_exists
 wi_test_run test_H4_manifest_present_and_valid_json
 wi_test_run test_H5_manifest_passes_validate
+wi_test_run test_H6_no_claude_md
 
 wi_test_run test_M1_routing_complete_all_16_entries
 wi_test_run test_M2_project_type_personal

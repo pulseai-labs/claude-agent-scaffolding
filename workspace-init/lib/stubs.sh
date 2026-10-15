@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# lib/stubs.sh — render 3 top-level stub files for AI workspace root.
-# Per SPEC §8.5/§8.6/§8.7: CLAUDE.md, AGENTS.md, README.md
+# lib/stubs.sh — render 2 top-level stub files for AI workspace root.
+# Per SPEC §8.6/§8.7: AGENTS.md (the one instruction file), README.md
 #
 # All filesystem operations append TAB-separated entries to
 # <ai-root>/.workspace/init-log so Phase 3g rollback can replay them in reverse.
@@ -37,58 +37,11 @@ _wi_stubs_log_once() {
   wi_log_op "$log" "$op" "$target_path"
 }
 
-# wi_stub_claude_md <ai-root> <project-name>
-#
-# Renders CLAUDE.md stub from template, substituting ${PROJECT_NAME} and
-# ${CANONICAL_ROOT}. Reads canonical_root from manifest (assumes manifest
-# exists and is valid). Logs WRITE_FILE to init-log.
-#
-# Returns 0 on success, 1 on failure.
-wi_stub_claude_md() {
-  local ai_root="$1"
-  local project_name="$2"
-
-  if [[ ! -d "$ai_root" ]]; then
-    wi_log_error "wi_stub_claude_md: ai_root does not exist: $ai_root"
-    return 1
-  fi
-
-  # Read canonical_root from manifest.
-  local canonical_root
-  canonical_root="$(wi_manifest_read "$ai_root" '.canonical.root' 2>/dev/null)" || {
-    wi_log_error "wi_stub_claude_md: failed to read canonical.root from manifest"
-    return 1
-  }
-
-  local tmpl="${WI_TEMPLATES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates}/CLAUDE.md.stub.tmpl"
-  local out="${ai_root}/CLAUDE.md"
-
-  if [[ ! -f "$tmpl" ]]; then
-    wi_log_error "wi_stub_claude_md: template not found: $tmpl"
-    return 1
-  fi
-
-  # Render template with substitutions.
-  if ! wi_render_template "$tmpl" "$out" \
-      "PROJECT_NAME=$project_name" \
-      "CANONICAL_ROOT=$canonical_root"; then
-    wi_log_error "wi_stub_claude_md: template render failed"
-    return 1
-  fi
-
-  # Log the write.
-  local log
-  log="$(_wi_stubs_log "$ai_root")"
-  _wi_stubs_log_once "$log" WRITE_FILE "$out"
-
-  return 0
-}
-
 # wi_stub_agents_md <ai-root> [<project-name>]
 #
-# Renders AGENTS.md stub from template, substituting ${PROJECT_NAME}.
-# If <project-name> is omitted, reads it from manifest (ai_workspace.name).
-# Logs WRITE_FILE to init-log.
+# Renders AGENTS.md stub from template, substituting ${PROJECT_NAME} and
+# ${CANONICAL_ROOT}. If <project-name> is omitted, reads it from manifest
+# (ai_workspace.name). Logs WRITE_FILE to init-log.
 #
 # Returns 0 on success, 1 on failure.
 wi_stub_agents_md() {
@@ -108,6 +61,13 @@ wi_stub_agents_md() {
     }
   fi
 
+  # Read canonical_root from manifest.
+  local canonical_root
+  canonical_root="$(wi_manifest_read "$ai_root" '.canonical.root' 2>/dev/null)" || {
+    wi_log_error "wi_stub_agents_md: failed to read canonical.root from manifest"
+    return 1
+  }
+
   local tmpl="${WI_TEMPLATES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates}/AGENTS.md.stub.tmpl"
   local out="${ai_root}/AGENTS.md"
 
@@ -116,8 +76,10 @@ wi_stub_agents_md() {
     return 1
   fi
 
-  # Render template with substitution.
-  if ! wi_render_template "$tmpl" "$out" "PROJECT_NAME=$project_name"; then
+  # Render template with substitutions.
+  if ! wi_render_template "$tmpl" "$out" \
+      "PROJECT_NAME=$project_name" \
+      "CANONICAL_ROOT=$canonical_root"; then
     wi_log_error "wi_stub_agents_md: template render failed"
     return 1
   fi

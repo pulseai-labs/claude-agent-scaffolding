@@ -98,7 +98,6 @@ _run_pair_with_bootstrap() {
       --default-branch "$default_branch" || return 1
   fi
 
-  wi_stub_claude_md "$ai_root" "$name" || return 1
   wi_stub_agents_md "$ai_root" "$name" || return 1
   wi_stub_readme    "$ai_root" "$name" || return 1
   wi_git_init_ai_only "$ai_root" || return 1
@@ -150,8 +149,8 @@ test_PH3_ai_has_skeleton_manifest_stubs() {
   assert_dir_exists  "$ai/.claude"    || return 1
   assert_dir_exists  "$ai/docs"       || return 1
   assert_file_exists "$ai/.workspace/pairing.json" || return 1
-  assert_file_exists "$ai/CLAUDE.md"  || return 1
   assert_file_exists "$ai/AGENTS.md"  || return 1
+  [[ ! -e "$ai/CLAUDE.md" ]] || { echo "    CLAUDE.md was written"; return 1; }
   assert_file_exists "$ai/README.md"  || return 1
   assert_file_exists "$ai/.gitignore" || return 1
 }

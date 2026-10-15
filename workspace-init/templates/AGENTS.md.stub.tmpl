@@ -1,22 +1,37 @@
-# AGENTS.md — ${PROJECT_NAME}
+<!-- workspace-init stub: ossify:start replaces this file -->
+# ${PROJECT_NAME} — AI workspace
 
-Cross-tool agent guidance. Read by Codex CLI, Cursor, Aider, Continue, and other agentic tools that look for an `AGENTS.md` at the repo root.
+The one instruction file for this AI workspace. Claude Code, Codex, OMP and other agents read it.
+This is a temporary stub: `/ossify:start` replaces the whole file with project-specific guidance.
+Put lasting notes in it only after `/ossify:start` has run.
 
-## Workspace topology
+This is the AI workspace half of a dual-repo project.
+Paired canonical repo: `${CANONICAL_ROOT}`.
 
-This is the AI workspace of a dual-repo project. Production code lives in the sibling canonical repo (see `.workspace/pairing.json` for paths).
+## What workspace-init declared
 
-When running agentic tools here:
-- Edits to MASTER-SPEC.md, memory-bank/, sprint specs land here (AI workspace).
-- Edits to src/, tests/, PRD.md, SRS.md, ADRs land in canonical.
-- See the `routing` block in `.workspace/pairing.json` for the full table.
+- `.workspace/pairing.json` — pairing manifest and repository topology (see its `routing` block)
+- `.workspace/init-log` — workspace-init's rollback record
+- `AGENTS.md` and `README.md` — temporary stubs
+
+Production source, tests, product documentation and product ADRs belong in the canonical.
+Specs, the memory bank and process records belong here.
+
+## Continue with ossify
+
+- Empty canonical: run `/ossify:start` (on Codex or OMP, the `start` skill).
+- `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack — a canonical that already carries source or history without that stack has no supported ossify continuation yet.
 
 ## Git policy
 
-- Commit messages must NOT contain AI-trace patterns (Co-Authored-By trailers, 🤖 markers). A `commit-msg` hook enforces this in both repos.
 - Network ops (push/pull/fetch) require explicit user instruction. Default-deny per the manifest's `git_policy.allow_ai_*` fields.
-- Local merges + rebases allowed.
+- Local merges and rebases are allowed.
 
-## When in doubt
+## AI-trace filter
 
-Read `CLAUDE.md` for the topology. Route lifecycle work through ossify: `/ossify:start` for an empty canonical, and `/ossify:adopt` only for a project previously onboarded with the legacy scaffold stack — a repository that already carries source or history without that stack has no supported ossify continuation yet. On Codex, invoke the corresponding ossify skill.
+A `commit-msg` hook is installed in both this AI workspace and the canonical repo. It blocks:
+- `Co-Authored-By:` trailers
+- `🤖 Generated with` markers
+- `<noreply@anthropic.com>` / `<noreply@openai.com>` references
+
+Override with `git commit --no-verify` only if you understand the implication.

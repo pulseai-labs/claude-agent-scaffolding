@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # tests/test-stubs.sh — unit tests for lib/stubs.sh
-# Covers (per SPEC §8.5/§8.6/§8.7, ~10 tests):
-#   C. CLAUDE.md (3) — stub rendering + substitution + idempotency
-#   A. AGENTS.md (3) — stub rendering + project-name fallback + idempotency
+# Covers (per SPEC §8.5/§8.6/§8.7, ~9 tests):
+#   A. AGENTS.md (5) — stub rendering + project-name fallback + idempotency +
+#                      no CLAUDE.md + dispatcher path
 #   R. README.md (3) — stub rendering + substitution + idempotency
 #   T. Template missing (1) — returns non-zero when template absent
 
@@ -33,81 +33,7 @@ _setup_manifest() {
 }
 
 # ---------------------------------------------------------------------------
-# C. CLAUDE.md (3 tests)
-# ---------------------------------------------------------------------------
-
-test_C1_claude_md_writes_file_with_substitution() {
-  local ai_root="$_WI_TMP/c1-ai"
-  local canonical_root="$_WI_TMP/c1"
-  mkdir -p "$ai_root" "$canonical_root"
-  _setup_manifest "$ai_root" "$canonical_root" || return 1
-
-  if ! wi_stub_claude_md "$ai_root" "my-project" 2>/dev/null; then
-    echo "    expected success"
-    return 1
-  fi
-
-  assert_file_exists "${ai_root}/CLAUDE.md" || return 1
-  local content
-  content="$(cat "${ai_root}/CLAUDE.md")"
-  assert_contains "my-project" "$content" || return 1
-  assert_contains "$canonical_root" "$content" || return 1
-  assert_not_contains '${PROJECT_NAME}' "$content" || return 1
-  assert_not_contains '${CANONICAL_ROOT}' "$content" || return 1
-
-  # S8: the rendered stub hands lifecycle work to ossify and carries no
-  # retired-stack continuation or ornamental version claim.
-  assert_contains '/ossify:start' "$content" || return 1
-  assert_contains '/ossify:adopt' "$content" || return 1
-  assert_not_contains '/onboard' "$content" || return 1
-  assert_not_contains 'scaffold-onboard' "$content" || return 1
-  [[ ! "$content" =~ workspace-init\ v[0-9] ]] || return 1
-
-  # S8 round 3: the continuation must state adoption's scope rather than imply
-  # that "existing source or history" alone qualifies for it.
-  assert_contains 'legacy scaffold stack' "$content" || return 1
-  assert_not_contains 'Existing source or history: run' "$content" || return 1
-}
-
-test_C2_claude_md_logs_write_file() {
-  local ai_root="$_WI_TMP/c2-ai"
-  local canonical_root="$_WI_TMP/c2"
-  mkdir -p "$ai_root" "$canonical_root"
-  _setup_manifest "$ai_root" "$canonical_root" || return 1
-
-  wi_stub_claude_md "$ai_root" "test-proj" >/dev/null 2>&1 || return 1
-
-  local log="${ai_root}/.workspace/init-log"
-  assert_file_exists "$log" || return 1
-  local content
-  content="$(cat "$log")"
-  assert_contains "WRITE_FILE" "$content" || return 1
-  assert_contains "${ai_root}/CLAUDE.md" "$content" || return 1
-}
-
-test_C3_claude_md_idempotent() {
-  local ai_root="$_WI_TMP/c3-ai"
-  local canonical_root="$_WI_TMP/c3"
-  mkdir -p "$ai_root" "$canonical_root"
-  _setup_manifest "$ai_root" "$canonical_root" || return 1
-
-  # First call.
-  wi_stub_claude_md "$ai_root" "proj" >/dev/null 2>&1 || return 1
-  local log="${ai_root}/.workspace/init-log"
-  local count1
-  count1="$(grep -c 'WRITE_FILE' "$log" || echo 0)"
-
-  # Second call (idempotent).
-  wi_stub_claude_md "$ai_root" "proj" >/dev/null 2>&1 || return 1
-  local count2
-  count2="$(grep -c 'WRITE_FILE' "$log" || echo 0)"
-
-  # Should still be same count (one CLAUDE.md entry).
-  [[ "$count1" == "$count2" ]] || { echo "    log grew on second call"; return 1; }
-}
-
-# ---------------------------------------------------------------------------
-# A. AGENTS.md (3 tests)
+# A. AGENTS.md (5 tests)
 # ---------------------------------------------------------------------------
 
 test_A1_agents_md_writes_file_with_project_name() {
@@ -137,6 +63,15 @@ test_A1_agents_md_writes_file_with_project_name() {
   # "existing source or history" alone qualifies for it.
   assert_contains 'legacy scaffold stack' "$content" || return 1
   assert_not_contains 'for existing source or history' "$content" || return 1
+
+  assert_contains "$canonical_root" "$content" || return 1
+  assert_not_contains '${CANONICAL_ROOT}' "$content" || return 1
+  local first; first="$(head -n 1 "${ai_root}/AGENTS.md")"
+  assert_eq '<!-- workspace-init stub: ossify:start replaces this file -->' "$first" || return 1
+  # The single file carries what the CLAUDE.md stub used to: the trace filter.
+  assert_contains 'Co-Authored-By:' "$content" || return 1
+  # No pointer to a file that is no longer written.
+  assert_not_contains 'Read `CLAUDE.md`' "$content" || return 1
 }
 
 test_A2_agents_md_fallback_to_manifest_name() {
@@ -174,6 +109,26 @@ test_A3_agents_md_idempotent() {
   count2="$(grep -c 'AGENTS.md' "$log" || echo 0)"
 
   [[ "$count1" == "$count2" ]] || { echo "    log grew on second call"; return 1; }
+}
+
+test_A4_no_claude_md_written() {
+  local ai_root="$_WI_TMP/a4-ai" canonical_root="$_WI_TMP/a4"
+  mkdir -p "$ai_root" "$canonical_root"
+  _setup_manifest "$ai_root" "$canonical_root" || return 1
+  wi_stub_agents_md "$ai_root" "p" >/dev/null 2>&1 || return 1
+  [[ ! -e "${ai_root}/CLAUDE.md" ]] || { echo "    CLAUDE.md was written"; return 1; }
+  if declare -F wi_stub_claude_md >/dev/null; then echo "    wi_stub_claude_md still defined"; return 1; fi
+}
+
+test_A5_dispatcher_path_renders_marker() {
+  # bin/wi runs set -euo pipefail; sourcing the lib does not (canonical CLAUDE.md).
+  local ai_root="$_WI_TMP/a5-ai" canonical_root="$_WI_TMP/a5"
+  mkdir -p "$ai_root" "$canonical_root"
+  _setup_manifest "$ai_root" "$canonical_root" || return 1
+  "$WI_PLUGIN_ROOT/bin/wi" stub_agents_md "$ai_root" "p" >/dev/null 2>&1 || { echo "    dispatcher failed"; return 1; }
+  assert_eq '<!-- workspace-init stub: ossify:start replaces this file -->' "$(head -n 1 "$ai_root/AGENTS.md")" || return 1
+  if "$WI_PLUGIN_ROOT/bin/wi" stub_claude_md "$ai_root" "p" >/dev/null 2>&1; then
+    echo "    stub_claude_md still dispatches"; return 1; fi
 }
 
 # ---------------------------------------------------------------------------
@@ -262,7 +217,7 @@ test_T1_missing_template_fails() {
   export WI_TEMPLATES_DIR="/nonexistent/templates"
 
   local rc=0
-  wi_stub_claude_md "$ai_root" "proj" 2>/dev/null || rc=$?
+  wi_stub_agents_md "$ai_root" "proj" 2>/dev/null || rc=$?
 
   export WI_TEMPLATES_DIR="$old_tmpl_dir"
 
@@ -276,16 +231,12 @@ test_T1_missing_template_fails() {
 echo "== Running tests for lib/stubs.sh =="
 echo ""
 
-echo "C. CLAUDE.md"
-wi_test_run test_C1_claude_md_writes_file_with_substitution
-wi_test_run test_C2_claude_md_logs_write_file
-wi_test_run test_C3_claude_md_idempotent
-
-echo ""
 echo "A. AGENTS.md"
 wi_test_run test_A1_agents_md_writes_file_with_project_name
 wi_test_run test_A2_agents_md_fallback_to_manifest_name
 wi_test_run test_A3_agents_md_idempotent
+wi_test_run test_A4_no_claude_md_written
+wi_test_run test_A5_dispatcher_path_renders_marker
 
 echo ""
 echo "R. README.md"

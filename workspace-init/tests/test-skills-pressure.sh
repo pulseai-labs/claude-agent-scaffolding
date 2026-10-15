@@ -258,7 +258,6 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   # plugin entries in the shared catalogs are accurate hosted-but-deprecated
   # documentation and are deliberately out of scope.
   local files=(
-    "$WI_PLUGIN_ROOT/templates/CLAUDE.md.stub.tmpl"
     "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl"
     "$WI_PLUGIN_ROOT/templates/README.md.tmpl"
     "$WI_PLUGIN_ROOT/templates/gitignore.tmpl"
