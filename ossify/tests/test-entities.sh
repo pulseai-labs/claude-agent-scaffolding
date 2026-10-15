@@ -133,6 +133,11 @@ t_capture oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_status
 t_assert_eq "0" "$T_OUT" "no rejected work-item/release status change journals anything"
 
 # And the accept path, so the guards are not passing by refusing everything.
+# 1.22.0 (#563): `complete` needs a recorded dispatch, so the never-dispatched
+# item refuses first, and lands once the dispatch is recorded - the real order.
+t_capture oss_entity_set_work_item_status "$S" "$WI" "complete"
+t_assert_rc 7 "work item status refuses complete on a never-dispatched item (#563)"
+oss_entity_set_work_item_exec "$S" "$WI" "work/$WI" "$TMP/.worktrees/$WI" "sha-wi" >/dev/null
 t_capture oss_entity_set_work_item_status "$S" "$WI" "complete"
 t_assert_rc 0 "work item status accepts a valid transition"
 t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WI\") | .status"
@@ -203,30 +208,22 @@ t_assert_rc 0 "setup: the dispatched item can still go complete"
 t_capture oss_entity_set_work_item_status "$S" "$WID" abandoned
 t_assert_rc 7 "a COMPLETE item cannot be abandoned after its merge landed"
 
-# The MIRROR arm does NOT ship in 1.12.0 - the operator's ruling of 2026-09-23
-# narrowed the set to the abandonment transition, and a refusal on the dispatch
-# WRITE is a condition on the record, not on that transition (#563). So
-# dispatching an already-`abandoned` item is accepted again, and the pair it
-# leaves - {status:abandoned, branch, worktree_path} - is doctor's §5 report, not
-# the verb's refusal: the report half is what still carries it (state-inspection.md
-# §5, pinned by test-prose-contracts.sh).
+# THE MIRROR ARM SHIPS in 1.22.0 (#563 member 2, operator ruling of 2026-10-12:
+# refuse new writes). It was dropped from 1.12.0 by the 2026-09-23 narrowing; a
+# dispatch onto an already-`abandoned` item now refuses, so the pair
+# {status:abandoned, branch, worktree_path} can no longer be written through the
+# verb. doctor's §5 report stays for the pairs older journals already hold.
 WID3="$(oss_entity_add_work_item "$S" r0.s1 "withdrawn, then dispatched?")"
 t_capture oss_entity_set_work_item_status "$S" "$WID3" abandoned
 t_assert_rc 0 "setup: a third item is withdrawn before any dispatch"
 N2="$(oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_exec")] | length')"
 t_capture oss_entity_set_work_item_exec "$S" "$WID3" "work/$WID3" "$TMP/.worktrees/$WID3" "abc123"
-t_assert_rc 0 "dispatching an ABANDONED item is accepted - the mirror arm is dropped"
+t_assert_rc 7 "dispatching an ABANDONED item is refused - the mirror arm ships (#563)"
+t_assert_contains "$T_OUT" "work_item_status $WID3 planned" "...naming the route back"
 t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WID3\") | [(.status // \"\"), (.branch // \"\")] | join(\",\")"
-t_assert_eq "abandoned,work/$WID3" "$T_OUT" "...and the drift pair is the record it lands (the report, not the rail)"
+t_assert_eq "abandoned," "$T_OUT" "...and no drift pair is written"
 t_capture oss_state_read "$S" '[.mutations[] | select(.op=="set_work_item_exec")] | length'
-t_assert_eq "$((N2 + 1))" "$T_OUT" "...journaling exactly one mutation"
-# ADJACENT CONTROL: the SAME pair is still refused in the guarded direction, and
-# this is what makes the drop a narrowing rather than a hole - the item now
-# records a dispatch, so the rail that DID ship refuses the withdrawal right next
-# to the call that was let through.
-t_capture oss_entity_set_work_item_status "$S" "$WID3" abandoned
-t_assert_rc 7 "...and withdrawing that same item is still refused (the kept rail)"
-t_assert_contains "$T_OUT" "records a dispatch" "...naming the dispatch it recorded"
+t_assert_eq "$N2" "$T_OUT" "...journaling nothing"
 # The live-item control this row has always carried: the same dispatch call on an
 # item that is neither withdrawn nor landed still journals, so the accepted row
 # above is not "this verb says yes to everything now".
@@ -269,10 +266,10 @@ t_assert_eq "$N3" "$T_OUT" "...and journaling nothing"
 # a journal from a build that recorded the merge without the dispatch - and its
 # merge is on the spine branch either way, so abandoning it takes a landed line
 # out of every close-path reader and out of release close's tag set. The raw op
-# below writes the shape with no dispatch record and no journal gap, and the
-# shipped status verb writes it too - `work_item_status <wi> complete` carries no
-# precondition of its own on a never-dispatched item - which is what makes this
-# the clause's own row rather than a duplicate of the dispatched one above.
+# below writes the shape with no dispatch record and no journal gap. Since 1.22.0
+# the status verb refuses to write it (#563), so the raw op - an older journal -
+# is the only source, and this stays the clause's own row rather than a duplicate
+# of the dispatched one above.
 WID4B="$(oss_entity_add_work_item "$S" r0.s1 "landed, no dispatch record")"
 oss_state_mutate "$S" set_work_item_status \
   "$(jq -n --arg w "$WID4B" --arg st complete --arg ts "$(_oss_now)" '{work_item:$w,status:$st,at:$ts}')" >/dev/null
@@ -368,8 +365,9 @@ t_assert_rc 0 "replay of that journal stays CLEAN - the rails are verb-side and 
 # of 2026-09-23: ONE clause survives on the dispatch write - a payload that
 # records NO dispatch at all, on an item that already records one - because the
 # abandonment rail above stands on it (erase the record and that rail sees an
-# undispatched item and lets the strand through). The narrowing clause, the
-# landed-provenance clause and the mirror arm do not ship (#563); each row below
+# undispatched item and lets the strand through). The narrowing clause and the
+# landed-provenance clause do not ship; the mirror arm ships in 1.22.0 (#563,
+# the 1.22.0 block at the end of this file); each row below
 # states which side of that line it is on, and every accepted row is paired with
 # the refusal that must still fire next to it.
 # ---------------------------------------------------------------------------
@@ -597,6 +595,155 @@ t_capture oss_entity_set_work_item_exec "$S" "$WIEXEC" "work/$WIEXEC" "/tmp/wt" 
 t_assert_rc 0 "work item exec fields recorded"
 t_capture oss_state_replay "$S"
 t_assert_rc 0 "replay stays clean across the new status + exec ops"
+
+# ---------------------------------------------------------------------------
+# 1.22.0 (#563, operator ruling 2026-10-12: refuse new writes, replay stays
+# permissive). The verbs refuse the shapes; _oss_apply_op is unchanged, so a
+# journal that already holds one still replays clean.
+# ---------------------------------------------------------------------------
+S22="$TMP/s22.json"
+oss_state_init "$S22" s22 >/dev/null
+oss_entity_add_release "$S22" "R" "goal" >/dev/null
+SPA="$(oss_entity_add_spine "$S22" r0 "live spine" flesh canonical)"
+_n22() { oss_state_read "$S22" '.mutations | length'; }
+
+# (563-1) `complete` needs a recorded dispatch.
+WC1="$(oss_entity_add_work_item "$S22" "$SPA" "never dispatched")"
+N="$(_n22)"
+t_capture oss_entity_set_work_item_status "$S22" "$WC1" complete
+t_assert_rc 7 "563-1: complete refuses an item that records no dispatch"
+t_assert_contains "$T_OUT" "work_item_exec" "563-1: ...naming the dispatch record as the route"
+t_assert_eq "planned" "$(oss_state_read "$S22" ".work_items[] | select(.id==\"$WC1\") | .status")" "563-1: ...leaving the status untouched"
+t_assert_eq "$N" "$(_n22)" "563-1: ...and journaling nothing"
+t_capture oss_entity_set_work_item_status "$S22" "$WC1" abandoned
+t_assert_rc 0 "563-1 setup: the never-dispatched item withdraws"
+t_capture oss_entity_set_work_item_status "$S22" "$WC1" complete
+t_assert_rc 7 "563-1: complete refuses to resurrect a withdrawn item as landed"
+t_capture env OSS_STATE_FILE="$S22" "$OSS" work_item_status "$WC1" complete
+t_assert_rc 7 "563-1: ...and the dispatcher returns the same rc 7"
+# ADJACENT CONTROLS: a dispatched item still lands, and the predicate is the
+# abandonment guard's own (a base_sha-only half-write counts as a dispatch).
+WC2="$(oss_entity_add_work_item "$S22" "$SPA" "dispatched")"
+oss_entity_set_work_item_exec "$S22" "$WC2" "work/$WC2" "/tmp/wt-$WC2" "sha-c2" >/dev/null
+t_capture oss_entity_set_work_item_status "$S22" "$WC2" complete
+t_assert_rc 0 "563-1 control: a dispatched item still goes complete"
+WC3="$(oss_entity_add_work_item "$S22" "$SPA" "base_sha only")"
+oss_entity_set_work_item_exec "$S22" "$WC3" "" "" "sha-c3" >/dev/null
+t_capture oss_entity_set_work_item_status "$S22" "$WC3" complete
+t_assert_rc 0 "563-1 control: a base_sha-only dispatch counts as recorded"
+# A malformed field and nothing well-formed: the guard cannot answer - rc 4.
+oss_state_mutate "$S22" add_work_item \
+  "$(jq -n --arg s "$SPA" --arg ts "$(_oss_now)" '{spine:$s,title:"bad",target_repo:"canonical",status:"planned",created_at:$ts,id:"r0.s1.w90",branch:false}')" >/dev/null
+N="$(_n22)"
+t_capture oss_entity_set_work_item_status "$S22" "r0.s1.w90" complete
+t_assert_rc 4 "563-1: a malformed dispatch field fails complete CLOSED at rc 4"
+t_assert_contains "$T_OUT" "not a string" "563-1: ...saying the guard could not answer"
+t_assert_eq "$N" "$(_n22)" "563-1: ...and journaling nothing"
+# A malformed field beside a well-formed one: a genuine dispatch survives - lands.
+oss_state_mutate "$S22" add_work_item \
+  "$(jq -n --arg s "$SPA" --arg ts "$(_oss_now)" '{spine:$s,title:"mixed",target_repo:"canonical",status:"planned",created_at:$ts,id:"r0.s1.w91",branch:"work/m",worktree_path:false}')" >/dev/null
+t_capture oss_entity_set_work_item_status "$S22" "r0.s1.w91" complete
+t_assert_rc 0 "563-1: a mixed record (a well-formed field survives) still goes complete"
+# Other statuses are not touched by the new clause.
+WC4="$(oss_entity_add_work_item "$S22" "$SPA" "goes active")"
+t_capture oss_entity_set_work_item_status "$S22" "$WC4" active
+t_assert_rc 0 "563-1 control: active on a never-dispatched item is still a plain write"
+# Replay stays permissive: the raw op journals complete-without-dispatch (an
+# older journal), and replay is clean.
+oss_state_mutate "$S22" set_work_item_status \
+  "$(jq -n --arg w "$WC4" --arg ts "$(_oss_now)" '{work_item:$w,status:"complete",at:$ts}')" >/dev/null
+t_assert_eq "complete" "$(oss_state_read "$S22" ".work_items[] | select(.id==\"$WC4\") | .status")" "563-1 setup: a legacy complete-without-dispatch record"
+t_capture oss_state_replay "$S22"
+t_assert_rc 0 "563-1: replay of a journal holding complete-without-dispatch stays CLEAN"
+
+# (563-2a) an abandoned spine takes no new work item.
+SPB="$(oss_entity_add_spine "$S22" r0 "retired spine" flesh canonical)"
+WB1="$(oss_entity_add_work_item "$S22" "$SPB" "minted before the retirement")"
+t_capture oss_entity_set_spine_status "$S22" "$SPB" abandoned
+t_assert_rc 0 "563-2 setup: the spine retires"
+N="$(_n22)"; NW="$(oss_state_read "$S22" '.work_items | length')"
+t_capture oss_entity_add_work_item "$S22" "$SPB" "new work on a retired spine"
+t_assert_rc 7 "563-2a: work_item_add refuses an abandoned spine"
+t_assert_contains "$T_OUT" "spine_status $SPB planned" "563-2a: ...naming the route back"
+t_assert_eq "$NW" "$(oss_state_read "$S22" '.work_items | length')" "563-2a: ...minting no item"
+t_assert_eq "$N" "$(_n22)" "563-2a: ...and journaling nothing"
+t_capture env OSS_STATE_FILE="$S22" "$OSS" work_item_add "$SPB" "via the dispatcher" canonical
+t_assert_rc 7 "563-2a: ...and the dispatcher returns the same rc 7"
+# (563-2b) nor a dispatch onto one of its items.
+t_capture oss_entity_set_work_item_exec "$S22" "$WB1" "work/$WB1" "/tmp/wt-$WB1" "sha-b1"
+t_assert_rc 7 "563-2b: work_item_exec refuses a dispatch onto an item of an abandoned spine"
+t_assert_contains "$T_OUT" "spine_status $SPB planned" "563-2b: ...naming the route back"
+t_assert_eq "" "$(oss_state_read "$S22" ".work_items[] | select(.id==\"$WB1\") | .branch // \"\"")" "563-2b: ...recording no dispatch"
+t_assert_eq "$N" "$(_n22)" "563-2b: ...and journaling nothing"
+# A wipe records no dispatch, so it keeps its existing behaviour.
+t_capture oss_entity_set_work_item_exec "$S22" "$WB1" "" "" ""
+t_assert_rc 0 "563-2b: a wipe (records no dispatch) on that item is still accepted"
+# The route the messages name runs.
+t_capture oss_entity_set_spine_status "$S22" "$SPB" planned
+t_assert_rc 0 "563-2 route: the spine returns to planned"
+t_capture oss_entity_add_work_item "$S22" "$SPB" "after the route"
+t_assert_rc 0 "563-2 route: ...and takes a new item again"
+t_capture oss_entity_set_work_item_exec "$S22" "$WB1" "work/$WB1" "/tmp/wt-$WB1" "sha-b1"
+t_assert_rc 0 "563-2 route: ...and a dispatch again"
+# (563-2b) item level: a withdrawn item takes no dispatch.
+WA1="$(oss_entity_add_work_item "$S22" "$SPA" "withdrawn")"
+oss_entity_set_work_item_status "$S22" "$WA1" abandoned >/dev/null
+N="$(_n22)"
+t_capture oss_entity_set_work_item_exec "$S22" "$WA1" "work/$WA1" "/tmp/wt-$WA1" "sha-a1"
+t_assert_rc 7 "563-2b: work_item_exec refuses a dispatch onto an abandoned item"
+t_assert_contains "$T_OUT" "work_item_status $WA1 planned" "563-2b: ...naming the route back"
+t_assert_eq "$N" "$(_n22)" "563-2b: ...and journaling nothing"
+t_capture oss_entity_set_work_item_exec "$S22" "$WA1" "" "" "sha-a1"
+t_assert_rc 7 "563-2b: a base_sha-only payload records a dispatch too, and is refused"
+t_capture oss_entity_set_work_item_status "$S22" "$WA1" planned
+t_assert_rc 0 "563-2 route: the item returns to planned"
+t_capture oss_entity_set_work_item_exec "$S22" "$WA1" "work/$WA1" "/tmp/wt-$WA1" "sha-a1"
+t_assert_rc 0 "563-2 route: ...and is then dispatched"
+t_capture oss_state_replay "$S22"
+t_assert_rc 0 "563: replay is clean across the refusals and routes"
+
+# ---------------------------------------------------------------------------
+# 1.22.0 (#335, operator ruling 2026-10-12): spine_rename and work_item_rename,
+# name-only journaled verbs.
+# ---------------------------------------------------------------------------
+SPR="$(oss_entity_add_spine "$S22" r0 "Coach agent" bone canonical)"
+WR="$(oss_entity_add_work_item "$S22" "$SPR" "old title")"
+oss_entity_set_spine_class "$S22" "$SPR" flesh "internal-enabler admitted" >/dev/null
+SP_BEFORE="$(oss_state_read "$S22" ".spines[] | select(.id==\"$SPR\") | del(.name) | tojson")"
+t_capture env OSS_STATE_FILE="$S22" "$OSS" spine_rename "$SPR" "[internal] Coach agent"
+t_assert_rc 0 "335: spine_rename accepts"
+t_assert_eq "[internal] Coach agent" "$(oss_state_read "$S22" ".spines[] | select(.id==\"$SPR\") | .name")" "335: ...and the name changed"
+t_assert_eq "$SP_BEFORE" "$(oss_state_read "$S22" ".spines[] | select(.id==\"$SPR\") | del(.name) | tojson")" "335: ...and nothing else on the spine did"
+t_assert_eq "[\"set_spine_name\",{\"spine\":\"$SPR\",\"name\":\"[internal] Coach agent\"}]" \
+  "$(oss_state_read "$S22" '.mutations[-1] | [.op, (.payload | del(.at))] | tojson')" "335: journaled as set_spine_name {spine,name,at}"
+t_assert_eq "at,name,spine" "$(oss_state_read "$S22" '.mutations[-1].payload | keys | join(",")')" "335: ...payload keys exactly"
+WI_BEFORE="$(oss_state_read "$S22" ".work_items[] | select(.id==\"$WR\") | del(.title) | tojson")"
+t_capture env OSS_STATE_FILE="$S22" "$OSS" work_item_rename "$WR" "new title"
+t_assert_rc 0 "335: work_item_rename accepts"
+t_assert_eq "new title" "$(oss_state_read "$S22" ".work_items[] | select(.id==\"$WR\") | .title")" "335: ...and the title changed"
+t_assert_eq "$WI_BEFORE" "$(oss_state_read "$S22" ".work_items[] | select(.id==\"$WR\") | del(.title) | tojson")" "335: ...and nothing else on the item did"
+t_assert_eq "[\"set_work_item_title\",{\"work_item\":\"$WR\",\"title\":\"new title\"}]" \
+  "$(oss_state_read "$S22" '.mutations[-1] | [.op, (.payload | del(.at))] | tojson')" "335: journaled as set_work_item_title {work_item,title,at}"
+t_assert_eq "at,title,work_item" "$(oss_state_read "$S22" '.mutations[-1].payload | keys | join(",")')" "335: ...payload keys exactly"
+N="$(_n22)"
+t_capture env OSS_STATE_FILE="$S22" "$OSS" spine_rename r0.s99 "x"
+t_assert_rc 7 "335: spine_rename refuses an unknown spine"
+t_capture env OSS_STATE_FILE="$S22" "$OSS" work_item_rename r0.s1.w99 "x"
+t_assert_rc 7 "335: work_item_rename refuses an unknown item"
+t_capture env OSS_STATE_FILE="$S22" "$OSS" spine_rename "$SPR" "[internal]" "Coach"
+t_assert_rc 2 "335: spine_rename refuses an unquoted multi-word name instead of truncating it"
+t_capture env OSS_STATE_FILE="$S22" "$OSS" work_item_rename "$WR"
+t_assert_rc 2 "335: work_item_rename refuses a missing title"
+for _t in a b; do
+  oss_state_mutate "$S22" add_work_item \
+    "$(jq -n --arg s "$SPA" --arg ts "$(_oss_now)" '{spine:$s,title:"dup",target_repo:"canonical",status:"planned",created_at:$ts,id:"r0.s1.w88"}')" >/dev/null
+done
+N="$(_n22)"
+t_capture oss_entity_rename_work_item "$S22" "r0.s1.w88" "which one"
+t_assert_rc 7 "335: a duplicate id refuses the rename rather than renaming both"
+t_assert_eq "$N" "$(_n22)" "335: ...and none of the refusals journaled"
+t_capture oss_state_replay "$S22"
+t_assert_rc 0 "335: replay is clean across the renames"
 
 cd "$HERE"
 rm -rf "$TMP"

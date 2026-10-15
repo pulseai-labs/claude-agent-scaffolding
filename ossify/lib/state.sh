@@ -103,6 +103,14 @@ _oss_apply_op() { # $1=op $2=payload-json
       jq --argjson p "$payload" '(first(.bones[] | select(.adr == $p.adr)) | .touch) = $p.touch' ;;
     set_risk_gate_touch)
       jq --argjson p "$payload" '(first(.risk_gates[] | select(.name == $p.name)) | .touch) = $p.touch' ;;
+    # 1.22.0 (#305 item 2): a bone's title and revisit trigger, amended the way
+    # set_bone_touch amends its surface - first()-targeted, same contract: the op
+    # names and the payload keys {adr,title} and {adr,revisit_trigger} are live
+    # journal vocabulary from this release on, pinned by test-registries.sh.
+    set_bone_title)
+      jq --argjson p "$payload" '(first(.bones[] | select(.adr == $p.adr)) | .title) = $p.title' ;;
+    set_bone_revisit)
+      jq --argjson p "$payload" '(first(.bones[] | select(.adr == $p.adr)) | .revisit_trigger) = $p.revisit_trigger' ;;
     add_fake)      jq --argjson p "$payload" '.fakes += [$p]' ;;
     add_feature)   jq --argjson p "$payload" '.feature_map += [$p]' ;;
     add_demo_line)
@@ -228,6 +236,12 @@ _oss_apply_op() { # $1=op $2=payload-json
       jq --argjson p "$payload" '(.spines[] | select(.id == $p.spine) | .status) = $p.status' ;;
     set_work_item_status)
       jq --argjson p "$payload" '(.work_items[] | select(.id == $p.work_item) | .status) = $p.status' ;;
+    # 1.22.0 (#335): name-only renames. Nothing but the name or title changes;
+    # the verbs resolve exactly one record inside the lock, as the status verbs do.
+    set_spine_name)
+      jq --argjson p "$payload" '(.spines[] | select(.id == $p.spine) | .name) = $p.name' ;;
+    set_work_item_title)
+      jq --argjson p "$payload" '(.work_items[] | select(.id == $p.work_item) | .title) = $p.title' ;;
     set_release_status)
       jq --argjson p "$payload" '(.releases[] | select(.id == $p.release) | .status) = $p.status' ;;
     set_work_item_exec)

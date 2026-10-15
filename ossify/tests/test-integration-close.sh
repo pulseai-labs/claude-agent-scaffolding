@@ -260,6 +260,8 @@ rel="r0"
 OPEN_SPINES="$("$OSS" get "[.spines[] | select(.release==\"$rel\" and .status != \"closed\" and .status != \"abandoned\") | \"\(.id) (\(.status))\"] | join(\", \")")"
 t_assert_eq "r0.s2 (planned)" "$OPEN_SPINES" "station 10: §2's selector NAMES the open spine AND its status"
 
+t_capture "$OSS" work_item_exec r0.s2.w1 "work/r0.s2.w1" "$TMP/canon/.worktrees/r0.s2.w1" "0000000000000000000000000000000000000003"
+t_assert_rc 0 "station 10: r0.s2.w1 dispatch recorded (complete needs one, #563)"
 t_capture "$OSS" work_item_status r0.s2.w1 complete
 t_assert_rc 0 "station 10: r0.s2.w1 complete"
 t_capture "$OSS" demo_run

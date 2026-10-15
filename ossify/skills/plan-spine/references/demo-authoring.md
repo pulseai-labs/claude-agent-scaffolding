@@ -280,6 +280,8 @@ name marker and the reason string are the only durable carriers of this fact —
 `internal-enabler` with exit 2, so an admitted enabler is stored under its
 structural class). A spine that looks internal *here* but carries neither marker
 nor admission reason is a planning miss: surface it, do not quietly re-label it.
+Once the operator confirms the admission, `oss spine_rename "$spine" "[internal] <name>"`
+adds the marker (name only, since 1.22.0).
 
 **Judgment 2 — is it admitted?** Admitted **only if** it names:
 

@@ -71,6 +71,14 @@ _oss_entity_require_single() { # $1=state-file $2=collection-selector(uses $v) $
 # drop of the dispatch refusal and the spine-level retirement refusal is tracked
 # in #563; what the release claims is only what it enforces.
 #
+# 1.22.0 builds #563 to the operator's ruling of 2026-10-12 (refuse new writes,
+# replay stays permissive): this guard also refuses `complete` on an item that
+# records no dispatch (_oss_entity_guard_wi_complete), the exec guard refuses a
+# dispatch onto an abandoned item or an item of an abandoned spine, and
+# work_item_add refuses an abandoned spine (_oss_entity_guard_wi_add). The
+# retirement itself (`spine_status <sp> abandoned` over dispatched items) is still
+# not refused; what changed is that nothing new can be added under it.
+#
 # _oss_entity_guard_wi_status is handed to oss_state_mutate as its `$5`, so it is
 # evaluated INSIDE that function's lock, immediately before the append: the
 # pre-lock spelling was a check-to-append race - a concurrent work_item_exec
@@ -88,8 +96,12 @@ _oss_entity_guard_wi_status() { # $1=state-file $2=payload about to be minted
   wi="$(printf '%s' "$2" | jq -r '.work_item // ""')" || return 4
   st="$(printf '%s' "$2" | jq -r '.status // ""')" || return 4
   _oss_entity_require_single "$sf" '.work_items[] | select(.id == $v)' "work item" "$wi" || return $?
-  # Only an abandonment is guarded; every other status is a plain write.
-  [ "$st" = "abandoned" ] || return 0
+  # An abandonment and a landing are guarded; every other status is a plain write.
+  case "$st" in
+    abandoned) ;;
+    complete) _oss_entity_guard_wi_complete "$sf" "$wi"; return $? ;;
+    *) return 0 ;;
+  esac
   # `abandoned` is refused on an item that records a dispatch - ANY of the three
   # fields the writer journals - or that is `complete` or `active`. Every
   # close-path reader skips an abandoned item, so each of those pairs strands work
@@ -155,6 +167,37 @@ _oss_entity_guard_wi_status() { # $1=state-file $2=payload about to be minted
   fi
 }
 
+# 1.22.0 (#563 member 1, operator ruling of 2026-10-12: refuse new writes, replay
+# stays permissive). `complete` means "this item's work is on the spine branch"
+# (close/references/spine-close.md §2), and no work reaches the spine branch from
+# an item that was never dispatched - so the status verb refuses `complete` on an
+# item that records no dispatch, from planned and from abandoned alike. "Records a
+# dispatch" is the abandonment guard's own reading: a `set` field (a non-empty
+# string) is a dispatch, which is exactly where _OSS_DISPATCHED_JQ reads true on a
+# record with no malformed field. A malformed field with nothing well-formed
+# beside it cannot be answered, so it fails closed at rc 4; a malformed field
+# beside a well-formed one still records a genuine dispatch, so it lands. Replay
+# does not call this guard: a journal that already holds complete-without-dispatch
+# still loads.
+_oss_entity_guard_wi_complete() { # $1=state-file $2=work-item-id
+  local sf="$1" wi="$2" cls cur
+  cls="$(jq -r --arg w "$wi" "([.work_items[] | select(.id == \$w)] | first // {}) | ${_OSS_DISPATCH_CLS_JQ}" "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
+  case "$cls" in
+    *set*) return 0 ;;
+    *bad*)
+      echo "oss: work item '$wi' records a dispatch field (branch, worktree_path or base_sha) that is not a string, and none that is well-formed, so this guard cannot tell whether the item was dispatched - and a malformed field must not read as a dispatch either way. Repair the record with a full dispatch, \"oss work_item_exec $wi <branch> <worktree_path> <base_sha>\" (work-item/references/round-orchestration.md §3), then mark it complete" >&2
+      return 4 ;;
+  esac
+  cur="$(jq -r --arg w "$wi" '([.work_items[] | select(.id == $w)] | first // {}) | .status // "" | tostring' "$sf" 2>/dev/null)"
+  if [ "$cur" = "abandoned" ]; then
+    echo "oss: work item '$wi' is abandoned and records no dispatch - 'complete' would resurrect withdrawn work as landed, recording a merge that never happened (#563). If the withdrawal was wrong, return it to planned (\"oss work_item_status $wi planned\"), dispatch it (\"oss work_item_exec $wi <branch> <worktree_path> <base_sha>\"), and land it" >&2
+  else
+    echo "oss: work item '$wi' records no dispatch (branch, worktree_path or base_sha) - 'complete' means its work is on the spine branch, and an item that was never dispatched has no work there (#563). Record the dispatch first, \"oss work_item_exec $wi <branch> <worktree_path> <base_sha>\" (work-item/references/round-orchestration.md §3), then mark it complete" >&2
+  fi
+  return 7
+}
+
 # THE ONE clause the narrowing kept on the dispatch write, and the reason it is
 # the one that stayed: it is what the abandonment guard above stands on. Erase
 # the record and that guard sees an undispatched item and lets the strand through
@@ -164,10 +207,11 @@ _oss_entity_guard_wi_status() { # $1=state-file $2=payload about to be minted
 # abandonment returned rc 0 too, which is the strand #529 exists to prevent,
 # entered through the verb that maintains the record.
 #
-# Nothing else is refused here. The mirror refusal (a dispatch onto a withdrawn
-# item), the narrowing refusal (emptying one recorded field), and the landed-item
-# refusal all ride #563 with the rest of the dropped arms: they are conditions on
-# the record rather than on the abandonment transition, and read alone each looked
+# The mirror refusal (a dispatch onto a withdrawn item) ships in 1.22.0, with its
+# spine-level counterpart (#563, below). Nothing else is refused here: the
+# narrowing refusal (emptying one recorded field) and the landed-item refusal (a
+# re-dispatch over a complete item) stay dropped - they are conditions on the
+# record rather than on a new write onto retired work, and read alone each looked
 # correct while the set of them did not converge.
 #
 # Both sides are read with jq into the SAME fixed token vocabulary, and a field
@@ -190,7 +234,29 @@ _oss_entity_guard_wi_exec() { # $1=state-file $2=payload about to be minted
     *bad*)
       echo "oss: this work_item_exec payload records a dispatch field (branch, worktree_path or base_sha) that is not a string - a malformed field must not read as no dispatch (jq's // takes the right side for a JSON false), so this guard refuses the write rather than reading it as a wipe" >&2
       return 4 ;;
-    *set*) return 0 ;;
+    *set*)
+      # 1.22.0 (#563 member 2): a payload that RECORDS a dispatch is new work, and
+      # a withdrawn item, or an item of a retired spine, takes none. One fixed
+      # token, decided in jq, so nothing a record carries is parsed positionally.
+      # A wipe records no dispatch and falls through to the clause below unchanged.
+      local where sp
+      where="$(jq -r --arg w "$wi" '
+        ([.work_items[] | select(.id == $w)] | first // {}) as $r
+        | ($r.spine // "") as $s
+        | if ($r.status // "") == "abandoned" then "item"
+          elif (([.spines[] | select(.id == $s)] | first // {}) | .status // "") == "abandoned" then "spine"
+          else "live" end' "$sf" 2>/dev/null)" || {
+        echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
+      case "$where" in
+        item)
+          echo "oss: work item '$wi' is abandoned - withdrawn before any dispatch - so it takes no dispatch (#563). If the withdrawal was wrong, return it to planned first: \"oss work_item_status $wi planned\"" >&2
+          return 7 ;;
+        spine)
+          sp="$(jq -r --arg w "$wi" '([.work_items[] | select(.id == $w)] | first // {}) | .spine // "" | tostring' "$sf" 2>/dev/null)"
+          echo "oss: work item '$wi' belongs to spine '$sp', which is abandoned - a retired spine takes no new work, and every close-path reader skips it (#563). If the retirement was wrong, return the spine to planned first: \"oss spine_status $sp planned\"" >&2
+          return 7 ;;
+      esac
+      return 0 ;;
   esac
   rcls="$(jq -r --arg w "$wi" "([.work_items[] | select(.id == \$w)] | first // {}) | ${_OSS_DISPATCH_CLS_JQ}" "$sf" 2>/dev/null)" || {
     echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
@@ -211,6 +277,45 @@ _oss_entity_guard_wi_exec() { # $1=state-file $2=payload about to be minted
       echo "oss: work_item_exec for '$wi' records no dispatch at all - all three fields are empty, so this is not a dispatch, and the item already records one: this write would erase the record of it. A dispatch names the round's branch, worktree_path and base_sha (work-item/references/round-orchestration.md §3), and replacing a record rather than erasing it means giving all three" >&2
       return 7 ;;
   esac
+}
+
+# 1.22.0 (#563 member 2): a retired spine takes no new work item. Evaluated
+# inside oss_state_mutate's lock, as the `$5` guard; the pre-lock existence read
+# in oss_entity_add_work_item stays for its own message.
+_oss_entity_guard_wi_add() { # $1=state-file $2=payload about to be minted
+  local sf="$1" sp st
+  sp="$(printf '%s' "$2" | jq -r '.spine // ""')" || return 4
+  _oss_entity_require_single "$sf" '.spines[] | select(.id == $v)' "spine" "$sp" || return $?
+  st="$(jq -r --arg s "$sp" '[.spines[] | select(.id == $s)] | first | .status // "" | tostring' "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read spine '$sp' from $sf" >&2; return 2; }
+  [ "$st" = "abandoned" ] || return 0
+  echo "oss: spine '$sp' is abandoned - a retired spine takes no new work item, and every close-path reader skips it (#563). Mint the work on a live spine; or, if the retirement was wrong, return the spine to planned first: \"oss spine_status $sp planned\"" >&2
+  return 7
+}
+
+# 1.22.0 (#335): the rename verbs resolve exactly one record inside the lock.
+_oss_entity_guard_spine_one() { # $1=state-file $2=payload
+  local sp; sp="$(printf '%s' "$2" | jq -r '.spine // ""')" || return 4
+  _oss_entity_require_single "$1" '.spines[] | select(.id == $v)' "spine" "$sp"
+}
+_oss_entity_guard_wi_one() { # $1=state-file $2=payload
+  local wi; wi="$(printf '%s' "$2" | jq -r '.work_item // ""')" || return 4
+  _oss_entity_require_single "$1" '.work_items[] | select(.id == $v)' "work item" "$wi"
+}
+
+# Name-only renames (#335, operator ruling of 2026-10-12). The id, class, status,
+# target_repo and every relationship stay as they are. A spine's `[internal]`
+# name prefix is what plan-spine's demo-authoring §4 reads, so an
+# internal-enabler admitted after its spine was minted takes its marker here.
+oss_entity_rename_spine() { # $1=state $2=spine-id $3=new-name
+  oss_state_mutate "$1" set_spine_name \
+    "$(jq -n --arg s "$2" --arg n "$3" --arg ts "$(_oss_now)" '{spine:$s,name:$n,at:$ts}')" \
+    "" _oss_entity_guard_spine_one
+}
+oss_entity_rename_work_item() { # $1=state $2=work-item-id $3=new-title
+  oss_state_mutate "$1" set_work_item_title \
+    "$(jq -n --arg w "$2" --arg t "$3" --arg ts "$(_oss_now)" '{work_item:$w,title:$t,at:$ts}')" \
+    "" _oss_entity_guard_wi_one
 }
 
 oss_entity_add_release() { # $1=state $2=name $3=goal
@@ -250,7 +355,7 @@ oss_entity_add_work_item() { # $1=state $2=spine-id $3=title $4=target_repo
   oss_state_mutate "$sf" add_work_item \
     "$(jq -n --arg s "$spine" --arg t "$3" --arg r "$tr" --arg ts "$ts" \
       '{spine:$s,title:$t,target_repo:$r,status:"planned",created_at:$ts}')" \
-    "work_item:$spine"
+    "work_item:$spine" _oss_entity_guard_wi_add
 }
 
 oss_entity_set_spine_class() { # $1=state $2=spine-id $3=new-class $4=reason
