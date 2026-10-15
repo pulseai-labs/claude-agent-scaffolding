@@ -64,9 +64,13 @@ ac_state_init() {
 }
 
 # _ac_state_is_blank <file> — rc0 when the file holds nothing but whitespace
-# (0 bytes included; CR counts as whitespace).
+# (0 bytes included; CR counts as whitespace). Only grep's "no match" (rc 1)
+# is blank: a read error (rc 2) is not, so an unreadable file goes on to the
+# single-object check and is refused rather than re-seeded over.
 _ac_state_is_blank() {
-  ! grep -q '[^[:space:]]' "$1" 2>/dev/null
+  local rc=0
+  grep -q '[^[:space:]]' "$1" 2>/dev/null || rc=$?
+  [[ "$rc" -eq 1 ]]
 }
 
 # _ac_state_reseed_blank <state_file> <seed> — the #485 re-seed: take

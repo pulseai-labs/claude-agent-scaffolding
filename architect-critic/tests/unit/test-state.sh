@@ -505,6 +505,28 @@ T25_RC=$?
 assert_eq "whitespace plus garbage refused (rc != 0)" "0" "$?"
 assert_eq "whitespace plus garbage byte-identical" "$t25_before" "$(shasum -a 256 "$state_file" | awk '{print $1}')"
 
+# T25b (control, #485): a state.json the blank check cannot READ is not blank.
+# grep exits 2 on a read error; reading that as "no content" would re-seed, and
+# the atomic replace would destroy the unread document.
+echo "T25b: an unreadable state.json is refused, never re-seeded (#485 control)"
+setup_tmp_repo > /dev/null
+mkdir -p "$(ac_data_dir)"
+state_file="$(ac_state_path)"
+printf '{"schema_version":3,"runs":[{"id":"keep"}]}\n' > "$state_file"
+t25b_before="$(shasum -a 256 "$state_file" | awk '{print $1}')"
+chmod 000 "$state_file"
+if [[ -r "$state_file" ]]; then
+  echo "  skip: running as a user that can read a mode-000 file"
+else
+  ac_state_init 2>/dev/null
+  T25B_RC=$?
+  chmod 600 "$state_file"
+  [[ "$T25B_RC" -ne 0 ]]
+  assert_eq "unreadable state.json refused (rc != 0)" "0" "$?"
+  assert_eq "unreadable state.json not re-seeded" "$t25b_before" "$(shasum -a 256 "$state_file" | awk '{print $1}')"
+fi
+chmod 600 "$state_file" 2>/dev/null
+
 # T26 (#485): the re-seed takes state.lock. With a lock held by another owner,
 # a 0-byte or whitespace-only file is NOT re-seeded (acquire times out), and
 # the foreign lock survives.
