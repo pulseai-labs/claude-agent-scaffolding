@@ -48,7 +48,7 @@ position; carry any ledger line already planned against the old spine with
 state, abandoned, so the release close can report it
 (`close/references/release-close.md` §2 names abandoned spines explicitly).
 If the old spine pulled in an intake request, comment `withdrawn — <old-spine>` on
-it, and re-disposition it to the half that takes the feature
+it, as the whole comment body, and re-disposition it to the half that takes the feature
 (`intake-and-ledger.md` §1), or the request never closes.
 
 What **not** to do, in order of how tempting each is:

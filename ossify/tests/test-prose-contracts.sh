@@ -1985,7 +1985,7 @@ pin "$SKILLS/close/references/spine-close.md" 'spine that carries it (#631).' \
   "spine close closes an intake request only at its last carrying spine (#631)"
 pin "$SKILLS/close/references/spine-close.md" 'request on a list you could not read.' \
   "spine close leaves a request open when its comments or a named spine cannot be read (#631)"
-pin "$SKILLS/close/references/spine-close.md" 'each one that a later `withdrawn — <spine id>` comment names' \
+pin "$SKILLS/close/references/spine-close.md" 'each one named by a later comment whose whole body' \
   "spine close honours a withdrawn disposition (#631)"
 pin "$SKILLS/plan-spine/references/intake-and-ledger.md" '`oss feature_add "<name>" "<value>" "<bone|flesh>" intake <issue-number>`' \
   "a release-level pull-in records the request's issue on the feature entry (#631)"
@@ -2009,6 +2009,14 @@ for _f in "$SKILLS/plan-spine/references/intake-and-ledger.md" "$SKILLS/close/re
   _r=1; grep -Fq '/permission --jq .permission' "$_f" && ! grep -Fq 'authorAssociation' "$_f" && _r=0
   _pin "$_r" "$(basename "$_f") does not count a disposition only from an author with write permission (#631)"
 done
+# Codex round 3 on PR #821: a withdrawn counts only as a whole comment body, so a
+# comment that quotes or discusses one cannot drop a live carrier (early close).
+pin "$SKILLS/close/references/spine-close.md" 'whose whole body is `withdrawn — <spine id>`' \
+  "spine close counts a withdrawn only as a whole comment body (#631)"
+pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'as the whole body of a comment' \
+  "intake §1 posts withdrawn as a whole comment body (#631)"
+pin "$SKILLS/plan-spine/references/decomposition.md" 'as the whole comment body' \
+  "a whole-spine split posts withdrawn as a whole comment body (#631)"
 # ...and the advertised '#N' form is quoted: an unquoted # starts a shell comment.
 _r=1; grep -Fq "'#N'" "$HERE/../README.md" && ! grep -Fq '(`N` or `#N`)' "$HERE/../README.md" && _r=0
 _pin "$_r" "ossify README advertises an unquoted #N - the shell drops it as a comment and feature_add records no issue (#631)"

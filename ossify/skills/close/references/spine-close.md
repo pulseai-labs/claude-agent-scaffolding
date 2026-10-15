@@ -685,7 +685,9 @@ organization member or collaborator can hold read or triage access only, so a
 `withdrawn` from an author who cannot write must not close a request. A
 permission you cannot read is part of a list you could not read (below).
 Collect every spine id that a `pulled in — <spine id>` comment names, and drop
-each one that a later `withdrawn — <spine id>` comment names. A release-level
+each one named by a later comment whose whole body is `withdrawn — <spine id>`.
+A comment that quotes or discusses a withdrawal is not one: dropping a carrier
+can close the request early, while an extra `pulled in` only holds it open. A release-level
 `pulled in — r<n>` names no spine and does not count. Then:
 
 - **Every collected spine other than this one is `closed`** in state

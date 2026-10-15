@@ -57,7 +57,7 @@ this spine does not take that feature, leave the request as it is.
 feature, and each posts its own `pulled in — <spine id>` comment. Spine close
 (`close/references/spine-close.md` §3) closes the request only when every spine
 those comments name has landed. A spine that is retired or replanned without the
-feature must say so on the request: `withdrawn — <spine id>`, which cancels that
+feature must say so on the request, with `withdrawn — <spine id>` as the whole body of a comment, which cancels that
 spine's `pulled in` comment. Without it, the request stays open after the other
 spines land, until the comment is posted.
 

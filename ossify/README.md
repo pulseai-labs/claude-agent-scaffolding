@@ -92,7 +92,7 @@ simply has none. Spine planning reads the request from the entry's `issue`
 instead of matching titles. Spine close closes an intake request only at the last
 spine that carries it: every spine named in the request's `pulled in — <spine id>`
 comments from authors with write permission on the repository,
-less any a `withdrawn — <spine id>` comment cancels, must be closed in state; otherwise, or when that list cannot be read, the request stays open with a
+less any a later comment whose whole body is `withdrawn — <spine id>` cancels, must be closed in state; otherwise, or when that list cannot be read, the request stays open with a
 comment saying why. A spine retired without the feature holds its request open
 until its `withdrawn` comment is posted.
 
