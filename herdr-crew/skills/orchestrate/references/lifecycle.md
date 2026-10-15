@@ -86,10 +86,10 @@ Every command's syntax comes from `herdr --skill`.
    this pane or the seat is on another machine — so an eligible worker's ping comes to whichever pane
    `run.orchestrator` names when it renames; a coordinator fills its children's slots with its own
    nested `run.json` the same way, and an operator's `brief:` is sent as a copy carrying the slots and the ping step, never edited in place (`briefs.md`).
-   The launch writes the attempt with `phase: recorded` and its full locator before the brief goes —
-   `pane`, `machine` (a local seat's too), `report`, molt's `status` path and autonomic's `pain` path —
-   and writes `phase: delivered` once the send is confirmed, so an attempt whose brief never arrived
-   never looks live.
+   The full locator records `pane`, `machine` (a local seat's too), `report`, molt's `status` path
+   and autonomic's `pain` path, so an attempt whose brief never arrived never looks live.
+   Every dispatch — a launch or a new brief to a retained seat — opens its attempt with `phase: recorded`
+   and its full locator before the brief goes and sets `phase: delivered` once the send is confirmed.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes or the plan's
@@ -239,16 +239,16 @@ Every command's syntax comes from `herdr --skill`.
     so its teardown validates the close's own result instead — the local landing it
     recorded in each hosting repo — and waits for no record pass.
 13. **Handoff.** If the run outlives the session, write a handoff naming the run's
-    `run.json` path, task ids, head SHA, the pane `run.orchestrator` names at writing,
-    and the next step — every seat's pane id, with
-    its machine label where the seat is not on this machine, and,
-    per live dispatch, its `REPORT_PATH`, the hash last noted, and the file's identity
-    noted beside that hash — inode or mtime, and, per live seat, the molt status path
-    recorded at its launch and the last status line noted, and its autonomic pain path
-    and the last pain line noted; on an activated
-    ossify spine, also the spine's approved `SEATS` block, the resolved coordinator
-    profiles and the accumulated close-review ledger (oldest first). With ossify
-    installed, that is `/ossify:handoff`.
+    `run.json` path, the pane `run.orchestrator` names at writing, and the next step,
+    plus what the run file cannot hold — why a choice was made, what the operator said.
+    Every seat's pane, machine, report path, last consumed generation and molt and pain
+    paths are in `run.json` (steps 1, 3 and 5), so the handoff does not copy them. On an
+    activated ossify spine, also the spine's approved `SEATS` block, the resolved coordinator
+    profiles and the accumulated close-review ledger (oldest first). With
+    ossify installed, that is `/ossify:handoff`.
+    The former “Write the handoff, recording every seat's pane id, with its machine label where the seat is not on this machine, and,”
+    inventory is read from `run.json`, not copied. Neither “per live seat, the molt status path recorded at its launch and the last status line noted”
+    nor “per live seat, its molt status path recorded at launch and the last status line noted” is copied into the handoff.
 
 ## Roles of the operator's own
 
@@ -291,55 +291,43 @@ never guessed. Both sessions' boundaries and returns are in their briefs
 (`ossify-briefs.md`, `ossify-pr-briefs.md`); a spine `rotate:` is
 `ossify-nested-run.md` §4.
 
-**Your own rotation.** Your boundary is a fully acknowledged delivery with no
-operator question in flight. Live child dispatches keep running, but nothing
-inherits their waits: they are this session's background calls, and rebinding a
-`run.json` re-arms nothing. Write the handoff, recording every seat's pane id, with its
-machine label where the seat is not on this machine, the pane `run.orchestrator` names at
-writing, and, per live dispatch, its
-`REPORT_PATH`, the hash last noted, and the file's identity noted beside that hash — inode
-or mtime — and, per live seat, its molt status path recorded at launch and the last status
-line noted, its autonomic pain path and the last pain line noted, and a resolved profile beside a launch command for each host — this top's and the other host's
+**Your own rotation, and a resume after a hard stop.** Two entries lead into one resume: a rotation, and a hard stop.
+In a rotation your boundary is a fully acknowledged delivery with no operator question in flight. Write the handoff
+step 13 states, plus a resolved profile beside a launch command for each host — this top's and the other host's
 (Claude Code and OMP: `omp-seat orchestrator --via omp-glm`), the other host's profile resolved from its machine-file
-entry like any seat's (`config.md`) — ask the operator once when there is none — so the operator's "fall back to OMP" or
-"hand back to Claude" picks one
-— `/ossify:handoff` with ossify installed (`skill://handoff` on OMP), the same file by hand without it. Open a new tab
-and pane with the launch command the handoff recorded — ask the operator once when none
-did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`,
-which herdr sets in every pane it hosts (as it does `HERDR_PANE_ID`), the top's own
-workspace, never the run's, which closes last. **Launch it as the seat launch
-`herdr-mechanics.md` states** — marked `orchestrator` before its command (`herdr-mechanics.md`
-step 2) — using the destination host's recorded profile for the readiness path and model read,
-then the second detection ask — and send its resume on the route that
-ask fixes: a successor is a seat like any other, and one sent its resume before its TUI
-accepts input never binds the run. The file's `run.orchestrator` block — where dagr
-routes the operator's messages — is the successor's first write: A session that binds an
-existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr's
-stable-agent fallback otherwise — in the same producer loop every other write takes. The
-rebind does not wait on this session's stand-down — that kills waits, and writes
-nothing — and from the handoff on this session writes nothing to the run file and takes
-no dispatch action. Send the new top its
-resume — `/ossify:handoff-resume <path>` with ossify, or the path as its first
-instruction without — confirm its turn started, then **stand down**: kill this session's
-armed background waits and its heartbeat before the successor re-arms the same panes and
-arms its own, and take no dispatch action from here on. One report must wake one top — a
-live dispatch a successor is also waiting on otherwise advances twice, and a close, a PR
-or a merge runs twice with it. A worker pings whichever pane `run.orchestrator` names, so after
-the rebind a worker on the successor's machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued
-here before the rebind, is read and handed to the successor, never acted on.
-Then tell the operator which tab to use
-and that this one can close.
-A successor on the other host takes that host's form: with ossify, `skill://handoff-resume <path>` to an OMP top
-and `/ossify:handoff-resume <path>` to a Claude Code top; without it, the path as its first instruction on either.
-The new top resumes by naming the parent's `run.json` path — there is no CLI call —
-rebinding `run.orchestrator` to its own pane as its first write, and then, before the
-step the handoff named, re-arms each live pane the handoff listed with the waits step 5 states (a detected
-coordinator's companion included), through the machine the handoff names for a
-remote one, which every later operation on that pane carries too (`herdr-mechanics.md`,
-Machines): a new session's first wait, not a re-entry,
-which re-arms what the `run.json` cannot — and it can re-arm them because the
-predecessor stood down, so each pane has exactly one waiter — and arms one fresh
-heartbeat, the predecessor's having been killed at stand-down.
+entry like any seat's (`config.md`) — ask the operator once when there is none. The handoff restates no operator gate:
+a line copied from this skill becomes an instruction to the successor, which outranks a standing order. For the merge
+it points at step 12 and `run.merge_word`. `/ossify:handoff` with ossify installed (`skill://handoff` on OMP), the same
+file by hand without it. Open a new tab and pane with the launch command the handoff recorded — ask the operator once
+when none did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`, the top's own
+workspace, never the run's. **Launch it as the seat launch `herdr-mechanics.md` states** — marked `orchestrator`
+before its command (`herdr-mechanics.md` step 2) — using the destination host's recorded profile for the readiness
+path and model read, then the second detection ask, and send its resume on the route that ask fixes: with ossify,
+`skill://handoff-resume <path>` to an OMP top and `/ossify:handoff-resume <path>` to a Claude Code top; without it,
+the path as its first instruction on either. Confirm its turn started, then **stand down**: kill this session's armed
+background waits and its heartbeat, write nothing more to the run file and take no dispatch action. One report must
+wake one top. A worker pings whichever pane `run.orchestrator` names, so after the rebind a worker on the successor's machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.
+Then tell the operator which tab to use and that this one can close.
+A hard stop has no outgoing top: the operator starts a top and names the run's `run.json`.
+
+**The resume.** The new top resumes by naming the parent's `run.json` path — there is no CLI call:
+1. It reads the file and notes the old `run.orchestrator` pane and machine before any write.
+2. On a hard stop only, it stands the old top down: when `herdr agent list` on that machine shows an agent session in
+   that pane, it closes the pane (`herdr pane close`), which ends the session with its armed waits and heartbeat. It
+   never closes a pane it cannot identify; that, or an unreachable machine, it tells the operator once, and goes on.
+3. A session that binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr's stable-agent fallback otherwise — in the same producer loop every other write takes.
+   It writes `run.orchestrator.machine` beside the pane.
+   From here every worker's next ping comes to this pane.
+4. If `run.question` is present, it asks it once again.
+5. Per working attempt: `phase: recorded` — one `herdr pane read`; a pane showing the worker on this task is set
+   `delivered`, any other is settled `failed` ("brief not delivered before the top stopped"), released, and relaunched
+   from its seat row as a new attempt. `phase: delivered` — the generation check against `locator.seen`, a new
+   generation read once, recorded and acted on; then step 5's waits re-armed on the pane (a detected coordinator's
+   companion included) through `locator.machine`, rather than through the machine the handoff names for a remote one;
+   every later operation on that pane carries `locator.machine` (`herdr-mechanics.md`, Machines).
+6. It arms one fresh heartbeat.
+7. It continues at the step the handoff names; with no handoff, at the first task whose deps are done and that is not
+   itself done. A `done` task is never re-run.
 
 **Where molt runs, you molt in place instead.** The top is molt's root: it is never marked a
 molt child, and molt's active marker silences this plugin's hook (0.2.6). molt's two warnings

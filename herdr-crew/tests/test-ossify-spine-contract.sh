@@ -1746,7 +1746,6 @@ pin "$BRIEFS_MD" "$REBIND" "the spine brief rebinds a continued RUN_JSON (rotate
 pin "$PRBRIEFS_MD" "$REBIND" "the work-PR brief rebinds a continued RUN_JSON (open successor)" flat
 pin "$NESTED_MD" 'rebinding `run.orchestrator` to its own pane' "nested-run §4 says the rotate successor rebinds" flat
 pin "$LIFECYCLE_MD" 'the pane `run.orchestrator` names at writing, and the next step' "step 13's handoff records the pane the block names" flat
-pin "$LIFECYCLE_MD" 'the pane `run.orchestrator` names at writing, and, per live dispatch' "the rotation handoff records the pane the block names" flat
 pin "$BRIEFS_MD" 'the path of RUN_JSON and the pane `run.orchestrator` names at writing' "the spine rotate return records the pane the block names" flat
 pin "$PRBRIEFS_MD" "RUN_JSON's path and the pane its \`run.orchestrator\`" "the work-PR open return records the pane the block names" flat
 # #556 round 1, finding 6: the gap sentence's absence is plugin-wide and must be
@@ -1805,6 +1804,8 @@ pin "$LIFECYCLE_MD" 'with `phase: recorded` and its full locator before the brie
   "step 3 records the attempt before the send" flat
 pin "$LIFECYCLE_MD" '`phase: delivered` once the send is confirmed' \
   "step 3 marks delivery after the send" flat
+pin "$LIFECYCLE_MD" 'Every dispatch — a launch or a new brief to a retained seat — opens its attempt with `phase: recorded` and its full locator before the brief goes and sets `phase: delivered` once the send is confirmed.' \
+  "every dispatch refreshes phase and locator, including a retained seat" flat
 pin "$LIFECYCLE_MD" 'writes `run.question` before it asks and removes it on the answer' \
   "an operator ask is recorded in the run" flat
 pin "$LIFECYCLE_MD" '`{text, asked_at, task, message_id?}`' \
@@ -1813,6 +1814,24 @@ pin "$MECHANICS_MD" 'and recorded as the attempt'"'"'s `locator.seen`' \
   "the generation check records the consumed generation in the run" flat
 pin "$MECHANICS_MD" '`{hash, identity}`' \
   "the consumed generation records the exact object keys" flat
+
+section "one resume procedure from run state (#810, #819)"
+pin "$LIFECYCLE_MD" 'Two entries lead into one resume: a rotation, and a hard stop' \
+  "the rotation section names both entries" flat
+pin "$LIFECYCLE_MD" 'notes the old `run.orchestrator` pane and machine before any write' \
+  "the resume reads the dead top's address before the rebind" flat
+pin "$LIFECYCLE_MD" 'never closes a pane it cannot identify' \
+  "the hard-stop stand-down closes only an identified agent pane" flat
+pin "$LIFECYCLE_MD" 'brief not delivered before the top stopped' \
+  "a recorded attempt with no delivery is settled and relaunched" flat
+pin "$LIFECYCLE_MD" 'If `run.question` is present, it asks it once again' \
+  "the resume re-asks an open operator question" flat
+pin "$LIFECYCLE_MD" 'A `done` task is never re-run' \
+  "the resume never re-runs a done task" flat
+pin "$LIFECYCLE_MD" 'The handoff restates no operator gate' \
+  "the rotation handoff restates no operator gate (#819)" flat
+pin "$LIFECYCLE_MD" 'step 12 and `run.merge_word`' \
+  "the handoff points at the merge rule instead of restating it" flat
 
 section "waits and completion bodies"
 
@@ -2373,9 +2392,6 @@ pin "$PRBRIEFS_MD" 'If molt'"'"'s handoff command arrives mid-round, still finis
   "work-PR MOLT line: never stop mid-round, as the spine" flat
 pin "$CHANGELOG_MD" '## 0.2.8' "CHANGELOG has 0.2.8"
 pin "$CHANGELOG_MD" '## 0.2.9' "CHANGELOG has 0.2.9"
-pin "$LIFECYCLE_MD" 'and its autonomic pain path' "lifecycle step 13: the top's handoff carries each seat's pain path" flat
-pin "$LIFECYCLE_MD" 'its autonomic pain path and the last pain line noted, and a resolved profile beside' \
-  "lifecycle: the top's own rotation handoff carries each seat's pain path" flat
 
 section "reference line budgets"
 
