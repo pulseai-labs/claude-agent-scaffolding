@@ -16,7 +16,8 @@ export const ROLES: Record<string, string | undefined> = {
 // autonomic's live mode file, so the herdr seats it launches inherit autopilot.
 const ROLE_MIN: Record<string, Partial<Record<(typeof MODS)[number], string>>> = { orchestrator: { 'seat-mods': '0.4.4', autonomic: '0.7.0' } }
 // A role whose procedure is another plugin's skill: the orchestrator follows herdr-crew's orchestrate skill, whose
-// "Host: OMP" section ships in 0.2.19. Installed for omp or for Claude Code, since omp reads both skill stores.
+// "Host: OMP" section ships in 0.2.19. Only omp's own record counts: omp does not discover a Claude Code user-scope
+// plugin unless its claude-plugins provider is enabled.
 const ROLE_SKILL: Record<string, { plugin: string; min: string }> = { orchestrator: { plugin: 'herdr-crew', min: '0.2.19' } }
 
 export function pinWarning(installed: string, tested: string): string | undefined {
@@ -37,7 +38,7 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
   if (!Object.hasOwn(ROLES, o.role)) return { error: `omp-seat: unknown role "${o.role}" (known: ${Object.keys(ROLES).join(', ')})` }
   // seat-mods' no-subagent rail (#798) keys on the session's SEAT_MODS_ROLE, which the launcher sets: refuse a top
   // the rail would not cover.
-  if (o.role === 'orchestrator' && o.roleEnv?.trim() !== 'orchestrator')
+  if (o.role === 'orchestrator' && o.roleEnv !== 'orchestrator')
     return { error: `omp-seat: the orchestrator role needs SEAT_MODS_ROLE=orchestrator (got "${o.roleEnv ?? ''}"); seat-mods' no-subagent rail keys on it` }
   // A record that exists but cannot be read must stop the launch: guessing would start an unguarded seat.
   const read = (record: string): Map<string, string> | { error: string } => {
@@ -76,8 +77,8 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
   }
   if (Object.hasOwn(ROLE_SKILL, o.role)) {
     const { plugin, min } = ROLE_SKILL[o.role]
-    const root = omp.get(plugin) ?? claude.get(plugin)
-    if (root === undefined) return { error: `omp-seat: ${o.role} needs ${plugin} ${min} or later for its procedure (looked in ${o.ompRecord} and ${o.claudeRecord})` }
+    const root = omp.get(plugin)
+    if (root === undefined) return { error: `omp-seat: ${o.role} needs ${plugin} ${min} or later installed for omp (omp plugin install ${plugin}@claude-agent-scaffolding); looked in ${o.ompRecord}` }
     const manifest = join(root, '.claude-plugin', 'plugin.json')
     let version: unknown
     try { version = JSON.parse(readFileSync(manifest, 'utf8')).version } catch (e) {

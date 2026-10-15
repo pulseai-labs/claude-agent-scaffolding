@@ -70,23 +70,23 @@ describe('planLaunch', () => {
     expect(r.error).toContain('autonomic 0.6.0')
     expect(r.error).toContain('0.7.0')
   })
-  test('orchestrator refuses a host with no herdr-crew, naming the plugin and both records', () => {
+  test('orchestrator refuses a host with no herdr-crew, naming the plugin, the install command and the omp record', () => {
     record(ompRecord, orchMods())
     const r = orch() as { error: string }
-    expect(r.error).toContain('orchestrator needs herdr-crew 0.2.19 or later')
+    expect(r.error).toContain('orchestrator needs herdr-crew 0.2.19 or later installed for omp')
+    expect(r.error).toContain('omp plugin install herdr-crew@claude-agent-scaffolding')
     expect(r.error).toContain(ompRecord)
-    expect(r.error).toContain(claudeRecord)
   })
   test('orchestrator refuses herdr-crew 0.2.18 (no "Host: OMP")', () => {
     record(ompRecord, { ...orchMods(), 'herdr-crew': install('herdr-crew', false, '0.2.18') })
     expect((orch() as { error: string }).error).toContain('herdr-crew 0.2.18 is unsupported for orchestrator')
   })
-  test("orchestrator accepts herdr-crew from Claude Code's record", () => {
+  test("orchestrator refuses herdr-crew installed only for Claude Code (omp would not discover it)", () => {
     record(ompRecord, orchMods())
     record(claudeRecord, { 'herdr-crew': install('herdr-crew', false, '0.2.19') })
-    expect(orch()).toHaveProperty('argv')
+    expect((orch() as { error: string }).error).toContain('needs herdr-crew 0.2.19 or later installed for omp')
   })
-  for (const env of [undefined, '', 'coordinator', 'implementer']) {
+  for (const env of [undefined, '', 'coordinator', 'implementer', ' orchestrator', 'orchestrator ']) {
     test(`orchestrator refuses SEAT_MODS_ROLE=${JSON.stringify(env)}: the #798 rail keys on "orchestrator"`, () => {
       record(ompRecord, { ...orchMods(), 'herdr-crew': install('herdr-crew', false, '0.2.19') })
       const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir: join(import.meta.dir, '../../omp-roles/roles'), roleEnv: env })
