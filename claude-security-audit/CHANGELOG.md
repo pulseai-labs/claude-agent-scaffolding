@@ -1,5 +1,11 @@
 # claude-security-audit changelog
 
+## 0.1.8 (2026-10-15)
+
+### Fixed
+- **A large enabled-plugin array no longer empties the enabled set** (#424). The project and user `enabledPlugins` arrays reached jq as one `--argjson` argv value each, so an array over the OS per-argument limit (131072 bytes on Linux) made jq print nothing, and every enabled plugin turned into a paranoid candidate. The lists now reach jq on stdin. A settings file that exists but cannot be read or is not a regular file (a FIFO would block jq forever), an unreadable plugin cache, or a failed merge now fails the enumeration with rc 2 and a message, never an empty set, and the scan's target list fails with it. Malformed JSON and an `enabledPlugins` value that is not an array still read as an empty list, as before; such a value no longer empties the other file's list as well.
+- **Plugin cache names are compared whole** (#425). Paranoid candidates came from `find | xargs basename`, which split `my plugin` into `my` and `plugin`. Names are now read NUL-delimited and compared to the enabled set inside jq, so a name with a space or a newline is one identity. Candidates print one per line in codepoint order; a candidate whose name holds a newline cannot be one line, so the enumeration refuses it (rc 2) and prints nothing rather than split it.
+
 ## 0.1.7 (2026-10-15)
 
 ### Fixed
