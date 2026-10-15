@@ -321,7 +321,7 @@ A resume the operator started is a hard stop, even with an old handoff present.
 **The resume.** The new top resumes by naming the parent's `run.json` path — there is no CLI call:
 1. It reads the file and notes the old `run.orchestrator` pane and machine before any write.
    On a hard stop with no fresh handoff, it takes the head SHA from the PR the run tracks
-   (`gh pr view <PR> --json headRefOid`), or else from the last settled attempt's receipt.
+   (`gh pr view <PR> --repo <owner/repo> --json headRefOid`, the PR's repository), or else from the last settled attempt's receipt.
    On a hard stop with no fresh handoff, it counts every molt-status and pain line already present at resume as noted.
 2. On a hard stop only, it stands the old top down. A pane that is this session's own `$HERDR_PANE_ID` is never
    closed: the old top is already gone. Otherwise, when `herdr agent list` on that machine shows an agent session in
@@ -333,12 +333,10 @@ A resume the operator started is a hard stop, even with an old handoff present.
 4. If `run.question` is present, it asks it once again.
 5. Per working attempt, first run the generation check against `locator.seen`, for both `phase: recorded` and
    `phase: delivered`. A new report generation proves delivery: set a recorded attempt `delivered`, then read the
-   generation once, record it and act on it by kind. With no new generation and `phase: recorded`, take one
-   `herdr pane read`. Only when the pane is gone or `herdr agent list` shows no agent session in it is that attempt
-   settled `failed` ("brief not delivered before the top stopped"), released, and relaunched from its seat row as a new
-   attempt with `cause: {type: followup, ref: <the settled attempt's id>}`. Any other read — idle, working or unreadable
-   included — counts as `delivered`, not proof of non-delivery. The re-armed wait’s timeout checkpoint and the heartbeat
-   surface a worker that never started; never run two workers on one attempt.
+   generation once, record it and act on it by kind. With no new generation and `phase: recorded`, treat the attempt
+   as `delivered` and re-arm it like any delivered attempt. Never relaunch it automatically. The re-armed wait’s timeout
+   checkpoint (step 5) reports a worker that never started to the operator, who decides on a relaunch; never run two
+   workers on one attempt.
    Re-arm step 5’s waits only for an attempt still live after its generation check; a final report consumed on resume
    settles that dispatch, so it gets no wait. The waits are on the pane (a detected coordinator's companion included)
    through `locator.machine`; every later operation on that pane carries `locator.machine` (`herdr-mechanics.md`, Machines).
@@ -347,11 +345,14 @@ A resume the operator started is a hard stop, even with an old handoff present.
    the first task whose deps are done, that is not itself done and has no live attempt;
    an old handoff is context only, never its next step. A `done` task is never re-run.
 
-A run file older than 0.2.21 lacks these fields: an attempt with no `phase` counts as `delivered`; with no `seen`, an
-existing report for a task that is not done is read once; with no `locator.report`, the path comes from a handoff, or
-the operator once; no `merge_word` counts as `standing` unless the run's brief sets an operator gate; no
-`run.orchestrator.machine` is this top's machine. A live worker dispatched under 0.2.20 or earlier keeps pinging its
-fixed pane until that dispatch ends; the heartbeat covers it.
+A run file older than 0.2.21 lacks these fields: an attempt with no `phase` counts as `delivered`; with no
+`locator.report`, the path comes from a handoff, or the operator once; no `merge_word` counts as `standing` unless
+the run's brief sets an operator gate. With no `run.orchestrator.machine`, on a hard stop the top asks the operator
+once for the old top's machine, or skips the stand-down close and says so. For a live dispatch with no `seen` and no
+fresh handoff generation, the existing report is ambiguous: the top reads it but does not act on it until the operator
+confirms it belongs to the live attempt. A fresh handoff's noted hash and identity, where present, are the baseline.
+A live worker dispatched under 0.2.20 or earlier keeps pinging its fixed pane until that dispatch ends; the heartbeat
+covers it.
 
 **Where molt runs, you molt in place instead.** The top is molt's root: it is never marked a
 molt child, and molt's active marker silences this plugin's hook (0.2.6). molt's two warnings

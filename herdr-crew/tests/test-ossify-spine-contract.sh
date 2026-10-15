@@ -1836,24 +1836,24 @@ pin "$LIFECYCLE_MD" 'Binding a run another top drove — a rotation'"'"'s resume
   "Orient routes takeover through the resume before rebinding the old top's address" flat
 pin "$LIFECYCLE_MD" 'A resume the operator started is a hard stop, even with an old handoff present.' \
   "an operator-started resume takes the hard-stop path despite an old handoff" flat
-pin "$LIFECYCLE_MD" 'On a hard stop with no fresh handoff, it takes the head SHA from the PR the run tracks (`gh pr view <PR> --json headRefOid`), or else from the last settled attempt'"'"'s receipt.' \
-  "a hard stop without a fresh handoff reconstructs the head from the tracked PR or last settled receipt" flat
+pin "$LIFECYCLE_MD" 'On a hard stop with no fresh handoff, it takes the head SHA from the PR the run tracks (`gh pr view <PR> --repo <owner/repo> --json headRefOid`, the PR'"'"'s repository), or else from the last settled attempt'"'"'s receipt.' \
+  "a hard stop reconstructs the head from the tracked PR in its repository or last settled receipt" flat
 pin "$LIFECYCLE_MD" 'On a hard stop with no fresh handoff, it counts every molt-status and pain line already present at resume as noted.' \
   "a hard stop without a fresh handoff baselines all existing molt-status and pain lines" flat
-pin "$LIFECYCLE_MD" 'brief not delivered before the top stopped' \
-  "a recorded attempt with no delivery is settled and relaunched" flat
-pin "$LIFECYCLE_MD" 'relaunched from its seat row as a new attempt with `cause: {type: followup, ref: <the settled attempt'"'"'s id>}`' \
-  "an undelivered attempt is relaunched with followup cause referencing the settled attempt" flat
+# Ruling 12: automatic relaunch retired; an unstarted worker is the operator's decision.
+# Ruling 12: relaunch cause retired with the automatic relaunch path.
 pin "$LIFECYCLE_MD" 'Per working attempt, first run the generation check against `locator.seen`, for both `phase: recorded` and `phase: delivered`.' \
   "resume checks the generation baseline before deciding recorded delivery" flat
 pin "$LIFECYCLE_MD" 'A new report generation proves delivery: set a recorded attempt `delivered`, then read the generation once, record it and act on it by kind.' \
   "a new report proves recorded delivery and is consumed once by kind" flat
-pin "$LIFECYCLE_MD" 'Only when the pane is gone or `herdr agent list` shows no agent session in it is that attempt settled `failed`' \
-  "only positive absence permits a recorded attempt to fail and relaunch" flat
-pin "$LIFECYCLE_MD" 'Any other read — idle, working or unreadable included — counts as `delivered`, not proof of non-delivery.' \
-  "inconclusive pane snapshots preserve delivery instead of duplicating the worker" flat
-pin "$LIFECYCLE_MD" 'The re-armed wait’s timeout checkpoint and the heartbeat surface a worker that never started; never run two workers on one attempt.' \
-  "bounded recovery surfaces an unstarted worker without duplicating the attempt" flat
+# Ruling 12: agent-list absence retired as evidence that a recorded brief was not delivered.
+# Ruling 12: pane-snapshot delivery branches retired; every recorded attempt with no new generation is re-armed.
+pin "$LIFECYCLE_MD" 'With no new generation and `phase: recorded`, treat the attempt as `delivered` and re-arm it like any delivered attempt.' \
+  "a recorded attempt without a new generation is delivered and re-armed" flat
+pin "$LIFECYCLE_MD" 'Never relaunch it automatically.' \
+  "resume never automatically relaunches a recorded attempt" flat
+pin "$LIFECYCLE_MD" 'The re-armed wait’s timeout checkpoint (step 5) reports a worker that never started to the operator, who decides on a relaunch; never run two workers on one attempt.' \
+  "the timeout reports an unstarted worker for the operator's relaunch decision without duplicating the attempt" flat
 pin "$LIFECYCLE_MD" 'Re-arm step 5’s waits only for an attempt still live after its generation check; a final report consumed on resume settles that dispatch, so it gets no wait.' \
   "resume re-arms only live attempts and never waits on consumed final reports" flat
 pin "$LIFECYCLE_MD" 'It arms one fresh heartbeat only if at least one dispatch is still live.' \
@@ -1882,6 +1882,14 @@ pin "$LIFECYCLE_MD" 'A run file older than 0.2.21' \
   "the resume names the legacy run-file rules" flat
 pin "$LIFECYCLE_MD" 'no `phase` counts as `delivered`' \
   "legacy: an attempt with no phase is delivered" flat
+# Ruling 12: legacy machine default retired; the old host must not be guessed from this top's host.
+pin "$LIFECYCLE_MD" 'With no `run.orchestrator.machine`, on a hard stop the top asks the operator once for the old top'"'"'s machine, or skips the stand-down close and says so.' \
+  "legacy: an unknown old machine requires an operator ask or an explicit skipped close" flat
+# Ruling 12: legacy read-once default retired; an unbaselined report does not prove the live attempt's result.
+pin "$LIFECYCLE_MD" 'For a live dispatch with no `seen` and no fresh handoff generation, the existing report is ambiguous: the top reads it but does not act on it until the operator confirms it belongs to the live attempt.' \
+  "legacy: an ambiguous report is read but requires operator confirmation before action" flat
+pin "$LIFECYCLE_MD" 'A fresh handoff'"'"'s noted hash and identity, where present, are the baseline.' \
+  "legacy: a fresh handoff supplies the generation baseline where present" flat
 pin "$LIFECYCLE_MD" 'no `merge_word` counts as `standing`' \
   "legacy: no merge_word is standing" flat
 pin "$LIFECYCLE_MD" 'against the attempt'"'"'s `locator.seen`' \
