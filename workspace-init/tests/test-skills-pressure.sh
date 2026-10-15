@@ -430,20 +430,77 @@ test_skills_resolve_wi_bin_before_first_use() {
 
 # --- #768: workspace-init writes AGENTS.md only ---
 
+# The detector both the scan and its adjacent control run, so the control
+# cannot pass by exercising a different predicate than the one that scans.
+names_claude_md_stub() { # $1=file -> 0 when the file names a CLAUDE.md stub
+  grep -Fq 'stub_claude_md' "$1" || grep -Fq 'CLAUDE.md stub' "$1" || grep -Fq 'Write CLAUDE.md' "$1"
+}
+
+# scan_claude_md_stub_mentions <plugin-root>
+# Prints one path per offending file; rc 1 (with a message) when the globs match
+# nothing at all, so an empty tree cannot report a clean scan having read none.
+scan_claude_md_stub_mentions() { # $1=plugin root
+  local root="$1" f hits="" scanned=0
+  for f in "$root"/skills/*/SKILL.md "$root"/skills/*/examples/*.md \
+           "$root"/templates/*.tmpl "$root/README.md"; do
+    [[ -f "$f" ]] || continue
+    scanned=$((scanned + 1))
+    if names_claude_md_stub "$f"; then hits="$hits $f"; fi
+  done
+  if [[ "$scanned" -eq 0 ]]; then
+    echo "    the surface globs matched no files under $root"; return 1
+  fi
+  [[ -z "$hits" ]] || printf '%s\n' "${hits# }"
+  return 0
+}
+
 test_no_claude_md_stub_on_any_surface() {
   # #768: workspace-init writes AGENTS.md only. No skill, example or template
   # may still tell a model to write or expect a CLAUDE.md stub.
-  local f hits=""
-  for f in "$WI_PLUGIN_ROOT"/skills/*/SKILL.md "$WI_PLUGIN_ROOT"/skills/*/examples/*.md \
-           "$WI_PLUGIN_ROOT"/templates/*.tmpl "$WI_PLUGIN_ROOT/README.md"; do
-    if grep -Fq 'stub_claude_md' "$f" || grep -Fq 'CLAUDE.md stub' "$f" || grep -Fq 'Write CLAUDE.md' "$f"; then
-      hits="$hits $f"
-    fi
-  done
+  local hits
+  hits="$(scan_claude_md_stub_mentions "$WI_PLUGIN_ROOT")" || return 1
   [[ -z "$hits" ]] || { echo "    still names a CLAUDE.md stub:$hits"; return 1; }
   # Positive control: the skills still name the one stub they do write.
   grep -Fq 'stub_agents_md' "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md" || { echo "    fresh skill lost stub_agents_md"; return 1; }
   grep -Fq 'stub_agents_md' "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md" || { echo "    pair skill lost stub_agents_md"; return 1; }
+  # Adjacent control: the same predicate still fires on a file that names one.
+  # Written outside the tree — this suite must not leave files in the plugin.
+  local probe
+  probe="$(mktemp "${TMPDIR:-/tmp}/wi-probe.XXXXXX")"
+  printf 'Write CLAUDE.md for the workspace\n' > "$probe"
+  if names_claude_md_stub "$probe"; then :; else
+    rm -f "$probe"
+    echo "    the detector no longer fires on a CLAUDE.md stub mention"; return 1
+  fi
+  rm -f "$probe"
+}
+
+test_claude_md_stub_scan_fails_on_an_empty_surface() {
+  # D13: the guard's own path. A root with no matching files must report RED,
+  # never a green scan of nothing — and the real root must still come back clean,
+  # which is the adjacent control above.
+  local empty
+  empty="$(mktemp -d "${TMPDIR:-/tmp}/wi-empty-surface.XXXXXX")"
+  if scan_claude_md_stub_mentions "$empty" >/dev/null 2>&1; then
+    rmdir "$empty" 2>/dev/null
+    echo "    an empty surface reported a clean scan"; return 1
+  fi
+  rmdir "$empty" 2>/dev/null
+}
+
+test_marker_string_matches_across_surfaces() {
+  # D14: the marker is a contract between workspace-init and ossify's /start.
+  # The skills quote it in prose; the template mints it. A typo in either would
+  # ship a stub ossify never recognises.
+  local marker='<!-- workspace-init stub: ossify:start replaces this file -->'
+  local tmpl_first
+  tmpl_first="$(head -n 1 "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")"
+  assert_eq "$marker" "$tmpl_first" || return 1
+  local s
+  for s in "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md" \
+           "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md"; do
+    grep -Fq "$marker" "$s" || { echo "    $s does not quote the template marker verbatim"; return 1; }
+  done
 }
 
 test_existing_dual_scans_both_instruction_files() {
@@ -478,6 +535,8 @@ wi_test_run test_ai_dir_name_flag_reaches_skills_and_commands
 wi_test_run test_readme_links_stay_inside_the_plugin
 wi_test_run test_skills_resolve_wi_bin_before_first_use
 wi_test_run test_no_claude_md_stub_on_any_surface
+wi_test_run test_claude_md_stub_scan_fails_on_an_empty_surface
+wi_test_run test_marker_string_matches_across_surfaces
 wi_test_run test_existing_dual_scans_both_instruction_files
 
 wi_test_summary

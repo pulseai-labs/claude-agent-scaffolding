@@ -113,7 +113,9 @@ test_H6_no_claude_md() {
   # #768: workspace-init writes one instruction file, AGENTS.md. A CLAUDE.md
   # at the AI-workspace root would shadow it in Claude Code's default load.
   local parent="$_WI_TMP/h6"; mkdir -p "$parent"
-  _run_bootstrap "$parent" "alpha" personal >/dev/null 2>&1
+  # D12: a failed bootstrap would leave BOTH assertions below true on an empty
+  # tree, so the helper's status is checked first.
+  _run_bootstrap "$parent" "alpha" personal >/dev/null 2>&1 || return 1
   [[ ! -e "$parent/alpha-ai/CLAUDE.md" ]] || { echo "    CLAUDE.md was written"; return 1; }
   assert_file_exists "$parent/alpha-ai/AGENTS.md" || return 1
 }

@@ -72,6 +72,14 @@ test_A1_agents_md_writes_file_with_project_name() {
   assert_contains 'Co-Authored-By:' "$content" || return 1
   # No pointer to a file that is no longer written.
   assert_not_contains 'Read `CLAUDE.md`' "$content" || return 1
+  # D9: the fold dropped the route assertions the retired test_C1 carried; the
+  # one stub still hands lifecycle work to ossify, with no retired-stack route.
+  # Assert the routes themselves, not just the strings: line 5's prose already
+  # contains `/ossify:start`, so the bare substring would survive the route's
+  # removal (measured — that mutation SURVIVED until this line named the route).
+  assert_contains '- Empty canonical: run `/ossify:start`' "$content" || return 1
+  assert_contains '- `/ossify:adopt` currently targets projects previously onboarded' "$content" || return 1
+  assert_not_contains '/onboard' "$content" || return 1
 }
 
 test_A2_agents_md_fallback_to_manifest_name() {
@@ -101,14 +109,30 @@ test_A3_agents_md_idempotent() {
 
   wi_stub_agents_md "$ai_root" "test" >/dev/null 2>&1 || return 1
   local log="${ai_root}/.workspace/init-log"
-  local count1
-  count1="$(grep -c 'AGENTS.md' "$log" || echo 0)"
+  local count1 count2
+  count1="$(count_matches 'AGENTS.md' "$log")"
+  # D10: a non-zero baseline, so the equality below cannot be 0 == 0.
+  [[ "$count1" -gt 0 ]] || { echo "    no AGENTS.md entry after the first call"; return 1; }
 
   wi_stub_agents_md "$ai_root" "test" >/dev/null 2>&1 || return 1
-  local count2
-  count2="$(grep -c 'AGENTS.md' "$log" || echo 0)"
+  count2="$(count_matches 'AGENTS.md' "$log")"
 
-  [[ "$count1" == "$count2" ]] || { echo "    log grew on second call"; return 1; }
+  [[ "$count1" == "$count2" ]] || { echo "    log grew on second call ($count1 -> $count2)"; return 1; }
+}
+
+test_A7_agents_md_logs_write_file() {
+  # D10: the fold dropped test_C2, which asserted the WRITE_FILE log line; no
+  # test in the A set replaced it.
+  local ai_root="$_WI_TMP/a7-ai" canonical_root="$_WI_TMP/a7"
+  mkdir -p "$ai_root" "$canonical_root"
+  _setup_manifest "$ai_root" "$canonical_root" || return 1
+  wi_stub_agents_md "$ai_root" "p" >/dev/null 2>&1 || return 1
+
+  local log="${ai_root}/.workspace/init-log"
+  assert_file_exists "$log" || return 1
+  local content; content="$(cat "$log")"
+  assert_contains "WRITE_FILE" "$content" || return 1
+  assert_contains "${ai_root}/AGENTS.md" "$content" || return 1
 }
 
 test_A4_no_claude_md_written() {
@@ -127,8 +151,11 @@ test_A5_dispatcher_path_renders_marker() {
   _setup_manifest "$ai_root" "$canonical_root" || return 1
   "$WI_PLUGIN_ROOT/bin/wi" stub_agents_md "$ai_root" "p" >/dev/null 2>&1 || { echo "    dispatcher failed"; return 1; }
   assert_eq '<!-- workspace-init stub: ossify:start replaces this file -->' "$(head -n 1 "$ai_root/AGENTS.md")" || return 1
-  if "$WI_PLUGIN_ROOT/bin/wi" stub_claude_md "$ai_root" "p" >/dev/null 2>&1; then
-    echo "    stub_claude_md still dispatches"; return 1; fi
+  # D11: assert the refusal itself, not merely a non-zero exit — any failure
+  # (a missing arg, a bad path) would otherwise satisfy this test.
+  local err
+  err="$("$WI_PLUGIN_ROOT/bin/wi" stub_claude_md "$ai_root" "p" 2>&1 >/dev/null)"
+  assert_contains 'Unknown function: wi_stub_claude_md' "$err" || return 1
 }
 
 test_A6_ampersand_in_canonical_root_survives_render() {
@@ -210,14 +237,14 @@ test_R3_readme_idempotent() {
 
   wi_stub_readme "$ai_root" "proj" >/dev/null 2>&1 || return 1
   local log="${ai_root}/.workspace/init-log"
-  local count1
-  count1="$(grep -c 'README.md' "$log" || echo 0)"
+  local count1 count2
+  count1="$(count_matches 'README.md' "$log")"
+  [[ "$count1" -gt 0 ]] || { echo "    no README.md entry after the first call"; return 1; }
 
   wi_stub_readme "$ai_root" "proj" >/dev/null 2>&1 || return 1
-  local count2
-  count2="$(grep -c 'README.md' "$log" || echo 0)"
+  count2="$(count_matches 'README.md' "$log")"
 
-  [[ "$count1" == "$count2" ]] || { echo "    log grew on second call"; return 1; }
+  [[ "$count1" == "$count2" ]] || { echo "    log grew on second call ($count1 -> $count2)"; return 1; }
 }
 
 # ---------------------------------------------------------------------------
@@ -253,6 +280,7 @@ echo "A. AGENTS.md"
 wi_test_run test_A1_agents_md_writes_file_with_project_name
 wi_test_run test_A2_agents_md_fallback_to_manifest_name
 wi_test_run test_A3_agents_md_idempotent
+wi_test_run test_A7_agents_md_logs_write_file
 wi_test_run test_A4_no_claude_md_written
 wi_test_run test_A5_dispatcher_path_renders_marker
 wi_test_run test_A6_ampersand_in_canonical_root_survives_render
