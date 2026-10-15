@@ -1995,5 +1995,18 @@ pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'until the comment is p
   "intake §1 names the replanned-spine limit where the operator meets it (#631)"
 pin "$SKILLS/plan-spine/references/decomposition.md" 'comment `withdrawn — <old-spine>`' \
   "a whole-spine split posts withdrawn on the old spine's intake request (#631)"
+# Codex round 1 on PR #821. (a) A second spine that takes the same feature posts
+# its own pulled in, or the first spine's close sees no other carrier and closes
+# early. (b) Only the repository's own people's dispositions count: anyone can
+# comment on a public issue. (c) codebase-design no longer says a fifth
+# feature_add argument is dropped - it is now the intake issue, refused elsewhere.
+pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'or to an earlier spine' \
+  "a later spine that takes the same feature posts its own pulled in (#631)"
+pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'OWNER, MEMBER or COLLABORATOR' \
+  "intake planning counts dispositions only from the repository's own people (#631)"
+pin "$SKILLS/close/references/spine-close.md" 'OWNER, MEMBER or COLLABORATOR' \
+  "spine close counts dispositions only from the repository's own people (#631)"
+_r=1; ! grep -Fq 'accepted and silently dropped' "$SKILLS/plan-spine/references/codebase-design.md" && grep -Fq 'only for an intake request' "$SKILLS/plan-spine/references/codebase-design.md" && _r=0
+_pin "$_r" "codebase-design.md still says a fifth feature_add argument is dropped - a planner's split trigger is now refused at rc 2 (#631)"
 
 t_summary

@@ -640,12 +640,22 @@ for bad in 0 -3 05 abc 4a "#" "##4" "4 5" " 4" "1.5"; do
 done
 t_assert_contains "$T_OUT" "issue" "631: the refusal names the issue argument"
 t_assert_eq "$NF1" "$(jq '.mutations | length' "$SF")" "631: no refused issue journaled"
+# Codex round 1 on PR #821: an issue on a non-intake entry would send spine
+# planning to an unrelated request. Only source `intake` takes one; the empty
+# issue on a journey-map entry above stays accepted (the adjacent control).
+NF2="$(jq '.mutations | length' "$SF")"
+t_capture oss_reg_add_feature "$SF" "notintake" "a journey item" flesh journey-map 123
+t_assert_rc 2 "631: feature_add refuses an issue on a non-intake source"
+t_assert_contains "$T_OUT" "intake" "631: the non-intake refusal names the intake source"
+t_assert_eq "$NF2" "$(jq '.mutations | length' "$SF")" "631: no non-intake issue journaled"
 # The dispatcher path runs under set -euo pipefail; the same contract holds there.
 t_capture env OSS_STATE_FILE="$SF" bash "$OSS" feature_add "cli" "a cli" flesh intake "#12"
 t_assert_rc 0 "631: oss feature_add takes the issue as its 5th argument"
 t_assert_eq "12" "$(jq -c '.feature_map[-1].issue' "$SF")" "631: the dispatcher records it normalised"
 t_capture env OSS_STATE_FILE="$SF" bash "$OSS" feature_add "cli2" "a cli" flesh intake abc
 t_assert_rc 2 "631: oss feature_add refuses a bad issue at rc 2"
+t_capture env OSS_STATE_FILE="$SF" bash "$OSS" feature_add "cli4" "a cli" flesh journey-map 9
+t_assert_rc 2 "631: oss feature_add refuses an issue on a non-intake source"
 t_capture env OSS_STATE_FILE="$SF" bash "$OSS" feature_add "cli3" "a cli" flesh intake 3 extra
 t_assert_rc 2 "631: oss feature_add refuses a 6th argument rather than dropping it"
 t_capture env OSS_STATE_FILE="$SF" bash "$OSS" feature_list
