@@ -275,6 +275,8 @@ Next steps:
   4. /ossify:start                         # bare canonical; routes to /ossify:adopt if source or history is present
                                            # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
                                            # a recorded tooling repo that already carries history refuses it too, with no supported ossify continuation yet
+                                           # adopt merges its loop section into AGENTS.md on ossify 1.24.0 or later; on an older
+                                           # ossify it merges into CLAUDE.md — merge that into AGENTS.md by hand, then remove CLAUDE.md
 
 Manifest at: /abs/path/{name}-ai/.workspace/pairing.json
 Init log at: /abs/path/{name}-ai/.workspace/init-log (rollback record)

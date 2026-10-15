@@ -512,6 +512,26 @@ test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c() {
   assert_not_contains 'Specs, the memory bank and process records belong here.' "$tmpl" || return 1
   # D5: the §4 scan must name the `.claude/` copy too, which step 3 covers.
   assert_contains '- `${ai_root}/.claude/CLAUDE.md`' "$dual" || return 1
+  # D19: adopt routes legacy projects, and an older ossify's adopt merges its loop
+  # section into CLAUDE.md — so the same version condition applies there, and the
+  # by-hand merge must be named on every surface that routes to adopt.
+  assert_contains 'adopt merges its loop section into' "$tmpl" || return 1
+  assert_contains 'adopt merges it into `CLAUDE.md`' "$dual" || return 1
+  # The by-hand route itself, not just the diagnosis: removing it SURVIVED until
+  # this line existed.
+  assert_contains 'merge it into `AGENTS.md` by hand afterwards, then remove `CLAUDE.md`' "$dual" || return 1
+  local pair
+  pair="$(cat "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md")"
+  # Assert the version, not just the sentence: the bare "adopt merges its loop
+  # section into `AGENTS.md`" SURVIVED dropping the condition on first run.
+  assert_contains 'On ossify 1.24.0 or later, adopt merges its loop section into `AGENTS.md`' "$pair" || return 1
+  assert_contains 'merge that section into' "$pair" || return 1
+  local init_s
+  init_s="$(cat "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md")"
+  assert_contains 'adopt merges its loop section into AGENTS.md on ossify 1.24.0 or later' "$init_s" || return 1
+  # Adjacent control: the unconditional claim that adopt targets CLAUDE.md alone
+  # must be gone from the stub.
+  assert_not_contains 'adopt merges that section into `CLAUDE.md` instead' "$tmpl" || return 1
 }
 
 test_marker_string_matches_across_surfaces() {

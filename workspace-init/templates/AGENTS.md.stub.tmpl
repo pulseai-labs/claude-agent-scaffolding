@@ -23,7 +23,7 @@ canonical — see the manifest's `routing` block for the full table.
 ## Continue with ossify
 
 - Empty canonical: run `/ossify:start` (on Codex or OMP, the `start` skill).
-- `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack — a canonical that already carries source or history without that stack has no supported ossify continuation yet.
+- `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack — a canonical that already carries source or history without that stack has no supported ossify continuation yet. On ossify 1.24.0 or later, adopt merges its loop section into this `AGENTS.md`. On an older ossify it merges that section into `CLAUDE.md` instead, which then shadows `AGENTS.md` — merge it into `AGENTS.md` by hand afterwards, then remove `CLAUDE.md`.
 
 ## Git policy
 

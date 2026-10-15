@@ -185,6 +185,9 @@ Next steps:
   4. Run `/ossify:adopt` only for a project previously onboarded with the legacy scaffold stack —
      without that stack there is no supported ossify continuation yet (or `/ossify:start` if the
      canonical is empty); on Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
+     - **ossify 1.24.0 or later:** adopt merges its loop section into `AGENTS.md`.
+     - **An older ossify:** adopt merges it into `CLAUDE.md`, which then shadows `AGENTS.md` —
+       merge it into `AGENTS.md` by hand afterwards, then remove `CLAUDE.md`.
   5. Adoption refuses while any tree it will edit is dirty: the AI workspace, the canonical, and
      every repo the topology declares must all be clean — tracked and untracked — with each
      declared repo on the default branch the manifest declares (otherwise adoption names the
