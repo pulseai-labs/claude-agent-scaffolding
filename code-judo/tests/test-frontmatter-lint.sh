@@ -36,7 +36,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# CODE_JUDO_LINT_ROOT points the lint at another plugin tree; only
+# tests/test-frontmatter-lint-fixtures.sh sets it, to run the lint on fixtures.
+PLUGIN_ROOT="${CODE_JUDO_LINT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 SKILLS_DIR="$PLUGIN_ROOT/skills"
 COMMANDS_DIR="$PLUGIN_ROOT/commands"
 
@@ -53,8 +55,13 @@ require_ruby_psych || { report; exit 1; }
 #   key <name>               one line per top-level key, in document order
 #   val <name> <type> <val>  type is string|bool|number, or the YAML class for
 #                            anything non-scalar; callers requiring text check it
+#   len <name> <bytes>       a string value's byte length AS PARSED, before the
+#                            whitespace flattening the TSV transport needs (#390)
+# A parser that exits non-zero (an unreadable file, a Ruby error) is an `err`
+# line, never empty facts: empty facts read as "no keys", which a
+# model-invocable command passes (#404).
 fm_facts() {
-  "$RUBY_BIN" -ryaml -e '
+  _ff_out="$("$RUBY_BIN" -ryaml -e '
     lines = File.read(ARGV[0]).lines
     unless lines[0] && lines[0].rstrip == "---"
       puts "err\tno frontmatter: the file must open with --- on line 1"
@@ -89,26 +96,38 @@ fm_facts() {
     # which is non-empty and under the cap, so every scalar check passed on it.
     doc.each do |k, v|
       case v
-      when String then puts "val\t#{k}\tstring\t#{v.gsub(/\s+/, " ").strip}"
+      when String
+        puts "val\t#{k}\tstring\t#{v.gsub(/\s+/, " ").strip}"
+        puts "len\t#{k}\t#{v.bytesize}"
       when true, false then puts "val\t#{k}\tbool\t#{v}"
       when Numeric then puts "val\t#{k}\tnumber\t#{v}"
       else puts "val\t#{k}\t#{v.class.to_s.downcase}\t"
       end
     end
-  ' "$1" 2>/dev/null
+  ' "$1" 2>/dev/null)"
+  _ff_rc=$?
+  if [ "$_ff_rc" -ne 0 ]; then
+    printf 'err\tthe frontmatter parser failed (ruby exit %s); the file is unreadable or not text it can parse\n' "$_ff_rc"
+    return 0
+  fi
+  printf '%s\n' "$_ff_out"
 }
 
 facts_error() { printf '%s\n' "$1" | awk -F'\t' '$1=="err"{print $2; exit}'; }
 facts_keys()  { printf '%s\n' "$1" | awk -F'\t' '$1=="key"{print $2}'; }
 facts_type()  { printf '%s\n' "$1" | awk -F'\t' -v k="$2" '$1=="val" && $2==k{print $3; exit}'; }
 facts_value() { printf '%s\n' "$1" | awk -F'\t' -v k="$2" '$1=="val" && $2==k{print $4; exit}'; }
+facts_len()   { printf '%s\n' "$1" | awk -F'\t' -v k="$2" '$1=="len" && $2==k{print $3; exit}'; }
 facts_count() { printf '%s\n' "$1" | awk -F'\t' -v k="$2" '$1=="key" && $2==k{n++} END{print n+0}'; }
 
+# The class is spelled out, not a range: under a non-C locale a range like a-z
+# can collate in upper-case or accented letters (bash 3.2, or bash 5 with
+# globasciiranges off), and kebab-case here means ASCII (#404).
 is_kebab_case() {
   case "$1" in
     "" ) return 1 ;;
     -*|*-) return 1 ;;
-    *[!a-z0-9-]* ) return 1 ;;
+    *[!abcdefghijklmnopqrstuvwxyz0123456789-]* ) return 1 ;;
     *) return 0 ;;
   esac
 }
@@ -149,9 +168,6 @@ posture_problem() {
   fi
 }
 
-# Psych collapses a folded scalar into one string, so this is the real length
-# whatever shape the author used — the thing the awk version could not see.
-byte_len() { LC_ALL=C printf '%s' "$1" | LC_ALL=C wc -c | tr -d ' '; }
 
 check_skill() {
   name="$1"; md="$SKILLS_DIR/$name/SKILL.md"; rel="skills/$name/SKILL.md"
@@ -187,8 +203,11 @@ check_skill() {
   else fail "$rel: 'name' matches directory" "directory='$name' but name='$name_val'"; fi
 
   desc_val="$(facts_value "$facts" description)"
-  len="$(byte_len "$desc_val")"
-  if [ "$len" -eq 0 ]; then fail "$rel: 'description' is non-empty" "empty"
+  # The parsed byte length, not the flattened value's: flattening collapses
+  # whitespace runs, so a long literal block would measure short (#390).
+  # Emptiness reads the flattened value, so whitespace alone is still empty.
+  len="$(facts_len "$facts" description)"; len="${len:-0}"
+  if [ -z "$desc_val" ]; then fail "$rel: 'description' is non-empty" "empty"
   elif [ "$len" -le "$DESC_LIMIT" ]; then pass "$rel: 'description' length ${len}/${DESC_LIMIT} bytes"
   else fail "$rel: 'description' length ≤${DESC_LIMIT} bytes" "actual=${len}"; fi
 
