@@ -35,11 +35,7 @@ silently. A closed issue is not in the queue.
 
 A request stays open until the spine that pulled it in lands, so the queue can
 return one an earlier planning already took. Read its comments
-(`gh issue view <n> --repo "<owner/repo>" --json comments`). Count a disposition
-only from a comment whose author can write to the repository:
-`gh api repos/<owner/repo>/collaborators/<login>/permission --jq .permission`
-prints `admin` or `write`. Anyone can comment on a public issue, and an
-organization member can hold read access only. One carrying a
+(`gh issue view <n> --repo "<owner/repo>" --json comments`): one carrying a
 `pulled in — <spine id>` disposition is already assigned — list it as
 such, and never add it to the feature map again or pull it into a spine as new
 work. A spine id has the
@@ -55,11 +51,12 @@ this spine does not take that feature, leave the request as it is.
 
 **A request closes at its last carrying spine.** Several spines can take one
 feature, and each posts its own `pulled in — <spine id>` comment. Spine close
-(`close/references/spine-close.md` §3) closes the request only when every spine
-those comments name has landed. A spine that is retired or replanned without the
-feature must say so on the request, with `withdrawn — <spine id>` as the whole body of a comment, which cancels that
-spine's `pulled in` comment. Without it, the request stays open after the other
-spines land, until the comment is posted.
+(`close/references/spine-close.md` §3) closes the request only when the closing
+spine's own comment is there and every spine the comments name is `closed`.
+Comments only add carriers, so a stray or forged one can hold a request open but
+never close it. A carrier that is retired (`abandoned`) or replanned without the
+feature holds the request open: spine close names it, and the operator closes
+the request by hand once the work it asked for has landed.
 
 For each other open request, record exactly one disposition:
 

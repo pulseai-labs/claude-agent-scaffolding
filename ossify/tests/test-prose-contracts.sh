@@ -1985,38 +1985,33 @@ pin "$SKILLS/close/references/spine-close.md" 'spine that carries it (#631).' \
   "spine close closes an intake request only at its last carrying spine (#631)"
 pin "$SKILLS/close/references/spine-close.md" 'request on a list you could not read.' \
   "spine close leaves a request open when its comments or a named spine cannot be read (#631)"
-pin "$SKILLS/close/references/spine-close.md" 'each one named by a later comment whose whole body' \
-  "spine close honours a withdrawn disposition (#631)"
 pin "$SKILLS/plan-spine/references/intake-and-ledger.md" '`oss feature_add "<name>" "<value>" "<bone|flesh>" intake <issue-number>`' \
   "a release-level pull-in records the request's issue on the feature entry (#631)"
 pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'never by matching titles' \
   "spine planning reads the request from the feature entry's issue (#631)"
-pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'until the comment is posted' \
-  "intake §1 names the replanned-spine limit where the operator meets it (#631)"
-pin "$SKILLS/plan-spine/references/decomposition.md" 'comment `withdrawn — <old-spine>`' \
-  "a whole-spine split posts withdrawn on the old spine's intake request (#631)"
-# Codex round 1 on PR #821. (a) A second spine that takes the same feature posts
-# its own pulled in, or the first spine's close sees no other carrier and closes
-# early. (b) Only the repository's own people's dispositions count: anyone can
-# comment on a public issue. (c) codebase-design no longer says a fifth
-# feature_add argument is dropped - it is now the intake issue, refused elsewhere.
+# Codex round 1 on PR #821: a second spine that takes the same feature posts its
+# own pulled in, or the first spine's close sees no other carrier and closes early.
 pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'or to an earlier spine' \
   "a later spine that takes the same feature posts its own pulled in (#631)"
-# Codex round 2 on PR #821: an organization MEMBER or COLLABORATOR can hold read
-# or triage access only, so the author check reads the repository permission
-# (admin or write), never authorAssociation.
-for _f in "$SKILLS/plan-spine/references/intake-and-ledger.md" "$SKILLS/close/references/spine-close.md"; do
-  _r=1; grep -Fq '/permission --jq .permission' "$_f" && ! grep -Fq 'authorAssociation' "$_f" && _r=0
-  _pin "$_r" "$(basename "$_f") does not count a disposition only from an author with write permission (#631)"
+# Operator ruling after Codex round 4 on PR #821 (fail-closed): comments only ADD
+# carriers. No comment removes one, so no comment author is authenticated; a
+# stray or forged comment can hold a request open but never close it. The spine
+# closing must be a collected carrier itself (no vacuous close on an empty set),
+# and only `closed` counts - an `abandoned` carrier holds the request open.
+pin "$SKILLS/close/references/spine-close.md" 'add carriers: nothing in a comment removes one' \
+  "spine close: comments only add carriers, so none can close a request early (#631)"
+pin "$SKILLS/close/references/spine-close.md" '**This spine is not among the collected carriers**' \
+  "spine close leaves a request open when this spine's own pulled in is missing (#631)"
+pin "$SKILLS/close/references/spine-close.md" 'an `abandoned` carrier holds the request open' \
+  "spine close counts only closed carriers; an abandoned one holds the request open (#631)"
+pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'Comments only add carriers' \
+  "intake §1 states that comments only add carriers (#631)"
+pin "$SKILLS/plan-spine/references/decomposition.md" 'holds the request open' \
+  "a whole-spine split's abandoned old spine holds the request open (#631)"
+for _f in "$SKILLS/close/references/spine-close.md" "$SKILLS/plan-spine/references/intake-and-ledger.md" "$SKILLS/plan-spine/references/decomposition.md" "$HERE/../README.md" "$HERE/../../README.md"; do
+  _r=1; ! grep -Fq 'withdrawn — <' "$_f" && ! grep -Fq '/permission' "$_f" && _r=0
+  _pin "$_r" "$(basename "$_f") still names a withdrawn disposition or an author permission check - the fail-closed rule has neither (#631)"
 done
-# Codex round 3 on PR #821: a withdrawn counts only as a whole comment body, so a
-# comment that quotes or discusses one cannot drop a live carrier (early close).
-pin "$SKILLS/close/references/spine-close.md" 'whose whole body is `withdrawn — <spine id>`' \
-  "spine close counts a withdrawn only as a whole comment body (#631)"
-pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'as the whole body of a comment' \
-  "intake §1 posts withdrawn as a whole comment body (#631)"
-pin "$SKILLS/plan-spine/references/decomposition.md" 'as the whole comment body' \
-  "a whole-spine split posts withdrawn as a whole comment body (#631)"
 # ...and the advertised '#N' form is quoted: an unquoted # starts a shell comment.
 _r=1; grep -Fq "'#N'" "$HERE/../README.md" && ! grep -Fq '(`N` or `#N`)' "$HERE/../README.md" && _r=0
 _pin "$_r" "ossify README advertises an unquoted #N - the shell drops it as a comment and feature_add records no issue (#631)"

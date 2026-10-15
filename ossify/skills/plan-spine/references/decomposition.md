@@ -47,9 +47,10 @@ position; carry any ledger line already planned against the old spine with
 `oss ledger_unplan <line-id> <old-spine>` first (`demo-amendments.md` §6). The old spine stays in
 state, abandoned, so the release close can report it
 (`close/references/release-close.md` §2 names abandoned spines explicitly).
-If the old spine pulled in an intake request, comment `withdrawn — <old-spine>` on
-it, as the whole comment body, and re-disposition it to the half that takes the feature
-(`intake-and-ledger.md` §1), or the request never closes.
+If the old spine pulled in an intake request, re-disposition it to the half that
+takes the feature (`intake-and-ledger.md` §1). The old spine's `pulled in` comment
+stays, and as an `abandoned` carrier it holds the request open: spine close names
+it, and the operator closes the request by hand once the halves have landed.
 
 What **not** to do, in order of how tempting each is:
 

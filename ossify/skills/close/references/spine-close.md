@@ -677,27 +677,24 @@ EOF
 or without merge-bar, and only once every hosting repo is recorded landed (pass
 one's local merges and the record pass above). A request closes only at the last
 spine that carries it (#631). For each request, read its comments with
-`gh issue view <n> --repo "<owner/repo>" --json comments --jq '.comments[] | {login: .author.login, body}'`.
-Count a comment only when its author can write to the repository:
-`gh api repos/<owner/repo>/collaborators/<login>/permission --jq .permission`
-prints `admin` or `write`. Anyone can comment on a public issue, and an
-organization member or collaborator can hold read or triage access only, so a
-`withdrawn` from an author who cannot write must not close a request. A
-permission you cannot read is part of a list you could not read (below).
-Collect every spine id that a `pulled in — <spine id>` comment names, and drop
-each one named by a later comment whose whole body is `withdrawn — <spine id>`.
-A comment that quotes or discusses a withdrawal is not one: dropping a carrier
-can close the request early, while an extra `pulled in` only holds it open. A release-level
-`pulled in — r<n>` names no spine and does not count. Then:
+`gh issue view <n> --repo "<owner/repo>" --json comments --jq '.comments[].body'`.
+Collect every spine id that a `pulled in — <spine id>` comment names. A
+release-level `pulled in — r<n>` names no spine and does not count. Comments only
+add carriers: nothing in a comment removes one, so a stray, quoted or forged
+comment can hold a request open but never close it, whoever wrote it. Then:
 
-- **Every collected spine other than this one is `closed`** in state
-  (`oss spine_list`): close it with
+- **This spine is collected, and every other collected spine is `closed`** in
+  state (`oss spine_list`): close it with
   `gh issue close <n> --repo "<owner/repo>" --comment "<spine-id> landed: <PR URLs or merge SHAs>"`.
+- **This spine is not among the collected carriers** (its own `pulled in`
+  comment is missing): leave the request open and tell the operator. Nothing on
+  the request shows that this spine carried it.
 - **Otherwise, leave it open** and say why in one comment:
   `gh issue comment <n> --repo "<owner/repo>" --body "<spine-id> landed: <PR URLs or merge SHAs>; the request stays open for <spine ids not yet closed>"`.
-  Tell the operator too. A spine that was retired or replanned without the
-  feature holds the request open until someone posts `withdrawn — <spine id>`
-  for it (`plan-spine/references/intake-and-ledger.md` §1).
+  Tell the operator too. Only `closed` counts: an `abandoned` carrier holds the request open, and so does
+  a spine replanned without the feature. Name each such spine with its status,
+  and tell the operator to close the request by hand once the work it asked for
+  has landed (`plan-spine/references/intake-and-ledger.md` §1).
 - **The comments cannot be read, or a collected id is not in state:** leave the
   request open, and tell the operator what could not be read. Never close a
   request on a list you could not read.
