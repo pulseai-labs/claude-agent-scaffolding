@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.8.1 — 2026-10-15
+
+State-lib hardening deferred from #483's review (#485, #486, #489).
+
+### Fixed
+- **A whitespace-only `state.json` is re-seeded like a 0-byte one** (#485). A file holding only spaces, tabs, CR or newlines has nothing to lose; it was refused, and every guarded write with it. Any other content that is not exactly one JSON object is still refused byte-identical.
+- **The empty-state re-seed takes `state.lock`** (#485), re-checks under the lock that the file is still blank, and replaces it atomically. A concurrent writer that re-seeded and wrote first keeps its document.
+- **The lock's EXIT handler preserves `$?`** (#489): a chained EXIT trap of the form `rc=$?; cleanup; exit $rc` now reads the real exit status.
+- **A lock taken inside a subshell is released when that subshell exits** (#489). The handler records the depth at acquire and releases at that depth; bash does not carry an EXIT trap into a subshell, so it is installed once per depth. A lock the parent holds still survives its subshells and command substitutions. A prior EXIT trap is chained only at depth 0, because a subshell's `trap -p` reports the parent's inactive trap.
+
+### Added
+- Tests pinning the single-object guards (#486): `ac_guarded_jq_write` refuses a single non-object document (`[]`, `null`, `"s"`, `42`), and `ac_state_init` refuses `{}{}`, `[]` and `null`, each left byte-identical.
+
 ## v0.8.0 — 2026-10-11
 
 OMP marketplace surface.

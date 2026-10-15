@@ -80,4 +80,24 @@ MARKER="$(jq -r '.marker' "$TARGET")"
 assert_eq "written field applied" "yes" "$MARKER"
 
 # ---------------------------------------------------------------------------
+# T4 (#486): exactly one document that is NOT an object is refused too — the
+# funnel's promise is "exactly one JSON object", not "exactly one document".
+# T3 above is the adjacent valid-object control.
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- T4: a single non-object document is refused (#486) ---"
+for doc in '[]' 'null' '"s"' '42'; do
+  setup_tmp_repo > /dev/null
+  TARGET="$TMP_DIR/state.json"
+  printf '%s\n' '{"schema_version":3,"recent_runs":[]}' > "$TARGET"
+  BEFORE_SHA="$(_sha256 "$TARGET")"
+  ac_guarded_jq_write "$TARGET" -n "$doc" 2>/dev/null
+  RC=$?
+  [[ "$RC" -ne 0 ]]
+  assert_eq "single non-object $doc refused (rc != 0)" "0" "$?"
+  assert_eq "target byte-identical after refusing $doc" "$BEFORE_SHA" "$(_sha256 "$TARGET")"
+  assert_eq "no temp file left behind after $doc" "0" "$(_tmp_leftover_count "$TARGET")"
+done
+
+# ---------------------------------------------------------------------------
 report_results

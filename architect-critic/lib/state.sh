@@ -31,9 +31,12 @@ ac_state_path() {
 # than this build knows (>3) is preserved untouched with an info log
 # (forward-compatibility tolerance). Files < 2 are the v0.1→v0.2 filesystem
 # migration's responsibility (lib/migration.sh), not touched here.
-# A 0-byte state.json is the aftermath of an emptied write (#451): it holds
-# nothing to lose, so it is re-seeded with a warning. A non-empty file that is
-# not exactly one JSON object is refused — re-seeding it could destroy data.
+# A 0-byte or whitespace-only state.json is the aftermath of an emptied write
+# (#451, #485): it holds nothing to lose, so it is re-seeded with a warning,
+# under state.lock, after re-checking it is still blank, by an atomic replace —
+# a concurrent writer that re-seeded and wrote first keeps its document. A
+# file with any other content that is not exactly one JSON object is refused —
+# re-seeding it could destroy data.
 ac_state_init() {
   local state_file
   state_file="$(ac_state_path)"
@@ -43,9 +46,8 @@ ac_state_init() {
   if [[ ! -f "$state_file" ]]; then
     mkdir -p "$data_dir"
     printf '%s\n' "$seed" > "$state_file"
-  elif [[ ! -s "$state_file" ]]; then
-    ac_log_warn "state.json is empty (0 bytes); re-seeding with a fresh schema v3 document"
-    printf '%s\n' "$seed" > "$state_file"
+  elif _ac_state_is_blank "$state_file"; then
+    _ac_state_reseed_blank "$state_file" "$seed" || return 1
   else
     if ! jq -e -s 'length == 1 and (.[0] | type == "object")' "$state_file" >/dev/null 2>&1; then
       ac_log_error "state.json exists but is not a single parseable JSON object; refusing to touch it: $state_file"
@@ -59,6 +61,33 @@ ac_state_init() {
       ac_state_migrate
     fi
   fi
+}
+
+# _ac_state_is_blank <file> — rc0 when the file holds nothing but whitespace
+# (0 bytes included; CR counts as whitespace).
+_ac_state_is_blank() {
+  ! grep -q '[^[:space:]]' "$1" 2>/dev/null
+}
+
+# _ac_state_reseed_blank <state_file> <seed> — the #485 re-seed: take
+# state.lock, re-check the file is still blank (another writer may have
+# re-seeded and written while we waited), then replace it atomically.
+_ac_state_reseed_blank() {
+  local state_file="$1" seed="$2" lock_path tmp rc=0
+  lock_path="$(ac_data_dir)/state.lock"
+  ac_lock_acquire "$lock_path" || return 1
+  if _ac_state_is_blank "$state_file"; then
+    ac_log_warn "state.json is empty or whitespace-only; re-seeding with a fresh schema v3 document"
+    if tmp="$(mktemp "${state_file}.XXXXXX")" && printf '%s\n' "$seed" > "$tmp" && mv "$tmp" "$state_file"; then
+      rc=0
+    else
+      rm -f "${tmp:-}"
+      ac_log_error "could not re-seed $state_file"
+      rc=1
+    fi
+  fi
+  ac_lock_release "$lock_path"
+  return $rc
 }
 
 # _ac_state_check_parseable <state_file> — read-side guard for verbs that must never
