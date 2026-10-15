@@ -79,7 +79,7 @@ the recorded base hides the very mismatch that halt exists to catch. Copy it fro
 
 ### `## 3. Work item identifiers`
 
-The load-bearing section. Six facts, each on its own line, each absolute where a
+The load-bearing section. Five facts, each on its own line, each absolute where a
 path is involved:
 
 ```text
@@ -88,7 +88,6 @@ target_repo:    canonical
 worktree_path:  /abs/path/to/canonical/.worktrees/r1.s2.w1
 branch:         work/r1.s2.w1-toc-anchors
 spec_path:      /abs/path/to/ai-workspace/docs/specs/r1/r1.s2-toc/work-r1.s2.w1/spec.md
-spec_oid:       0123456789abcdef0123456789abcdef01234567
 ```
 
 _Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
@@ -97,11 +96,6 @@ _Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on 
 `oss verify_acs "<abs spec path>"` against it and the whole TDD loop works the
 ordered rows that come back. A handoff whose only mention of the spec is a
 sentence like "see the spec in this directory" is malformed at Gate 1.
-
-`spec_oid` is the spec's blob id when this handoff was authored, written once by
-`round-orchestration.md` §4. The worker never reads it; close compares the spec to
-it before the gate (`close/references/work-item-close.md` §1), so an edit to the spec
-after dispatch halts close instead of moving the ACs.
 
 `branch` must be the branch that is **actually checked out** in the worktree —
 read it back with `git -C "$wt" rev-parse --abbrev-ref HEAD` rather than

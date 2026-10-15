@@ -149,45 +149,39 @@ path problem, and the recovery menu sends someone to fix code that is fine.
 
 The gate judges the work against `spec.md` as it is now. An implementer that
 edited it would be judged against criteria it wrote, so compare the spec's blob
-to the `spec_oid` the handoff's §3 recorded when it was authored
-(`work-item/references/round-orchestration.md` §4). Both execution paths reach
-this block: on the external path the executor's own declared `spec_oid` only
-proves the record agrees with the tree it edited.
+to the one `work-item/references/round-orchestration.md` §4 wrote to `spec.oid`,
+beside the spec, when it authored the handoff. Both execution paths reach this
+block: on the external path the executor's own declared `spec_oid` only proves
+the record agrees with the tree it edited.
 
 ```bash
 handoff="$(dirname "$spec")/handoff.md"
 [ -f "$handoff" ] && [ -r "$handoff" ] || { echo "close: no handoff.md for $wi at $handoff - halt"; exit 1; }
-# Only §3's identifiers count (Clarifications may quote a spec_oid line); CRLF lines read as LF.
-want="$(awk '{ sub(/\r$/, "") }
-  /^##[[:space:]]/ { in3 = ($0 ~ /^##[[:space:]]+3\./) }
-  in3 && /^[[:space:]]*spec_oid:/ { n++; v = $2 }
-  END { if (n > 1) print "MANY"; else if (n == 1 && v == "") print "EMPTY"; else print v }' "$handoff")"
+oidf="$(dirname "$spec")/spec.oid"
 # --no-filters: hash the bytes the gate reads, not what .gitattributes makes of them.
 have="$(git -C "$(dirname "$spec")" hash-object --no-filters -- "$spec")" \
   || { echo "close: cannot hash $spec - halt"; exit 1; }
-case "$want" in
-  "")
-    echo "close: $handoff records no spec_oid (authored before ossify 1.21.2, or round-orchestration.md §4 skipped it) - spec.md is gated as found at close; its dispatch-time blob was never recorded" ;;
-  MANY)
-    echo "close: $handoff records spec_oid more than once in §3 - keep the one round-orchestration.md §4 wrote - halt"; exit 1 ;;
-  EMPTY)
-    echo "close: spec_oid in $handoff §3 has no value, so it is not a full blob id - halt"; exit 1 ;;
-  *[!0-9a-f]*)
-    echo "close: spec_oid '$want' in $handoff is not a full blob id - halt"; exit 1 ;;
-  "$have") ;;
-  *)
-    if [ "${#want}" -ne "${#have}" ]; then
-      echo "close: spec_oid '$want' in $handoff is not a full blob id - halt"; exit 1
-    fi
-    echo "close: spec.md for $wi changed since dispatch (handoff spec_oid $want, now $have) - the gate would judge the work against criteria it was not dispatched with. A spec that needed changing is a replan (work-item/SKILL.md): if the orchestrator made this change as a replan, re-record spec_oid in handoff §3 as git -C <spec dir> hash-object --no-filters -- <spec> prints it and re-dispatch the item (round-orchestration.md §4-§5) so the work is built against the new criteria, then close that result; otherwise restore the dispatched spec.md (blob $want) and re-run close - halt"
-    exit 1 ;;
-esac
+if [ ! -e "$oidf" ]; then
+  echo "close: no spec.oid beside $spec (dispatched before ossify 1.21.2, or round-orchestration.md §4 skipped it) - spec.md is gated as found at close; its dispatch-time blob was never recorded"
+else
+  want="$(tr -d '[:space:]' < "$oidf")" || { echo "close: cannot read $oidf - halt"; exit 1; }
+  case "$want" in
+    ""|*[!0-9a-f]*) echo "close: $oidf does not hold one full blob id - halt"; exit 1 ;;
+  esac
+  if [ "${#want}" -ne "${#have}" ]; then
+    echo "close: $oidf does not hold one full blob id - halt"; exit 1
+  fi
+  if [ "$want" != "$have" ]; then
+    echo "close: spec.md for $wi changed since dispatch ($oidf holds $want, the spec is now $have) - the gate would judge the work against criteria it was not dispatched with. A spec that needed changing is a replan (work-item/SKILL.md): if the orchestrator made this change as one, rewrite $oidf with the new blob and send the item a correction continuation naming the changed criteria (work-item/references/correction-continuation.md), which reworks the staged result, then close that result; otherwise restore the dispatched spec.md (blob $want) and re-run close - halt"
+    exit 1
+  fi
+fi
 ```
 
-Only §3 is read, so a Clarifications answer that quotes a `spec_oid:` line does not
-count. A handoff with **no** `spec_oid` line in §3 is valid input: items dispatched before
-1.21.2 are still in flight, and close says the check did not run rather than
-refusing them.
+`spec.oid` holds one line and nothing else, so close parses no markdown to find
+it. An **absent** file is valid input: items dispatched before 1.21.2 are still in
+flight, and close says the check did not run rather than refusing them. A file
+that is present but empty or malformed halts.
 
 Carry `$spec`, `$report` and `$wt` forward as absolute paths. Nothing below
 re-derives them, and nothing anywhere in this layer `cd`s (SKILL.md §3).

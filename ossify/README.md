@@ -71,7 +71,7 @@ Since 1.21.1, `/ossify:adopt`'s completion floor refuses a record with no C2
 result line per declared repo: "no C2 gaps" from a clean-checkout pass that
 never ran no longer closes (#367).
 
-Since 1.21.2, work-item close compares `spec.md` to the blob the handoff recorded
+Since 1.21.2, work-item close compares `spec.md` to the blob written to `spec.oid`
 at dispatch and halts on a difference, on the nested and the external path: an
 implementer that edits its own acceptance criteria no longer passes the gate (#434).
 
