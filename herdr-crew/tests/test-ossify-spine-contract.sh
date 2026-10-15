@@ -1804,8 +1804,8 @@ pin "$LIFECYCLE_MD" 'with `phase: recorded` and its full locator before the brie
   "step 3 records the attempt before the send" flat
 pin "$LIFECYCLE_MD" '`phase: delivered` once the send is confirmed' \
   "step 3 marks delivery after the send" flat
-pin "$LIFECYCLE_MD" 'Every dispatch — a launch or a new brief to a retained seat — opens its attempt with `phase: recorded` and its full locator before the brief goes and sets `phase: delivered` once the send is confirmed.' \
-  "every dispatch refreshes phase and locator, including a retained seat" flat
+pin "$LIFECYCLE_MD" 'Every dispatch — a launch or a new brief to a retained seat — opens its attempt with `phase: recorded` and its full locator before the brief goes, writing an existing `REPORT_PATH` file'"'"'s current generation `{hash, identity}` as the new attempt'"'"'s `locator.seen` and leaving `seen` absent only when the file is absent, and sets `phase: delivered` once the send is confirmed.' \
+  "every dispatch records its phase, full locator and existing report baseline before sending" flat
 pin "$LIFECYCLE_MD" 'writes `run.question` before it asks and removes it on the answer' \
   "an operator ask is recorded in the run" flat
 pin "$LIFECYCLE_MD" '`{text, asked_at, task, message_id?}`' \

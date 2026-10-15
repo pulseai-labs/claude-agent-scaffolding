@@ -89,7 +89,9 @@ Every command's syntax comes from `herdr --skill`.
    The full locator records `pane`, `machine` (a local seat's too), `report`, molt's `status` path
    and autonomic's `pain` path, so an attempt whose brief never arrived never looks live.
    Every dispatch — a launch or a new brief to a retained seat — opens its attempt with `phase: recorded`
-   and its full locator before the brief goes and sets `phase: delivered` once the send is confirmed.
+   and its full locator before the brief goes, writing an existing `REPORT_PATH` file's current generation
+   `{hash, identity}` as the new attempt's `locator.seen` and leaving `seen` absent only when the file is absent,
+   and sets `phase: delivered` once the send is confirmed.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes or the plan's
