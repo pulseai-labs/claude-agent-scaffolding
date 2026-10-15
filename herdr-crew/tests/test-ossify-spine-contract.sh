@@ -1840,6 +1840,20 @@ pin "$LIFECYCLE_MD" 'brief not delivered before the top stopped' \
   "a recorded attempt with no delivery is settled and relaunched" flat
 pin "$LIFECYCLE_MD" 'relaunched from its seat row as a new attempt with `cause: {type: followup, ref: <the settled attempt'"'"'s id>}`' \
   "an undelivered attempt is relaunched with followup cause referencing the settled attempt" flat
+pin "$LIFECYCLE_MD" 'Per working attempt, first run the generation check against `locator.seen`, for both `phase: recorded` and `phase: delivered`.' \
+  "resume checks the generation baseline before deciding recorded delivery" flat
+pin "$LIFECYCLE_MD" 'A new report generation proves delivery: set a recorded attempt `delivered`, then read the generation once, record it and act on it by kind.' \
+  "a new report proves recorded delivery and is consumed once by kind" flat
+pin "$LIFECYCLE_MD" 'Only when the pane is gone or `herdr agent list` shows no agent session in it is that attempt settled `failed`' \
+  "only positive absence permits a recorded attempt to fail and relaunch" flat
+pin "$LIFECYCLE_MD" 'Any other read — idle, working or unreadable included — counts as `delivered`, not proof of non-delivery.' \
+  "inconclusive pane snapshots preserve delivery instead of duplicating the worker" flat
+pin "$LIFECYCLE_MD" 'The re-armed wait’s timeout checkpoint and the heartbeat surface a worker that never started; never run two workers on one attempt.' \
+  "bounded recovery surfaces an unstarted worker without duplicating the attempt" flat
+pin "$LIFECYCLE_MD" 'Re-arm step 5’s waits only for an attempt still live after its generation check; a final report consumed on resume settles that dispatch, so it gets no wait.' \
+  "resume re-arms only live attempts and never waits on consumed final reports" flat
+pin "$LIFECYCLE_MD" 'It arms one fresh heartbeat only if at least one dispatch is still live.' \
+  "resume arms no heartbeat after its last dispatch settles" flat
 pin "$LIFECYCLE_MD" 'If `run.question` is present, it asks it once again' \
   "the resume re-asks an open operator question" flat
 pin "$LIFECYCLE_MD" 'A `done` task is never re-run' \

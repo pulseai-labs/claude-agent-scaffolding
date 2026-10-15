@@ -326,13 +326,18 @@ A resume the operator started is a hard stop, even with an old handoff present.
    It writes `run.orchestrator.machine` beside the pane.
    From here every worker's next ping comes to this pane.
 4. If `run.question` is present, it asks it once again.
-5. Per working attempt: `phase: recorded` — one `herdr pane read`; a pane showing the worker on this task is set
-   `delivered`, any other is settled `failed` ("brief not delivered before the top stopped"), released, and relaunched
-   from its seat row as a new attempt with `cause: {type: followup, ref: <the settled attempt's id>}`. `phase: delivered` — the generation check against `locator.seen`, a new
-   generation read once, recorded and acted on; then step 5's waits re-armed on the pane (a detected coordinator's
-   companion included) through `locator.machine`;
-   every later operation on that pane carries `locator.machine` (`herdr-mechanics.md`, Machines).
-6. It arms one fresh heartbeat.
+5. Per working attempt, first run the generation check against `locator.seen`, for both `phase: recorded` and
+   `phase: delivered`. A new report generation proves delivery: set a recorded attempt `delivered`, then read the
+   generation once, record it and act on it by kind. With no new generation and `phase: recorded`, take one
+   `herdr pane read`. Only when the pane is gone or `herdr agent list` shows no agent session in it is that attempt
+   settled `failed` ("brief not delivered before the top stopped"), released, and relaunched from its seat row as a new
+   attempt with `cause: {type: followup, ref: <the settled attempt's id>}`. Any other read — idle, working or unreadable
+   included — counts as `delivered`, not proof of non-delivery. The re-armed wait’s timeout checkpoint and the heartbeat
+   surface a worker that never started; never run two workers on one attempt.
+   Re-arm step 5’s waits only for an attempt still live after its generation check; a final report consumed on resume
+   settles that dispatch, so it gets no wait. The waits are on the pane (a detected coordinator's companion included)
+   through `locator.machine`; every later operation on that pane carries `locator.machine` (`herdr-mechanics.md`, Machines).
+6. It arms one fresh heartbeat only if at least one dispatch is still live.
 7. It continues at the step the handoff names; with no handoff, at the first task whose deps are done, that is not
    itself done and has no live attempt. A `done` task is never re-run.
 
