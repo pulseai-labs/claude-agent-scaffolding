@@ -219,8 +219,8 @@ for word, so the bar exists before the first review.
 - **Evidence** — the gates each work item's close ran, with their results;
   nothing that did not run.
 - **Closes** — `None.` The intake requests this spine pulled in are listed as
-  `Refs <owner>/<repo>#<n>`, never `Closes`: they are closed after the landing is
-  recorded (below the record pass), not by the first PR to merge.
+  `Refs <owner>/<repo>#<n>`, never `Closes`: spine close comments on them after the
+  landing is recorded (below the record pass), and the operator closes them.
 
 Claim, Evidence and Closes are the spine's and read the same in every file; Scope,
 Known limits and Merge danger are the repo's. Write each repo's fields to `<fields-dir>/<repo>`,
@@ -673,10 +673,19 @@ $pr_lines
 EOF
 ```
 
-**Then close the intake requests this spine pulled in** — on every install, with
-or without merge-bar, and only once every hosting repo is recorded landed (pass
-one's local merges and the record pass above): for each,
-`gh issue close <n> --repo "<owner/repo>" --comment "<spine-id> landed: <PR URLs or merge SHAs>"`.
+**Then report on the intake requests this spine pulled in** — on every install,
+with or without merge-bar, and only once every hosting repo is recorded landed
+(pass one's local merges and the record pass above). Spine close never closes an intake request (#631):
+one feature can span spines not yet planned, and a spine can land without the
+work item that carried the request, so no spine knows when the request is done.
+For each request, comment
+`gh issue comment <n> --repo "<owner/repo>" --body "<spine-id> landed: <PR URLs or merge SHAs>"`.
+Then tell the operator which requests this spine touched, the other spines their
+`pulled in — <spine id>` comments name
+(`gh issue view <n> --repo "<owner/repo>" --json comments --jq '.comments[].body'`),
+and each one's status in state (`oss spine_list`). The operator closes a request by
+hand once the work it asked for has landed. If the comments cannot be read, say so;
+the request stays open either way.
 No PR carries a `Closes` line for them: with several hosting repos, the first PR
 to merge would close a request while the rest are still open.
 
