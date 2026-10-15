@@ -37,9 +37,11 @@ constraint:
 - **Optimise for the most common caller.** Make the default case trivial.
 - **Design around ports and adapters**, where cross-seam dependencies make that relevant.
 
-Include both this skill's vocabulary and the project's domain vocabulary (`CONTEXT.md`) in
-each brief, so every agent names things consistently with the architecture language *and*
-the domain language.
+Include both this skill's vocabulary and the project's domain vocabulary in each brief, so
+every agent names things consistently with the architecture language *and* the domain
+language. Pass the vocabulary source the caller already resolved under `domain-modeling`'s
+*Where the model lives*, not a file name: it may not be a glossary file at all. Reached
+directly, with no caller, resolve it yourself under that section before spawning.
 
 Each sub-agent returns:
 
