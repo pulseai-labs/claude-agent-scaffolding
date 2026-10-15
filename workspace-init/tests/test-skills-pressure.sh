@@ -506,8 +506,9 @@ test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c() {
   assert_contains 'merge `CLAUDE.md` into `AGENTS.md`' "$dual" || return 1
   # D4: the blanket "Specs … belong here" contradicted the manifest's routing,
   # which sends prd/srs/product_adrs to the canonical. The old stub had the
-  # distinction; the fold dropped it.
-  assert_contains 'Sprint specs, the memory bank and process records belong here.' "$tmpl" || return 1
+  # distinction; the fold dropped it. D25 adds MASTER-SPEC, which routing sends
+  # to the AI workspace (`pairing.json.tmpl:76`).
+  assert_contains 'Sprint specs, `MASTER-SPEC.md`, the memory bank and process records belong here.' "$tmpl" || return 1
   assert_contains 'PRDs and SRSs also go to the' "$tmpl" || return 1
   assert_not_contains 'Specs, the memory bank and process records belong here.' "$tmpl" || return 1
   # D5: the §4 scan must name the `.claude/` copy too, which step 3 covers.
@@ -608,6 +609,35 @@ test_claude_code_fallback_is_version_gated() {
   assert_not_contains 'Claude Code loads it when the' "$tmpl" || return 1
 }
 
+test_release_record_matches_the_shipped_files() {
+  # D23/D24: the release record and a test header carry claims about files that
+  # can drift from them. Three of these were wrong in round 1 (R2 found them) and
+  # each mutation SURVIVED until this test existed.
+  local chg hdr
+  chg="$(cat "$WI_PLUGIN_ROOT/CHANGELOG.md")"
+  hdr="$(sed -n '1,10p' "$WI_PLUGIN_ROOT/tests/test-stubs.sh")"
+  # The "grown organically" pointer lives in `pairing-canonical-repo` §1, not in
+  # `pairing-existing-dual` — verify the fact before pinning the claim.
+  local dual_s
+  dual_s="$(cat "$WI_PLUGIN_ROOT/skills/pairing-existing-dual/SKILL.md")"
+  grep -Fq 'grown organically' "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md" \
+    || { echo "    the pointer no longer lives in pairing-canonical-repo"; return 1; }
+  case "$dual_s" in
+    *'grown organically'*) echo "    pairing-existing-dual now holds the pointer too — update the claim"; return 1 ;;
+  esac
+  assert_contains 'pointer paragraph in `pairing-canonical-repo` §1 names' "$chg" || return 1
+  # The `## AI-trace filter` section came from the old CLAUDE.md stub.
+  git -C "$REPO_ROOT" show b4410e89:workspace-init/templates/CLAUDE.md.stub.tmpl 2>/dev/null \
+    | grep -Fq '## AI-trace filter' \
+    || { echo "    the old CLAUDE.md stub no longer shows the AI-trace section"; return 1; }
+  assert_contains 'section plus the canonical-and-ossify continuation sections from the old `CLAUDE.md` stub' "$chg" || return 1
+  # The header's count must equal the runners that file actually declares.
+  local runners
+  runners="$(grep -c 'wi_test_run' "$WI_PLUGIN_ROOT/tests/test-stubs.sh")"
+  assert_contains "Covers ($runners tests)" "$hdr" || return 1
+  assert_not_contains 'SPEC §8.5' "$hdr" || return 1
+}
+
 test_layout_tree_versions_match_manifests() {
   # D7: the root README's Layout tree carries a hand-maintained `(vX.Y.Z)` per
   # plugin, and workspace-init's had drifted to v0.8.0 two releases behind. The
@@ -676,6 +706,7 @@ wi_test_run test_claude_md_stub_scan_fails_on_an_empty_surface
 wi_test_run test_marker_string_matches_across_surfaces
 wi_test_run test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c
 wi_test_run test_claude_code_fallback_is_version_gated
+wi_test_run test_release_record_matches_the_shipped_files
 wi_test_run test_layout_tree_versions_match_manifests
 wi_test_run test_existing_dual_scans_both_instruction_files
 

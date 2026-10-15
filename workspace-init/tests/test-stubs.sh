@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # tests/test-stubs.sh — unit tests for lib/stubs.sh
-# Covers (per SPEC §8.5/§8.6/§8.7, ~9 tests):
-#   A. AGENTS.md (5) — stub rendering + project-name fallback + idempotency +
-#                      no CLAUDE.md + dispatcher path
+# Covers (11 tests):
+#   A. AGENTS.md (7) — stub rendering + project-name fallback + idempotency +
+#                      no CLAUDE.md + dispatcher path + `&` in the root +
+#                      WRITE_FILE logging
 #   R. README.md (3) — stub rendering + substitution + idempotency
 #   T. Template missing (1) — returns non-zero when template absent
 
