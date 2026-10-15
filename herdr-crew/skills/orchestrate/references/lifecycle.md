@@ -22,7 +22,7 @@ Every command's syntax comes from `herdr --skill`.
    loop every other write takes.
    Every creation and every bind writes `run.orchestrator.machine` beside its pane — this server's
    machine, per `herdr-mechanics.md`, Machines.
-   Binding a run another top drove — a rotation's resume or a hard stop — runs **The resume** (Rotation past the context ceiling) first; its step 3 is this rebind.
+   Binding a run another top drove through a rotation runs **The resume** (Rotation past the context ceiling) first; its step 2 is this rebind.
 1b. **Ossify spine planned here?** If this session just completed `/ossify:plan-spine`
    against a concrete spine directory with a run bound, step 2 is replaced by
    `references/ossify-execution.md`: agree one implementer/verifier seat per work
@@ -296,8 +296,7 @@ never guessed. Both sessions' boundaries and returns are in their briefs
 (`ossify-briefs.md`, `ossify-pr-briefs.md`); a spine `rotate:` is
 `ossify-nested-run.md` §4.
 
-**Your own rotation, and a resume after a hard stop.** Two entries lead into one resume: a rotation, and a hard stop.
-In a rotation your boundary is a fully acknowledged delivery with no operator question in flight. Write the handoff
+**Your own rotation.** Your boundary is a fully acknowledged delivery with no operator question in flight. Write the handoff
 step 13 states, plus a resolved profile beside a launch command for each host — this top's and the other host's
 (Claude Code and OMP: `omp-seat orchestrator --via omp-glm`), the other host's profile resolved from its machine-file
 entry like any seat's (`config.md`) — ask the operator once when there is none. The handoff restates no operator gate:
@@ -315,23 +314,16 @@ Confirm its turn started, then **stand down**: kill this session's armed
 background waits and its heartbeat, write nothing more to the run file and take no dispatch action. One report must
 wake one top. A worker pings whichever pane `run.orchestrator` names, so after the rebind a worker on the successor's machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.
 Then tell the operator which tab to use and that this one can close.
-A hard stop has no outgoing top: the operator starts a top and names the run's `run.json`.
-A resume the operator started is a hard stop, even with an old handoff present.
+A hard stop — the top died with no handoff — has no resume procedure yet (#810): the new top tells the operator and
+continues only as the operator directs.
 
 **The resume.** The new top resumes by naming the parent's `run.json` path — there is no CLI call:
-1. It reads the file and notes the old `run.orchestrator` pane and machine before any write.
-   On a hard stop with no fresh handoff, it takes the head SHA from the PR the run tracks
-   (`gh pr view <PR> --repo <owner/repo> --json headRefOid`, the PR's repository), or else from the last settled attempt's receipt.
-   On a hard stop with no fresh handoff, it counts every molt-status and pain line already present at resume as noted.
-2. On a hard stop only, it stands the old top down. A pane that is this session's own `$HERDR_PANE_ID` is never
-   closed: the old top is already gone. Otherwise, when `herdr agent list` on that machine shows an agent session in
-   that pane, it closes the pane (`herdr pane close`), which ends the session with its armed waits and heartbeat. It
-   never closes a pane it cannot identify; that, or an unreachable machine, it tells the operator once, and goes on.
-3. A session that binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr's stable-agent fallback otherwise — in the same producer loop every other write takes.
+1. It reads the file and the fresh handoff.
+2. A session that binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr's stable-agent fallback otherwise — in the same producer loop every other write takes.
    It writes `run.orchestrator.machine` beside the pane.
    From here every worker's next ping comes to this pane.
-4. If `run.question` is present, it asks it once again.
-5. Per working attempt, first run the generation check against `locator.seen`, for both `phase: recorded` and
+3. If `run.question` is present, it asks it once again.
+4. Per working attempt, first run the generation check against `locator.seen`, for both `phase: recorded` and
    `phase: delivered`. A new report generation proves delivery: set a recorded attempt `delivered`, then read the
    generation once, record it and act on it by kind. With no new generation and `phase: recorded`, treat the attempt
    as `delivered` and re-arm it like any delivered attempt. Never relaunch it automatically. The re-armed wait’s timeout
@@ -340,15 +332,12 @@ A resume the operator started is a hard stop, even with an old handoff present.
    Re-arm step 5’s waits only for an attempt still live after its generation check; a final report consumed on resume
    settles that dispatch, so it gets no wait. The waits are on the pane (a detected coordinator's companion included)
    through `locator.machine`; every later operation on that pane carries `locator.machine` (`herdr-mechanics.md`, Machines).
-6. It arms one fresh heartbeat only if at least one dispatch is still live.
-7. On a rotation, it continues at the fresh handoff's next step. On a hard stop, it continues from `run.json` at
-   the first task whose deps are done, that is not itself done and has no live attempt;
-   an old handoff is context only, never its next step. A `done` task is never re-run.
+5. It arms one fresh heartbeat only if at least one dispatch is still live.
+6. It continues at the fresh handoff's next step. A `done` task is never re-run.
 
 A run file older than 0.2.21 lacks these fields: an attempt with no `phase` counts as `delivered`; with no
 `locator.report`, the path comes from a handoff, or the operator once; no `merge_word` counts as `standing` unless
-the run's brief sets an operator gate. With no `run.orchestrator.machine`, on a hard stop the top asks the operator
-once for the old top's machine, or skips the stand-down close and says so. For a live dispatch with no `seen` and no
+the run's brief sets an operator gate. For a live dispatch with no `seen` and no
 fresh handoff generation, the existing report is ambiguous: the top reads it but does not act on it until the operator
 confirms it belongs to the live attempt. A fresh handoff's noted hash and identity, where present, are the baseline.
 A live worker dispatched under 0.2.20 or earlier keeps pinging its fixed pane until that dispatch ends; the heartbeat

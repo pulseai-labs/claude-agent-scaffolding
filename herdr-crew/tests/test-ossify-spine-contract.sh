@@ -1815,31 +1815,21 @@ pin "$MECHANICS_MD" 'and recorded as the attempt'"'"'s `locator.seen`' \
 pin "$MECHANICS_MD" '`{hash, identity}`' \
   "the consumed generation records the exact object keys" flat
 
-section "one resume procedure from run state (#810, #819)"
-pin "$LIFECYCLE_MD" 'Two entries lead into one resume: a rotation, and a hard stop' \
-  "the rotation section names both entries" flat
+section "a rotation resumes from run state (#819; hard stop deferred to #810)"
+# Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 pin "$LIFECYCLE_MD" 'From the handoff on, this session writes nothing to the run file and takes no dispatch action; a wake that reaches it before it stands down is handed to the successor, never acted on.' \
   "the outgoing top stops writing and dispatching at handoff and relays every intervening wake" flat
-pin "$LIFECYCLE_MD" 'On a hard stop only, it stands the old top down' \
-  "only a hard-stop resume stands the old top down" flat
+# Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 pin "$LIFECYCLE_MD" 'write nothing more to the run file and take no dispatch action' \
   "stand-down keeps the outgoing top from writing or dispatching" flat
 pin "$LIFECYCLE_MD" 'It writes `run.orchestrator.machine` beside the pane.' \
-  "resume step 3 writes the successor's machine beside its pane" flat
-pin "$LIFECYCLE_MD" 'notes the old `run.orchestrator` pane and machine before any write' \
-  "the resume reads the dead top's address before the rebind" flat
-pin "$LIFECYCLE_MD" 'never closes a pane it cannot identify' \
-  "the hard-stop stand-down closes only an identified agent pane" flat
-pin "$LIFECYCLE_MD" 'A pane that is this session'"'"'s own `$HERDR_PANE_ID` is never closed: the old top is already gone.' \
-  "a hard-stop resume in the old pane never closes its own session" flat
-pin "$LIFECYCLE_MD" 'Binding a run another top drove — a rotation'"'"'s resume or a hard stop — runs **The resume** (Rotation past the context ceiling) first; its step 3 is this rebind.' \
-  "Orient routes takeover through the resume before rebinding the old top's address" flat
-pin "$LIFECYCLE_MD" 'A resume the operator started is a hard stop, even with an old handoff present.' \
-  "an operator-started resume takes the hard-stop path despite an old handoff" flat
-pin "$LIFECYCLE_MD" 'On a hard stop with no fresh handoff, it takes the head SHA from the PR the run tracks (`gh pr view <PR> --repo <owner/repo> --json headRefOid`, the PR'"'"'s repository), or else from the last settled attempt'"'"'s receipt.' \
-  "a hard stop reconstructs the head from the tracked PR in its repository or last settled receipt" flat
-pin "$LIFECYCLE_MD" 'On a hard stop with no fresh handoff, it counts every molt-status and pain line already present at resume as noted.' \
-  "a hard stop without a fresh handoff baselines all existing molt-status and pain lines" flat
+  "resume step 2 writes the successor's machine beside its pane" flat
+# Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
+pin "$LIFECYCLE_MD" 'Binding a run another top drove through a rotation runs **The resume** (Rotation past the context ceiling) first; its step 2 is this rebind.' \
+  "Orient routes a rotation's takeover through the resume before rebinding" flat
+pin "$LIFECYCLE_MD" 'A hard stop — the top died with no handoff — has no resume procedure yet (#810): the new top tells the operator and continues only as the operator directs.' \
+  "a hard stop is not claimed: the new top defers to the operator (#810)" flat
+# Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 # Ruling 12: automatic relaunch retired; an unstarted worker is the operator's decision.
 # Ruling 12: relaunch cause retired with the automatic relaunch path.
 pin "$LIFECYCLE_MD" 'Per working attempt, first run the generation check against `locator.seen`, for both `phase: recorded` and `phase: delivered`.' \
@@ -1862,10 +1852,9 @@ pin "$LIFECYCLE_MD" 'If `run.question` is present, it asks it once again' \
   "the resume re-asks an open operator question" flat
 pin "$LIFECYCLE_MD" 'A `done` task is never re-run' \
   "the resume never re-runs a done task" flat
-pin "$LIFECYCLE_MD" 'On a rotation, it continues at the fresh handoff'"'"'s next step.' \
+pin "$LIFECYCLE_MD" 'It continues at the fresh handoff'"'"'s next step.' \
   "a rotation continues at its fresh handoff's next step" flat
-pin "$LIFECYCLE_MD" 'On a hard stop, it continues from `run.json` at the first task whose deps are done, that is not itself done and has no live attempt; an old handoff is context only, never its next step.' \
-  "a hard stop selects a ready unfinished task without a live attempt from run.json and never follows an old handoff's next step" flat
+# Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 pin "$LIFECYCLE_MD" 'and the next step, the head SHA, and, per live seat, the last molt status line noted and the last autonomic pain line noted.' \
   "step 13 preserves the head SHA and each live seat's status and pain cursors" flat
 pin "$LIFECYCLE_MD" 'The run file holds those files’ paths, not the read cursors.' \
@@ -1882,9 +1871,7 @@ pin "$LIFECYCLE_MD" 'A run file older than 0.2.21' \
   "the resume names the legacy run-file rules" flat
 pin "$LIFECYCLE_MD" 'no `phase` counts as `delivered`' \
   "legacy: an attempt with no phase is delivered" flat
-# Ruling 12: legacy machine default retired; the old host must not be guessed from this top's host.
-pin "$LIFECYCLE_MD" 'With no `run.orchestrator.machine`, on a hard stop the top asks the operator once for the old top'"'"'s machine, or skips the stand-down close and says so.' \
-  "legacy: an unknown old machine requires an operator ask or an explicit skipped close" flat
+# Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 # Ruling 12: legacy read-once default retired; an unbaselined report does not prove the live attempt's result.
 pin "$LIFECYCLE_MD" 'For a live dispatch with no `seen` and no fresh handoff generation, the existing report is ambiguous: the top reads it but does not act on it until the operator confirms it belongs to the live attempt.' \
   "legacy: an ambiguous report is read but requires operator confirmation before action" flat

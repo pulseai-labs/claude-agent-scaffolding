@@ -4,12 +4,11 @@ All notable changes to the `herdr-crew` plugin.
 
 ## 0.2.22
 
-**One resume from run state** (#810, #819). A rotation and a resume after a hard stop (the top died with no handoff) run one procedure from `run.json`: read the old `run.orchestrator` pane and machine before any write; on a hard stop, close the old top's pane only when `herdr agent list` shows an agent session in it; rebind; re-ask an open `run.question`; run the generation check against `locator.seen` and re-arm each delivered attempt's waits; arm one heartbeat; continue at the first ready task, never re-running a done one. The rotation handoff shrinks to the run path, the next step and the context the run file cannot hold, and restates no operator gate: for the merge it points at step 12 and `run.merge_word`, which step 12 now reads. Legacy run files resume with stated defaults. A molted top reads `locator.seen`. A brief sent to a seat already running now opens its attempt with phase and locator like a launch.
+**A rotation resumes from run state** (#819, part of #810). The rotation's resume is one procedure from `run.json`: rebind; re-ask an open `run.question`; run the generation check against `locator.seen` and re-arm each live attempt's waits; arm one heartbeat; continue at the handoff's next step, never re-running a done one. A resume after a hard stop (the top died with no handoff) is not claimed: the new top tells the operator (#810). The rotation handoff shrinks to the run path, the next step and the context the run file cannot hold, and restates no operator gate: for the merge it points at step 12 and `run.merge_word`, which step 12 now reads. Legacy run files resume with stated defaults. A molted top reads `locator.seen`. A brief sent to a seat already running now opens its attempt with phase and locator like a launch.
 
 - The outgoing top's write/dispatch ban starts at the handoff, including wakes during successor launch.
 - At `phase: recorded`, every dispatch saves an existing report's generation in the new attempt's `locator.seen`, so a retained seat's previous report is not consumed again after a resume or molt.
-- Orient sends a takeover through the resume before rebinding; an operator-started resume is a hard stop even with an old handoff, and restarting in the old pane never closes the new top itself.
-- Resume task selection skips tasks that already have a live attempt.
+- Orient sends a rotation's takeover through the resume before rebinding.
 
 ## 0.2.21
 
