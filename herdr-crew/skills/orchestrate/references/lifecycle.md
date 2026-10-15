@@ -14,10 +14,14 @@ Every command's syntax comes from `herdr --skill`.
    writing run files at all. That contract is the rule for every write of the
    file, not only its first: the complete document goes to a temp file beside
    the target, `dagr check --strict` it, and the rename over `run.json` — `mv`,
-   which this command allows — lands only once that check is clean. A session that
+   which this command allows — lands only once that check is clean. A created run records
+   `run.merge_word` — `standing` unless the brief or the operator sets a merge gate for this run,
+   then `operator`. A session that
    binds an existing `run.json` rewrites `run.orchestrator` to its own
    `$HERDR_PANE_ID` — dagr's stable-agent fallback otherwise — in the same producer
    loop every other write takes.
+   Every creation and every bind writes `run.orchestrator.machine` beside its pane — this server's
+   machine, per `herdr-mechanics.md`, Machines.
 1b. **Ossify spine planned here?** If this session just completed `/ossify:plan-spine`
    against a concrete spine directory with a run bound, step 2 is replaced by
    `references/ossify-execution.md`: agree one implementer/verifier seat per work
@@ -77,11 +81,15 @@ Every command's syntax comes from `herdr --skill`.
    session's brief already carries. The "state your model" line is the worker's own second check: a
    model that is not `SEAT_EXPECTED_MODEL` is a failed launch it writes to its report file
    and stops on. Wrong model at the banner read: release the seat and report it.
-   Every brief this session dispatches names its own pane in the brief's `NOTIFY_PANE` slot —
-   this session's `$HERDR_PANE_ID` when herdr detects this pane and the seat shares its server,
-   otherwise the sentinel `none` — so an eligible worker's ping comes back here; a coordinator
-   fills its children's slot the same way, and an operator's `brief:` is sent as a copy carrying
-   the slot and the ping step, never edited in place (`briefs.md`).
+   Every brief this session dispatches names this run's `run.json` in its `NOTIFY_RUN` slot and the
+   seat's machine in `NOTIFY_MACHINE` — `NOTIFY_RUN` is the sentinel `none` when herdr does not detect
+   this pane or the seat is on another machine — so an eligible worker's ping comes to whichever pane
+   `run.orchestrator` names when it renames; a coordinator fills its children's slots with its own
+   nested `run.json` the same way, and an operator's `brief:` is sent as a copy carrying the slots and the ping step, never edited in place (`briefs.md`).
+   The launch writes the attempt with `phase: recorded` and its full locator before the brief goes —
+   `pane`, `machine` (a local seat's too), `report`, molt's `status` path and autonomic's `pain` path —
+   and writes `phase: delivered` once the send is confirmed, so an attempt whose brief never arrived
+   never looks live.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes or the plan's
@@ -115,6 +123,9 @@ Every command's syntax comes from `herdr --skill`.
    seat is in scope, not only a report-file wait — and kills it when its last dispatch settles,
    at teardown, and at a rotation's stand-down; a host with no background timer keeps the wait/ping fallback, never a rolling foreground
    loop (`herdr-mechanics.md`).
+   Before any question to the operator the top writes `run.question` before it asks and removes it on
+   the answer — `{text, asked_at, task, message_id?}` (`message_id` only when the question answers or
+   relays a dagr operator message) — so a question survives the top.
    `herdr pane read`
    only on a `blocked` wake, a missing or malformed report, a timeout's checkpoint, the
    false wake's own read, or the heartbeat tick's one check per live seat — never to watch progress.
@@ -313,13 +324,11 @@ instruction without — confirm its turn started, then **stand down**: kill this
 armed background waits and its heartbeat before the successor re-arms the same panes and
 arms its own, and take no dispatch action from here on. One report must wake one top — a
 live dispatch a successor is also waiting on otherwise advances twice, and a close, a PR
-or a merge runs twice with it. A wake that fires anyway — a stale ping naming this
-session's pane, or a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the
-rebind, included — is read and handed to the successor, never acted on: until that
-successor's next message to a retained worker carries its own pane id as the new
-`NOTIFY_PANE`, the worker keeps pinging this pane, and the successor's heartbeat covers the
-interval. Then tell the
-operator which tab to use and that this one can close.
+or a merge runs twice with it. A worker pings whichever pane `run.orchestrator` names, so after
+the rebind a worker on the successor's machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued
+here before the rebind, is read and handed to the successor, never acted on.
+Then tell the operator which tab to use
+and that this one can close.
 A successor on the other host takes that host's form: with ossify, `skill://handoff-resume <path>` to an OMP top
 and `/ossify:handoff-resume <path>` to a Claude Code top; without it, the path as its first instruction on either.
 The new top resumes by naming the parent's `run.json` path — there is no CLI call —
@@ -344,7 +353,7 @@ you after it is added to it verbatim, never acted on, and end that reply with
 `MOLT-HANDOFF: <path>`. molt runs `/clear` in this pane and seeds the fresh session with the
 handoff. There is no stand-down and no successor launch: the pane, its `HERDR_PANE_ID`, its
 seat marking (`herdr-mechanics.md` step 2, "A molt is not a launch") and every armed wait
-survive the clear, and every worker's `NOTIFY_PANE` still names this pane. The resumed top
+survive the clear, and every worker's ping still reaches this pane, which `run.orchestrator` still names. The resumed top
 reads the handoff and confirms `run.orchestrator` names its own `$HERDR_PANE_ID`, rewriting it
 only where it does not. It arms no wait and no heartbeat the handoff lists: they keep running,
 and their notifications are its own. A heartbeat tick the handoff carries means that heartbeat

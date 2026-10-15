@@ -161,9 +161,9 @@ brief: ./briefs/security-audit.md
 - `brief:` — the file the coordinator sends as that role's brief. It must carry a
   report envelope — a `REPORT_PATH` and a completion shape — checked at approval
   with `can:` and the block's other fields; without one the role cannot return. The
-  coordinator sends a copy carrying the run's `NOTIFY_PANE` slot and ping step beside that
-  envelope (`briefs.md`), and edits no stored file: a stored brief whose fixed target differs from
-  the run's is a conflict surfaced to the operator, never overridden; an equal target is no conflict, kept as it is.
+  coordinator sends a copy carrying the run's `NOTIFY_RUN` (the run file whose `run.orchestrator` the worker pings) slot, `NOTIFY_MACHINE` and ping step beside that
+  envelope (`briefs.md`), and edits no stored file: a stored brief whose fixed run file or fixed machine differs from
+  the run's is a conflict surfaced to the operator, never overridden; equal values are no conflict, kept as they are.
 - `replaces:` — hands the role a step the plugin owns; the valid targets are
   `implementer`, `verifier`, `reviewer` only. The named seat is not launched for
   that run — the operator's role runs at the step's point in its place, and the

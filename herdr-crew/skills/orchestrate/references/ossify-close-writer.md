@@ -27,8 +27,8 @@ WRITER_EXPECTED_MODEL is a failed launch to report, not to work around.
 PLACEMENT: REPO_ROOT — the worktree holding this repo's spine branch.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
-REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_PANE=<the pane id of the seat that dispatched you — filled with the dispatcher's own $HERDR_PANE_ID only when herdr detects that pane and your pane's server can reach it; otherwise the sentinel `none`, which is never sent to>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_PANE is not `none`: `herdr agent prompt <NOTIFY_PANE> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). The report file is the contract; a failed send is left as it is.
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 SPINE_ID=<spine id>
 REPO=<the declared `target_repo` identifier for this writer's repo — it exists
 for remote and remote-less repos alike>
@@ -51,7 +51,7 @@ DONE: write your report file, carrying ACCEPTED_LEDGER back with one line per
 finding — `fixed in <sha>` or `blocked: <reason>` — plus:
   Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
-MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> 'MOLT WARNING <pct> <task id>'` (never to `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
+MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: push, open a PR, merge, edit outside this worktree (your report file
 excepted), run the close or any review, dispatch or create anything, or work
 around a finding you cannot fix — report it. When blocked, write the question

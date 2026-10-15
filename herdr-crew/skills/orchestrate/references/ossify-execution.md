@@ -77,10 +77,10 @@ so an edit made for another spine cannot reach a
 spine already running. **The item briefs travel with it**: append that file's item implementer,
 item verifier and correction templates — and the generic verifier body from `briefs.md`, whose
 claims list the item verifier template instantiates — to the same dispatch, as `briefs.md`'s
-header requires. The spine session's own brief carries `NOTIFY_PANE` with the top's
-`$HERDR_PANE_ID` when herdr detects the top's pane and the seat shares its server (otherwise
-`none`), and each item brief the spine session constructs carries the spine session's own pane
-id the same way — the dispatcher fills it, the worker never rediscovers it. A seat
+header requires. The spine session's own brief carries `NOTIFY_RUN` with the top's `run.json`
+when herdr detects the top's pane and the seat shares its machine (otherwise `none`), and
+`NOTIFY_MACHINE` with the seat's machine. For each child, the spine session fills `NOTIFY_RUN` with its own
+nested `run.json` and `NOTIFY_MACHINE` with the child's machine — the dispatcher fills the slots, the worker never rediscovers them. A seat
 that needs to change mid-spine is a new operator
 decision you relay down through the reply; no session re-reads the file for it.
 

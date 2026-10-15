@@ -294,12 +294,27 @@ pin "$WRITER_MD" 'REPORT_PATH=' \
 # The ping target rides the report-path slot line, one per report-producing
 # template: three spine-layer sessions, two PR-layer, one writer. A template
 # missing its slot lowers the count, which is what makes the count the check.
-n_eq "$BRIEFS_MD" 'NOTIFY_PANE=' 3 \
-  "all three spine briefs carry the ping target"
-n_eq "$PRBRIEFS_MD" 'NOTIFY_PANE=' 2 \
-  "the close and work-PR briefs carry the ping target"
-pin "$WRITER_MD" 'NOTIFY_PANE=' \
-  "the close-review writer's brief carries the ping target"
+n_eq "$BRIEFS_MD" 'NOTIFY_RUN=' 3 \
+  "all three spine briefs carry the run file the ping reads"
+n_eq "$PRBRIEFS_MD" 'NOTIFY_RUN=' 2 \
+  "the close and work-PR briefs carry the run file the ping reads"
+pin "$WRITER_MD" 'NOTIFY_RUN=' \
+  "the close-review writer's brief carries the run file the ping reads"
+n_eq "$BRIEFS_MD" 'NOTIFY_MACHINE=' 3 \
+  "all three spine briefs carry the worker's machine"
+n_eq "$PRBRIEFS_MD" 'NOTIFY_MACHINE=' 2 \
+  "the close and work-PR briefs carry the worker's machine"
+pin "$WRITER_MD" 'NOTIFY_MACHINE=' \
+  "the close-review writer's brief carries the worker's machine"
+for f in "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" "$GENERIC_BRIEFS_MD" "$MECHANICS_MD" "$LIFECYCLE_MD" "$SKILL_MD" "$CONFIG_MD" "$PLUGIN_README_MD" "$EXEC_MD" "$NESTED_MD" "$ROLES_MD"; do
+  absent "$f" 'NOTIFY_PANE' "${f##*/} names no fixed ping target"
+done
+# #816: the ping goes only to a pane on the worker's own server. The comparison is
+# the rule that keeps a cross-host rotation from pinging a pane id from another server.
+pin "$MECHANICS_MD" 'only when `run.orchestrator.machine` equals `NOTIFY_MACHINE`' \
+  "the ping compares the top's machine with the worker's" flat
+pin "$GENERIC_BRIEFS_MD" 'a stored brief whose fixed run file or fixed machine differs from the run'"'"'s is surfaced, not overridden; equal values are no conflict, kept as they are.' \
+  "a stored brief conflicts on either fixed run file or fixed machine, not equal values" flat
 for id in RUN_JSON MECHANICS; do
   pin "$PRBRIEFS_MD" "$id=" "the work-PR brief injects $id exactly once"
 done
@@ -399,9 +414,9 @@ section "one mechanic, one statement"
 # brief file every `herdr agent ` occurrence IS the ping line — counted both
 # ways, so any other agent command breaks the equality. The adjacent control
 # below proves the equality still flags one. 0.2.8: a leaf template's MOLT line states the
-# worker's second own ping, `MOLT WARNING`, to the same NOTIFY_PANE, for the same reason —
+# worker's second own ping, `MOLT WARNING`, read from NOTIFY_RUN, for the same reason —
 # so each count below adds one per MOLT line in that file.
-PING_CMD='herdr agent prompt <NOTIFY_PANE>'
+PING_CMD='herdr agent prompt <that pane>'
 agent_commands_are_pings() { # <file> <expected ping lines>
   _a="$(count_of "$1" 'herdr agent ')" || return 1
   _p="$(count_of "$1" "$PING_CMD")" || return 1
@@ -1707,6 +1722,8 @@ section "rotation past the context ceiling"
 pin "$LIFECYCLE_MD" "## Rotation past the context ceiling" "lifecycle.md carries the rotation section"
 pin "$LIFECYCLE_MD" 'resumes by naming the parent'"'"'s `run.json` path' \
   "a new top binds the parent run by naming its run.json path"
+pin "$LIFECYCLE_MD" 'so after the rebind a worker on the successor'"'"'s machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.' \
+  "same-machine pings follow the rebind and stale pings are handed to the successor" flat
 pin "$BRIEFS_MD" "HANDOFF_PATH=<" "the spine brief takes HANDOFF_PATH"
 pin "$BRIEFS_MD" "rotate: <handoff path>" "the spine brief returns rotate: past the ceiling"
 pin "$NESTED_MD" "rotate: <handoff path>" "the top's spine-completion step handles rotate:"
@@ -1767,6 +1784,35 @@ pin "$NESTED_MD" 'the `RUN_JSON` path that return named' \
   "nested-run §4 carries RUN_JSON into a resumed work-PR dispatch" flat
 pin "$EXEC_MD" 'the `RUN_JSON` path that record'"'"'s return named' \
   "ossify-execution's top column carries RUN_JSON into a resumed work-PR dispatch" flat
+
+section "the run file carries the live facts (#810, #816, #819)"
+# Spec §3/§5: each fact a successor needs is written at the step that learns it.
+pin "$LIFECYCLE_MD" '`run.merge_word` — `standing` unless the brief or the operator sets a merge gate for this run, then `operator`' \
+  "step 1 writes the run's merge authority at creation" flat
+pin "$LIFECYCLE_MD" 'Every creation and every bind writes `run.orchestrator.machine` beside its pane' \
+  "step 1 writes the top's machine on creation and binding" flat
+pin "$MECHANICS_MD" 'A `machine` is a remote server'"'"'s `herdr machine list` label; this server'"'"'s machine is its `hostname -s`' \
+  "every coordinator can read the shared machine-label rule" flat
+for f in "$BRIEFS_MD" "$PRBRIEFS_MD"; do
+  pin "$f" 'On creation and on continue/rebind, write `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per MECHANICS' \
+    "${f##*/} writes its machine on creation and continuation" flat
+done
+pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `herdr-mechanics.md`' \
+  "the nested spine successor writes its machine on rebind" flat
+pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `herdr-mechanics.md`' \
+  "the nested work-PR dispatch writes its machine on creation and continuation" flat
+pin "$LIFECYCLE_MD" 'with `phase: recorded` and its full locator before the brief goes' \
+  "step 3 records the attempt before the send" flat
+pin "$LIFECYCLE_MD" '`phase: delivered` once the send is confirmed' \
+  "step 3 marks delivery after the send" flat
+pin "$LIFECYCLE_MD" 'writes `run.question` before it asks and removes it on the answer' \
+  "an operator ask is recorded in the run" flat
+pin "$LIFECYCLE_MD" '`{text, asked_at, task, message_id?}`' \
+  "an operator question records the exact object keys" flat
+pin "$MECHANICS_MD" 'and recorded as the attempt'"'"'s `locator.seen`' \
+  "the generation check records the consumed generation in the run" flat
+pin "$MECHANICS_MD" '`{hash, identity}`' \
+  "the consumed generation records the exact object keys" flat
 
 section "waits and completion bodies"
 
@@ -2244,7 +2290,7 @@ pin "$NESTED_MD" 'A spine session that rotated on a molt warning returns the sam
 pin "$NESTED_MD" 'one cut mid-round returns none and is respawned the same way' \
   "nested-run §4: a mid-round cut is respawned under ossify 1.14.0 (#674)" flat
 absent "$NESTED_MD" 'returns none and goes to the operator' "nested-run §4: the pre-1.14.0 relay is gone (#674)"
-MOLT_LINE='MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> '"'"'MOLT WARNING <pct> <task id>'"'"'` (never to `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
+MOLT_LINE='MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> '"'"'MOLT WARNING <pct> <task id>'"'"'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
 # One pin per template, labelled by name, so a miss names its site (0.2.5 and 0.2.7 were
 # both caught on unnamed launch sites). The span is the Nth ```text fence of the file.
 molt_in_template() { # <file> <fence n> <template name>
@@ -2272,7 +2318,7 @@ n_eq "$GENERIC_BRIEFS_MD" "$MOLT_LINE" 9 "briefs.md carries the MOLT line 9 time
 n_eq "$BRIEFS_MD" "$MOLT_LINE" 2 "ossify-briefs.md carries the leaf MOLT line twice (item pair only)"
 pin "$BRIEFS_MD" 'ROTATE instead once the context-ceiling notice or a molt warning has fired' \
   "spine brief: a molt warning triggers the existing ROTATE" flat
-pin "$BRIEFS_MD" 'MOLT: if molt warns you, send one ping, `herdr agent prompt <NOTIFY_PANE> '"'"'MOLT WARNING <pct> <SPINE_ID>'"'"'` (never to `none`), and ROTATE at the next round barrier' \
+pin "$BRIEFS_MD" 'MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> '"'"'MOLT WARNING <pct> <SPINE_ID>'"'"'` (read as PING says; never when NOTIFY_RUN is `none`), and ROTATE at the next round barrier' \
   "spine brief: the MOLT line" flat
 pin "$BRIEFS_MD" 'End the reply that writes `rotate:` with `MOLT-HANDOFF: <handoff path>`' \
   "spine brief: the rotate reply names the handoff for molt (D5)" flat
