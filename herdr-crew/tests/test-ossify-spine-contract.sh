@@ -1834,6 +1834,16 @@ pin "$LIFECYCLE_MD" 'The handoff restates no operator gate' \
   "the rotation handoff restates no operator gate (#819)" flat
 pin "$LIFECYCLE_MD" 'step 12 and `run.merge_word`' \
   "the handoff points at the merge rule instead of restating it" flat
+pin "$LIFECYCLE_MD" 'With `operator`, the ask says that this run'"'"'s brief or the operator set an operator merge gate, so autonomic routes it to the operator' \
+  "step 12 states an operator gate explicitly so autonomic routes it" flat
+pin "$LIFECYCLE_MD" 'A run file older than 0.2.21' \
+  "the resume names the legacy run-file rules" flat
+pin "$LIFECYCLE_MD" 'no `phase` counts as `delivered`' \
+  "legacy: an attempt with no phase is delivered" flat
+pin "$LIFECYCLE_MD" 'no `merge_word` counts as `standing`' \
+  "legacy: no merge_word is standing" flat
+pin "$LIFECYCLE_MD" 'against the attempt'"'"'s `locator.seen`' \
+  "the molted top's generation check reads seen from run.json" flat
 
 section "waits and completion bodies"
 
@@ -2299,8 +2309,7 @@ pin "$LIFECYCLE_MD" 'There is no stand-down and no successor launch' "lifecycle:
 pin "$LIFECYCLE_MD" 'It arms no wait and no heartbeat the handoff lists' "lifecycle: the resumed top re-arms nothing listed (#669)" flat
 pin "$LIFECYCLE_MD" 'A heartbeat tick the handoff carries means that heartbeat has ended' \
   "lifecycle: a carried tick re-arms the heartbeat (#669)" flat
-pin "$LIFECYCLE_MD" 'runs the generation check once per live dispatch against the hash and identity the handoff noted' \
-  "lifecycle: a report landed across the clear is acted on once (#669)" flat
+# Retired the handoff hash/identity pin: run.json now holds locator.seen (ruling 12).
 pin "$LIFECYCLE_MD" 'With `/molt off` the marker goes, the hook speaks again, and the rotation above applies.' \
   "lifecycle: /molt off falls back to the rotation (#669)" flat
 pin "$NESTED_MD" 'A spine session that rotated on a molt warning returns the same `rotate:`' \

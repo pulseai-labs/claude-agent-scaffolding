@@ -222,6 +222,9 @@ Every command's syntax comes from `herdr --skill`.
     Ask only when every one is clean: a non-mergeable state is surfaced to the operator
     as the blocker instead of asking, and a new actionable finding returns to step 10.
     Ask the operator for the merge word naming that SHA.
+    The run's `run.merge_word` decides who answers: with `standing`, the ask goes to whoever
+    answers this session's questions, as for any top. With `operator`, the ask says that this run's
+    brief or the operator set an operator merge gate, so autonomic routes it to the operator.
     Merge only on that word, as a merge commit, never a squash, bound to the approved
     SHA: re-fetch the same full gate set for that SHA once more, then
     `gh pr merge <number> --repo <owner/repo> --merge --match-head-commit <sha>` —
@@ -326,6 +329,12 @@ A hard stop has no outgoing top: the operator starts a top and names the run's `
 7. It continues at the step the handoff names; with no handoff, at the first task whose deps are done and that is not
    itself done. A `done` task is never re-run.
 
+A run file older than 0.2.21 lacks these fields: an attempt with no `phase` counts as `delivered`; with no `seen`, an
+existing report for a task that is not done is read once; with no `locator.report`, the path comes from a handoff, or
+the operator once; no `merge_word` counts as `standing` unless the run's brief sets an operator gate; no
+`run.orchestrator.machine` is this top's machine. A live worker dispatched under 0.2.20 or earlier keeps pinging its
+fixed pane until that dispatch ends; the heartbeat covers it.
+
 **Where molt runs, you molt in place instead.** The top is molt's root: it is never marked a
 molt child, and molt's active marker silences this plugin's hook (0.2.6). molt's two warnings
 (40% and 50% of the window by default) mean: take your next fully acknowledged delivery with
@@ -343,7 +352,7 @@ reads the handoff and confirms `run.orchestrator` names its own `$HERDR_PANE_ID`
 only where it does not. It arms no wait and no heartbeat the handoff lists: they keep running,
 and their notifications are its own. A heartbeat tick the handoff carries means that heartbeat
 has ended: the resumed top arms a fresh one. It runs the generation check once per live
-dispatch against the hash and identity the handoff noted, a carried wake included, so a report
+dispatch against the attempt's `locator.seen`, a carried wake included, so a report
 that landed across the clear is acted on once and retires its listed wait by id; the later
 notification for that generation retires nothing. With `/molt off` the marker goes, the hook
 speaks again, and the rotation above applies.
