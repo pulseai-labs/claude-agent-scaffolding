@@ -380,7 +380,11 @@ setup_tmp_repo > /dev/null
 ac_state_init
 state_file="$(ac_state_path)"
 lock_file="$(ac_data_dir)/state.lock"
-printf '{bad' > "$state_file"   # corrupt: the funnel's jq fails inside the caller
+# The file stays a valid document: since #512 every writer runs ac_state_init
+# first, which refuses a corrupt file before the funnel. The funnel's jq fails
+# instead on an unparseable --argjson value (the challenge count below), so the
+# refusal still happens inside the locked caller, and (c) still reaches the
+# acquire.
 
 # (a) wrap ac_guarded_jq_write: run the real funnel, then plant a foreign lock
 #     at the path before the caller's ac_lock_release executes.
@@ -393,7 +397,7 @@ ac_guarded_jq_write() {
   fi
   return $rc
 }
-ac_state_append_run "gap-run" "close" '["claude"]' 1 0 "critiquing-spec" 10 2>/dev/null
+ac_state_append_run "gap-run" "close" '["claude"]' 'notjson{' 0 "critiquing-spec" 10 2>/dev/null
 T21_RC=$?
 [[ "$T21_RC" -ne 0 ]]
 assert_eq "if-form caller refusal still exits non-zero" "0" "$?"

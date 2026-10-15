@@ -26,6 +26,11 @@ ac_state_path() {
 }
 
 # Initialise state.json with an empty schema v3 if it does not already exist.
+# Only an ABSENT path is created (#512): under state.lock, after re-checking it
+# is still absent, by an atomic replace — a concurrent writer that created and
+# wrote it first keeps its document. A path that exists but is not a regular
+# file (a directory, a FIFO, a dangling symlink) is refused, never written
+# through or replaced. Every writer calls this first and stops on its refusal.
 # If the file exists at the immediate predecessor (v2), upgrade it in place via
 # ac_state_migrate (adds external_runs[], bumps to 3). A schema_version higher
 # than this build knows (>3) is preserved untouched with an info log
@@ -40,12 +45,12 @@ ac_state_path() {
 ac_state_init() {
   local state_file
   state_file="$(ac_state_path)"
-  local data_dir
-  data_dir="$(ac_data_dir)"
   local seed='{"schema_version":3,"recent_runs":[],"external_runs":[],"principle_promotions":[]}'
-  if [[ ! -f "$state_file" ]]; then
-    mkdir -p "$data_dir"
-    printf '%s\n' "$seed" > "$state_file"
+  if [[ ! -e "$state_file" && ! -L "$state_file" ]]; then
+    _ac_state_seed_absent "$state_file" "$seed" || return 1
+  elif [[ ! -f "$state_file" ]]; then
+    ac_log_error "state.json exists but is not a regular file; refusing to touch it: $state_file"
+    return 1
   elif _ac_state_is_blank "$state_file"; then
     _ac_state_reseed_blank "$state_file" "$seed" || return 1
   else
@@ -71,6 +76,31 @@ _ac_state_is_blank() {
   local rc=0
   grep -q '[^[:space:]]' "$1" 2>/dev/null || rc=$?
   [[ "$rc" -eq 1 ]]
+}
+
+# _ac_state_seed_absent <state_file> <seed> — the #512 create: make the data
+# dir, take state.lock, re-check the path is still absent (another writer may
+# have created and written it while we waited), then write the seed atomically.
+_ac_state_seed_absent() {
+  local state_file="$1" seed="$2" data_dir lock_path tmp rc=0
+  data_dir="$(ac_data_dir)"
+  lock_path="$data_dir/state.lock"
+  if ! mkdir -p "$data_dir"; then
+    ac_log_error "could not create the state directory: $data_dir"
+    return 1
+  fi
+  ac_lock_acquire "$lock_path" || return 1
+  if [[ ! -e "$state_file" && ! -L "$state_file" ]]; then
+    if tmp="$(mktemp "${state_file}.XXXXXX")" && printf '%s\n' "$seed" > "$tmp" && mv "$tmp" "$state_file"; then
+      rc=0
+    else
+      rm -f "${tmp:-}"
+      ac_log_error "could not create $state_file"
+      rc=1
+    fi
+  fi
+  ac_lock_release "$lock_path"
+  return $rc
 }
 
 # _ac_state_reseed_blank <state_file> <seed> — the #485 re-seed: take
@@ -149,6 +179,7 @@ ac_state_write_field() {
   state_file="$(ac_state_path)"
   lock_path="$(ac_data_dir)/state.lock"
 
+  ac_state_init || return 1
   ac_lock_acquire "$lock_path" || return 1
   ac_guarded_jq_write "$state_file" --argjson v "$value" "${jq_path} = \$v" "$state_file"
   local rc=$?
@@ -220,6 +251,7 @@ ac_state_append_run() {
   lock_path="$(ac_data_dir)/state.lock"
   completed_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
+  ac_state_init || return 1
   ac_lock_acquire "$lock_path" || return 1
   local rc
   if ac_guarded_jq_write "$state_file" \
@@ -271,6 +303,7 @@ ac_state_append_promotion() {
   lock_path="$(ac_data_dir)/state.lock"
   timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
+  ac_state_init || return 1
   ac_lock_acquire "$lock_path" || return 1
   ac_guarded_jq_write "$state_file" \
     --arg src "$source" \
@@ -286,8 +319,9 @@ ac_state_append_promotion() {
 
 # ═════════════════════════════════════════════════════════════════════════════
 # external_runs[] — durable async external-adversary job memory (schema v3, #39).
-# Writer functions call ac_state_init first (creates a v3 file / lazily
-# migrates a v2 file), so external_runs[] always exists before a write. The two
+# Writer functions call ac_state_init first and stop on its refusal (it
+# creates an absent v3 file / lazily migrates a v2 file), so external_runs[]
+# always exists before a write. The two
 # read functions (get/list) do NOT init — a read must not create or migrate
 # state. They go through _ac_state_check_parseable instead: a missing or 0-byte file
 # is an empty list / not-found, a non-empty unparseable file is refused
@@ -327,7 +361,7 @@ ac_state_external_run_add() {
     true|false) ;;
     *) ac_log_error "ac_state_external_run_add: --walk-mode must be true or false"; return 2 ;;
   esac
-  ac_state_init
+  ac_state_init || return 1
   local state_file lock_path started_at
   state_file="$(ac_state_path)"
   lock_path="$(ac_data_dir)/state.lock"
@@ -393,7 +427,7 @@ ac_state_external_run_set_status() {
     running|completed|failed|cancelled|stalled|capped|error) ;;
     *) ac_log_error "ac_state_external_run_set_status: invalid status: $status"; return 2 ;;
   esac
-  ac_state_init
+  ac_state_init || return 1
   local state_file lock_path
   state_file="$(ac_state_path)"
   lock_path="$(ac_data_dir)/state.lock"
@@ -478,7 +512,7 @@ ac_state_external_run_resolve() {
     ac_log_error "ac_state_external_run_resolve: usage: <run-id> <request-id>"
     return 2
   fi
-  ac_state_init
+  ac_state_init || return 1
   local state_file lock_path existing
   state_file="$(ac_state_path)"
   lock_path="$(ac_data_dir)/state.lock"
@@ -556,7 +590,7 @@ ac_state_external_run_finalize_resume() {
     return 2
   fi
 
-  ac_state_init
+  ac_state_init || return 1
   local state_file lock_path existing completed_at
   state_file="$(ac_state_path)"
   lock_path="$(ac_data_dir)/state.lock"

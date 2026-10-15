@@ -164,6 +164,36 @@ test_bug_96_scorer_agent_inline() {
   fi
 }
 
+# --- #512 item 3: the v0.1.x migration is manual, and the README says so ---
+test_512_3_migration_is_manual() {
+  echo "#512 item 3 — README's v0.1.x migration section describes the manual verb"
+  local readme="$PLUGIN_DIR/README.md" arc_bin="$PLUGIN_DIR/bin/arc" section hooks_ref
+  section="$(awk '/^## Migrating from v0\.1\.x/ { f = 1; print; next } f && /^## / { exit } f { print }' "$readme" 2>/dev/null)"
+  [[ -n "$section" ]] || { assert_fail "README has no '## Migrating from v0.1.x' section"; return; }
+  if [[ "$section" =~ (runs\ automatically|No\ manual\ steps|[Oo]n\ first\ run\ after\ upgrading) ]]; then
+    assert_fail "README still claims the migration runs by itself: '${BASH_REMATCH[1]}'"
+  else
+    assert_pass "README makes no automatic-migration claim"
+  fi
+  if [[ "$section" == *"arc migration_check_v01_state"* ]]; then
+    assert_pass "README names the manual verb (arc migration_check_v01_state)"
+  else
+    assert_fail "README does not name 'arc migration_check_v01_state'"
+  fi
+  if bash "$arc_bin" --list 2>/dev/null | awk '$0 == "migration_check_v01_state" { found = 1 } END { exit !found }'; then
+    assert_pass "arc --list offers migration_check_v01_state"
+  else
+    assert_fail "arc --list does not offer migration_check_v01_state"
+  fi
+  # The README's claim holds only while nothing runs the migration on its own.
+  hooks_ref="$(grep -rl 'migration' "$PLUGIN_DIR/hooks" "$PLUGIN_DIR/hooks-handlers" 2>/dev/null)"
+  if [[ -z "$hooks_ref" ]]; then
+    assert_pass "no hook runs the migration (the README's manual claim is true)"
+  else
+    assert_fail "a hook references the migration — update the README's manual claim: $hooks_ref"
+  fi
+}
+
 # --- Run all ---
 test_bug_1_arguments_bridge
 test_bug_2_skill_body_runs_audit
@@ -175,6 +205,7 @@ test_bug_7_readme_standalone
 test_bug_8_project_class_doc
 test_bug_9_codex_host_claude_adversary
 test_bug_96_scorer_agent_inline
+test_512_3_migration_is_manual
 
 echo ""
 echo "Results: $TESTS_PASSED passed, $TESTS_FAILED failed"
