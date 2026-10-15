@@ -256,6 +256,26 @@ test_enum_unreadable_settings_fail_explicitly() {
   return "$rc"
 }
 
+# 10c2. A settings path that is not a regular file (a FIFO, a directory) is
+# not read: a FIFO would block jq forever (Codex on PR #826). It stops with
+# rc 2 like an unreadable file - the enabled set is unknown. `timeout` turns a
+# hang into a failure instead of a stuck suite.
+test_enum_non_regular_settings_fail_explicitly() {
+  local kind rc=0
+  for kind in fifo dir; do
+    local fake_home; fake_home="$(mktemp -d "${TMPDIR:-/tmp}/csa-nreg-home.XXXXXX")"
+    local fixture; fixture="$(mktemp -d "${TMPDIR:-/tmp}/csa-nreg-project.XXXXXX")"
+    mkdir -p "$fixture/.claude"
+    if [[ "$kind" == fifo ]]; then mkfifo "$fixture/.claude/settings.json"; else mkdir "$fixture/.claude/settings.json"; fi
+    local rc_en=0 err
+    err="$(HOME="$fake_home" timeout 10 bash -c 'source "$1/helpers.sh"; source "$1/enumerate-targets.sh"; csa_enum_enabled_plugins "$2"' _ "$CSA_LIB_DIR" "$fixture" 2>&1 >/dev/null)" || rc_en=$?
+    assert_eq "2" "$rc_en" "non-regular settings ($kind): enabled-plugins rc 2, no hang" || rc=1
+    assert_contains "$err" "not a regular file" "non-regular settings ($kind): stderr says so" || rc=1
+    rm -rf "$fixture" "$fake_home"
+  done
+  return "$rc"
+}
+
 # 10d. #425: a cache directory name is one identity — spaces and newlines are
 # compared whole, never word-split. "my" and "plugin" enabled separately do not
 # enable "my plugin" (the adjacent negative control).
@@ -402,6 +422,7 @@ csa_test_run test_enum_dotted_executable_hook_handler || _csa_failed=$((_csa_fai
 csa_test_run test_enum_paranoid_candidates_exact_membership_under_pipefail || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_enum_enabled_plugins_transport          || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_enum_unreadable_settings_fail_explicitly || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_enum_non_regular_settings_fail_explicitly || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_enum_paranoid_candidates_whole_names  || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_enum_paranoid_candidates_refuse_newline_candidate || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_enum_paranoid_candidates_unreadable_cache || _csa_failed=$((_csa_failed + 1))

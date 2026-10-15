@@ -110,13 +110,19 @@ csa_enum_project_targets() {
 
 # _csa_enum_settings_plugin_list <settings-file> — the file's enabledPlugins
 # array as compact JSON. An absent file, malformed JSON (SETTINGS-PARSE is the
-# rule engine's concern) or a value that is not an array reads as []. A file
-# that exists but cannot be read is NOT an empty list: rc 2 (#424).
+# rule engine's concern) or a value that is not an array reads as []. A path
+# that exists but is not a regular file, or cannot be read, is NOT an empty
+# list: rc 2 (#424).
 _csa_enum_settings_plugin_list() {
   local f="$1" list
   if [[ ! -e "$f" ]]; then
     printf '[]\n'
     return 0
+  fi
+  if [[ ! -f "$f" ]]; then
+    # A FIFO would block jq forever; a directory holds no settings.
+    printf 'csa: %s is not a regular file; the enabled-plugin set is unknown\n' "$f" >&2
+    return 2
   fi
   if [[ ! -r "$f" ]]; then
     printf 'csa: cannot read %s; the enabled-plugin set is unknown\n' "$f" >&2
