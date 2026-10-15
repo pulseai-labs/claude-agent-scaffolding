@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MARKETPLACE } from '../../omp-roles/omp/bin-path'
-import { checkExtensions, pinWarning, planLaunch, versionWarning } from '../../omp-roles/omp/seat'
+import { checkExtensions, expandRole, pinWarning, planLaunch, versionWarning } from '../../omp-roles/omp/seat'
 
 let root: string, ompRecord: string, claudeRecord: string
 
@@ -260,5 +260,25 @@ describe('checkExtensions (fix wave 4)', () => {
     const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
     record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })
     expect((launch() as { extensions: string[] }).extensions).toEqual([s, m, a].map((p) => join(p, 'omp/extension.ts')))
+  })
+})
+
+describe('expandRole', () => {
+  test('orc is the orchestrator on omp-glm, marked for the rail when SEAT_MODS_ROLE is unset or empty', () => {
+    expect(expandRole('orc', undefined, undefined)).toEqual({ role: 'orchestrator', via: 'omp-glm', roleEnv: 'orchestrator' })
+    expect(expandRole('orc', undefined, '')).toEqual({ role: 'orchestrator', via: 'omp-glm', roleEnv: 'orchestrator' })
+  })
+  test('orc keeps an explicit --via', () => {
+    expect(expandRole('orc', 'omp-sol', undefined)).toEqual({ role: 'orchestrator', via: 'omp-sol', roleEnv: 'orchestrator' })
+  })
+  test('orc never overrides another SEAT_MODS_ROLE, so planLaunch still refuses it', () => {
+    const e = expandRole('orc', undefined, 'coordinator')
+    expect(e).toEqual({ role: 'orchestrator', via: 'omp-glm', roleEnv: 'coordinator' })
+    expect(planLaunch({ ...e, args: [], ompRecord, claudeRecord })).toEqual({
+      error: 'omp-seat: the orchestrator role needs SEAT_MODS_ROLE=orchestrator (got "coordinator"); seat-mods\' no-subagent rail keys on it' })
+  })
+  test('every other role is unchanged and defaults to plain omp', () => {
+    expect(expandRole('orchestrator', undefined, undefined)).toEqual({ role: 'orchestrator', via: 'omp', roleEnv: undefined })
+    expect(expandRole('worker', 'omp-glm', 'implementer')).toEqual({ role: 'worker', via: 'omp-glm', roleEnv: 'implementer' })
   })
 })
