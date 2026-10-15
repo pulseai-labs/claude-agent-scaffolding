@@ -1,5 +1,21 @@
 # workspace-init changelog
 
+## 0.10.0 (2026-10-16)
+
+One instruction file: AGENTS.md.
+
+### Changed
+- **#768 — the two stub files fold into one `AGENTS.md`.** `templates/AGENTS.md.stub.tmpl` takes the content the `CLAUDE.md` stub carried (topology and the pairing manifest, what lives in the canonical, the git policy, the AI-trace filter, and the ossify continuation routes), renders `${PROJECT_NAME}` **and** `${CANONICAL_ROOT}`, and its **first line** is exactly `<!-- workspace-init stub: ossify:start replaces this file -->`. OMP, Codex and other agents read `AGENTS.md`; Claude Code loads it when no `CLAUDE.md` exists, which is the case in every fresh workspace. A workspace therefore has one instruction file, not a `CLAUDE.md` that three of four agents cannot see. Task 8.5 and Task 8.6 of `initializing-dual-repo-workspace` become one step, and the two pairing skills follow.
+- **`wi stub_claude_md` and `templates/CLAUDE.md.stub.tmpl` are removed.** `wi stub_agents_md` and `wi stub_readme` are the stub verbs; calling the retired one is an unknown-function error, not a silent no-op. No path writes a `CLAUDE.md` any more.
+- **A legacy `CLAUDE.md` is detected, preserved and routed, never written.** `pairing-canonical-repo` and `pairing-existing-dual` count `AGENTS.md` **and** `CLAUDE.md` when they check for existing AI scaffolding, so a workspace that predates 0.10.0 still counts as populated and its file is not clobbered. `pairing-existing-dual`'s next steps send a leftover `CLAUDE.md` (root or `.claude/`) to `/ossify:doctor`'s interop repair, which moves or merges it into `AGENTS.md` after showing the operator the result — the repair ships in ossify 1.24.0, so until that release is installed, a leftover `CLAUDE.md` keeps shadowing `AGENTS.md` under Claude Code.
+
+### Tests
+- `test_A4_no_claude_md_written` and `test_A5_dispatcher_path_renders_marker` (`test-stubs.sh`) — no `CLAUDE.md` on any path, `wi_stub_claude_md` undefined in the sourced lib and refused by the dispatcher, and the marker rendered through `bin/wi` under `set -euo pipefail` (sourcing the lib does not reproduce that). `test_A1` now asserts the marker is line 1, `${CANONICAL_ROOT}` is substituted, the trace-filter text is present and no `Read \`CLAUDE.md\`` pointer survives.
+- `test_H6_no_claude_md` (`test-init-fresh.sh`) and the Scenario A guard in `test-pair-with-existing.sh` — the fresh and pairing pipelines write no `CLAUDE.md`.
+- `test_no_claude_md_stub_on_any_surface` and `test_existing_dual_scans_both_instruction_files` (`test-skills-pressure.sh`) — no skill, example, template or README names a `CLAUDE.md` stub or the retired verb, with a positive control that both skills still name `stub_agents_md`; and Scenario C names both instruction files in its scan list and routes the leftover to `/ossify:doctor`.
+- Plugin suite 12 files / 308 passed / 0 failed (306 before this release). Independent verification: Tasks 1 and 2 each mutation-tested against a disposable worktree (V1 7/7, V2 8/8).
+- The root catalog row's version is read from `.claude-plugin/plugin.json` by the pressure test and asserted there, so a bump that misses the row fails the suite instead of shipping a stale literal.
+
 ## 0.9.0 (2026-10-15)
 
 Choose the AI workspace's directory name; the launcher step names Codex too.
