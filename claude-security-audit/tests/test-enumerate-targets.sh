@@ -258,8 +258,9 @@ test_enum_unreadable_settings_fail_explicitly() {
 
 # 10c2. A settings path that is not a regular file (a FIFO, a directory) is
 # not read: a FIFO would block jq forever (Codex on PR #826). It stops with
-# rc 2 like an unreadable file - the enabled set is unknown. `timeout` turns a
-# hang into a failure instead of a stuck suite.
+# rc 2 like an unreadable file - the enabled set is unknown. A timeout (GNU
+# `timeout`, `gtimeout`, or perl's alarm on stock macOS) turns a hang into a
+# failure instead of a stuck suite.
 test_enum_non_regular_settings_fail_explicitly() {
   local kind rc=0
   for kind in fifo dir; do
@@ -267,8 +268,13 @@ test_enum_non_regular_settings_fail_explicitly() {
     local fixture; fixture="$(mktemp -d "${TMPDIR:-/tmp}/csa-nreg-project.XXXXXX")"
     mkdir -p "$fixture/.claude"
     if [[ "$kind" == fifo ]]; then mkfifo "$fixture/.claude/settings.json"; else mkdir "$fixture/.claude/settings.json"; fi
-    local rc_en=0 err
-    err="$(HOME="$fake_home" timeout 10 bash -c 'source "$1/helpers.sh"; source "$1/enumerate-targets.sh"; csa_enum_enabled_plugins "$2"' _ "$CSA_LIB_DIR" "$fixture" 2>&1 >/dev/null)" || rc_en=$?
+    local rc_en=0 err to=()
+    # Stock macOS ships no `timeout`: fall back to gtimeout, then perl's alarm.
+    if command -v timeout >/dev/null 2>&1; then to=(timeout 10)
+    elif command -v gtimeout >/dev/null 2>&1; then to=(gtimeout 10)
+    else to=(perl -e 'alarm shift; exec @ARGV' 10)
+    fi
+    err="$(HOME="$fake_home" "${to[@]}" bash -c 'source "$1/helpers.sh"; source "$1/enumerate-targets.sh"; csa_enum_enabled_plugins "$2"' _ "$CSA_LIB_DIR" "$fixture" 2>&1 >/dev/null)" || rc_en=$?
     assert_eq "2" "$rc_en" "non-regular settings ($kind): enabled-plugins rc 2, no hang" || rc=1
     assert_contains "$err" "not a regular file" "non-regular settings ($kind): stderr says so" || rc=1
     rm -rf "$fixture" "$fake_home"
