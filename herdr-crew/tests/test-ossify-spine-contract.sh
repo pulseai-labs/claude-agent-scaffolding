@@ -1775,6 +1775,21 @@ pin "$NESTED_MD" 'the `RUN_JSON` path that return named' \
 pin "$EXEC_MD" 'the `RUN_JSON` path that record'"'"'s return named' \
   "ossify-execution's top column carries RUN_JSON into a resumed work-PR dispatch" flat
 
+section "the run file carries the live facts (#810, #816, #819)"
+# Spec §3/§5: each fact a successor needs is written at the step that learns it.
+pin "$LIFECYCLE_MD" '`run.merge_word` — `standing` unless the brief or the operator sets a merge gate for this run, then `operator`' \
+  "step 1 writes the run's merge authority at creation" flat
+pin "$LIFECYCLE_MD" '`run.orchestrator.machine` beside its pane' \
+  "every bind writes the top's machine" flat
+pin "$LIFECYCLE_MD" 'with `phase: recorded` and its full locator before the brief goes' \
+  "step 3 records the attempt before the send" flat
+pin "$LIFECYCLE_MD" '`phase: delivered` once the send is confirmed' \
+  "step 3 marks delivery after the send" flat
+pin "$LIFECYCLE_MD" 'writes `run.question` before it asks and removes it on the answer' \
+  "an operator ask is recorded in the run" flat
+pin "$MECHANICS_MD" 'and recorded as the attempt'"'"'s `locator.seen`' \
+  "the generation check records the consumed generation in the run" flat
+
 section "waits and completion bodies"
 
 # The typed wait is stated once, in herdr-mechanics.md; lifecycle step 5 and

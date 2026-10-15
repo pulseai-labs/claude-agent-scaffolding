@@ -254,10 +254,10 @@ actually renamed over. Every other dispatch keeps the report-file wait and this 
 as the whole of its push bound. A failed read or send changes nothing.
 
 A ping is one way a report announces itself, beside a `Completion` wake and a heartbeat tick,
-and the generation check governs all three: a new generation is read, noted, acted on once by
-kind, and retires that dispatch's wait and companion; an already-consumed one is not read, not
-acted on, retires nothing — a stale same-path ping never cancels the current phase's wait. A
-live dialog and the tick's health check are reports of neither kind and still run. A ping whose
+and the generation check governs all three: a new generation is read, noted — its hash and identity —
+and recorded as the attempt's `locator.seen`, acted on once by kind, and retires that dispatch's wait and companion;
+an already-consumed one is not read, not acted on, retires nothing — a stale same-path ping never cancels the current phase's wait.
+A live dialog and the tick's health check are reports of neither kind and still run. A ping whose
 path is not this dispatch's `REPORT_PATH` is not delivered — nothing is opened, no other
 dispatch is reached — and gets `briefs.md`'s correction request; an unmatched ping is reported.
 

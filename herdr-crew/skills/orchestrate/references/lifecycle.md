@@ -14,10 +14,14 @@ Every command's syntax comes from `herdr --skill`.
    writing run files at all. That contract is the rule for every write of the
    file, not only its first: the complete document goes to a temp file beside
    the target, `dagr check --strict` it, and the rename over `run.json` — `mv`,
-   which this command allows — lands only once that check is clean. A session that
+   which this command allows — lands only once that check is clean. A created run records
+   `run.merge_word` — `standing` unless the brief or the operator sets a merge gate for this run,
+   then `operator`. A session that
    binds an existing `run.json` rewrites `run.orchestrator` to its own
    `$HERDR_PANE_ID` — dagr's stable-agent fallback otherwise — in the same producer
    loop every other write takes.
+   Every bind writes `run.orchestrator.machine` beside its pane. A `machine` is a remote server's
+   `herdr machine list` label; the top's own server is its `hostname -s`.
 1b. **Ossify spine planned here?** If this session just completed `/ossify:plan-spine`
    against a concrete spine directory with a run bound, step 2 is replaced by
    `references/ossify-execution.md`: agree one implementer/verifier seat per work
@@ -82,6 +86,10 @@ Every command's syntax comes from `herdr --skill`.
    this pane or the seat is on another machine — so an eligible worker's ping comes to whichever pane
    `run.orchestrator` names when it renames; a coordinator fills its children's slots with its own
    nested `run.json` the same way, and an operator's `brief:` is sent as a copy carrying the slots and the ping step, never edited in place (`briefs.md`).
+   The launch writes the attempt with `phase: recorded` and its full locator before the brief goes —
+   `pane`, `machine` (a local seat's too), `report`, molt's `status` path and autonomic's `pain` path —
+   and writes `phase: delivered` once the send is confirmed, so an attempt whose brief never arrived
+   never looks live.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes or the plan's
@@ -115,6 +123,8 @@ Every command's syntax comes from `herdr --skill`.
    seat is in scope, not only a report-file wait — and kills it when its last dispatch settles,
    at teardown, and at a rotation's stand-down; a host with no background timer keeps the wait/ping fallback, never a rolling foreground
    loop (`herdr-mechanics.md`).
+   Before any question to the operator the top writes `run.question` before it asks and removes it on
+   the answer — text, time, the task it holds and any dagr `message_id` — so a question survives the top.
    `herdr pane read`
    only on a `blocked` wake, a missing or malformed report, a timeout's checkpoint, the
    false wake's own read, or the heartbeat tick's one check per live seat — never to watch progress.
