@@ -2,6 +2,10 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.20
+
+**Waits that do not page the operator for nothing** (#651, B and D; the operator's 2026-10-12 ruling). A detected coordinator's `--until blocked` companion that times out while its report-file doorbell is still armed lapses silently: no `pane read`, no report, and the doorbell (and the heartbeat, where armed) covers the rest of the dispatch. The heartbeat gains a stall rule: a seat read `working` at two consecutive ticks with no new report generation takes the next tick's one check as `herdr pane read`; a read showing only provider errors and retries is a seat failure, not a failed task: its dispatch is settled (its report-file wait and companion killed) and the fallback the project file's `## Conditions` names is launched as a fresh seat from its own row, the brief re-sent with `RESUME FROM:` the seat's last report when it wrote one. A seat a fresh session cannot resume (a work-PR seat inside a fix round; a close, work-item, lane-driver or doctor seat mid-ceremony; a reviewer before its report validates) gets no fallback, and it or a stall with no fallback named is reported to the operator once. Every timeout-is-a-checkpoint rule (`herdr-mechanics.md`'s typed wait and dead ends, `lifecycle.md` step 5) carries the companion's exception. `## Conditions` may set another bound. The mechanics reference budget rises from 370 to 385 lines.
+
 ## 0.2.19
 
 **An OMP top for the weekly-limit fallback.** herdr-mechanics.md gains "Host: OMP"; lifecycle.md's rotation handoff records a launch command and resolved profile per host, a cross-host successor is checked against its own host's profile and resumed in its host's form, an OMP top writes its handoff with `skill://handoff`, and a new top re-arms each live pane with step 5's waits. A resume after a hard stop (no handoff) is not in this release. OMP may now fill the top and its rotation successor (omp-roles 0.4.0 `orchestrator`, seat-mods 0.4.4). herdr-crew joins the OMP catalog. Work-PR and activated-spine placement stay narrow (#788).
