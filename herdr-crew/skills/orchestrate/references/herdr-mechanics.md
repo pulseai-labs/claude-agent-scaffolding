@@ -275,8 +275,8 @@ request timeouts, rate-limit waits), nothing else advancing, is a seat failure, 
 task — named in the tick's line and the handoff. Launch the fallback the project file's
 `## Conditions` names for that seat as a fresh seat is launched (below), from the fallback's
 row, its brief re-sent with `RESUME FROM:` the seat's last report; with none named, report it
-to the operator once. `## Conditions` may set another bound. Killed when the last dispatch
-settles, at teardown and at stand-down, where the successor arms a fresh one.
+to the operator once. `## Conditions` may set another bound. The heartbeat is killed when the last
+dispatch settles, at teardown and at stand-down, where the successor arms a fresh one.
 
 **A child past molt's warnings.** A seat marked a molt child (step 2) is never cleared by molt.
 At each of molt's two warnings it sends one ping, `MOLT WARNING <pct> <task id>`, to its
