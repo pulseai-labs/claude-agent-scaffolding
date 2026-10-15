@@ -2002,8 +2002,14 @@ for _f in "$SKILLS/close/references/spine-close.md" "$SKILLS/plan-spine/referenc
   _pin "$_r" "$(basename "$_f") still says spine close closes an intake request, or names withdrawn or a permission check (#631)"
 done
 # ...and the advertised '#N' form is quoted: an unquoted # starts a shell comment.
-_r=1; grep -Fq "'#N'" "$HERE/../README.md" && ! grep -Fq '(`N` or `#N`)' "$HERE/../README.md" && _r=0
-_pin "$_r" "ossify README advertises an unquoted #N - the shell drops it as a comment and feature_add records no issue (#631)"
+for _f in "$HERE/../README.md" "$HERE/../../README.md"; do
+  _r=1; grep -Fq "'#N'" "$_f" && ! grep -Fq '`N` or `#N`' "$_f" && _r=0
+  _pin "$_r" "$_f advertises an unquoted #N - the shell drops it as a comment and feature_add records no issue (#631)"
+done
+# CodeRabbit round 6 on PR #821: a split's halves landing is not the close
+# condition - another spine may carry the feature too.
+pin "$SKILLS/plan-spine/references/decomposition.md" 'and any other spine that carries the feature' \
+  "a whole-spine split's close guidance counts every carrier, not only the halves (#631)"
 _r=1; ! grep -Fq 'accepted and silently dropped' "$SKILLS/plan-spine/references/codebase-design.md" && grep -Fq 'only for an intake request' "$SKILLS/plan-spine/references/codebase-design.md" && _r=0
 _pin "$_r" "codebase-design.md still says a fifth feature_add argument is dropped - a planner's split trigger is now refused at rc 2 (#631)"
 
