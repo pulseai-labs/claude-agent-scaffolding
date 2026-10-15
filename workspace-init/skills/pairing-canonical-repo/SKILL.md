@@ -75,7 +75,10 @@ Resolve to shell variables:
   `${name}-ai` when the flag is absent
 - `ai_root="${parent}/${ai_dir_name}"`
 
-Run the preflight against these values before any task in §6:
+Resolve the `wi` dispatcher once and hold it in `wi_bin`: `wi_bin="$(command -v wi)"`
+— the plugin loader puts `bin/` on `$PATH`. Every `wi` invocation below — and in this
+skill's references — is `"$wi_bin"`. Then run the preflight against these values before
+any task in §6:
 
 ```
 "$wi_bin" skeleton_preflight "$parent" "$name" --pair-with "$canonical_root"
@@ -129,8 +132,7 @@ Exit non-zero. Do NOT touch anything (no mkdirs, no manifest, no hook).
 
 Detect default branch + remote from the existing repo via the `wi`
 dispatcher (`workspace-init/bin/wi`; bash shebang forces a bash
-runtime even when the calling shell is zsh). Resolve `wi` once into
-`wi_bin` (`command -v wi`); every `wi` in this skill and its references is `"$wi_bin"`. Per
+runtime even when the calling shell is zsh), through the `wi_bin` resolved in §3. Per
 **SPEC §8.4** the fallback chain is robust to oddly-configured repos:
 
 - `detected_branch="$("$wi_bin" git_detect_default_branch "$canonical_root")"`

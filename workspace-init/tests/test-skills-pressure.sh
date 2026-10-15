@@ -407,6 +407,25 @@ test_readme_links_stay_inside_the_plugin() {
   fi
 }
 
+# --- PR #829: each skill resolves wi_bin before its first "$wi_bin" call ---
+
+test_skills_resolve_wi_bin_before_first_use() {
+  local f rc=0
+  for f in "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md" \
+           "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md"; do
+    # One awk pass: the line that assigns wi_bin must precede the first line
+    # that invokes "$wi_bin".
+    if ! awk '
+      index($0, "wi_bin=\"$(command -v wi)\"") && !def { def = NR }
+      index($0, "\"$wi_bin\" ") && !use { use = NR }
+      END { exit !(def && use && def < use) }
+    ' "$f"; then
+      echo "    $f: wi_bin is used before it is resolved (or never resolved)"; rc=1
+    fi
+  done
+  return "$rc"
+}
+
 # --- run all ---
 wi_test_run test_init_skill_file_exists
 wi_test_run test_pair_skill_file_exists
@@ -431,5 +450,6 @@ wi_test_run test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces
 wi_test_run test_launcher_steps_name_both_surfaces
 wi_test_run test_ai_dir_name_flag_reaches_skills_and_commands
 wi_test_run test_readme_links_stay_inside_the_plugin
+wi_test_run test_skills_resolve_wi_bin_before_first_use
 
 wi_test_summary
