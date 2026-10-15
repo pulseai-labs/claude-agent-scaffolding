@@ -19,7 +19,7 @@ branches, remotes, `.gitignore`, and existing hooks (other than the one
 `commit-msg`) are not modified. The skill auto-invokes on phrases like
 "pair this repo with an AI workspace", "add AI workspace alongside",
 "existing canonical needs scaffolding". It also runs via
-`/pair-workspace <abs-path-to-canonical>`.
+`/pair-workspace <abs-path-to-canonical> [--ai-dir-name <dir>]`.
 
 **Already have a populated AI workspace?** This skill creates a *fresh* AI
 workspace. If your AI workspace already exists as a separate populated sibling
@@ -54,6 +54,11 @@ as literal tokens in the invocation/request text):
   existing canonical's basename, but it doesn't have to.
 - **parent dir for the NEW AI workspace** (default: `$PWD`; absolute path).
   This is where `<name>-ai/` will be created.
+- **AI workspace dir name** (optional; only from `--ai-dir-name <dir>`, never
+  prompted). It replaces the default `<name>-ai` — for example, to match the
+  AI workspace's own remote name. Pass it through as typed — preflight refuses
+  a name that is not a plain directory name, so do not rewrite it. Reject a
+  duplicate `--ai-dir-name` or a missing/empty value with a usage error.
 - **existing canonical absolute path** (required; supplied via `$ARGUMENTS`
   for `/pair-workspace`). This is where the user's existing repo lives.
 - **project_type** — `personal` or `work` (per **SPEC §7.1** prompt:
@@ -66,7 +71,22 @@ Resolve to shell variables:
 - `parent="$resolved_parent"`
 - `canonical_root="$resolved_canonical_abs"`
 - `project_type="$resolved_project_type"`
-- `ai_root="${parent}/${name}-ai"`
+- `ai_dir_name="$resolved_ai_dir_name"` — the `--ai-dir-name` value, or
+  `${name}-ai` when the flag is absent
+- `ai_root="${parent}/${ai_dir_name}"`
+
+Run the preflight against these values before any task in §6:
+
+```
+"$wi_bin" skeleton_preflight "$parent" "$name" --pair-with "$canonical_root"
+```
+
+When `--ai-dir-name` was given, append `--ai-dir-name "$ai_dir_name"` to this
+call and to the `skeleton_create_root_ai_only` call in §6.2; without the flag,
+run both exactly as written. Preflight refuses an AI target that already
+exists and, with the flag, a name that is not a plain directory name (it must
+start with a letter or digit and use only letters, digits, `.`, `_` and `-`).
+On a refusal nothing has been created; report it as printed and exit non-zero.
 
 ## 4. Abort-on-AI-scaffolding-marker check
 
@@ -279,9 +299,10 @@ delete in one command.
 
 ## 8. Print next-steps
 
-After all tasks succeed, print this message verbatim (substitute `{name}`
-and `/abs/path` with resolved values; everything else stays as written —
-this is the pair-with variant of **SPEC §8.8**):
+After all tasks succeed, print this message verbatim. First
+substitute `{name}-ai` with the AI workspace directory name (`$ai_dir_name`),
+then `{name}` and `/abs/path` with resolved values; everything else stays as written —
+this is the pair-with variant of **SPEC §8.8**:
 
 ```
 Pair-with bootstrap complete.
@@ -296,13 +317,13 @@ Canonical's working tree NOT modified.
 Next steps:
   1. cd /abs/path/{name}-ai && git status
   2. git commit -m "workspace-init: initial bootstrap (pair-with)"
-  3. cd /abs/path/{name}-ai && claude
+  3. cd /abs/path/{name}-ai && claude      # Claude Code; on Codex, run `codex` in that directory instead
   4. Continue into ossify only where it currently continues: `/ossify:adopt` targets projects
      previously onboarded with the legacy scaffold stack — it reads that stack's roadmap state,
      active-context cursor and legacy spec. A repository that already carries source or history
      but never used that stack has no supported ossify continuation yet; `/ossify:start` sends
      such a repository here rather than onboarding it. (For an empty canonical, `/ossify:start`
-     does onboard it.)
+     does onboard it.) On Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
   5. Before `/ossify:adopt`, every participating tree must be clean: adoption refuses while any
      tree it will edit carries an uncommitted or untracked line — the AI workspace, the canonical,
      and every other repo the topology declares — with each declared repo on the default branch
@@ -330,8 +351,8 @@ To override trace filter for a specific commit: git commit --no-verify
 
 ## 10. Failure handling
 
-- **Parent dir not writable / project name invalid** → preflight aborts;
-  nothing created; no rollback needed.
+- **Parent dir not writable / project name invalid / `--ai-dir-name`
+  invalid** → preflight aborts; nothing created; no rollback needed.
 - **Canonical path doesn't exist or isn't absolute** → preflight aborts.
 - **Canonical isn't a git repo** → preflight aborts (per **SPEC §13.3**:
   fail, or — future enhancement — offer to `git init` it; today it just

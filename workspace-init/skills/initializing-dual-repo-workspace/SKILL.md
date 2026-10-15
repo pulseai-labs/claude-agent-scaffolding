@@ -18,7 +18,7 @@ the user signals intent to start a new project under workspace-init's topology
 dual repo", "init project workspace"). It also runs when the user explicitly
 invokes the `/init-workspace` slash command. On success it produces:
 `<parent>/<name>-ai/` (the AI workspace, with skeleton + manifest + stubs
-staged) AND `<parent>/<name>/` (the canonical, freshly `git init`'d on `main`,
+staged; `<parent>/<dir>/` instead with `--ai-dir-name <dir>`) AND `<parent>/<name>/` (the canonical, freshly `git init`'d on `main`,
 working tree empty). Trace-filter commit-msg hooks are installed in both. Cite
 **SPEC §1** (TL;DR) and **SPEC §4.3** (the dual-repo topology). The user is
 expected to commit the staged bootstrap manually — workspace-init never
@@ -60,15 +60,17 @@ Slash-command grammar:
 ```
 /init-workspace <name>
 /init-workspace <name> --wrapper <existing-dir>
+/init-workspace <name> [--wrapper <existing-dir>] --ai-dir-name <dir>
 ```
 
 Read the raw slash-command text from the `$ARGUMENTS` env-var bridge — never
 from `$1`/`$2`, per the slash-command `$N` substitution bug. On shim-less
 channels (`Skill()`, natural language) nothing exports `$ARGUMENTS`;
-read the name and `--wrapper` tokens from the invocation/request text. Interpret exactly
-one positional project name plus the optional `--wrapper <existing-dir>` pair.
-Reject an unknown option, duplicate `--wrapper`, a missing/empty wrapper value,
-or more than one positional name with a concise usage error. A wrapper path
+read the name, `--wrapper` and `--ai-dir-name` tokens from the invocation/request text.
+Interpret exactly one positional project name plus the optional `--wrapper <existing-dir>`
+and `--ai-dir-name <dir>` pairs, in either order. Reject an unknown option, a duplicate
+`--wrapper` or `--ai-dir-name`, a missing/empty value for either, or more than one
+positional name with a concise usage error. A wrapper path
 containing spaces must be quoted in the slash command.
 
 Inputs (prompt the user when not supplied):
@@ -79,6 +81,10 @@ Inputs (prompt the user when not supplied):
 - **wrapper dir** (wrapper mode only; the explicit `--wrapper` value; resolve
   it with `wi_realpath`; it must already exist and be writable). Treat the
   resolved wrapper as `parent`. Do not also prompt for a separate parent.
+- **AI workspace dir name** (optional; only from `--ai-dir-name`, never
+  prompted). It replaces the default `<name>-ai`. Pass it through as typed —
+  preflight refuses a name that is not a plain directory name, so do not
+  rewrite it.
 - **project_type** — one of `personal` or `work`. Per **SPEC §7.1** prompt
   the user with the exact wording: *"Is this a personal project or a
   work/company project?"* Both project types still enforce the trace filter;
@@ -91,7 +97,9 @@ set `parent="$resolved_wrapper"`; otherwise use the resolved normal parent:
 - `parent="$resolved_wrapper"` in wrapper mode, otherwise
   `parent="$resolved_parent"`
 - `project_type="$resolved_project_type"`
-- `ai_root="${parent}/${name}-ai"`
+- `ai_dir_name="$resolved_ai_dir_name"` — the `--ai-dir-name` value, or
+  `${name}-ai` when the flag is absent
+- `ai_root="${parent}/${ai_dir_name}"`
 - `canonical_root="${parent}/${name}"`
 
 Wrapper mode is explicit only: never auto-detect it from the parent's basename,
@@ -114,14 +122,21 @@ Run preflight via the `wi` dispatcher:
 "$wi_bin" skeleton_preflight "$parent" "$name"
 ```
 
+When `--ai-dir-name` was given, append `--ai-dir-name "$ai_dir_name"` to this
+call and to the `skeleton_create_root_pair` call in §5.2; without the flag,
+run both exactly as written.
+
 The dispatcher (`workspace-init/bin/wi`) sources every `lib/*.sh` module
 under a bash shebang and resolves the function-suffix argument
 (`skeleton_preflight` → `wi_skeleton_preflight`). No env-var setup, no
 `source`, no shell-portability footgun.
 
 `wi_skeleton_preflight` checks the parent-writable + name-regex invariants
-(same as section 2) AND verifies that the target dirs (`<parent>/<name>-ai`
-and `<parent>/<name>`) do NOT already exist. A non-empty explicit wrapper is
+(same as section 2) AND verifies that the target dirs (`$ai_root` and
+`<parent>/<name>`) do NOT already exist. With `--ai-dir-name` it also refuses a
+name that is not a plain directory name (it must start with a letter or digit
+and use only letters, digits, `.`, `_` and `-`) and a name equal to `<name>`,
+which would put both repos in one directory. A non-empty explicit wrapper is
 valid: only those two inner targets are collision-sensitive. If any check fails, abort
 cleanly — no rollback needed because nothing has been created. Print the
 preflight error to stderr and exit non-zero.
@@ -146,9 +161,9 @@ resolved `name`, `parent`, `project_type`, `ai_root`, `canonical_root`.
 
 ### 5.2 — Task 8.2: Create root dir pair
 
-Creates `<parent>/<name>-ai` AND `<parent>/<name>` (both empty). In wrapper
+Creates `$ai_root` AND `<parent>/<name>` (both empty). In wrapper
 mode, `<parent>` is the existing wrapper; the operation creates/logs only the
-two inner roots and `<name>-ai/.workspace`, never the wrapper itself.
+two inner roots and `$ai_root/.workspace`, never the wrapper itself.
 
 ```
 "$wi_bin" skeleton_create_root_pair "$parent" "$name"
@@ -240,9 +255,10 @@ Expected init-log entries: `git-init <ai_root>`, `git-init <canonical_root>`,
 
 ## 6. Print next-steps
 
-After all 8 tasks succeed, print the following message verbatim (substitute
-`{name}` and `/abs/path` with the resolved values; everything else stays as
-written, per **SPEC §8.8**):
+After all 8 tasks succeed, print the following message verbatim. First
+substitute `{name}-ai` with the AI workspace directory name (`$ai_dir_name`),
+then `{name}` and `/abs/path` with the resolved values; everything else stays as
+written, per **SPEC §8.8**:
 
 ```
 Workspace bootstrap complete.
@@ -256,7 +272,7 @@ AI workspace has skeleton + manifest + stubs staged (not yet committed — revie
 Next steps:
   1. cd /abs/path/{name}-ai && git status
   2. git commit -m "workspace-init: initial bootstrap"
-  3. cd /abs/path/{name}-ai && claude
+  3. cd /abs/path/{name}-ai && claude      # Claude Code; on Codex, run `codex` in that directory instead
   4. /ossify:start                         # bare canonical; routes to /ossify:adopt if source or history is present
                                            # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
                                            # a recorded tooling repo that already carries history refuses it too, with no supported ossify continuation yet
@@ -311,6 +327,9 @@ where indicated.
   forms from §3; do not guess intent.
 - **Project name invalid** (fails kebab-case regex) → preflight aborts;
   nothing created.
+- **`--ai-dir-name` invalid** (not a plain directory name, or equal to the
+  project name) → preflight aborts; nothing created. Report the refusal as
+  printed — never retry with a corrected name the user did not type.
 - **Pair-with path doesn't exist** → not relevant in fresh mode (this skill
   doesn't take a `--pair-with` arg). The sibling `pairing-canonical-repo`
   skill handles the pair-with case; if the user signaled pair-with intent

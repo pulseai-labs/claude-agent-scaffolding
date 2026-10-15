@@ -1,5 +1,20 @@
 # workspace-init changelog
 
+## 0.9.0 (2026-10-15)
+
+Choose the AI workspace's directory name; the launcher step names Codex too.
+
+### Added
+- **#174 — `--ai-dir-name <dir>`** on `/init-workspace` and `/pair-workspace` names the AI workspace directory in place of `<name>-ai`, so a workspace whose own remote has another name need not keep a mismatched directory. `wi skeleton_preflight`, `wi skeleton_create_root_pair` and `wi skeleton_create_root_ai_only` take the flag. The name must start with a letter or digit and use only letters, digits, `.`, `_` and `-`; anything else — empty, `.`, `..`, a `/`, a leading `-` — is refused, never rewritten, as are a missing value and a repeated flag. Fresh mode also refuses a name equal to the project name (compared without case, for case-insensitive filesystems), which would put both repos in one directory. The manifest records the chosen name as `ai_workspace.name`, and rollback removes that directory. Without the flag every helper behaves exactly as before. The Scenario A skill now names the `skeleton_preflight --pair-with` call its failure list already relied on. `pairing-existing-dual` is unchanged: it pairs two directories that already exist.
+
+### Fixed
+- **#538 — the fresh and Scenario A next-steps no longer tell a Codex user to launch `claude`.** The launcher step names both CLIs, and the Scenario A route names the Codex skill form (`adopt`, or `start`) as the fresh and Scenario C blocks already did. The two examples mirror both blocks.
+- **#146 (this plugin's README)** — the Pointers section no longer links to `../docs/SPEC-workspace-init.md` and `../docs/PLAN-workspace-init.md`, which never ship; it points at the plugin's own `skills/` and `lib/`.
+
+### Tests
+- New `tests/test-ai-dir-name.sh` (17 tests): the no-flag control, the override through preflight, both create helpers and the manifest, each refusal, rollback of the custom directory, and the `bin/wi` dispatcher path under `set -euo pipefail`.
+- `test-skills-pressure.sh` adds three checks: both launcher steps and their example mirrors name Codex, the flag reaches both skills and both commands, and the README carries no `../docs/` link.
+
 ## 0.8.0 (2026-10-11)
 
 OMP marketplace surface.

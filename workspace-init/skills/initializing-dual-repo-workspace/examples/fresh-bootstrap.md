@@ -169,7 +169,7 @@ AI workspace has skeleton + manifest + stubs staged (not yet committed — revie
 Next steps:
   1. cd /Users/example/projects/foo-ai && git status
   2. git commit -m "workspace-init: initial bootstrap"
-  3. cd /Users/example/projects/foo-ai && claude
+  3. cd /Users/example/projects/foo-ai && claude      # Claude Code; on Codex, run `codex` in that directory instead
   4. /ossify:start                         # bare canonical; routes to /ossify:adopt if source or history is present
                                            # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
                                            # a recorded tooling repo that already carries history refuses it too, with no supported ossify continuation yet
@@ -180,4 +180,4 @@ Init log at: /Users/example/projects/foo-ai/.workspace/init-log (rollback record
 To override trace filter for a specific commit: git commit --no-verify
 ```
 
-The user then commits the staged AI workspace skeleton manually, launches Claude Code in the AI workspace directory, and invokes `/ossify:start`.
+The user then commits the staged AI workspace skeleton manually, launches Claude Code (or Codex) in the AI workspace directory, and invokes `/ossify:start` (on Codex, the `start` skill).
