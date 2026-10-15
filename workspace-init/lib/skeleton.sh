@@ -290,12 +290,15 @@ wi_skeleton_create_root_pair() {
   local ai_root="${parent}/${ai_dir}"
   local canonical_root="${parent}/${name}"
 
-  if ! mkdir -p "$ai_root"; then
-    wi_log_error "wi_skeleton_create_root_pair: mkdir failed: $ai_root"
+  # Plain `mkdir`, never `-p`, for the two roots: rollback answers a MKDIR
+  # entry with `rm -rf`, so a root that already exists must be refused here,
+  # not adopted and logged as ours.
+  if ! mkdir "$ai_root"; then
+    wi_log_error "wi_skeleton_create_root_pair: mkdir failed (exists or unwritable): $ai_root"
     return 1
   fi
-  if ! mkdir -p "$canonical_root"; then
-    wi_log_error "wi_skeleton_create_root_pair: mkdir failed: $canonical_root"
+  if ! mkdir "$canonical_root"; then
+    wi_log_error "wi_skeleton_create_root_pair: mkdir failed (exists or unwritable): $canonical_root"
     return 1
   fi
   if ! mkdir -p "${ai_root}/.workspace"; then
@@ -324,8 +327,10 @@ wi_skeleton_create_root_ai_only() {
   ai_dir="$(_wi_skeleton_ai_dir_from_args wi_skeleton_create_root_ai_only "$name" "$@")" || return 1
   local ai_root="${parent}/${ai_dir}"
 
-  if ! mkdir -p "$ai_root"; then
-    wi_log_error "wi_skeleton_create_root_ai_only: mkdir failed: $ai_root"
+  # Plain `mkdir`, never `-p`: an AI root that already exists is refused, not
+  # logged as MKDIR for rollback's `rm -rf` (see wi_skeleton_create_root_pair).
+  if ! mkdir "$ai_root"; then
+    wi_log_error "wi_skeleton_create_root_ai_only: mkdir failed (exists or unwritable): $ai_root"
     return 1
   fi
   if ! mkdir -p "${ai_root}/.workspace"; then

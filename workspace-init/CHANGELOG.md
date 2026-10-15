@@ -9,6 +9,8 @@ Choose the AI workspace's directory name; the launcher step names Codex too.
 
 ### Fixed
 - **#538 — the fresh and Scenario A next-steps no longer tell a Codex user to launch `claude`.** The launcher step names both CLIs, and the Scenario A route names the Codex skill form (`adopt`, or `start`) as the fresh and Scenario C blocks already did. The two examples mirror both blocks.
+- **`wi skeleton_create_root_pair` and `wi skeleton_create_root_ai_only` refuse a root that already exists.** They used `mkdir -p`, so an existing AI or canonical root was logged as `MKDIR` and a later rollback ran `rm -rf` on it. They now use plain `mkdir` for the roots; the `.workspace` subdir and the init-log lines of a fresh run are unchanged.
+- **The Scenario A skill resolves `wi_bin` before its preflight call**, so a run that follows the skill in order no longer calls an empty dispatcher path.
 - **#146 (this plugin's README)** — the Pointers section no longer links to `../docs/SPEC-workspace-init.md` and `../docs/PLAN-workspace-init.md`, which never ship; it points at the plugin's own `skills/` and `lib/`.
 
 ### Tests
