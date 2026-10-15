@@ -149,7 +149,7 @@ time). The manifest is written to
 
 ### Tasks 8.5–8.7: Write stubs
 
-Same as fresh mode: CLAUDE.md, AGENTS.md, README.md.
+Same as fresh mode: AGENTS.md, README.md.
 
 ### Task 8.8: Git init (AI ONLY) + hooks (BOTH) + stage (AI ONLY)
 
@@ -202,7 +202,7 @@ Newly created at `/Users/example/projects/foo-ai/` — it contains exactly:
 - `docs/.gitkeep`, `docs/specs/.gitkeep`
 - `.superpowers/.gitkeep`
 - `.archive/.gitkeep`
-- `CLAUDE.md`, `AGENTS.md`, `README.md` — stubs
+- `AGENTS.md`, `README.md` — stubs
 - `.gitignore` — rendered from template
 - `.git/hooks/commit-msg` — trace filter (executable; not tracked by git)
 - (all files staged, not committed)
@@ -216,7 +216,6 @@ Changes to be committed:
   new file:   .claude/.gitkeep
   new file:   .superpowers/.gitkeep
   new file:   ...
-  new file:   CLAUDE.md
   new file:   AGENTS.md
   new file:   README.md
   new file:   .gitignore

@@ -190,7 +190,10 @@ test_printed_skill_routes_point_to_ossify() {
   # AGENTS.md work is committed before the route, or A3 refuses on the dirt that
   # step itself created.
   assert_contains 'only for a project previously onboarded with the legacy scaffold stack' "$dual_sec" || return 1
-  assert_contains 'author and commit before' "$dual_sec" || return 1
+  # #768: step 3 now routes the leftover CLAUDE.md to /ossify:doctor, which authors
+  # the repair — so the block says the user *reviews and commits* the result, rather
+  # than authoring the file themselves. Same commitment before the route (A3).
+  assert_contains 'review and commit before' "$dual_sec" || return 1
 
   local sec
   for sec in "$init_sec" "$pair_sec" "$dual_sec"; do
@@ -425,6 +428,30 @@ test_skills_resolve_wi_bin_before_first_use() {
   return "$rc"
 }
 
+# --- #768: workspace-init writes AGENTS.md only ---
+
+test_no_claude_md_stub_on_any_surface() {
+  # #768: workspace-init writes AGENTS.md only. No skill, example or template
+  # may still tell a model to write or expect a CLAUDE.md stub.
+  local f hits=""
+  for f in "$WI_PLUGIN_ROOT"/skills/*/SKILL.md "$WI_PLUGIN_ROOT"/skills/*/examples/*.md \
+           "$WI_PLUGIN_ROOT"/templates/*.tmpl "$WI_PLUGIN_ROOT/README.md"; do
+    if grep -Fq 'stub_claude_md' "$f" || grep -Fq 'CLAUDE.md stub' "$f" || grep -Fq 'Write CLAUDE.md' "$f"; then
+      hits="$hits $f"
+    fi
+  done
+  [[ -z "$hits" ]] || { echo "    still names a CLAUDE.md stub:$hits"; return 1; }
+  # Positive control: the skills still name the one stub they do write.
+  grep -Fq 'stub_agents_md' "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md" || { echo "    fresh skill lost stub_agents_md"; return 1; }
+  grep -Fq 'stub_agents_md' "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md" || { echo "    pair skill lost stub_agents_md"; return 1; }
+}
+
+test_existing_dual_scans_both_instruction_files() {
+  local s="$WI_PLUGIN_ROOT/skills/pairing-existing-dual/SKILL.md"
+  grep -Fq '`${ai_root}/AGENTS.md`' "$s" && grep -Fq '`${ai_root}/CLAUDE.md`' "$s" || { echo "    scan list must name both files"; return 1; }
+  grep -Fq '/ossify:doctor' "$s" || { echo "    next steps must route a CLAUDE.md to the doctor repair"; return 1; }
+}
+
 # --- run all ---
 wi_test_run test_init_skill_file_exists
 wi_test_run test_pair_skill_file_exists
@@ -450,5 +477,7 @@ wi_test_run test_launcher_steps_name_both_surfaces
 wi_test_run test_ai_dir_name_flag_reaches_skills_and_commands
 wi_test_run test_readme_links_stay_inside_the_plugin
 wi_test_run test_skills_resolve_wi_bin_before_first_use
+wi_test_run test_no_claude_md_stub_on_any_surface
+wi_test_run test_existing_dual_scans_both_instruction_files
 
 wi_test_summary

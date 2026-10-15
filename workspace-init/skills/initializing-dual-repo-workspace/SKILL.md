@@ -204,26 +204,24 @@ mode; omit the flags and the `tooling_repo` key is left out entirely (unchanged)
 
 Expected init-log entry: `file <ai_root>/.workspace/pairing.json`.
 
-### 5.5 — Task 8.5: Write CLAUDE.md stub
+### 5.5 — Task 8.5: Write the AGENTS.md stub
 
-Renders the topology-only CLAUDE.md stub. Ossify onboarding owns the
-project-specific router that follows.
-
-```
-"$wi_bin" stub_claude_md "$ai_root" "$name"
-```
-
-Expected init-log entry: `file <ai_root>/CLAUDE.md`.
-
-### 5.6 — Task 8.6: Write AGENTS.md stub
-
-Renders the cross-tool AGENTS.md stub.
+Renders the one instruction file, `AGENTS.md`. Claude Code loads it when the
+workspace has no `CLAUDE.md`, and Codex and OMP read it directly. Its first
+line is the marker `<!-- workspace-init stub: ossify:start replaces this file -->`;
+`/ossify:start` replaces a file that starts with it. workspace-init writes no
+`CLAUDE.md`.
 
 ```
-"$wi_bin" stub_agents_md "$ai_root"
+"$wi_bin" stub_agents_md "$ai_root" "$name"
 ```
 
 Expected init-log entry: `file <ai_root>/AGENTS.md`.
+
+### 5.6 — Task 8.6: (merged into 5.5)
+
+Since 0.10.0 the `AGENTS.md` stub is the only instruction file. There is no
+separate `CLAUDE.md` task.
 
 ### 5.7 — Task 8.7: Write README.md
 

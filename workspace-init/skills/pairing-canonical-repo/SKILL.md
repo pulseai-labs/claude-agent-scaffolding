@@ -23,7 +23,7 @@ branches, remotes, `.gitignore`, and existing hooks (other than the one
 
 **Already have a populated AI workspace?** This skill creates a *fresh* AI
 workspace. If your AI workspace already exists as a separate populated sibling
-directory (memory-bank, specs, CLAUDE.md grown organically before you found the
+directory (memory-bank, specs, AGENTS.md or CLAUDE.md grown organically before you found the
 plugins) and you only need a manifest to wire it up, use `pairing-existing-dual`
 (`/pair-existing-dual <ai-workspace-abs> <canonical-abs>`, **Scenario C**)
 instead — it preserves your existing content and never seeds or stubs.
@@ -213,21 +213,24 @@ is left out entirely (today's behavior, unchanged).
 
 Expected init-log entry: `file <ai_root>/.workspace/pairing.json`.
 
-### 6.5 — Task 8.5: Write CLAUDE.md stub
+### 6.5 — Task 8.5: Write the AGENTS.md stub
+
+Renders the one instruction file, `AGENTS.md`. Claude Code loads it when the
+workspace has no `CLAUDE.md`, and Codex and OMP read it directly. Its first
+line is the marker `<!-- workspace-init stub: ossify:start replaces this file -->`;
+`/ossify:start` replaces a file that starts with it. workspace-init writes no
+`CLAUDE.md`.
 
 ```
-"$wi_bin" stub_claude_md "$ai_root" "$name"
-```
-
-Expected init-log entry: `file <ai_root>/CLAUDE.md`.
-
-### 6.6 — Task 8.6: Write AGENTS.md stub
-
-```
-"$wi_bin" stub_agents_md "$ai_root"
+"$wi_bin" stub_agents_md "$ai_root" "$name"
 ```
 
 Expected init-log entry: `file <ai_root>/AGENTS.md`.
+
+### 6.6 — Task 8.6: (merged into 6.5)
+
+Since 0.10.0 the `AGENTS.md` stub is the only instruction file. There is no
+separate `CLAUDE.md` task.
 
 ### 6.7 — Task 8.7: Write README.md
 

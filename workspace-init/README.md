@@ -30,7 +30,7 @@ This bootstraps two sibling directories:
 
 ```
 foo/                  # canonical repo (skeleton: README, .gitignore, LICENSE stub)
-foo-ai/               # AI workspace (.workspace/pairing.json, .claude/, docs/, AGENTS.md, CLAUDE.md stub)
+foo-ai/               # AI workspace (.workspace/pairing.json, .claude/, docs/, AGENTS.md stub)
 ```
 
 Both are explicitly `git init`'d on `main`, regardless of the machine's
