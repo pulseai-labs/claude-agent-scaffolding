@@ -56,6 +56,7 @@ Then **detect and surface** the existing AI-workspace scaffolding so the user ca
 - `${ai_root}/docs/MASTER-SPEC.md` or `${ai_root}/MASTER-SPEC.md`
 - `${ai_root}/AGENTS.md`
 - `${ai_root}/CLAUDE.md`
+- `${ai_root}/.claude/CLAUDE.md`
 - `${ai_root}/docs/specs/` (and a count of spec files under it)
 
 Unlike Scenario A's §4 marker check, this is **NOT an abort** — finding these markers is exactly what Scenario C expects. Log them as *"existing state to preserve"* and proceed.
@@ -171,9 +172,15 @@ Next steps:
   3. Make `AGENTS.md` the workspace's one instruction file before you continue. ossify's interop
      check fails while `AGENTS.md` is missing or never names ossify, and while a `CLAUDE.md`
      (root or `.claude/`) is present — Claude Code loads `CLAUDE.md` and ignores `AGENTS.md`
-     whenever both exist. Run `/ossify:doctor` (on Codex or OMP, the `doctor` skill) and accept
-     its interop repair: it moves or merges `CLAUDE.md` into `AGENTS.md` and shows you the result
-     first. This skill writes no project guidance: the result is yours to review and commit before
+     whenever both exist.
+     - **ossify 1.24.0 or later:** run `/ossify:doctor` (on Codex or OMP, the `doctor` skill) and
+       accept its interop repair. It moves or merges `CLAUDE.md` into `AGENTS.md` and shows you the
+       result first.
+     - **An older ossify:** the repair does not exist yet, so merge `CLAUDE.md` into `AGENTS.md`
+       by hand — keep every rule and fact from both files, drop lines whose only job was to point
+       from one file to the other ("Read `CLAUDE.md` for …"), then remove `CLAUDE.md` so Claude
+       Code stops preferring it.
+     Either way this skill writes no project guidance — review and commit before
      step 4.
   4. Run `/ossify:adopt` only for a project previously onboarded with the legacy scaffold stack —
      without that stack there is no supported ossify continuation yet (or `/ossify:start` if the

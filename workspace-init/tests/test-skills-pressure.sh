@@ -488,6 +488,32 @@ test_claude_md_stub_scan_fails_on_an_empty_surface() {
   rmdir "$empty" 2>/dev/null
 }
 
+test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c() {
+  # D1/D2: the stub replaces itself and the Scenario C route relies on doctor's
+  # repair; both ship in ossify 1.24.0, and a shipped 1.23.0 does neither. Each
+  # surface must say so, and must keep the by-hand route the PR removed.
+  local tmpl dual
+  tmpl="$(cat "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")"
+  dual="$(cat "$WI_PLUGIN_ROOT/skills/pairing-existing-dual/SKILL.md")"
+  assert_contains 'ossify 1.24.0 or later replaces a file that starts with the marker' "$tmpl" || return 1
+  assert_not_contains '`/ossify:start` replaces the whole file' "$tmpl" || return 1
+  local s
+  for s in "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md" \
+           "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md"; do
+    assert_contains 'ossify 1.24.0 or later replaces a file that starts with it' "$(cat "$s")" || return 1
+  done
+  assert_contains 'ossify 1.24.0 or later' "$dual" || return 1
+  assert_contains 'merge `CLAUDE.md` into `AGENTS.md`' "$dual" || return 1
+  # D4: the blanket "Specs … belong here" contradicted the manifest's routing,
+  # which sends prd/srs/product_adrs to the canonical. The old stub had the
+  # distinction; the fold dropped it.
+  assert_contains 'Sprint specs, the memory bank and process records belong here.' "$tmpl" || return 1
+  assert_contains 'PRDs and SRSs also go to the' "$tmpl" || return 1
+  assert_not_contains 'Specs, the memory bank and process records belong here.' "$tmpl" || return 1
+  # D5: the §4 scan must name the `.claude/` copy too, which step 3 covers.
+  assert_contains '- `${ai_root}/.claude/CLAUDE.md`' "$dual" || return 1
+}
+
 test_marker_string_matches_across_surfaces() {
   # D14: the marker is a contract between workspace-init and ossify's /start.
   # The skills quote it in prose; the template mints it. A typo in either would
@@ -537,6 +563,7 @@ wi_test_run test_skills_resolve_wi_bin_before_first_use
 wi_test_run test_no_claude_md_stub_on_any_surface
 wi_test_run test_claude_md_stub_scan_fails_on_an_empty_surface
 wi_test_run test_marker_string_matches_across_surfaces
+wi_test_run test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c
 wi_test_run test_existing_dual_scans_both_instruction_files
 
 wi_test_summary

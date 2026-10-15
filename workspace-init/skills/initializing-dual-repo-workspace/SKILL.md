@@ -209,8 +209,9 @@ Expected init-log entry: `file <ai_root>/.workspace/pairing.json`.
 Renders the one instruction file, `AGENTS.md`. Claude Code loads it when the
 workspace has no `CLAUDE.md`, and Codex and OMP read it directly. Its first
 line is the marker `<!-- workspace-init stub: ossify:start replaces this file -->`;
-`/ossify:start` replaces a file that starts with it. workspace-init writes no
-`CLAUDE.md`.
+ossify 1.24.0 or later replaces a file that starts with it, with no question.
+An older ossify treats it as an existing file and asks you to keep it or move it
+aside, and writes a `CLAUDE.md`. workspace-init writes no `CLAUDE.md`.
 
 ```
 "$wi_bin" stub_agents_md "$ai_root" "$name"
