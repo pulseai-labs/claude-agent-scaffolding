@@ -320,7 +320,7 @@ oss_reg_add_feature() { # $1=state $2=name $3=value $4=class-guess $5=source [$6
     *)
       case "$issue" in
         ""|0*|*[!0-9]*)
-          echo "oss: feature_add's intake issue must be a positive issue number (N or #N), got '$6'" >&2
+          echo "oss: feature_add's intake issue must be a positive issue number (N, or '#N' quoted), got '$6'" >&2
           return 2 ;;
       esac
       [ "$5" = intake ] || {

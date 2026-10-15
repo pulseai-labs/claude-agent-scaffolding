@@ -84,13 +84,14 @@ its spine was minted takes its `[internal]` marker), `oss work_item_rename <wi>
 <trigger>` (an empty trigger clears it).
 
 Since 1.23.0 (#631), `oss feature_add` takes an optional fifth argument, the
-intake issue number (`N` or `#N`), and stores it on the feature entry as
+intake issue number (`N`, or `'#N'` quoted: an unquoted `#` starts a shell
+comment), and stores it on the feature entry as
 `issue`; anything else, or an issue on any source but `intake`, is refused at
 rc 2, and an entry added before 1.23.0
 simply has none. Spine planning reads the request from the entry's `issue`
 instead of matching titles. Spine close closes an intake request only at the last
 spine that carries it: every spine named in the request's `pulled in — <spine id>`
-comments from the repository's own people (OWNER, MEMBER or COLLABORATOR),
+comments from authors with write permission on the repository,
 less any a `withdrawn — <spine id>` comment cancels, must be closed in state; otherwise, or when that list cannot be read, the request stays open with a
 comment saying why. A spine retired without the feature holds its request open
 until its `withdrawn` comment is posted.

@@ -36,8 +36,10 @@ silently. A closed issue is not in the queue.
 A request stays open until the spine that pulled it in lands, so the queue can
 return one an earlier planning already took. Read its comments
 (`gh issue view <n> --repo "<owner/repo>" --json comments`). Count a disposition
-only from a comment whose `authorAssociation` is OWNER, MEMBER or COLLABORATOR:
-anyone can comment on a public issue. One carrying a
+only from a comment whose author can write to the repository:
+`gh api repos/<owner/repo>/collaborators/<login>/permission --jq .permission`
+prints `admin` or `write`. Anyone can comment on a public issue, and an
+organization member can hold read access only. One carrying a
 `pulled in — <spine id>` disposition is already assigned — list it as
 such, and never add it to the feature map again or pull it into a spine as new
 work. A spine id has the

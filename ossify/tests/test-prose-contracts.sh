@@ -2002,10 +2002,16 @@ pin "$SKILLS/plan-spine/references/decomposition.md" 'comment `withdrawn — <ol
 # feature_add argument is dropped - it is now the intake issue, refused elsewhere.
 pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'or to an earlier spine' \
   "a later spine that takes the same feature posts its own pulled in (#631)"
-pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'OWNER, MEMBER or COLLABORATOR' \
-  "intake planning counts dispositions only from the repository's own people (#631)"
-pin "$SKILLS/close/references/spine-close.md" 'OWNER, MEMBER or COLLABORATOR' \
-  "spine close counts dispositions only from the repository's own people (#631)"
+# Codex round 2 on PR #821: an organization MEMBER or COLLABORATOR can hold read
+# or triage access only, so the author check reads the repository permission
+# (admin or write), never authorAssociation.
+for _f in "$SKILLS/plan-spine/references/intake-and-ledger.md" "$SKILLS/close/references/spine-close.md"; do
+  _r=1; grep -Fq '/permission --jq .permission' "$_f" && ! grep -Fq 'authorAssociation' "$_f" && _r=0
+  _pin "$_r" "$(basename "$_f") does not count a disposition only from an author with write permission (#631)"
+done
+# ...and the advertised '#N' form is quoted: an unquoted # starts a shell comment.
+_r=1; grep -Fq "'#N'" "$HERE/../README.md" && ! grep -Fq '(`N` or `#N`)' "$HERE/../README.md" && _r=0
+_pin "$_r" "ossify README advertises an unquoted #N - the shell drops it as a comment and feature_add records no issue (#631)"
 _r=1; ! grep -Fq 'accepted and silently dropped' "$SKILLS/plan-spine/references/codebase-design.md" && grep -Fq 'only for an intake request' "$SKILLS/plan-spine/references/codebase-design.md" && _r=0
 _pin "$_r" "codebase-design.md still says a fifth feature_add argument is dropped - a planner's split trigger is now refused at rc 2 (#631)"
 

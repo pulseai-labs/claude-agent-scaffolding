@@ -677,10 +677,14 @@ EOF
 or without merge-bar, and only once every hosting repo is recorded landed (pass
 one's local merges and the record pass above). A request closes only at the last
 spine that carries it (#631). For each request, read its comments with
-`gh issue view <n> --repo "<owner/repo>" --json comments --jq '.comments[] | select(.authorAssociation == "OWNER" or .authorAssociation == "MEMBER" or .authorAssociation == "COLLABORATOR") | .body'`.
-Only comments whose `authorAssociation` is OWNER, MEMBER or COLLABORATOR count:
-anyone can comment on a public issue, and a stranger's `withdrawn` must not close
-a request. Collect every spine id that a `pulled in — <spine id>` comment names, and drop
+`gh issue view <n> --repo "<owner/repo>" --json comments --jq '.comments[] | {login: .author.login, body}'`.
+Count a comment only when its author can write to the repository:
+`gh api repos/<owner/repo>/collaborators/<login>/permission --jq .permission`
+prints `admin` or `write`. Anyone can comment on a public issue, and an
+organization member or collaborator can hold read or triage access only, so a
+`withdrawn` from an author who cannot write must not close a request. A
+permission you cannot read is part of a list you could not read (below).
+Collect every spine id that a `pulled in — <spine id>` comment names, and drop
 each one that a later `withdrawn — <spine id>` comment names. A release-level
 `pulled in — r<n>` names no spine and does not count. Then:
 
