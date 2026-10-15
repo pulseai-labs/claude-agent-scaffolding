@@ -1979,38 +1979,27 @@ _pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt C6 still says no ceremony con
 pin "$SKILLS/adopt/SKILL.md" 'Record what the pass did as the adoption record'"'"'s C2 result line (§6, #367)' \
   "adopt C2 points the station at its result line (#367)"
 
-# #631 (1.23.0): an intake request closes at its LAST carrying spine, read from the
-# request's own comments; a release-level pull-in records the issue on the entry.
-pin "$SKILLS/close/references/spine-close.md" 'spine that carries it (#631).' \
-  "spine close closes an intake request only at its last carrying spine (#631)"
-pin "$SKILLS/close/references/spine-close.md" 'request on a list you could not read.' \
-  "spine close leaves a request open when its comments or a named spine cannot be read (#631)"
+# #631 (1.23.0): the feature entry carries its intake issue, so spine planning
+# reads the request from the entry; a release-level pull-in records the issue.
 pin "$SKILLS/plan-spine/references/intake-and-ledger.md" '`oss feature_add "<name>" "<value>" "<bone|flesh>" intake <issue-number>`' \
   "a release-level pull-in records the request's issue on the feature entry (#631)"
 pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'never by matching titles' \
   "spine planning reads the request from the feature entry's issue (#631)"
-# Codex round 1 on PR #821: a second spine that takes the same feature posts its
-# own pulled in, or the first spine's close sees no other carrier and closes early.
+# Codex round 1 on PR #821: a later spine that takes the same feature posts its
+# own pulled in, so the request's comments name every carrier planned so far.
 pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'or to an earlier spine' \
   "a later spine that takes the same feature posts its own pulled in (#631)"
-# Operator ruling after Codex round 4 on PR #821 (fail-closed): comments only ADD
-# carriers. No comment removes one, so no comment author is authenticated; a
-# stray or forged comment can hold a request open but never close it. The spine
-# closing must be a collected carrier itself (no vacuous close on an empty set),
-# and only `closed` counts - an `abandoned` carrier holds the request open.
-pin "$SKILLS/close/references/spine-close.md" 'add carriers: nothing in a comment removes one' \
-  "spine close: comments only add carriers, so none can close a request early (#631)"
-pin "$SKILLS/close/references/spine-close.md" '**This spine is not among the collected carriers**' \
-  "spine close leaves a request open when this spine's own pulled in is missing (#631)"
-pin "$SKILLS/close/references/spine-close.md" 'an `abandoned` carrier holds the request open' \
-  "spine close counts only closed carriers; an abandoned one holds the request open (#631)"
-pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'Comments only add carriers' \
-  "intake §1 states that comments only add carriers (#631)"
-pin "$SKILLS/plan-spine/references/decomposition.md" 'holds the request open' \
-  "a whole-spine split's abandoned old spine holds the request open (#631)"
+# Operator ruling at PR #821's round-5 review stop: spine close never closes an
+# intake request. No spine knows when a request is done - a feature can span
+# spines not yet planned, and a spine can land without the item that carried it -
+# so spine close comments that it landed and the operator closes the request.
+pin "$SKILLS/close/references/spine-close.md" 'Spine close never closes an intake request' \
+  "spine close never closes an intake request; the operator does (#631)"
+pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'The operator closes a request' \
+  "intake §1 says the operator closes a request (#631)"
 for _f in "$SKILLS/close/references/spine-close.md" "$SKILLS/plan-spine/references/intake-and-ledger.md" "$SKILLS/plan-spine/references/decomposition.md" "$HERE/../README.md" "$HERE/../../README.md"; do
-  _r=1; ! grep -Fq 'withdrawn — <' "$_f" && ! grep -Fq '/permission' "$_f" && _r=0
-  _pin "$_r" "$(basename "$_f") still names a withdrawn disposition or an author permission check - the fail-closed rule has neither (#631)"
+  _r=1; ! grep -Fq 'gh issue close <n>' "$_f" && ! grep -Fq 'withdrawn — <' "$_f" && ! grep -Fq '/permission' "$_f" && ! grep -Fq 'last carrying spine' "$_f" && ! grep -Fq 'closes an intake request only' "$_f" && _r=0
+  _pin "$_r" "$(basename "$_f") still says spine close closes an intake request, or names withdrawn or a permission check (#631)"
 done
 # ...and the advertised '#N' form is quoted: an unquoted # starts a shell comment.
 _r=1; grep -Fq "'#N'" "$HERE/../README.md" && ! grep -Fq '(`N` or `#N`)' "$HERE/../README.md" && _r=0

@@ -33,7 +33,7 @@ requester.
 prints `1000`, raise the limit and list again. A truncated page drops requests
 silently. A closed issue is not in the queue.
 
-A request stays open until the spine that pulled it in lands, so the queue can
+A request stays open until the operator closes it, so the queue can
 return one an earlier planning already took. Read its comments
 (`gh issue view <n> --repo "<owner/repo>" --json comments`): one carrying a
 `pulled in — <spine id>` disposition is already assigned — list it as
@@ -49,14 +49,11 @@ issue as below. Find the request from the feature entry's `issue` field
 added before 1.23.0) came from a request you must confirm with the operator. If
 this spine does not take that feature, leave the request as it is.
 
-**A request closes at its last carrying spine.** Several spines can take one
-feature, and each posts its own `pulled in — <spine id>` comment. Spine close
-(`close/references/spine-close.md` §3) closes the request only when the closing
-spine's own comment is there and every spine the comments name is `closed`.
-Comments only add carriers, so a stray or forged one can hold a request open but
-never close it. A carrier that is retired (`abandoned`) or replanned without the
-feature holds the request open: spine close names it, and the operator closes
-the request by hand once the work it asked for has landed.
+**The operator closes a request.** Several spines can take one feature, and each
+posts its own `pulled in — <spine id>` comment. Spine close never closes the
+request: it comments that its spine landed and tells the operator, who closes the
+request by hand once the work it asked for has landed
+(`close/references/spine-close.md` §3).
 
 For each other open request, record exactly one disposition:
 

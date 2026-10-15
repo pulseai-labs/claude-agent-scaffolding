@@ -219,8 +219,8 @@ for word, so the bar exists before the first review.
 - **Evidence** — the gates each work item's close ran, with their results;
   nothing that did not run.
 - **Closes** — `None.` The intake requests this spine pulled in are listed as
-  `Refs <owner>/<repo>#<n>`, never `Closes`: they are closed after the landing is
-  recorded (below the record pass), not by the first PR to merge.
+  `Refs <owner>/<repo>#<n>`, never `Closes`: spine close comments on them after the
+  landing is recorded (below the record pass), and the operator closes them.
 
 Claim, Evidence and Closes are the spine's and read the same in every file; Scope,
 Known limits and Merge danger are the repo's. Write each repo's fields to `<fields-dir>/<repo>`,
@@ -673,31 +673,19 @@ $pr_lines
 EOF
 ```
 
-**Then close the intake requests this spine pulled in** — on every install, with
-or without merge-bar, and only once every hosting repo is recorded landed (pass
-one's local merges and the record pass above). A request closes only at the last
-spine that carries it (#631). For each request, read its comments with
-`gh issue view <n> --repo "<owner/repo>" --json comments --jq '.comments[].body'`.
-Collect every spine id that a `pulled in — <spine id>` comment names. A
-release-level `pulled in — r<n>` names no spine and does not count. Comments only
-add carriers: nothing in a comment removes one, so a stray, quoted or forged
-comment can hold a request open but never close it, whoever wrote it. Then:
-
-- **This spine is collected, and every other collected spine is `closed`** in
-  state (`oss spine_list`): close it with
-  `gh issue close <n> --repo "<owner/repo>" --comment "<spine-id> landed: <PR URLs or merge SHAs>"`.
-- **This spine is not among the collected carriers** (its own `pulled in`
-  comment is missing): leave the request open and tell the operator. Nothing on
-  the request shows that this spine carried it.
-- **Otherwise, leave it open** and say why in one comment:
-  `gh issue comment <n> --repo "<owner/repo>" --body "<spine-id> landed: <PR URLs or merge SHAs>; the request stays open for <spine ids not yet closed>"`.
-  Tell the operator too. Only `closed` counts: an `abandoned` carrier holds the request open, and so does
-  a spine replanned without the feature. Name each such spine with its status,
-  and tell the operator to close the request by hand once the work it asked for
-  has landed (`plan-spine/references/intake-and-ledger.md` §1).
-- **The comments cannot be read, or a collected id is not in state:** leave the
-  request open, and tell the operator what could not be read. Never close a
-  request on a list you could not read.
+**Then report on the intake requests this spine pulled in** — on every install,
+with or without merge-bar, and only once every hosting repo is recorded landed
+(pass one's local merges and the record pass above). Spine close never closes an intake request (#631):
+one feature can span spines not yet planned, and a spine can land without the
+work item that carried the request, so no spine knows when the request is done.
+For each request, comment
+`gh issue comment <n> --repo "<owner/repo>" --body "<spine-id> landed: <PR URLs or merge SHAs>"`.
+Then tell the operator which requests this spine touched, the other spines their
+`pulled in — <spine id>` comments name
+(`gh issue view <n> --repo "<owner/repo>" --json comments --jq '.comments[].body'`),
+and each one's status in state (`oss spine_list`). The operator closes a request by
+hand once the work it asked for has landed. If the comments cannot be read, say so;
+the request stays open either way.
 No PR carries a `Closes` line for them: with several hosting repos, the first PR
 to merge would close a request while the rest are still open.
 

@@ -49,8 +49,7 @@ state, abandoned, so the release close can report it
 (`close/references/release-close.md` §2 names abandoned spines explicitly).
 If the old spine pulled in an intake request, re-disposition it to the half that
 takes the feature (`intake-and-ledger.md` §1). The old spine's `pulled in` comment
-stays, and as an `abandoned` carrier it holds the request open: spine close names
-it, and the operator closes the request by hand once the halves have landed.
+stays as history; the operator closes the request once the halves have landed.
 
 What **not** to do, in order of how tempting each is:
 

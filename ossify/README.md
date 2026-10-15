@@ -89,13 +89,10 @@ comment), and stores it on the feature entry as
 `issue`; anything else, or an issue on any source but `intake`, is refused at
 rc 2, and an entry added before 1.23.0
 simply has none. Spine planning reads the request from the entry's `issue`
-instead of matching titles. Spine close closes an intake request only at the last
-spine that carries it: the closing spine must be named in the request's
-`pulled in — <spine id>` comments, and every spine they name must be `closed` in
-state; otherwise, or when that list cannot be read, the request stays open with a
-comment saying why. Comments only add carriers, so no comment can close a request
-early. A retired (`abandoned`) carrier, or one replanned without the feature, holds
-the request open until the operator closes it by hand.
+instead of matching titles, and every spine that takes the feature posts its own
+`pulled in — <spine id>` comment. Spine close never closes an intake request: a
+feature can span spines not yet planned, so it comments that its spine landed,
+names the other carriers and their status, and the operator closes the request.
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo
