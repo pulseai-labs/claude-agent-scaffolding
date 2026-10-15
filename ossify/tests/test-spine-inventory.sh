@@ -550,8 +550,18 @@ t_assert_rc 3 "S35: ...rc 3"
 # post-cleanup shape - nothing proves a branch existed - so it halts under its
 # own route instead of skipping the round done. S26 is the control (a branch
 # recorded, its ref gone: the cleanup shape, still skip).
+# Since 1.22.0 (#563) the status verb refuses `complete` on an item with no
+# recorded dispatch, so this shape is reachable only from an older journal: the
+# raw op writes it here, as that journal would hold it, and the verb's refusal is
+# asserted beside it.
 F="$TMP/s36"; fx "$F" 1
-oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null; inv "$F"
+oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null 2>&1
+t_assert_eq "7" "$?" "S36 setup: the verb refuses complete with no dispatch (#563)"
+S36SF="$(find "$F/ws" -name project-state.json -path '*/.ossify/*' | head -1)"
+( . "$HERE/../lib/state.sh" && oss_state_mutate "$S36SF" set_work_item_status \
+    "$(jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{work_item:"r0.s1.w1",status:"complete",at:$ts}')" >/dev/null )
+t_assert_eq "complete" "$(cd "$F/ws" && bash "$OSS" get '.work_items[] | select(.id=="r0.s1.w1") | .status')" "S36 setup: the raw op writes the legacy shape"
+inv "$F"
 t_assert_eq "halt:branch-unknown" "$(route r0.s1.w1)" "S36: complete with no branch ever recorded halts"
 t_assert_rc 3 "S36: ...rc 3"
 

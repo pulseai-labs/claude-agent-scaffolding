@@ -230,8 +230,11 @@ oss class_set "$sid" bone "internal-enabler admitted: consumed by r1.s4 (MVP); c
 ```
 
 The `[internal]` marker and the reason string are what `plan-spine` reads to
-enforce "`auto:` lines only". A **non-admitted** enabler is never given a spine id
-at all — it goes back to the feature map (§4).
+enforce "`auto:` lines only". A spine minted before its verdict existed (§5c of
+`plan-release` names every spine before §7a runs the ladder) takes the marker
+afterwards with `oss spine_rename "$sid" "[internal] <name>"`, which changes the
+name and nothing else (1.22.0). A **non-admitted** enabler is never given a spine
+id at all — it goes back to the feature map (§4).
 
 ---
 

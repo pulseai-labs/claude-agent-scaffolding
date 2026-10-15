@@ -573,5 +573,44 @@ t_assert_contains "$T_OUT" "at least one glob" "...and it is the lib's refusal, 
 t_capture env OSS_STATE_FILE="$SD" bash "$OSS" risk_gate_set_touch no-such-gate "src/**"
 t_assert_rc 7 "the dispatcher returns the lib's rc 7 on an unknown gate"
 
+# --- 1.22.0 (#305 item 2): a bone's title and revisit trigger amend -----------
+# Corrective appends like bone_set_touch: pre-lock single-row read, first()-
+# targeted apply, exact arity. The op names and payload keys are a compatibility
+# contract from this release on, pinned here exactly as set_bone_touch is.
+SB="$TMP/bone-amend.json"
+oss_state_init "$SB" bone-amend >/dev/null
+oss_reg_add_bone "$SB" ADR-0005 "event store" "src/store/**" "" >/dev/null
+oss_reg_add_bone "$SB" ADR-0006 "neighbour" "src/n/**" "when n grows" >/dev/null
+NB0="$(jq '.mutations | length' "$SB")"
+B_BEFORE="$(jq -c '.bones[] | select(.adr=="ADR-0005") | del(.title)' "$SB")"
+t_capture env OSS_STATE_FILE="$SB" bash "$OSS" bone_set_title ADR-0005 "event store schema"
+t_assert_rc 0 "305: bone_set_title accepts"
+t_assert_eq "event store schema" "$(jq -r '.bones[] | select(.adr=="ADR-0005") | .title' "$SB")" "305: ...and the title changed"
+t_assert_eq "$B_BEFORE" "$(jq -c '.bones[] | select(.adr=="ADR-0005") | del(.title)' "$SB")" "305: ...and nothing else on the bone did"
+t_assert_eq '["set_bone_title",{"adr":"ADR-0005","title":"event store schema"}]' "$(jq -c '.mutations[-1] | [.op, .payload]' "$SB")" "305: journaled as set_bone_title with payload exactly {adr,title}"
+t_capture env OSS_STATE_FILE="$SB" bash "$OSS" bone_set_revisit ADR-0005 "when a second writer appears"
+t_assert_rc 0 "305: bone_set_revisit accepts"
+t_assert_eq "when a second writer appears" "$(jq -r '.bones[] | select(.adr=="ADR-0005") | .revisit_trigger' "$SB")" "305: ...and the trigger changed"
+t_assert_eq '["set_bone_revisit",{"adr":"ADR-0005","revisit_trigger":"when a second writer appears"}]' "$(jq -c '.mutations[-1] | [.op, .payload]' "$SB")" "305: journaled as set_bone_revisit with payload exactly {adr,revisit_trigger}"
+t_capture env OSS_STATE_FILE="$SB" bash "$OSS" bone_set_revisit ADR-0005 ""
+t_assert_rc 0 "305: an empty trigger is accepted"
+t_assert_eq "null" "$(jq -c '.bones[] | select(.adr=="ADR-0005") | .revisit_trigger' "$SB")" "305: ...and clears to null, as bone_add records an absent one"
+t_assert_eq '["set_bone_revisit",{"adr":"ADR-0005","revisit_trigger":null}]' "$(jq -c '.mutations[-1] | [.op, .payload]' "$SB")" "305: ...journaled with a null trigger"
+t_assert_eq '"neighbour","when n grows"' "$(jq -r '.bones[] | select(.adr=="ADR-0006") | [.title, .revisit_trigger] | map(tojson) | join(",")' "$SB")" "305: the neighbouring bone is untouched"
+t_assert_eq "$((NB0 + 3))" "$(jq '.mutations | length' "$SB")" "305: one journaled mutation per accepted call"
+t_capture oss_state_replay "$SB"
+t_assert_rc 0 "305: replay reproduces the amended bones"
+NB1="$(jq '.mutations | length' "$SB")"
+t_capture env OSS_STATE_FILE="$SB" bash "$OSS" bone_set_title ADR-0404 "x"
+t_assert_rc 7 "305: bone_set_title refuses an unknown ADR"
+t_assert_contains "$T_OUT" "unknown bone 'ADR-0404'" "305: ...and names the bone"
+t_capture env OSS_STATE_FILE="$SB" bash "$OSS" bone_set_revisit ADR-0404 "x"
+t_assert_rc 7 "305: bone_set_revisit refuses an unknown ADR"
+t_capture env OSS_STATE_FILE="$SB" bash "$OSS" bone_set_title ADR-0005 event store
+t_assert_rc 2 "305: bone_set_title refuses an unquoted multi-word title instead of truncating it"
+t_capture env OSS_STATE_FILE="$SB" bash "$OSS" bone_set_revisit ADR-0005
+t_assert_rc 2 "305: bone_set_revisit refuses a missing trigger (clear it with \"\")"
+t_assert_eq "$NB1" "$(jq '.mutations | length' "$SB")" "305: none of the refusals journaled"
+
 rm -rf "$TMP"
 t_summary

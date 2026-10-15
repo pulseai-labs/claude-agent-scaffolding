@@ -102,6 +102,14 @@ oss_cmd_bone_set_touch() { # $1=adr $2=touch-csv — corrective append (1.11.0)
   _oss_need_exact 2 bone_set_touch "<adr> <touch-csv>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_bone_touch "$sf" "$1" "$2"
 }
+oss_cmd_bone_set_title() { # $1=adr $2=title — corrective append (1.22.0, #305)
+  _oss_need_exact 2 bone_set_title "<adr> <title>" "$@" || return 2;
+  local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_bone_title "$sf" "$1" "$2"
+}
+oss_cmd_bone_set_revisit() { # $1=adr $2=revisit ("" clears) — corrective append (1.22.0, #305)
+  _oss_need_exact 2 bone_set_revisit "<adr> <revisit-trigger>" "$@" || return 2;
+  local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_bone_revisit "$sf" "$1" "$2"
+}
 oss_cmd_risk_gate_set_touch() { # $1=name $2=touch-csv — corrective append (1.11.0)
   _oss_need_exact 2 risk_gate_set_touch "<name> <touch-csv>" "$@" || return 2;
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_set_risk_gate_touch "$sf" "$1" "$2"
@@ -211,6 +219,8 @@ oss_cmd_veto_add() { # $1=spine $2=finding $3=disposition $4=reason
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_add_veto "$sf" "$1" "$2" "$3" "$4"
 }
 oss_cmd_spine_status()     { _oss_need 2 spine_status "<spine> <status>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_set_spine_status "$sf" "$1" "$2"; }
+oss_cmd_spine_rename()     { _oss_need_exact 2 spine_rename "<spine> <new-name>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_rename_spine "$sf" "$1" "$2"; }
+oss_cmd_work_item_rename() { _oss_need_exact 2 work_item_rename "<wi-id> <new-title>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_rename_work_item "$sf" "$1" "$2"; }
 oss_cmd_work_item_status() { _oss_need 2 work_item_status "<wi-id> <status>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_set_work_item_status "$sf" "$1" "$2"; }
 oss_cmd_release_status()   { _oss_need 2 release_status "<release> <status>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_set_release_status "$sf" "$1" "$2"; }
 oss_cmd_work_item_exec()   { _oss_need 4 work_item_exec "<wi-id> <branch> <worktree> <base-sha>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_set_work_item_exec "$sf" "$1" "$2" "$3" "$4"; }

@@ -250,6 +250,26 @@ oss_reg_set_bone_touch() { # $1=state $2=adr $3=touch-csv
     "$(jq -n --arg a "$adr" --argjson t "$touch" '{adr:$a,touch:$t}')"
 }
 
+# 1.22.0 (#305 item 2): a bone's title and revisit trigger, amended in place.
+# Same shape as oss_reg_set_bone_touch: one row resolved before the lock, a
+# first()-targeted op. An empty trigger clears it to null, as bone_add records
+# an absent one.
+oss_reg_set_bone_title() { # $1=state $2=adr $3=title
+  local sf="$1" adr="$2"
+  _oss_reg_require_single "$sf" '.bones[] | select(.adr == $v)' \
+    "bone" "bones" "bones" "duplicate ADR refs" "$adr" || return $?
+  oss_state_mutate "$sf" set_bone_title \
+    "$(jq -n --arg a "$adr" --arg t "$3" '{adr:$a,title:$t}')"
+}
+
+oss_reg_set_bone_revisit() { # $1=state $2=adr $3=revisit (""=clear)
+  local sf="$1" adr="$2"
+  _oss_reg_require_single "$sf" '.bones[] | select(.adr == $v)' \
+    "bone" "bones" "bones" "duplicate ADR refs" "$adr" || return $?
+  oss_state_mutate "$sf" set_bone_revisit \
+    "$(jq -n --arg a "$adr" --arg rv "$3" '{adr:$a,revisit_trigger:(if $rv=="" then null else $rv end)}')"
+}
+
 oss_reg_set_risk_gate_touch() { # $1=state $2=name $3=touch-csv
   local sf="$1" name="$2" touch
   _oss_reg_require_single "$sf" '.risk_gates[] | select(.name == $v)' \

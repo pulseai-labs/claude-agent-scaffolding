@@ -128,6 +128,16 @@ is the hit/clean verdict and is read per
 `plan-release/references/bone-touch-judge.md` §2. A re-point that still reads
 clean on the code it was meant to cover has repaired nothing.
 
+### Amending a bone's title or revisit trigger
+
+A bone's title and revisit trigger are amended the same way, by a corrective
+append (1.22.0, #305): `oss bone_set_title "<adr>" "<title>"` and
+`oss bone_set_revisit "<adr>" "<trigger>"`, where an empty trigger clears it.
+Each changes that one field and nothing else, and refuses an unknown or
+duplicate ADR ref. Quote the value: each verb takes exactly two arguments, so an
+unquoted title is refused rather than cut at its first space. Update the ADR
+file in the same change.
+
 ### Authoring the ADR file
 
 `oss bone_add` writes **the index row only**. Nothing writes the ADR file, and

@@ -1,4 +1,4 @@
-# ossify (v1.21.1)
+# ossify (v1.22.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -70,6 +70,18 @@ once, `active`, prefixed `[adoption-seed]`, and outside each spine's own floors
 Since 1.21.1, `/ossify:adopt`'s completion floor refuses a record with no C2
 result line per declared repo: "no C2 gaps" from a clean-checkout pass that
 never ran no longer closes (#367).
+
+Since 1.22.0, the state verbs refuse new writes onto work that has not landed or
+has been retired (#563): `work_item_status <wi> complete` refuses an item that
+records no dispatch (rc 7, or rc 4 on a malformed dispatch field with nothing
+well-formed beside it), `work_item_add` refuses an abandoned spine, and
+`work_item_exec` refuses a dispatch onto an abandoned item or an item of an
+abandoned spine. A wipe and every replay are unchanged, so a journal that already
+holds such a shape still loads. Four name-only verbs journal a correction (#335,
+#305): `oss spine_rename <spine> <name>` (how an internal-enabler admitted after
+its spine was minted takes its `[internal]` marker), `oss work_item_rename <wi>
+<title>`, `oss bone_set_title <adr> <title>` and `oss bone_set_revisit <adr>
+<trigger>` (an empty trigger clears it).
 
 Since 1.13.0, work that arrives mid-release has a lane that never reopens a
 running spine. A request from another project is an issue in this project's repo

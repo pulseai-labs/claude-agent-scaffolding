@@ -428,6 +428,7 @@ WIM2="$(cd "$P2WS" && bash "$OSS" work_item_add "$SPMIX" "withdrawn one")"
 t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$P2WS'; set -euo pipefail; spine_id='$SPMIX'; . '$OPEN_BLOCK'"
 t_assert_rc 1 "...a spine with a PLANNED item still halts on the not-complete arm"
 t_assert_contains "$T_OUT" "$WIM1" "...naming the live offender"
+( cd "$P2WS" && bash "$OSS" work_item_exec "$WIM1" "work/$WIM1" "$P2WS/.worktrees/$WIM1" "sha-wim1" >/dev/null )  # complete needs a dispatch (#563)
 ( cd "$P2WS" && bash "$OSS" work_item_status "$WIM1" complete >/dev/null )
 t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$P2WS'; set -euo pipefail; spine_id='$SPMIX'; . '$OPEN_BLOCK'"
 t_assert_rc 0 "...and a spine with one completed and one withdrawn item PASSES the gate - the refusal is empty, not partially withdrawn"
@@ -2075,6 +2076,7 @@ t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$TMP/r8ws' && set -euo pipefail; s
 t_assert_rc 1 "R9: a planned item still halts the gate beside an abandoned one"
 t_assert_contains "$T_OUT" "not complete: $R8CI - halt" "R9: ...naming only the live item"
 case "$T_OUT" in *"$R8WD"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: R9: the gate named the withdrawn item $R8WD as an offender" ;; *) T_PASS=$((T_PASS+1)) ;; esac
+( cd "$TMP/r8ws" && bash "$OSS" work_item_exec "$R8CI" "work/$R8CI" "$TMP/r8ws/.worktrees/$R8CI" "sha-r8ci" >/dev/null )  # complete needs a dispatch (#563)
 ( cd "$TMP/r8ws" && bash "$OSS" work_item_status "$R8CI" complete >/dev/null )
 t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$TMP/r8ws' && set -euo pipefail; spine_id='$R8CLOSED_SP'; . '$OPEN_BLOCK'"
 t_assert_rc 0 "R9: complete + abandoned passes the gate - under set -e, so the withdrawn line's form is proven too"

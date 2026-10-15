@@ -69,7 +69,8 @@ into a sibling, found unnecessary, moved to another spine — is **withdrawn**:
 `oss work_item_status <wi-id> abandoned`. It is **never deleted** (the
 journal is append-only, so there is no delete) and **never marked `complete`**
 (`complete` records a merge onto the spine branch, which for a withdrawn item
-never happened). Left `planned`, it blocks spine close forever
+never happened; since 1.22.0 the verb refuses `complete` on an item that records
+no dispatch, rc 7). Left `planned`, it blocks spine close forever
 (`close/references/spine-close.md` §2). Record why in `SPINE.md` beside the
 decomposition — state carries the status, not the reason.
 
