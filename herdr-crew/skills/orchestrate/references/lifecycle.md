@@ -22,6 +22,7 @@ Every command's syntax comes from `herdr --skill`.
    loop every other write takes.
    Every creation and every bind writes `run.orchestrator.machine` beside its pane — this server's
    machine, per `herdr-mechanics.md`, Machines.
+   Binding a run another top drove — a rotation's resume or a hard stop — runs **The resume** (Rotation past the context ceiling) first; its step 3 is this rebind.
 1b. **Ossify spine planned here?** If this session just completed `/ossify:plan-spine`
    against a concrete spine directory with a run bound, step 2 is replaced by
    `references/ossify-execution.md`: agree one implementer/verifier seat per work
@@ -313,10 +314,12 @@ background waits and its heartbeat, write nothing more to the run file and take 
 wake one top. A worker pings whichever pane `run.orchestrator` names, so after the rebind a worker on the successor's machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.
 Then tell the operator which tab to use and that this one can close.
 A hard stop has no outgoing top: the operator starts a top and names the run's `run.json`.
+A resume the operator started is a hard stop, even with an old handoff present.
 
 **The resume.** The new top resumes by naming the parent's `run.json` path — there is no CLI call:
 1. It reads the file and notes the old `run.orchestrator` pane and machine before any write.
-2. On a hard stop only, it stands the old top down: when `herdr agent list` on that machine shows an agent session in
+2. On a hard stop only, it stands the old top down. A pane that is this session's own `$HERDR_PANE_ID` is never
+   closed: the old top is already gone. Otherwise, when `herdr agent list` on that machine shows an agent session in
    that pane, it closes the pane (`herdr pane close`), which ends the session with its armed waits and heartbeat. It
    never closes a pane it cannot identify; that, or an unreachable machine, it tells the operator once, and goes on.
 3. A session that binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr's stable-agent fallback otherwise — in the same producer loop every other write takes.

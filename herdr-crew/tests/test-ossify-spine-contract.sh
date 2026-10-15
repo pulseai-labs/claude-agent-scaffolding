@@ -1830,6 +1830,12 @@ pin "$LIFECYCLE_MD" 'notes the old `run.orchestrator` pane and machine before an
   "the resume reads the dead top's address before the rebind" flat
 pin "$LIFECYCLE_MD" 'never closes a pane it cannot identify' \
   "the hard-stop stand-down closes only an identified agent pane" flat
+pin "$LIFECYCLE_MD" 'A pane that is this session'"'"'s own `$HERDR_PANE_ID` is never closed: the old top is already gone.' \
+  "a hard-stop resume in the old pane never closes its own session" flat
+pin "$LIFECYCLE_MD" 'Binding a run another top drove — a rotation'"'"'s resume or a hard stop — runs **The resume** (Rotation past the context ceiling) first; its step 3 is this rebind.' \
+  "Orient routes takeover through the resume before rebinding the old top's address" flat
+pin "$LIFECYCLE_MD" 'A resume the operator started is a hard stop, even with an old handoff present.' \
+  "an operator-started resume takes the hard-stop path despite an old handoff" flat
 pin "$LIFECYCLE_MD" 'brief not delivered before the top stopped' \
   "a recorded attempt with no delivery is settled and relaunched" flat
 pin "$LIFECYCLE_MD" 'relaunched from its seat row as a new attempt with `cause: followup`' \
