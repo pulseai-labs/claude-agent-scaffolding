@@ -2,6 +2,22 @@
 
 All notable changes to the `code-judo` plugin.
 
+## 0.2.1
+
+- `design-it-twice` hands each parallel brief the vocabulary source the caller resolved under
+  `domain-modeling`'s *Where the model lives*, not a hard-coded `CONTEXT.md` (#392). In a repo
+  whose vocabulary has another owner (an ossify repo has no `CONTEXT.md`), every brief pointed
+  at a file that does not exist.
+- The frontmatter lint measures a description's parsed bytes, not its whitespace-flattened copy,
+  so a long literal block can no longer pass the 1024-byte cap (#390); a parser that exits
+  non-zero is a lint failure instead of empty facts that a command passed (#404); kebab-case is
+  checked against an explicit ASCII class, not a locale range (#404).
+- A fixture suite, `tests/test-frontmatter-lint-fixtures.sh`, runs the lint on small plugin
+  trees so its failure branches run in CI: the over-cap literal, an unreadable file, invalid
+  UTF-8, non-ASCII and upper-case names, a whitespace-only description, and the human-only
+  branch (#404). #404's parity test against orca-crew's copy no longer applies: orca-crew was
+  retired (#729).
+
 ## 0.2.0
 
 OMP marketplace surface.
