@@ -325,8 +325,8 @@ armed background waits and its heartbeat before the successor re-arms the same p
 arms its own, and take no dispatch action from here on. One report must wake one top — a
 live dispatch a successor is also waiting on otherwise advances twice, and a close, a PR
 or a merge runs twice with it. A worker pings whichever pane `run.orchestrator` names, so after
-the rebind its pings reach the successor. Only a `[DAGR OPERATOR MESSAGE]` envelope dagr queued
-here before the rebind is read and handed to the successor, never acted on.
+the rebind a worker on the successor's machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued
+here before the rebind, is read and handed to the successor, never acted on.
 Then tell the operator which tab to use
 and that this one can close.
 A successor on the other host takes that host's form: with ossify, `skill://handoff-resume <path>` to an OMP top

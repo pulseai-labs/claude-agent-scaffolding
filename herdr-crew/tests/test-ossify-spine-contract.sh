@@ -313,6 +313,8 @@ done
 # the rule that keeps a cross-host rotation from pinging a pane id from another server.
 pin "$MECHANICS_MD" 'only when `run.orchestrator.machine` equals `NOTIFY_MACHINE`' \
   "the ping compares the top's machine with the worker's" flat
+pin "$GENERIC_BRIEFS_MD" 'a stored brief whose fixed run file or fixed machine differs from the run'"'"'s is surfaced, not overridden; equal values are no conflict, kept as they are.' \
+  "a stored brief conflicts on either fixed run file or fixed machine, not equal values" flat
 for id in RUN_JSON MECHANICS; do
   pin "$PRBRIEFS_MD" "$id=" "the work-PR brief injects $id exactly once"
 done
@@ -1720,6 +1722,8 @@ section "rotation past the context ceiling"
 pin "$LIFECYCLE_MD" "## Rotation past the context ceiling" "lifecycle.md carries the rotation section"
 pin "$LIFECYCLE_MD" 'resumes by naming the parent'"'"'s `run.json` path' \
   "a new top binds the parent run by naming its run.json path"
+pin "$LIFECYCLE_MD" 'so after the rebind a worker on the successor'"'"'s machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.' \
+  "same-machine pings follow the rebind and stale pings are handed to the successor" flat
 pin "$BRIEFS_MD" "HANDOFF_PATH=<" "the spine brief takes HANDOFF_PATH"
 pin "$BRIEFS_MD" "rotate: <handoff path>" "the spine brief returns rotate: past the ceiling"
 pin "$NESTED_MD" "rotate: <handoff path>" "the top's spine-completion step handles rotate:"

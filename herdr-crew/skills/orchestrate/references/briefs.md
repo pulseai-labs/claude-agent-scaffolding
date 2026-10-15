@@ -41,7 +41,7 @@ single-quoted literal argument (a single quote in it is written `'\''`; `$` and 
 The ping only wakes the parent — a parent undetected or on another server keeps the report-file wait
 and the run's heartbeat, no push promised — and a failed send is left as it is. An operator's own `brief:`
 is dispatched as a copy carrying the same envelope, the leaf templates' `MOLT:` line included; the stored file is
-never edited, and a stored brief whose fixed run file differs from the run's is surfaced, not overridden; an equal run file is no conflict, kept as it is.
+never edited, and a stored brief whose fixed run file or fixed machine differs from the run's is surfaced, not overridden; equal values are no conflict, kept as they are.
 
 ## A template is a whole contract
 
