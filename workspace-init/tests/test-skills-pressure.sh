@@ -549,6 +549,29 @@ test_marker_string_matches_across_surfaces() {
   done
 }
 
+test_claude_code_fallback_is_version_gated() {
+  # D20: the `AGENTS.md` fallback shipped in Claude Code 2.1.277 (release
+  # v2.1.277, 2026-09-18). This release stops writing CLAUDE.md, so on an older
+  # or enterprise-pinned client a fresh workspace loads no project instructions
+  # at all — every surface that states the fallback must name the floor.
+  local tmpl init_s pair_s chg
+  tmpl="$(cat "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")"
+  init_s="$(cat "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md")"
+  pair_s="$(cat "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md")"
+  chg="$(cat "$WI_PLUGIN_ROOT/CHANGELOG.md")"
+
+  assert_contains 'Claude Code 2.1.277 or later loads it when the' "$tmpl" || return 1
+  assert_contains 'an older Claude Code reads only `CLAUDE.md`' "$tmpl" || return 1
+  assert_contains 'Claude Code 2.1.277 or later' "$init_s" || return 1
+  assert_contains 'Claude Code 2.1.277 or later' "$pair_s" || return 1
+  assert_contains 'Claude Code **2.1.277 or later** loads it as project instructions' "$chg" || return 1
+  # Adjacent control: the unqualified claim, and the "measured on" wording the
+  # design used for its probe, must be gone from the shipped surfaces.
+  assert_not_contains 'Claude Code, Codex, OMP and other agents read it' "$tmpl" || return 1
+  assert_not_contains 'measured on Claude Code 2.1.300' "$chg" || return 1
+  assert_not_contains 'Claude Code loads it when the' "$tmpl" || return 1
+}
+
 test_layout_tree_versions_match_manifests() {
   # D7: the root README's Layout tree carries a hand-maintained `(vX.Y.Z)` per
   # plugin, and workspace-init's had drifted to v0.8.0 two releases behind. The
@@ -616,6 +639,7 @@ wi_test_run test_no_claude_md_stub_on_any_surface
 wi_test_run test_claude_md_stub_scan_fails_on_an_empty_surface
 wi_test_run test_marker_string_matches_across_surfaces
 wi_test_run test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c
+wi_test_run test_claude_code_fallback_is_version_gated
 wi_test_run test_layout_tree_versions_match_manifests
 wi_test_run test_existing_dual_scans_both_instruction_files
 

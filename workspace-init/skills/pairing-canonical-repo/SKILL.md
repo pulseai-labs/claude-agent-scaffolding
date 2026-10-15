@@ -215,8 +215,9 @@ Expected init-log entry: `file <ai_root>/.workspace/pairing.json`.
 
 ### 6.5 — Task 8.5: Write the AGENTS.md stub
 
-Renders the one instruction file, `AGENTS.md`. Claude Code loads it when the
-workspace has no `CLAUDE.md`, and Codex and OMP read it directly. Its first
+Renders the one instruction file, `AGENTS.md`. Claude Code 2.1.277 or later
+loads it when the workspace has no `CLAUDE.md`; an older Claude Code reads only
+`CLAUDE.md` and sees none of it. Codex and OMP read it directly. Its first
 line is the marker `<!-- workspace-init stub: ossify:start replaces this file -->`;
 ossify 1.24.0 or later replaces a file that starts with it, with no question.
 An older ossify treats it as an existing file and asks you to keep it or move it

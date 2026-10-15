@@ -1,7 +1,9 @@
 <!-- workspace-init stub: ossify:start replaces this file -->
 # ${PROJECT_NAME} — AI workspace
 
-The one instruction file for this AI workspace. Claude Code, Codex, OMP and other agents read it.
+The one instruction file for this AI workspace. Claude Code 2.1.277 or later loads it when the
+workspace has no `CLAUDE.md`; an older Claude Code reads only `CLAUDE.md` and sees none of this.
+Codex, OMP and other agents read `AGENTS.md` directly.
 This is a temporary stub: ossify 1.24.0 or later replaces a file that starts with the marker above.
 An older ossify reads it as an existing file and asks you to keep it or move it aside, and writes a
 `CLAUDE.md` — install 1.24.0 or later before you run `/ossify:start` if you want the one-file result.
