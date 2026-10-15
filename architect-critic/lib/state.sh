@@ -47,25 +47,41 @@ ac_state_init() {
   state_file="$(ac_state_path)"
   local seed='{"schema_version":3,"recent_runs":[],"external_runs":[],"principle_promotions":[]}'
   if [[ ! -e "$state_file" && ! -L "$state_file" ]]; then
-    _ac_state_seed_absent "$state_file" "$seed" || return 1
-  elif [[ ! -f "$state_file" ]]; then
-    ac_log_error "state.json exists but is not a regular file; refusing to touch it: $state_file"
-    return 1
-  elif _ac_state_is_blank "$state_file"; then
-    _ac_state_reseed_blank "$state_file" "$seed" || return 1
-  else
-    if ! jq -e -s 'length == 1 and (.[0] | type == "object")' "$state_file" >/dev/null 2>&1; then
-      ac_log_error "state.json exists but is not a single parseable JSON object; refusing to touch it: $state_file"
-      return 1
-    fi
-    local on_disk_ver
-    on_disk_ver="$(jq -r '.schema_version // 0' "$state_file" 2>/dev/null || echo 0)"
-    if [[ "$on_disk_ver" -gt 3 ]] 2>/dev/null; then
-      ac_log_info "state.json has future schema_version=${on_disk_ver}; preserving without modification"
-    elif [[ "$on_disk_ver" -eq 2 ]] 2>/dev/null; then
-      ac_state_migrate
-    fi
+    local seed_rc=0
+    _ac_state_seed_absent "$state_file" "$seed" || seed_rc=$?
+    # rc 3: the path appeared while we waited for the lock. It is not ours, so
+    # it goes through the same checks as any existing path below.
+    [[ "$seed_rc" -eq 3 ]] || return "$seed_rc"
   fi
+  _ac_state_check_regular "$state_file" || return 1
+  if _ac_state_is_blank "$state_file"; then
+    local reseed_rc=0
+    _ac_state_reseed_blank "$state_file" "$seed" || reseed_rc=$?
+    # rc 3: the file changed while we waited for the lock; check it again
+    # below instead of trusting it.
+    [[ "$reseed_rc" -eq 3 ]] || return "$reseed_rc"
+    _ac_state_check_regular "$state_file" || return 1
+  fi
+  if ! jq -e -s 'length == 1 and (.[0] | type == "object")' "$state_file" >/dev/null 2>&1; then
+    ac_log_error "state.json exists but is not a single parseable JSON object; refusing to touch it: $state_file"
+    return 1
+  fi
+  local on_disk_ver
+  on_disk_ver="$(jq -r '.schema_version // 0' "$state_file" 2>/dev/null || echo 0)"
+  if [[ "$on_disk_ver" -gt 3 ]] 2>/dev/null; then
+    ac_log_info "state.json has future schema_version=${on_disk_ver}; preserving without modification"
+  elif [[ "$on_disk_ver" -eq 2 ]] 2>/dev/null; then
+    ac_state_migrate
+  fi
+}
+
+# _ac_state_check_regular <file> — rc0 for a regular file; otherwise logs the
+# refusal and returns 1. A directory, FIFO or dangling symlink is never read,
+# written through or replaced.
+_ac_state_check_regular() {
+  [[ -f "$1" ]] && return 0
+  ac_log_error "state.json exists but is not a regular file; refusing to touch it: $1"
+  return 1
 }
 
 # _ac_state_is_blank <file> — rc0 when the file holds nothing but whitespace
@@ -81,6 +97,8 @@ _ac_state_is_blank() {
 # _ac_state_seed_absent <state_file> <seed> — the #512 create: make the data
 # dir, take state.lock, re-check the path is still absent (another writer may
 # have created and written it while we waited), then write the seed atomically.
+# Returns 0 when it wrote the seed, 3 when the path appeared while it waited
+# (the caller checks that path like any existing one), 1 on an error.
 _ac_state_seed_absent() {
   local state_file="$1" seed="$2" data_dir lock_path tmp rc=0
   data_dir="$(ac_data_dir)"
@@ -98,6 +116,8 @@ _ac_state_seed_absent() {
       ac_log_error "could not create $state_file"
       rc=1
     fi
+  else
+    rc=3
   fi
   ac_lock_release "$lock_path"
   return $rc
@@ -106,11 +126,15 @@ _ac_state_seed_absent() {
 # _ac_state_reseed_blank <state_file> <seed> — the #485 re-seed: take
 # state.lock, re-check the file is still blank (another writer may have
 # re-seeded and written while we waited), then replace it atomically.
+# Returns 0 when it re-seeded, 3 when the path is no longer a blank regular
+# file (the caller checks it again), 1 on an error.
 _ac_state_reseed_blank() {
   local state_file="$1" seed="$2" lock_path tmp rc=0
   lock_path="$(ac_data_dir)/state.lock"
   ac_lock_acquire "$lock_path" || return 1
-  if _ac_state_is_blank "$state_file"; then
+  # Re-check under the lock, regular file first so a FIFO swapped in is never
+  # read. Anything that is no longer a blank regular file returns 3.
+  if [[ -f "$state_file" ]] && _ac_state_is_blank "$state_file"; then
     ac_log_warn "state.json is empty or whitespace-only; re-seeding with a fresh schema v3 document"
     if tmp="$(mktemp "${state_file}.XXXXXX")" && printf '%s\n' "$seed" > "$tmp" && mv "$tmp" "$state_file"; then
       rc=0
@@ -119,6 +143,8 @@ _ac_state_reseed_blank() {
       ac_log_error "could not re-seed $state_file"
       rc=1
     fi
+  else
+    rc=3
   fi
   ac_lock_release "$lock_path"
   return $rc

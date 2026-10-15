@@ -5,6 +5,7 @@
 # still refused and left as it was. The create takes state.lock and re-checks
 # absence under it. Checks go through bin/arc (`set -euo pipefail`); W7 also
 # runs the external writers sourced, where no errexit stops them.
+# W9 creates the path while the writer waits for the lock.
 set -u
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -207,6 +208,59 @@ for w in append_run append_promotion write_field; do
   assert_eq "$w on v2: earlier fields kept" "old:v" \
     "$(jq -r '"\(.recent_runs[0].request_id):\(.extra_unknown.k)"' "$STATE_FILE" 2>/dev/null)"
 done
+
+# ---------------------------------------------------------------------------
+# W9: a path that appears while the create waits for state.lock is checked like
+# any existing path, never trusted (PR #830 round 1): a FIFO is refused without
+# blocking, and a v2 document is upgraded before the write.
+echo "W9: a path created during the lock wait is checked, not trusted"
+fresh
+printf 'foreign-owner-token' > "$LOCK_FILE"
+( sleep 0.5; mkfifo "$STATE_FILE"; rm -f "$LOCK_FILE" ) &
+w9_bg=$!
+run_writer append_run >/dev/null 2>&1; rc=$?
+wait "$w9_bg"
+assert_eq "append_run, FIFO created during the wait: refused without blocking" "1" \
+  "$([[ $rc -ne 0 && $rc -ne 124 ]] && echo 1 || echo "rc=$rc")"
+assert_eq "the FIFO is left as it was" "1" "$([[ -p "$STATE_FILE" ]] && echo 1 || echo 0)"
+
+fresh
+printf 'foreign-owner-token' > "$LOCK_FILE"
+( sleep 0.5
+  printf '%s\n' '{"schema_version":2,"recent_runs":[{"request_id":"kept"}],"principle_promotions":[]}' > "$STATE_FILE"
+  rm -f "$LOCK_FILE" ) &
+w9_bg=$!
+run_writer append_run >/dev/null 2>&1
+assert_eq "append_run, v2 created during the wait: rc0" "0" "$?"
+wait "$w9_bg"
+assert_eq "the v2 document is upgraded, its record kept, ours appended" "3:array:kept,req-new" \
+  "$(jq -r '"\(.schema_version):\(.external_runs | type):\([.recent_runs[].request_id] | join(","))"' "$STATE_FILE" 2>/dev/null)"
+
+# W10: the same for 0.8.1's blank re-seed — a blank file replaced while the
+# re-seed waits for state.lock is checked again, never read if it is a FIFO.
+echo "W10: a blank file replaced during the re-seed's lock wait is checked again"
+fresh
+: > "$STATE_FILE"
+printf 'foreign-owner-token' > "$LOCK_FILE"
+( sleep 0.5; rm -f "$STATE_FILE"; mkfifo "$STATE_FILE"; rm -f "$LOCK_FILE" ) &
+w10_bg=$!
+run_writer append_run >/dev/null 2>&1; rc=$?
+wait "$w10_bg"
+assert_eq "append_run, blank swapped for a FIFO during the wait: refused without blocking" "1" \
+  "$([[ $rc -ne 0 && $rc -ne 124 ]] && echo 1 || echo "rc=$rc")"
+
+fresh
+: > "$STATE_FILE"
+printf 'foreign-owner-token' > "$LOCK_FILE"
+( sleep 0.5
+  printf '%s\n' '{"schema_version":2,"recent_runs":[{"request_id":"kept"}],"principle_promotions":[]}' > "$STATE_FILE"
+  rm -f "$LOCK_FILE" ) &
+w10_bg=$!
+run_writer append_run >/dev/null 2>&1
+assert_eq "append_run, blank filled with v2 during the wait: rc0" "0" "$?"
+wait "$w10_bg"
+assert_eq "the v2 document is upgraded, its record kept, ours appended" "3:array:kept,req-new" \
+  "$(jq -r '"\(.schema_version):\(.external_runs | type):\([.recent_runs[].request_id] | join(","))"' "$STATE_FILE" 2>/dev/null)"
 
 # ---------------------------------------------------------------------------
 report_results
