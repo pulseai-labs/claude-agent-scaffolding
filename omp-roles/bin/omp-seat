@@ -5,28 +5,30 @@ import { spawnSync } from 'node:child_process'
 import { join, dirname } from 'node:path'
 import { realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { checkExtensions, planLaunch, versionWarning, testedVersion } from '../omp/seat'
+import { checkExtensions, expandRole, planLaunch, versionWarning, testedVersion } from '../omp/seat'
 import { ompRecordPath } from '../omp/bin-path'
 
 const here = dirname(realpathSync(process.argv[1]))
 const [role, ...rest] = process.argv.slice(2)
-let via = 'omp'
+let via: string | undefined
 const args: string[] = []
 for (let i = 0; i < rest.length; i++) {
   if (rest[i] === '--via' && rest[i + 1] !== undefined) { via = rest[++i]; continue }
   args.push(rest[i])
 }
-if (role === undefined) { console.error('usage: omp-seat <role> [--via <command>] [omp args...]'); process.exit(2) }
+if (role === undefined) { console.error('usage: omp-seat <role> [--via <command>] [omp args...]   (orc = the orchestrator on omp-glm)'); process.exit(2) }
+const seat = expandRole(role, via, process.env.SEAT_MODS_ROLE)
+if (seat.roleEnv !== undefined) process.env.SEAT_MODS_ROLE = seat.roleEnv   // omp inherits it
 const home = homedir()
-const plan = planLaunch({ role, via, args, ompRecord: ompRecordPath(home),
+const plan = planLaunch({ role: seat.role, via: seat.via, args, ompRecord: ompRecordPath(home),
   claudeRecord: join(home, '.claude', 'plugins', 'installed_plugins.json'), rolesDir: join(here, '..', 'roles'),
-  roleEnv: process.env.SEAT_MODS_ROLE })
+  roleEnv: seat.roleEnv })
 if ('error' in plan) { console.error(plan.error); process.exit(2) }
 const broken = await checkExtensions(plan.extensions)
 if (broken !== undefined) { console.error(broken); process.exit(2) }
-const v = spawnSync(via, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 15_000 })
+const v = spawnSync(seat.via, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 15_000 })
 const warn = versionWarning(v, testedVersion(join(here, '..', 'package.json')))
 if (warn !== undefined) console.error(warn)
 const r = spawnSync(plan.argv[0], plan.argv.slice(1), { stdio: 'inherit' })
-if (r.error !== undefined) { console.error(`omp-seat: cannot run ${via}: ${r.error.message}`); process.exit(2) }
+if (r.error !== undefined) { console.error(`omp-seat: cannot run ${seat.via}: ${r.error.message}`); process.exit(2) }
 process.exit(r.status ?? 1)
