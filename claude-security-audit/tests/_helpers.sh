@@ -119,7 +119,7 @@ csa_audit_harness() {
   local run_index; run_index=$(jq -r '.audit_history | length // 0' "$(csa_state_path "$root")" 2>/dev/null || echo 0)
   run_index=$((run_index + 1))
   local findings_content; findings_content="$(cat "$filtered")"
-  csa_state_record_audit "$root" "$run_index" ".claude/audits/run-$run_index.md" "$findings_content" >/dev/null 2>&1 || true
+  csa_state_record_audit "$root" "$run_index" ".claude/audits/run-$run_index.md" "$findings_content" "$focus" >/dev/null 2>&1 || true
 
   # 5. Update self-integrity after state write
   csa_state_update_self_integrity "$root" >/dev/null 2>&1 || true

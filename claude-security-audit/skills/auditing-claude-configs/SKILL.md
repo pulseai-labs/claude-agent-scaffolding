@@ -23,7 +23,7 @@ v0.1 catches **common, unobfuscated patterns**. A determined adversary who obfus
 6. Tag scanner findings NEW vs PERSISTED via `csa baseline_tag <findings>` against state.json's `findings` registry.
 7. Filter suppressed scanner findings via `csa suppress_filter <findings>` (unless `--show-suppressed`).
 8. Write the scanner report file `.claude/audits/<date>-<NN>.md` and return chat summary via `csa report_render_markdown` + `csa report_render_chat`.
-9. Update `state.json` (last-audit-date, scanner findings registry with GC per references/severity-rubric.md §GC, `self_integrity.state_mtime_at_last_audit` per references/auto-fix-policy.md §tamper).
+9. Update `state.json` with `csa state_record_audit`, passing step 1's `focus` as its fifth argument so a focused scan ages only its own aspect (last-audit-date, scanner findings registry with GC per references/severity-rubric.md §GC, `self_integrity.state_mtime_at_last_audit` per references/auto-fix-policy.md §tamper).
 10. If any rules failed to load, emit prominent chat banner: `"⚠ N rule(s) failed to load; results incomplete. See report for SCANNER-001 findings."`
 11. Emit chat summary inline (per references/severity-rubric.md §chat-summary-format).
 

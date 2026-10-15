@@ -1,5 +1,10 @@
 # claude-security-audit changelog
 
+## 0.1.7 (2026-10-15)
+
+### Fixed
+- **Focused scans no longer age other aspects' findings** (#429). Every audit advanced one global run index, so 11 `/secrets-scan` runs evicted a permissions or hook finding, and the next full audit labelled it NEW with a fresh `first_seen`. Each `audit_history` entry now records its `focus` (`all` for a full audit), and GC counts a finding's absence only in full runs and in runs focused on its aspect (its rule's directory). `csa state_record_audit` takes the focus as an optional fifth argument and refuses an unknown aspect before writing. A full audit ages findings exactly as before; runs recorded by 0.1.6 and earlier read as full runs, so an upgrade changes nothing until a focused run is recorded.
+
 ## 0.1.6 (2026-10-15)
 
 ### Fixed

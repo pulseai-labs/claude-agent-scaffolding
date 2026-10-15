@@ -3,6 +3,7 @@ set -u
 source "$(dirname "$0")/_helpers.sh"
 source "$CSA_LIB_DIR/helpers.sh"
 source "$CSA_LIB_DIR/state.sh"
+source "$CSA_LIB_DIR/baseline.sh"
 
 _csa_failed=0
 
@@ -236,6 +237,180 @@ test_bootstrap_gitignore_appends_to_existing() {
 }
 
 # ---------------------------------------------------------------------------
+# 12–17. Focused scans age only the aspects they scanned (#429)
+# ---------------------------------------------------------------------------
+_CSA_PERM_FINDING='{"finding_uid":"FUID-perm0001","rule_id":"PERM-003","severity":"medium","file":".claude/settings.json","display_id":"SA-x-001"}'
+_CSA_SEC_FINDING='{"finding_uid":"FUID-sec00001","rule_id":"SECRETS-001","severity":"critical","file":"CLAUDE.md","display_id":"SA-x-002"}'
+
+# _csa_record <root> <run_index> <findings_jsonl> [<focus>]
+_csa_record() {
+  if [[ $# -ge 4 ]]; then
+    csa_state_record_audit "$1" "$2" ".claude/audits/run-$2.md" "$3" "$4"
+  else
+    csa_state_record_audit "$1" "$2" ".claude/audits/run-$2.md" "$3"
+  fi
+}
+
+# The issue's sequence, with its control in the same run: a full scan records a
+# permissions finding and a secrets finding; 11 secrets-only scans that miss both
+# keep the permissions finding (never scanned) and evict the secrets one (scanned
+# 11 times and absent); a later full scan keeps the permissions finding's identity.
+test_focused_scans_do_not_age_unscanned_aspects() {
+  local root="$_CSA_TMP/t12"
+  mkdir -p "$root/.claude/audits"
+  csa_state_init "$root"
+  local state_file; state_file="$(csa_state_path "$root")"
+
+  _csa_record "$root" 1 "$(printf '%s\n%s' "$_CSA_PERM_FINDING" "$_CSA_SEC_FINDING")" all || return 1
+  local first_seen; first_seen="$(jq -r '.findings["FUID-perm0001"].first_seen' "$state_file")"
+
+  local i
+  for i in 2 3 4 5 6 7 8 9 10 11 12; do
+    _csa_record "$root" "$i" "" secrets || return 1
+  done
+
+  assert_eq "PERM-003" "$(jq -r '.findings["FUID-perm0001"].rule_id // "evicted"' "$state_file")" \
+    "11 secrets-only scans must not evict a permissions finding" || return 1
+  assert_eq "evicted" "$(jq -r '.findings["FUID-sec00001"].rule_id // "evicted"' "$state_file")" \
+    "control: a secrets finding absent from 11 secrets scans must still age out" || return 1
+
+  local tagged_in="$_CSA_TMP/t12-findings.jsonl"
+  printf '%s\n' "$_CSA_PERM_FINDING" > "$tagged_in"
+  local tag; tag="$(csa_baseline_tag "$tagged_in" "$root" | jq -r '.state')"
+  assert_eq "PERSISTED" "$tag" "the next full scan must not relabel it NEW" || return 1
+
+  _csa_record "$root" 13 "$_CSA_PERM_FINDING" all || return 1
+  assert_eq "$first_seen" "$(jq -r '.findings["FUID-perm0001"].first_seen' "$state_file")" \
+    "a later full scan keeps first_seen" || return 1
+  assert_eq "2" "$(jq -r '.findings["FUID-perm0001"].seen_in_runs' "$state_file")" \
+    "a later full scan continues the same registry entry" || return 1
+}
+
+# Full audits keep 0.1.6's aging exactly: gap 10 stays, gap 11 goes.
+test_full_scans_age_as_before() {
+  local root="$_CSA_TMP/t13"
+  mkdir -p "$root/.claude/audits"
+  csa_state_init "$root"
+  local state_file; state_file="$(csa_state_path "$root")"
+
+  _csa_record "$root" 1 "$_CSA_PERM_FINDING" || return 1
+  local i
+  for i in 2 3 4 5 6 7 8 9 10 11; do
+    _csa_record "$root" "$i" "" || return 1
+  done
+  assert_eq "PERM-003" "$(jq -r '.findings["FUID-perm0001"].rule_id // "evicted"' "$state_file")" \
+    "gap 10 after full scans must keep the finding" || return 1
+  _csa_record "$root" 12 "" all || return 1
+  assert_eq "evicted" "$(jq -r '.findings["FUID-perm0001"].rule_id // "evicted"' "$state_file")" \
+    "gap 11 after full scans must evict the finding" || return 1
+}
+
+# Each audit record stores the aspect it scanned as `focus`; a full audit (or no
+# focus argument) records `all`.
+test_record_audit_stores_focus() {
+  local root="$_CSA_TMP/t14"
+  mkdir -p "$root/.claude/audits"
+  csa_state_init "$root"
+  local state_file; state_file="$(csa_state_path "$root")"
+
+  _csa_record "$root" 1 "" secrets || return 1
+  _csa_record "$root" 2 "" all || return 1
+  _csa_record "$root" 3 "" || return 1
+  assert_eq '["secrets","all","all"]' "$(jq -c '[.audit_history[].focus]' "$state_file")" \
+    "each run records its focus; no focus argument records all" || return 1
+}
+
+# A run index above the current one is outside the window and never counts as
+# a skipped run.
+test_gc_window_ignores_later_run_indices() {
+  local root="$_CSA_TMP/t18"
+  _csa_write_legacy_state "$root"
+  local state_file; state_file="$(csa_state_path "$root")"
+  jq '.audit_history += [{run_index: 17, focus: "secrets"}]' "$state_file" > "$state_file.new" \
+    && mv "$state_file.new" "$state_file"
+  csa_state_gc_findings "$root" 16
+  assert_eq "evicted" "$(jq -r '.findings["FUID-perm0001"].rule_id // "evicted"' "$state_file")" \
+    "a later focused run must not shorten the gap (gap 11)" || return 1
+}
+
+# An unknown focus is refused before state is written.
+test_record_audit_refuses_unknown_focus() {
+  local root="$_CSA_TMP/t15"
+  mkdir -p "$root/.claude/audits"
+  csa_state_init "$root"
+  local state_file; state_file="$(csa_state_path "$root")"
+  _csa_record "$root" 1 "$_CSA_PERM_FINDING" all || return 1
+  cp "$state_file" "$_CSA_TMP/t15-before.json"
+
+  local f
+  for f in secret ../rules ""; do
+    assert_exits_with 2 csa_state_record_audit "$root" 2 ".claude/audits/run-2.md" "" "$f" || return 1
+  done
+  cmp -s "$state_file" "$_CSA_TMP/t15-before.json" \
+    || { printf '    state.json changed after a refused focus\n' >&2; return 1; }
+}
+
+# _csa_write_legacy_state <root> — a 0.1.6 state: runs 1..15 recorded with no
+# focus field, a permissions finding last seen in run 5.
+_csa_write_legacy_state() {
+  local state_file; state_file="$(csa_state_path "$1")"
+  mkdir -p "$(dirname "$state_file")"
+  jq -n '{
+    schema_version: 2,
+    last_audit: null,
+    self_integrity: {
+      state_mtime_at_last_audit: 0,
+      suppressions_mtime_at_last_audit: 0,
+      git_tracked_check: { state_json_tracked: false, suppressions_json_tracked: false, checked_at: null }
+    },
+    findings: {
+      "FUID-perm0001": {
+        rule_id: "PERM-003", severity: "medium", file: ".claude/settings.json",
+        first_seen: "2026-01-01T00:00:00Z", last_seen: "2026-01-01T00:00:00Z",
+        seen_in_runs: 1, last_run_index: 5, last_display_id: "SA-old"
+      }
+    },
+    audit_history: [range(1; 16) | {run_index: ., date: "2026-01-01T00:00:00Z",
+      report_path: ".claude/audits/old.md",
+      finding_counts: {critical: 0, high: 0, medium: 0, low: 0, info: 0}}],
+    applied_fixes: []
+  }' > "$state_file"
+}
+
+# Upgrade input class: runs recorded by 0.1.6 and earlier read as full runs.
+test_legacy_runs_read_as_full_runs() {
+  local root="$_CSA_TMP/t16a" state_file
+  _csa_write_legacy_state "$root"
+  state_file="$(csa_state_path "$root")"
+  _csa_record "$root" 16 "" all || return 1
+  assert_eq "evicted" "$(jq -r '.findings["FUID-perm0001"].rule_id // "evicted"' "$state_file")" \
+    "legacy runs plus one full run age a finding exactly as 0.1.6 (gap 11)" || return 1
+
+  root="$_CSA_TMP/t16b"
+  _csa_write_legacy_state "$root"
+  state_file="$(csa_state_path "$root")"
+  _csa_record "$root" 16 "" secrets || return 1
+  assert_eq "PERM-003" "$(jq -r '.findings["FUID-perm0001"].rule_id // "evicted"' "$state_file")" \
+    "legacy runs count as full; only the new secrets run is skipped (gap 10)" || return 1
+}
+
+# A finding whose rule_id names no shipped rule (SCANNER-*, TAMPER-*) has no
+# aspect, so it ages on every run, as in 0.1.6.
+test_unmapped_rule_id_ages_on_every_run() {
+  local root="$_CSA_TMP/t17"
+  mkdir -p "$root/.claude/audits"
+  csa_state_init "$root"
+  local state_file; state_file="$(csa_state_path "$root")"
+  _csa_record "$root" 1 '{"finding_uid":"FUID-scan0001","rule_id":"SCANNER-002","severity":"high","file":"x.sh","display_id":"SA-x-003"}' all || return 1
+  local i
+  for i in 2 3 4 5 6 7 8 9 10 11 12; do
+    _csa_record "$root" "$i" "" secrets || return 1
+  done
+  assert_eq "evicted" "$(jq -r '.findings["FUID-scan0001"].rule_id // "evicted"' "$state_file")" \
+    "an unmapped finding ages on focused runs too" || return 1
+}
+
+# ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
 csa_test_run test_init_creates_schema_v2                          || _csa_failed=$((_csa_failed + 1))
@@ -249,5 +424,13 @@ csa_test_run test_tamper_check_silent_on_first_run                || _csa_failed
 csa_test_run test_tamper_001_fires_on_state_mtime_drift           || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_tamper_002_fires_on_suppressions_mtime_drift    || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_bootstrap_gitignore_appends_to_existing         || _csa_failed=$((_csa_failed + 1))
+
+csa_test_run test_focused_scans_do_not_age_unscanned_aspects      || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_full_scans_age_as_before                        || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_record_audit_stores_focus                       || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_record_audit_refuses_unknown_focus              || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_legacy_runs_read_as_full_runs                   || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_unmapped_rule_id_ages_on_every_run              || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_gc_window_ignores_later_run_indices             || _csa_failed=$((_csa_failed + 1))
 
 [[ "$_csa_failed" -eq 0 ]] || exit 1

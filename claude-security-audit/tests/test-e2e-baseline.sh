@@ -146,8 +146,41 @@ test_e2e_baseline_new_finding_tagged_new() {
 # Run
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# test_e2e_focused_scans_keep_other_aspects_persisted (#429)
+# A full audit records permissions and secrets findings; 11 secrets-only audits
+# follow; the next full audit still tags the permissions findings PERSISTED with
+# their original first_seen.
+# ---------------------------------------------------------------------------
+test_e2e_focused_scans_keep_other_aspects_persisted() {
+  _next_scratch; local scratch="$_CSA_TMP/t$_test_n"
+  local project="$scratch/project"
+  mkdir -p "$project"
+  cp -R "$CSA_FIXTURES_DIR/issues/permissions-issue/." "$project/"
+  cp "$CSA_FIXTURES_DIR/issues/secrets-issue/CLAUDE.md" "$project/"
+
+  HOME=/nonexistent csa_audit_harness "$project" all > "$scratch/run1.jsonl"
+  local perm1; perm1="$(jq -c 'select(.rule_id | startswith("PERM-")) | {finding_uid}' "$scratch/run1.jsonl" | sort)"
+  [[ -n "$perm1" ]] || { printf '    run1 produced no permissions findings\n' >&2; return 1; }
+  local seen1; seen1="$(jq -c '.findings | with_entries(select(.value.rule_id | startswith("PERM-"))) | map_values(.first_seen)' "$(csa_state_path "$project")")"
+
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10 11; do
+    HOME=/nonexistent csa_audit_harness "$project" secrets > /dev/null
+  done
+
+  HOME=/nonexistent csa_audit_harness "$project" all > "$scratch/run13.jsonl"
+  local perm13; perm13="$(jq -c 'select(.rule_id | startswith("PERM-")) | {finding_uid}' "$scratch/run13.jsonl" | sort)"
+  assert_eq "$perm1" "$perm13" "the same permissions findings come back" || return 1
+  local relabelled; relabelled="$(jq -r 'select(.rule_id | startswith("PERM-")) | select(.state != "PERSISTED") | .finding_uid' "$scratch/run13.jsonl")"
+  assert_eq "" "$relabelled" "permissions findings must stay PERSISTED after secrets-only audits" || return 1
+  local seen13; seen13="$(jq -c '.findings | with_entries(select(.value.rule_id | startswith("PERM-"))) | map_values(.first_seen)' "$(csa_state_path "$project")")"
+  assert_eq "$seen1" "$seen13" "permissions findings keep their first_seen" || return 1
+}
+
 csa_test_run test_e2e_baseline_repeat_run_persisted      || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_e2e_baseline_whitespace_edit_persisted  || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_e2e_baseline_new_finding_tagged_new     || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_e2e_focused_scans_keep_other_aspects_persisted || _csa_failed=$((_csa_failed + 1))
 
 [[ "$_csa_failed" -eq 0 ]] || exit 1

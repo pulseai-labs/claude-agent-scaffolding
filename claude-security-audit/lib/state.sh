@@ -80,15 +80,41 @@ csa_state_read() {
 # Record audit
 # ---------------------------------------------------------------------------
 
-# csa_state_record_audit <project_root> <run_index> <report_path> <findings_jsonl>
+# _csa_state_rules_dir — the shipped rule tree (one directory per aspect).
+_csa_state_rules_dir() {
+  printf '%s' "${CSA_RULES_DIR:-$(dirname "${BASH_SOURCE[0]}")/rules}"
+}
+
+# _csa_state_rule_aspects — JSON object mapping each shipped RULE_ID to the
+# aspect directory its rule file sits in (#429).
+_csa_state_rule_aspects() {
+  local f id
+  for f in "$(_csa_state_rules_dir)"/*/*.sh; do
+    [[ -f "$f" ]] || continue
+    id="$(grep -m1 '^RULE_ID=' "$f" 2>/dev/null | sed 's/^RULE_ID=//' | tr -d '"'\')"
+    [[ -n "$id" ]] && printf '%s\t%s\n' "$id" "$(basename "$(dirname "$f")")"
+  done | jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | {key: .[0], value: .[1]}) | from_entries'
+}
+
+# csa_state_record_audit <project_root> <run_index> <report_path> <findings_jsonl> [<focus>]
 # Append to audit_history, update last_audit, update findings registry, run GC.
 # findings_jsonl: newline-delimited JSON objects; each must have:
 #   finding_uid, rule_id, severity, file, display_id
+# focus: the aspect the run scanned, or `all` (the default) for a full audit.
+# The history entry records it as `focus`; an unknown aspect is refused
+# (exit 2) before any write.
 csa_state_record_audit() {
   local root="$1"
   local run_index="$2"
   local report_path="$3"
   local findings_jsonl="$4"
+  local focus="${5-all}"
+
+  if [[ "$focus" != "all" ]] && ! [[ -n "$focus" && "$focus" != */* && "$focus" != .* \
+        && -d "$(_csa_state_rules_dir)/$focus" ]]; then
+    printf 'Unknown rule aspect: %s\n' "$focus" >&2
+    return 2
+  fi
 
   local state_file; state_file="$(csa_state_path "$root")"
   local now; now="$(csa_iso_now)"
@@ -193,6 +219,7 @@ csa_state_record_audit() {
     --arg display_id_prefix "$display_id_prefix" \
     --argjson finding_counts "$finding_counts" \
     --argjson enabled_plugins_snapshot "$enabled_plugins_snapshot" \
+    --arg focus "$focus" \
     --argjson run_index "$run_index" '
     .last_audit = {
       date: $now,
@@ -205,7 +232,8 @@ csa_state_record_audit() {
       run_index: $run_index,
       date: $now,
       report_path: $report_path,
-      finding_counts: $finding_counts
+      finding_counts: $finding_counts,
+      focus: $focus
     }]
   ')"
 
@@ -223,19 +251,35 @@ csa_state_record_audit() {
 # ---------------------------------------------------------------------------
 
 # csa_state_gc_findings <project_root> <current_run_index>
-# Evict findings where (current_run_index - last_run_index) > 10.
+# Evict findings absent for more than 10 runs that scanned their aspect (#429):
+# (current_run_index - last_run_index) minus the recorded runs in that window
+# that were focused on another aspect. A run with focus `all`, or with no focus
+# (written by 0.1.6 and earlier), is a full run and counts for every finding. A
+# finding whose rule_id maps to no shipped rule has no aspect and ages on every
+# run.
 csa_state_gc_findings() {
   local root="$1"
   local current_run_index="$2"
   local state_file; state_file="$(csa_state_path "$root")"
   [[ -f "$state_file" ]] || return 0
 
+  local rule_aspects; rule_aspects="$(_csa_state_rule_aspects)"
   local tmp; tmp="$(dirname "$state_file")/state.json.tmp.$$"
   jq \
     --argjson current "$current_run_index" \
+    --argjson rule_aspects "$rule_aspects" \
     'if .findings then
+      (.audit_history // []) as $hist |
       .findings = (.findings | with_entries(
-        select(($current - .value.last_run_index) <= 10)
+        .value.last_run_index as $last |
+        ($rule_aspects[.value.rule_id // ""] // null) as $aspect |
+        ([$hist[]
+          | select(.run_index > $last and .run_index <= $current)
+          | select($aspect != null
+                   and (.focus // "all") != "all"
+                   and .focus != $aspect)
+         ] | length) as $skipped |
+        select(($current - $last - $skipped) <= 10)
       ))
     else . end' \
     "$state_file" > "$tmp" && mv "$tmp" "$state_file"
