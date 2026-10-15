@@ -124,7 +124,8 @@ Every command's syntax comes from `herdr --skill`.
    at teardown, and at a rotation's stand-down; a host with no background timer keeps the wait/ping fallback, never a rolling foreground
    loop (`herdr-mechanics.md`).
    Before any question to the operator the top writes `run.question` before it asks and removes it on
-   the answer — text, time, the task it holds and any dagr `message_id` — so a question survives the top.
+   the answer — `{text, asked_at, task, message_id?}` (`message_id` only when the question answers or
+   relays a dagr operator message) — so a question survives the top.
    `herdr pane read`
    only on a `blocked` wake, a missing or malformed report, a timeout's checkpoint, the
    false wake's own read, or the heartbeat tick's one check per live seat — never to watch progress.

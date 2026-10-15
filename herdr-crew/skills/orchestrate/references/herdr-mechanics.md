@@ -254,7 +254,7 @@ actually renamed over. Every other dispatch keeps the report-file wait and this 
 as the whole of its push bound. A failed read or send changes nothing.
 
 A ping is one way a report announces itself, beside a `Completion` wake and a heartbeat tick,
-and the generation check governs all three: a new generation is read, noted — its hash and identity —
+and the generation check governs all three: a new generation is read, noted — `{hash, identity}`, with `identity` as defined at dispatch —
 and recorded as the attempt's `locator.seen`, acted on once by kind, and retires that dispatch's wait and companion;
 an already-consumed one is not read, not acted on, retires nothing — a stale same-path ping never cancels the current phase's wait.
 A live dialog and the tick's health check are reports of neither kind and still run. A ping whose

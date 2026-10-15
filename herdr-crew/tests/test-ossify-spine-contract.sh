@@ -1787,8 +1787,12 @@ pin "$LIFECYCLE_MD" '`phase: delivered` once the send is confirmed' \
   "step 3 marks delivery after the send" flat
 pin "$LIFECYCLE_MD" 'writes `run.question` before it asks and removes it on the answer' \
   "an operator ask is recorded in the run" flat
+pin "$LIFECYCLE_MD" '`{text, asked_at, task, message_id?}`' \
+  "an operator question records the exact object keys" flat
 pin "$MECHANICS_MD" 'and recorded as the attempt'"'"'s `locator.seen`' \
   "the generation check records the consumed generation in the run" flat
+pin "$MECHANICS_MD" '`{hash, identity}`' \
+  "the consumed generation records the exact object keys" flat
 
 section "waits and completion bodies"
 
