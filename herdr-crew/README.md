@@ -111,13 +111,13 @@ Every launch that places a seat in a herdr pane marks it, in the pane, before th
 marked with its role and `SEAT_MODS_ALLOW`; a coordinator seat — the spine, close or work-PR
 session, the doctor session, the lane driver — with `SEAT_MODS_ROLE=coordinator`; and
 the top's rotation successor with `SEAT_MODS_ROLE=orchestrator`. The two free roles
-carry no `SEAT_MODS_ALLOW` except for an OMP lane driver, close or doctor coordinator (config.md), which adds each hosting repo's `.worktrees` root (colon-separated roots). Never through `settings.json`'s `env`, a shell profile or a
+carry no `SEAT_MODS_ALLOW` except for an OMP coordinator (config.md), which adds each hosting repo's `.worktrees` root (colon-separated roots). Never through `settings.json`'s `env`, a shell profile or a
 `command:` line. The operator's own top is launched by the operator, through an alias that
 sets `orchestrator`; herdr-crew launches no top but a rotation successor.
 Since 0.2.18, an OMP launcher reads autonomic 0.7.0's live mode file via `AUTONOMIC_MODE_FILE`;
 Claude Code keeps reading `AUTONOMIC_EFFECTIVE_MODE`. Only an exact `autopilot` marks a child; unset, missing or older autonomic is manual.
 
-Since 0.2.17, OMP coordinator and worker seats launch through `omp-seat` (see `references/config.md`); OMP seats fill the lane driver (default-lane spine session), close, doctor or worker seats, and, since 0.2.19, the orchestrator top and its rotation successor (`omp-seat orchestrator --via omp-glm`; omp-roles 0.4.0, seat-mods 0.4.4) — never a work-PR session or an activated spine session until a live OMP seat-launching run lifts it (#788).
+Since 0.2.17, OMP coordinator and worker seats launch through `omp-seat` (see `references/config.md`); OMP seats fill the lane driver (default-lane spine session), close, doctor or worker seats, and, since 0.2.19, the orchestrator top and its rotation successor (`omp-seat orchestrator --via omp-glm`; omp-roles 0.4.0, seat-mods 0.4.4); since 0.2.23, also the activated spine session (`omp-seat crew-spine`) and the work-PR session (`omp-seat crew-work-pr`; omp-roles 0.6.0), which run 788 lifted (#788).
 
 **Known limit.** `seat-mods` 0.1.0 does not know the two free roles: it reads either as an
 invalid role and denies every tool call, so herdr-crew 0.2.7 must be installed together

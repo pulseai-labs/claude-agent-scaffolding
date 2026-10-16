@@ -60,7 +60,7 @@
     },
     {
       "name": "omp-roles",
-      "description": "OMP role pack for default mode. 0.5.0 ships omp-seat, the launcher that pins the seat-mods, molt and autonomic OMP extensions onto a seat, plus the implementer and seat-reviewer agents and the spine-driver, close, work-pr and orchestrator coordinator roles, launched with omp-seat <role>; omp-seat orc opens the orchestrator on omp-glm. OMP only.",
+      "description": "OMP role pack for default mode. 0.6.0 ships omp-seat, the launcher that pins the seat-mods, molt and autonomic OMP extensions onto a seat, plus the implementer and seat-reviewer agents and the spine-driver, close, work-pr, orchestrator, crew-spine and crew-work-pr coordinator roles, launched with omp-seat <role>; omp-seat orc opens the orchestrator on omp-glm. OMP only.",
       "category": "workflow",
       "source": "./omp-roles"
     },

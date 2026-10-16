@@ -45,7 +45,7 @@ describe('planLaunch', () => {
     expect(launch('__proto__')).toHaveProperty('error')
   })
   test('an unknown role is an error', () => {
-    expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker, spine-driver, close, work-pr, orchestrator)' })
+    expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker, spine-driver, close, work-pr, orchestrator, crew-spine, crew-work-pr)' })
   })
   test('orchestrator appends its role file when seat-mods is 0.4.4, autonomic 0.7.0 and herdr-crew 0.2.19 or later', () => {
     const [s, m, a] = [install('seat-mods', true, '0.4.4'), install('molt'), install('autonomic', true, '0.7.0')]
@@ -105,7 +105,7 @@ describe('planLaunch', () => {
     record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.1'), molt: install('molt'), autonomic: install('autonomic') })
     expect(launch('worker')).toHaveProperty('argv')
   })
-  for (const role of ['spine-driver', 'close', 'work-pr']) {
+  for (const role of ['spine-driver', 'close', 'work-pr', 'crew-spine', 'crew-work-pr']) {
     test(`${role} appends its shipped role file after the extensions and before passthrough args`, () => {
       const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
       record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })

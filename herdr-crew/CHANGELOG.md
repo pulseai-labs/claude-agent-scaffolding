@@ -2,6 +2,10 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.23
+
+**OMP may fill the activated spine session and the work-PR session** (#788, #839). Run 788 ran both on OMP (GLM-5.3) and passed. config.md's placement sentence and README's copy now allow them, through omp-roles 0.6.0's `crew-spine` and `crew-work-pr` roles. Those roles take the brief as the procedure and launch every seat as a herdr pane, so they no longer contradict it, as the default-lane `spine-driver` and `work-pr` roles did. The `can:` table's OMP doctor row now also covers the activated spine session, the ossify item implementer (`omp-seat worker`) and the work-PR session: each reaches its skill by `skill://` and needs no `slash-commands`. Both new OMP coordinators get each hosting repo's `.worktrees` root in `SEAT_MODS_ALLOW`, as the lane driver, close and doctor sessions already do.
+
 ## 0.2.22
 
 **A rotation resumes from run state** (#819, part of #810). The rotation's resume is one procedure from `run.json`: rebind; re-ask an open `run.question`; run the generation check against `locator.seen` and re-arm each live attempt's waits; arm one heartbeat; continue at the handoff's next step, never re-running a done one. A resume after a hard stop (the top died with no handoff) is not claimed: the new top tells the operator (#810). The rotation handoff shrinks to the run path, the next step and the context the run file cannot hold, and restates no operator gate: for the merge it points at step 12 and `run.merge_word`, which step 12 now reads. Legacy run files resume with stated defaults. A molted top reads `locator.seen`. A brief sent to a seat already running now opens its attempt with phase and locator like a launch.
