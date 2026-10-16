@@ -6,6 +6,7 @@
 // under plain bun.
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { JudgmentRequest, Question } from '@oh-my-pi/pi-ai'
@@ -125,6 +126,7 @@ const sidecar = (w: RoutingWorld): Array<Record<string, unknown>> => {
 }
 const human = (w: RoutingWorld): string => { try { return readFileSync(w.ledgerPath, 'utf8') } catch { return '' } }
 const pain = (w: RoutingWorld): string => w.painLines().join('\n')
+const digest = (s: string): string => createHash('sha256').update(s).digest('hex')
 const generated = (w: RoutingWorld): Array<Record<string, unknown>> => w.generationRequests as Array<Record<string, unknown>>
 
 // =====================================================================================
@@ -642,8 +644,12 @@ describe('the turn-end consumer', () => {
     expect(await w.stop('Which way?')).toBeUndefined()
     const notice = w.notices.join('\n')
     expect(notice).toContain('autopilot: pain')
-    // Options are listed, recommended first, and the credential request stays its own plain line.
-    expect(notice).toContain('1) Hold (Recommended) 2) Merge')
+    // Options are listed, recommended first, each with its 40-character label AND its complete
+    // validated instruction text (the text a press submits, never cut); the credential request stays
+    // its own plain line.
+    expect(notice).toContain('1) Hold (Recommended) — keep the change uncommitted 2) Merge — a one-way door that cannot be undone')
+    expect(pain(w)).toContain('keep the change uncommitted')
+    expect(human(w)).toContain('keep the change uncommitted')
     expect(notice).toContain('in plain text: run the focused suite')
     expect(pain(w)).toContain('pain')
     expect(sidecar(w)[0]).toMatchObject({ consumer: 'turn-end', outcome: 'pain' })
@@ -676,6 +682,58 @@ describe('the turn-end consumer', () => {
 // =====================================================================================
 // Step 5 — failure, lifecycle and mode behaviour
 // =====================================================================================
+
+describe('the R5 secret gate (R5)', () => {
+  let w: RoutingWorld
+  afterEach(() => { if (w) w.close() })
+
+  const SECRET = `ghp_${'a'.repeat(36)}`
+  const withSecret = (text: string) => `${text} ${SECRET}`
+
+  test('a secret in the last reply abstains before any native call and echoes no byte', async () => {
+    w = turnWorld(turnPolicy('stalled', STEP))
+    classifyAs(w, 'stalled')
+    generateText(w, envelope({ case: 'stalled', next_step: STEP, reason: 'x' }, null, []))
+    expect(await w.stop(withSecret('Step complete.'))).toBeUndefined()
+    expect(w.nativeRequests).toEqual([])
+    expect(generated(w)).toEqual([])
+    expect(human(w)).toContain(' · pain · ')
+    expect(human(w)).not.toContain(SECRET)
+    expect(pain(w)).toContain('pain')
+    expect(pain(w)).not.toContain(SECRET)
+    expect(w.notices.join('\n')).not.toContain(SECRET)
+  })
+
+  test('a secret in an approved step or evidence text abstains, so nothing is judged or rendered', async () => {
+    const policy = turnPolicy('stalled', withSecret(STEP))
+    w = turnWorld(policy)
+    classifyAs(w, 'stalled')
+    generateText(w, envelope({ case: 'stalled', next_step: STEP, reason: 'x' }, null, []))
+    expect(await w.stop('Step complete.')).toBeUndefined()
+    expect(w.nativeRequests).toEqual([])
+    expect(generated(w)).toEqual([])
+    expect(human(w)).toContain(' · pain · ')
+    expect([human(w), pain(w), w.notices.join('\n')].join('\n')).not.toContain(SECRET)
+  })
+
+  test('a secret in the evidence a pain option is grounded in abstains, so nothing is judged or rendered', async () => {
+    // The secret sits in a real pinned material the policy cites: it is in the frozen state before any
+    // native call, which is exactly why the gate must abstain there.
+    const secretNote = 'fixture-secret-note'
+    const secretText = `Synthetic approved note: hold the change. ${SECRET}`
+    const policy = fixturePolicy()
+    policy.evidence.push({ ref: { id: secretNote, source: join(tmpdir(), secretNote), sha256: digest(secretText), locator: 'fixture:secret' }, text: secretText })
+    policy.approved.remainingSteps = [{ id: 'step-3', text: STEP, grantIds: [GRANT], evidenceIds: [secretNote] }]
+    w = routingWorld({ grants: [turnGrant()], policy, mode: 'autopilot', extraMaterials: [{ id: secretNote, text: secretText }] })
+    classifyAs(w, 'pain')
+    generateText(w, envelope({ case: 'pain', reason: 'x' }, null, []))
+    expect(await w.stop('Which way?')).toBeUndefined()
+    expect(w.nativeRequests).toEqual([])
+    expect(generated(w)).toEqual([])
+    expect(human(w)).toContain(' · pain · ')
+    expect([human(w), pain(w), w.notices.join('\n')].join('\n')).not.toContain(SECRET)
+  })
+})
 
 describe('the turn-end consumer failures', () => {
   let w: RoutingWorld
@@ -743,11 +801,152 @@ describe('the turn-end consumer failures', () => {
     expect(human(w)).not.toContain('continue')
     expect(w.nativeRequests).toHaveLength(0)
   })
+
+  test('a stale stop leaves the successor\'s change mark and judge budget alone', async () => {
+    w = turnWorld(turnPolicy('stalled', STEP))
+    classifyAs(w, 'stalled')
+    for (let i = 0; i < 3; i++) expect((await w.stop('x'))?.decision).toBe('block')
+    // A retained change on the live session, then a stop whose event names another session.
+    await w.handlers.get('tool_result')!({ toolName: 'write', input: { path: 'a' }, content: [{ type: 'text', text: 't' }], isError: false }, w.ctx)
+    expect(await w.handlers.get('session_stop')!({ session_id: 'S0', last_assistant_message: 'x' }, w.ctx)).toBeUndefined()
+    expect(w.nativeRequests).toHaveLength(3)
+    // The successor's change mark is still there: its next stop resets the count to zero and blocks
+    // rather than hitting the exhausted loop guard, and the stale event spent no native judgment.
+    expect((await w.stop('x'))?.decision).toBe('block')
+    expect(w.nativeRequests).toHaveLength(4)
+    expect(pain(w)).toBe('')
+  })
+
+  test('the event\'s own session: handled as before', async () => {
+    w = turnWorld(turnPolicy('stalled', STEP))
+    classifyAs(w, 'stalled')
+    expect((await w.handlers.get('session_stop')!({ session_id: 'S1', last_assistant_message: 'x' }, w.ctx))?.decision).toBe('block')
+    expect(w.nativeRequests).toHaveLength(1)
+    expect(human(w)).toContain(' · stalled · ')
+  })
 })
 
 // =====================================================================================
 // Step 5 — the loop guard and change tracking (moved here from autonomic.test.ts)
 // =====================================================================================
+
+describe('the recorded draft evidence subset (R1)', () => {
+  let w: RoutingWorld
+  afterEach(() => { if (w) w.close() })
+
+  test('a waiting decision citing a minted wait fact records exactly the lease-resolvable subset', async () => {
+    w = turnWorld(emptyPolicy())
+    classifyAs(w, 'waiting')
+    w.setJobs({ running: [{ id: 'J7', status: 'running' } as never], recent: [], delivery: {} as never })
+    // The reason cites the minted wait evidence (in the state, NOT in the lease) beside a lease ID: the
+    // decision must stay recordable, and the recorded list is exactly the lease-resolvable subset.
+    const waitEvidenceId = 'wait:host-job:job:J7'
+    const waitText = 'host-job job:J7 is running'
+    const waitQuote = { evidenceId: waitEvidenceId, start: 0, end: waitText.length }
+    const briefText = 'Synthetic task: exercise the bounded decision transaction. No publication.'
+    const briefQuote = { evidenceId: BRIEF, start: 0, end: 8 }
+    void briefText
+    generateText(w, envelope({ case: 'waiting', reason: `${waitEvidenceId}: ${waitText}; ${BRIEF}: Syntheti` }, null, [waitQuote, briefQuote]))
+    expect(await w.stop('Waiting for the job.')).toBeUndefined()
+    const authority = sidecar(w)[0]?.['authority'] as { evidenceIds: string[] } | undefined
+    expect(authority?.evidenceIds).toEqual([BRIEF])
+    expect(authority?.evidenceIds).not.toContain(waitEvidenceId)
+  })
+
+  test('a done decision citing bundle-only evidence records the lease subset and nothing more', async () => {
+    const completion = 'fixture-completion-only-in-bundle'
+    const completionText = 'Synthetic approved completion evidence: the objective is met.'
+    const policy = fixturePolicy()
+    // The completion evidence is in the pinned bundle only: the lease never carries it.
+    policy.evidence.push({ ref: { id: completion, source: join(tmpdir(), completion), sha256: digest(completionText), locator: 'fixture:completion' }, text: completionText })
+    w = routingWorld({ grants: [turnGrant()], policy, mode: 'autopilot' })
+    classifyAs(w, 'done')
+    const quote = { evidenceId: completion, start: 0, end: completionText.length }
+    // The bundle-only completion evidence plus a lease ID: the record keeps exactly the lease subset.
+    const briefQuote = { evidenceId: BRIEF, start: 0, end: 8 }
+    generateText(w, envelope({ case: 'done', reason: `${completion}: ${completionText}; ${BRIEF}: Syntheti` }, null, [quote, briefQuote]))
+    expect(await w.stop('All done.')).toBeUndefined()
+    expect(human(w)).toContain(' · done · ')
+    const authority = sidecar(w)[0]?.['authority'] as { evidenceIds: string[] } | undefined
+    expect(authority?.evidenceIds).toEqual([BRIEF])
+    expect(authority?.evidenceIds).not.toContain(completion)
+  })
+})
+
+describe('the post-record freshness check (F2)', () => {
+  let w: RoutingWorld
+  afterEach(() => { if (w) w.close() })
+
+  test('an authority revoked after the decision was reached stops with no continuation', async () => {
+    w = turnWorld(turnPolicy('stalled', STEP))
+    // The authority is revoked while the native judgment is in flight: the checks around the record must
+    // refuse to continue — no continuation block, no successor progress move, a recorded pain row.
+    w.setNative(async (request: JudgmentRequest) => { w.revoke(); return turnEnvelope(request, { turn_end: turnAnswer(request, 'stalled') }) })
+    expect(await w.stop('Step 2 is done.')).toBeUndefined()
+    // No continuation is returned and the human ledger carries no continuation row for this stop.
+    expect(human(w)).not.toContain(' · stalled · ')
+    expect(human(w)).toContain(' · pain · ')
+    expect(pain(w)).toContain('pain')
+    // The one decision window was spent on this stop (no re-judgment) and no successor state moved.
+    expect(w.nativeRequests).toHaveLength(1)
+  })
+
+  test('the check is inside the decision window, not a second transaction', async () => {
+    w = turnWorld(turnPolicy('stalled', STEP))
+    // A revoked authority mid-flight consumes no second frame: the successor count cannot advance, so a
+    // stop that was never decided can never have been continued.
+    w.setNative(async (request: JudgmentRequest) => { w.revoke(); return turnEnvelope(request, { turn_end: turnAnswer(request, 'stalled') }) })
+    const first = await w.stop('Step 2 is done.')
+    const second = await w.stop('Step 2 is done.')
+    expect(first).toBeUndefined()
+    expect(second).toBeUndefined()
+    // Both stops are recorded (the pain path is on the record), and neither ever blocked with a continuation.
+    expect(human(w)).not.toContain('Autopilot')
+    expect(w.nativeRequests).toHaveLength(1)
+  })
+})
+
+describe('changed tracking through the stop path (restored)', () => {
+  let w: RoutingWorld
+  afterEach(() => { if (w) w.close() })
+
+  /** After three no-change pushes, the next stop blocks only when the intervening call counted as a change. */
+  async function changesBy(...results: Array<{ toolName: string; input: unknown; isError?: boolean }>): Promise<boolean> {
+    w = turnWorld(turnPolicy('stalled', STEP))
+    classifyAs(w, 'stalled')
+    for (let i = 0; i < 3; i++) await w.stop('x')
+    for (const r of results) await w.handlers.get('tool_result')!({ isError: false, ...r }, w.ctx)
+    const blocked = (await w.stop('x'))?.decision === 'block'
+    w.close()
+    return blocked
+  }
+
+  const AST = { toolName: 'ast_edit', input: { ops: [{ pat: 'a', out: 'b' }], paths: ['src/a.ts'] } }
+  const RESOLVE = { toolName: 'write', input: { path: 'xd://resolve', content: 'the preview is right' } }
+  const REJECT = { toolName: 'write', input: { path: 'xd://reject', content: 'wrong files' } }
+
+  test('an ast_edit result is a preview: a change only once it is resolved', async () => {
+    expect(await changesBy(AST)).toBe(false)
+    expect(await changesBy(AST, REJECT)).toBe(false)
+    expect(await changesBy(AST, RESOLVE)).toBe(true)
+    expect(await changesBy(AST, { ...RESOLVE, isError: true })).toBe(false)
+    expect(await changesBy(AST, { toolName: 'resolve', input: { action: 'apply', reason: 'ok' } })).toBe(true)
+    expect(await changesBy(AST, { toolName: 'resolve', input: { action: 'discard', reason: 'no' } })).toBe(false)
+    expect(await changesBy(AST, { toolName: 'reject', input: { reason: 'no' } })).toBe(false)
+    expect(await changesBy({ toolName: 'write', input: { path: 'xd://propose', content: 'my-plan' } })).toBe(false)
+  })
+
+  test('lsp: a rename or rename_file applies by default and is a change; apply:false is a preview; code_actions apply only on apply:true', async () => {
+    const lsp = (input: Record<string, unknown>) => ({ toolName: 'lsp', input })
+    expect(await changesBy(lsp({ action: 'rename', file: 'a.ts', new_name: 'b' }))).toBe(true)
+    expect(await changesBy(lsp({ action: 'rename_file', file: 'a.ts', new_name: 'b.ts' }))).toBe(true)
+    expect(await changesBy(lsp({ action: 'rename', file: 'a.ts', new_name: 'b', apply: false }))).toBe(false)
+    expect(await changesBy(lsp({ action: 'code_actions', file: 'a.ts', query: 'fix', apply: true }))).toBe(true)
+    expect(await changesBy(lsp({ action: 'code_actions', file: 'a.ts' }))).toBe(false)
+    for (const action of ['diagnostics', 'definition', 'references', 'hover', 'symbols', 'reload', 'status'])
+      expect([action, await changesBy(lsp({ action, file: 'a.ts' }))]).toEqual([action, false])
+  })
+})
 
 describe('the loop guard and change tracking', () => {
   let w: RoutingWorld
@@ -802,7 +1001,8 @@ describe('an unenrolled autopilot session', () => {
     expect(r).toBeUndefined()
     expect(u.notes.join('\n')).toContain('question for you')
     expect(u.ledger()).toContain(' · pain · ')
-    expect(u.prompts).toEqual([])
+    expect(u.records.filter(r => r.includes('.decisions.jsonl'))).toEqual([])
+    expect(u.records.some(r => r.includes(' Which plan? '))).toBe(true)
   })
 
   test('the turn end stops with no continuation and no ledger row', async () => {
@@ -810,7 +1010,7 @@ describe('an unenrolled autopilot session', () => {
     expect(await u.autonomic.onSessionStop({ last_assistant_message: 'Step complete.' })).toBeUndefined()
     expect(u.ledger()).toBe('')
     expect(u.notes).toEqual([])
-    expect(u.prompts).toEqual([])
+    expect(u.records).toEqual([])
   })
 })
 
@@ -819,15 +1019,16 @@ describe('an unenrolled autopilot session', () => {
 // binding (so `io.decisions` is undefined and no conversational path exists any more).
 // =====================================================================================
 
-type UnenrolledWorld = { autonomic: ReturnType<typeof createAutonomic>; notes: string[]; prompts: string[]
-  ledger: () => string; close: () => void }
+type UnenrolledWorld = { autonomic: ReturnType<typeof createAutonomic>; notes: string[]
+  records: string[]; ledger: () => string; close: () => void }
 
 function unenrolledWorld(): UnenrolledWorld {
   const files = new Map<string, string>([
     [`${HOME}/.claude/autonomic/policy.md`, 'TEST POLICY\n'],
     [`${HOME}/.claude/state/autonomic/sessions/S1.json`, JSON.stringify({ mode: 'autopilot', scope: [], source: 'command' })],
   ])
-  const notes: string[] = [], prompts: string[] = []
+  const notes: string[] = []
+  const records: string[] = []
   const saved: Record<string, string | undefined> = {}
   for (const name of ['AUTONOMIC_AUTHORITY_PATH', 'AUTONOMIC_AUTHORITY_SHA256', 'AUTONOMIC_ASSIGNMENT_ID',
     'AUTONOMIC_ASSIGNMENT_GENERATION', 'AUTONOMIC_LAUNCH_ID', 'AUTONOMIC_MODE']) {
@@ -842,18 +1043,19 @@ function unenrolledWorld(): UnenrolledWorld {
     readText: async p => files.get(p),
     exists: async p => files.has(p),
     writeText: async (p, t) => { files.set(p, t) },
-    appendLine: async (p, l) => { files.set(p, `${files.get(p) ?? ''}${l}\n`); return true },
+    appendLine: async (p, l) => { records.push(`${p}\n${l}`); files.set(p, `${files.get(p) ?? ''}${l}\n`); return true },
     touch: async p => { if (!files.has(p)) files.set(p, ''); return true },
     run: async argv => argv.join(' ').endsWith('rev-parse --show-toplevel')
       ? { exitCode: 0, stdout: '/repo\n' } : { exitCode: 1, stdout: '' },
-    ephemeral: async (prompt: string) => { prompts.push(prompt); return undefined },
     usage: () => undefined, systemPrompt: () => undefined,
     notify: t => { notes.push(t) }, status: () => {}, bell: async () => {},
   }
   const autonomic = createAutonomic(io)
   return {
-    autonomic, notes, prompts,
+    autonomic, notes, records,
     ledger: () => files.get('/repo/.autonomic/ledger.md') ?? '',
     close: () => { for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v } },
   }
 }
+
+

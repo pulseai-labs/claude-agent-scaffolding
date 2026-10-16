@@ -582,8 +582,9 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
   the floor never matched, are untouched. It is gated until Tasks 6–8 and both releases.
 - The `github` route's bounded facts read the repository's configured remote URLs locally (read-only `git config`) so a PR/API mutation can resolve
   its exact repository from the pinned facts; no network call is made while deciding.
-- There is no band: a turn-end pain lists its options, numbered, in the notice, the bell and the pain file. The ask judge sees what
-  the session has read, so a scope document answers an ask only after the session has read it.
+- There is no band: a turn-end pain lists its options, numbered, in the notice, the bell and the pain file, recommended first, each with
+  its 40-character one-line label and its complete validated instruction text (the same content the human ledger row carries). The ask
+  judge sees what the session has read, so a scope document answers an ask only after the session has read it.
 - **Five-state turn end with grounded payloads (Task 7, unactivated).** An enrolled session's stop is classified once, natively, with one
   `turn_end` choice question whose labels are exactly `covered`, `stalled`, `waiting`, `done` and `pain`. The classification is never
   authority: before it, the stale-event check, the Molt handoff and the loop guard decide as they always did, and after it the payload must

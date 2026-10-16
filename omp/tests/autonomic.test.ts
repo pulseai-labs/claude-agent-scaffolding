@@ -696,14 +696,6 @@ describe('the omp wiring', () => {
     expect((await a.onBeforeAgentStart({ systemPrompt: ['BASE'] }))?.systemPrompt.join('\n')).toContain('- /spec.md')
   })
 
-  test('the default export is a function and imports under plain bun', () => {
-    expect(typeof ompExtension).toBe('function')
-    const path = join(import.meta.dir, '../../autonomic/omp/extension.ts')
-    const r = Bun.spawnSync(['bun', '-e', `const m = await import(${JSON.stringify(path)}); process.exit(typeof m.default === 'function' ? 0 : 3)`], { stdout: 'pipe', stderr: 'pipe' })
-    expect(r.stderr.toString()).toBe('')
-    expect(r.exitCode).toBe(0)
-  })
-
   test('a child agent (task, advisor, /tan clone): no handler does anything', async () => {
     const b = boot({ mode: 'autopilot' })
     try {

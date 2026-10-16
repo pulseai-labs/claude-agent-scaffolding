@@ -360,15 +360,26 @@ export function createAutonomic(io: AutonomicIO) {
     return false
   }
 
+  // The complete validated option text (Plan Task 7 §9 line 1103): a 40-character one-line label and the
+  // whole instruction a press submits, never cut, recommended first. One renderer, so the notice, the bell,
+  // the pain file and the human row all carry the same content.
+  function optionLines(options?: ReadonlyArray<{ label: string; text: string; recommended: boolean }>): string {
+    return (options ?? [])
+      .map(o => ({ label: oneLine(o.label, 40), text: o.text, recommended: o.recommended }))
+      .sort((a, b) => Number(b.recommended) - Number(a.recommended))
+      .map((o, i) => `${i + 1}) ${o.label}${o.recommended ? ' (Recommended)' : ''} — ${o.text}`)
+      .join(' ')
+  }
+
   // A pain signal (spec §3.4): notice, bell and the pain file a launcher may name. It never resumes the run by
-  // itself. Options (a turn-end pain) are listed in the notice, the bell and the pain file, numbered; a credential
-  // request is its own plain-text line after them. No band buttons on OMP.
+  // itself. Options (a turn-end pain) are listed in the notice, the bell and the pain file, numbered, recommended
+  // first, each with its complete validated instruction text; a credential request is its own plain-text line
+  // after them. No band buttons on OMP.
   async function pain(id: string, reason: string, detail: string, options?: ReadonlyArray<{ label: string; text: string; recommended: boolean }>, credential?: string): Promise<void> {
     const text = `autopilot: ${reason} — ${oneLine(detail, 200)}`
-    const shown = (options ?? []).map(o => ({ label: oneLine(o.label, 40), recommended: o.recommended })).sort((a, b) => Number(b.recommended) - Number(a.recommended))
+    const optionsText = optionLines(options)
     const plain = credential === undefined ? undefined : oneLine(credential, Number.MAX_SAFE_INTEGER)
-    const numbered = shown.length === 0 ? text
-      : `${text} · options: ${shown.map((o, i) => `${i + 1}) ${o.label}${o.recommended ? ' (Recommended)' : ''}`).join(' ')}`
+    const numbered = optionsText === '' ? text : `${text} · options: ${optionsText}`
     const listed = plain === undefined ? numbered : `${numbered} · in plain text: ${plain}`
     io.notify(listed)
     const bell = live.get(id)?.bell
@@ -831,7 +842,11 @@ export function createAutonomic(io: AutonomicIO) {
       answers: {}, route: null, response: null, payloadSource: rendered.source, reason: verdict.reason }
     const rows = verdict.case === 'waiting'
       ? [{ kase: 'operator' as const, q: 'turn end', a: 'waiting; no continuation' }]
-      : [{ kase: verdict.case, q: verdict.question ?? 'turn end', a: verdict.answer ?? verdict.next_step ?? 'stop' }]
+      : [{ kase: verdict.case, q: verdict.question ?? 'turn end',
+        // A pain row carries the complete validated option content, exactly as the notice and pain file do.
+        a: verdict.case === 'pain' && verdict.options !== undefined
+          ? `ask the operator; options: ${optionLines(verdict.options)}`
+          : verdict.answer ?? verdict.next_step ?? 'stop' }]
     await commitDecision(decisions, frame, draft, rows)
     void id
   }
