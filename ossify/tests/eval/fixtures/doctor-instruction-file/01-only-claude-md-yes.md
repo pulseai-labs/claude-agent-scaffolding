@@ -1,7 +1,7 @@
 ---
 scenario_id: 01-only-claude-md-yes
 expected_outcome: repair-rename
-expected_reason: "Root `CLAUDE.md` only — 3,010 B, names `ossify`, one relative import `@docs/rules.md` — and no `AGENTS.md` anywhere in the AI workspace. `agents_md` fails (no `AGENTS.md` at the root) and `claude_md` fails on `/home/ada/ws/CLAUDE.md`. The operator says yes, so §5 branch 1 is the branch that runs: show the operator the move, then `git mv /home/ada/ws/CLAUDE.md /home/ada/ws/AGENTS.md`; `@docs/rules.md` is listed and still resolves from the root; nothing is committed; the re-emitted lines are `ok: agents_md` and `ok: claude_md`."
+expected_reason: "Root `CLAUDE.md` only — 3,010 B, names `ossify`, one relative import `@docs/rules.md` — and no `AGENTS.md` anywhere in the AI workspace. `agents_md` fails (no `AGENTS.md` at the root) and `claude_md` fails on `/home/ada/ws/CLAUDE.md`. The operator says yes, so §5.3 branch 1 is the branch that runs: the plan is shown, and the move is a `git mv /home/ada/ws/CLAUDE.md /home/ada/ws/AGENTS.md` because the source is tracked (`git ls-files --error-unmatch CLAUDE.md` succeeds) — the tracked-ness decides it, not the workspace being a git repo. `@docs/rules.md` is listed and still resolves from the root; nothing is committed; the re-emitted lines are `ok: agents_md` and `ok: claude_md`."
 ---
 
 `.workspace/pairing.json` at the AI workspace root declares:
@@ -12,8 +12,9 @@ expected_reason: "Root `CLAUDE.md` only — 3,010 B, names `ossify`, one relativ
 
 Exactly one JSON object. `/home/ada/ws` and `/home/ada/repos/product-api` both
 exist as real directories, and `git -C <root> rev-parse --is-inside-work-tree`
-prints `true` for both. `/home/ada/ws` is itself a git repository with a clean
-work tree, so a move inside it is a `git mv`.
+prints `true` for both. `/home/ada/ws` is a git repository with a clean work tree,
+and the root `CLAUDE.md` below is tracked —
+`git ls-files --error-unmatch CLAUDE.md` succeeds.
 
 `$OSS_STATE_FILE` is unset. `oss state_path` resolves to
 `/home/ada/ws/.ossify/project-state.json`, which exists and parses.

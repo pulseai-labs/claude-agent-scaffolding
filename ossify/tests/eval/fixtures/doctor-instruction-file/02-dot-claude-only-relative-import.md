@@ -1,7 +1,7 @@
 ---
 scenario_id: 02-dot-claude-only-relative-import
 expected_outcome: repair-rename
-expected_reason: "No `AGENTS.md` at the root; the only instruction file is `/home/bo/ws/.claude/CLAUDE.md` (2,140 B, names `ossify`), whose one import `@../docs/rules.md` resolves from `.claude/` to `/home/bo/ws/docs/rules.md`. `agents_md` fails (no `AGENTS.md`) and `claude_md` fails on the `.claude/` path, not the root. The operator says yes, so §5 branch 1 runs: show the move, then `git mv /home/bo/ws/.claude/CLAUDE.md /home/bo/ws/AGENTS.md`. After that move the same relative import resolves from the ROOT as `/home/bo/docs/rules.md`, which does not exist — §5 branch 3 requires listing it as not resolving and fixing it to `@docs/rules.md` or reporting it. Nothing is committed; the re-emitted lines are both `ok:`."
+expected_reason: "No `AGENTS.md` at the root; the only instruction file is `/home/bo/ws/.claude/CLAUDE.md` (2,140 B, names `ossify`), whose one import `@../docs/rules.md` resolves from `.claude/` to `/home/bo/ws/docs/rules.md`. `agents_md` fails (no `AGENTS.md`) and `claude_md` fails on the `.claude/` path, not the root. The operator says yes, so §5.3 branch 1 runs: the plan is shown, and the move is a `git mv /home/bo/ws/.claude/CLAUDE.md /home/bo/ws/AGENTS.md` because the source is tracked (`git ls-files --error-unmatch .claude/CLAUDE.md` succeeds) — not because the workspace is a git repo, which is what 06 shows the difference on. After that move the same relative import resolves from the ROOT as `/home/bo/docs/rules.md`, which does not exist — §5.1 shows the rewrite in the plan before the yes, and §5.5 step 1 applies it (`@docs/rules.md`) or reports it broken. Nothing is committed; the re-emitted lines are both `ok:`."
 ---
 
 `.workspace/pairing.json` at the AI workspace root declares:
@@ -12,8 +12,10 @@ expected_reason: "No `AGENTS.md` at the root; the only instruction file is `/hom
 
 Exactly one JSON object. `/home/bo/ws` and `/home/bo/repos/product-api` both
 exist as real directories, and `git -C <root> rev-parse --is-inside-work-tree`
-prints `true` for both. `/home/bo/ws` is a clean git repository with no staged or
-unstaged changes, so a move inside it is a `git mv`.
+prints `true` for both. `/home/bo/ws` is a git repository with a clean work tree,
+and `.claude/CLAUDE.md` below is tracked —
+`git ls-files --error-unmatch .claude/CLAUDE.md` succeeds, so this is not 06's
+untracked shape.
 
 `$OSS_STATE_FILE` is unset. `oss state_path` resolves to
 `/home/bo/ws/.ossify/project-state.json`, which exists and parses.
