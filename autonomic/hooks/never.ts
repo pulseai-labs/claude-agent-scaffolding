@@ -893,14 +893,20 @@ function wrapNext(name: string, ws: readonly string[], i: number): number | unde
   if (name === 'timeout' && k < ws.length && /^\d+(?:\.\d+)?[smhd]?$/.test(ws[k]!)) k++
   return k
 }
-const joinPath = (cwd: string, target: string): string | undefined => {
-  const t = target.replace(/\/+$/, '') || '/'
-  if (t.startsWith('~')) return undefined
-  if (t.startsWith('/')) return t
-  const parts = `${cwd}/${t}`.split('/')
+// Pure string dot-segment collapsing (`.` and `..`), used for both the relative and the absolute
+// branch. No filesystem access: the comparison path must stay lexical.
+const collapseDots = (parts: readonly string[]): string => {
   const out: string[] = []
   for (const p of parts) { if (p === '' && out.length > 0) continue; if (p === '.') continue; if (p === '..') { out.pop(); continue } out.push(p) }
   return out.join('/') || '/'
+}
+const joinPath = (cwd: string, target: string): string | undefined => {
+  const t = target.replace(/\/+$/, '') || '/'
+  if (t.startsWith('~')) return undefined
+  // The absolute branch collapses dots too, so `/tree/../other` is `/other` and cannot pass a
+  // `startsWith(root + '/')` prefix test while pointing outside the pinned worktree.
+  if (t.startsWith('/')) return collapseDots(t.split('/'))
+  return collapseDots(`${cwd}/${t}`.split('/'))
 }
 // A literal cd target for later segments: undefined means no change, null means unknown.
 function literalCd(bare: string): string | undefined | null {

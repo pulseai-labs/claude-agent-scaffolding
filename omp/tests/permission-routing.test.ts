@@ -721,8 +721,14 @@ describe('executionSegments parses the whole command with the existing grammar',
     expect(seg(`git -C /elsewhere push origin ${MAIN}:${MAIN}`, '/repo', '/repo')[0]!.opaque).toBe(true)
     expect(seg(`env -C /elsewhere git push origin ${MAIN}:${MAIN}`, '/repo', '/repo')[0]!.opaque).toBe(true)
     expect(seg(`env --chdir=/elsewhere git push origin ${MAIN}:${MAIN}`, '/repo', '/repo')[0]!.opaque).toBe(true)
+    // An absolute target whose `..` escapes the root is normalized before the comparison.
+    expect(seg(`git -C /repo/../elsewhere push origin ${MAIN}:${MAIN}`, '/repo', '/repo')[0]!.opaque).toBe(true)
+    expect(seg(`git -C /repo/../elsewhere push origin ${MAIN}:${MAIN}`, '/repo', '/repo')[0]!.cwd).toBe('/elsewhere')
     // And a directory inside the pinned root stays eligible.
     expect(seg(`git -C sub push origin ${MAIN}:${MAIN}`, '/repo', '/repo')[0]!.opaque).toBe(false)
+    // Dots that normalize back inside the root stay eligible.
+    expect(seg(`git -C /repo/./inner/../sub push origin ${MAIN}:${MAIN}`, '/repo', '/repo')[0]!.opaque).toBe(false)
+    expect(seg(`git -C /repo/./inner/../sub push origin ${MAIN}:${MAIN}`, '/repo', '/repo')[0]!.cwd).toBe('/repo/sub')
   })
 })
 
@@ -774,6 +780,46 @@ describe('a segment cwd outside the pinned worktree is never released', () => {
     setNative(w)
     const r = await w.invoke('bash', { command: `env -C ${secondRepo(w.root, join(w.root, 'out'))} git push origin ${MAIN}:${MAIN}`, cwd: w.tree })
     expect(r?.block).toBe(true)
+    expect(rows(w)).toEqual([])
+  })
+
+  test('an absolute relocation target with .. cannot escape the pinned worktree', async () => {
+    w = pushWorld()
+    setNative(w)
+    // A real second repo, reached by an absolute path whose `..` segment points outside the pin.
+    secondRepo(w.root, join(w.root, 'out'))
+    const escape = `${w.tree}/../other`
+    const viaGit = await w.invoke('bash', { command: `git -C ${escape} push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    expect(viaGit?.block).toBe(true)
+    expect(w.nativeRequests).toEqual([])
+    expect(rows(w)).toEqual([])
+    expect(human(w)).not.toContain('allow')
+    // The same escape through env's own relocation flags.
+    const viaEnvC = await w.invoke('bash', { command: `env -C ${escape} git push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    expect(viaEnvC?.block).toBe(true)
+    const viaChdir = await w.invoke('bash', { command: `env --chdir=${escape} git push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    expect(viaChdir?.block).toBe(true)
+    expect(rows(w)).toEqual([])
+  })
+
+  test('absolute and relative dot segments that stay inside the worktree remain eligible', async () => {
+    w = pushWorld()
+    setNative(w)
+    mkdirSync(join(w.tree, 'sub'), { recursive: true })
+    mkdirSync(join(w.tree, 'sub2'), { recursive: true })
+    // `<tree>/./sub` and `<tree>/sub/../sub2` both normalize inside the pinned worktree.
+    const dot = await w.invoke('bash', { command: `git -C ${w.tree}/./sub push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    expect(dot).toBeUndefined()
+    const normalized = await w.invoke('bash', { command: `git -C ${w.tree}/sub/../sub2 push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    expect(normalized).toBeUndefined()
+    expect(rows(w).at(-1)).toMatchObject({ outcome: 'allow' })
+  })
+
+  test('a relative .. traversal and a nonexistent .. target still block', async () => {
+    w = pushWorld()
+    setNative(w)
+    expect((await w.invoke('bash', { command: `git -C ../other push origin ${MAIN}:${MAIN}`, cwd: w.tree }))?.block).toBe(true)
+    expect((await w.invoke('bash', { command: `git -C ${w.tree}/../gone push origin ${MAIN}:${MAIN}`, cwd: w.tree }))?.block).toBe(true)
     expect(rows(w)).toEqual([])
   })
 
