@@ -1746,7 +1746,6 @@ pin "$BRIEFS_MD" "$REBIND" "the spine brief rebinds a continued RUN_JSON (rotate
 pin "$PRBRIEFS_MD" "$REBIND" "the work-PR brief rebinds a continued RUN_JSON (open successor)" flat
 pin "$NESTED_MD" 'rebinding `run.orchestrator` to its own pane' "nested-run §4 says the rotate successor rebinds" flat
 pin "$LIFECYCLE_MD" 'the pane `run.orchestrator` names at writing, and the next step' "step 13's handoff records the pane the block names" flat
-pin "$LIFECYCLE_MD" 'the pane `run.orchestrator` names at writing, and, per live dispatch' "the rotation handoff records the pane the block names" flat
 pin "$BRIEFS_MD" 'the path of RUN_JSON and the pane `run.orchestrator` names at writing' "the spine rotate return records the pane the block names" flat
 pin "$PRBRIEFS_MD" "RUN_JSON's path and the pane its \`run.orchestrator\`" "the work-PR open return records the pane the block names" flat
 # #556 round 1, finding 6: the gap sentence's absence is plugin-wide and must be
@@ -1805,6 +1804,8 @@ pin "$LIFECYCLE_MD" 'with `phase: recorded` and its full locator before the brie
   "step 3 records the attempt before the send" flat
 pin "$LIFECYCLE_MD" '`phase: delivered` once the send is confirmed' \
   "step 3 marks delivery after the send" flat
+pin "$LIFECYCLE_MD" 'Every dispatch — a launch or a new brief to a retained seat — opens its attempt with `phase: recorded` and its full locator before the brief goes, writing an existing `REPORT_PATH` file'"'"'s current generation `{hash, identity}` as the new attempt'"'"'s `locator.seen` and leaving `seen` absent only when the file is absent, and sets `phase: delivered` once the send is confirmed.' \
+  "every dispatch records its phase, full locator and existing report baseline before sending" flat
 pin "$LIFECYCLE_MD" 'writes `run.question` before it asks and removes it on the answer' \
   "an operator ask is recorded in the run" flat
 pin "$LIFECYCLE_MD" '`{text, asked_at, task, message_id?}`' \
@@ -1813,6 +1814,73 @@ pin "$MECHANICS_MD" 'and recorded as the attempt'"'"'s `locator.seen`' \
   "the generation check records the consumed generation in the run" flat
 pin "$MECHANICS_MD" '`{hash, identity}`' \
   "the consumed generation records the exact object keys" flat
+
+section "a rotation resumes from run state (#819; hard stop deferred to #810)"
+# Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
+pin "$LIFECYCLE_MD" 'From the handoff on, this session writes nothing to the run file and takes no dispatch action; a wake that reaches it before it stands down is handed to the successor, never acted on.' \
+  "the outgoing top stops writing and dispatching at handoff and relays every intervening wake" flat
+# Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
+pin "$LIFECYCLE_MD" 'write nothing more to the run file and take no dispatch action' \
+  "stand-down keeps the outgoing top from writing or dispatching" flat
+pin "$LIFECYCLE_MD" 'It writes `run.orchestrator.machine` beside the pane.' \
+  "resume step 2 writes the successor's machine beside its pane" flat
+# Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
+pin "$LIFECYCLE_MD" 'Binding a run another top drove through a rotation runs **The resume** (Rotation past the context ceiling) first; its step 2 is this rebind.' \
+  "Orient routes a rotation's takeover through the resume before rebinding" flat
+pin "$LIFECYCLE_MD" 'A hard stop — the top died with no handoff — has no resume procedure yet (#810): the new top tells the operator and continues only as the operator directs.' \
+  "a hard stop is not claimed: the new top defers to the operator (#810)" flat
+# Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
+# Ruling 12: automatic relaunch retired; an unstarted worker is the operator's decision.
+# Ruling 12: relaunch cause retired with the automatic relaunch path.
+pin "$LIFECYCLE_MD" 'Per working attempt, first run the generation check against `locator.seen`, for both `phase: recorded` and `phase: delivered`.' \
+  "resume checks the generation baseline before deciding recorded delivery" flat
+pin "$LIFECYCLE_MD" 'A new report generation proves delivery: set a recorded attempt `delivered`, then read the generation once, record it and act on it by kind.' \
+  "a new report proves recorded delivery and is consumed once by kind" flat
+# Ruling 12: agent-list absence retired as evidence that a recorded brief was not delivered.
+# Ruling 12: pane-snapshot delivery branches retired; every recorded attempt with no new generation is re-armed.
+pin "$LIFECYCLE_MD" 'With no new generation and `phase: recorded`, treat the attempt as `delivered` and re-arm it like any delivered attempt.' \
+  "a recorded attempt without a new generation is delivered and re-armed" flat
+pin "$LIFECYCLE_MD" 'Never relaunch it automatically.' \
+  "resume never automatically relaunches a recorded attempt" flat
+pin "$LIFECYCLE_MD" 'The re-armed wait’s timeout checkpoint (step 5) reports a worker that never started to the operator, who decides on a relaunch; never run two workers on one attempt.' \
+  "the timeout reports an unstarted worker for the operator's relaunch decision without duplicating the attempt" flat
+pin "$LIFECYCLE_MD" 'Re-arm step 5’s waits only for an attempt still live after its generation check; a final report consumed on resume settles that dispatch, so it gets no wait.' \
+  "resume re-arms only live attempts and never waits on consumed final reports" flat
+pin "$LIFECYCLE_MD" 'It arms one fresh heartbeat only if at least one dispatch is still live.' \
+  "resume arms no heartbeat after its last dispatch settles" flat
+pin "$LIFECYCLE_MD" 'If `run.question` is present, it asks it once again' \
+  "the resume re-asks an open operator question" flat
+pin "$LIFECYCLE_MD" 'A `done` task is never re-run' \
+  "the resume never re-runs a done task" flat
+pin "$LIFECYCLE_MD" 'It continues at the fresh handoff'"'"'s next step.' \
+  "a rotation continues at its fresh handoff's next step" flat
+# Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
+pin "$LIFECYCLE_MD" 'and the next step, the head SHA, and, per live seat, the last molt status line noted and the last autonomic pain line noted.' \
+  "step 13 preserves the head SHA and each live seat's status and pain cursors" flat
+pin "$LIFECYCLE_MD" 'The run file holds those files’ paths, not the read cursors.' \
+  "handoff distinguishes durable status and pain paths from their last-noted lines" flat
+pin "$LIFECYCLE_MD" 'Write the handoff step 13 states, plus a resolved profile beside a launch command for each host' \
+  "rotation inherits step 13's head SHA and live-seat cursors" flat
+pin "$LIFECYCLE_MD" 'The handoff restates no operator gate' \
+  "the rotation handoff restates no operator gate (#819)" flat
+pin "$LIFECYCLE_MD" 'step 12 and `run.merge_word`' \
+  "the handoff points at the merge rule instead of restating it" flat
+pin "$LIFECYCLE_MD" 'With `operator`, the ask says that this run'"'"'s brief or the operator set an operator merge gate, so autonomic routes it to the operator' \
+  "step 12 states an operator gate explicitly so autonomic routes it" flat
+pin "$LIFECYCLE_MD" 'A run file older than 0.2.21' \
+  "the resume names the legacy run-file rules" flat
+pin "$LIFECYCLE_MD" 'no `phase` counts as `delivered`' \
+  "legacy: an attempt with no phase is delivered" flat
+# Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
+# Ruling 12: legacy read-once default retired; an unbaselined report does not prove the live attempt's result.
+pin "$LIFECYCLE_MD" 'For a live dispatch with no `seen` and no fresh handoff generation, the existing report is ambiguous: the top reads it but does not act on it until the operator confirms it belongs to the live attempt.' \
+  "legacy: an ambiguous report is read but requires operator confirmation before action" flat
+pin "$LIFECYCLE_MD" 'A fresh handoff'"'"'s noted hash and identity, where present, are the baseline.' \
+  "legacy: a fresh handoff supplies the generation baseline where present" flat
+pin "$LIFECYCLE_MD" 'no `merge_word` counts as `standing`' \
+  "legacy: no merge_word is standing" flat
+pin "$LIFECYCLE_MD" 'against the attempt'"'"'s `locator.seen`' \
+  "the molted top's generation check reads seen from run.json" flat
 
 section "waits and completion bodies"
 
@@ -1955,12 +2023,9 @@ pin "$PLUGIN_README_MD" 'Nine dispatched brief templates — the generic five (p
 # `flat` because the file breaks its line inside the clause today.
 pin "$LIFECYCLE_MD" 'creates it again first and binds the id that call returns' \
   "a launch whose run workspace is gone recreates it and rebinds the returned id"
-pin "$LIFECYCLE_MD" 'its machine label where the seat is not on this machine, and,' \
-  "step 13's handoff records each live seat's machine label"
-pin "$LIFECYCLE_MD" 'Write the handoff, recording every seat'"'"'s pane id, with its' \
-  "the rotation's own handoff records each live seat's machine label"
-pin "$LIFECYCLE_MD" 'through the machine the handoff names for a remote one' \
-  "a resumed top re-arms each remote pane through the machine it names" flat
+# 0.2.22 (#810): the handoff no longer lists per-seat panes, machines, molt or pain lines — run.json holds them (steps 1, 3, 5); pins retired.
+pin "$LIFECYCLE_MD" 'through `locator.machine`' \
+  "a resumed top re-arms each remote pane through locator.machine" flat
 
 # T4 G3 and the P3 it drew. "`mv`, which this command allows" is a CROSS-FILE
 # truth: the dagr write's own sentence and the top's command allowlist are two
@@ -2281,8 +2346,7 @@ pin "$LIFECYCLE_MD" 'There is no stand-down and no successor launch' "lifecycle:
 pin "$LIFECYCLE_MD" 'It arms no wait and no heartbeat the handoff lists' "lifecycle: the resumed top re-arms nothing listed (#669)" flat
 pin "$LIFECYCLE_MD" 'A heartbeat tick the handoff carries means that heartbeat has ended' \
   "lifecycle: a carried tick re-arms the heartbeat (#669)" flat
-pin "$LIFECYCLE_MD" 'runs the generation check once per live dispatch against the hash and identity the handoff noted' \
-  "lifecycle: a report landed across the clear is acted on once (#669)" flat
+# Retired the handoff hash/identity pin: run.json now holds locator.seen (ruling 12).
 pin "$LIFECYCLE_MD" 'With `/molt off` the marker goes, the hook speaks again, and the rotation above applies.' \
   "lifecycle: /molt off falls back to the rotation (#669)" flat
 pin "$NESTED_MD" 'A spine session that rotated on a molt warning returns the same `rotate:`' \
@@ -2355,10 +2419,7 @@ pin "$PRBRIEFS_MD" 'End the reply that writes `open:` with `MOLT-HANDOFF: <REPOR
 pin "$SKILL_MD" 'Where molt runs, its warnings replace the notice' "SKILL.md names the molt path" flat
 pin "$ROLES_MD" 'a warned seat gets no new unit' "roles.md: a warned retained seat is replaced, not reused" flat
 # PR #671 round 1.
-pin "$LIFECYCLE_MD" 'per live seat, the molt status path recorded at its launch and the last status line noted' \
-  "lifecycle step 13: the top's handoff carries each seat's status path" flat
-pin "$LIFECYCLE_MD" 'per live seat, its molt status path recorded at launch and the last status line noted' \
-  "lifecycle: the top's own rotation handoff carries each seat's status path" flat
+# 0.2.22 (#810): the handoff no longer lists per-seat panes, machines, molt or pain lines — run.json holds them (steps 1, 3, 5); pins retired.
 pin "$GENERIC_BRIEFS_MD" 'the leaf templates'"'"' `MOLT:` line included' \
   "briefs.md: an operator brief's envelope carries the MOLT line" flat
 pin "$BRIEFS_MD" 'a `correct` decision on it first launches the item'"'"'s implementer in that worktree' \
@@ -2373,9 +2434,6 @@ pin "$PRBRIEFS_MD" 'If molt'"'"'s handoff command arrives mid-round, still finis
   "work-PR MOLT line: never stop mid-round, as the spine" flat
 pin "$CHANGELOG_MD" '## 0.2.8' "CHANGELOG has 0.2.8"
 pin "$CHANGELOG_MD" '## 0.2.9' "CHANGELOG has 0.2.9"
-pin "$LIFECYCLE_MD" 'and its autonomic pain path' "lifecycle step 13: the top's handoff carries each seat's pain path" flat
-pin "$LIFECYCLE_MD" 'its autonomic pain path and the last pain line noted, and a resolved profile beside' \
-  "lifecycle: the top's own rotation handoff carries each seat's pain path" flat
 
 section "reference line budgets"
 
