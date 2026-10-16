@@ -187,7 +187,7 @@ These cases are named because they look like clashes and are not:
   GitHub signals after a push, so no second `/code-review` occurs. The worker stops at
   `work-pr`'s merge ask and returns its ledger in its report file; you answer it as
   step 12's `run.merge_word` says (with `standing`, a clean gate set is the word; with `operator`,
-  ask the operator) and merge with one `gh` command.
+  ask the operator), and the assigned merge executor lands it — one `gh` command where that is you.
 
 ## 7. Refusals
 
