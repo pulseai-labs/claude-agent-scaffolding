@@ -45,7 +45,16 @@ describe('planLaunch', () => {
     expect(launch('__proto__')).toHaveProperty('error')
   })
   test('an unknown role is an error', () => {
-    expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker, spine-driver, close, work-pr, orchestrator)' })
+    expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker, spine-driver, close, work-pr, orchestrator, crew-spine, crew-work-pr)' })
+  })
+  test.each([['crew-spine'], ['crew-work-pr']])('%s appends its own role file, not the default-lane one (#839)', (role) => {
+    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
+    record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })
+    const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
+    expect(planLaunch({ role, via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir })).toMatchObject({
+      argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'),
+        '--append-system-prompt', join(rolesDir, `${role}.md`)],
+    })
   })
   test('orchestrator appends its role file when seat-mods is 0.4.4, autonomic 0.7.0 and herdr-crew 0.2.19 or later', () => {
     const [s, m, a] = [install('seat-mods', true, '0.4.4'), install('molt'), install('autonomic', true, '0.7.0')]

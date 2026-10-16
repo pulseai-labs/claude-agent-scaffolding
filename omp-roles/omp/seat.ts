@@ -10,8 +10,8 @@ export const MODS = ['seat-mods', 'molt', 'autonomic'] as const
 const MIN_VERSION: Record<(typeof MODS)[number], string> = { 'seat-mods': '0.4.1', molt: '0.3.0', autonomic: '0.6.0' }
 export const ROLES: Record<string, string | undefined> = {
   worker: undefined, 'spine-driver': 'spine-driver.md', close: 'close.md', 'work-pr': 'work-pr.md',
-  orchestrator: 'orchestrator.md',
-}   // role → roles/<file>.md
+  orchestrator: 'orchestrator.md', 'crew-spine': 'crew-spine.md', 'crew-work-pr': 'crew-work-pr.md',
+}   // role → roles/<file>.md; the crew-* roles follow a herdr-crew activated brief (#839)
 // A role that relies on a newer mod than the floor: the orchestrator needs seat-mods' no-subagent rail (#798) and
 // autonomic's live mode file, so the herdr seats it launches inherit autopilot.
 const ROLE_MIN: Record<string, Partial<Record<(typeof MODS)[number], string>>> = { orchestrator: { 'seat-mods': '0.4.4', autonomic: '0.7.0' } }
