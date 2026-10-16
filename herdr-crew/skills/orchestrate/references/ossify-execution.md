@@ -118,7 +118,7 @@ ordinary first run of the item, not an inheritance of the rejected work.
 Reviewer profile is absent from spine planning and from the SEATS block on purpose: the PR
 does not exist yet, and a profile chosen before there is a diff to read is a guess
 recorded as a decision. At the PR transition ask for the reviewer's resolved profile
-and `/code-review` level, and put **both** into the **work-PR
+and review level (it fills that agent's review command, `config.md`), and put **both** into the **work-PR
 session's** brief (`ossify-pr-briefs.md`) — that session creates the reviewer from the
 decided row and confirms its model as `model_shows` says and by the worker's own check exactly as an
 item row is; step 8's reviewer seat is the default only outside such a spine.

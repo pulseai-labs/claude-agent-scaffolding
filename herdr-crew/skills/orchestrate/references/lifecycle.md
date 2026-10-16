@@ -170,7 +170,7 @@ Every command's syntax comes from `herdr --skill`.
    verifier; a second fail on the same item goes to the operator. The verifier is
    released only at pass or escalation.
 8. **Review.** A review runs exactly once per PR: the reviewer seat in a fresh worktree
-   at the PR head, brief `/code-review <PR>`, every finding returned in the report file.
+   at the PR head, brief its review command (`config.md`, `review:`; `/code-review <PR>` by default), every finding returned in the report file.
    **A fixed head is revalidated, never re-reviewed whole**: the reviewer is re-dispatched from
    its seat over the fix range alone — one scoped delta re-review — and its findings enter the
    disposition baseline like any other, so a repository whose bot does not review a push still
@@ -202,7 +202,7 @@ Every command's syntax comes from `herdr --skill`.
     bot or human finding that arrives after the disposition returns to the
     orchestrator, and the implementer waits — it
     resolves the finding only after the orchestrator's decision (#410). No second
-    `/code-review`. Bot comments after each push stay in this stream, and review
+    review. Bot comments after each push stay in this stream, and review
     bodies and top-level PR conversation comments are part of it too —
     `reviewThreads` does not return them — refreshed after each push alongside the
     thread count. With ossify installed, this

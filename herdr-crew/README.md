@@ -5,7 +5,7 @@ The orchestrator/worker session model over herdr. One prose skill, no runtime li
 One orchestrator session keeps its context for decisions and dispatches everything else
 to worker sessions launched by seat name through herdr — the seats defined in the
 operator's own files, not in this plugin. A planned-work seat and a bounded-work seat
-implement by complexity class, one reviewer seat runs `/code-review` once per PR and
+implement by complexity class, one reviewer seat runs its review command (`/code-review` by default) once per PR and
 returns its findings through its report file, the retained implementer works GitHub
 threads to zero, and the merge waits for the operator's word.
 
@@ -53,7 +53,7 @@ verifier session.
 | Orchestrator | this session — the operator launches it | |
 | Implementer, planned | a seat the project file names | `contract`, and the default when unclassified |
 | Implementer, fast | a seat the project file names | `bounded` |
-| Reviewer | a seat with `slash-commands`, `/code-review <PR>` once | |
+| Reviewer | a seat with `slash-commands` for `/code-review <PR>`, or its agent's `review:` command; once | |
 | Verifier | a seat the project file names — the work-item verify; read-only probes and mechanical runs may take a lighter one. Read-only | |
 | Operator | the human: the merge word | |
 
@@ -226,7 +226,7 @@ has one fixed path.
   unavailable.
 - The agents named in `~/.claude/herdr-crew/agents.md` resolvable where their pane
   runs; one that is not shows `command not found` and stops that dispatch.
-- The `/code-review` skill available to the reviewer session. If it is unavailable, the
+- The review command (`/code-review` by default, or the agent's `review:`) available to the reviewer session. If it is unavailable, the
   reviewer reports that in its report file and the operator decides.
 - The target repository's ruleset requires conversation resolution before merge, so
   GitHub itself refuses a merge while any review thread is open.

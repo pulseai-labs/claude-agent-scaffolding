@@ -1647,8 +1647,10 @@ pin "$PRBRIEFS_MD" 'REPO_ROOT=' \
   "the work-PR brief injects the repo root exactly once"
 pin "$PRBRIEFS_MD" '/ossify:work-pr $PR_NUMBER --repo-root $REPO_ROOT' \
   "the work-PR brief names its invocation exactly once"
-pin "$PRBRIEFS_MD" 'REVIEW_LEVEL=' \
-  "the work-PR brief injects the decided review level"
+pin "$PRBRIEFS_MD" 'REVIEW_INVOCATION=<the reviewer'"'"'s agent'"'"'s `review:`, else `/code-review <PR> <LEVEL>`, with PR_NUMBER, the PR URL and the level the top decided filled in>' \
+  "the work-PR brief injects the reviewer's filled review command"
+pin "$PRBRIEFS_MD" 'brief it to run REVIEW_INVOCATION.' \
+  "the work-PR session briefs the reviewer with the filled review command"
 pin "$PRBRIEFS_MD" 'merge bound to the named SHA' \
   "the work-PR session merges bound to the SHA the top relayed"
 pin "$PRBRIEFS_MD" 'never a squash or rebase' \

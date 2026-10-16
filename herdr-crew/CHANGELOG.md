@@ -2,6 +2,10 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.27
+
+**The reviewer's command is configurable** (operator, 2026-10-16). A machine entry may declare `review:`, the command a reviewer seat on that agent runs, with `<PR>`, `<PR_URL>` and `<LEVEL>` filled at dispatch (`/review <PR_URL>` on OMP). An entry with no `review:` keeps `/code-review <PR> <LEVEL>`. Both reviewer briefs carry the filled command as `REVIEW_INVOCATION`, which replaces the work-PR brief's `REVIEW_LEVEL`. The `can:` table's reviewer row needs `slash-commands` only for `/code-review`. Lifecycle step 8, roles.md, SKILL.md and the README name the review command instead of `/code-review`.
+
 ## 0.2.26
 
 **A run resumes after its top dies with no handoff** (#810; operator rulings 2026-10-16). Every bind now records `run.orchestrator.session`, herdr's `agent_session` for the top's pane — the top's own bind, a spine or work-PR session's, and a top that molts in place (molt's `/clear` starts a new session in the same pane). On the operator's word that the old top died, a new top told to bind the run runs three steps before the resume: it reads `run.orchestrator` before any write, stands the old top down (the operator confirms and closes a pane that still exists: never two tops on one run), and reads the dead top's transcript, found by that session id, for the step in hand, decisions in flight and the last action started. Then the rotation's resume runs with the transcript in the handoff's place: `run.json` wins on facts, a dispatch whose attempt the run records is never sent again (the resume's generation check settles it), and any other started but unconfirmed send, merge, tag or branch delete is checked for its effect before it is redone. Every brief's PING line now says a skipped or failed send is never an answer: a worker with a plan or a question waits at that gate (run B's implementer started without approval).
