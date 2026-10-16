@@ -34,9 +34,10 @@ import { captureLaunchBinding } from '../hooks/authority'
 import { launchWorkerRoots } from '../bin/authority'
 import { PinnedAuthority, placementFacts } from './authority-store'
 import type { AuthorityLease } from '../hooks/authority'
-import { captureFrame, judgeNative, acceptedChoice, parsePolicyBundle } from './judgment'
+import { acceptedChoice, captureFrame, judgeNative, parsePolicyBundle } from './judgment'
 import type { ConsumerHost, DecisionDraft, DecisionFrame, DecisionIO } from './judgment'
 import { commitDecision } from './decision-ledger'
+import { assembleAsk, planAsk, snapshotAsk } from './asks'
 
 type Live = SessionRecord & { problem?: string; invalid?: string }
 
@@ -602,14 +603,11 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
 
   // The ask reflex (spec §3.2): answer from the policy and scope, or let the operator see the question and ring.
   async function askReflex(input: unknown): Promise<{ block: true; reason: string } | undefined> {
-    // An enrolled session never falls back to the conversational classifier (Plan Task 4 §6): the
-    // native ask consumer arrives in Task 6, so until then the ask reaches the operator.
     const questions = questionsOf(input)
     if ((await modeOf()).mode !== 'autopilot' || questions.length === 0) return undefined
-    if (enrolled) {
-      await askPain(io.sessionId(), questions[0]?.question ?? 'a question', 'the native ask consumer is not yet active')
-      return undefined
-    }
+    // An enrolled session answers only from a complete grounded native batch (Plan Task 6 §8): the
+    // whole original ask stays displayed, and rings, on any shortfall. No conversational fallback.
+    if (enrolled) return answerAsk(input)
     const id = io.sessionId()
     // A question with no options takes free text: only the operator can answer it.
     if (questions.some(q => !Array.isArray(q.options) || q.options.length === 0)) {
@@ -629,6 +627,47 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     const why = 'v' in j ? j.v.reason : 'fail' in j ? j.fail : 'nothing to judge yet'
     await askPain(id, questions[0]?.question ?? 'a question', why)
     return undefined
+  }
+
+  // The native ask consumer (Plan Task 6 §8 Step 4): snapshot the whole batch, plan the exact-ID
+  // independent questions, judge once, assemble only a complete grounded batch, record every
+  // question's decision, and only then block the original ask with the single exact answer block.
+  // Any exception, missing bridge/authority/route/acceptance, unplannable batch or ledger failure
+  // leaves the entire original ask visible (with the existing ask-pain path) and never injects a
+  // fake or partial answer.
+  async function answerAsk(input: unknown): Promise<{ block: true; reason: string } | undefined> {
+    const decisions = io.decisions
+    if (decisions === undefined) return undefined
+    const id = io.sessionId()
+    let snapshot
+    try { snapshot = snapshotAsk(input) } catch (err) {
+      await log(`ask snapshot rejected ${String(err)}`)
+      await askPain(id, questionsOf(input)[0]?.question ?? 'a question', 'a malformed ask batch')
+      return undefined
+    }
+    try {
+      const frame = await captureFrame(decisions, lastEntryMs, 'ask', input)
+      const plan = planAsk(snapshot, frame)
+      const result = await judgeNative(frame, plan.request)
+      const answer = assembleAsk(plan, result, frame)
+      if (answer === undefined) {
+        await askPain(id, plan.snapshot.questions[0]!.question, 'the batch is not completely covered by approved evidence')
+        return undefined
+      }
+      const draft: DecisionDraft = { outcome: 'answered', grantIds: answer.grantIds, evidenceIds: answer.evidenceIds,
+        answers: result.judgment.answers as DecisionDraft['answers'], route: result.route, response: result.judgment,
+        payloadSource: { kind: 'candidate', id: null }, reason: answer.reason }
+      await commitDecision(decisions, frame, draft,
+        plan.snapshot.questions.map(q => ({ kase: 'ask' as const, q: q.question, a: answer.answers[q.question]! })))
+      frame.budget.check()
+      if (!frame.lease.fresh()) return undefined
+      note(id, toolEntry('ask', input, { text: `autonomic answered: ${JSON.stringify(answer.answers)}` }))
+      return { block: true, reason: `autonomic answered: ${JSON.stringify(answer.answers)} — ${answer.reason}` }
+    } catch (err) {
+      await log(`ask decision error ${String(err)}`)
+      await askPain(id, snapshot.questions[0]?.question ?? 'a question', 'the native ask decision is unavailable')
+      return undefined
+    }
   }
 
   // The one independent choice question of Step 4: statement and criteria exactly as planned.

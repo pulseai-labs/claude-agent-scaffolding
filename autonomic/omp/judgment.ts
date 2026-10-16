@@ -334,12 +334,19 @@ function question(value: unknown): ApprovedQuestion {
   const o = exactObject(value, ['fingerprint', 'optionIds', 'complete', 'evidenceIds', 'grantIds', 'operatorGate', 'membership', 'requires', 'excludes'])
   if (o.complete !== true) throw new Error('an approved question must be complete')
   const optionIds = strings(o.optionIds)
+  if (optionIds.length === 0) throw new Error('an approved question names no supported option')
   const gate = opaque(o.operatorGate)
   if (!Object.hasOwn(GATES, gate)) throw new Error('unknown operator gate')
+  // Only a gate-free question may be answered autonomously (Plan Task 6 §8): a bundle that carries
+  // any operator gate is unavailable to every consumer rather than silently auto-answering it.
+  if (gate !== 'none') throw new Error(`an approved question carries the operator gate ${gate}`)
+  const evidenceIds = strings(o.evidenceIds)
+  if (evidenceIds.length === 0) throw new Error('an approved question names no approved evidence')
+  const grantIds = strings(o.grantIds)
+  if (grantIds.length === 0) throw new Error('an approved question names no grant reference')
   const membership = o.membership === null ? null : membershipOf(o.membership, optionIds)
   return { fingerprint: opaque(o.fingerprint), optionIds, complete: true,
-    evidenceIds: strings(o.evidenceIds), grantIds: strings(o.grantIds),
-    operatorGate: gate as ApprovedQuestion['operatorGate'], membership,
+    evidenceIds, grantIds, operatorGate: gate as ApprovedQuestion['operatorGate'], membership,
     requires: pairs(o.requires, optionIds), excludes: pairs(o.excludes, optionIds) }
 }
 
@@ -390,8 +397,10 @@ function approved(value: unknown): ApprovedDecisions {
     const s = exactObject(v, ['id', 'text', 'grantIds', 'evidenceIds'])
     return { id: opaque(s.id), text: opaque(s.text), grantIds: strings(s.grantIds), evidenceIds: strings(s.evidenceIds) }
   }) as ApprovedDecisions['remainingSteps']
-  return { commands, permissions, questions: list(o.questions, question) as ApprovedQuestion[],
-    turns: list(o.turns, turnCandidate) as ApprovedTurnCandidate[], remainingSteps }
+  const questions = list(o.questions, question) as ApprovedQuestion[]
+  // Two approved questions for one frozen fingerprint would make the match ambiguous (Plan Task 6 §8).
+  if (new Set(questions.map(q => q.fingerprint)).size !== questions.length) throw new Error('duplicate approved fingerprint')
+  return { commands, permissions, questions, turns: list(o.turns, turnCandidate) as ApprovedTurnCandidate[], remainingSteps }
 }
 
 function hex(value: unknown): string {

@@ -80,6 +80,35 @@ This is an ordinary same-UID/shared-process guard contract, not a sandbox: hosti
 
 **Lifecycle.** A mode change, authority invalidation, navigation/compact, shutdown or Molt transition aborts outstanding frames, so a late completion cannot mutate a successor's state or attribute a result to it. The factory exposes the captured service as `createAutonomic(...).decisions` for the consumers; when absent, the native route is unavailable.
 
+### Exact-ID, all-question structured asks (unreleased, Task 6)
+
+`omp/asks.ts` turns an OMP ask into one frozen, byte-exact batch and answers it only when the **whole** batch is grounded in approved evidence. Anything short of that returns the entire original ask to the operator — never a partial answer, never a per-question average, never generated prose for free text or a label. The shared `parseAsk`/`Question` seam and Claude Code's answer map are untouched.
+
+**Snapshot and identity.** `snapshotAsk(input)` copies the whole input as JSON before any asynchronous work, so later mutation cannot change the frozen batch or its fingerprint. It validates every question (text, ID, option label/description, `header`, `multi`, `recommended`). A **malformed batch is rejected outright** rather than silently shortened to the questions that happened to parse — the old normalizer dropped IDs/descriptions and filtered bad entries; this route does neither. Every label byte is retained; duplicate label bytes, duplicate supplied or derived IDs, duplicate question text (the key of the existing consumer answer map), an empty/missing option list, and a `multi` label carrying a comma or edge whitespace (which the shared `", "`-joined representation could not read back) all keep the ask with the operator.
+
+**The exact question/label mapping.** SDK question IDs, not labels:
+
+| Purpose | SDK question ID | Type |
+|---|---|---|
+| Original identity | actual nonempty host `id`; a legacy no-ID input derives `legacy:<full-input-sha256>:<zero-based-ordinal>` | — |
+| Coverage per question | `cover:${encodeURIComponent(q.id)}` | `noul` — P(yes) that this whole question is already covered by approved evidence without an operator gate |
+| Single-select candidate | `select:${encodeURIComponent(q.id)}` | `choice`, criteria keyed by the internal ordinal option IDs `o0`, `o1`, … |
+| Multi membership per option | `member:${encodeURIComponent(q.id)}:${option.id}` | `noul` — P(yes) that this exact option belongs to the decided complete set; **every** option gets a question |
+
+Option IDs are request-local ordinals, never label text. Labels sent back to the consumer are the **original label bytes**, in stable input order, joined with `", "` for a multi-select (the existing representation; a comma-bearing multi label therefore stays with the operator).
+
+**Independent questions over one frozen state.** Every question is answered against the same frozen state and its own input/evidence; none references another's answer ("if coverage is yes", "use the preceding selection"). Coverage, selection and membership are separate, and all must later validate. `recommended` is read as a position only and creates no grant; descriptions, `header` and `multi` grant nothing.
+
+**Planning is gated by approved evidence, never by inference.** `planAsk` requires, per question, exactly one approved question for the frozen **fingerprint** (the content digest — text, `header`, `multi`, `recommended` and every option's ordinal/label/description — deliberately **not** the identity, so a legacy digest-derived ID stays authorizable), live grant references in the current lease, at least one approved evidence reference that resolves, and a complete `membership` map for a multi question (and none for a single-select). An approved option the ask does not carry, an unknown constraint reference, a missing map or an inline operator gate makes the whole ask unplannable. Missing complete evidence or routine-versus-gate uncertainty returns the whole ask to the operator; the model is never asked to infer that permission probably existed.
+
+**Assembly accepts a whole batch or nothing.** `assembleAsk` validates the SDK result first, then for **each** question: every coverage answer must be an accepted `yes` under `ask.coverage`; every single selection must pass its own `ask.selection` rule **and** be specifically supported by that question's evidence; every multi membership must resolve under its own `ask.membership` rule and equal the pinned complete membership map (an unresolved verdict is a failure, never read as "no"). A mismatch is rejected rather than averaged. Constraints are deterministic over the assembled set: `requires` `(a,b)` means `!selected.has(a) || selected.has(b)`, `excludes` means `!(selected.has(a) && selected.has(b))`. An empty multi set, a member outside the approved supported options, an uncovered option, a missing/extra native ID or a malformed answer fails the whole batch. The reason cites the real approved evidence (`ref.id@ref.locator`) this batch used and no assumed prose; an answer whose approved evidence resolves only in the pinned bundle (not the lease) leaves no citable reason and stands down.
+
+**Records before the answer.** Every question gets one `ask` ledger row and the sidecar records the native IDs/probabilities, matched grants/evidence and route, before the single exact-answer block. A ledger failure leaves the real ask visible with **no partial answer injection**.
+
+**Operator gates are bundle-level.** Policy parsing rejects **any** approved question whose `operatorGate` is not `none`; a bundle carrying one is unavailable, so **both** the ask and the permission consumers treat it as absent — the conservative direction (an unanswered gate is never auto-answered). The gate matrix (spec/design/plan/release approval, merge acknowledgment, unresolved product choice, credential location/value, Molt handoff) stays operator-owned even under favourable probabilities and otherwise valid unrelated grants.
+
+**Abstention and failure.** A malformed batch, an unplannable batch, a missing bridge/authority/native route, a failed or stale transaction, or any exception uses the existing ask-pain path and returns no block: the entire original dialog stays displayed. No generative side turn answers free text or produces a label. Until Task 7 ships, the **unenrolled** legacy conversational ask path is byte-unchanged (only an enrolled session takes this route).
+
 ## Turning it on
 
 | Source | Effect |
