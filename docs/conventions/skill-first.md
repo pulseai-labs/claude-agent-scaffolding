@@ -1,7 +1,7 @@
 # Skill-first — prose by default, code where the input is closed
 
 > **Single source of truth.** This file is authored once at the marketplace root
-> (`docs/conventions/skill-first.md`) and imported by every `CLAUDE.md` that needs it,
+> (`docs/conventions/skill-first.md`) and imported by every instruction file that needs it,
 > including the paired private AI workspace's. Edit here.
 >
 > **One copy is sanctioned: the headline sentence, inline above each import.** `@` expansion

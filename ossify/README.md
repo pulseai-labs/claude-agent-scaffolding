@@ -1,4 +1,4 @@
-# ossify (v1.23.0)
+# ossify (v1.24.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -140,10 +140,14 @@ lean one. doctor's and close's `fail: state` remedy names `/ossify:start` or
 code, no state change.
 
 Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
-instruction file every agent reads; neither writes `CLAUDE.md`. `/start`
-replaces a workspace-init stub (marker on line 1) without asking. `doctor`'s
-interop check fails on a leftover `CLAUDE.md` and, on the operator's yes, moves
-or merges it into `AGENTS.md`.
+instruction file: Claude Code loads it when no `CLAUDE.md` exists, and Codex and
+OMP read it directly. Neither writes `CLAUDE.md`. `/start` replaces a
+workspace-init stub (marker on line 1) without asking; `adopt` merges its loop
+section into an `AGENTS.md` that exists and authors one that does not. `doctor`'s
+interop check fails on a leftover `CLAUDE.md` at the AI workspace root or in
+`.claude/`, and its repair — offered only on the operator's explicit yes, after
+showing every change, and never committed — moves or merges that file into
+`AGENTS.md`.
 
 Since 1.13.4 (#154, #561, #301, #299), four prose defects that only a careful
 reader could catch are corrected, and each is pinned red-then-green. doctor's
