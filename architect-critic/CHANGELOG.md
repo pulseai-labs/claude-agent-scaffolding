@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.8.2 — 2026-10-15
+
+Three items deferred from the 0.7.0 review loop (#512 items 3, 4, 8). #512 stays open for its other items.
+
+### Fixed
+- **Every state writer creates an absent `state.json`** (#512 item 4). `state_append_run`, `state_append_promotion` and `state_write_field` failed with `jq: Could not open file` on a fresh install unless `state_init` ran first; they now call `ac_state_init` first, as the `external_run_*` writers already did. Every writer now stops on its refusal (`ac_state_init || return 1`), so a sourced caller with no errexit no longer goes on to read a file `ac_state_init` refused.
+- **`ac_state_init` creates only an absent path, under `state.lock`.** It makes the data dir, takes the lock, re-checks that the path is still absent, and writes the seed atomically, so a concurrent writer that created and wrote it first keeps its document. A path that exists but is not a regular file — a directory, a FIFO, a dangling symlink — is refused with an error. Before, a dangling symlink was written through (its target created) and then replaced by a regular file on the next write, and a FIFO blocked the writer forever. An unreadable or unparseable file is still refused byte-identical, as in 0.8.1. A path that appears, or a blank file that changes, while the create or 0.8.1's blank re-seed waits for the lock is checked again like any existing path — a FIFO is refused without being read, a v2 document is upgraded — never trusted (PR #830 round 1).
+- **A writer on a v2 `state.json` upgrades it to v3**, since every writer now runs `ac_state_init`; `state_append_run`, `state_append_promotion` and `state_write_field` used to write a v2 file without upgrading it. Read verbs still never create or migrate.
+- **README: the v0.1.x migration is manual** (#512 item 3). The section said `lib/migration.sh` "runs automatically" on first run with "no manual steps required"; nothing ever called it. It now gives the verb, `arc migration_check_v01_state`, and says `/critique-list` points to it on a schema v1 `state.json`.
+- **`critiquing-spec` Step 9** no longer says the append cannot take `state.lock` without `state_init`; the append now creates the data dir itself. The `state_init` call stays.
+
+### Tests
+- New `tests/unit/test-state-writer-init.sh` (100 checks): each writer on an absent file and with no data dir at all, and on a v2 file (upgraded, fields kept); the run-id writers report not-found on an absent file; the controls — unparseable, unreadable, a directory, a dangling symlink and a FIFO are each refused and left as they were, for each writer; the create waits for a foreign `state.lock` and creates nothing; absence is re-checked under the lock, so another owner's document is kept; sourced external writers return on a FIFO instead of blocking. W9/W10: a FIFO or a v2 document that appears during the create's or the re-seed's lock wait is refused or upgraded.
+- `test-state-upgrade.sh` (#512 item 8): a two-document `state.json` holding the requested run. With `_ac_state_check_parseable`'s refusal disabled, `state_external_run_get` returns that record (rc 0), so `get`'s refusal is now pinned on its own; the old malformed-file checks pass either way, because the downstream `jq` failure gives the same rc 1 and empty stdout.
+- `test-bug-repros.sh`: the README's migration section makes no automatic claim, names `arc migration_check_v01_state`, `arc --list` offers it, and no hook references the migration.
+- `test-state.sh` T21: the fixture keeps a valid document and fails the funnel with an unparseable `--argjson` value, because a corrupt file is now refused before the funnel runs; T21(c) again reaches the lock acquire.
+
 ## v0.8.1 — 2026-10-15
 
 State-lib hardening deferred from #483's review (#485, #486, #489).

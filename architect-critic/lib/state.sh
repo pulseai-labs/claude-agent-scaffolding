@@ -26,6 +26,11 @@ ac_state_path() {
 }
 
 # Initialise state.json with an empty schema v3 if it does not already exist.
+# Only an ABSENT path is created (#512): under state.lock, after re-checking it
+# is still absent, by an atomic replace — a concurrent writer that created and
+# wrote it first keeps its document. A path that exists but is not a regular
+# file (a directory, a FIFO, a dangling symlink) is refused, never written
+# through or replaced. Every writer calls this first and stops on its refusal.
 # If the file exists at the immediate predecessor (v2), upgrade it in place via
 # ac_state_migrate (adds external_runs[], bumps to 3). A schema_version higher
 # than this build knows (>3) is preserved untouched with an info log
@@ -40,27 +45,43 @@ ac_state_path() {
 ac_state_init() {
   local state_file
   state_file="$(ac_state_path)"
-  local data_dir
-  data_dir="$(ac_data_dir)"
   local seed='{"schema_version":3,"recent_runs":[],"external_runs":[],"principle_promotions":[]}'
-  if [[ ! -f "$state_file" ]]; then
-    mkdir -p "$data_dir"
-    printf '%s\n' "$seed" > "$state_file"
-  elif _ac_state_is_blank "$state_file"; then
-    _ac_state_reseed_blank "$state_file" "$seed" || return 1
-  else
-    if ! jq -e -s 'length == 1 and (.[0] | type == "object")' "$state_file" >/dev/null 2>&1; then
-      ac_log_error "state.json exists but is not a single parseable JSON object; refusing to touch it: $state_file"
-      return 1
-    fi
-    local on_disk_ver
-    on_disk_ver="$(jq -r '.schema_version // 0' "$state_file" 2>/dev/null || echo 0)"
-    if [[ "$on_disk_ver" -gt 3 ]] 2>/dev/null; then
-      ac_log_info "state.json has future schema_version=${on_disk_ver}; preserving without modification"
-    elif [[ "$on_disk_ver" -eq 2 ]] 2>/dev/null; then
-      ac_state_migrate
-    fi
+  if [[ ! -e "$state_file" && ! -L "$state_file" ]]; then
+    local seed_rc=0
+    _ac_state_seed_absent "$state_file" "$seed" || seed_rc=$?
+    # rc 3: the path appeared while we waited for the lock. It is not ours, so
+    # it goes through the same checks as any existing path below.
+    [[ "$seed_rc" -eq 3 ]] || return "$seed_rc"
   fi
+  _ac_state_check_regular "$state_file" || return 1
+  if _ac_state_is_blank "$state_file"; then
+    local reseed_rc=0
+    _ac_state_reseed_blank "$state_file" "$seed" || reseed_rc=$?
+    # rc 3: the file changed while we waited for the lock; check it again
+    # below instead of trusting it.
+    [[ "$reseed_rc" -eq 3 ]] || return "$reseed_rc"
+    _ac_state_check_regular "$state_file" || return 1
+  fi
+  if ! jq -e -s 'length == 1 and (.[0] | type == "object")' "$state_file" >/dev/null 2>&1; then
+    ac_log_error "state.json exists but is not a single parseable JSON object; refusing to touch it: $state_file"
+    return 1
+  fi
+  local on_disk_ver
+  on_disk_ver="$(jq -r '.schema_version // 0' "$state_file" 2>/dev/null || echo 0)"
+  if [[ "$on_disk_ver" -gt 3 ]] 2>/dev/null; then
+    ac_log_info "state.json has future schema_version=${on_disk_ver}; preserving without modification"
+  elif [[ "$on_disk_ver" -eq 2 ]] 2>/dev/null; then
+    ac_state_migrate
+  fi
+}
+
+# _ac_state_check_regular <file> — rc0 for a regular file; otherwise logs the
+# refusal and returns 1. A directory, FIFO or dangling symlink is never read,
+# written through or replaced.
+_ac_state_check_regular() {
+  [[ -f "$1" ]] && return 0
+  ac_log_error "state.json exists but is not a regular file; refusing to touch it: $1"
+  return 1
 }
 
 # _ac_state_is_blank <file> — rc0 when the file holds nothing but whitespace
@@ -73,14 +94,47 @@ _ac_state_is_blank() {
   [[ "$rc" -eq 1 ]]
 }
 
+# _ac_state_seed_absent <state_file> <seed> — the #512 create: make the data
+# dir, take state.lock, re-check the path is still absent (another writer may
+# have created and written it while we waited), then write the seed atomically.
+# Returns 0 when it wrote the seed, 3 when the path appeared while it waited
+# (the caller checks that path like any existing one), 1 on an error.
+_ac_state_seed_absent() {
+  local state_file="$1" seed="$2" data_dir lock_path tmp rc=0
+  data_dir="$(ac_data_dir)"
+  lock_path="$data_dir/state.lock"
+  if ! mkdir -p "$data_dir"; then
+    ac_log_error "could not create the state directory: $data_dir"
+    return 1
+  fi
+  ac_lock_acquire "$lock_path" || return 1
+  if [[ ! -e "$state_file" && ! -L "$state_file" ]]; then
+    if tmp="$(mktemp "${state_file}.XXXXXX")" && printf '%s\n' "$seed" > "$tmp" && mv "$tmp" "$state_file"; then
+      rc=0
+    else
+      rm -f "${tmp:-}"
+      ac_log_error "could not create $state_file"
+      rc=1
+    fi
+  else
+    rc=3
+  fi
+  ac_lock_release "$lock_path"
+  return $rc
+}
+
 # _ac_state_reseed_blank <state_file> <seed> — the #485 re-seed: take
 # state.lock, re-check the file is still blank (another writer may have
 # re-seeded and written while we waited), then replace it atomically.
+# Returns 0 when it re-seeded, 3 when the path is no longer a blank regular
+# file (the caller checks it again), 1 on an error.
 _ac_state_reseed_blank() {
   local state_file="$1" seed="$2" lock_path tmp rc=0
   lock_path="$(ac_data_dir)/state.lock"
   ac_lock_acquire "$lock_path" || return 1
-  if _ac_state_is_blank "$state_file"; then
+  # Re-check under the lock, regular file first so a FIFO swapped in is never
+  # read. Anything that is no longer a blank regular file returns 3.
+  if [[ -f "$state_file" ]] && _ac_state_is_blank "$state_file"; then
     ac_log_warn "state.json is empty or whitespace-only; re-seeding with a fresh schema v3 document"
     if tmp="$(mktemp "${state_file}.XXXXXX")" && printf '%s\n' "$seed" > "$tmp" && mv "$tmp" "$state_file"; then
       rc=0
@@ -89,6 +143,8 @@ _ac_state_reseed_blank() {
       ac_log_error "could not re-seed $state_file"
       rc=1
     fi
+  else
+    rc=3
   fi
   ac_lock_release "$lock_path"
   return $rc
@@ -149,6 +205,7 @@ ac_state_write_field() {
   state_file="$(ac_state_path)"
   lock_path="$(ac_data_dir)/state.lock"
 
+  ac_state_init || return 1
   ac_lock_acquire "$lock_path" || return 1
   ac_guarded_jq_write "$state_file" --argjson v "$value" "${jq_path} = \$v" "$state_file"
   local rc=$?
@@ -220,6 +277,7 @@ ac_state_append_run() {
   lock_path="$(ac_data_dir)/state.lock"
   completed_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
+  ac_state_init || return 1
   ac_lock_acquire "$lock_path" || return 1
   local rc
   if ac_guarded_jq_write "$state_file" \
@@ -271,6 +329,7 @@ ac_state_append_promotion() {
   lock_path="$(ac_data_dir)/state.lock"
   timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
+  ac_state_init || return 1
   ac_lock_acquire "$lock_path" || return 1
   ac_guarded_jq_write "$state_file" \
     --arg src "$source" \
@@ -286,8 +345,9 @@ ac_state_append_promotion() {
 
 # ═════════════════════════════════════════════════════════════════════════════
 # external_runs[] — durable async external-adversary job memory (schema v3, #39).
-# Writer functions call ac_state_init first (creates a v3 file / lazily
-# migrates a v2 file), so external_runs[] always exists before a write. The two
+# Writer functions call ac_state_init first and stop on its refusal (it
+# creates an absent v3 file / lazily migrates a v2 file), so external_runs[]
+# always exists before a write. The two
 # read functions (get/list) do NOT init — a read must not create or migrate
 # state. They go through _ac_state_check_parseable instead: a missing or 0-byte file
 # is an empty list / not-found, a non-empty unparseable file is refused
@@ -327,7 +387,7 @@ ac_state_external_run_add() {
     true|false) ;;
     *) ac_log_error "ac_state_external_run_add: --walk-mode must be true or false"; return 2 ;;
   esac
-  ac_state_init
+  ac_state_init || return 1
   local state_file lock_path started_at
   state_file="$(ac_state_path)"
   lock_path="$(ac_data_dir)/state.lock"
@@ -393,7 +453,7 @@ ac_state_external_run_set_status() {
     running|completed|failed|cancelled|stalled|capped|error) ;;
     *) ac_log_error "ac_state_external_run_set_status: invalid status: $status"; return 2 ;;
   esac
-  ac_state_init
+  ac_state_init || return 1
   local state_file lock_path
   state_file="$(ac_state_path)"
   lock_path="$(ac_data_dir)/state.lock"
@@ -478,7 +538,7 @@ ac_state_external_run_resolve() {
     ac_log_error "ac_state_external_run_resolve: usage: <run-id> <request-id>"
     return 2
   fi
-  ac_state_init
+  ac_state_init || return 1
   local state_file lock_path existing
   state_file="$(ac_state_path)"
   lock_path="$(ac_data_dir)/state.lock"
@@ -556,7 +616,7 @@ ac_state_external_run_finalize_resume() {
     return 2
   fi
 
-  ac_state_init
+  ac_state_init || return 1
   local state_file lock_path existing completed_at
   state_file="$(ac_state_path)"
   lock_path="$(ac_data_dir)/state.lock"

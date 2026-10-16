@@ -279,13 +279,13 @@ Canonical's working tree NOT modified.
 Next steps:
   1. cd /Users/example/projects/foo-ai && git status
   2. git commit -m "workspace-init: initial bootstrap (pair-with)"
-  3. cd /Users/example/projects/foo-ai && claude
+  3. cd /Users/example/projects/foo-ai && claude      # Claude Code; on Codex, run `codex` in that directory instead
   4. Continue into ossify only where it currently continues: `/ossify:adopt` targets projects
      previously onboarded with the legacy scaffold stack — it reads that stack's roadmap state,
      active-context cursor and legacy spec. A repository that already carries source or history
      but never used that stack has no supported ossify continuation yet; `/ossify:start` sends
      such a repository here rather than onboarding it. (For an empty canonical, `/ossify:start`
-     does onboard it.)
+     does onboard it.) On Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
   5. Before `/ossify:adopt`, every participating tree must be clean: adoption refuses while any
      tree it will edit carries an uncommitted or untracked line — the AI workspace, the canonical,
      and every other repo the topology declares — with each declared repo on the default branch
@@ -297,5 +297,5 @@ Trace filter active in: /Users/example/projects/foo-ai  AND  /Users/example/proj
 To override trace filter for a specific commit: git commit --no-verify
 ```
 
-The user commits the AI workspace skeleton, launches Claude Code in the AI workspace, and continues into ossify as step 4 describes — adoption lands only on a project that was onboarded with the legacy scaffold stack, and it refuses any participating tree that is not clean.
+The user commits the AI workspace skeleton, launches Claude Code (or Codex) in the AI workspace, and continues into ossify as step 4 describes — adoption lands only on a project that was onboarded with the legacy scaffold stack, and it refuses any participating tree that is not clean.
 The canonical repo's workflow is unaffected; the trace filter hook silently guards against AI-trace patterns in commits.

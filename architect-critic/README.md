@@ -142,13 +142,19 @@ Principles merge order (later sources win on a normalized duplicate):
 
 See [CHANGELOG.md](./CHANGELOG.md) for the full breaking-changes list.
 
-On first run after upgrading, `lib/migration.sh` runs automatically:
+Nothing runs the migration for you: no hook or skill calls it. Run it once, by hand, after upgrading from v0.1.x:
 
-- Backs up `state.json` → `state.json.v0.1.3.bak` (timestamped on collision).
+```bash
+arc migration_check_v01_state
+```
+
+`/critique-list` tells you to do this when it finds a schema v1 `state.json`. The verb works on `~/.claude/architect-critic/`:
+
+- Backs up a pre-v0.2 `state.json` → `state.json.v0.1.3.bak` (timestamped on collision) and starts a fresh one.
 - Moves `inbox/` and `outbox/` directories to `legacy-v0.1.x/` (no data is deleted).
 - Prepends ghost-notes + CORE shipped defaults to `principles.md`, preserving all existing user content below the defaults block.
 
-No manual steps required. If anything looks wrong after migration, restore from the `.bak` file and open an issue.
+It prints a one-line notice when it changed something, and does nothing on a fresh install or one already migrated. If anything looks wrong after migration, restore from the `.bak` file and open an issue.
 
 ## Composition
 

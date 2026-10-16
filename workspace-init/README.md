@@ -69,6 +69,17 @@ is never inferred from directory names or non-empty parents.
 
 This creates `existing-project-ai/` as a sibling, writes the pairing manifest pointing at the existing canonical, and installs the `commit-msg` hook into the canonical's `.git/hooks/`. **The canonical's working tree is not modified.** Refuses to proceed if the canonical already has AI scaffolding (`.claude/memory-bank/`, `MASTER-SPEC.md`, `docs/MASTER-SPEC.md`, or `.claude/.onboarding-state.json`) — that's a Scenario B migration, deferred to v0.2.
 
+### Choose the AI workspace directory name
+
+The AI workspace is `<name>-ai/` by default. When its own remote has a different name, give the directory that name instead with `--ai-dir-name`, in either flow:
+
+```
+/pair-workspace /abs/path/to/existing-project --ai-dir-name existing-project-internal
+/init-workspace foo --ai-dir-name foo-notes
+```
+
+The name must start with a letter or digit and use only letters, digits, `.`, `_` and `-`; it must not be the canonical's own directory name. A name outside that shape is refused, never rewritten. The manifest records the chosen name as `ai_workspace.name`, and rollback removes that directory. Without the flag nothing changes.
+
 ### Skill auto-invocation
 
 The two skills (`initializing-dual-repo-workspace`, `pairing-canonical-repo`) auto-invoke on natural-language triggers too:
@@ -163,8 +174,8 @@ The hook itself lives in `.git/hooks/commit-msg`, which is **not tracked by git*
 
 ## Pointers
 
-- Spec: [`docs/SPEC-workspace-init.md`](../docs/SPEC-workspace-init.md) — manifest schema (§6.2), resolver semantics (§6.3), bootstrap procedure (§8.1), Scenario A migration (§9.4), trace filter contract (§7.3).
-- Plan: [`docs/PLAN-workspace-init.md`](../docs/PLAN-workspace-init.md) — 9-phase implementation plan.
+- Skills: [`skills/`](./skills/) — the three flows (fresh, Scenario A, Scenario C). Each skill states its preconditions, its tasks in order, its rollback rules and the next-steps block it prints; worked examples sit beside each one.
+- Library: [`lib/`](./lib/) — the `wi` verbs the skills call (`bin/wi --list` prints them): the manifest schema and resolver in `lib/manifest.sh`, preflight and the directory skeleton in `lib/skeleton.sh`, the trace filter in `lib/trace-filter.sh`, rollback in `lib/rollback.sh`.
 - Changelog: [`CHANGELOG.md`](./CHANGELOG.md).
 - Lifecycle continuation: [`ossify`](../ossify/) — `/ossify:start` for an empty canonical; `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack, so a canonical that already carries source or history without that stack has no supported ossify continuation yet.
 

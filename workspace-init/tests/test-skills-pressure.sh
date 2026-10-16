@@ -346,6 +346,86 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
     || { echo "    fresh example created_by is not version-neutral"; return 1; }
 }
 
+# --- #538: the launcher step names both surfaces, as the Scenario-C block does ---
+
+test_launcher_steps_name_both_surfaces() {
+  local init_sec pair_sec init_ex_sec pair_ex_sec
+  init_sec="$(awk '/^## 6\. Print next-steps/,/^## 7\./' "$INIT_SKILL")"
+  pair_sec="$(awk '/^## 8\. Print next-steps/,/^## 9\./' "$PAIR_SKILL")"
+  init_ex_sec="$(awk '/^## Final next-steps message/,0' "$FRESH_EX")"
+  pair_ex_sec="$(awk '/^## Final next-steps message/,0' "$PAIR_CLEAN_EX")"
+  [[ -n "$init_sec" && -n "$pair_sec" && -n "$init_ex_sec" && -n "$pair_ex_sec" ]] \
+    || { echo "    a scoped next-steps section is empty — headings drifted"; return 1; }
+
+  local sec
+  for sec in "$init_sec" "$pair_sec" "$init_ex_sec" "$pair_ex_sec"; do
+    # No Claude-only launcher line survives …
+    if grep -Eq '&& claude[[:space:]]*$' <<<"$sec"; then
+      echo "    a launcher line still names only claude:"
+      grep -En '&& claude[[:space:]]*$' <<<"$sec"
+      return 1
+    fi
+    # … and the launcher names the Codex CLI beside it.
+    assert_contains '&& claude      # Claude Code; on Codex, run `codex` in that directory instead' "$sec" || return 1
+  done
+
+  # The Scenario-A route names the Codex skill form, as the fresh and C blocks do.
+  assert_contains 'On Codex, invoke the corresponding ossify skill — `adopt`, or `start`' "$pair_sec" || return 1
+  assert_contains 'On Codex, invoke the corresponding ossify skill — `adopt`, or `start`' "$pair_ex_sec" || return 1
+}
+
+# --- #174: `--ai-dir-name` reaches every station the skills and commands own ---
+
+test_ai_dir_name_flag_reaches_skills_and_commands() {
+  local s
+  for s in "$INIT_SKILL" "$PAIR_SKILL"; do
+    grep -qF -- '--ai-dir-name <dir>' "$s" || { echo "    $s: flag grammar missing"; return 1; }
+    grep -qF 'ai_root="${parent}/${ai_dir_name}"' "$s" || { echo "    $s: ai_root does not use ai_dir_name"; return 1; }
+    ! grep -qF 'ai_root="${parent}/${name}-ai"' "$s" || { echo "    $s: hard-coded <name>-ai ai_root survives"; return 1; }
+    grep -qF 'append `--ai-dir-name "$ai_dir_name"`' "$s" || { echo "    $s: lib calls do not forward the flag"; return 1; }
+    grep -qF 'substitute `{name}-ai` with the AI workspace directory name' "$s" \
+      || { echo "    $s: next-steps substitution ignores a custom dir"; return 1; }
+  done
+  grep -qF -- '/init-workspace <name> [--wrapper <existing-dir>] --ai-dir-name <dir>' "$WI_PLUGIN_ROOT/commands/init-workspace.md" \
+    || { echo "    init-workspace command lacks the flag form"; return 1; }
+  grep -qF -- '/pair-workspace <abs-path-to-canonical> [--ai-dir-name <dir>]' "$WI_PLUGIN_ROOT/commands/pair-workspace.md" \
+    || { echo "    pair-workspace command lacks the flag form"; return 1; }
+  grep -qF -- '/pair-workspace /abs/path/to/existing-project --ai-dir-name existing-project-internal' "$WI_PLUGIN_ROOT/README.md" \
+    || { echo "    README does not show the Scenario-A flag form"; return 1; }
+}
+
+# --- #146: the README describes itself without links outside the plugin tree ---
+
+test_readme_links_stay_inside_the_plugin() {
+  local readme="$WI_PLUGIN_ROOT/README.md"
+  # `../docs/` is untracked process exhaust: it never ships and never resolves.
+  if grep -En '\]\(\.\./docs/' "$readme"; then
+    echo "    README links into the untracked ../docs/ tree"; return 1
+  fi
+  if grep -En 'docs/(SPEC|PLAN)-workspace-init' "$readme"; then
+    echo "    README still names the untracked SPEC/PLAN docs"; return 1
+  fi
+}
+
+# --- PR #829: each skill resolves wi_bin before its first "$wi_bin" call ---
+
+test_skills_resolve_wi_bin_before_first_use() {
+  local f rc=0
+  for f in "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md" \
+           "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md"; do
+    # One awk pass: the line that assigns wi_bin must precede the first line
+    # that invokes "$wi_bin".
+    if ! awk '
+      index($0, "wi_bin=\"$(command -v wi)\"") && !def { def = NR }
+      index($0, "\"$wi_bin\" ") && !use { use = NR }
+      END { exit !(def && use && def < use) }
+    ' "$f"; then
+      echo "    $f: wi_bin is used before it is resolved (or never resolved)"; rc=1
+    fi
+  done
+  return "$rc"
+}
+
 # --- run all ---
 wi_test_run test_init_skill_file_exists
 wi_test_run test_pair_skill_file_exists
@@ -367,5 +447,9 @@ wi_test_run test_no_site_references_dead_repair_flag
 wi_test_run test_printed_skill_routes_point_to_ossify
 wi_test_run test_examples_routes_and_created_paths_match_reality
 wi_test_run test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces
+wi_test_run test_launcher_steps_name_both_surfaces
+wi_test_run test_ai_dir_name_flag_reaches_skills_and_commands
+wi_test_run test_readme_links_stay_inside_the_plugin
+wi_test_run test_skills_resolve_wi_bin_before_first_use
 
 wi_test_summary

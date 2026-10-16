@@ -56,13 +56,73 @@ wi_git_is_linked_worktree() {
   [[ "$git_dir" != "$common_dir" ]]
 }
 
-# wi_skeleton_preflight <parent> <name> [--pair-with <existing-canonical>]
+# _wi_skeleton_ai_dir_from_args <caller> <name> [--ai-dir-name NAME]
+#
+# Prints the AI workspace directory name (#174): NAME when `--ai-dir-name` is
+# given, else `<name>-ai` — the unchanged default. NAME is typed by the user, so
+# it must match one closed shape before it becomes a path component: a letter
+# or digit first, then letters, digits, `.`, `_` or `-`. That refuses empty,
+# `.`, `..`, any `/`, a leading `-`, and the whitespace and control characters
+# the TAB-separated init-log cannot hold. It is refused, never rewritten. Also
+# refuses an unknown arg, a missing value and a repeated flag.
+_wi_skeleton_ai_dir_from_args() {
+  local caller="$1"
+  local name="$2"
+  shift 2
+  local ai_dir="" ai_dir_set=""
+  while (( $# > 0 )); do
+    case "$1" in
+      --ai-dir-name)
+        if (( $# < 2 )); then
+          wi_log_error "$caller: --ai-dir-name requires a value"
+          return 1
+        fi
+        if [[ -n "$ai_dir_set" ]]; then
+          wi_log_error "$caller: --ai-dir-name given more than once"
+          return 1
+        fi
+        ai_dir="$2"
+        ai_dir_set=1
+        shift 2
+        ;;
+      *)
+        wi_log_error "$caller: unknown arg: $1"
+        return 1
+        ;;
+    esac
+  done
+
+  if [[ -z "$ai_dir_set" ]]; then
+    printf '%s\n' "${name}-ai"
+    return 0
+  fi
+  if ! [[ "$ai_dir" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    wi_log_error "$caller: invalid --ai-dir-name (must match ^[A-Za-z0-9][A-Za-z0-9._-]*\$): '$ai_dir'"
+    return 1
+  fi
+  printf '%s\n' "$ai_dir"
+}
+
+# _wi_skeleton_same_dir_name <a> <b>
+#
+# True when two sibling names would land on one directory. Compared without
+# case, because the default macOS filesystem maps `FOO` and `foo` to one entry.
+_wi_skeleton_same_dir_name() {
+  local a b
+  a="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  b="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"
+  [[ "$a" == "$b" ]]
+}
+
+# wi_skeleton_preflight <parent> <name> [--pair-with <existing-canonical>] [--ai-dir-name <dir>]
 #
 # Validates the inputs needed to start an init run, per SPEC §8.1:
 #   - <name> matches ^[a-z0-9-]+$ (kebab-case)
 #   - <parent> exists and is writable
-#   - AI workspace target (<parent>/<name>-ai) has no existing filesystem entry
-#   - Fresh mode: canonical target (<parent>/<name>) has no existing entry
+#   - AI workspace target (<parent>/<name>-ai, or <parent>/<dir> with
+#     --ai-dir-name) has no existing filesystem entry
+#   - Fresh mode: canonical target (<parent>/<name>) has no existing entry, and
+#     the AI target is not the canonical target
 #   - Pair-with mode: --pair-with path must exist + be a git repo
 #
 # Returns 0 on success, non-zero on any failure (with error to stderr).
@@ -70,12 +130,21 @@ wi_skeleton_preflight() {
   local parent="$1"
   local name="$2"
   local pair_with=""
+  local ai_dir_args=()
   shift 2
   while (( $# > 0 )); do
     case "$1" in
       --pair-with)
         pair_with="$2"
         shift 2
+        ;;
+      --ai-dir-name)
+        ai_dir_args+=("$1")
+        if (( $# >= 2 )); then
+          ai_dir_args+=("$2")
+          shift
+        fi
+        shift
         ;;
       *)
         wi_log_error "wi_skeleton_preflight: unknown arg: $1"
@@ -100,8 +169,15 @@ wi_skeleton_preflight() {
     return 1
   fi
 
-  local ai_root="${parent}/${name}-ai"
+  local ai_dir
+  ai_dir="$(_wi_skeleton_ai_dir_from_args wi_skeleton_preflight "$name" ${ai_dir_args[@]+"${ai_dir_args[@]}"})" || return 1
+  local ai_root="${parent}/${ai_dir}"
   local canonical_root="${parent}/${name}"
+
+  if [[ -z "$pair_with" ]] && _wi_skeleton_same_dir_name "$ai_dir" "$name"; then
+    wi_log_error "wi_skeleton_preflight: --ai-dir-name names the canonical target; pick a different AI workspace dir: $ai_root"
+    return 1
+  fi
 
   # Reject every target collision before root creation starts. `-d` misses
   # regular files and `-e` alone misses dangling symlinks; either shape would
@@ -196,22 +272,33 @@ wi_skeleton_preflight_existing_dual() {
   return 0
 }
 
-# wi_skeleton_create_root_pair <parent> <name>
+# wi_skeleton_create_root_pair <parent> <name> [--ai-dir-name <dir>]
 #
 # Fresh-mode root creation (SPEC §8.2): mkdir both AI workspace and canonical.
 # Also creates <ai>/.workspace so the init-log has a parent. Logs all three.
+# The AI workspace is <parent>/<name>-ai, or <parent>/<dir> with --ai-dir-name.
 wi_skeleton_create_root_pair() {
   local parent="$1"
   local name="$2"
-  local ai_root="${parent}/${name}-ai"
-  local canonical_root="${parent}/${name}"
-
-  if ! mkdir -p "$ai_root"; then
-    wi_log_error "wi_skeleton_create_root_pair: mkdir failed: $ai_root"
+  shift 2
+  local ai_dir
+  ai_dir="$(_wi_skeleton_ai_dir_from_args wi_skeleton_create_root_pair "$name" "$@")" || return 1
+  if _wi_skeleton_same_dir_name "$ai_dir" "$name"; then
+    wi_log_error "wi_skeleton_create_root_pair: --ai-dir-name names the canonical target: ${parent}/${ai_dir}"
     return 1
   fi
-  if ! mkdir -p "$canonical_root"; then
-    wi_log_error "wi_skeleton_create_root_pair: mkdir failed: $canonical_root"
+  local ai_root="${parent}/${ai_dir}"
+  local canonical_root="${parent}/${name}"
+
+  # Plain `mkdir`, never `-p`, for the two roots: rollback answers a MKDIR
+  # entry with `rm -rf`, so a root that already exists must be refused here,
+  # not adopted and logged as ours.
+  if ! mkdir "$ai_root"; then
+    wi_log_error "wi_skeleton_create_root_pair: mkdir failed (exists or unwritable): $ai_root"
+    return 1
+  fi
+  if ! mkdir "$canonical_root"; then
+    wi_log_error "wi_skeleton_create_root_pair: mkdir failed (exists or unwritable): $canonical_root"
     return 1
   fi
   if ! mkdir -p "${ai_root}/.workspace"; then
@@ -227,17 +314,23 @@ wi_skeleton_create_root_pair() {
   return 0
 }
 
-# wi_skeleton_create_root_ai_only <parent> <name>
+# wi_skeleton_create_root_ai_only <parent> <name> [--ai-dir-name <dir>]
 #
 # Pair-with-mode root creation (SPEC §8.2): mkdir only AI workspace. The
-# canonical already exists and must NOT be touched here.
+# canonical already exists and must NOT be touched here. The AI workspace is
+# <parent>/<name>-ai, or <parent>/<dir> with --ai-dir-name.
 wi_skeleton_create_root_ai_only() {
   local parent="$1"
   local name="$2"
-  local ai_root="${parent}/${name}-ai"
+  shift 2
+  local ai_dir
+  ai_dir="$(_wi_skeleton_ai_dir_from_args wi_skeleton_create_root_ai_only "$name" "$@")" || return 1
+  local ai_root="${parent}/${ai_dir}"
 
-  if ! mkdir -p "$ai_root"; then
-    wi_log_error "wi_skeleton_create_root_ai_only: mkdir failed: $ai_root"
+  # Plain `mkdir`, never `-p`: an AI root that already exists is refused, not
+  # logged as MKDIR for rollback's `rm -rf` (see wi_skeleton_create_root_pair).
+  if ! mkdir "$ai_root"; then
+    wi_log_error "wi_skeleton_create_root_ai_only: mkdir failed (exists or unwritable): $ai_root"
     return 1
   fi
   if ! mkdir -p "${ai_root}/.workspace"; then

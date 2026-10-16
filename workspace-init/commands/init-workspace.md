@@ -12,12 +12,16 @@ Accepted forms:
 ```
 /init-workspace <name>
 /init-workspace <name> --wrapper <existing-dir>
+/init-workspace <name> [--wrapper <existing-dir>] --ai-dir-name <dir>
 ```
 
 Pass the raw `$ARGUMENTS` text to the skill for interpretation. The skill must
 reject an unknown option, duplicate `--wrapper`, extra positional values, or a
 missing/empty wrapper value with an error containing `--wrapper requires an
-existing writable directory` plus the accepted forms above. If no project name
+existing writable directory` plus the accepted forms above. It rejects a
+duplicate `--ai-dir-name` or a missing/empty value for it the same way; the
+value replaces the default `<name>-ai` directory name and is passed through as
+typed. If no project name
 is supplied, prompt for it interactively. Never use shell positional parameters,
 never infer wrapper mode, and never treat the entire non-empty argument string as
 the name.

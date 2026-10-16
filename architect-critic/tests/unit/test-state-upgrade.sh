@@ -191,6 +191,36 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# (b2) #512 item 8: on `not json{` above, a disabled refusal is invisible to
+# get — past the guard, jq fails too and get still ends rc1, empty stdout, and
+# the logged wording. Two documents are different: jq reads them, so past a
+# disabled guard get would RETURN the matching record. Only the guard's own
+# refusal keeps get from answering out of a file that is not one object.
+echo "-- (b2) two-document state.json: get refuses rather than answering from it --"
+printf '%s\n%s\n' '{"schema_version":3,"external_runs":[{"run_id":"r-two"}]}' '{}' > "$STATE_FILE"
+cp "$STATE_FILE" "$TMP_DIR/two-before.json"
+set +e
+out="$(bash "$ARC" state_external_run_get r-two 2>"$TMP_DIR/err-get2.txt")"; rc=$?
+set -e 2>/dev/null || true
+assert_eq "external_run_get on a two-document file: rc1 (refused)" "1" "$rc"
+assert_eq "external_run_get on a two-document file: no record printed" "" "$out"
+if /usr/bin/grep -q 'not a single parseable JSON object' "$TMP_DIR/err-get2.txt"; then
+  echo "  ✓ get refusal on the two-document file is logged"
+  PASS=$((PASS+1))
+else
+  echo "  ✗ get refusal on the two-document file missing from stderr:"
+  cat "$TMP_DIR/err-get2.txt"
+  FAIL=$((FAIL+1))
+fi
+if cmp -s "$TMP_DIR/two-before.json" "$STATE_FILE"; then
+  echo "  ✓ two-document file byte-identical after get refusal"
+  PASS=$((PASS+1))
+else
+  echo "  ✗ two-document file changed by external_run_get"
+  FAIL=$((FAIL+1))
+fi
+
+# ---------------------------------------------------------------------------
 echo "-- (c) fresh seed carries the reduced schema --"
 rm -f "$STATE_FILE"
 bash "$ARC" state_init
