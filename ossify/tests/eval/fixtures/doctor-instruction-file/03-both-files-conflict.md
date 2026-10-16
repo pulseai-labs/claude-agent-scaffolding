@@ -1,7 +1,7 @@
 ---
 scenario_id: 03-both-files-conflict
 expected_outcome: repair-merge-asks
-expected_reason: "Both instruction files exist. The root `/home/cy/ws/CLAUDE.md` (4,180 B) is the router and says \"Network ops are allowed for the orchestrator\"; `/home/cy/ws/AGENTS.md` (1,020 B) is a September workspace-init stub that names `ossify`, carries the pointer line \"Read `CLAUDE.md` for richer guidance\", and says \"Network ops require explicit user instruction\". The two disagree on the git policy. `agents_md` is `ok:` (the stub exists and names ossify); `claude_md` fails on the root `CLAUDE.md`. The operator says yes, so §5 branch 2 runs: the merge keeps every rule and fact from both files, drops the pointer line, does NOT pick between the two network-ops statements — it shows both and asks the operator — and shows the whole merged file before writing it. Then it writes the merged `AGENTS.md` and removes `CLAUDE.md`. Nothing is committed; the re-emitted lines are both `ok:`."
+expected_reason: "Both instruction files exist. The root `/home/cy/ws/CLAUDE.md` (4,180 B) is the router and says \"Network ops are allowed for the orchestrator\"; `/home/cy/ws/AGENTS.md` (1,020 B) is a September workspace-init stub that names `ossify`, carries the pointer line \"Read `CLAUDE.md` for richer guidance\", and says \"Network ops require explicit user instruction\". The two disagree on the git policy. `agents_md` is `ok:` (the stub exists and names ossify); `claude_md` fails on the root `CLAUDE.md`. The operator says yes, so §5's plan runs: the merge keeps every rule and fact from both files, drops the pointer line, does NOT pick between the two network-ops statements — it shows both and asks the operator — and shows the whole merged file before writing it. The operator answers the disagreement (keeps \"Network ops require explicit user instruction\"); only then does §5 write the merged `AGENTS.md` and remove `CLAUDE.md`. Nothing is committed; the re-emitted lines are both `ok:`."
 ---
 
 `.workspace/pairing.json` at the AI workspace root declares:
@@ -36,3 +36,7 @@ other.
 
 Doctor's `/ossify:doctor interop` surface is invoked. After the read-out, the
 operator answers the repair offer with an unconditional yes.
+
+The merge asks the operator which network-ops rule to keep, and the operator
+answers: "keep 'Network ops require explicit user instruction' — the orchestrator
+does not push on its own".

@@ -9,10 +9,7 @@ It holds a `CLAUDE.md` (2,104 B) written by an older workspace-init, and no
 `EXECUTIVE-SUMMARY.md`, no `.claude/` directory and no memory bank.
 
 `CLAUDE.md` is not one of `/start`'s destinations: ossify authors `AGENTS.md`,
-never `CLAUDE.md`. So there is no question about the file; it stays untouched.
-The workspace ends the ceremony with both `CLAUDE.md` (unchanged) and ossify's
-`AGENTS.md`, and the hand-off routes the operator to `ossify:doctor`, whose
-interop check names the leftover file and offers the repair.
+never `CLAUDE.md`.
 
 The topology declares one repo, `canonical`, at
 `/home/dev/projects/wickham`; it holds only a `.git` with no commits and no

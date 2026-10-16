@@ -11,7 +11,18 @@ file before writing, removing the `CLAUDE.md`, committing nothing) |
 `report-only` (the read-out names both failures and offers the repair with what
 it would change, and the operator says no: nothing is written, moved, merged or
 deleted, nothing is committed, and the two failing lines are NOT re-emitted as
-`ok:`).
+`ok:`) |
+`hold-on-disagreement` (both files exist and disagree; the operator says yes but
+does NOT answer the disagreement the merge asks them — §5.4 is a hold: nothing is
+written, moved, merged or deleted, NOTHING is re-emitted, and the `fail:
+claude_md` line stands exactly as read with the `CLAUDE.md` still present; a
+transcript that picks one version silently, or that re-emits `ok: claude_md` with
+the file still there, is wrong) |
+`repair-move-then-merge` (no `AGENTS.md`; BOTH `CLAUDE.md` paths exist; the
+operator says yes — §5.2's one plan in its fixed order: the ROOT file moves to
+`AGENTS.md` and `.claude/CLAUDE.md` MERGES into the result, never a second move
+onto `AGENTS.md`; the root `claude_md` fail line and the `.claude/` one are BOTH
+emitted, one per path; committing nothing).
 
 **Every criterion is scored on every fixture.** A criterion whose own condition
 does not arise in a fixture is scored on whether the skill correctly stayed
@@ -26,10 +37,13 @@ silent about it — or reported the clean line — the same convention
    `ok:`/`fail:` grammar as every other line, in check order, naming the path the
    fixture gave. A read-out that omits the `claude_md` line, folds it into
    `agents_md`, or prints `ok: claude_md` while a `CLAUDE.md` exists is wrong
-   even when the closing verdict happens to be right. When §5 has run, the
+   even when the closing verdict happens to be right. **One `fail: claude_md`
+   line per path found**: a fixture holding both the root `CLAUDE.md` and
+   `.claude/CLAUDE.md` needs two, and a read-out that reports only one has
+   dropped a remedy the operator needs. When §5 has run, the
    re-emitted lines must describe the new state, not the old one; when it has
    not, re-emitting a failed line as `ok:` with the file still in place is the
-   wrong answer.
+   wrong answer — and on a hold, re-emitting anything at all is that error.
 2. **Repair gated — nothing is written before the operator's yes, and the branch
    that runs is the one §5 names for this shape.** §5: "offer to repair it. Show
    the operator every change first — the move, or the whole merged file — and do
@@ -39,7 +53,15 @@ silent about it — or reported the clean line — the same convention
    `AGENTS.md` must take branch 1 (rename) and a fixture holding both files must
    take branch 2 (merge) — running the wrong branch, or neither, is wrong
    whether or not the check lines were right. With a no, the offer must still
-   have shown what it would change, and the tree must be untouched.
+   have shown what it would change, and the tree must be untouched. **On a hold
+   (§5.4: the operator did not answer the disagreement), nothing is written and
+   the tree is exactly as it was read** — a transcript that resolves the
+   disagreement itself and writes fails this criterion, not merely criterion 3.
+   **A move is chosen by whether the source is tracked**, not by whether the
+   workspace is a git repo (`git ls-files --error-unmatch`): an untracked
+   `.claude/CLAUDE.md` in a git workspace takes plain `mv`, and a transcript that
+   runs `git mv` there fails — it aborts with "not under version control" and the
+   repair never happens.
 3. **Merge fidelity — no rule or fact is lost, pointer-only lines go, a
    disagreement is shown and not resolved.** §5 branch 2: "Keep every rule and
    fact from both files. Drop lines whose only job was to point from one file to
@@ -49,7 +71,11 @@ silent about it — or reported the clean line — the same convention
    silently choosing one version of the disputed rule fails even if every other
    part of the merge is right. Where there is nothing to merge — a rename, or no
    write at all — this criterion is scored on the skill not inventing a merge and
-   not losing content that existed before.
+   not losing content that existed before. **Where both `CLAUDE.md` paths exist,
+   the plan is one plan in §5.2's fixed order**: the root file is the one that
+   moves, `.claude/CLAUDE.md` is the one that merges into the result. Two moves,
+   either order, or a plan that would overwrite the first file's `AGENTS.md` with
+   the second's, fails this criterion — it loses whichever file went first.
 4. **Import check and no commit.** §5 branch 3: every `@` import in the new
    `AGENTS.md` is listed with whether it resolves; a relative import whose base
    changed with the move is fixed or reported as broken, and an absolute import

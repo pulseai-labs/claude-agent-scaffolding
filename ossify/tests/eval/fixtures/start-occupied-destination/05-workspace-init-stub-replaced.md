@@ -12,8 +12,7 @@ else: no `.ossify/` state, no `MASTER-SPEC.md`, no `EXECUTIVE-SUMMARY.md`, no
 
 The stub is workspace-init's temporary file: `/ossify:start` replaces the whole
 file with project-specific guidance, and the stub's own text says so. Its first
-line is the marker, so §1a of `references/occupied-destinations.md` applies and
-the file counts as unoccupied.
+line is the marker.
 
 The topology declares one repo, `canonical`, at
 `/home/dev/projects/ferrite`; it holds only a `.git` with no commits and no
