@@ -34,7 +34,7 @@ otherwise get no rule at all. **If the two ever disagree, the file wins.**
 
 It lives there rather than here because the paired private AI workspace needs the same rule and
 **this file does not load there.** Claude Code walks *up* from the working directory; the two
-repos are siblings, so a session started in the workspace never sees this file. Its `CLAUDE.md`
+repos are siblings, so a session started in the workspace never sees this file. Its `AGENTS.md`
 imports the same file by absolute path.
 
 That import is **external** — outside its working directory — so Claude Code gates it behind a

@@ -24,6 +24,7 @@ entry claims to be.
 
 `$OSS_STATE_FILE` is unset and `oss state_path` resolves cleanly to an
 existing file. `AGENTS.md` exists at `/srv/ws/AGENTS.md` and mentions
-`ossify` in its opening paragraph.
+`ossify` in its opening paragraph. There is no `CLAUDE.md` in the AI workspace,
+at its root or in `.claude/`.
 
 Doctor's `/ossify:doctor interop` surface is invoked.
