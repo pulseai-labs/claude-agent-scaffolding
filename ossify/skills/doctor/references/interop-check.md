@@ -412,9 +412,9 @@ For each `CLAUDE.md` the check named, in the order §5.2 fixes:
    version control". Test it:
 
    ```bash
-   git -C <ai_workspace.root> ls-files --error-unmatch <path> >/dev/null 2>&1 \
-     && git mv <path> <ai_workspace.root>/AGENTS.md \
-     || mv <path> <ai_workspace.root>/AGENTS.md
+   git -C "<ai_workspace.root>" ls-files --error-unmatch "<path>" >/dev/null 2>&1 \
+     && git mv "<path>" "<ai_workspace.root>/AGENTS.md" \
+     || mv "<path>" "<ai_workspace.root>/AGENTS.md"
    ```
 
    A non-git workspace has no `git ls-files` to consult; use plain `mv` there,
