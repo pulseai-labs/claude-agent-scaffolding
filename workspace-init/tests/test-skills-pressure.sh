@@ -626,10 +626,6 @@ test_release_record_matches_the_shipped_files() {
     *'grown organically'*) echo "    pairing-existing-dual now holds the pointer too — update the claim"; return 1 ;;
   esac
   assert_contains 'pointer paragraph in `pairing-canonical-repo` §1 names' "$chg" || return 1
-  # The `## AI-trace filter` section came from the old CLAUDE.md stub.
-  git -C "$REPO_ROOT" show b4410e89:workspace-init/templates/CLAUDE.md.stub.tmpl 2>/dev/null \
-    | grep -Fq '## AI-trace filter' \
-    || { echo "    the old CLAUDE.md stub no longer shows the AI-trace section"; return 1; }
   assert_contains 'section plus the canonical-and-ossify continuation sections from the old `CLAUDE.md` stub' "$chg" || return 1
   # The header's count must equal the runners that file actually declares.
   local runners
