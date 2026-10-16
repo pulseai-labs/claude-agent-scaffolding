@@ -1,6 +1,6 @@
 # Machine-checkable rule authoring
 
-The depth behind `doctor/SKILL.md` §6. The one surface in this skill that
+The depth behind `doctor/SKILL.md` §6. One of the two surfaces in this skill that
 writes, and it writes to exactly one file.
 
 **Two modes, and the sweep only ever gets the first.**
@@ -44,7 +44,7 @@ one, and neither is a defect.
 
 **Lane discipline: this surface writes to `03-code-patterns.md` and nothing
 else.** Never `00-project-brief.md` through `08-governance.md`, never
-`CLAUDE.md`, never `MASTER-SPEC.md`.
+`AGENTS.md` (or a legacy `CLAUDE.md`), never `MASTER-SPEC.md`.
 
 ---
 

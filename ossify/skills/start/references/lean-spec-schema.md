@@ -98,7 +98,7 @@ with ceremony sprawl.
 | **Fake ledger** | **Skeleton shells only** | Every spine that introduces or retains a fake |
 | **Feature map** | **May be three lines** | Groomed at every release close |
 | **Posture** | May be *"default-private, revisit at MVP"* | Posture-supersede ceremony |
-| **Memory bank + CLAUDE.md** | The Tier-0 files with real content; the rest seeded thin | Harvest at every spine close |
+| **Memory bank + AGENTS.md** | The Tier-0 files with real content; the rest seeded thin | Harvest at every spine close |
 
 A spec-core close that produced a five-line feature map and four `not-applicable`
 bones is a **successful** close, not a lazy one — provided every category was

@@ -23,6 +23,7 @@ repository`.
 `$OSS_STATE_FILE` is unset. `oss state_path` resolves to
 `/Users/ops/ws/.ossify/project-state.json`, which exists. `AGENTS.md` exists
 at `/Users/ops/ws/AGENTS.md` and its second heading reads `## Ossify
-ceremonies`.
+ceremonies`. There is no `CLAUDE.md` in the AI workspace, at its root or in
+`.claude/`.
 
 Doctor's `/ossify:doctor interop` surface is invoked.
