@@ -80,6 +80,12 @@ belongs. It is the one instruction file: Claude Code loads it when no
 `CLAUDE.md` exists, and Codex and OMP read it directly. Never author a
 `CLAUDE.md`.
 
+Two sections are not ours to author: when the file replaced was workspace-init's
+marked stub (occupied-destinations §1a), its `## Git policy` and
+`## AI-trace filter` sections are carried across verbatim. They are this
+workspace's git policy and its trace-filter notice, and nothing else regenerates
+them.
+
 ---
 
 ## 4. Routing

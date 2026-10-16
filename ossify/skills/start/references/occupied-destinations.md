@@ -61,6 +61,19 @@ that the workspace-init stub was replaced. The marker must be the first line.
 An `AGENTS.md` with the marker anywhere else, or without it, is occupied and
 takes §2's question like any other file.
 
+**Carry the stub's two policy sections, verbatim.** The stub is not only a
+placeholder: it is where workspace-init recorded this workspace's git policy and
+its AI-trace filter, and ossify's `AGENTS.md` does not regenerate either. Dropping
+them would let a later agent push without asking — the stub's own
+`## Git policy` is the default-deny rule, and `## AI-trace filter` is why a hook
+exists. So when the marked stub is replaced, copy both sections from it into
+ossify's `AGENTS.md` **verbatim**, wording and bullets included, and say in the
+§13 hand-off that the workspace-init stub was replaced and its `## Git policy`
+and `## AI-trace filter` sections were carried across. Section names and text are
+`workspace-init/templates/AGENTS.md.stub.tmpl`'s; read the file the workspace
+actually holds, since a stub written by an older workspace-init may read
+differently, and carry what is there rather than the template's current text.
+
 **A leftover `CLAUDE.md` is not a destination.** `/start` never writes
 `CLAUDE.md`. When the AI workspace holds one (at its root or at
 `.claude/CLAUDE.md`), leave it untouched, and say in the §13 hand-off that

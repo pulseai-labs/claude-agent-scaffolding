@@ -2086,4 +2086,12 @@ _pin "$_r" "the repair offer has no sweep timing - §3 forbids a mid-sweep promp
 _r=1; ! grep -Fq 'Editing `AGENTS.md` or the pairing manifest' "$_DS" \
   && ! grep -Fq 'The one surface in this skill that' "$_PRA" && _r=0
 _pin "$_r" "doctor's never-do list still forbids editing AGENTS.md to make the interop check pass, or rule-authoring still calls itself the one writing surface (D7)"
+# D9: replacing the marked stub must carry the stub's git policy and trace filter.
+# The greps read the CARRY INSTRUCTION, not the section heading: a heading word
+# `verbatim` satisfied an earlier form of this pin while the instruction itself
+# could be deleted (the mutation survived - PR #836 round-2 fix).
+_r=1; grep -Fq '## Git policy' "$_OD5" && grep -Fq '## AI-trace filter' "$_OD5" \
+  && grep -Fq 'copy both sections from it into' "$_OD5" && _r=0
+_pin "$_r" "/start's stub replacement drops the stub's Git policy and AI-trace filter sections - later agents lose the network-ops default-deny (D9)"
+
 t_summary
