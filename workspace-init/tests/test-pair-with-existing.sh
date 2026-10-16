@@ -98,7 +98,6 @@ _run_pair_with_bootstrap() {
       --default-branch "$default_branch" || return 1
   fi
 
-  wi_stub_claude_md "$ai_root" "$name" || return 1
   wi_stub_agents_md "$ai_root" "$name" || return 1
   wi_stub_readme    "$ai_root" "$name" || return 1
   wi_git_init_ai_only "$ai_root" || return 1
@@ -144,14 +143,16 @@ test_PH2_ai_created_canonical_working_tree_unchanged() {
 test_PH3_ai_has_skeleton_manifest_stubs() {
   local parent="$_WI_TMP/ph3"; mkdir -p "$parent"
   local canonical; canonical="$(_make_existing_canonical "$parent" "proj1")"
-  _run_pair_with_bootstrap "$parent" "proj1" "$canonical" work >/dev/null 2>&1
+  # D12: without this, a failed bootstrap leaves the no-CLAUDE.md guard below
+  # trivially true on an empty tree and the test passes for the wrong reason.
+  _run_pair_with_bootstrap "$parent" "proj1" "$canonical" work >/dev/null 2>&1 || return 1
   local ai="$parent/proj1-ai"
   assert_dir_exists  "$ai/.workspace" || return 1
   assert_dir_exists  "$ai/.claude"    || return 1
   assert_dir_exists  "$ai/docs"       || return 1
   assert_file_exists "$ai/.workspace/pairing.json" || return 1
-  assert_file_exists "$ai/CLAUDE.md"  || return 1
   assert_file_exists "$ai/AGENTS.md"  || return 1
+  [[ ! -e "$ai/CLAUDE.md" ]] || { echo "    CLAUDE.md was written"; return 1; }
   assert_file_exists "$ai/README.md"  || return 1
   assert_file_exists "$ai/.gitignore" || return 1
 }

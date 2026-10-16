@@ -216,6 +216,47 @@ test_B3_resolve_both_refs_in_one_string() {
   assert_eq "X=${aw}/foo Y=${cn}/bar" "$out" || return 1
 }
 
+# D22/#768: on bash 5.2+ `patsub_replacement` is on by default, so an `&` inside
+# a ${result//pat/repl} replacement expands to the matched text. A root path
+# carrying `&` (or `\`) was therefore mangled in every resolved routing path —
+# and the resolver still exited 0, so the corruption was silent.
+test_B4_resolve_ampersand_and_backslash_in_root_are_literal() {
+  local slot="b4"
+  # The roots themselves carry the metacharacters a real path can carry.
+  local ai_root="$_WI_TMP/$slot/proj&co-ai"
+  local canonical_root="$_WI_TMP/$slot/proj&co\\dev"
+  mkdir -p "$ai_root/.workspace" "$canonical_root" || return 1
+  wi_manifest_write "$ai_root" "$canonical_root" "personal" --default-branch main >/dev/null 2>&1 \
+    || { echo "    setup: wi_manifest_write failed"; return 1; }
+
+  local out rc
+  out="$(wi_manifest_resolve "$ai_root" '${ai_workspace.root}|${canonical.root}')"; rc=$?
+  [[ $rc -eq 0 ]] || { echo "    resolver exited $rc"; return 1; }
+
+  # Independent oracle: the literal concatenation, not the resolver's own output.
+  assert_eq "${ai_root}|${canonical_root}" "$out" || return 1
+  # Adjacent control: a plain root still resolves (the fix must not disable
+  # substitution wholesale), and the placeholder is gone.
+  local plain; plain="$(_setup_pair b4-plain)" || return 1
+  local pout; pout="$(wi_manifest_resolve "$plain" '${ai_workspace.root}')"
+  assert_eq "$plain" "$pout" || return 1
+  assert_not_contains '${ai_workspace.root}' "$out" || return 1
+
+  # The other two arms splice through the same helper and must be exercised with
+  # the same metacharacter: a mutation back to ${var//pat/repl} on the PLUGIN_DATA
+  # arm SURVIVED until this ran.
+  local pd_root="$_WI_TMP/$slot/plug&in-root"
+  mkdir -p "$pd_root" || return 1
+  local pd_out
+  pd_out="$(CLAUDE_PLUGINS_ROOT="$pd_root" wi_manifest_resolve "$ai_root" '${PLUGIN_DATA:foo}')"
+  assert_eq "${pd_root}/foo/data" "$pd_out" || return 1
+
+  # HOME with a metacharacter, through a throwaway value (never the real HOME).
+  local h_out
+  h_out="$(HOME="$slot/h&me" wi_manifest_resolve "$ai_root" '${HOME}/x')"
+  assert_eq "$slot/h&me/x" "$h_out" || return 1
+}
+
 # ---------------------------------------------------------------------------
 # C. ${PLUGIN_DATA:<name>} (4 tests)
 # ---------------------------------------------------------------------------
@@ -404,6 +445,7 @@ wi_test_run test_A10_read_returns_present_boolean_false
 wi_test_run test_B1_resolve_ai_workspace_root
 wi_test_run test_B2_resolve_canonical_root
 wi_test_run test_B3_resolve_both_refs_in_one_string
+wi_test_run test_B4_resolve_ampersand_and_backslash_in_root_are_literal
 
 # C
 wi_test_run test_C1_plugin_data_resolves_to_path

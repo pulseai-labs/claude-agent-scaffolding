@@ -38,7 +38,6 @@ FILE	/Users/example/projects/foo-ai/docs/specs/.gitkeep
 FILE	/Users/example/projects/foo-ai/.superpowers/.gitkeep
 FILE	/Users/example/projects/foo-ai/.archive/.gitkeep
 FILE	/Users/example/projects/foo-ai/.workspace/pairing.json
-FILE	/Users/example/projects/foo-ai/CLAUDE.md
 FILE	/Users/example/projects/foo-ai/AGENTS.md
 ```
 
@@ -70,7 +69,6 @@ ERROR: /Users/example/projects/foo-ai/README.md already exists (not overwriting)
 
 ```
 REVERSING: FILE /Users/example/projects/foo-ai/AGENTS.md → rm
-REVERSING: FILE /Users/example/projects/foo-ai/CLAUDE.md → rm
 REVERSING: FILE /Users/example/projects/foo-ai/.workspace/pairing.json → rm
 REVERSING: FILE /Users/example/projects/foo-ai/.archive/.gitkeep → rm
 REVERSING: FILE /Users/example/projects/foo-ai/.superpowers/.gitkeep → rm

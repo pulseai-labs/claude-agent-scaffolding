@@ -599,6 +599,28 @@ wi_manifest_read() {
 }
 
 # ---------------------------------------------------------------------------
+# _wi_splice_literal
+# ---------------------------------------------------------------------------
+# Usage: _wi_splice_literal <haystack> <needle> <replacement>
+# Output: haystack with every literal occurrence of needle replaced.
+#
+# Splices left-to-right with %%/# ops, NOT ${var//pat/repl} or sed. Under bash
+# 5.2+ patsub_replacement (and always under sed), a `&` in the replacement
+# expands to the matched text, so a path carrying `&` — a real directory name —
+# was corrupted in every resolved routing path, silently, with the resolver
+# still exiting 0. The same splice is in lib/_helpers.sh's wi_render_template.
+_wi_splice_literal() {
+  local rest="$1" needle="$2" replacement="$3"
+  local out=""
+  [[ -n "$needle" ]] || { printf '%s' "$rest"; return 0; }
+  while [[ "$rest" == *"$needle"* ]]; do
+    out+="${rest%%"$needle"*}${replacement}"
+    rest="${rest#*"$needle"}"
+  done
+  printf '%s' "${out}${rest}"
+}
+
+# ---------------------------------------------------------------------------
 # wi_manifest_resolve
 # ---------------------------------------------------------------------------
 # Usage:
@@ -632,10 +654,10 @@ wi_manifest_resolve() {
   aw_root="$(jq -r '.ai_workspace.root // empty' "$manifest" 2>/dev/null)"
   cn_root="$(jq -r '.canonical.root    // empty' "$manifest" 2>/dev/null)"
   if [[ -n "$aw_root" ]]; then
-    result="${result//\$\{ai_workspace.root\}/$aw_root}"
+    result="$(_wi_splice_literal "$result" '${ai_workspace.root}' "$aw_root")"
   fi
   if [[ -n "$cn_root" ]]; then
-    result="${result//\$\{canonical.root\}/$cn_root}"
+    result="$(_wi_splice_literal "$result" '${canonical.root}' "$cn_root")"
   fi
 
   # Form 2 — ${PLUGIN_DATA:<name>}. Bash 3.2 supports BASH_REMATCH with [[ =~ ]].
@@ -648,10 +670,10 @@ wi_manifest_resolve() {
     data_dir="$(wi_plugin_data_dir "$plugin")" || {
       wi_log_warn "wi_manifest_resolve: wi_plugin_data_dir failed for '$plugin'"
       # Replace with empty to avoid infinite loop.
-      result="${result//\$\{PLUGIN_DATA:${plugin}\}/}"
+      result="$(_wi_splice_literal "$result" "\${PLUGIN_DATA:${plugin}}" "")"
       continue
     }
-    result="${result//\$\{PLUGIN_DATA:${plugin}\}/$data_dir}"
+    result="$(_wi_splice_literal "$result" "\${PLUGIN_DATA:${plugin}}" "$data_dir")"
     guard=$((guard + 1))
     if (( guard > 64 )); then
       wi_log_warn "wi_manifest_resolve: PLUGIN_DATA loop guard tripped (>64 substitutions)"
@@ -660,10 +682,10 @@ wi_manifest_resolve() {
   done
 
   # Form 3 — standard env vars. Limited set per SPEC §6.3 ("also supported").
-  result="${result//\$\{HOME\}/$HOME}"
+  result="$(_wi_splice_literal "$result" '${HOME}' "$HOME")"
   # USER may be unset in minimal envs; fall back to id -un.
   local _user="${USER:-$(id -un 2>/dev/null)}"
-  result="${result//\$\{USER\}/$_user}"
+  result="$(_wi_splice_literal "$result" '${USER}' "$_user")"
 
   echo "$result"
   return 0
