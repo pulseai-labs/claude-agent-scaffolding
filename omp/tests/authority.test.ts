@@ -1,5 +1,5 @@
 // Synthetic operator records only. These fixtures never enroll a real worker.
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { createHash } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -14,6 +14,13 @@ import factory from '../../autonomic/omp/extension'
 const bytes = (v: unknown) => new TextEncoder().encode(JSON.stringify(v))
 const digest = (v: string | Uint8Array) => createHash('sha256').update(v).digest('hex')
 const roots: string[] = []
+// The suite is hermetic to the ambient seat role: PinnedAuthority reads
+// SEAT_MODS_ROLE at construction while the fixtures pin seat.role to
+// 'implementer', so an ambient guard role would fail every load case.
+// Save the incoming value once, neutralize before each test, restore after all.
+const ambientSeatRole = process.env.SEAT_MODS_ROLE
+beforeEach(() => { delete process.env.SEAT_MODS_ROLE })
+afterAll(() => { if (ambientSeatRole === undefined) delete process.env.SEAT_MODS_ROLE; else process.env.SEAT_MODS_ROLE = ambientSeatRole })
 afterEach(() => { for (const p of roots.splice(0)) rmSync(p, { recursive: true, force: true }) })
 function snapshotForTest(): Snapshot {
   return {
