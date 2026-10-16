@@ -22,7 +22,7 @@ if (seat.roleEnv !== undefined) process.env.SEAT_MODS_ROLE = seat.roleEnv   // o
 const home = homedir()
 const plan = planLaunch({ role: seat.role, via: seat.via, args, ompRecord: ompRecordPath(home),
   claudeRecord: join(home, '.claude', 'plugins', 'installed_plugins.json'), rolesDir: join(here, '..', 'roles'),
-  roleEnv: seat.roleEnv })
+  roleEnv: seat.roleEnv, seatConfig: join(here, '..', 'seat-config.yml') })
 if ('error' in plan) { console.error(plan.error); process.exit(2) }
 const broken = await checkExtensions(plan.extensions)
 if (broken !== undefined) { console.error(broken); process.exit(2) }
