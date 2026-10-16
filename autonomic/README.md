@@ -584,6 +584,23 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
   its exact repository from the pinned facts; no network call is made while deciding.
 - There is no band: a turn-end pain lists its options, numbered, in the notice, the bell and the pain file. The ask judge sees what
   the session has read, so a scope document answers an ask only after the session has read it.
+- **Five-state turn end with grounded payloads (Task 7, unactivated).** An enrolled session's stop is classified once, natively, with one
+  `turn_end` choice question whose labels are exactly `covered`, `stalled`, `waiting`, `done` and `pain`. The classification is never
+  authority: before it, the stale-event check, the Molt handoff and the loop guard decide as they always did, and after it the payload must
+  survive `validateTurnPayload` (`omp/turn-end.ts`). `covered` and `stalled` may only repeat an approved remaining step or an approved
+  candidate — byte for byte, with its grants and evidence still live — so a model can render prose and never extend an action. `waiting`
+  needs a real running host job or the verified Molt fact (prose saying “waiting” is not evidence), `done` needs approved completion
+  evidence, and `pain` grounds its question, options and credential-location request in cited evidence. Every reason is the cited rendering
+  `evidenceId: excerpt[start..end]` joined by `; `, so no invented policy line reaches the ledger. No approved action means no payload —
+  the stop escalates instead.
+- **One isolated generation, never a classifier.** With no prebuilt candidate, one `runEphemeralTurn` at `{tools:false, isolated:true,
+  dedupeReply:false}` renders the required fields inside the frozen, redacted state (Task 2's explicit isolation, not `history:[]`). A
+  provider/native failure never calls it, and it never supplies a step the policy does not approve. Native classification and the render
+  stay separately accounted.
+- **The conversational OMP classifier is gone.** The old `judge('ask'|'turn-end')` two-attempt fork, its `MIN_ATTEMPT_MS`, `io.ephemeral`,
+  `questionsOf` and the OMP turn digest are removed: an autopilot ask or turn end with no decision service is now operator-owned (the ask
+  passes and rings; the stop passes with no continuation and no ledger row) rather than answered by chat. The shared Claude Code prompts,
+  parsers and `$.model.fork` are untouched.
 - A process that dies without `session_shutdown` (SIGKILL, crash, shutdown budget) leaves `mode/<pid>`; nothing sweeps these files; a reused pid clears its own at first load, and only children of the dead process could read it.
 - Main limit: if writing the OMP mode file fails AND removing it fails, a stale file can remain. The notice says
   not to let a launcher trust it in this session. A missing file reads manual.

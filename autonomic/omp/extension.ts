@@ -13,23 +13,19 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DEFAULTS, parseConfig } from '../hooks/config'
 import type { AutonomicConfig } from '../hooks/config'
-import { toolEntry, pushEntry, renderDigest } from '../hooks/digest'
-import { enforced } from '../hooks/enforce'
 import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields } from '../hooks/floor'
 import { ledgerLine, ledgerPathFor, oneLine, redact } from '../hooks/ledger'
 import type { LedgerCase } from '../hooks/ledger'
 import { parseCommand, parseEnvMode, resolveDoc, statusText } from '../hooks/mode'
-import { DEFAULT_READERS, floorFindings, namesDanger, neverRules } from '../hooks/never'
+import { DEFAULT_READERS, floorFindings, namesDanger } from '../hooks/never'
 import type { Finding, Where } from '../hooks/never'
 import { operationFacts, permissionEligibility } from '../hooks/operations'
-import type { ApprovedCommand, ApprovedPermission, OperationContext, PermissionEligibility } from '../hooks/operations'
 import { DEFAULT_POLICY, expandHome } from '../hooks/policy'
-import { askPrompt, scopeMessage, shownInput, turnEndPrompt } from '../hooks/prompts'
+import { scopeMessage, shownInput } from '../hooks/prompts'
 import { lineagePath, logPath, modeFilePath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from '../hooks/records'
 import type { SessionRecord } from '../hooks/records'
 import { shape } from '../hooks/shape'
-import { parseAsk, parseTurn } from '../hooks/verdict'
-import type { Question } from '../hooks/verdict'
+import type { TurnCase, TurnVerdict } from '../hooks/verdict'
 import { captureLaunchBinding } from '../hooks/authority'
 import { launchWorkerRoots } from '../bin/authority'
 import { PinnedAuthority, placementFacts } from './authority-store'
@@ -38,6 +34,7 @@ import { acceptedChoice, captureFrame, judgeNative, parsePolicyBundle } from './
 import type { ConsumerHost, DecisionDraft, DecisionFrame, DecisionIO } from './judgment'
 import { commitDecision } from './decision-ledger'
 import { assembleAsk, holdsSecret, planAsk, snapshotAsk } from './asks'
+import { payloadForTurn, stateHoldsSecret, turnEvidence } from './turn-end'
 
 type Live = SessionRecord & { problem?: string; invalid?: string }
 
@@ -65,9 +62,6 @@ export type AutonomicIO = {
   // Read the live entry context ONCE, binding judge/generate to that exact object. Absent on hosts
   // with no captured context; the decision route is then unavailable.
   captureHost?: () => ConsumerHost
-  // One side turn off the session's history. A throw or an empty reply is a failed attempt; undefined means the
-  // host has no ephemeral turn, so there is nothing to judge with.
-  ephemeral(prompt: string, timeoutMs: number): Promise<string | undefined>
   usage(): number | undefined                                    // ctx.getContextUsage().percent
   systemPrompt(): string | string[] | undefined
   notify(text: string): void
@@ -77,20 +71,6 @@ export type AutonomicIO = {
 
 const CONFIG_PATH = '.omp/agent/autonomic.json'
 const USAGE_TEXT = 'usage: /autopilot on [scope doc …] | off | status'
-// tool_call and the other dispatched handlers have a 30 s budget in omp 18.8.9, and tool_call fails closed on a
-// timeout. Both attempts of a judgment share one deadline inside it, so a slow model ends in a pain signal and a
-// passed event, never in the host's timeout.
-export const JUDGE_BUDGET_MS = 25_000
-const MIN_ATTEMPT_MS = 1_000
-
-// The deadline must not depend on the host honouring the abort signal: a turn that never settles is a failed attempt.
-function within<T>(p: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`no reply within ${ms} ms`)), ms)
-    p.then(v => { clearTimeout(timer); resolve(v) }, e => { clearTimeout(timer); reject(e) })
-  })
-}
-
 // omp 18.8.9's built-in tools (the binary's tool registry, the same enumeration molt/omp/core.ts records), each
 // decided once. Read-only, so a turn of these alone is no progress for the loop guard:
 //   read, grep, glob, find, ast_grep, web_search, fetch, ls, ask, todo, wait, think, recall, reflect
@@ -142,25 +122,6 @@ const textOf = (content: unknown): string => {
   return content.filter(b => b?.type === 'text' && typeof b.text === 'string').map(b => b.text as string).join('\n')
 }
 
-// omp's ask input: { questions: [{ id, question, options: [{ label, description? }], recommended?, header?, multi? }] }
-// (probe 13 Q4; the binary also reads a legacy single `question` / `options` form and options given as strings).
-export function questionsOf(input: unknown): Question[] {
-  const args = input !== null && typeof input === 'object' ? (input as Record<string, unknown>) : {}
-  const list = Array.isArray(args.questions) ? args.questions : typeof args.question === 'string' ? [args] : []
-  const out: Question[] = []
-  for (const q of list) {
-    const text = str((q as Record<string, unknown> | null)?.question)
-    if (text === undefined) continue
-    const rec = q as Record<string, unknown>
-    const options = (Array.isArray(rec.options) ? rec.options : [])
-      .map(o => ({ label: typeof o === 'string' ? o : str((o as Record<string, unknown> | null)?.label) }))
-      .filter((o): o is { label: string } => o.label !== undefined && o.label !== '')
-    const header = str(rec.header)
-    out.push({ question: text, ...(header === undefined ? {} : { header }), options, ...(rec.multi === true ? { multiSelect: true } : {}) })
-  }
-  return out
-}
-
 // A system prompt as a list of blocks: omp 18.8.9 hands the event and ctx.getSystemPrompt() a string[]; a lone string is one block.
 const blocksOf = (v: unknown): string[] | undefined =>
   typeof v === 'string' ? [v] : Array.isArray(v) && v.every(b => typeof b === 'string') ? (v as string[]) : undefined
@@ -190,7 +151,7 @@ const claimedModeFiles = new Set<string>()
 
 type Judged<T> = { v: T } | { skip: true } | { fail: string }
 
-export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_BUDGET_MS) {
+export function createAutonomic(io: AutonomicIO) {
   // Capture before worker execution; mode records, later env and briefs never rebind this store.
   const startup = Object.freeze({ ...io.env })
   const enrolled = ['AUTONOMIC_AUTHORITY_PATH', 'AUTONOMIC_AUTHORITY_SHA256', 'AUTONOMIC_ASSIGNMENT_ID', 'AUTONOMIC_ASSIGNMENT_GENERATION', 'AUTONOMIC_LAUNCH_ID'].some(name => startup[name] !== undefined)
@@ -252,9 +213,6 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   const changed = new Set<string>()          // sessions that changed something since their last turn end
   const announced = new Set<string>()        // sessions whose carried scope has been announced
   const pendingScope = new Set<string>()     // prepared scope, committed only at agent_start
-  const digests = new Map<string, string[]>()
-  const note = (id: string, entry: string): void => { digests.set(id, pushEntry(digests.get(id) ?? [], entry)) }
-  const digestOf = (id: string): string => renderDigest(digests.get(id) ?? [])
 
   const home = (): string => io.env.HOME ?? ''
   // omp's bash helper captures the environment after extension load. The path stays fixed for this process.
@@ -453,28 +411,6 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   } : undefined
   if (decisionIO !== undefined) io.decisions = decisionIO
 
-  // One side turn, one retry (spec §4), both inside one deadline. No ephemeral turn lets the event pass.
-  async function judge<T>(kind: 'turn-end' | 'ask', prompt: string, parse: (text: string) => T | undefined): Promise<Judged<T>> {
-    const deadline = Date.now() + judgeBudgetMs
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const left = deadline - Date.now()
-      if (attempt > 0 && left < MIN_ATTEMPT_MS) break
-      let text: string | undefined
-      const ms = Math.max(left, MIN_ATTEMPT_MS)
-      try { text = await within(io.ephemeral(prompt, ms), ms) } catch (err) {
-        await log(`fork failed attempt=${attempt + 1} ${String(err)}`)
-        continue
-      }
-      if (text === undefined) return { skip: true }
-      if (text.trim() === '') { await log(`fork reply empty attempt=${attempt + 1}`); continue }
-      await log(`fork ${kind} session=${io.sessionId()}`)
-      const v = parse(text)
-      if (v !== undefined) return { v }
-      await log(`fork reply did not parse attempt=${attempt + 1}`)
-    }
-    return { fail: 'the fork failed twice, or its reply did not parse' }
-  }
-
   async function writeDefaultPolicy(): Promise<void> {
     const path = expandHome(cfg.policyPath, home())
     try {
@@ -556,7 +492,6 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     abortFrames()
     suspendAuthority()
     const id = io.sessionId()
-    digests.delete(id)
     changed.delete(id)
     pendingScope.delete(id)
     announced.delete(id)
@@ -595,37 +530,30 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (pendingScope.delete(id)) announced.add(id)
   }
 
+  // The display text of an operator-owned ask. Never used to judge or answer: `snapshotAsk` names a
+  // well-formed batch, and a malformed or free-text one keeps a generic label (the dialog is on screen).
+  function askLabel(input: unknown): string {
+    try { return snapshotAsk(input).questions[0]!.question } catch {}
+    const args = input !== null && typeof input === 'object' ? (input as { questions?: unknown; question?: unknown }) : {}
+    const first = Array.isArray(args.questions) ? args.questions[0] : undefined
+    if (first !== null && typeof first === 'object' && typeof (first as { question?: unknown }).question === 'string') return (first as { question: string }).question
+    return typeof args.question === 'string' && args.question.trim() !== '' ? args.question : 'a question'
+  }
+
   // An ask that reaches the operator is on the record as well as on the screen (Review Focus 5).
   async function askPain(id: string, question: string, why: string): Promise<void> {
     await record(id, 'pain', question, 'ask the operator', why)
     await pain(id, 'question for you', `${question} (${why})`)
   }
 
-  // The ask reflex (spec §3.2): answer from the policy and scope, or let the operator see the question and ring.
+  // The ask reflex (spec §3.2): an enrolled session answers from a complete grounded native batch;
+  // any other autopilot session leaves the whole ask with the operator (R3 — no conversational
+  // classifier remains, and no ask is answered without a decision service).
   async function askReflex(input: unknown): Promise<{ block: true; reason: string } | undefined> {
-    const questions = questionsOf(input)
-    if ((await modeOf()).mode !== 'autopilot' || questions.length === 0) return undefined
-    // An enrolled session answers only from a complete grounded native batch (Plan Task 6 §8): the
-    // whole original ask stays displayed, and rings, on any shortfall. No conversational fallback.
-    if (enrolled) return answerAsk(input)
-    const id = io.sessionId()
-    // A question with no options takes free text: only the operator can answer it.
-    if (questions.some(q => !Array.isArray(q.options) || q.options.length === 0)) {
-      await askPain(id, questions[0]?.question ?? 'a question', 'free text')
-      return undefined
-    }
-    const j = await judge('ask', askPrompt(questions, (await policyText()) ?? '', digestOf(id)), t => parseAsk(t, questions))
-    if ('v' in j && j.v.covered) {
-      const { answers, reason } = j.v
-      const time = new Date().toISOString()
-      const lines = questions.map(q => ledgerLine({ time, session: id, kase: 'ask', q: q.question, a: answers[q.question] ?? '', why: reason }))
-      if (!(await recordAll(id, lines))) return undefined
-      const noteText = `autonomic answered in the operator's place, from the autopilot policy and scope: ${reason}`
-      note(id, toolEntry('ask', input, { text: `autonomic answered: ${JSON.stringify(answers)}` }))
-      return { block: true, reason: `autonomic answered: ${JSON.stringify(answers)} — ${noteText}` }
-    }
-    const why = 'v' in j ? j.v.reason : 'fail' in j ? j.fail : 'nothing to judge yet'
-    await askPain(id, questions[0]?.question ?? 'a question', why)
+    if ((await modeOf()).mode !== 'autopilot') return undefined
+    if (io.decisions !== undefined) return answerAsk(input)
+    // The dialog is already on screen; this records the operator-owned ask and rings.
+    await askPain(io.sessionId(), askLabel(input), 'no decision service is enrolled')
     return undefined
   }
 
@@ -642,7 +570,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     let snapshot
     try { snapshot = snapshotAsk(input) } catch (err) {
       await log(`ask snapshot rejected ${String(err)}`)
-      await askPain(id, questionsOf(input)[0]?.question ?? 'a question', 'a malformed ask batch')
+      await askPain(id, askLabel(input), 'a malformed ask batch')
       return undefined
     }
     // Never judge a batch in part: if redaction would hide any string the frozen batch carries (a
@@ -669,7 +597,6 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
         plan.snapshot.questions.map(q => ({ kase: 'ask' as const, q: q.question, a: answer.answers[q.question]! })))
       frame.budget.check()
       if (!frame.lease.fresh()) return undefined
-      note(id, toolEntry('ask', input, { text: `autonomic answered: ${JSON.stringify(answer.answers)}` }))
       return { block: true, reason: `autonomic answered: ${JSON.stringify(answer.answers)} — ${answer.reason}` }
     } catch (err) {
       await log(`ask decision error ${String(err)}`)
@@ -727,7 +654,6 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
       const id = io.sessionId()
       await record(id, 'permission', tool === 'github' ? `github pr_push: ${shape(command)}` : `Bash: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
       await pain(id, 'never-approve', painFocus(rules, command))
-      note(id, toolEntry(tool, { command }, { deny: `never-approve: ${rules.join(', ')}` }))
     } catch (err) {
       await log(`floor signal error ${String(err)}`)
     }
@@ -787,7 +713,6 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
       const id = io.sessionId()
       await record(id, 'permission', tool === 'github' ? `github pr_push: ${shape(command)}` : `Bash: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')} (${reason})`)
       await pain(id, 'never-approve', painFocus(rules, command))
-      note(id, toolEntry(tool, { command }, { deny: `never-approve: ${rules.join(', ')}` }))
     } catch (err) {
       await log(`floor signal error ${String(err)}`)
     }
@@ -827,14 +752,101 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     return undefined
   }
 
-  // tool_result: the turn digest, and whether this turn changed anything (the loop guard's progress).
+  // tool_result: whether this turn changed anything (the loop guard's progress).
   async function onToolResult(e: { toolName?: string; input?: unknown; isError?: boolean; content?: unknown }): Promise<void> {
     try {
       const id = io.sessionId()
       const name = String(e?.toolName ?? '')
-      note(id, toolEntry(name, e.input, { text: textOf(e.content), ...(e.isError === true ? { isError: true as const } : {}) }))
       if (e.isError !== true && changedBy(name, e.input)) changed.add(id)
     } catch {}
+  }
+
+  // The one classification question (Plan Task 7 §9 Step 3): exactly five labels, judged once
+  // against the bounded state, with the operator-owned acceptance rule. Never a joint planner.
+  const TURN_QUESTIONS = { turn_end: {
+    type: 'choice' as const,
+    instructions: 'Classify this bounded turn end without granting authority or inventing payloads.',
+    criteria: {
+      covered: 'An already-decided routine choice can continue within supplied task authority.',
+      stalled: 'An approved remaining step exists and work stopped without a valid wait or operator gate.',
+      waiting: 'Real armed work or verified Molt handoff requires no continuation.',
+      done: 'Approved objective completion is evidenced; no acceptance or release approval is implied.',
+      pain: 'Operator decision, missing evidence/authority, credentials, approval gate or other unsafe ambiguity.',
+    },
+  } }
+
+  // The hosted turn-end consumer (Plan Task 7 §9 Steps 3–5): freeze the bounded state, classify once
+  // through the native bridge, render an exact candidate or one isolated generation, validate the
+  // payload against the approved records, record both rows, re-check time and freshness, and only
+  // then move the loop and return the continuation. Any shortfall leaves the operator the stop.
+  async function decideTurnEnd(id: string, answer: string, n: number): Promise<{ decision: 'block'; reason: string } | undefined> {
+    const decisions = io.decisions
+    if (decisions === undefined) return undefined
+    let frame: DecisionFrame | undefined
+    try {
+      frame = await captureFrame(decisions, lastEntryMs, 'turn-end', { lastReply: answer.slice(-cfg.tailChars) })
+      const state = turnEvidence(frame, answer.slice(-cfg.tailChars),
+        { pushes: n, changed: false, loopMax: cfg.loopMax }, { stage: null, handoff: false })
+      // Every string the state would send native or generation must survive redaction unchanged.
+      if (stateHoldsSecret(state)) return void (await turnPain(id, 'turn end', 'the turn state holds content that redaction would hide'))
+      const result = await judgeNative(frame, { state: state as unknown as Readonly<Record<string, unknown>>, questions: TURN_QUESTIONS })
+      const accepted = acceptedChoice((result.judgment.answers as Record<string, unknown>).turn_end as never, frame.policy.acceptance['turn-end'])
+      if (accepted === undefined) return void (await turnPain(id, 'turn end', 'the native classification was not accepted'))
+      const rendered = await payloadForTurn(frame, accepted as TurnCase, state)
+      if (rendered === undefined) return void (await turnPain(id, 'turn end', `no grounded ${accepted} payload could be validated`))
+      const verdict = rendered.verdict
+      await commitTurn(frame, rendered, id, verdict)
+      frame.budget.check()
+      if (!frame.lease.fresh()) {
+        pushes.delete(id)
+        await turnPain(id, 'turn end', 'authority changed before the turn could continue')
+        return undefined
+      }
+      return applyTurn(id, n, verdict)
+    } catch (err) {
+      await log(`turn-end decision error ${String(err)}`)
+      if (frame !== undefined) {
+        try { frame.budget.cancel() } catch {}
+      }
+      pushes.delete(id)
+      await turnPain(id, 'turn end', 'the native turn-end decision is unavailable')
+      return undefined
+    }
+  }
+
+  // The operator-facing escalation for a turn end that could not be groundedly decided.
+  async function turnPain(id: string, q: string, why: string): Promise<void> {
+    await record(id, 'pain', q, 'ask the operator', why)
+    await pain(id, 'pain', why)
+  }
+
+  // Both records, then the loop/progress move. `waiting` uses the existing `operator` human case with
+  // the exact planned text and the JSONL outcome `waiting`; nothing outside this branch continues.
+  async function commitTurn(frame: DecisionFrame, rendered: { verdict: TurnVerdict; source: DecisionDraft['payloadSource'] }, id: string, verdict: TurnVerdict): Promise<void> {
+    const decisions = io.decisions!
+    const draft: DecisionDraft = { outcome: verdict.case === 'covered' || verdict.case === 'stalled' ? 'continue'
+        : verdict.case === 'waiting' ? 'waiting' : verdict.case === 'done' ? 'done' : 'pain',
+      grantIds: frame.policy.approved.remainingSteps.filter(s => s.text === (verdict.answer ?? verdict.next_step)).flatMap(s => s.grantIds),
+      evidenceIds: frame.lease.evidence.filter(e => verdict.reason.includes(e.ref.id)).map(e => e.ref.id),
+      answers: {}, route: null, response: null, payloadSource: rendered.source, reason: verdict.reason }
+    const rows = verdict.case === 'waiting'
+      ? [{ kase: 'operator' as const, q: 'turn end', a: 'waiting; no continuation' }]
+      : [{ kase: verdict.case, q: verdict.question ?? 'turn end', a: verdict.answer ?? verdict.next_step ?? 'stop' }]
+    await commitDecision(decisions, frame, draft, rows)
+    void id
+  }
+
+  // The loop/progress move and the continuation text, only after both records landed.
+  function applyTurn(id: string, n: number, verdict: TurnVerdict): { decision: 'block'; reason: string } | undefined {
+    if (verdict.case === 'covered' || verdict.case === 'stalled') {
+      const a = (verdict.answer ?? verdict.next_step ?? '').replace(/[.!]\s*$/, '')
+      pushes.set(id, n + 1)
+      return { decision: 'block', reason: verdict.case === 'covered' ? `Autopilot: ${a}. Proceed.` : `Autopilot: continue — ${a}.` }
+    }
+    pushes.delete(id)
+    if (verdict.case === 'done') io.notify(`autopilot: done — ${oneLine(verdict.reason, 160)}`)
+    if (verdict.case === 'pain') void pain(id, 'pain', verdict.question ?? verdict.reason, verdict.options, verdict.credential)
+    return undefined
   }
 
   // session_stop: the turn-end reflex (spec §3.1). Yield to molt first, then the loop guard, then classify.
@@ -852,26 +864,25 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
         return undefined
       }
       if ((await modeOf()).mode !== 'autopilot') return undefined
-      // An enrolled session has no conversational classification fallback (Plan Task 4 §6); the
-      // native turn-end consumer arrives in Task 7, so the turn ends normally until then.
-      if (enrolled) return undefined
       const m = e?.last_assistant_message
       const answer = typeof m === 'string' ? m : m !== null && typeof m === 'object' ? textOf((m as { content?: unknown }).content) : ''
       // The turn end is molt's at its handoff command: molt's stage file when it exists, else the yieldAtPercent
       // fill fallback (molt absent). The live fill is checked against the file's effective command too, so hook
-      // order cannot hide a handoff that is due.
+      // order cannot hide a handoff that is due. Molt outranks the decision route (Plan Task 7 §9 Step 3).
       const stageText = safeSessionId(id) ? await io.readText(stagePath(home(), id)) : undefined
       const stage = parseStage(stageText)
       const at = stage === undefined ? cfg.yieldAtPercent : stage === 'off' ? undefined : parseStageCommand(stageText)
       const fill = at === undefined ? undefined : io.usage()
       const statusPath = (io.env.MOLT_STATUS_PATH ?? '').trim()
       const status = statusPath === '' ? undefined : await io.readText(statusPath)
-      if (hasMoltMarker(answer) || statusYields(status) || stageYields(stage) || (fill !== undefined && at !== undefined && fill >= at)) {
+      const handoff = hasMoltMarker(answer) || statusYields(status) || stageYields(stage) || (fill !== undefined && at !== undefined && fill >= at)
+      if (handoff) {
         pushes.delete(id)
         changed.delete(id)
         await record(id, 'molt', 'turn end in a molt handoff', 'let it stop', 'molt owns this turn end')
         return undefined
       }
+      // The loop guard is deterministic and outranks classification (Plan Task 7 §9 Step 3).
       const n = changed.has(id) ? 0 : (pushes.get(id) ?? 0)
       changed.delete(id)
       if (n >= cfg.loopMax) {
@@ -880,33 +891,10 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
         await pain(id, 'autopilot loop', `${n} turn ends pushed on with no change made`)
         return undefined
       }
-      const j = await judge('turn-end', turnEndPrompt(answer.slice(-cfg.tailChars), (await policyText()) ?? ''), parseTurn)
-      if ('skip' in j) return undefined
-      if ('fail' in j) {
-        pushes.delete(id)
-        await record(id, 'pain', 'turn end', 'ask the operator', j.fail)
-        await pain(id, 'fork failed', j.fail)
-        return undefined
-      }
-      const v = j.v
-      if (v.case === 'covered' || v.case === 'stalled') {
-        const a = v.case === 'covered' ? (v.answer ?? '') : (v.next_step ?? '')
-        if (!(await record(id, v.case, v.question ?? 'turn end', a, v.reason))) return undefined
-        pushes.set(id, n + 1)
-        const bare = a.replace(/[.!]\s*$/, '')
-        return { decision: 'block', reason: v.case === 'covered' ? `Autopilot: ${bare}. Proceed.` : `Autopilot: continue — ${bare}.` }
-      }
-      pushes.delete(id)
-      if (v.case === 'waiting') return undefined
-      if (v.case === 'done') {
-        await record(id, 'done', 'turn end', 'stop', v.reason)
-        io.notify(`autopilot: done — ${oneLine(v.reason, 160)}`)
-        return undefined
-      }
-      const asked = v.credential === undefined ? v.question ?? 'turn end' : `${v.question ?? 'turn end'} · in plain text: ${v.credential}`
-      await record(id, 'pain', asked, 'ask the operator', v.reason)
-      await pain(id, 'pain', v.question ?? v.reason, v.options, v.credential)
-      return undefined
+      // No decision service means no classification, no generation and no continuation: the turn end
+      // is operator-owned (R3). There is no conversational fallback left.
+      if (io.decisions === undefined) return undefined
+      return await decideTurnEnd(id, answer, n)
     } catch (err) {
       await log(`session_stop error ${String(err)}`)
       return undefined
@@ -998,12 +986,6 @@ function ioFor(pi: any, cur: () => any): AutonomicIO {
         resolve({ exitCode: err === null ? 0 : typeof code === 'number' ? code : 1, stdout: String(stdout ?? '') })
       })
     }),
-    ephemeral: async (prompt, timeoutMs) => {
-      const run = cur().runEphemeralTurn
-      if (typeof run !== 'function') return undefined
-      const r = await run.call(cur(), { promptText: prompt, tools: false, signal: AbortSignal.timeout(timeoutMs) })
-      return typeof r?.replyText === 'string' ? r.replyText : ''
-    },
     usage: () => { const p = cur().getContextUsage?.()?.percent; return typeof p === 'number' && Number.isFinite(p) ? p : undefined },
     systemPrompt: () => { try { return blocksOf(cur().getSystemPrompt?.()) } catch { return undefined } },
     notify: text => { cur().ui?.notify?.(text, 'warning') },

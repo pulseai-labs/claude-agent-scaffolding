@@ -7,6 +7,7 @@
 // synthetic and no network/git mutation is performed. Every SDK/host import is `import type`: the
 // CSA tree has no installed host package, so a value import would not resolve under plain bun.
 import type { ExtensionContext, ExtensionJudge } from '@oh-my-pi/pi-coding-agent/extensibility/extensions/types'
+import type { AsyncJobSnapshot } from '@oh-my-pi/pi-coding-agent/session/agent-session-types'
 import type { JudgmentRequest, Usage } from '@oh-my-pi/pi-ai'
 import { createHash } from 'node:crypto'
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -61,6 +62,8 @@ export function fixturePolicy(): PolicyBundle {
 
 export type RoutingWorld = {
   root: string; tree: string; authorityPath: string; ledgerPath: string; painPath: string
+  // Task 7: each pinned material's real ref (exact id/source/sha256), keyed by ID.
+  materials: Record<string, EvidenceMaterial['ref']>
   readonly decisions: DecisionIO
   handlers: Map<string, (event: any, ctx: any) => Promise<any> | any>
   ctx: any; notices: string[]; nativeRequests: JudgmentRequest[]; generationRequests: unknown[]
@@ -71,6 +74,9 @@ export type RoutingWorld = {
   setGeneration: (run: NonNullable<ExtensionContext['runEphemeralTurn']>) => void
   revoke: () => void; replace: () => void
   switchTo: (id: string, reason: 'new' | 'resume' | 'fork') => Promise<void>
+  // Task 7: the host's async-job snapshot, read by the turn-end state builder. Null means the host
+  // exposes none; a running entry is real armed work.
+  setJobs: (snapshot: AsyncJobSnapshot | null) => void
   // E3/E4/E5 (Plan Task 5 Step 5): an append fault injector owned by the fixture's own
   // io.appendLine, the ordered multi-extension dispatch, and a pain-file reader.
   armAppend: (hook: ((path: string, line: string) => void | Promise<void>) | undefined) => void
@@ -92,7 +98,11 @@ export type RoutingWorld = {
 }
 
 /** Build a real transaction world: real temp files, real issuer, the real factory and lifecycle. */
-export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; branch?: string; mode?: 'manual' | 'autopilot' }): RoutingWorld {
+export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; branch?: string; mode?: 'manual' | 'autopilot';
+  // Task 7: extra trusted evidence the policy's approved records may cite. Each entry becomes real
+  // launch material with its own digest, and its ref is returned in `materials` so a test can cite
+  // an exact ID/source/sha256 without re-deriving it.
+  extraMaterials?: Array<{ id: string; text: string }> }): RoutingWorld {
   const root = mkdtempSync(join(tmpdir(), 'judgment-world-'))
   const tree = join(root, 'tree'), out = join(root, 'out'), trusted = join(root, 'trusted'), authority = join(root, 'authority'), home = join(root, 'home')
   for (const p of [tree, out, trusted, authority, home]) mkdirSync(p, { recursive: true })
@@ -124,6 +134,11 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   }
   const brief = material('fixture-brief', 'Synthetic task: exercise the bounded decision transaction. No publication.')
   const policy = material('fixture-policy', JSON.stringify(options.policy))
+  // Task 7: extra evidence, minted through the same real `material` writer, so its ref bytes match
+  // what the issuer will later verify.
+  const extra = (options.extraMaterials ?? []).map(m => material(m.id, m.text))
+  const materials: Record<string, EvidenceMaterial['ref']> = Object.fromEntries(
+    [brief, policy, ...extra].map(m => [m.ref.id, m.ref]))
   const snapshot: Snapshot = {
     version: 1, assignmentId: 'fixture-assignment', generation: 1,
     issuer: { kind: 'operator', id: 'fixture-operator', approvalRef: 'fixture-approval', delegationRef: null },
@@ -137,7 +152,7 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   const approval = material('fixture-approval', JSON.stringify({ version: 1, kind: 'operator-approval',
     id: 'fixture-approval', operatorId: 'fixture-operator', snapshotSha256: digest(bytes(snapshot)),
     delegationSha256: null, assignments: [{ assignmentId: snapshot.assignmentId, briefSha256: snapshot.task.briefSha256 }] }))
-  writeFileSync(input, JSON.stringify({ snapshot, material: [brief, policy], approval, delegation: null }))
+  writeFileSync(input, JSON.stringify({ snapshot, material: [brief, policy, ...extra], approval, delegation: null }))
   const binding = issueAuthority(input, authority, workerRoots)
 
   const ledgerPath = join(tree, '.autonomic/ledger.md')
@@ -147,13 +162,15 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   let currentId = 'S1'
   let nativeRun: ExtensionJudge | undefined
   let generationRun: NonNullable<ExtensionContext['runEphemeralTurn']> | undefined
+  // Task 7: the host async-job snapshot the turn-end state reads. Null is the host default.
+  let jobs: AsyncJobSnapshot | null = null
 
   const ctx: Record<string, unknown> = {
     agent: { kind: 'main', id: 'fixture-agent', name: 'main' },
     cwd: tree,
     getContextUsage: () => ({ tokens: 1, contextWindow: 100, percent: 10 }),
     getSystemPrompt: () => 'FIXTURE BASE PROMPT',
-    getAsyncJobSnapshot: () => null,
+    getAsyncJobSnapshot: () => jobs,
     sessionManager: { getSessionId: () => currentId, getSessionFile: () => join(out, `${currentId}.jsonl`) },
     ui: { notify: (t: string) => { notices.push(t) }, setStatus: () => {} },
   }
@@ -176,7 +193,7 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   const host = (): ConsumerHost => ({
     sessionId: currentId, cwd: tree, sessionFile: join(out, `${currentId}.jsonl`),
     judge: ctx.judge as ExtensionJudge, generate: ctx.runEphemeralTurn as NonNullable<ExtensionContext['runEphemeralTurn']>,
-    asyncJobs: () => null,
+    asyncJobs: () => jobs,
   })
 
   // A real AutonomicIO over the fixture tree: real files, real local git, no network.
@@ -203,7 +220,6 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
     },
     touch: async path => { try { mkdirSync(dirname(path), { recursive: true }); appendFileSync(path, ''); return true } catch { return false } },
     run: argv => Promise.resolve(runLocal(argv, tree)),
-    ephemeral: async () => undefined,
     usage: () => 10,
     systemPrompt: () => 'FIXTURE BASE PROMPT',
     notify: text => { notices.push(text) },
@@ -259,12 +275,13 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
     return { block: false, receipt, order: [...order] }
   }
   return {
-    root, tree, authorityPath: binding.path, ledgerPath, painPath, decisions, handlers, ctx, notices, nativeRequests, generationRequests,
+    root, tree, authorityPath: binding.path, ledgerPath, painPath, decisions, handlers, ctx, notices, nativeRequests, generationRequests, materials,
     entryMs: autonomic.entryMs,
     invoke,
     stop: async (reply: string) => handlers.get('session_stop')?.({ last_assistant_message: reply, session_id: currentId }, ctx) as Promise<{ decision: 'block'; reason: string } | undefined>,
     setNative: run => { nativeRun = run },
     setGeneration: run => { generationRun = run },
+    setJobs: snapshot => { jobs = snapshot },
     // Test-only failure injectors: a revoked snapshot, and an atomic identical-bytes/new-inode swap.
     revoke: () => { writeFileSync(binding.path, JSON.stringify({ ...snapshot, lifetime: { ...snapshot.lifetime, revoked: true } })) },
     replace: () => { writeFileSync(binding.path + '.new', readFileSync(binding.path)); renameSync(binding.path + '.new', binding.path) },
