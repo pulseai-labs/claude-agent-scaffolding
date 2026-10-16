@@ -209,6 +209,15 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   let frameAbort = new AbortController()
   function abortFrames(): void { frameAbort.abort(new Error('frame cancelled')); frameAbort = new AbortController() }
 
+  // Every automatic fall to manual is a mode change. It cancels outstanding decision frames and, for
+  // an enrolled session, suspends the pinned authority — the same invalidation the other points use —
+  // so no frame captured before the fall can still pass its freshness check and release afterward.
+  function fallToManual(rec: Live, problem: string): Live {
+    if (enrolled) suspendAuthority()
+    else abortFrames()
+    return { ...rec, mode: 'manual', problem }
+  }
+
   // The entry moment of the current handler, captured before any await so a decision frame gets the
   // real start of its one monotonic 25-second window. Read by the native consumers (Tasks 5–7).
   let lastEntryMs = 0
@@ -298,9 +307,9 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     const clean: Live = { ...rec, problem: undefined }
     if (rec.mode !== 'autopilot') return clean
     // Task 3 delivers authority, not the three native decision consumers. Never act via the old chat route.
-    if (enrolled) return { ...clean, mode: 'manual', problem: 'enrolled authority requires native decision consumers before activation' }
-    if ((await policyText()) === undefined) return { ...clean, mode: 'manual', problem: 'no policy' }
-    if (!(await io.touch(await ledgerPath()))) return { ...clean, mode: 'manual', problem: 'ledger not writable' }
+    if (enrolled) return fallToManual(clean, 'enrolled authority requires native decision consumers before activation')
+    if ((await policyText()) === undefined) return fallToManual(clean, 'no policy')
+    if (!(await io.touch(await ledgerPath()))) return fallToManual(clean, 'ledger not writable')
     return clean
   }
 
@@ -333,7 +342,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (safeSessionId(id)) {
       try { await io.writeText(sessionPath(home(), id), serializeRecord(rec)) } catch (err) {
         await log(`record write failed session=${id} ${String(err)}`)
-        out = { ...rec, mode: 'manual', problem: 'record not writable' }
+        out = fallToManual(rec, 'record not writable')
         io.notify(`autonomic: the session record could not be saved (${sessionPath(home(), id)}); this session is manual.`)
       }
     }
@@ -351,7 +360,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     // The policy is read again each time: one removed mid-session ends autopilot (spec §4).
     if (known !== undefined && (known.mode !== 'autopilot' || (await policyText()) !== undefined)) return known
     if (known !== undefined) {
-      const off = await save(id, { ...known, mode: 'manual', problem: 'no policy' })
+      const off = await save(id, fallToManual(known, 'no policy'))
       io.notify('autonomic: autopilot refused — no policy')
       return off
     }
@@ -381,7 +390,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   async function recordAll(id: string, lines: readonly string[]): Promise<boolean> {
     if (await io.appendLine(await ledgerPath(), lines.join('\n'))) return true
     const rec = live.get(id)
-    if (rec !== undefined) await save(id, { ...rec, mode: 'manual', problem: 'ledger not writable' })
+    if (rec !== undefined) await save(id, fallToManual(rec, 'ledger not writable'))
     io.notify('autonomic: the ledger is not writable; this session is manual now.')
     await log(`ledger append failed session=${id}`)
     await pain(id, 'ledger not writable', `${await ledgerPath()}: autopilot is off for this session`)
@@ -433,7 +442,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     // Manual/failure integration: publish the operator-facing failure state; never authorize action.
     fail: async (sessionId, reason) => {
       const rec = live.get(sessionId)
-      if (rec !== undefined) await save(sessionId, { ...rec, mode: 'manual', problem: 'decision not recorded' })
+      if (rec !== undefined) await save(sessionId, fallToManual(rec, 'decision not recorded'))
       await pain(sessionId, 'decision failure', reason)
     },
   } : undefined

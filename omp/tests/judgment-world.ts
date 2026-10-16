@@ -59,7 +59,7 @@ export function fixturePolicy(): PolicyBundle {
 }
 
 export type RoutingWorld = {
-  root: string; tree: string; authorityPath: string; ledgerPath: string
+  root: string; tree: string; authorityPath: string; ledgerPath: string; painPath: string
   readonly decisions: DecisionIO
   handlers: Map<string, (event: any, ctx: any) => Promise<any> | any>
   ctx: any; notices: string[]; nativeRequests: JudgmentRequest[]; generationRequests: unknown[]
@@ -140,11 +140,16 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   ctx.judge = async (request: JudgmentRequest, opts: unknown) => { nativeRequests.push(structuredClone(request)); if (!nativeRun) throw new Error('no native run'); return nativeRun(request, opts as never) }
   ctx.runEphemeralTurn = async (opts: unknown) => { generationRequests.push(opts); if (!generationRun) throw new Error('no generation run'); return generationRun(opts as never) }
 
-  // Enroll through the real startup binding variables; HOME and the ledger path are fixture-local.
+  // Enroll through the real startup binding variables; HOME, the ledger path and the pain path are
+  // fixture-local, so a real consumer's io.fail → pain() writes inside this temp root and never the
+  // running seat's pain file. All are restored exactly in close(). The pain file sits under `out`:
+  // the launcher derives a worker root from its dirname, and `root` itself would overlap the
+  // authority directory.
+  const painPath = join(out, 'pain.log')
   const savedEnv: Record<string, string | undefined> = {}
   for (const [k, v] of Object.entries({ AUTONOMIC_AUTHORITY_PATH: binding.path, AUTONOMIC_AUTHORITY_SHA256: binding.sha256,
     AUTONOMIC_ASSIGNMENT_ID: binding.assignmentId, AUTONOMIC_ASSIGNMENT_GENERATION: String(binding.generation),
-    AUTONOMIC_LAUNCH_ID: binding.launchId, AUTONOMIC_LEDGER: ledgerPath, HOME: home })) { savedEnv[k] = process.env[k]; process.env[k] = v }
+    AUTONOMIC_LAUNCH_ID: binding.launchId, AUTONOMIC_LEDGER: ledgerPath, AUTONOMIC_PAIN_PATH: painPath, HOME: home })) { savedEnv[k] = process.env[k]; process.env[k] = v }
 
   const host = (): ConsumerHost => ({
     sessionId: currentId, cwd: tree, sessionFile: join(out, `${currentId}.jsonl`),
@@ -202,7 +207,7 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
 
   const invoke = async (toolName: string, rawInput: unknown) => handlers.get('tool_call')?.({ toolName, input: rawInput }, ctx) as Promise<{ block: true; reason: string } | undefined>
   return {
-    root, tree, authorityPath: binding.path, ledgerPath, decisions, handlers, ctx, notices, nativeRequests, generationRequests,
+    root, tree, authorityPath: binding.path, ledgerPath, painPath, decisions, handlers, ctx, notices, nativeRequests, generationRequests,
     entryMs: autonomic.entryMs,
     invoke,
     stop: async (reply: string) => handlers.get('session_stop')?.({ last_assistant_message: reply, session_id: currentId }, ctx) as Promise<{ decision: 'block'; reason: string } | undefined>,

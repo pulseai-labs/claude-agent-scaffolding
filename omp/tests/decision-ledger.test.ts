@@ -4,6 +4,8 @@
 // shape of the code that produced it.
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { existsSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { commitDecision } from '../../autonomic/omp/decision-ledger'
 import { captureFrame, DecisionBudget } from '../../autonomic/omp/judgment'
 import type { DecisionDraft, DecisionFrame, DecisionIO } from '../../autonomic/omp/judgment'
@@ -204,5 +206,65 @@ describe('commitDecision — the two-write order and freshness checks are load-b
 describe('DecisionBudget.check', () => {
   test('rejects once the total window has elapsed', () => {
     expect(() => new DecisionBudget(performance.now() - 30_000).check()).toThrow()
+  })
+})
+
+// F1: the fixture must never write a real seat's pain file. A real fail path through the fixture
+// points AUTONOMIC_PAIN_PATH at a file inside its own temp root, and one outside it is untouched.
+describe('the fixture isolates the pain path', () => {
+  test('a fail path writes its pain line to the fixture-local path, not the ambient one', async () => {
+    const outside = join(tmpdir(), `real-pain-${process.pid}-${Date.now()}`)
+    const saved = process.env.AUTONOMIC_PAIN_PATH
+    process.env.AUTONOMIC_PAIN_PATH = outside
+    const world = routingWorld({ grants: [], policy: fixturePolicy() })
+    try {
+      expect(world.painPath.startsWith(world.root + '/')).toBe(true)   // fixture-local, inside its temp root
+      expect(process.env.AUTONOMIC_PAIN_PATH).toBe(world.painPath)     // the ambient value was overridden
+      await world.decisions.fail('S1', 'fixture fail path')
+      expect(readFileSync(world.painPath, 'utf8')).toContain('fixture fail path')
+      expect(existsSync(outside)).toBe(false)                          // the ambient path received nothing
+    } finally {
+      // Close the world FIRST (it restores the value it captured), then restore the ambient value.
+      world.close()
+      if (saved === undefined) delete process.env.AUTONOMIC_PAIN_PATH; else process.env.AUTONOMIC_PAIN_PATH = saved
+    }
+  })
+
+  test('close restores the ambient pain path exactly', () => {
+    const saved = process.env.AUTONOMIC_PAIN_PATH
+    process.env.AUTONOMIC_PAIN_PATH = '/tmp/ambient-pain-marker'
+    const world = routingWorld({ grants: [], policy: fixturePolicy() })
+    world.close()
+    expect(process.env.AUTONOMIC_PAIN_PATH).toBe('/tmp/ambient-pain-marker')
+    if (saved === undefined) delete process.env.AUTONOMIC_PAIN_PATH; else process.env.AUTONOMIC_PAIN_PATH = saved
+  })
+})
+
+// F2: an automatic fall to manual is a mode change. It must abort outstanding frames, so a frame
+// captured before the fall no longer passes freshness and commitDecision abstains.
+describe('an automatic fall to manual aborts outstanding frames', () => {
+  let w: RoutingWorld
+  afterEach(() => { if (w) w.close() })
+
+  test('a decision-failure fall makes an outstanding frame stale and commitDecision abstains', async () => {
+    w = routingWorld({ grants: [], policy: fixturePolicy() })
+    // Drive a handler that resolves the session record (modeOf → save, no autopilot) so live holds S1,
+    // then capture a fresh frame and trigger the automatic fall to manual.
+    await w.handlers.get('before_agent_start')?.({ systemPrompt: ['BASE'] }, w.ctx)
+    const frame = await frameOf(w)
+    expect(frame.lease.fresh()).toBe(true)
+    await w.decisions.fail('S1', 'reproducing the verifier probe')
+    expect(frame.lease.fresh()).toBe(false)
+    expect(await act(w.decisions, frame, draft())).toBe('abstained')
+  })
+
+  test('the switch control still makes an outstanding frame stale (unchanged)', async () => {
+    w = routingWorld({ grants: [], policy: fixturePolicy() })
+    await w.handlers.get('before_agent_start')?.({ systemPrompt: ['BASE'] }, w.ctx)
+    const frame = await frameOf(w)
+    expect(frame.lease.fresh()).toBe(true)
+    await w.switchTo('S2', 'new')
+    expect(frame.lease.fresh()).toBe(false)
+    expect(await act(w.decisions, frame, draft())).toBe('abstained')
   })
 })
