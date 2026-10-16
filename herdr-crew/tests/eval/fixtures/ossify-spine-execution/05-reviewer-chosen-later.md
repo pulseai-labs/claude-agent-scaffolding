@@ -12,7 +12,7 @@ expected_reason: 'Two halves. The refusal: the reviewers resolved profile and
   is not a general rule that nothing but item seats may be approved. The positive half:
   at the spines PR transition the top asks separately for the reviewers resolved
   profile - command, expected model, effort, model-shows and brief-delivery - and
-  /code-review level, and TWO profiles are decided there, not one
+  review level, and TWO profiles are decided there, not one
   - alongside the reviewer the top also decides a single PR-fix implementer, because
   every item pair was released at its items close and no implementer survives to the
   PR. Both go into the WORK-PR SESSIONS brief, not into a reviewer task the top runs:

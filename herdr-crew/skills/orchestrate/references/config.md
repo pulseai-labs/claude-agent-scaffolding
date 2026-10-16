@@ -49,9 +49,8 @@ Each field exists because a measured case needs it:
   status-bar agent returns nothing on the default read.
 - `brief_delivery:` — `inject` is the ordinary dispatch; `file` writes the brief to
   a file and sends one line pointing at it, for an agent whose composer fragments injects.
-- `can:` — what the agent is able to run, comma-separated: `slash-commands`,
-  `subagents` (the lane's `Agent`-tool workers), or `—`. The per-role
-  requirement, and where it is checked, are stated below.
+- `can:` — what the agent is able to run, comma-separated: `slash-commands`, `subagents` (the lane's `Agent`-tool workers), or `—`. The per-role requirement, and where it is checked, are stated below.
+- `review:` — optional: the command a reviewer seat on this agent runs, `<PR>`, `<PR_URL>` and `<LEVEL>` filled at dispatch (`/review <PR_URL>` on OMP); absent, `/code-review <PR> <LEVEL>`.
 - `note:` — free prose the coordinator reads when it uses that agent.
 
 A seat's readiness path is never a field here: it follows from herdr's own answer
@@ -97,7 +96,7 @@ a session launches nothing with its own profile.
 
 | role | its brief invokes | needs |
 |---|---|---|
-| reviewer | `/code-review` | `slash-commands` |
+| reviewer | its agent's `review:` command, else `/code-review` | `slash-commands` when that command is a slash command |
 | implementer, verifier | no command | — |
 | fix-round implementer | `/ossify:work-pr` when ossify is installed | `slash-commands` then |
 | ossify item implementer | `/ossify:work-item` | `slash-commands` |

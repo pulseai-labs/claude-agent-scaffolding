@@ -160,13 +160,14 @@ stop; report refusals verbatim.
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md> — a record of your own launch: you are already that seat, never run it
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
+REVIEW_INVOCATION=<this seat's agent's `review:` from agents.md, else `/code-review <PR> <LEVEL>`, with `<PR>`, `<PR_URL>` and `<LEVEL>` filled by the orchestrator>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
 PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
 ROLE: reviewer. State the model you are running in your first reply, then continue.
 
 PLACEMENT: worktree <abs-path> checked out at PR <number>'s head <sha>.
 
-TASK: run `/code-review <number> <level>` — the level the orchestrator decided, not
+TASK: run REVIEW_INVOCATION as given — its level is the one the orchestrator decided, not
 one you pick; outside an activated ossify spine the level is `medium` unless the
 orchestrator names another. Your first reply must state the model you are running; it is expected to
 be SEAT_EXPECTED_MODEL, and a mismatch is a failed launch to report, not to work around.
@@ -184,7 +185,7 @@ RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: edit any file other than your report file, post anything to GitHub, or run a second
 review. Your findings
-travel only in your report file. If `/code-review` refuses or errors, report its output
+travel only in your report file. If REVIEW_INVOCATION refuses or errors, report its output
 verbatim and stop. A blocking question goes in your report file, then wait; an
 escalation goes there too, then stop.
 ```
