@@ -852,7 +852,8 @@ export type Floor = { findings: Finding[] }
 // One executable command segment of a call, in order (Plan Task 5 §7 Step 3). `text` is the
 // segment as written; `argv` is the literal argv the shell would pass after quote decoding;
 // `cwd` is where it runs, after any literal cd/git -C; `opaque` marks a segment whose effects
-// cannot be established (never granted authority); `redirects` are its redirection targets.
+// cannot be established (never granted authority) — including one whose resolved cwd is not the
+// pinned worktree (root) or a directory within it; `redirects` are its redirection targets.
 export type ExecutionSegment = { text: string; argv: string[]; cwd: string; opaque: boolean; redirects: string[] }
 
 // The mask never.ts uses for hidden characters; a literal one in the raw text is a user byte we
@@ -860,18 +861,15 @@ export type ExecutionSegment = { text: string; argv: string[]; cwd: string; opaq
 const MASKED = /[\uE000-\uF8FF]/
 const unmask = (w: string) => w.replace(/[\uE000-\uF8FF]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xE000))
 // A wrapper's own words, never the wrapped program: the value flags each wrapper's options take.
+// The accepted wrappers are exactly the plan's five (env, nice, ionice, timeout, command): each
+// runs its argument in the same place for the same user, so nothing else is parsed through.
 const WRAP_VALUES: Record<string, ReadonlySet<string>> = {
   env: new Set(['-u', '--unset', '-C', '--chdir', '-S', '--split-string']),
-  sudo: new Set(['-u', '--user', '-g', '--group', '-p', '--prompt', '-C', '--close-from', '-h', '--host', '-r', '--role', '-t', '--type']),
-  doas: new Set(['-u', '-C']),
   nice: new Set(['-n', '--adjustment']),
   ionice: new Set(['-c', '--class', '-n', '--classdata', '-p', '--pid', '-P', '--pgid', '-u', '--uid']),
   timeout: new Set(['-s', '--signal', '-k', '--kill-after']),
-  stdbuf: new Set(['-i', '-o', '-e', '--input', '--output', '--error']),
-  chrt: new Set(['-p', '--pid', '-T', '--sched-runtime', '-P', '--sched-period', '-D', '--sched-deadline']),
-  taskset: new Set(['-p', '--pid']),
 }
-const WRAPPERS = new Set(Object.keys(WRAP_VALUES).concat(['nohup', 'time', 'command', 'exec', 'builtin', 'setsid']))
+const WRAPPERS = new Set([...Object.keys(WRAP_VALUES), 'command'])
 // Every program whose effects this vocabulary can name. An unknown program may run its arguments,
 // so it is opaque rather than silently treated as inert.
 const KNOWN_PROGRAMS = new Set(['git', 'gh', 'rm', 'unlink', 'chmod', 'chown', 'mv', 'cp', 'ln', 'mkdir', 'touch', 'sed', 'tee',
@@ -927,8 +925,25 @@ function gitDir(bare: string): string | undefined | null {
   }
   return undefined
 }
+// A literal `env -C/--chdir <dir>` relocation: undefined when absent, null when not literal.
+function envDir(bare: string): string | undefined | null {
+  const ws = split(bare)
+  const i = ws.findIndex(x => !KEYWORD.has(x))
+  if (i < 0 || base(ws[i]!) !== 'env') return undefined
+  const values = WRAP_VALUES.env ?? new Set<string>()
+  for (let k = i + 1; k < ws.length; k++) {
+    const w = ws[k]!
+    if (w === '--') return undefined
+    if (w === '-C' || w === '--chdir') { const v = ws[k + 1]; return v === undefined || hasExpansion(v) ? null : v }
+    if (w.startsWith('--chdir=')) { const v = w.slice(8); return v === '' || hasExpansion(v) ? null : v }
+    if (/^-C./.test(w)) { const v = w.slice(2); return hasExpansion(v) ? null : v }
+    if (w.startsWith('-') || /^[A-Za-z_]\w*=/.test(w)) { if (values.has(w)) k++; continue }
+    return undefined
+  }
+  return undefined
+}
 // One segment: its literal argv, its cwd, and whether its effects can be established at all.
-function segmentOf(c: Command, cwd: string, unknownCwd: boolean): ExecutionSegment {
+function segmentOf(c: Command, cwd: string, unknownCwd: boolean, root: string): ExecutionSegment {
   const raw = c.text
   const redirects = targets(c.bare)
   const hidden = MASKED.test(raw)
@@ -956,10 +971,17 @@ function segmentOf(c: Command, cwd: string, unknownCwd: boolean): ExecutionSegme
   const git = isGit(words)
   const movesFacts = git && (writesConfig(words) || words.some(w => /^--(?:git-dir|work-tree)/.test(w) || /^GIT_(?:DIR|WORK_TREE|CONFIG)/.test(w)))
   const dirs = gitDir(c.bare)
+  const envC = envDir(c.bare)
+  // A resolved cwd outside the pinned worktree relocates the real command, so the segment's
+  // effects cannot be established against the task's own resources (Plan §7 Step 3): the
+  // resolution to the pinned facts is what decides, not merely that a path resolved.
+  const moves = dirs !== undefined ? dirs : envC
+  const resolved = moves === undefined ? cwd : (moves === null ? null : joinPath(cwd, moves))
+  const elsewhere = resolved !== null && resolved !== root && !resolved.startsWith(root + '/')
   const opaque = expandable || unknownCwd || defines || runner || unsafeSed || !known
-  const cwdFor = dirs === null || dirs === undefined ? cwd : (joinPath(cwd, dirs) ?? cwd)
+  const cwdFor = resolved ?? cwd
   return { text: raw.trim(), argv: words.slice(progAt < 0 ? words.length : progAt).map(unmask), cwd: cwdFor,
-    opaque: opaque || dirs === null || movesFacts, redirects }
+    opaque: opaque || moves === null || movesFacts || elsewhere, redirects }
 }
 /**
  * Every executable command of `command`, in order, with the literal argv each is given, where it
@@ -968,14 +990,14 @@ function segmentOf(c: Command, cwd: string, unknownCwd: boolean): ExecutionSegme
  * An unknown program, expansion, substitution, interpreter, definition or config write is
  * `opaque`, and an opaque segment never gains authority.
  */
-export function executionSegments(command: string, cwd: string): ExecutionSegment[] {
+export function executionSegments(command: string, cwd: string, root = cwd): ExecutionSegment[] {
   const cmds = commands(command)
   if (cmds === undefined) return [{ text: command.trim(), argv: [], cwd, opaque: true, redirects: [] }]
   const out: ExecutionSegment[] = []
   let current = cwd
   let unknownCwd = false
   for (const c of cmds) {
-    out.push(segmentOf(c, current, unknownCwd))
+    out.push(segmentOf(c, current, unknownCwd, root))
     const cd = literalCd(c.bare)
     if (cd !== undefined) {
       if (cd === null) unknownCwd = true

@@ -1,7 +1,11 @@
 // Normalized operation facts and deterministic eligibility (Plan Task 5 §7 Step 3).
-// Pure Autonomic logic and supplied canonical facts only: no OMP module, no host call, so this
-// file is equally usable by the shared/CC side. Every fact here comes from the literal input and
-// the pinned snapshot/placement; a model supplies no path, ref, flag or argv.
+// Pure Autonomic logic and supplied canonical facts only: no OMP module, and no host call but one
+// local, bounded `existsSync` on a resolved working directory, which exists so a literal cwd that
+// does not exist is marked unresolved rather than classified against the pinned facts. It reads
+// nothing else and a failure to read means unresolved, never a release. Every other fact here
+// comes from the literal input and the pinned snapshot/placement; a model supplies no path, ref,
+// flag or argv.
+import { existsSync } from 'node:fs'
 import type { EvidenceMaterial, Operation, PlacementFacts, Resource, Snapshot } from './authority'
 import { rolePermits } from './authority'
 import type { Finding, Where } from './never'
@@ -74,10 +78,10 @@ function gitSub(argv: readonly string[]): string | undefined {
   return undefined
 }
 
-function pushEffect(argv: readonly string[], ctx: OperationContext): Effect {
+function pushEffect(argv: readonly string[], ctx: OperationContext, cwd: string): Effect {
   const at = subAt(argv, 'push')
   const rest = at < 0 ? [] : argv.slice(at + 1)
-  const effect: Effect = { operation: null, resource: null, argv: [...argv], cwd: ctx.facts.cwd,
+  const effect: Effect = { operation: null, resource: null, argv: [...argv], cwd,
     force: false, deletion: false, noVerify: false, merge: false, trailer: false, targets: [], sourceObject: null, unresolved: null }
   const operands: string[] = []
   for (const w of rest) {
@@ -109,8 +113,8 @@ function pushEffect(argv: readonly string[], ctx: OperationContext): Effect {
     resource: { kind: 'push', repository: ctx.facts.repository, remote, sourceRef: src, destinationRef: dst } }
 }
 
-function ghEffect(argv: readonly string[], ctx: OperationContext): Effect {
-  const effect: Effect = { operation: null, resource: null, argv: [...argv], cwd: ctx.facts.cwd,
+function ghEffect(argv: readonly string[], ctx: OperationContext, cwd: string): Effect {
+  const effect: Effect = { operation: null, resource: null, argv: [...argv], cwd,
     force: false, deletion: false, noVerify: false, merge: false, trailer: false, targets: [], sourceObject: null, unresolved: null }
   const at = subAt(argv, 'gh')
   const rest = at < 0 ? [] : argv.slice(at + 1)
@@ -146,8 +150,8 @@ function ghEffect(argv: readonly string[], ctx: OperationContext): Effect {
     resource: { kind: 'pr', repository: ctx.facts.repository, headRef: ctx.facts.branch, number: create ? null : number } }
 }
 
-function rmEffect(argv: readonly string[], ctx: OperationContext): Effect {
-  const effect: Effect = { operation: null, resource: null, argv: [...argv], cwd: ctx.facts.cwd,
+function rmEffect(argv: readonly string[], ctx: OperationContext, cwd: string): Effect {
+  const effect: Effect = { operation: null, resource: null, argv: [...argv], cwd,
     force: false, deletion: true, noVerify: false, merge: false, trailer: false, targets: [], sourceObject: null, unresolved: null }
   const at = subAt(argv, 'rm')
   const rest = at < 0 ? [] : argv.slice(at + 1)
@@ -156,8 +160,8 @@ function rmEffect(argv: readonly string[], ctx: OperationContext): Effect {
   return { ...effect, targets }
 }
 
-function commitEffect(argv: readonly string[], ctx: OperationContext): Effect {
-  const effect: Effect = { operation: null, resource: null, argv: [...argv], cwd: ctx.facts.cwd,
+function commitEffect(argv: readonly string[], ctx: OperationContext, cwd: string): Effect {
+  const effect: Effect = { operation: null, resource: null, argv: [...argv], cwd,
     force: false, deletion: false, noVerify: false, merge: false, trailer: false, targets: [], sourceObject: null, unresolved: null }
   const at = subAt(argv, 'commit')
   const rest = at < 0 ? [] : argv.slice(at + 1)
@@ -174,34 +178,49 @@ function commitEffect(argv: readonly string[], ctx: OperationContext): Effect {
       paths: effect.targets.map(t => (t.startsWith('/') ? t : `${ctx.facts.worktree}/${t.replace(/^\.\//, '')}`)) } }
 }
 
-function approvedCommandEffect(argv: readonly string[], ctx: OperationContext): Effect {
-  const effect: Effect = { operation: null, resource: null, argv: [...argv], cwd: ctx.facts.cwd,
+function approvedCommandEffect(argv: readonly string[], ctx: OperationContext, cwd: string): Effect {
+  const effect: Effect = { operation: null, resource: null, argv: [...argv], cwd,
     force: false, deletion: false, noVerify: false, merge: false, trailer: false, targets: [], sourceObject: null, unresolved: null }
-  const match = ctx.commands.find(c => c.cwd === ctx.facts.cwd && c.argv.length === argv.length && c.argv.every((w, i) => w === argv[i]))
+  const match = ctx.commands.find(c => c.cwd === cwd && c.argv.length === argv.length && c.argv.every((w, i) => w === argv[i]))
   const grant = match === undefined ? undefined : ctx.snapshot.grants.find(g => g.id === match.grantId)
   if (grant === undefined || grant.resource.kind !== 'paths') return { ...effect, unresolved: 'no exact approved executable/argv evidence for this command' }
   return { ...effect, operation: grant.operation, resource: grant.resource }
 }
 
-/** Classify one literal segment into the existing approved vocabulary, or leave it unresolved. */
-function effectOf(argv: readonly string[], ctx: OperationContext): Effect {
+/** Classify one literal segment into the existing approved vocabulary, or leave it unresolved.
+ *  A segment that runs outside the pinned worktree, or in a directory that does not exist, can
+ *  never be matched to the task's own resources, so it resolves to unresolved rather than being
+ *  classified against the pinned facts (Plan §7 Step 3: known cwd changes are resolved to facts
+ *  or marked unresolved). The existence read is local and bounded; it fails closed. */
+function effectOf(argv: readonly string[], ctx: OperationContext, cwd: string): Effect {
+  const pinned = ctx.facts.worktree
+  if (cwd !== pinned && !cwd.startsWith(pinned + '/')) {
+    return { operation: null, resource: null, argv: [...argv], cwd, force: false, deletion: false,
+      noVerify: false, merge: false, trailer: false, targets: [], sourceObject: null,
+      unresolved: `the command runs in ${cwd}, outside the pinned worktree` }
+  }
+  if (!existsSync(cwd)) {
+    return { operation: null, resource: null, argv: [...argv], cwd, force: false, deletion: false,
+      noVerify: false, merge: false, trailer: false, targets: [], sourceObject: null,
+      unresolved: `the command's working directory ${cwd} does not exist` }
+  }
   const name = argv[0] === undefined ? '' : base(argv[0])
   if (name === 'git') {
     const sub = gitSub(argv)
-    if (sub === 'push') return pushEffect(argv, ctx)
-    if (sub === 'commit') return commitEffect(argv, ctx)
+    if (sub === 'push') return pushEffect(argv, ctx, cwd)
+    if (sub === 'commit') return commitEffect(argv, ctx, cwd)
     if (sub === 'merge') {
-      return { operation: null, resource: null, argv: [...argv], cwd: ctx.facts.cwd, force: false, deletion: false,
+      return { operation: null, resource: null, argv: [...argv], cwd, force: false, deletion: false,
         noVerify: false, merge: true, trailer: false, targets: [], sourceObject: null, unresolved: 'a merge is operator-owned' }
     }
-    if (sub === 'rm') return { ...rmEffect(argv, ctx), deletion: true }
-    return { operation: null, resource: null, argv: [...argv], cwd: ctx.facts.cwd, force: false, deletion: false,
+    if (sub === 'rm') return { ...rmEffect(argv, ctx, cwd), deletion: true }
+    return { operation: null, resource: null, argv: [...argv], cwd, force: false, deletion: false,
       noVerify: false, merge: false, trailer: false, targets: [], sourceObject: null, unresolved: `git ${sub ?? ''} names no approved effect` }
   }
-  if (name === 'gh') return ghEffect(argv, ctx)
-  if (SED_DELETE.test(name)) return rmEffect(argv, ctx)
-  if (COMMAND_PROGRAM.test(name)) return approvedCommandEffect(argv, ctx)
-  return { operation: null, resource: null, argv: [...argv], cwd: ctx.facts.cwd, force: false, deletion: false,
+  if (name === 'gh') return ghEffect(argv, ctx, cwd)
+  if (SED_DELETE.test(name)) return rmEffect(argv, ctx, cwd)
+  if (COMMAND_PROGRAM.test(name)) return approvedCommandEffect(argv, ctx, cwd)
+  return { operation: null, resource: null, argv: [...argv], cwd, force: false, deletion: false,
     noVerify: false, merge: false, trailer: false, targets: [], sourceObject: null, unresolved: `${name || 'this program'} names no approved effect` }
 }
 
@@ -227,14 +246,14 @@ export function operationFacts(tool: string, input: unknown, context: OperationC
   const where = whereFor(facts)
   const findings = text === '' ? [] : floorFindings(text, where, readers).findings
   const effects: Effect[] = []
-  if (text !== '') for (const s of executionSegments(text, facts.cwd)) {
+  if (text !== '') for (const s of executionSegments(text, facts.cwd, facts.worktree)) {
     if (s.opaque) {
       effects.push({ operation: null, resource: null, argv: s.argv, cwd: s.cwd, force: false, deletion: false, noVerify: false,
         merge: false, trailer: false, targets: [], sourceObject: null, unresolved: 'the segment\'s effects cannot be established' })
       continue
     }
     if (s.argv.length === 0) continue
-    effects.push(effectOf(s.argv, context))
+    effects.push(effectOf(s.argv, context, s.cwd))
   }
   // A structured native force-with-lease is a real force push, read from its own field.
   if (tool === 'github') {

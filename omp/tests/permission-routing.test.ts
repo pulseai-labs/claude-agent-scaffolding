@@ -4,6 +4,7 @@
 // what landed in the two-write ledger, and what the operator was told. Every SDK/host import
 // is `import type`: the CSA tree has no installed host package.
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -79,6 +80,21 @@ function setNative(w: RoutingWorld, choice: 'allow' | 'ask' = 'allow'): void {
 }
 
 const bash = (command: string, cwd: string) => ({ command, cwd })
+// A real second git repository with its own origin, inside the fixture root but outside the
+// pinned worktree, so the F1 pin can observe a relocated push being refused rather than released.
+const secondRepo = (root: string, out: string): string => {
+  const other = join(root, 'other')
+  mkdirSync(other, { recursive: true })
+  const git = (dir: string, ...args: string[]) => {
+    const r = spawnSync('git', ['-C', dir, ...args], { encoding: 'utf8', timeout: 3000 })
+    if (r.status !== 0) throw new Error(`fixture git ${args.join(' ')} failed: ${r.stderr}`)
+    return r.stdout.trim()
+  }
+  git(other, 'init', '-b', 'main')
+  git(other, '-c', 'user.name=Synthetic', '-c', 'user.email=synthetic@example.invalid', 'commit', '--allow-empty', '-m', 'synthetic second repository')
+  git(other, 'remote', 'add', 'origin', join(out, 'other-origin.git'))
+  return other
+}
 const rows = (w: RoutingWorld): Array<Record<string, unknown>> => {
   const path = `${w.ledgerPath}.decisions.jsonl`
   return existsSync(path) ? readFileSync(path, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l) as Record<string, unknown>) : []
@@ -617,7 +633,7 @@ describe('the eligibility red-line clauses, driven directly', () => {
 })
 
 describe('executionSegments parses the whole command with the existing grammar', () => {
-  const seg = (command: string, cwd = '/repo') => executionSegments(command, cwd)
+  const seg = (command: string, cwd = '/repo', root = '/repo') => executionSegments(command, cwd, root)
 
   test('a literal push is one segment with its exact argv', () => {
     expect(seg(`git push origin ${MAIN}:${MAIN}`)).toEqual([
@@ -690,6 +706,87 @@ describe('executionSegments parses the whole command with the existing grammar',
     const out = seg(`git push origin ${MAIN}:${MAIN}`)
     expect(out[0]!.text).toContain('push')
     expect(out[0]!.argv).toEqual(['git', 'push', 'origin', `${MAIN}:${MAIN}`])
+  })
+
+  test('a relocation outside the pinned root is opaque at the segment', () => {
+    // F2: only the plan's five wrappers parse through; everything else is opaque.
+    for (const wrapper of ['sudo', 'doas', 'stdbuf', 'chrt', 'taskset', 'nohup', 'time', 'exec', 'builtin', 'setsid']) {
+      expect(seg(`${wrapper} git push origin ${MAIN}:${MAIN}`)[0]!.opaque).toBe(true)
+    }
+    // The five named wrappers still parse through to the wrapped program.
+    expect(seg(`env nice -n 5 ionice -c3 timeout 10 command git push origin ${MAIN}:${MAIN}`)[0]!.argv[0]).toBe('git')
+  })
+
+  test('a literal git -C or env -C outside the pinned root is opaque at the segment', () => {
+    expect(seg(`git -C /elsewhere push origin ${MAIN}:${MAIN}`, '/repo', '/repo')[0]!.opaque).toBe(true)
+    expect(seg(`env -C /elsewhere git push origin ${MAIN}:${MAIN}`, '/repo', '/repo')[0]!.opaque).toBe(true)
+    expect(seg(`env --chdir=/elsewhere git push origin ${MAIN}:${MAIN}`, '/repo', '/repo')[0]!.opaque).toBe(true)
+    // And a directory inside the pinned root stays eligible.
+    expect(seg(`git -C sub push origin ${MAIN}:${MAIN}`, '/repo', '/repo')[0]!.opaque).toBe(false)
+  })
+})
+
+// =====================================================================================
+// F1: a relocated segment is never authorized against the pinned facts
+// =====================================================================================
+
+describe('a segment cwd outside the pinned worktree is never released', () => {
+  let w: RoutingWorld
+  afterEach(() => { if (w) w.close() })
+
+  test('git -C into a real second repository blocks instead of releasing', async () => {
+    w = pushWorld()
+    setNative(w)
+    // A real second repository, with its own origin, exists inside the fixture root but outside
+    // the pinned worktree: the granted own-feature push must not authorize a push performed there.
+    const other = secondRepo(w.root, join(w.root, 'out'))
+    const r = await w.invoke('bash', { command: `git -C ${other} push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    expect(r?.block).toBe(true)
+    expect(w.nativeRequests).toEqual([])
+    expect(rows(w)).toEqual([])
+    expect(human(w)).not.toContain('allow')
+  })
+
+  test('git -C into a nonexistent directory blocks', async () => {
+    w = pushWorld()
+    setNative(w)
+    // Inside the pinned worktree (so the segment cwd resolves to the task's own root) but the
+    // directory does not exist: the effects still cannot be established there.
+    const r = await w.invoke('bash', { command: `git -C ${join(w.tree, 'gone')} push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    expect(r?.block).toBe(true)
+    expect(rows(w)).toEqual([])
+    // And a nonexistent target outside the worktree blocks too (the segment is opaque there).
+    const outside = await w.invoke('bash', { command: `git -C ${join(w.root, 'nowhere')} push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    expect(outside?.block).toBe(true)
+  })
+
+  test('git -C into a subdirectory of the pinned worktree stays eligible', async () => {
+    w = pushWorld()
+    setNative(w)
+    const sub = join(w.tree, 'sub')
+    mkdirSync(sub, { recursive: true })
+    expect(await w.invoke('bash', { command: `git -C ${sub} push origin ${MAIN}:${MAIN}`, cwd: w.tree })).toBeUndefined()
+    expect(rows(w).at(-1)).toMatchObject({ outcome: 'allow' })
+  })
+
+  test('an env -C relocation outside the pinned worktree blocks', async () => {
+    w = pushWorld()
+    setNative(w)
+    const r = await w.invoke('bash', { command: `env -C ${secondRepo(w.root, join(w.root, 'out'))} git push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    expect(r?.block).toBe(true)
+    expect(rows(w)).toEqual([])
+  })
+
+  test('the existing cd-segment semantics are unchanged', async () => {
+    w = pushWorld()
+    setNative(w)
+    // `cd` is not a known program, so its own segment is opaque and a `cd && …` call asks — this
+    // predates the cwd pin and must not change. The push segment itself resolves its own cwd.
+    const r = await w.invoke('bash', { command: `cd ${join(w.root, 'other')} && git push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    expect(r?.block).toBe(true)
+    const inside = await w.invoke('bash', { command: `cd sub && git push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    expect(inside?.block).toBe(true)
+    expect(executionSegments(`cd sub && git push origin ${MAIN}:${MAIN}`, w.tree, w.tree)[1]!.cwd).toBe(join(w.tree, 'sub'))
   })
 })
 
