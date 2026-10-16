@@ -131,7 +131,7 @@ then dispatch a fresh spine session on the same spine-session seat — marked `c
 before its command as `herdr-mechanics.md` step 2 says — the same approved SEATS
 block injected again — with `HANDOFF_PATH` set and the same `RUN_JSON`, which it continues,
 rebinding `run.orchestrator` to its own pane (its brief's step 2 says). On that rebind it writes
-`run.orchestrator.machine` beside the pane — this server's machine, per `herdr-mechanics.md`. The close waits for a
+`run.orchestrator.machine` beside the pane — this server's machine, per `herdr-mechanics.md` — and `run.orchestrator.session` (`lifecycle.md` step 1). The close waits for a
 completion at the final barrier. A spine session that rotated on a molt warning returns the same
 `rotate:`; one cut mid-round returns none and is respawned the same way, its handoff as
 `HANDOFF_PATH`: ossify 1.14.0's run-spine re-enters the round from recorded state, and only a
@@ -192,7 +192,7 @@ has covered, `covered` when one has and left durable evidence its review ran but
 record, otherwise the durable record that PR's last `open:` result persisted — and the
 `RUN_JSON` path that return named: a resumed successor continues and rebinds that file,
 a first dispatch names a fresh one. On creation and on continue/rebind it writes `run.orchestrator.machine`
-beside the pane — this server's machine, per `herdr-mechanics.md`. It owns both PR seats in a `run.json` of its own,
+beside the pane — this server's machine, per `herdr-mechanics.md` — and `run.orchestrator.session` (`lifecycle.md` step 1). It owns both PR seats in a `run.json` of its own,
 relays one summary per round, and asks you for the merge word; you answer as `lifecycle.md` step 12's `run.merge_word` says (with
 `standing`, a clean gate set is the word; with `operator`, you ask the operator), and the merge lands under the reply's executor — a merge commit on the named SHA, session or
 operator alike. `lifecycle.md` steps 8-12 are that session's loop, not yours.

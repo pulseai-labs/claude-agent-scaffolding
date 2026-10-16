@@ -114,7 +114,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID`
      — dagr's stable-agent fallback otherwise — in the same producer loop every other
      write takes. On creation and on continue/rebind, write `run.orchestrator.machine` beside the pane
-     — this server's machine, per MECHANICS. Stay its single writer, as dagr's producer contract (`dagr --skill`)
+     — this server's machine, per MECHANICS — and `run.orchestrator.session`, herdr's `agent_session` for the pane as `{agent, id}`, as step 1 of `lifecycle.md` beside MECHANICS says. Stay its single writer, as dagr's producer contract (`dagr --skill`)
      says, linting every write with `dagr check --strict` before it replaces the file.
      Nothing of yours goes in the top's run.json.
   2. Decide your startup branches BEFORE any seat exists. MERGE_EXECUTOR must read

@@ -57,7 +57,7 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID`
      — dagr's stable-agent fallback otherwise — in the same producer loop every other write
      takes. On creation and on continue/rebind, write `run.orchestrator.machine` beside the pane
-     — this server's machine, per MECHANICS. Stay its single writer per dagr's producer contract (`dagr --skill`):
+     — this server's machine, per MECHANICS — and `run.orchestrator.session`, herdr's `agent_session` for the pane as `{agent, id}`, as step 1 of `lifecycle.md` beside MECHANICS says. Stay its single writer per dagr's producer contract (`dagr --skill`):
      one task per item, and each round's barrier a gate node whose fan-in is that round's items. Lint every write with `dagr check --strict` before it replaces the file.
   3. Invoke `/ossify:run-spine $SPINE_ID --external-executor`. On the round's
      execution requests, launch a fresh IMPLEMENTER seat per item from its SEATS row, verbatim —

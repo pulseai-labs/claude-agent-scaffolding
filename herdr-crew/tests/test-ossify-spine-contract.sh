@@ -1815,7 +1815,7 @@ pin "$MECHANICS_MD" 'and recorded as the attempt'"'"'s `locator.seen`' \
 pin "$MECHANICS_MD" '`{hash, identity}`' \
   "the consumed generation records the exact object keys" flat
 
-section "a rotation resumes from run state (#819; hard stop deferred to #810)"
+section "a rotation and a hard stop resume from run state (#819, #810)"
 # Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 pin "$LIFECYCLE_MD" 'From the handoff on, this session writes nothing to the run file and takes no dispatch action; a wake that reaches it before it stands down is handed to the successor, never acted on.' \
   "the outgoing top stops writing and dispatching at handoff and relays every intervening wake" flat
@@ -1841,6 +1841,24 @@ pin "$LIFECYCLE_MD" 'where it and `run.json` disagree on a fact, `run.json` wins
   "the transcript is context; run.json wins on facts (#810)" flat
 pin "$LIFECYCLE_MD" 'is checked for its effect first' \
   "a started-but-unconfirmed action is checked before it is redone (#810)" flat
+pin "$LIFECYCLE_MD" 'A dispatch whose attempt the run records is never sent again: step 4 settles it' \
+  "a hard stop never re-sends a recorded dispatch; resume step 4 settles it (#810)" flat
+pin "$LIFECYCLE_MD" 'Binding one whose top died with no handoff runs **A hard stop**'"'"'s three steps before it.' \
+  "Orient routes a hard-stop takeover through its three steps before the rebind (#810)" flat
+pin "$LIFECYCLE_MD" 'Claude `~/.claude/projects/*/<id>.jsonl`' \
+  "the transcript is found by session id on Claude Code too (#810)" flat
+pin "$LIFECYCLE_MD" 'With no session recorded, no file found, or the old top on another machine, ask the operator once for the transcript path or the next step.' \
+  "a hard stop with no transcript asks the operator once (#810)" flat
+pin "$LIFECYCLE_MD" 'it always rewrites `run.orchestrator.session` (step 1), since molt'"'"'s `/clear` starts a new session in this pane' \
+  "a top that molts in place records its new session (#810)" flat
+for f in "$BRIEFS_MD" "$PRBRIEFS_MD"; do
+  pin "$f" 'and `run.orchestrator.session`, herdr'"'"'s `agent_session` for the pane as `{agent, id}`' \
+    "${f##*/} records its session on creation and continuation (#810)" flat
+done
+pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `herdr-mechanics.md` — and `run.orchestrator.session`' \
+  "the nested spine successor records its session on rebind (#810)" flat
+pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `herdr-mechanics.md` — and `run.orchestrator.session`' \
+  "the nested work-PR dispatch records its session (#810)" flat
 # Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 # Ruling 12: automatic relaunch retired; an unstarted worker is the operator's decision.
 # Ruling 12: relaunch cause retired with the automatic relaunch path.
