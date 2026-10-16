@@ -1,6 +1,6 @@
 # omp-roles
 
-The OMP role pack for default mode. 0.6.0 ships `omp-seat`, the launcher that pins the `seat-mods`, `molt` and `autonomic` OMP extensions onto a seat, and the `implementer` and `seat-reviewer` agents. The launcher accepts `worker` (`omp-seat worker`) and ships the `spine-driver`, `close`, `work-pr` and `orchestrator` coordinator roles, launched with `omp-seat <role>`. Since 0.6.0 it also ships `crew-spine` and `crew-work-pr` for herdr-crew 0.2.23's activated spine session and work-PR session: their brief is the procedure, and every seat they create is a herdr pane, never a task subagent (#839). `spine-driver` and `work-pr` stay the default-lane roles. OMP only: it has no `.claude-plugin/` and Claude Code never loads it.
+The OMP role pack for default mode. 0.5.0 ships `omp-seat`, the launcher that pins the `seat-mods`, `molt` and `autonomic` OMP extensions onto a seat, and the `implementer` and `seat-reviewer` agents. The launcher accepts `worker` (`omp-seat worker`) and ships the `spine-driver`, `close`, `work-pr` and `orchestrator` coordinator roles, launched with `omp-seat <role>`. Since 0.6.0 it also ships `crew-spine` and `crew-work-pr` for herdr-crew 0.2.23's activated spine session and work-PR session: their brief is the procedure, and every seat they create is a herdr pane, never a task subagent (#839). `spine-driver` and `work-pr` stay the default-lane roles. OMP only: it has no `.claude-plugin/` and Claude Code never loads it.
 
 `orchestrator`: the OMP top; needs seat-mods 0.4.4, autonomic 0.7.0 and herdr-crew 0.2.19 (its procedure, the `orchestrate` skill), and `omp-seat` refuses the role without them. Launch with `SEAT_MODS_ROLE=orchestrator`; `omp-seat` refuses the role without it, since the #798 rail keys on it. Since 0.5.0, `omp-seat orc` is the operator's short form: it sets `SEAT_MODS_ROLE=orchestrator` when the variable is unset or empty (another value is kept and refused) and runs `omp-glm` unless `--via` names another wrapper.
 
@@ -10,7 +10,7 @@ Under `omp-seat`, a `spine-driver`, `close`, `work-pr`, `crew-spine` or `crew-wo
 
 ## Install
 
-Coordinator roles need ossify 1.18.0 for `spine-driver` and `close`, and merge-bar for `work-pr`.
+Coordinator roles need ossify 1.18.0 for `spine-driver`, `close`, `crew-spine` and `crew-work-pr`, and merge-bar for `work-pr` (and for `crew-work-pr` where its brief's stopping rule is merge-bar).
 
 OMP does not put a plugin's `bin/` on `PATH`, so a coordinator role also needs the `plugin-bin-path.ts` loader from the root README's OMP section, installed once per machine; without it `oss` is not found. `omp-seat` does not pass `--no-extensions`, so the loader in your user extension folder still loads.
 

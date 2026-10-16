@@ -4,7 +4,7 @@ All notable changes to the `herdr-crew` plugin.
 
 ## 0.2.23
 
-**OMP may fill the activated spine session and the work-PR session** (#788, #839). Run 788 ran both on OMP (GLM-5.3) and passed. config.md's placement sentence and README's copy now allow them, through omp-roles 0.6.0's `crew-spine` and `crew-work-pr` roles. Those roles take the brief as the procedure and launch every seat as a herdr pane, so they no longer contradict it, as the default-lane `spine-driver` and `work-pr` roles did. The `can:` table gains OMP rows for the activated spine session, the ossify item implementer (`omp-seat worker`) and the work-PR session: each reaches its skill by `skill://` and needs no `slash-commands`. Both new OMP coordinators get each hosting repo's `.worktrees` root in `SEAT_MODS_ALLOW`, as the lane driver, close and doctor sessions already do.
+**OMP may fill the activated spine session and the work-PR session** (#788, #839). Run 788 ran both on OMP (GLM-5.3) and passed. config.md's placement sentence and README's copy now allow them, through omp-roles 0.6.0's `crew-spine` and `crew-work-pr` roles. Those roles take the brief as the procedure and launch every seat as a herdr pane, so they no longer contradict it, as the default-lane `spine-driver` and `work-pr` roles did. The `can:` table's OMP doctor row now also covers the activated spine session, the ossify item implementer (`omp-seat worker`) and the work-PR session: each reaches its skill by `skill://` and needs no `slash-commands`. Both new OMP coordinators get each hosting repo's `.worktrees` root in `SEAT_MODS_ALLOW`, as the lane driver, close and doctor sessions already do.
 
 ## 0.2.22
 
