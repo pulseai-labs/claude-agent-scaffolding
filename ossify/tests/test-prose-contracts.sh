@@ -2047,4 +2047,43 @@ _pin "$_r" "adopt merges its loop section into CLAUDE.md - an adopted workspace'
 _r=1; grep -Fq 'author it when absent' "$_AS" && grep -Fq '`AGENTS.md` when present, else author' "$_AS" && _r=0
 _pin "$_r" "adopt's AGENTS.md row is merge-only - a legacy workspace with no AGENTS.md leaves C5's line-234 precondition ('each file you create does not exist yet') nothing to merge into, so adopt refuses it (D31)"
 
+# PR #836 round 1 (D1-D9). The repair is one design; one pin per finding, each
+# statement pinned where the finding said the text was wrong.
+_PRA="$_OSSR/skills/doctor/references/rule-authoring.md"
+# D1: the check's scope is the AI workspace, and nothing about it reaches a
+# declared repo - read alone, an unscoped line fails every canonical that keeps
+# its own CLAUDE.md and offers to move canonical instructions into the workspace.
+_r=1; grep -Fq 'Scope: the AI workspace, and only the AI workspace' "$_IC" \
+  && grep -Fq 'Never look inside a declared repo' "$_IC" \
+  && grep -Fq 'that workspace' "$_DS" && grep -Fq 'never a declared repo' "$_DS" && _r=0
+_pin "$_r" "claude_md's scope is unstated or reaches a declared repo - a canonical's own CLAUDE.md reads as a failure of the AI workspace (D1)"
+# D2: the offer must not wait for an otherwise-clean read-out; the no-AGENTS.md
+# shape branch 1 exists for is exactly the one the old gate excluded.
+_r=1; ! grep -Fq 'the only problem is a leftover' "$_IC" \
+  && grep -Fq 'whatever else the' "$_IC" && grep -Fq 'whatever else the' "$_DS" && _r=0
+_pin "$_r" "the repair is offered only when CLAUDE.md is the sole problem - the no-AGENTS.md shape branch 1 exists for is gated off (D2)"
+# D3: a disagreement is a hold. No write, and above all no re-emit - the old
+# text re-read on an unanswered question and printed ok: over a file still there.
+_r=1; grep -Fq 'and hold' "$_IC" && grep -Fq 're-emit nothing' "$_IC" \
+  && grep -Fq 'Resume only' "$_IC" && _r=0
+_pin "$_r" "§5 has no hold - an unanswered disagreement re-emits ok: with the CLAUDE.md still present and nothing written (D3)"
+# D5: git mv is chosen by whether the SOURCE IS TRACKED, not by whether the
+# workspace is a git repo - the untracked .claude/CLAUDE.md shape fails on rc.
+_r=1; grep -Fq 'ls-files --error-unmatch' "$_IC" && grep -Fq 'only when the source is' "$_IC" \
+  && ! grep -Fq 'plain `mv` if the workspace is not a git repo' "$_IC" && _r=0
+_pin "$_r" "git mv is chosen by git-repo-ness - an untracked .claude/CLAUDE.md in a git workspace fails 'not under version control' (D5)"
+# D6: both files is ONE plan with a fixed order, so two runs agree; the old text
+# ran a move per file and the second collided on AGENTS.md.
+_r=1; grep -Fq 'that is one plan, not' "$_IC" && grep -Fq 'The root `CLAUDE.md` moves' "$_IC" \
+  && grep -Fq 'merges** into that `AGENTS.md`' "$_IC" \
+  && grep -Fq 'one line per path' "$_IC" && _r=0
+_pin "$_r" "root and .claude/CLAUDE.md are two independent moves - the second git mv fails or a plain mv overwrites AGENTS.md (D6)"
+# D8: the offer lands after the sweep's read-out; §3 forbids a mid-sweep prompt.
+_r=1; grep -Fq "after the sweep's read-out, never mid-sweep" "$_IC" \
+  && grep -Fq 'never mid-sweep' "$_DS" && _r=0
+_pin "$_r" "the repair offer has no sweep timing - §3 forbids a mid-sweep prompt and the offer has no stated place (D8)"
+# D7: the falsified write-count and never-do text the repair makes untrue.
+_r=1; ! grep -Fq 'Editing `AGENTS.md` or the pairing manifest' "$_DS" \
+  && ! grep -Fq 'The one surface in this skill that' "$_PRA" && _r=0
+_pin "$_r" "doctor's never-do list still forbids editing AGENTS.md to make the interop check pass, or rule-authoring still calls itself the one writing surface (D7)"
 t_summary

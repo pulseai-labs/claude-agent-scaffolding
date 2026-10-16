@@ -5,8 +5,10 @@ The depth behind `doctor/SKILL.md` §7. Absorbed from `scaffold-onboard`'s
 the question and `workspace-init` stays unchanged.
 
 **Check first, repair on a yes.** This surface reports and names the fix. One
-fix it can also carry out: moving a leftover `CLAUDE.md` into `AGENTS.md` (§5),
-only on the operator's explicit yes. It never edits the manifest.
+fix it can also carry out: moving a leftover `CLAUDE.md` into `AGENTS.md`, or
+merging it into an `AGENTS.md` that already exists (§5), only on the operator's
+explicit yes and only after the whole plan has been shown. It never edits the
+manifest.
 
 _Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
@@ -37,7 +39,11 @@ two vocabularies:
 ok: manifest - /path/to/.workspace/pairing.json
 fail: agents_md - no AGENTS.md at /path/AGENTS.md; a Codex session gets no project instructions at all
 fail: claude_md - /path/CLAUDE.md exists; Claude Code loads it and ignores AGENTS.md
+fail: claude_md - /path/.claude/CLAUDE.md exists; Claude Code loads it and ignores AGENTS.md
 ```
+
+`claude_md` emits one line per path it found, in the order root then `.claude/`
+(§3) — the sample above is a workspace holding both.
 
 Check names, in this order: `manifest`, `ai_workspace`, one `ok:`/`fail:`
 line per declared repo — named by its own key, `canonical` for a project that
@@ -318,51 +324,129 @@ If the `ai_workspace` root did not resolve, you cannot look for the file: report
 `fail: agents_md - cannot look for AGENTS.md without a resolvable ai_workspace
 root` and stop there.
 
-Do not author `AGENTS.md` from nothing here — its content is the project's. When
-the only problem is a leftover `CLAUDE.md`, §5's repair applies.
+Do not author `AGENTS.md` from nothing here — its content is the project's. A
+leftover `CLAUDE.md` is §5's business whatever else this read-out found: the
+repair runs on its own failing line, not on the workspace being otherwise clean.
 
 ### `claude_md`
 
 The check that keeps Claude Code on the same file as everyone else.
 
-Look for `CLAUDE.md` at the `ai_workspace` root **and** at
-`<ai_workspace.root>/.claude/CLAUDE.md`. Either one makes Claude Code load it
-and ignore `AGENTS.md` (its default `instructionFiles` setting loads
-`AGENTS.md` only when no `CLAUDE.md` exists), so Claude sessions and every
-other agent follow different instructions.
+**Scope: the AI workspace, and only the AI workspace.** Look for `CLAUDE.md` at
+the `ai_workspace` root **and** at `<ai_workspace.root>/.claude/CLAUDE.md`.
+Never look inside a declared repo: a canonical's own `CLAUDE.md` is its
+business, its sessions are Claude's either way, and moving canonical
+instructions into the AI workspace would be a worse bug than the one this check
+reports. `ai_workspace` here is the resolved root, the same value the
+`agents_md` check reads.
+
+Either path makes Claude Code load that file and ignore `AGENTS.md` (its default
+`instructionFiles` setting loads `AGENTS.md` only when no `CLAUDE.md` exists), so
+Claude sessions and every other agent follow different instructions.
+**Emit one `fail:` line per path found** — both files present is two failures
+with two remedies, not one failure with one:
 
 | Line | Remedy |
 |---|---|
 | `ok: claude_md - no CLAUDE.md in the AI workspace` | — |
-| `fail: claude_md - <path> exists; Claude Code loads it and ignores AGENTS.md` | offer §5's repair |
+| `fail: claude_md - <path> exists; Claude Code loads it and ignores AGENTS.md` | offer §5's repair — one such line per path found, both when both exist |
 
 A declared repo's own `CLAUDE.md` is not this check's business: canonical repos
-keep theirs.
+keep theirs, and the loop above never probes them.
 
 ---
 
 ## 5. The repair — only on the operator's explicit yes
 
-After the read-out, when `claude_md` failed, offer to repair it. Show the
-operator every change first — the move, or the whole merged file — and do
-nothing until the operator says yes. For each `CLAUDE.md` the check named:
+When `claude_md` failed, offer to repair it. **Offer it whatever else the
+read-out found** — the repair answers `claude_md`'s own failing lines, and a
+workspace usually has more than one problem; gating the offer on an otherwise
+clean read-out strands the no-`AGENTS.md` shape branch 1 exists for.
 
-1. **No `AGENTS.md` at the root:** `git mv <path> <ai_workspace.root>/AGENTS.md`
-   (plain `mv` if the workspace is not a git repo).
+**In a full sweep, offer it after the sweep's read-out, never mid-sweep.** §3
+forbids a mid-sweep prompt (the sweep's rule verdict is an inspection, and a
+write solicited halfway through would stall the remaining surfaces); the repair
+is a prompted write, so it comes after §14's read-out, as the operator's next
+step.
+
+### 5.1 Build the whole plan, then show it
+
+**Nothing is written, moved, merged or deleted before the operator's yes.**
+Build one plan for the whole workspace, not per file, and show every change first
+— as a list:
+
+- every **move**: source path → `<ai_workspace.root>/AGENTS.md`;
+- every **merge**: the whole merged file, shown, not summarized;
+- every **`@` import** in the result and whether it resolves from the new
+  location, plus every import **rewrite** the move forces;
+- every file that will be **removed**;
+- any rule where the two files disagree, with **both** versions quoted.
+
+An import that cannot be kept is shown as such, with the reason, and the operator
+decides before the yes — not discovered after the write.
+
+### 5.2 Which file moves, and which merges
+
+**When both `CLAUDE.md` files exist (root and `.claude/`), that is one plan, not
+two moves.** Two independent moves both target `AGENTS.md`: the second `git mv`
+fails, and a plain `mv` silently overwrites the first. The plan is fixed so two
+runs give the same result:
+
+1. **The root `CLAUDE.md` moves** — `mv <root>/CLAUDE.md <ai_workspace.root>/AGENTS.md`,
+   or a merge into an `AGENTS.md` that already exists (5.3).
+2. **`.claude/CLAUDE.md` merges** into that `AGENTS.md`, never over it.
+
+Root first, `.claude/` merged into the result. The same rule applies to a single
+file: a lone `.claude/CLAUDE.md` with no `AGENTS.md` moves (5.3 has no merge
+target to take), and branch 1 below is the branch that runs.
+
+### 5.3 Move, or merge
+
+For each `CLAUDE.md` the check named, in the order §5.2 fixes:
+
+1. **No `AGENTS.md` at the root, and this is the file being placed:**
+   `git mv <path> <ai_workspace.root>/AGENTS.md` — **only when the source is
+   tracked**. Decide by tracking, not by whether the workspace is a git repo: an
+   untracked `CLAUDE.md` inside a git workspace (the common `.claude/CLAUDE.md`
+   shape — `.claude/` is usually ignored) makes `git mv` fail with "not under
+   version control". Test it:
+
+   ```bash
+   git -C <ai_workspace.root> ls-files --error-unmatch <path> >/dev/null 2>&1 \
+     && git mv <path> <ai_workspace.root>/AGENTS.md \
+     || mv <path> <ai_workspace.root>/AGENTS.md
+   ```
+
+   A non-git workspace has no `git ls-files` to consult; use plain `mv` there,
+   which is the same answer the failing `ls-files` gives.
+
 2. **`AGENTS.md` exists:** merge. Keep every rule and fact from both files.
    Drop lines whose only job was to point from one file to the other ("Read
-   `CLAUDE.md` for …"). Where the two files disagree, do not pick one: show
-   both versions and ask the operator. Show the operator the whole merged file
-   before you write it. Then write it and remove the `CLAUDE.md`.
-3. **Check every `@` import** in the new `AGENTS.md`: list each path and say
-   whether it resolves. A relative import moved from `.claude/CLAUDE.md` to the
-   root now resolves from the root — fix the path, or report it. An absolute
-   import outside the workspace may ask for approval again in the next
-   interactive Claude Code session; say so.
-4. **Never commit.** Report what changed and leave the commit to the operator.
+   `CLAUDE.md` for …"). Show the operator the whole merged file before you write
+   it. Then write it and remove the `CLAUDE.md`.
 
-Re-read the workspace afterwards and emit the `agents_md` and `claude_md`
-lines again.
+### 5.4 Where the two files disagree, ask — and hold
+
+**Do not pick a version.** Show both and ask. Until the operator answers:
+
+- write nothing, move nothing, delete nothing;
+- **re-emit nothing** — the `fail:` lines stand as they were read.
+
+A hold is not a failure of the repair: it is the repair refusing to choose a
+rule for the project. Re-reading and re-emitting on an unresolved disagreement
+would print `ok: claude_md` while the `CLAUDE.md` is still there and nothing was
+written — the read-out would certify a workspace it had not changed. Resume only
+when the operator answers.
+
+### 5.5 After the writes
+
+1. **Check every `@` import** in the new `AGENTS.md`: list each path and say
+   whether it resolves. A relative import moved from `.claude/CLAUDE.md` to the
+   root now resolves from the root — this is the rewrite §5.1 already showed, so
+   apply what the operator approved. An absolute import outside the workspace may
+   ask for approval again in the next interactive Claude Code session; say so.
+2. **Never commit.** Report what changed and leave the commit to the operator.
+3. Re-read the workspace and emit the `agents_md` and `claude_md` lines again.
 
 ---
 

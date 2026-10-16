@@ -1,6 +1,6 @@
 # Machine-checkable rule authoring
 
-The depth behind `doctor/SKILL.md` §6. The one surface in this skill that
+The depth behind `doctor/SKILL.md` §6. One of the two surfaces in this skill that
 writes, and it writes to exactly one file.
 
 **Two modes, and the sweep only ever gets the first.**

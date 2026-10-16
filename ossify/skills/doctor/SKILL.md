@@ -304,9 +304,9 @@ resolving to real directories, with each declared repo — never
 git **work tree** (a bare repository or a `.git` directory is not
 one and fails), the state path resolving and not silently
 overridden, and **`AGENTS.md` existing and naming ossify**, and **no `CLAUDE.md`**
-at the workspace root or in `.claude/` (`claude_md`). `AGENTS.md` is the one
-instruction file every agent reads; a `CLAUDE.md` beside it makes Claude Code
-ignore it.
+at the AI workspace root or in its `.claude/` (`claude_md`) — that workspace
+only, never a declared repo, which keeps its own. `AGENTS.md` is the one
+instruction file every agent reads; a `CLAUDE.md` beside it shadows it for Claude.
 
 **What was absorbed is the question, not the checklist.** The scaffold-onboard
 original requires `routing.roadmap`, `routing.sprint_specs` and
@@ -314,9 +314,9 @@ original requires `routing.roadmap`, `routing.sprint_specs` and
 set over would report a correctly-configured ossify project as broken for
 lacking the previous stack's furniture.
 
-**Check first, repair on a yes.** When `claude_md` fails, offer the repair in
-`references/interop-check.md` §5 — move or merge `CLAUDE.md` into `AGENTS.md` —
-and run it only on the operator's explicit yes. Never commit it.
+**Check first, repair on a yes.** When `claude_md` fails — whatever else the
+read-out found — offer §5's repair, after the read-out and never mid-sweep: whole
+plan shown first, writes only on the operator's explicit yes, never commits.
 
 Full detail — each check with what it protects, why an unrouted manifest is
 deliberately not a finding, and the remedy per failing line — is in
@@ -407,9 +407,9 @@ Named here rather than left to read as executed:
 - **Telling the user an authored rule is mechanically enforced.** It is
   documented, well-formed, and read by the work-item gate's agent — the
   evaluator is wontfix (§6, §9).
-- **Editing `AGENTS.md` or the pairing manifest to make the interop check
-  pass.** The check reports; only `references/interop-check.md` §5's repair
-  writes, on the operator's yes.
+- **Editing the pairing manifest to make the interop check pass.** §5's repair
+  writes `AGENTS.md` and removes a `CLAUDE.md`, on the operator's yes; the
+  manifest is never edited by this skill.
 - **Demanding `routing.roadmap`, `routing.sprint_specs` or `.workspace/locks`.**
   Those belong to the stack ossify replaced, and a project that lacks them is
   correct, not broken (§7).
