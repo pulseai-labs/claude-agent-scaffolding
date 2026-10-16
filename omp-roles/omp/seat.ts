@@ -41,7 +41,7 @@ export function versionWarning(v: { error?: Error; status: number | null; stdout
   return pinWarning(v.stdout ?? '', tested)
 }
 
-export function planLaunch(o: { role: string; via: string; args: string[]; ompRecord: string; claudeRecord: string; rolesDir?: string; roleEnv?: string }):
+export function planLaunch(o: { role: string; via: string; args: string[]; ompRecord: string; claudeRecord: string; rolesDir?: string; roleEnv?: string; seatConfig?: string }):
   { argv: string[]; warnings: string[]; extensions: string[] } | { error: string } {
   if (!Object.hasOwn(ROLES, o.role)) return { error: `omp-seat: unknown role "${o.role}" (known: ${Object.keys(ROLES).join(', ')})` }
   // seat-mods' no-subagent rail (#798) keys on the session's SEAT_MODS_ROLE, which the launcher sets: refuse a top
@@ -76,6 +76,12 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
     }
     argv.push('-e', ext)
     extensions.push(ext)
+  }
+  // The seat overlay keeps omp's todo reminders from restarting a turn molt needs to end (#843); without it the
+  // seat would launch but stall at every handoff, so a missing file stops the launch like a missing role file.
+  if (o.seatConfig !== undefined) {
+    if (!existsSync(o.seatConfig)) return { error: `omp-seat: seat config ${o.seatConfig} is missing` }
+    argv.push(`--config=${o.seatConfig}`)
   }
   const file = ROLES[o.role]
   if (file !== undefined) {
