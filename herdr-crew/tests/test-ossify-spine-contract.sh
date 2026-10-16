@@ -1869,6 +1869,8 @@ pin "$LIFECYCLE_MD" 'With `operator`, the ask says that this run'"'"'s brief or 
   "step 12 states an operator gate explicitly so autonomic routes it" flat
 pin "$LIFECYCLE_MD" 'a clean gate set on that SHA is the agreed condition, so merge with no ask (#837)' \
   "under a standing merge word the top merges a clean gate with no ask (#837)" flat
+pin "$LIFECYCLE_MD" 'merge executor is the operator (`MERGE_EXECUTOR=operator`) still goes to the operator' \
+  "an operator merge executor is reached under a standing word too (#837 round 1)" flat
 pin "$LIFECYCLE_MD" 'A run file older than 0.2.21' \
   "the resume names the legacy run-file rules" flat
 pin "$LIFECYCLE_MD" 'no `phase` counts as `delivered`' \
