@@ -2030,8 +2030,16 @@ _r=1; grep -Fq 'leftover `CLAUDE.md`' "$_OD5" && grep -Fq 'ossify:doctor' "$_OD5
 _pin "$_r" "occupied-destinations is silent on a leftover CLAUDE.md - Claude Code keeps loading it over the AGENTS.md /start just wrote"
 _r=1; grep -Fq '### `claude_md`' "$_IC" && grep -Fq 'fail: claude_md' "$_IC" && grep -Fq '.claude/CLAUDE.md' "$_IC" && _r=0
 _pin "$_r" "interop-check has no claude_md check - a leftover CLAUDE.md silently shadows AGENTS.md"
-_r=1; grep -Fq '## 5. The repair' "$_IC" && grep -Fq "operator's explicit yes" "$_IC" && grep -Fq 'Never commit' "$_IC" && ! grep -Fq 'Do not write or edit `AGENTS.md` yourself' "$_IC" && _r=0
+_r=1; grep -Fq "## 5. The repair — only on the operator's explicit yes" "$_IC" && grep -Fq 'Never commit' "$_IC" && ! grep -Fq 'Do not write or edit `AGENTS.md` yourself' "$_IC" && _r=0
 _pin "$_r" "interop-check still forbids the repair, or runs it without the operator's yes, or commits it"
+# The gate comes before the write, not only before the commit: workspace-init
+# 0.10.0 promises the operator sees the result first.
+_r=1; grep -Fq 'every change first' "$_IC" && grep -Fq 'Show the operator the whole merged file' "$_IC" && _r=0
+_pin "$_r" "interop-check's repair writes before the operator has seen it - workspace-init 0.10.0 promises the result is shown first"
+# doctor writes twice, each on the operator's word: §6's asked-for rule and §7's
+# yes-gated repair. The older "exactly one thing writes" claim is false.
+_r=1; ! grep -Fq 'Exactly one thing writes' "$_DS" && _r=0
+_pin "$_r" "doctor/SKILL.md claims 'Exactly one thing writes' again - §7's repair is a second write, so the count is wrong"
 _r=1; grep -Fq '`claude_md`' "$_DS" && ! grep -Fq 'do not edit `AGENTS.md` yourself' "$_DS" && _r=0
 _pin "$_r" "doctor/SKILL.md §7 does not name the claude_md check or still forbids the repair its reference ships"
 _r=1; grep -Fq '| `AGENTS.md` | merge ossify' "$_AS" && ! grep -Fq '| `CLAUDE.md` | merge' "$_AS" && _r=0

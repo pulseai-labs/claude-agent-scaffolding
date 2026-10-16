@@ -29,14 +29,15 @@ It shells out to `oss` for mechanical facts **where a verb exists**. The interop
 surface no longer has one: `interop_check` was 175 lines of bash that opened
 files and described them, and the skill performs that surface by reading — the
 manifest walk and parse, `ai_workspace`'s and every declared repo's root as
-directories, a raw `git -C` probe on each declared repo, and the `AGENTS.md`
-scan. What stays mechanical there is path
+directories, a raw `git -C` probe on each declared repo, and the `AGENTS.md` /
+`CLAUDE.md` scan. What stays mechanical there is path
 *resolution* (`oss repo_root`, `oss state_path`), because every mutating verb
 routes through it.
 
 With no argument it runs all six surfaces and reports all six. Unlike `/close`,
 nothing here halts on a failure and nothing here is a gate: `doctor` reports, and
-the only thing it writes is a rule block the user asked for.
+the only things it writes are a rule block the user asked for and §7's `claude_md`
+repair, on the operator's explicit yes.
 
 It also runs on a **broken** project by design — an uninitialised project, a
 corrupt state file or a missing topology declaration is the finding, not a

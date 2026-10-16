@@ -4,10 +4,9 @@ The depth behind `doctor/SKILL.md` §7. Absorbed from `scaffold-onboard`'s
 `checking-workspace-interoperability` (spec §8.1), so the unified plugin owns
 the question and `workspace-init` stays unchanged.
 
-**Check only.** Spec §9.1 allocates `doctor` an *interop check*; the additive
-repair half was scaffold-onboard's own extension and is not shipped here. This
-surface reports and names the fix. It does not edit the manifest and does not
-touch `AGENTS.md`.
+**Check first, repair on a yes.** This surface reports and names the fix. One
+fix it can also carry out: moving a leftover `CLAUDE.md` into `AGENTS.md` (§5),
+only on the operator's explicit yes. It never edits the manifest.
 
 _Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 
@@ -37,11 +36,12 @@ two vocabularies:
 ```
 ok: manifest - /path/to/.workspace/pairing.json
 fail: agents_md - no AGENTS.md at /path/AGENTS.md; a Codex session gets no project instructions at all
+fail: claude_md - /path/CLAUDE.md exists; Claude Code loads it and ignores AGENTS.md
 ```
 
 Check names, in this order: `manifest`, `ai_workspace`, one `ok:`/`fail:`
 line per declared repo — named by its own key, `canonical` for a project that
-declares one that way — `state_path`, `agents_md`. **If any line is `fail:`,
+declares one that way — `state_path`, `agents_md`, `claude_md`. **If any line is `fail:`,
 say so explicitly at the end** — there is no exit code to carry it now, so the
 summary is what the reader acts on. Report every failing line, not just the
 first, except where §3 says to stop.
@@ -297,13 +297,14 @@ do not grow a normalizer here either.
 
 ### `agents_md`
 
-The check that is actually about Codex.
+The check that every non-Claude agent depends on.
 
-`AGENTS.md` in the AI workspace must exist **and name ossify**. It is the only
-file Codex reads for project instructions: a workspace whose `AGENTS.md` never
-mentions ossify has a Codex session driving the project with none of its
-ceremonies — no spine planning, no close gates, no demo ledger — while the state
-file goes on recording a lifecycle nobody is following.
+`AGENTS.md` in the AI workspace must exist **and name ossify**. It is the one
+instruction file: Codex and OMP read only it, and Claude Code reads it whenever no
+`CLAUDE.md` exists: a workspace whose `AGENTS.md` never mentions ossify has a
+Codex session driving the project with none of its ceremonies — no spine
+planning, no close gates, no demo ledger — while the state file goes on
+recording a lifecycle nobody is following.
 
 Read `<ai_workspace.root>/AGENTS.md` and look for `ossify`, case-insensitively,
 anywhere in the file — a `## Ossify` heading satisfies it.
@@ -317,14 +318,55 @@ If the `ai_workspace` root did not resolve, you cannot look for the file: report
 `fail: agents_md - cannot look for AGENTS.md without a resolvable ai_workspace
 root` and stop there.
 
-**Do not write or edit `AGENTS.md` yourself.** It holds user-authored content,
-and this surface has no managed-section contract to merge into — that machinery
-belongs to the repair half that is deliberately not shipped here. Report the
-line, name the fix, stop.
+Do not author `AGENTS.md` from nothing here — its content is the project's. When
+the only problem is a leftover `CLAUDE.md`, §5's repair applies.
+
+### `claude_md`
+
+The check that keeps Claude Code on the same file as everyone else.
+
+Look for `CLAUDE.md` at the `ai_workspace` root **and** at
+`<ai_workspace.root>/.claude/CLAUDE.md`. Either one makes Claude Code load it
+and ignore `AGENTS.md` (its default `instructionFiles` setting loads
+`AGENTS.md` only when no `CLAUDE.md` exists), so Claude sessions and every
+other agent follow different instructions.
+
+| Line | Remedy |
+|---|---|
+| `ok: claude_md - no CLAUDE.md in the AI workspace` | — |
+| `fail: claude_md - <path> exists; Claude Code loads it and ignores AGENTS.md` | offer §5's repair |
+
+A declared repo's own `CLAUDE.md` is not this check's business: canonical repos
+keep theirs.
 
 ---
 
-## 4. What this check cannot tell you
+## 5. The repair — only on the operator's explicit yes
+
+After the read-out, when `claude_md` failed, offer to repair it. Show the
+operator every change first — the move, or the whole merged file — and do
+nothing until the operator says yes. For each `CLAUDE.md` the check named:
+
+1. **No `AGENTS.md` at the root:** `git mv <path> <ai_workspace.root>/AGENTS.md`
+   (plain `mv` if the workspace is not a git repo).
+2. **`AGENTS.md` exists:** merge. Keep every rule and fact from both files.
+   Drop lines whose only job was to point from one file to the other ("Read
+   `CLAUDE.md` for …"). Where the two files disagree, do not pick one: show
+   both versions and ask the operator. Show the operator the whole merged file
+   before you write it. Then write it and remove the `CLAUDE.md`.
+3. **Check every `@` import** in the new `AGENTS.md`: list each path and say
+   whether it resolves. A relative import moved from `.claude/CLAUDE.md` to the
+   root now resolves from the root — fix the path, or report it. An absolute
+   import outside the workspace may ask for approval again in the next
+   interactive Claude Code session; say so.
+4. **Never commit.** Report what changed and leave the commit to the operator.
+
+Re-read the workspace afterwards and emit the `agents_md` and `claude_md`
+lines again.
+
+---
+
+## 6. What this check cannot tell you
 
 Stated so a green result is not over-read:
 

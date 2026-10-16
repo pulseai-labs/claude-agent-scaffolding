@@ -9,7 +9,7 @@ You are ossify's **diagnostic surface** (spec §9.1, §9.2) — the sixth and la
 entry skill, and the only one that is not a ceremony. Every other entry skill
 *advances* the lifecycle. This one asks whether the lifecycle's records still
 describe the repository they claim to describe, and names the remedy for each
-way they do not. It reports; the operator repairs.
+way they do not. It reports, and writes only on the operator's word.
 
 `oss` (the dispatcher over `lib/*.sh`) supplies the mechanical facts: whether the
 schema parses, whether the journal replays, which worktree directories no work
@@ -51,10 +51,10 @@ of the read-out and mark the rest derived, so the sweep does not lead with three
 consequences of one cause. The one thing you may
 refuse is a request to *change* something you were not asked to change.
 
-**`doctor` reports; it does not mutate state.** Five of the six surfaces are
-strictly read-only. **Exactly one thing writes** — **rule authoring** (§6),
-which appends to `03-code-patterns.md`, and only because the user asked for a
-rule. Everything else names a remedy and stops. Running `oss state_restore`
+**`doctor` reports; it writes only on the operator's word.** Two things write:
+**rule authoring** (§6), which appends to `03-code-patterns.md` and only because
+the user asked for a rule, and **§7's `claude_md` repair**, only on an explicit
+yes. Everything else names a remedy and stops. Running `oss state_restore`
 because replay failed is not your call to make silently: surface the line, name
 the verb, let the user run it.
 
@@ -81,7 +81,7 @@ the verb, let the user run it.
 - The user wants to **plan, decompose, or execute** anything. Those are
   `/plan-release`, `/plan-spine`, `/work-item`.
 - The user asks to **fix** a finding you reported. Name the verb and let them
-  run it, unless it is the one explicit-write surface above (rule authoring).
+  run it, unless it is the rule the user asked for (§6) or §7's own repair.
 - The spec and the state disagree on **what adoption did**. Read
   `<ai-workspace>/ADOPTION.md` if it exists — it is adoption's record
   (`adopt` §6); route the discrepancy there before re-deriving one side.
@@ -122,7 +122,7 @@ Run all six surfaces in the order of §4 → §8 then §13, and **report every o
 **No check halts another.** This is the sharpest difference between `doctor` and
 `close`, and copying `close`'s halt discipline here is the mistake to avoid: a
 close halts because every later step *mutates* on the assumption the earlier one
-passed. Nothing here mutates, so a failed check costs nothing but its own line.
+passed. No check here does, so a failed check costs nothing but its own line.
 An operator with a corrupt state file still needs to know their interop is also
 broken — telling them one problem at a time is how a two-hour repair becomes
 three sessions.
@@ -248,7 +248,7 @@ deliberately does not check — is in **`references/spec-validation.md`**.
 
 `03-code-patterns.md` ships from `/start` with an **empty**
 `## Machine-checkable rules` section — the heading present, no rules. Filling it
-is this surface's job, and it is the one place `doctor` writes on purpose.
+is this surface's job; with §7's `claude_md` repair it is one of the two writes.
 
 Four rule types, and the field sets are per-type rather than shared — the
 reference's §3 table is the authoritative list; there is no verb behind it.
@@ -303,10 +303,10 @@ resolving to real directories, with each declared repo — never
 `ai_workspace`, which is legitimately allowed to be untracked — also being a
 git **work tree** (a bare repository or a `.git` directory is not
 one and fails), the state path resolving and not silently
-overridden, and **`AGENTS.md` existing and naming ossify**. That last one is the
-check that is actually about Codex: `AGENTS.md` is the only file Codex reads for
-project instructions, so a workspace whose `AGENTS.md` never mentions ossify has
-a Codex session driving the project with none of its ceremonies.
+overridden, and **`AGENTS.md` existing and naming ossify**, and **no `CLAUDE.md`**
+at the workspace root or in `.claude/` (`claude_md`). `AGENTS.md` is the one
+instruction file every agent reads; a `CLAUDE.md` beside it makes Claude Code
+ignore it.
 
 **What was absorbed is the question, not the checklist.** The scaffold-onboard
 original requires `routing.roadmap`, `routing.sprint_specs` and
@@ -314,9 +314,9 @@ original requires `routing.roadmap`, `routing.sprint_specs` and
 set over would report a correctly-configured ossify project as broken for
 lacking the previous stack's furniture.
 
-**Check only.** Spec §9.1 allocates `doctor` an *interop check*; the additive
-repair half was scaffold-onboard's own extension and does not ship here (§9).
-Report the failing line and name the fix; do not edit `AGENTS.md` yourself.
+**Check first, repair on a yes.** When `claude_md` fails, offer the repair in
+`references/interop-check.md` §5 — move or merge `CLAUDE.md` into `AGENTS.md` —
+and run it only on the operator's explicit yes. Never commit it.
 
 Full detail — each check with what it protects, why an unrouted manifest is
 deliberately not a finding, and the remedy per failing line — is in
@@ -362,10 +362,9 @@ Named here rather than left to read as executed:
   against a codebase mechanically is **wontfix** (settled 2026-08-15): the
   work-item gate's Layer 3 agent read is ossify's evaluation mechanism, and
   no ossify evaluator will ship.
-- **Interop repair.** §7 checks; it does not add manifest keys or merge
-  `AGENTS.md`. Spec §9.1 says *check*, and the repair half was the
-  retired `scaffold-onboard`'s — porting it would also mean porting a managed
-  `AGENTS.md` section this stack does not yet define.
+- **Interop repair beyond §7's one case.** Spec §9.1 allocates *check*; that
+  repair — move or merge a leftover `CLAUDE.md`, on the operator's explicit yes —
+  is one of `doctor`'s two writes (§6 is the other). No manifest keys, no block.
 - **Vocabulary maintenance.** A term drifting is a domain-model finding, not
   a state defect — the discipline is `start`'s `references/domain-modeling.md`,
   exercised through the bone retro's lessons section and its own stumble
@@ -381,7 +380,7 @@ Named here rather than left to read as executed:
 
 - **Refusing because the project is broken.** That is the finding, not an
   obstacle to reporting it (§1).
-- **Halting the sweep on the first `fail:`.** Nothing here mutates, so nothing
+- **Halting the sweep on the first `fail:`.** No check here mutates, so nothing
   downstream is unsafe. Report all six surfaces (§3).
 - **Letting a surface that could not run print nothing.** Silence reads as a
   pass (§3).
@@ -409,7 +408,8 @@ Named here rather than left to read as executed:
   documented, well-formed, and read by the work-item gate's agent — the
   evaluator is wontfix (§6, §9).
 - **Editing `AGENTS.md` or the pairing manifest to make the interop check
-  pass.** This surface checks; the user repairs (§7, §9).
+  pass.** The check reports; only `references/interop-check.md` §5's repair
+  writes, on the operator's yes.
 - **Demanding `routing.roadmap`, `routing.sprint_specs` or `.workspace/locks`.**
   Those belong to the stack ossify replaced, and a project that lacks them is
   correct, not broken (§7).
