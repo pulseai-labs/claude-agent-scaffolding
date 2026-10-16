@@ -2,6 +2,14 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.22
+
+**A rotation resumes from run state** (#819, part of #810). The rotation's resume is one procedure from `run.json`: rebind; re-ask an open `run.question`; run the generation check against `locator.seen` and re-arm each live attempt's waits; arm one heartbeat; continue at the handoff's next step, never re-running a done one. A resume after a hard stop (the top died with no handoff) is not claimed: the new top tells the operator (#810). The rotation handoff shrinks to the run path, the next step and the context the run file cannot hold, and restates no operator gate: for the merge it points at step 12 and `run.merge_word`, which step 12 now reads. Legacy run files resume with stated defaults. A molted top reads `locator.seen`. A brief sent to a seat already running now opens its attempt with phase and locator like a launch.
+
+- The outgoing top's write/dispatch ban starts at the handoff, including wakes during successor launch.
+- At `phase: recorded`, every dispatch saves an existing report's generation in the new attempt's `locator.seen`, so a retained seat's previous report is not consumed again after a resume or molt.
+- Orient sends a rotation's takeover through the resume before rebinding.
+
 ## 0.2.21
 
 **The ping follows the top; the run file carries the live facts** (#816, groundwork for #810 and #819). Every report-producing brief replaces `NOTIFY_PANE` with `NOTIFY_RUN` (the dispatcher's `run.json`) and `NOTIFY_MACHINE`: at each ping the worker reads `run.orchestrator` and pings that pane only when its machine is the worker's, so a successor top's rebind redirects every live worker's ping with no message to it. The top now writes `run.merge_word` at creation, `run.orchestrator.machine` at each bind, `run.question` around each operator ask, and per attempt `phase` (`recorded` before the brief, `delivered` after the confirmed send) and `locator` `machine`, `report`, `status`, `pain` and `seen` (the consumed report generation). `dagr check --strict` accepts every field. A live worker dispatched under 0.2.20 or earlier keeps pinging its fixed pane until its dispatch ends.
