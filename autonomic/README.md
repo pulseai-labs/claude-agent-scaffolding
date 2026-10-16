@@ -539,6 +539,18 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
 - OMP seats run `--approval-mode yolo`, so there is no permission fork: a never-approve match in autopilot blocks the `bash` call, writes
   a `permission` ledger line and raises a pain signal. The floor reads `bash` (the command, judged in the call's own `cwd`) and `github` `pr_push`
   with `forceWithLease`; `eval`, `debug` and scripts are not read, and a subagent's calls are covered by seat-mods' child rails.
+- **Grant-bounded decisions (0.7.x, unactivated).** An enrolled session with a decision service now has one extra branch in that floor: a matched
+  call whose *complete literal* effects are bounded by live positive grants is decided by `permissionEligibility` (`hooks/operations.ts`) and
+  recorded, then the original tool runs unchanged and exactly once. It is deterministic when a bounded command's evidence and a matching grant
+  already agree, and otherwise one native judgment inside the matched grants, with the semantic route requiring the judge, the accepted choice and
+  the deterministic grant/fact checks to all agree. Nothing widens what autonomy may do: `executionSegments` parses only the bash grammar it can
+  read (literal wrappers, `cd`, `git -C`, explicit ref/config effects) and marks anything it cannot — expansions, substitutions, interpreters,
+  aliases, functions, config writes — opaque, and an opaque segment never gains authority. A grant never mints authority for an operation it does
+  not cover, a command outside its approved evidence is not enough, and a default or protected destination, force, delete, `--no-verify`, an AI
+  trailer, a merge or any unsupported effect always stays with the operator. This is not universal enforcement: the other OMP tools, and any call
+  the floor never matched, are untouched. It is gated until Tasks 6–8 and both releases.
+- The `github` route's bounded facts read the repository's configured remote URLs locally (read-only `git config`) so a PR/API mutation can resolve
+  its exact repository from the pinned facts; no network call is made while deciding.
 - There is no band: a turn-end pain lists its options, numbered, in the notice, the bell and the pain file. The ask judge sees what
   the session has read, so a scope document answers an ask only after the session has read it.
 - A process that dies without `session_shutdown` (SIGKILL, crash, shutdown budget) leaves `mode/<pid>`; nothing sweeps these files; a reused pid clears its own at first load, and only children of the dead process could read it.

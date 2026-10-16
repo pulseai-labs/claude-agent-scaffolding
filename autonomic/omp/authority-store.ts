@@ -145,7 +145,16 @@ export function placementFacts(cwd: string): PlacementFacts {
   const sourceRefs: Record<string, string> = {}
   if (branch) sourceRefs[branch] = git(cwd, ['rev-parse', '--verify', branch])
   const defaultRef = git(cwd, ['symbolic-ref', '-q', 'refs/remotes/origin/HEAD'], true)
-  return freeze({ repository: dirname(common), worktree, cwd: canonicalTarget(cwd), branch, sourceRefs, defaultRefs: defaultRef ? [defaultRef] : [], protectedRefs: [], remotes: {}, targets: {} })
+  // Configured remote URLs (Plan Task 5 §7 Step 3; U1): a bounded, read-only local query, so a
+  // gh PR/API mutation can resolve its exact repository from the pinned facts. No network.
+  const remotes: Record<string, string> = {}
+  for (const line of git(cwd, ['config', '--get-regexp', '^remote\\..*\\.url$'], true).split('\n')) {
+    const at = line.indexOf(' ')
+    if (at < 0) continue
+    const name = line.slice(0, at).replace(/^remote\./, '').replace(/\.url$/, '')
+    if (/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) remotes[name] = line.slice(at + 1).trim()
+  }
+  return freeze({ repository: dirname(common), worktree, cwd: canonicalTarget(cwd), branch, sourceRefs, defaultRefs: defaultRef ? [defaultRef] : [], protectedRefs: [], remotes, targets: {} })
 }
 function checkPlacement(snapshot: Snapshot, facts: PlacementFacts): void {
   const live = placementFacts(facts.cwd)

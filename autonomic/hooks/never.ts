@@ -849,6 +849,142 @@ function writesConfig(ws: readonly string[]): boolean {
 export type Finding = { rule: NeverRule; level: 'ask' | 'fork'; focus: string }
 export type Floor = { findings: Finding[] }
 
+// One executable command segment of a call, in order (Plan Task 5 §7 Step 3). `text` is the
+// segment as written; `argv` is the literal argv the shell would pass after quote decoding;
+// `cwd` is where it runs, after any literal cd/git -C; `opaque` marks a segment whose effects
+// cannot be established (never granted authority); `redirects` are its redirection targets.
+export type ExecutionSegment = { text: string; argv: string[]; cwd: string; opaque: boolean; redirects: string[] }
+
+// The mask never.ts uses for hidden characters; a literal one in the raw text is a user byte we
+// must reject, never confound with a decoded quote character.
+const MASKED = /[\uE000-\uF8FF]/
+const unmask = (w: string) => w.replace(/[\uE000-\uF8FF]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xE000))
+// A wrapper's own words, never the wrapped program: the value flags each wrapper's options take.
+const WRAP_VALUES: Record<string, ReadonlySet<string>> = {
+  env: new Set(['-u', '--unset', '-C', '--chdir', '-S', '--split-string']),
+  sudo: new Set(['-u', '--user', '-g', '--group', '-p', '--prompt', '-C', '--close-from', '-h', '--host', '-r', '--role', '-t', '--type']),
+  doas: new Set(['-u', '-C']),
+  nice: new Set(['-n', '--adjustment']),
+  ionice: new Set(['-c', '--class', '-n', '--classdata', '-p', '--pid', '-P', '--pgid', '-u', '--uid']),
+  timeout: new Set(['-s', '--signal', '-k', '--kill-after']),
+  stdbuf: new Set(['-i', '-o', '-e', '--input', '--output', '--error']),
+  chrt: new Set(['-p', '--pid', '-T', '--sched-runtime', '-P', '--sched-period', '-D', '--sched-deadline']),
+  taskset: new Set(['-p', '--pid']),
+}
+const WRAPPERS = new Set(Object.keys(WRAP_VALUES).concat(['nohup', 'time', 'command', 'exec', 'builtin', 'setsid']))
+// Every program whose effects this vocabulary can name. An unknown program may run its arguments,
+// so it is opaque rather than silently treated as inert.
+const KNOWN_PROGRAMS = new Set(['git', 'gh', 'rm', 'unlink', 'chmod', 'chown', 'mv', 'cp', 'ln', 'mkdir', 'touch', 'sed', 'tee',
+  'diff', 'cmp', 'sha1sum', 'sha256sum', 'sha512sum', 'md5sum', 'b2sum', 'file', 'du', 'readlink', 'realpath', 'basename', 'dirname',
+  'bun', 'npm', 'npx', 'pnpm', 'yarn', 'cargo', 'go', 'make', 'pytest', 'uv', 'pip', 'tsc', 'eslint', 'prettier', 'ruff', 'vitest', 'jest',
+  ...[...INERT]])
+// The wrapped program's index, after a wrapper's own options and assignments (undefined: no wrapper).
+function wrapNext(name: string, ws: readonly string[], i: number): number | undefined {
+  if (!WRAPPERS.has(name)) return undefined
+  const values = WRAP_VALUES[name] ?? new Set<string>()
+  let k = i + 1
+  while (k < ws.length) {
+    const w = ws[k]!
+    if (w === '--') { k++; break }
+    if (values.has(w)) { k += 2; continue }
+    if (/^[A-Za-z_]\w*=/.test(w)) { k++; continue }
+    if (w.startsWith('-')) { k++; continue }
+    break
+  }
+  // timeout's own operand is the duration, before the program.
+  if (name === 'timeout' && k < ws.length && /^\d+(?:\.\d+)?[smhd]?$/.test(ws[k]!)) k++
+  return k
+}
+const joinPath = (cwd: string, target: string): string | undefined => {
+  const t = target.replace(/\/+$/, '') || '/'
+  if (t.startsWith('~')) return undefined
+  if (t.startsWith('/')) return t
+  const parts = `${cwd}/${t}`.split('/')
+  const out: string[] = []
+  for (const p of parts) { if (p === '' && out.length > 0) continue; if (p === '.') continue; if (p === '..') { out.pop(); continue } out.push(p) }
+  return out.join('/') || '/'
+}
+// A literal cd target for later segments: undefined means no change, null means unknown.
+function literalCd(bare: string): string | undefined | null {
+  const ws = split(bare)
+  const i = ws.findIndex(x => !KEYWORD.has(x))
+  if (i < 0 || (ws[i] !== 'cd' && ws[i] !== 'pushd')) return undefined
+  const t = ws.slice(i + 1).find(w => !w.startsWith('-'))
+  if (t === undefined || t === '-' || hasExpansion(t)) return null
+  return t
+}
+const hasExpansion = (w: string) => /[$*?[{`]/.test(w)
+// A literal `git -C <dir>` value for this command: undefined when absent, null when not literal.
+function gitDir(bare: string): string | undefined | null {
+  const ws = split(bare)
+  const i = ws.findIndex(x => !KEYWORD.has(x))
+  if (i < 0 || base(ws[i]!) !== 'git') return undefined
+  for (let k = i + 1; k < ws.length; k++) {
+    if (ws[k] === '-C') return ws[k + 1] === undefined || hasExpansion(ws[k + 1]!) ? null : ws[k + 1]!
+    if (ws[k] === '--') return undefined
+    if (ws[k]!.startsWith('-')) continue
+    return undefined
+  }
+  return undefined
+}
+// One segment: its literal argv, its cwd, and whether its effects can be established at all.
+function segmentOf(c: Command, cwd: string, unknownCwd: boolean): ExecutionSegment {
+  const raw = c.text
+  const redirects = targets(c.bare)
+  const hidden = MASKED.test(raw)
+  const masked = maskQuoted(raw.replace(REDIRS, ' '))
+  const words = argv(masked)
+  // A program, flag or redirect position holding an expansion, substitution or glob may be any
+  // word, so the segment's effects cannot be established (never granted authority).
+  const expandable = hidden || /[$`*?[\]{}]/.test(masked)
+  let progAt = -1
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i]!
+    if (KEYWORD.has(w) || /^[A-Za-z_]\w*=/.test(w)) continue
+    const next = wrapNext(base(w), words, i)
+    if (next !== undefined) { i = next - 1; continue }
+    progAt = i
+    break
+  }
+  const prog = progAt < 0 ? undefined : words[progAt]!
+  const name = prog === undefined ? undefined : base(prog)
+  const known = name !== undefined && KNOWN_PROGRAMS.has(name)
+  const runner = name !== undefined && (RUNNER.test(name) || name === 'xargs')
+  const defines = /\([ \t]*\)/.test(unquoted(masked)) || /(?:^|[\s;&|(])(?:function|alias)[ \t]/.test(masked)
+  const unsafeSed = name === 'sed' && !safeSed(raw)
+  // A git config write or an explicit git dir/work-tree moves the facts out of the pinned ones.
+  const git = isGit(words)
+  const movesFacts = git && (writesConfig(words) || words.some(w => /^--(?:git-dir|work-tree)/.test(w) || /^GIT_(?:DIR|WORK_TREE|CONFIG)/.test(w)))
+  const dirs = gitDir(c.bare)
+  const opaque = expandable || unknownCwd || defines || runner || unsafeSed || !known
+  const cwdFor = dirs === null || dirs === undefined ? cwd : (joinPath(cwd, dirs) ?? cwd)
+  return { text: raw.trim(), argv: words.slice(progAt < 0 ? words.length : progAt).map(unmask), cwd: cwdFor,
+    opaque: opaque || dirs === null || movesFacts, redirects }
+}
+/**
+ * Every executable command of `command`, in order, with the literal argv each is given, where it
+ * runs and what could not be established. Reuses the floor's own grammar (`commands`, the quote
+ * mask, `targets`, `split`), so a word the floor reads the same way reaches the same segment.
+ * An unknown program, expansion, substitution, interpreter, definition or config write is
+ * `opaque`, and an opaque segment never gains authority.
+ */
+export function executionSegments(command: string, cwd: string): ExecutionSegment[] {
+  const cmds = commands(command)
+  if (cmds === undefined) return [{ text: command.trim(), argv: [], cwd, opaque: true, redirects: [] }]
+  const out: ExecutionSegment[] = []
+  let current = cwd
+  let unknownCwd = false
+  for (const c of cmds) {
+    out.push(segmentOf(c, current, unknownCwd))
+    const cd = literalCd(c.bare)
+    if (cd !== undefined) {
+      if (cd === null) unknownCwd = true
+      else { const next = joinPath(current, cd); if (next === undefined) unknownCwd = true; else current = next }
+    }
+  }
+  return out
+}
+
 export function neverRules(command: string, where: Where, readers: Readers = DEFAULT_READERS): NeverRule[] {
   return [...new Set(floorFindings(command, where, readers).findings.map(f => f.rule))]
 }

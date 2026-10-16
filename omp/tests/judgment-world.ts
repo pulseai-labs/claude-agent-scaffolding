@@ -18,6 +18,7 @@ import { placementFacts } from '../../autonomic/omp/authority-store'
 import type { EvidenceMaterial, Grant, Snapshot } from '../../autonomic/hooks/authority'
 import { createAutonomic } from '../../autonomic/omp/extension'
 import type { AutonomicIO } from '../../autonomic/omp/extension'
+import { DEFAULT_POLICY } from '../../autonomic/hooks/policy'
 import { parsePolicyBundle } from '../../autonomic/omp/judgment'
 import type { ConsumerHost, DecisionIO, PolicyBundle } from '../../autonomic/omp/judgment'
 
@@ -70,6 +71,23 @@ export type RoutingWorld = {
   setGeneration: (run: NonNullable<ExtensionContext['runEphemeralTurn']>) => void
   revoke: () => void; replace: () => void
   switchTo: (id: string, reason: 'new' | 'resume' | 'fork') => Promise<void>
+  // E3/E4/E5 (Plan Task 5 Step 5): an append fault injector owned by the fixture's own
+  // io.appendLine, the ordered multi-extension dispatch, and a pain-file reader.
+  armAppend: (hook: ((path: string, line: string) => void | Promise<void>) | undefined) => void
+  registerOrdered: (factory: (pi: unknown) => void) => void
+  // The fixture's own real Autonomic tool_call handler, without building a second PinnedAuthority
+  // (a second factory would read the ambient SEAT_MODS_ALLOW and refuse the fixture worktree).
+  orderedAutonomic: () => void
+  dispatch: (toolName: string, input: unknown) => Promise<{ block: boolean; reason?: string; receipt: number; order: string[] }>
+  order: string[]
+  painLines: () => string[]
+  // Write the fixture home's ~/.omp/agent/autonomic.json before session_start, so the real
+  // config load reads it (the load is lazy and session_start is the first caller).
+  writeConfig: (config: Record<string, unknown>) => void
+  // E2/negative-world helpers: a fixture-local remote and an origin/HEAD mapping, no network.
+  addRemote: (name: string, url: string) => void
+  setRemoteHead: (name: string, ref: string) => void
+  branchRef: () => string
   close: () => void
 }
 
@@ -81,6 +99,8 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   const branch = options.branch ?? 'fixture'
   git(tree, 'init', '-b', branch)
   git(tree, '-c', 'user.name=Synthetic', '-c', 'user.email=synthetic@example.invalid', 'commit', '--allow-empty', '-m', 'synthetic fixture')
+  // E2 (Plan Task 5 §7): the requested branch is a real ref, so a push grant always has a source.
+  git(tree, 'rev-parse', '--verify', `refs/heads/${branch}`)
 
   const workerRoots = [tree, out]
   // Rewrite the plan's template repository/paths/refs into this fixture's temp roots BEFORE issuance.
@@ -147,7 +167,9 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   // authority directory.
   const painPath = join(out, 'pain.log')
   const savedEnv: Record<string, string | undefined> = {}
-  for (const [k, v] of Object.entries({ AUTONOMIC_AUTHORITY_PATH: binding.path, AUTONOMIC_AUTHORITY_SHA256: binding.sha256,
+  // E1 (Plan Task 5 Step 1): the requested mode is real. Without AUTONOMIC_MODE the session
+  // record resolves `manual` and the intercepted floor returns before any decision.
+  for (const [k, v] of Object.entries({ AUTONOMIC_MODE: options.mode ?? 'manual', AUTONOMIC_AUTHORITY_PATH: binding.path, AUTONOMIC_AUTHORITY_SHA256: binding.sha256,
     AUTONOMIC_ASSIGNMENT_ID: binding.assignmentId, AUTONOMIC_ASSIGNMENT_GENERATION: String(binding.generation),
     AUTONOMIC_LAUNCH_ID: binding.launchId, AUTONOMIC_LEDGER: ledgerPath, AUTONOMIC_PAIN_PATH: painPath, HOME: home })) { savedEnv[k] = process.env[k]; process.env[k] = v }
 
@@ -158,6 +180,8 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   })
 
   // A real AutonomicIO over the fixture tree: real files, real local git, no network.
+  let appendHook: ((path: string, line: string) => void | Promise<void>) | undefined
+  const order: string[] = []
   const io: AutonomicIO = {
     pid: process.pid,
     launchCwd: tree,
@@ -172,7 +196,11 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
     readText: async path => { try { return readFileSync(path, 'utf8') } catch { return undefined } },
     exists: async path => existsSync(path),
     writeText: async (path, text) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text) },
-    appendLine: async (path, line) => { try { mkdirSync(dirname(path), { recursive: true }); appendFileSync(path, `${line}\n`); return true } catch { return false } },
+    appendLine: async (path, line) => {
+      order.push(path.endsWith('.decisions.jsonl') ? 'sidecar' : 'human')
+      if (appendHook !== undefined) await appendHook(path, line)
+      try { mkdirSync(dirname(path), { recursive: true }); appendFileSync(path, `${line}\n`); return true } catch { return false }
+    },
     touch: async path => { try { mkdirSync(dirname(path), { recursive: true }); appendFileSync(path, ''); return true } catch { return false } },
     run: argv => Promise.resolve(runLocal(argv, tree)),
     ephemeral: async () => undefined,
@@ -185,6 +213,10 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   }
 
   const autonomic = createAutonomic(io)
+  // E1 (Plan Task 5 Step 1): a real autopilot session has the default policy on disk, written by
+  // session_start. The fixture writes it at construction so `invoke` alone is a live autopilot call.
+  mkdirSync(join(home, '.claude/autonomic'), { recursive: true })
+  writeFileSync(join(home, '.claude/autonomic/policy.md'), DEFAULT_POLICY)
   // The exposed decisions service and the lifecycle handlers share this one authority instance.
   const decisions = autonomic.decisions
   if (decisions === undefined) throw new Error('fixture is not enrolled: the decision service is unavailable')
@@ -206,6 +238,26 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   pi.on('session_stop', (e: unknown) => autonomic.onSessionStop(e as { last_assistant_message?: unknown; session_id?: unknown }))
 
   const invoke = async (toolName: string, rawInput: unknown) => handlers.get('tool_call')?.({ toolName, input: rawInput }, ctx) as Promise<{ block: true; reason: string } | undefined>
+  // E4: the real extension order. seat-mods, molt and autonomic each register one `tool_call`
+  // handler; dispatch runs them in registration order, stops at the first block, and otherwise
+  // runs the no-side-effect original tool once (a receipt), recording the observed order. The
+  // plain `handlers` map stays intact, so `invoke` still reaches the Autonomic handler alone.
+  const ordered: Array<(e: unknown, c: unknown) => unknown> = []
+  let receipt = 0
+  const registerOrdered = (factory: (piArg: unknown) => void): void => {
+    factory({ on: (n: string, fn: unknown) => { if (n === 'tool_call') ordered.push(fn as (e: unknown, c: unknown) => unknown) },
+      registerCommand: () => {}, exec: async () => ({ code: 0 }), sendMessage: () => {}, sendUserMessage: () => {} })
+  }
+  const dispatch = async (toolName: string, input: unknown) => {
+    order.push('dispatch')
+    for (const fn of ordered) {
+      const r = await fn({ toolName, input }, ctx) as { block?: true; reason?: string } | undefined
+      if (r?.block === true) return { block: true, reason: r.reason, receipt, order: [...order] }
+    }
+    receipt += 1
+    order.push(`receipt:${toolName}`)
+    return { block: false, receipt, order: [...order] }
+  }
   return {
     root, tree, authorityPath: binding.path, ledgerPath, painPath, decisions, handlers, ctx, notices, nativeRequests, generationRequests,
     entryMs: autonomic.entryMs,
@@ -222,6 +274,16 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
       await autonomic.onSessionSwitch()
       void reason
     },
+    armAppend: hook => { appendHook = hook },
+    registerOrdered,
+    orderedAutonomic: () => { const h = handlers.get('tool_call'); if (h !== undefined) ordered.push(h as (e: unknown, c: unknown) => unknown) },
+    dispatch,
+    order,
+    painLines: () => existsSync(painPath) ? readFileSync(painPath, 'utf8').split('\n').filter(l => l !== '') : [],
+    writeConfig: config => { mkdirSync(join(home, '.omp/agent'), { recursive: true }); writeFileSync(join(home, '.omp/agent/autonomic.json'), JSON.stringify(config)) },
+    addRemote: (name, url) => { git(tree, 'remote', 'add', name, url) },
+    setRemoteHead: (name, ref) => { git(tree, 'symbolic-ref', `refs/remotes/${name}/HEAD`, ref) },
+    branchRef: () => `refs/heads/${branch}`,
     close: () => {
       for (const [k, v] of Object.entries(savedEnv)) { if (v === undefined) delete process.env[k]; else process.env[k] = v }
       rmSync(root, { recursive: true, force: true })
