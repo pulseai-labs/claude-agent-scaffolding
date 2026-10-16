@@ -104,7 +104,7 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
 herdr answers, live, which path a seat takes: whether `herdr agent list` returns a record for
 the pane. That answer, never a config field, is the discriminator — a detection manifest
 landing later moves a seat to the typed path with no edit anywhere. Detection after `pane
-run`: a record at about a second (0.6 s, still `agent_status: unknown`, no session identity)
+run`: a record at about a second (0.6 s, still `agent_status: unknown`, no session identity; before it, `agent list` omits the pane and `agent get`/`agent wait` answer `agent_not_found`: ask again for up to five seconds, then take the not-detected path)
 and a settled state (`idle`) at about four seconds (3.8–4.0 s). The first ask, once the record
 is there, chooses only the **readiness wait** below; made once step 5's model read has shown
 `expected_model:` on the pane, a second ask of that list decides the **send's route** and with
@@ -153,11 +153,11 @@ question written to the report file is not a dialog; it rings that doorbell (Com
 ## Host: OMP
 
 An OMP top (`omp-seat orchestrator --via omp-glm`, omp-roles 0.4.0) runs this skill as written, with these
-substitutions. Background call: omp's bash async job (`async.enabled`, on by default); the async job passes
-`timeout: 0`, which disables omp's command deadline (a nonzero value is clamped), so herdr's `--timeout` bounds
-the wait; its result returns to the session as a turn, so every readiness and completion wait, and the heartbeat, runs as one. A send's slash command
+substitutions; so does an OMP coordinator for the seats it drives. Background call: omp's bash async job (`async.enabled`, on by default); pass `timeout: 0` on every one
+(omp's default deadline is 300 s and a nonzero value is clamped; 0 disables it), so herdr's `--timeout` bounds the wait; never pass `name:`, which puts omp's bash in service mode and refuses async and timeout.
+Its result returns to the session as a turn, so every readiness and completion wait, and the heartbeat, runs as one. A send's slash command
 is text on omp: `/<plugin>:<skill>` becomes `skill://<skill>`, except a send to a Claude Code seat. herdr-crew's
-`hooks.json` does not run on omp: the context-ceiling notice comes from molt's omp extension. No `Agent` tool
+`hooks.json` does not run on omp: the context-ceiling notice comes from molt's omp extension. For the top, no `Agent` tool
 means no `task`, `eval` `agent()` or workpool: seat-mods 0.4.4 blocks them for `SEAT_MODS_ROLE=orchestrator` (#798).
 
 ## Sending a seat a message

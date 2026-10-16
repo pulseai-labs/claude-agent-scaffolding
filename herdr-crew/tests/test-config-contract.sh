@@ -89,6 +89,17 @@ brief_pin() {
 # doctor dispatch, direct work-item, non-spine close. The correction-request
 # template is a send, not a launch, so it carries no seat.
 brief_pin 'SEAT_COMMAND=' "every dispatched template names its seat's command" 9
+brief_pin 'you are already that seat, never run it' "every SEAT_COMMAND says it is a record, never run (#845)" 9
+# The class, not the instance (#845 round 1): every launch-record line in any reference — SEAT_, SPINE_,
+# CLOSE_, WORKPR_, WRITER_COMMAND — carries the never-run clause, so a new *_COMMAND line without it fails here.
+cmd_total=0; cmd_bare=""
+for f in "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
+  n="$(awk '/^[A-Z]+_COMMAND=</ { t++ } END { print t+0 }' "$f")"
+  b="$(awk '/^[A-Z]+_COMMAND=</ && index($0, "you are already that seat, never run it") == 0 { print FILENAME ":" FNR }' "$f")"
+  cmd_total=$((cmd_total + n)); [ -z "$b" ] || cmd_bare="$cmd_bare $b"
+done
+if [ "$cmd_total" -ge 13 ] && [ -z "$cmd_bare" ]; then pass "every *_COMMAND launch record says never run ($cmd_total)"
+else fail "every *_COMMAND launch record says never run" "total $cmd_total (want >= 13), bare:$cmd_bare"; fi
 brief_pin 'SEAT_EXPECTED_MODEL=' "every dispatched template names its expected model" 9
 brief_pin 'SEAT_EFFORT=' "every dispatched template names its effort" 9
 brief_pin 'NOTIFY_RUN=' "every dispatched template names the run file its ping reads" 9

@@ -97,6 +97,8 @@ present "$REF" '--until done --until idle --until blocked' "the typed wait names
 present "$REF" "--match '<expected_model:>'" "the undetected path waits on the seat's own expected_model:"
 pin "$REF" 'herdr agent list' "the discriminator is named once"
 
+pin "$REF" '`agent get`/`agent wait` answer `agent_not_found`: ask again for up to five seconds, then take the not-detected path' "a detection ask before the record is retried, then bounded (#845)" flat
+
 section "the rules that must survive a rewording"
 pin "$REF" 'never `pane split`' "the no-split rule survives"
 pin "$REF" 'invoked by name' "the lane-by-name rule survives"
@@ -275,7 +277,9 @@ pin "$LIFE" 'without it, the path as its first instruction on either' "a cross-h
 pin "$LIFE" '(`skill://handoff` on OMP)' "an OMP top writes its handoff with the OMP skill spelling"
 pin "$LIFE" 'the other host'"'"'s profile resolved from its machine-file entry like any seat'"'"'s' "the other host's profile comes from its machine-file entry" flat
 pin "$LIFE" 'a detected coordinator'"'"'s companion included' "a new top re-arms a coordinator's companion wait" flat
-pin "$REF" '`timeout: 0`, which disables omp' "OMP async waits disable the command deadline" flat
+pin "$REF" 'pass `timeout: 0` on every one' "OMP async waits disable the command deadline (#845)" flat
+pin "$REF" 'never pass `name:`, which puts omp'"'"'s bash in service mode' "OMP async waits never pass name: (#845)" flat
+pin "$REF" '0 disables it), so herdr'"'"'s `--timeout` bounds the wait' "OMP: timeout 0 is why herdr's --timeout bounds the wait (#845)" flat
 
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"
