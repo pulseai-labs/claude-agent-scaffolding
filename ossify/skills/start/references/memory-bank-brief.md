@@ -1,7 +1,7 @@
 # Memory-bank derivation brief (ossify-owned)
 
 Depth for SKILL.md §13. This is **ossify's own** derivation brief — the memory
-bank and `CLAUDE.md` are authored here, from the lean spec sections, not by
+bank and `AGENTS.md` are authored here, from the lean spec sections, not by
 calling scaffold-onboard. The 14-file structure and the harvest mechanics carry
 over unchanged; only the *derivation source* is re-anchored.
 
@@ -59,7 +59,7 @@ before. Bootstrap does not need to be complete; it needs to be honest.
 
 ---
 
-## 3. `CLAUDE.md`
+## 3. `AGENTS.md`
 
 Authored at the same time, from the same sources. Contents at Release 0:
 
@@ -75,14 +75,16 @@ Authored at the same time, from the same sources. Contents at Release 0:
 5. **Bones with revisit triggers** — the short list, so an agent knows which
    decisions are load-bearing before it touches them.
 
-Keep it short. `CLAUDE.md` is read on every call; the memory bank is where depth
-belongs.
+Keep it short. `AGENTS.md` is read on every call; the memory bank is where depth
+belongs. It is the one instruction file: Claude Code loads it when no
+`CLAUDE.md` exists, and Codex and OMP read it directly. Never author a
+`CLAUDE.md`.
 
 ---
 
 ## 4. Routing
 
-- **Memory bank + `CLAUDE.md`** → the **AI workspace** (they are agent
+- **Memory bank + `AGENTS.md`** → the **AI workspace** (they are agent
   scaffolding, not product code).
 - **`PUBLIC_BOUNDARY.md`** → each **public repo root**.
 - **Lean MASTER-SPEC** → AI workspace. **EXECUTIVE-SUMMARY** → per the project's
@@ -106,6 +108,6 @@ belongs.
 - **Inventing detail to fill a thin section.** A three-line true section is
   correct at Release 0; a paragraph of plausible fiction is a hallucination that
   a future session will treat as a decision.
-- **Front-loading depth into `CLAUDE.md`.** Every call pays for it.
+- **Front-loading depth into `AGENTS.md`.** Every call pays for it.
 - **Omitting the unverified claims.** They are the most load-bearing content the
   bank carries at bootstrap.

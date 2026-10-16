@@ -2,7 +2,7 @@
 
 Depth for SKILL.md §3 and §13. `/start` can run in a workspace that already
 holds files at its destinations: a project scaffold-onboard set up before any
-code carries a legacy MASTER-SPEC, a hand-authored `CLAUDE.md` and a memory
+code carries a legacy MASTER-SPEC, a hand-authored `AGENTS.md` or `CLAUDE.md` and a memory
 bank whose LIVE files (`05`, `06`, `09`, `10`) hold history nothing else
 records. §3's canonical-content gate never sees them, because it reads declared
 repos and the AI workspace is never one. This file is the rule that keeps them.
@@ -23,7 +23,7 @@ Resolve the path of every output in §13's table (`memory-bank-brief.md` §4 —
 never reaches it) and check whether a file already exists there: the
 MASTER-SPEC at `oss spec_path`, the EXECUTIVE-SUMMARY, each memory-bank
 file where the bank lives (`close/references/harvest.md`, "Where the bank is"),
-`CLAUDE.md`, each `PUBLIC_BOUNDARY.md`, and the private boundary inventory —
+`AGENTS.md`, each `PUBLIC_BOUNDARY.md`, and the private boundary inventory —
 checked **both** at `posture-block.md` §7's convention,
 `<ai-workspace>/docs/private-boundary-inventory.md`, **and** for any other
 `docs/*inventor*.md` beneath the `ai_workspace` root (a case-insensitive glob:
@@ -50,6 +50,22 @@ yet — an EXECUTIVE-SUMMARY with no routing key — cannot be checked here; §2
 last paragraph checks it when its path is chosen.
 
 A destination that holds nothing is written as usual, with no question.
+
+### 1a. Two instruction-file cases
+
+**workspace-init's stub is not occupied.** An `AGENTS.md` whose first line is
+exactly `<!-- workspace-init stub: ossify:start replaces this file -->` is the
+temporary file workspace-init wrote, and it counts as unoccupied: write
+ossify's `AGENTS.md` over it with no question, and say in the §13 hand-off
+that the workspace-init stub was replaced. The marker must be the first line.
+An `AGENTS.md` with the marker anywhere else, or without it, is occupied and
+takes §2's question like any other file.
+
+**A leftover `CLAUDE.md` is not a destination.** `/start` never writes
+`CLAUDE.md`. When the AI workspace holds one (at its root or at
+`.claude/CLAUDE.md`), leave it untouched, and say in the §13 hand-off that
+Claude Code loads it in preference to `AGENTS.md` until it is migrated — run
+`ossify:doctor` (OMP: `skill://doctor`) and accept its interop repair.
 
 ## 2. Stop and ask, per file
 

@@ -2013,4 +2013,28 @@ pin "$SKILLS/plan-spine/references/decomposition.md" 'and any other spine that c
 _r=1; ! grep -Fq 'accepted and silently dropped' "$SKILLS/plan-spine/references/codebase-design.md" && grep -Fq 'only for an intake request' "$SKILLS/plan-spine/references/codebase-design.md" && _r=0
 _pin "$_r" "codebase-design.md still says a fifth feature_add argument is dropped - a planner's split trigger is now refused at rc 2 (#631)"
 
+# 1.24.0 (#768, #554) - AGENTS.md is the one instruction file. One pin per
+# station; behaviour is judged by the start-occupied-destination and
+# doctor-instruction-file eval surfaces.
+_MB="$_OSSR/skills/start/references/memory-bank-brief.md"
+_OD5="$_OSSR/skills/start/references/occupied-destinations.md"
+_IC="$_OSSR/skills/doctor/references/interop-check.md"
+_DS="$_OSSR/skills/doctor/SKILL.md"
+_AS="$_OSSR/skills/adopt/SKILL.md"
+_MARK='<!-- workspace-init stub: ossify:start replaces this file -->'
+_r=1; grep -Fq '## 3. `AGENTS.md`' "$_MB" && ! grep -Fq '## 3. `CLAUDE.md`' "$_MB" && grep -Fq '| Memory bank (14 files) + `AGENTS.md` | AI workspace |' "$_SS" && _r=0
+_pin "$_r" "start authors CLAUDE.md - a new workspace gets the file Codex and OMP never read"
+_r=1; grep -Fq "$_MARK" "$_OD5" && grep -Fq 'first line' "$_OD5" && grep -Fq 'counts as unoccupied' "$_OD5" && _r=0
+_pin "$_r" "occupied-destinations has no workspace-init stub exception - /start leaves the marked stub in place, so it never becomes ossify's AGENTS.md (#554)"
+_r=1; grep -Fq 'leftover `CLAUDE.md`' "$_OD5" && grep -Fq 'ossify:doctor' "$_OD5" && _r=0
+_pin "$_r" "occupied-destinations is silent on a leftover CLAUDE.md - Claude Code keeps loading it over the AGENTS.md /start just wrote"
+_r=1; grep -Fq '### `claude_md`' "$_IC" && grep -Fq 'fail: claude_md' "$_IC" && grep -Fq '.claude/CLAUDE.md' "$_IC" && _r=0
+_pin "$_r" "interop-check has no claude_md check - a leftover CLAUDE.md silently shadows AGENTS.md"
+_r=1; grep -Fq '## 5. The repair' "$_IC" && grep -Fq "operator's explicit yes" "$_IC" && grep -Fq 'Never commit' "$_IC" && ! grep -Fq 'Do not write or edit `AGENTS.md` yourself' "$_IC" && _r=0
+_pin "$_r" "interop-check still forbids the repair, or runs it without the operator's yes, or commits it"
+_r=1; grep -Fq '`claude_md`' "$_DS" && ! grep -Fq 'do not edit `AGENTS.md` yourself' "$_DS" && _r=0
+_pin "$_r" "doctor/SKILL.md §7 does not name the claude_md check or still forbids the repair its reference ships"
+_r=1; grep -Fq '| `AGENTS.md` | merge ossify' "$_AS" && ! grep -Fq '| `CLAUDE.md` | merge' "$_AS" && _r=0
+_pin "$_r" "adopt merges its loop section into CLAUDE.md - an adopted workspace's AGENTS.md never names ossify"
+
 t_summary

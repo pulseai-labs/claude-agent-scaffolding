@@ -139,6 +139,12 @@ lean one. doctor's and close's `fail: state` remedy names `/ossify:start` or
 `/ossify:adopt`, which each run `init`, instead of a bare `init`. No `lib/`
 code, no state change.
 
+Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
+instruction file every agent reads; neither writes `CLAUDE.md`. `/start`
+replaces a workspace-init stub (marker on line 1) without asking. `doctor`'s
+interop check fails on a leftover `CLAUDE.md` and, on the operator's yes, moves
+or merges it into `AGENTS.md`.
+
 Since 1.13.4 (#154, #561, #301, #299), four prose defects that only a careful
 reader could catch are corrected, and each is pinned red-then-green. doctor's
 bones-drift check compares the registry's and the spec's identifier *sets*, so a

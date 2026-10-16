@@ -404,13 +404,13 @@ Full minima in `references/lean-spec-schema.md`.
 |---|---|
 | Lean MASTER-SPEC (7 sections) | AI workspace |
 | EXECUTIVE-SUMMARY | per manifest routing |
-| Memory bank (14 files) + `CLAUDE.md` | AI workspace |
+| Memory bank (14 files) + `AGENTS.md` | AI workspace |
 | Bones-registry ADRs | the project's ADR directory |
 | Seed feature map | `project-state.json` (already written via `oss feature_add`) |
 | `PUBLIC_BOUNDARY.md` | **each public repo root** |
 | Private boundary inventory | AI workspace — `docs/private-boundary-inventory.md` |
 
-The memory bank + `CLAUDE.md` are authored **by ossify**, in conversation, from
+The memory bank + `AGENTS.md` are authored **by ossify**, in conversation, from
 the lean spec sections — not by calling scaffold-onboard, whose brief targets the
 retired 10-phase schema. Never emit fill-in markers; thin-and-true beats a `TODO`.
 **Never write over an existing file:** honour the per-file answers §3 collected (`references/occupied-destinations.md`).
