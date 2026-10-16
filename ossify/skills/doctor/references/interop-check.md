@@ -392,8 +392,9 @@ two moves.** Two independent moves both target `AGENTS.md`: the second `git mv`
 fails, and a plain `mv` silently overwrites the first. The plan is fixed so two
 runs give the same result:
 
-1. **The root `CLAUDE.md` moves** — `mv <root>/CLAUDE.md <ai_workspace.root>/AGENTS.md`,
-   or a merge into an `AGENTS.md` that already exists (5.3).
+1. **The root `CLAUDE.md` moves** into `AGENTS.md` by §5.3's own choice of command
+   (`git -C … mv` when it is tracked, plain `mv` otherwise — 5.3 decides, not
+   this step), or a merge into an `AGENTS.md` that already exists (5.3).
 2. **`.claude/CLAUDE.md` merges** into that `AGENTS.md`, never over it.
 
 Root first, `.claude/` merged into the result. The same rule applies to a single
@@ -402,20 +403,53 @@ target to take), and branch 1 below is the branch that runs.
 
 ### 5.3 Move, or merge
 
+**Re-read the inputs after the yes.** The plan was built before the operator
+answered; between the two, a `CLAUDE.md` can be edited or an `AGENTS.md` can
+appear or disappear. Before any write, re-read every `CLAUDE.md` the plan names
+and `AGENTS.md` (or its absence). If any differs from what the plan was built
+from, write nothing — rebuild the plan and show it again for a new yes. A plan
+approved against different bytes is not an approval.
+
 For each `CLAUDE.md` the check named, in the order §5.2 fixes:
 
-1. **No `AGENTS.md` at the root, and this is the file being placed:**
-   `git mv <path> <ai_workspace.root>/AGENTS.md` — **only when the source is
-   tracked**. Decide by tracking, not by whether the workspace is a git repo: an
-   untracked `CLAUDE.md` inside a git workspace (the common `.claude/CLAUDE.md`
-   shape — `.claude/` is usually ignored) makes `git mv` fail with "not under
-   version control". Test it:
+1. **No `AGENTS.md` at the root, and this is the file being placed.** Choose the
+   command **first**, by the tracking test — never by trying one and falling back
+   to the other:
+
+   - **Tracked** (`git -C "<ai_workspace.root>" ls-files --error-unmatch "<path>"`
+     succeeds): `git -C "<ai_workspace.root>" mv "<path>" "<ai_workspace.root>/AGENTS.md"`.
+     An untracked `CLAUDE.md` inside a git workspace (the common `.claude/CLAUDE.md`
+     shape — `.claude/` is usually ignored) fails that test and takes the next
+     branch; its `git mv` would abort with "not under version control".
+   - **Untracked, or no git repo to consult:** plain
+     `mv "<path>" "<ai_workspace.root>/AGENTS.md"`.
+
+   The choice is the `if`, and only the branch it selects runs — there is no
+   `|| mv` to fall through to:
 
    ```bash
-   git -C "<ai_workspace.root>" ls-files --error-unmatch "<path>" >/dev/null 2>&1 \
-     && git mv "<path>" "<ai_workspace.root>/AGENTS.md" \
-     || mv "<path>" "<ai_workspace.root>/AGENTS.md"
+   if git -C "<ai_workspace.root>" ls-files --error-unmatch "<path>" >/dev/null 2>&1; then
+     git -C "<ai_workspace.root>" mv "<path>" "<ai_workspace.root>/AGENTS.md"
+   else
+     mv "<path>" "<ai_workspace.root>/AGENTS.md"
+   fi
    ```
+
+   Absolute paths throughout, and `-C "<ai_workspace.root>"` on every `git` call
+   (§11): a bare `git mv` run from another worktree moves the file in *that*
+   repo's index.
+
+   **Run only the command you chose.** If it fails — `mv` refused, `git mv`
+   aborted, a permission error — **stop there**: write nothing more, re-emit
+   nothing, report the error, and rebuild and re-show the plan. Do not try the
+   other command: a fallback after a failed `git mv` looks like recovery and is
+   how a plain `mv` lands on an `AGENTS.md` that appeared after the plan was
+   shown. (E1)
+
+   **The destination must still be free.** Immediately before the command,
+   `AGENTS.md` must still be absent. If it now exists, stop and rebuild the plan:
+   the shape is a merge, not a move, and overwriting it loses every rule in the
+   file that appeared.
 
    A non-git workspace has no `git ls-files` to consult; use plain `mv` there,
    which is the same answer the failing `ls-files` gives.

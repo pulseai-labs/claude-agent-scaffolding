@@ -2069,7 +2069,11 @@ _r=1; grep -Fq 'and hold' "$_IC" && grep -Fq 're-emit nothing' "$_IC" \
 _pin "$_r" "§5 has no hold - an unanswered disagreement re-emits ok: with the CLAUDE.md still present and nothing written (D3)"
 # D5: git mv is chosen by whether the SOURCE IS TRACKED, not by whether the
 # workspace is a git repo - the untracked .claude/CLAUDE.md shape fails on rc.
-_r=1; grep -Fq 'ls-files --error-unmatch' "$_IC" && grep -Fq 'only when the source is' "$_IC" \
+# Round 2 (E1): the anchor moved from "only when the source is" to "Choose the
+# command **first**, by the tracking test" - the same claim, and the phrase E1's
+# no-fallback rule is built on. The grep below keeps the claim pinned.
+_r=1; grep -Fq 'ls-files --error-unmatch' "$_IC" && grep -Fq 'Choose the' "$_IC" \
+  && grep -Fq 'by the tracking test' "$_IC" \
   && ! grep -Fq 'plain `mv` if the workspace is not a git repo' "$_IC" && _r=0
 _pin "$_r" "git mv is chosen by git-repo-ness - an untracked .claude/CLAUDE.md in a git workspace fails 'not under version control' (D5)"
 # D6: both files is ONE plan with a fixed order, so two runs agree; the old text
@@ -2093,5 +2097,29 @@ _pin "$_r" "doctor's never-do list still forbids editing AGENTS.md to make the i
 _r=1; grep -Fq '## Git policy' "$_OD5" && grep -Fq '## AI-trace filter' "$_OD5" \
   && grep -Fq 'copy both sections from it into' "$_OD5" && _r=0
 _pin "$_r" "/start's stub replacement drops the stub's Git policy and AI-trace filter sections - later agents lose the network-ops default-deny (D9)"
+
+# PR #836 round 2 (E1, E2). Both are defects in the repair's own move path.
+# E1: no fallback - the tracking test chooses the command and only that command
+# runs; an `|| mv` after a failed `git mv` can overwrite an AGENTS.md that
+# appeared after the plan was shown, and a bare `git mv` targets $PWD's repo.
+# The `git mv` half is a NEGATIVE grep: the correct text has no bare
+# `git mv "<path>"` anywhere (every git call carries -C), so this catches both
+# the prose bullet and the executable block. A positive grep for the -C form
+# alone did not: mutating only the block's line survived it (round-2 fix).
+_r=1; grep -Fq 'Run only the command you chose' "$_IC" \
+  && grep -Fq 'Do not try the' "$_IC" \
+  && ! grep -Fq 'git mv "<path>"' "$_IC" \
+  && ! grep -Fq '|| mv "<path>"' "$_IC" \
+  && grep -Fq 'git -C "<ai_workspace.root>" ls-files --error-unmatch' "$_IC" && _r=0
+_pin "$_r" "the move falls back to plain mv after a failed git mv, or runs a bare git mv without -C - the fallback overwrites an AGENTS.md that appeared, and the bare form targets the wrong repo (E1)"
+# E2: the inputs are re-read after the yes, before any write - a plan approved
+# against different bytes is not an approval.
+# The ordering is the point: a re-read AFTER the write is no gate at all, and
+# greping only the heading and the rebuild clause survived exactly that mutation
+# (round-2 fix). `Before any write` is what pins the order.
+_r=1; grep -Fq 'Re-read the inputs after the yes' "$_IC" \
+  && grep -Fq 'Before any write' "$_IC" \
+  && grep -Fq 'rebuild the plan and show it again for a new yes' "$_IC" && _r=0
+_pin "$_r" "the repair writes on a plan whose inputs changed between the yes and the write - a CLAUDE.md edited, or an AGENTS.md appeared, is never noticed (E2)"
 
 t_summary
