@@ -4,7 +4,7 @@ All notable changes to the `herdr-crew` plugin.
 
 ## 0.2.27
 
-**The reviewer's command is configurable** (operator, 2026-10-16). A machine entry may declare `review:`, the command a reviewer seat on that agent runs, with `<PR>`, `<PR_URL>` and `<LEVEL>` filled at dispatch (`/review <PR_URL>` on OMP). An entry with no `review:` keeps `/code-review <PR> <LEVEL>`. Both reviewer briefs carry the filled command as `REVIEW_INVOCATION`, which replaces the work-PR brief's `REVIEW_LEVEL`. The `can:` table's reviewer row needs `slash-commands` only for `/code-review`. Lifecycle step 8, roles.md, SKILL.md and the README name the review command instead of `/code-review`.
+**The reviewer's command is configurable** (operator, 2026-10-16). A machine entry may declare `review:`, the command a reviewer seat on that agent runs, with `<PR>`, `<PR_URL>` and `<LEVEL>` filled at dispatch (`/review <PR_URL>` on OMP). An entry with no `review:` keeps `/code-review <PR> <LEVEL>`. Both reviewer briefs carry the filled command as `REVIEW_INVOCATION`, which replaces the work-PR brief's `REVIEW_LEVEL`. The `can:` table's reviewer row needs `slash-commands` when the command the reviewer runs is a slash command. Lifecycle step 8, roles.md, SKILL.md and the README name the review command instead of `/code-review`.
 
 ## 0.2.26
 
