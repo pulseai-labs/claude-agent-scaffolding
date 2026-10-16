@@ -2036,5 +2036,7 @@ _r=1; grep -Fq '`claude_md`' "$_DS" && ! grep -Fq 'do not edit `AGENTS.md` yours
 _pin "$_r" "doctor/SKILL.md §7 does not name the claude_md check or still forbids the repair its reference ships"
 _r=1; grep -Fq '| `AGENTS.md` | merge ossify' "$_AS" && ! grep -Fq '| `CLAUDE.md` | merge' "$_AS" && _r=0
 _pin "$_r" "adopt merges its loop section into CLAUDE.md - an adopted workspace's AGENTS.md never names ossify"
+_r=1; grep -Fq 'author it when absent' "$_AS" && grep -Fq '`AGENTS.md` when present, else author' "$_AS" && _r=0
+_pin "$_r" "adopt's AGENTS.md row is merge-only - a legacy workspace with no AGENTS.md leaves C5's line-234 precondition ('each file you create does not exist yet') nothing to merge into, so adopt refuses it (D31)"
 
 t_summary

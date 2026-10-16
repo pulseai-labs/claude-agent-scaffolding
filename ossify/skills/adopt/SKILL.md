@@ -236,7 +236,7 @@ no blank destinations — an adopted project is all occupied surface.
 | Destination | Action |
 |---|---|
 | `MASTER-SPEC.md` | map legacy phases → the 7 lean sections; keep legacy sections (spec-validation reads their presence as legal) |
-| `CLAUDE.md` | merge ossify's loop section; preserve hand-authored zones |
+| `AGENTS.md` | merge ossify's loop section when the file exists; author it when absent; preserve hand-authored zones. If the AI workspace still holds a `CLAUDE.md` (root or `.claude/`), leave it untouched and name `ossify:doctor`'s interop repair in the adoption record and the hand-off: Claude Code loads `CLAUDE.md` over `AGENTS.md` until it is migrated |
 | `EXECUTIVE-SUMMARY.md` | leave; no gate reads it |
 | memory bank | append with harvest's provenance trailer (`close/references/harvest.md`), declaring `source: adoption` with the baseline this pass recorded — `r0 baseline <sha>`, one `<repo>=<sha>` per declared repo when the adoption spans several; **never truncate**. For `09-known-issues.md` / `10-decisions-log.md`, harvest's never-regenerate rule wins — they hold the history adoption preserves (#268; the brief's conditional is still owed) |
 | `tech-debt.md`, `PUBLIC_BOUNDARY.md` | author (absent) |
@@ -258,7 +258,7 @@ the shipped surface.
 
 | Output | Routed to | Mode |
 |---|---|---|
-| Lean spec sections 1–7, memory bank, `CLAUDE.md` | AI workspace | merge (spec, `CLAUDE.md`); append-with-trailer, author only what is absent (memory bank) |
+| Lean spec sections 1–7, memory bank, `AGENTS.md` | AI workspace | merge (spec; `AGENTS.md` when present, else author); append-with-trailer, author only what is absent (memory bank) |
 | Bones ADRs | each declared repo's `docs/adr/` | append, continuing the series |
 | Bones / risk gates / feature map / posture / Release 0 closed | `project-state.json` | `oss` verbs — into §3's init state |
 | `PUBLIC_BOUNDARY.md` | each public repo root | author |
@@ -300,7 +300,7 @@ Close with `oss doctor` (the state gate: `state`, `schema`, `replay`,
   overload the word.
 - **Touching the legacy stack's STATE** — roadmap position, cursor, slice
   and worktree structure: read, never written. Reconciling the legacy
-  ARTIFACTS (spec, `CLAUDE.md`, memory bank, ADRs) is C5's job. Adoption
+  ARTIFACTS (spec, `AGENTS.md`, memory bank, ADRs) is C5's job. Adoption
   is additive; the operator retires the old stack at their choosing.
 - **Mid-slice adoption.** §3 A5 refuses it by design.
 - **Repairing what it finds.** C2 gaps and stale ADRs are findings.
