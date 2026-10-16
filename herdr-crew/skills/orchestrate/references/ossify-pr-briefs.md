@@ -35,7 +35,7 @@ TASK: run `/ossify:close SPINE_ID` and let it complete or halt. Whatever it hand
 off, you do not drive: if it opens PRs and halts, that halt is your result. The
 ceremony's own steps are yours to perform, including
 the close review the ceremony itself runs over the accumulated diff before any PR
-opens — `/ossify:close` doing its job, not a `/code-review` you dispatch. Its
+opens — `/ossify:close` doing its job, not a review you dispatch. Its
 findings are yours to report, never to fix: ossify keeps that review advisory —
 it halts no ceremony gate — but this dispatch is stricter, and a `fix now`
 disposition ends this dispatch as `halted: close-review — <ledger>`,
@@ -97,7 +97,7 @@ WORKPR_COMMAND=<the command this seat was launched with, from its machine entry>
 WORKPR_EXPECTED_MODEL=<the model the banner or screen must show>
 WORKPR_EFFORT=<the effort this seat was launched at>
 REVIEWER=<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
-REVIEW_LEVEL=<the /code-review level the top decided>
+REVIEW_INVOCATION=<the reviewer's agent's `review:`, else `/code-review <PR> <LEVEL>`, with PR_NUMBER, the PR URL and the level the top decided filled in>
 PRFIX=<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
 PRIOR_REVIEW=<the prior dispatch's durable review record — ran, reviewed head,
 clean/findings state, summary, fix rounds run, ledger/comment refs — "none", or "covered">
@@ -136,7 +136,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
   3. Initial runs only: create the reviewer FIRST from its REVIEWER row — every launch or
      re-creation of it carries the guard before its command (role `reviewer`, `MECHANICS`
      step 2) — confirm the model as its row's `model_shows` says and from the first reply,
-     and brief it to run `/code-review PR_NUMBER REVIEW_LEVEL`. Read the findings from its
+     and brief it to run REVIEW_INVOCATION. Read the findings from its
      report file — it posts nothing; that file is the only copy. Validate it against the
      reviewer brief's schema — `Findings: none` with `Reviewed head:` and `Summary:`, or
      finding lines plus both — before passing anything on; on a malformed body send
