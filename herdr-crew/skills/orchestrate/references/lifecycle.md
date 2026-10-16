@@ -222,12 +222,12 @@ Every command's syntax comes from `herdr --skill`.
     threads, and the non-thread signals of review bodies and PR conversation comments,
     which are clean when every finding in them has a terminal state recorded in the
     disposition comment (step 10).
-    Ask only when every one is clean: a non-mergeable state is surfaced to the operator
-    as the blocker instead of asking, and a new actionable finding returns to step 10.
-    Ask the operator for the merge word naming that SHA.
-    The run's `run.merge_word` decides who answers: with `standing`, the ask goes to whoever
-    answers this session's questions, as for any top. With `operator`, the ask says that this run's
-    brief or the operator set an operator merge gate, so autonomic routes it to the operator.
+    Act only when every one is clean: a non-mergeable state is surfaced to the operator
+    as the blocker, and a new actionable finding returns to step 10.
+    The run's `run.merge_word` decides where the merge word comes from. With `standing`, the operator's
+    standing word is it: a clean gate set on that SHA is the agreed condition, so merge with no ask (#837).
+    With `operator`, the ask says that this run's brief or the operator set an operator merge gate, so
+    autonomic routes it to the operator: ask for the merge word naming that SHA.
     Merge only on that word, as a merge commit, never a squash, bound to the approved
     SHA: re-fetch the same full gate set for that SHA once more, then
     `gh pr merge <number> --repo <owner/repo> --merge --match-head-commit <sha>` —

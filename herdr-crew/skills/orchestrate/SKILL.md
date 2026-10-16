@@ -185,8 +185,9 @@ These cases are named because they look like clashes and are not:
   targets the invoking repository unless told otherwise, and the retained implementer
   often sits elsewhere. `work-pr`'s "re-review on the new head" means re-fetching
   GitHub signals after a push, so no second `/code-review` occurs. The worker stops at
-  `work-pr`'s merge ask and returns its ledger in its report file; you relay the ask to the
-  operator and merge on the word with one `gh` command.
+  `work-pr`'s merge ask and returns its ledger in its report file; you answer it as
+  step 12's `run.merge_word` says (with `standing`, a clean gate set is the word; with `operator`,
+  ask the operator) and merge with one `gh` command.
 
 ## 7. Refusals
 
