@@ -8,6 +8,16 @@ The `implementer` autoloads ossify's `work-item` skill and returns its JSON afte
 
 Under `omp-seat`, a `spine-driver`, `close` or `work-pr` launch must export `SEAT_MODS_ROLE=coordinator` (unset, seat-mods guards the session as an implementer, which denies the commits, pushes and merges the procedures need) and list each hosting repo's worktree root in `SEAT_MODS_ALLOW` (e.g. `SEAT_MODS_ROLE=coordinator SEAT_MODS_ALLOW=/path/to/repo/.worktrees omp-seat spine-driver`).
 
+### Opt-in trusted OMP assignment launch (unreleased)
+
+A dispatcher with separately recorded operator approval issues through the installed Autonomic `bin/authority.ts`, then sets all five startup fields: `AUTONOMIC_AUTHORITY_PATH`, `AUTONOMIC_AUTHORITY_SHA256`, `AUTONOMIC_ASSIGNMENT_ID`, `AUTONOMIC_ASSIGNMENT_GENERATION`, `AUTONOMIC_LAUNCH_ID`. A role, `AUTONOMIC_MODE`, seat selection, plan approval or digest supplied by the worker is not enrollment. No binding keeps legacy/manual launch; a partial/invalid binding refuses before even the via's version probe.
+
+`omp-seat` resolves the already selected Autonomic install root and synchronously invokes `bun <root>/bin/authority.ts validate-launch --worker-root <root>` for the captured allowance; no inter-plugin import. Validation includes actual assignment worktree, all `SEAT_MODS_ALLOW` entries (coordinator `.worktrees` included), report/scratch and declared output roots. Authority/input/evidence/policy and parent directories must not overlap that allowance in either direction. Existing role guards, alias/minimum-version checks, original argv, marking and extension order **seat-mods → Molt → Autonomic** remain unchanged.
+
+Every materially new enrolled assignment needs a fresh process/launch binding, even if its pane is retained. A changed env/report cannot hot-enroll a running seat. Same-assignment corrections may reuse only unchanged approvals/grants/lifetime; completion or revocation invalidates old authority. Public Molt ownership evidence is insufficient for automatic reactivation: an in-place clear stays suspended and requires a fresh trusted launch. Finish/handoff already-running tops/workers before rollout. A wrapper bypassing `omp-seat` is not a validated launch.
+
+The real authority CLI/reader is usable independently of model/backend; native decision activation and its host release/policy/calibration gates are separate. Task-3 fixture issuance is not a live grant. See Autonomic's trusted-assignment section for exact schema/CLI and same-UID/shared-process/last-check race limits. Operator-owned merge/design/plan gates and all seat-mods denials remain absolute; no new role/profile/exception is supplied. Claude Code launch/backend semantics are unchanged; Jev parity remains deferred to #832.
+
 ## Install
 
 Coordinator roles need ossify 1.18.0 for `spine-driver` and `close`, and merge-bar for `work-pr`.

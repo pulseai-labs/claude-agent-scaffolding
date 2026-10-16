@@ -10,8 +10,59 @@ session stop only for a reason on a closed **pain list**, and tells the operator
 Every decision it takes in the operator's place is one line in a committed **ledger**. It fails
 toward manual: anything broken gives more asks, never fewer.
 
-autonomic reads no crew or multiplexer state. It reads five environment variables a launcher may
-set, and two files `molt` writes.
+The legacy adapter reads launcher mode variables and Molt files; OMP's opt-in trusted-assignment contract below has additional startup/provenance inputs. Neither route reads crew or multiplexer state.
+
+## OMP trusted assignment authority (unreleased)
+
+This delivers the issuer/reader/launch contract, **not activation of native decision consumers**. A bound OMP factory validates eligibility but stays manual until the complete native consumer integration ships; it never uses the old conversational reflex as an enrolled fallback. No live grant, host capability, calibration or deployment is supplied. Unbound legacy OMP and Claude Code keep their existing behavior. Claude Code Jev integration is deferred to #832; OMP-only work does not close #831's cross-host criterion.
+
+### Dispatcher CLI and independent provenance
+
+Only the operator, or a dispatcher with recorded bounded operator delegation, selects the trusted input/source paths outside every worker allowance. A worker must never invoke issuance or supply a new path/hash as enrollment. Commands use the known installed Autonomic path:
+
+```text
+bun <autonomic-root>/bin/authority.ts issue --input <trusted-input> --authority-root <trusted-root> --worker-root <assignment-worktree> --worker-root <each-additional-root>
+bun <autonomic-root>/bin/authority.ts validate-launch --worker-root <assignment-worktree> --worker-root <each-additional-root>
+```
+
+Repeat `--worker-root`; unknown flags and duplicate scalar flags fail. `issue` prints one JSON `{path,sha256,assignmentId,generation,launchId}` binding, not shell text. `validate-launch` reads startup variables, checks actual local Git placement and emits a positive validation receipt or exits 2 before the worker runs. Include the entire launch allowance: assignment worktree, all `SEAT_MODS_ALLOW` entries (coordinator `.worktrees` included), report/scratch/handoff roots and writable output locations. The snapshot, its parent, input and provenance/evidence/policy sources must be outside them in either ancestry direction. Free roles do not waive this check or create sandbox isolation.
+
+For a new enrolled launch, export every declared report/scratch/handoff/other writable root in the startup `SEAT_MODS_ALLOW`, **also for free roles**, in addition to any coordinator `.worktrees` roots. Alternatively the corresponding exported report/output path variables contribute their parent directories; `SCRATCH_DIR` contributes its directory. This is the trusted launch envelope captured by both CLI and factory, not a later model-supplied list. Issuer `--worker-root` arguments and the envelope must describe the same complete allowance. A path mentioned only in a mutable brief is not a usable launch-envelope input; reconcile it before issuance. The legacy marking examples are unchanged.
+
+Trusted input is exactly `{snapshot,material,approval,delegation}`. Each material is `{ref:{id,source,sha256,locator},text}`; `source` is the independently selected absolute canonical source file, and the full bounded UTF-8 text must match its coherent bytes and digest. Approval is an external JSON event: `{version:1,kind:'operator-approval',id,operatorId,snapshotSha256,delegationSha256,assignments:[{assignmentId,briefSha256}]}`. Its locator equals its event ID. Direct issuance requires matching operator ID and null delegation; delegated issuance supplies a separately materialized operator parent Snapshot with the event's exact delegation digest, explicit assignment/brief membership and finite resource narrowing. An event/path/hash claimed by a worker is not an operator event.
+
+Construction order is acyclic: **materialize task/brief/policy evidence → serialize Snapshot → record the external operator event hashing those snapshot bytes → create the independently selected issuance input**. Snapshot string approval IDs identify the event but no snapshot EvidenceRef/policy/brief may hash the approval event or reference its source/input. The CLI rejects that circular provenance rather than seeking a hash fixed point. Operator source selection is an external trust prerequisite, not something JSON or file permissions can prove.
+
+Each launch is a fresh exclusive directory under the authority root. The issuer writes/fsyncs complete sibling files, atomically renames the snapshot and returns its binding. It preserves original input path/digest/file identity in `provenance.json`; referenced excerpts live in `evidence/<sha256>` and policy bytes in `policy/<policy-sha256>.json`. Original event/input/source records must remain readable and unchanged. The Markdown policy is never rewritten. Replacement/removal/revocation is invalidation, not an in-process grant update.
+
+### Version-1 snapshot and reader API
+
+`hooks/authority.ts` exports the exact schema/types and `parseSnapshot`, `narrows`, `captureLaunchBinding`; `omp/authority-store.ts` exports `canonicalTarget`, `readCoherent`, `PinnedAuthority`, `MoltTransition` and local `placementFacts`. Snapshot is one object, at most 64,000 UTF-8 bytes, with these required fields:
+
+| Field | Closed shape |
+|---|---|
+| identity | `version:1`, nonempty `assignmentId`, positive safe-integer `generation` |
+| issuer | `{kind:'operator'|'delegated-dispatcher',id,approvalRef,delegationRef:string|null}` |
+| seat | `{id,host:'omp',role:'implementer'|'verifier'|'reviewer'|'coordinator'|'orchestrator',launchId}` |
+| placement | `{repository,worktree,branch}` — canonical absolute paths and exact full ref |
+| task | `{briefSha256,scopeRefs:EvidenceRef[],instructionRefs:EvidenceRef[]}`; brief bytes resolve to pinned task evidence |
+| policy | `{id,sha256,approvalRef}`; materialized companion bytes, not standing-mode authority |
+| grants | `{id,operation,resource,authorityRefs:string[]}[]`; empty authorizes nothing |
+| lifetime | `{issuedAt,expiresAt:string|null,revoked:false}`; calendar-valid UTC RFC3339, issued no later than now, future expiry |
+
+Unknown/duplicate keys, conflicting/duplicate IDs, malformed hashes, nonfinite/unsafe numbers, wildcards, ambiguous refs/paths, invalid UTF-8 and unresolved approvals fail. Repeated evidence IDs across scope/instruction lists must have identical definitions. Resources are finite `paths {repository,roots}`, `commit {repository,branch,paths}`, `push {repository,remote,sourceRef,destinationRef}`, or `pr {repository,headRef,number}`. Create uses null PR number; update requires a positive safe integer.
+
+Operations are `worktree.read/build/test/lint/edit`, `git.commit`, `git.push-own-branch`, `pr.create-own`, `pr.update-own`, `task-output.write`. Paths/refs/repository must narrow the approved task/delegation. Commit/push/PR operations are excluded for reviewer/verifier roles; reviewers also cannot edit the worktree. Seat-mods still owns all its denials independently. No delete/merge/force/no-verify/trailer grant exists. Operator merge acknowledgment, design/spec/plan/release gates, product choices, credentials and Molt handoff cannot be supplied by a role, standing mode, plan approval, confidence or a model. Actual operation/command facts and protected/default-ref checks remain mandatory at the consumer boundary; a lease is not permission to execute an arbitrary command.
+
+`PinnedAuthority(binding,workerRoots)` captures one launch and role. `lease(sessionId,facts)` returns frozen snapshot/evidence/policy, file identity, session/epoch and `fresh()`. Read before decisions, after asynchronous work, and immediately before action; final `fresh()` must have no subsequent model await. Local Git rechecks are synchronous bounded subprocesses; consumers must check their remaining transaction deadline again after these calls before acting. `signal` aborts outstanding work on invalidation. `invalidate()` permanently rejects; `suspend()` cancels and advances the epoch. File reads use no-follow regular-file descriptors, bounded coherent bytes and full dev/inode/size/nanosecond mtime/ctime comparisons. Same-byte replacement, symlinks, revoked/expired state, missing/changed source/policy/evidence, branch/placement drift and generation mismatch reject; they never select newer authority.
+
+### Startup and assignment lifecycle
+
+Copy the trusted binding into `AUTONOMIC_AUTHORITY_PATH`, `AUTONOMIC_AUTHORITY_SHA256`, `AUTONOMIC_ASSIGNMENT_ID`, `AUTONOMIC_ASSIGNMENT_GENERATION`, `AUTONOMIC_LAUNCH_ID` **before** `omp-seat` starts. All five are captured once; partial/invalid bindings refuse launch. Editing env/report/task prose in a running seat cannot enroll it. Every materially new assignment ends the old process and launches fresh, even in a retained pane. Same-assignment corrections stay within unchanged pinned approvals/grants/lifetime; replacing those bytes requires fresh issuance/launch. Completion/revocation invalidates the predecessor.
+
+The factory exposes its captured `authority` service from `createAutonomic` for later DecisionIO integration, never a worker-reconstructed lease. Main-only before-switch, switch/resume, context rebuild/rewind, shutdown and explicit mode-off cancel eligibility. `/autopilot on`, lineage and predecessor mode records cannot restore it. `revalidateMolt(MoltTransition,facts)` keeps the planned before/after interface, but the inspected public host exposes no proof of Molt's private pending ownership. Therefore in-place Molt **remains suspended and requires fresh trusted launch**, even with plausible lineage/stage bytes; parent-handback children end their unit. Already-running tops/workers must finish/handoff then launch fresh, not hot-enroll or assume restart installs a missing host API.
+
+This is an ordinary same-UID/shared-process guard contract, not a sandbox: hostile same-UID processes, free seats and arbitrary in-process extensions are not isolated. Recheck-to-execution is not an atomic filesystem/ref lock; changes observed before action abort, but an external change immediately after the final check is not transactionally prevented.
 
 ## Turning it on
 

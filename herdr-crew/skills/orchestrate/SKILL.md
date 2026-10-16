@@ -96,6 +96,12 @@ verifier, the operator, the coordinator seats an activated spine adds, and a
 operator's two files (`references/config.md`), never from this plugin's prose. A seat
 name neither file defines halts the run rather than guessing.
 
+### Enrolled OMP authority
+
+Only a separately approved operator issuance or bounded recorded delegation may enroll a new OMP autonomous assignment. Use Autonomic's real file/CLI contract and omp-seat preflight; mode, role, model/seat selection, plan approval and reports are not grants. Copy each dispatched template's complete authority identity/prohibitions envelope, filled with trusted startup facts or `none`, not a reference-only fragment. No live grants/thresholds or activation follow from this skill.
+
+A materially new enrolled assignment ends the old process and launches fresh even in a retained pane. Same-assignment corrections/rechecks retain only unchanged approval/grants/lifetime. Revocation/completion/replacement invalidates; existing tops/workers cannot hot-enroll through env/reports. Public Molt evidence cannot prove private transition ownership, so enrolled clears remain suspended and require fresh trusted launch. All seat-mods rails and operator merge/design/plan/release gates outrank standing routing. Claude Code and legacy/manual rules remain unchanged; keep phase/locator.seen/resume/generation ownership and never auto-relaunch a live attempt.
+
 ## 4. The run
 
 `references/lifecycle.md` is the thirteen-step run: orient, decompose, launch, plan

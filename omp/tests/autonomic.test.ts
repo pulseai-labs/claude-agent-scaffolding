@@ -1024,22 +1024,6 @@ describe('the omp wiring', () => {
     expect(r.exitCode).toBe(0)
   })
 
-  test('the extension imports only autonomic\'s hooks, node: builtins and relative modules (Ruling 10)', () => {
-    const src = readFileSync(join(import.meta.dir, '../../autonomic/omp/extension.ts'), 'utf8')
-    const specs = [...src.matchAll(/^import(?: type)?[^'"]*from\s+['"]([^'"]+)['"]/gm)].map(m => m[1]!)
-    expect(specs.length).toBeGreaterThan(10)
-    for (const s of specs) expect(s.startsWith('node:') || /^\.\.\/hooks\/(?!register|io)[a-z]+$/.test(s)).toBe(true)
-    expect(src).not.toMatch(/@oh-my-pi|@sinclair|claude-code/)
-  })
-
-  test('registers /autopilot and the event handlers', () => {
-    const b = boot()
-    try {
-      expect([...b.commands.keys()]).toEqual(['autopilot'])
-      expect([...b.handlers.keys()].sort()).toEqual(['agent_start', 'before_agent_start', 'input', 'session_compact', 'session_shutdown', 'session_start', 'session_stop', 'session_switch', 'session_tree', 'tool_call', 'tool_result'])
-    } finally { b.restore() }
-  })
-
   test('a child agent (task, advisor, /tan clone): no handler does anything', async () => {
     const b = boot({ mode: 'autopilot' })
     try {

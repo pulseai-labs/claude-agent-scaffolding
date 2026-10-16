@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MARKETPLACE } from '../../omp-roles/omp/bin-path'
@@ -238,6 +238,20 @@ describe('bin/omp-seat with a via that cannot run', () => {
     const r = run('false')
     expect(r.status).toBe(1)
     expect(r.stderr).not.toContain('not the tested')
+  })
+  test('partial authority refuses before the via version probe or worker executes', () => {
+    const home = join(root, 'home')
+    const receipt = join(root, 'executed')
+    const via = join(root, 'harmless-via')
+    writeFileSync(via, `#!/bin/sh\nprintf executed >> '${receipt}'\n`)
+    chmodSync(via, 0o700)
+    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map(n => install(n))
+    record(join(home, '.omp/plugins/installed_plugins.json'), { 'seat-mods': s, molt: m, autonomic: a })
+    const r = spawnSync('bun', [seat, 'worker', '--via', via], {
+      env: { ...process.env, HOME: home, AUTONOMIC_AUTHORITY_PATH: join(root, 'missing-snapshot') },
+      encoding: 'utf8', timeout: 30_000,
+    })
+    expect({ status: r.status, executed: existsSync(receipt) }).toEqual({ status: 2, executed: false })
   })
 })
 

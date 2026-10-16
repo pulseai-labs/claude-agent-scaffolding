@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process'
 import { join, dirname } from 'node:path'
 import { realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { checkExtensions, expandRole, planLaunch, versionWarning, testedVersion } from '../omp/seat'
+import { authorityPreflight, checkExtensions, expandRole, planLaunch, versionWarning, testedVersion } from '../omp/seat'
 import { ompRecordPath } from '../omp/bin-path'
 
 const here = dirname(realpathSync(process.argv[1]))
@@ -24,6 +24,8 @@ const plan = planLaunch({ role: seat.role, via: seat.via, args, ompRecord: ompRe
   claudeRecord: join(home, '.claude', 'plugins', 'installed_plugins.json'), rolesDir: join(here, '..', 'roles'),
   roleEnv: seat.roleEnv })
 if ('error' in plan) { console.error(plan.error); process.exit(2) }
+const authority = authorityPreflight({ env: { ...process.env }, workerRoots: [process.cwd()], autonomicRoot: dirname(dirname(plan.extensions[2])) })
+if ('error' in authority) { console.error(authority.error); process.exit(2) }
 const broken = await checkExtensions(plan.extensions)
 if (broken !== undefined) { console.error(broken); process.exit(2) }
 const v = spawnSync(seat.via, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 15_000 })

@@ -93,6 +93,7 @@ Every command's syntax comes from `herdr --skill`.
    and its full locator before the brief goes, writing an existing `REPORT_PATH` file's current generation
    `{hash, identity}` as the new attempt's `locator.seen` and leaving `seen` absent only when the file is absent,
    and sets `phase: delivered` once the send is confirmed.
+   **Enrolled OMP only:** new material assignments require ending the old process and fresh trusted issuance/launch, even in retained panes; same-assignment corrections/rechecks retain only unchanged approvals/grants/lifetime. Keep this attempt's phase/locator.seen/generation and no-auto-relaunch ownership: the authority rule never starts a duplicate worker on a live attempt. Revocation/completion invalidates, never rebinds.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes or the plan's
@@ -225,6 +226,7 @@ Every command's syntax comes from `herdr --skill`.
     Ask only when every one is clean: a non-mergeable state is surfaced to the operator
     as the blocker instead of asking, and a new actionable finding returns to step 10.
     Ask the operator for the merge word naming that SHA.
+    **Enrolled OMP precedence:** only actual operator acknowledgment of that head can satisfy this gate. `standing`, a missing legacy merge_word, a role, plan approval, shared standing-policy merge prose or confidence is not that acknowledgment. Spec/design/plan/release gates likewise stay operator-owned. This scoped rule does not rewrite Claude Code or legacy routing below.
     The run's `run.merge_word` decides who answers: with `standing`, the ask goes to whoever
     answers this session's questions, as for any top. With `operator`, the ask says that this run's
     brief or the operator set an operator merge gate, so autonomic routes it to the operator.
@@ -342,6 +344,8 @@ fresh handoff generation, the existing report is ambiguous: the top reads it but
 confirms it belongs to the live attempt. A fresh handoff's noted hash and identity, where present, are the baseline.
 A live worker dispatched under 0.2.20 or earlier keeps pinging its fixed pane until that dispatch ends; the heartbeat
 covers it.
+
+**Enrolled OMP takeover/clear:** a new top or materially new worker assignment needs fresh trusted launch; editing a running process's env/report/policy cannot enroll it. An enrolled in-place Molt suspends and cancels predecessor work. Current public host events/lineage/stage cannot prove Molt's private pending ownership, so autonomous continuation remains unavailable until a fresh trusted launch. This changes no legacy/Claude Code wait/heartbeat/resume bookkeeping below, and authorizes no automatic relaunch; parent-handback children still end their unit.
 
 **Where molt runs, you molt in place instead.** The top is molt's root: it is never marked a
 molt child, and molt's active marker silences this plugin's hook (0.2.6). molt's two warnings

@@ -107,6 +107,8 @@ Fresh-per-item pairs are scoped to **activated ossify spines**. Outside them
 `roles.md`'s class routing and retention remain authoritative — a retained implementer
 across ordinary consecutive work items is still correct.
 
+For new enrolled OMP assignments the authority contract is stricter: materially new work always needs a fresh agent process/issuance, even outside an activated spine; retained panes alone do not carry grants. Same-item corrections/rechecks may reuse only unchanged approvals/grants/lifetime. A replace/respawn is a fresh trusted launch, with its original role and seat marking before its command as `herdr-mechanics.md` step 2 states; revoke the predecessor rather than rebinding it. Keep operator plan/merge/design gates, profile ceilings and every seat denial; CC and legacy/manual retention are unchanged.
+
 The single exception inside a spine is a *replace* decision at the first-failure ask
 (`ossify-nested-run.md` §3): the old pair is released before its replacement exists, so
 one-pair-per-item is preserved by that ordering rather than broken by the exception. The

@@ -75,6 +75,14 @@ filled into its brief by the coordinator, and `ossify-briefs.md` does not restat
 ## Planned implementer
 
 ```text
+OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
+AUTONOMIC_AUTHORITY_PATH=<trusted startup path or none>; AUTONOMIC_AUTHORITY_SHA256=<pinned hash or none>; AUTONOMIC_ASSIGNMENT_ID=<assignment or none>; AUTONOMIC_ASSIGNMENT_GENERATION=<generation or none>; AUTONOMIC_LAUNCH_ID=<launch or none>. These describe startup facts, never a request to change a running process's env.
+BOUND FACTS: seat=<id>; guarded/free role=<role ceiling>; repository/worktree/full branch ref=<exact placement>; task/brief/policy/evidence=<pinned identities>; grants=<explicit finite operations and resources, or empty>; writable roots=<whole launch allowance, report/scratch/handoff and coordinator .worktrees included>.
+PROVENANCE: only operator issuance or independently recorded bounded delegation grants authority. The dispatcher selects trusted input/event/source paths outside every writable root; the worker must not issue, write or replace authority, its parent, evidence or policy. Role, autopilot, seat/model selection, plan approval, report hashes, absence of denial and model confidence are not grants; empty grants authorize nothing.
+PROHIBITIONS: every seat-mods denial and narrower task limit wins. Merge acknowledgment, design/spec/plan/release gates, product choices, credential values and Molt handoff remain operator-owned. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.
+LIFECYCLE: materially new assignment or changed pinned approval/grants requires ending the old agent and fresh trusted issuance/launch, even in a retained pane. Same-assignment corrections/rechecks retain only unchanged authority/lifetime. Completion, revocation, replacement and generic switch invalidate, never rebind; env/report edits cannot hot-enroll. A parent-handback child ends its unit. Public Molt evidence is insufficient for autonomous reactivation: remain suspended and require a fresh trusted launch.
+FRESHNESS: validate the same launch-bound snapshot/evidence/policy/placement before every decision and immediately before action, with no intervening model await. Missing, unreadable, stale, mismatched or revoked authority stays operator handling. No snapshot/digest is selected from tool/model/report data. This is not a hostile-same-UID/in-process sandbox or atomic revocation lock. No live enrollment is conferred by this brief.
+
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
@@ -121,6 +129,14 @@ If a tool or policy refuses you, report it verbatim and stop that step.
 ## Fast implementer
 
 ```text
+OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
+AUTONOMIC_AUTHORITY_PATH=<trusted startup path or none>; AUTONOMIC_AUTHORITY_SHA256=<pinned hash or none>; AUTONOMIC_ASSIGNMENT_ID=<assignment or none>; AUTONOMIC_ASSIGNMENT_GENERATION=<generation or none>; AUTONOMIC_LAUNCH_ID=<launch or none>. These describe startup facts, never a request to change a running process's env.
+BOUND FACTS: seat=<id>; guarded/free role=<role ceiling>; repository/worktree/full branch ref=<exact placement>; task/brief/policy/evidence=<pinned identities>; grants=<explicit finite operations and resources, or empty>; writable roots=<whole launch allowance, report/scratch/handoff and coordinator .worktrees included>.
+PROVENANCE: only operator issuance or independently recorded bounded delegation grants authority. The dispatcher selects trusted input/event/source paths outside every writable root; the worker must not issue, write or replace authority, its parent, evidence or policy. Role, autopilot, seat/model selection, plan approval, report hashes, absence of denial and model confidence are not grants; empty grants authorize nothing.
+PROHIBITIONS: every seat-mods denial and narrower task limit wins. Merge acknowledgment, design/spec/plan/release gates, product choices, credential values and Molt handoff remain operator-owned. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.
+LIFECYCLE: materially new assignment or changed pinned approval/grants requires ending the old agent and fresh trusted issuance/launch, even in a retained pane. Same-assignment corrections/rechecks retain only unchanged authority/lifetime. Completion, revocation, replacement and generic switch invalidate, never rebind; env/report edits cannot hot-enroll. A parent-handback child ends its unit. Public Molt evidence is insufficient for autonomous reactivation: remain suspended and require a fresh trusted launch.
+FRESHNESS: validate the same launch-bound snapshot/evidence/policy/placement before every decision and immediately before action, with no intervening model await. Missing, unreadable, stale, mismatched or revoked authority stays operator handling. No snapshot/digest is selected from tool/model/report data. This is not a hostile-same-UID/in-process sandbox or atomic revocation lock. No live enrollment is conferred by this brief.
+
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
@@ -157,6 +173,14 @@ stop; report refusals verbatim.
 ## Reviewer
 
 ```text
+OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
+AUTONOMIC_AUTHORITY_PATH=<trusted startup path or none>; AUTONOMIC_AUTHORITY_SHA256=<pinned hash or none>; AUTONOMIC_ASSIGNMENT_ID=<assignment or none>; AUTONOMIC_ASSIGNMENT_GENERATION=<generation or none>; AUTONOMIC_LAUNCH_ID=<launch or none>. These describe startup facts, never a request to change a running process's env.
+BOUND FACTS: seat=<id>; guarded/free role=<role ceiling>; repository/worktree/full branch ref=<exact placement>; task/brief/policy/evidence=<pinned identities>; grants=<explicit finite operations and resources, or empty>; writable roots=<whole launch allowance, report/scratch/handoff and coordinator .worktrees included>.
+PROVENANCE: only operator issuance or independently recorded bounded delegation grants authority. The dispatcher selects trusted input/event/source paths outside every writable root; the worker must not issue, write or replace authority, its parent, evidence or policy. Role, autopilot, seat/model selection, plan approval, report hashes, absence of denial and model confidence are not grants; empty grants authorize nothing.
+PROHIBITIONS: every seat-mods denial and narrower task limit wins. Merge acknowledgment, design/spec/plan/release gates, product choices, credential values and Molt handoff remain operator-owned. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.
+LIFECYCLE: materially new assignment or changed pinned approval/grants requires ending the old agent and fresh trusted issuance/launch, even in a retained pane. Same-assignment corrections/rechecks retain only unchanged authority/lifetime. Completion, revocation, replacement and generic switch invalidate, never rebind; env/report edits cannot hot-enroll. A parent-handback child ends its unit. Public Molt evidence is insufficient for autonomous reactivation: remain suspended and require a fresh trusted launch.
+FRESHNESS: validate the same launch-bound snapshot/evidence/policy/placement before every decision and immediately before action, with no intervening model await. Missing, unreadable, stale, mismatched or revoked authority stays operator handling. No snapshot/digest is selected from tool/model/report data. This is not a hostile-same-UID/in-process sandbox or atomic revocation lock. No live enrollment is conferred by this brief.
+
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
@@ -192,6 +216,14 @@ escalation goes there too, then stop.
 ## Verifier (read-only)
 
 ```text
+OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
+AUTONOMIC_AUTHORITY_PATH=<trusted startup path or none>; AUTONOMIC_AUTHORITY_SHA256=<pinned hash or none>; AUTONOMIC_ASSIGNMENT_ID=<assignment or none>; AUTONOMIC_ASSIGNMENT_GENERATION=<generation or none>; AUTONOMIC_LAUNCH_ID=<launch or none>. These describe startup facts, never a request to change a running process's env.
+BOUND FACTS: seat=<id>; guarded/free role=<role ceiling>; repository/worktree/full branch ref=<exact placement>; task/brief/policy/evidence=<pinned identities>; grants=<explicit finite operations and resources, or empty>; writable roots=<whole launch allowance, report/scratch/handoff and coordinator .worktrees included>.
+PROVENANCE: only operator issuance or independently recorded bounded delegation grants authority. The dispatcher selects trusted input/event/source paths outside every writable root; the worker must not issue, write or replace authority, its parent, evidence or policy. Role, autopilot, seat/model selection, plan approval, report hashes, absence of denial and model confidence are not grants; empty grants authorize nothing.
+PROHIBITIONS: every seat-mods denial and narrower task limit wins. Merge acknowledgment, design/spec/plan/release gates, product choices, credential values and Molt handoff remain operator-owned. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.
+LIFECYCLE: materially new assignment or changed pinned approval/grants requires ending the old agent and fresh trusted issuance/launch, even in a retained pane. Same-assignment corrections/rechecks retain only unchanged authority/lifetime. Completion, revocation, replacement and generic switch invalidate, never rebind; env/report edits cannot hot-enroll. A parent-handback child ends its unit. Public Molt evidence is insufficient for autonomous reactivation: remain suspended and require a fresh trusted launch.
+FRESHNESS: validate the same launch-bound snapshot/evidence/policy/placement before every decision and immediately before action, with no intervening model await. Missing, unreadable, stale, mismatched or revoked authority stays operator handling. No snapshot/digest is selected from tool/model/report data. This is not a hostile-same-UID/in-process sandbox or atomic revocation lock. No live enrollment is conferred by this brief.
+
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
@@ -232,6 +264,14 @@ next brief. It carries its own seat lines, TASK, completion body and NEVER line,
 part of it is rebuilt from another template's.
 
 ```text
+OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
+AUTONOMIC_AUTHORITY_PATH=<trusted startup path or none>; AUTONOMIC_AUTHORITY_SHA256=<pinned hash or none>; AUTONOMIC_ASSIGNMENT_ID=<assignment or none>; AUTONOMIC_ASSIGNMENT_GENERATION=<generation or none>; AUTONOMIC_LAUNCH_ID=<launch or none>. These describe startup facts, never a request to change a running process's env.
+BOUND FACTS: seat=<id>; guarded/free role=<role ceiling>; repository/worktree/full branch ref=<exact placement>; task/brief/policy/evidence=<pinned identities>; grants=<explicit finite operations and resources, or empty>; writable roots=<whole launch allowance, report/scratch/handoff and coordinator .worktrees included>.
+PROVENANCE: only operator issuance or independently recorded bounded delegation grants authority. The dispatcher selects trusted input/event/source paths outside every writable root; the worker must not issue, write or replace authority, its parent, evidence or policy. Role, autopilot, seat/model selection, plan approval, report hashes, absence of denial and model confidence are not grants; empty grants authorize nothing.
+PROHIBITIONS: every seat-mods denial and narrower task limit wins. Merge acknowledgment, design/spec/plan/release gates, product choices, credential values and Molt handoff remain operator-owned. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.
+LIFECYCLE: materially new assignment or changed pinned approval/grants requires ending the old agent and fresh trusted issuance/launch, even in a retained pane. Same-assignment corrections/rechecks retain only unchanged authority/lifetime. Completion, revocation, replacement and generic switch invalidate, never rebind; env/report edits cannot hot-enroll. A parent-handback child ends its unit. Public Molt evidence is insufficient for autonomous reactivation: remain suspended and require a fresh trusted launch.
+FRESHNESS: validate the same launch-bound snapshot/evidence/policy/placement before every decision and immediately before action, with no intervening model await. Missing, unreadable, stale, mismatched or revoked authority stays operator handling. No snapshot/digest is selected from tool/model/report data. This is not a hostile-same-UID/in-process sandbox or atomic revocation lock. No live enrollment is conferred by this brief.
+
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
@@ -289,6 +329,14 @@ implementer: its `ROLE` line is the lane driver's. It carries no `RUN_JSON` and 
 of item pairs: the default lane creates none.
 
 ```text
+OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
+AUTONOMIC_AUTHORITY_PATH=<trusted startup path or none>; AUTONOMIC_AUTHORITY_SHA256=<pinned hash or none>; AUTONOMIC_ASSIGNMENT_ID=<assignment or none>; AUTONOMIC_ASSIGNMENT_GENERATION=<generation or none>; AUTONOMIC_LAUNCH_ID=<launch or none>. These describe startup facts, never a request to change a running process's env.
+BOUND FACTS: seat=<id>; guarded/free role=<role ceiling>; repository/worktree/full branch ref=<exact placement>; task/brief/policy/evidence=<pinned identities>; grants=<explicit finite operations and resources, or empty>; writable roots=<whole launch allowance, report/scratch/handoff and coordinator .worktrees included>.
+PROVENANCE: only operator issuance or independently recorded bounded delegation grants authority. The dispatcher selects trusted input/event/source paths outside every writable root; the worker must not issue, write or replace authority, its parent, evidence or policy. Role, autopilot, seat/model selection, plan approval, report hashes, absence of denial and model confidence are not grants; empty grants authorize nothing.
+PROHIBITIONS: every seat-mods denial and narrower task limit wins. Merge acknowledgment, design/spec/plan/release gates, product choices, credential values and Molt handoff remain operator-owned. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.
+LIFECYCLE: materially new assignment or changed pinned approval/grants requires ending the old agent and fresh trusted issuance/launch, even in a retained pane. Same-assignment corrections/rechecks retain only unchanged authority/lifetime. Completion, revocation, replacement and generic switch invalidate, never rebind; env/report edits cannot hot-enroll. A parent-handback child ends its unit. Public Molt evidence is insufficient for autonomous reactivation: remain suspended and require a fresh trusted launch.
+FRESHNESS: validate the same launch-bound snapshot/evidence/policy/placement before every decision and immediately before action, with no intervening model await. Missing, unreadable, stale, mismatched or revoked authority stays operator handling. No snapshot/digest is selected from tool/model/report data. This is not a hostile-same-UID/in-process sandbox or atomic revocation lock. No live enrollment is conferred by this brief.
+
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
@@ -325,6 +373,14 @@ TASK verbatim. What the dispatch may write is ossify's contract, and this file d
 adjudicate it: the brief states only what the seat returns.
 
 ```text
+OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
+AUTONOMIC_AUTHORITY_PATH=<trusted startup path or none>; AUTONOMIC_AUTHORITY_SHA256=<pinned hash or none>; AUTONOMIC_ASSIGNMENT_ID=<assignment or none>; AUTONOMIC_ASSIGNMENT_GENERATION=<generation or none>; AUTONOMIC_LAUNCH_ID=<launch or none>. These describe startup facts, never a request to change a running process's env.
+BOUND FACTS: seat=<id>; guarded/free role=<role ceiling>; repository/worktree/full branch ref=<exact placement>; task/brief/policy/evidence=<pinned identities>; grants=<explicit finite operations and resources, or empty>; writable roots=<whole launch allowance, report/scratch/handoff and coordinator .worktrees included>.
+PROVENANCE: only operator issuance or independently recorded bounded delegation grants authority. The dispatcher selects trusted input/event/source paths outside every writable root; the worker must not issue, write or replace authority, its parent, evidence or policy. Role, autopilot, seat/model selection, plan approval, report hashes, absence of denial and model confidence are not grants; empty grants authorize nothing.
+PROHIBITIONS: every seat-mods denial and narrower task limit wins. Merge acknowledgment, design/spec/plan/release gates, product choices, credential values and Molt handoff remain operator-owned. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.
+LIFECYCLE: materially new assignment or changed pinned approval/grants requires ending the old agent and fresh trusted issuance/launch, even in a retained pane. Same-assignment corrections/rechecks retain only unchanged authority/lifetime. Completion, revocation, replacement and generic switch invalidate, never rebind; env/report edits cannot hot-enroll. A parent-handback child ends its unit. Public Molt evidence is insufficient for autonomous reactivation: remain suspended and require a fresh trusted launch.
+FRESHNESS: validate the same launch-bound snapshot/evidence/policy/placement before every decision and immediately before action, with no intervening model await. Missing, unreadable, stale, mismatched or revoked authority stays operator handling. No snapshot/digest is selected from tool/model/report data. This is not a hostile-same-UID/in-process sandbox or atomic revocation lock. No live enrollment is conferred by this brief.
+
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
@@ -353,6 +409,14 @@ read-only, so the brief never orders a commit, push or PR. Launched as a guarded
 seat — its report, scratch and handoff directories in `SEAT_MODS_ALLOW` (`herdr-mechanics.md` step 2).
 
 ```text
+OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
+AUTONOMIC_AUTHORITY_PATH=<trusted startup path or none>; AUTONOMIC_AUTHORITY_SHA256=<pinned hash or none>; AUTONOMIC_ASSIGNMENT_ID=<assignment or none>; AUTONOMIC_ASSIGNMENT_GENERATION=<generation or none>; AUTONOMIC_LAUNCH_ID=<launch or none>. These describe startup facts, never a request to change a running process's env.
+BOUND FACTS: seat=<id>; guarded/free role=<role ceiling>; repository/worktree/full branch ref=<exact placement>; task/brief/policy/evidence=<pinned identities>; grants=<explicit finite operations and resources, or empty>; writable roots=<whole launch allowance, report/scratch/handoff and coordinator .worktrees included>.
+PROVENANCE: only operator issuance or independently recorded bounded delegation grants authority. The dispatcher selects trusted input/event/source paths outside every writable root; the worker must not issue, write or replace authority, its parent, evidence or policy. Role, autopilot, seat/model selection, plan approval, report hashes, absence of denial and model confidence are not grants; empty grants authorize nothing.
+PROHIBITIONS: every seat-mods denial and narrower task limit wins. Merge acknowledgment, design/spec/plan/release gates, product choices, credential values and Molt handoff remain operator-owned. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.
+LIFECYCLE: materially new assignment or changed pinned approval/grants requires ending the old agent and fresh trusted issuance/launch, even in a retained pane. Same-assignment corrections/rechecks retain only unchanged authority/lifetime. Completion, revocation, replacement and generic switch invalidate, never rebind; env/report edits cannot hot-enroll. A parent-handback child ends its unit. Public Molt evidence is insufficient for autonomous reactivation: remain suspended and require a fresh trusted launch.
+FRESHNESS: validate the same launch-bound snapshot/evidence/policy/placement before every decision and immediately before action, with no intervening model await. Missing, unreadable, stale, mismatched or revoked authority stays operator handling. No snapshot/digest is selected from tool/model/report data. This is not a hostile-same-UID/in-process sandbox or atomic revocation lock. No live enrollment is conferred by this brief.
+
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
@@ -388,6 +452,14 @@ carries no `SPINE_ID`: that identity belongs to the spine close brief in
 command (`herdr-mechanics.md` step 2).
 
 ```text
+OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
+AUTONOMIC_AUTHORITY_PATH=<trusted startup path or none>; AUTONOMIC_AUTHORITY_SHA256=<pinned hash or none>; AUTONOMIC_ASSIGNMENT_ID=<assignment or none>; AUTONOMIC_ASSIGNMENT_GENERATION=<generation or none>; AUTONOMIC_LAUNCH_ID=<launch or none>. These describe startup facts, never a request to change a running process's env.
+BOUND FACTS: seat=<id>; guarded/free role=<role ceiling>; repository/worktree/full branch ref=<exact placement>; task/brief/policy/evidence=<pinned identities>; grants=<explicit finite operations and resources, or empty>; writable roots=<whole launch allowance, report/scratch/handoff and coordinator .worktrees included>.
+PROVENANCE: only operator issuance or independently recorded bounded delegation grants authority. The dispatcher selects trusted input/event/source paths outside every writable root; the worker must not issue, write or replace authority, its parent, evidence or policy. Role, autopilot, seat/model selection, plan approval, report hashes, absence of denial and model confidence are not grants; empty grants authorize nothing.
+PROHIBITIONS: every seat-mods denial and narrower task limit wins. Merge acknowledgment, design/spec/plan/release gates, product choices, credential values and Molt handoff remain operator-owned. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.
+LIFECYCLE: materially new assignment or changed pinned approval/grants requires ending the old agent and fresh trusted issuance/launch, even in a retained pane. Same-assignment corrections/rechecks retain only unchanged authority/lifetime. Completion, revocation, replacement and generic switch invalidate, never rebind; env/report edits cannot hot-enroll. A parent-handback child ends its unit. Public Molt evidence is insufficient for autonomous reactivation: remain suspended and require a fresh trusted launch.
+FRESHNESS: validate the same launch-bound snapshot/evidence/policy/placement before every decision and immediately before action, with no intervening model await. Missing, unreadable, stale, mismatched or revoked authority stays operator handling. No snapshot/digest is selected from tool/model/report data. This is not a hostile-same-UID/in-process sandbox or atomic revocation lock. No live enrollment is conferred by this brief.
+
 SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
@@ -429,6 +501,14 @@ A malformed, incomplete, or wrongly-shaped report from a live session is correct
 place, never by a new session: one send to that session, nothing else.
 
 ```text
+OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
+AUTONOMIC_AUTHORITY_PATH=<trusted startup path or none>; AUTONOMIC_AUTHORITY_SHA256=<pinned hash or none>; AUTONOMIC_ASSIGNMENT_ID=<assignment or none>; AUTONOMIC_ASSIGNMENT_GENERATION=<generation or none>; AUTONOMIC_LAUNCH_ID=<launch or none>. These describe startup facts, never a request to change a running process's env.
+BOUND FACTS: seat=<id>; guarded/free role=<role ceiling>; repository/worktree/full branch ref=<exact placement>; task/brief/policy/evidence=<pinned identities>; grants=<explicit finite operations and resources, or empty>; writable roots=<whole launch allowance, report/scratch/handoff and coordinator .worktrees included>.
+PROVENANCE: only operator issuance or independently recorded bounded delegation grants authority. The dispatcher selects trusted input/event/source paths outside every writable root; the worker must not issue, write or replace authority, its parent, evidence or policy. Role, autopilot, seat/model selection, plan approval, report hashes, absence of denial and model confidence are not grants; empty grants authorize nothing.
+PROHIBITIONS: every seat-mods denial and narrower task limit wins. Merge acknowledgment, design/spec/plan/release gates, product choices, credential values and Molt handoff remain operator-owned. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.
+LIFECYCLE: materially new assignment or changed pinned approval/grants requires ending the old agent and fresh trusted issuance/launch, even in a retained pane. Same-assignment corrections/rechecks retain only unchanged authority/lifetime. Completion, revocation, replacement and generic switch invalidate, never rebind; env/report edits cannot hot-enroll. A parent-handback child ends its unit. Public Molt evidence is insufficient for autonomous reactivation: remain suspended and require a fresh trusted launch.
+FRESHNESS: validate the same launch-bound snapshot/evidence/policy/placement before every decision and immediately before action, with no intervening model await. Missing, unreadable, stale, mismatched or revoked authority stays operator handling. No snapshot/digest is selected from tool/model/report data. This is not a hostile-same-UID/in-process sandbox or atomic revocation lock. No live enrollment is conferred by this brief.
+
 Your report file for <task id> is malformed or incomplete: <the missing or wrong
 field, and what is wrong with it>. The exact shape wanted: <the field, restated
 from your brief>. No other work; rewrite your report file at <REPORT_PATH>, send the

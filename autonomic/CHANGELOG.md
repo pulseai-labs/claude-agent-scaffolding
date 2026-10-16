@@ -2,6 +2,12 @@
 
 All notable changes to the `autonomic` plugin.
 
+## Unreleased
+
+- Add closed version-1 assignment schema, duplicate-safe JSON parsing, bounded delegation narrowing and real dispatcher issuer/launch-validation CLI. Approval events are external and acyclic; no live grants or acceptance values ship.
+- Pin coherent snapshot/input/source/evidence/policy identities outside the complete worker allowance; invalidate on replacement, revocation, expiry or placement drift. Capture startup once; new assignments require fresh processes. Public Molt evidence is insufficient for autonomous reactivation, so transitions remain suspended.
+- Capture authority in the OMP factory without activating native decision consumers or an enrolled conversational fallback. Legacy OMP and Claude Code behavior/policy remain unchanged; #832 and #831's cross-host criterion remain open.
+
 ## 0.7.1
 
 - tests: the reader's size check uses a relative time bound (#782). No behaviour change.

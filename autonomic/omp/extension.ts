@@ -28,6 +28,10 @@ import type { SessionRecord } from '../hooks/records'
 import { shape } from '../hooks/shape'
 import { parseAsk, parseTurn } from '../hooks/verdict'
 import type { Question } from '../hooks/verdict'
+import { captureLaunchBinding } from '../hooks/authority'
+import { launchWorkerRoots } from '../bin/authority'
+import { PinnedAuthority, placementFacts } from './authority-store'
+import type { AuthorityLease } from '../hooks/authority'
 
 type Live = SessionRecord & { problem?: string; invalid?: string }
 
@@ -40,6 +44,8 @@ export type AutonomicIO = {
   sessionId(): string
   cwd: string
   env: Readonly<Record<string, string | undefined>>
+  launchCwd?: string                                        // immutable trusted process-start cwd
+  sessionFile?(): string | undefined
   setEnv(name: string, value: string | undefined): void
   readText(path: string): Promise<string | undefined>
   exists(path: string): Promise<boolean>
@@ -173,6 +179,40 @@ const claimedModeFiles = new Set<string>()
 type Judged<T> = { v: T } | { skip: true } | { fail: string }
 
 export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_BUDGET_MS) {
+  // Capture before worker execution; mode records, later env and briefs never rebind this store.
+  const startup = Object.freeze({ ...io.env })
+  const enrolled = ['AUTONOMIC_AUTHORITY_PATH', 'AUTONOMIC_AUTHORITY_SHA256', 'AUTONOMIC_ASSIGNMENT_ID', 'AUTONOMIC_ASSIGNMENT_GENERATION', 'AUTONOMIC_LAUNCH_ID'].some(name => startup[name] !== undefined)
+  let authority: PinnedAuthority
+  let authorityState = enrolled ? 'unavailable' : 'legacy/manual (no grant)'
+  let authorityLease: AuthorityLease | undefined
+  let predecessorFile: string | undefined
+  try {
+    const binding = captureLaunchBinding(startup)
+    authority = new PinnedAuthority(binding, binding ? launchWorkerRoots(startup, io.launchCwd ?? io.cwd) : [])
+  } catch {
+    authority = new PinnedAuthority(undefined, [])
+    authority.invalidate()
+    authorityState = 'invalid startup binding; fresh trusted launch required'
+  }
+
+  function suspendAuthority(): void {
+    if (!enrolled) return
+    authority.suspend()
+    authorityState = 'suspended; fresh trusted launch required'
+  }
+  function onSessionBeforeSwitch(): void {
+    predecessorFile = io.sessionFile?.()
+    suspendAuthority()
+  }
+  async function onSessionSwitch(): Promise<void> {
+    // reason:new + predecessor file/lineage/stage do not expose Molt's private pending ownership.
+    // Keep the observed predecessor, but never turn a generic new/resume into autonomous eligibility.
+    if (enrolled) {
+      suspendAuthority()
+      io.notify(`autonomic authority: ${authorityState}${predecessorFile ? ' (observed predecessor transition)' : ''}`)
+    }
+    await onSessionStart()
+  }
   let cfg: AutonomicConfig = DEFAULTS
   let ready: Promise<void> | undefined
   const live = new Map<string, Live>()       // each session's resolved record
@@ -194,6 +234,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   }
 
   function onSessionShutdown(): void {
+    if (enrolled) authority.invalidate()
     try { io.remove(modeFile) } catch {}
   }
 
@@ -236,6 +277,8 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   async function guard(rec: Live): Promise<Live> {
     const clean: Live = { ...rec, problem: undefined }
     if (rec.mode !== 'autopilot') return clean
+    // Task 3 delivers authority, not the three native decision consumers. Never act via the old chat route.
+    if (enrolled) return { ...clean, mode: 'manual', problem: 'enrolled authority requires native decision consumers before activation' }
     if ((await policyText()) === undefined) return { ...clean, mode: 'manual', problem: 'no policy' }
     if (!(await io.touch(await ledgerPath()))) return { ...clean, mode: 'manual', problem: 'ledger not writable' }
     return clean
@@ -412,6 +455,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     const stageNow = safeSessionId(id) ? parseStage(await io.readText(stagePath(home(), id))) : undefined
     const lines = [
       `${rec.mode} (source: ${rec.source})${rec.problem === undefined ? '' : ` — autopilot refused: ${rec.problem}`}`,
+      ...(enrolled ? [`authority: ${authority.signal.aborted ? 'suspended; fresh trusted launch required' : authorityState}`] : []),
       `scope: ${rec.scope.length === 0 ? 'none named (what the session has read)' : rec.scope.join(', ')}`,
       `policy: ${pol === undefined ? 'missing or empty' : pol === DEFAULT_POLICY.trim() ? 'default' : 'edited'} (${policyPath})`,
       `yieldAtPercent: ${cfg.yieldAtPercent} (used only without a molt stage file) · loopMax: ${cfg.loopMax} · tailChars: ${cfg.tailChars}`,
@@ -429,6 +473,15 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
 
   // session_start: the default policy (never overwritten), the live mode for launchers, and any config problem.
   async function onSessionStart(): Promise<void> {
+    if (enrolled) {
+      try {
+        authorityLease = authority.lease(io.sessionId(), placementFacts(io.cwd))
+        authorityState = 'eligible pinned assignment (decision activation separate)'
+      } catch {
+        authorityState = 'suspended; fresh trusted launch required'
+        io.notify(`autonomic authority: ${authorityState}`)
+      }
+    }
     await load()
     await writeDefaultPolicy()
     try { publish((await modeOf()).mode) } catch (err) { await log(`session_start mode error ${String(err)}`) }
@@ -437,6 +490,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
 
   // In-file navigation/compaction abandons branch facts, never the operator's mode or scope.
   function onContextRebuild(): void {
+    suspendAuthority()
     const id = io.sessionId()
     digests.delete(id)
     changed.delete(id)
@@ -650,6 +704,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (c.kind === 'status') return statusReport(id)
     const prev = await modeOf()
     if (c.kind === 'off') {
+      suspendAuthority()
       pendingScope.delete(id)
       const off = await save(id, { ...prev, mode: 'manual', source: 'command', problem: undefined, invalid: undefined })
       pushes.delete(id)
@@ -678,16 +733,19 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
 
   // Claude's composer/bridge prompt reset: OMP notices have no persistent pain band to dismiss.
   function onInput(e: { source?: string }): void {
+    if (enrolled && authorityLease && !authorityLease.fresh()) suspendAuthority()
     if (e.source !== 'extension') pushes.delete(io.sessionId())
   }
 
-  return { onSessionShutdown, onInput, onAgentStart, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
+  return { authority, onSessionBeforeSwitch, onSessionSwitch, onSessionShutdown, onInput, onAgentStart, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
 }
 
 // omp's real ctx behind AutonomicIO. Each handler points `cur` at the event's ctx first.
 function ioFor(pi: any, cur: () => any): AutonomicIO {
   return {
     pid: process.pid,
+    launchCwd: process.cwd(),
+    sessionFile: () => cur()?.sessionManager?.getSessionFile?.(),
     remove: path => { rmSync(path, { force: true }) },
     writeMode: (path, mode) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, mode) },
     rename: (from, to) => { renameSync(from, to) },
@@ -746,7 +804,8 @@ export default function (pi: any) {
   pi.on('session_start', (_e: any, c: any) => main(c) ? autonomic.onSessionStart() : undefined)
   pi.on('session_tree', (_e: any, c: any) => main(c) ? autonomic.onContextRebuild() : undefined)
   pi.on('session_compact', (_e: any, c: any) => main(c) ? autonomic.onContextRebuild() : undefined)
-  pi.on('session_switch', (_e: any, c: any) => main(c) ? autonomic.onSessionStart() : undefined)
+  pi.on('session_before_switch', (_e: unknown, c: unknown) => main(c) ? autonomic.onSessionBeforeSwitch() : undefined)
+  pi.on('session_switch', (_e: unknown, c: unknown) => main(c) ? autonomic.onSessionSwitch() : undefined)
   pi.on('input', (e: any, c: any) => main(c) ? autonomic.onInput(e) : undefined)
   pi.on('agent_start', (_e: any, c: any) => main(c) ? autonomic.onAgentStart() : undefined)
   pi.on('before_agent_start', (e: any, c: any) => main(c) ? autonomic.onBeforeAgentStart(e) : undefined)
