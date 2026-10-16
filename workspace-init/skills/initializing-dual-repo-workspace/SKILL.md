@@ -211,12 +211,9 @@ loads it when the workspace has no `CLAUDE.md`; an older Claude Code reads only
 `CLAUDE.md` and sees none of it. Codex and OMP read it directly. Its first
 line is the marker `<!-- workspace-init stub: ossify:start replaces this file -->`;
 ossify 1.24.0 or later replaces a file that starts with it, with no question.
-An older ossify's `/ossify:start` checks only the destinations it writes —
-`CLAUDE.md`, the memory bank, the spec — and never looks for `AGENTS.md`, so it
-writes a fresh `CLAUDE.md` beside the untouched stub, and that file shadows
-`AGENTS.md` in Claude Code. Its `doctor` interop check reads `AGENTS.md` for the
-word `ossify` and never opens `CLAUDE.md`, and neither offers a repair.
-workspace-init writes no `CLAUDE.md`.
+Continue into ossify 1.24.0 or later: on an older ossify, stop after pairing — do
+not run `/ossify:start`, `/ossify:adopt` or the `doctor` repair until 1.24.0 is
+installed. workspace-init writes no `CLAUDE.md`.
 
 ```
 "$wi_bin" stub_agents_md "$ai_root" "$name"
@@ -280,11 +277,10 @@ Next steps:
   4. /ossify:start                         # bare canonical; routes to /ossify:adopt if source or history is present
                                            # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
                                            # a recorded tooling repo that already carries history refuses it too, with no supported ossify continuation yet
-                                           # on ossify 1.24.0 or later this replaces the marked AGENTS.md stub; on an older
-                                           # ossify it writes a CLAUDE.md beside the stub, which then shadows AGENTS.md in Claude
-                                           # Code — merge the two by hand, or install 1.24.0 first
-                                           # adopt merges its loop section into AGENTS.md on ossify 1.24.0 or later; on an older
-                                           # ossify it merges into CLAUDE.md — merge that into AGENTS.md by hand, then remove CLAUDE.md
+                                           # on ossify 1.24.0 or later this replaces the marked AGENTS.md stub, and
+                                           # adopt merges its loop section into AGENTS.md; continue into ossify 1.24.0
+                                           # or later — on an older ossify, stop after pairing: do not run
+                                           # /ossify:start, /ossify:adopt or the doctor repair until 1.24.0 is installed
 
 Manifest at: /abs/path/{name}-ai/.workspace/pairing.json
 Init log at: /abs/path/{name}-ai/.workspace/init-log (rollback record)

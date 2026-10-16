@@ -285,9 +285,9 @@ Next steps:
      but never used that stack has no supported ossify continuation yet; `/ossify:start` sends
      such a repository here rather than onboarding it. (For an empty canonical, `/ossify:start`
      does onboard it.) On Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
-     On ossify 1.24.0 or later, adopt merges its loop section into `AGENTS.md`; on an older ossify
-     it merges into `CLAUDE.md`, which then shadows `AGENTS.md` — merge that section into
-     `AGENTS.md` by hand afterwards, then remove `CLAUDE.md`.
+     On ossify 1.24.0 or later, adopt merges its loop section into `AGENTS.md`. Continue into
+     ossify 1.24.0 or later: on an older ossify, stop after pairing — do not run `/ossify:start`,
+     `/ossify:adopt` or the `doctor` repair until 1.24.0 is installed.
   5. Before `/ossify:adopt`, every participating tree must be clean: adoption refuses while any
      tree it will edit carries an uncommitted or untracked line — the AI workspace, the canonical,
      and every other repo the topology declares — with each declared repo on the default branch

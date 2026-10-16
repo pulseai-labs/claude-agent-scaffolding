@@ -5,12 +5,9 @@ The one instruction file for this AI workspace. Claude Code 2.1.277 or later loa
 workspace has no `CLAUDE.md`; an older Claude Code reads only `CLAUDE.md` and sees none of this.
 Codex, OMP and other agents read `AGENTS.md` directly.
 This is a temporary stub. ossify 1.24.0 or later replaces a file that starts with the marker
-above, with no question. An older ossify does not: its `/ossify:start` checks only the destinations
-it writes (`CLAUDE.md`, the memory bank, the spec) and never looks for `AGENTS.md`, so it writes a
-fresh `CLAUDE.md` beside this file and leaves the stub in place — and a `CLAUDE.md` shadows
-`AGENTS.md` in Claude Code. Nothing in that ossify offers a repair: its `doctor` interop check reads
-`AGENTS.md` for the word `ossify` and never opens `CLAUDE.md`. Install 1.24.0 or later before you run
-`/ossify:start`, or merge by hand first — see the adopt route below.
+above, with no question. Continue into ossify 1.24.0 or later: on an older ossify, stop after
+pairing — do not run `/ossify:start`, `/ossify:adopt` or the `doctor` repair until 1.24.0 is
+installed.
 Put lasting notes in this file only after `/ossify:start` has run.
 
 This is the AI workspace half of a dual-repo project.
@@ -29,7 +26,7 @@ canonical — see the manifest's `routing` block for the full table.
 ## Continue with ossify
 
 - Empty canonical: run `/ossify:start` (on Codex or OMP, the `start` skill).
-- `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack — a canonical that already carries source or history without that stack has no supported ossify continuation yet. On ossify 1.24.0 or later, adopt merges its loop section into this `AGENTS.md`. On an older ossify it merges that section into `CLAUDE.md` instead, which then shadows `AGENTS.md` — merge it into `AGENTS.md` by hand afterwards, then remove `CLAUDE.md`.
+- `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack — a canonical that already carries source or history without that stack has no supported ossify continuation yet. On ossify 1.24.0 or later, adopt merges its loop section into this `AGENTS.md`. Continue into ossify 1.24.0 or later: on an older ossify, stop after pairing — do not run `/ossify:start`, `/ossify:adopt` or the `doctor` repair until 1.24.0 is installed.
 
 ## Git policy
 

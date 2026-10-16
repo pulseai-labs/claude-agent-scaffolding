@@ -172,29 +172,23 @@ Next steps:
   3. Make `AGENTS.md` the workspace's one instruction file before you continue. ossify's interop
      check fails while `AGENTS.md` is missing or never names ossify — that is its `agents_md` check,
      and it is real. Claude Code loads `CLAUDE.md` and ignores `AGENTS.md` whenever both exist, so a
-     leftover `CLAUDE.md` (root or `.claude/`) shadows this file, and shipped ossify 1.23.0 does not
-     flag it: the interop check reads `AGENTS.md` and **never opens `CLAUDE.md`**, and
-     `/ossify:start` checks only the destinations it writes (`CLAUDE.md`, the memory bank, the spec)
-     and never looks for `AGENTS.md` — so neither flags the leftover, and neither offers a repair.
+     leftover `CLAUDE.md` (root or `.claude/`) shadows this file until it is gone.
      - **ossify 1.24.0 or later:** run `/ossify:doctor` (on Codex or OMP, the `doctor` skill) and
        accept its interop repair. It moves or merges `CLAUDE.md` into `AGENTS.md` and shows you the
-       result first.
-     - **An older ossify:** the repair does not exist yet, so merge `CLAUDE.md` into `AGENTS.md`
-       by hand — keep every rule and fact from both files, drop lines whose only job was to point
-       from one file to the other ("Read `CLAUDE.md` for …"), then remove `CLAUDE.md` so Claude
-       Code stops preferring it.
-     Either way this skill writes no project guidance — review and commit before
-     step 4.
+       result first; review and commit before step 4.
+     - **An older ossify:** leave the leftover `CLAUDE.md` exactly where it is. Continue into
+       ossify 1.24.0 or later: on an older ossify, stop after pairing — do not run `/ossify:start`,
+       `/ossify:adopt` or the `doctor` repair until 1.24.0 is installed.
+     This skill writes no project guidance.
   4. Run `/ossify:adopt` only for a project previously onboarded with the legacy scaffold stack —
      without that stack there is no supported ossify continuation yet (or `/ossify:start` if the
      canonical is empty); on Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
      - **`/ossify:start` (empty canonical):** on ossify 1.24.0 or later it replaces the marked
-       `AGENTS.md`; on an older ossify it writes a `CLAUDE.md` beside the stub, which then shadows
-       `AGENTS.md` in Claude Code — merge the two by hand, or install 1.24.0 first (step 3).
+       `AGENTS.md`; it is the route that writes the one instruction file.
      - **`/ossify:adopt` (legacy scaffold stack only):** on ossify 1.24.0 or later, adopt merges
-       its loop section into `AGENTS.md`. On an older ossify it merges that section into
-       `CLAUDE.md` instead, which then shadows `AGENTS.md` — merge it into `AGENTS.md` by hand
-       afterwards, then remove `CLAUDE.md`.
+       its loop section into `AGENTS.md`. Continue into ossify 1.24.0 or later: on an older ossify,
+       stop after pairing — do not run `/ossify:start`, `/ossify:adopt` or the `doctor` repair
+       until 1.24.0 is installed.
   5. Adoption refuses while any tree it will edit is dirty: the AI workspace, the canonical, and
      every repo the topology declares must all be clean — tracked and untracked — with each
      declared repo on the default branch the manifest declares (otherwise adoption names the

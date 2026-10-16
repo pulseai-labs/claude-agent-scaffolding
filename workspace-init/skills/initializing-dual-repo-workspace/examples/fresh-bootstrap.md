@@ -171,11 +171,10 @@ Next steps:
   4. /ossify:start                         # bare canonical; routes to /ossify:adopt if source or history is present
                                            # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
                                            # a recorded tooling repo that already carries history refuses it too, with no supported ossify continuation yet
-                                           # on ossify 1.24.0 or later this replaces the marked AGENTS.md stub; on an older
-                                           # ossify it writes a CLAUDE.md beside the stub, which then shadows AGENTS.md in Claude
-                                           # Code — merge the two by hand, or install 1.24.0 first
-                                           # adopt merges its loop section into AGENTS.md on ossify 1.24.0 or later; on an older
-                                           # ossify it merges into CLAUDE.md — merge that into AGENTS.md by hand, then remove CLAUDE.md
+                                           # on ossify 1.24.0 or later this replaces the marked AGENTS.md stub, and
+                                           # adopt merges its loop section into AGENTS.md; continue into ossify 1.24.0
+                                           # or later — on an older ossify, stop after pairing: do not run
+                                           # /ossify:start, /ossify:adopt or the doctor repair until 1.24.0 is installed
 
 Manifest at: /Users/example/projects/foo-ai/.workspace/pairing.json
 Init log at: /Users/example/projects/foo-ai/.workspace/init-log (rollback record)
