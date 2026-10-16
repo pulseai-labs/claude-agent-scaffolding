@@ -193,8 +193,8 @@ record, otherwise the durable record that PR's last `open:` result persisted —
 `RUN_JSON` path that return named: a resumed successor continues and rebinds that file,
 a first dispatch names a fresh one. On creation and on continue/rebind it writes `run.orchestrator.machine`
 beside the pane — this server's machine, per `herdr-mechanics.md`. It owns both PR seats in a `run.json` of its own,
-relays one summary per round, and asks you for the merge word; you ask the operator, and
-the merge lands under the reply's executor — a merge commit on the named SHA, session or
+relays one summary per round, and asks you for the merge word; you answer as `lifecycle.md` step 12's `run.merge_word` says (with
+`standing`, a clean gate set is the word; with `operator`, you ask the operator), and the merge lands under the reply's executor — a merge commit on the named SHA, session or
 operator alike. `lifecycle.md` steps 8-12 are that session's loop, not yours.
 
 **Then, once every returned PR has merged, one record pass** — a second

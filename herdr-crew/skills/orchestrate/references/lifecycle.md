@@ -217,18 +217,20 @@ Every command's syntax comes from `herdr --skill`.
     the deferrable work and examines process, not code; blocking remediation continues
     past round five until each finding is fixed or rejected with evidence.
 12. **Merge gate.** Fetch the full gate set against `--repo <owner/repo>` for the head
-    SHA immediately before asking: `isDraft`, `mergeable`, `mergeStateStatus`, every
+    SHA immediately before deciding: `isDraft`, `mergeable`, `mergeStateStatus`, every
     relevant check-run and status context — all must be successful — the unresolved
     threads, and the non-thread signals of review bodies and PR conversation comments,
     which are clean when every finding in them has a terminal state recorded in the
     disposition comment (step 10).
-    Ask only when every one is clean: a non-mergeable state is surfaced to the operator
-    as the blocker instead of asking, and a new actionable finding returns to step 10.
-    Ask the operator for the merge word naming that SHA.
-    The run's `run.merge_word` decides who answers: with `standing`, the ask goes to whoever
-    answers this session's questions, as for any top. With `operator`, the ask says that this run's
-    brief or the operator set an operator merge gate, so autonomic routes it to the operator.
-    Merge only on that word, as a merge commit, never a squash, bound to the approved
+    Act only when every one is clean: a non-mergeable state is surfaced to the operator
+    as the blocker, and a new actionable finding returns to step 10.
+    The run's `run.merge_word` decides where the merge word comes from. With `standing`, the operator's
+    standing word is it: a clean gate set on that SHA is the agreed condition, so merge with no ask (#837).
+    With `operator`, the ask says that this run's brief or the operator set an operator merge gate, so
+    autonomic routes it to the operator: ask for the merge word naming that SHA. Under either word, a dispatch whose
+    merge executor is the operator (`MERGE_EXECUTOR=operator`) still goes to the operator: tell them the word and the
+    SHA, and they land it.
+    Merge only on that word, as a merge commit, never a squash, bound to that
     SHA: re-fetch the same full gate set for that SHA once more, then
     `gh pr merge <number> --repo <owner/repo> --merge --match-head-commit <sha>` —
     the orchestrator often sits outside the PR's repository, so every
@@ -259,7 +261,7 @@ Every command's syntax comes from `herdr --skill`.
 
 A role the operator defines in the project file (`config.md`) runs at a named point of
 the run above: `after-implementer` (after step 6), `before-review` (before step 8),
-`after-disposition` (after step 9), `before-merge-ask` (before step 12's ask),
+`after-disposition` (after step 9), `before-merge-ask` (before step 12's merge word: its ask, or under `standing` its merge),
 `at-teardown` (step 12's teardown — release and branch deletion, not step 13's
 handoff). `at: on-demand` has no fixed point, dispatched when wanted — its seat
 counts against the allowance the project file declares, one by default. A declared
