@@ -27,7 +27,7 @@ PING: after every report rename — plan, question, escalation, late finding, fi
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
 MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
 SPINE_ID=<spine id>
-SPINE_COMMAND=<the command this seat was launched with, from its machine entry>
+SPINE_COMMAND=<the command this seat was launched with, from its machine entry> — a record of your own launch: you are already that seat, never run it
 SPINE_EXPECTED_MODEL=<the model the banner or screen must show>
 SPINE_EFFORT=<the effort this seat was launched at>
 SEATS — the operator-approved seats for this spine. Use them verbatim.

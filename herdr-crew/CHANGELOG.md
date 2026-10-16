@@ -4,7 +4,7 @@ All notable changes to the `herdr-crew` plugin.
 
 ## 0.2.24
 
-**Seat-driving fixes from the OMP friction review** (part of #845). Every brief template's `SEAT_COMMAND` line says it records the seat's own launch and is never run: an OMP implementer ran it and started a nested console. The OMP host notes now tell the top to pass `timeout: 0` on every bash async job (omp's default deadline is 300 s) and never `name:`, which puts omp's bash in service mode and refuses async and timeout. The readiness text says an `agent list` ask before detection (about a second after `pane run`) answers `agent_not_found` and is asked again.
+**Seat-driving fixes from the OMP friction review** (part of #845). Every launch-record line in a brief (`SEAT_COMMAND`, `SPINE_COMMAND`, `CLOSE_COMMAND`, `WORKPR_COMMAND`, `WRITER_COMMAND`) says it records the seat's own launch and is never run: an OMP implementer ran one and started a nested console. The OMP host notes now tell the top, and an OMP coordinator for the seats it drives, to pass `timeout: 0` on every bash async job (omp's default deadline is 300 s) and never `name:`, which puts omp's bash in service mode and refuses async and timeout. The readiness text says that before detection (about a second after `pane run`) `agent list` omits the pane and `agent get`/`agent wait` answer `agent_not_found`: ask again for up to five seconds, then take the not-detected path.
 
 ## 0.2.23
 

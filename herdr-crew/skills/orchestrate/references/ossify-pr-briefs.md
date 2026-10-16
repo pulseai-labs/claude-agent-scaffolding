@@ -24,7 +24,7 @@ INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
 PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
 SPINE_ID=<spine id>
-CLOSE_COMMAND=<the command this seat was launched with, from its machine entry>
+CLOSE_COMMAND=<the command this seat was launched with, from its machine entry> — a record of your own launch: you are already that seat, never run it
 CLOSE_EXPECTED_MODEL=<the model the banner or screen must show>
 CLOSE_EFFORT=<the effort this seat was launched at>
 CLOSE_REVIEW_LEDGER=<every close review's ledger for this spine, oldest first,
@@ -93,7 +93,7 @@ MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from
 PR_REPO=<owner/repo>
 PR_NUMBER=<number>
 REPO_ROOT=<abs path of this seat's worktree>
-WORKPR_COMMAND=<the command this seat was launched with, from its machine entry>
+WORKPR_COMMAND=<the command this seat was launched with, from its machine entry> — a record of your own launch: you are already that seat, never run it
 WORKPR_EXPECTED_MODEL=<the model the banner or screen must show>
 WORKPR_EFFORT=<the effort this seat was launched at>
 REVIEWER=<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
