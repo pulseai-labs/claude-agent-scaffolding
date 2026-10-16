@@ -92,6 +92,15 @@ brief_pin 'SEAT_COMMAND=' "every dispatched template names its seat's command" 9
 brief_pin 'you are already that seat, never run it' "every SEAT_COMMAND says it is a record, never run (#845)" 9
 # The class, not the instance (#845 round 1): every launch-record line in any reference — SEAT_, SPINE_,
 # CLOSE_, WORKPR_, WRITER_COMMAND — carries the never-run clause, so a new *_COMMAND line without it fails here.
+# Every PING line carries the hold-at-gate rule (#810): a worker whose ping finds no top waits, never proceeds.
+ping_total=0; ping_bare=""
+for f in "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
+  n="$(awk '/^PING: / { t++ } END { print t+0 }' "$f")"
+  b="$(awk '/^PING: / && index($0, "A skipped or failed send is never an answer") == 0 { print FILENAME ":" FNR }' "$f")"
+  ping_total=$((ping_total + n)); [ -z "$b" ] || ping_bare="$ping_bare $b"
+done
+if [ "$ping_total" -ge 15 ] && [ -z "$ping_bare" ]; then pass "every PING line holds a worker at its gate ($ping_total)"
+else fail "every PING line holds a worker at its gate" "total $ping_total (want >= 15), bare:$ping_bare"; fi
 cmd_total=0; cmd_bare=""
 for f in "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
   n="$(awk '/^[A-Z]+_COMMAND=</ { t++ } END { print t+0 }' "$f")"
