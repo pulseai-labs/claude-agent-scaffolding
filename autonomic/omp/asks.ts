@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto'
 import type { Answer, Questions } from '@oh-my-pi/pi-ai'
 import type { ExtensionJudgment } from '@oh-my-pi/pi-coding-agent/extensibility/extensions/types'
 import type { EvidenceMaterial } from '../hooks/authority'
+import { redact } from '../hooks/ledger'
 import { acceptedChoice, acceptedNoul, validateAnswers } from './judgment'
 import type { ApprovedQuestion, DecisionFrame } from './judgment'
 
@@ -117,6 +118,19 @@ export function snapshotAsk(input: unknown): AskSnapshot {
     texts.add(q.question)
   }
   return { inputSha256, questions }
+}
+
+/**
+ * Whether redaction would change any string the frozen batch carries. The ask consumer calls this
+ * before any frame capture, state build or native call: a secret in a question text, option label,
+ * description or header must abstain exactly as the permission path does, rather than send the
+ * batch to judgment or let it reach the operator-visible block reason.
+ */
+export function holdsSecret(snapshot: AskSnapshot): boolean {
+  const changed = (value: string): boolean => redact(value) !== value
+  return snapshot.questions.some(q =>
+    changed(q.question) || (q.header !== undefined && changed(q.header))
+    || q.options.some(o => changed(o.label) || (o.description !== undefined && changed(o.description))))
 }
 
 /** The approved question for a fingerprint; exactly one, or the whole ask stays with the operator. */

@@ -107,6 +107,8 @@ Option IDs are request-local ordinals, never label text. Labels sent back to the
 
 **Operator gates are bundle-level.** Policy parsing rejects **any** approved question whose `operatorGate` is not `none`; a bundle carrying one is unavailable, so **both** the ask and the permission consumers treat it as absent — the conservative direction (an unanswered gate is never auto-answered). The gate matrix (spec/design/plan/release approval, merge acknowledgment, unresolved product choice, credential location/value, Molt handoff) stays operator-owned even under favourable probabilities and otherwise valid unrelated grants.
 
+**Secret-like content abstains.** Before any frame capture, state build or native call, if redaction would change **any** string the frozen batch carries (a question text, option label, description or header), the whole ask stays with the operator — the same shape as the permission path's `redact(shown) !== shown` abstain — with the pain reason's own redaction applied, so no secret byte reaches state, the block reason, the ledger, a notice or the pain file.
+
 **Abstention and failure.** A malformed batch, an unplannable batch, a missing bridge/authority/native route, a failed or stale transaction, or any exception uses the existing ask-pain path and returns no block: the entire original dialog stays displayed. No generative side turn answers free text or produces a label. Until Task 7 ships, the **unenrolled** legacy conversational ask path is byte-unchanged (only an enrolled session takes this route).
 
 ## Turning it on

@@ -37,7 +37,7 @@ import type { AuthorityLease } from '../hooks/authority'
 import { acceptedChoice, captureFrame, judgeNative, parsePolicyBundle } from './judgment'
 import type { ConsumerHost, DecisionDraft, DecisionFrame, DecisionIO } from './judgment'
 import { commitDecision } from './decision-ledger'
-import { assembleAsk, planAsk, snapshotAsk } from './asks'
+import { assembleAsk, holdsSecret, planAsk, snapshotAsk } from './asks'
 
 type Live = SessionRecord & { problem?: string; invalid?: string }
 
@@ -643,6 +643,14 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     try { snapshot = snapshotAsk(input) } catch (err) {
       await log(`ask snapshot rejected ${String(err)}`)
       await askPain(id, questionsOf(input)[0]?.question ?? 'a question', 'a malformed ask batch')
+      return undefined
+    }
+    // Never judge a batch in part: if redaction would hide any string the frozen batch carries (a
+    // question text, option label, description or header), the whole ask stays with the operator.
+    // The same shape as the permission path; the reason/pain layers apply their own redaction, so
+    // no secret byte is echoed.
+    if (holdsSecret(snapshot)) {
+      await askPain(id, snapshot.questions[0]!.question, 'the batch holds content that redaction would hide')
       return undefined
     }
     try {

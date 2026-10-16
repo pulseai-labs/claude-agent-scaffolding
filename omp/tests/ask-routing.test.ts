@@ -697,6 +697,54 @@ describe('the ask surface answers only a complete grounded batch', () => {
 })
 
 // =====================================================================================
+// Step 4 — a secret in the frozen batch abstains like the permission path
+// =====================================================================================
+
+describe('a batch that carries a secret abstains before any judgment', () => {
+  let w: RoutingWorld
+  afterEach(() => { if (w) w.close() })
+
+  // A real secret shape the shared redaction catches; it must never reach state, the block reason,
+  // the ledger, a notice or the pain file.
+  const SECRET = `ghp_${'A'.repeat(36)}`
+
+  const secrets: Array<[string, unknown]> = [
+    ['a question text', { questions: [{ id: 'q1', question: `Which plan for ${SECRET}?`, options: [{ label: 'Plan A' }] }] }],
+    ['an option label', { questions: [{ id: 'q1', question: 'Which plan?', options: [{ label: `Plan ${SECRET}` }] }] }],
+    ['an option description', { questions: [{ id: 'q1', question: 'Which plan?', options: [{ label: 'Plan A', description: `token ${SECRET}` }] }] }],
+    ['a header', { questions: [{ id: 'q1', question: 'Which plan?', header: SECRET, options: [{ label: 'Plan A' }] }] }],
+  ]
+  for (const [name, input] of secrets) {
+    test(`a secret in ${name} leaves the whole dialog operator-owned with no secret byte echoed`, async () => {
+      w = askWorld(questionPolicy(input, ['o0']))
+      setNativeBatch(w, request => allYes(request))
+      const r = await w.invoke('ask', input)
+      expect(r).toBeUndefined()                       // no block reason at all
+      expect(w.nativeRequests).toEqual([])            // no judgment native call
+      expect(w.generationRequests).toEqual([])
+      expect(sidecar(w)).toEqual([])                  // no decision record
+      expect(human(w)).not.toContain(' · ask · ')     // no ask row
+      expect(w.notices.join('\n')).toContain('question for you')
+      expect(w.notices.join('\n')).not.toContain(SECRET)
+      expect(human(w)).not.toContain(SECRET)
+      expect(pain(w)).toContain('question for you')
+      expect(pain(w)).not.toContain(SECRET)           // the pain layer's own redaction holds
+    })
+  }
+
+  test('a clean batch with the same shape still answers exactly as before', async () => {
+    const clean = { questions: [{ id: 'q1', question: 'Which plan?', header: 'H', options: [{ label: 'Plan A' }, { label: 'Plan B' }] }] }
+    w = askWorld(questionPolicy(clean, ['o0']))
+    setNativeBatch(w, request => allYes(request))
+    const r = await w.invoke('ask', clean)
+    expect(r?.block).toBe(true)
+    expect(r?.reason).toContain('"Which plan?":"Plan A"')
+    expect(w.nativeRequests).toHaveLength(1)
+    expect(human(w)).toContain(' · ask · Q: Which plan? · A: Plan A')
+  })
+})
+
+// =====================================================================================
 // Step 3 — the approved-question policy contract (judgment.ts validation)
 // =====================================================================================
 
