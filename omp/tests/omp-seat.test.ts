@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MARKETPLACE } from '../../omp-roles/omp/bin-path'
@@ -208,6 +208,43 @@ describe('versionWarning', () => {
   test('a via that runs is held to the tested version', () => {
     expect(versionWarning({ status: 0, stdout: 'omp/18.9.0\n' }, '18.8.9')).toContain('18.9.0')
     expect(versionWarning({ status: 0, stdout: 'omp/18.8.9\n' }, '18.8.9')).toBeUndefined()
+  })
+})
+
+describe('seat config overlay (#843)', () => {
+  const shipped = join(import.meta.dir, '..', '..', 'omp-roles', 'seat-config.yml')
+  test('the shipped overlay turns off omp\'s todo reminders and nothing else', () => {
+    expect(Bun.YAML.parse(readFileSync(shipped, 'utf8'))).toEqual({ todo: { reminders: false } })
+  })
+  test('planLaunch passes the overlay right after the extensions, before the role file', () => {
+    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
+    record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })
+    const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
+    expect(planLaunch({ role: 'close', via: 'omp-glm', args: ['Begin.'], ompRecord, claudeRecord, rolesDir, seatConfig: shipped })).toMatchObject({
+      argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'),
+        `--config=${shipped}`, '--append-system-prompt', join(rolesDir, 'close.md'), 'Begin.'],
+    })
+  })
+  test('a missing overlay stops the launch instead of starting a seat whose todo reminders block molt', () => {
+    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
+    record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })
+    const gone = join(root, 'missing', 'seat-config.yml')
+    expect(planLaunch({ role: 'worker', via: 'omp-glm', args: [], ompRecord, claudeRecord, seatConfig: gone })).toEqual({
+      error: `omp-seat: seat config ${gone} is missing`,
+    })
+  })
+  test('bin/omp-seat passes the shipped overlay to every launch', () => {
+    const seat = join(import.meta.dir, '..', '..', 'omp-roles', 'bin', 'omp-seat')
+    const home = mkdtempSync(join(tmpdir(), 'seat-home-'))
+    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
+    record(join(home, '.omp', 'plugins', 'installed_plugins.json'), { 'seat-mods': s, molt: m, autonomic: a })
+    const out = join(home, 'argv.txt')
+    const via = join(home, 'via.sh')
+    writeFileSync(via, `#!/bin/sh\n[ "$1" = --version ] && exit 0\nprintf '%s\\n' "$@" > '${out}'\n`)
+    chmodSync(via, 0o755)
+    const r = spawnSync('bun', [seat, 'worker', '--via', via], { env: { ...process.env, HOME: home }, encoding: 'utf8', timeout: 30_000 })
+    expect(r.status).toBe(0)
+    expect(readFileSync(out, 'utf8').split('\n')).toContain(`--config=${shipped}`)
   })
 })
 
