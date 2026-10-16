@@ -157,7 +157,7 @@ substitutions; so does an OMP coordinator for the seats it drives. Background ca
 (omp's default deadline is 300 s and a nonzero value is clamped; 0 disables it), so herdr's `--timeout` bounds the wait; never pass `name:`, which puts omp's bash in service mode and refuses async and timeout.
 Its result returns to the session as a turn, so every readiness and completion wait, and the heartbeat, runs as one. A send's slash command
 is text on omp: `/<plugin>:<skill>` becomes `skill://<skill>`, except a send to a Claude Code seat. herdr-crew's
-`hooks.json` does not run on omp: the context-ceiling notice comes from molt's omp extension. No `Agent` tool
+`hooks.json` does not run on omp: the context-ceiling notice comes from molt's omp extension. For the top, no `Agent` tool
 means no `task`, `eval` `agent()` or workpool: seat-mods 0.4.4 blocks them for `SEAT_MODS_ROLE=orchestrator` (#798).
 
 ## Sending a seat a message
