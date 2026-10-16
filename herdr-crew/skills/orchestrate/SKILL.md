@@ -177,7 +177,7 @@ These cases are named because they look like clashes and are not:
   not this file's, and that template does not adjudicate it.
 - **`work-pr`.** Its brief carries the child templates it will construct, verbatim:
   `references/briefs.md`'s reviewer template for the
-  review, and that file's fix-round and correction bodies for what follows — a work-PR session
+  review, its REVIEW_INVOCATION filled by you (the worker cannot read the machine file), and that file's fix-round and correction bodies for what follows — a work-PR session
   builds those child briefs, and a dispatched brief is the whole contract its worker ever sees.
   After the single reviewer dispatch and your disposition, the fix dispatch
   to the retained implementer is `/ossify:work-pr <PR> --repo-root <worktree holding the

@@ -1651,6 +1651,7 @@ pin "$PRBRIEFS_MD" 'REVIEW_INVOCATION=<the reviewer'"'"'s agent'"'"'s `review:`,
   "the work-PR brief injects the reviewer's filled review command"
 pin "$PRBRIEFS_MD" 'brief it to run REVIEW_INVOCATION.' \
   "the work-PR session briefs the reviewer with the filled review command"
+absent "$PRBRIEFS_MD" '/code-review PR_NUMBER' "the work-PR brief hardcodes no reviewer command"
 pin "$PRBRIEFS_MD" 'merge bound to the named SHA' \
   "the work-PR session merges bound to the SHA the top relayed"
 pin "$PRBRIEFS_MD" 'never a squash or rebase' \

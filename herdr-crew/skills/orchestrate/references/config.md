@@ -96,7 +96,7 @@ a session launches nothing with its own profile.
 
 | role | its brief invokes | needs |
 |---|---|---|
-| reviewer | its agent's `review:` command, else `/code-review` | `slash-commands` for `/code-review`; none with `review:` |
+| reviewer | its agent's `review:` command, else `/code-review` | `slash-commands` when that command is a slash command |
 | implementer, verifier | no command | — |
 | fix-round implementer | `/ossify:work-pr` when ossify is installed | `slash-commands` then |
 | ossify item implementer | `/ossify:work-item` | `slash-commands` |

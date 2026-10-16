@@ -43,7 +43,7 @@ present "$CONFIG_MD" 'model_shows: screen' "screen is a documented value"
 present "$CONFIG_MD" 'brief_delivery: inject' "inject is a documented value"
 present "$CONFIG_MD" 'brief_delivery: file' "file delivery is a documented value"
 present "$CONFIG_MD" 'absent, `/code-review <PR> <LEVEL>`.' "a reviewer with no review: field runs /code-review"
-present "$CONFIG_MD" '| reviewer | its agent'"'"'s `review:` command, else `/code-review` | `slash-commands` for `/code-review`; none with `review:` |' "the reviewer's can: need follows its review command"
+present "$CONFIG_MD" '| reviewer | its agent'"'"'s `review:` command, else `/code-review` | `slash-commands` when that command is a slash command |' "the reviewer's can: need follows its review command"
 
 section "the project file"
 for heading in '## Seats' '## My roles' '## Conditions'; do
@@ -119,7 +119,9 @@ brief_pin 'NOTIFY_PANE' "no template keeps the fixed ping target" 0
 brief_pin 'claude-glm' "no alias name survives in briefs.md" 0
 brief_pin 'REVIEW_INVOCATION=<this seat'"'"'s agent'"'"'s `review:` from agents.md, else `/code-review <PR> <LEVEL>`' "the reviewer brief carries its filled review command" 1
 brief_pin 'TASK: run REVIEW_INVOCATION as given' "the reviewer runs the filled review command, not a fixed one" 1
-brief_pin 'run `/code-review <number> <level>`' "no reviewer brief hardcodes /code-review" 0
+brief_pin 'run `/code-review <number> <level>`' "the reviewer TASK does not hardcode /code-review" 0
+brief_pin 'If `/code-review` refuses' "the reviewer's failure rule names REVIEW_INVOCATION, not /code-review" 0
+brief_pin 'If REVIEW_INVOCATION refuses or errors, report its output' "the reviewer reports its own command's refusal" 1
 
 section "the named points exist in the run"
 LIFECYCLE_MD="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
