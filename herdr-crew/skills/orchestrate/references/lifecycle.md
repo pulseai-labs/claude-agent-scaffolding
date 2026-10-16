@@ -21,8 +21,10 @@ Every command's syntax comes from `herdr --skill`.
    `$HERDR_PANE_ID` — dagr's stable-agent fallback otherwise — in the same producer
    loop every other write takes.
    Every creation and every bind writes `run.orchestrator.machine` beside its pane — this server's
-   machine, per `herdr-mechanics.md`, Machines.
-   Binding a run another top drove through a rotation runs **The resume** (Rotation past the context ceiling) first; its step 2 is this rebind.
+   machine, per `herdr-mechanics.md`, Machines — and `run.orchestrator.session`, herdr's `agent_session` for
+   that pane as `{agent, id}` (`herdr pane get "$HERDR_PANE_ID"`: `.result.pane.agent_session.agent` and `.result.pane.agent_session.value`);
+   with none returned, none is written. A hard stop's resume finds the dead top's transcript by it (#810).
+   Binding a run another top drove through a rotation runs **The resume** (Rotation past the context ceiling) first; its step 2 is this rebind. Binding one whose top died with no handoff runs **A hard stop**'s three steps before it.
 1b. **Ossify spine planned here?** If this session just completed `/ossify:plan-spine`
    against a concrete spine directory with a run bound, step 2 is replaced by
    `references/ossify-execution.md`: agree one implementer/verifier seat per work
@@ -316,13 +318,28 @@ Confirm its turn started, then **stand down**: kill this session's armed
 background waits and its heartbeat, write nothing more to the run file and take no dispatch action. One report must
 wake one top. A worker pings whichever pane `run.orchestrator` names, so after the rebind a worker on the successor's machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.
 Then tell the operator which tab to use and that this one can close.
-A hard stop — the top died with no handoff — has no resume procedure yet (#810): the new top tells the operator and
-continues only as the operator directs.
+**A hard stop** — the top died with no handoff (#810) — is resumed only on the operator's word that it died, after
+three steps a rotation does not need:
+1. Read `run.orchestrator` — pane, machine, session — before any write: the resume's rebind overwrites it.
+2. Stand the old top down. If `herdr pane get <pane>` on its machine (`herdr-mechanics.md`, Machines) still finds the pane, the old top may still hold
+   armed waits: ask the operator to confirm it is dead and to close its pane, or close it on the operator's word,
+   before binding. Never two tops on one run. A pane already gone needs no ask.
+3. Read its transcript, found by `run.orchestrator.session` on its machine: Claude `~/.claude/projects/*/<id>.jsonl`,
+   OMP `~/.omp/agent/sessions/*/*_<id>.jsonl`. Read back from the end to the last step it named: that step, the task
+   or PR in hand, operator words and decisions since its last handoff, and the last action it started. It is context:
+   where it and `run.json` disagree on a fact, `run.json` wins. With no session recorded, no file found, or the old top
+   on another machine, ask the operator once for the transcript path or the next step.
+
+Then **The resume** runs with the transcript in the fresh handoff's place: step 1 reads the file and the transcript,
+and step 6 continues at the step the transcript shows. A dispatch whose attempt the run records is never sent again: step 4
+settles it (an attempt is recorded before its send). Any other action it shows started but not confirmed — an answer or message to a worker, a merge, a tag, a
+branch delete — is checked for its effect first (the worker's pane for a send, GitHub for the rest) and redone only
+when the effect is absent.
 
 **The resume.** The new top resumes by naming the parent's `run.json` path — there is no CLI call:
 1. It reads the file and the fresh handoff.
 2. A session that binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr's stable-agent fallback otherwise — in the same producer loop every other write takes.
-   It writes `run.orchestrator.machine` beside the pane.
+   It writes `run.orchestrator.machine` and `.session` beside the pane (step 1).
    From here every worker's next ping comes to this pane.
 3. If `run.question` is present, it asks it once again.
 4. Per working attempt, first run the generation check against `locator.seen`, for both `phase: recorded` and
@@ -359,7 +376,7 @@ handoff. There is no stand-down and no successor launch: the pane, its `HERDR_PA
 seat marking (`herdr-mechanics.md` step 2, "A molt is not a launch") and every armed wait
 survive the clear, and every worker's ping still reaches this pane, which `run.orchestrator` still names. The resumed top
 reads the handoff and confirms `run.orchestrator` names its own `$HERDR_PANE_ID`, rewriting it
-only where it does not. It arms no wait and no heartbeat the handoff lists: they keep running,
+only where it does not; it always rewrites `run.orchestrator.session` (step 1), since molt's `/clear` starts a new session in this pane. It arms no wait and no heartbeat the handoff lists: they keep running,
 and their notifications are its own. A heartbeat tick the handoff carries means that heartbeat
 has ended: the resumed top arms a fresh one. It runs the generation check once per live
 dispatch against the attempt's `locator.seen`, a carried wake included, so a report
