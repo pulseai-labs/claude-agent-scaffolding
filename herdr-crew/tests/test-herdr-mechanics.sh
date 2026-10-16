@@ -275,7 +275,9 @@ pin "$LIFE" 'without it, the path as its first instruction on either' "a cross-h
 pin "$LIFE" '(`skill://handoff` on OMP)' "an OMP top writes its handoff with the OMP skill spelling"
 pin "$LIFE" 'the other host'"'"'s profile resolved from its machine-file entry like any seat'"'"'s' "the other host's profile comes from its machine-file entry" flat
 pin "$LIFE" 'a detected coordinator'"'"'s companion included' "a new top re-arms a coordinator's companion wait" flat
-pin "$REF" '`timeout: 0`, which disables omp' "OMP async waits disable the command deadline" flat
+pin "$REF" 'pass `timeout: 0` on every one' "OMP async waits disable the command deadline (#845)" flat
+pin "$REF" 'never `name:`, which puts omp'"'"'s bash in service mode' "OMP async waits never pass name: (#845)" flat
+pin "$REF" 'an ask before it answers `agent_not_found`: ask again' "a readiness ask before detection is retried (#845)" flat
 
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"

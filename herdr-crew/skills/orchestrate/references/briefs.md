@@ -75,7 +75,7 @@ filled into its brief by the coordinator, and `ossify-briefs.md` does not restat
 ## Planned implementer
 
 ```text
-SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md> — a record of your own launch: you are already that seat, never run it
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
@@ -121,7 +121,7 @@ If a tool or policy refuses you, report it verbatim and stop that step.
 ## Fast implementer
 
 ```text
-SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md> — a record of your own launch: you are already that seat, never run it
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
@@ -157,7 +157,7 @@ stop; report refusals verbatim.
 ## Reviewer
 
 ```text
-SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md> — a record of your own launch: you are already that seat, never run it
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
@@ -192,7 +192,7 @@ escalation goes there too, then stop.
 ## Verifier (read-only)
 
 ```text
-SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md> — a record of your own launch: you are already that seat, never run it
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
@@ -232,7 +232,7 @@ next brief. It carries its own seat lines, TASK, completion body and NEVER line,
 part of it is rebuilt from another template's.
 
 ```text
-SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md> — a record of your own launch: you are already that seat, never run it
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
@@ -289,7 +289,7 @@ implementer: its `ROLE` line is the lane driver's. It carries no `RUN_JSON` and 
 of item pairs: the default lane creates none.
 
 ```text
-SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md> — a record of your own launch: you are already that seat, never run it
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
@@ -325,7 +325,7 @@ TASK verbatim. What the dispatch may write is ossify's contract, and this file d
 adjudicate it: the brief states only what the seat returns.
 
 ```text
-SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md> — a record of your own launch: you are already that seat, never run it
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
@@ -353,7 +353,7 @@ read-only, so the brief never orders a commit, push or PR. Launched as a guarded
 seat — its report, scratch and handoff directories in `SEAT_MODS_ALLOW` (`herdr-mechanics.md` step 2).
 
 ```text
-SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md> — a record of your own launch: you are already that seat, never run it
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
@@ -388,7 +388,7 @@ carries no `SPINE_ID`: that identity belongs to the spine close brief in
 command (`herdr-mechanics.md` step 2).
 
 ```text
-SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md>
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md> — a record of your own launch: you are already that seat, never run it
 SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
 SEAT_EFFORT=<the effort this seat was launched at>
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>

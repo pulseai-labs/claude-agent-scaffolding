@@ -89,6 +89,7 @@ brief_pin() {
 # doctor dispatch, direct work-item, non-spine close. The correction-request
 # template is a send, not a launch, so it carries no seat.
 brief_pin 'SEAT_COMMAND=' "every dispatched template names its seat's command" 9
+brief_pin 'you are already that seat, never run it' "every SEAT_COMMAND says it is a record, never run (#845)" 9
 brief_pin 'SEAT_EXPECTED_MODEL=' "every dispatched template names its expected model" 9
 brief_pin 'SEAT_EFFORT=' "every dispatched template names its effort" 9
 brief_pin 'NOTIFY_RUN=' "every dispatched template names the run file its ping reads" 9
