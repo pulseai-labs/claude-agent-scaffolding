@@ -4,9 +4,10 @@ All notable changes to the `autonomic` plugin.
 
 ## Unreleased
 
-- Add closed version-1 assignment schema, duplicate-safe JSON parsing, bounded delegation narrowing and real dispatcher issuer/launch-validation CLI. Approval events are external and acyclic; no live grants or acceptance values ship.
+- Add the bounded OMP decision transaction (`omp/judgment.ts`, `omp/decision-ledger.ts`): one monotonic 25-second window from handler entry (capture ≤2 s, native ≤12 s and ≤10 s, generation ≤22 s and ≤10 s, final ≤25 s), exact SDK result validation before any confidence is read, operator-owned acceptance (no default cutoff), and a native-only judge call bound to the captured host context and the pinned lease. `PolicyBundle` is a version-1 effective-policy file; a missing, malformed or unapproved one disables the route. No class activates with an absent policy, bridge or authority, and no conversational classification fallback is retained.
+- Add the two-write decision attribution: `<resolved-ledger>.decisions.jsonl` (audit output, never authority) plus the human ledger row, each written under a freshness check, with redaction of every string field. A partial write is an intent, never execution proof; a required-write failure or timeout publishes manual/failure and releases nothing. Native `result.usage` is never re-billed; Claude Code's token-only human rows are unchanged.
+- Capture authority in the OMP factory without activating native decision consumers or an enrolled conversational fallback. The factory exposes the captured `DecisionIO` (`createAutonomic(...).decisions`) for the later consumers, aborts outstanding frames on mode change, authority invalidation, navigation, shutdown and Molt transitions, and records the handler entry moment before any await. Legacy OMP and Claude Code behavior/policy remain unchanged; #832 and #831's cross-host criterion remain open.
 - Pin coherent snapshot/input/source/evidence/policy identities outside the complete worker allowance; invalidate on replacement, revocation, expiry or placement drift. Capture startup once; new assignments require fresh processes. Public Molt evidence is insufficient for autonomous reactivation, so transitions remain suspended.
-- Capture authority in the OMP factory without activating native decision consumers or an enrolled conversational fallback. Legacy OMP and Claude Code behavior/policy remain unchanged; #832 and #831's cross-host criterion remain open.
 
 ## 0.7.1
 

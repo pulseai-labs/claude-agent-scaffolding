@@ -64,6 +64,22 @@ The factory exposes its captured `authority` service from `createAutonomic` for 
 
 This is an ordinary same-UID/shared-process guard contract, not a sandbox: hostile same-UID processes, free seats and arbitrary in-process extensions are not isolated. Recheck-to-execution is not an atomic filesystem/ref lock; changes observed before action abort, but an external change immediately after the final check is not transactionally prevented.
 
+### The bounded decision transaction (unreleased, Tasks 5–7 consumers)
+
+`omp/judgment.ts` and `omp/decision-ledger.ts` hold the shared transaction the three native consumers call. This section documents the contract; no consumer is activated by it. An absent policy, bridge or authority **disables** the route (operator handling), never the old conversational classifier.
+
+**One monotonic window.** All phases share one deadline **25 seconds from handler entry**, captured at the first line of the handler before any await. Capture is ≤2 s; one native judgment is ≤12 s from entry and at most 10 s; generation is ≤22 s and at most 10 s; the final validation/record/recheck is ≤25 s. Earlier completion can advance work but never extends a cutoff, and no phase creates a fresh 25-second window. A phase whose allowance is exhausted aborts.
+
+**Result validation and units.** `validateAnswers` rejects before any confidence is read: answer/question ID sets must match exactly, the answer type must match the question, choice labels and distribution keys must equal `criteria` exactly, every probability and confidence is finite in [0,1], the distribution sums to 1 within `PROBABILITY_SUM_TOLERANCE = 1e-6`, and the reported choice is a **unique** maximum. `noul` is **P(yes)**, not a boolean. Cache counts are safe integers with `0 ≤ cachedQuestions ≤ questions`, equal to the frozen question count. A selected native API kind must be one of `typesafe`/`openrouter-decisions` (the SDK union), and the selected API/provider/model tuple plus its `calibrationRef` must appear, with matching evidence, in the effective policy. `PROBABILITY_SUM_TOLERANCE` is serialization roundoff only, **never** an action threshold.
+
+**Operator-owned acceptance.** `acceptedChoice` and `acceptedNoul` apply rules the operator supplies in the effective policy. There is no default probability, confidence or rollout cutoff. An overlapping `noul` rule (`minYes + minNo ≤ 1`) is invalid configuration; where the regions overlap, the answer is `undefined` (abstain). Acceptance is a configured decision, never authority.
+
+**The effective policy.** `PolicyBundle` is a version-1 file whose exact bytes are pinned by the snapshot's policy digest. It is an OMP-only companion to the Markdown policy, not a rewrite of it; ordinary repository prose never becomes a bundle. A missing, malformed or unapproved bundle disables the route.
+
+**Two-write attribution.** `commitDecision` writes both `<resolved-ledger>.decisions.jsonl` (a version-1 `DecisionRecord`; audit output, **never** authority) and the human ledger row, each under a `lease.fresh()` check, with `budget.check()` after each write and a final `lease.fresh()` after the last. Every string field is redacted with the existing `redact`, and command/input values use the existing `shape`/`inputShape`. The human row's `why` carries `decisionId=<id>; <reason>`, with room reserved for the full ID before `oneLine` truncation. A partial sidecar or human record is an **intent, never execution proof**. A required-write failure or timeout publishes manual/failure (via the captured `io.fail`) and releases nothing. Native `result.usage` is not billed again; Claude Code's token-only rows are unchanged. The caller must still do `budget.check()` plus a synchronous `lease.fresh()` immediately before its action or return; anything changed while logging means abstain.
+
+**Lifecycle.** A mode change, authority invalidation, navigation/compact, shutdown or Molt transition aborts outstanding frames, so a late completion cannot mutate a successor's state or attribute a result to it. The factory exposes the captured service as `createAutonomic(...).decisions` for the consumers; when absent, the native route is unavailable.
+
 ## Turning it on
 
 | Source | Effect |

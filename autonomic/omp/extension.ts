@@ -32,6 +32,8 @@ import { captureLaunchBinding } from '../hooks/authority'
 import { launchWorkerRoots } from '../bin/authority'
 import { PinnedAuthority, placementFacts } from './authority-store'
 import type { AuthorityLease } from '../hooks/authority'
+import { parsePolicyBundle } from './judgment'
+import type { ConsumerHost, DecisionIO } from './judgment'
 
 type Live = SessionRecord & { problem?: string; invalid?: string }
 
@@ -53,6 +55,12 @@ export type AutonomicIO = {
   appendLine(path: string, line: string): Promise<boolean>      // creates the folder; false when it did not land
   touch(path: string): Promise<boolean>
   run(argv: string[]): Promise<{ exitCode: number; stdout: string }>
+  // The bounded decision services (Task 4). Absent means the native decision route is unavailable:
+  // a consumer must fall back to operator handling, never to the old ephemeral classifier.
+  decisions?: DecisionIO
+  // Read the live entry context ONCE, binding judge/generate to that exact object. Absent on hosts
+  // with no captured context; the decision route is then unavailable.
+  captureHost?: () => ConsumerHost
   // One side turn off the session's history. A throw or an empty reply is a failed attempt; undefined means the
   // host has no ephemeral turn, so there is nothing to judge with.
   ephemeral(prompt: string, timeoutMs: number): Promise<string | undefined>
@@ -195,8 +203,19 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     authorityState = 'invalid startup binding; fresh trusted launch required'
   }
 
+  // One per-process cancellation for outstanding decision frames. A mode change, navigation,
+  // shutdown, Molt transition or authority invalidation aborts it and replaces it for the next
+  // frame, so no late completion can act on a session whose authority has moved.
+  let frameAbort = new AbortController()
+  function abortFrames(): void { frameAbort.abort(new Error('frame cancelled')); frameAbort = new AbortController() }
+
+  // The entry moment of the current handler, captured before any await so a decision frame gets the
+  // real start of its one monotonic 25-second window. Read by the native consumers (Tasks 5–7).
+  let lastEntryMs = 0
+
   function suspendAuthority(): void {
     if (!enrolled) return
+    abortFrames()
     authority.suspend()
     authorityState = 'suspended; fresh trusted launch required'
   }
@@ -234,6 +253,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   }
 
   function onSessionShutdown(): void {
+    abortFrames()
     if (enrolled) authority.invalidate()
     try { io.remove(modeFile) } catch {}
   }
@@ -390,6 +410,35 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     await log(`pain session=${id} ${listed}`)
   }
 
+  // The bounded decision services (Task 4). Built once; absent (undefined) whenever this session is
+  // not an enrolled assignment, so a consumer treats the native route as unavailable. It is exposed
+  // for Tasks 5–7 to call; nothing here activates a consumer or the old classifier.
+  const decisionIO: DecisionIO | undefined = enrolled ? {
+    capture: () => {
+      const host = io.captureHost?.()
+      if (host === undefined) throw new Error('no captured host context')
+      return host
+    },
+    authority,
+    placement: async (input, signal) => {
+      signal.throwIfAborted()
+      const raw = input !== null && typeof input === 'object' && 'cwd' in input ? input.cwd : undefined
+      const dir = typeof raw === 'string' && raw.trim() !== '' ? bashCwd(raw, io.cwd, home()) : io.cwd
+      if (dir === undefined) throw new Error('the input cwd is not a folder the decision route can read')
+      return placementFacts(dir)
+    },
+    policy: lease => parsePolicyBundle(lease.policyText),
+    appendLine: (path, line) => io.appendLine(path, line),
+    ledgerPath,
+    // Manual/failure integration: publish the operator-facing failure state; never authorize action.
+    fail: async (sessionId, reason) => {
+      const rec = live.get(sessionId)
+      if (rec !== undefined) await save(sessionId, { ...rec, mode: 'manual', problem: 'decision not recorded' })
+      await pain(sessionId, 'decision failure', reason)
+    },
+  } : undefined
+  if (decisionIO !== undefined) io.decisions = decisionIO
+
   // One side turn, one retry (spec §4), both inside one deadline. No ephemeral turn lets the event pass.
   async function judge<T>(kind: 'turn-end' | 'ask', prompt: string, parse: (text: string) => T | undefined): Promise<Judged<T>> {
     const deadline = Date.now() + judgeBudgetMs
@@ -490,6 +539,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
 
   // In-file navigation/compaction abandons branch facts, never the operator's mode or scope.
   function onContextRebuild(): void {
+    abortFrames()
     suspendAuthority()
     const id = io.sessionId()
     digests.delete(id)
@@ -594,6 +644,8 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   }
 
   async function onToolCall(e: { toolName?: string; input?: unknown }): Promise<{ block: true; reason: string } | undefined> {
+    // The one monotonic decision window starts at the first line, before load/mode/authority awaits.
+    lastEntryMs = performance.now()
     await load()
     if (e?.toolName === 'ask') {
       try { return await askReflex(e.input) } catch (err) { await log(`ask reflex error ${String(err)}`); return undefined }
@@ -626,6 +678,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   // session_stop: the turn-end reflex (spec §3.1). Yield to molt first, then the loop guard, then classify.
   async function onSessionStop(e: { last_assistant_message?: unknown; session_id?: unknown }): Promise<{ decision: 'block'; reason: string } | undefined> {
     try {
+      lastEntryMs = performance.now()   // the one monotonic window starts here, before any await
       await load()
       const id = io.sessionId()
       // omp runs the handlers in extension order and molt's has already cleared the session when it molted: the event is
@@ -737,14 +790,28 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (e.source !== 'extension') pushes.delete(io.sessionId())
   }
 
-  return { authority, onSessionBeforeSwitch, onSessionSwitch, onSessionShutdown, onInput, onAgentStart, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
+  return { authority, decisions: decisionIO, abortFrames, entryMs: () => lastEntryMs, onSessionBeforeSwitch, onSessionSwitch, onSessionShutdown, onInput, onAgentStart, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
 }
 
 // omp's real ctx behind AutonomicIO. Each handler points `cur` at the event's ctx first.
 function ioFor(pi: any, cur: () => any): AutonomicIO {
+  // Bind the live entry context ONCE: judge/generate are captured against that exact object, so a
+  // later mutable cur() cannot attribute a result to a different context (never evaluate after await).
+  const captureHost = (): ConsumerHost => {
+    const c = cur()
+    return {
+      sessionId: c?.sessionManager?.getSessionId?.() ?? '',
+      cwd: typeof c?.cwd === 'string' ? c.cwd : '',
+      sessionFile: c?.sessionManager?.getSessionFile?.(),
+      judge: typeof c?.judge === 'function' ? c.judge.bind(c) : undefined,
+      generate: typeof c?.runEphemeralTurn === 'function' ? c.runEphemeralTurn.bind(c) : undefined,
+      asyncJobs: () => (typeof c?.getAsyncJobSnapshot === 'function' ? c.getAsyncJobSnapshot() : null) as ReturnType<ConsumerHost['asyncJobs']>,
+    }
+  }
   return {
     pid: process.pid,
     launchCwd: process.cwd(),
+    captureHost,
     sessionFile: () => cur()?.sessionManager?.getSessionFile?.(),
     remove: path => { rmSync(path, { force: true }) },
     writeMode: (path, mode) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, mode) },
