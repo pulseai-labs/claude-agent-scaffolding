@@ -91,8 +91,16 @@ outcome matched. A line the human reports as not matching is a **failure**, and
 it halts exactly like an `auto:` failure — there is no "note it and move on" tier
 here.
 
-You may not perform a `user:` line on the human's behalf and mark it passed. The
-whole reason the ledger keeps a `user:` half is that some outcomes are only
+Under a standing order in the autopilot policy that gives you the demo walk, walk each line yourself,
+one at a time and in the same order, against the merged product. Record for each
+line the evidence the order requires — the commands you ran and their output, and
+a screenshot path where a screen is involved — and mark it `walked by orchestrator`
+in the read-out, never "walked by operator". A line you find failing is a
+**failure** and halts exactly as above. The read-out, with each line's evidence
+and its mark, goes to the operator.
+
+Absent that order, the walk is the human's. You may not perform a `user:` line on the human's behalf and mark it passed.
+The whole reason the ledger keeps a `user:` half is that some outcomes are only
 visible to a person using the thing.
 
 ---
@@ -295,6 +303,11 @@ The reason is **the operator's own words**, and a session never supplies them: a
 deferral on the session's judgment is the same failure as walking the line on the
 operator's behalf. The line is not cleared — it is still owed, now against a release,
 and the release close collects it with the operator present (`release-close.md` §5b).
+
+Under a standing order in the autopilot policy that gives you the demo walk, a
+line is walked by the orchestrator, so the operator's absence is not a reason to
+defer one; a line that needs a person's own device or account still defers, with
+the operator's words.
 
 **An escape closes on a negative result the plan declared.** Only when this spine's
 `SPINE.md` declared the time-box escape at plan time:

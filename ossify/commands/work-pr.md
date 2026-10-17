@@ -1,5 +1,5 @@
 ---
-description: Drive a pull request to merge — merge-bar's working-a-pr when that plugin is installed, else ossify's bundled review-fix-merge loop; every finding dispositioned, merge only on explicit ack
+description: Drive a pull request to merge — merge-bar's working-a-pr when that plugin is installed, else ossify's bundled review-fix-merge loop; every finding dispositioned, merge only on the operator's explicit ack, or a standing order's in the autopilot policy
 argument-hint: "<PR number or URL> [--repo-root DIR]"
 allowed-tools: Bash(bash:*), Bash(git:*), Bash(gh:*), Read, Write, Edit, Glob, Grep, Skill
 ---

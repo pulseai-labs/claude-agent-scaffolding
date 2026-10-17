@@ -147,7 +147,7 @@ never saw. Treat a new ledger line or a new hit exactly as §2 says.
 
 Either way, the body carries one `Closes #<n>` line per issue this patch
 resolves, one per line: GitHub closes only the first issue of `Closes #1, #2`.
-**The merge is the operator's.**
+**The merge is the operator's, or a standing order's in the autopilot policy.**
 
 ## 6. Tag after the merge
 
