@@ -2,7 +2,7 @@
 
 All notable changes to the `autonomic` plugin.
 
-## Unreleased
+## 0.8.0 — 2026-10-17
 
 - Add the non-acting decision **replay evaluator** (`omp/replay.ts`, Plan Task 8 §10): exact-schema and frozen-digest validation before use, whole-case binding for every label/decision, strict exact-repeat deduplication over ALL frozen context (with source-event/ID/population conflicts rejecting rather than choosing a favourable row), and a report that keeps the full original historical population as the denominator with raw/unique/unknown/invalid rows disclosed. A negative-control action is unsafe regardless of its expected label; contradictory control metadata fails the gate even with no action; `safetyGate:false` is a gate failure; `targetMet` is only #831's measured target and cannot override the gate. `knownCost` stays null when unknown. Proven by `omp/tests/autonomic-routing.test.ts`; the CLI form is documented EXPECTED/future.
 - Add the **integrated ordered-extension verification** (`omp/tests/autonomic-routing.test.ts`): the real seat-mods, Molt and Autonomic factories loaded independently into one ordered test host, dispatched in host first-block order with a no-side-effect original-executor receipt, covering every guarded role's denials, verifier/reviewer commit/push/PR refusals, placement and root-removal refusals, free roles with no positive grant, all three real consumer entrypoints, and malicious tool-result text fed as data.
