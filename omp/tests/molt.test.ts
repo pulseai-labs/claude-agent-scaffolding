@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import ompExtension, { FALLBACK_BRIEF_MS, claudeShape, claudeShapes, createMolt, messagesOf } from '../../molt/omp/extension'
+import ompExtension, { FALLBACK_BRIEF_MS, JOBS_CANCELLED, claudeShape, claudeShapes, createMolt, messagesOf } from '../../molt/omp/extension'
 import type { ClearResult, MoltIO } from '../../molt/omp/extension'
 import { activePath, autonomicPath, fallbackPath, lineagePath, stagePath } from '../../molt/hooks/records'
 import { extractFacts } from '../../molt/hooks/handoff'
@@ -30,6 +30,7 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     logs: [] as string[],
     ephemerals: [] as string[],
     seeds: [] as string[],
+    asides: [] as string[],
     bells: [] as string[],
   }
   const io: MoltIO = {
@@ -44,6 +45,7 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     remove: async p => { files.delete(p) },
     appendLog: async l => { w.logs.push(l) },
     steer: t => { w.steers.push(t) },
+    aside: t => { w.asides.push(t) },
     warnNext: t => { w.warnNexts.push(t) },
     status: () => {},
     notify: t => { w.notes.push(t) },
@@ -203,7 +205,7 @@ describe('a stop at the handoff stage', () => {
     const path = fallbackPath(HOME, 'S1')
     expect(w.files.get(path)).toContain('resume here')
     expect(w.files.get(path)).toContain('#12')
-    expect(w.seeds).toEqual([fill(DEFAULT_SEED, { path })])
+    expect(w.seeds).toEqual([`${fill(DEFAULT_SEED, { path })}\n\n${JOBS_CANCELLED}`])
   })
 
   test('81% with no marker: the first two stops block (no brief, no clear); the third runs the fallback brief and the molt', async () => {
@@ -236,7 +238,7 @@ describe('a stop at the handoff stage', () => {
     const path = fallbackPath(HOME, 'S1')
     expect(w.files.get(path)).toContain('#12')
     expect(w.files.get(path)).not.toContain('Work in progress')
-    expect(w.seeds).toEqual([fill(DEFAULT_SEED, { path })])
+    expect(w.seeds).toEqual([`${fill(DEFAULT_SEED, { path })}\n\n${JOBS_CANCELLED}`])
     expect(w.logs.join('\n')).toContain('ephemeral brief error session=S1')
   })
 
@@ -610,11 +612,16 @@ describe('settings, the stage file and the active marker', () => {
     expect(w.files.has(activePath(HOME, 'S1'))).toBe(false)
   })
 
-  test('/molt now steers the instruction whatever the fill, and /molt status reports', async () => {
+  test('/molt now sends the instruction as an aside (it starts a turn on an idle session) whatever the fill, and /molt status reports', async () => {
     const { w, m } = world()
     w.percent = 5
     await m.onCommand('now')
-    expect(w.steers[0]).toContain('MOLT-HANDOFF: <absolute path')
+    expect(w.steers).toEqual([])
+    expect(w.asides).toHaveLength(1)
+    expect(w.asides[0]).toContain('MOLT-HANDOFF: <absolute path')
+    // Below the threshold the text says the operator asked, never "past molt's handoff threshold".
+    expect(w.asides[0]).toContain('Context is at 5% of the window, and the operator asked for a handoff now.')
+    expect(w.asides[0]).not.toContain('past molt')
     const s = await m.onCommand('status')
     expect(s).toContain('molt is on')
     expect(s).toContain('handoff 65%')
@@ -850,10 +857,42 @@ describe('the omp wiring', () => {
       b.state.branch = marked(handoff)
       expect(await b.handlers.get('session_stop')!({}, b.ctxFor())).toBeUndefined()
       expect(b.order).toEqual(['user', 'newSession', 'user'])
-      expect(b.sent.at(-1)).toEqual({ kind: 'user', text: fill(DEFAULT_SEED, { path: handoff }) })
+      expect(b.sent.at(-1)).toEqual({ kind: 'user', text: `${fill(DEFAULT_SEED, { path: handoff })}\n\n${JOBS_CANCELLED}` })
       expect(JSON.parse(readFileSync(lineagePath(b.home, 'W2'), 'utf8'))).toMatchObject({ from: 'W1', depth: 1, handoff })
       expect(existsSync(activePath(b.home, 'W1'))).toBe(false)
       expect(existsSync(activePath(b.home, 'W2'))).toBe(true)
+    } finally { b.restore() }
+  })
+
+  test('#855 through the real wiring: agent_end with willContinue (a job pending) molts on the marker; /molt now asides', async () => {
+    const b = boot({ percent: 41 })
+    try {
+      const handoff = join(b.home, 'handoff.md')
+      writeFileSync(handoff, '# h')
+      await b.handlers.get('session_start')!({}, b.ctxFor())
+      await b.handlers.get('input')!({ text: 'hello', source: 'rpc' }, b.ctxFor())
+      await b.commands.get('molt-arm')!.handler('hello', b.ctxFor())
+      await b.commands.get('molt')!.handler('now', b.ctxFor())
+      expect(b.sent.at(-1)).toMatchObject({ kind: 'message', options: { deliverAs: 'aside' } })
+      b.state.branch = marked(handoff)
+      const messages = b.state.branch.map(x => (x as { message: unknown }).message)
+      await b.handlers.get('agent_end')!({ messages, willContinue: true }, b.ctxFor())
+      expect(b.order.slice(-2)).toEqual(['newSession', 'user'])
+      expect(b.sent.at(-1)).toEqual({ kind: 'user', text: `${fill(DEFAULT_SEED, { path: handoff })}\n\n${JOBS_CANCELLED}` })
+    } finally { b.restore() }
+  })
+
+  test('#855 /molt now as the first prompt arms the clear route itself', async () => {
+    const b = boot({ percent: 41 })
+    try {
+      const handoff = join(b.home, 'handoff.md')
+      writeFileSync(handoff, '# h')
+      await b.handlers.get('session_start')!({}, b.ctxFor())
+      await b.commands.get('molt')!.handler('now', b.ctxFor())
+      b.state.branch = marked(handoff)
+      const messages = b.state.branch.map(x => (x as { message: unknown }).message)
+      await b.handlers.get('agent_end')!({ messages, willContinue: true }, b.ctxFor())
+      expect(b.state.newSessions).toBe(1)
     } finally { b.restore() }
   })
 
@@ -936,7 +975,7 @@ describe('round 2 handoff targets and facts', () => {
         if (source === 'marker') w.branch = marked(raw!)
         else await m.onToolResult(result('write', { path: raw }))
         for (let i = 0; i < (source === 'marker' ? 1 : 3); i++) await m.onSessionStop()
-        expect(w.seeds[0]).toContain(fill(DEFAULT_SEED, { path: path! }))
+        expect(w.seeds[0]).toContain(`${fill(DEFAULT_SEED, { path: path! })}\n\n${JOBS_CANCELLED}`)
         expect(w.ephemerals).toHaveLength(0)
       })
     }
@@ -996,5 +1035,76 @@ describe('round 3 stop cancellation', () => {
     expect(outcome).toBe('returned')
     expect(w.files.has(fallbackPath(HOME, 'S1'))).toBe(false)
     expect(w.seeds).toEqual([])
+  })
+})
+
+// #855: omp defers session_stop while a background job is pending, and skips it for a todo continuation. It reports
+// both as agent_end with willContinue. molt reads the marker there too; a clear cancels the jobs anyway.
+describe('a marker at a deferred settle (agent_end, willContinue)', () => {
+  const end = (branch: unknown[], willContinue?: boolean) => ({ messages: messagesOfBranch(branch), willContinue })
+  const messagesOfBranch = (branch: unknown[]) => branch.map(x => (x as { message: unknown }).message)
+
+  test('a warned session whose reply ends with a readable marker molts at once', async () => {
+    const { w, m } = world({ files: { '/h/handoff.md': '# h' } })
+    w.percent = 41
+    w.branch = marked('/h/handoff.md')
+    await m.onAgentEnd(end(w.branch, true))
+    expect(w.seeds).toHaveLength(1)
+    expect(w.seeds[0]).toContain('/h/handoff.md')
+    expect(w.logs.some(l => l.includes('source=marker'))).toBe(true)
+  })
+
+  test('two overlapping agent_end calls, or one overlapping a session_stop, clear once', async () => {
+    const { w, m } = world({ files: { '/h/handoff.md': '# h' } })
+    w.percent = 60
+    w.branch = marked('/h/handoff.md')
+    await Promise.all([m.onAgentEnd(end(w.branch, true)), m.onAgentEnd(end(w.branch, true)), m.onSessionStop()])
+    expect(w.seeds).toHaveLength(1)
+  })
+
+  test('/molt off while the marker file is being read: no clear', async () => {
+    const { w, io, m } = world({ files: { '/h/handoff.md': '# h' } })
+    w.percent = 41
+    w.branch = marked('/h/handoff.md')
+    const read = io.readText
+    io.readText = async p => { if (p === '/h/handoff.md') await m.onCommand('off'); return read(p) }
+    await m.onAgentEnd(end(w.branch, true))
+    expect(w.seeds).toEqual([])
+  })
+
+  test('a terminal settle is left to session_stop', async () => {
+    const { w, m } = world({ files: { '/h/handoff.md': '# h' } })
+    w.percent = 41
+    w.branch = marked('/h/handoff.md')
+    await m.onAgentEnd(end(w.branch, false))
+    await m.onAgentEnd(end(w.branch))
+    expect(w.seeds).toEqual([])
+  })
+
+  test('below the first warning a marker is not a molt', async () => {
+    const { w, m } = world({ files: { '/h/handoff.md': '# h' } })
+    w.percent = 30
+    w.branch = marked('/h/handoff.md')
+    await m.onAgentEnd(end(w.branch, true))
+    expect(w.seeds).toEqual([])
+  })
+
+  test('no marker, or a marker naming a missing file, does nothing here: no block, no fallback', async () => {
+    const { w, m } = world()
+    w.percent = 81
+    w.branch = unmarked
+    await m.onAgentEnd(end(w.branch, true))
+    w.branch = marked('/h/gone.md')
+    await m.onAgentEnd(end(w.branch, true))
+    expect(w.seeds).toEqual([])
+    expect(w.ephemerals).toEqual([])
+  })
+
+  test('the OMP seed says the clear cancelled every background job', async () => {
+    const { w, m } = world({ files: { '/h/handoff.md': '# h' } })
+    w.percent = 66
+    w.branch = marked('/h/handoff.md')
+    expect(await m.onSessionStop()).toBeUndefined()
+    expect(w.seeds[0]).toContain('omp cancelled every background job this session had running when it cleared')
   })
 })

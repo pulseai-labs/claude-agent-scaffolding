@@ -2,6 +2,10 @@
 
 All notable changes to the `herdr-crew` plugin.
 
+## 0.2.28
+
+**A top that molts in place on OMP re-arms its waits** (#855). omp cancels every background job a session owns when it clears that session, so on OMP the armed waits and the heartbeat do not survive a molt; molt 0.3.3's seed says so. The molt-in-place paragraph now scopes "every armed wait survives the clear" and "it arms no wait the handoff lists" to Claude Code. On OMP, after its generation check, the resumed top re-arms the wait of each dispatch still live and one fresh heartbeat.
+
 ## 0.2.27
 
 **The reviewer's command is configurable** (operator, 2026-10-16). A machine entry may declare `review:`, the command a reviewer seat on that agent runs, with `<PR>`, `<PR_URL>` and `<LEVEL>` filled at dispatch (`/review <PR_URL>` on OMP). An entry with no `review:` keeps `/code-review <PR> <LEVEL>`. Both reviewer briefs carry the filled command as `REVIEW_INVOCATION`, which replaces the work-PR brief's `REVIEW_LEVEL`. The `can:` table's reviewer row needs `slash-commands` when the command the reviewer runs is a slash command. Lifecycle step 8, roles.md, SKILL.md and the README name the review command instead of `/code-review`.
