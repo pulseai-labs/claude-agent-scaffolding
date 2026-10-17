@@ -23,7 +23,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_MD="$PLUGIN_ROOT/skills/orchestrate/references/config.md"
-REF_BUDGET=208          # 2026-10-17: +6 for the `layer:` key, its two stops and the `host:` key (crew 0.3.0, spec §4.2/§4.6)
+REF_BUDGET=207          # 2026-10-17: +5 for the `layer:` key, its two stops and the `host:` key (crew 0.3.0, spec §4.2/§4.6)
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

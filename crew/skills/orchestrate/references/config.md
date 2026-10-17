@@ -16,8 +16,7 @@ agents by name, never by command, so no machine detail reaches a repo. For a dua
 the project root is the AI workspace, where orchestrators launch; a single-repo project uses
 that repo.
 
-The project file's first non-heading line states the layer — `layer: herdr` or `layer: orca`. The coordinator
-loads `references/layers/<layer>.md` before its first launch and reads no other layer's file; a missing or
+The project file's first non-heading line states the layer — `layer: herdr` or `layer: orca`. A missing or
 unknown value stops the run with one question, and there is no default. 0.3.0 ships the herdr layer only: asking for Orca stops, and says the Orca layer ships in crew 0.4.0.
 
 Resolution is a walk up from the session's working directory; the first project file found wins. The pairing manifest is not consulted — its absolute roots can belong to another host.
