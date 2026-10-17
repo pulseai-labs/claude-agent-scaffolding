@@ -64,7 +64,7 @@ Each field exists because a measured case needs it:
 - `review:` — optional: the command a reviewer seat on this agent runs, `<PR>`, `<PR_URL>` and `<LEVEL>` filled at dispatch (`/review <PR_URL>` on OMP); absent, `/code-review <PR> <LEVEL>`.
 - `note:` — free prose the coordinator reads when it uses that agent.
 
-A seat's readiness path is never a field here: it follows from herdr's own answer
+A seat's readiness path is never a field here: it follows from the layer's own answer
 to whether the pane is detected (`layers/herdr.md`) — so a detection manifest
 landing later moves a seat onto the typed path with no edit anywhere.
 
