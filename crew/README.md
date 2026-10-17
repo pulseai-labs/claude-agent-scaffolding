@@ -215,7 +215,9 @@ Two operator-owned markdown files, read as prose — nothing parses them.
 launch, one block each, with the field table in `skills/orchestrate/references/config.md`
 saying what each means and where it travels. `<project root>/.crew/roles.md` is the
 project file: which agent fills each role, the operator's own roles, and the conditions
-that choose between seats — it wins for anything it names. With neither file the
+that choose between seats — it wins for anything it names. Its first non-heading line is the
+mandatory layer line — `layer: herdr` in 0.3.0, and a missing or unknown value stops the run
+with one question; the Orca layer ships in crew 0.4.0. With neither file the
 session's own work needs no setup, and the first delegated dispatch halts naming the file
 to add; a seat name neither defines halts the run.
 
@@ -251,9 +253,12 @@ has one fixed path.
 bash crew/run-tests.sh
 ```
 
-Six suites: frontmatter and invocation posture across the three surfaces; five fidelity
-pins, each exactly once; the herdr mechanics contract; the config contract, including the
-sweep for a personal name across the shipped prose surfaces; the ossify spine-execution
-contract; and the context-ceiling hook's behaviour at its interface. A session-driven
-eval harness for the spine-execution surface lives under `tests/eval/` and is run by hand
-from its RUNBOOK — the runner does not execute it.
+Every suite under `tests/` (`test-*.sh` — the runner globs them rather than listing them):
+frontmatter and invocation posture across the three surfaces; five fidelity pins, each
+exactly once; the brief envelope's layer-Send lines; the herdr mechanics contract; the
+layer boundary, which sweeps the shared files for a layer's commands and the thirteen step
+headings a layer file must carry; the config contract, including the sweep for a personal
+name across the shipped prose surfaces; the launch sites' seat-mods marking clause; the
+ossify spine-execution contract; and the context-ceiling hook's behaviour at its interface.
+A session-driven eval harness for the spine-execution surface lives under `tests/eval/` and
+is run by hand from its RUNBOOK — the runner does not execute it.

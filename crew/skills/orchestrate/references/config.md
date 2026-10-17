@@ -189,13 +189,15 @@ default is one, and anything beyond the declared number is a planning defect.
 What the session does itself — reading, planning, the ceremonies it runs in its
 own context — needs no setup in any state: every role falls back to the agent this session is already running, and crew works on install. Delegation meets each state's missing half — a session cannot recover its own launch command, so the first delegated dispatch halts; which file it names depends on what exists:
 
-- Neither file — the machine file and the one entry to add, in the shape below.
+- Neither file — the machine file and the one entry to add, in the shape below, plus the
+  project file, whose first non-heading line is its `layer:` line.
 - Machine file only — agent names have launch details but no role mapping; it
-  names the project file and the `## Seats` section to add.
+  names the project file, its `layer:` line and the `## Seats` section to add.
 - Project file only — roles name agents nothing resolves; it names the
   machine file and the entry to add.
 - The old path only — a file left at its old name: the run stops, prints the move and reads no old file:
-  `mkdir -p ~/.claude/crew && mv ~/.claude/herdr-crew/agents.md ~/.claude/crew/agents.md` (machine file), `mv .herdr-crew .crew` (project file).
+  `mkdir -p ~/.claude/crew && mv ~/.claude/herdr-crew/agents.md ~/.claude/crew/agents.md` (machine file), `mv .herdr-crew .crew` (project file) — the moved project file
+  then needs the `layer:` line 0.3.0 introduced, before any seat is launched.
 
 The operator writes the machine file once per machine; this is the shape to copy:
 
