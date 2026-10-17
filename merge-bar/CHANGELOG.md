@@ -2,6 +2,18 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.4.0
+
+Standing orders in the autopilot policy for the merge, the round stop and the reviewers.
+
+- `working-a-pr` — under a **Merge authority** standing order, a clean terminus is the ack
+  (the reviewed-OID pin and the pre-merge re-fetch still hold); under a **Round stop** order,
+  the round-3 stop narrows the Claim and continues instead of asking, and a condition-1
+  finding is never narrowed; under a **Reviewers** order, a reviewer that cannot run on this
+  head is replaced by the fallback reviewer the project's roles file names, and the ledger
+  says so. With no standing order in effect, every ask stays exactly as it is.
+- New eval fixture `W11` covers the three orders in one run: narrow, replace, merge.
+
 ## 0.3.0
 
 OMP marketplace surface.
