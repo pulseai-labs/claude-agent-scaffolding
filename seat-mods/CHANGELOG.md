@@ -2,6 +2,13 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.4.6 — 2026-10-18
+
+- **Naming: the orchestrator's deny text and every launcher reference say `crew`** (crew 0.3.0's
+  rename, spec §4.6). The rail's message now reads `seat-mods (orchestrator): no subagents —
+  dispatch a crew seat instead (crew orchestrate; #798).`; the shared-rules comment and the
+  README's rollout lines follow. No guard, profile or write-placement behaviour changes.
+
 ## 0.4.5 — 2026-10-17
 
 - **Scratch work costs one turn, not several** (#844). A friction review of 88 OMP sessions found 12 write denials

@@ -70,8 +70,8 @@ jobs:
       - name: code-judo suite
         run: bash code-judo/run-tests.sh
 
-      - name: herdr-crew suite
-        run: bash herdr-crew/run-tests.sh
+      - name: crew suite
+        run: bash crew/run-tests.sh
 
       - name: merge-bar suite
         run: bash merge-bar/run-tests.sh
@@ -94,11 +94,18 @@ jobs:
       - name: recommendation-policy parity (repo-root)
         run: bash tests/test-recommendation-policy-parity.sh
 
-      - name: herdr-crew parity pins (repo-root)
-        # herdr-crew's verbatim copy of ossify's eval aggregator, its Codex prompts,
+      - name: crew parity pins (repo-root)
+        # crew's verbatim copy of ossify's eval aggregator, its Codex prompts,
         # and the manifest/marketplace description. A plugin suite cannot see its
         # sibling tree, so this one is repo-root.
-        run: bash tests/test-herdr-crew-parity.sh
+        run: bash tests/test-crew-parity.sh
+
+      - name: crew rename gate (repo-root)
+        # The rename's clean cut (spec §4.6): no tracked path, no catalog entry and no
+        # tree-wide reference to the old plugin name outside CHANGELOG history and
+        # config.md's old-path stop. Repo-root because it scans every plugin's tree,
+        # which crew's own runner cannot see.
+        run: bash tests/test-crew-rename.sh
 
       - name: merge-bar template parity (repo-root)
         # ossify's fallback PR-body template must match merge-bar's (ossify 1.13.0).

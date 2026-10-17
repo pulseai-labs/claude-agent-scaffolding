@@ -77,10 +77,10 @@
       "category": "Coding"
     },
     {
-      "name": "herdr-crew",
+      "name": "crew",
       "source": {
         "source": "local",
-        "path": "./herdr-crew"
+        "path": "./crew"
       },
       "policy": {
         "installation": "AVAILABLE",
