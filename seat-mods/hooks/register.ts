@@ -1,5 +1,5 @@
 import type { Register } from 'claude-code'
-import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
+import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
 import type { RoleState } from './rules'
 
 async function roleOf($: any): Promise<RoleState> {
@@ -97,7 +97,8 @@ export const register: Register = on => {
         if (operands.length > 0) {
           const [cwd, home, root, allow] = await Promise.all([$.session.cwd(), $.env.get('HOME'), worktreeOf($), allowOf($)])
           for (const operand of operands) {
-            const target = operand.path === undefined ? undefined : await removalPath($, operand.path, cwd, home, operand.glob)
+            if (operand.path === undefined) { removals.push(UNREAD); continue }
+            const target = await removalPath($, operand.path, cwd, home, operand.glob)
             removals.push(removalOf(target, root, allow, operand.glob))
           }
         }
@@ -111,7 +112,7 @@ export const register: Register = on => {
     if (e.tool === 'Edit' || e.tool === 'Write') {
       const [target, root, allow] = await Promise.all([realOf($, e.file_path), worktreeOf($), allowOf($)])
       const place = target === undefined || root === undefined ? 'outside' : placeOf(target, root, allow)
-      const deny = decide(role, { kind: 'write', place })
+      const deny = decide(role, { kind: 'write', place, allow })
       return deny === undefined ? next(e) : { deny }
     }
 

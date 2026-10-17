@@ -703,3 +703,21 @@ describe('a lone & reaches the hook rails (#723)', () => {
     expect((await $.tool.call({ tool: 'Bash', command: 'true & rm -rf /w/build' })).deny).toBeUndefined()
   })
 })
+
+// #844: an operand the guard cannot read says how to make it readable; a write outside names the scratch folders.
+describe('deny texts point at the way through (#844)', () => {
+  test('implementer: rm "$S/x" is told to spell the path out; the literal path in the allow folder runs', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
+    const deny = (await $.tool.call({ tool: 'Bash', command: 'S=/reports; rm -rf "$S/shallow"' })).deny
+    expect(deny).toContain('no rm with an operand the guard cannot resolve')
+    expect(deny).toContain('spell its path out literally')
+    expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /var/x' })).deny).not.toContain('literally')
+    expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /reports/shallow' })).deny).toBeUndefined()
+  })
+  test('implementer: a Write outside names the SEAT_MODS_ALLOW folder', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
+    const deny = (await $.tool.call({ tool: 'Write', file_path: '/var/commit-message.txt', content: 'x' })).deny
+    expect(deny).toContain('no writes outside')
+    expect(deny).toContain('go in /reports.')
+  })
+})

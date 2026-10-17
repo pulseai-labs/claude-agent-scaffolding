@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { dirname, basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, placeOf, decide,
+  parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide,
   uncheckedRmText, invalidText, statusText,
 } from '../hooks/rules'
 import type { Place, Role, RoleState, RuleId } from '../hooks/rules'
@@ -257,7 +257,8 @@ async function shellCheck(deps: GuardDeps, role: Role, commands: string[], baseO
       const removals = []
       for (const operand of rmTargets(command)) {
         const [root, allow] = await Promise.all([deps.worktree(), allowOf(deps)])
-        const target = operand.path === undefined || base === undefined ? undefined : await removalPath(deps, base, operand.path, operand.glob)
+        if (operand.path === undefined) { removals.push(UNREAD); continue }
+        const target = base === undefined ? undefined : await removalPath(deps, base, operand.path, operand.glob)
         removals.push(removalOf(target, root, allow, operand.glob))
       }
       const deny = decide(role, { kind: 'bash', rules: bashRules(command, texts.join('\n')), removals })
@@ -277,6 +278,7 @@ async function writeCheck(deps: GuardDeps, role: Role, toolName: string, input: 
     // `write xd://resolve` / `xd://reject` confirm or discard a preview an earlier, already-checked ast_edit staged.
     const places: Place[] = []
     if (toolName === 'write' && CONFIRM_ONLY.test(raw)) continue // names no file; acts on a preview already placed
+    if (toolName === 'write' && LOCAL_SCRATCH.test(raw)) continue // session scratch omp confines (#844)
     else for (const reading of readings(raw, toolName === 'ast_edit')) {
       const path = toolName === 'ast_edit' ? globBase(reading) : reading
       let abs: string | undefined
@@ -285,7 +287,7 @@ async function writeCheck(deps: GuardDeps, role: Role, toolName: string, input: 
       places.push(target === undefined || root === undefined ? 'outside' : placeOf(target, root, allow))
     }
     for (const place of places) {
-      const deny = decide(role, { kind: 'write', place })
+      const deny = decide(role, { kind: 'write', place, allow })
       if (deny !== undefined) return deny
     }
   }
@@ -300,6 +302,11 @@ const SCHEME = /[A-Za-z][A-Za-z0-9+.-]*:\//
 // device writes are checked as their inner tool in guard(), with raw-arg key and force-flag guards. Every other
 // device name (docs included), special name and malformed device URL still fails placement.
 const CONFIRM_ONLY = /^\s*xd:\/\/(?:resolve|reject)\s*$/
+// #844: the write tool's `local://<name>` is omp's per-session scratch. omp confines it itself (absolute paths and `..`
+// refused after URL decoding, real-path containment under the session's local root), so a guarded seat may write it.
+// Only this exact lowercase form with a closed character set is taken: every other spelling, and every other tool,
+// keeps write placement, where a scheme is outside (a false deny costs one turn).
+const LOCAL_SCRATCH = /^local:\/\/(?!(?:.*\/)?\.\.?(?:\/|$))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/
 
 // The one reading of an omp path argument — a write-class target or a bash `cwd` — as omp's expandPath and
 // resolveToCwd do it: a leading `:` before a path shape is dropped; `@` before `/abs`, `~`, `~/` or a URL is

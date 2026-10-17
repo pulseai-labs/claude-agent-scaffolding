@@ -277,8 +277,8 @@ describe('last fix: omp\'s lenient header detection', () => {
 describe('PR 762 round 1: URL-scheme write targets', () => {
   // omp redirects local:// (and vault://, ssh://, cfg://, ...) to backing files outside the worktree, so a scheme
   // target must never be read as the synthetic path `<cwd>/local:/x` (inside the tree).
-  test('an implementer child cannot write through local://, whichever tool carries it', async () => {
-    expect(await guard(deps(), 'write', { path: 'local://report.md', content: 'x' }, child('implementer'))).toContain('no writes outside')
+  // #844: the write tool's own `local://<name>` is session scratch omp confines, so it is allowed (see the #844 block).
+  test('an implementer child cannot write through local:// with any other tool', async () => {
     expect(await guard(deps(), 'edit', { path: 'local://x' }, child('implementer'))).toContain('no writes outside')
     expect(await guard(deps(), 'ast_edit', { path: 'local://x', pattern: 'a', rewrite: 'b' }, child('implementer'))).toContain('no writes outside')
     expect(await guard(deps(), 'edit', { path: 'a.ts', input: '[a.ts]\nMV local://x' }, child('implementer'))).toContain('no writes outside')
@@ -313,7 +313,7 @@ describe('PR 762 round 1: URL-scheme write targets', () => {
   })
   test('an implementer main session (default rails) is guarded the same way', async () => {
     const env = { HOME: '/home/u' } as Record<string, string | undefined>
-    expect(await guard(deps({ env }), 'write', { path: 'local://x', content: 'x' }, { kind: 'main' })).toContain('no writes outside')
+    expect(await guard(deps({ env }), 'edit', { path: 'local://x' }, { kind: 'main' })).toContain('no writes outside')
   })
 })
 
@@ -595,5 +595,40 @@ describe('orchestrator: no subagents (#798)', () => {
     expect(spawnDecision({ kind: 'main' }, undefined)).toBeUndefined()
     expect(spawnDecision({ kind: 'main' })).toBeUndefined()
     expect(spawnDecision({ kind: 'sub', name: 'implementer' })).toMatchObject({ block: true })
+  })
+})
+
+// #844: guarded seats lost a turn on each scratch write. omp's `local://` is per-session scratch that omp itself confines
+// (absolute paths and `..` refused, real-path containment under the session's local root), so the write tool may use it.
+// /tmp and xd://report_issue (an outward report to omp's maintainers) stay denied; the deny texts say where to go instead.
+describe('scratch sinks (#844)', () => {
+  test('every guarded role may write a local://<name> file with the write tool', async () => {
+    for (const role of ['implementer', 'reviewer', 'task'])
+      for (const path of ['local://pr861-commit-message.txt', 'local://notes/round-1.md', 'local://a_b-c.d'])
+        expect(await guard(deps(), 'write', { path, content: 'x' }, child(role))).toBeUndefined()
+    const env = { HOME: '/home/u' } as Record<string, string | undefined>
+    expect(await guard(deps({ env }), 'write', { path: 'local://msg.txt', content: 'x' }, { kind: 'main' })).toBeUndefined()
+  })
+  test('adjacent controls: other local:// shapes, other tools, /tmp and report_issue still deny', async () => {
+    for (const path of ['local://', 'local://../x', 'local://a/../../x', 'local://%2e%2e/x', 'local://a b', 'local://x#abcd', 'local:///etc/x',
+      'LOCAL://x', 'local:/x', ' local://x', 'sub/local://x', '/tmp/x.txt', 'xd://report_issue'])
+      expect(await guard(deps(), 'write', { path, content: 'x' }, child('implementer'))).toBeDefined()
+    expect(await guard(deps(), 'edit', { path: 'local://x' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'ast_edit', { path: 'local://x', pattern: 'a', rewrite: 'b' }, child('implementer'))).toContain('no writes outside')
+  })
+  test('a write denied outside names the SEAT_MODS_ALLOW folders as the place for scratch files', async () => {
+    const deny = await guard(deps(), 'write', { path: '/tmp/pr861-commit-message.txt', content: 'x' }, child('implementer'))
+    expect(deny).toContain('no writes outside')
+    expect(deny).toContain('/tmp/allow')
+  })
+  test('an rm operand the guard cannot resolve says to spell the path literally; one outside keeps its own text', async () => {
+    const unresolved = await guard(deps(), 'bash', { command: 'S=/tmp/allow; rm -rf "$S/shallow"' }, child('implementer'))
+    expect(unresolved).toContain('no rm')
+    expect(unresolved).toContain('literal')
+    const outside = await guard(deps(), 'bash', { command: 'rm -rf /etc/x' }, child('implementer'))
+    expect(outside).toContain('no rm outside')
+    expect(outside).not.toContain('literal')
+    // control: the same removal spelled literally, in the allow folder, runs
+    expect(await guard(deps(), 'bash', { command: 'rm -rf /tmp/allow/shallow' }, child('implementer'))).toBeUndefined()
   })
 })

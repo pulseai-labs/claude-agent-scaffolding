@@ -83,8 +83,8 @@ Each is a `tool.call` deny on Bash, Edit or Write.
 | Force-push (`--force`, `-f`, `--force-with-lease`, `--mirror`, a `+` refspec); branch deletion (`git branch -D`, or `-d`/`--delete` with `-f`/`--force`; `git push --delete` / `-d` / `--prune` / `:branch`) | deny | deny | deny |
 | `--no-verify` on any git command (and `git commit -n`) | deny | deny | deny |
 | A commit message with `Co-Authored-By:` or `🤖 Generated with` — on the command line, in a heredoc, or in the `-F` / `--file` message file | deny | deny | deny |
-| Edit or Write outside the worktree and outside every `SEAT_MODS_ALLOW` directory | deny | deny | deny |
-| `rm` outside writable places, with unresolvable operands, or removing a writable root or its ancestor | deny | deny | deny |
+| Edit or Write outside the worktree and outside every `SEAT_MODS_ALLOW` directory (the deny names those directories as the place for scratch files) | deny | deny | deny |
+| `rm` outside writable places, with unresolvable operands, or removing a writable root or its ancestor (an operand it cannot read is told to spell its path out literally) | deny | deny | deny |
 | `rm` inside the worktree (below its root) | allow | allow | deny |
 | `rm` inside a `SEAT_MODS_ALLOW` directory (below its root) | allow | allow | allow |
 | `git commit`, `git push`, `gh pr create` | allow | deny | deny |
@@ -219,7 +219,7 @@ Under any guarded role, a tool call passes only if its name is on the allow list
 | `read`, `grep`, `glob`, `find`, `ast_grep`, `web_search`, `recall`, `todo`, `wait`, `yield`, `think`, `advise` | allowed |
 | `ask`, `goal`, `task` | the top-level session only; a child is denied |
 | `bash`, `eval` | the command rules; `eval` source read best effort, and blocked for a reviewer |
-| `write`, `edit` (and its `apply_patch` wire name), `ast_edit` | every target placed as omp reads it: a `[path#HHHH]` header unwrapped, `~`, `@/`, `:/` and `file://` expanded, any other `scheme:/` outside |
+| `write`, `edit` (and its `apply_patch` wire name), `ast_edit` | every target placed as omp reads it: a `[path#HHHH]` header unwrapped, `~`, `@/`, `:/` and `file://` expanded, any other `scheme:/` outside; since 0.4.5 (#844) `write` to an exact `local://<name>` is allowed for every guarded role: omp's per-session scratch, which omp confines itself |
 | `lsp` | omp's read-only actions only (`diagnostics`, `definition`, `type_definition`, `implementation`, `references`, `hover`, `symbols`, `status`, `capabilities`) |
 | `github` | omp's read-only ops; `pr_create`/`pr_push` follow the PR and push rails; `pr_checkout` and every other op denied; `forceWithLease` is a force-push |
 | `debug` | an implementer only, its launch read like `eval`; denied for a verifier or reviewer |
