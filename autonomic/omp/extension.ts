@@ -600,8 +600,12 @@ export function createAutonomic(io: AutonomicIO) {
       await askPain(id, snapshot.questions[0]!.question, 'the batch holds content that redaction would hide')
       return undefined
     }
+    // The cancellation generation this frame belongs to, bound where the frame starts:
+    // `abortFrames()` aborts and replaces the controller, so reading it here is what ties the
+    // frame's work to the session it was captured for (shutdown, switch, rebuild, mode fall).
+    const signal = frameAbort.signal
     try {
-      const frame = await captureFrame(decisions, lastEntryMs, 'ask', input)
+      const frame = await captureFrame(decisions, lastEntryMs, 'ask', input, signal)
       const plan = planAsk(snapshot, frame)
       const result = await judgeNative(frame, plan.request)
       const answer = assembleAsk(plan, result, frame)
@@ -619,6 +623,9 @@ export function createAutonomic(io: AutonomicIO) {
       return { block: true, reason: `autonomic answered: ${JSON.stringify(answer.answers)} — ${answer.reason}` }
     } catch (err) {
       await log(`ask decision error ${String(err)}`)
+      // A frame cancelled with its session writes nothing late: the pain row would be attributed
+      // to a dialog the session no longer owns.
+      if (signal.aborted) return undefined
       await askPain(id, snapshot.questions[0]?.question ?? 'a question', 'the native ask decision is unavailable')
       return undefined
     }
@@ -658,10 +665,14 @@ export function createAutonomic(io: AutonomicIO) {
     // An enrolled session owns a decision service; without one the call keeps the plain operator block.
     const decisions = io.decisions
     if (decisions !== undefined) {
+      const signal = frameAbort.signal
       try {
-        return await decisionFor(decisions, { tool, command, input: from?.input, findings })
+        return await decisionFor(decisions, { tool, command, input: from?.input, findings }, signal)
       } catch (err) {
         await log(`permission decision error ${String(err)}`)
+        // A frame cancelled with its session neither writes nor releases: the call still stays with
+        // the operator, but no row is attributed to a session that has moved on.
+        if (signal.aborted) return { block: true, reason: 'autonomic: the decision frame was cancelled with the session; this call stays with the operator' }
         // The decision route failed, so this call stays with the operator — and it is recorded and
         // rings exactly as the plain never-approve path does, rather than blocking in silence.
         await ringDecline(tool, command, [...new Set(findings.map(f => f.rule))], 'the decision route failed')
@@ -696,13 +707,13 @@ export function createAutonomic(io: AutonomicIO) {
    * host's nonblocking result, or keep it with the operator. Every failure returns an explicit
    * block; a catch returning undefined here would release a yolo-blocked call.
    */
-  async function decisionFor(io2: DecisionIO, call: { tool: 'bash' | 'github'; command: string; input: unknown; findings: Finding[] }): Promise<{ block: true; reason: string } | undefined> {
+  async function decisionFor(io2: DecisionIO, call: { tool: 'bash' | 'github'; command: string; input: unknown; findings: Finding[] }, signal: AbortSignal): Promise<{ block: true; reason: string } | undefined> {
     const { tool, command } = call
     const captured = call.input !== undefined ? call.input : { command }
     // Never judge an input in part: if redaction would hide material text, this call stays with the operator.
     const shown = shownInput(captured)
     if (redact(shown) !== shown) return operatorBlock(tool, command, call.findings, 'the input holds content that redaction would hide')
-    const frame = await captureFrame(io2, lastEntryMs, 'permission', captured)
+    const frame = await captureFrame(io2, lastEntryMs, 'permission', captured, signal)
     const ctx: OperationContext = { inputSha256: frame.inputSha256, facts: frame.facts, snapshot: frame.lease.snapshot,
       approved: frame.policy.approved.permissions as ApprovedPermission[], evidence: frame.lease.evidence,
       commands: frame.policy.approved.commands as ApprovedCommand[] }
@@ -812,8 +823,9 @@ export function createAutonomic(io: AutonomicIO) {
     const decisions = io.decisions
     if (decisions === undefined) return undefined
     let frame: DecisionFrame | undefined
+    const signal = frameAbort.signal
     try {
-      frame = await captureFrame(decisions, lastEntryMs, 'turn-end', { lastReply: answer.slice(-cfg.tailChars) })
+      frame = await captureFrame(decisions, lastEntryMs, 'turn-end', { lastReply: answer.slice(-cfg.tailChars) }, signal)
       const state = turnEvidence(frame, answer.slice(-cfg.tailChars),
         { pushes: n, changed: turn.changed, loopMax: cfg.loopMax }, { stage: turn.stage, handoff: turn.handoff })
       // Every string the state would send native or generation must survive redaction unchanged.
@@ -838,6 +850,9 @@ export function createAutonomic(io: AutonomicIO) {
         try { frame.budget.cancel() } catch {}
       }
       pushes.delete(id)
+      // A frame cancelled with its session writes nothing late: the turn end belongs to a session
+      // that has ended, switched or rebuilt.
+      if (signal.aborted) return undefined
       await turnPain(id, 'turn end', 'the native turn-end decision is unavailable')
       return undefined
     }

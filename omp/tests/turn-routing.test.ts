@@ -15,7 +15,7 @@ import type { EvidenceMaterial, Grant } from '../../autonomic/hooks/authority'
 import { DEFAULTS } from '../../autonomic/hooks/config'
 import { painOptions } from '../../autonomic/hooks/verdict'
 import type { TurnCase, TurnVerdict } from '../../autonomic/hooks/verdict'
-import { captureFrame } from '../../autonomic/omp/judgment'
+import { captureFrame, parsePolicyBundle } from '../../autonomic/omp/judgment'
 import type { DecisionFrame, PolicyBundle } from '../../autonomic/omp/judgment'
 import { stagePath } from '../../autonomic/hooks/records'
 import { createAutonomic } from '../../autonomic/omp/extension'
@@ -441,12 +441,22 @@ describe('validateTurnPayload per-label grounding', () => {
     const policy = emptyPolicy()
     policy.approved.turns = [{ id: 'cand-pain', case: 'pain',
       payload: { case: 'pain', reason: `${NOTE}: run the focused suite is the remaining approved action`, question: 'run the focused suite',
-        options: [{ label: 'Merge', text: 'a one-way door that cannot be undone', recommended: true }] },
+        options: [{ label: 'Merge', text: 'a one-way door that cannot be undone', recommended: false }] },
       evidenceIds: [NOTE], grantIds: [GRANT], irreversibleOptionLabels: ['Merge'] }]
     const fixture2 = await minimalTurnFrame(policy)
     try {
-      const verdict = validateTurnPayload(envelope(policy.approved.turns[0]!.payload, 'cand-pain', []), 'pain', minimalTurnState(fixture2.frame), fixture2.frame)
-      expect(verdict).toBeUndefined()
+      // The candidate no longer recommends the one-way option, so the validator's own rule is
+      // exercised where it still runs: on a rendered payload that does.
+      const text = 'a one-way door that cannot be undone'
+      const quote = quoteOf(NOTE, text)
+      const recommended = { case: 'pain', reason: reasonFrom(quote), question: 'run the focused suite',
+        options: [{ label: 'Merge', text, recommended: true }] }
+      expect(validateTurnPayload(envelope(recommended, null, [quote]), 'pain', minimalTurnState(fixture2.frame), fixture2.frame)).toBeUndefined()
+      // CR8: the candidate path returns its payload without passing that validator, so a candidate
+      // that recommends its own irreversible option is refused where the bundle is parsed.
+      const bad = structuredClone(policy)
+      bad.approved.turns[0]!.payload.options![0]!.recommended = true
+      expect(() => parsePolicyBundle(JSON.stringify(bad))).toThrow(/irreversible option/)
     } finally { fixture2.close() }
   })
 
@@ -863,6 +873,20 @@ describe('the turn-end consumer failures', () => {
     expect((await w.handlers.get('session_stop')!({ session_id: 'S1', last_assistant_message: 'x' }, w.ctx))?.decision).toBe('block')
     expect(w.nativeRequests).toHaveLength(1)
     expect(human(w)).toContain(' · stalled · ')
+  })
+  test('a frame cancelled with its session writes nothing late', async () => {
+    w = turnWorld(turnPolicy('stalled', STEP))
+    w.setNative(async (request: JudgmentRequest) => {
+      // The session navigates while the native judgment is in flight: `abortFrames()` aborts the
+      // frame this stop captured, so the decisions in flight are cancelled, not finished late.
+      await w.handlers.get('session_tree')!({}, w.ctx)
+      return turnEnvelope(request, { turn_end: turnAnswer(request, 'stalled') })
+    })
+    expect(await w.stop('x')).toBeUndefined()
+    expect(w.nativeRequests).toHaveLength(1)
+    expect(sidecar(w)).toEqual([])
+    expect(human(w)).not.toContain(' · pain · ')
+    expect(pain(w)).toBe('')
   })
 })
 

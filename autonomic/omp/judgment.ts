@@ -374,8 +374,14 @@ function turnCandidate(value: unknown): ApprovedTurnCandidate {
   if (!(TURN_CASES as readonly string[]).includes(kase)) throw new Error('unknown turn candidate case')
   const payload = parseTurn(JSON.stringify(o.payload))
   if (payload === undefined || payload.case !== kase) throw new Error('invalid turn candidate payload')
+  const irreversible = strings(o.irreversibleOptionLabels)
+  // A payload that recommends one of the candidate's own irreversible options never reaches the
+  // validator: `payloadForTurn` returns the unique live candidate directly. Rejecting it at parse
+  // disables the route, exactly as the bundle's other invariants do.
+  if (payload.options?.some(opt => opt.recommended && irreversible.includes(opt.label)))
+    throw new Error('an approved turn candidate recommends an irreversible option')
   return { id: opaque(o.id), case: kase as TurnCase, payload, evidenceIds: strings(o.evidenceIds),
-    grantIds: strings(o.grantIds), irreversibleOptionLabels: strings(o.irreversibleOptionLabels) }
+    grantIds: strings(o.grantIds), irreversibleOptionLabels: irreversible }
 }
 
 function approved(value: unknown): ApprovedDecisions {

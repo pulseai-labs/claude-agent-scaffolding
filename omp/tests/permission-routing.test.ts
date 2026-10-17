@@ -946,7 +946,12 @@ describe('the commit path bound, redirections, config injection and the gh metho
     const trailer = 'Co-Authored-By: someone <someone@example.invalid>'
     const forms = ['git commit -F -', 'git commit -F msg.txt', 'git commit -Fmsg.txt', 'git commit --file msg.txt',
       'git commit --file=msg.txt', `git commit -m "${trailer}"`, `git commit -am "${trailer}"`,
-      `git commit --message "${trailer}"`, `git commit --message="${trailer}"`]
+      `git commit --message "${trailer}"`, `git commit --message="${trailer}"`,
+      // CR6: an explicit trailer, and the message sources this module cannot read — another
+      // commit's message (-C/-c/--reuse-message/--reedit-message/--squash) or a template file.
+      `git commit -m x --trailer '${trailer}'`, 'git commit -C HEAD', 'git commit -c HEAD~1',
+      'git commit --reuse-message HEAD', 'git commit --reedit-message=HEAD~1', 'git commit --template msg.tmpl',
+      'git commit -t msg.tmpl', 'git commit --squash HEAD~1']
     for (const command of forms) {
       const { facts, eligibility } = await factsFor(command, [commitGrant()])
       expect([command, facts.effects[0]!.trailer]).toEqual([command, true])
@@ -1025,5 +1030,73 @@ describe('the commit path bound, redirections, config injection and the gh metho
     const tilde = await factsFor('git -C ~ status', [pushGrant()])
     expect(tilde.facts.effects[0]!.unresolved).toBe("the segment's effects cannot be established")
     expect(tilde.eligibility.kind).toBe('ask')
+  })
+
+  // ---- the CodeRabbit review round ----
+
+  test('an env split string is opaque: its payload is not the argv this segment names', async () => {
+    const forms = [`env -S 'sh -c x' git push origin ${MAIN}:${MAIN}`,
+      `env --split-string='sh -c x' git push origin ${MAIN}:${MAIN}`,
+      `env -S'sh -c x' git push origin ${MAIN}:${MAIN}`]
+    for (const command of forms) {
+      expect([command, executionSegments(command, '/repo', '/repo')[0]!.opaque]).toEqual([command, true])
+      const { facts, eligibility } = await factsFor(command, [pushGrant()])
+      expect([command, facts.effects[0]!.operation]).toEqual([command, null])
+      expect([command, eligibility.kind]).toEqual([command, 'ask'])
+    }
+  })
+
+  test('a prefix environment assignment or git --exec-path is opaque, never a bounded push', async () => {
+    const forms = [`GIT_SSH_COMMAND=/tmp/x git push origin ${MAIN}:${MAIN}`,
+      `PATH=/tmp/x git push origin ${MAIN}:${MAIN}`,
+      `env LD_PRELOAD=/tmp/x.so git push origin ${MAIN}:${MAIN}`,
+      `git --exec-path=/tmp/x push origin ${MAIN}:${MAIN}`]
+    for (const command of forms) {
+      const { facts, eligibility } = await factsFor(command, [pushGrant()])
+      expect([command, facts.effects[0]!.operation]).toEqual([command, null])
+      expect([command, eligibility.kind]).toEqual([command, 'ask'])
+    }
+    // Control: the same push without a prefix assignment or the option is bounded by its grant.
+    expect((await factsFor(`git push origin ${MAIN}:${MAIN}`, [pushGrant()])).eligibility.kind).toBe('semantic')
+  })
+
+  test('push --no-verify arms its red line and --follow-tags is an unsupported effect', async () => {
+    const noVerify = await factsFor(`git push --no-verify origin ${MAIN}:${MAIN}`, [pushGrant()])
+    expect(noVerify.facts.effects[0]!.noVerify).toBe(true)
+    expect(noVerify.eligibility).toEqual({ kind: 'ask', reason: '--no-verify is operator-owned' })
+    const followTags = await factsFor(`git push --follow-tags origin ${MAIN}:${MAIN}`, [pushGrant()])
+    expect(followTags.facts.effects[0]!.unresolved).toContain('unsupported push effect')
+    expect(followTags.eligibility.kind).toBe('ask')
+  })
+
+  test('gh resolves its own repository selector and refuses an explicit host', async () => {
+    const ownPr: Grant = { id: 'fixture-pr', operation: 'pr.update-own',
+      resource: { kind: 'pr', repository: '/fixture/repo', headRef: MAIN, number: 1 }, authorityRefs: ['fixture-approval'] }
+    // A selector naming another repository never acts on it: it is not a configured remote.
+    const other = await factsFor('gh pr edit 1 -R other/repo', [ownPr])
+    expect(other.facts.effects[0]!.unresolved).toBe('repository other/repo is not a configured remote')
+    expect(other.eligibility.kind).toBe('ask')
+    // The api path and an explicit selector that disagree are a conflicting identity, not a choice.
+    const conflict = await factsFor('gh api repos/o/r/pulls/1/comments/2/replies -f body=x -R other/repo', [ownPr])
+    expect(conflict.facts.effects[0]!.unresolved).toBe('conflicting repository identity')
+    // An explicit host is not a pinned fact.
+    const host = await factsFor('gh pr edit 1 --hostname enterprise.example', [ownPr])
+    expect(host.facts.effects[0]!.unresolved).toBe('an explicit gh host is not a pinned fact')
+    // Control: the own-PR edit naming the pinned repository still routes.
+    expect((await factsFor('gh pr edit 1 --repo o/r', [ownPr])).eligibility)
+      .toMatchObject({ kind: 'semantic', grantIds: ['fixture-pr'] })
+  })
+
+  test('an include or amend commit is unresolved: its content escapes the literal path bound', async () => {
+    const forms = ['git commit -i -m x src/app.ts', 'git commit --include -m x src/app.ts',
+      'git commit --amend -m x', 'git commit -i src/app.ts']
+    for (const command of forms) {
+      const { facts, eligibility } = await factsFor(command, [commitGrant()])
+      expect([command, facts.effects[0]!.unresolved]).toEqual([command, 'the commit carries content outside its literal paths'])
+      expect([command, eligibility.kind]).toEqual([command, 'ask'])
+    }
+    // Control: the same commit without them is bounded by its grant.
+    expect((await factsFor('git commit -m x src/app.ts', [commitGrant()])).eligibility)
+      .toMatchObject({ kind: 'semantic', grantIds: ['fixture-commit'] })
   })
 })

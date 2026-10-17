@@ -41,7 +41,9 @@ const exact = (r: string): string => r.replace(/^\+/, '')
 const PUSH_FLAGS = /^(?:-[uqvn]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin|force|force-with-lease|force-if-includes|delete|prune|mirror|all|branches|no-verify))$/
 const SHORT_FORCE = /^-[A-Za-z]*f/
 const SHORT_DELETE = /^-[A-Za-z]*d/
-const PUSH_UNSUPPORTED = /^--(?:mirror|all|branches|tags)/
+// `--follow-tags` writes annotated tag refs the push resource never names, so the grant no longer
+// bounds every ref the push writes: like --tags/--mirror/--all/--branches it stays unresolved.
+const PUSH_UNSUPPORTED = /^--(?:mirror|all|branches|tags|follow-tags)/
 // A commit message never becomes authority, but a trailer in it is a red line.
 const TRAILER = /(?:^|\n)\s*(?:Co-Authored-By:|🤖\s*Generated with)/i
 // The commit options whose value is a separate argv word: the short letters and the long names.
@@ -53,9 +55,11 @@ const COMMIT_LONG_VALUE: Record<string, true> = { '--message': true, '--file': t
   '--reedit-message': true, '--fixup': true, '--squash': true, '--author': true, '--date': true,
   '--template': true, '--cleanup': true, '--trailer': true, '--pathspec-from-file': true }
 // The message-bearing commit options. Their value is the commit message, so a trailer in it is the
-// red line; a message read from a file or stdin (`-F -`, `--file=…`) cannot be shown trailer-free
-// here, so it takes the same red line rather than releasing with bytes this module never read.
-const COMMIT_FILE_LONG: Record<string, true> = { '--file': true }
+// red line; a message this module cannot read — from a file (`-F`/`--file`), another commit
+// (`--reuse-message`/`--reedit-message`/`--squash`) or a template (`--template`) — cannot be shown
+// trailer-free, so each takes the same red line rather than releasing unread bytes.
+const COMMIT_FILE_LONG: Record<string, true> = { '--file': true, '--reuse-message': true, '--reedit-message': true,
+  '--template': true, '--squash': true }
 const SED_DELETE = /^(?:rm|unlink)$/
 // Programs whose effects the approved-command vocabulary could name, so an exact approved
 // executable+argv can authorize them. Path scope alone never does.
@@ -102,6 +106,7 @@ function pushEffect(argv: readonly string[], ctx: OperationContext, cwd: string)
       if (!PUSH_FLAGS.test(w)) effect.unresolved = `unknown push flag ${w}`
       if (w === '--force' || w.startsWith('--force') || SHORT_FORCE.test(w)) effect.force = true
       if (w === '--delete' || w === '--prune' || SHORT_DELETE.test(w)) effect.deletion = true
+      if (w === '--no-verify') effect.noVerify = true
       if (PUSH_UNSUPPORTED.test(w)) effect.unresolved = `unsupported push effect ${w}`
       continue
     }
@@ -169,6 +174,21 @@ function ghEffect(argv: readonly string[], ctx: OperationContext, cwd: string): 
     if (method === 'DELETE') return { ...effect, deletion: true, unresolved: 'a delete is operator-owned' }
     if (method !== undefined && API_UPDATE_METHODS[method] !== true) return { ...effect, unresolved: `the ${method} method names no bounded update` }
   }
+  // An explicit repository selector names the target, so it is resolved from the call's own words
+  // before the identity check — and it must still resolve to a configured remote. Without this,
+  // `gh pr edit 1 -R other/repo` (or --repo=, or attached -R…) defaulted to the single origin's
+  // owner/repo and a grant for our own PR 1 matched a call acting on another repository.
+  for (let i = 0; i < rest.length; i++) {
+    const w = rest[i]!
+    const v = w === '-R' || w === '--repo' ? rest[i + 1] : w.startsWith('--repo=') ? w.slice(7) : /^-R./.test(w) ? w.slice(2) : undefined
+    if (v !== undefined) {
+      if (ownerRepo !== undefined && ownerRepo !== v) return { ...effect, unresolved: 'conflicting repository identity' }
+      ownerRepo = v
+    }
+    // `--hostname` names a GitHub host that is not a pinned fact: the remotes pin the repository,
+    // never the host it is reached through.
+    if (w === '--hostname' || w.startsWith('--hostname=')) return { ...effect, unresolved: 'an explicit gh host is not a pinned fact' }
+  }
   if (!create && (number === undefined || !Number.isSafeInteger(number) || number <= 0)) return { ...effect, unresolved: 'no exact pull-request/issue identity' }
   // The repository resolves only from the configured remotes: a named owner/repo must match one,
   // and an unnamed one needs exactly one configured remote to be unambiguous.
@@ -210,6 +230,10 @@ function commitEffect(argv: readonly string[], ctx: OperationContext, cwd: strin
     if (w === '--') { for (i++; i < rest.length; i++) effect.targets.push(rest[i]!); break }
     if (!w.startsWith('-')) { effect.targets.push(w); continue }
     if (w === '--no-verify' || /^-[A-Za-z]*n/.test(w)) effect.noVerify = true
+    // The literal paths bound only an `--only` commit: `--include`/`-i` adds everything already
+    // staged, and `--amend` keeps HEAD's whole tree and message, so the commit carries content the
+    // path bound never names.
+    if (w === '--include' || w === '--amend') { effect.unresolved ??= 'the commit carries content outside its literal paths'; continue }
     if (w.startsWith('--')) {
       const eq = w.indexOf('=')
       const name = eq < 0 ? w : w.slice(0, eq)
@@ -218,8 +242,13 @@ function commitEffect(argv: readonly string[], ctx: OperationContext, cwd: strin
       // empty inline value takes the next word, because a quoted value is its own argv word once
       // the segment's masking has split it (`--message="Co-Authored-By: …"` arrives as two words).
       if (name === '--message') { const value = inline === undefined || inline === '' ? (rest[++i] ?? '') : inline; if (TRAILER.test(value)) effect.trailer = true; continue }
-      // `--file <path>`, `--file=<path>`: the message is not in this argv, so it cannot be shown
-      // to hold no trailer — the red line covers it rather than releasing unread bytes.
+      // An explicit `--trailer <value>` IS a trailer, whatever it names, and its value is consumed
+      // here rather than read as a pathspec.
+      if (name === '--trailer') { effect.trailer = true; if (inline === undefined || inline === '') i++; continue }
+      // `--file <path>`, `--file=<path>` and the message sources this module cannot read
+      // (`--reuse-message`, `--reedit-message`, `--template`, `--squash`): the message bytes come
+      // from a file, another commit or a template, so they cannot be shown to hold no trailer — the
+      // red line covers them rather than releasing unread bytes.
       if (COMMIT_FILE_LONG[name] === true) { effect.trailer = true; if (inline === undefined) i++; continue }
       if (COMMIT_LONG_VALUE[name] === true) { if (inline === undefined) i++; continue }
       continue
@@ -229,11 +258,19 @@ function commitEffect(argv: readonly string[], ctx: OperationContext, cwd: strin
     const letters = w.slice(1)
     for (let k = 0; k < letters.length; k++) {
       const letter = letters[k]!
-      if (COMMIT_SHORT_VALUE[letter] !== true) continue
+      if (COMMIT_SHORT_VALUE[letter] !== true) {
+        // A letter ahead of the first value-taking letter is another boolean option in the cluster:
+        // `-i` is `--include` (see above). A letter after that first one is inside its value, so it
+        // is never read here.
+        if (letter === 'i') effect.unresolved ??= 'the commit carries content outside its literal paths'
+        continue
+      }
       const attached = letters.slice(k + 1)
       const value = attached === '' ? (rest[++i] ?? '') : attached
       if (letter === 'm') { if (TRAILER.test(value)) effect.trailer = true }
-      else if (letter === 'F') effect.trailer = true
+      // F sources the message from a file, C/c reuse another commit's message, t from a template:
+      // bytes this module never read, so each takes the red line.
+      else if (letter === 'F' || letter === 'C' || letter === 'c' || letter === 't') effect.trailer = true
       break
     }
   }

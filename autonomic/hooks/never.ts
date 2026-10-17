@@ -882,7 +882,7 @@ const unmask = (w: string) => w.replace(/[\uE000-\uF8FF]/g, c => String.fromChar
 // The accepted wrappers are exactly the plan's five (env, nice, ionice, timeout, command): each
 // runs its argument in the same place for the same user, so nothing else is parsed through.
 const WRAP_VALUES: Record<string, ReadonlySet<string>> = {
-  env: new Set(['-u', '--unset', '-C', '--chdir', '-S', '--split-string']),
+  env: new Set(['-u', '--unset', '-C', '--chdir']),
   nice: new Set(['-n', '--adjustment']),
   ionice: new Set(['-c', '--class', '-n', '--classdata', '-p', '--pid', '-P', '--pgid', '-u', '--uid']),
   timeout: new Set(['-s', '--signal', '-k', '--kill-after']),
@@ -991,10 +991,24 @@ function segmentOf(c: Command, cwd: string, unknownCwd: boolean, root: string): 
   const runner = name !== undefined && (RUNNER.test(name) || name === 'xargs')
   const defines = /\([ \t]*\)/.test(unquoted(masked)) || /(?:^|[\s;&|(])(?:function|alias)[ \t]/.test(masked)
   const unsafeSed = name === 'sed' && !safeSed(raw)
-  // A git config write, a global `-c`/`--config-env` injection, or an explicit git dir/work-tree
-  // moves the facts out of the pinned ones.
+  // The words ahead of the program: a wrapper's own options and any prefix environment assignment.
+  const before = words.slice(0, progAt < 0 ? words.length : progAt)
+  // `env -S`/`--split-string` splits its value into words and runs THEM as the command, so the
+  // words after it are not the argv this segment names and the payload is dropped from argv and
+  // from the native state. Read from `before`, in every form (`-S`, `-S…`, `--split-string[=]`),
+  // because the split program runs code no pinned fact names (the `=` form still leaves a known
+  // program after it, so this check — not the unknown-name rule — is what marks it).
+  const splitString = before.some(w => w === '-S' || /^-S./.test(w) || w === '--split-string' || w.startsWith('--split-string='))
+  // Any environment assignment ahead of the program — a shell prefix or one after `env` — changes
+  // how the program runs in a way no pinned fact names (GIT_SSH_COMMAND, GIT_EXEC_PATH, LD_PRELOAD,
+  // PATH, GH_REPO …), and argv drops it: a bounded effect would be established from a command that
+  // is not the one that runs.
+  const assigns = before.some(w => /^[A-Za-z_]\w*=/.test(w))
+  // A git config write, a global `-c`/`--config-env` injection, or an explicit git dir/work-tree —
+  // and `--exec-path`, which moves the very `git-<subcommand>` git runs — moves the facts out of
+  // the pinned ones.
   const git = isGit(words)
-  const movesFacts = git && (injectsConfig(words) || writesConfig(words) || words.some(w => /^--(?:git-dir|work-tree)/.test(w) || /^GIT_(?:DIR|WORK_TREE|CONFIG)/.test(w)))
+  const movesFacts = assigns || (git && (injectsConfig(words) || writesConfig(words) || words.some(w => /^--(?:git-dir|work-tree|exec-path)/.test(w) || /^GIT_(?:DIR|WORK_TREE|CONFIG)/.test(w))))
   const dirs = gitDir(c.bare)
   const envC = envDir(c.bare)
   // A resolved cwd outside the pinned worktree relocates the real command, so the segment's
@@ -1008,7 +1022,7 @@ function segmentOf(c: Command, cwd: string, unknownCwd: boolean, root: string): 
   // TypeError inside classification, which the floor's catch turned into the generic
   // "decision unavailable" block instead of this segment's own unresolved fact.
   const elsewhere = resolved !== null && resolved !== undefined && resolved !== root && !resolved.startsWith(root + '/')
-  const opaque = expandable || unknownCwd || defines || runner || unsafeSed || !known
+  const opaque = expandable || unknownCwd || defines || runner || unsafeSed || !known || splitString
   const cwdFor = resolved ?? cwd
   return { text: raw.trim(), argv: words.slice(progAt < 0 ? words.length : progAt).map(unmask), cwd: cwdFor,
     opaque: opaque || resolved === null || resolved === undefined || movesFacts || elsewhere, redirects }

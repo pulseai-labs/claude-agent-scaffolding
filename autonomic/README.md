@@ -42,13 +42,13 @@ Each launch is a fresh exclusive directory under the authority root. The issuer 
 | Field | Closed shape |
 |---|---|
 | identity | `version:1`, nonempty `assignmentId`, positive safe-integer `generation` |
-| issuer | `{kind:'operator'|'delegated-dispatcher',id,approvalRef,delegationRef:string|null}` |
-| seat | `{id,host:'omp',role:'implementer'|'verifier'|'reviewer'|'coordinator'|'orchestrator',launchId}` |
+| issuer | `{kind:'operator'\|'delegated-dispatcher',id,approvalRef,delegationRef:string\|null}` |
+| seat | `{id,host:'omp',role:'implementer'\|'verifier'\|'reviewer'\|'coordinator'\|'orchestrator',launchId}` |
 | placement | `{repository,worktree,branch}` — canonical absolute paths and exact full ref |
 | task | `{briefSha256,scopeRefs:EvidenceRef[],instructionRefs:EvidenceRef[]}`; brief bytes resolve to pinned task evidence |
 | policy | `{id,sha256,approvalRef}`; materialized companion bytes, not standing-mode authority |
 | grants | `{id,operation,resource,authorityRefs:string[]}[]`; empty authorizes nothing |
-| lifetime | `{issuedAt,expiresAt:string|null,revoked:false}`; calendar-valid UTC RFC3339, issued no later than now, future expiry |
+| lifetime | `{issuedAt,expiresAt:string\|null,revoked:false}`; calendar-valid UTC RFC3339, issued no later than now, future expiry |
 
 Unknown/duplicate keys, conflicting/duplicate IDs, malformed hashes, nonfinite/unsafe numbers, wildcards, ambiguous refs/paths, invalid UTF-8 and unresolved approvals fail. Repeated evidence IDs across scope/instruction lists must have identical definitions. Resources are finite `paths {repository,roots}`, `commit {repository,branch,paths}`, `push {repository,remote,sourceRef,destinationRef}`, or `pr {repository,headRef,number}`. Create uses null PR number; update requires a positive safe integer.
 
@@ -109,7 +109,7 @@ Option IDs are request-local ordinals, never label text. Labels sent back to the
 
 **Secret-like content abstains.** Before any frame capture, state build or native call, if redaction would change **any** string the frozen batch carries (a question text, option label, description or header), the whole ask stays with the operator — the same shape as the permission path's `redact(shown) !== shown` abstain — with the pain reason's own redaction applied, so no secret byte reaches state, the block reason, the ledger, a notice or the pain file.
 
-**Abstention and failure.** A malformed batch, an unplannable batch, a missing bridge/authority/native route, a failed or stale transaction, or any exception uses the existing ask-pain path and returns no block: the entire original dialog stays displayed. No generative side turn answers free text or produces a label. Until Task 7 ships, the **unenrolled** legacy conversational ask path is byte-unchanged (only an enrolled session takes this route).
+**Abstention and failure.** A malformed batch, an unplannable batch, a missing bridge/authority/native route, a failed or stale transaction, or any exception uses the existing ask-pain path and returns no block: the entire original dialog stays displayed. No generative side turn answers free text or produces a label. Only an enrolled session takes this route; an unenrolled autopilot ask is operator-owned — it passes and rings — because the legacy conversational classifier is removed.
 
 ### Non-acting replay evaluator (unreleased, Task 8)
 
