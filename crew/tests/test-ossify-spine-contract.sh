@@ -2105,8 +2105,8 @@ section "the seat-mods guard reaches every launch site"
 # site that orders one of those launches must order the guard beside it. One pin per
 # site; the label names the site, so a removal reads as that site. 0.2.7's
 # coordinator-marking pins sit beside these, one per site.
-pin "$MECHANICS_MD" 'Every launch that places a seat in a herdr pane marks it' \
-  "step 2's opening states every herdr-pane launch is marked"
+pin "$ROLES_MD" '`Seat marking` writes these into the seat'"'"'s pane' \
+  "the launch block states every launch's marking, one copy"
 pin "$ROLES_MD" 'into the seat'"'"'s pane, before the seat'"'"'s command' \
   "the launch block binds the marking to the launch, before the command" flat
 pin "$ROLES_MD" 'the spine, close or work-PR session, the doctor session, the lane driver' \
@@ -2462,7 +2462,7 @@ pin "$PRBRIEFS_MD" 'and return `open:` at the next fix-round boundary' "work-PR 
 pin "$PRBRIEFS_MD" 'End the reply that writes `open:` with `MOLT-HANDOFF: <REPORT_PATH>`' \
   "work-PR brief: the open reply names its report for molt (D5)" flat
 pin "$SKILL_MD" 'Where molt runs, its warnings replace the notice' "SKILL.md names the molt path" flat
-pin "$ROLES_MD" 'a warned seat gets no new unit' "roles.md: a warned retained seat is replaced, not reused" flat
+pin "$COMPLETION_MD" 'note it and send that seat no new unit' "completion.md: a warned retained seat is replaced, not reused" flat
 # PR #671 round 1.
 # 0.2.22 (#810): the handoff no longer lists per-seat panes, machines, molt or pain lines — run.json holds them (steps 1, 3, 5); pins retired.
 pin "$GENERIC_BRIEFS_MD" 'the leaf templates'"'"' `MOLT:` line included' \

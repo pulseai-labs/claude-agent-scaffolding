@@ -68,10 +68,10 @@ LIFE="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=228  # 2026-10-17: crew 0.3.0 Task 3 fix round — the completion, teardown, machine and
-# marking RULES left this file for completion.md, roles.md and config.md (spec §2: a layer file
-# holds commands only), so the count fell 422 -> 228. What remains is the layer's own half: the
-# thirteen step headings and the herdr commands, flags and ids under them.
+REF_BUDGET=225  # 2026-10-17: crew 0.3.0 Task 3, second fix round — the eight rule residues the
+# re-check named (the run-workspace order, the workspace recreate, the marking policy, the
+# typed-state rule, the workspace order at teardown, the machine reachability) left for their
+# shared owners, leaving bare pointers; the count fell 228 -> 225.
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

@@ -61,7 +61,7 @@ plus `AUTONOMIC_MODE=autopilot` where the autonomic marking below says. The name
   own first top is not launched here — the operator starts it through a `claude-orch` alias
   that sets `orchestrator`. A coordinator takes none, except an OMP coordinator (`config.md`),
   which adds each hosting repo's `.worktrees` root.
-- `MOLT_HANDOFF=parent` and `MOLT_STATUS_PATH=<REPORT_PATH>.molt-status` — every guarded seat, every coordinator seat and every operator-declared role is marked a molt child, so molt never clears it and hands off to its parent (`completion.md`, "A child past molt's warnings"). The operator's first top and the top's rotation successor are roots and take neither.
+- `MOLT_HANDOFF=parent` and `MOLT_STATUS_PATH=<REPORT_PATH>.molt-status` — every guarded seat, every coordinator seat and every operator-declared role. The operator's first top and the top's rotation successor are roots and take neither. What the marking does is `completion.md`'s ("A child past molt's warnings").
 - `AUTONOMIC_LEDGER` and `AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain` — the run's one
   ledger, an **absolute** path outside every worktree, and the seat's pain file; the top's
   successor takes `AUTONOMIC_LEDGER` and no pain path, since it has no parent.
@@ -143,8 +143,7 @@ the item it has just finished, not a probe it cannot answer. The
 implementer returns its handoff inputs in its report file; the orchestrator writes the
 handoff into the next brief. Rotation happens between work items, never mid-PR: the
 retained implementer finishes the PR's fix rounds unless the harness auto-compacts or molt
-warns it: a warned seat gets no new unit, and its next one goes to a fresh seat
-(`completion.md`, "A child past molt's warnings").
+warns it (`completion.md`, "A child past molt's warnings").
 The reviewer owns nothing durable and is released the moment its report file is
 processed; the verifier seat is retained across a fail-and-fix cycle on the same item
 — the re-check attaches its task to the same verifier — and is released only when the

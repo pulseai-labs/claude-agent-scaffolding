@@ -24,16 +24,14 @@ whether a pane still exists, the stand-down read (`lifecycle.md`). This server's
 
 ## Run workspace
 
-**The run's workspace, once per run per server that hosts a seat.**
 `herdr workspace create --cwd <a path that already exists> --label "run: <objective>"
 --no-focus` — the first seat's tree, or a neutral path when that seat's worktree is still to
 be created (Seat worktree; a nonexistent `--cwd` fails the launch). Its tab and shell pane
 (`.result.tab`, `.result.root_pane`) are the first seat's when that path is its tree:
 `herdr tab rename <tab> "<seat label>"`, not a second tab beside an empty one; a
 seat on another machine needs its own, `--machine <label>` — ids are server-scoped.
-`herdr workspace list` shows what a run still holds: a later launch whose workspace that list
-no longer shows creates it again first and binds the id the call returns, and Teardown reads
-the same list to confirm what closed.
+`herdr workspace list` shows what a run still holds, and Teardown reads the same list to
+confirm what closed.
 
 ## Seat worktree
 
@@ -45,8 +43,8 @@ step: it opens **two** workspaces, the worktree's own and the **source repositor
 (`is_linked_worktree: false`). Its `--label` names the worktree's **workspace**, so the seat's tab
 needs the `herdr tab rename` the workspace step prescribes. `--cwd` is the lever that retargets
 the **source** repo: without it the call resolves its source from the *calling workspace's* repo.
-Read every id from the response, `result.root_pane.pane_id` included. Every seat this places is
-marked before its command (`Seat marking`, `Seat launch`).
+Read every id from the response, `result.root_pane.pane_id` included. Marking:
+`Seat marking`, `Seat launch` (`roles.md`).
 
 A seat's tree is whatever `--cwd` names, so a seat may sit in another repository: in the
 dual-repo case an orchestrator in the AI workspace places an implementer in the canonical
@@ -65,12 +63,11 @@ sequence `roles.md` names, `<seat label>` being `seat: <role> (<agent>)`. This f
 sequence's layer half — the pane and its command, the readiness wait, the model read and the
 dispatch:
 
-**Seat marking.** Every launch that places a seat in a herdr pane marks it, in the pane, before
-the seat's command: one `herdr pane run <pane> "export …"`, whose variables are the launch
-environment `roles.md`'s launch block states (`worktree create` takes no `--env`; `--env`
-carries only a seat's own scratch). The status line `roles.md` reads is the rendered viewport
-here: `--source visible` on the model read, even where a `banner` seat's model read is the
-default stream.
+**Seat marking** (`Seat marking`; `roles.md`). It is one `herdr pane run <pane> "export …"`,
+whose variables are the launch environment `roles.md`'s launch block states (`worktree create`
+takes no `--env`; `--env` carries only a seat's own scratch). The status line `roles.md` reads
+is the rendered viewport here: `--source visible` on the model read, even where a `banner`
+seat's model read is the default stream.
 
 **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry —
 re-running a **launch** command into a pane whose foreground process is already that
@@ -180,18 +177,18 @@ It is herdr's default set, written out rather than inherited; `--until` narrows:
 companion's excepted: it lapses).
 
 **A `blocked` wake** means herdr recognised an approval or question dialog. A blocked
-agent rejects `herdr agent prompt` with `agent_blocked`, sending nothing, so read the dialog
-with `herdr pane read <pane>`, put it to the operator (herdr's guide says to ask first),
-give the answer with `herdr agent send-keys <pane> <keys>`, then one fresh bounded wait. A
+agent rejects `herdr agent prompt` with `agent_blocked`, sending nothing; the procedure is
+`lifecycle.md` step 5's, and herdr's reads are `herdr pane read <pane>` for the dialog and
+`herdr agent send-keys <pane> <keys>` for the answer, then one fresh bounded wait. A
 question written to the report file is not a dialog; it rings that doorbell (`completion.md`).
 
 ## Completion signal
 
 herdr types a seat's terminal state, and the three settled states are the ones `Wait` lists;
-`done` fires for a Claude Code pane as `idle` does. A typed state carries no body — the state
-is only the doorbell, and what it rings is `completion.md`'s. The health read is `herdr agent
-get <pane>` where herdr holds a record, else one `herdr pane read <pane>`; a seat herdr does
-not detect is read through its report file (`completion.md`).
+`done` fires for a Claude Code pane as `idle` does. The doorbell and what it rings are
+`completion.md`'s. The health read is `herdr agent get <pane>` where herdr holds a record, else
+one `herdr pane read <pane>`; a seat herdr does not detect is read through its report file
+(`completion.md`).
 
 ## Teardown
 
@@ -200,9 +197,9 @@ seat is not: its workspace holds only its tab and pane, closing that pane may ta
 with it or be refused, and its id is the only selector of `herdr worktree remove --workspace
 <id>`. That remove releases only the worktree's own workspace: `herdr workspace list` still
 shows the **source repository's** checkout Seat worktree's `worktree create` opened — in the
-dual-repo case the canonical checkout. The run's own workspace is `herdr workspace close <id>`,
-after every workspace linked to it; a failed call is JSON on stderr, exit 1, and a last pane's
-close may take its tab and workspace too. Confirm what closed with `herdr workspace list`. The
+dual-repo case the canonical checkout. The run's own workspace is `herdr workspace close <id>`;
+a failed call is JSON on stderr, exit 1, and a last pane's close may take its tab and workspace
+too. Confirm what closed with `herdr workspace list`. The
 order, and what a refused remove does, are `roles.md`'s Teardown order.
 
 ## Machines
@@ -210,8 +207,8 @@ order, and what a refused remove does, are `roles.md`'s Teardown order.
 A `machine` is a remote server's `herdr machine list` label; this server's machine is its `hostname -s`.
 Every command for a seat on that machine carries `herdr --machine <label>`, with its ids
 discovered there: ids and agent names are scoped to one server, and `--current` reaches no
-remote pane. Only a machine that list shows is reachable; the operator names one in the machine
-file's `host:`, and the rules for placing a seat there are `config.md`'s.
+remote pane. The operator names one in the machine file's `host:`; the rules for reaching it and
+placing a seat on it are `config.md`'s.
 
 ## Host: OMP
 
