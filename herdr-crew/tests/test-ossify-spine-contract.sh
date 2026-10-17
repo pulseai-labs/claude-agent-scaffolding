@@ -2479,6 +2479,43 @@ pin "$PRBRIEFS_MD" 'If molt'"'"'s handoff command arrives mid-round, still finis
 pin "$CHANGELOG_MD" '## 0.2.8' "CHANGELOG has 0.2.8"
 pin "$CHANGELOG_MD" '## 0.2.9' "CHANGELOG has 0.2.9"
 
+# ── the standing orders reach the seats and the briefs (0.2.29, slice 1) ────
+#
+# The old PROHIBITIONS line carried Merge acknowledgment in the operator-owned
+# set and left every brief saying the merge is the operator's word, while
+# lifecycle step 12 already merges on `run.merge_word`; slice 1 moves a worker's
+# plan to the top. Sixteen sites change together, and a per-file COUNT is the
+# right check: this line repeats once per template, so a `pin` (unique) cannot
+# assert it — the counts are 10 + 3 + 2 + 1, and a missed, duplicated or extra
+# site fails here. The absence pin is a loosening; its adjacent control (the
+# operator-owned gate sentence, at the same counts) means deleting the whole
+# line fails the control even though it would pass the absence pin.
+section "the standing orders reach the seats and the briefs"
+
+NEW_PROHIBITIONS='PROHIBITIONS: every seat-mods denial and narrower task limit wins. Design/spec/release gates, product choices, credential values and Molt handoff remain operator-owned; a worker'"'"'s implementation plan is the top'"'"'s to approve, and the merge follows run.merge_word. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.'
+for pair in "$GENERIC_BRIEFS_MD:10" "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:1"; do
+  f="${pair%:*}"; want="${pair##*:}"
+  n_eq "$f" 'PROHIBITIONS: ' "$want" "${f##*/} carries exactly $want PROHIBITIONS lines"
+  n_eq "$f" "$NEW_PROHIBITIONS" "$want" "${f##*/} carries the new PROHIBITIONS line at all $want sites"
+done
+for f in "$GENERIC_BRIEFS_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" "$EXEC_MD" \
+         "$NESTED_MD" "$LIFECYCLE_MD" "$ROLES_MD" "$SKILL_MD" \
+         "$PLUGIN_README_MD" "$COMMAND_MD"; do
+  absent "$f" 'Merge acknowledgment, design/spec/plan/release gates, product choices' \
+    "${f##*/} carries no old PROHIBITIONS phrase"
+done
+for pair in "$GENERIC_BRIEFS_MD:10" "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:1"; do
+  f="${pair%:*}"; want="${pair##*:}"
+  n_eq "$f" 'Design/spec/release gates, product choices, credential values and Molt handoff remain operator-owned' "$want" \
+    "${f##*/} keeps the operator-owned gate sentence at all $want sites"
+done
+# The two fixed needles. Both wrap in the file today, so the flat join is each
+# pin's mode, as this suite's header says for a wrapped clause.
+pin "$EXEC_MD" 'under a standing order in the autopilot policy for seats and profiles, write the recommended set and continue; otherwise present every seat' \
+  "ossify-execution.md §3: the seat set is written under the order, else presented" flat
+pin "$EXEC_MD" 'under that standing order, pick the reviewer and PR-fix profiles from the project file and record why; otherwise ask' \
+  "ossify-execution.md §5: the reviewer and PR-fix profiles follow the order, else are asked" flat
+
 section "reference line budgets"
 
 budget "$EXEC_MD" "ossify-execution.md is within the reference budget"
