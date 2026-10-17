@@ -64,9 +64,10 @@ fact, the same way §3 names a quarantined line.
 ### `## 3. Demo outcome`
 
 The `auto:` result (`PASS <n> lines`, or the line that failed and what was done
-about it) and the `user:` walk — which journeys the human drove and whether each
-outcome matched. Name any line that was **quarantined during this close**, with
-its expiry release.
+about it) and the `user:` walk — which journeys the human drove, or you walked
+under a standing order in the autopilot policy that gives you the demo walk
+(`cumulative-demo.md` §3), and whether each outcome matched. Name any line that
+was **quarantined during this close**, with its expiry release.
 
 _Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next._
 

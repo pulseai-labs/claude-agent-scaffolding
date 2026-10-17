@@ -15,6 +15,12 @@ All notable changes to the `crew` plugin.
 
 **One orchestration prose, one file per terminal layer.** The skill keeps every decision; the commands that drive a layer move into that layer's own file, `references/layers/herdr.md`, under fixed step headings, so the next layer adds a file rather than a second copy of the rules. The rules a layer only obeys stay in the shared files and are named by the step that carries them: the seat marking and the teardown order in `roles.md`, the completion contract — the report-file doorbell, the generation check, the ping and the heartbeat — in the new `references/completion.md`, and the machine rules beside the `host:` key in `config.md`. Which layer a project uses is the project file's own line, `layer: herdr` or `layer: orca` — read from the file, never guessed. 0.3.0 ships the herdr layer only: `layer: orca` stops and says the Orca layer arrives in 0.4.0.
 
+- **This release carries herdr-crew 0.2.29 with it** (below): the standing-order seat, profile and PROHIBITIONS changes merge in before `crew` 0.3.0 ships, so the first crew release is 0.2.29 plus the rename and the layer split.
+
+## 0.2.29
+
+**Seats, profiles and the briefs follow the autopilot standing orders** (slice 1 of the stop-the-menus plan). `ossify-execution.md` §3's seat set, its depth confirmation and its resumed-top seat ask, §5's reviewer, PR-fix and close-review writer picks, and `ossify-nested-run.md`'s writer ask now carry the condition: under the **Seats and profiles** standing order in the autopilot policy, the top picks from the project file and continues; otherwise every ask stands exactly as it was. The PROHIBITIONS line in all sixteen brief templates moves the merge off the operator-owned list: a worker's implementation plan is the top's to approve and the merge follows `run.merge_word`; design/spec/release gates, product choices, credential values, Molt handoff, the delete/force-push/no-verify rails and the enrolled-OMP acknowledgment clause are unchanged.
+
 ## 0.2.28
 
 **A top that molts in place on OMP re-arms its waits** (#855). omp cancels every background job a session owns when it clears that session, so on OMP the armed waits and the heartbeat do not survive a molt; molt 0.3.3's seed says so. The molt-in-place paragraph now scopes "every armed wait survives the clear" and "it arms no wait the handoff lists" to Claude Code. On OMP, after its generation check, the resumed top re-arms the wait of each dispatch still live and one fresh heartbeat.
