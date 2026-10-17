@@ -14,6 +14,12 @@ describe('fork prompts', () => {
   test('the turn-end prompt keeps the doubt rule', () => {
     expect(turnEndPrompt('t', 'p')).toContain('When in doubt between "pain" and any other case, answer "pain".')
   })
+  test('the turn-end covered branch keeps the pain-list exception (PR #864 review)', () => {
+    expect(turnEndPrompt('t', 'p')).toContain('and no pain-list reason applies')
+  })
+  test('the turn-end otherwise branch keeps the scope exception (#866)', () => {
+    expect(turnEndPrompt('t', 'p')).toContain('unless the scope already decides the choice')
+  })
   test('the ask prompt covers a recommended option under a standing order', () => {
     expect(askPrompt([], 'p')).toContain('When a standing order gives the recommendation authority, a question whose options mark one "(Recommended)" is covered by that option')
   })
