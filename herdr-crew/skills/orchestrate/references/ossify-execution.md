@@ -42,10 +42,11 @@ layer, in its report file.** And every dispatched session returns a checkable
 artifact — a PR list, a ledger comment id, a merge SHA — never narrative.
 
 **Depth is confirmed with the operator, twice over.** Before the spine session
-launches, ask the operator to confirm nested worker depth is `2`: the spine
-session launches item sessions of its own. herdr has no depth setting to read, so
-a brief asserting the depth is not confirmation, and no CLI read substitutes. A
-spine session that reports it cannot launch an item session is relayed to the
+launches, under a standing order in the autopilot policy for seats and profiles, take
+the depth as `2` and continue; otherwise ask the operator to confirm nested worker depth
+is `2`: the spine session launches item sessions of its own. herdr has no depth setting
+to read, so a brief asserting the depth is not confirmation, and no CLI read substitutes.
+A spine session that reports it cannot launch an item session is relayed to the
 operator as an ask — you never answer it yourself or record your own choice as an
 operator decision.
 
@@ -59,9 +60,10 @@ this plugin's own.
 
 **Recommending.** After `/plan-spine`, recommend one implementer and one verifier seat per item
 from the project file's seats and conditions — scope, risk and cost,
-item by item — and the three coordinator seats beside them. Present **every** seat
-to the operator in one approval phase and write nothing until all of it is decided
-— a half-approved set looks binding and is not. Record the recommendation and any
+item by item — and the three coordinator seats beside them: under a standing order in the
+autopilot policy for seats and profiles, write the recommended set and continue; otherwise
+present every seat to the operator in one approval phase and write nothing until all of it is
+decided — a half-approved set looks binding and is not. Record the recommendation and any
 override. Prefer an agent herdr detects for an item row where the choice is open: the
 typed wait then covers that seat, and an undetected seat stays legal, waited on through
 its report file — the path is read live, never declared in a profile.
@@ -88,7 +90,8 @@ A handoff the top writes **carries the approved seats verbatim** — the item ro
 and the three resolved coordinator profiles beside them; a resumed top
 launches from those, never a fresh read, and marks each seat it launches as
 `herdr-mechanics.md` step 2 states — a guarded role with its allow paths, `coordinator`
-for a coordinator seat. A resumed top whose handoff lacks them asks the operator before any launch that spends an approved seat.
+for a coordinator seat. A resumed top whose handoff lacks them asks the operator before any launch that spends an approved seat
+— under a standing order in the autopilot policy for seats and profiles, it picks the set from the project file, records the pick and why, and continues instead.
 
 ## Fixed procedures
 
@@ -119,8 +122,10 @@ ordinary first run of the item, not an inheritance of the rejected work.
 
 Reviewer profile is absent from spine planning and from the SEATS block on purpose: the PR
 does not exist yet, and a profile chosen before there is a diff to read is a guess
-recorded as a decision. At the PR transition ask for the reviewer's resolved profile
-and review level (it fills that agent's review command, `config.md`), and put **both** into the **work-PR
+recorded as a decision. At the PR transition, a standing order in the autopilot policy
+for seats and profiles decides the pick: under that standing order, pick the reviewer
+and PR-fix profiles from the project file and record why; otherwise ask for the
+reviewer's resolved profile and review level (it fills that agent's review command, `config.md`), and put **both** into the **work-PR
 session's** brief (`ossify-pr-briefs.md`) — that session creates the reviewer from the
 decided row and confirms its model as `model_shows` says and by the worker's own check exactly as an
 item row is; step 8's reviewer seat is the default only outside such a spine.
@@ -128,17 +133,18 @@ item row is; step 8's reviewer seat is the default only outside such a spine.
 **Decide the PR-fix implementer in the same breath.** Every item pair was released at
 its item's close and the spine session was a coordinator, not a writer — so step 10's
 *retained implementer* does not exist here. Ask for one PR-fix resolved profile
-alongside the reviewer's, and inject it into the same work-PR
-brief. The seat is **decided** by you and **created and dispatched by the work-PR
+alongside the reviewer's — or pick it from the project file under that standing order —
+and inject it into the same work-PR brief. The seat is **decided** by you and **created and dispatched by the work-PR
 session**, only once its disposition ledger exists, on `briefs.md`'s **fix-round
 brief** rather than the planned-implementer brief, whose DONE opens a new PR: it works
 the PR that already exists. One seat per PR, released at merge.
 
 **A close-review writer is not this seat.** When a close halts on its own review
-(`ossify-nested-run.md` §4), ask the operator for that writer's profile at the
-halt and dispatch one writer per affected hosting repo, each from
-`references/ossify-close-writer.md`, bounded to its own repo's worktree — not
-the PR-fix seat, chosen at the transition or early.
+(`ossify-nested-run.md` §4), under a standing order in the autopilot policy for seats
+and profiles, pick that writer's profile from the project file and record why;
+otherwise ask the operator for it at the halt — then dispatch one writer per affected
+hosting repo, each from `references/ossify-close-writer.md`, bounded to its own repo's
+worktree — not the PR-fix seat, chosen at the transition or early.
 
 ## 6. Briefs
 

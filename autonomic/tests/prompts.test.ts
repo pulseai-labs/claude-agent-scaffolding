@@ -5,8 +5,26 @@ import { LIVE_TASK, RECENT_RULE } from '../hooks/prompts'
 describe('fork prompts', () => {
   test('the turn-end prompt carries the policy, the tail, every case and the molt rule', () => {
     const p = turnEndPrompt('…Shall I proceed?', 'POLICY-TEXT')
-    for (const s of ['POLICY-TEXT', '…Shall I proceed?', '"covered"', '"stalled"', '"waiting"', '"done"', '"pain"', '40%', '65%', 'a recommendation is not a decision'])
+    for (const s of ['POLICY-TEXT', '…Shall I proceed?', '"covered"', '"stalled"', '"waiting"', '"done"', '"pain"', '40%', '65%', 'a recommendation is the decision only under a standing order'])
       expect(p).toContain(s)
+  })
+  test('the turn-end prompt drops the old recommendation sentence (0.9.0, D6)', () => {
+    expect(turnEndPrompt('t', 'p')).not.toContain('a recommendation is not a decision')
+  })
+  test('the turn-end prompt keeps the doubt rule', () => {
+    expect(turnEndPrompt('t', 'p')).toContain('When in doubt between "pain" and any other case, answer "pain".')
+  })
+  test('the turn-end covered branch keeps the pain-list exception (PR #864 review)', () => {
+    expect(turnEndPrompt('t', 'p')).toContain('and no pain-list reason applies')
+  })
+  test('the turn-end otherwise branch keeps the scope exception (#866)', () => {
+    expect(turnEndPrompt('t', 'p')).toContain('unless the scope already decides the choice')
+  })
+  test('the turn-end otherwise branch keeps the pain-list exception too (PR #864 round 2)', () => {
+    expect(turnEndPrompt('t', 'p')).toContain('unless the scope already decides the choice and no pain-list reason applies')
+  })
+  test('the ask prompt covers a recommended option under a standing order', () => {
+    expect(askPrompt([], 'p')).toContain('When a standing order gives the recommendation authority, a question whose options mark one "(Recommended)" is covered by that option')
   })
   test('the ask prompt lists every question and its labels', () => {
     const p = askPrompt([{ question: 'Which colour?', options: [{ label: 'Red' }, { label: 'Blue' }] }], 'POL')
