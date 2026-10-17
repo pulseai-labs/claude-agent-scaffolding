@@ -662,20 +662,31 @@ export function createAutonomic(io: AutonomicIO) {
         return await decisionFor(decisions, { tool, command, input: from?.input, findings })
       } catch (err) {
         await log(`permission decision error ${String(err)}`)
+        // The decision route failed, so this call stays with the operator — and it is recorded and
+        // rings exactly as the plain never-approve path does, rather than blocking in silence.
+        await ringDecline(tool, command, [...new Set(findings.map(f => f.rule))], 'the decision route failed')
         return { block: true, reason: 'autonomic: decision unavailable or stale; this call stays with the operator' }
       }
     }
     return signalOperator(tool, command, rules)
   }
-  // The plain never-approve operator path, unchanged (Plan Task 5 §7 Step 4).
-  async function signalOperator(tool: 'bash' | 'github', command: string, rules: readonly string[]): Promise<{ block: true; reason: string }> {
+  // The operator-visible outcome for a call this route will not release: the human ledger row plus
+  // the pain signal a launcher watching AUTONOMIC_PAIN_PATH sees. Every decline goes through here —
+  // the plain never-approve path, the operator block of an incomplete effect bound, the native
+  // judgment's own `ask`, and the decision route's failure — so a stopped force push is never a
+  // silent block. `why` is the deciding reason, omitted where the reason is the rules themselves.
+  async function ringDecline(tool: 'bash' | 'github', command: string, rules: readonly string[], why?: string): Promise<void> {
     try {
       const id = io.sessionId()
-      await record(id, 'permission', tool === 'github' ? `github pr_push: ${shape(command)}` : `Bash: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
+      await record(id, 'permission', tool === 'github' ? `github pr_push: ${shape(command)}` : `Bash: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')}${why === undefined ? '' : ` (${why})`}`)
       await pain(id, 'never-approve', painFocus(rules, command))
     } catch (err) {
       await log(`floor signal error ${String(err)}`)
     }
+  }
+  // The plain never-approve operator path, unchanged (Plan Task 5 §7 Step 4).
+  async function signalOperator(tool: 'bash' | 'github', command: string, rules: readonly string[]): Promise<{ block: true; reason: string }> {
+    await ringDecline(tool, command, rules)
     return { block: true, reason: `autonomic: never-approve — ${rules.join(', ')}; the operator decides` }
   }
 
@@ -717,7 +728,12 @@ export function createAutonomic(io: AutonomicIO) {
           ? `native judgment and the matched grants ${eligibility.grantIds.join(', ')} agree within their evidence`
           : 'native judgment did not accept the call as covered' }
     }
-    if (decision !== 'allow') return { block: true, reason: 'autonomic: the operator decides' }
+    if (decision !== 'allow') {
+      // A native `ask` is an operator-owned stop like any other: it is recorded and rings, so a
+      // declined force-push attempt is visible to a launcher watching the pain file.
+      await ringDecline(tool, command, [...new Set(merged.map(f => f.rule))], 'the native judgment declined the call')
+      return { block: true, reason: 'autonomic: the operator decides' }
+    }
     await commitDecision(io2, frame, draft, [{ kase: 'permission', q: `${tool}: ${shape(command)}`, a: 'allow original call' }])
     frame.budget.check()
     if (!frame.lease.fresh()) throw new Error('stale permission')
@@ -725,16 +741,10 @@ export function createAutonomic(io: AutonomicIO) {
   }
 
   // The operator-visible outcome for a call the decision route will not release: the same
-  // never-approve record/pain/notice plus the deciding reason.
+  // never-approve record/pain plus the deciding reason.
   async function operatorBlock(tool: 'bash' | 'github', command: string, findings: readonly Finding[], reason: string): Promise<{ block: true; reason: string }> {
     const rules = [...new Set(findings.map(f => f.rule))]
-    try {
-      const id = io.sessionId()
-      await record(id, 'permission', tool === 'github' ? `github pr_push: ${shape(command)}` : `Bash: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')} (${reason})`)
-      await pain(id, 'never-approve', painFocus(rules, command))
-    } catch (err) {
-      await log(`floor signal error ${String(err)}`)
-    }
+    await ringDecline(tool, command, rules, reason)
     return { block: true, reason: `autonomic: never-approve — ${rules.join(', ')}; the operator decides` }
   }
 
@@ -798,14 +808,14 @@ export function createAutonomic(io: AutonomicIO) {
   // through the native bridge, render an exact candidate or one isolated generation, validate the
   // payload against the approved records, record both rows, re-check time and freshness, and only
   // then move the loop and return the continuation. Any shortfall leaves the operator the stop.
-  async function decideTurnEnd(id: string, answer: string, n: number): Promise<{ decision: 'block'; reason: string } | undefined> {
+  async function decideTurnEnd(id: string, answer: string, n: number, turn: { changed: boolean; stage: string | null; handoff: boolean }): Promise<{ decision: 'block'; reason: string } | undefined> {
     const decisions = io.decisions
     if (decisions === undefined) return undefined
     let frame: DecisionFrame | undefined
     try {
       frame = await captureFrame(decisions, lastEntryMs, 'turn-end', { lastReply: answer.slice(-cfg.tailChars) })
       const state = turnEvidence(frame, answer.slice(-cfg.tailChars),
-        { pushes: n, changed: false, loopMax: cfg.loopMax }, { stage: null, handoff: false })
+        { pushes: n, changed: turn.changed, loopMax: cfg.loopMax }, { stage: turn.stage, handoff: turn.handoff })
       // Every string the state would send native or generation must survive redaction unchanged.
       if (stateHoldsSecret(state)) return void (await turnPain(id, 'turn end', 'the turn state holds content that redaction would hide'))
       const result = await judgeNative(frame, { state: state as unknown as Readonly<Record<string, unknown>>, questions: TURN_QUESTIONS })
@@ -906,7 +916,8 @@ export function createAutonomic(io: AutonomicIO) {
         return undefined
       }
       // The loop guard is deterministic and outranks classification (Plan Task 7 §9 Step 3).
-      const n = changed.has(id) ? 0 : (pushes.get(id) ?? 0)
+      const changedNow = changed.has(id)
+      const n = changedNow ? 0 : (pushes.get(id) ?? 0)
       changed.delete(id)
       if (n >= cfg.loopMax) {
         pushes.delete(id)
@@ -917,7 +928,9 @@ export function createAutonomic(io: AutonomicIO) {
       // No decision service means no classification, no generation and no continuation: the turn end
       // is operator-owned (R3). There is no conversational fallback left.
       if (io.decisions === undefined) return undefined
-      return await decideTurnEnd(id, answer, n)
+      // The state the classifier judges carries the facts this handler just measured — the change
+      // mark and the live molt stage — never a hardcoded false/no-stage pair.
+      return await decideTurnEnd(id, answer, n, { changed: changedNow, stage: stage ?? null, handoff })
     } catch (err) {
       await log(`session_stop error ${String(err)}`)
       return undefined

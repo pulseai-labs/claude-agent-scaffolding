@@ -167,22 +167,76 @@ describe('real trusted issuer and pinned reader', () => {
     f.s.seat.launchId = 'expanded-launch'; f.s.grants[0].resource = { kind: 'paths', repository: f.tree, roots: [f.dir] }
     expect(() => f.issue()).toThrow()
   })
-  for (const mutation of ['replace', 'delete', 'tamper', 'revoke', 'symlink', 'policy', 'brief', 'approval', 'branch'] as const) {
+  /** Apply one mutation of the issued record or of the world it was read against. */
+  function mutate(f: { s: Snapshot; brief: EvidenceMaterial; trusted: string; tree: string }, b: LaunchBinding, mutation: string): void {
+    if (mutation === 'replace') { writeFileSync(b.path + '.new', readFileSync(b.path)); renameSync(b.path + '.new', b.path) }
+    if (mutation === 'delete') rmSync(b.path)
+    if (mutation === 'tamper') writeFileSync(b.path, JSON.stringify({ ...f.s, generation: 2 }))
+    if (mutation === 'revoke') writeFileSync(b.path, JSON.stringify({ ...f.s, lifetime: { ...f.s.lifetime, revoked: true } }))
+    if (mutation === 'symlink') { renameSync(b.path, b.path + '.saved'); symlinkSync(b.path + '.saved', b.path) }
+    if (mutation === 'policy') writeFileSync(join(dirname(b.path), 'policy', f.s.policy.sha256 + '.json'), '{}')
+    if (mutation === 'brief') writeFileSync(f.brief.ref.source, 'changed task')
+    if (mutation === 'approval') writeFileSync(join(f.trusted, 'fixture-approval'), '{}')
+    if (mutation === 'branch') git(f.tree, 'checkout', '-b', 'other')
+  }
+  // The stored record itself. This is what a decision's own in-line freshness check reads, so the
+  // change is seen at once: the lease is stale, the authority is invalidated and the next capture
+  // refuses permanently.
+  for (const mutation of ['replace', 'delete', 'tamper', 'revoke', 'symlink'] as const) {
     test(`${mutation} invalidates the original lease and aborts outstanding work permanently`, () => {
       const f = fixture(), b = f.issue(), a = new PinnedAuthority(b, f.workerRoots), lease = a.lease('S1', f.facts), signal = a.signal
-      if (mutation === 'replace') { writeFileSync(b.path + '.new', readFileSync(b.path)); renameSync(b.path + '.new', b.path) }
-      if (mutation === 'delete') rmSync(b.path)
-      if (mutation === 'tamper') writeFileSync(b.path, JSON.stringify({ ...f.s, generation: 2 }))
-      if (mutation === 'revoke') writeFileSync(b.path, JSON.stringify({ ...f.s, lifetime: { ...f.s.lifetime, revoked: true } }))
-      if (mutation === 'symlink') { renameSync(b.path, b.path + '.saved'); symlinkSync(b.path + '.saved', b.path) }
-      if (mutation === 'policy') writeFileSync(join(dirname(b.path), 'policy', f.s.policy.sha256 + '.json'), '{}')
-      if (mutation === 'brief') writeFileSync(f.brief.ref.source, 'changed task')
-      if (mutation === 'approval') writeFileSync(join(f.trusted, 'fixture-approval'), '{}')
-      if (mutation === 'branch') git(f.tree, 'checkout', '-b', 'other')
+      mutate(f, b, mutation)
       expect(lease.fresh()).toBe(false); expect(signal.aborted).toBe(true)
       expect(() => a.lease('S1', f.facts)).toThrow()
     })
   }
+  // The world the record is read against: a materialized file, a material source, the recorded
+  // approval event, the live branch. The in-line check deliberately does not re-run those reads —
+  // that pipeline is what a capture pays for — so the change is caught when the next decision
+  // captures, which still invalidates the authority permanently and leaves the earlier lease stale
+  // by the same invalidation. No capture can release the mutated record either way.
+  for (const mutation of ['policy', 'brief', 'approval', 'branch'] as const) {
+    test(`${mutation} is refused at the next capture and invalidates the authority permanently`, () => {
+      const f = fixture(), b = f.issue(), a = new PinnedAuthority(b, f.workerRoots), lease = a.lease('S1', f.facts), signal = a.signal
+      mutate(f, b, mutation)
+      expect(() => a.lease('S1', f.facts)).toThrow()
+      expect(signal.aborted).toBe(true)
+      expect(lease.fresh()).toBe(false)
+      expect(() => a.lease('S1', f.facts)).toThrow()
+    })
+  }
+  // F15(a): the in-line check is the stored record only. A git that answers nothing at all must not
+  // reach it — re-running the capture pipeline here would throw, invalidate and stale the lease.
+  test('the in-line freshness check spawns no git and re-reads no material', () => {
+    const f = fixture(), b = f.issue(), a = new PinnedAuthority(b, f.workerRoots), lease = a.lease('S1', f.facts)
+    const shim = join(f.dir, 'gitshim'); mkdirSync(shim)
+    writeFileSync(join(shim, 'git'), '#!/bin/sh\nexit 42\n'); chmodSync(join(shim, 'git'), 0o700)
+    const path = process.env.PATH
+    process.env.PATH = `${shim}:${path}`
+    try { expect(lease.fresh()).toBe(true) } finally { process.env.PATH = path }
+    // The same check still sees a real change to that record.
+    writeFileSync(b.path, JSON.stringify({ ...f.s, generation: 2 }))
+    expect(lease.fresh()).toBe(false)
+  })
+  // F15(b): a spawn that never ran is not a statement about the authority. The decision in flight
+  // blocks (fail-closed) and the next one proceeds; the pinned record is not suspended.
+  test('a transient git failure stales one decision without suspending the authority', () => {
+    const f = fixture(), b = f.issue(), a = new PinnedAuthority(b, f.workerRoots), lease = a.lease('S1', f.facts)
+    const shim = join(f.dir, 'slowgit'); mkdirSync(shim)
+    // A git that never answers inside the store's own 1000 ms bound.
+    writeFileSync(join(shim, 'git'), '#!/bin/sh\n/bin/sleep 3\n'); chmodSync(join(shim, 'git'), 0o700)
+    const path = process.env.PATH
+    process.env.PATH = `${shim}:${path}`
+    try {
+      expect(() => a.lease('S1', f.facts)).toThrow()
+      expect(lease.fresh()).toBe(false)      // the decision in flight is stale: it cannot release
+      expect(a.signal.aborted).toBe(false)   // and the pinned authority is not suspended by it
+      expect(() => a.lease('S1', f.facts)).toThrow()
+    } finally { process.env.PATH = path }
+    const next = a.lease('S1', f.facts)
+    expect(next.fresh()).toBe(true)
+    expect(lease.fresh()).toBe(false)        // the stale decision stays stale
+  })
   test('worker overlap in either direction including coordinator worktrees is refused', () => {
     const f = fixture(), b = f.issue()
     for (const root of [dirname(b.path), b.path, f.dir, join(dirname(b.path), '.worktrees')]) {

@@ -44,6 +44,18 @@ const SHORT_DELETE = /^-[A-Za-z]*d/
 const PUSH_UNSUPPORTED = /^--(?:mirror|all|branches|tags)/
 // A commit message never becomes authority, but a trailer in it is a red line.
 const TRAILER = /(?:^|\n)\s*(?:Co-Authored-By:|🤖\s*Generated with)/i
+// The commit options whose value is a separate argv word: the short letters and the long names.
+// A word one of these consumes is a value, never a path target, so `-m hello` cannot bound the
+// commit to a file called hello. An option outside this table does not consume the next word, so a
+// value it missed is read as a path — which only narrows the bound, the safe direction.
+const COMMIT_SHORT_VALUE: Record<string, true> = { m: true, F: true, C: true, c: true, t: true }
+const COMMIT_LONG_VALUE: Record<string, true> = { '--message': true, '--file': true, '--reuse-message': true,
+  '--reedit-message': true, '--fixup': true, '--squash': true, '--author': true, '--date': true,
+  '--template': true, '--cleanup': true, '--trailer': true, '--pathspec-from-file': true }
+// The message-bearing commit options. Their value is the commit message, so a trailer in it is the
+// red line; a message read from a file or stdin (`-F -`, `--file=…`) cannot be shown trailer-free
+// here, so it takes the same red line rather than releasing with bytes this module never read.
+const COMMIT_FILE_LONG: Record<string, true> = { '--file': true }
 const SED_DELETE = /^(?:rm|unlink)$/
 // Programs whose effects the approved-command vocabulary could name, so an exact approved
 // executable+argv can authorize them. Path scope alone never does.
@@ -113,6 +125,22 @@ function pushEffect(argv: readonly string[], ctx: OperationContext, cwd: string)
     resource: { kind: 'push', repository: ctx.facts.repository, remote, sourceRef: src, destinationRef: dst } }
 }
 
+/** The HTTP method a `gh api` call names, uppercased, or undefined when it names none. */
+function ghMethod(rest: readonly string[]): string | undefined {
+  for (let i = 0; i < rest.length; i++) {
+    const w = rest[i]!
+    if (w === '-X' || w === '--method') { const v = rest[i + 1]; return v === undefined || v.startsWith('-') ? undefined : v.toUpperCase() }
+    if (w.startsWith('--method=')) { const v = w.slice(9); return v === '' ? undefined : v.toUpperCase() }
+    if (/^-X./.test(w)) return w.slice(2).toUpperCase()
+  }
+  return undefined
+}
+// The `gh api` methods that can be a bounded PR/issue update. DELETE is a delete (its own red
+// line), and anything else — PUT on a merge endpoint, or a method this route does not know — is
+// not classified as a benign update: only the model's reading of raw argv would stand between the
+// call and execution otherwise.
+const API_UPDATE_METHODS: Record<string, true> = { GET: true, HEAD: true, POST: true, PATCH: true }
+
 function ghEffect(argv: readonly string[], ctx: OperationContext, cwd: string): Effect {
   const effect: Effect = { operation: null, resource: null, argv: [...argv], cwd,
     force: false, deletion: false, noVerify: false, merge: false, trailer: false, targets: [], sourceObject: null, unresolved: null }
@@ -132,8 +160,16 @@ function ghEffect(argv: readonly string[], ctx: OperationContext, cwd: string): 
     if (n !== undefined) number = Number(n)
     if (rest.includes('merge')) merge = true
   }
+  // The create branch is computed before the identity check: `gh pr create` names no existing
+  // pull request, and rejecting it for a missing identity first made pr.create-own unreachable.
+  const create = sub === 'pr' && rest.includes('create')
   if (merge) return { ...effect, merge: true, unresolved: 'a merge is operator-owned' }
-  if (number === undefined || !Number.isSafeInteger(number) || number <= 0) return { ...effect, unresolved: 'no exact pull-request/issue identity' }
+  if (sub === 'api') {
+    const method = ghMethod(rest)
+    if (method === 'DELETE') return { ...effect, deletion: true, unresolved: 'a delete is operator-owned' }
+    if (method !== undefined && API_UPDATE_METHODS[method] !== true) return { ...effect, unresolved: `the ${method} method names no bounded update` }
+  }
+  if (!create && (number === undefined || !Number.isSafeInteger(number) || number <= 0)) return { ...effect, unresolved: 'no exact pull-request/issue identity' }
   // The repository resolves only from the configured remotes: a named owner/repo must match one,
   // and an unnamed one needs exactly one configured remote to be unambiguous.
   const urls = Object.values(ctx.facts.remotes)
@@ -141,7 +177,6 @@ function ghEffect(argv: readonly string[], ctx: OperationContext, cwd: string): 
   if (named === undefined) return { ...effect, unresolved: 'no exact repository identity' }
   if (!urls.some(url => repoOf(url) === named)) return { ...effect, unresolved: `repository ${named} is not a configured remote` }
   if (ctx.facts.branch === null) return { ...effect, unresolved: 'no exact head ref' }
-  const create = sub === 'pr' && rest.includes('create')
   // The action is the argv word, or the path's own segment (`…/1/comments/2/replies`).
   const wordAction = rest.find(w => ['comment', 'edit', 'review', 'replies', 'merge', 'create'].includes(w))
   const action = wordAction ?? pathAction?.[2] ?? pathAction?.[1]
@@ -160,6 +195,10 @@ function rmEffect(argv: readonly string[], ctx: OperationContext, cwd: string): 
   return { ...effect, targets }
 }
 
+/** The absolute target of a literal relative or absolute path, as the pinned worktree reads it. */
+const targetPath = (facts: PlacementFacts, target: string): string =>
+  target.startsWith('/') ? target : `${facts.worktree}/${target.replace(/^\.\//, '')}`
+
 function commitEffect(argv: readonly string[], ctx: OperationContext, cwd: string): Effect {
   const effect: Effect = { operation: null, resource: null, argv: [...argv], cwd,
     force: false, deletion: false, noVerify: false, merge: false, trailer: false, targets: [], sourceObject: null, unresolved: null }
@@ -167,15 +206,41 @@ function commitEffect(argv: readonly string[], ctx: OperationContext, cwd: strin
   const rest = at < 0 ? [] : argv.slice(at + 1)
   for (let i = 0; i < rest.length; i++) {
     const w = rest[i]!
+    // Everything past `--` is a pathspec, whatever it spells.
+    if (w === '--') { for (i++; i < rest.length; i++) effect.targets.push(rest[i]!); break }
+    if (!w.startsWith('-')) { effect.targets.push(w); continue }
     if (w === '--no-verify' || /^-[A-Za-z]*n/.test(w)) effect.noVerify = true
-    if (w === '-m' || w === '--message') { if (TRAILER.test(rest[i + 1] ?? '')) effect.trailer = true }
-    else if (w.startsWith('--message=')) { if (TRAILER.test(w.slice(10))) effect.trailer = true }
-    else if (!w.startsWith('-')) effect.targets.push(w)
+    if (w.startsWith('--')) {
+      const eq = w.indexOf('=')
+      const name = eq < 0 ? w : w.slice(0, eq)
+      const inline = eq < 0 ? undefined : w.slice(eq + 1)
+      // `--message <value>` and `--message=<value>`: a trailer in the message is the red line. An
+      // empty inline value takes the next word, because a quoted value is its own argv word once
+      // the segment's masking has split it (`--message="Co-Authored-By: …"` arrives as two words).
+      if (name === '--message') { const value = inline === undefined || inline === '' ? (rest[++i] ?? '') : inline; if (TRAILER.test(value)) effect.trailer = true; continue }
+      // `--file <path>`, `--file=<path>`: the message is not in this argv, so it cannot be shown
+      // to hold no trailer — the red line covers it rather than releasing unread bytes.
+      if (COMMIT_FILE_LONG[name] === true) { effect.trailer = true; if (inline === undefined) i++; continue }
+      if (COMMIT_LONG_VALUE[name] === true) { if (inline === undefined) i++; continue }
+      continue
+    }
+    // A short cluster (`-m x`, `-am x`, `-amx`): read left to right, and the first letter that
+    // takes a value ends the cluster — what follows it in the word is the value, else the next word.
+    const letters = w.slice(1)
+    for (let k = 0; k < letters.length; k++) {
+      const letter = letters[k]!
+      if (COMMIT_SHORT_VALUE[letter] !== true) continue
+      const attached = letters.slice(k + 1)
+      const value = attached === '' ? (rest[++i] ?? '') : attached
+      if (letter === 'm') { if (TRAILER.test(value)) effect.trailer = true }
+      else if (letter === 'F') effect.trailer = true
+      break
+    }
   }
   if (ctx.facts.branch === null) return { ...effect, unresolved: 'no exact commit branch' }
   return { ...effect, operation: 'git.commit',
     resource: { kind: 'commit', repository: ctx.facts.repository, branch: ctx.facts.branch,
-      paths: effect.targets.map(t => (t.startsWith('/') ? t : `${ctx.facts.worktree}/${t.replace(/^\.\//, '')}`)) } }
+      paths: effect.targets.map(t => targetPath(ctx.facts, t)) } }
 }
 
 function approvedCommandEffect(argv: readonly string[], ctx: OperationContext, cwd: string): Effect {
@@ -235,6 +300,23 @@ const whereFor = (facts: PlacementFacts): Where => ({ cwd: facts.cwd, root: fact
   ...(defaultBranchOf(facts) === undefined ? {} : { defaultBranch: defaultBranchOf(facts)! }) })
 
 /**
+ * Re-attach a segment's shell redirections as write targets of its own effect. `executionSegments`
+ * strips a redirection from argv, so without this the write it names appears in no effect at all
+ * and a released call carries an unexamined write target. A commit's path bound then covers it; an
+ * effect that cannot express a path bound (a push or a PR) has nothing to bound the write with, so
+ * it becomes unresolved rather than released.
+ */
+function withRedirects(effect: Effect, facts: PlacementFacts, redirects: readonly string[]): Effect {
+  if (redirects.length === 0) return effect
+  const targets = [...effect.targets, ...redirects]
+  if (effect.resource?.kind === 'commit') {
+    return { ...effect, targets, resource: { ...effect.resource,
+      paths: [...effect.resource.paths, ...redirects.map(t => targetPath(facts, t))] } }
+  }
+  return { ...effect, targets, unresolved: effect.unresolved ?? 'a shell redirection is a write target this effect cannot bound' }
+}
+
+/**
  * The normalized facts of a tool call: ordered literal effects, the retained floor findings and
  * anything that could not be established. The floor's bag-of-words is never promoted to facts.
  */
@@ -249,11 +331,18 @@ export function operationFacts(tool: string, input: unknown, context: OperationC
   if (text !== '') for (const s of executionSegments(text, facts.cwd, facts.worktree)) {
     if (s.opaque) {
       effects.push({ operation: null, resource: null, argv: s.argv, cwd: s.cwd, force: false, deletion: false, noVerify: false,
-        merge: false, trailer: false, targets: [], sourceObject: null, unresolved: 'the segment\'s effects cannot be established' })
+        merge: false, trailer: false, targets: [...s.redirects], sourceObject: null, unresolved: 'the segment\'s effects cannot be established' })
       continue
     }
-    if (s.argv.length === 0) continue
-    effects.push(effectOf(s.argv, context, s.cwd))
+    if (s.argv.length === 0) {
+      // A segment that is only a redirection writes the file it names — it has an effect even
+      // though it runs no program, and this route has no bound to apply to it.
+      if (s.redirects.length > 0) effects.push({ operation: null, resource: null, argv: [], cwd: s.cwd, force: false,
+        deletion: false, noVerify: false, merge: false, trailer: false, targets: [...s.redirects],
+        sourceObject: null, unresolved: 'a write target with no program to bound it' })
+      continue
+    }
+    effects.push(withRedirects(effectOf(s.argv, context, s.cwd), facts, s.redirects))
   }
   // A structured native force-with-lease is a real force push, read from its own field.
   if (tool === 'github') {
@@ -281,10 +370,20 @@ function taskEvidence(context: OperationContext): string[] {
 function resourceMatches(a: Resource, b: Resource): boolean {
   if (a.kind !== b.kind) return false
   if (a.kind === 'push' && b.kind === 'push') return a.remote === b.remote && a.sourceRef === b.sourceRef && a.destinationRef === b.destinationRef
-  if (a.kind === 'commit' && b.kind === 'commit') return a.branch === b.branch && a.paths.every(p => b.paths.includes(p))
+  // Every path the commit names must sit inside a bound the grant names (the same containment the
+  // paths resource and `narrows` use). An index commit names no path at all, which is an unbounded
+  // effect: the empty list must never match a roots-bounded grant vacuously, so it matches only a
+  // grant that carries no path bound of its own — and a snapshot never issues one, so an index
+  // commit asks.
+  if (a.kind === 'commit' && b.kind === 'commit') return a.branch === b.branch &&
+    (a.paths.length === 0 ? b.paths.length === 0 : a.paths.every(p => b.paths.some(root => p === root || p.startsWith(root === '/' ? '/' : `${root}/`))))
   if (a.kind === 'pr' && b.kind === 'pr') return a.headRef === b.headRef && a.number === b.number
   if (a.kind === 'paths' && b.kind === 'paths') return b.roots.some(root => a.roots.some(r => r === root || r.startsWith(`${root}/`)))
   return false
+}
+/** Whether one live grant covers one effect: the same operation and a resource the effect is inside. */
+function grantCovers(grant: Snapshot['grants'][number], effect: Effect): boolean {
+  return effect.operation === grant.operation && effect.resource !== null && resourceMatches(effect.resource, grant.resource)
 }
 const inProtected = (ref: string, facts: PlacementFacts): boolean =>
   [...facts.defaultRefs, ...facts.protectedRefs].some(p => p === ref || p.replace(/^refs\/remotes\/[^/]+\//, 'refs/heads/') === ref)
@@ -316,9 +415,11 @@ export function permissionEligibility(facts: OperationFacts, context: OperationC
   // 3. Complete facts for every segment.
   if (facts.unresolved.length > 0) return { kind: 'ask', reason: facts.unresolved[0]! }
   for (const e of facts.effects) if (e.operation === null || e.resource === null) return { kind: 'ask', reason: 'an effect is not bounded by the approved vocabulary' }
-  // 4. Live positive matching grants (with the operation's resource).
-  const grants = context.snapshot.grants.filter(g => facts.effects.every(e => e.operation === g.operation && e.resource !== null && resourceMatches(e.resource, g.resource)))
-  if (grants.length === 0) return { kind: 'ask', reason: 'no applicable grant' }
+  // 4. Live positive matching grants, one per effect: a compound command is routable exactly when
+  // the live grant SET covers every one of its effects (the red lines and the role ceiling above
+  // have already applied effect by effect), and the matched set is what the record names.
+  const grants = context.snapshot.grants.filter(g => facts.effects.some(e => grantCovers(g, e)))
+  if (!facts.effects.every(e => grants.some(g => grantCovers(g, e)))) return { kind: 'ask', reason: 'no applicable grant' }
   const grantIds = grants.map(g => g.id)
   // 5. An exact already-approved decision decides it deterministically, with no inference.
   const approved = context.approved.find(a => a.inputSha256 === context.inputSha256 && a.grantIds.every(id => grantIds.includes(id)))

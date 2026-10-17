@@ -25,6 +25,11 @@ export type TurnEvidence = {
   candidates: ApprovedTurnCandidate[]
   remainingSteps: ApprovedDecisions['remainingSteps']
   evidence: EvidenceMaterial[]
+  // The evidence IDs this state minted for its own wait facts (`waitMaterial`). They are live
+  // observations, not approved material: a `waiting` reason may cite them, but they are not
+  // grounding for a done or pain payload, whose claims must rest on evidence the lease or the
+  // policy bundle actually carries.
+  mintedWaitIds: string[]
 }
 export type QuoteRef = { evidenceId: string; start: number; end: number }
 export type GeneratedTurnPayload = { payload: TurnVerdict; candidateId: string | null; reasonQuotes: QuoteRef[] }
@@ -62,14 +67,18 @@ export function turnEvidence(frame: DecisionFrame, reply: string, progress: Turn
   const seen = new Set<string>()
   for (const m of frame.lease.evidence) { if (!seen.has(m.ref.id)) { seen.add(m.ref.id); evidence.push(m) } }
   for (const m of frame.policy.evidence) { if (!seen.has(m.ref.id)) { seen.add(m.ref.id); evidence.push(m) } }
-  for (const fact of waits) { if (!seen.has(fact.evidenceId)) { seen.add(fact.evidenceId); evidence.push(waitMaterial(fact)) } }
+  const mintedWaitIds: string[] = []
+  for (const fact of waits) {
+    if (seen.has(fact.evidenceId)) continue
+    seen.add(fact.evidenceId); evidence.push(waitMaterial(fact)); mintedWaitIds.push(fact.evidenceId)
+  }
 
   return {
     lastReply: reply, mode: 'autopilot', sessionId: frame.host.sessionId, epoch: frame.lease.epoch,
     assignmentId: frame.lease.snapshot.assignmentId, generation: frame.lease.snapshot.generation,
     authoritySha256: frame.lease.binding.sha256, policySha256: frame.lease.policyDigest,
     progress, waits, molt, candidates: frame.policy.approved.turns,
-    remainingSteps: frame.policy.approved.remainingSteps, evidence,
+    remainingSteps: frame.policy.approved.remainingSteps, evidence, mintedWaitIds,
   }
 }
 
@@ -130,8 +139,7 @@ export function renderReason(state: TurnEvidence, quotes: readonly QuoteRef[]): 
 }
 
 /** A grounded pain option must be carried verbatim by cited evidence, and pass the shared shape. */
-function groundedPainOptions(state: TurnEvidence, options: readonly PainOption[]): PainOption[] | undefined {
-  const cited = state.evidence.map(e => e.text).join('\n')
+function groundedPainOptions(cited: string, options: readonly PainOption[]): PainOption[] | undefined {
   if (!options.every(o => cited.includes(o.label) && cited.includes(o.text))) return undefined
   if (!options.every(o => o.text.length <= MAX_OPTION_TEXT)) return undefined
   return painOptions(options)
@@ -178,6 +186,13 @@ export function validateTurnPayload(value: unknown, accepted: TurnCase, state: T
   if (!Array.isArray(quoted) || !quoted.every(isQuoteRef)) return undefined
   if (stateHoldsSecret(state) || stateHoldsSecret(verdict)) return undefined
 
+  // The rows this state minted for its own wait facts are live observations, never grounding: a
+  // done or pain claim has to rest on evidence the lease or the pinned bundle carries. A `waiting`
+  // reason is the one case that cites them, through `state.waits`.
+  const minted = new Set(state.mintedWaitIds)
+  const grounding = state.evidence.filter(e => !minted.has(e.ref.id))
+  const cited = grounding.map(e => e.text).join('\n')
+
   const steps = approvedStepTexts(state, frame)
   const live = liveCandidates(state, frame, accepted)
   if (verdict.case === 'covered') {
@@ -189,15 +204,16 @@ export function validateTurnPayload(value: unknown, accepted: TurnCase, state: T
   } else if (verdict.case === 'waiting') {
     if (state.waits.length === 0) return undefined
   } else if (verdict.case === 'done') {
-    // Grounded in approved completion evidence: at least one quote must resolve to real evidence.
-    if (quoted.length === 0) return undefined
+    // Grounded in approved completion evidence: at least one quote must resolve to material this
+    // turn did not mint for itself. The minted wait rows are citable in a reason but they evidence
+    // nothing about completion, so a done payload that cites only them abstains.
+    if (quoted.length === 0 || !quoted.some(q => !minted.has(q.evidenceId))) return undefined
   } else {
     const irreversible = irreversibleLabels(state)
     if (verdict.options?.some(o => o.label && irreversible.has(o.label) && o.recommended)) return undefined
-    const cited = state.evidence.map(e => e.text).join('\n')
     if (verdict.question !== undefined && !cited.includes(verdict.question)) return undefined
     if (verdict.credential !== undefined && !cited.includes(verdict.credential)) return undefined
-    if (verdict.options !== undefined && groundedPainOptions(state, verdict.options) === undefined) return undefined
+    if (verdict.options !== undefined && groundedPainOptions(cited, verdict.options) === undefined) return undefined
   }
 
   if (candidateId === null) {
@@ -226,8 +242,11 @@ export async function payloadForTurn(frame: DecisionFrame, accepted: TurnCase, s
   Promise<{ verdict: TurnVerdict; source: { kind: 'deterministic' | 'candidate' | 'generation'; id: string | null } } | undefined> {
   const applicable = liveCandidates(state, frame, accepted)
   if (applicable.length === 1) return { verdict: applicable[0]!.payload, source: { kind: 'candidate', id: applicable[0]!.id } }
+  // A done or pain payload is grounded in approved material, so minted wait rows alone never make
+  // one renderable — a `waiting` payload is the one that rests on the wait facts themselves.
+  const minted = new Set(state.mintedWaitIds)
   const renderable = accepted === 'waiting' ? state.waits.length > 0
-    : accepted === 'done' || accepted === 'pain' ? state.evidence.length > 0
+    : accepted === 'done' || accepted === 'pain' ? state.evidence.some(e => !minted.has(e.ref.id))
     : approvedStepTexts(state, frame).length > 0 || applicable.length > 1
   if (!renderable) return undefined
 

@@ -832,6 +832,24 @@ function verbOpaque(ws: readonly string[]): boolean {
 }
 const isGit = (ws: readonly string[]) => ws.some(w => isVerb(w, 'git') || /^git-/.test(base(w)))
 const READ_CONFIG = /^(?:--(?:get|get-all|get-regexp|get-urlmatch|get-color|get-colorbool|list|show-origin|show-scope|name-only|null|includes|type=\w+|global|local|system|worktree)|-[lz]+)$/
+// A git global `-c NAME=VALUE` or `--config-env=NAME=ENVVAR` runs the command with configuration
+// the model chose: core.hooksPath, core.pager, aliases and every other key. That configuration is
+// a fact this segment cannot establish — a released push then executes bytes a pinned fact never
+// named — so the segment is opaque, the same rule a config write already gets. Only the
+// global-option position counts: past the subcommand word a `-c` belongs to the subcommand
+// (`git commit -c <commit>` reuses a message) and injects nothing.
+function injectsConfig(words: readonly string[]): boolean {
+  const at = words.findIndex(w => isVerb(w, 'git'))
+  if (at < 0) return false
+  for (let i = at + 1; i < words.length; i++) {
+    const w = words[i]!
+    if (w === '-C' || w === '--git-dir' || w === '--work-tree' || w === '--namespace' || w === '--exec-path') { i++; continue }
+    if (w === '-c' || /^-c./.test(w) || w === '--config-env' || w.startsWith('--config-env=')) return true
+    if (w.startsWith('-')) continue
+    return false
+  }
+  return false
+}
 // Section 1: any git config that is not a plain read (one key, or a --get/--list form) is a write.
 function writesConfig(ws: readonly string[]): boolean {
   const at = ws.findIndex(w => isVerb(w, 'config'))
@@ -973,9 +991,10 @@ function segmentOf(c: Command, cwd: string, unknownCwd: boolean, root: string): 
   const runner = name !== undefined && (RUNNER.test(name) || name === 'xargs')
   const defines = /\([ \t]*\)/.test(unquoted(masked)) || /(?:^|[\s;&|(])(?:function|alias)[ \t]/.test(masked)
   const unsafeSed = name === 'sed' && !safeSed(raw)
-  // A git config write or an explicit git dir/work-tree moves the facts out of the pinned ones.
+  // A git config write, a global `-c`/`--config-env` injection, or an explicit git dir/work-tree
+  // moves the facts out of the pinned ones.
   const git = isGit(words)
-  const movesFacts = git && (writesConfig(words) || words.some(w => /^--(?:git-dir|work-tree)/.test(w) || /^GIT_(?:DIR|WORK_TREE|CONFIG)/.test(w)))
+  const movesFacts = git && (injectsConfig(words) || writesConfig(words) || words.some(w => /^--(?:git-dir|work-tree)/.test(w) || /^GIT_(?:DIR|WORK_TREE|CONFIG)/.test(w)))
   const dirs = gitDir(c.bare)
   const envC = envDir(c.bare)
   // A resolved cwd outside the pinned worktree relocates the real command, so the segment's
@@ -983,11 +1002,16 @@ function segmentOf(c: Command, cwd: string, unknownCwd: boolean, root: string): 
   // resolution to the pinned facts is what decides, not merely that a path resolved.
   const moves = dirs !== undefined ? dirs : envC
   const resolved = moves === undefined ? cwd : (moves === null ? null : joinPath(cwd, moves))
-  const elsewhere = resolved !== null && resolved !== root && !resolved.startsWith(root + '/')
+  // A relocation target the module cannot resolve (a literal `~`, whose expansion needs HOME) is
+  // as unknown as a non-literal one: `joinPath` answers undefined for it, so the segment's cwd is
+  // not established and its effects are not either. Reading undefined as a path here threw a
+  // TypeError inside classification, which the floor's catch turned into the generic
+  // "decision unavailable" block instead of this segment's own unresolved fact.
+  const elsewhere = resolved !== null && resolved !== undefined && resolved !== root && !resolved.startsWith(root + '/')
   const opaque = expandable || unknownCwd || defines || runner || unsafeSed || !known
   const cwdFor = resolved ?? cwd
   return { text: raw.trim(), argv: words.slice(progAt < 0 ? words.length : progAt).map(unmask), cwd: cwdFor,
-    opaque: opaque || moves === null || movesFacts || elsewhere, redirects }
+    opaque: opaque || resolved === null || resolved === undefined || movesFacts || elsewhere, redirects }
 }
 /**
  * Every executable command of `command`, in order, with the literal argv each is given, where it

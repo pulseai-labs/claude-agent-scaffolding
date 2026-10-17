@@ -5,10 +5,10 @@
 // `import type`: the CSA tree has no installed host package, so a value import would not resolve
 // under plain bun.
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { JudgmentRequest, Question } from '@oh-my-pi/pi-ai'
 import type { ExtensionJudgment } from '@oh-my-pi/pi-coding-agent/extensibility/extensions/types'
 import type { EvidenceMaterial, Grant } from '../../autonomic/hooks/authority'
@@ -17,6 +17,7 @@ import { painOptions } from '../../autonomic/hooks/verdict'
 import type { TurnCase, TurnVerdict } from '../../autonomic/hooks/verdict'
 import { captureFrame } from '../../autonomic/omp/judgment'
 import type { DecisionFrame, PolicyBundle } from '../../autonomic/omp/judgment'
+import { stagePath } from '../../autonomic/hooks/records'
 import { createAutonomic } from '../../autonomic/omp/extension'
 import type { AutonomicIO } from '../../autonomic/omp/extension'
 import { payloadForTurn, renderReason, turnEvidence, validateTurnPayload } from '../../autonomic/omp/turn-end'
@@ -456,6 +457,45 @@ describe('validateTurnPayload per-label grounding', () => {
     expect(validateTurnPayload(envelope(smuggled, null, [quote]), 'stalled', state(), fixture.frame)).toBeUndefined()
     // The bounded reply is in the state; the instruction inside it is not an approved step.
     expect(minimalTurnState(fixture.frame).lastReply).toBe('Step complete.')
+  })
+
+  // F6: the state mints one evidence row per real armed wait fact. Those rows are live observations,
+  // citable by a `waiting` reason, and are NOT grounding for a done or pain claim.
+  const armedJob = { running: [{ id: 'J7', status: 'running' } as never], recent: [], delivery: {} as never }
+  const waitEvidenceId = 'wait:host-job:job:J7'
+  const waitText = 'host-job job:J7 is running'
+  const waitQuote = { evidenceId: waitEvidenceId, start: 0, end: waitText.length }
+
+  test('done cannot be grounded in the state\'s own minted wait material', async () => {
+    fixture = await minimalTurnFrame(emptyPolicy())
+    fixture.w.setJobs(armedJob)
+    const armed = turnEvidence(fixture.frame, 'x', { pushes: 0, changed: false, loopMax: 3 }, { stage: null, handoff: false })
+    // The quote resolves and renders, which is all the previous check asked: the minted row is not
+    // approved completion evidence, so the done claim has nothing to stand on.
+    const payload = { case: 'done', reason: `${waitEvidenceId}: ${waitText}` }
+    expect(validateTurnPayload(envelope(payload, null, [waitQuote]), 'done', armed, fixture.frame)).toBeUndefined()
+    // Control: the same label grounded in the bundle's own completion evidence still passes.
+    const completion = quoteOf(COMPLETION, 'the approved objective was met')
+    expect(validateTurnPayload(envelope({ case: 'done', reason: reasonFrom(completion) }, null, [completion]), 'done', armed, fixture.frame)).toBeDefined()
+  })
+
+  test('pain cannot be grounded in the state\'s own minted wait material', async () => {
+    fixture = await minimalTurnFrame(emptyPolicy())
+    fixture.w.setJobs(armedJob)
+    const armed = turnEvidence(fixture.frame, 'x', { pushes: 0, changed: false, loopMax: 3 }, { stage: null, handoff: false })
+    const payload = { case: 'pain', reason: `${waitEvidenceId}: ${waitText}`, question: waitText }
+    expect(validateTurnPayload(envelope(payload, null, [waitQuote]), 'pain', armed, fixture.frame)).toBeUndefined()
+    // Control: a question carried by real evidence still grounds the same shape.
+    const note = quoteOf(NOTE, 'run the focused suite')
+    expect(validateTurnPayload(envelope({ case: 'pain', reason: reasonFrom(note), question: 'run the focused suite' }, null, [note]), 'pain', armed, fixture.frame)).toBeDefined()
+  })
+
+  test('a waiting payload still cites the minted wait fact it rests on', async () => {
+    fixture = await minimalTurnFrame(emptyPolicy())
+    fixture.w.setJobs(armedJob)
+    const armed = turnEvidence(fixture.frame, 'x', { pushes: 0, changed: false, loopMax: 3 }, { stage: null, handoff: false })
+    const payload = { case: 'waiting', reason: `${waitEvidenceId}: ${waitText}` }
+    expect(validateTurnPayload(envelope(payload, null, [waitQuote]), 'waiting', armed, fixture.frame)).toBeDefined()
   })
 })
 
@@ -1094,6 +1134,10 @@ describe('changed tracking through the stop path (restored)', () => {
     expect(await changesBy({ toolName: 'write', input: { path: 'xd://propose', content: 'my-plan' } })).toBe(false)
   })
 
+  // The `changesBy` helper drives 3 + N full stops, each a whole decision transaction (capture,
+  // native judgment, generation, two ledger writes), so this case measures 5011-5024 ms against
+  // bun's 5 s default per-test bound. An explicit generous timeout keeps the suite stably green
+  // without weakening what the case asserts.
   test('lsp: a rename or rename_file applies by default and is a change; apply:false is a preview; code_actions apply only on apply:true', async () => {
     const lsp = (input: Record<string, unknown>) => ({ toolName: 'lsp', input })
     expect(await changesBy(lsp({ action: 'rename', file: 'a.ts', new_name: 'b' }))).toBe(true)
@@ -1103,7 +1147,7 @@ describe('changed tracking through the stop path (restored)', () => {
     expect(await changesBy(lsp({ action: 'code_actions', file: 'a.ts' }))).toBe(false)
     for (const action of ['diagnostics', 'definition', 'references', 'hover', 'symbols', 'reload', 'status'])
       expect([action, await changesBy(lsp({ action, file: 'a.ts' }))]).toEqual([action, false])
-  })
+  }, 30000)
 })
 
 describe('the loop guard and change tracking', () => {
@@ -1142,6 +1186,33 @@ describe('the loop guard and change tracking', () => {
     expect(await w.stop('x')).toBeUndefined()
     expect(pain(w)).toContain('pain')
     expect(human(w)).not.toContain('continue')
+  })
+
+  // F8: the classifier judges the turn this handler just measured, never a frozen
+  // `changed: false` / `molt: null` pair. Both facts are asserted where they are observable: in the
+  // state the native request carried.
+  test('the judged state carries the real change mark and the live molt stage', async () => {
+    w = turnWorld(turnPolicy('stalled', STEP))
+    classifyAs(w, 'stalled')
+    // A real molt stage file that does not yield: `below` outranks nothing, so the stop proceeds to
+    // classification with that stage live.
+    const stage = stagePath(join(w.root, 'home'), 'S1')
+    mkdirSync(dirname(stage), { recursive: true })
+    writeFileSync(stage, JSON.stringify({ stage: 'below' }))
+    // A tool result that changed the tree marks this turn as progress.
+    await w.handlers.get('tool_result')!({ toolName: 'edit', input: { path: 'a' }, isError: false }, w.ctx)
+    expect((await w.stop('Step 2 is done.'))?.decision).toBe('block')
+    const judged = JSON.stringify(w.nativeRequests[0]!.state)
+    expect(judged).toContain('"changed":true')
+    expect(judged).toContain('"stage":"below"')
+    // Control: a turn with no change and no stage file judges the same shape with false/none.
+    w.close()
+    w = turnWorld(turnPolicy('stalled', STEP))
+    classifyAs(w, 'stalled')
+    expect((await w.stop('Step 2 is done.'))?.decision).toBe('block')
+    const quiet = JSON.stringify(w.nativeRequests[0]!.state)
+    expect(quiet).toContain('"changed":false')
+    expect(quiet).toContain('"stage":null')
   })
 })
 

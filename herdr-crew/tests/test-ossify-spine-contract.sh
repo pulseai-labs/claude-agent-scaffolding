@@ -24,6 +24,7 @@
 #   - the nested run's own mechanical values: the file item bookkeeping lives
 #     in, the round barrier's gate node, and the required worker depth
 #   - no worker-to-orchestrator message type herdr does not have
+#   - the line budget these references are held to
 #
 # Counting is one awk index() pass: `grep -c` counts LINES, and `… | grep -q`
 # can fail on a true match under pipefail. Every zero-count has a non-empty
@@ -65,10 +66,28 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
+REF_BUDGET=257          # A3: the budget equals the longest budgeted reference (257,
+                        # ossify-briefs.md); 0.2.9 raised it from 214 for the spine brief's 1.14.0
+                        # caller rules and re-entry seat rule.
+                        # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking
+                        # clause each launch site gained.
+                        # 0.2.8: raised for the molt clauses — nested-run §4 (211), the spine brief
+                        # (214), the spine, work-PR and leaf MOLT lines.
+                        # 0.2.11 (#663): raised from 230 for the two launch-site citing clauses
+                        # (ossify-briefs.md's item-verifier intro took the two lines, 232).
+                        # 0.2.16: the §8a caller rule lost its "(run-spine's resolved
+                        # dispatcher)" parenthetical, which took ossify-briefs.md back to 231.
+                        # 0.2.23 (PR #860 review F11): the gate and its adjacent control were
+                        # deleted while ossify-briefs.md grew to 257 lines — the shipped briefs
+                        # gained the review-round and close-out caller rules. Restored at the
+                        # reviewed size rather than the file being cut to fit a stale bound; the
+                        # budget still equals the longest budgeted reference, and the adjacent
+                        # control below holds the gate at that minimum.
+
 # occurrences, occurrences_flat, count_of and pin are _helpers.sh's (#514, L1);
 # this suite's pin already took <file> <needle> <label> [line|flat], which is the
 # shape the other suites adopted when their copies were hoisted. What is left here
-# is this suite's own nine: absent, absent_any, assert_set, keys, n_eq,
+# is this suite's own ten: absent, absent_any, assert_set, budget, keys, n_eq,
 # nonempty, and — further down, beside the check they serve — span_of,
 # commands_in_span and span_balanced.
 #
@@ -106,6 +125,13 @@ absent_any() { # <file> <label> <line|flat> <needle>...
 nonempty() {
   if [ -s "$1" ]; then pass "$2"
   else fail "$2" "$1 is missing or empty — every zero-count against it would be vacuous"; fi
+}
+
+budget() { # <file> <label>: the reference's own line count against REF_BUDGET.
+  if [ ! -f "$1" ]; then fail "$2" "no such file: $1"; return 0; fi
+  n="$(wc -l < "$1" | tr -d ' ')"
+  if [ "$n" -le "$REF_BUDGET" ]; then pass "$2 ($n lines)"
+  else fail "$2" "$n lines, over the $REF_BUDGET-line reference budget by $((n - REF_BUDGET))"; fi
 }
 
 
@@ -2412,6 +2438,35 @@ pin "$PRBRIEFS_MD" 'If molt'"'"'s handoff command arrives mid-round, still finis
   "work-PR MOLT line: never stop mid-round, as the spine" flat
 pin "$CHANGELOG_MD" '## 0.2.8' "CHANGELOG has 0.2.8"
 pin "$CHANGELOG_MD" '## 0.2.9' "CHANGELOG has 0.2.9"
+
+section "reference line budgets"
+
+budget "$EXEC_MD" "ossify-execution.md is within the reference budget"
+budget "$NESTED_MD" "ossify-nested-run.md is within the reference budget"
+budget "$PRBRIEFS_MD" "ossify-pr-briefs.md is within the reference budget"
+budget "$BRIEFS_MD" "ossify-briefs.md is within the reference budget"
+budget "$WRITER_MD" "ossify-close-writer.md is within the reference budget"
+# Adjacent control (#651, fix round 1 N4): the raise must not have neutered the gate. The
+# fixture is one line longer than the longest reference the budget holds, and the suite's
+# own budget predicate, run in a subshell, must report the failure. A REF_BUDGET-derived
+# fixture cannot see the constant move — raise REF_BUDGET and the fixture scales with it —
+# so the fixture comes from the files: a gate rebuilt around a raised constant accepts it
+# and this control fails. Restored with the gate in PR #860's review round (F11).
+ctl="$(mktemp)"
+budget_max=0
+for f in "$EXEC_MD" "$NESTED_MD" "$PRBRIEFS_MD" "$BRIEFS_MD" "$WRITER_MD"; do
+  b_n="$(wc -l < "$f" | tr -d ' ')"
+  [ "$b_n" -gt "$budget_max" ] && budget_max="$b_n"
+done
+awk -v n="$((budget_max + 1))" 'BEGIN { for (i = 0; i < n; i++) print "x" }' > "$ctl"
+parent_fail="$FAIL"
+ctl_fail="$( budget "$ctl" "control: one line over the longest budgeted reference is refused" >/dev/null 2>&1; printf '%s' "$FAIL" )"
+if [ "$ctl_fail" -eq $((parent_fail + 1)) ]; then
+  pass "control: one line over the longest budgeted reference is refused"
+else
+  fail "control: one line over the longest budgeted reference is refused" "accepted $((budget_max + 1)) lines at REF_BUDGET=$REF_BUDGET — the longest budgeted reference is $budget_max lines; lower REF_BUDGET to $budget_max"
+fi
+rm -f "$ctl"
 
 # #514, L1: the shape, asserted rather than assumed — a counter re-copied into any
 # suite shadows the hoisted one and keeps passing. This suite's copies were the

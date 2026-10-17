@@ -14,7 +14,7 @@ import type { ExtensionJudgment } from '@oh-my-pi/pi-coding-agent/extensibility/
 import type { EvidenceRef, Grant } from '../../autonomic/hooks/authority'
 import { DEFAULT_READERS, executionSegments } from '../../autonomic/hooks/never'
 import { operationFacts, permissionEligibility } from '../../autonomic/hooks/operations'
-import type { OperationContext } from '../../autonomic/hooks/operations'
+import type { OperationContext, OperationFacts, PermissionEligibility } from '../../autonomic/hooks/operations'
 import { captureFrame } from '../../autonomic/omp/judgment'
 import type { PolicyBundle } from '../../autonomic/omp/judgment'
 import molt from '../../molt/omp/extension'
@@ -888,5 +888,142 @@ describe('operationFacts and permissionEligibility', () => {
     const facts = operationFacts('bash', { command, cwd: w.tree }, withApproved, DEFAULT_READERS)
     const el = permissionEligibility(facts, withApproved)
     expect(el).toMatchObject({ kind: 'covered', decision: 'allow', grantIds: ['fixture-push'] })
+  })
+})
+
+// =====================================================================================
+// The PR #860 review-fix round: bounds that never bind, effects that go unexamined
+// =====================================================================================
+
+describe('an enrolled decline is recorded and rings', () => {
+  let w: RoutingWorld
+  afterEach(() => { if (w) w.close() })
+
+  test('a native judgment that answers ask writes the row and the pain line', async () => {
+    w = pushWorld()
+    setNative(w, 'ask')
+    expect(await w.invoke('bash', { command: PUSH, cwd: w.tree })).toEqual({ block: true, reason: 'autonomic: the operator decides' })
+    expect(human(w)).toContain(' · permission · ')
+    expect(w.painLines().join('\n')).toContain('never-approve')
+  })
+
+  test('a decision route that fails writes the row and the pain line too', async () => {
+    w = pushWorld()   // no native bridge: the fixture's own ctx.judge throws
+    expect(String((await w.invoke('bash', { command: PUSH, cwd: w.tree }))?.reason)).toContain('decision unavailable or stale')
+    expect(human(w)).toContain(' · permission · ')
+    expect(w.painLines().join('\n')).toContain('never-approve')
+  })
+})
+
+describe('the commit path bound, redirections, config injection and the gh method', () => {
+  // One command's normalized facts and deterministic eligibility, read in a fresh world before that
+  // world closes (classification reads the working directory with existsSync).
+  async function factsFor(command: string, grants: Grant[]): Promise<{ facts: OperationFacts; eligibility: PermissionEligibility }> {
+    const world = routingWorld({ grants, policy: pushPolicy(), branch: 'main', mode: 'autopilot' })
+    try {
+      world.addRemote('origin', 'https://github.com/o/r.git')
+      const frame = await captureFrame(world.decisions, performance.now(), 'permission', { command, cwd: world.tree })
+      const ctx: OperationContext = { inputSha256: frame.inputSha256, facts: frame.facts, snapshot: frame.lease.snapshot,
+        approved: frame.policy.approved.permissions, evidence: frame.lease.evidence, commands: frame.policy.approved.commands }
+      const facts = operationFacts('bash', { command, cwd: world.tree }, ctx, DEFAULT_READERS)
+      return { facts, eligibility: permissionEligibility(facts, ctx) }
+    } finally { world.close() }
+  }
+
+  test('the message value is never a path and an index commit is not vacuously granted', async () => {
+    const index = await factsFor('git commit -m hello', [commitGrant()])
+    const resource = index.facts.effects[0]!.resource
+    if (resource === null || resource.kind !== 'commit') throw new Error('expected a commit resource')
+    expect(resource.paths).toEqual([])          // `hello` is the message, not a phantom path
+    expect(index.eligibility.kind).toBe('ask')  // an empty path set never matches a bounded grant
+    // Control: a path inside the granted root is bounded by it, and one outside asks.
+    expect((await factsFor('git commit -m hello src/app.ts', [commitGrant()])).eligibility)
+      .toMatchObject({ kind: 'semantic', grantIds: ['fixture-commit'] })
+    expect((await factsFor('git commit -m hello /etc/autonomic-outside', [commitGrant()])).eligibility.kind).toBe('ask')
+  })
+
+  test('the AI-trailer red line covers every message-bearing commit form', async () => {
+    const trailer = 'Co-Authored-By: someone <someone@example.invalid>'
+    const forms = ['git commit -F -', 'git commit -F msg.txt', 'git commit -Fmsg.txt', 'git commit --file msg.txt',
+      'git commit --file=msg.txt', `git commit -m "${trailer}"`, `git commit -am "${trailer}"`,
+      `git commit --message "${trailer}"`, `git commit --message="${trailer}"`]
+    for (const command of forms) {
+      const { facts, eligibility } = await factsFor(command, [commitGrant()])
+      expect([command, facts.effects[0]!.trailer]).toEqual([command, true])
+      expect([command, eligibility.kind === 'ask' && eligibility.reason.includes('trailer')]).toEqual([command, true])
+    }
+    // Control: a trailer-free message with a bounded path still routes under the same grant.
+    const clean = await factsFor('git commit -m hello src/app.ts', [commitGrant()])
+    expect(clean.facts.effects[0]!.trailer).toBe(false)
+    expect(clean.eligibility).toMatchObject({ kind: 'semantic', grantIds: ['fixture-commit'] })
+  })
+
+  test('a shell redirection stripped from argv returns as a write target under the path bound', async () => {
+    const commit = await factsFor('git commit -m x > /etc/autonomic-outside', [commitGrant()])
+    expect(commit.facts.effects[0]!.targets).toContain('/etc/autonomic-outside')
+    expect(commit.eligibility.kind).toBe('ask')
+    // An effect that cannot express a path bound cannot bound the write either: unresolved, not clean.
+    const push = await factsFor(`git push origin ${MAIN}:${MAIN} > /etc/autonomic-outside`, [pushGrant()])
+    expect(push.facts.effects[0]!.unresolved).toContain('redirection')
+    expect(push.eligibility.kind).toBe('ask')
+    // Control: an in-tree redirect is just another bounded target of the same commit.
+    expect((await factsFor('git commit -m x src/app.ts > log.txt', [commitGrant()])).eligibility)
+      .toMatchObject({ kind: 'semantic', grantIds: ['fixture-commit'] })
+  })
+
+  test('a global git config injection is opaque, never a bounded push', async () => {
+    const forms = [`git -c core.hooksPath=/tmp/h push origin ${MAIN}:${MAIN}`,
+      `git --config-env=core.hooksPath=HOOKS push origin ${MAIN}:${MAIN}`]
+    for (const command of forms) {
+      const { facts, eligibility } = await factsFor(command, [pushGrant()])
+      expect([command, facts.effects[0]!.unresolved]).toEqual([command, "the segment's effects cannot be established"])
+      expect([command, eligibility.kind]).toEqual([command, 'ask'])
+    }
+    // Control: the same push without the injection is bounded by its grant.
+    expect((await factsFor(`git push origin ${MAIN}:${MAIN}`, [pushGrant()])).eligibility.kind).toBe('semantic')
+  })
+
+  test('gh api inspects the HTTP method: a DELETE hits the delete red line, not a benign update', async () => {
+    const grant: Grant = { id: 'fixture-pr', operation: 'pr.update-own',
+      resource: { kind: 'pr', repository: '/fixture/repo', headRef: MAIN, number: 1 }, authorityRefs: ['fixture-approval'] }
+    const deleted = await factsFor('gh api -X DELETE repos/o/r/pulls/1', [grant])
+    expect(deleted.facts.effects[0]!.deletion).toBe(true)
+    expect(deleted.facts.effects[0]!.operation).toBeNull()
+    expect(deleted.eligibility).toEqual({ kind: 'ask', reason: 'a delete effect is operator-owned' })
+    // A method that is not a bounded update is never classified as one.
+    const put = await factsFor('gh api -X PUT repos/o/r/pulls/1', [grant])
+    expect(put.facts.effects[0]!.operation).toBeNull()
+    expect(put.eligibility.kind).toBe('ask')
+    // Control: the bounded reply this grant exists for still routes.
+    expect((await factsFor('gh api repos/o/r/pulls/1/comments/2/replies -f body=hello', [grant])).eligibility)
+      .toMatchObject({ kind: 'semantic', grantIds: ['fixture-pr'] })
+  })
+
+  test('gh pr create matches an issued pr.create-own grant instead of asking for an identity it has none of', async () => {
+    const grant: Grant = { id: 'fixture-create', operation: 'pr.create-own',
+      resource: { kind: 'pr', repository: '/fixture/repo', headRef: MAIN, number: null }, authorityRefs: ['fixture-approval'] }
+    const created = await factsFor('gh pr create --title t', [grant])
+    expect(created.facts.effects[0]!.operation).toBe('pr.create-own')
+    expect(created.eligibility).toMatchObject({ kind: 'semantic', grantIds: ['fixture-create'] })
+    // Control: without the grant the same call asks.
+    expect((await factsFor('gh pr create --title t', [])).eligibility.kind).toBe('ask')
+  })
+
+  test('a compound command routes exactly when the grant set covers every effect', async () => {
+    const command = `git commit -m x src/app.ts && git push origin ${MAIN}:${MAIN}`
+    expect((await factsFor(command, [commitGrant(), pushGrant()])).eligibility)
+      .toMatchObject({ kind: 'semantic', grantIds: ['fixture-commit', 'fixture-push'] })
+    // One grant short: the uncovered effect keeps the whole call with the operator.
+    expect((await factsFor(command, [commitGrant()])).eligibility.kind).toBe('ask')
+    expect((await factsFor(command, [pushGrant()])).eligibility.kind).toBe('ask')
+  })
+
+  test('a literal ~ relocation target classifies as unresolved, never as a crash', async () => {
+    // The segment itself is opaque, and `operationFacts` answers an unresolved effect rather than
+    // throwing a TypeError the floor's catch would turn into the generic unavailable block.
+    expect(executionSegments('git -C ~ status', '/repo', '/repo')[0]!.opaque).toBe(true)
+    const tilde = await factsFor('git -C ~ status', [pushGrant()])
+    expect(tilde.facts.effects[0]!.unresolved).toBe("the segment's effects cannot be established")
+    expect(tilde.eligibility.kind).toBe('ask')
   })
 })

@@ -132,10 +132,15 @@ export function validateIssuance(inputPath: string, workerRoots: readonly string
   return { snapshot, snapshotBytes, material: materials, approval, delegation, bytes: input.bytes, identity: input.identity }
 }
 
+// A spawn that never ran — the 1000 ms timeout on a loaded host, EAGAIN, ENOMEM — says nothing
+// about the authority: it is marked, so it stales only the decisions in flight instead of
+// suspending the pinned authority for the life of the process.
+class TransientGitFailure extends Error {}
 // Reads only the named local git facts. No fetch/authentication/network; failure is unavailable authority.
 function git(cwd: string, args: string[], optional = false): string {
   const result = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', timeout: 1000, maxBuffer: 256000, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_CONFIG_NOSYSTEM: '1' } })
-  if (result.error || result.status !== 0) { if (optional && result.status === 1) return ''; throw new Error('local authority placement check failed') }
+  if (result.error !== undefined) throw new TransientGitFailure(`the local authority placement check could not run: ${result.error.message}`)
+  if (result.status !== 0) { if (optional && result.status === 1) return ''; throw new Error('local authority placement check failed') }
   return result.stdout.trim()
 }
 export function placementFacts(cwd: string): PlacementFacts {
@@ -222,6 +227,24 @@ export class PinnedAuthority {
     }
     return { snapshot, identity: read.identity, evidence: issued.material, policyText: issued.material.find(m => m.ref.id === snapshot.policy.id)!.text }
   }
+  /**
+   * The cheap freshness check a decision makes in line — and on every input event: one bounded read
+   * of the stored authority record, checked against the launch binding's own digest and identity,
+   * plus the revocation, expiry and assignment-generation facts that record carries (parseSnapshot
+   * refuses a revoked, expired or malformed lifetime outright). The heavy pipeline — the provenance
+   * receipt, the issuance input, every material source and the placement facts with their git
+   * spawns — belongs to `validate()`, which is what a capture calls: re-running it here cost eight
+   * sequential git spawns and megabytes of re-reads inside every decision, six or seven times over.
+   * A detected change invalidates; only a spawn that never ran is transient.
+   */
+  private assertStoredRecord(): void {
+    const b = this.binding
+    if (b === undefined) throw new Error('no trusted startup authority')
+    const record = this.read(b.path, 64000)
+    if (sha256(record.bytes) !== b.sha256) throw new Error('stored authority record changed')
+    const snapshot = parseSnapshot(record.bytes)
+    if (snapshot.assignmentId !== b.assignmentId || snapshot.generation !== b.generation || snapshot.seat.launchId !== b.launchId) throw new Error('stored authority identity changed')
+  }
   lease(sessionId: string, facts: PlacementFacts): AuthorityLease {
     if (this.invalid || this.suspended) throw new Error('authority suspended; fresh trusted launch required')
     try {
@@ -234,9 +257,22 @@ export class PinnedAuthority {
         policyText: current.policyText, policyDigest: current.snapshot.policy.sha256, sessionId, epoch,
         fresh: () => {
           if (this.invalid || this.suspended || this.session !== sessionId || this.epoch !== epoch) return false
-          try { this.validate(captured); return true } catch { this.invalidate(); return false }
+          try { this.assertStoredRecord(); return true } catch (err) {
+            // Fail-closed for this decision either way, but only a real change suspends the
+            // authority: a transient failure moves the epoch, so every outstanding lease reads
+            // stale and the next decision re-attempts the same pinned record.
+            if (err instanceof TransientGitFailure) this.epoch++
+            else this.invalidate()
+            return false
+          }
         } })
-    } catch (err) { this.invalidate(); throw err }
+    } catch (err) {
+      // Same rule at capture: a read that could not run stales the decisions in flight, while a
+      // real mismatch invalidates permanently and needs a fresh trusted launch.
+      if (err instanceof TransientGitFailure) this.epoch++
+      else this.invalidate()
+      throw err
+    }
   }
   revalidateMolt(transition: MoltTransition, facts: PlacementFacts): AuthorityLease {
     this.suspend()

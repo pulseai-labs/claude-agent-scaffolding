@@ -122,14 +122,16 @@ export function snapshotAsk(input: unknown): AskSnapshot {
 
 /**
  * Whether redaction would change any string the frozen batch carries. The ask consumer calls this
- * before any frame capture, state build or native call: a secret in a question text, option label,
- * description or header must abstain exactly as the permission path does, rather than send the
- * batch to judgment or let it reach the operator-visible block reason.
+ * before any frame capture, state build or native call: a secret in a question's SUPPLIED ID, its
+ * text, an option label, description or header must abstain exactly as the permission path does,
+ * rather than send the batch to judgment or let it reach the operator-visible block reason. The ID
+ * is walked because it is not identity-only: it keys the native protocol IDs, the frozen state and
+ * the ledger's answers map, so a secret-bearing one persisted plaintext where no redaction ran.
  */
 export function holdsSecret(snapshot: AskSnapshot): boolean {
   const changed = (value: string): boolean => redact(value) !== value
   return snapshot.questions.some(q =>
-    changed(q.question) || (q.header !== undefined && changed(q.header))
+    changed(q.id) || changed(q.question) || (q.header !== undefined && changed(q.header))
     || q.options.some(o => changed(o.label) || (o.description !== undefined && changed(o.description))))
 }
 

@@ -710,6 +710,9 @@ describe('a batch that carries a secret abstains before any judgment', () => {
 
   const secrets: Array<[string, unknown]> = [
     ['a question text', { questions: [{ id: 'q1', question: `Which plan for ${SECRET}?`, options: [{ label: 'Plan A' }] }] }],
+    // The supplied ID is not identity-only: it keys the native protocol IDs, the frozen state and
+    // the ledger's answers map, so a secret-bearing one would persist plaintext (f06a009b's shape).
+    ['a question id', { questions: [{ id: SECRET, question: 'Which plan?', options: [{ label: 'Plan A' }] }] }],
     ['an option label', { questions: [{ id: 'q1', question: 'Which plan?', options: [{ label: `Plan ${SECRET}` }] }] }],
     ['an option description', { questions: [{ id: 'q1', question: 'Which plan?', options: [{ label: 'Plan A', description: `token ${SECRET}` }] }] }],
     ['a header', { questions: [{ id: 'q1', question: 'Which plan?', header: SECRET, options: [{ label: 'Plan A' }] }] }],
