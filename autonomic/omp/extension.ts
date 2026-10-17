@@ -371,6 +371,14 @@ export function createAutonomic(io: AutonomicIO) {
       .join(' ')
   }
 
+  // The pain row a press would submit, and the bound that keeps it whole: `painOptions` allows three
+  // options of 300 characters, and the row carries every one of them complete, exactly as the notice does.
+  function painRow(options?: ReadonlyArray<{ label: string; text: string; recommended: boolean }>): { a: string; answerMax: number } {
+    const optionsText = optionLines(options)
+    const a = optionsText === '' ? 'ask the operator' : `ask the operator; options: ${optionsText}`
+    return { a, answerMax: a.length }
+  }
+
   // A pain signal (spec §3.4): notice, bell and the pain file a launcher may name. It never resumes the run by
   // itself. Options (a turn-end pain) are listed in the notice, the bell and the pain file, numbered, recommended
   // first, each with its complete validated instruction text; a credential request is its own plain-text line
@@ -842,11 +850,11 @@ export function createAutonomic(io: AutonomicIO) {
       answers: {}, route: null, response: null, payloadSource: rendered.source, reason: verdict.reason }
     const rows = verdict.case === 'waiting'
       ? [{ kase: 'operator' as const, q: 'turn end', a: 'waiting; no continuation' }]
-      : [{ kase: verdict.case, q: verdict.question ?? 'turn end',
-        // A pain row carries the complete validated option content, exactly as the notice and pain file do.
-        a: verdict.case === 'pain' && verdict.options !== undefined
-          ? `ask the operator; options: ${optionLines(verdict.options)}`
-          : verdict.answer ?? verdict.next_step ?? 'stop' }]
+      : [verdict.case === 'pain'
+        // A pain row carries the complete validated option content, exactly as the notice and pain file
+        // do, so its own row bound is the content's own length rather than the default clamp.
+        ? { kase: 'pain' as const, q: verdict.question ?? 'turn end', ...painRow(verdict.options) }
+        : { kase: verdict.case, q: verdict.question ?? 'turn end', a: verdict.answer ?? verdict.next_step ?? 'stop' }]
     await commitDecision(decisions, frame, draft, rows)
     void id
   }

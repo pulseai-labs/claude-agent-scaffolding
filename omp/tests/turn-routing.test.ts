@@ -873,6 +873,164 @@ describe('the recorded draft evidence subset (R1)', () => {
   })
 })
 
+describe('the complete pain surface (F5/R1-R3)', () => {
+  let w: RoutingWorld
+  afterEach(() => { if (w) w.close() })
+
+  /** A pain world whose option labels and texts are carried verbatim by one real pinned material,
+   *  so every option is grounded and each surface can be compared against the same strings. */
+  function painWorld(options: Array<{ label: string; text: string; recommended: boolean }>): { w: RoutingWorld; quotes: QuoteRef[]; reason: string } {
+    const id = 'fixture-options'
+    const text = `Synthetic approved options: ${options.map(o => `${o.label}: ${o.text}`).join(' ')}`
+    const policy = fixturePolicy()
+    policy.evidence.push({ ref: { id, source: join(tmpdir(), id), sha256: digest(text), locator: 'fixture:options' }, text })
+    policy.approved.remainingSteps = [{ id: 'step-3', text: STEP, grantIds: [GRANT], evidenceIds: [id] }]
+    const world = routingWorld({ grants: [turnGrant()], policy, mode: 'autopilot', extraMaterials: [{ id, text }] })
+    const quote = { evidenceId: id, start: 0, end: text.length }
+    return { w: world, quotes: [quote], reason: `${id}: ${text}` }
+  }
+
+  test('two long option texts reach all four surfaces complete', async () => {
+    // Each text is 287 characters: together they are far past the default 300-character row bound.
+    const options = [
+      { label: 'Merge', text: `open a one-way door that cannot be undone and record it in the ledger afterwards ${'b'.repeat(206)}`, recommended: false },
+      { label: 'Hold', text: `keep the change uncommitted and rerun the focused suite before asking again ${'a'.repeat(211)}`, recommended: true },
+    ]
+    const a = options[0]!.text, b = options[1]!.text
+    expect(a.length).toBe(287)
+    expect(b.length).toBe(287)
+    const built = painWorld(options)
+    w = built.w
+    classifyAs(w, 'pain')
+    generateText(w, envelope({ case: 'pain', reason: built.reason, question: 'run the focused suite', options }, null, built.quotes))
+    expect(await w.stop('Which way?')).toBeUndefined()
+    // All four surfaces hold both complete texts: the notice, the bell text, the pain file and the row.
+    expect(w.notices.join('\n')).toContain(a)
+    expect(w.notices.join('\n')).toContain(b)
+    expect(pain(w)).toContain(a)
+    expect(pain(w)).toContain(b)
+    expect(human(w)).toContain(a)
+    expect(human(w)).toContain(b)
+    expect(human(w)).toContain(' · pain · ')
+  })
+
+  test('the recommended option is rendered first even when the input puts it second', async () => {
+    const options = [{ label: 'Merge', text: 'a one-way door that cannot be undone', recommended: false },
+      { label: 'Hold', text: 'keep the change uncommitted', recommended: true }]
+    const built = painWorld(options)
+    w = built.w
+    classifyAs(w, 'pain')
+    generateText(w, envelope({ case: 'pain', reason: built.reason, question: 'run the focused suite', options }, null, built.quotes))
+    expect(await w.stop('Which way?')).toBeUndefined()
+    // The input lists Merge first; every surface must render the recommended Hold first.
+    expect(w.notices.join('\n')).toContain('1) Hold (Recommended) — keep the change uncommitted 2) Merge — a one-way door that cannot be undone')
+    expect(human(w)).toContain('1) Hold (Recommended) — keep the change uncommitted')
+    expect(pain(w)).toContain('1) Hold (Recommended) — keep the change uncommitted')
+  })
+
+  test('an option text longer than the 40-character label bound renders complete', async () => {
+    const long = 'keep the change uncommitted and rerun the focused suite before asking again'
+    expect(long.length).toBeGreaterThan(40)
+    const options = [{ label: 'Hold', text: long, recommended: false }]
+    const built = painWorld(options)
+    w = built.w
+    classifyAs(w, 'pain')
+    generateText(w, envelope({ case: 'pain', reason: built.reason, question: 'run the focused suite', options }, null, built.quotes))
+    expect(await w.stop('Which way?')).toBeUndefined()
+    const notice = w.notices.join('\n')
+    expect(notice).toContain(`1) Hold — ${long}`)
+    // The 40-character bound applies to the label only: the instruction is never cut.
+    expect(notice).not.toContain(`${long.slice(0, 39)}…`)
+    expect(human(w)).toContain(long)
+    expect(pain(w)).toContain(long)
+  })
+})
+
+describe('every freshness check on the post-record path (R4/R5)', () => {
+  let w: RoutingWorld
+  afterEach(() => { if (w) w.close() })
+
+  /**
+   * The reachable gap the recheck proved: the authority is revoked as queued microtasks *during* an
+   * awaited step, so the revocation lands after the earlier synchronous freshness reads and before the
+   * later ones. `at` names the step the revoke is queued from ("native" = the judge call, "sidecar" and
+   * "human" = the two ledger appends); `hops` walks it across the check sequence, which is what makes
+   * each check individually observable instead of collectively masked.
+   */
+  type Chain = { block: unknown; mode: string; sidecarRows: number; humanStalledRow: boolean; pain: string }
+  async function revokeDuring(at: 'native' | 'sidecar' | 'human', hops: number): Promise<Chain> {
+    w = turnWorld(turnPolicy('stalled', STEP))
+    classifyAs(w, 'stalled')
+    const go = (n: number): void => { if (n === 0) w.revoke(); else queueMicrotask(() => go(n - 1)) }
+    w.setNative(async (request: JudgmentRequest) => { if (at === 'native') go(hops); return turnEnvelope(request, { turn_end: turnAnswer(request, 'stalled') }) })
+    w.armAppend(path => {
+      if (at === 'sidecar' && path.endsWith('.decisions.jsonl')) go(hops)
+      if (at === 'human' && !path.endsWith('.decisions.jsonl')) go(hops)
+    })
+    const block = await w.stop('Step 2 is done.')
+    const mode = (() => { try { return JSON.parse(readFileSync(`${w.root}/home/.claude/state/autonomic/sessions/S1.json`, 'utf8')).mode as string } catch { return '?' } })()
+    return { block, mode, sidecarRows: sidecar(w).length,
+      humanStalledRow: /· stalled · /.test(human(w)), pain: pain(w) }
+  }
+
+  test('the check after the native judgment refuses and never records anything', async () => {
+    // The revoke is queued from the judge call, so it lands just before the post-native check. If that
+    // check were dropped, the record path would see the stale lease and publish the manual failure
+    // state instead — the mode is the observable that separates the two.
+    const out = await revokeDuring('native', 1)
+    expect(out.block).toBeUndefined()
+    expect(out.mode).toBe('autopilot')
+    expect(out.sidecarRows).toBe(0)
+    expect(out.pain).not.toContain('decision not recorded')
+  })
+
+  test('the pre-sidecar check refuses before either ledger write', async () => {
+    // Four hops from the judge call land it after the post-native check and before the record's first
+    // check: a later drop would let the record write the sidecar row first.
+    const out = await revokeDuring('native', 4)
+    expect(out.block).toBeUndefined()
+    expect(out.sidecarRows).toBe(0)
+    expect(out.humanStalledRow).toBe(false)
+    expect(out.pain).toContain('pain')
+  })
+
+  test('the pre-human check refuses after the sidecar write and before the human row', async () => {
+    const out = await revokeDuring('sidecar', 0)
+    expect(out.block).toBeUndefined()
+    expect(out.sidecarRows).toBe(1)
+    expect(out.humanStalledRow).toBe(false)
+  })
+
+  test('the final commit check refuses after both writes, as the record path failure', async () => {
+    // The revoke lands during the human append, so the final check is the one that reads stale. If it
+    // were dropped, the extension's own post-record check would refuse instead, with its own reason.
+    const out = await revokeDuring('human', 0)
+    expect(out.block).toBeUndefined()
+    expect(out.sidecarRows).toBe(1)
+    expect(out.humanStalledRow).toBe(true)
+    expect(out.pain).toContain('decision not recorded')
+  })
+
+  test('the extension check refuses after the record is complete and returns no continuation', async () => {
+    // Four hops land the revoke after the final commit check and inside the extension's own gap: this is
+    // the input only the extension check reaches, and the one dropping it turns into a continuation.
+    const out = await revokeDuring('human', 4)
+    expect(out.block).toBeUndefined()
+    expect(out.sidecarRows).toBe(1)
+    expect(out.humanStalledRow).toBe(true)
+    expect(out.pain).toContain('authority changed before the turn could continue')
+  })
+
+  test('the whole sweep never continues on a revoked authority', async () => {
+    for (const hops of [0, 1, 2, 3, 4, 5, 6, 8]) {
+      for (const at of ['native', 'sidecar', 'human'] as const) {
+        const out = await revokeDuring(at, hops)
+        expect([at, hops, out.block === undefined]).toEqual([at, hops, true])
+      }
+    }
+  })
+})
+
 describe('the post-record freshness check (F2)', () => {
   let w: RoutingWorld
   afterEach(() => { if (w) w.close() })

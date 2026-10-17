@@ -52,13 +52,15 @@ function leaseEvidenceIds(frame: DecisionFrame, ids: readonly string[]): string[
  * after the last. On any required-write failure or timeout, publish manual/failure and never act.
  */
 export async function commitDecision(io: DecisionIO, frame: DecisionFrame, draft: DecisionDraft,
-  rows: readonly { kase: LedgerCase; q: string; a: string }[]): Promise<void> {
+  rows: readonly { kase: LedgerCase; q: string; a: string; answerMax?: number }[]): Promise<void> {
   const session = frame.host.sessionId
   try {
     const record = recordFor(frame, draft)
     const redactedReason = oneLine(draft.reason, 300 - DECISION_ID_ROOM)
     const time = new Date().toISOString()
     const humanLines = rows.map(r => ledgerLine({ time, session, kase: r.kase, q: r.q, a: r.a,
+      // A row type may carry content past the default bound (the pain row holds complete option texts).
+      ...(r.answerMax === undefined ? {} : { answerMax: r.answerMax }),
       why: `decisionId=${frame.id}; ${redactedReason}` }))
     await frame.budget.run('final', async signal => {
       const path = await io.ledgerPath()
