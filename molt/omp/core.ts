@@ -719,6 +719,8 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       const marker = markerPath(answerOf({ last_assistant_message: last }, io.branch()))
       const resolved = marker === undefined ? undefined : handoffPath(marker, io.cwd, home())
       if (resolved === undefined || !(await isReadable(resolved))) return
+      // An await sits between the first check and here: /molt off or a pause may have landed meanwhile.
+      if (off.has(id) || paused === id) return
       if (unroutable.has(id)) {
         if (!io.route()) return
         unroutable.delete(id)

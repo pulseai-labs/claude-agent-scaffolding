@@ -1062,6 +1062,16 @@ describe('a marker at a deferred settle (agent_end, willContinue)', () => {
     expect(w.seeds).toHaveLength(1)
   })
 
+  test('/molt off while the marker file is being read: no clear', async () => {
+    const { w, io, m } = world({ files: { '/h/handoff.md': '# h' } })
+    w.percent = 41
+    w.branch = marked('/h/handoff.md')
+    const read = io.readText
+    io.readText = async p => { if (p === '/h/handoff.md') await m.onCommand('off'); return read(p) }
+    await m.onAgentEnd(end(w.branch, true))
+    expect(w.seeds).toEqual([])
+  })
+
   test('a terminal settle is left to session_stop', async () => {
     const { w, m } = world({ files: { '/h/handoff.md': '# h' } })
     w.percent = 41
