@@ -5,8 +5,8 @@ All notable changes to the `molt` plugin.
 ## 0.3.4 — 2026-10-17
 
 - **OMP: the status meter follows the window** (#842). After a clear-and-seed, molt's status line kept the old
-  session's percent (`molt 40%/65%` beside OMP's own 17%). The meter was drawn only at `session_stop` and
-  `agent_end`, and omp defers or skips `session_stop` while a background job or a todo continuation is pending. Now
+  session's percent (`molt 40%/65%` beside OMP's own 17%). The meter was redrawn with a fresh reading only at
+  `session_stop` and `agent_end`, and omp defers or skips `session_stop` while a background job or a todo continuation is pending. Now
   every reading redraws the meter, and a new window (a clear-and-seed, a session switch, a compaction) shows `molt`
   until its first reading.
 
