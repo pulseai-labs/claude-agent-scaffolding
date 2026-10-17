@@ -8,7 +8,7 @@ import { FALLBACK_BRIEF_MS, createMolt } from './core'
 import type { MoltIO } from './core'
 import { logPath } from '../hooks/records'
 
-export { FALLBACK_BRIEF_MS, claudeShape, claudeShapes, createMolt, messagesOf } from './core'
+export { FALLBACK_BRIEF_MS, JOBS_CANCELLED, claudeShape, claudeShapes, createMolt, messagesOf } from './core'
 export type { ClearResult, MoltIO, Shape } from './core'
 
 // omp's real ctx behind MoltIO. Each handler points `cur` at the event's ctx first; the saved command ctx is
@@ -27,6 +27,7 @@ function ioFor(pi: any, cur: () => any, route: () => any): MoltIO {
     remove: async path => { rmSync(path, { force: true }) },
     appendLog: async line => { const path = logPath(env.HOME ?? ''); mkdirSync(dirname(path), { recursive: true }); appendFileSync(path, `${line}\n`) },
     steer: text => { pi.sendMessage(text, { deliverAs: 'steer' }) },
+    aside: text => { pi.sendMessage(text, { deliverAs: 'aside' }) },
     warnNext: text => { pi.sendMessage(text, { deliverAs: 'nextTurn' }) },
     status: text => { cur().ui?.setStatus?.('molt', text) },
     notify: (text, tone) => { cur().ui?.notify?.(text, tone === 'warn' ? 'warning' : 'info') },
@@ -96,4 +97,6 @@ export default function (pi: any) {
     return molt.onToolResult(e)
   })
   pi.on('session_stop', (e: any, c: any) => main(c) ? molt.onSessionStop(e) : undefined)
+  // omp does not await agent_end handlers, so a clear started here cannot hold the agent loop (#855).
+  pi.on('agent_end', (e: any, c: any) => main(c) ? molt.onAgentEnd(e) : undefined)
 }

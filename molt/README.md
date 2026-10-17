@@ -216,6 +216,10 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
 - A root session is cleared with `newSession()` and seeded with the handoff. The first operator prompt is rewritten to an internal
   `/molt-arm` command, which saves the command context that can clear; measured for two cycles in rpc mode. A child
   (`MOLT_HANDOFF=parent`) appends its `warned` and `handed-off` lines to `MOLT_STATUS_PATH` and is never cleared.
+- omp defers `session_stop` while a background job is pending and skips it for a todo or compaction continuation (#855), so
+  molt also reads the marker at `agent_end` when the settle will continue: from the first warning on, a readable marker molts at
+  once. `newSession()` cancels every background job the old session owned, and the seed's last line tells the resumed session to
+  re-arm what its handoff lists. `/molt now` sends the instruction as an `aside`, which starts a turn on an idle session.
 - There is no manifest UI on OMP: `~/.omp/agent/molt.json` holds the same keys as the settings table below, and a file that is not valid
   JSON falls back to the defaults with a notice. The state files (`~/.claude/state/molt/`) are the ones `autonomic` reads.
 - Past the block threshold only `write`, `edit`, `apply_patch`, `ast_edit`, a `skill://` read and `git add` / `git commit` run.

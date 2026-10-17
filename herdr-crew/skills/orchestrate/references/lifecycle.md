@@ -373,13 +373,15 @@ operator question you are holding. Start no dispatch after it; a wake or message
 you after it is added to it verbatim, never acted on, and end that reply with
 `MOLT-HANDOFF: <path>`. molt runs `/clear` in this pane and seeds the fresh session with the
 handoff. There is no stand-down and no successor launch: the pane, its `HERDR_PANE_ID`, its
-seat marking (`herdr-mechanics.md` step 2, "A molt is not a launch") and every armed wait
+seat marking (`herdr-mechanics.md` step 2, "A molt is not a launch") and, on Claude Code, every armed wait
 survive the clear, and every worker's ping still reaches this pane, which `run.orchestrator` still names. The resumed top
 reads the handoff and confirms `run.orchestrator` names its own `$HERDR_PANE_ID`, rewriting it
-only where it does not; it always rewrites `run.orchestrator.session` (step 1), since molt's `/clear` starts a new session in this pane. It arms no wait and no heartbeat the handoff lists: they keep running,
+only where it does not; it always rewrites `run.orchestrator.session` (step 1), since molt's `/clear` starts a new session in this pane. On Claude Code it arms no wait and no heartbeat the handoff lists: they keep running,
 and their notifications are its own. A heartbeat tick the handoff carries means that heartbeat
 has ended: the resumed top arms a fresh one. It runs the generation check once per live
 dispatch against the attempt's `locator.seen`, a carried wake included, so a report
 that landed across the clear is acted on once and retires its listed wait by id; the later
-notification for that generation retires nothing. With `/molt off` the marker goes, the hook
+notification for that generation retires nothing. On OMP the clear cancels every background job the old session
+ran, and molt's seed says so (#855): after that check the resumed top re-arms the wait of each dispatch still live
+and one fresh heartbeat; there is no listed wait left to retire. With `/molt off` the marker goes, the hook
 speaks again, and the rotation above applies.

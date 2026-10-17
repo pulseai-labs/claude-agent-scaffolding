@@ -187,6 +187,7 @@ export type MoltIO = {
   remove(path: string): Promise<void>
   appendLog(line: string): Promise<void>
   steer(text: string): void                            // pi.sendMessage(text, { deliverAs: 'steer' })
+  aside(text: string): void                            // pi.sendMessage(text, { deliverAs: 'aside' }): starts a turn when idle
   warnNext(text: string): void                         // pi.sendMessage(text, { deliverAs: 'nextTurn' })
   status(text: string): void
   notify(text: string, tone: 'info' | 'warn'): void
@@ -236,6 +237,13 @@ export function messagesOf(branch: readonly unknown[]): Message[] {
   }
   return out
 }
+
+// omp cancels a session's background jobs when it clears it (newSession → #cancelOwnAsyncJobs), so the seeded session
+// is told to re-arm what its handoff lists (#855).
+export const JOBS_CANCELLED = 'omp cancelled every background job this session had running when it cleared: re-arm each wait and heartbeat the handoff lists before you continue.'
+// /molt now below the threshold: the instruction's lead names the operator, not a threshold the fill has not reached.
+const PAST_LEAD = "Context is at {{percent}}% of the window, past molt's handoff threshold ({{command}}%)."
+const OPERATOR_LEAD = 'Context is at {{percent}}% of the window, and the operator asked for a handoff now.'
 
 // The reply the session stopped on: the event's own field, else the last assistant message of the branch.
 function answerOf(e: { last_assistant_message?: unknown }, branch: readonly unknown[]): string {
@@ -351,7 +359,10 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       percent: Math.round(lastPercent ?? t.command), command: Math.round(t.command), block: Math.round(t.block),
       soft: Math.round(t.command), hard: Math.round(t.block),   // 0.1.0 template names
     }
-    const text = `${fill(await template(cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS), values)}\n\n${io.isChild ? CHILD_NOTE : ROOT_NOTE}`
+    let body = fill(await template(cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS), values)
+    const past = fill(PAST_LEAD, values)
+    if (forced.has(id) && (lastPercent ?? 0) < t.command && body.startsWith(past)) body = fill(OPERATOR_LEAD, values) + body.slice(past.length)
+    const text = `${body}\n\n${io.isChild ? CHILD_NOTE : ROOT_NOTE}`
     return atLeast(stage, 'block') ? `${text}\n\n${fill(BLOCK_NOTE, values)}` : text
   }
 
@@ -455,7 +466,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       const seed = await template(cfg.seedTemplate, DEFAULT_SEED)
       if (signal?.aborted) { pending = undefined; inFlight = false; return }
       // session_switch fires inside this call and consumes `pending`.
-      result = await io.newSessionAndSeed(fill(seed, { path: handoff.path }))
+      result = await io.newSessionAndSeed(`${fill(seed, { path: handoff.path })}\n\n${JOBS_CANCELLED}`)
     } catch (err) {
       await log(`clear rejected session=${id} ${String(err)}`)
     }
@@ -689,6 +700,35 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     return undefined
   }
 
+  // omp defers session_stop while a background job is pending, and skips it for a todo or compaction continuation;
+  // agent_end still fires, with willContinue (#855). A readable marker there is the session's own request: molt at
+  // once, since a clear cancels pending jobs anyway. No block and no fallback here: a terminal settle reaches
+  // session_stop, which keeps both.
+  async function onAgentEnd(e: { messages?: readonly unknown[]; willContinue?: boolean } = {}): Promise<void> {
+    if (e.willContinue !== true) return
+    await load()
+    const id = io.sessionId()
+    try {
+      if (off.has(id) || inFlight || paused === id || handedOff.has(id)) return
+      await measure(id)
+      showStatus(id)
+      if (!atLeast(stage, 'warn')) return
+      const last = [...(e.messages ?? [])].reverse().find(x => (x as { role?: unknown })?.role === 'assistant')
+      const marker = markerPath(answerOf({ last_assistant_message: last }, io.branch()))
+      const resolved = marker === undefined ? undefined : handoffPath(marker, io.cwd, home())
+      if (resolved === undefined || !(await isReadable(resolved))) return
+      if (unroutable.has(id)) {
+        if (!io.route()) return
+        unroutable.delete(id)
+      }
+      const handoff: Handoff = { path: resolved, source: 'marker' }
+      if (io.isChild) await handOff(id, handoff)
+      else await molt(id, handoff)
+    } catch (err) {
+      await log(`agent_end error ${String(err)}`)
+    }
+  }
+
   async function status(id: string): Promise<string> {
     const t = thresholds(id)
     const record = parseAutonomic(await io.readText(autonomicPath(home(), id)))
@@ -727,12 +767,12 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       await touchActive(id)
       forced.add(id)
       await measure(id)
-      io.steer(await instruction(id))
+      io.aside(await instruction(id))
       return 'molt: the handoff request is sent. The session acts on it at its next step.'
     }
     if (arg === 'status') return status(id)
     return COMMAND_USAGE
   }
 
-  return { onSessionStart, onSessionSwitch, onSessionCompact, onSessionShutdown, onInput, onToolCall, onToolResult, onSessionStop, onCommand }
+  return { onSessionStart, onSessionSwitch, onSessionCompact, onSessionShutdown, onInput, onToolCall, onToolResult, onSessionStop, onAgentEnd, onCommand }
 }

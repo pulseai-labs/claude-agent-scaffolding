@@ -2380,7 +2380,10 @@ pin "$LIFECYCLE_MD" 'add to it the id of every background task you have running'
 pin "$LIFECYCLE_MD" 'a wake or message that reaches you after it is added to it verbatim, never acted on' \
   "lifecycle: a wake after the top's handoff is handed over (Review Focus 5)" flat
 pin "$LIFECYCLE_MD" 'There is no stand-down and no successor launch' "lifecycle: the molt path launches nothing (#669)" flat
-pin "$LIFECYCLE_MD" 'It arms no wait and no heartbeat the handoff lists' "lifecycle: the resumed top re-arms nothing listed (#669)" flat
+pin "$LIFECYCLE_MD" 'On Claude Code it arms no wait and no heartbeat the handoff lists' "lifecycle: the resumed top re-arms nothing listed on Claude Code (#669, #855)" flat
+pin "$LIFECYCLE_MD" 'and, on Claude Code, every armed wait survive the clear' "lifecycle: waits survive a molt on Claude Code only (#855)" flat
+pin "$LIFECYCLE_MD" 'On OMP the clear cancels every background job the old session ran' "lifecycle: an OMP molt cancels the old session's jobs (#855)" flat
+pin "$LIFECYCLE_MD" 'the resumed top re-arms the wait of each dispatch still live and one fresh heartbeat' "lifecycle: a top resumed on OMP re-arms its live waits and a heartbeat (#855)" flat
 pin "$LIFECYCLE_MD" 'A heartbeat tick the handoff carries means that heartbeat has ended' \
   "lifecycle: a carried tick re-arms the heartbeat (#669)" flat
 # Retired the handoff hash/identity pin: run.json now holds locator.seen (ruling 12).
