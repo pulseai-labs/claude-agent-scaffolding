@@ -15,9 +15,10 @@
 # Comment lines here say "the old name" rather than writing it: this file is scanned by its
 # own check 3, so a literal mention in prose is a hit that can never be cleared.
 #
-# Task 7 owns the trees this gate still reports (omp-roles, omp/tests, seat-mods, molt,
-# autonomic, ossify): Task 1's non-goal, so each hit is listed and the gate stays red until
-# Task 7 lands. Failing with that list is the expected state at the end of Task 1.
+# What the gate holds now: all three facts pass on the shipped tree, and a reintroduction of
+# any of them — the directory back under the old name, a catalog entry for it, or one
+# reference in a tracked file outside the two sanctioned survivors above — fails here. No
+# part of it is left to a later task. CI runs this file beside the crew parity pins.
 #
 # A checkout is the premise of all three facts, and the guard before them fails loudly on a
 # tree that is not one — see its own comment.
