@@ -17,7 +17,7 @@ The seat names below are examples: the project file (`.crew/roles.md`,
 | Operator | the human — the merge word, and decisions no session can own | | | |
 
 Herdr's own answer decides a seat's wait path, so where the project file offers a choice,
-prefer an agent herdr detects (a `claude-*` lane, `pi`) for the implementer and
+prefer an agent the layer detects (a `claude-*` lane, `pi`) for the implementer and
 verifier roles: the typed wait then covers a live state instead of the report file alone. An
 undetected seat stays legal — it is waited on through its report file and pings like any
 other — and no profile field declares the path: detection is read live at launch.
@@ -29,31 +29,45 @@ machine file; run-time surfaces carry the name only, and a name neither file def
 halts the run. **Both files must exist before this sequence is run**: a seat's role
 resolves through the project file and its launch command through the machine file, so
 with either absent there is nothing to resolve — that state is `config.md`'s, its
-"When a file is missing", not a decision this sequence makes. No single herdr
-call creates a seat, launches its command and delivers its brief, so the launch is this
-sequence (take exact flag syntax from `herdr --skill`):
+"When a file is missing", not a decision this sequence makes. The launch is this sequence
+of the layer's steps, and only the layer's file holds their commands and flags:
 
-```bash
-herdr workspace create --cwd <path> --label "run: <objective>"   # once per run, not per seat
-herdr tab create --workspace <id> --cwd <path> --label "seat: <role> (<agent>)"
-herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"   # implementer, verifier or reviewer seat only, before its command; herdr-mechanics.md step 2
-herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"   # a coordinator seat only — the spine, close or work-PR session, a `/ossify:doctor` session, the lane driver — before its command, with no SEAT_MODS_ALLOW except for an OMP coordinator (config.md), which adds each hosting repo's .worktrees root (colon-separated roots); herdr-mechanics.md step 2
-# both exports add AUTONOMIC_MODE=autopilot only when the launcher is in autopilot; <ledger> absolute, one per run — herdr-mechanics.md step 2
-herdr pane run <pane> "<command:>"
-herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>
-herdr pane read <pane>                      # confirm expected_model: before dispatch
-herdr agent prompt <pane> "<brief>" --wait --until working --until blocked --timeout <ms>
-```
+1. **Run workspace** — the run's workspace, once per run per server that hosts a seat.
+2. **Seat worktree** — the seat's tab, and a new worktree where the seat needs one.
+3. **Seat launch** — the tab's pane, the launch environment below, and the seat's command.
+4. **Readiness** — the wait the pane's kind takes.
+5. **Read** — the model read that confirms `expected_model:`.
+6. **Send** — the brief, as `brief_delivery` says.
 
-`references/herdr-mechanics.md` holds the full sequence and the flags this block leaves
-out. The first seat takes the workspace's own tab rather than a new one; a seat that
-needs a new worktree opens it with `herdr worktree create`, whose options are in its
-`--help`; a seat herdr does not detect has its readiness read from its screen and is sent
-its brief through the pane, never with an `agent` command. This file states only the role table
-and retention.
-Acceptance of input is not the start of a turn: that send's `--wait` confirms the turn
-started in the same call, and `herdr-mechanics.md`'s `agent_prompt_stalled` bullet says
-what to do when it did not. A wrong model is a failed launch: release the seat and report
+**The launch environment.** `Seat marking` writes these into the seat's pane, before the
+seat's command; every layer sets the same names and meanings, because the mods read them and
+never ask which layer set them:
+
+- `SEAT_MODS_ROLE` — the seat's role: `implementer`, `verifier` or `reviewer` for a guarded
+  seat, `coordinator` for a coordinator seat, `orchestrator` for the top's rotation successor.
+  A project-file role whose `replaces:` names a guarded role is guarded as that role; one with
+  no `replaces:` is a guarded `implementer`.
+- `SEAT_MODS_ALLOW` — the colon-separated paths a guarded seat may write: its report directory
+  and its scratch directory. A coordinator takes none, except an OMP coordinator (`config.md`),
+  which adds each hosting repo's `.worktrees` root.
+- `MOLT_HANDOFF=parent` and `MOLT_STATUS_PATH=<REPORT_PATH>.molt-status` — every child seat,
+  every coordinator seat and every operator-declared role, so molt never clears it and hands
+  off to its parent; the operator's first top and the top's rotation successor are roots and
+  take neither.
+- `AUTONOMIC_LEDGER` and `AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain` — the run's one
+  ledger, an **absolute** path outside every worktree, and the seat's pain file; the top's
+  successor takes `AUTONOMIC_LEDGER` and no pain path, since it has no parent.
+- `AUTONOMIC_MODE=autopilot` — only when the launcher is itself in autopilot.
+
+The scratch directory, created first, is `<run dir>/scratch/<role>-<n>` — `<run dir>` the
+directory holding the run's `run.json`, outside every worktree — with no `:` or space in either
+directory, as `:` separates the list. An ossify implementer's list adds its handoff's directory;
+a brief with scratch work names it `SCRATCH_DIR`. The layer file says how its own launch sets
+all of this, and what its model read also checks.
+
+This file states only the role table and retention. Acceptance of input is not the start of a
+turn: the send's own check confirms the turn started in the same call, and the layer's Send
+says what to do when it did not. A wrong model is a failed launch: release the seat and report
 it. Every brief also asks the worker to state its model in its first reply — the second
 check, and the worker's own: one that finds its model is not `SEAT_EXPECTED_MODEL` reports
 a failed launch in its report file and stops, rather than working around it.
@@ -63,15 +77,15 @@ a failed launch in its report file and stops, rather than working around it.
 **Enrolled OMP override:** retention preserves a pane/artifact lineage, not permission to hot-enroll its running agent. A materially new task ends the process and takes fresh trusted issuance/launch. A correction or re-check may reuse only the same assignment and unchanged approval/grants/lifetime. All role profiles remain ceilings, never grants; operator-owned merge/design/plan gates and seat-mods denials win. Completion/revocation invalidates old authority. Generic switch or an in-place Molt without independently distinguishable public ownership evidence remains suspended and needs fresh trusted launch; parent-handback children end their unit. The legacy/Claude Code retention paragraphs below are unchanged.
 
 The session that built the PR fixes the PR, and an implementer is retained across
-consecutive work items. herdr has no ownership transfer: retain a seat by keeping its
-pane and sending it the next task's brief (`herdr-mechanics.md` says how). At each task
+consecutive work items. No ownership transfer exists: retain a seat by keeping its
+pane and sending it the next task's brief (`layers/herdr.md` says how). At each task
 boundary the context probe is `/context`, for a seat whose profile can run a local slash
 command (`can: slash-commands`, `config.md`): send it and read the one reply with
-`herdr pane read <pane>` — the orchestrator's one context source: past half its window, as
+the model read (the layer's Read) — the orchestrator's one context source: past half its window, as
 `/context` reports, or an auto-compact, the next item goes to a fresh implementer. That
 probe is the mechanism for the seats that can answer it, and a seat is sent one only when
 both hold: its profile can run a local slash command, and the send route that reaches it —
-the second detection ask's answer (`herdr-mechanics.md`) — carries one. A seat failing
+the second detection ask's answer (`layers/herdr.md`) — carries one. A seat failing
 either condition — a profile without the capability, or a pane that ask finds undetected —
 is never sent the probe, and rotates at its item boundary instead, on the run's own record:
 the item it has just finished, not a probe it cannot answer. The
@@ -79,11 +93,11 @@ implementer returns its handoff inputs in its report file; the orchestrator writ
 handoff into the next brief. Rotation happens between work items, never mid-PR: the
 retained implementer finishes the PR's fix rounds unless the harness auto-compacts or molt
 warns it: a warned seat gets no new unit, and its next one goes to a fresh seat
-(`herdr-mechanics.md`, "A child past molt's warnings").
+(`layers/herdr.md`, "A child past molt's warnings").
 The reviewer owns nothing durable and is released the moment its report file is
 processed; the verifier seat is retained across a fail-and-fix cycle on the same item
 — the re-check attaches its task to the same verifier — and is released only when the
-item passes or goes to the operator. A seat is released as `herdr-mechanics.md`'s
+item passes or goes to the operator. A seat is released as `layers/herdr.md`'s
 Teardown says — the same place that states the source repository's workspace a worktree
 seat leaves open, which the run did not create and does not close — and
 the run's own workspace closes last. Read each receipt rather than assuming it succeeded.
@@ -98,12 +112,12 @@ model is confirmed as the row's `model_shows` says and by the worker's own check
 as *The launch* requires; and each item gets a
 **fresh** pair, retained across that item's corrections and released when it closes or
 escalates. A pair never crosses work items there. The session that launches the seat
-marks it in the pane, before its command, as `herdr-mechanics.md` step 2 states.
+marks it in the pane, before its command, as the layer's `Seat marking` states.
 
 Everything else on this page — the class routing, the retention rule, the placement
 and writer rules, and the budget below — is unchanged and still governs every session
 outside such a spine. The spine session itself is launched **from the `spine session` seat the project file names**
-for that spine — marked `coordinator` before its command (`herdr-mechanics.md` step 2) —
+for that spine — marked `coordinator` before its command (the layer's `Seat marking`) —
 so the generic lane-driver policy does not select it.
 
 ## Session budget
@@ -127,7 +141,7 @@ the spine session, one per spine; a close
 session, a fresh tab and pane per close dispatch; a work-PR session, one per returned
 PR — each launched from its own seat in the project file (`spine session`,
 `close session`, `work-PR session`), marked `coordinator` before its command
-(`herdr-mechanics.md` step 2), the model confirmed as its profile's
+(the layer's `Seat marking`), the model confirmed as its profile's
 `model_shows` says and by the worker's own check, as an item row's is — and a close-review writer,
 one per affected hosting repo at a `halted: close-review`, launched from the profile the operator
 names at that halt (`ossify-close-writer.md`), never a seat the file pre-defines.** The
@@ -139,7 +153,7 @@ implementer is retained into a spine PR: every item pair was released at its ite
 close. None of these seats exists anywhere else. A `doctor session` — one fresh
 tab and pane per `/ossify:doctor` dispatch, released on return — sits outside the
 budget too, launched from the project-file seat of the same name, marked `coordinator`
-before its command (`herdr-mechanics.md` step 2).
+before its command (the layer's `Seat marking`).
 
 ## Placement
 

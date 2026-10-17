@@ -11,7 +11,7 @@ threads to zero, and the merge waits for the operator's word.
 
 Every herdr command's syntax comes from `herdr --skill`, the binary's own
 version-matched guide. This plugin states what a seat is and who does what; it does not
-re-type the guide. `skills/orchestrate/references/herdr-mechanics.md` is the one file
+re-type the guide. `skills/orchestrate/references/layers/herdr.md` is the one file
 that records the mechanics the guide cannot state or defaults differently — the launch,
 the two readiness paths, the send and its turn-start check, the waits, completion,
 placement, teardown, and machines — and it wins where the two differ.
@@ -31,7 +31,7 @@ For enrolled OMP, operator merge acknowledgment and spec/design/plan/release gat
 | Surface | What it carries |
 |---|---|
 | `orchestrate` (the skill) | The orchestrator session's playbook: the delegation floor and its decidable test, the role list, the run by reference, the briefs, the ossify seam, and the refusals. |
-| `references/herdr-mechanics.md` | The mechanics `herdr --skill` cannot state: the seat launch and its placement, the two readiness paths, the typed wait, the turn-start check on a send, the report-file doorbell, the worker ping and its one-generation consumption rule, the heartbeat backstop, teardown, and machines. It overrides the guide's default placement. |
+| `references/layers/herdr.md` | The mechanics `herdr --skill` cannot state: the seat launch and its placement, the two readiness paths, the typed wait, the turn-start check on a send, the report-file doorbell, the worker ping and its one-generation consumption rule, the heartbeat backstop, teardown, and machines. It overrides the guide's default placement. |
 | `references/roles.md` | The role table and the seats that fill it, the launch sequence, retention, the session budget, placement for the dual-repo case, and the writers rules. |
 | `references/lifecycle.md` | The thirteen-step run, the operator's own roles and the named points they run at, and rotation past the context ceiling. |
 | `references/config.md` | The operator's two files, the agent entries and their fields, the resolved profile and where each value travels, the project file's three sections, and what happens when a file is missing. |
@@ -117,7 +117,7 @@ stays in the pane the operator launched it in, and crew does not move it.
 ## Seat marking
 
 Every launch that places a seat in a herdr pane marks it, in the pane, before the command
-(`references/herdr-mechanics.md`, step 2): an implementer, verifier or reviewer seat is
+(the layer's `Seat marking`): an implementer, verifier or reviewer seat is
 marked with its role and `SEAT_MODS_ALLOW`; a coordinator seat — the spine, close or work-PR
 session, the doctor session, the lane driver — with `SEAT_MODS_ROLE=coordinator`; and
 the top's rotation successor with `SEAT_MODS_ROLE=orchestrator`. The two free roles
@@ -184,23 +184,23 @@ traffic out of the top's.
 
 ## Context ceiling
 
-One fail-open hook, gated on `HERDR_PANE_ID`, tells a seat in a herdr pane its own context
+One fail-open hook, gated on the layer's Identity, tells a seat in a pane its own context
 figure once it reaches the `context_ceiling` setting (default 500000 tokens): finish the
 unit in hand and start no new one, and a coordinator seat rotates at the next boundary. It
-never allows, denies or asks, it is inert outside a herdr pane, and it reports the figure as
+never allows, denies or asks, it is inert outside a seat's pane, and it reports the figure as
 unavailable rather than guessing when it cannot read it. The rotation itself is prose, in
 `references/lifecycle.md`. Since 0.2.6 the hook is silent in a session where the `molt` mod
-is active, because `molt` owns the context boundary there. Since 0.2.8, every child seat in a herdr pane is
+is active, because `molt` owns the context boundary there. Since 0.2.8, every child seat is
 launched as a molt child (`MOLT_HANDOFF=parent`): at molt's warnings it pings its parent and
 hands off at its next boundary, and molt never clears it; only the top molts in place
 (`references/lifecycle.md`, "Where molt runs"). Install molt 0.2.0 and crew 0.2.8
 together. Since 0.2.9, the same launch export carries `autonomic`'s three variables: every
 Claude Code child (autonomic is a Claude Code mod) writes the run's one ledger and its own pain file beside its report, and runs in
-autopilot only when its launcher does (`references/herdr-mechanics.md` step 2). Since 0.2.10, the
+autopilot only when its launcher does (the layer's `Seat marking`). Since 0.2.10, the
 launcher's mode is autonomic's live `AUTONOMIC_EFFECTIVE_MODE`, never its record file, which can be
 stale after a failed write. Since 0.2.11, the suite `tests/test-launch-site-marking.sh` selects the launch
 shapes its own header lists and fails a selected site whose own paragraph or list item
-carries no seat-mods marking clause (`herdr-mechanics.md` step 2); the shapes it does not select are named under
+carries no seat-mods marking clause (the layer's `Seat marking`); the shapes it does not select are named under
 NOT COVERED in that header. Test tooling only — no shipped behaviour changes. That hook is the only deterministic code a run executes: a run
 has **no `lib/`, no state directory, no parser** — `agents.md` and `roles.md` are read as
 prose and nothing parses them. The suites and the eval harness under `tests/` are
@@ -223,9 +223,11 @@ has one fixed path.
 
 ## Requirements
 
-- herdr 0.9.1 or later, running — **and the orchestrator session itself running inside one
-  of its panes**: the context-ceiling hook is gated on `HERDR_PANE_ID`, and every seat is
-  placed relative to the pane the operator launched this session in.
+- The project's layer running, and the orchestrator session itself running inside one of
+  its seats: the layer's Health step is the check (`references/layers/herdr.md`, Health, for
+  herdr 0.9.1+), and its Identity step gives this session the address the context-ceiling hook
+  reads (`references/layers/herdr.md`, Identity), because every seat is
+  placed relative to the seat the operator launched this session in.
 - The **`herdr-dagr`** plugin's `dagr` binary on PATH, to create and lint the run's
   `run.json`: dagr's producer contract resolves that validator *before* anything is
   written, and with none available the run starts no run file — not an unvalidated one.

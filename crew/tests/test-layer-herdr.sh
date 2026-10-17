@@ -10,13 +10,13 @@
 # wrappers (#514, L1): `grep -c` counts LINES, and `… | grep -q` can fail on a
 # true match under pipefail.
 #
-# Usage: bash crew/tests/test-herdr-mechanics.sh
+# Usage: bash crew/tests/test-layer-herdr.sh
 # Deps:  bash 3.2+, awk.
 
 set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-REF="$PLUGIN_ROOT/skills/orchestrate/references/herdr-mechanics.md"
+REF="$PLUGIN_ROOT/skills/orchestrate/references/layers/herdr.md"
 LIFE="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 # 235, raised from 204 during T3 (2026-09-22): the pilot measured eight mechanics the file
 # had wrong or missing — the two detection events, the worktree path's workspace label and
@@ -66,7 +66,7 @@ LIFE="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=389  # 2026-10-17: +4 lines for PR #860's enrolled-OMP authority paragraphs (trusted issuance CLI, allowance non-overlap, fresh-process lifecycle, operator precedence); 0.2.20: +15 lines for #651 B (a companion timeout lapses silently, and every timeout-is-a-checkpoint site says so) and D (the heartbeat's stall rule: settle first, no fallback for a seat a fresh session cannot resume); 0.2.19: +10 lines for "Host: OMP" (spec D); 2026-10-15: 0.2.18: +3 lines for the OMP mode-file read; adjacent over-budget control retained. 0.2.13: lowered from 360 when the dsh carve-out left step 2 and the heartbeat. 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
+REF_BUDGET=422  # 2026-10-17: crew 0.3.0 Task 3 — the file is the herdr layer now: the same text re-headed into the thirteen steps, plus the five step sections the shared files no longer state (Health, Identity, Run workspace, Seat worktree, Read).
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -77,10 +77,10 @@ REF_BUDGET=389  # 2026-10-17: +4 lines for PR #860's enrolled-OMP authority para
 # of the squeezed-line counter had already diverged between this suite and the
 # ossify one. What is left here is this suite's own: nothing.
 
-printf '%screw herdr mechanics contract%s\n\n' "$DIM" "$RST"
+printf '%screw herdr layer contract%s\n\n' "$DIM" "$RST"
 
 if [ ! -f "$REF" ]; then
-  fail "herdr-mechanics.md exists" "no such file"
+  fail "layers/herdr.md exists" "no such file"
   report; exit $?
 fi
 
@@ -267,7 +267,7 @@ pin "$REF" 'it is never a failed task' "a pain line is an ask, not a failure" fl
 pin "$REF" 'seat-mods refuses the call before autonomic sees it' "a seat-mods deny rings no pain of its own (F7)" flat
 
 section "OMP top (0.2.19)"
-pin "$REF" '## Host: OMP' "herdr-mechanics carries the OMP host mapping"
+pin "$REF" '## Host: OMP' "the layer file carries the OMP host mapping"
 pin "$REF" 'crew'"'"'s `hooks.json` does not run on omp' "the ceiling notice on omp comes from molt" flat
 pin "$LIFE" 'a launch command for each host' "the rotation handoff records both hosts' launch commands"
 pin "$LIFE" 'a resolved profile beside a launch command for each host' "the rotation handoff records each host's resolved profile"
@@ -283,8 +283,8 @@ pin "$REF" '0 disables it), so herdr'"'"'s `--timeout` bounds the wait' "OMP: ti
 
 section "budget"
 n="$(wc -l < "$REF" | tr -d ' ')"
-if within_budget "$REF"; then pass "herdr-mechanics.md within the reference budget ($n lines)"
-else fail "herdr-mechanics.md within the reference budget" "$n lines, over by $((n - REF_BUDGET))"; fi
+if within_budget "$REF"; then pass "layers/herdr.md within the reference budget ($n lines)"
+else fail "layers/herdr.md within the reference budget" "$n lines, over by $((n - REF_BUDGET))"; fi
 # Adjacent control (#651, fix round 1 N4): the fixture is one line longer than the REAL
 # reference file and the SAME predicate must refuse it. A REF_BUDGET-derived fixture
 # cannot see the constant move — raise REF_BUDGET and budget+1 scales with it, leaving the
@@ -304,8 +304,8 @@ hits=0
 for needle in claude-glm claude-glm-flash claude-sol glm-5.3 Fable; do
   hits=$((hits + $(occurrences "$REF" "$needle")))
 done
-if [ "$hits" -eq 0 ]; then pass "no personal name in herdr-mechanics.md"
-else fail "no personal name in herdr-mechanics.md" "$hits occurrence(s)"; fi
+if [ "$hits" -eq 0 ]; then pass "no personal name in layers/herdr.md"
+else fail "no personal name in layers/herdr.md" "$hits occurrence(s)"; fi
 
 # #514, L1: the shape, asserted rather than assumed — a counter re-copied into any
 # suite shadows the hoisted one and keeps passing.

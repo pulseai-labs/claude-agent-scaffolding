@@ -9,17 +9,16 @@ description: The orchestrator/worker session model over herdr — one orchestrat
 
 You are the orchestrator session. Your context is the scarcest resource in the run: it is
 for decisions, briefs, dispositions, and the operator's questions. Every other kind of
-work goes to a herdr worker session launched by seat name.
+work goes to a worker seat launched by seat name through the project's layer.
 
 Which layer drives those seats is the project file's own line — `layer: herdr` or `layer: orca` — and
 that layer's file, `references/layers/<layer>.md`, is where its commands live: load it before your
 first launch, and read no other layer's file.
 
-Your first herdr command is `herdr --skill`; take every command's syntax from that guide,
-not from this skill. `references/herdr-mechanics.md` states once what that guide cannot
-express or sets a default for that crew overrides: the seat launch and placement
-(one tab per seat, never the guide's default split), the readiness and completion waits,
-how a seat is sent a message, teardown, and machines. Where the two differ, that file
+Every command's syntax comes from that layer's own guide; `references/layers/<layer>.md` states once
+what the guide cannot express or sets a default for that crew overrides: the run's workspace, the
+seat's worktree and tab, the launch and its marking, readiness, the model read, the send, the typed
+wait, how a seat signals completion, teardown, and machines. Where the two differ, that file
 wins. Everything else here says what to do, and the guide says how to type it.
 
 If you were invoked with an objective, bind or create the run's `run.json` for it, then follow
@@ -31,7 +30,7 @@ for the objective in one line. Do not start probing first.
 Your own turns take these kinds of action, and no others:
 
 1. Probe live state with single commands: `git status`, `gh pr view`,
-   the run's `run.json` (and its `dagr check --strict` lint), `herdr status`.
+   the run's `run.json` (and its `dagr check --strict` lint), and the layer's health check.
 2. Write briefs from the templates in `references/briefs.md`, `references/ossify-briefs.md`,
    `references/ossify-pr-briefs.md` and `references/ossify-close-writer.md`, dispositions,
    the handoff, and — on an activated
@@ -58,31 +57,27 @@ correction session is never created.
 Three consequences:
 
 - **No `Agent` tool from the orchestrator.** Subagents spend orchestrator-tier tokens and
-  leave no herdr provenance. Every helper is a herdr session.
-- **`herdr pane read` only on a `blocked` wake, a missing or malformed report, a
-  timeout's checkpoint, the false wake's own read, or the heartbeat tick's one check per
-  live seat (`herdr agent get` where herdr holds a record, else one `herdr pane read`)**,
-  never to watch progress. A single bounded `herdr agent wait`, on
-  the state set `references/herdr-mechanics.md` states and always with a `--timeout`, is
-  the wait primitive for a detected seat that is not a coordinator, over a typed state
-  (`idle｜working｜blocked｜done｜unknown`); a seat herdr does not detect, and a coordinator
-  seat, wait on their report files instead, with no keepalive and no re-entry — the run's
-  ping and its heartbeat are neither: the ping is a wake the worker sends, and the
-  heartbeat is a session-level timer over every live herdr-pane dispatch, typed-wait seats
-  included. The two dead
-  ends — a timeout, and a wake with nothing new in the report while the seat still works —
-  are that file's, and it names the next action for each. A loop of waits, and restarting a
-  wait after an empty timeout, stays forbidden; the ping and the heartbeat are not that
-  loop, and a ping for a generation already consumed retires no wait
-  (`references/herdr-mechanics.md`). Beyond those `herdr pane read` cases, the only
-  bounded reads are the launch-banner `pane read` in `roles.md`, the readiness
-  `pane wait-output` of a seat herdr does not detect, and the one `/context` reply at
-  each task boundary for a seat that can answer the probe — one that cannot rotates at
-  its item boundary instead (`references/roles.md`).
+  leave no run provenance. Every helper is a seat session.
+- **Reads and waits are licensed, not free.** A read (the layer's Read) only on a `blocked`
+  wake, a missing or malformed report, a timeout's checkpoint, the false wake's own read, or the
+  heartbeat tick's one check per live seat, never to watch progress. One bounded wait (the
+  layer's Wait), always with a timeout, is the wait primitive for a detected seat that is not a
+  coordinator, over the state set that step states; a seat the layer does not detect, and a
+  coordinator seat, wait on their report files instead, with no keepalive and no re-entry — the
+  run's ping and its heartbeat are neither: the ping is a wake the worker sends, and the
+  heartbeat is a session-level timer over every live seat dispatch, typed-wait seats included.
+  The two dead ends — a timeout, and a wake with nothing new in the report while the seat still
+  works — are that step's, and it names the next action for each
+  (`references/layers/<layer>.md`). A loop of waits, and restarting a wait after an empty
+  timeout, stays forbidden; the ping and the heartbeat are not that loop, and a ping for a
+  generation already consumed retires no wait. Beyond those reads, the only bounded ones are the
+  launch-banner read in `roles.md`, the readiness wait of a seat the layer does not detect, and
+  the one `/context` reply at each task boundary for a seat that can answer the probe — one that
+  cannot rotates at its item boundary instead (`references/roles.md`).
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
   and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
   Where molt runs, its warnings replace the notice: a child hands off to its parent
-  (`herdr-mechanics.md`, "A child past molt's warnings"), and the top molts in place.
+  (`layers/herdr.md`, "A child past molt's warnings"), and the top molts in place.
 - **Verifying a worker's claim is a verifier dispatch**, not an orchestrator read. "Tests
   pass" in a seat's report is a claim until CI on that head SHA, or a verifier, says so.
   One narrow exception: lifecycle step 6's PR gate — `gh pr view` for identity and
@@ -127,7 +122,7 @@ failed launch the worker reports and stops on rather than works around, and that
 report reaches you in its report file, like everything else it says — and that file is
 the wait's own wake, so a brief naming no `REPORT_PATH` gives the wait for it nothing.
 Every brief also carries `NOTIFY_RUN` (the run file whose `run.orchestrator` the worker pings),
-filled with the dispatching session's own `run.json` only when herdr detects that pane and
+filled with the dispatching session's own `run.json` only when the layer detects that pane and
 the seat shares its machine, otherwise the sentinel `none` (never read, never sent to); a
 coordinator fills its children's with its own nested `run.json` and `NOTIFY_MACHINE` with the child's machine the same way, and an operator's custom brief
 gains the same envelope in the dispatched copy, never in the stored file. This session's own check is
@@ -141,7 +136,7 @@ command by the delegation floor: does it need the operator turn by turn?
 
 - **Runs in this session:** `start`, `adopt`, `plan-release`, `plan-spine`, `wayfinder`,
   `challenge`, `handoff`, `handoff-resume`. These are dialogue and decisions.
-- **Dispatched to a herdr session:** `run-spine`, `work-item`, `close`, `work-pr`,
+- **Dispatched to a seat session:** `run-spine`, `work-item`, `close`, `work-pr`,
   `doctor`.
 
 These cases are named because they look like clashes and are not:
@@ -149,19 +144,19 @@ These cases are named because they look like clashes and are not:
 - **`run-spine`, by default.** Dispatch `/ossify:run-spine <id>` to one lane-driver
   session — the seat the project file names for it, `can: subagents` on its machine
   entry since the lane spawns `ossify:implementer-agent` subagents through the
-  `Agent` tool. Mark it `coordinator` before its command (`herdr-mechanics.md` step 2).
+  `Agent` tool. Mark it `coordinator` before its command (the layer's `Seat marking`).
   From ossify's point of view that
   session is its orchestrator: it holds the state lock, commits at each close,
   merges at the barrier. The `Agent`-tool ban in §2 applies
   to this session only. You
   wait on one spine report, through its report file: a lane driver whose subagents run
-  in the background is a coordinator seat (`references/herdr-mechanics.md`, Completion).
+  in the background is a coordinator seat (`references/layers/herdr.md`, Completion).
   Its brief is `references/briefs.md`'s lane-driver template, filled: that template carries
   its own ROLE, PLACEMENT, TASK, completion body and NEVER line, so none of them is
   assembled from another template's. When its barrier lands, the close transition
   `lifecycle.md` step 1b defines is this path's too: dispatch `/ossify:close <spine-id>` to a
   fresh close session, then a work-PR session per returned PR, then the record pass — each
-  marked `coordinator` before its command (`herdr-mechanics.md` step 2) — otherwise
+  marked `coordinator` before its command (the layer's `Seat marking`) — otherwise
   a successful default lane has no defined next step and nothing records what it opened.
 - **`run-spine`, when this session just planned the spine.** Then the items deserve
   their own models, and inherited-runtime subagents cannot give them that.
@@ -178,9 +173,9 @@ These cases are named because they look like clashes and are not:
   and the spine close brief names `SPINE_ID`. Dispatch them from `references/briefs.md`'s own —
   the direct work-item template, or the non-spine close one — filled: the TASK is the operator's
   command verbatim and the DONE body that command's own result, so the seat has a `REPORT_PATH` and
-  a body, and never the implementer's commit/push line where the unit is read-only. The direct work-item seat is a guarded `implementer` — its report, scratch and handoff directories in `SEAT_MODS_ALLOW` (`herdr-mechanics.md` step 2); a non-spine close is a coordinator seat, marked `coordinator` before its command (same step).
+  a body, and never the implementer's commit/push line where the unit is read-only. The direct work-item seat is a guarded `implementer` — its report, scratch and handoff directories in `SEAT_MODS_ALLOW` (the layer's `Seat marking`); a non-spine close is a coordinator seat, marked `coordinator` before its command (same step).
 - **`doctor`.** One fresh tab and pane per dispatch, launched from the project-file
-  `doctor session` seat and released on return (`references/roles.md`). Mark the doctor seat `coordinator` before its command (`herdr-mechanics.md` step 2). Its brief is
+  `doctor session` seat and released on return (`references/roles.md`). Mark the doctor seat `coordinator` before its command (the layer's `Seat marking`). Its brief is
   `references/briefs.md`'s doctor-dispatch template, filled: the TASK is the operator's dispatch
   verbatim, its surface arguments included, and the DONE line carries that dispatch's own result
   rather than `commit …; push; open the PR`. What that dispatch may write is ossify's contract,

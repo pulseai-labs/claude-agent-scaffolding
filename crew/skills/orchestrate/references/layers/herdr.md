@@ -1,112 +1,161 @@
-# herdr mechanics
-
-## What this file is for
+# herdr — the layer
 
 `herdr --skill` and the `--help` text it points to are the command reference. This file
 states only what that guide cannot, how crew composes those commands into a seat;
 role, retention and run decisions stay in `roles.md`, `lifecycle.md` and `config.md`.
 Where it overrides the guide's default, it says so. Read each id from the JSON that made it.
+Every layer file implements the same named steps; the shared files name them and never carry a
+command, and this is the file `references/layers/<layer>.md` resolves to on `layer: herdr`.
 
-## The seat launch
+## Health
 
-No single herdr call creates a seat, starts its command and delivers its brief; a seat is this sequence, `<seat label>` being `seat: <role> (<agent>)`:
+`herdr status` answers whether the server is up; failing, it is a refused run (`SKILL.md` §7).
+The heartbeat's per-tick health check reads `herdr agent get <pane>` where herdr holds a
+record, else one `herdr pane read <pane>`.
 
-1. **The run's workspace, once per run per server that hosts a seat.**
-   `herdr workspace create --cwd <a path that already exists> --label "run: <objective>"
-   --no-focus` — the first seat's tree, or a neutral path when that seat's worktree is still to
-   be created (step 2; a nonexistent `--cwd` fails the launch). Its tab and shell pane
-   (`.result.tab`, `.result.root_pane`) are the first seat's when that path is its tree:
-   `herdr tab rename <tab> "<seat label>"`, not a second tab beside an empty one; a
-   seat on another machine needs its own, `--machine <label>` — ids are server-scoped.
-2. **One tab per further seat.**
-   `herdr tab create --workspace <id> --cwd <the seat's tree> --label "<seat label>" --no-focus`.
-   Its pane is `.result.root_pane`. A seat that needs a new worktree uses `herdr worktree create`
-   — `--cwd <the source repo> --path <the new tree> --branch <b> --base <base-branch> --label
-   "<seat label>" --no-focus` — in place of this step, never step 1: it opens **two** workspaces,
-   the worktree's own and the **source repository's** checkout (`is_linked_worktree: false`). Its
-   `--label` names the worktree's **workspace**, so the seat's tab needs the `herdr tab rename`
-   step 1 prescribes. `--cwd` is the lever that retargets the **source** repo: without it the
-   call resolves its source from the *calling workspace's* repo. Read every id from the
-   response, `result.root_pane.pane_id` included.
+## Identity
 
-   **Seat marking** (seat-mods): every launch that places a seat in a herdr pane marks it, in the pane, before the
-   command — one `herdr pane run <pane> "export …"` (`worktree create` takes no `--env`).
-   A guarded seat — implementer, verifier or reviewer — is marked by its launcher, before its command, with `herdr pane run <pane> "export SEAT_MODS_ROLE=<role>
-   SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"`, plus `AUTONOMIC_MODE=autopilot` where the autonomic marking below says. A project-file role whose `replaces:` names one of those roles is guarded as that role.
-   A project-file role with no `replaces:` is marked a guarded `implementer` — its own
-   report directory and its scratch directory in its `SEAT_MODS_ALLOW`. A coordinator seat —
-   the spine, close or work-PR session, the doctor session, the lane driver — exports
-   `SEAT_MODS_ROLE=coordinator` with the molt marking below; the top's rotation successor exports
-   `SEAT_MODS_ROLE=orchestrator`; neither free role gets `SEAT_MODS_ALLOW` except for an OMP coordinator (config.md), which adds each hosting repo's `.worktrees` root (colon-separated roots). The operator's
-   own first top is not launched here — the operator starts it through a `claude-orch` alias
-   that sets `orchestrator`. The scratch directory, created first, is
-   `<run dir>/scratch/<role>-<n>` — `<run dir>` the directory holding the run's `run.json`,
-   outside every worktree — with no `:` or space in either directory, as `:` separates the
-   list. An ossify implementer's list adds its handoff's directory; a brief with scratch
-   work names it `SCRATCH_DIR`. Never in `settings.json`'s `env`, a shell profile or a
-   `command:` line. The model read of a guarded seat also reads the status line for
-   `seat: <role>` — from the rendered viewport (`--source visible`) even where a `banner`
-   seat's model read is the default stream; its absence there means no guards — a
-   coordinator records that in its report file (to the top), the top records one from its
-   own launches to the operator, and a missing status line halts no seat, re-launches none
-   and is never silently dropped.
-   **molt marking.** The same export marks each child a molt child — every guarded seat, every
-   coordinator seat and every operator-declared role — by adding `MOLT_HANDOFF=parent` and `MOLT_STATUS_PATH=<REPORT_PATH>.molt-status` (the guarded export above shows both),
-   `<REPORT_PATH>` the path that seat's brief names. molt then never clears that session; it
-   hands off to its parent (Completion, "A child past molt's warnings"). The operator's first
-   top and the top's rotation successor are roots and take neither.
-   **autonomic marking.** The same export adds `AUTONOMIC_LEDGER=<ledger>
-   AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain` for every child the molt marking reaches,
-   and `AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot. `<ledger>` is
-   the launcher's own `$AUTONOMIC_LEDGER` when set, else `<run dir>/autonomic-ledger.md`: one
-   ledger per run, an **absolute** path outside every worktree. A relative launcher value is
-   first resolved against the launcher's own repo root, as autonomic resolves it, never passed
-   on as written: a relative path resolves inside each seat's worktree and dies with it, and
-   with none the ledger lands in the worktree and rides the seat's commits. The export
-   quotes nothing, so an inherited path is passed on only when every character is a letter,
-   a digit, `.`, `_`, `/` or `-`; any other is not passed on: the child gets
-   `<run dir>/autonomic-ledger.md` instead. `<run dir>` and `REPORT_PATH` are crew's own
-   choice and keep to the same characters. The launcher's mode is autonomic's live mode, read at each
-   launch — on Claude Code, `printf %s "$AUTONOMIC_EFFECTIVE_MODE"`, set by autonomic 0.4.0 on every mode change.
-   An OMP launcher (an `omp-seat` coordinator) reads `cat "$AUTONOMIC_MODE_FILE"` (autonomic 0.7.0), because
-   omp's bash children keep the environment from session start. Exactly `autopilot` marks the child; anything
-   else (unset, missing file, older autonomic) does not. It is
-   never `$AUTONOMIC_MODE`, the spawn's input: the top may be in autopilot by `/autopilot on` or a
-   molt's lineage, which that never shows, or may have been refused it. It is never the record file
-   either: one that failed to write can still read `autopilot` after a fall to manual. `autopilot`
-   marks the child; anything else, unset included, leaves `AUTONOMIC_MODE` unset. A manual seat writes
-   neither file, so the two paths cost nothing. An autopilot seat's scope is its brief; it gets no
-   `/autopilot on`. Its first permission ask, and the first after a clear, has nothing to judge and
-   waits for a human, so a seat meant to run unattended needs a `command:` whose permission mode does
-   not ask first — the operator's file, never a launch-time edit. `AUTONOMIC_BELL` is never set: the
-   pain file reaches the parent. The top's rotation successor takes `AUTONOMIC_MODE` and
-   `AUTONOMIC_LEDGER` by the same rule and no pain path, since it has no parent; the operator's first
-   top takes none. A respawn reads the launcher's mode again. **A molt is not a launch.**
-   The top's in-place molt (`lifecycle.md`, "Where molt runs") keeps the pane's process and its
-   exports, so its `orchestrator` marking stands across the clear, and seat-mods reads the role from
-   the environment on every tool call. The status-line check belongs to the launch read; a later read
-   that finds no `seat: <role>` after a molt is not a missing marking. A respawned child is a launch:
-   this step runs again in full — a fresh export naming its new `MOLT_STATUS_PATH`, its
-   `SEAT_MODS_ALLOW` rebuilt, and the status-line read, a missing `seat: <role>` recorded as at any
-   launch.
+A session's own address is its pane: `$HERDR_PANE_ID`, with `$HERDR_WORKSPACE_ID` for the
+workspace a rotation later needs. Its agent session is `herdr pane get "$HERDR_PANE_ID"` —
+`.result.pane.agent_session.agent` and `.result.pane.agent_session.value` — written as the run
+file's `{agent, id}`; with none returned, none is written. `herdr pane get <pane>` also answers
+whether a pane still exists, the stand-down read (`lifecycle.md`). This server's machine is its
+`hostname -s` (`Machines`).
+
+## Run workspace
+
+**The run's workspace, once per run per server that hosts a seat.**
+`herdr workspace create --cwd <a path that already exists> --label "run: <objective>"
+--no-focus` — the first seat's tree, or a neutral path when that seat's worktree is still to
+be created (Seat worktree; a nonexistent `--cwd` fails the launch). Its tab and shell pane
+(`.result.tab`, `.result.root_pane`) are the first seat's when that path is its tree:
+`herdr tab rename <tab> "<seat label>"`, not a second tab beside an empty one; a
+seat on another machine needs its own, `--machine <label>` — ids are server-scoped.
+`herdr workspace list` shows what a run still holds: a later launch whose workspace that list
+no longer shows creates it again first and binds the id the call returns, and Teardown reads
+the same list to confirm what closed.
+
+## Seat worktree
+
+**One tab per further seat.** `herdr tab create --workspace <id> --cwd <the seat's tree> --label
+"<seat label>" --no-focus`; its pane is `.result.root_pane`. A seat that needs a new worktree uses
+`herdr worktree create` — `--cwd <the source repo> --path <the new tree> --branch <b>
+--base <base-branch> --label "<seat label>" --no-focus` — in place of this step, never the workspace
+step: it opens **two** workspaces, the worktree's own and the **source repository's** checkout
+(`is_linked_worktree: false`). Its `--label` names the worktree's **workspace**, so the seat's tab
+needs the `herdr tab rename` the workspace step prescribes. `--cwd` is the lever that retargets
+the **source** repo: without it the call resolves its source from the *calling workspace's* repo.
+Read every id from the response, `result.root_pane.pane_id` included. Every seat this places is
+marked before its command (`Seat marking`, `Seat launch`).
+
+A seat's tree is whatever `--cwd` names, so a seat may sit in another repository: in the
+dual-repo case an orchestrator in the AI workspace places an implementer in the canonical
+tree — for a worktree seat, Seat worktree's `--cwd` is what makes that true. `--env` (on
+`tab create` and `workspace create`) carries only a seat's own scratch, such as
+`OSSIFY_SEAT`; a lane's provider variables are invoked by name through `command:`, never
+replayed with `--env` — a replayed environment is the silent-reroute defect.
+
+`--trust-repository` on `herdr worktree` grants herdr's per-request Git trust, not Claude
+Code's folder-trust dialog; only for a repository the operator verified, never as a retry.
+
+## Seat launch
+
+The launch runs in this order: the run workspace (`Run workspace`), the seat's worktree and its
+tab (`Seat worktree`), the pane and its command here, readiness (`Readiness`), the model read
+(`Read`), and the dispatch (`Send`). No single herdr call creates a seat, starts its command and
+delivers its brief; a seat is this sequence, `<seat label>` being `seat: <role> (<agent>)`:
+
+**Seat marking** (seat-mods): every launch that places a seat in a herdr pane marks it, in the pane, before the
+command — one `herdr pane run <pane> "export …"` (`worktree create` takes no `--env`).
+A guarded seat — implementer, verifier or reviewer — is marked by its launcher, before its command, with `herdr pane run <pane> "export SEAT_MODS_ROLE=<role>
+SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"`, plus `AUTONOMIC_MODE=autopilot` where the autonomic marking below says. A project-file role whose `replaces:` names one of those roles is guarded as that role.
+A project-file role with no `replaces:` is marked a guarded `implementer` — its own
+report directory and its scratch directory in its `SEAT_MODS_ALLOW`. A coordinator seat — the spine, close or work-PR session, the doctor session, the lane driver — exports
+the same line with `SEAT_MODS_ROLE=coordinator` **in place of** `<role>`, and no `SEAT_MODS_ALLOW`:
+every other assignment on it is unchanged. The top's rotation successor's is that variant with
+`SEAT_MODS_ROLE=orchestrator`. The operator's
+own first top is not launched here — the operator starts it through a `claude-orch` alias
+that sets `orchestrator`. The scratch directory, created first, is
+`<run dir>/scratch/<role>-<n>` — `<run dir>` the directory holding the run's `run.json`,
+outside every worktree — with no `:` or space in either directory, as `:` separates the
+list. An ossify implementer's list adds its handoff's directory; a brief with scratch
+work names it `SCRATCH_DIR`. Never in `settings.json`'s `env`, a shell profile or a
+`command:` line. The model read of a guarded seat also reads the status line for
+`seat: <role>` — from the rendered viewport (`--source visible`) even where a `banner`
+seat's model read is the default stream; its absence there means no guards — a
+coordinator records that in its report file (to the top), the top records one from its
+own launches to the operator, and a missing status line halts no seat, re-launches none
+and is never silently dropped.
+**molt marking.** The same export marks each child a molt child — every guarded seat, every
+coordinator seat and every operator-declared role — by adding `MOLT_HANDOFF=parent` and `MOLT_STATUS_PATH=<REPORT_PATH>.molt-status` (the guarded export above shows both),
+`<REPORT_PATH>` the path that seat's brief names. molt then never clears that session; it
+hands off to its parent (Completion signal, "A child past molt's warnings"). The operator's first
+top and the top's rotation successor are roots and take neither.
+**autonomic marking.** The same export adds `AUTONOMIC_LEDGER=<ledger>
+AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain` for every child the molt marking reaches,
+and `AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot. `<ledger>` is
+the launcher's own `$AUTONOMIC_LEDGER` when set, else `<run dir>/autonomic-ledger.md`: one
+ledger per run, an **absolute** path outside every worktree. A relative launcher value is
+first resolved against the launcher's own repo root, as autonomic resolves it, never passed
+on as written: a relative path resolves inside each seat's worktree and dies with it, and
+with none the ledger lands in the worktree and rides the seat's commits. The export
+quotes nothing, so an inherited path is passed on only when every character is a letter,
+a digit, `.`, `_`, `/` or `-`; any other is not passed on: the child gets
+`<run dir>/autonomic-ledger.md` instead. `<run dir>` and `REPORT_PATH` are crew's own
+choice and keep to the same characters. The launcher's mode is autonomic's live mode, read at each
+launch — on Claude Code, `printf %s "$AUTONOMIC_EFFECTIVE_MODE"`, set by autonomic 0.4.0 on every mode change.
+An OMP launcher (an `omp-seat` coordinator) reads `cat "$AUTONOMIC_MODE_FILE"` (autonomic 0.7.0), because
+omp's bash children keep the environment from session start. Exactly `autopilot` marks the child; anything
+else (unset, missing file, older autonomic) does not. It is
+never `$AUTONOMIC_MODE`, the spawn's input: the top may be in autopilot by `/autopilot on` or a
+molt's lineage, which that never shows, or may have been refused it. It is never the record file
+either: one that failed to write can still read `autopilot` after a fall to manual. `autopilot`
+marks the child; anything else, unset included, leaves `AUTONOMIC_MODE` unset. A manual seat writes
+neither file, so the two paths cost nothing. An autopilot seat's scope is its brief; it gets no
+`/autopilot on`. Its first permission ask, and the first after a clear, has nothing to judge and
+waits for a human, so a seat meant to run unattended needs a `command:` whose permission mode does
+not ask first — the operator's file, never a launch-time edit. `AUTONOMIC_BELL` is never set: the
+pain file reaches the parent. The top's rotation successor takes `AUTONOMIC_MODE` and
+`AUTONOMIC_LEDGER` by the same rule and no pain path, since it has no parent; the operator's first
+top takes none. A respawn reads the launcher's mode again. **A molt is not a launch.**
+The top's in-place molt (`lifecycle.md`, "Where molt runs") keeps the pane's process and its
+exports, so its `orchestrator` marking stands across the clear, and seat-mods reads the role from
+the environment on every tool call. The status-line check belongs to the launch read; a later read
+that finds no `seat: <role>` after a molt is not a missing marking. A respawned child is a launch:
+this step runs again in full — a fresh export naming its new `MOLT_STATUS_PATH`, its
+`SEAT_MODS_ALLOW` rebuilt, and the status-line read, a missing `seat: <role>` recorded as at any
+launch.
 3. **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry —
-   re-running a **launch** command into a pane whose foreground process is already that
-   agent's TUI delivers its line as a prompt, the mechanism the undetected seat's one-line
-   pointer relies on, so a stray re-run costs a live seat a turn.
+re-running a **launch** command into a pane whose foreground process is already that
+agent's TUI delivers its line as a prompt, the mechanism the undetected seat's one-line
+pointer relies on, so a stray re-run costs a live seat a turn.
 4. **Readiness**, on whichever of the two paths below the pane takes.
 5. **The model.** `herdr pane read <pane>`, with `--source visible` (the rendered viewport)
-   when `model_shows: screen`, must show `expected_model:`; one showing
-   `command not found` — or another model — is a failed launch (`roles.md`).
+when `model_shows: screen`, must show `expected_model:`; one showing
+`command not found` — or another model — is a failed launch (`roles.md`).
 6. **Dispatch**, sent as below.
 
-## The two readiness paths
+    workspace "run: <objective>"          one per run, closed last
+      tab "seat: verifier (<agent>)"      one full-size pane
+      workspace "seat: implementer (<agent>)" one per worktree a seat needs, named by
+                                              Seat worktree's `--label`; its tab is renamed
+        tab "seat: implementer (<agent>)" one full-size pane
+
+One tab per seat, one full-size pane per tab: **crew places a seat with `tab create`,
+never `pane split`** — panes sharing a tab make a multi-agent screen unreadable — overriding
+`herdr --skill`, whose "Start and coordinate an agent" defaults to a sibling split.
+
+The orchestrator is not in that workspace: it stays in the pane the operator launched it
+in, and crew does not move it, because a moved pane takes a new id.
+
+## Readiness
 
 herdr answers, live, which path a seat takes: whether `herdr agent list` returns a record for
 the pane. That answer, never a config field, is the discriminator — a detection manifest
 landing later moves a seat to the typed path with no edit anywhere. Detection after `pane
 run`: a record at about a second (0.6 s, still `agent_status: unknown`, no session identity; before it, `agent list` omits the pane and `agent get`/`agent wait` answer `agent_not_found`: ask again for up to five seconds, then take the not-detected path)
 and a settled state (`idle`) at about four seconds (3.8–4.0 s). The first ask, once the record
-is there, chooses only the **readiness wait** below; made once step 5's model read has shown
+is there, chooses only the **readiness wait** below; made once the model read (`Seat launch`) has shown
 `expected_model:` on the pane, a second ask of that list decides the **send's route** and with
 it the **completion wait**, so the route that delivered the message is the one that can wake
 it. A pane absent to that ask is undetected for the send.
@@ -123,48 +172,7 @@ the TUI is up. Without `--timeout` the wait has no bound. Caveat: it searches ex
 before it polls, so a seat whose own command line contains its model string matches at once —
 wait on output the launch command cannot produce, or exclude the echoed command.
 
-## The typed wait
-
-Every `herdr agent wait` crew issues names the same three settled states, except one
-companion wait a detected coordinator needs, which selects `blocked` alone (Completion):
-
-    herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>
-
-The set is stated here; `roles.md` and `lifecycle.md` step 5 carry the same command.
-It is herdr's default set, written out rather than inherited; `--until` narrows: without
-`blocked`, a wait sleeps through a dialog to its timeout, and only `idle`, `done` and
-`blocked` are proved settled — `done` fires for a Claude Code pane as `idle` does.
-`--timeout` bounds it; a timeout is the checkpoint Completion states (a doorbell
-companion's excepted: it lapses).
-
-**Every readiness and completion wait runs in the background:** one shell call the host
-wakes the session on when it exits (Claude Code: the Bash tool's `run_in_background`), so
-it spends no tokens and its `--timeout` can be hours. It still returns once and re-enters
-nothing; a round's N items are N such waits, one per pane. A host with no background call
-waits in the foreground, `<ms>` inside its cap on one call (Claude Code: 120000 ms default,
-600000 max) and cannot arm the heartbeat; a cut-off wait is neither wake nor timeout.
-
-**A `blocked` wake** means herdr recognised an approval or question dialog. A blocked
-agent rejects `herdr agent prompt` with `agent_blocked`, sending nothing, so read the dialog
-with `herdr pane read <pane>`, put it to the operator (herdr's guide says to ask first),
-give the answer with `herdr agent send-keys <pane> <keys>`, then one fresh bounded wait. A
-question written to the report file is not a dialog; it rings that doorbell (Completion).
-
-## Host: OMP
-
-An OMP top (`omp-seat orchestrator --via omp-glm`, omp-roles 0.4.0) runs this skill as written, with these
-substitutions; so does an OMP coordinator for the seats it drives. Background call: omp's bash async job (`async.enabled`, on by default); pass `timeout: 0` on every one
-(omp's default deadline is 300 s and a nonzero value is clamped; 0 disables it), so herdr's `--timeout` bounds the wait; never pass `name:`, which puts omp's bash in service mode and refuses async and timeout.
-Its result returns to the session as a turn, so every readiness and completion wait, and the heartbeat, runs as one. A send's slash command
-is text on omp: `/<plugin>:<skill>` becomes `skill://<skill>`, except a send to a Claude Code seat. crew's
-`hooks.json` does not run on omp: the context-ceiling notice comes from molt's omp extension. For the top, no `Agent` tool
-means no `task`, `eval` `agent()` or workpool: seat-mods 0.4.4 blocks them for `SEAT_MODS_ROLE=orchestrator` (#798).
-**New enrolled OMP path only:** before the seat command, the operator/trusted delegated dispatcher independently selects outside-allowance input/event/source paths and invokes `bun <autonomic-root>/bin/authority.ts issue --input <trusted-input> --authority-root <trusted-root> --worker-root <assignment-worktree> --worker-root <each-extra-root>` (repeat roots). Its JSON binding maps path/sha256/assignmentId/generation/launchId to `AUTONOMIC_AUTHORITY_PATH`, `AUTONOMIC_AUTHORITY_SHA256`, `AUTONOMIC_ASSIGNMENT_ID`, `AUTONOMIC_ASSIGNMENT_GENERATION`, `AUTONOMIC_LAUNCH_ID` in the trusted startup export; never take them from a worker/report/model.
-Check the whole allowance, including every `SEAT_MODS_ALLOW` entry, coordinator `.worktrees`, report/scratch/handoff and output roots: authority, parent, input and evidence/policy sources must not overlap in either ancestry direction. omp-seat resolves the installed Autonomic CLI and validates before the via version probe/worker; partial/invalid bindings refuse. Preserve all existing role/path/molt/autonomic markings and extension order seat-mods → Molt → Autonomic. A role or autopilot marks a seat, not a grant; empty grants authorize nothing. No live issuance is supplied by these instructions.
-Every materially new enrolled assignment ends the old agent process and needs fresh issuance/launch, retained pane included. Same-assignment corrections/rechecks use unchanged approvals/grants/lifetime; revocation/completion/replacement invalidates, never rebinds. A parent-handback child ends its unit. Public host evidence cannot distinguish private Molt ownership from generic `/new` plus lineage, so enrolled in-place clears remain suspended and require fresh trusted launch; finish/handoff existing tops/workers before rollout, never hot-enroll via env/report edits. Retain phase/locator.seen/generation/resume ownership and never auto-relaunch a live attempt.
-Enrolled OMP operator merge acknowledgment and design/spec/plan/release gates override standing routing, shared policy prose, role and confidence; all seat-mods denials remain absolute. Read/revalidate the original pinned authority before decisions and immediately before action, with no following model await; failures stay operator handling, never a new digest. Same-UID/shared-process and last-check race limits remain; this is not a sandbox/atomic revocation lock. Unbound OMP and Claude Code keep their legacy behavior; #832 and #831's full parity criterion remain open. Native decision consumers and release/activation remain separately gated.
-
-## Sending a seat a message
+## Send
 
 This is the one statement of how the orchestrator sends a seat anything; other files say "send" and mean this.
 
@@ -199,7 +207,43 @@ timeout counts from before submission, a few seconds above the five-second gate.
 - `agent_blocked` (nothing was sent) and `blocked` (the turn opened on one) are both a
   `blocked` wake; a cleared `agent_blocked` re-sends the brief with the turn-start check.
 
-## Completion
+## Read
+
+The layer's read forms: `herdr pane read <pane>` (the rendered screen, `--source visible` when
+the profile says `model_shows: screen`), `herdr pane wait-output <pane> --match '<pattern>'
+--timeout <ms>` (output), and the detection asks `Readiness` states. Each use states its flags
+where it is used — `Readiness` for both wait paths, `Seat launch` for the model read,
+`Completion signal` for the health check. No read is licensed
+by the layer: the shared files say which reads a turn may spend.
+
+## Wait
+
+Every `herdr agent wait` crew issues names the same three settled states, except one
+companion wait a detected coordinator needs, which selects `blocked` alone (Completion):
+
+    herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>
+
+The set is stated here; `roles.md` and `lifecycle.md` name this step rather than repeating the command.
+It is herdr's default set, written out rather than inherited; `--until` narrows: without
+`blocked`, a wait sleeps through a dialog to its timeout, and only `idle`, `done` and
+`blocked` are proved settled — `done` fires for a Claude Code pane as `idle` does.
+`--timeout` bounds it; a timeout is the checkpoint Completion states (a doorbell
+companion's excepted: it lapses).
+
+**Every readiness and completion wait runs in the background:** one shell call the host
+wakes the session on when it exits (Claude Code: the Bash tool's `run_in_background`), so
+it spends no tokens and its `--timeout` can be hours. It still returns once and re-enters
+nothing; a round's N items are N such waits, one per pane. A host with no background call
+waits in the foreground, `<ms>` inside its cap on one call (Claude Code: 120000 ms default,
+600000 max) and cannot arm the heartbeat; a cut-off wait is neither wake nor timeout.
+
+**A `blocked` wake** means herdr recognised an approval or question dialog. A blocked
+agent rejects `herdr agent prompt` with `agent_blocked`, sending nothing, so read the dialog
+with `herdr pane read <pane>`, put it to the operator (herdr's guide says to ask first),
+give the answer with `herdr agent send-keys <pane> <keys>`, then one fresh bounded wait. A
+question written to the report file is not a dialog; it rings that doorbell (Completion).
+
+## Completion signal
 
 A seat's result is its report file, at the `REPORT_PATH=` its brief names; `done` carries
 no body, so the file is the contract and the typed state is only the doorbell. Every file
@@ -257,7 +301,7 @@ One single-quoted literal argument (a single quote in it is written `'\''`), `<p
 actually renamed over. Every other dispatch keeps the report-file wait and this session's heartbeat
 as the whole of its push bound. A failed read or send changes nothing.
 
-A ping is one way a report announces itself, beside a `Completion` wake and a heartbeat tick,
+A ping is one way a report announces itself, beside a completion wake and a heartbeat tick,
 and the generation check governs all three: a new generation is read, noted — `{hash, identity}`, with `identity` as defined at dispatch —
 and recorded as the attempt's `locator.seen`, acted on once by kind, and retires that dispatch's wait and companion;
 an already-consumed one is not read, not acted on, retires nothing — a stale same-path ping never cancels the current phase's wait.
@@ -287,7 +331,7 @@ stall with no fallback named, is reported to the operator once. `## Conditions` 
 bound. The heartbeat is killed when the last
 dispatch settles, at teardown and at stand-down, where the successor arms a fresh one.
 
-**A child past molt's warnings.** A seat marked a molt child (step 2) is never cleared by molt.
+**A child past molt's warnings.** A seat marked a molt child (`Seat marking`) is never cleared by molt.
 At each of molt's two warnings it sends one ping, `MOLT WARNING <pct> <task id>`, to the pane
 read from `NOTIFY_RUN` as PING says — not a report ping: it names no path, opens no report and gets no correction
 request. molt appends `warned <n>`, `handoff required` and `handed-off <path>` to the status
@@ -308,7 +352,7 @@ a status-only handoff writes no report generation, so kill its report-file wait 
 respawn, after `rotate:` and `open:` included — is launched from the same row, marked the same,
 with a fresh `REPORT_PATH` in the same report directory, so its status file starts empty; it
 reuses its predecessor's scratch directory (and an ossify implementer's handoff directory) in
-its `SEAT_MODS_ALLOW`, since step 2 runs again for it; and an implementer's opens as a new tab
+its `SEAT_MODS_ALLOW`, since the launch marking runs again for it; and an implementer's opens as a new tab
 of its predecessor's worktree workspace, never a new `worktree create`, so it can write the
 tree its predecessor left. Its brief is re-sent whole, plus one line, `RESUME FROM: <handoff path>` —
 the predecessor's handoff, or for a warned seat that handed off nothing, its last report. Close
@@ -335,31 +379,6 @@ the operator as any escalation; it is never a failed task. A seat-mods deny on a
 rings nothing of its own: seat-mods refuses the call before autonomic sees it, so it reaches
 you only as a turn-end pain line.
 
-## Placement
-
-    workspace "run: <objective>"          one per run, closed last
-      tab "seat: verifier (<agent>)"      one full-size pane
-      workspace "seat: implementer (<agent>)" one per worktree a seat needs, named by
-                                              step 2's `--label`; its tab is renamed
-        tab "seat: implementer (<agent>)" one full-size pane
-
-One tab per seat, one full-size pane per tab: **crew places a seat with `tab create`,
-never `pane split`** — panes sharing a tab make a multi-agent screen unreadable — overriding
-`herdr --skill`, whose "Start and coordinate an agent" defaults to a sibling split.
-
-The orchestrator is not in that workspace: it stays in the pane the operator launched it
-in, and crew does not move it, because a moved pane takes a new id.
-
-A seat's tree is whatever `--cwd` names, so a seat may sit in another repository: in the
-dual-repo case an orchestrator in the AI workspace places an implementer in the canonical
-tree — for a worktree seat, step 2's `--cwd` is what makes that true. `--env` (on
-`tab create` and `workspace create`) carries only a seat's own scratch, such as
-`OSSIFY_SEAT`; a lane's provider variables are invoked by name through `command:`, never
-replayed with `--env` — a replayed environment is the silent-reroute defect.
-
-`--trust-repository` on `herdr worktree` grants herdr's per-request Git trust, not Claude
-Code's folder-trust dialog; only for a repository the operator verified, never as a retry.
-
 ## Teardown
 
 A seat in a tab of the run's workspace is released with `herdr pane close <pane>`; a
@@ -369,7 +388,7 @@ the workspace with it or be refused, and its id is the only selector of `herdr w
 `lifecycle.md` step 12's merged-branch check, the reviewer's (it edits nothing) once its report
 file validates (step 8). A refused remove goes to the operator, never `--force`, and it releases
 only the worktree's own workspace: `herdr workspace list` still shows the **source repository's**
-checkout step 2's `worktree create` opened, which the run did not create and the operator's to
+checkout Seat worktree's `worktree create` opened, which the run did not create and the operator's to
 close — in the dual-repo case the canonical checkout. The run's own workspace closes last,
 `herdr workspace close <id>`, after every workspace linked to it.
 Close only what the run created; read every receipt (a failed call is JSON on stderr, exit 1)
@@ -387,3 +406,17 @@ a `--machine` reply; resolve the seat's paths on its own machine. Place a seat o
 machine that stays up and whose filesystem the orchestrator can read: its report file is read
 where it is written, so an unopenable `REPORT_PATH` never reports. A connection failure does
 not prove a mutation was not applied, so inspect the remote state before retrying.
+
+## Host: OMP
+
+An OMP top (`omp-seat orchestrator --via omp-glm`, omp-roles 0.4.0) runs this skill as written, with these
+substitutions; so does an OMP coordinator for the seats it drives. Background call: omp's bash async job (`async.enabled`, on by default); pass `timeout: 0` on every one
+(omp's default deadline is 300 s and a nonzero value is clamped; 0 disables it), so herdr's `--timeout` bounds the wait; never pass `name:`, which puts omp's bash in service mode and refuses async and timeout.
+Its result returns to the session as a turn, so every readiness and completion wait, and the heartbeat, runs as one. A send's slash command
+is text on omp: `/<plugin>:<skill>` becomes `skill://<skill>`, except a send to a Claude Code seat. crew's
+`hooks.json` does not run on omp: the context-ceiling notice comes from molt's omp extension. For the top, no `Agent` tool
+means no `task`, `eval` `agent()` or workpool: seat-mods 0.4.4 blocks them for `SEAT_MODS_ROLE=orchestrator` (#798).
+**New enrolled OMP path only:** before the seat command, the operator/trusted delegated dispatcher independently selects outside-allowance input/event/source paths and invokes `bun <autonomic-root>/bin/authority.ts issue --input <trusted-input> --authority-root <trusted-root> --worker-root <assignment-worktree> --worker-root <each-extra-root>` (repeat roots). Its JSON binding maps path/sha256/assignmentId/generation/launchId to `AUTONOMIC_AUTHORITY_PATH`, `AUTONOMIC_AUTHORITY_SHA256`, `AUTONOMIC_ASSIGNMENT_ID`, `AUTONOMIC_ASSIGNMENT_GENERATION`, `AUTONOMIC_LAUNCH_ID` in the trusted startup export; never take them from a worker/report/model.
+Check the whole allowance, including every `SEAT_MODS_ALLOW` entry, coordinator `.worktrees`, report/scratch/handoff and output roots: authority, parent, input and evidence/policy sources must not overlap in either ancestry direction. omp-seat resolves the installed Autonomic CLI and validates before the via version probe/worker; partial/invalid bindings refuse. Preserve all existing role/path/molt/autonomic markings and extension order seat-mods → Molt → Autonomic. A role or autopilot marks a seat, not a grant; empty grants authorize nothing. No live issuance is supplied by these instructions.
+Every materially new enrolled assignment ends the old agent process and needs fresh issuance/launch, retained pane included. Same-assignment corrections/rechecks use unchanged approvals/grants/lifetime; revocation/completion/replacement invalidates, never rebinds. A parent-handback child ends its unit. Public host evidence cannot distinguish private Molt ownership from generic `/new` plus lineage, so enrolled in-place clears remain suspended and require fresh trusted launch; finish/handoff existing tops/workers before rollout, never hot-enroll via env/report edits. Retain phase/locator.seen/generation/resume ownership and never auto-relaunch a live attempt.
+Enrolled OMP operator merge acknowledgment and design/spec/plan/release gates override standing routing, shared policy prose, role and confidence; all seat-mods denials remain absolute. Read/revalidate the original pinned authority before decisions and immediately before action, with no following model await; failures stay operator handling, never a new digest. Same-UID/shared-process and last-check race limits remain; this is not a sandbox/atomic revocation lock. Unbound OMP and Claude Code keep their legacy behavior; #832 and #831's full parity criterion remain open. Native decision consumers and release/activation remain separately gated.

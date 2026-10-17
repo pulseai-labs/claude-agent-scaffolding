@@ -5,9 +5,9 @@ The contract these mechanics serve is `references/ossify-execution.md`.
 ## 1. Nested depth is a prerequisite, not a fallback
 
 Nested worker depth must be `2`: you launch the spine session, and the spine session
-launches item sessions of its own, from its own pane. herdr has no depth setting and
+launches item sessions of its own, from its own pane. The layer has no depth setting and
 no CLI read that proves one — its one nesting key, `[experimental] allow_nested`,
-governs launching herdr itself inside a pane, not the `herdr` commands a seat runs —
+governs launching the layer's own CLI inside a pane, not the commands a seat runs —
 so get the operator's confirmation before starting the spine session; its first item
 launch is the runtime proof.
 
@@ -20,7 +20,7 @@ to the operator — the top does not answer a launch refusal itself.
 ## 2. The nested `run.json`
 
 Your brief gives the spine session its identities explicitly (`ossify-briefs.md`) —
-herdr prepends nothing to a brief — among them `RUN_JSON`, the path of a `run.json`
+the layer prepends nothing to a brief — among them `RUN_JSON`, the path of a `run.json`
 it writes and owns, separate from yours. dagr keeps one run per file and
 links no run to another, so *nested* names the session hierarchy, not anything
 dagr records. The spine session is that file's single writer and you never write
@@ -29,7 +29,7 @@ file, as dagr's producer contract requires.
 
 - every item task, and each round's barrier, is recorded in `RUN_JSON`, never in your `run.json`;
 - the spine session is the orchestrator of its own run, so it launches, sends to, waits
-  on and releases its item seats as `herdr-mechanics.md` says — each a tab in its run's
+  on and releases its item seats as `layers/herdr.md` says — each a tab in its run's
   workspace, with its own `--cwd`, the worktree ossify prepared for the item;
 - plan, gap, depth and other spine-level questions come up in its report file, and
   you answer by sending it its next message;
@@ -37,14 +37,14 @@ file, as dagr's producer contract requires.
   report file;
 - its final report goes in its report file like everything else, naming `RUN_JSON`;
 - the spine session is the only waiter on its item seats; you wait on the spine session
-  as on a coordinator seat (`herdr-mechanics.md`, Completion).
+  as on a coordinator seat (`layers/herdr.md`, Completion).
 
 The nested run keeps item plans and item reports away from you: you read a batched
 plan relay, genuine spine-level decisions, and one final report.
 
 **Teardown is the pairs and their workspace, not the `run.json`.** The spine session
 releases every item pair and closes the workspace it created, as
-`herdr-mechanics.md`'s Teardown says, before its final report. Nothing closes a
+`layers/herdr.md`'s Teardown says, before its final report. Nothing closes a
 `run.json`: dagr never writes one, and the file stays as the spine's record.
 
 ## 3. The round procedure, as the spine session runs it
@@ -63,7 +63,7 @@ releases every item pair and closes the workspace it created, as
 3. For each item, launch a **fresh implementer seat** from its SEATS row's
    exact command — the verifier is not created yet; it has nothing to verify until
    step 5 — and deliver its brief as its row's `brief_delivery` says. Guard it
-   before its command as `herdr-mechanics.md` step 2 says — role `implementer`,
+   before its command as the layer's `Seat marking` says — role `implementer`,
    its scratch directory created first under your own run directory.
    On the new enrolled OMP path only, issue from separately approved external operator/delegation records, bind the five exact authority startup fields before omp-seat, and include the complete filled authority envelope in the item brief. Compare the trusted authority/input/evidence/policy roots against the entire worker allowance, coordinator `.worktrees` included. A profile/SEATS row or plan approval is not a grant; operator-owned plan/design/merge gates and seat-mods denials remain absolute. Corrections/rechecks stay same-assignment only while approvals/grants/lifetime are unchanged; replacement/completion/revocation invalidates. New work/respawn requires fresh process, never a new digest from env/report/lineage. Public Molt ownership evidence is insufficient, so an enrolled clear stays suspended pending fresh trusted launch. Preserve nested run phase/generation/resume ownership and no-auto-relaunch rules; CC/legacy behavior is unchanged.
 4. Each implementer confirms its model, reads, and writes a detailed plan to its
@@ -75,7 +75,7 @@ releases every item pair and closes the workspace it created, as
    declares (`ossify/skills/work-item/references/external-executor.md` §4) — then create and
    dispatch that item's **fresh verifier seat** from its SEATS row's exact
    command, in the same worktree, against the fixed all-claims procedure. Guard it
-   before its command as `herdr-mechanics.md` step 2 says — role `verifier`.
+   before its command as the layer's `Seat marking` says — role `verifier`.
    `cannot determine` = fail.
 6. On the **first** verifier failure, write one question to its own report file with
    the verifier's summary and three options —
@@ -129,19 +129,19 @@ initiative.
 **A `rotate: <handoff path>` completion is not the final barrier.** The spine session stopped
 at an earlier round barrier past the ceiling (`lifecycle.md`). Confirm the handoff resolves,
 then dispatch a fresh spine session on the same spine-session seat — marked `coordinator`
-before its command as `herdr-mechanics.md` step 2 says — the same approved SEATS
+before its command as the layer's `Seat marking` says — the same approved SEATS
 block injected again — with `HANDOFF_PATH` set and the same `RUN_JSON`, which it continues,
 rebinding `run.orchestrator` to its own pane (its brief's step 2 says). On that rebind it writes
-`run.orchestrator.machine` beside the pane — this server's machine, per `herdr-mechanics.md` — and `run.orchestrator.session` (`lifecycle.md` step 1). The close waits for a
+`run.orchestrator.machine` beside the pane — this server's machine, per `layers/herdr.md` — and `run.orchestrator.session` (`lifecycle.md` step 1). The close waits for a
 completion at the final barrier. A spine session that rotated on a molt warning returns the same
 `rotate:`; one cut mid-round returns none and is respawned the same way, its handoff as
 `HANDOFF_PATH`: ossify 1.14.0's run-spine re-enters the round from recorded state, and only a
-halt in its reconcile read-out goes to the operator (`herdr-mechanics.md`, "A child past
+halt in its reconcile read-out goes to the operator (`layers/herdr.md`, "A child past
 molt's warnings").
 
 When its final report lands, **you dispatch** `/ossify:close <spine-id>` to a close
 session that is **always a fresh seat** you create, never the spine driver's — marked
-`coordinator` before its command (`herdr-mechanics.md` step 2): it
+`coordinator` before its command (the layer's `Seat marking`): it
 creates nothing, runs the close, and returns what the close opened
 (`ossify-pr-briefs.md`). You do not run it here — SKILL.md §6 lists `close` among the
 dispatched commands, and the delegation floor keeps suites out of your session.
@@ -170,8 +170,8 @@ A multi-repo close can also open a PR in one repo and then halt on a later one, 
 returns `halted:` naming what it opened so far. **Dispatch nothing downstream — no
 work-PR session, no record pass — until a close returns a complete PR list or `closed`.**
 A halt settles that dispatch only: remediate the blocker it names, then dispatch a
-**fresh** close session — marked `coordinator` before its command (`herdr-mechanics.md`
-step 2) — as many times as that takes.
+**fresh** close session — marked `coordinator` before its command (`layers/herdr.md`
+Seat launch) — as many times as that takes.
 
 **A close that halts on its own review returns `halted: close-review` with the
 ledger.** The ceremony's accumulated-diff review is the close seat's to run, never to
@@ -186,21 +186,21 @@ this permanently.
 
 **Then one work-PR session per returned PR**, each created in that PR's hosting-repo
 worktree, launched from the project file's `work-PR session` seat — marked `coordinator`
-before its command (`herdr-mechanics.md` step 2) — and briefed with the
+before its command (the layer's `Seat marking`) — and briefed with the
 two profiles you decided at the PR transition (`ossify-execution.md` §5), the
 merge-executor assignment, `PRIOR_REVIEW` — `none` for a PR no earlier work-PR dispatch
 has covered, `covered` when one has and left durable evidence its review ran but no
 record, otherwise the durable record that PR's last `open:` result persisted — and the
 `RUN_JSON` path that return named: a resumed successor continues and rebinds that file,
 a first dispatch names a fresh one. On creation and on continue/rebind it writes `run.orchestrator.machine`
-beside the pane — this server's machine, per `herdr-mechanics.md` — and `run.orchestrator.session` (`lifecycle.md` step 1). It owns both PR seats in a `run.json` of its own,
+beside the pane — this server's machine, per `layers/herdr.md` — and `run.orchestrator.session` (`lifecycle.md` step 1). It owns both PR seats in a `run.json` of its own,
 relays one summary per round, and asks you for the merge word; you answer as `lifecycle.md` step 12's `run.merge_word` says (with
 `standing`, a clean gate set is the word; with `operator`, you ask the operator), and the merge lands under the reply's executor — a merge commit on the named SHA, session or
 operator alike. `lifecycle.md` steps 8-12 are that session's loop, not yours.
 
 **Then, once every returned PR has merged, one record pass** — a second
 `/ossify:close <spine-id>`, to another fresh close session — marked `coordinator` before
-its command (`herdr-mechanics.md` step 2). **Hold step 12's teardown —
+its command (the layer's `Seat marking`). **Hold step 12's teardown —
 worker release, branch deletion — until that pass returns:** it resolves the spine
 branch again. That hold is the top's spine-level teardown; the work-PR
 session's own seats released when their work finished (#448).

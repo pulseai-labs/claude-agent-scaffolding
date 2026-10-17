@@ -57,7 +57,7 @@ SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
 CONFIG_MD="$REF/config.md"
 PLUGIN_README_MD="$PLUGIN_ROOT/README.md"
 COMMAND_MD="$PLUGIN_ROOT/commands/orchestrate.md"
-MECHANICS_MD="$REF/herdr-mechanics.md"
+MECHANICS_MD="$REF/layers/herdr.md"
 EVAL_DIR="$PLUGIN_ROOT/tests/eval"
 EVAL_FIXTURE14="$EVAL_DIR/fixtures/ossify-spine-execution/14-close-brief-identities-and-workspace-records.md"
 EVAL_RUBRIC_MD="$EVAL_DIR/rubrics/ossify-spine-execution.md"
@@ -276,7 +276,7 @@ section "no lifecycle id slots: every brief names its report path"
 # S3a/#446 RF9 + #454 + #447/#450 + #449, mechanical only: the removed declaration
 # slots are gone, the new injected identities exist exactly once, the close-review
 # halt has a result shape, the contradiction is deleted, and the spine brief
-# releases its seats as herdr-mechanics.md's Teardown says (#455's requirement,
+# releases its seats as layers/herdr.md's Teardown says (#455's requirement,
 # which named the exact close command). The BEHAVIOUR around each (who validates
 # what, which branch runs first) is the rubric's, not this file's.
 absent "$BRIEFS_MD" 'SPINE_TASK_ID=' \
@@ -324,7 +324,7 @@ for id in RUN_JSON MECHANICS; do
 done
 # One mechanic, one statement: the byte-identical anchor the briefs point at.
 pin "$MECHANICS_MD" '## Teardown' \
-  "herdr-mechanics.md carries the Teardown section the briefs defer to"
+  "layers/herdr.md carries the Teardown section the briefs defer to"
 pin "$PRBRIEFS_MD" 'CLOSE_EXPECTED_MODEL=' \
   "the close brief injects its ratified expected model exactly once"
 pin "$PRBRIEFS_MD" 'WORKPR_EXPECTED_MODEL=' \
@@ -365,8 +365,8 @@ pin "$NESTED_MD" 'one writer per affected hosting repo' \
 absent "$PRBRIEFS_MD" 'per spine at most' \
   "the close-dispatch cap contradiction is gone"
 pin "$BRIEFS_MD" 'as MECHANICS'"'"'s Teardown says' \
-  "the spine brief releases its seats as herdr-mechanics.md's Teardown says"
-pin "$BRIEFS_MD" 'herdr workspace list` showing none of them' \
+  "the spine brief releases its seats as layers/herdr.md's Teardown says"
+pin "$BRIEFS_MD" 'the layer'"'"'s Run workspace list showing none of them' \
   "the spine brief's teardown check is none of its own, not none at all"
 # R7: the halt path and the completion bullet must name the report file, not
 # the deleted declaration slots' phrase.
@@ -408,7 +408,7 @@ done
 
 section "one mechanic, one statement"
 
-# Every launch, send, wait, read and release is stated in herdr-mechanics.md
+# Every launch, send, wait, read and release is stated in layers/herdr.md
 # and deferred to. Two names are sanctioned as deferrals: `herdr --skill`, the
 # entry point, and `herdr workspace list`, the teardown check — neither of them
 # here. The ping is the one exception with a reason: a brief is the whole
@@ -451,10 +451,10 @@ else fail "control: the ping line alone is accepted" "refused it"; fi
 rm -f "$ctl_extra" "$ctl_ping"
 # #574, the generic layer's half: briefs.md is where a brief-writer meets the doorbell, so
 # it must name what the doorbell compares — the hash or the file's identity — while still
-# deferring to herdr-mechanics.md for the rule. The mechanics file states it once (its own
+# deferring to layers/herdr.md for the rule. The mechanics file states it once (its own
 # suite pins that); this pin holds the deferral, not a second statement.
-pin "$GENERIC_BRIEFS_MD" 'doorbell compares that file'"'"'s hash or its identity (`herdr-mechanics.md`)' \
-  "briefs.md names what the doorbell compares and still defers to herdr-mechanics.md (#574)"
+pin "$GENERIC_BRIEFS_MD" 'doorbell compares that file'"'"'s hash or its identity (`layers/herdr.md`)' \
+  "briefs.md names what the doorbell compares and still defers to layers/herdr.md (#574)"
 
 section "the seats block is the freeze, not a file"
 
@@ -786,12 +786,12 @@ span_balanced() { # the span arrives on stdin
   [ $((_ticks % 2)) -eq 0 ] || { printf '%s' "$_ticks"; return 1; }
   return 0
 }
-start=$(awk '/Dispatched to a herdr session/{print NR; exit}' "$SKILL_MD")
+start=$(awk '/Dispatched to a seat session/{print NR; exit}' "$SKILL_MD")
 missing=0
 parsed=0
 span=""
 if [ -z "$start" ]; then
-  fail "SKILL.md's dispatched-command list is found" "no line reads 'Dispatched to a herdr session'"
+  fail "SKILL.md's dispatched-command list is found" "no line reads 'Dispatched to a seat session'"
 elif ! span="$(span_of "$SKILL_MD" "$start")"; then
   # The carve refused, and its message names the carve, the file and both line numbers.
   # Nothing below runs: the per-command check would otherwise certify the commands before
@@ -842,7 +842,7 @@ fi
 # control goes RED by TOTAL LOSS — measured, the fixture then emits ONE EMPTY TOKEN
 # (the single pair that still forms, on the second line) and neither half arrives: not
 # as a token of its own, not at all.
-ctl_wrap='- **Dispatched to a herdr session:** `alpha-
+ctl_wrap='- **Dispatched to a seat session:** `alpha-
   one`, `beta-two`.'
 c1="$(printf '%s\n' "$ctl_wrap" | commands_in_span | tr '\n' '|')"
 if [ "$c1" = 'alpha-one|beta-two|' ]; then
@@ -927,7 +927,7 @@ ctl_carve="$(mktemp -d)"
 # command in it is captured. Measured before this change: the carve stopped at the blank line
 # and emitted `alpha-one` and `beta-two` only, with rc 0 — the command below it was never
 # checked and the shipping check stayed green.
-printf -- '- **Dispatched to a herdr session:** `alpha-one`, `beta-two`.\n\n  `gamma-three` is also dispatched to a herdr session.\n' \
+printf -- '- **Dispatched to a seat session:** `alpha-one`, `beta-two`.\n\n  `gamma-three` is also dispatched to a herdr session.\n' \
   > "$ctl_carve/continuation.md"
 if c4_span="$(span_of "$ctl_carve/continuation.md" 1)"; then
   c4="$(printf '%s\n' "$c4_span" | commands_in_span | tr '\n' '|')"
@@ -949,9 +949,9 @@ fi
 # check (measured: SKILL.md's section names `/ossify:close <spine-id>`, `references/…` and
 # `commit …; push; open the PR` after the span). So the carve REFUSES, and what the control
 # decides is that the refusal names the carve rather than returning a quiet rc 0.
-printf -- '- **Dispatched to a herdr session:** `alpha-one`, `beta-two`.\n\n`gamma-three` is also dispatched to a herdr session.\n' \
+printf -- '- **Dispatched to a seat session:** `alpha-one`, `beta-two`.\n\n`gamma-three` is also dispatched to a herdr session.\n' \
   > "$ctl_carve/after-blank.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`, `beta-two`.\n- `gamma-three`, dispatched to a herdr session.\n' \
+printf -- '- **Dispatched to a seat session:** `alpha-one`, `beta-two`.\n- `gamma-three`, dispatched to a herdr session.\n' \
   > "$ctl_carve/sibling-bullet.md"
 for c5_fixture in after-blank sibling-bullet; do
   case "$c5_fixture" in
@@ -975,7 +975,7 @@ done
 # with a span here. C8 is the heading rule: this fixture's heading line carries the backtick
 # that would otherwise refuse it, and the control asserts that fixture property itself, so it
 # cannot pass by accident on a heading that carries none.
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n- Runs in this session instead.\n' \
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n- Runs in this session instead.\n' \
   > "$ctl_carve/sibling-plain.md"
 if c7_span="$(span_of "$ctl_carve/sibling-plain.md" 1)" &&
    [ "$(printf '%s\n' "$c7_span" | commands_in_span | tr '\n' '|')" = 'alpha-one|' ]; then
@@ -984,7 +984,7 @@ else
   fail "control: a sibling bullet that carries no command does not refuse the span" \
     "got [$c7_span] — a carve that refuses every bullet after the anchor cannot be told from one that refuses only the ones carrying a command"
 fi
-ctl_carve_heading='- **Dispatched to a herdr session:** `alpha-one`.
+ctl_carve_heading='- **Dispatched to a seat session:** `alpha-one`.
 ## `Refusals`
 - `herdr status` fails: say so and stop.'
 printf '%s\n' "$ctl_carve_heading" > "$ctl_carve/heading-break.md"
@@ -1011,11 +1011,11 @@ fi
 # is its adjacent control, because a carve that refused every bullet run would satisfy C9
 # alone and would refuse the shipped file the day its bullet grows a sibling.
 ctl_run="$(mktemp -d)"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+printf -- '- **Dispatched to a seat session:** `alpha-one`.
 - Runs in this session instead.
 - `gamma-three`, dispatched to a herdr session.
 ' > "$ctl_run/run-with-command.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+printf -- '- **Dispatched to a seat session:** `alpha-one`.
 - Runs in this session instead.
 - Another item of this list, carrying no command.
 ' > "$ctl_run/run-plain.md"
@@ -1039,7 +1039,7 @@ fi
 # shipped file (measured: its own later bullets name `run-spine`, `/ossify:close <spine-id>`
 # and `references/…`). If a later change widens the carve past prose, this control goes RED
 # and the bound in span_of's comment has to move with it, deliberately.
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+printf -- '- **Dispatched to a seat session:** `alpha-one`.
 
 These cases are named because they look like clashes and are not:
 
@@ -1070,21 +1070,21 @@ fi
 # seen, so the command came back rc 0 with the anchor alone. C14: a lone unpaired backtick in
 # the block is not a token (C9 is its adjacent control: a pair on one line still refuses).
 ctl_block="$(mktemp -d)"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+printf -- '- **Dispatched to a seat session:** `alpha-one`.
 
 ## `Refusals`
 - `herdr status` fails: say so and stop.
 ' > "$ctl_block/blank-then-heading.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+printf -- '- **Dispatched to a seat session:** `alpha-one`.
 - Runs in this session instead.
 - `gamma-
   three`, dispatched to a herdr session.
 ' > "$ctl_block/wrapped-in-run.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+printf -- '- **Dispatched to a seat session:** `alpha-one`.
 - Runs in this session instead.
 - A stray ` backtick opens no pair.
 ' > "$ctl_block/lone-backtick.md"
-if ! printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+if ! printf -- '- **Dispatched to a seat session:** `alpha-one`.
 
 ## `Refusals`
 - `herdr status` fails: say so and stop.
@@ -1127,12 +1127,12 @@ fi
 # refused on its first bullet — a false refusal of a valid document. C12 is the adjacent
 # control (a column-0 heading after a blank line, which must stay exempt).
 ctl_indent="$(mktemp -d)"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+printf -- '- **Dispatched to a seat session:** `alpha-one`.
 
    ## `Refusals`
 - `herdr status` fails: say so and stop.
 ' > "$ctl_indent/indented-heading.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+printf -- '- **Dispatched to a seat session:** `alpha-one`.
 
     ## `Refusals`
 ' > "$ctl_indent/four-space-line.md"
@@ -1166,22 +1166,22 @@ fi
 # under it was dropped with rc 0 — the silent direction the refusal exists to close. C8 and C12
 # are the adjacent controls: a real ATX heading still ends the span and is still exempt.
 ctl_atx="$(mktemp -d)"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+printf -- '- **Dispatched to a seat session:** `alpha-one`.
 
 #597 backlog note, and `gamma-three` is dispatched to a herdr session.
 ' > "$ctl_atx/hash-then-digit.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+printf -- '- **Dispatched to a seat session:** `alpha-one`.
 
 ####### seven hashes, and `gamma-three` is dispatched to a herdr session.
 ' > "$ctl_atx/seven-hashes.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+printf -- '- **Dispatched to a seat session:** `alpha-one`.
 
   ```
   # init is code here
   ```
   `gamma-three`, dispatched to a herdr session.
 ' > "$ctl_atx/fenced-init.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.
+printf -- '- **Dispatched to a seat session:** `alpha-one`.
 
   ~~~
   # init is code here
@@ -1233,12 +1233,12 @@ fi
 # dot is NOT a marker, so a rule that dropped the blank/tab/end-of-line requirement would refuse a
 # document that is not ambiguous.
 ctl_marker="$(mktemp -d)"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n1. ordinary item\n2. `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/ordered-dot.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n1) ordinary item\n2) `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/ordered-paren.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n* ordinary item\n* `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/star.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n+ ordinary item\n+ `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/plus.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n* `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/star-sibling.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n1. ordinary item\n2.NoSpace `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/no-space-after-dot.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\n1. ordinary item\n2. `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/ordered-dot.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\n1) ordinary item\n2) `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/ordered-paren.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\n* ordinary item\n* `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/star.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\n+ ordinary item\n+ `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/plus.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n* `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/star-sibling.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n1. ordinary item\n2.NoSpace `gamma-three`, dispatched to a herdr session.\n' > "$ctl_marker/no-space-after-dot.md"
 for c20 in ordered-dot ordered-paren star plus star-sibling; do
   if c20_out="$(span_of "$ctl_marker/$c20.md" 1)"; then
     fail "control: every list marker is read as one ($c20)" \
@@ -1270,8 +1270,8 @@ fi
 # between the prose and the item the block has ended and the span is certified, which is the
 # shape the shipped file has.
 ctl_prose="$(mktemp -d)"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\nProse line with no backticks.\n- `gamma-three`, dispatched to a herdr session.\n'   > "$ctl_prose/direct.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\nProse line with no backticks.\n\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_prose/blank-separated.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\nProse line with no backticks.\n- `gamma-three`, dispatched to a herdr session.\n'   > "$ctl_prose/direct.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\nProse line with no backticks.\n\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_prose/blank-separated.md"
 if c23_out="$(span_of "$ctl_prose/direct.md" 1)"; then
   fail "control: a list item directly under prose is still in the block" \
     "rc 0 with [$c23_out] — reading it as outside the block would certify the list without it"
@@ -1302,8 +1302,8 @@ fi
 # config.md. C25 is the adjacent control, the same fixture with a code line that is not list
 # shaped, whose verdict must not move.
 ctl_fence="$(mktemp -d)"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n```\n- code bullet\n```\n`gamma-three`, dispatched to a herdr session.\n' > "$ctl_fence/fence-list-under-anchor.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n```\nx code bullet\n```\n`gamma-three`, dispatched to a herdr session.\n' > "$ctl_fence/fence-plain-under-anchor.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n```\n- code bullet\n```\n`gamma-three`, dispatched to a herdr session.\n' > "$ctl_fence/fence-list-under-anchor.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n```\nx code bullet\n```\n`gamma-three`, dispatched to a herdr session.\n' > "$ctl_fence/fence-plain-under-anchor.md"
 c24_out="$(span_of "$ctl_fence/fence-list-under-anchor.md" 1)" && c24_rc=0 || c24_rc=$?
 if [ "$c24_rc" -ne 0 ] || printf '%s\n' "$c24_out" | grep -F 'gamma-three' >/dev/null; then
   pass "control: a list-shaped line inside a fence does not end the carve, so the command after it is checked"
@@ -1333,8 +1333,8 @@ fi
 # backticks — so C27 is the control for the exclusion and C26 is its adjacent pair: with the
 # exclusion, the item that carries a command still refuses and the one that carries none does not.
 ctl_fenceblock="$(mktemp -d)"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n```\nx code\n```\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_fenceblock/fence-then-bullet.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n```\nx code\n```\n- an item carrying no command\n' > "$ctl_fenceblock/fence-then-plain.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\n```\nx code\n```\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_fenceblock/fence-then-bullet.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\n```\nx code\n```\n- an item carrying no command\n' > "$ctl_fenceblock/fence-then-plain.md"
 if c26_out="$(span_of "$ctl_fenceblock/fence-then-bullet.md" 1)"; then
   fail "control: a bullet after a fence is still read as the block's own" \
     "rc 0 with [$c26_out] — the fence hid the item and its command went unchecked"
@@ -1373,8 +1373,8 @@ fi
 # refused there and must keep refusing: the fenced blank is the whole difference between them, so
 # the verdict cannot be read as following the fence instead of the blank line above the gate.
 ctl_f13="$(mktemp -d)"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n```\n\n```\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_f13/fence-blank-para.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n```\n```\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_f13/fence-noblank-para.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\n```\n\n```\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_f13/fence-blank-para.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\n```\n```\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_f13/fence-noblank-para.md"
 if c28_out="$(span_of "$ctl_f13/fence-blank-para.md" 1)"; then
   fail "control: a blank line inside a fence does not end the block (paragraph)" \
     "rc 0 with [$c28_out] — the fence hid the bullet after it and its command went unchecked"
@@ -1398,9 +1398,9 @@ fi
 # backticks out of the joined text with the fence inside the scanned range — C27's property one
 # position along: measured, letting fenced lines into the text refuses it. C32 is C30's adjacent
 # control without the fenced blank.
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n- an item carrying no command\n```\n\n```\n- `delta-nine`, dispatched to a herdr session.\n' > "$ctl_f13/fence-blank-run.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n- an item carrying no command\n```\n\n```\n- an item carrying no command either\n' > "$ctl_f13/fence-blank-run-plain.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n- an item carrying no command\n```\n```\n- `delta-nine`, dispatched to a herdr session.\n' > "$ctl_f13/fence-noblank-run.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\n- an item carrying no command\n```\n\n```\n- `delta-nine`, dispatched to a herdr session.\n' > "$ctl_f13/fence-blank-run.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\n- an item carrying no command\n```\n\n```\n- an item carrying no command either\n' > "$ctl_f13/fence-blank-run-plain.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\n- an item carrying no command\n```\n```\n- `delta-nine`, dispatched to a herdr session.\n' > "$ctl_f13/fence-noblank-run.md"
 if c30_out="$(span_of "$ctl_f13/fence-blank-run.md" 1)"; then
   fail "control: a blank line inside a fence does not end the block (list run)" \
     "rc 0 with [$c30_out] — the fence hid the item after it and its command went unchecked"
@@ -1433,8 +1433,8 @@ fi
 # C34 is the scan that picks the block's FIRST line: the paragraph fixture with a BLANK between
 # the fence and the command bullet. Measured on 2d9c389: rc 0 with the command never read, the
 # same silent shape by the other route.
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n```\n\n```\n   `gamma-three`, dispatched to a herdr session.\n' > "$ctl_f13/fence-blank-carve.md"
-printf -- '- **Dispatched to a herdr session:** `alpha-one`.\n\n```\n\n```\n\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_f13/fence-blank-separated.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n```\n\n```\n   `gamma-three`, dispatched to a herdr session.\n' > "$ctl_f13/fence-blank-carve.md"
+printf -- '- **Dispatched to a seat session:** `alpha-one`.\n\n```\n\n```\n\n- `gamma-three`, dispatched to a herdr session.\n' > "$ctl_f13/fence-blank-separated.md"
 c33_out="$(span_of "$ctl_f13/fence-blank-carve.md" 1)" && c33_rc=0 || c33_rc=$?
 if [ "$c33_rc" -eq 0 ] && printf '%s\n' "$c33_out" | grep -F 'gamma-three' >/dev/null; then
   pass "control: a fenced blank does not end the carve, so an indented continuation keeps its command"
@@ -1555,18 +1555,18 @@ pin "$PRBRIEFS_MD" 'released after its report file validates' \
 pin "$PRBRIEFS_MD" 're-fetch the GitHub review signals' \
   "each new head is covered by re-fetching the signals, not by a second review"
 # N8/#467: the work-PR session's seats get the #455 teardown — release what it
-# created as herdr-mechanics.md's Teardown says, then prove the list shows none
+# created as layers/herdr.md's Teardown says, then prove the list shows none
 # of it. The list is named byte-identical to that file's confirmation.
 pin "$PRBRIEFS_MD" 'as MECHANICS'"'"'s Teardown says' \
-  "the work-PR session releases its seats as herdr-mechanics.md's Teardown says"
-pin "$PRBRIEFS_MD" 'herdr workspace list' \
+  "the work-PR session releases its seats as layers/herdr.md's Teardown says"
+pin "$PRBRIEFS_MD" 'the layer'"'"'s Run workspace list' \
   "the work-PR session verifies what it created is gone"
 pin "$MECHANICS_MD" 'with `herdr workspace list`, never assume' \
-  "the confirming list is herdr-mechanics.md's own"
+  "the confirming list is layers/herdr.md's own"
 # PR #470 row 4 (settles ledger row 9): the list always shows the top's
 # workspaces as well as this session's — the check is none OF THEM, never none
 # at all.
-pin "$PRBRIEFS_MD" 'herdr workspace list` showing none of them' \
+pin "$PRBRIEFS_MD" 'the layer'"'"'s Run workspace list showing none of them' \
   "the teardown check is none of the session's own, not none at all"
 # PR #470 row 5: the budget ate the close seat's question target — restore it.
 pin "$PRBRIEFS_MD" 'questions go up to the top in your report file' \
@@ -1803,9 +1803,9 @@ for f in "$BRIEFS_MD" "$PRBRIEFS_MD"; do
   pin "$f" 'On creation and on continue/rebind, write `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per MECHANICS' \
     "${f##*/} writes its machine on creation and continuation" flat
 done
-pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `herdr-mechanics.md`' \
+pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md`' \
   "the nested spine successor writes its machine on rebind" flat
-pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `herdr-mechanics.md`' \
+pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md`' \
   "the nested work-PR dispatch writes its machine on creation and continuation" flat
 pin "$LIFECYCLE_MD" 'with `phase: recorded` and its full locator before the brief goes' \
   "step 3 records the attempt before the send" flat
@@ -1862,9 +1862,9 @@ for f in "$BRIEFS_MD" "$PRBRIEFS_MD"; do
   pin "$f" 'and `run.orchestrator.session`, herdr'"'"'s `agent_session` for the pane as `{agent, id}`' \
     "${f##*/} records its session on creation and continuation (#810)" flat
 done
-pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `herdr-mechanics.md` — and `run.orchestrator.session`' \
+pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md` — and `run.orchestrator.session`' \
   "the nested spine successor records its session on rebind (#810)" flat
-pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `herdr-mechanics.md` — and `run.orchestrator.session`' \
+pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md` — and `run.orchestrator.session`' \
   "the nested work-PR dispatch records its session (#810)" flat
 # Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 # Ruling 12: automatic relaunch retired; an unstarted worker is the operator's decision.
@@ -1925,16 +1925,16 @@ pin "$LIFECYCLE_MD" 'against the attempt'"'"'s `locator.seen`' \
 
 section "waits and completion bodies"
 
-# The typed wait is stated once, in herdr-mechanics.md; lifecycle step 5 and
-# roles.md's launch block carry it byte-identical. Three copies or none: T4's
-# reviewer measured that roles.md's was unpinned where the brief said all three
-# were, so a revert of only that copy left the suite green.
+# The typed wait is stated ONCE, in layers/herdr.md; the shared files name that step
+# rather than repeating the command — a second copy of a rule is the split's own
+# anti-goal (spec §2). The absence counts are the half that moved: before Task 3 the
+# command stood byte-identical in three files.
 TYPED_WAIT='herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>'
-pin "$MECHANICS_MD" "$TYPED_WAIT" "herdr-mechanics.md states the typed wait once"
-pin "$LIFECYCLE_MD" "$TYPED_WAIT" "lifecycle step 5's wait is the typed wait, byte-identical"
-pin "$ROLES_MD" "$TYPED_WAIT" "roles.md's launch block carries the same typed wait, byte-identical"
-pin "$SKILL_MD" 'A single bounded `herdr agent wait`' \
-  "SKILL.md's wait primitive is one bounded agent wait"
+pin "$MECHANICS_MD" "$TYPED_WAIT" "layers/herdr.md states the typed wait once"
+n_eq "$LIFECYCLE_MD" 'herdr agent wait' 0 "lifecycle names the layer'"'"'s wait instead of repeating its command"
+n_eq "$ROLES_MD" 'herdr agent wait' 0 "roles.md names the layer'"'"'s wait instead of repeating its command"
+pin "$SKILL_MD" 'One bounded wait (the' \
+  "SKILL.md's wait primitive is one bounded wait of the layer's"
 # Each dispatched brief names the file its report is written to. Nine templates:
 # the generic five, plus the four dedicated dispatch templates in the same file.
 n_eq "$GENERIC_BRIEFS_MD" 'REPORT_PATH=<the absolute path this seat writes its report to>' 9 \
@@ -2012,8 +2012,8 @@ pin "$ROLES_MD" 'a seat is sent one only when' \
   "the context probe is conditioned, not sent to every retained seat"
 pin "$ROLES_MD" 'the send route that reaches it' \
   "the probe's second condition is the route, not the profile's can: alone"
-pin "$ROLES_MD" 'A seat is released as `herdr-mechanics.md`'"'"'s' \
-  "roles.md points teardown at herdr-mechanics.md instead of restating it"
+pin "$ROLES_MD" 'A seat is released as `layers/herdr.md`'"'"'s' \
+  "roles.md points teardown at layers/herdr.md instead of restating it"
 
 # T8b. The shipped summaries of that conditioning, pinned next door to the rule
 # they summarise. T8 rewrote the two it could reach to carry the condition and the
@@ -2099,7 +2099,7 @@ n_eq "$BRIEFS_MD" 'RULES THAT DO NOT LOAD HERE' 3 \
 
 section "the seat-mods guard reaches every launch site"
 
-# The guard is a launch-time export (`herdr-mechanics.md`, the launch's step 2), and the
+# The guard is a launch-time export (`layers/herdr.md`, the launch's step 2), and the
 # rows a coordinator receives name no such thing ("verbatim from its row" wins), so every
 # site that orders one of those launches must order the guard beside it. One pin per
 # site; the label names the site, so a removal reads as that site. 0.2.7's
@@ -2112,13 +2112,13 @@ pin "$MECHANICS_MD" 'the spine, close or work-PR session, the doctor session, th
   "step 2's coordinator marking enumerates the coordinator seats" flat
 pin "$MECHANICS_MD" 'A project-file role with no `replaces:` is marked a guarded `implementer`' \
   "step 2 marks an operator role with no replaces as a guarded implementer" flat
-pin "$MECHANICS_MD" 'the top'"'"'s rotation successor exports `SEAT_MODS_ROLE=orchestrator`' \
+pin "$MECHANICS_MD" 'is that variant with `SEAT_MODS_ROLE=orchestrator`' \
   "step 2 marks the top's rotation successor orchestrator" flat
 pin "$MECHANICS_MD" '`SEAT_MODS_ROLE=coordinator`' \
   "step 2 names the coordinator seat's export once"
 # 0.2.19: scope to the launch export; Host: OMP also names the role's rail.
-pin "$MECHANICS_MD" '`SEAT_MODS_ROLE=orchestrator`; neither free role gets' \
-  "step 2 names the successor's export once"
+pin "$MECHANICS_MD" 'blocks them for `SEAT_MODS_ROLE=orchestrator`' \
+  "the OMP host names the role's rail once"
 pin "$MECHANICS_MD" 'The operator'"'"'s own first top is not launched here' \
   "step 2 says the operator launches its own top" flat
 pin "$MECHANICS_MD" 'the directory holding the run'"'"'s `run.json`, outside every worktree' \
@@ -2138,12 +2138,12 @@ pin "$MECHANICS_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role>' \
 pin "$MECHANICS_MD" 'A project-file role whose `replaces:` names one of those roles is guarded as that role' \
   "a replacing project-file role is guarded as the role it replaces"
 
-pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch dir> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"' \
-  "roles.md's launch block shows the guard export, molt marking included, as the send into the seat's pane"
-pin "$ROLES_MD" 'implementer, verifier or reviewer seat only, before its command' \
-  "roles.md scopes the export to the guarded roles"
+pin "$ROLES_MD" 'The launch environment' \
+  "roles.md carries the launch environment every layer sets, one copy"
+pin "$ROLES_MD" '`SEAT_MODS_ALLOW` — the colon-separated paths a guarded seat may write' \
+  "roles.md scopes the allow list to the guarded roles"
 
-pin "$LIFECYCLE_MD" 'runs the guarded-seat export `herdr-mechanics.md` step 2 states' \
+pin "$LIFECYCLE_MD" 'runs the guarded-seat export the layer'"'"'s `Seat marking` states' \
   "lifecycle step 3 requires the guard and points at step 2"
 
 pin "$BRIEFS_MD" 'Guard it before its command as' \
@@ -2155,7 +2155,7 @@ pin "$BRIEFS_MD" 'two fresh seats guarded exactly as the initial pair'"'"'s were
 
 pin "$NESTED_MD" '`brief_delivery` says. Guard it' \
   "the nested run guards the implementer launch (step 3)"
-pin "$NESTED_MD" 'Guard it before its command as `herdr-mechanics.md` step 2 says — role `verifier`' \
+pin "$NESTED_MD" 'Guard it before its command as the layer'"'"'s `Seat marking` says — role `verifier`' \
   "the nested run guards the verifier launch (step 5)" flat
 pin "$NESTED_MD" 'Both replacement seats are guarded exactly as the first pair'"'"'s were' \
   "the nested run guards a replacement pair" flat
@@ -2164,7 +2164,7 @@ pin "$PRBRIEFS_MD" 'every launch or re-creation of it carries the guard before i
   "the work-PR brief guards the reviewer launch and its re-creation" flat
 pin "$PRBRIEFS_MD" 'every launch of it carries the guard before its command (role `implementer`' \
   "the work-PR brief guards the PR-fix launch" flat
-pin "$PRBRIEFS_MD" 're-created if it was released, and guarded before its command then (role `reviewer`, `MECHANICS` step 2)' \
+pin "$PRBRIEFS_MD" 're-created if it was released, and guarded before its command then (role `reviewer`, `MECHANICS` Seat launch)' \
   "a resumed run's re-created reviewer carries its own guard requirement" flat
 
 pin "$WRITER_MD" 'launches each writer' \
@@ -2200,7 +2200,7 @@ pin "$LIFECYCLE_MD" 'start **one** spine session — marked `coordinator` before
   "lifecycle step 1b marks the spine session" flat
 pin "$LIFECYCLE_MD" 'close-session seat, marked `coordinator` before its' \
   "lifecycle step 1b marks the first close" flat
-pin "$LIFECYCLE_MD" 'seat, marked `coordinator` before its command (`herdr-mechanics.md` step 2),' \
+pin "$LIFECYCLE_MD" 'seat, marked `coordinator` before its command (the layer'"'"'s `Seat marking`),' \
   "lifecycle step 1b marks the work-PR dispatch" flat
 pin "$LIFECYCLE_MD" 'a second close, marked `coordinator` before' \
   "lifecycle step 1b marks the record pass" flat
@@ -2218,8 +2218,8 @@ pin "$ROLES_MD" '`work-PR session`), marked `coordinator` before its command' \
   "roles.md's budget marks the close and work-PR launches" flat
 pin "$ROLES_MD" 'seat of the same name, marked `coordinator`' \
   "roles.md marks the doctor session's launch" flat
-pin "$ROLES_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=coordinator MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain"' \
-  "roles.md's launch block shows the coordinator export, molt marking included"
+pin "$MECHANICS_MD" 'the same line with `SEAT_MODS_ROLE=coordinator` **in place of** `<role>`' \
+  "the layer file shows the coordinator export as the guarded line's variant" flat
 absent "$MECHANICS_MD" 'SEAT_MODS_ROLE=orchestrator MOLT_HANDOFF' "the top's successor export carries no molt marking"
 absent "$ROLES_MD" 'SEAT_MODS_ROLE=orchestrator MOLT_HANDOFF' "roles.md carries no marked orchestrator export"
 pin "$COMMAND_MD" 'start one spine session — marked `coordinator`' \

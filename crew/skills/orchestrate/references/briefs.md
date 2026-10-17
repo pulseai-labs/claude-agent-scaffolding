@@ -1,8 +1,8 @@
 # Briefs
 
 A brief is the whole contract the worker will ever see. The worker has no orchestration
-context, may be launched where the project's rules do not load, and herdr delivers this
-text verbatim (`herdr-mechanics.md`) — no preamble, nothing prepended, nothing else.
+context, may be launched where the project's rules do not load, and the layer delivers this
+text verbatim (`layers/herdr.md`) — no preamble, nothing prepended, nothing else.
 Every brief carries, in this order:
 
 1. Role, and "state your model in your first reply".
@@ -22,7 +22,7 @@ the operator's approved seat, copied into the brief at launch; a worker that fin
 model is not `SEAT_EXPECTED_MODEL` reports a failed launch and stops.
 
 The report file is replaced whole, never appended to in pieces: the orchestrator's
-doorbell compares that file's hash or its identity (`herdr-mechanics.md`), and it reads a
+doorbell compares that file's hash or its identity (`layers/herdr.md`), and it reads a
 change as a finished report. Write the new content to a temp file in the same directory,
 then rename it over the path: the rename is the atomic step, and opening the path is not —
 it truncates the file before the content lands, and the doorbell can fire on that
@@ -32,7 +32,7 @@ replace the file the same way.
 
 Every report-producing brief names its dispatcher's run file as `NOTIFY_RUN` and the worker's
 machine as `NOTIFY_MACHINE`, beside its report path. The dispatcher fills `NOTIFY_RUN` only when
-herdr detects its pane and the seat is on its machine — otherwise the sentinel `none`, never read
+the layer detects its pane and the seat is on its machine — otherwise the sentinel `none`, never read
 and never sent to. After every rename the worker reads `run.orchestrator` from that file and sends
 one `agent prompt` to its pane, no `--wait` and no retry, only when its machine is the worker's,
 naming the file it actually renamed over. Reading the file at ping time makes every rebind
@@ -259,7 +259,7 @@ commit it — and run in a disposable worktree. Any other write: stop, and write
 
 ## Fix round (retained implementer, after disposition)
 
-Attach it to the same pane by sending it this brief (`herdr-mechanics.md` says how) —
+Attach it to the same pane by sending it this brief (`layers/herdr.md` says how) —
 there is no attach or ownership-transfer call; the same session simply receives its
 next brief. It carries its own seat lines, TASK, completion body and NEVER line, and no
 part of it is rebuilt from another template's.
@@ -407,7 +407,7 @@ write an escalation there and stop; report refusals verbatim.
 A `/ossify:work-item <handoff path>` the operator asked for directly, with no activated
 spine: no SEATS row is involved and the brief is this file's own. The unit it runs may be
 read-only, so the brief never orders a commit, push or PR. Launched as a guarded `implementer`
-seat — its report, scratch and handoff directories in `SEAT_MODS_ALLOW` (`herdr-mechanics.md` step 2).
+seat — its report, scratch and handoff directories in `SEAT_MODS_ALLOW` (the layer's `Seat marking`).
 
 ```text
 OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
@@ -450,7 +450,7 @@ verbatim.
 A `/ossify:close r1` or `r1.s2.w3` the operator asked for directly. Close-shaped, and it
 carries no `SPINE_ID`: that identity belongs to the spine close brief in
 `ossify-pr-briefs.md`, a different dispatch. The top marks it `coordinator` before its
-command (`herdr-mechanics.md` step 2).
+command (the layer's `Seat marking`).
 
 ```text
 OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):

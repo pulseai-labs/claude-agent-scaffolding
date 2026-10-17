@@ -28,7 +28,7 @@ planned *this* spine.
 
 | Layer | Owns | Never |
 |---|---|---|
-| **Top orchestrator** (you) | agreeing one implementer/verifier seat per item and the three coordinator seats — spine, close, work-PR — with the operator into the project file, injecting them into the spine session's brief as its SEATS block, launching the spine session from that seat's resolved profile, verbatim — marked `coordinator` before its command (`herdr-mechanics.md` step 2); a model mismatch is a failed launch, exactly as for an item row — approving or amending each relayed worker plan, deciding the reviewer and PR-fix seats at the PR transition, dispatching the close and one work-PR session per returned PR, each launched from its project-file seat — marked `coordinator` before its command (`herdr-mechanics.md` step 2) — with the model confirmed as an item row's, assigning each work-PR dispatch's merge executor (`MERGE_EXECUTOR`) and supplying its `PRIOR_REVIEW` — `none` only for a PR no earlier work-PR dispatch has covered, `covered` when one has and left durable evidence its review ran but persisted no record, otherwise the durable record that PR's last `open:` result persisted — and, on a resumed dispatch, the `RUN_JSON` path that record's return named — asking for a writer profile and dispatching one fresh close-review writer per affected hosting repo when a close returns `halted: close-review`, relaying the merge word, dispatching the record pass, and the teardown | launching or supervising an item seat; reading an item seat's report file; reviewing, fixing or merging a spine PR itself |
+| **Top orchestrator** (you) | agreeing one implementer/verifier seat per item and the three coordinator seats — spine, close, work-PR — with the operator into the project file, injecting them into the spine session's brief as its SEATS block, launching the spine session from that seat's resolved profile, verbatim — marked `coordinator` before its command (the layer's `Seat marking`); a model mismatch is a failed launch, exactly as for an item row — approving or amending each relayed worker plan, deciding the reviewer and PR-fix seats at the PR transition, dispatching the close and one work-PR session per returned PR, each launched from its project-file seat — marked `coordinator` before its command (the layer's `Seat marking`) — with the model confirmed as an item row's, assigning each work-PR dispatch's merge executor (`MERGE_EXECUTOR`) and supplying its `PRIOR_REVIEW` — `none` only for a PR no earlier work-PR dispatch has covered, `covered` when one has and left durable evidence its review ran but persisted no record, otherwise the durable record that PR's last `open:` result persisted — and, on a resumed dispatch, the `RUN_JSON` path that record's return named — asking for a writer profile and dispatching one fresh close-review writer per affected hosting repo when a close returns `halted: close-review`, relaying the merge word, dispatching the record pass, and the teardown | launching or supervising an item seat; reading an item seat's report file; reviewing, fixing or merging a spine PR itself |
 | **Spine session** | the ossify lane, a nested `run.json` of its own, launching and supervising both item seats per item, relaying plans up, item-local corrections | changing any ossify contract; writing item tasks into the top's `run.json` |
 | **Item seats** | one item each: implement, verify | crossing into another item |
 | **Close session** | one dispatch of `/ossify:close`, returning every PR it opened | creating any seat; driving a PR it opened |
@@ -43,7 +43,7 @@ artifact — a PR list, a ledger comment id, a merge SHA — never narrative.
 
 **Depth is confirmed with the operator, twice over.** Before the spine session
 launches, ask the operator to confirm nested worker depth is `2`: the spine
-session launches item sessions of its own. herdr has no depth setting to read, so
+session launches item sessions of its own. The layer has no depth setting to read, so
 a brief asserting the depth is not confirmation, and no CLI read substitutes. A
 spine session that reports it cannot launch an item session is relayed to the
 operator as an ask — you never answer it yourself or record your own choice as an
@@ -62,7 +62,7 @@ from the project file's seats and conditions — scope, risk and cost,
 item by item — and the three coordinator seats beside them. Present **every** seat
 to the operator in one approval phase and write nothing until all of it is decided
 — a half-approved set looks binding and is not. Record the recommendation and any
-override. Prefer an agent herdr detects for an item row where the choice is open: the
+override. Prefer an agent the layer detects for an item row where the choice is open: the
 typed wait then covers that seat, and an undetected seat stays legal, waited on through
 its report file — the path is read live, never declared in a profile.
 
@@ -78,7 +78,7 @@ spine already running. **The item briefs travel with it**: append that file's it
 item verifier and correction templates — and the generic verifier body from `briefs.md`, whose
 claims list the item verifier template instantiates — to the same dispatch, as `briefs.md`'s
 header requires. The spine session's own brief carries `NOTIFY_RUN` with the top's `run.json`
-when herdr detects the top's pane and the seat shares its machine (otherwise `none`), and
+when the layer detects the top's pane and the seat shares its machine (otherwise `none`), and
 `NOTIFY_MACHINE` with the seat's machine. For each child, the spine session fills `NOTIFY_RUN` with its own
 nested `run.json` and `NOTIFY_MACHINE` with the child's machine — the dispatcher fills the slots, the worker never rediscovers them. A seat
 that needs to change mid-spine is a new operator
@@ -87,7 +87,7 @@ decision you relay down through the reply; no session re-reads the file for it.
 A handoff the top writes **carries the approved seats verbatim** — the item rows
 and the three resolved coordinator profiles beside them; a resumed top
 launches from those, never a fresh read, and marks each seat it launches as
-`herdr-mechanics.md` step 2 states — a guarded role with its allow paths, `coordinator`
+the layer's `Seat marking` states — a guarded role with its allow paths, `coordinator`
 for a coordinator seat. A resumed top whose handoff lacks them asks the operator before any launch that spends an approved seat.
 
 ## Fixed procedures
@@ -107,7 +107,7 @@ Fresh-per-item pairs are scoped to **activated ossify spines**. Outside them
 `roles.md`'s class routing and retention remain authoritative — a retained implementer
 across ordinary consecutive work items is still correct.
 
-For new enrolled OMP assignments the authority contract is stricter: materially new work always needs a fresh agent process/issuance, even outside an activated spine; retained panes alone do not carry grants. Same-item corrections/rechecks may reuse only unchanged approvals/grants/lifetime. A replace/respawn is a fresh trusted launch, with its original role and seat marking before its command as `herdr-mechanics.md` step 2 states; revoke the predecessor rather than rebinding it. Keep operator plan/merge/design gates, profile ceilings and every seat denial; CC and legacy/manual retention are unchanged.
+For new enrolled OMP assignments the authority contract is stricter: materially new work always needs a fresh agent process/issuance, even outside an activated spine; retained panes alone do not carry grants. Same-item corrections/rechecks may reuse only unchanged approvals/grants/lifetime. A replace/respawn is a fresh trusted launch, with its original role and seat marking before its command as the layer's `Seat marking` states; revoke the predecessor rather than rebinding it. Keep operator plan/merge/design gates, profile ceilings and every seat denial; CC and legacy/manual retention are unchanged.
 
 The single exception inside a spine is a *replace* decision at the first-failure ask
 (`ossify-nested-run.md` §3): the old pair is released before its replacement exists, so

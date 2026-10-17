@@ -113,7 +113,7 @@ section "budget"
 # One predicate, two callers: the shipped reference and the over-budget control below. The
 # control pads the REAL file to REF_BUDGET+1 rather than using a fixed count, because a fixture
 # with a fixed line count goes valid the moment the constant moves — the bound
-# test-herdr-mechanics.sh states for its own control.
+# test-layer-herdr.sh states for its own control.
 config_over_budget() { # <file> -> "<lines> <over>", rc 0 when over budget
   [ -f "$1" ] || return 1
   _n="$(wc -l < "$1" | tr -d ' ')"

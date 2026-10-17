@@ -13,7 +13,7 @@ every slot and delete nothing else.
 
 The lane driver, launched **from the `spine session` seat the project file names** —
 the top copies its approved profile in — and marked `coordinator` before its command
-(`herdr-mechanics.md` step 2). A coordinator too, so it carries scope identities.
+(the layer's `Seat marking`). A coordinator too, so it carries scope identities.
 
 ```text
 OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
@@ -33,7 +33,7 @@ INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
 PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
-MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
+MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/layers/herdr.md
 SPINE_ID=<spine id>
 SPINE_COMMAND=<the command this seat was launched with, from its machine entry> — a record of your own launch: you are already that seat, never run it
 SPINE_EXPECTED_MODEL=<the model the banner or screen must show>
@@ -54,7 +54,7 @@ handoff first; ossify's own state says which round runs next. Step 3's same comm
 re-enters a started spine, mid-round included (ossify 1.14.0): it prints a reconcile
 read-out before any mutation, and a halt row in it is a halt to report, never repaired by hand.
 Before that re-run, close every item pane a predecessor left live — found through the
-handoff, RUN_JSON or `herdr workspace list` — the way MECHANICS's Teardown closes one, panes only, never
+handoff, RUN_JSON or the layer's Run workspace list — the way MECHANICS's Teardown closes one, panes only, never
 a worktree: an old implementer must not write a tree the re-entry redispatches. A predecessor
 pane you cannot find or close is a halt to report. A first reply whose model
 is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
@@ -70,9 +70,9 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
   3. Invoke `/ossify:run-spine $SPINE_ID --external-executor`. On the round's
      execution requests, launch a fresh IMPLEMENTER seat per item from its SEATS row, verbatim —
      never a substitute value — as a tab of the workspace you create for your run (created
-     again first if `herdr workspace list` no longer shows it: closing its last pane may take
+     again first if the layer's Run workspace list no longer shows it: closing its last pane may take
      it), its `--cwd` the worktree ossify prepared. Guard it before its command as
-     `MECHANICS` step 2 says — role `implementer`, its scratch directory created
+     `MECHANICS` Seat launch says — role `implementer`, its scratch directory created
      first under your own run directory. A request the lane issues on re-entry for an item this
      session has not executed, whose worktree already holds a staged result with its `report.md`
      (ossify's close-finished route), launches no implementer and counts no dispatch: go straight
@@ -91,7 +91,7 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      ONE ordered relay to the top, and wait; send each implementer the top's decision before any edit starts.
   5. On each complete return, create and dispatch that item's fresh VERIFIER
      seat from its SEATS row's verifier command — guard it before its command as
-     `MECHANICS` step 2 says, role `verifier` — and run the fixed all-claims
+     `MECHANICS` Seat launch says, role `verifier` — and run the fixed all-claims
      procedure; `cannot determine` counts as fail. On the FIRST failure ask the
      top, with the verifier's summary and the three options — correct, replace,
      halt — and block: the pair idles until the reply. Correct sends one
@@ -121,7 +121,7 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
 DONE: release every item pair and close the workspace you created for them,
-as MECHANICS's Teardown says, with `herdr workspace list` showing none of them; report
+as MECHANICS's Teardown says, with the layer's Run workspace list showing none of them; report
 teardown you cannot complete, never claim it. Then write your report file:
   Changed / Evidence / Open / Files as ids, SHAs, counts and a report path, and the path of RUN_JSON.
 ROTATE instead once the context-ceiling notice or a molt warning has fired: stop at the next round barrier,
@@ -197,7 +197,7 @@ Launched from its SEATS row's verifier command, verbatim. Its procedure is the
 fixed `all-claims-work-item-verify/v1`; its CLAIMS is `briefs.md`'s verifier CLAIMS
 body, supplied verbatim with the dispatch; its placements and retention are its own.
 The session that launches the seat marks it in the pane, before its command, as
-`herdr-mechanics.md` step 2 states.
+the layer's `Seat marking` states.
 
 ```text
 OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):

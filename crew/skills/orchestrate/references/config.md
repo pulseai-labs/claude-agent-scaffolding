@@ -17,7 +17,7 @@ the project root is the AI workspace, where orchestrators launch; a single-repo 
 that repo.
 
 The project file's first non-heading line states the layer — `layer: herdr` or `layer: orca`. A missing or
-unknown value stops the run with one question, and there is no default. 0.3.0 ships the herdr layer only: asking for Orca stops, and says the Orca layer ships in crew 0.4.0.
+unknown value stops the run with one question, and there is no default. 0.3.0 ships one layer only: asking for Orca stops, and says the Orca layer ships in crew 0.4.0.
 
 Resolution is a walk up from the session's working directory; the first project file found wins. The pairing manifest is not consulted — its absolute roots can belong to another host.
 
@@ -58,7 +58,7 @@ Each field exists because a measured case needs it:
 - `note:` — free prose the coordinator reads when it uses that agent.
 
 A seat's readiness path is never a field here: it follows from herdr's own answer
-to whether the pane is detected (`herdr-mechanics.md`) — so a detection manifest
+to whether the pane is detected (`layers/herdr.md`) — so a detection manifest
 landing later moves a seat onto the typed path with no edit anywhere.
 
 **OMP coordinator seats.** Put `omp-seat` on PATH with the symlink in [omp-roles' Install step](../../../../omp-roles/README.md#install); an OMP seat fills the lane driver (default-lane spine session), close, doctor or worker seats (`omp-seat worker --via <wrapper>`), and, since 0.2.19, the orchestrator top and its rotation successor (`omp-seat orchestrator --via omp-glm`; omp-roles 0.4.0, seat-mods 0.4.4); since 0.2.23, also the activated spine session (`omp-seat crew-spine`) and the work-PR session (`omp-seat crew-work-pr`; omp-roles 0.6.0), which run 788 lifted (#788). Every OMP coordinator seat adds each hosting repo's `.worktrees` root (colon-separated roots) to its `SEAT_MODS_ALLOW`: its procedure and the omp task children that inherit its env write item worktrees. New enrolled OMP authority is separate from these profiles: role/effort/model/command/autopilot never mint grants. The operator/trusted dispatcher selects outside-allowance issuance/source paths and a trusted root; the complete startup envelope must include coordinator `.worktrees`, report/scratch/handoff/output roots, exported through `SEAT_MODS_ALLOW` also for free roles. Preserve the startup binding and complete brief envelope. New material assignment needs fresh process; existing tops/workers finish/handoff before enrollment. A restored wrapper or edited env/report cannot enroll. Public Molt evidence is insufficient for autonomous reactivation: remain suspended until fresh trusted launch. No actual roster/config/grant is written here; CC/legacy profile behavior stays unchanged.
@@ -70,7 +70,7 @@ effort: max
 model_shows: screen
 brief_delivery: inject
 can: subagents
-note: OMP coordinator (omp-roles). seat-mods, molt and autonomic run as OMP extensions; mark the pane SEAT_MODS_ROLE=coordinator (herdr-mechanics.md step 2) and add SEAT_MODS_ALLOW=<each hosting repo>/.worktrees (colon-separated roots) to its export: omp task children (implementer, seat-reviewer) inherit the env, and the implementer must write the item worktree; herdr-restore relaunches the --via wrapper without omp-seat, its three extensions or its exports — release a restored OMP seat and relaunch through omp-seat.
+note: OMP coordinator (omp-roles). seat-mods, molt and autonomic run as OMP extensions; mark the pane SEAT_MODS_ROLE=coordinator (the layer's `Seat marking`) and add SEAT_MODS_ALLOW=<each hosting repo>/.worktrees (colon-separated roots) to its export: omp task children (implementer, seat-reviewer) inherit the env, and the implementer must write the item worktree; herdr-restore relaunches the --via wrapper without omp-seat, its three extensions or its exports — release a restored OMP seat and relaunch through omp-seat.
 ```
 
 ## What a resolved profile carries
@@ -136,7 +136,7 @@ Three sections. `## Seats` is a table of role, agent name and when:
 
 `## My roles` holds the operator's own roles as blocks (next section). `## Conditions`
 is free text: sentences the coordinator reads when it picks a seat (a stalled seat's
-fallback and bound among them, `herdr-mechanics.md`), and nothing parses them. The plugin ships the role list — orchestrator, implementer,
+fallback and bound among them, `layers/herdr.md`), and nothing parses them. The plugin ships the role list — orchestrator, implementer,
 verifier, reviewer and the coordinator seats (spine session,
 close session, work-PR session), plus a `doctor session` for `/ossify:doctor`
 dispatches; the project file fills them and does not define new

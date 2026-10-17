@@ -3,10 +3,10 @@
 One run per objective. The orchestrator drives these thirteen steps and nothing else.
 Every command's syntax comes from `herdr --skill`.
 
-1. **Orient.** Your first herdr command is `herdr --skill`; every
-   command's syntax comes from that guide. Single-command probes only: branch,
+1. **Orient.** Take every command's syntax from the layer's own guide
+   (`references/layers/<layer>.md`). Single-command probes only: branch,
    `git status`, open PRs, the run's `run.json` (and its `dagr check --strict`
-   lint), `herdr status`. Then bind or create the run's `run.json` for the
+   lint), and the layer's health check. Then bind or create the run's `run.json` for the
    objective — **binding** an existing one is naming its path, with no CLI call,
    and you continue from the one the operator names when resuming. **Creating**
    one is dagr's producer contract, never a bare write: resolve the `dagr`
@@ -21,7 +21,7 @@ Every command's syntax comes from `herdr --skill`.
    `$HERDR_PANE_ID` — dagr's stable-agent fallback otherwise — in the same producer
    loop every other write takes.
    Every creation and every bind writes `run.orchestrator.machine` beside its pane — this server's
-   machine, per `herdr-mechanics.md`, Machines — and `run.orchestrator.session`, herdr's `agent_session` for
+   machine, per `layers/herdr.md`, Machines — and `run.orchestrator.session`, herdr's `agent_session` for
    that pane as `{agent, id}` (`herdr pane get "$HERDR_PANE_ID"`: `.result.pane.agent_session.agent` and `.result.pane.agent_session.value`);
    with none returned, none is written. A hard stop's resume finds the dead top's transcript by it (#810).
    Binding a run another top drove through a rotation runs **The resume** (Rotation past the context ceiling) first; its step 2 is this rebind. Binding one whose top died with no handoff runs **A hard stop**'s three steps before it.
@@ -32,19 +32,19 @@ Every command's syntax comes from `herdr --skill`.
    inject them as the spine session's SEATS block, ask the
    operator to confirm nested worker depth is 2, and
    start **one** spine session — marked `coordinator` before its command
-   (`herdr-mechanics.md` step 2) — that creates a nested `run.json` of its own and launches every
+   (the layer's `Seat marking`) — that creates a nested `run.json` of its own and launches every
    item pair. You approve relayed worker plans and wait on that one completion; you
    launch no item pane. **That completion is the final round barrier, not a PR.** When
    it lands you **dispatch** `/ossify:close <spine-id>` to a **fresh** close session —
    launched from the project file's close-session seat, marked `coordinator` before its
-   command (`herdr-mechanics.md` step 2) — never
+   command (the layer's `Seat marking`) — never
    the spine driver's pane, and wait on its report file, which returns **every** PR
    it opened, one per remote product hosting repo — a remote-less repo lands
    locally and is never a PR; an AI-workspace record arm is not one —
    or `closed`; `close` is a dispatched command (§6),
    not one you run here. Then **dispatch a work-PR session** per returned PR, in that
    PR's own hosting-repo worktree, launched from the project file's work-PR
-   seat, marked `coordinator` before its command (`herdr-mechanics.md` step 2),
+   seat, marked `coordinator` before its command (the layer's `Seat marking`),
    carrying the reviewer **and** PR-fix profiles you
    decide now, the merge-executor assignment, `PRIOR_REVIEW` (`none` for a PR no
    earlier work-PR dispatch has covered, `covered` when one has and left durable
@@ -56,7 +56,7 @@ Every command's syntax comes from `herdr --skill`.
    dispatch matrix lists them for a work-PR session: steps 8-12 are that session's loop,
    and you relay the merge word to it rather than merging yourself. Once every returned
    PR has merged, dispatch the record pass — a second close, marked `coordinator` before
-   its command (`herdr-mechanics.md` step 2) — and only then tear down:
+   its command (the layer's `Seat marking`) — and only then tear down:
    **step 12's worker release and branch deletion wait for that pass** — the work-PR
    session's own reviewer and PR-fix seats are exempt: it releases them when their work
    finishes, and the hold covers the top's spine-level teardown, not seats in a work-PR
@@ -73,19 +73,19 @@ Every command's syntax comes from `herdr --skill`.
    within a round may run in parallel; their merges are serial.
 3. **Launch.** The seat launch — pane creation, the readiness wait, the banner read that
    confirms the model, then the brief delivered as `brief_delivery` says (inject or
-   file) on the route `herdr-mechanics.md` fixes from its second detection ask after
+   file) on the route `layers/herdr.md` fixes from its second detection ask after
    that read — is `roles.md`'s "The launch," with the undetected-seat path in
-   `herdr-mechanics.md`. An implementer, verifier or reviewer seat's launch also
-   runs the guarded-seat export `herdr-mechanics.md` step 2 states, before its
+   `layers/herdr.md`. An implementer, verifier or reviewer seat's launch also
+   runs the guarded-seat export the layer's `Seat marking` states, before its
    command — `roles.md`'s launch block carries the line. The run's workspace can
    go before the run does — a first seat's release may take it — so a later launch
-   whose `herdr workspace list` no longer shows it
+   whose workspace the layer's Run workspace no longer shows
    creates it again first and binds the id that call returns, the clause the spine
    session's brief already carries. The "state your model" line is the worker's own second check: a
    model that is not `SEAT_EXPECTED_MODEL` is a failed launch it writes to its report file
    and stops on. Wrong model at the banner read: release the seat and report it.
    Every brief this session dispatches names this run's `run.json` in its `NOTIFY_RUN` slot and the
-   seat's machine in `NOTIFY_MACHINE` — `NOTIFY_RUN` is the sentinel `none` when herdr does not detect
+   seat's machine in `NOTIFY_MACHINE` — `NOTIFY_RUN` is the sentinel `none` when the layer does not detect
    this pane or the seat is on another machine — so an eligible worker's ping comes to whichever pane
    `run.orchestrator` names when it renames; a coordinator fills its children's slots with its own
    nested `run.json` the same way, and an operator's `brief:` is sent as a copy carrying the slots and the ping step, never edited in place (`briefs.md`).
@@ -98,40 +98,39 @@ Every command's syntax comes from `herdr --skill`.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes or the plan's
-   ping arrives, the same doorbell as completion (`herdr-mechanics.md`), and approves or
+   ping arrives, the same doorbell as completion (`layers/herdr.md`), and approves or
    amends it by sending the seat its next message. The final report later overwrites the
    plan in the same file. Fast briefs skip this.
-5. **Wait.** One bounded wait per dispatch, run in the background as `herdr-mechanics.md`
-   states it: for a detected seat that is not a coordinator
-   `herdr agent wait <pane> --until done --until idle --until blocked --timeout <ms>`,
-   over a typed state (`idle｜working｜blocked｜done｜unknown`); for a seat herdr does not
-   detect, and for a coordinator seat, the report-file wait. Either is one call that
+5. **Wait.** One bounded wait per dispatch, run in the background as the layer's Wait
+   states it: the layer's typed wait for a detected seat that is not a coordinator, over
+   the states that step lists; for a seat the layer does not detect, and for a coordinator
+   seat, the report-file wait. Either is one call that
    returns once: whatever polling it does happens inside that call, never a rolling poll
    by the orchestrator.
    On a `done` or `idle` wake, read the report file its brief named, when
-   it is new since dispatch (`herdr-mechanics.md`) — the wake is only the doorbell, the
+   it is new since dispatch (`layers/herdr.md`) — the wake is only the doorbell, the
    file is the contract. A `blocked` wake is a dialog, and a blocked seat rejects
-   `herdr agent prompt`: `herdr pane read <pane>` for it, answer it as
-   `herdr-mechanics.md` says, then one fresh bounded wait on the answer.
+   a send: read it (the layer's Read), answer it as
+   `layers/herdr.md` says, then one fresh bounded wait on the answer.
    A timeout is that file's checkpoint (a doorbell companion's lapses instead), and a wake with nothing new in the report while the
-   seat still works is its false wake. Each licenses one `herdr pane read`: the timeout's
+   seat still works is its false wake. Each licenses one read (the layer's Read): the timeout's
    observed state — stopped, at a dialog, or still at work — is reported to the operator,
    and the false wake follows the doorbell rule that file states for the rest of that
    dispatch, paging no one. Neither is a failure, and neither is re-entered here. A loop of
    waits, and restarting a wait after an empty timeout, both stay forbidden. The run's ping
    and its heartbeat are not that loop. A ping is a wake that arrives as a turn: the
-   generation check precedes it as it does any wake (`herdr-mechanics.md`), and a ping for a
+   generation check precedes it as it does any wake (`layers/herdr.md`), and a ping for a
    generation already consumed is a no-op — it retires no wait and acts on nothing. The
    heartbeat is one bounded background timer of about 15 minutes, re-armed per tick, at most
    one health check per live seat per tick; it is not a completion wait and never re-enters
    or restarts one. This session arms it with the first live herdr-pane dispatch — a typed-wait
    seat is in scope, not only a report-file wait — and kills it when its last dispatch settles,
    at teardown, and at a rotation's stand-down; a host with no background timer keeps the wait/ping fallback, never a rolling foreground
-   loop (`herdr-mechanics.md`).
+   loop (`layers/herdr.md`).
    Before any question to the operator the top writes `run.question` before it asks and removes it on
    the answer — `{text, asked_at, task, message_id?}` (`message_id` only when the question answers or
    relays a dagr operator message) — so a question survives the top.
-   `herdr pane read`
+   A read only
    only on a `blocked` wake, a missing or malformed report, a timeout's checkpoint, the
    false wake's own read, or the heartbeat tick's one check per live seat — never to watch progress.
    A round's N parallel items are N bounded background waits, one per pane, each waking the
@@ -165,7 +164,7 @@ Every command's syntax comes from `herdr --skill`.
    entry names — the claims include judgment, and `cannot determine` counts as fail.
    On a fail, attach a fix task to the retained implementer by sending it the
    fast-implementer brief with the verifier's claims for a TASK (`briefs.md`;
-   `herdr-mechanics.md` says how), wait for its report file
+   `layers/herdr.md` says how), wait for its report file
    naming the new head SHA, read that SHA's check-runs, then re-check on the retained
    verifier; a second fail on the same item goes to the operator. The verifier is
    released only at pass or escalation.
@@ -275,7 +274,7 @@ the operator's word settles it, anything else is advice in the disposition. A ro
 with `replaces:` takes a plugin step — `implementer`, `verifier`, `reviewer`:
 the named seat is not launched, the role runs at its point in its place, and the
 handoff says which step was the operator's. A declared role with no `replaces:` is marked a guarded `implementer` — its report
-directory and its scratch directory in `SEAT_MODS_ALLOW` (`herdr-mechanics.md` step 2);
+directory and its scratch directory in `SEAT_MODS_ALLOW` (the layer's `Seat marking`);
 it runs under implementer rails. Every point above is the top's own — a
 declared role is not yet carried into a delegated spine or work-PR session, so a
 `before-merge-ask` role does not fire on an activated spine (issue #500 holds it).
@@ -286,12 +285,12 @@ crew's hook tells a session its own context figure once it reaches the ceiling (
 plugin setting `context_ceiling`, default 500000 tokens). The top, the spine session and the
 work-PR session act on it; a close session and every leaf seat simply finish their unit.
 Where molt runs, its warnings take the notice's place: every seat but the top hands off to
-its parent (`herdr-mechanics.md`, "A child past molt's warnings"), and the top molts in place
+its parent (`layers/herdr.md`, "A child past molt's warnings"), and the top molts in place
 (below).
 Past the ceiling a seat finishes the unit in hand and starts no new one, never stopping
 mid-item. At its next boundary it settles its dispatch with a return that carries its state
 forward, and its parent launches a fresh seat to resume, marked `coordinator` before its
-command as `herdr-mechanics.md` step 2 says: the spine session writes
+command as the layer's `Seat marking` says: the spine session writes
 `/ossify:handoff`, returns `rotate: <handoff path>`, and resumes from the same
 project-file seat with that path as `HANDOFF_PATH`; a work-PR session returns `open: <PR url> at
 <head sha>` with its review record and the `RUN_JSON` path it continued, and its successor
@@ -309,8 +308,8 @@ a line copied from this skill becomes an instruction to the successor, which out
 it points at step 12 and `run.merge_word`. `/ossify:handoff` with ossify installed (`skill://handoff` on OMP), the same
 file by hand without it. Open a new tab and pane with the launch command the handoff recorded — ask the operator once
 when none did; an alias carries provider settings `ps` does not show — in `$HERDR_WORKSPACE_ID`, the top's own
-workspace, never the run's. **Launch it as the seat launch `herdr-mechanics.md` states** — marked `orchestrator`
-before its command (`herdr-mechanics.md` step 2) — using the destination host's recorded profile for the readiness
+workspace, never the run's. **Launch it as the seat launch `layers/herdr.md` states** — marked `orchestrator`
+before its command (the layer's `Seat marking`) — using the destination host's recorded profile for the readiness
 path and model read, then the second detection ask, and send its resume on the route that ask fixes: with ossify,
 `skill://handoff-resume <path>` to an OMP top and `/ossify:handoff-resume <path>` to a Claude Code top; without it,
 the path as its first instruction on either. From the handoff on, this session writes nothing to the run file and
@@ -322,7 +321,7 @@ Then tell the operator which tab to use and that this one can close.
 **A hard stop** — the top died with no handoff (#810) — is resumed only on the operator's word that it died, after
 three steps a rotation does not need:
 1. Read `run.orchestrator` — pane, machine, session — before any write: the resume's rebind overwrites it.
-2. Stand the old top down. If `herdr pane get <pane>` on its machine (`herdr-mechanics.md`, Machines) still finds the pane, the old top may still hold
+2. Stand the old top down. If `herdr pane get <pane>` on its machine (`layers/herdr.md`, Machines) still finds the pane, the old top may still hold
    armed waits: ask the operator to confirm it is dead and to close its pane, or close it on the operator's word,
    before binding. Never two tops on one run. A pane already gone needs no ask.
 3. Read its transcript, found by `run.orchestrator.session` on its machine: Claude `~/.claude/projects/*/<id>.jsonl`,
@@ -351,7 +350,7 @@ when the effect is absent.
    workers on one attempt.
    Re-arm step 5’s waits only for an attempt still live after its generation check; a final report consumed on resume
    settles that dispatch, so it gets no wait. The waits are on the pane (a detected coordinator's companion included)
-   through `locator.machine`; every later operation on that pane carries `locator.machine` (`herdr-mechanics.md`, Machines).
+   through `locator.machine`; every later operation on that pane carries `locator.machine` (`layers/herdr.md`, Machines).
 5. It arms one fresh heartbeat only if at least one dispatch is still live.
 6. It continues at the fresh handoff's next step. A `done` task is never re-run.
 
@@ -374,7 +373,7 @@ operator question you are holding. Start no dispatch after it; a wake or message
 you after it is added to it verbatim, never acted on, and end that reply with
 `MOLT-HANDOFF: <path>`. molt runs `/clear` in this pane and seeds the fresh session with the
 handoff. There is no stand-down and no successor launch: the pane, its `HERDR_PANE_ID`, its
-seat marking (`herdr-mechanics.md` step 2, "A molt is not a launch") and, on Claude Code, every armed wait
+seat marking (the layer's `Seat marking`, "A molt is not a launch") and, on Claude Code, every armed wait
 survive the clear, and every worker's ping still reaches this pane, which `run.orchestrator` still names. The resumed top
 reads the handoff and confirms `run.orchestrator` names its own `$HERDR_PANE_ID`, rewriting it
 only where it does not; it always rewrites `run.orchestrator.session` (step 1), since molt's `/clear` starts a new session in this pane. On Claude Code it arms no wait and no heartbeat the handoff lists: they keep running,

@@ -5,7 +5,7 @@
 #
 # WHAT THIS GUARDS. The seat-mods marking (a guarded role + `SEAT_MODS_ALLOW`, or
 # `coordinator`, or `orchestrator`) is stated in prose at every launch site, by
-# reference to `herdr-mechanics.md` step 2. Pinned suites catch a site that LOSES its
+# reference to the layer's Seat launch. Pinned suites catch a site that LOSES its
 # clause; nothing caught a NEW launch site added without one. This suite selects the
 # launch sites by the rule below and fails when a selected site's own region carries
 # no marking clause — the #651 recurrence shape.
@@ -321,7 +321,7 @@ fi
 
 # B2, green: the same site with a clause passes, so the check fails on the missing
 # clause and not on the paragraph's shape.
-printf 'Mark it a guarded `reviewer` before its command (`herdr-mechanics.md` step 2).\n' \
+printf 'Mark it a guarded `reviewer` before its command (Seat marking).\n' \
   >> "$tmp/skills/orchestrate/references/roles.md"
 green="$(scan_launch_sites "$tmp")"
 green_fails="$(scan_fails "$green")"

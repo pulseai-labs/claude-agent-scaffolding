@@ -10,7 +10,7 @@ whole contract its reader will ever see — fill every slot, delete nothing else
 
 ## Close session (one fresh seat per dispatch, created by the top)
 
-The top marks it `coordinator` before its command (`herdr-mechanics.md` step 2).
+The top marks it `coordinator` before its command (the layer's `Seat marking`).
 It creates nothing, returns a list; only the successful record pass is single and conditional.
 
 ```text
@@ -70,7 +70,7 @@ MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> 'MOLT WA
 NEVER: create a seat, merge on your own authority, ask the operator anything
 (questions go up to the top in your report file), or re-invoke `/ossify:close` — a halt
 settles this dispatch; remediated, the top dispatches a fresh close session, marked
-`coordinator` before its command (`herdr-mechanics.md` step 2).
+`coordinator` before its command (the layer's `Seat marking`).
 Report a refusal verbatim.
 ```
 
@@ -81,9 +81,9 @@ Report a refusal verbatim.
 Created by the top **in that PR's hosting-repo worktree**, so REPO_ROOT is the path this
 seat already sits in, never a fixed canonical path. Launched from the `work-PR session`
 seat the project file names — marked `coordinator` before its command
-(`herdr-mechanics.md` step 2) — with the top's merge-executor assignment and PRIOR_REVIEW, it
+(the layer's `Seat marking`) — with the top's merge-executor assignment and PRIOR_REVIEW, it
 owns both PR seats inside a `run.json` of its own. The top waits on it as a coordinator
-seat (`herdr-mechanics.md`, Completion).
+seat (`layers/herdr.md`, Completion).
 
 ```text
 OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
@@ -105,7 +105,7 @@ INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
 PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
-MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
+MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/layers/herdr.md
 PR_REPO=<owner/repo>
 PR_NUMBER=<number>
 REPO_ROOT=<abs path of this seat's worktree>
@@ -121,7 +121,7 @@ MERGE_EXECUTOR=<session|operator — the top's explicit assignment>
 STOPPING_RULE=<`merge-bar` where merge-bar is installed; otherwise the rule agreed before the PR opened>
 Everything you tell the top — a question, the round summary, the merge ask, your report —
 goes in your report file at REPORT_PATH; then wait, or stop where this brief says so. Your
-first herdr command is `herdr --skill`. MECHANICS addresses a run's orchestrator, which for
+command's syntax comes from the layer's own guide (`references/layers/<layer>.md`). MECHANICS addresses a run's orchestrator, which for
 your own seats is you: every seat you launch, send to, wait on or release follows it,
 except that where it says the operator, you mean the top, through your report file.
 
@@ -151,7 +151,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      ask the top and create nothing. You did not open this PR.
   3. Initial runs only: create the reviewer FIRST from its REVIEWER row — every launch or
      re-creation of it carries the guard before its command (role `reviewer`, `MECHANICS`
-     step 2) — confirm the model as its row's `model_shows` says and from the first reply,
+     Seat launch) — confirm the model as its row's `model_shows` says and from the first reply,
      and brief it to run REVIEW_INVOCATION. Read the findings from its
      report file — it posts nothing; that file is the only copy. Validate it against the
      reviewer brief's schema — `Findings: none` with `Reviewed head:` and `Summary:`, or
@@ -176,7 +176,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      pushes, and returns `fixed in <sha>` per finding, never running work-pr or
      asking a merge — created from its PRFIX row —
      every launch of it carries the guard before its command (role `implementer`,
-     `MECHANICS` step 2); confirm its model as the row's `model_shows` says and by the worker's own check before the
+     `MECHANICS` Seat launch); confirm its model as the row's `model_shows` says and by the worker's own check before the
      first fix task; a mismatch is a failed launch to ask about, never to work
      around. The delegated review ran once, on the head it was briefed with, and that seat is
      released after its report file validates. Each push moves the head under that verdict:
@@ -184,7 +184,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      on the new head — the bots review every push where they are installed, so the current-head
      verdict is read there; where none is, the reviewer seat is re-dispatched over the fix range
      — re-created if it was released, and guarded before its command then (role `reviewer`,
-     `MECHANICS` step 2). A post-disposition finding returns through a blocking question to the
+     `MECHANICS` Seat launch). A post-disposition finding returns through a blocking question to the
      top before any seat acts on it, never fixed by you or silently deferred. Relay ONE batched
      summary per round; STOPPING_RULE decides when fixing stops, counting the fix rounds
      PRIOR_REVIEW carries. `merge-bar` means `/ossify:work-pr` runs `working-a-pr`, whose
@@ -200,7 +200,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      confirm and report the resulting merge SHA, surfacing any deviation rather than
      adopting it. Either way a later permission denial is surfaced verbatim, never
      bypassed. Then release both seats and close the workspaces you created for them;
-     as MECHANICS's Teardown says, with `herdr workspace list` showing none of them — only what
+     as MECHANICS's Teardown says, with the layer's Run workspace list showing none of them — only what
      you can prove is yours; report any teardown you cannot complete rather than claiming it.
      You are exempt from any record-pass hold.
 
