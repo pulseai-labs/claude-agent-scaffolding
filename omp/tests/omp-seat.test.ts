@@ -77,9 +77,11 @@ describe('planLaunch', () => {
     expect(r.error).toContain('omp plugin install crew@claude-agent-scaffolding')
     expect(r.error).toContain(ompRecord)
   })
-  test('orchestrator refuses crew 0.2.28 (no "Host: OMP")', () => {
-    record(ompRecord, { ...orchMods(), 'crew': install('crew', false, '0.2.28') })
-    expect((orch() as { error: string }).error).toContain('crew 0.2.28 is unsupported for orchestrator')
+  // crew's first release is 0.3.0, so no below-minimum `crew` version can exist: the value
+  // here is synthetic on purpose, and exists only to exercise the compare and its message.
+  test('orchestrator refuses a crew record below 0.3.0 (no "Host: OMP")', () => {
+    record(ompRecord, { ...orchMods(), 'crew': install('crew', false, '0.0.1') })
+    expect((orch() as { error: string }).error).toContain('crew 0.0.1 is unsupported for orchestrator')
   })
   test("orchestrator refuses crew installed only for Claude Code (omp would not discover it)", () => {
     record(ompRecord, orchMods())
