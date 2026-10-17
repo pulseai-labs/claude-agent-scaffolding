@@ -121,7 +121,7 @@ run "$(input UserPromptSubmit "$T_BELOW")"
 expect_silent "one token below the ceiling: silent"
 run "$(input UserPromptSubmit "$T_AT")"
 expect_notice "at the ceiling: notice on a prompt" UserPromptSubmit \
-  "crew:" "context 500000" "ceiling 500000" "Rotation past the context ceiling"
+  "crew:" "context 500000" "ceiling 500000" "crew lifecycle.md" "Rotation past the context ceiling"
 run "$(input PreToolUse "$T_PAST" 'herdr agent prompt w7:p2 "implement item 3"')"
 expect_notice "past the ceiling: notice before 'agent prompt'" PreToolUse "context 523114" "ceiling 500000"
 
@@ -547,6 +547,24 @@ then pass "the Claude manifest declares context_ceiling (number, default 500000)
 else fail "the Claude manifest declares context_ceiling (number, default 500000)" "$M"; fi
 if [ -x "$PLUGIN_ROOT/hooks-handlers/context-ceiling.sh" ]; then pass "the handler is executable"
 else fail "the handler is executable"; fi
+
+# Task 6 (crew 0.3.0): the notice is crew's and it points at the shared prose that
+# defines a unit; the pane gate and the verb list stay the herdr layer's in 0.3.0,
+# named as the layer's rather than as crew's own, and the Orca layer brings its own
+# (crew 0.4.0, plan Part C). The emitted text is asserted in "the ceiling" above;
+# these guard the source strings that survived Task 1's rename.
+section "the notice names crew, and the gate and verbs are the layer's"
+pin "$HOOK" 'crew lifecycle.md' "the notice points at lifecycle.md by its crew path"
+pin "$HOOK" "the herdr layer's gate" "the pane gate is named as the herdr layer's"
+pin "$HOOK" "The herdr layer's new-work commands" "the verb list is named as the herdr layer's"
+pin "$HOOK" 'the Orca layer brings its own' "the comments say the Orca layer brings its own"
+# Adjacent control: the old plugin name, which the notice, the header and every comment
+# must not carry again. A handler that spelled it would pass every case above and fail
+# only here. Built in two pieces: this suite lives in the tree `tests/test-crew-rename.sh`
+# sweeps, and the name it forbids must not appear in the sweeper's own subject either.
+old_name="herdr-"; old_name="${old_name}crew"
+if [ "$(occurrences "$HOOK" "$old_name")" -eq 0 ]; then pass "no old plugin name in the handler"
+else fail "no old plugin name in the handler" "$(occurrences "$HOOK" "$old_name") occurrence(s)"; fi
 
 # #514, L1: a counter re-copied into this suite would shadow the hoisted one and keep every
 # assertion that calls it passing. Both halves assert the shape: this one is the per-suite

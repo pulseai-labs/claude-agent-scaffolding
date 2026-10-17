@@ -7,7 +7,9 @@
 # exits 0: a hook failure must not stop a seat. Every seat in a herdr pane is told, since
 # a session does not declare what it is; only a coordinator seat rotates on it, and what
 # a unit is — for that, and for a leaf's finish-and-report — is prose: lifecycle.md,
-# "Rotation past the context ceiling".
+# "Rotation past the context ceiling". The pane gate and the new-work verbs below are
+# the herdr layer's: 0.3.0 ships the herdr layer alone, so they stay herdr-only, and
+# the Orca layer brings its own gate and verbs (0.4.0, plan Part C).
 #
 # The figure is input + cache_creation + cache_read tokens of the latest
 # non-sidechain assistant record in the transcript Claude Code names in the
@@ -19,7 +21,7 @@
 
 set +e
 
-[ -n "${HERDR_PANE_ID:-}" ] || exit 0    # inert outside herdr panes
+[ -n "${HERDR_PANE_ID:-}" ] || exit 0    # the herdr layer's gate; inert outside its panes
 
 DEFAULT_CEILING=500000
 TAIL_BYTES=4000000    # the latest assistant record sits in the transcript's tail
@@ -30,14 +32,15 @@ case "$ceiling" in ''|*[!0-9]*) ceiling=$DEFAULT_CEILING ;; esac
 
 input="$(cat)"
 
-# herdr's new-work commands, in one list: the fast path below and the PreToolUse
+# The herdr layer's new-work commands, in one list: the fast path below and the PreToolUse
 # matcher both read it, so a verb rename is one edit and the suite's five-verb
 # loop keys on the same five strings. Matched by substring, so a command that
 # merely mentions one of those verbs also fires; that is deliberate — the notice
 # is advisory and never a block, and narrowing the pattern risks missing the real
 # forms (`herdr --machine x pane run`, `"$HERDR_BIN_PATH" pane run`). `agent
 # wait`, `pane read`, `pane list` and `agent list` carry none of the five and
-# stay silent.
+# stay silent. The herdr layer's list is the whole list in 0.3.0; the Orca layer
+# adds its own verbs alongside it (0.4.0, plan Part C).
 NEW_WORK_VERBS=('tab create' 'workspace create' 'worktree create' 'pane run' 'agent prompt')
 
 new_work() { # <text> — does the text carry one of those verbs?
